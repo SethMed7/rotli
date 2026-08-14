@@ -176,7 +176,7 @@ default rather than adopting a nonsense number.
 | Snapshot event | `rotli:local-queue` → `onLocalQueue` in `src/lib/tauri.ts` |
 | Commands | `local_queue_status` · `local_queue_prioritize` · `local_queue_cancel` |
 | requestId forwarded to the wire | `src/ai/host.ts` (`complete`) → `src/lib/tauri.ts` (`chatMessages`) |
-| Queued state + Prioritize button | `src/components/chatSurface.tsx` (the busy bubble) + `.cmsg-queued*` in `src/styles/memex.css` |
+| Queued state + Prioritize button | `src/components/chat/chatSurface.tsx` (the busy bubble) + `.cmsg-queued*` in `src/styles/memex.css` |
 
 The frontend already mints a `requestId` per turn and threads it through
 `hostOpts` for CLI kill-on-cancel; the local lane simply starts carrying the

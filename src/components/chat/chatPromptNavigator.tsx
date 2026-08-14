@@ -12,6 +12,7 @@ export function ChatPromptNavigator({
   onJump: (messageIndex: number) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [previewMessageIndex, setPreviewMessageIndex] = useState<number | null>(null);
   const rootRef = useRef<HTMLElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -28,6 +29,7 @@ export function ChatPromptNavigator({
   };
   const closeMenu = () => {
     cancelScheduledClose();
+    setPreviewMessageIndex(null);
     setOpen(false);
   };
   const scheduleClose = () => {
@@ -126,7 +128,12 @@ export function ChatPromptNavigator({
         {prompts.slice(-7).map((prompt) => (
           <span
             key={prompt.messageIndex}
-            className={prompt.messageIndex === activeMessageIndex ? "active" : undefined}
+            className={[
+              prompt.messageIndex === activeMessageIndex ? "active" : "",
+              prompt.messageIndex === previewMessageIndex ? "preview" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
           />
         ))}
       </button>
@@ -139,6 +146,10 @@ export function ChatPromptNavigator({
                 key={prompt.messageIndex}
                 className={prompt.messageIndex === activeMessageIndex ? "active" : undefined}
                 title={prompt.text}
+                onPointerEnter={() => setPreviewMessageIndex(prompt.messageIndex)}
+                onPointerLeave={() => setPreviewMessageIndex(null)}
+                onFocus={() => setPreviewMessageIndex(prompt.messageIndex)}
+                onBlur={() => setPreviewMessageIndex(null)}
                 onClick={() => {
                   onJump(prompt.messageIndex);
                   closeMenu();

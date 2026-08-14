@@ -20,11 +20,10 @@ import { useEffect, useState } from "react";
 import { Suspense, lazy } from "react";
 
 import { CaptureCard } from "./components/captureCard";
-import { chatDropAt } from "./components/chatDrop";
+import { chatDropAt } from "./components/chat/chatDrop";
 import { ContextMenu } from "./components/contextMenu";
 import { HotkeyBadges } from "./components/hotkeyBadges";
 import { NotesSurface } from "./components/notesSurface";
-import { Palette } from "./components/palette";
 import { PreviewModal } from "./components/previewModal";
 import { QuickNote } from "./components/quickNote";
 import { RenameDialog } from "./components/renameDialog";
@@ -81,11 +80,24 @@ import { hydrateViews } from "./state/views";
 // once) open — split them off the entry chunk like paneTree's CanvasSurface
 // (perf audit 2026-07-30, #18). Suspense falls back to nothing for a frame.
 const SettingsSurface = lazy(() =>
-  import("./components/settingsSurface").then((m) => ({ default: m.SettingsSurface })),
+  import("./components/settingsSurface").then((m) => ({
+    default: m.SettingsSurface,
+  })),
 );
-const Onboarding = lazy(() => import("./components/onboarding").then((m) => ({ default: m.Onboarding })));
+const Onboarding = lazy(() =>
+  import("./components/onboarding/onboarding").then((m) => ({
+    default: m.Onboarding,
+  })),
+);
 const VaultActivation = lazy(() =>
-  import("./components/vaultActivation").then((m) => ({ default: m.VaultActivation })),
+  import("./components/onboarding/vaultActivation").then((m) => ({
+    default: m.VaultActivation,
+  })),
+);
+const ModelSetup = lazy(() =>
+  import("./components/onboarding/modelSetup").then((m) => ({
+    default: m.ModelSetup,
+  })),
 );
 
 registerDefaultActions();
@@ -96,7 +108,10 @@ if (import.meta.env.DEV) {
   // no longer refetches the notes universe, audit 2026-07-30 #1).
   (
     window as Window & {
-      __rotli?: { dispatch: (actionId: string) => void; queryClient: typeof queryClient };
+      __rotli?: {
+        dispatch: (actionId: string) => void;
+        queryClient: typeof queryClient;
+      };
     }
   ).__rotli = {
     dispatch,
@@ -124,27 +139,33 @@ const REQUIRED_ONBOARDING_VERSION =
   (Number.parseInt(APP_VERSION.split(".")[0] ?? "0", 10) || 0) >= 1 ? "1.0.0" : APP_VERSION;
 
 function MainShell() {
+  const [resumeAtShortcuts, setResumeAtShortcuts] = useState(false);
   const settingsOpen = useUiStore((s) => s.settingsOpen);
   const paletteOpen = useUiStore((s) => s.paletteOpen);
   const transientCount = useUiStore((s) => s.transients.length);
-  const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
   const focusMode = useUiStore((s) => s.focusMode);
   const onboarded = useUiStore((s) => s.onboarded);
   const setOnboarded = useUiStore((s) => s.setOnboarded);
   const onboardingVersion = useUiStore((s) => s.onboardingVersion);
   const setOnboardingVersion = useUiStore((s) => s.setOnboardingVersion);
+  const onboardingPhase = useUiStore((s) => s.onboardingPhase);
+  const setOnboardingPhase = useUiStore((s) => s.setOnboardingPhase);
   const vaultStatus = useVaultStore((s) => s.status);
   const mainAutoRemoveDays = useUiStore((s) => s.mainAutoRemoveDays);
   const chatAutoArchiveDays = useUiStore((s) => s.chatAutoArchiveDays);
   // first run (the real app only). The version gate ALSO re-onboards on every 0.x
   // update — bulletproof regardless of the `onboarded` flag's state on disk.
-  const showOnboarding = onboardingRequired(
+  const onboardingActive = onboardingRequired(
     isTauri(),
     onboarded,
     onboardingVersion,
     REQUIRED_ONBOARDING_VERSION,
   );
-  const showVaultActivation = isTauri() && vaultStatus === "unconfigured" && !showOnboarding;
+  const showOnboarding = onboardingActive && onboardingPhase === "preferences";
+  const showModelSetup = onboardingActive && onboardingPhase === "models";
+  const showVaultActivation =
+    (onboardingActive && onboardingPhase === "vault") ||
+    (isTauri() && vaultStatus === "unconfigured" && !onboardingActive);
 
   // A lone ⌘ reveals shortcut help immediately in the normal workspace. When
   // a modal/popover owns attention, keep the deliberate hold threshold so a
@@ -156,7 +177,8 @@ function MainShell() {
   useHeldModifier({
     modifier: "Meta",
     delayMs: hotkeyPeekDelay(transientCount > 0 || paletteOpen),
-    enabled: hotkeyPeek !== "off" && !settingsOpen && !showOnboarding && !showVaultActivation,
+    enabled:
+      hotkeyPeek !== "off" && !settingsOpen && !showOnboarding && !showVaultActivation && !showModelSetup,
     onHold: () => setWhichKey(true),
     onRelease: () => setWhichKey(false),
   });
@@ -409,24 +431,18 @@ function MainShell() {
   // the flow would disappear the moment focus slips. The real behavior is
   // (re)applied on finish from the user's chosen Stay-open value.
   useEffect(() => {
-    if (showOnboarding || showVaultActivation) void setHideOnBlur(false);
-  }, [showOnboarding, showVaultActivation]);
+    if (showOnboarding || showVaultActivation || showModelSetup) void setHideOnBlur(false);
+  }, [showOnboarding, showVaultActivation, showModelSetup]);
 
   if (showOnboarding) {
     return (
       <div className="app-window">
         <Suspense fallback={null}>
           <Onboarding
+            initialStep={resumeAtShortcuts ? "shortcuts" : "welcome"}
             onDone={() => {
-              setOnboarded(true);
-              setOnboardingVersion(APP_VERSION);
-              // apply the deferred window choices now (changing them live during
-              // onboarding can kill the frameless window — #1)
-              const ui = useUiStore.getState();
-              void setHideOnBlur(!ui.stayOpen);
-              void setDockVisible(ui.showInDock);
-              // The onboarding gate is machine-level and must land even while
-              // no vault exists. Vault activation is the explicit next screen.
+              setResumeAtShortcuts(false);
+              setOnboardingPhase("vault");
               void flushSettingsNow().catch(() => {});
             }}
           />
@@ -439,7 +455,55 @@ function MainShell() {
     return (
       <div className="app-window">
         <Suspense fallback={null}>
-          <VaultActivation />
+          <VaultActivation
+            onboarding={onboardingActive}
+            allowCurrent={vaultStatus === "configured"}
+            {...(onboardingActive
+              ? {
+                  onBack: () => {
+                    setResumeAtShortcuts(true);
+                    setOnboardingPhase("preferences");
+                    void flushSettingsNow().catch(() => {});
+                  },
+                  onDone: () => {
+                    setOnboardingPhase("models");
+                    return flushSettingsNow();
+                  },
+                  onBeforeSwitch: () => {
+                    setOnboardingPhase("models");
+                    return flushSettingsNow();
+                  },
+                  onSwitchFailed: () => {
+                    setOnboardingPhase("vault");
+                    return flushSettingsNow();
+                  },
+                }
+              : {})}
+          />
+        </Suspense>
+      </div>
+    );
+  }
+
+  if (showModelSetup) {
+    return (
+      <div className="app-window">
+        <Suspense fallback={null}>
+          <ModelSetup
+            onBack={() => {
+              setOnboardingPhase("vault");
+              void flushSettingsNow().catch(() => {});
+            }}
+            onDone={() => {
+              setOnboarded(true);
+              setOnboardingVersion(APP_VERSION);
+              setOnboardingPhase("preferences");
+              const ui = useUiStore.getState();
+              void setHideOnBlur(!ui.stayOpen);
+              void setDockVisible(ui.showInDock);
+              void flushSettingsNow().catch(() => {});
+            }}
+          />
         </Suspense>
       </div>
     );
@@ -461,7 +525,6 @@ function MainShell() {
           <NotesSurface />
         )}
       </main>
-      {paletteOpen && <Palette onClose={() => setPaletteOpen(false)} />}
       <PreviewModal />
       {whichKey &&
         (hotkeyPeek === "badges" ? <HotkeyBadges /> : <WhichKey onClose={() => setWhichKey(false)} />)}
@@ -479,6 +542,7 @@ export default function App() {
   const matchDarkFamily = useUiStore((s) => s.matchDarkFamily);
   const syntaxPalette = useUiStore((s) => s.syntaxPalette);
   const accentColor = useUiStore((s) => s.accentColor);
+  const accentHue = useUiStore((s) => s.accentHue);
   const surface = surfaceFromUrl();
 
   useEffect(
@@ -490,7 +554,7 @@ export default function App() {
     [theme, themeFamily, matchLightFamily, matchDarkFamily],
   );
   useEffect(() => applySyntaxPalette(syntaxPalette), [syntaxPalette]);
-  useEffect(() => applyAccent(accentColor), [accentColor]);
+  useEffect(() => applyAccent(accentColor, accentHue), [accentColor, accentHue]);
 
   // theme is broadcast from the MAIN window so the quick + capture webviews
   // follow it LIVE (each applies its own theme; without this they only read it
@@ -503,8 +567,10 @@ export default function App() {
       themeFamily,
       matchLightFamily,
       matchDarkFamily,
+      accentColor,
+      accentHue,
     });
-  }, [surface, theme, themeFamily, matchLightFamily, matchDarkFamily]);
+  }, [surface, theme, themeFamily, matchLightFamily, matchDarkFamily, accentColor, accentHue]);
   useEffect(() => {
     if (surface === "main") return;
     return onThemeSet((p) =>
@@ -513,6 +579,8 @@ export default function App() {
         themeFamily: p.themeFamily,
         matchLightFamily: p.matchLightFamily,
         matchDarkFamily: p.matchDarkFamily,
+        accentColor: p.accentColor,
+        accentHue: p.accentHue,
       }),
     );
   }, [surface]);

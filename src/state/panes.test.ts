@@ -241,6 +241,22 @@ describe("the nav trail records every content surface", () => {
     expect(useNavHistory.getState().stack).toEqual(["chat:daily"]);
   });
 
+  test("distinct saved chats stay open together and reopening one reuses its tab", () => {
+    usePanesStore.getState().openChat("alpha");
+    usePanesStore.getState().openChat("beta");
+
+    let pane = findLeaf(usePanesStore.getState().root, "p1")!;
+    const chatTabs = pane.tabs.filter((item) => item.surfaceKind === "chat");
+    expect(chatTabs.map((item) => item.chatSlug)).toEqual(["alpha", "beta"]);
+    expect(pane.tabs).toHaveLength(3);
+    expect(activeTabOf(pane)).toMatchObject({ surfaceKind: "chat", chatSlug: "beta" });
+
+    usePanesStore.getState().openChat("alpha");
+    pane = findLeaf(usePanesStore.getState().root, "p1")!;
+    expect(pane.tabs).toHaveLength(3);
+    expect(activeTabOf(pane)).toMatchObject({ surfaceKind: "chat", chatSlug: "alpha" });
+  });
+
   test("bindChat records the newly-bound slug (the fresh chat gained identity)", () => {
     usePanesStore.getState().openChat(null);
     const tabId = findLeaf(usePanesStore.getState().root, "p1")!.activeTabId;

@@ -132,26 +132,25 @@ export function Sidebar() {
       // The editor keeps its native menu (spell-check / copy) — this is scoped here.
       onContextMenu={(event) => event.preventDefault()}
     >
-      {/* ONE header row (Seth, 2026-07-26): the vault switcher + the create
-          icons share a line — less chrome before the content starts. Hidden in
-          Breve mode — Breve is a mode over the same vault, not a different one. */}
+      {/* ONE header row: the active vault never disappears. Breve routines and
+          notifications are owned by that vault, so hiding the switcher made
+          the mode look detached from its durable home. Creation controls stay
+          notes-only. */}
       <div className={sidebarMode === "breve" ? "nl-top breve-active" : "nl-top"}>
-        {sidebarMode !== "breve" && (
-          <button
-            type="button"
-            className="vault-switch"
-            aria-haspopup="menu"
-            aria-label={`Vault: ${vaultName}. Switch or connect vaults`}
-            title={`${vaultName} — switch or connect vaults`}
-            onClick={openVaultMenu}
-          >
-            <VaultGlyph size={14.5} />
-            <span className="vault-switch-name">{vaultName}</span>
-            <span className="vault-switch-caret caret-down" aria-hidden="true">
-              <ChevronRight size={9} />
-            </span>
-          </button>
-        )}
+        <button
+          type="button"
+          className="vault-switch"
+          aria-haspopup="menu"
+          aria-label={`Vault: ${vaultName}. Switch or connect vaults`}
+          title={`${vaultName} — switch or connect vaults`}
+          onClick={openVaultMenu}
+        >
+          <VaultGlyph size={14.5} />
+          <span className="vault-switch-name">{vaultName}</span>
+          <span className="vault-switch-caret caret-down" aria-hidden="true">
+            <ChevronRight size={9} />
+          </span>
+        </button>
         <button
           type="button"
           className={sidebarMode === "breve" ? "icobtn railon sb-breve-toggle" : "icobtn sb-breve-toggle"}
@@ -165,80 +164,69 @@ export function Sidebar() {
             {sidebarMode === "breve" ? "Back to Rotli" : "Breve"}
           </span>
         </button>
-        <span className="nl-mode-sep" aria-hidden="true" />
-        {/* IDE-style create icons (Seth #7/#13, 2026-07-03): the old "+" dropdown
+        {sidebarMode !== "breve" && (
+          <>
+            <span className="nl-mode-sep" aria-hidden="true" />
+            {/* IDE-style create icons (Seth #7/#13, 2026-07-03): the old "+" dropdown
             became explicit, always-visible actions — New… · New folder — mirroring
             VS Code's file-explorer title bar. Each targets the resolved (selected)
             folder. */}
-        <button
-          type="button"
-          /* tb-trail right-anchors the tip inside the sidebar's overflow box —
+            <button
+              type="button"
+              /* tb-trail right-anchors the tip inside the sidebar's overflow box —
              notes mode only: in Breve these buttons sit left-packed and a
              right-anchored tip would clip at the LEFT edge (review 2026-07-31) */
-          className={sidebarMode === "breve" ? "icobtn" : "icobtn tb-trail"}
-          aria-label={sidebarMode === "breve" ? "New is unavailable in Breve" : "New…"}
-          disabled={sidebarMode === "breve"}
-          onClick={openNewItemMenu}
-        >
-          <NewFileGlyph size={16} />
-          <span className="tip" aria-hidden="true">
-            {sidebarMode === "breve" ? "Unavailable in Breve" : "New…"}
-          </span>
-        </button>
-        <button
-          type="button"
-          className={sidebarMode === "breve" ? "icobtn" : "icobtn tb-trail"}
-          aria-label={
-            sidebarMode === "breve"
-              ? "New folder is unavailable in Breve"
-              : visibleSidebarView === "chat"
-                ? "New chat folder"
-                : "New folder"
-          }
-          disabled={sidebarMode === "breve"}
-          onClick={() => {
-            // the System browser open? create a real folder at its cwd; else the
-            // ACTIVE FRONT answers — Home opens its Main-folder input, Chat mints
-            // a chat folder (the inline notes-tree input died with the 2026-07-26
-            // System fold and left this button a silent no-op, P0)
-            if (contentView === "system") requestSystemFolder();
-            else requestSidebarFolder();
-          }}
-        >
-          <NewFolderGlyph size={16} />
-          <span className="tip" aria-hidden="true">
-            {sidebarMode === "breve"
-              ? "Unavailable in Breve"
-              : visibleSidebarView === "chat"
-                ? "New chat folder"
-                : "New folder"}
-          </span>
-        </button>
-        {/* New board lives in the New… dropdown (Seth, 2026-07-28) — its own
+              className="icobtn tb-trail"
+              aria-label="New…"
+              onClick={openNewItemMenu}
+            >
+              <NewFileGlyph size={16} />
+              <span className="tip" aria-hidden="true">
+                New…
+              </span>
+            </button>
+            <button
+              type="button"
+              className="icobtn tb-trail"
+              aria-label={visibleSidebarView === "chat" ? "New chat folder" : "New folder"}
+              onClick={() => {
+                // the System browser open? create a real folder at its cwd; else the
+                // ACTIVE FRONT answers — Home opens its Main-folder input, Chat mints
+                // a chat folder (the inline notes-tree input died with the 2026-07-26
+                // System fold and left this button a silent no-op, P0)
+                if (contentView === "system") requestSystemFolder();
+                else requestSidebarFolder();
+              }}
+            >
+              <NewFolderGlyph size={16} />
+              <span className="tip" aria-hidden="true">
+                {visibleSidebarView === "chat" ? "New chat folder" : "New folder"}
+              </span>
+            </button>
+            {/* New board lives in the New… dropdown (Seth, 2026-07-28) — its own
             header icon was one too many for a narrow sidebar */}
-        {/* collapse-all — TWO-STAGE (Seth, 2026-07-31): first press folds the
+            {/* collapse-all — TWO-STAGE (Seth, 2026-07-31): first press folds the
             open folders/trees, a second press folds the SYSTEM zone (the
             fronts replaced the Chat/Notes sections, 2026-08-01). Kept last,
             like the IDE. */}
-        <button
-          type="button"
-          className={sidebarMode === "breve" ? "icobtn" : "icobtn tb-trail"}
-          aria-label={
-            sidebarMode === "breve" ? "Collapse all is unavailable in Breve" : "Collapse all folders"
-          }
-          disabled={sidebarMode === "breve"}
-          /* default-OPEN rows (Main folders, CHAT folders) need an explicit
+            <button
+              type="button"
+              className="icobtn tb-trail"
+              aria-label="Collapse all folders"
+              /* default-OPEN rows (Main folders, CHAT folders) need an explicit
              false — wiping the map alone re-EXPANDED them (#83, audit 2026-07;
              chat folders were missed until 2026-07-31). "Brain" is NOT passed:
              nothing renders it as default-open anymore, and treating it as
              open made the first press a no-op on a fully-folded sidebar. */
-          onClick={() => collapseAllDests([...mainFolderIds(activeTree), ...chats.folderKeys])}
-        >
-          <FoldGlyph size={16} />
-          <span className="tip" aria-hidden="true">
-            {sidebarMode === "breve" ? "Unavailable in Breve" : "Collapse all"}
-          </span>
-        </button>
+              onClick={() => collapseAllDests([...mainFolderIds(activeTree), ...chats.folderKeys])}
+            >
+              <FoldGlyph size={16} />
+              <span className="tip" aria-hidden="true">
+                Collapse all
+              </span>
+            </button>
+          </>
+        )}
       </div>
 
       {/* the FRONT switcher (Seth, 2026-08-01) — directly under the vault

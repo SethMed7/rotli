@@ -69,7 +69,12 @@ const REQUIRED_STRICT_FLAGS = [
   "noFallthroughCasesInSwitch",
   "noUncheckedIndexedAccess",
 ];
-const TSCONFIG_FILES = ["tsconfig.json", "tsconfig.e2e.json", "breve-runtime/tsconfig.json"];
+const TSCONFIG_FILES = [
+  "tsconfig.json",
+  "tsconfig.node.json",
+  "tsconfig.e2e.json",
+  "breve-runtime/tsconfig.json",
+];
 // Documented divergences — measured with a probe config (tsc --noEmit), not vibes.
 // Re-measure before removing an entry; remove the entry in the same change that
 // turns the flag on.
@@ -175,7 +180,7 @@ if (!/jc:\s*\{\s*compile:\s*false\s*\}/.test(blockRender)) {
 }
 const viteConfig = readFileSync(join(root, "vite.config.ts"), "utf8");
 for (const token of [
-  "./scripts/build-policy.mjs",
+  "./scripts/build-policy",
   "shouldIgnoreBuildWarning",
   "bundleBudgetViolations",
   "chunkSizeWarningLimit",

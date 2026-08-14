@@ -27,13 +27,15 @@ import {
   refitColumns,
   usePanesStore,
 } from "../state/panes";
+import { isWarmSurface, nextWarmSurfaceIds } from "../state/paneWarmth";
 import type { LeafNode, PaneNode, SplitNode } from "../types";
 import { ActivitySurface } from "./activitySurface";
 import { Character } from "./character";
-import { ChatSurface } from "./chatSurface";
+import { ChatSurface } from "./chat/chatSurface";
 import { FileSurface } from "./fileSurface";
 import { NewItemSurface } from "./newItemSurface";
 import { TabStrip } from "./tabStrip";
+import { VaultWelcomeSurface } from "./vaultWelcomeSurface";
 
 // Excalidraw is heavy (~3.5MB with its mermaid/katex deps) and most sessions
 // never open a board — code-split it so it loads only when a canvas tab mounts,
@@ -76,6 +78,12 @@ function LeafView({ node }: { node: LeafNode }) {
     s.dropPreview?.kind === "zone" && s.dropPreview.leafId === node.id ? s.dropPreview.zone : null,
   );
   const tab = activeTabOf(node);
+  const [warmSurfaceIds, setWarmSurfaceIds] = useState<string[]>([]);
+  useEffect(() => {
+    setWarmSurfaceIds((current) => nextWarmSurfaceIds(current, tab, node.tabs));
+  }, [node.tabs, tab]);
+  const mountedHeavyIds = new Set([...warmSurfaceIds, ...(tab && isWarmSurface(tab) ? [tab.id] : [])]);
+  const mountedHeavyTabs = node.tabs.filter((candidate) => mountedHeavyIds.has(candidate.id));
 
   // `focused` drives two cues, both multi-pane only (the lone pane has nowhere
   // else to be), both drawn in CSS off the `focused` class — that class is the
@@ -117,16 +125,33 @@ function LeafView({ node }: { node: LeafNode }) {
           pointer-drag controller (lib/tabDrag) find this leaf via elementFromPoint. */}
       <div className="pane-body" data-pane-body data-leaf-id={node.id}>
         {!tab && <PaneEmptyState />}
-        {tab?.surfaceKind === "note" && <EditorSurface key={tab.id} paneId={node.id} noteId={tab.noteId} />}
-        {tab?.surfaceKind === "canvas" && (
-          <Suspense fallback={<div className="canvas-surface" />}>
-            <CanvasSurface key={tab.id} paneId={node.id} boardId={tab.boardId} />
-          </Suspense>
-        )}
-        {tab?.surfaceKind === "chat" && (
-          <ChatSurface key={tab.id} paneId={node.id} tabId={tab.id} chatSlug={tab.chatSlug} />
-        )}
-        {tab?.surfaceKind === "file" && <FileSurface key={tab.id} paneId={node.id} fileId={tab.fileId} />}
+        {tab?.surfaceKind === "note" &&
+          (tab.noteId ? (
+            <EditorSurface key={tab.id} paneId={node.id} noteId={tab.noteId} />
+          ) : (
+            <VaultWelcomeSurface key={tab.id} />
+          ))}
+        {mountedHeavyTabs.map((heavyTab) => {
+          const active = heavyTab.id === tab?.id;
+          return (
+            <div
+              key={heavyTab.id}
+              className={active ? "pane-surface-slot active" : "pane-surface-slot idle"}
+              aria-hidden={!active}
+              inert={!active}
+            >
+              {heavyTab.surfaceKind === "canvas" && (
+                <Suspense fallback={<div className="canvas-surface" />}>
+                  <CanvasSurface paneId={node.id} boardId={heavyTab.boardId} />
+                </Suspense>
+              )}
+              {heavyTab.surfaceKind === "chat" && (
+                <ChatSurface paneId={node.id} tabId={heavyTab.id} chatSlug={heavyTab.chatSlug} />
+              )}
+              {heavyTab.surfaceKind === "file" && <FileSurface paneId={node.id} fileId={heavyTab.fileId} />}
+            </div>
+          );
+        })}
         {tab?.surfaceKind === "activity" && <ActivitySurface key={tab.id} />}
         {tab?.surfaceKind === "newItem" && <NewItemSurface key={tab.id} paneId={node.id} tabId={tab.id} />}
         {/* split-detach preview — mounted only mid-drag, pointer-events:none

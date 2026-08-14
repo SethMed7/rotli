@@ -15,6 +15,10 @@ and their presence does not imply sponsorship or endorsement.
 - `gemini.svg` and `qwen.svg`: LobeHub Lobe Icons compact color vectors at
   commit `f07e9be35aef452ce735f95ea8204a14ecc513f7`, used under the included MIT
   license.
+- `meta.svg`, `microsoft.svg`, and `mistral.svg`: LobeHub Lobe Icons compact
+  monochrome vectors from `@lobehub/icons-static-svg` 1.91.0, used under the
+  included MIT license to identify Llama, Phi, and Mistral-family local models.
 
-Claude, OpenAI, Gemini, Gemma, and Qwen names and marks belong to their
-respective owners. Use these files only to identify the selected model family.
+Claude, OpenAI, Gemini, Gemma, Qwen, Meta, Microsoft, and Mistral names and
+marks belong to their respective owners. Use these files only to identify the
+selected model family.

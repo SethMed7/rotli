@@ -8,7 +8,7 @@ direction, runtime wiring, and owning documentation must agree.
 
 | Command | Purpose |
 |---|---|
-| `bun run lint` | TypeScript plus code-shape, brand, architecture, IPC, structure, and documentation guards |
+| `bun run lint` | All four TypeScript scopes on both compiler implementations, plus formatting, oxlint, code-shape, brand, architecture, IPC, structure, and documentation guards |
 | `bun run test:unit` | Frontend domain, application, adapter, and state tests under `src/` |
 | `bun run test:evals` | Deterministic offline AI loop, routing, model-policy, prompt, retrieval, and memory-workflow evals |
 | `bun run test:breve` | Breve policy, failure-state, locking, and delivery-claim regressions |
@@ -29,11 +29,11 @@ stays complete — every `package.json` script must appear in this document):
 | Command | Purpose |
 |---|---|
 | `bun run dev` / `bun run preview` | Vite dev server against the seeded demo corpus / preview of the built bundle |
-| `bun run dev:app` | The native desktop development app, branded `rotli (dev)` with the accent-backed icon; explicitly mounts the production vault writable for real-app testing, while raw `bun run tauri dev` retains the read-only safety default |
-| `bun run format` / `bun run format:check` | oxfmt write / verify over `src`, `e2e`, `scripts`, `playwright.config.ts` — the same trees the pre-commit hook enforces, with import sorting on (`breve-runtime` keeps hand-aligned tables and stays outside). `format:check` rides the `lint` chain |
-| `bun run typecheck` | The TypeScript compiler over `src` (`tsc --noEmit` — `typescript@7`, the Go port) — the type-correctness source of truth, first step of `lint` (e2e and breve-runtime have their own lanes: `check:e2e-types`, `check:breve-runtime`) |
-| `bun run typecheck:tsc6` | All three scopes re-checked on `typescript6` (`npm:typescript@~6.0.3`, the last JavaScript TypeScript) — the independent second implementation, not merely a slower one; must stay green alongside the `tsc` lanes. Called by explicit path because `typescript@7` owns `node_modules/.bin/tsc` |
-| `bun run lint:oxlint` | The oxlint layer alone (`src`, `e2e`, `breve-runtime`, `playwright.config.ts`; oxlint's `correctness` category plus the hand-picked rules, type-aware via `oxlint-tsgolint`) — part of `lint` |
+| `bun run dev:app` | The native desktop development app, branded `rotli (dev)` with a fixed blue Rotli Dock icon (including an optically matched safe area for the unbundled `tauri dev` runtime); explicitly mounts the production vault writable for real-app testing, while raw `bun run tauri dev` retains the read-only safety default |
+| `bun run format` / `bun run format:check` | oxfmt write / verify over TypeScript in `src`, `e2e`, and `scripts`, plus `playwright.config.ts` — the same scope the pre-commit hook enforces, with import sorting on (`breve-runtime` keeps hand-aligned tables and stays outside). `format:check` rides the `lint` chain |
+| `bun run typecheck` | The TypeScript compiler over `src` and the Vite/build-policy scope (`tsc --noEmit` — `typescript@7`, the Go port) — the type-correctness source of truth and first step of `lint` (e2e and Breve retain their named lanes) |
+| `bun run typecheck:tsc6` | All four scopes (`src`, Vite/build policy, E2E, and Breve) re-checked on `typescript6` (`npm:typescript@~6.0.3`, the last JavaScript TypeScript) — the independent second implementation, not merely a slower one. It is part of `lint` and is called by explicit path because `typescript@7` owns `node_modules/.bin/tsc` |
+| `bun run lint:oxlint` | The oxlint layer alone (`src`, `e2e`, `scripts`, Breve, and both root TypeScript configs; oxlint's `correctness` category plus the hand-picked rules, type-aware via `oxlint-tsgolint`) — part of `lint` |
 | `bun run check:knip` | Dead-weight gate — unreferenced files, exports, and dependencies, plus undeclared imports and binaries (`knip.json`); part of `lint` |
 | `bun run check:dup` | Advisory duplication miner over `scripts/dup-judgments.json` — run on demand, deliberately not a gate |
 | `bun run build:mac` | Local signed `.app` bundle (predmg clean + `tauri build`) |

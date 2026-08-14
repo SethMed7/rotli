@@ -1113,9 +1113,6 @@ async fn corpus_import_vault_copy(
 ) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let _lane = vault_lane();
-        if cfg!(debug_assertions) {
-            return Err("Importing a primary vault is disabled in development.".into());
-        }
         let authorizations = app.state::<memex::FolderAuthorizations>();
         let source = authorizations.require(std::path::Path::new(&source))?;
         let destination = authorizations.require(std::path::Path::new(&destination))?;
@@ -1188,9 +1185,6 @@ async fn corpus_choose_folder(app: AppHandle, path: Option<String>) -> Result<bo
 
 fn corpus_choose_folder_blocking(app: AppHandle, path: Option<String>) -> Result<bool, String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
-        return Err("The production vault is the fixed read-only source in development.".into());
-    }
     use tauri_plugin_dialog::DialogExt;
     let abs = match path {
         Some(p) => app
@@ -1265,9 +1259,6 @@ fn corpus_init_memex_blocking(
     brain_enabled: bool,
 ) -> Result<(), String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
-        return Err("Creating or replacing the primary vault is disabled in development.".into());
-    }
     let root = app
         .state::<memex::FolderAuthorizations>()
         .require(std::path::Path::new(&path))?;
@@ -1317,9 +1308,6 @@ async fn corpus_create_practice_vault(app: AppHandle) -> Result<(), String> {
 
 fn corpus_create_practice_vault_blocking(app: AppHandle) -> Result<(), String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
-        return Err("Creating or replacing the primary vault is disabled in development.".into());
-    }
     use tauri::Manager;
     let current = corpus::is_configured(&app).then(|| corpus::resolve_corpus(&app));
     let home = app.path().home_dir().map_err(|e| e.to_string())?;
@@ -1489,20 +1477,44 @@ fn set_dock_visible(app: AppHandle, visible: bool) {
     let _ = (app, visible);
 }
 
+#[cfg(target_os = "macos")]
+fn app_icon_bytes(variant: &str) -> Option<&'static [u8]> {
+    // `tauri dev` launches an unbundled executable, so clearing AppKit's icon
+    // override reveals macOS's generic `exec` tile instead of the icon declared
+    // in tauri.dev.conf.json. Keep every debug build visibly distinct and safe
+    // to identify while release builds retain the user's icon preference.
+    #[cfg(debug_assertions)]
+    {
+        let _ = variant;
+        Some(include_bytes!("../icons-dev/runtime.png"))
+    }
+
+    #[cfg(not(debug_assertions))]
+    match variant {
+        "warm" => Some(include_bytes!("../icons/variants/warm.png")),
+        "paper" => Some(include_bytes!("../icons/variants/paper.png")),
+        "charcoal" => Some(include_bytes!("../icons/variants/charcoal.png")),
+        "clay" => Some(include_bytes!("../icons/variants/clay.png")),
+        _ => None, // "default" → the bundle icon (nil clears the override)
+    }
+}
+
+#[cfg(all(test, target_os = "macos", debug_assertions))]
+#[test]
+fn development_app_icon_is_embedded_for_the_default_variant() {
+    let bytes = app_icon_bytes("default").expect("debug builds must set a Dock icon");
+    assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
+}
+
 /// Swap the macOS Dock/app icon at runtime (Settings → Appearance → App icon).
-/// The variant PNGs are compiled in; "default" (or any unknown value) resets to
-/// the bundle icon. AppKit's setApplicationIconImage must run on the main thread.
+/// Debug builds always use the blue development icon because `tauri dev` has no
+/// app bundle to fall back to. Release builds keep the configured icon variant.
+/// AppKit's setApplicationIconImage must run on the main thread.
 #[tauri::command]
 fn set_app_icon(app: AppHandle, variant: String) {
     #[cfg(target_os = "macos")]
     {
-        let bytes: Option<Vec<u8>> = match variant.as_str() {
-            "warm" => Some(include_bytes!("../icons/variants/warm.png").to_vec()),
-            "paper" => Some(include_bytes!("../icons/variants/paper.png").to_vec()),
-            "charcoal" => Some(include_bytes!("../icons/variants/charcoal.png").to_vec()),
-            "clay" => Some(include_bytes!("../icons/variants/clay.png").to_vec()),
-            _ => None, // "default" → the bundle icon (nil clears the override)
-        };
+        let bytes = app_icon_bytes(&variant).map(<[u8]>::to_vec);
         let _ = app.run_on_main_thread(move || {
             use objc2::{AllocAnyThread, MainThreadMarker};
             use objc2_app_kit::{NSApplication, NSImage};
@@ -1749,6 +1761,7 @@ pub fn run() {
             breve::breve_brief_skill,
             breve::breve_write_brief_skill,
             breve::breve_write_watchlist,
+            breve::breve_backfill_watchlist,
             breve::breve_delivery_settings,
             breve::breve_write_delivery_settings,
             breve::breve_store_resend_key,

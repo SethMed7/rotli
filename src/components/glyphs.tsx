@@ -41,6 +41,19 @@ export function ChevronRight({ size = 10, className }: GlyphProps) {
   );
 }
 
+/** Browser / web destination — globe meridians avoid conflating the web with
+ * Rotli's folder-shaped System browser. */
+export function BrowserGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3.5 12h17" />
+      <path d="M12 3c2.3 2.45 3.5 5.45 3.5 9S14.3 18.55 12 21" />
+      <path d="M12 3C9.7 5.45 8.5 8.45 8.5 12S9.7 18.55 12 21" />
+    </Glyph>
+  );
+}
+
 /** Scroll-to-top — a calm vertical arrow, distinct from disclosure chevrons. */
 export function ArrowUpGlyph(props: GlyphProps) {
   return (
@@ -304,7 +317,10 @@ export function CoffeeGlyph(props: GlyphProps) {
  * format mark for files (svg/pdf/raster image) and the Excalidraw logo for
  * canvases; notes and unknown files stay the generic document. */
 export function glyphForNote(
-  note: { kind?: "note" | "board" | "file" | undefined; title?: string | undefined },
+  note: {
+    kind?: "note" | "board" | "file" | undefined;
+    title?: string | undefined;
+  },
   props?: GlyphProps,
 ): ReactNode {
   if (note.kind === "board") return <ExcalidrawGlyph {...props} />;

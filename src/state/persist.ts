@@ -64,8 +64,10 @@ import {
   ALL_NOTES,
   type BreveView,
   CHAT_ARTIFACT_OPENS,
+  CHAT_NAMINGS,
   CHAT_WELCOME_STYLES,
   type ChatArtifactOpen,
+  type ChatNaming,
   type ChatReasoningEffort,
   type ChatServiceTier,
   type ChatWelcomeStyle,
@@ -92,7 +94,7 @@ import {
   type SyntaxPalette,
   useUiStore,
 } from "./ui";
-import { ACCENT_COLORS, type AccentColor } from "./ui";
+import { ACCENT_COLORS, DEFAULT_ACCENT_HUE, type AccentColor } from "./ui";
 import { useVaultStore } from "./vault";
 import { hydrateViews, useViewsStore } from "./views";
 
@@ -199,6 +201,7 @@ interface PersistedSettings {
   matchDarkFamily: ThemeFamily;
   syntaxPalette: SyntaxPalette;
   accentColor: AccentColor;
+  accentHue: number;
   stayOpen: boolean;
   showInDock: boolean;
   /** What the generic New tab command creates. Markdown remains the safe default. */
@@ -246,6 +249,8 @@ interface PersistedSettings {
   chatNoteOpen: "tab" | "split";
   /** Fresh-chat personality: quiet, or time-aware with restrained color. */
   chatWelcomeStyle: ChatWelcomeStyle;
+  /** Ask in the chat header, or derive the title from the first message. */
+  chatNaming: ChatNaming;
   /** Where chat-created files and boards open. */
   chatArtifactOpen: ChatArtifactOpen;
   /** What holding ⌘ reveals: inline badges (default), the grouped panel, or off. */
@@ -296,6 +301,8 @@ interface PersistedSettings {
   onboarded: boolean;
   /** The app version onboarding last completed at (the onboardingVersion gate). */
   onboardingVersion: string;
+  /** First-run checkpoint that survives a vault-selection relaunch. */
+  onboardingPhase: "preferences" | "vault" | "models";
   /** The Quick Note window's capped set, remembered note, and new-note folder
    * (Seth, 2026-06-15). */
   quickNoteIds: string[];
@@ -346,16 +353,19 @@ const APP_SETTINGS_KEYS = new Set([
   "matchDarkFamily",
   "syntaxPalette",
   "accentColor",
+  "accentHue",
   "stayOpen",
   "showInDock",
   "tabLayout",
   "userName",
   "timeFormat",
   "chatWelcomeStyle",
+  "chatNaming",
   "hotkeyPeek",
   "appIcon",
   "onboarded",
   "onboardingVersion",
+  "onboardingPhase",
   "bindings",
 ]);
 
@@ -457,6 +467,13 @@ export function parseSettings(raw: string): PersistedSettings {
     matchDarkFamily: asEnum(data.matchDarkFamily, THEME_FAMILIES, "warm"),
     syntaxPalette: asEnum(data.syntaxPalette, SYNTAX_PALETTES, "rotli"),
     accentColor: asEnum(data.accentColor, ACCENT_COLORS, "default"),
+    accentHue:
+      typeof data.accentHue === "number" &&
+      Number.isFinite(data.accentHue) &&
+      data.accentHue >= 0 &&
+      data.accentHue <= 359
+        ? Math.round(data.accentHue)
+        : DEFAULT_ACCENT_HUE,
     stayOpen: asBool(data.stayOpen, false),
     showInDock: asBool(data.showInDock, false),
     newTabDefault: asEnum(data.newTabDefault, NEW_ITEM_KINDS, DEFAULT_NEW_ITEM_KIND),
@@ -516,6 +533,7 @@ export function parseSettings(raw: string): PersistedSettings {
     })(),
     chatNoteOpen: data.chatNoteOpen === "split" ? "split" : "tab",
     chatWelcomeStyle: asEnum(data.chatWelcomeStyle, CHAT_WELCOME_STYLES, "lively"),
+    chatNaming: asEnum(data.chatNaming, CHAT_NAMINGS, "ask"),
     chatArtifactOpen: asEnum(data.chatArtifactOpen, CHAT_ARTIFACT_OPENS, "sidecar"),
     // an unknown/absent value reads as the default rather than disabling the
     // peek — a typo in the file must never silently remove a discoverability aid
@@ -582,6 +600,10 @@ export function parseSettings(raw: string): PersistedSettings {
     // onboarding on existing users (same migration shape as expandedDests above)
     onboarded: typeof data.onboarded === "boolean" ? data.onboarded : Object.keys(data).length > 0,
     onboardingVersion: typeof data.onboardingVersion === "string" ? data.onboardingVersion : "",
+    onboardingPhase:
+      data.onboardingPhase === "vault" || data.onboardingPhase === "models"
+        ? data.onboardingPhase
+        : "preferences",
     quickNoteIds,
     captureOrder,
     quickActiveId,
@@ -596,12 +618,17 @@ export function parseSettings(raw: string): PersistedSettings {
     // Home is the safe default front — a fresh (or unknown) value opens on notes
     sidebarView: data.sidebarView === "chat" ? "chat" : "home",
     breveView:
-      data.breveView === "watchlist" || data.breveView === "routines" || data.breveView === "settings"
+      data.breveView === "dashboard" ||
+      data.breveView === "briefs" ||
+      data.breveView === "notifications" ||
+      data.breveView === "watchlist" ||
+      data.breveView === "routines" ||
+      data.breveView === "settings"
         ? data.breveView
         : // the retired Models/Configure views merged into Settings (2026-07-30)
           data.breveView === "models" || data.breveView === "configure"
           ? "settings"
-          : "briefs",
+          : "dashboard",
     expandedDests,
     bindings,
     noteStyles,
@@ -640,6 +667,7 @@ function applySettings(s: PersistedSettings): void {
     matchDarkFamily: s.matchDarkFamily,
     syntaxPalette: s.syntaxPalette,
     accentColor: s.accentColor,
+    accentHue: s.accentHue,
     stayOpen: s.stayOpen,
     showInDock: s.showInDock,
     newTabDefault: s.newTabDefault,
@@ -660,6 +688,7 @@ function applySettings(s: PersistedSettings): void {
     chatMeasure: s.chatMeasure,
     chatNoteOpen: s.chatNoteOpen,
     chatWelcomeStyle: s.chatWelcomeStyle,
+    chatNaming: s.chatNaming,
     chatArtifactOpen: s.chatArtifactOpen,
     hotkeyPeek: s.hotkeyPeek,
     readAloud: s.readAloud,
@@ -681,6 +710,7 @@ function applySettings(s: PersistedSettings): void {
     librarianIntroSeen: s.librarianIntroSeen,
     onboarded: s.onboarded,
     onboardingVersion: s.onboardingVersion,
+    onboardingPhase: s.onboardingPhase,
     quickNoteIds: s.quickNoteIds,
     captureOrder: s.captureOrder,
     quickActiveId: s.quickActiveId,
@@ -713,16 +743,19 @@ function applyAppSettings(s: PersistedSettings): void {
     matchDarkFamily: s.matchDarkFamily,
     syntaxPalette: s.syntaxPalette,
     accentColor: s.accentColor,
+    accentHue: s.accentHue,
     stayOpen: s.stayOpen,
     showInDock: s.showInDock,
     tabLayout: s.tabLayout,
     userName: s.userName,
     timeFormat: s.timeFormat,
     chatWelcomeStyle: s.chatWelcomeStyle,
+    chatNaming: s.chatNaming,
     hotkeyPeek: s.hotkeyPeek,
     appIcon: s.appIcon,
     onboarded: s.onboarded,
     onboardingVersion: s.onboardingVersion,
+    onboardingPhase: s.onboardingPhase,
   });
   useBindingsStore.setState({ overrides: s.bindings });
 }
@@ -736,16 +769,19 @@ function withAppSettings(vault: PersistedSettings, app: PersistedSettings): Pers
     matchDarkFamily: app.matchDarkFamily,
     syntaxPalette: app.syntaxPalette,
     accentColor: app.accentColor,
+    accentHue: app.accentHue,
     stayOpen: app.stayOpen,
     showInDock: app.showInDock,
     tabLayout: app.tabLayout,
     userName: app.userName,
     timeFormat: app.timeFormat,
     chatWelcomeStyle: app.chatWelcomeStyle,
+    chatNaming: app.chatNaming,
     hotkeyPeek: app.hotkeyPeek,
     appIcon: app.appIcon,
     onboarded: app.onboarded,
     onboardingVersion: app.onboardingVersion,
+    onboardingPhase: app.onboardingPhase,
     bindings: app.bindings,
   };
 }
@@ -1173,7 +1209,7 @@ function prePaint(): void {
     dark: s.matchDarkFamily,
   });
   applySyntaxPalette(s.syntaxPalette);
-  applyAccent(s.accentColor);
+  applyAccent(s.accentColor, s.accentHue);
 }
 
 // ─── hydrate (awaited by main.tsx before the first render) ───────────────────
@@ -1241,6 +1277,7 @@ export async function hydratePersistedState(): Promise<void> {
       matchDarkFamily: "mono",
       syntaxPalette: "rotli",
       accentColor: "default",
+      accentHue: DEFAULT_ACCENT_HUE,
       stayOpen: false,
       showInDock: false,
     });
@@ -1271,16 +1308,19 @@ function appSettingsSnapshot(): string {
     matchDarkFamily: ui.matchDarkFamily,
     syntaxPalette: ui.syntaxPalette,
     accentColor: ui.accentColor,
+    accentHue: ui.accentHue,
     stayOpen: ui.stayOpen,
     showInDock: ui.showInDock,
     tabLayout: ui.tabLayout,
     userName: ui.userName,
     timeFormat: ui.timeFormat,
     chatWelcomeStyle: ui.chatWelcomeStyle,
+    chatNaming: ui.chatNaming,
     hotkeyPeek: ui.hotkeyPeek,
     appIcon: ui.appIcon,
     onboarded: ui.onboarded,
     onboardingVersion: ui.onboardingVersion,
+    onboardingPhase: ui.onboardingPhase,
     bindings: useBindingsStore.getState().overrides,
   });
 }
@@ -1295,6 +1335,7 @@ function settingsSnapshot(): string {
     matchDarkFamily: ui.matchDarkFamily,
     syntaxPalette: ui.syntaxPalette,
     accentColor: ui.accentColor,
+    accentHue: ui.accentHue,
     stayOpen: ui.stayOpen,
     showInDock: ui.showInDock,
     newTabDefault: ui.newTabDefault,
@@ -1315,6 +1356,7 @@ function settingsSnapshot(): string {
     chatMeasure: persistableChatMap(ui.chatMeasure),
     chatNoteOpen: ui.chatNoteOpen,
     chatWelcomeStyle: ui.chatWelcomeStyle,
+    chatNaming: ui.chatNaming,
     chatArtifactOpen: ui.chatArtifactOpen,
     hotkeyPeek: ui.hotkeyPeek,
     readAloud: ui.readAloud,
@@ -1336,6 +1378,7 @@ function settingsSnapshot(): string {
     librarianIntroSeen: ui.librarianIntroSeen,
     onboarded: ui.onboarded,
     onboardingVersion: ui.onboardingVersion,
+    onboardingPhase: ui.onboardingPhase,
     quickNoteIds: ui.quickNoteIds,
     captureOrder: ui.captureOrder,
     quickActiveId: ui.quickActiveId,

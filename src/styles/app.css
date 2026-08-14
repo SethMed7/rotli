@@ -135,7 +135,8 @@
   color: var(--text-muted);
   cursor: pointer;
 }
-.tb-nav + .tb-search {
+.tb-nav + .tb-search,
+.tb-nav + .tb-search-popover {
   margin-left: 4px;
 }
 .tb-nav:hover:not(:disabled) {
@@ -158,7 +159,7 @@
   width: 100%;
   max-width: 560px;
   height: 30px;
-  padding: 0 10px 0 5px;
+  padding: 0 10px;
   border: 1px solid var(--border);
   background: var(--surface-2);
   border-radius: var(--r-pill);
@@ -169,23 +170,22 @@
     border-color var(--motion-exit) var(--motion-ease),
     color var(--motion-exit) var(--motion-ease);
 }
-.tb-search:hover {
+.tb-search:hover,
+.tb-search.is-open {
   background: var(--surface);
   color: var(--text);
 }
-/* the rotli mark, in a circle, where the search glyph used to sit */
+.tb-search:focus-within {
+  border-color: var(--accent-text);
+}
+/* Rotli identifies search without a second badge behind it. */
 .tb-search-mark {
   flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
+  width: 18px;
+  height: 18px;
   display: grid;
   place-items: center;
-  background: var(--surface);
   color: var(--text);
-}
-.tb-search:hover .tb-search-mark {
-  background: var(--surface-2);
 }
 .tb-search-label {
   flex: 1 1 auto;
@@ -202,6 +202,36 @@
   font-size: 11px;
   color: var(--text-muted);
   opacity: 0.7;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.tb-search-popover {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  z-index: 20;
+}
+.tb-search-popover .tb-search {
+  max-width: none;
+}
+.tb-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  user-select: text;
+}
+.tb-search-input::placeholder {
+  color: var(--text-muted);
+}
+.tb-search-input:focus-visible {
+  outline: none;
 }
 .tb-actions {
   display: flex;
@@ -419,6 +449,139 @@ body[data-surface="capture"] {
 .pane-empty-act:hover {
   background: var(--hov);
   color: var(--text);
+}
+
+/* Empty-vault onboarding lives in memory, not in the user's Markdown tree. */
+.vault-welcome {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: clamp(28px, 7vh, 72px) 24px 32px;
+}
+.vault-welcome-inner {
+  width: min(680px, 100%);
+  margin: 0 auto;
+  text-align: center;
+}
+.vault-welcome .quokka {
+  color: var(--text);
+}
+.vault-welcome-eyebrow {
+  margin: 14px 0 6px;
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.vault-welcome h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: clamp(28px, 4cqw, 42px);
+  letter-spacing: -0.035em;
+}
+.vault-welcome-lede {
+  margin: 8px auto 24px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.vault-welcome-create {
+  margin: 0 auto;
+  text-align: left;
+}
+.vault-welcome-create > label {
+  display: block;
+  margin: 0 0 7px 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+.vault-welcome-field {
+  display: flex;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+}
+.vault-welcome-field:focus-within {
+  border-color: var(--accent-text);
+}
+.vault-welcome-field input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 9px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+.vault-welcome-field button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+.vault-welcome-field button:disabled {
+  opacity: 0.45;
+}
+.vault-welcome-create > p {
+  margin: 8px 2px 0;
+  color: var(--danger);
+  font-size: 11px;
+}
+.vault-welcome-tips {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+  text-align: left;
+}
+.vault-welcome-tips button {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  text-align: left;
+}
+.vault-welcome-tips button:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.vault-welcome-tips span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+.vault-welcome-tips strong {
+  color: var(--text);
+  font-size: 12.5px;
+}
+.vault-welcome-tips small {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+@media (max-width: 620px) {
+  .vault-welcome-tips {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* — the ⌘N chooser tab (Seth, 2026-07-29): pick what this tab becomes — */

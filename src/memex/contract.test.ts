@@ -30,6 +30,7 @@ import {
   parsePrimaryUser,
   setAttachedTo,
   setChatPinned,
+  setChatTitle,
   setChatSecureContext,
   hasSecureContext,
   slugify,
@@ -98,6 +99,25 @@ describe("composeChatFile (byte-exact)", () => {
 
   test("rejects a source not on the chats surface", () => {
     expect(() => composeChatFile({ title: "x", source: "history" }, DATE)).toThrow(/not allowed/);
+  });
+});
+
+describe("setChatTitle (stable chat identity)", () => {
+  test("updates the first frontmatter title and contract-owned H1 only", () => {
+    const base =
+      composeChatFile({ title: "Old name", source: "rotli" }, DATE) +
+      "**assistant** · 2026-06-24 — title: leave this alone\n# and this too\n";
+    const out = setChatTitle(base, "  A better   name  ");
+    expect(out).toContain("title: A better name\n");
+    expect(out).toContain("# A better name\n");
+    expect(out).toContain("title: leave this alone\n# and this too\n");
+  });
+
+  test("normalizes pasted line breaks and leaves malformed files alone", () => {
+    const base = composeChatFile({ title: "Old", source: "rotli" }, DATE);
+    expect(setChatTitle(base, "First\nsecond")).toContain("title: First second\n");
+    expect(setChatTitle("title: body only\n", "New")).toBe("title: body only\n");
+    expect(setChatTitle(base, "   ")).toBe(base);
   });
 });
 

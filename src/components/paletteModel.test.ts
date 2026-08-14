@@ -15,4 +15,15 @@ describe("palette relevance", () => {
       ]).map((group) => group.name),
     ).toEqual(["Files", "Chats", "Notes"]);
   });
+
+  test("sorts strongest matches within a section and keeps equal scores stable", () => {
+    expect(
+      rankSearchGroups([
+        { name: "body", score: 40 },
+        { name: "exact", score: 0 },
+        { name: "prefix-a", score: 10 },
+        { name: "prefix-b", score: 10 },
+      ]).map((row) => row.name),
+    ).toEqual(["exact", "prefix-a", "prefix-b", "body"]);
+  });
 });

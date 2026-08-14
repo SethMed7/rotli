@@ -9,14 +9,12 @@ import {
   closeFocusedTabWithDraftCleanup,
 } from "../documents/draftComposition";
 import { type BlockToggle, type HeadingLevel, type InlineMark, activeEditor } from "../editor/commands";
-import { captureHandle } from "../lib/captureHandle";
-import { quickHandle } from "../lib/quickHandle";
-import { setupHandle } from "../lib/setupHandle";
 import {
   corpusFrontmatter,
   corpusSetPinned,
   hideMainWindow,
   hideQuickWindow,
+  openUrl,
   summon,
   toggleMainWindow,
   toggleQuickWindow,
@@ -34,6 +32,7 @@ import { DEFAULT_NOTE_STYLE, useNoteStyleStore } from "../state/noteStyle";
 import { findLeaf, leaves, openNavTarget, usePanesStore } from "../state/panes";
 import { cycleQuick, removeQuickNote } from "../state/quick";
 import { SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
+import { captureHandle, quickHandle, setupHandle } from "./handles";
 import { registerAction } from "./registry";
 import { runSurfaceFind } from "./surfaceFind";
 
@@ -173,6 +172,11 @@ export function registerDefaultActions(): void {
     title: "Back — previous note",
     defaultChord: "Meta+BracketLeft",
     run: () => {
+      const setup = setupHandle();
+      if (setup?.back) {
+        setup.back();
+        return;
+      }
       if (!notesWorkspaceActive()) return;
       navigate(-1, openNavTarget);
     },
@@ -257,6 +261,7 @@ export function registerDefaultActions(): void {
       )
         return;
       if (!ui.settingsOpen && ui.sidebarMode === "breve") ui.setBreveDirty(false);
+      ui.setPaletteOpen(false);
       ui.setFocusMode(false);
       ui.setContentView("panes");
       ui.setSettingsOpen(!ui.settingsOpen);
@@ -703,6 +708,12 @@ export function registerDefaultActions(): void {
     global: true, // Rust shows the window + emits rotli:summon-search;
     // in-app it force-OPENS the palette (never toggles — same law as ⌥A)
     run: () => useUiStore.getState().setPaletteOpen(true),
+  });
+  registerAction({
+    id: "browser.open",
+    title: "Open web browser",
+    defaultChord: "Alt+T",
+    run: () => void openUrl("https://www.google.com/"),
   });
   // — note ↔ chat: a note owns MANY chats (Seth, 2026-07-30). ⌘⇧C continues
   //   the most recently touched one (creating the first when none exists);

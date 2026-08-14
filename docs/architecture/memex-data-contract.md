@@ -32,6 +32,13 @@ second user-visible product or storage location.
   provider selector. Brave credentials live under Rotli's allowlisted macOS
   Keychain account, while search execution and provider failure policy remain
   application/adapter concerns outside the vault contract.
+- **Breve stays inside the active vault.** Its portable routine configuration
+  lives under `.rotli/routines/`; its private runtime state and sanitized event
+  source live under `.rotli/breve/`; its watchlist and generated briefs are
+  ordinary canonical vault Markdown. Dashboard cards and Notifications are
+  projections, never a parallel news database. A 30-day watchlist backfill is
+  an explicit user-triggered routine and writes one ordinary brief through the
+  same sandboxed runtime instead of silently fetching on Save.
 - A Markdown note may belong to one named view. Rotli synchronizes the exact
   view name into managed `view_tag` metadata on assignment, rename, deletion,
   UI, CLI, and MCP writes. View names are unique case-insensitively and use
@@ -84,7 +91,9 @@ second user-visible product or storage location.
 - Clicking or keyboard-opening a Main or named-view folder makes that virtual
   folder the creation parent for every item kind. Opening the new-item chooser
   must retain that parent while the user chooses Markdown, document, sheet,
-  board, or Mermaid. Named-view creation also retains the global Main reference.
+  board, or Mermaid. The chooser may also expose non-durable actions such as
+  opening the system web browser; those actions create no vault item. Named-view
+  creation also retains the global Main reference.
 - The Librarian waits for the configured quiet window after the note's
   latest edit (five minutes by default) before classifying or refiling it. New
   edits reset that window; filing changes location/metadata, never note prose.
@@ -229,6 +238,13 @@ second user-visible product or storage location.
   clears that draft; sending it does. The first successful save binds the
   initiating tab rather than whichever tab happens to be active when an async
   write completes.
+- A new empty vault starts on a transient welcome projection, not a Markdown
+  tutorial. Rotli creates no durable file until the user names and confirms
+  their first note; that confirmation uses the ordinary routed-note workflow.
+  Expensive chat, board, and conventional-file surfaces may remain mounted in a
+  small recent-tab cache so ordinary tab switching does not rebuild them on the
+  WebKit main thread. The cache is bounded, inactive surfaces are inert and
+  hidden, and each chat retains its own tab identity, draft, and active run.
 - User turns are the navigation landmarks for a long transcript. The chat may
   derive a compact left-edge prompt navigator from rendered messages; it is a
   view only and does not create another chat index or durable identity.
@@ -486,8 +502,8 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   READING one: the 2026-08-01 flip widened reading only.
 - A non-secure note whose content fires the secret detector enters the
   Librarian journal's **secure review** instead of being silently modeled around: the
-  organizer skips it and the pane offers *Make secure* (the existing protected
-  flow) or *Not sensitive*. The detector proposes; the user disposes — this
+  organizer skips it and the pane offers _Make secure_ (the existing protected
+  flow) or _Not sensitive_. The detector proposes; the user disposes — this
   lane never auto-marks a note. A dismissal is content-keyed rebuildable
   `.rotli/organizer.json` state (never note frontmatter) and re-arms when
   anything the detector sees changes. The existing auto-secure flag on the

@@ -27,10 +27,10 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-import { modelIsOnDevice } from "../ai/guard";
-import { type HostArtifactKind, makeTauriHost } from "../ai/host";
-import { presetFor, runHybrid } from "../ai/hybrid";
-import { runAgent } from "../ai/loop";
+import { modelIsOnDevice } from "../../ai/guard";
+import { type HostArtifactKind, makeTauriHost } from "../../ai/host";
+import { presetFor, runHybrid } from "../../ai/hybrid";
+import { runAgent } from "../../ai/loop";
 import {
   PROVIDER_IDS,
   PROVIDER_LABELS,
@@ -38,25 +38,25 @@ import {
   type ProviderId,
   flattenModels,
   mergedModels,
-} from "../ai/models";
-import type { AgentQuestion, ChatTurn, RunInput } from "../ai/types";
-import { syncManagedChatMemory } from "../chatMemory/composition";
+} from "../../ai/models";
+import type { AgentQuestion, ChatTurn, RunInput } from "../../ai/types";
+import { syncManagedChatMemory } from "../../chatMemory/composition";
 import {
   attachedNoteId as resolveAttachedNoteId,
   buildChatNotesPrompt,
   type MemoryTurn,
-} from "../chatMemory/model";
-import { DOCUMENT_EXTS, WORD_EXTS } from "../documents/kinds";
-import { renderMermaidElement } from "../editor/mermaidRender";
-import { renderInline } from "../editor/render";
+} from "../../chatMemory/model";
+import { DOCUMENT_EXTS, WORD_EXTS } from "../../documents/kinds";
+import { renderMermaidElement } from "../../editor/mermaidRender";
+import { renderInline } from "../../editor/render";
 import {
   CHAT_IMAGE_ASSET_EXTS,
   attachmentReference,
   projectChatWorkItems,
   visibleChatText,
-} from "../lib/chatWork";
-import { extOf, fileName, IMAGE_EXTS } from "../lib/fileKind";
-import { type AnchoredPlacement, anchoredPopover, useTransientPopover } from "../lib/popover";
+} from "../../lib/chatWork";
+import { extOf, fileName, IMAGE_EXTS } from "../../lib/fileKind";
+import { type AnchoredPlacement, anchoredPopover, useTransientPopover } from "../../lib/popover";
 import {
   type ChatModelInfo,
   type LocalQueueEntry,
@@ -71,60 +71,54 @@ import {
   localQueueCancel,
   localQueuePrioritize,
   onLocalQueue,
-} from "../lib/tauri";
-import { CORPUS_INSTANCE_ID, activeInstance } from "../memex/config";
+} from "../../lib/tauri";
+import { CORPUS_INSTANCE_ID, activeInstance } from "../../memex/config";
 import {
   type ChatArtifact,
   hasSecureContext,
   parseChatArtifacts,
   parseChatArtifactTurns,
-} from "../memex/contract";
-import { readChat, registerChatArtifact, registerChatArtifactTurn, writeNote } from "../memex/service";
-import { useInstanceChats, useMemexConfig, useSetChatAttachedTo, useWriteChat } from "../memex/useMemex";
-import { splitMessageBlocks } from "../noteChat/chatMessageBlocks";
-import { structureMessageLines } from "../noteChat/chatMessageBlocks";
-import { formatChatTime } from "../noteChat/chatTime";
-import { rememberedChatNote, rememberChatNote } from "../noteChat/session";
+} from "../../memex/contract";
+import { readChat, registerChatArtifact, registerChatArtifactTurn, writeNote } from "../../memex/service";
+import {
+  useInstanceChats,
+  useMemexConfig,
+  useSetChatAttachedTo,
+  useUpdateChatTitle,
+  useWriteChat,
+} from "../../memex/useMemex";
+import { splitMessageBlocks } from "../../noteChat/chatMessageBlocks";
+import { structureMessageLines } from "../../noteChat/chatMessageBlocks";
+import { formatChatTime } from "../../noteChat/chatTime";
+import { rememberedChatNote, rememberChatNote } from "../../noteChat/session";
 import {
   assignChatToFolder,
   invalidateChatFolders,
   loadChatFolders,
   saveChatFolders,
-} from "../services/chatFolders";
-import { invalidateNotes, useNoteIndex } from "../services/hooks";
-import { artifactMainFolderName, fileNoteInNamedRootFolder } from "../services/mainTree";
-import { assignChatToView } from "../services/viewTree";
-import { type ChatImageAttachment, chatDraftFor, useChatDrafts } from "../state/chatDrafts";
-import { useChatRuns } from "../state/chatRuns";
-import { useMainStore } from "../state/main";
-import { touchChatActivity } from "../state/mru";
-import { type Measure } from "../state/noteStyle";
-import { findLeaf, leaves, usePanesStore } from "../state/panes";
+} from "../../services/chatFolders";
+import { invalidateNotes, useNoteIndex } from "../../services/hooks";
+import { artifactMainFolderName, fileNoteInNamedRootFolder } from "../../services/mainTree";
+import { assignChatToView } from "../../services/viewTree";
+import { type ChatImageAttachment, chatDraftFor, useChatDrafts } from "../../state/chatDrafts";
+import { useChatRuns } from "../../state/chatRuns";
+import { useMainStore } from "../../state/main";
+import { touchChatActivity } from "../../state/mru";
+import { type Measure } from "../../state/noteStyle";
+import { findLeaf, leaves, usePanesStore } from "../../state/panes";
 import {
   type ChatReasoningEffort,
   type ChatServiceTier,
   chatKey,
   chatModelFor,
   useUiStore,
-} from "../state/ui";
-import { useViewsStore } from "../state/views";
-import { takeSentences } from "../voice/sentences";
-import { speaker } from "../voice/speech";
-import { Character, QuokkaMark } from "./character";
-import { CHAT_PANE_ATTR, registerChatDrop } from "./chatDrop";
-import { ChatPromptNavigator } from "./chatPromptNavigator";
-import { conversationPrompts } from "./chatPromptNavigatorModel";
-import { normalizedReasoning, normalizedServiceTier, reasoningChoices } from "./chatReasoningModel";
-import {
-  chatDaypart,
-  chatGreeting,
-  chatWelcomeCharacter,
-  chatWelcomeSuggestions,
-  type ChatWelcomeSuggestionKind,
-} from "./chatWelcomeModel";
+} from "../../state/ui";
+import { useViewsStore } from "../../state/views";
+import { takeSentences } from "../../voice/sentences";
+import { speaker } from "../../voice/speech";
+import { Character, QuokkaMark } from "../character";
 import {
   CheckGlyph,
-  ChevronRight,
   CloudGlyph,
   CopyGlyph,
   BoardGlyph,
@@ -138,7 +132,26 @@ import {
   SquareGlyph,
   WordGlyph,
   XGlyph,
-} from "./glyphs";
+} from "../glyphs";
+import { chatMark } from "../sidebar/chatMark";
+import { ModelLogo } from "../sidebar/modelLogo";
+import { CHAT_PANE_ATTR, registerChatDrop } from "./chatDrop";
+import { ChatPromptNavigator } from "./chatPromptNavigator";
+import { conversationPrompts } from "./chatPromptNavigatorModel";
+import { normalizedReasoning, normalizedServiceTier, reasoningChoices } from "./chatReasoningModel";
+import {
+  CHAT_TITLE_MAX_LENGTH,
+  chatTitleAdvanceHint,
+  deriveChatTitle,
+  normalizeChatTitle,
+} from "./chatTitleModel";
+import {
+  chatDaypart,
+  chatWelcomeCharacter,
+  chatWelcomeSuggestions,
+  chatWorkPrompt,
+  type ChatWelcomeSuggestionKind,
+} from "./chatWelcomeModel";
 
 interface Msg {
   speaker: string;
@@ -309,10 +322,6 @@ function StopGlyph() {
       <rect x="3" y="3" width="10" height="10" rx="2" />
     </svg>
   );
-}
-
-function deriveTitle(text: string): string {
-  return text.split(/\s+/).slice(0, 6).join(" ").slice(0, 60) || "New chat";
 }
 
 /** Chat measure widths — comfort keeps the tuned 740 column (Seth, 2026-07-01);
@@ -632,11 +641,13 @@ function ModelPicker({
   onPick: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const [box, setBox] = useState<AnchoredPlacement | null>(null);
   const anchorRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const rowRefs = useRef<Array<HTMLButtonElement | null>>([]);
   useTransientPopover([popRef, anchorRef], open, () => setOpen(false));
 
@@ -712,12 +723,18 @@ function ModelPicker({
     },
   ].filter((s) => s.items.length > 0);
   const selectedSection = sections.find((section) => section.items.some((item) => item.id === picked?.id));
-  const shownSections = sections.filter((section) => section.key === expandedSection);
-  const flatItems = shownSections.flatMap((s) => s.items);
-  // the identity-picking effect below deliberately keys off flatKey/picked?.id
-  // (cheap primitives) rather than the flatItems/picked objects themselves —
-  // those are rebuilt every render, so depending on them directly would refocus
-  // on every keystroke elsewhere in the app. Refs carry the latest values in.
+  const currentSection =
+    sections.find((section) => section.key === activeSection) ?? selectedSection ?? sections[0];
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const flatItems = (
+    normalizedQuery ? sections.flatMap((section) => section.items) : (currentSection?.items ?? [])
+  ).filter((model) =>
+    normalizedQuery
+      ? `${model.label} ${model.id} ${model.provider}`.toLocaleLowerCase().includes(normalizedQuery)
+      : true,
+  );
+  const sectionFor = (model: ChatModelInfo) =>
+    sections.find((section) => section.items.some((item) => item.id === model.id));
   const flatItemsRef = useRef(flatItems);
   flatItemsRef.current = flatItems;
   const pickedRef = useRef(picked);
@@ -736,17 +753,17 @@ function ModelPicker({
   useEffect(() => {
     const items = flatItemsRef.current;
     const current = pickedRef.current;
-    if (!open || items.length === 0) return;
+    if (!open) return;
     const selected = current ? items.findIndex((m) => m.id === current.id) : -1;
     const next = selected >= 0 ? selected : 0;
     setActiveIndex(next);
-    const frame = requestAnimationFrame(() => rowRefs.current[next]?.focus());
+    const frame = requestAnimationFrame(() => searchRef.current?.focus());
     return () => cancelAnimationFrame(frame);
   }, [flatKey, open, picked?.id]);
 
   useEffect(() => {
     if (!open) return;
-    setExpandedSection((current) => current ?? selectedSection?.key ?? sections[0]?.key ?? null);
+    setActiveSection((current) => current ?? selectedSection?.key ?? sections[0]?.key ?? null);
   }, [open, selectedSection?.key, sections]);
 
   const moveActive = (index: number) => {
@@ -760,10 +777,10 @@ function ModelPicker({
     event.stopPropagation();
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      moveActive(activeIndex + 1);
+      moveActive(document.activeElement === searchRef.current ? 0 : activeIndex + 1);
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
-      moveActive(activeIndex - 1);
+      moveActive(document.activeElement === searchRef.current ? flatItems.length - 1 : activeIndex - 1);
     } else if (event.key === "Home") {
       event.preventDefault();
       moveActive(0);
@@ -779,8 +796,6 @@ function ModelPicker({
     }
   };
 
-  let rowIndex = -1;
-
   return (
     <div className="chat-modelpick">
       <button
@@ -791,7 +806,8 @@ function ModelPicker({
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => {
-          setExpandedSection(selectedSection?.key ?? sections[0]?.key ?? null);
+          setActiveSection(selectedSection?.key ?? sections[0]?.key ?? null);
+          setQuery("");
           setOpen((v) => !v);
         }}
         onKeyDown={(event) => {
@@ -839,26 +855,70 @@ function ModelPicker({
                 the composer.
               </div>
             )}
-            {sections.map((s) => (
-              <div className="chat-modelpop-group" key={s.key}>
-                <button
-                  type="button"
-                  className="chat-modelpop-grouplabel"
-                  aria-expanded={expandedSection === s.key}
-                  onClick={() => setExpandedSection((current) => (current === s.key ? null : s.key))}
-                >
-                  <span className="chat-modelpop-groupico">{modelKindGlyph(s.kind)}</span>
-                  <span>{s.label}</span>
-                  <ChevronRight size={10} />
-                </button>
-                {expandedSection === s.key && s.hint && (
-                  <div className="chat-modelpop-grouphint">{s.hint}</div>
-                )}
-                {expandedSection === s.key &&
-                  s.items.map((m) => {
-                    rowIndex += 1;
-                    const index = rowIndex;
+            <nav className="chat-modelpop-rail" aria-label="Model providers">
+              {sections.map((section) => {
+                const representative = section.items[0];
+                const mark = representative ? chatMark(representative.provider, representative.label) : null;
+                return (
+                  <button
+                    type="button"
+                    key={section.key}
+                    className={
+                      currentSection?.key === section.key && !normalizedQuery
+                        ? "chat-model-provider sel"
+                        : "chat-model-provider"
+                    }
+                    aria-label={section.label}
+                    aria-pressed={currentSection?.key === section.key && !normalizedQuery}
+                    title={`${section.label} · ${section.items.length}`}
+                    onClick={() => {
+                      setQuery("");
+                      setActiveSection(section.key);
+                      setActiveIndex(0);
+                      requestAnimationFrame(() => searchRef.current?.focus());
+                    }}
+                  >
+                    {section.kind === "local" ? (
+                      <LaptopGlyph size={18} />
+                    ) : mark?.logo ? (
+                      <ModelLogo logo={mark.logo} />
+                    ) : (
+                      <span aria-hidden="true">{mark?.initial ?? "⇢"}</span>
+                    )}
+                    <span className="chat-model-provider-count">{section.items.length}</span>
+                  </button>
+                );
+              })}
+            </nav>
+            <div className="chat-modelpop-main">
+              <label className="chat-model-search">
+                <SearchGlyph size={14} />
+                <input
+                  ref={searchRef}
+                  value={query}
+                  placeholder="Search models…"
+                  aria-label="Search models"
+                  onChange={(event) => {
+                    setQuery(event.currentTarget.value);
+                    setActiveIndex(0);
+                  }}
+                />
+              </label>
+              <div className="chat-modelpop-heading">
+                <div>
+                  <strong>{normalizedQuery ? "Search results" : currentSection?.label}</strong>
+                  {!normalizedQuery && currentSection?.hint && <span>{currentSection.hint}</span>}
+                </div>
+                <span>{flatItems.length}</span>
+              </div>
+              <div className="chat-modelpop-list" role="radiogroup" aria-label="Available models">
+                {flatItems.length === 0 ? (
+                  <p className="chat-model-empty">No models match “{query.trim()}”.</p>
+                ) : (
+                  flatItems.map((m, index) => {
                     const sel = m.id === picked?.id;
+                    const mark = chatMark(m.provider, m.label);
+                    const owner = sectionFor(m)?.label ?? m.provider;
                     return (
                       <button
                         type="button"
@@ -877,7 +937,17 @@ function ModelPicker({
                           setOpen(false);
                         }}
                       >
-                        <span className="chat-modelrow-name">{shortModelLabel(m.label)}</span>
+                        <span className="chat-modelrow-logo">
+                          {mark.logo ? (
+                            <ModelLogo logo={mark.logo} />
+                          ) : (
+                            <span aria-hidden="true">{mark.initial}</span>
+                          )}
+                        </span>
+                        <span className="chat-modelrow-copy">
+                          <span className="chat-modelrow-name">{shortModelLabel(m.label)}</span>
+                          <small>{owner}</small>
+                        </span>
                         {m.vision && (
                           <span className="chat-modelrow-tag" title="Can see attached images">
                             <EyeGlyph size={13} />
@@ -888,9 +958,10 @@ function ModelPicker({
                         )}
                       </button>
                     );
-                  })}
+                  })
+                )}
               </div>
-            ))}
+            </div>
           </div>,
           document.body,
         )}
@@ -1465,8 +1536,8 @@ const ChatMessage = memo(function ChatMessage({
       </div>
       {!you && onOpenArtifact && <ChatArtifactButtons artifacts={artifacts} onOpen={onOpenArtifact} />}
       <div className={endMark ? "cmsg-footer has-endmark" : "cmsg-footer"}>
-        {timeLabel && <time dateTime={at}>{timeLabel}</time>}
         <div className="cmsg-actions">
+          {timeLabel && <time dateTime={at}>{timeLabel}</time>}
           <button
             type="button"
             className="cmsg-act"
@@ -1552,7 +1623,9 @@ export function ChatSurface({
   const clearChatMeasure = useUiStore((s) => s.clearChatMeasure);
   const chatNoteOpen = useUiStore((s) => s.chatNoteOpen);
   const chatWelcomeStyle = useUiStore((s) => s.chatWelcomeStyle);
+  const chatNaming = useUiStore((s) => s.chatNaming);
   const chatArtifactOpen = useUiStore((s) => s.chatArtifactOpen);
+  const activeView = useUiStore((s) => s.activeView);
   const userName = useUiStore((s) => s.userName);
   const imageEngine = useUiStore((s) => s.imageEngine);
   const isFocusedPane = usePanesStore((s) => s.focusedPaneId === paneId);
@@ -1608,12 +1681,23 @@ export function ChatSurface({
   const active = cfg.data ? activeInstance(cfg.data) : null;
   const chats = useInstanceChats(active);
   const write = useWriteChat();
+  const updateTitle = useUpdateChatTitle();
   // The stored title is presentation; attachment identity is the note stem.
   // A session mapping makes a just-created note chat immediately resolvable,
   // while a current or preserved filename alias restores it after relaunch.
   // The resolver retains the old id-tail path for pre-readable-name chats.
   const summary = chatSlug ? chats.data?.find((chat) => chat.slug === chatSlug) : undefined;
   const storedTitle = summary?.title ?? null;
+  const displayTitle = storedTitle || chatSlug?.replace(/-/g, " ") || "New chat";
+  const [editingStoredTitle, setEditingStoredTitle] = useState(false);
+  const [storedTitleDraft, setStoredTitleDraft] = useState("");
+  const [titleRenameErr, setTitleRenameErr] = useState<string | null>(null);
+  useEffect(() => {
+    setEditingStoredTitle(false);
+    setStoredTitleDraft(displayTitle);
+    setTitleRenameErr(null);
+  }, [chatSlug, displayTitle]);
+
   const attachedStem = (summary?.attachedTo ?? "").replace(/^\[\[|\]\]$/g, "").trim();
   const attachedNoteId =
     rememberedChatNote(chatSlug) ??
@@ -1744,9 +1828,9 @@ export function ChatSurface({
   const fileRef = useRef<HTMLInputElement>(null);
   const msgRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
-  /** One-shot: a new chat opens with the caret in its title field, and nothing
-   * later steals focus back (Seth, 2026-08-04). */
-  const didFocusTitle = useRef(false);
+  /** One-shot: a new chat follows its naming preference, and nothing later
+   * steals focus back from whichever field the user receives. */
+  const didFocusNewChat = useRef(false);
   // true once THIS chat's history carries secure-note content (loaded marker
   // or a secure read during a live turn) — drives the one-way taint
   const secureReadRef = useRef(false);
@@ -1759,7 +1843,10 @@ export function ChatSurface({
   // orphaning is the honest cancel: the UI is free, the result is discarded)
   const runSeq = useRef(0);
   // what Stop gives back to the composer — the sent prompt returns intact
-  const lastSentRef = useRef<{ text: string; images: ChatImageAttachment[] } | null>(null);
+  const lastSentRef = useRef<{
+    text: string;
+    images: ChatImageAttachment[];
+  } | null>(null);
   // this turn's place in the local-compute queue, or null when it's actually
   // generating. Local models share one Mac: a send that doesn't fit measured
   // headroom WAITS rather than piling on (docs/design/local-compute-guardrails.md).
@@ -1806,6 +1893,20 @@ export function ChatSurface({
   }, []);
 
   const writable = active?.perms === "chats+inbox";
+  const beginStoredTitleEdit = () => {
+    if (!chatSlug || !writable) return;
+    setStoredTitleDraft(displayTitle);
+    setTitleRenameErr(null);
+    setEditingStoredTitle(true);
+  };
+  const commitStoredTitle = () => {
+    setEditingStoredTitle(false);
+    const next = normalizeChatTitle(storedTitleDraft);
+    if (!active || !chatSlug || !next || next === displayTitle) return;
+    void updateTitle
+      .mutateAsync({ instance: active, slug: chatSlug, title: next })
+      .catch((error) => setTitleRenameErr(error instanceof Error ? error.message : String(error)));
+  };
 
   // per-chat web toggle (the composer globe) — keyed by slug; a not-yet-saved chat
   // rides a PANE-scoped key (session-only, never persisted): a shared "" key leaked
@@ -1881,18 +1982,18 @@ export function ChatSurface({
     return () => observer.disconnect();
   }, []);
 
-  // A NEW chat opens ready to be NAMED (Seth, 2026-08-04: "by default be in the
-  // top part where I can instantly type the name of the chat") — ⏎ from there
-  // still skips straight to the composer. Deps rather than mount-only because
+  // A NEW chat either opens ready to be named in the persistent header, or
+  // goes straight to the composer when first-message naming is selected. In
+  // ask mode, ⏎ always skips/accepts and moves to the composer. Deps rather than mount-only because
   // `writable` resolves with the memex config, so the input may not exist on
   // the first paint; the ref makes it fire exactly once, so a later config
   // refetch can never yank focus out of the message box. Only the FOCUSED
   // pane's chat claims focus — a chat opened into a split must not steal it.
   useEffect(() => {
-    if (didFocusTitle.current || chatSlug || !writable || !isFocusedPane) return;
-    didFocusTitle.current = true;
-    titleRef.current?.focus();
-  }, [chatSlug, writable, isFocusedPane]);
+    if (didFocusNewChat.current || chatSlug || !writable || !isFocusedPane) return;
+    didFocusNewChat.current = true;
+    (chatNaming === "ask" ? titleRef.current : msgRef.current)?.focus();
+  }, [chatNaming, chatSlug, writable, isFocusedPane]);
 
   // keep the newest message in view — including the live streaming row as it grows
   useEffect(() => {
@@ -2017,7 +2118,12 @@ export function ChatSurface({
     }));
     setMessages((p) => [
       ...p,
-      { speaker: "you", text: userText, at: userAt, images: imgs.map((image) => image.src) },
+      {
+        speaker: "you",
+        text: userText,
+        at: userAt,
+        images: imgs.map((image) => image.src),
+      },
     ]);
     setBusy(true);
     busyRef.current = true;
@@ -2034,7 +2140,7 @@ export function ChatSurface({
     // was active in the pane by then). If the write fails (read-only vault,
     // disk trouble), the run continues in-memory and the completion path falls
     // back to the old persist-at-the-end shape — same net behavior as before.
-    const sentTitle = title.trim() || deriveTitle(userText);
+    const sentTitle = normalizeChatTitle(title) || deriveChatTitle(userText);
     let sentSlug: string | null = chatSlug;
     let sentPersisted = false;
     try {
@@ -2634,93 +2740,150 @@ export function ChatSurface({
       {...{ [CHAT_PANE_ATTR]: paneId }}
       style={{ "--chat-measure": `${CHAT_MEASURE_PX[measure]}px` } as CSSProperties}
     >
-      {!pristineChat && (
-        <header className="chat-head">
-          <h2 className="chat-title-h">
-            {chatSlug ? storedTitle || chatSlug.replace(/-/g, " ") : "New chat"}
-          </h2>
-          {active && <span className="chat-inst">· {active.label}</span>}
-          {active && (
-            <div className="chat-head-tools">
-              {artifacts.length > 0 && (artifactsCompact || !artifactsOpen) && (
-                <>
-                  <button
-                    ref={artifactsBtnRef}
-                    type="button"
-                    className={[
-                      "chat-head-action",
-                      "artifacts",
-                      artifactsCompact ? "icon-only" : "",
-                      artifactsOpen ? "on" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    aria-expanded={artifactsOpen}
-                    aria-label={`Chat artifacts, ${artifacts.length}`}
-                    title={`Artifacts created in this chat (${artifacts.length})`}
-                    onClick={() => setArtifactsOpen((value) => !value)}
-                  >
-                    <AssetsGlyph />
-                    {!artifactsCompact && (
-                      <>
-                        <span>Artifacts</span>
-                        <span className="chat-head-count">{artifacts.length}</span>
-                      </>
-                    )}
-                  </button>
-                  {artifactsOpen && artifactsCompact && (
-                    <ArtifactsDrawer
-                      artifacts={artifacts}
-                      anchorRef={artifactsBtnRef}
-                      onOpen={(artifact) => {
-                        setArtifactsOpen(false);
-                        openArtifact(artifact.kind, artifact.id);
-                      }}
-                      onClose={() => setArtifactsOpen(false)}
-                    />
-                  )}
-                </>
-              )}
-              <button
-                ref={measureBtnRef}
-                type="button"
-                className={measureOpen ? "chat-head-action icon-only on" : "chat-head-action icon-only"}
-                aria-label="Chat width"
-                aria-expanded={measureOpen}
-                title="Chat width — Narrow / Comfort / Wide"
-                onClick={() => setMeasureOpen((v) => !v)}
-              >
-                <WidthGlyph />
-              </button>
-              {measureOpen && (
-                <MeasureMenu
-                  value={measure}
-                  anchorRef={measureBtnRef}
-                  onPick={(m) => setChatMeasure(webKey, m)}
-                  onClose={() => setMeasureOpen(false)}
-                />
-              )}
-              <button
-                type="button"
-                className={
-                  attachedStem ? "chat-head-action icon-only available" : "chat-head-action icon-only"
+      <header className="chat-head">
+        <div className="chat-breadcrumb" aria-label="Chat location and title">
+          <span className="chat-context">{activeView || active?.label || "Chat"}</span>
+          <span className="chat-breadcrumb-separator" aria-hidden="true">
+            /
+          </span>
+          {!chatSlug && chatNaming === "ask" && writable ? (
+            <label className="chat-title-field">
+              <input
+                ref={titleRef}
+                className="chat-title-edit is-new"
+                aria-label="Chat name, optional"
+                placeholder="Name this chat (optional)"
+                maxLength={CHAT_TITLE_MAX_LENGTH}
+                value={title}
+                onChange={(event) => setDraftTitle(tabId, event.currentTarget.value)}
+                onKeyDown={(event) => {
+                  event.stopPropagation();
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    msgRef.current?.focus();
+                  }
+                }}
+              />
+              <span className="chat-title-skip">{chatTitleAdvanceHint(title)}</span>
+            </label>
+          ) : chatSlug && editingStoredTitle ? (
+            <input
+              className="chat-title-edit"
+              aria-label="Rename chat"
+              autoFocus
+              maxLength={CHAT_TITLE_MAX_LENGTH}
+              value={storedTitleDraft}
+              onChange={(event) => setStoredTitleDraft(event.currentTarget.value)}
+              onBlur={commitStoredTitle}
+              onKeyDown={(event) => {
+                event.stopPropagation();
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  event.currentTarget.blur();
+                } else if (event.key === "Escape") {
+                  event.preventDefault();
+                  setStoredTitleDraft(displayTitle);
+                  setEditingStoredTitle(false);
                 }
-                disabled={!chatSlug || !writable || noteBusy}
-                title={
-                  !chatSlug
-                    ? "Send a message first — the note attaches to the saved chat"
-                    : attachedStem
-                      ? "Open this chat's note"
-                      : "Create this chat's note"
-                }
-                onClick={() => void onNoteToggle()}
-              >
-                <NoteGlyph />
-              </button>
-            </div>
+              }}
+            />
+          ) : chatSlug ? (
+            <button
+              type="button"
+              className="chat-title-h"
+              title={writable ? "Rename chat" : displayTitle}
+              disabled={!writable}
+              onClick={beginStoredTitleEdit}
+            >
+              {displayTitle}
+            </button>
+          ) : (
+            <span className="chat-title-h is-placeholder">New chat</span>
           )}
-        </header>
-      )}
+          {titleRenameErr && (
+            <span className="chat-title-error" role="alert" title={titleRenameErr}>
+              Couldn’t rename
+            </span>
+          )}
+        </div>
+        {active && (
+          <div className="chat-head-tools">
+            {artifacts.length > 0 && (artifactsCompact || !artifactsOpen) && (
+              <>
+                <button
+                  ref={artifactsBtnRef}
+                  type="button"
+                  className={[
+                    "chat-head-action",
+                    "artifacts",
+                    artifactsCompact ? "icon-only" : "",
+                    artifactsOpen ? "on" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  aria-expanded={artifactsOpen}
+                  aria-label={`Chat artifacts, ${artifacts.length}`}
+                  title={`Artifacts created in this chat (${artifacts.length})`}
+                  onClick={() => setArtifactsOpen((value) => !value)}
+                >
+                  <AssetsGlyph />
+                  {!artifactsCompact && (
+                    <>
+                      <span>Artifacts</span>
+                      <span className="chat-head-count">{artifacts.length}</span>
+                    </>
+                  )}
+                </button>
+                {artifactsOpen && artifactsCompact && (
+                  <ArtifactsDrawer
+                    artifacts={artifacts}
+                    anchorRef={artifactsBtnRef}
+                    onOpen={(artifact) => {
+                      setArtifactsOpen(false);
+                      openArtifact(artifact.kind, artifact.id);
+                    }}
+                    onClose={() => setArtifactsOpen(false)}
+                  />
+                )}
+              </>
+            )}
+            <button
+              ref={measureBtnRef}
+              type="button"
+              className={measureOpen ? "chat-head-action icon-only on" : "chat-head-action icon-only"}
+              aria-label="Chat width"
+              aria-expanded={measureOpen}
+              title="Chat width — Narrow / Comfort / Wide"
+              onClick={() => setMeasureOpen((v) => !v)}
+            >
+              <WidthGlyph />
+            </button>
+            {measureOpen && (
+              <MeasureMenu
+                value={measure}
+                anchorRef={measureBtnRef}
+                onPick={(m) => setChatMeasure(webKey, m)}
+                onClose={() => setMeasureOpen(false)}
+              />
+            )}
+            <button
+              type="button"
+              className={attachedStem ? "chat-head-action icon-only available" : "chat-head-action icon-only"}
+              disabled={!chatSlug || !writable || noteBusy}
+              title={
+                !chatSlug
+                  ? "Send a message first — the note attaches to the saved chat"
+                  : attachedStem
+                    ? "Open this chat's note"
+                    : "Create this chat's note"
+              }
+              onClick={() => void onNoteToggle()}
+            >
+              <NoteGlyph />
+            </button>
+          </div>
+        )}
+      </header>
 
       {!isTauri() ? (
         <div className="list-empty chat-empty">
@@ -2747,19 +2910,21 @@ export function ChatSurface({
               <div className="chat-thread">
                 {messages.length === 0 ? (
                   <div className={`chat-newhint ${pristineChat ? chatWelcomeStyle : "calm"}`}>
-                    <div className="chat-welcome-scene">
-                      <Character
-                        name={pristineChat ? chatWelcomeCharacter(welcomeHour, chatWelcomeStyle) : "chat"}
-                        size={pristineChat ? 96 : 84}
-                        className="chat-welcome-character"
-                      />
+                    <div className="chat-welcome-heading">
+                      <div className="chat-welcome-scene">
+                        <Character
+                          name={pristineChat ? chatWelcomeCharacter(welcomeHour, chatWelcomeStyle) : "chat"}
+                          size={pristineChat ? 58 : 50}
+                          className="chat-welcome-character"
+                        />
+                      </div>
+                      <p className="chat-hint-title">
+                        {pristineChat ? chatWorkPrompt(userName) : "No messages yet."}
+                      </p>
                     </div>
-                    <p className="chat-hint-title">
-                      {pristineChat ? chatGreeting(welcomeHour, userName) : "No messages yet."}
-                    </p>
                     <p className="chat-sub">
                       {pristineChat
-                        ? "What would you like to explore in your vault?"
+                        ? "Ask, make, or search across this vault."
                         : "This saved chat is ready for its first message."}
                     </p>
                   </div>
@@ -2782,7 +2947,10 @@ export function ChatSurface({
                       {...(m.images ? { images: m.images } : {})}
                       endMark={!busy && idx === messages.length - 1 && m.speaker !== "you"}
                       {...(!busy && m.artifacts?.length
-                        ? { artifacts: m.artifacts, onOpenArtifact: openArtifactItem }
+                        ? {
+                            artifacts: m.artifacts,
+                            onOpenArtifact: openArtifactItem,
+                          }
                         : {})}
                     />
                   ))
@@ -2861,24 +3029,6 @@ export function ChatSurface({
               <>
                 <div className="chat-composer">
                   <div className="chat-composer-inner">
-                    {!chatSlug && (
-                      <input
-                        ref={titleRef}
-                        className="chat-input chat-title-input"
-                        placeholder="Chat title (optional — ⏎ skips; your first message names it)…"
-                        value={title}
-                        onChange={(e) => setDraftTitle(tabId, e.target.value)}
-                        onKeyDown={(e) => {
-                          e.stopPropagation();
-                          // ⏎ with nothing typed = "you name it": drop into the
-                          // composer; the first message titles the chat (deriveTitle)
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            msgRef.current?.focus();
-                          }
-                        }}
-                      />
-                    )}
                     {images.length > 0 && (
                       <div className="chat-attachments">
                         {images.map((image, i) => (

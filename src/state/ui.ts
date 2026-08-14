@@ -14,14 +14,16 @@ export type ThemeSetting = "light" | "dark" | "system";
 
 /** Theme family: Warm is the branded pair; Mono is Paper and Charcoal. */
 export type ThemeFamily = "warm" | "mono";
+export type OnboardingPhase = "preferences" | "vault" | "models";
 export type SyntaxPalette = "rotli" | "mono";
 
 /** The user's PRIMARY color (Seth, 2026-07-28): the active state, folder
  * color, selection wash — everything riding --accent. "default" keeps each
  * theme's own truth (warm clay / mono ink); a named accent overrides it in
  * both schemes. Chosen in onboarding, changeable in Settings → Appearance. */
-export const ACCENT_COLORS = ["default", "blue", "green", "violet", "rose", "amber"] as const;
+export const ACCENT_COLORS = ["default", "blue", "green", "violet", "rose", "amber", "custom"] as const;
 export type AccentColor = (typeof ACCENT_COLORS)[number];
+export const DEFAULT_ACCENT_HUE = 210;
 
 /** The four solid themes, in the order the titlebar sun cycles them. */
 export const SOLID_THEMES: {
@@ -33,6 +35,32 @@ export const SOLID_THEMES: {
   { family: "warm", mode: "dark", label: "Warm Dark" },
   { family: "mono", mode: "light", label: "Paper" },
   { family: "mono", mode: "dark", label: "Charcoal" },
+];
+
+/** Settings/onboarding presentation. Each family is one theme with a light and
+ * dark environment; System chooses between the same pair automatically. The
+ * underlying four environments and titlebar cycle above stay unchanged. */
+export const THEME_FAMILY_PRESENTATIONS: readonly {
+  family: ThemeFamily;
+  label: string;
+  description: string;
+  lightLabel: string;
+  darkLabel: string;
+}[] = [
+  {
+    family: "mono",
+    label: "Paper & Charcoal",
+    description: "Paper in Light, Charcoal in Dark.",
+    lightLabel: "Paper",
+    darkLabel: "Charcoal",
+  },
+  {
+    family: "warm",
+    label: "Rotli",
+    description: "Clay and cream by day, cocoa at night.",
+    lightLabel: "Warm Light",
+    darkLabel: "Warm Dark",
+  },
 ];
 
 /** The organizer daemon's §4.3 trust ladder, monotonic in risk. Off = dormant ·
@@ -73,6 +101,13 @@ export const TASK_CYCLES: readonly TaskCycle[] = ["two", "three"];
 export type ChatWelcomeStyle = "calm" | "lively";
 
 export const CHAT_WELCOME_STYLES: readonly ChatWelcomeStyle[] = ["calm", "lively"];
+
+/** How a fresh chat gets its display title. `ask` puts a quiet, skippable
+ * field in the persistent chat header; `automatic` derives it from the first
+ * message without adding another stop before the composer. */
+export type ChatNaming = "ask" | "automatic";
+
+export const CHAT_NAMINGS: readonly ChatNaming[] = ["ask", "automatic"];
 
 /** How the pane tab bar handles a crowded strip. `scroll` preserves a
  * readable tab floor and pans horizontally; `fit` keeps every tab visible by
@@ -171,10 +206,10 @@ export type DashboardSection = "rotli" | "models";
  * corpus, not a separate window or a tab, so switching lenses must leave the
  * current notes contentView and pane tree untouched. */
 export type SidebarMode = "notes" | "breve";
-/** Breve's four sections (2026-07-30 rework): reading first (Briefs), then the
- * schedule (Routines), the topic registry (Watchlist), and one Settings home
- * (the former Models + Configure views merged). */
-export type BreveView = "briefs" | "routines" | "watchlist" | "settings";
+/** Breve stays a vault-bound operational lens. Dashboard is the news-hub
+ * landing, Notifications is the sanitized routine activity projection, and
+ * the durable briefs/routines/watchlist/settings surfaces remain available. */
+export type BreveView = "dashboard" | "briefs" | "notifications" | "routines" | "watchlist" | "settings";
 
 /** The sidebar's FRONTS (Seth, 2026-08-01, from Claude Desktop's Home|Code
  * pill): a two-segment switcher under the vault header replaces the old stacked
@@ -234,6 +269,9 @@ interface UiState {
   /** The primary color — see ACCENT_COLORS. "default" = the theme's own. */
   accentColor: AccentColor;
   setAccentColor: (accent: AccentColor) => void;
+  /** Hue used by the contrast-managed Custom accent (0–359). */
+  accentHue: number;
+  setAccentHue: (hue: number) => void;
 
   /** General: visitor (click-away hides, default) vs resident (stays open). */
   stayOpen: boolean;
@@ -259,6 +297,10 @@ interface UiState {
    * gate re-onboards on every 0.x update, then freezes post-1.0. */
   onboardingVersion: string;
   setOnboardingVersion: (v: string) => void;
+  /** Durable first-run checkpoint. Vault selection may relaunch the native app,
+   * so the next launch must resume at model setup instead of starting over. */
+  onboardingPhase: OnboardingPhase;
+  setOnboardingPhase: (phase: OnboardingPhase) => void;
 
   /** The Quick Note window's capped set (Seth, 2026-06-15): up to QUICK_MAX
    * note ids, in switcher order. The mutations + cross-webview sync live in
@@ -503,6 +545,10 @@ interface UiState {
   /** The fresh-chat welcome's visual personality. Machine-level appearance. */
   chatWelcomeStyle: ChatWelcomeStyle;
   setChatWelcomeStyle: (v: ChatWelcomeStyle) => void;
+  /** Whether a fresh chat asks for a name in its header or names itself from
+   * the first message. Existing chat names always remain directly editable. */
+  chatNaming: ChatNaming;
+  setChatNaming: (v: ChatNaming) => void;
   /** Where files and boards created by chat open. Persisted per vault. */
   chatArtifactOpen: ChatArtifactOpen;
   setChatArtifactOpen: (v: ChatArtifactOpen) => void;
@@ -642,6 +688,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setSyntaxPalette: (palette) => set({ syntaxPalette: palette }),
   accentColor: "default",
   setAccentColor: (accent) => set({ accentColor: accent }),
+  accentHue: DEFAULT_ACCENT_HUE,
+  setAccentHue: (hue) => set({ accentHue: Math.max(0, Math.min(359, Math.round(hue))) }),
 
   stayOpen: false,
   setStayOpen: (on) => set({ stayOpen: on }),
@@ -656,6 +704,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setOnboarded: (done) => set({ onboarded: done }),
   onboardingVersion: "",
   setOnboardingVersion: (v) => set({ onboardingVersion: v }),
+  onboardingPhase: "preferences",
+  setOnboardingPhase: (phase) => set({ onboardingPhase: phase }),
 
   quickNoteIds: [],
   setQuickNoteIds: (ids) => set({ quickNoteIds: ids }),
@@ -696,7 +746,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   },
   sidebarView: "home",
   setSidebarView: (view) => set({ sidebarView: view }),
-  breveView: "briefs",
+  breveView: "dashboard",
   setBreveView: (view) => {
     const current = get();
     if (
@@ -873,6 +923,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setChatNoteOpen: (v) => set({ chatNoteOpen: v }),
   chatWelcomeStyle: "lively",
   setChatWelcomeStyle: (v) => set({ chatWelcomeStyle: v }),
+  chatNaming: "ask",
+  setChatNaming: (v) => set({ chatNaming: v }),
   chatArtifactOpen: "sidecar",
   setChatArtifactOpen: (v) => set({ chatArtifactOpen: v }),
   hotkeyPeek: "badges",

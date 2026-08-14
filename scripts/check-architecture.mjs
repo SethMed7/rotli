@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { LIB_EFFECTFUL_FILE_OWNERS, sourceOwnershipViolations } from "./source-ownership.ts";
 
 const root = process.cwd();
 
@@ -102,6 +103,28 @@ const protectedLayers = [
 
 const violations = [];
 
+// Every source root and presentation cluster has an explicit owner. This closes
+// the catch-all loophole where a new capability could land beside established
+// features without choosing a boundary, and where components/ accumulated
+// feature helpers that belonged together.
+const sourceEntries = readdirSync(join(root, "src"), { withFileTypes: true });
+const componentEntries = readdirSync(join(root, "src", "components"), { withFileTypes: true });
+violations.push(
+  ...sourceOwnershipViolations({
+    sourceDirectories: sourceEntries.filter((entry) => entry.isDirectory()).map((entry) => entry.name),
+    sourceRootFiles: sourceEntries
+      .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name))
+      .map((entry) => entry.name),
+    componentDirectories: componentEntries.filter((entry) => entry.isDirectory()).map((entry) => entry.name),
+    componentRootFiles: componentEntries
+      .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name))
+      .map((entry) => entry.name),
+    serviceFiles: readdirSync(join(root, "src", "services"), { withFileTypes: true })
+      .filter((entry) => entry.isFile() && /\.ts$/.test(entry.name) && !/\.test\.ts$/.test(entry.name))
+      .map((entry) => entry.name),
+  }),
+);
+
 // F7: a partial split (any role file or composition.ts without BOTH trigger
 // files) gets no protection above — that state must be exempt-by-name, and an
 // exemption must go stale loudly, never linger past a real split.
@@ -131,6 +154,29 @@ function importsOf(source) {
     ...source.matchAll(/(?:from\s+|import\s*\()(["'])([^"']+)\1/g),
     ...source.matchAll(/import\s+(["'])([^"']+)\1/g),
   ].map((match) => match[2]);
+}
+
+// lib is dependency-inward by default. The few cross-capability gesture and
+// shell adapters are explicit, reasoned exceptions; an effectful import in any
+// other lib file is a placement failure, and stale exceptions fail too.
+const effectfulLibPrefixes = ["@tauri-apps/", "../memex/", "../newItems/", "../services/", "../state/"];
+const libDir = join(root, "src", "lib");
+const effectfulLibFiles = new Set();
+for (const name of readdirSync(libDir)) {
+  if (!/\.tsx?$/.test(name) || /\.test\.tsx?$/.test(name)) continue;
+  const imports = importsOf(readFileSync(join(libDir, name), "utf8"));
+  if (!imports.some((dependency) => effectfulLibPrefixes.some((prefix) => dependency.startsWith(prefix)))) {
+    continue;
+  }
+  effectfulLibFiles.add(name);
+  if (!(name in LIB_EFFECTFUL_FILE_OWNERS)) {
+    violations.push(`src/lib/${name}: effectful cross-capability code needs a named owner or a services/ home`);
+  }
+}
+for (const name of Object.keys(LIB_EFFECTFUL_FILE_OWNERS)) {
+  if (!effectfulLibFiles.has(name)) {
+    violations.push(`src/lib/${name}: effectful-lib ownership entry is stale or the file is missing`);
+  }
 }
 
 for (const layer of protectedLayers) {
@@ -243,5 +289,5 @@ if (violations.length) {
 }
 
 console.log(
-  `check:architecture ok — ${discoveredCleanFiles.length} clean-feature files point inward (${Object.keys(cleanFeatureExemptions).length} dirs exempt by name); ports and pure policies stay adapter-free; Tauri stays behind its adapter`,
+  `check:architecture ok — source roots, presentation clusters, services, and effectful lib adapters have owners; ${discoveredCleanFiles.length} clean-feature files point inward (${Object.keys(cleanFeatureExemptions).length} dirs exempt by name); Tauri stays behind its adapter`,
 );

@@ -1849,6 +1849,8 @@ export interface ThemePayload {
   themeFamily: "warm" | "mono";
   matchLightFamily: "warm" | "mono";
   matchDarkFamily: "warm" | "mono";
+  accentColor: "default" | "blue" | "green" | "violet" | "rose" | "amber" | "custom";
+  accentHue: number;
 }
 
 export function emitThemeSet(payload: ThemePayload): void {
@@ -1967,6 +1969,15 @@ export interface BreveBrief {
   audioPath?: string;
 }
 
+export interface BreveNotification {
+  id: string;
+  at: string;
+  routine?: string;
+  kind: "running" | "success" | "warning" | "info";
+  title: string;
+  detail: string;
+}
+
 export interface BreveSnapshot {
   source: "rotli" | "legacy" | "empty";
   legacyRoot: string | null;
@@ -1976,9 +1987,18 @@ export interface BreveSnapshot {
   creators: Array<{ name: string; handle: string; channelId?: string }>;
   pages: Array<{ id: number; url: string; condition: string }>;
   briefs: BreveBrief[];
+  /** Sanitized projection of the current vault's recent scheduler log. Raw
+   * commands, paths, prompts, and stderr never cross IPC. */
+  notifications: BreveNotification[];
   artifactCount: number;
   imported: boolean;
   scheduler: "rotli" | "legacy-launchd" | "none";
+}
+
+export interface BreveBackfillResult {
+  snapshot: BreveSnapshot;
+  status: "preview" | "complete";
+  message: string;
 }
 
 export interface BreveDeliverySettings {
@@ -2045,6 +2065,7 @@ function browserBreveSnapshot(): BreveSnapshot {
         imported: true,
       },
     ],
+    notifications: [],
     artifactCount: 208,
     imported: true,
     scheduler: "rotli",
@@ -2094,6 +2115,16 @@ export function breveWriteWatchlist(markdown: string): Promise<BreveSnapshot> {
       watchlist: markdown,
     });
   return invoke<BreveSnapshot>("breve_write_watchlist", { markdown });
+}
+
+export function breveBackfillWatchlist(): Promise<BreveBackfillResult> {
+  if (!isTauri())
+    return Promise.resolve({
+      snapshot: browserBreveSnapshot(),
+      status: "preview",
+      message: "Preview only in the browser—no model ran and no files changed.",
+    });
+  return invoke<BreveBackfillResult>("breve_backfill_watchlist");
 }
 
 export function breveDeliverySettings(): Promise<BreveDeliverySettings> {

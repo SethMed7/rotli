@@ -217,6 +217,28 @@ export function appendMessages(existing: string, messages: ChatMsg[], date: stri
   return bumpUpdated(existing + composeMessageLines(messages, date), date);
 }
 
+/** Update the chat's presentation title without changing its filename identity.
+ * Only the first frontmatter block and the contract-owned H1 immediately after
+ * it are touched; message text that happens to contain `title:` or `#` remains
+ * byte-for-byte intact. */
+export function setChatTitle(contents: string, title: string): string {
+  const clean = title
+    .replace(/[\r\n]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+  if (!clean) return contents;
+  const frontmatter = /^---\n([\s\S]*?)\n---/.exec(contents);
+  if (!frontmatter || frontmatter[1] === undefined) return contents;
+
+  const body = frontmatter[1];
+  const nextBody = /^title:.*$/m.test(body)
+    ? body.replace(/^title:.*$/m, `title: ${clean}`)
+    : `title: ${clean}\n${body}`;
+  const next = `---\n${nextBody}\n---${contents.slice(frontmatter[0].length)}`;
+  return next.replace(/^(---\n[\s\S]*?\n---\n\n)# [^\n]*/, `$1# ${clean}`);
+}
+
 /** Build the full bytes of a brand-NEW chat (header + any initial messages),
  *  matching conversations.ts's create-then-append net result. */
 export function composeNewChat(

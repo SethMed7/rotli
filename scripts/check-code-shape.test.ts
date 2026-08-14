@@ -54,4 +54,12 @@ describe("code-shape checker", () => {
     expect(result.stderr).toContain("focused or skipped tests");
     expect(result.stderr).toContain("@ts-ignore");
   });
+
+  test("rejects focused Playwright specs", async () => {
+    const result = await fixture({
+      "e2e/onboarding.spec.ts": "test" + ".only('onboards', async () => {});\n",
+    });
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("e2e/onboarding.spec.ts: focused or skipped tests are not allowed");
+  });
 });

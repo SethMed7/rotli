@@ -48,6 +48,7 @@ import {
   parsePrimaryUser,
   setAttachedTo,
   setChatPinned,
+  setChatTitle,
   setChatSecureContext,
   today,
   ulid,
@@ -224,6 +225,26 @@ export async function renameChat(instance: MemexInstance, oldSlug: string, newSl
     throw new Error("this vault is read-only — can't rename a chat here");
   }
   return memexRenameChat(instance.root, oldSlug, newSlug);
+}
+
+/** Change a chat's display title while keeping its durable filename identity.
+ * Revision conflicts get one fresh read, matching the other frontmatter edits. */
+export async function updateChatTitle(instance: MemexInstance, slug: string, title: string): Promise<void> {
+  if (!canWrite(`chats/${slug}.md`, instance.perms)) {
+    throw new Error("this vault is read-only — can't rename a chat here");
+  }
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const existing = await memexReadChat(instance.root, slug);
+    const next = setChatTitle(existing.contents, title);
+    if (next === existing.contents) return;
+    try {
+      await memexWriteChat(instance.root, slug, next, existing.revision);
+      return;
+    } catch (error) {
+      if (attempt === 0 && /revision conflict/i.test(String(error))) continue;
+      throw error;
+    }
+  }
 }
 
 /** Soft-delete a chat (→ hidden chats/trash/, recoverable in Finder). */

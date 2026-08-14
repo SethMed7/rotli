@@ -85,7 +85,10 @@ const creator: NewItemCreator = {
     if (kind === "sheet") {
       const { createBlankWorkbookBase64 } = await import("../sheets/create");
       const base64 = await createBlankWorkbookBase64();
-      return { id: await corpusCreateManagedFile(`untitled-${Date.now()}.xlsx`, base64), kind };
+      return {
+        id: await corpusCreateManagedFile(`untitled-${Date.now()}.xlsx`, base64),
+        kind,
+      };
     }
     throw new Error("a board needs a name before it can be created");
   },
@@ -170,13 +173,42 @@ export async function createManagedItem(
   return item;
 }
 
+/** Turn the transient empty-vault welcome into the user's first real note.
+ * The caller supplies a non-empty Markdown body only after the user names it;
+ * until then there is no durable file to clean up. */
+export function createNamedMarkdownItem(body: string): Promise<CreatedItem> {
+  if (!body.trim()) return Promise.reject(new Error("name the note before creating it"));
+  const namedCreator: NewItemCreator = {
+    async create() {
+      const selected = useUiStore.getState().selectedFolderId;
+      const selectedMain = selected.startsWith(MAIN_ROOT);
+      const routeFolder = selectedMain ? ALL_NOTES : selected;
+      const id = await createRoutedNote({
+        selectedFolderId: routeFolder,
+        isSmart: routeFolder === ALL_NOTES || routeFolder === RECENT,
+        localFallback: inboxFolderId,
+        body,
+      });
+      return { id, kind: "markdown" };
+    },
+  };
+  return createNewItem({ creator: namedCreator, presenter }, "markdown", {
+    newTab: false,
+  });
+}
+
 /** Create a populated editable Word artifact while retaining the same refresh,
  * Main/view filing, and presentation policy as a toolbar-created document.
  * Populated artifacts are never tracked as discardable blank drafts. */
 export function createManagedDocumentWithContent(
   title: string,
   body: string,
-  options: { newTab?: boolean; open?: boolean; images?: DocumentImage[]; rootId?: string } = {},
+  options: {
+    newTab?: boolean;
+    open?: boolean;
+    images?: DocumentImage[];
+    rootId?: string;
+  } = {},
 ): Promise<CreatedItem> {
   const populatedDocumentCreator: NewItemCreator = {
     async create() {
@@ -228,7 +260,12 @@ export function requestManagedBoardCreation(options: { newTab?: boolean } = {}):
 export function createManagedBoardWithBody(
   body: string,
   name: string,
-  options: { newTab?: boolean; open?: boolean; besideNoteId?: string; rootId?: string } = {},
+  options: {
+    newTab?: boolean;
+    open?: boolean;
+    besideNoteId?: string;
+    rootId?: string;
+  } = {},
 ): Promise<CreatedItem> {
   const populatedBoardCreator: NewItemCreator = {
     async create() {

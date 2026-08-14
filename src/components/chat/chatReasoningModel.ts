@@ -1,4 +1,4 @@
-import type { ChatReasoningEffort, ChatServiceTier } from "../state/ui";
+import type { ChatReasoningEffort, ChatServiceTier } from "../../state/ui";
 
 export interface ReasoningChoice {
   value: ChatReasoningEffort | null;

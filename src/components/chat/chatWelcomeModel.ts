@@ -1,5 +1,5 @@
-import type { ChatWelcomeStyle } from "../state/ui";
-import type { CharacterName } from "./character";
+import type { ChatWelcomeStyle } from "../../state/ui";
+import type { CharacterName } from "../character";
 
 export type ChatDaypart = "morning" | "noon" | "afternoon" | "evening";
 export type ChatWelcomeSuggestionKind = "search" | "write" | "organize";
@@ -22,6 +22,14 @@ export function chatGreeting(hour: number, userName: string): string {
   const daypart = chatDaypart(hour);
   const greeting = daypart === "noon" ? "afternoon" : daypart;
   return `Good ${greeting}${name ? `, ${name}` : ""}.`;
+}
+
+/** The new-chat prompt reads like an invitation instead of a dashboard
+ * salutation. Only the first name is used so a full profile value never turns
+ * into a piece of UI chrome. */
+export function chatWorkPrompt(userName: string): string {
+  const name = userName.trim().split(/\s+/)[0];
+  return `What should we work on${name ? `, ${name}` : ""}?`;
 }
 
 export function chatWelcomeCharacter(hour: number, style: ChatWelcomeStyle): CharacterName {

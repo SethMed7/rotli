@@ -378,8 +378,14 @@ fn configured_at(config_file: &Path, config_dir: &Path, default_root: &Path) -> 
 /// read-only: a fresh launch must not create `~/Documents/rotli` or write a
 /// `corpus.json` before the user chooses a vault.
 pub fn is_configured(app: &tauri::AppHandle) -> bool {
-    if cfg!(debug_assertions) || demo_active(app) {
+    if demo_active(app) {
         return true;
+    }
+    // Development may temporarily mirror the production vault so the shell can
+    // boot, but that fallback is not an onboarding choice. Only the isolated
+    // corpus.dev.json proves the developer explicitly selected a vault.
+    if cfg!(debug_assertions) {
+        return read_corpus_config(app).is_some();
     }
     use tauri::Manager;
     let Ok(dir) = app.path().app_config_dir() else {
@@ -426,10 +432,13 @@ fn dev_primary_from_config(cfg: CorpusConfig) -> Option<CorpusConfig> {
 }
 
 fn read_dev_source_config(app: &tauri::AppHandle) -> Option<CorpusConfig> {
-    production_corpus_config_file(app)
-        .and_then(|f| read_config_path_or_backup(&f))
+    read_corpus_config(app)
         .and_then(dev_primary_from_config)
-        .or_else(|| read_corpus_config(app).and_then(dev_primary_from_config))
+        .or_else(|| {
+            production_corpus_config_file(app)
+                .and_then(|f| read_config_path_or_backup(&f))
+                .and_then(dev_primary_from_config)
+        })
 }
 
 pub fn write_corpus_config(app: &tauri::AppHandle, cfg: &CorpusConfig) -> Result<(), String> {

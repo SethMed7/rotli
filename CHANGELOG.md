@@ -12,6 +12,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breve now opens as a vault-specific news dashboard.** The latest saved
+  briefs form a most-recent-first carousel on the left while Top stories stays
+  visible on the right, with watchlist sources, actions, upcoming routines, and
+  sanitized scheduler activity below. Watchlist has an explicit **Refresh last
+  30 days** action: it saves pending topic changes first, generates one
+  in-app brief in that vault in production, and reports its bounded lifecycle
+  through Breve Notifications. Development only previews that action in memory;
+  it does not run a model or write a production vault.
+
+- **Browser is available from New and ⌥T.** The New chooser exposes a Browser
+  action alongside Chat and durable file types, and the same action is
+  independently rebindable in Keybindings. It opens the user's default web
+  browser without creating a fake vault item.
+
+- **Global search now happens in the titlebar field itself.** Clicking search or
+  pressing ⌘K focuses the same top field and unfolds results directly beneath
+  it instead of opening a centered modal. A semantic fade quiets the rest of
+  the workspace while leaving the field, results, and underlying content crisp.
+  The field keeps one clean container: the Rotli mark and ⌘K hint no longer sit
+  inside extra chips. Search sections now follow their strongest result, so an
+  exact or prefix filename/title match rises above incidental note-body hits
+  instead of being buried by a fixed Notes-before-Files order.
+
+- **Development builds now keep a recognizable Dock icon.** The unbundled
+  `tauri dev` executable sets Rotli's quokka icon at runtime instead of falling
+  back to macOS's generic `exec` tile, with a fixed blue background that keeps
+  it visibly distinct from the production app. Its runtime-safe artwork uses
+  the same optical Dock footprint as the production icon rather than filling
+  the entire slot. Release icon choices are unchanged.
+
+- **Chat naming now lives in the chat header.** Fresh and saved chats share a
+  quiet `view / chat name` breadcrumb instead of putting a second title field
+  above the composer. The fixed header now remains the first row in fresh and
+  saved chats instead of being displaced beneath the welcome area. Ask-first
+  mode focuses that optional header name and Enter advances directly to the
+  message; First-message mode bypasses naming and derives a normalized title
+  automatically. Saved titles remain directly editable in the same header and
+  update their sidebar and tab labels without changing the durable Markdown
+  filename.
+
+- **Onboarding now owns the vault and model decisions end to end.** Completing
+  shortcuts always proceeds to an explicit vault choice—even in development—
+  with options to create a tagged Rotli vault, review an existing folder, use a
+  practice vault, or deliberately keep a configured vault. Development writes
+  only its isolated vault binding and no longer treats the production fallback
+  as selected. After vault activation, a relaunch-safe final step can install a
+  starter on-device model or connect authenticated Claude Code, Codex, and
+  Antigravity lanes; model setup remains optional and clearly labels connected
+  models as remote.
+  The model step now reuses and lists every registered on-device model, lets
+  users select the MLX default or confirm removal, and exposes the curated
+  install catalog model by model. Back buttons now display and invoke Rotli's
+  real remappable Back chord across preferences, vault substates, and models.
+  The shared setup frame now keeps its footer fixed across every step; long
+  model or vault content scrolls inside the middle stage instead of moving the
+  primary action. Progress now remains one continuous six-step count across
+  preferences, vault, and models. The model screen groups local models,
+  installs, and subscriptions into compact disclosures with explicit scroll
+  cues, while the slowly alternating edge companions remain present through
+  the complete onboarding flow. Those disclosures now use Rotli's shared
+  chevron and show the approved Gemma, Qwen, Llama, Phi, Mistral, Claude,
+  OpenAI, and Gemini-family marks beside the models they identify.
+
+- **Onboarding appearance separates theme from mode.** The same Charcoal,
+  Paper, Warm Light, and Warm Dark token sets are organized as two families—
+  Paper & Charcoal, and Rotli—with explicit Light, Dark, and System choices.
+  Selecting Light or Dark turns System off; System follows macOS within the
+  selected family. Primary color leads with the
+  environment's own accent, keeps the existing presets, and adds a persisted,
+  contrast-managed custom hue. Dock companion now leads the window choices,
+  and two partly hidden characters remain at the welcome edges while a slow,
+  low-opacity pair alternates positions; reduced motion keeps the scene static.
+
+- **Chat dates now share the message hover row.** The timestamp appears beside
+  Copy (and Read aloud when available) on message hover or keyboard focus,
+  keeping the transcript quiet without separating related metadata controls.
+
 - **Rotli activity and model usage are now separate, honest dashboards.** Home
   opens vault note/chat activity; Chat opens local provider usage. Both lenses
   offer 24-hour, 7-, 30-, and 90-day ranges, while model usage adds trends,
@@ -68,11 +145,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   longer jump. Settings → General can keep readable horizontally scrolling
   tabs or shrink the full tab set to fit the pane.
 
-- **Fresh chats now feel composed instead of empty.** The greeting follows the
-  local time of day, the still Rotli companion keeps its neutral brand ink, and
-  the Lively appearance places it in a quiet Morning, Noon, Afternoon, or Evening
-  scene without tinting the workspace. Useful vault-aware starters sit beneath a
-  wider, centered composer.
+- **Fresh chats now feel composed instead of empty.** A compact Rotli companion
+  asks “What should we work on?” beside the prompt instead of sitting inside a
+  decorative time-of-day card. An optional onboarding name personalizes that
+  line, and Lively adds one restrained arrival hop rather than a continuous idle
+  loop. Useful vault-aware starters sit beneath a wider, centered composer.
 - **Chat artifacts now open where the user expects.** The default reuses one
   right-side working pane for every artifact from a chat; Settings can instead
   choose a new pane or new tab. Word/document buttons
@@ -80,7 +157,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   presents them.
 - **Long chats are easier to navigate and clarify.** A quiet left-edge prompt
   navigator stays open while the pointer crosses into its compact, top-aligned
-  prompt list and jumps to earlier user turns. Every local/connected/hybrid model can surface the same
+  prompt list and jumps to earlier user turns. Hovering or keyboard-focusing a
+  prompt previews its matching rail marker with a lower-opacity accent while
+  the current prompt keeps the stronger state. Every local/connected/hybrid model can surface the same
   compact clarification bar; the composer groups attachments and web search
   under one add menu, keeps the model beside Send, and reminds users to verify
   important model responses.
@@ -115,6 +194,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   compatibility.
 
 ### Fixed
+
+- **A new vault now opens as a real empty workspace.** Its welcome and mini
+  tutorial are transient UI, so Rotli does not create a throwaway tutorial note
+  or probe an empty note id. Naming the first note creates it through the normal
+  vault workflow. Chat, board, and rich-file tabs also keep a bounded three-item
+  warm cache, reducing WebKit rebuild stalls while preserving independent chat
+  drafts and multiple simultaneously open chats.
+- **Chat setup controls are more compact and stable.** The optional title's
+  Enter hint now lives inside the title field, and the model chooser groups
+  Local, Claude Code, Codex, and Antigravity behind a provider rail with search,
+  family marks, keyboard navigation, and a bounded scrolling result list.
+
+- **Onboarding card shortcuts work before the cards have focus.** Arrow and
+  visible number keys now move from the selected card on every choice step,
+  while editors and other controls retain their keys. Vault activation also
+  names the exact folder action, and app setup proceeds directly to that real
+  picker instead of stopping on a misleading passive “choose where notes live”
+  screen.
 
 - **Chat image attachments survive reload without trusting the webview.** File
   picks and drops are copied atomically into the initiating registered vault,

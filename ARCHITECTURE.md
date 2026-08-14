@@ -48,6 +48,7 @@ by directory folklore.
 | Area | Ownership |
 |---|---|
 | `src/` | React presentation, frontend capability modules, application workflows, and browser/Tauri adapters |
+| `scripts/source-ownership.ts` | Executable ownership registry for every top-level `src/` area, root source file, presentation feature directory, root component, and effectful `lib` exception |
 | `src-tauri/src/` | Trusted Rust host: filesystem, security, IPC, process, updater, and scheduler edges |
 | `src-tauri/src/workspace.rs` | Headless application service plus CLI/MCP adapters over the same corpus policy; no provider calls |
 | `.rotli/main.json` / `.rotli/views.json` | Portable reference trees; named-view writes synchronize Markdown `view_tag` while boards/binaries remain frontmatter-free |

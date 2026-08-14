@@ -27,6 +27,15 @@ describe("userName", () => {
   });
 });
 
+describe("onboarding checkpoint", () => {
+  test("survives a vault-selection relaunch and rejects unknown phases", () => {
+    expect(parseSettings("{}").onboardingPhase).toBe("preferences");
+    expect(parseSettings('{"onboardingPhase":"vault"}').onboardingPhase).toBe("vault");
+    expect(parseSettings('{"onboardingPhase":"models"}').onboardingPhase).toBe("models");
+    expect(parseSettings('{"onboardingPhase":"workspace"}').onboardingPhase).toBe("preferences");
+  });
+});
+
 describe("automatic housekeeping settings", () => {
   test("both policies default off and preserve valid day counts", () => {
     const defaults = parseSettings("{}");
@@ -50,6 +59,17 @@ describe("raw Markdown syntax palette", () => {
     expect(parseSettings("{}").syntaxPalette).toBe("rotli");
     expect(parseSettings('{"syntaxPalette":"mono"}').syntaxPalette).toBe("mono");
     expect(parseSettings('{"syntaxPalette":"neon"}').syntaxPalette).toBe("rotli");
+  });
+});
+
+describe("custom primary color", () => {
+  test("keeps a safe hue and falls back cleanly on invalid settings", () => {
+    const custom = parseSettings('{"accentColor":"custom","accentHue":287}');
+    expect(custom.accentColor).toBe("custom");
+    expect(custom.accentHue).toBe(287);
+
+    expect(parseSettings('{"accentHue":999}').accentHue).toBe(210);
+    expect(parseSettings('{"accentHue":"blue"}').accentHue).toBe(210);
   });
 });
 
@@ -89,14 +109,21 @@ describe("sidebarView (the Home/Chat front, 2026-08-01)", () => {
 });
 
 describe("parseSettings — Breve sidebar lens", () => {
-  test("defaults to Notes and the Briefs view", () => {
+  test("defaults to Notes and the Breve dashboard", () => {
     const s = parseSettings("{}");
     expect(s.sidebarMode).toBe("notes");
-    expect(s.breveView).toBe("briefs");
+    expect(s.breveView).toBe("dashboard");
   });
 
   test("keeps every valid Breve view", () => {
-    for (const view of ["briefs", "routines", "watchlist", "settings"] as const) {
+    for (const view of [
+      "dashboard",
+      "briefs",
+      "notifications",
+      "routines",
+      "watchlist",
+      "settings",
+    ] as const) {
       const s = parseSettings(JSON.stringify({ sidebarMode: "breve", breveView: view }));
       expect(s.sidebarMode).toBe("breve");
       expect(s.breveView).toBe(view);
@@ -113,7 +140,7 @@ describe("parseSettings — Breve sidebar lens", () => {
   test("coerces unknown values to the safe workspace defaults", () => {
     const s = parseSettings('{"sidebarMode":"mail","breveView":"accounts"}');
     expect(s.sidebarMode).toBe("notes");
-    expect(s.breveView).toBe("briefs");
+    expect(s.breveView).toBe("dashboard");
   });
 });
 
@@ -275,14 +302,21 @@ describe("parseSettings — the AI Models keys (Seth, 2026-07-02)", () => {
   test("chat presentation preferences round-trip and reject unknown values", () => {
     const defaults = parseSettings("{}");
     expect(defaults.chatWelcomeStyle).toBe("lively");
+    expect(defaults.chatNaming).toBe("ask");
     expect(defaults.chatArtifactOpen).toBe("sidecar");
 
-    const selected = parseSettings('{"chatWelcomeStyle":"calm","chatArtifactOpen":"tab"}');
+    const selected = parseSettings(
+      '{"chatWelcomeStyle":"calm","chatNaming":"automatic","chatArtifactOpen":"tab"}',
+    );
     expect(selected.chatWelcomeStyle).toBe("calm");
+    expect(selected.chatNaming).toBe("automatic");
     expect(selected.chatArtifactOpen).toBe("tab");
 
-    const invalid = parseSettings('{"chatWelcomeStyle":"animated","chatArtifactOpen":"window"}');
+    const invalid = parseSettings(
+      '{"chatWelcomeStyle":"animated","chatNaming":"surprise-me","chatArtifactOpen":"window"}',
+    );
     expect(invalid.chatWelcomeStyle).toBe("lively");
+    expect(invalid.chatNaming).toBe("ask");
     expect(invalid.chatArtifactOpen).toBe("sidecar");
   });
 

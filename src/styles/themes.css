@@ -17,6 +17,21 @@
    dropdowns "creep in" from another theme (Seth, 2026-07-08). Light is the
    base; every dark theme flips it. */
 :root {
+  --accent-hue: 210;
+  --theme-accent-swatch: #c97e62;
+  --theme-on-accent: #ffffff;
+  --accent-custom-swatch: oklch(53% 0.145 var(--accent-hue));
+  --accent-custom-on: #ffffff;
+  --accent-hue-track: linear-gradient(
+    90deg,
+    oklch(62% 0.18 20),
+    oklch(66% 0.17 75),
+    oklch(64% 0.16 135),
+    oklch(62% 0.15 190),
+    oklch(60% 0.16 245),
+    oklch(61% 0.17 300),
+    oklch(62% 0.18 360)
+  );
   color-scheme: light;
   --chat-welcome-morning: #f4dfd5;
   --chat-welcome-morning-detail: #c97e62;
@@ -34,7 +49,10 @@
 :root[data-theme="dark"],
 :root[data-theme="charcoal"] {
   color-scheme: dark;
+  --accent-custom-swatch: oklch(78% 0.13 var(--accent-hue));
+  --accent-custom-on: #161616;
 }
+:root[data-theme="dark"] { --theme-on-accent: #241d18; }
 :root[data-theme="dark"] {
   --chat-welcome-morning: #392923;
   --chat-welcome-morning-detail: #d89978;
@@ -78,6 +96,8 @@
   --text-muted: #6b6b68;
   --border: #e6e6e3;
   --accent: #161616;
+  --theme-accent-swatch: #161616;
+  --theme-on-accent: #ffffff;
   --accent-text: #161616;
   --on-accent: #ffffff;
   --success: #6b6b68;
@@ -110,6 +130,8 @@
   --text-muted: #a8a49c;
   --border: #2e2c29;
   --accent: #e9e7e2;
+  --theme-accent-swatch: #e9e7e2;
+  --theme-on-accent: #161616;
   --accent-text: #e9e7e2;
   --on-accent: #161616;
   --success: #a8a49c;
@@ -219,6 +241,18 @@
   --accent: #dfb15f;
   --accent-text: #e5bc74;
   --on-accent: #2a2110;
+}
+:root[data-theme="light"][data-accent="custom"],
+:root[data-theme="paper"][data-accent="custom"] {
+  --accent: oklch(53% 0.145 var(--accent-hue));
+  --accent-text: oklch(47% 0.14 var(--accent-hue));
+  --on-accent: #ffffff;
+}
+:root[data-theme="dark"][data-accent="custom"],
+:root[data-theme="charcoal"][data-accent="custom"] {
+  --accent: oklch(78% 0.13 var(--accent-hue));
+  --accent-text: oklch(83% 0.11 var(--accent-hue));
+  --on-accent: #161616;
 }
 
 /* picker swatches for the accent row (Settings + onboarding) — the LIGHT

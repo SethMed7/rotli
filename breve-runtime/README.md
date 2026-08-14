@@ -24,6 +24,17 @@ Private installation files (`signal.json`, mail/recipient/access configuration),
 logs, transcripts, pending actions, and scheduler state live only under
 `.rotli/breve/` and remain gitignored with other `.rotli` state.
 
+Rotli's Breve dashboard is a read projection of those same vault-owned files:
+saved brief Markdown supplies the issue carousel, top stories, actions, and
+source links; routine configuration supplies the schedule; a sanitized bounded
+tail of `logs/rotli-scheduler.log` supplies Notifications. Raw commands,
+prompts, paths, and stderr never cross the native IPC boundary. Watchlist
+editing and web research remain separate effects. **Refresh last 30 days** is
+an explicit user action that runs the ordinary sandboxed custom-brief pipeline
+with `inApp` delivery only and writes its Markdown into the canonical briefs
+lane. Debug builds simulate the notification in memory and never start a model,
+scheduler, or production-vault write.
+
 Remote model processes fail closed behind the generated macOS Seatbelt policy.
 The policy is rebuilt at each spawn and denies derived state, Git history,
 secure/tainted Markdown reads, and all AI writes to locked files even though the

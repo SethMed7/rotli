@@ -11,6 +11,13 @@ Rotli ships four complete environments: Warm Light, Warm Dark, Paper, and
 Charcoal. Paper and Charcoal are the calm defaults; the warm pair is
 intentional. Every product surface must work in all four.
 
+Theme pickers present that same set as two families: Paper & Charcoal, and
+Rotli. Light, Dark, and System are a separate mode choice; Paper is Mono's
+light environment and Charcoal is its dark environment. System follows the OS
+within the selected family instead of becoming a fifth theme.
+Primary color starts with the active environment's own accent, then offers the
+shared presets and a contrast-managed custom hue without rewriting theme tokens.
+
 - Consume semantic color, typography, spacing, focus, and state roles exposed by
   the shared foundation. Fixed `--rotli-*` palette values are foundation inputs,
   not component-level tokens.
@@ -41,6 +48,15 @@ exception.
 
 - Every user action remains keyboard reachable and participates in the shared
   action/keybinding system.
+- Global search is the real titlebar field: clicking it or invoking ⌘K focuses
+  that same field and opens a results list directly beneath it. It is not a
+  centered modal. A uniform semantic fade quiets the surrounding workspace
+  while the field and results remain crisp; search never blurs the user's
+  content. The field is one visual container; its Rotli mark and shortcut hint
+  do not add nested badges. Results rank by relevance across their labeled
+  sections: exact and prefix title or filename matches lead, while fuzzy title
+  and body-only matches follow. A fixed content-type order must never bury the
+  strongest result.
 - Held-Command badges show the complete live chord. Controls that are meant to
   be invoked directly from that reveal state include Command in their default
   chord, and a badge on the active control uses the calm surface voice instead
@@ -181,9 +197,16 @@ polish work.
 
 ## Chat welcome and navigation
 
+- Fresh and saved chats share one quiet header breadcrumb: the current view or
+  vault context first, then the chat's display name. In Ask-first mode the new
+  chat name edits in that header and Enter moves to the composer even when the
+  field is empty; First-message mode omits the field and focuses the composer.
+  Saved display names edit in place without changing the durable chat filename.
+  The header is always the surface's fixed first row above the conversation;
+  content height and fresh-chat layouts must never displace it to the footer.
 - A fresh, unsent chat is one centered working composition: time-aware greeting,
-  still companion illustration, optional title, composer, and three useful
-  prompt starters. A machine-level Calm/Lively preference changes the companion
+  still companion illustration, composer, and three useful prompt starters. A
+  machine-level Calm/Lively preference changes the companion
   pose and adds a quiet Morning, Noon, Afternoon, or Evening scene contained
   behind the companion rather than tinting the workspace; sun position, terrain,
   and dusk treatment convey the period without motion. The Rotli character keeps
@@ -197,16 +220,51 @@ polish work.
 
 ## First-run setup
 
-- App setup and vault activation are separate. Skipping app setup applies the
-  documented calm defaults, but never chooses or creates a notes folder; the
-  next surface still asks the user to create or open a vault.
+- First-run setup is one resumable sequence: app preferences, an explicit vault
+  decision, then optional model configuration. Skipping app preferences still
+  lands on the vault decision; skipping models is allowed. A successful vault
+  switch may relaunch the native app, so the machine-level checkpoint resumes
+  on model configuration instead of repeating or silently finishing setup.
 - The companion character appears directly on the ground, without a card, on
-  every setup and activation state. Motion is short, one-shot, tied to a state
-  change, and absent under reduced motion; scanning may use a bounded loading
-  indicator while work is active.
+  every setup and activation state. Its state entrance is short and one-shot.
+  Welcome may keep two partly hidden edge companions visible while a slow,
+  low-opacity pair alternates positions; reduced motion keeps two static.
+  Scanning may use a bounded loading indicator while work is active.
 - Progress reads as position plus step name. Choice numbers sit beside the
-  labels they invoke, radio choices use arrow-key selection, and the current
-  `⌘Enter` binding is rendered inside the primary button it activates.
+  labels they invoke, radio choices use arrow-key selection, and both number
+  and arrow shortcuts work from the quiet setup canvas before a card owns
+  focus. Real inputs and controls keep their own keys. The current `⌘Enter`
+  binding is rendered inside the primary button it activates.
+- Progress uses one six-step count across preferences, vault, and models; a
+  component boundary must never restart the denominator. Quiet edge companions
+  persist across the complete sequence, alternate in slow overlapping pairs,
+  and ease fully in and out instead of snapping at the viewport edge.
+- Vault selection is required even in development. A development fallback may
+  make a vault available so the shell can boot, but it does not count as the
+  user's selection; only the isolated development vault binding does. A
+  configured installation can explicitly keep its current vault, create a
+  tagged Rotli vault, open an existing folder, or start with a practice vault.
+- Model setup distinguishes on-device installs from connected subscription
+  CLIs. Installing or connecting is always explicit, connected lanes are named
+  as remote, unavailable CLIs show actionable setup guidance, and the user can
+  finish with no model because the vault remains useful on its own. Every local
+  model already registered on the Mac is reusable without another download;
+  the setup surface lists installed models, supports an explicit default,
+  confirms removal, and offers the curated install catalog individually.
+  Local, installable, and subscription controls use progressive disclosures so
+  only one decision set is open at a time. Any clipped model content carries a
+  visible scroll cue; long install lists name that they can be scrolled.
+  Disclosure controls use the shared chrome chevron, while model rows use the
+  approved provider or model-family mark and reserve a neutral fallback only
+  for genuinely unknown local families.
+- Back is one real, remappable command throughout first run. Every step after
+  Welcome renders its current chord, and invoking it returns one logical step:
+  model setup to vault, vault substate to its chooser, and the chooser to
+  Shortcuts. A decorative arrow must never imply an unregistered shortcut.
+- The onboarding frame does not move between steps: progress stays at the top
+  and Skip, Back, and Continue/Finish stay in one fixed footer position. A
+  content-heavy step scrolls only its middle stage rather than pushing the
+  primary action down or moving it relative to the other steps.
 - Opening an existing Markdown folder always has a read-only inventory/review
   step before confirmation. Open-in-place adds only hidden Rotli sidecars;
   import-copy requires an empty destination and leaves the source untouched.

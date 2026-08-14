@@ -3,11 +3,28 @@ export const MAX_LAZY_CHUNK_KIB = 3600;
 
 const JSXGRAPH_EVAL_SOURCE = "/node_modules/jsxgraph/src/parser/jessiecode.js";
 
+type BuildWarning = {
+  code?: string;
+  id?: string;
+};
+
+type BuildChunk = {
+  type: "chunk";
+  fileName: string;
+  code: string;
+  imports: string[];
+  isEntry: boolean;
+};
+
+type BuildOutput = Record<string, BuildChunk | { type: string }>;
+
 /** JSXGraph ships an optional compiler that contains eval. Rotli pins its
  * JessieCode interpreter to compile:false in check:structure, so the compiler
  * path is unreachable. Suppress only that exact vendor warning. */
-export function shouldIgnoreBuildWarning(warning) {
-  return warning.code === "EVAL" && warning.id?.replaceAll("\\", "/").endsWith(JSXGRAPH_EVAL_SOURCE);
+export function shouldIgnoreBuildWarning(warning: BuildWarning): boolean {
+  return (
+    warning.code === "EVAL" && (warning.id?.replaceAll("\\", "/").endsWith(JSXGRAPH_EVAL_SOURCE) ?? false)
+  );
 }
 
 export const LAZY_LOCALE_STUB_ID = "\0rotli-lazy-locale-stub";
@@ -19,7 +36,7 @@ export const LAZY_LOCALE_STUB_SOURCE = "export default {};\n";
  * export) and Excalidraw's UI translations (rotli never passes langCode, so
  * only the bundled English fallback is ever used). Both resolve to one shared
  * empty stub; English variants are kept as insurance for both engines. */
-export function shouldStubLazyLocale(source, importer) {
+export function shouldStubLazyLocale(source: string, importer: string | undefined): boolean {
   if (!importer) return false;
   const from = importer.replaceAll("\\", "/");
   if (from.includes("@univerjs/engine-render/lib/es/")) {
@@ -31,21 +48,21 @@ export function shouldStubLazyLocale(source, importer) {
   return false;
 }
 
-function bytes(source) {
+function bytes(source: string): number {
   return new TextEncoder().encode(source).byteLength;
 }
 
 /** Enforce separate budgets for the startup graph and opt-in editor engines.
  * Static imports of an entry are startup code; dynamic imports are lazy. */
-export function bundleBudgetViolations(bundle) {
+export function bundleBudgetViolations(bundle: BuildOutput): string[] {
   const chunks = new Map(
     Object.values(bundle)
-      .filter((item) => item.type === "chunk")
+      .filter((item): item is BuildChunk => item.type === "chunk")
       .map((chunk) => [chunk.fileName, chunk]),
   );
   const initial = new Set();
 
-  function visit(fileName) {
+  function visit(fileName: string): void {
     if (initial.has(fileName)) return;
     const chunk = chunks.get(fileName);
     if (!chunk) return;

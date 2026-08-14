@@ -8,7 +8,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -36,7 +36,9 @@ const BRIEF_ARTIFACTS_DIR: &str = "storage/breveBriefs";
 const MAX_TEXT_BYTES: u64 = 2 * 1024 * 1024;
 static DEV_RESEND_CONFIGURED: AtomicBool = AtomicBool::new(false);
 static DEV_DELIVERY_SETTINGS: OnceLock<Mutex<BreveDeliverySettings>> = OnceLock::new();
-static DEV_WATCHLIST: OnceLock<Mutex<String>> = OnceLock::new();
+static DEV_WATCHLISTS: OnceLock<Mutex<HashMap<PathBuf, String>>> = OnceLock::new();
+static DEV_NOTIFICATIONS: OnceLock<Mutex<HashMap<PathBuf, Vec<BreveNotification>>>> =
+    OnceLock::new();
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -221,6 +223,18 @@ pub struct BreveBrief {
     pub audio_path: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BreveNotification {
+    pub id: String,
+    pub at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub routine: Option<String>,
+    pub kind: String,
+    pub title: String,
+    pub detail: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct BreveCounts {
@@ -259,9 +273,18 @@ pub struct BreveSnapshot {
     pub creators: Vec<BreveCreator>,
     pub pages: Vec<BrevePage>,
     pub briefs: Vec<BreveBrief>,
+    pub notifications: Vec<BreveNotification>,
     pub artifact_count: usize,
     pub imported: bool,
     pub scheduler: BreveScheduler,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BreveBackfillResult {
+    pub snapshot: BreveSnapshot,
+    pub status: String,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -338,88 +361,45 @@ fn dev_delivery_settings(app: &tauri::AppHandle) -> BreveDeliverySettings {
     settings
 }
 
-fn fallback_dev_watchlist() -> String {
-    "# Breve Watchlist\n\n## AI and tools\n\n| Watch | Lens |\n|---|---|\n| Rotli | product changes |\n".into()
-}
-
-/// Seed Tauri dev from the user's production watchlist without connecting the
-/// dev corpus to production. The value is copied into memory once; all edits
-/// made by the dev UI remain in memory and are discarded when dev restarts.
-fn production_watchlist_for_dev(app: &tauri::AppHandle) -> Option<String> {
-    production_roots_for_dev(app)
-        .into_iter()
-        .map(|root| root.join(WATCHLIST_FILE))
-        .find_map(|path| read_text(&path))
-}
-
-fn dev_watchlist(app: &tauri::AppHandle) -> String {
-    DEV_WATCHLIST
-        .get_or_init(|| {
-            Mutex::new(production_watchlist_for_dev(app).unwrap_or_else(fallback_dev_watchlist))
-        })
+fn set_dev_watchlist(root: &Path, markdown: String) {
+    if let Ok(mut watchlists) = DEV_WATCHLISTS
+        .get_or_init(|| Mutex::new(HashMap::new()))
         .lock()
-        .map(|watchlist| watchlist.clone())
-        .unwrap_or_else(|_| fallback_dev_watchlist())
-}
-
-fn set_dev_watchlist(app: &tauri::AppHandle, markdown: String) {
-    let watchlist = DEV_WATCHLIST.get_or_init(|| {
-        Mutex::new(production_watchlist_for_dev(app).unwrap_or_else(fallback_dev_watchlist))
-    });
-    if let Ok(mut current) = watchlist.lock() {
-        *current = markdown;
+    {
+        watchlists.insert(root.to_path_buf(), markdown);
     }
 }
 
-fn dev_breve_snapshot(app: &tauri::AppHandle) -> BreveSnapshot {
-    let watchlist = dev_watchlist(app);
-    let (sections, topics) = watchlist_counts(&watchlist);
-    BreveSnapshot {
-        source: BreveSource::Rotli,
-        legacy_root: None,
-        config: default_config(true),
-        watchlist,
-        counts: BreveCounts {
-            sections,
-            topics,
-            creators: 4,
-            pages: 3,
-        },
-        creators: Vec::new(),
-        pages: Vec::new(),
-        briefs: vec![
-            BreveBrief {
-                stem: "2026-07-10".into(),
-                title: "Breve — July 10, 2026".into(),
-                kind: "morning".into(),
-                date: "2026-07-10".into(),
-                imported: true,
-                path: None,
-                audio_path: None,
-            },
-            BreveBrief {
-                stem: "2026-07-10-lunch".into(),
-                title: "Breve — July 10, 2026 · Lunchtime".into(),
-                kind: "lunch".into(),
-                date: "2026-07-10".into(),
-                imported: true,
-                path: None,
-                audio_path: None,
-            },
-            BreveBrief {
-                stem: "2026-07-09-night".into(),
-                title: "Breve — July 9, 2026 · The Archive".into(),
-                kind: "night".into(),
-                date: "2026-07-09".into(),
-                imported: true,
-                path: None,
-                audio_path: None,
-            },
-        ],
-        artifact_count: 208,
-        imported: true,
-        scheduler: BreveScheduler::Rotli,
+/// Native development reads the current vault's real Breve projection, but
+/// overlays only this process's in-memory edits and preview events. Switching
+/// vaults therefore switches briefs/watchlist/routines too, without a dev
+/// session writing configuration, starting jobs, or borrowing another vault's
+/// fake dashboard state.
+fn dev_breve_snapshot(root: &Path) -> BreveSnapshot {
+    let mut snapshot = snapshot_at(root, None);
+    if let Some(watchlist) = DEV_WATCHLISTS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .ok()
+        .and_then(|watchlists| watchlists.get(root).cloned())
+    {
+        let (sections, topics) = watchlist_counts(&watchlist);
+        snapshot.watchlist = watchlist;
+        snapshot.counts.sections = sections;
+        snapshot.counts.topics = topics;
     }
+    let previews = DEV_NOTIFICATIONS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .ok()
+        .and_then(|notifications| notifications.get(root).cloned())
+        .unwrap_or_default();
+    if !previews.is_empty() {
+        snapshot.notifications.splice(0..0, previews);
+        snapshot.notifications.truncate(BREVE_NOTIFICATION_LIMIT);
+    }
+    snapshot.scheduler = BreveScheduler::None;
+    snapshot
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -1053,6 +1033,146 @@ fn artifact_count(active_root: &Path, legacy: Option<&Path>) -> usize {
     count
 }
 
+const BREVE_NOTIFICATION_TAIL_BYTES: u64 = 512 * 1024;
+const BREVE_NOTIFICATION_LIMIT: usize = 48;
+
+fn read_tail(path: &Path, max_bytes: u64) -> Option<String> {
+    let mut file = fs::File::open(path).ok()?;
+    let len = file.metadata().ok()?.len();
+    let start = len.saturating_sub(max_bytes);
+    if start > 0 {
+        file.seek(SeekFrom::Start(start)).ok()?;
+    }
+    let mut bytes = Vec::with_capacity((len - start).min(max_bytes) as usize);
+    file.read_to_end(&mut bytes).ok()?;
+    let mut text = String::from_utf8_lossy(&bytes).into_owned();
+    if start > 0 {
+        let newline = text.find('\n')?;
+        text.drain(..=newline);
+    }
+    Some(text)
+}
+
+fn routine_label(config: &BreveConfig, id: &str) -> String {
+    config
+        .routines
+        .iter()
+        .find(|routine| routine.id == id)
+        .map(|routine| routine.label.trim().to_string())
+        .filter(|label| !label.is_empty())
+        .unwrap_or_else(|| {
+            let mut label = id.replace('-', " ");
+            if let Some(first) = label.get_mut(0..1) {
+                first.make_ascii_uppercase();
+            }
+            label
+        })
+}
+
+fn notification_from_scheduler_line(
+    line: &str,
+    config: &BreveConfig,
+    ordinal: usize,
+) -> Option<BreveNotification> {
+    let (at, event) = line.trim().split_once(' ')?;
+    if at.len() < 20 || !at.contains('T') {
+        return None;
+    }
+
+    let (routine, kind, title, detail) = if let Some(rest) = event.strip_prefix('[') {
+        let (id, message) = rest.split_once("] ")?;
+        let label = routine_label(config, id);
+        if message.starts_with("start:") {
+            (
+                Some(id.to_string()),
+                "running",
+                format!("{label} started"),
+                "Breve started this routine for the current vault.".into(),
+            )
+        } else if message.starts_with("complete") {
+            (
+                Some(id.to_string()),
+                "success",
+                format!("{label} completed"),
+                "The routine completed and its vault state is current.".into(),
+            )
+        } else if message.starts_with("failed") || message.contains("run error") {
+            (
+                Some(id.to_string()),
+                "warning",
+                format!("{label} needs attention"),
+                "The routine failed. Its detailed local log remains private in this vault.".into(),
+            )
+        } else if message.starts_with("skipped:") {
+            (
+                Some(id.to_string()),
+                "info",
+                format!("{label} was already running"),
+                "Breve skipped a duplicate run to keep delivery idempotent.".into(),
+            )
+        } else if id == "signal" && message.starts_with("starting managed daemon") {
+            (
+                Some(id.to_string()),
+                "success",
+                "Signal assistant started".into(),
+                "The vault-owned Breve assistant is available.".into(),
+            )
+        } else if id == "signal" && message.starts_with("exited") {
+            (
+                Some(id.to_string()),
+                "warning",
+                "Signal assistant restarted".into(),
+                "Breve scheduled a bounded restart after the assistant exited.".into(),
+            )
+        } else {
+            return None;
+        }
+    } else if event.starts_with("Rotli scheduler online") {
+        (
+            None,
+            "success",
+            "Breve is online".into(),
+            "Rotli is managing routines for this vault.".into(),
+        )
+    } else if event.starts_with("fatal:")
+        || event.starts_with("tick error:")
+        || event.starts_with("config unavailable:")
+    {
+        (
+            None,
+            "warning",
+            "Breve needs attention".into(),
+            "The scheduler reported a local problem. Open Breve Settings to review it.".into(),
+        )
+    } else {
+        return None;
+    };
+
+    Some(BreveNotification {
+        id: format!("{at}:{ordinal}"),
+        at: at.to_string(),
+        routine,
+        kind: kind.into(),
+        title,
+        detail,
+    })
+}
+
+fn recent_notifications(active_root: &Path, config: &BreveConfig) -> Vec<BreveNotification> {
+    let path = active_root
+        .join(routines::MANAGED_DIR)
+        .join("logs/rotli-scheduler.log");
+    let Some(text) = read_tail(&path, BREVE_NOTIFICATION_TAIL_BYTES) else {
+        return Vec::new();
+    };
+    text.lines()
+        .rev()
+        .enumerate()
+        .filter_map(|(ordinal, line)| notification_from_scheduler_line(line, config, ordinal))
+        .take(BREVE_NOTIFICATION_LIMIT)
+        .collect()
+}
+
 fn snapshot_at(active_root: &Path, legacy: Option<&Path>) -> BreveSnapshot {
     let migrated_config = read_json::<BreveConfig>(&active_root.join(CONFIG_FILE));
     let legacy_exists = legacy.is_some_and(Path::is_dir);
@@ -1103,6 +1223,7 @@ fn snapshot_at(active_root: &Path, legacy: Option<&Path>) -> BreveSnapshot {
     } else {
         BreveScheduler::None
     };
+    let notifications = recent_notifications(active_root, &config);
     BreveSnapshot {
         source,
         legacy_root: legacy
@@ -1119,6 +1240,7 @@ fn snapshot_at(active_root: &Path, legacy: Option<&Path>) -> BreveSnapshot {
         creators,
         pages,
         briefs,
+        notifications,
         artifact_count: artifact_count(active_root, legacy),
         imported: active_root.join(IMPORT_REPORT_FILE).is_file(),
         scheduler,
@@ -1466,11 +1588,11 @@ fn breve_test_signal_blocking(root: &Path) -> Result<String, String> {
 
 #[tauri::command]
 pub fn breve_snapshot(
-    app: tauri::AppHandle,
+    _app: tauri::AppHandle,
     state: tauri::State<'_, CorpusState>,
 ) -> Result<BreveSnapshot, String> {
     if cfg!(debug_assertions) {
-        return Ok(dev_breve_snapshot(&app));
+        return Ok(dev_breve_snapshot(&active_root(&state)?));
     }
     let root = active_root(&state)?;
     let legacy = legacy_root();
@@ -1485,7 +1607,7 @@ pub fn breve_write_config(
 ) -> Result<BreveSnapshot, String> {
     validate_config(&config)?;
     if cfg!(debug_assertions) {
-        let mut snapshot = dev_breve_snapshot(&app);
+        let mut snapshot = dev_breve_snapshot(&active_root(&state)?);
         snapshot.config = config;
         return Ok(snapshot);
     }
@@ -1591,7 +1713,7 @@ pub fn breve_write_brief_skill(
 
 #[tauri::command]
 pub fn breve_write_watchlist(
-    app: tauri::AppHandle,
+    _app: tauri::AppHandle,
     state: tauri::State<'_, CorpusState>,
     markdown: String,
 ) -> Result<BreveSnapshot, String> {
@@ -1599,8 +1721,9 @@ pub fn breve_write_watchlist(
         return Err("Breve watchlist is too large or contains invalid bytes".into());
     }
     if cfg!(debug_assertions) {
-        set_dev_watchlist(&app, markdown);
-        return Ok(dev_breve_snapshot(&app));
+        let root = active_root(&state)?;
+        set_dev_watchlist(&root, markdown);
+        return Ok(dev_breve_snapshot(&root));
     }
     let root = active_memex_write_root(&state)?;
     let path = root.join(WATCHLIST_FILE);
@@ -1644,6 +1767,117 @@ pub fn breve_write_watchlist(
     write_atomic(&path, doc.as_bytes())?;
     let legacy = legacy_root();
     Ok(snapshot_at(&root, legacy.as_deref()))
+}
+
+fn append_scheduler_event(root: &Path, routine: &str, message: &str) -> Result<(), String> {
+    let path = root
+        .join(routines::MANAGED_DIR)
+        .join("logs/rotli-scheduler.log");
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("create {}: {error}", parent.display()))?;
+    }
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|error| format!("open {}: {error}", path.display()))?;
+    writeln!(file, "{} [{}] {}", now_stamp(), routine, message)
+        .map_err(|error| format!("write {}: {error}", path.display()))
+}
+
+/// Explicit watchlist refresh. This is intentionally not coupled to Save:
+/// editing topics is local configuration; researching the web is a separate,
+/// user-requested effect. The generated Markdown lands in this vault's normal
+/// Breve briefs lane and the fixed log messages feed the sanitized notification
+/// projection above.
+#[tauri::command]
+pub async fn breve_backfill_watchlist(
+    _app: tauri::AppHandle,
+    state: tauri::State<'_, CorpusState>,
+) -> Result<BreveBackfillResult, String> {
+    if cfg!(debug_assertions) {
+        let root = active_root(&state)?;
+        let notification = BreveNotification {
+            id: format!("{}:watchlist-preview", now_stamp()),
+            at: now_stamp(),
+            routine: Some("watchlist-backfill".into()),
+            kind: "info".into(),
+            title: "30-day refresh preview".into(),
+            detail: "Development mode did not run a model or write the production vault.".into(),
+        };
+        if let Ok(mut notifications) = DEV_NOTIFICATIONS
+            .get_or_init(|| Mutex::new(HashMap::new()))
+            .lock()
+        {
+            let items = notifications.entry(root.clone()).or_default();
+            items.insert(0, notification);
+            items.truncate(BREVE_NOTIFICATION_LIMIT);
+        }
+        return Ok(BreveBackfillResult {
+            snapshot: dev_breve_snapshot(&root),
+            status: "preview".into(),
+            message: "Preview only in development—no model ran and no production files changed."
+                .into(),
+        });
+    }
+
+    let root = active_memex_write_root(&state)?;
+    let home = root.join(routines::MANAGED_DIR);
+    let script = home.join("scripts/custom-brief.sh");
+    if !script.is_file() {
+        return Err(
+            "Breve is not installed for this vault yet. Finish Breve setup, then refresh again."
+                .into(),
+        );
+    }
+    let stem = format!("{}-watchlist-30-days", now_date());
+    let output_path = home.join("briefs").join(format!("{stem}.md"));
+    let home_dir = std::env::var("HOME").unwrap_or_default();
+    let inherited_path = std::env::var("PATH").unwrap_or_default();
+    let runtime_path = format!(
+        "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:{home_dir}/.bun/bin:{home_dir}/.claude/local:{home_dir}/.local/bin:{inherited_path}"
+    );
+    append_scheduler_event(&root, "watchlist-backfill", "start: manual 30-day refresh")?;
+
+    let task_root = root.clone();
+    let task_home = home.clone();
+    let task_script = script.clone();
+    let task_stem = stem.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        Command::new("/bin/bash")
+            .arg(task_script)
+            .current_dir(&task_home)
+            .env("ROTLI_BREVE_HOME", &task_home)
+            .env("BREVE_KNOWLEDGE", &task_root)
+            .env("BREVE_STORAGE", task_root.join("storage"))
+            .env("ROTLI_ROUTINE_ID", "watchlist-backfill")
+            .env("ROTLI_ROUTINE_LABEL", "Watchlist — last 30 days")
+            .env("ROTLI_ROUTINE_STEM", task_stem)
+            .env("ROTLI_BREVE_LANES", "inApp")
+            .env("ROTLI_ROUTINE_PROMPT", "Use the current vault watchlist as the complete scope. Research the last 30 days only. Prioritize each topic's requested lens, put the strongest cross-watchlist developments first, include publication dates and direct source URLs, and clearly say when a watched topic has no material update. Do not invent evergreen filler or use facts older than 30 days as news.")
+            .env("PATH", runtime_path)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map_err(|error| format!("start 30-day watchlist refresh: {error}"))
+    })
+    .await
+    .map_err(|error| format!("30-day refresh worker failed: {error}"))?;
+
+    if result.is_ok_and(|status| status.success()) && output_path.is_file() {
+        append_scheduler_event(&root, "watchlist-backfill", "complete")?;
+        let legacy = legacy_root();
+        Ok(BreveBackfillResult {
+            snapshot: snapshot_at(&root, legacy.as_deref()),
+            status: "complete".into(),
+            message: "The last 30 days are ready in Today’s Briefs.".into(),
+        })
+    } else {
+        let _ = append_scheduler_event(&root, "watchlist-backfill", "failed");
+        Err("The 30-day refresh did not produce a brief. Breve kept the detailed local log private in this vault."
+            .into())
+    }
 }
 
 fn copy_brief_notes(legacy: &Path, active_root: &Path) -> Result<usize, String> {
@@ -1793,11 +2027,11 @@ fn import_legacy_at(root: &Path, legacy: &Path) -> Result<BreveSnapshot, String>
 
 #[tauri::command]
 pub fn breve_import_legacy(
-    app: tauri::AppHandle,
+    _app: tauri::AppHandle,
     state: tauri::State<'_, CorpusState>,
 ) -> Result<BreveSnapshot, String> {
     if cfg!(debug_assertions) {
-        return Ok(dev_breve_snapshot(&app));
+        return Ok(dev_breve_snapshot(&active_root(&state)?));
     }
     let root = active_memex_write_root(&state)?;
     let legacy = legacy_root().ok_or("HOME is unavailable; legacy Breve cannot be located")?;
@@ -1969,7 +2203,7 @@ pub fn breve_takeover(
     state: tauri::State<'_, CorpusState>,
 ) -> Result<BreveSnapshot, String> {
     if cfg!(debug_assertions) {
-        return Ok(dev_breve_snapshot(&app));
+        return Ok(dev_breve_snapshot(&active_root(&state)?));
     }
     let root = active_memex_write_root(&state)?;
     // Legacy-LESS activation (2026-07-31): a fresh vault has no ~/breve to
@@ -2047,7 +2281,7 @@ pub fn breve_retire_legacy(
     state: tauri::State<'_, CorpusState>,
 ) -> Result<BreveSnapshot, String> {
     if cfg!(debug_assertions) {
-        return Ok(dev_breve_snapshot(&app));
+        return Ok(dev_breve_snapshot(&active_root(&state)?));
     }
     let root = active_memex_write_root(&state)?;
     let legacy = legacy_root().ok_or("HOME is unavailable; legacy Breve cannot be located")?;
@@ -2084,6 +2318,30 @@ pub fn breve_retire_legacy(
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn scheduler_notifications_are_vault_scoped_and_sanitized() {
+        let config = default_config(true);
+        let started = notification_from_scheduler_line(
+            "2026-08-13T12:00:00.000Z [morning] start: /private/path/morning-brief.sh",
+            &config,
+            0,
+        )
+        .unwrap();
+        assert_eq!(started.kind, "running");
+        assert_eq!(started.title, "Morning brief started");
+        assert!(!started.detail.contains("/private/path"));
+
+        let failed = notification_from_scheduler_line(
+            "2026-08-13T12:05:00.000Z [watchers] failed: secret-shaped stderr",
+            &config,
+            1,
+        )
+        .unwrap();
+        assert_eq!(failed.kind, "warning");
+        assert!(!failed.detail.contains("secret-shaped"));
+        assert!(notification_from_scheduler_line("unstructured output", &config, 2).is_none());
+    }
 
     #[test]
     fn delivery_settings_accept_resend_and_e164_shapes() {

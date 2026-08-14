@@ -106,7 +106,7 @@ agy image profile.
 
 ### 7. MEDIUM · security — secure-note content reaches remote models via persisted chat history
 
-The model-switch gate (`src/components/chatSurface.tsx:747`) only fires for
+The model-switch gate (`src/components/chat/chatSurface.tsx:747`) only fires for
 chats *attached* to a secure note. In a loose chat, a local model with
 `local_ai_allowed` can `read_note` a secure note (permitted by
 `corpus.rs:3058`) and quote it in a persisted reply; switching that chat to

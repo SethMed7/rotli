@@ -102,7 +102,7 @@ import {
   ACCENT_COLORS,
   type AppIcon,
   type OrganizerTrust,
-  SOLID_THEMES,
+  THEME_FAMILY_PRESENTATIONS,
   type TimeFormat,
   useUiStore,
 } from "../state/ui";
@@ -235,8 +235,6 @@ function Seg<T extends string>({
     </div>
   );
 }
-
-const prefersDark = () => window.matchMedia("(prefers-color-scheme: dark)").matches;
 
 // ——— Hotkeys: every registry action, grouped by area + searchable ———
 
@@ -874,13 +872,6 @@ function GeneralPane() {
 
 // ——— Appearance: four intentional working environments. ———
 
-const THEME_CAPTIONS: Record<string, string> = {
-  "Warm Light": "The rotli default — paper under lamplight.",
-  "Warm Dark": "Cocoa dark, never clinical.",
-  Paper: "Simple white & black.",
-  Charcoal: "The SM-suite dark.",
-};
-
 const THEME_SWATCH: Record<string, string> = {
   "Warm Light": "var(--swatch-warm-light)",
   "Warm Dark": "var(--swatch-warm-dark)",
@@ -903,27 +894,53 @@ const APP_ICONS: { id: AppIcon; label: string }[] = [
 export function AccentRow() {
   const accentColor = useUiStore((s) => s.accentColor);
   const setAccentColor = useUiStore((s) => s.setAccentColor);
+  const accentHue = useUiStore((s) => s.accentHue);
+  const setAccentHue = useUiStore((s) => s.setAccentHue);
   return (
-    <div className="accentrow" role="radiogroup" aria-label="Primary color">
-      {ACCENT_COLORS.map((accent) => (
-        <button
-          type="button"
-          key={accent}
-          role="radio"
-          aria-checked={accentColor === accent}
-          className={accentColor === accent ? "accentdot sel" : "accentdot"}
-          title={accent === "default" ? "Theme default" : accent[0]?.toUpperCase() + accent.slice(1)}
-          aria-label={accent === "default" ? "Theme default" : accent}
-          style={
+    <div className="accent-control">
+      <div className="accentrow" role="radiogroup" aria-label="Primary color">
+        {ACCENT_COLORS.map((accent) => {
+          const label =
             accent === "default"
-              ? { background: "var(--accent)" }
-              : { background: `var(--accent-swatch-${accent})` }
-          }
-          onClick={() => setAccentColor(accent)}
-        >
-          {accent === "default" && <span className="accentdot-auto">A</span>}
-        </button>
-      ))}
+              ? "Theme color"
+              : accent === "custom"
+                ? "Custom color"
+                : accent[0]?.toUpperCase() + accent.slice(1);
+          return (
+            <button
+              type="button"
+              key={accent}
+              role="radio"
+              aria-checked={accentColor === accent}
+              className={`${accentColor === accent ? "accentdot sel" : "accentdot"} accentdot-${accent}`}
+              title={label}
+              aria-label={label}
+              style={
+                accent === "default" || accent === "custom"
+                  ? undefined
+                  : { background: `var(--accent-swatch-${accent})` }
+              }
+              onClick={() => setAccentColor(accent)}
+            >
+              {accent === "default" && <span className="accentdot-auto">Theme</span>}
+              {accent === "custom" && <span className="accentdot-custom-label">Custom</span>}
+            </button>
+          );
+        })}
+      </div>
+      {accentColor === "custom" && (
+        <label className="accent-hue">
+          <span>Hue {accentHue}°</span>
+          <input
+            type="range"
+            min="0"
+            max="359"
+            value={accentHue}
+            aria-label="Custom primary color hue"
+            onChange={(event) => setAccentHue(Number(event.currentTarget.value))}
+          />
+        </label>
+      )}
     </div>
   );
 }
@@ -933,86 +950,91 @@ function AppearancePane() {
   const setTheme = useUiStore((s) => s.setTheme);
   const themeFamily = useUiStore((s) => s.themeFamily);
   const setThemeFamily = useUiStore((s) => s.setThemeFamily);
-  const matchLightFamily = useUiStore((s) => s.matchLightFamily);
   const setMatchLightFamily = useUiStore((s) => s.setMatchLightFamily);
-  const matchDarkFamily = useUiStore((s) => s.matchDarkFamily);
   const setMatchDarkFamily = useUiStore((s) => s.setMatchDarkFamily);
   const syntaxPalette = useUiStore((s) => s.syntaxPalette);
   const setSyntaxPalette = useUiStore((s) => s.setSyntaxPalette);
   const chatWelcomeStyle = useUiStore((s) => s.chatWelcomeStyle);
   const setChatWelcomeStyle = useUiStore((s) => s.setChatWelcomeStyle);
+  const chatNaming = useUiStore((s) => s.chatNaming);
+  const setChatNaming = useUiStore((s) => s.setChatNaming);
   const appIcon = useUiStore((s) => s.appIcon);
   const setAppIconState = useUiStore((s) => s.setAppIcon);
-  const followingSystem = theme === "system";
+  const pickFamily = (family: typeof themeFamily) => {
+    setThemeFamily(family);
+    setMatchLightFamily(family);
+    setMatchDarkFamily(family);
+  };
+  const pickMode = (mode: typeof theme) => {
+    if (mode === "system") {
+      setMatchLightFamily(themeFamily);
+      setMatchDarkFamily(themeFamily);
+    }
+    setTheme(mode);
+  };
   return (
     <>
       <PaneHead title="Appearance" char="board" />
-      <p className="lead">Pick a theme. The titlebar sun cycles through these four.</p>
+      <h4 className="sethead">Theme</h4>
+      <p className="lead">Choose a visual family. Each includes a light and dark environment.</p>
       <div className="famrow">
-        {SOLID_THEMES.map(({ family, mode, label }) => {
-          const selected = themeFamily === family && theme === mode;
+        {THEME_FAMILY_PRESENTATIONS.map(({ family, label, description, lightLabel, darkLabel }) => {
+          const selected = themeFamily === family;
           return (
             <button
               type="button"
               key={label}
               className={selected ? "famcard sel" : "famcard"}
               aria-pressed={selected}
-              onClick={() => {
-                setThemeFamily(family);
-                setTheme(mode);
-              }}
+              onClick={() => pickFamily(family)}
             >
-              <span className="famswatch" style={{ background: THEME_SWATCH[label] }} aria-hidden="true" />
+              <span className="famswatch famswatch-pair" aria-hidden="true">
+                <span style={{ background: THEME_SWATCH[lightLabel] }} />
+                <span style={{ background: THEME_SWATCH[darkLabel] }} />
+              </span>
               <span className="famlabel">{label}</span>
-              <span className="famcaption">{THEME_CAPTIONS[label]}</span>
+              <span className="famcaption">{description}</span>
             </button>
           );
         })}
       </div>
-      <Toggle
-        on={followingSystem}
-        title="Match the system"
-        desc="Follow macOS light / dark automatically."
-        onChange={() => setTheme(followingSystem ? (prefersDark() ? "dark" : "light") : "system")}
+      <h4 className="sethead">Mode</h4>
+      <p className="lead">Light and Dark are explicit. System follows macOS automatically.</p>
+      <Seg
+        value={theme}
+        options={[
+          ["light", "Light"],
+          ["dark", "Dark"],
+          ["system", "System"],
+        ]}
+        onPick={pickMode}
       />
-      {followingSystem && (
-        <div className="matchpick">
-          <div className="mprow">
-            <span className="mplabel">When light</span>
-            <Seg
-              value={matchLightFamily}
-              options={[
-                ["warm", "Warm Light"],
-                ["mono", "Paper"],
-              ]}
-              onPick={setMatchLightFamily}
-            />
-          </div>
-          <div className="mprow">
-            <span className="mplabel">When dark</span>
-            <Seg
-              value={matchDarkFamily}
-              options={[
-                ["warm", "Warm Dark"],
-                ["mono", "Charcoal"],
-              ]}
-              onPick={setMatchDarkFamily}
-            />
-          </div>
-        </div>
-      )}
 
       <h4 className="sethead">Primary color</h4>
       <p className="lead">
-        The active state, folder color, and selection wash. Default keeps each theme’s own — or pick one that
-        follows you across themes.
+        The first option belongs to the environment. Presets and your custom hue follow you across themes
+        while Rotli keeps contrast safe.
       </p>
       <AccentRow />
 
-      <h4 className="sethead">New chat</h4>
+      <h4 className="sethead">Chat naming</h4>
       <p className="lead">
-        Calm keeps the welcome monochrome. Lively places the companion in a quiet time-of-day scene without
-        tinting the workspace. Neither mode animates while idle.
+        Ask first keeps an optional name in the chat header. First message skips that step and names the chat
+        automatically. You can rename either later.
+      </p>
+      <Seg
+        value={chatNaming}
+        options={[
+          ["ask", "Ask first"],
+          ["automatic", "First message"],
+        ]}
+        onPick={setChatNaming}
+      />
+
+      <h4 className="sethead">New chat welcome</h4>
+      <p className="lead">
+        Calm keeps the companion still. Lively adds one restrained arrival hop without a decorative scene or
+        an idle animation loop.
       </p>
       <Seg
         value={chatWelcomeStyle}

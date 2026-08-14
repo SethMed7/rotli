@@ -10,13 +10,15 @@
 // is an optional peer of Vite), so pinning back to it would mean re-adding a
 // dependency — and its advisory — for a strictly larger bundle.
 import { readFileSync } from "node:fs";
-import { defineConfig } from "vite";
+
 // @vitejs/plugin-react 6 is the Babel-free React plugin for the Vite 8 line: it
 // runs the same oxc/Rolldown-native transform the retired plugin-react-oxc did
 // (its Babel peers are optional and not installed), so no deprecation notice.
 // Dropping Babel also drops the React Compiler until oxc ships native support
 // (accepted; the memoization findings were hand-fixed in #36/#37).
 import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
+
 import {
   bundleBudgetViolations,
   LAZY_LOCALE_STUB_ID,
@@ -24,20 +26,19 @@ import {
   MAX_LAZY_CHUNK_KIB,
   shouldIgnoreBuildWarning,
   shouldStubLazyLocale,
-} from "./scripts/build-policy.mjs";
+} from "./scripts/build-policy.ts";
 
-// @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 // injected sync so the onboardingVersion gate has the build version at first paint
 const appVersion = JSON.parse(readFileSync("package.json", "utf8")).version as string;
 
 // https://vite.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig(() => ({
   plugins: [
     react(),
     // ~6 MB of vendor per-locale lazy chunks (Univer hyphenation dictionaries,
     // Excalidraw UI translations) collapse into one empty stub — see
-    // shouldStubLazyLocale in scripts/build-policy.mjs (perf audit finding 17).
+    // shouldStubLazyLocale in scripts/build-policy.ts (perf audit finding 17).
     {
       name: "rotli-prune-lazy-locales",
       // Vendor lazy-loader tables reach Rollup through resolveDynamicImport
@@ -105,13 +106,15 @@ export default defineConfig(async () => ({
     port: 1420,
     strictPort: true,
     host: host || false,
-    hmr: host
+    ...(host
       ? {
-          protocol: "ws",
-          host,
-          port: 1421,
+          hmr: {
+            protocol: "ws",
+            host,
+            port: 1421,
+          },
         }
-      : undefined,
+      : {}),
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],

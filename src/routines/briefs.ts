@@ -23,6 +23,7 @@ export const EMPTY_BREVE_SNAPSHOT: BreveSnapshot = {
   creators: [],
   pages: [],
   briefs: [],
+  notifications: [],
   artifactCount: 0,
   imported: false,
   scheduler: "none",

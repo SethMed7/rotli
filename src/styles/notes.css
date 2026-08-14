@@ -695,7 +695,11 @@
   margin: 4px 10px 2px;
   padding: 6px 8px;
   border-radius: var(--r-control);
-  background: color-mix(in srgb, var(--danger, var(--accent-text)) 9%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--danger, var(--accent-text)) 9%,
+    transparent
+  );
   font-size: 11.5px;
   line-height: 1.45;
   color: var(--danger, var(--accent-text));
@@ -882,10 +886,29 @@
 /* OpenAI ships black and white artwork. Use the official black Blossom as a
    mask so its exact silhouette follows semantic ink instead of disappearing
    in Warm Dark, Charcoal, or a selected row. */
-.model-logo--openai {
+.model-logo--openai,
+.model-logo--meta,
+.model-logo--microsoft,
+.model-logo--mistral {
   background: currentColor;
-  -webkit-mask: url("../brand/providers/openai-blossom.svg") center / contain no-repeat;
+}
+.model-logo--openai {
+  -webkit-mask: url("../brand/providers/openai-blossom.svg") center / contain
+    no-repeat;
   mask: url("../brand/providers/openai-blossom.svg") center / contain no-repeat;
+}
+.model-logo--meta {
+  -webkit-mask: url("../brand/providers/meta.svg") center / contain no-repeat;
+  mask: url("../brand/providers/meta.svg") center / contain no-repeat;
+}
+.model-logo--microsoft {
+  -webkit-mask: url("../brand/providers/microsoft.svg") center / contain
+    no-repeat;
+  mask: url("../brand/providers/microsoft.svg") center / contain no-repeat;
+}
+.model-logo--mistral {
+  -webkit-mask: url("../brand/providers/mistral.svg") center / contain no-repeat;
+  mask: url("../brand/providers/mistral.svg") center / contain no-repeat;
 }
 .sb-chatmark.preset,
 .sb-chatmark.local {
@@ -1414,6 +1437,20 @@
   min-width: 0;
   min-height: 0;
 }
+.pane-surface-slot {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.pane-surface-slot.idle {
+  display: none;
+}
+.pane-surface-slot > * {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
 .split {
   flex: 1;
   display: flex;
@@ -1638,11 +1675,19 @@
 }
 .tabscroll-wrap::before {
   left: 0;
-  background: linear-gradient(90deg, var(--ground), color-mix(in srgb, var(--ground), transparent 100%));
+  background: linear-gradient(
+    90deg,
+    var(--ground),
+    color-mix(in srgb, var(--ground), transparent 100%)
+  );
 }
 .tabscroll-wrap::after {
   right: 0;
-  background: linear-gradient(270deg, var(--ground), color-mix(in srgb, var(--ground), transparent 100%));
+  background: linear-gradient(
+    270deg,
+    var(--ground),
+    color-mix(in srgb, var(--ground), transparent 100%)
+  );
 }
 .tabscroll-wrap[data-fade-left="true"]::before {
   opacity: 1;
@@ -2116,7 +2161,13 @@
   position: absolute;
   inset: 0 16px auto;
   height: 1px;
-  background: linear-gradient(90deg, transparent, var(--border) 18%, var(--border) 82%, transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--border) 18%,
+    var(--border) 82%,
+    transparent
+  );
   opacity: 0.72;
 }
 .sb-footbtn {
@@ -2155,6 +2206,8 @@
 /* — the primary-color swatch row (Appearance + onboarding) — */
 .accentrow {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
   margin: 8px 0 4px;
 }
@@ -2172,10 +2225,67 @@
 .accentdot.sel {
   border-color: var(--text);
 }
+.accentdot-default,
+.accentdot-custom {
+  width: auto;
+  min-width: 54px;
+  padding: 0 9px;
+  border-radius: var(--r-pill);
+}
+.accentdot-default {
+  background: var(--theme-accent-swatch);
+  color: var(--theme-on-accent);
+}
+.accentdot-custom {
+  min-width: 62px;
+  background: var(--accent-custom-swatch);
+  color: var(--accent-custom-on);
+}
 .accentdot-auto {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
-  color: var(--on-accent);
+  color: inherit;
+}
+.accentdot-custom-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: inherit;
+}
+.accent-control {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.accent-hue {
+  width: min(280px, 100%);
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr);
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+.accent-hue input {
+  width: 100%;
+  height: 8px;
+  margin: 0;
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--accent-hue-track);
+  cursor: pointer;
+}
+.accent-hue input::-webkit-slider-thumb {
+  width: 18px;
+  height: 18px;
+  appearance: none;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--accent-custom-swatch);
+}
+.accent-hue input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 .onb-accent-lead {
   margin-top: 18px;

@@ -1,13 +1,11 @@
-// ⌘K — the command palette, r3 frame F (approved): 640px, horizontally
-// centered, anchored 96px from the top (never vertically centered — the input
-// must not move as results grow), behind it the window dims + blurs (the ONLY
-// overlay that dims). Empty query = Recent (in-memory MRU) + Suggested
+// ⌘K — titlebar search with an anchored results popover. Empty query = Recent
+// (in-memory MRU) + Suggested
 // actions; typing filters Open tabs · Notes · Actions. Every registry action
 // is listable with its current chord as an inline kbd hint. ⏎ opens replacing
 // the focused pane's active tab; ⌘⏎ opens in a new tab. Esc closes through
 // the transient stack (the registry's app.hide), not an ad-hoc listener.
 
-import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { useBindingsStore, resolveChord } from "../keys/bindings";
 import { formatChord } from "../keys/chords";
@@ -20,18 +18,19 @@ import { useMruStore } from "../state/mru";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
 import type { NoteSummary, SearchHit } from "../types";
+import { QuokkaMark } from "./character";
 import {
   glyphForNote,
   ChatGlyph,
   FocusGlyph,
   KeyboardGlyph,
   PlusGlyph,
-  SearchGlyph,
   SplitGlyph,
   SunGlyph,
 } from "./glyphs";
 import { Icon } from "./icon";
 import { MatchText } from "./matchText";
+import { paletteMatchScore, rankSearchGroups } from "./paletteModel";
 
 /** Simple subsequence match — instant, forgiving, no scoring (no metric gates). */
 function fuzzy(query: string, text: string): boolean {
@@ -57,6 +56,8 @@ function actionIcon(id: string): ReactNode {
 
 interface Row {
   key: string;
+  /** Lower is a stronger query match. Used both within and across sections. */
+  score: number;
   /** ReactNode so a title hit can carry its <mark> highlight (audit F6). */
   label: ReactNode;
   icon: ReactNode;
@@ -67,13 +68,15 @@ interface Row {
 interface Group {
   name: string;
   rows: Row[];
+  score: number;
 }
 
-export function Palette({ onClose }: { onClose: () => void }) {
+export function Palette({ onClose, breveActive = false }: { onClose: () => void; breveActive?: boolean }) {
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
   const palRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
 
   useTransientPopover([palRef], true, onClose);
 
@@ -113,8 +116,9 @@ export function Palette({ onClose }: { onClose: () => void }) {
       const chord = chordOf(a);
       return chord ? <kbd>{formatChord(chord)}</kbd> : null;
     };
-    const noteRow = (n: NoteSummary): Row => ({
+    const noteRow = (n: NoteSummary, body = ""): Row => ({
       key: `note:${n.id}`,
+      score: paletteMatchScore(q, n.title, body),
       label: n.title,
       icon: glyphForNote(n, { size: 15 }),
       hint: <span className="muted">{folderName(n.folderId)}</span>,
@@ -129,6 +133,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
     });
     const actionRow = (a: KeyAction, label?: string): Row => ({
       key: `action:${a.id}`,
+      score: paletteMatchScore(q, label ?? a.title, ""),
       label: label ?? a.title,
       icon: actionIcon(a.id),
       hint: kbdHint(a),
@@ -178,12 +183,14 @@ export function Palette({ onClose }: { onClose: () => void }) {
       suggest("panes.splitRight");
       suggest("view.focus");
       return [
-        ...(recents.length > 0 ? [{ name: "Recent", rows: recents.map(recentRow) }] : []),
-        { name: "Suggested", rows: suggested },
+        ...(recents.length > 0 ? [{ name: "Recent", rows: recents.map(recentRow), score: 100 }] : []),
+        { name: "Suggested", rows: suggested, score: 100 },
       ];
     }
 
-    // typed: Open tabs · Notes · Actions (gate order)
+    // Typed results are relevance-first across sections and within each
+    // section. Category labels remain useful orientation, but a strong
+    // filename/title match must not sit beneath incidental body matches.
     const tabRows: Row[] = [];
     for (const leaf of leaves(root)) {
       leaf.tabs.forEach((tab, i) => {
@@ -192,6 +199,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
         if (!n || !fuzzy(q, n.title)) return;
         tabRows.push({
           key: `tab:${leaf.id}:${tab.id}`,
+          score: paletteMatchScore(q, n.title, ""),
           label: n.title,
           icon: glyphForNote(n, { size: 15 }),
           hint:
@@ -226,11 +234,13 @@ export function Palette({ onClose }: { onClose: () => void }) {
       };
       const home = folderName(h.folderId);
       return {
-        ...noteRow(summary),
+        ...noteRow(summary, h.rank === 1 ? h.snippet : ""),
         // a TITLE hit highlights the match in the title itself; a BODY hit shows
         // the note's home AND the framed snippet, not one or the other (audit F6)
         ...(h.rank === 0
-          ? { label: <MatchText text={h.title} start={h.matchStart} len={h.matchLen} /> }
+          ? {
+              label: <MatchText text={h.title} start={h.matchStart} len={h.matchLen} />,
+            }
           : {}),
         hint:
           h.rank === 1 ? (
@@ -244,10 +254,12 @@ export function Palette({ onClose }: { onClose: () => void }) {
       };
     };
     const hitIds = new Set((hits ?? []).map((h) => h.id));
-    const noteRows = [
+    const noteRows = rankSearchGroups([
       ...(hits ?? []).map(hitRow),
-      ...notes.filter((n) => !hitIds.has(n.id) && (fuzzy(q, n.title) || fuzzy(q, n.snippet))).map(noteRow),
-    ].slice(0, 8);
+      ...notes
+        .filter((n) => !hitIds.has(n.id) && (fuzzy(q, n.title) || fuzzy(q, n.snippet)))
+        .map((n) => noteRow(n, n.snippet)),
+    ]).slice(0, 8);
     // Files by NAME (audit F4) — the searchable universe excludes binaries, but
     // a PDF/xlsx in Storage should be reachable by typing its name. The full
     // index carries them; openSummary already routes kind "file" to its viewer.
@@ -255,15 +267,14 @@ export function Palette({ onClose }: { onClose: () => void }) {
     for (const n of noteIndex.values()) {
       if (n.kind !== "file" || !fuzzy(q, n.title)) continue;
       fileRows.push(noteRow(n));
-      if (fileRows.length >= 4) break;
     }
     // Chats by TITLE (audit F3) — "everything has a chat", so a chat must at
     // least be findable by name. Full-text chat search is a later Rust lane.
     const chatRows: Row[] = chats
       .filter((c) => fuzzy(q, c.title || c.slug))
-      .slice(0, 4)
       .map((c) => ({
         key: `chat:${c.slug}`,
+        score: paletteMatchScore(q, c.title || c.slug, ""),
         label: c.title || c.slug,
         icon: <ChatGlyph size={15} />,
         hint: <span className="muted">Chat</span>,
@@ -277,15 +288,20 @@ export function Palette({ onClose }: { onClose: () => void }) {
     // null here and dispatching them would silently no-op
     const actionRows = allActions()
       .filter((a) => a.surface === "main" && fuzzy(q, a.title))
-      .slice(0, 10)
       .map((a) => actionRow(a));
-    return [
-      ...(tabRows.length > 0 ? [{ name: "Open tabs", rows: tabRows.slice(0, 6) }] : []),
-      ...(noteRows.length > 0 ? [{ name: "Notes", rows: noteRows }] : []),
-      ...(fileRows.length > 0 ? [{ name: "Files", rows: fileRows }] : []),
-      ...(chatRows.length > 0 ? [{ name: "Chats", rows: chatRows }] : []),
-      ...(actionRows.length > 0 ? [{ name: "Actions", rows: actionRows }] : []),
-    ];
+    const section = (name: string, rows: Row[], limit: number): Group | null => {
+      const ranked = rankSearchGroups(rows).slice(0, limit);
+      return ranked[0] ? { name, rows: ranked, score: ranked[0].score } : null;
+    };
+    return rankSearchGroups(
+      [
+        section("Open tabs", tabRows, 6),
+        section("Notes", noteRows, 8),
+        section("Files", fileRows, 4),
+        section("Chats", chatRows, 4),
+        section("Actions", actionRows, 10),
+      ].filter((group): group is Group => group !== null),
+    );
   }, [
     query,
     notes,
@@ -331,24 +347,39 @@ export function Palette({ onClose }: { onClose: () => void }) {
   let flatIndex = -1;
 
   return (
-    <div className="pal-scrim">
-      <div className="palette" ref={palRef} role="dialog" aria-label="Search notes and actions">
-        <div className="pal-in">
-          <SearchGlyph size={16} />
-          <input
-            autoFocus
-            type="text"
-            value={query}
-            placeholder="Search notes, files, chats, actions…"
-            aria-label="Search notes and actions"
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setIndex(0);
-            }}
-            onKeyDown={onInputKeyDown}
-          />
-        </div>
-        <div className="pal-list" ref={listRef}>
+    <div
+      className="tb-search-popover"
+      ref={palRef}
+      onMouseDown={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => event.stopPropagation()}
+    >
+      <div className="tb-search is-open" role="search">
+        <span className="tb-search-mark" aria-hidden="true">
+          <QuokkaMark size={15} />
+        </span>
+        <input
+          autoFocus
+          type="text"
+          className="tb-search-input"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-controls={listId}
+          aria-expanded="true"
+          aria-activedescendant={flat[selected] ? `${listId}-option-${selected}` : undefined}
+          value={query}
+          placeholder={
+            breveActive ? "Search Rotli, files, chats, actions…" : "Search notes, files, chats, actions…"
+          }
+          aria-label={breveActive ? "Search Rotli and actions" : "Search notes and actions"}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setIndex(0);
+          }}
+          onKeyDown={onInputKeyDown}
+        />
+      </div>
+      <div className="palette" aria-label="Search results">
+        <div className="pal-list" id={listId} role="listbox" ref={listRef}>
           {groups.map((group) => (
             <div key={group.name}>
               <div className="pal-sec">{group.name}</div>
@@ -359,6 +390,9 @@ export function Palette({ onClose }: { onClose: () => void }) {
                   <button
                     type="button"
                     key={row.key}
+                    id={`${listId}-option-${i}`}
+                    role="option"
+                    aria-selected={i === selected}
                     className={i === selected ? "prow sel" : "prow"}
                     // onMouseMove, NOT onMouseEnter: when ↑↓ scrolls the list,
                     // rows shift under a stationary cursor and Chromium fires

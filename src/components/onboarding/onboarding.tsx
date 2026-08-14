@@ -4,31 +4,76 @@
 
 import { type KeyboardEvent, useEffect, useState } from "react";
 
-import { resolveChord, useBindingsStore } from "../keys/bindings";
-import { chordFromEvent, formatChord, toAccelerator } from "../keys/chords";
-import { allActions, conflictFor, getAction, rebind, setDispatchSuspended } from "../keys/registry";
-import { setSetupHandle } from "../lib/setupHandle";
-import { setGlobalShortcut } from "../lib/tauri";
-import { SOLID_THEMES, type ThemeFamily, type ThemeSetting, useUiStore } from "../state/ui";
-import { Character } from "./character";
-import { AccentRow } from "./settingsSurface";
-import { SetupChoiceGroup, SetupPrimary } from "./setupControls";
+import { resolveChord, useBindingsStore } from "../../keys/bindings";
+import { chordFromEvent, formatChord, toAccelerator } from "../../keys/chords";
+import { setSetupHandle } from "../../keys/handles";
+import { allActions, conflictFor, getAction, rebind, setDispatchSuspended } from "../../keys/registry";
+import { setGlobalShortcut } from "../../lib/tauri";
+import { ONBOARDING_STEP_NUMBER, ONBOARDING_TOTAL_STEPS } from "../../state/onboarding";
+import {
+  DEFAULT_ACCENT_HUE,
+  THEME_FAMILY_PRESENTATIONS,
+  type ThemeFamily,
+  type ThemeSetting,
+  useUiStore,
+} from "../../state/ui";
+import { Character } from "../character";
+import { AccentRow } from "../settingsSurface";
+import { setupChoiceIndex, SetupBack, SetupChoiceGroup, SetupPrimary } from "./setupControls";
+import { SetupSideFriends } from "./setupSideFriends";
 
-const STEPS = ["welcome", "appearance", "behavior", "shortcuts", "ready"] as const;
+const STEPS = ["welcome", "appearance", "behavior", "shortcuts"] as const;
 type Step = (typeof STEPS)[number];
-
-const THEME_COPY: Record<string, string> = {
-  "Warm Light": "Soft clay and cream.",
-  "Warm Dark": "Warm, low-light cocoa.",
-  Paper: "Calm black on white.",
-  Charcoal: "Quiet near-black contrast.",
-};
 
 const HOTKEYS = [
   { id: "app.toggleWindow", label: "Open Rotli", hint: "Summon or tuck away the main window." },
   { id: "capture.summon", label: "Quick capture", hint: "Catch a thought without changing apps." },
   { id: "quick.summon", label: "Quick note", hint: "Open a small floating note." },
 ] as const;
+
+function ThemeModeChoice({
+  value,
+  onChange,
+}: {
+  value: ThemeSetting;
+  onChange: (mode: ThemeSetting) => void;
+}) {
+  const options: readonly { value: ThemeSetting; label: string }[] = [
+    { value: "light", label: "Light" },
+    { value: "dark", label: "Dark" },
+    { value: "system", label: "System" },
+  ];
+  return (
+    <div
+      className="setup-mode-choice"
+      role="radiogroup"
+      aria-label="Appearance mode"
+      onKeyDown={(event) => {
+        if (!event.key.startsWith("Arrow") && event.key !== "Home" && event.key !== "End") return;
+        const active = options.findIndex((option) => option.value === value);
+        const next = setupChoiceIndex(event.key, active, options.length, true);
+        if (next === null) return;
+        event.preventDefault();
+        const option = options[next];
+        if (option) onChange(option.value);
+      }}
+    >
+      {options.map((option) => (
+        <button
+          type="button"
+          role="radio"
+          aria-checked={value === option.value}
+          tabIndex={value === option.value ? 0 : -1}
+          className={value === option.value ? "selected" : ""}
+          key={option.value}
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function ChordRow({ id, label, hint }: (typeof HOTKEYS)[number]) {
   const overrides = useBindingsStore((state) => state.overrides);
@@ -90,29 +135,40 @@ function ChordRow({ id, label, hint }: (typeof HOTKEYS)[number]) {
   );
 }
 
-export function Onboarding({ onDone }: { onDone: () => void }) {
-  const [step, setStep] = useState<Step>("welcome");
+export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => void; initialStep?: Step }) {
+  const [step, setStep] = useState<Step>(initialStep);
   const index = STEPS.indexOf(step);
   const theme = useUiStore((state) => state.theme);
   const family = useUiStore((state) => state.themeFamily);
   const showInDock = useUiStore((state) => state.showInDock);
   const stayOpen = useUiStore((state) => state.stayOpen);
+  const userName = useUiStore((state) => state.userName);
+  const setUserName = useUiStore((state) => state.setUserName);
 
   const move = (delta: -1 | 1) => {
     const next = STEPS[Math.max(0, Math.min(STEPS.length - 1, index + delta))];
     if (next) setStep(next);
   };
-  const advance = () => (step === "ready" ? onDone() : move(1));
+  const advance = () => (step === "shortcuts" ? onDone() : move(1));
 
   useEffect(() => {
-    setSetupHandle({ continue: advance });
+    setSetupHandle({ continue: advance, ...(index > 0 ? { back: () => move(-1) } : {}) });
     return () => setSetupHandle(null);
   });
 
-  const pickTheme = (value: string) => {
-    const [nextFamily, nextTheme] = value.split(":") as [ThemeFamily, ThemeSetting];
-    useUiStore.getState().setThemeFamily(nextFamily);
-    useUiStore.getState().setTheme(nextTheme);
+  const pickFamily = (nextFamily: ThemeFamily) => {
+    const ui = useUiStore.getState();
+    ui.setThemeFamily(nextFamily);
+    ui.setMatchLightFamily(nextFamily);
+    ui.setMatchDarkFamily(nextFamily);
+  };
+  const pickMode = (nextTheme: ThemeSetting) => {
+    const ui = useUiStore.getState();
+    if (nextTheme === "system") {
+      ui.setMatchLightFamily(family);
+      ui.setMatchDarkFamily(family);
+    }
+    ui.setTheme(nextTheme);
   };
   const behavior = showInDock && stayOpen ? "resident" : showInDock ? "dock" : "visitor";
   const pickBehavior = (value: "visitor" | "dock" | "resident") => {
@@ -132,19 +188,18 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       matchDarkFamily: "mono",
       syntaxPalette: "rotli",
       accentColor: "default",
+      accentHue: DEFAULT_ACCENT_HUE,
       stayOpen: false,
       showInDock: false,
     });
     onDone();
   };
 
-  const themeValue = `${family}:${theme}`;
   const titles: Record<Step, string> = {
     welcome: "Welcome",
     appearance: "Appearance",
     behavior: "Window",
     shortcuts: "Shortcuts",
-    ready: "Ready",
   };
 
   return (
@@ -153,14 +208,16 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       <section className="setup-shell" aria-labelledby="setup-title">
         <div className="setup-progress">
           <span>
-            {index + 1} of {STEPS.length}
+            {ONBOARDING_STEP_NUMBER[step]} of {ONBOARDING_TOTAL_STEPS}
           </span>
           <span aria-hidden="true">·</span>
           <span>{titles[step]}</span>
         </div>
 
-        <div className="setup-stage" key={step}>
-          <aside className="setup-companion" aria-hidden="true">
+        <SetupSideFriends />
+
+        <div className="setup-stage" data-step={step} key={step}>
+          <aside className={`setup-companion setup-companion--${step}`} aria-hidden="true">
             <Character
               name={
                 step === "welcome"
@@ -169,18 +226,14 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                     ? "rest"
                     : step === "behavior"
                       ? "base"
-                      : step === "shortcuts"
-                        ? "searching"
-                        : "celebrating"
+                      : "searching"
               }
               size={152}
             />
             <p>
               {step === "shortcuts"
                 ? "I’ll stay out of the way until you call."
-                : step === "ready"
-                  ? "Nice. Now let’s give your notes a home."
-                  : "Everything here can change later."}
+                : "Everything here can change later."}
             </p>
           </aside>
 
@@ -193,37 +246,58 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                   Pick a look, choose how the window behaves, and meet the three shortcuts worth remembering.
                   Your notes folder comes next—and is always an explicit choice.
                 </p>
+                <label className="setup-name-field">
+                  <span>
+                    What should Rotli call you? <em>Optional</em>
+                  </span>
+                  <input
+                    type="text"
+                    value={userName}
+                    maxLength={80}
+                    autoComplete="name"
+                    placeholder="Your first name"
+                    onChange={(event) => setUserName(event.currentTarget.value)}
+                    onKeyDown={(event) => {
+                      event.stopPropagation();
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        advance();
+                      }
+                    }}
+                  />
+                  <small>Used for greetings only. Enter continues without a name.</small>
+                </label>
               </>
             )}
 
             {step === "appearance" && (
               <>
                 <p className="setup-eyebrow">Start somewhere comfortable</p>
-                <h1 id="setup-title">Choose an environment.</h1>
-                <p className="setup-lede">
-                  Paper and Charcoal are the calm defaults; the warm pair keeps Rotli’s softer side.
-                </p>
+                <h1 id="setup-title">Choose a theme.</h1>
+                <p className="setup-lede">Pick its character, then choose Light, Dark, or follow your Mac.</p>
                 <SetupChoiceGroup
-                  label="Environment"
-                  value={themeValue}
-                  onChange={pickTheme}
-                  options={[
-                    {
-                      value: "mono:system",
-                      title: "Match my Mac",
-                      description: "Paper by day, Charcoal by night.",
-                      detail: <span className="setup-theme-dot mono-system" aria-hidden="true" />,
-                    },
-                    ...SOLID_THEMES.map(({ family: optionFamily, mode, label }) => ({
-                      value: `${optionFamily}:${mode}`,
+                  label="Theme"
+                  value={family}
+                  onChange={pickFamily}
+                  options={THEME_FAMILY_PRESENTATIONS.map(
+                    ({ family: optionFamily, label, description, lightLabel, darkLabel }) => ({
+                      value: optionFamily,
                       title: label,
-                      description: THEME_COPY[label] ?? "",
+                      description,
                       detail: (
-                        <span className={`setup-theme-dot ${optionFamily}-${mode}`} aria-hidden="true" />
+                        <span className="setup-theme-pair" aria-hidden="true">
+                          <span className={`setup-theme-dot ${optionFamily}-light`} title={lightLabel} />
+                          <span className={`setup-theme-dot ${optionFamily}-dark`} title={darkLabel} />
+                        </span>
                       ),
-                    })),
-                  ]}
+                    }),
+                  )}
                 />
+                <div className="setup-mode-row">
+                  <span>Mode</span>
+                  <ThemeModeChoice value={theme} onChange={pickMode} />
+                  <small>{theme === "system" ? "Follows macOS" : `System is off · ${theme}`}</small>
+                </div>
                 <div className="setup-accent">
                   <span>Accent</span>
                   <AccentRow />
@@ -245,14 +319,14 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                   onChange={pickBehavior}
                   options={[
                     {
-                      value: "visitor",
-                      title: "Quiet visitor",
-                      description: "Menu bar only; hides when you click away.",
-                    },
-                    {
                       value: "dock",
                       title: "Dock companion",
                       description: "Appears in the Dock; still tucks away on blur.",
+                    },
+                    {
+                      value: "visitor",
+                      title: "Quiet visitor",
+                      description: "Menu bar only; hides when you click away.",
                     },
                     {
                       value: "resident",
@@ -280,17 +354,6 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                 </div>
               </>
             )}
-
-            {step === "ready" && (
-              <>
-                <p className="setup-eyebrow">App setup complete</p>
-                <h1 id="setup-title">Now choose where your notes live.</h1>
-                <p className="setup-lede">
-                  Create a fresh vault, open an Obsidian or ZenNotes folder in place, or import a copy. Rotli
-                  keeps one Main view while preserving every nested folder.
-                </p>
-              </>
-            )}
           </div>
         </div>
 
@@ -299,14 +362,13 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             Skip app setup
           </button>
           <div className="setup-actions">
-            {index > 0 && (
-              <button type="button" className="setup-button secondary" onClick={() => move(-1)}>
-                <kbd aria-hidden="true">←</kbd>
-                <span>Back</span>
-              </button>
-            )}
+            {index > 0 && <SetupBack onClick={() => move(-1)} />}
             <SetupPrimary onClick={advance}>
-              {step === "welcome" ? "Get started" : step === "ready" ? "Choose a vault" : "Continue"}
+              {step === "welcome"
+                ? "Get started"
+                : step === "shortcuts"
+                  ? "Choose where notes live"
+                  : "Continue"}
             </SetupPrimary>
           </div>
         </footer>

@@ -569,7 +569,7 @@ function mine() {
   for (const { dir, exts, lang } of SCAN_ROOTS) {
     const found = [];
     walk(dir, exts, found);
-    for (const rel of found.sort()) files.push({ rel, lang });
+    for (const rel of found.sort((a, b) => a.localeCompare(b))) files.push({ rel, lang });
   }
 
   const units = [];
@@ -766,7 +766,7 @@ function buildCluster(signal, sites, baseScore, sharedLiterals) {
       "\n" +
       ordered
         .map((u) => u.norm.join("\x1f"))
-        .sort()
+        .sort((a, b) => a.localeCompare(b))
         .join("\n\x00"),
   );
   return {
@@ -944,9 +944,9 @@ const report = {
   unitCount: units.length,
   clusterCount: reported.length,
   suppressed: suppressed.sort((a, b) => (a.fingerprint < b.fingerprint ? -1 : 1)),
-  clusters: capped.map(({ normalizedSnippets, ...c }) => ({
+  clusters: capped.map(({ normalizedSnippets: _normalizedSnippets, ...c }) => ({
     ...c,
-    sites: c.sites.map(({ startLine, endLine, ...s }) => s),
+    sites: c.sites.map(({ startLine: _startLine, endLine: _endLine, ...s }) => s),
   })),
 };
 

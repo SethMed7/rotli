@@ -1,18 +1,47 @@
 import { useEffect, useState } from "react";
 
-import { setSetupHandle } from "../lib/setupHandle";
-import { corpusImportVaultCopy, corpusInspectFolder, type VaultInspection } from "../lib/tauri";
-import { chooseFolder, createPracticeVault, initMemexAsCorpus, pickFolder } from "../memex/service";
-import { flushSettingsNow } from "../state/persist";
-import { useUiStore } from "../state/ui";
-import { Character } from "./character";
-import { SetupChoiceGroup, SetupPrimary } from "./setupControls";
+import { setSetupHandle } from "../../keys/handles";
+import {
+  corpusImportVaultCopy,
+  corpusInspectFolder,
+  corpusListConfig,
+  type CorpusRefView,
+  type VaultInspection,
+} from "../../lib/tauri";
+import { chooseFolder, createPracticeVault, initMemexAsCorpus, pickFolder } from "../../memex/service";
+import { ONBOARDING_STEP_NUMBER, ONBOARDING_TOTAL_STEPS } from "../../state/onboarding";
+import { flushSettingsNow } from "../../state/persist";
+import { useUiStore } from "../../state/ui";
+import { Character } from "../character";
+import { SetupBack, SetupChoiceGroup, SetupPrimary } from "./setupControls";
+import { SetupSideFriends } from "./setupSideFriends";
 
 type Stage = "choose" | "create" | "scanning" | "review";
-type Intent = "create" | "open" | "practice";
+type Intent = "create" | "open" | "practice" | "current";
 type ImportMode = "in-place" | "copy";
 
-export function VaultActivation() {
+export function vaultChoiceLabel(intent: Intent): string {
+  if (intent === "create") return "Choose an empty folder";
+  if (intent === "open") return "Choose an existing folder";
+  if (intent === "current") return "Use this vault";
+  return "Create a practice vault";
+}
+
+export function VaultActivation({
+  onboarding = false,
+  allowCurrent = false,
+  onDone,
+  onBack,
+  onBeforeSwitch,
+  onSwitchFailed,
+}: {
+  onboarding?: boolean;
+  allowCurrent?: boolean;
+  onDone?: () => void | Promise<void>;
+  onBack?: () => void;
+  onBeforeSwitch?: () => void | Promise<void>;
+  onSwitchFailed?: () => void | Promise<void>;
+}) {
   const [stage, setStage] = useState<Stage>("choose");
   const [intent, setIntent] = useState<Intent>("create");
   const [createPath, setCreatePath] = useState<string | null>(null);
@@ -21,12 +50,39 @@ export function VaultActivation() {
   const [brainEnabled, setBrainEnabled] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [current, setCurrent] = useState<CorpusRefView | null>(null);
+
+  useEffect(() => {
+    if (!onboarding || !allowCurrent) return;
+    let live = true;
+    void corpusListConfig()
+      .then((config) => {
+        if (live) setCurrent(config.corpus);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [allowCurrent, onboarding]);
+
+  const restoreVaultStep = async () => {
+    try {
+      await onSwitchFailed?.();
+    } catch {
+      // Preserve the real vault-operation error below; persistence will retry.
+    }
+  };
 
   const chooseIntent = async () => {
     setError(null);
     setBusy(true);
     try {
+      if (intent === "current") {
+        await onDone?.();
+        return;
+      }
       if (intent === "practice") {
+        await onBeforeSwitch?.();
         await flushSettingsNow();
         await createPracticeVault();
         return;
@@ -48,6 +104,7 @@ export function VaultActivation() {
         setStage("review");
       }
     } catch (cause) {
+      await restoreVaultStep();
       setStage("choose");
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -62,6 +119,7 @@ export function VaultActivation() {
     try {
       if (stage === "create" && createPath) {
         useUiStore.getState().setBrainEnabled(brainEnabled);
+        await onBeforeSwitch?.();
         await flushSettingsNow();
         await initMemexAsCorpus(createPath, brainEnabled);
         return;
@@ -70,25 +128,22 @@ export function VaultActivation() {
         if (importMode === "copy") {
           const destination = await pickFolder();
           if (!destination) return;
+          await onBeforeSwitch?.();
           await flushSettingsNow();
           await corpusImportVaultCopy(inspection.path, destination);
         } else {
+          await onBeforeSwitch?.();
           await flushSettingsNow();
           await chooseFolder(inspection.path);
         }
       }
     } catch (cause) {
+      await restoreVaultStep();
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setBusy(false);
     }
   };
-
-  const primary = stage === "choose" ? () => void chooseIntent() : () => void activate();
-  useEffect(() => {
-    setSetupHandle({ continue: primary });
-    return () => setSetupHandle(null);
-  });
 
   const back = () => {
     setError(null);
@@ -97,12 +152,19 @@ export function VaultActivation() {
     setStage("choose");
   };
 
+  const primary = stage === "choose" ? () => void chooseIntent() : () => void activate();
+  const goBack = stage === "choose" ? onBack : back;
+  useEffect(() => {
+    setSetupHandle({ continue: primary, ...(goBack ? { back: goBack } : {}) });
+    return () => setSetupHandle(null);
+  });
+
   return (
     <div className="onb vault-activation">
       <div className="onb-drag" data-tauri-drag-region />
       <section className="setup-shell" aria-labelledby="vault-title">
         <div className="setup-progress">
-          <span>Vault</span>
+          <span>{onboarding ? `${ONBOARDING_STEP_NUMBER.vault} of ${ONBOARDING_TOTAL_STEPS}` : "Vault"}</span>
           <span aria-hidden="true">·</span>
           <span>
             {stage === "choose"
@@ -114,6 +176,8 @@ export function VaultActivation() {
                   : "Review"}
           </span>
         </div>
+
+        {onboarding && <SetupSideFriends />}
 
         <div className="setup-stage" key={stage}>
           <aside className="setup-companion" aria-hidden="true">
@@ -146,8 +210,9 @@ export function VaultActivation() {
                   options={[
                     {
                       value: "create",
-                      title: "Create a new vault",
-                      description: "Choose an empty home and let rotli set up its plain-file structure.",
+                      title: "Create a Rotli vault",
+                      description:
+                        "Choose an empty home. Rotli marks the vault and sets up its documented plain-file structure.",
                     },
                     {
                       value: "open",
@@ -160,6 +225,15 @@ export function VaultActivation() {
                       title: "Try a practice vault",
                       description: "Let rotli make a disposable local playground so you can explore first.",
                     },
+                    ...(current
+                      ? [
+                          {
+                            value: "current" as const,
+                            title: `Keep ${current.absPath.split("/").pop() || "current vault"}`,
+                            description: `Explicitly continue with ${current.absPath}.`,
+                          },
+                        ]
+                      : []),
                   ]}
                 />
                 <p className="setup-arrow-note">
@@ -263,12 +337,7 @@ export function VaultActivation() {
         <footer className="setup-footer">
           <span className="setup-local-note">Local files remain the durable truth.</span>
           <div className="setup-actions">
-            {stage !== "choose" && stage !== "scanning" && (
-              <button type="button" className="setup-button secondary" disabled={busy} onClick={back}>
-                <kbd aria-hidden="true">←</kbd>
-                <span>Back</span>
-              </button>
-            )}
+            {stage !== "scanning" && goBack && <SetupBack disabled={busy} onClick={goBack} />}
             {stage !== "scanning" && (
               <SetupPrimary
                 disabled={busy || (stage === "review" && inspection?.kind === "empty")}
@@ -277,7 +346,7 @@ export function VaultActivation() {
                 {busy
                   ? "Working…"
                   : stage === "choose"
-                    ? "Choose folder"
+                    ? vaultChoiceLabel(intent)
                     : stage === "create"
                       ? "Create vault"
                       : importMode === "copy"

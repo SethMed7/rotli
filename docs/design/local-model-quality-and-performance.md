@@ -628,7 +628,7 @@ model with `max_size = 10`, storing prompt ‖ completion. Required shape:
   KV against key and corrupts continuations rather than merely missing.
 - **Key = (model path, scope key, prefix boundary).** The model path is not optional: one
   `requestId` spans *multiple models* inside a hybrid preset — it is minted once at
-  `src/components/chatSurface.tsx:1223` and reused by `runHybrid` for the routing generation, the
+  `src/components/chat/chatSurface.tsx:1223` and reused by `runHybrid` for the routing generation, the
   executor leg, and a fallback leg on a different model (`src/ai/hybrid.ts:88`, `:112`,
   `:136-139`). This is not hypothetical: the shipped `starter-private` preset
   (`src/ai/models.ts:291-300`) pairs a `qwen2.5-3b` organizer with a `gemma-3-12b` route/fallback,

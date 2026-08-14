@@ -2,11 +2,10 @@
   // Wired into `bun run lint` as lint:oxlint (migrated from ESLint 2026-07-31 —
   // eslint/typescript-eslint/eslint-plugin-react-hooks removed; same rule set,
   // ~90x faster syntax pass, type-aware pass via the oxlint-tsgolint sidecar).
-  // Scoped by the CLI invocation to src/, e2e/, breve-runtime/, and
-  // playwright.config.ts — scripts/ and src-tauri/ are untouched. scripts/ is
-  // oxfmt-owned but not yet lint-owned; a measurement 2026-08-01 put it at 6
-  // findings (3 no-unused-vars, 3 require-array-sort-compare), so it is a small
-  // deliberate follow-up, not a hidden gap.
+  // Scoped by the CLI invocation to src/, e2e/, scripts/, breve-runtime/,
+  // playwright.config.ts, and vite.config.ts. scripts/ joined 2026-08-13 after
+  // its measured six findings (three unused omission bindings and three sorts
+  // without explicit comparators) were fixed. src-tauri/ remains Clippy-owned.
   //
   // breve-runtime/ JOINED the lint scope 2026-08-01. Its long-standing deferral
   // (76 findings, last re-measured 2026-07-17) is retired: the debt was paid,

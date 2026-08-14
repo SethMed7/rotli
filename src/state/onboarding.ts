@@ -10,7 +10,18 @@ import { useBindingsStore } from "../keys/bindings";
 import { toAccelerator } from "../keys/chords";
 import { allActions } from "../keys/registry";
 import { setDockVisible, setGlobalShortcut, setHideOnBlur } from "../lib/tauri";
-import { useUiStore } from "./ui";
+import { DEFAULT_ACCENT_HUE, useUiStore } from "./ui";
+
+export const ONBOARDING_STEP_NUMBER = {
+  welcome: 1,
+  appearance: 2,
+  behavior: 3,
+  shortcuts: 4,
+  vault: 5,
+  models: 6,
+} as const;
+
+export const ONBOARDING_TOTAL_STEPS = Object.keys(ONBOARDING_STEP_NUMBER).length;
 
 function compareVersions(a: string, b: string): number {
   const left = a.split(".").map((part) => Number.parseInt(part, 10) || 0);
@@ -54,8 +65,11 @@ export async function resetAndReonboard(): Promise<void> {
     matchLightFamily: "mono",
     matchDarkFamily: "mono",
     syntaxPalette: "rotli",
+    accentColor: "default",
+    accentHue: DEFAULT_ACCENT_HUE,
     stayOpen: false,
     showInDock: false,
     onboarded: false,
+    onboardingPhase: "preferences",
   });
 }
