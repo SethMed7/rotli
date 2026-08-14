@@ -67,13 +67,14 @@ Mechanical guards: `check:architecture`, `check:ipc`, `check:structure`,
 5. Run:
 
 ```sh
-bun run check
-cargo test --manifest-path src-tauri/Cargo.toml
-NODE_OPTIONS=--max-old-space-size=4096 bun run build
+bun run verify
 ```
 
-Iterate with focused commands: `bun test <file>` and the relevant `check:*`
-script. Substantive changes land via Greptile-reviewed PRs (fixes on-thread);
+`verify` is CI's local twin: check, build, `site/`, Playwright, clippy, cargo
+test. `bun run check` alone is NOT the CI gate — the last three sit outside it.
+
+Iterate with focused commands: `bun test <file>`, `bun run verify <lane>`, and
+the relevant `check:*` script. Substantive changes land via Greptile-reviewed PRs (fixes on-thread);
 releases gate on CI conclusion; E2E clicks real controls, never ⌘-chords.
 
 UI work must follow `DESIGN.md`, use semantic tokens from `src/brand/`, remain

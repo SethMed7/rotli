@@ -4,8 +4,9 @@
  * Usage: bun email-topic.ts <pdf|plain> <recipient> <topic...>
  * Prints "OK <id>" on success, "ERR <reason>" on failure.
  */
-import { $ } from "bun";
 import { join } from "node:path";
+import { renderPdf } from "./chrome-pdf";
+import { errText } from "./err-text";
 import { TOPICS, PDFS } from "./paths";
 import { readSecret } from "./secret";
 import { runModel, STRICT_MCP, CLAUDE_BIN } from "./run-model";
@@ -57,7 +58,11 @@ if (format === "pdf") {
     .k{font-family:-apple-system,Helvetica,sans-serif;font-size:9pt;letter-spacing:.28em;color:var(--accent);text-transform:uppercase}
   </style></head><body><div class="k">BREVE · ON-DEMAND BRIEF</div>${body}${foot}</body></html>`;
   await Bun.write(htmlPath, page);
-  await $`"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --disable-gpu --no-pdf-header-footer --print-to-pdf=${pdfPath} ${"file://" + htmlPath}`.quiet();
+  try {
+    await renderPdf(htmlPath, pdfPath);
+  } catch (error) {
+    console.log(`ERR ${errText(error)}`); process.exit(1);
+  }
   attachments = [{ filename: `BREVE-${slug}.pdf`, content: Buffer.from(await Bun.file(pdfPath).arrayBuffer()).toString("base64") }];
   html = `<!DOCTYPE html><html><body style="margin:0;background:${palette.background};color:${palette.text};font-family:Georgia,serif;padding:28px 22px"><div style="max-width:600px;margin:0 auto">${kicker}<p style="font-size:15px">Your briefing on <b>${topic}</b> is attached as a PDF.</p>${foot}</div></body></html>`;
 } else {
