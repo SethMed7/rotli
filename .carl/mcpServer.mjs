@@ -9,6 +9,11 @@ const carlPath = join(dirname(fileURLToPath(import.meta.url)), "carl.json");
 const serverInfo = { name: "rotli-carl", version: "1.0.0" };
 const instructions = "Rotli CARL is compact, project-scoped architecture recall. Call carl_recall with the task topic before broad documentation or codebase scans, then open only the returned source files. AGENTS.md remains authoritative for process and safety. CARL rules summarize current contracts; they never override code or owning docs. Stage new rules for review instead of silently changing architecture.";
 
+// CARL_READONLY=1 (Cursor and Antigravity wiring) hides and refuses
+// carl_stage_proposal: those agents report stale rules in their handoff;
+// only Claude (or a human) stages proposals for review.
+const readOnly = process.env.CARL_READONLY === "1";
+
 const tools = [
   {
     name: "carl_recall",
@@ -234,11 +239,14 @@ function handle(request) {
     });
   }
   if (request.method === "ping") return success(request.id, {});
-  if (request.method === "tools/list") return success(request.id, { tools });
+  if (request.method === "tools/list") return success(request.id, { tools: readOnly ? tools.filter((tool) => tool.name !== "carl_stage_proposal") : tools });
   if (request.method === "tools/call") {
     const name = request.params?.name;
     const handler = handlers[name];
     if (!handler) return failure(request.id, -32602, `unknown tool: ${name}`);
+    if (readOnly && name === "carl_stage_proposal") {
+      return failure(request.id, -32602, "carl_stage_proposal is disabled in read-only mode — report the stale rule in your handoff instead");
+    }
     try {
       const result = handler(request.params?.arguments ?? {});
       return success(request.id, { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], isError: false });

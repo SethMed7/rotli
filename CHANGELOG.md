@@ -12,6 +12,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The agent surface is now uniform across Claude, Codex, Cursor, and
+  Antigravity.** All four tools load the same canonical `AGENTS.md` (Cursor
+  natively, Antigravity through a gate-enforced `.agents/rules/AGENTS.md`
+  symlink), reach the same project CARL server (`.cursor/mcp.json` and
+  `.agents/mcp_config.json` join `.mcp.json` and `.codex/config.toml`), and
+  share one repo skills home — `.agents/skills/` (Agent Skills standard),
+  with `.claude/skills` symlinked in for Claude. The CARL server gained an
+  env-gated read-only mode (`CARL_READONLY=1` hides and refuses
+  `carl_stage_proposal`) so only Claude stages rule proposals, and a first
+  shared `verify` skill routes every agent to the same proof chain.
+  `bun run check:docs` asserts the wiring, mirror integrity, skills parity,
+  and read-only behavior (live smoke test).
+- **Claude now genuinely always-loads the canonical agent rules.** `CLAUDE.md`
+  became a true importing adapter: a bare `@AGENTS.md` memory-import line
+  replaces the former Markdown link, which Claude Code never auto-loaded.
+  `AGENTS.md` slimmed to 4.6 KB of real headroom under its 5 KiB ceiling by
+  moving the surface-ownership map into
+  `docs/architecture/ai-context-architecture.md` (now the single ownership +
+  budget contract) and dropping `README.md` from mandatory per-task reading.
+  `bun run check:docs` newly enforces the bare import line and a 1,000-byte
+  adapter budget so `CLAUDE.md` cannot regrow into a second rulebook.
 - **Breve now opens as a vault-specific news dashboard.** The latest saved
   briefs form a most-recent-first carousel on the left while Top stories stays
   visible on the right, with watchlist sources, actions, upcoming routines, and

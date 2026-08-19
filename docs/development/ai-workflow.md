@@ -22,8 +22,9 @@ Tauri development process.
 
 ## Use one canonical instruction graph
 
-`AGENTS.md` owns the small always-loaded rule set. `CLAUDE.md`, Copilot
-instructions, and future adapters point to it. Project CARL stores topic-sized
+`AGENTS.md` owns the small always-loaded rule set. Claude imports it
+(`@AGENTS.md` in `CLAUDE.md`), Codex and Cursor read it natively, Antigravity
+loads the `.agents/rules/AGENTS.md` mirror, and Copilot uses its adapter. Project CARL stores topic-sized
 recall and decisions; `carl_recall` should run before broad code or documentation
 scans. Open only the source contracts it returns. Carl never overrides current
 repository contracts; see `architecture/ai-context-architecture.md`.
@@ -52,7 +53,7 @@ require translating the project into a new set of duplicated rules.
 
 | Change | Minimum focused evidence |
 |---|---|
-| Theme or product UI | Design-system checks, keyboard/state tests, four-theme screenshots |
+| Theme or product UI | Design-system checks, keyboard/state tests, light and dark screenshots per affected theme family |
 | Memex writes or metadata | TS policy tests, Rust write-boundary tests, fixture validation |
 | AI retrieval or chat memory | Ranking/budget tests, provenance checks, secure-content denial |
 | DOCX, sheets, or boards | Codec round trip, adapter tests, save/reopen behavior |

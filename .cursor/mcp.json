@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "rotli-carl": {
+      "command": "node",
+      "args": [".carl/mcpServer.mjs"],
+      "env": { "CARL_READONLY": "1" }
+    }
+  }
+}

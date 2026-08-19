@@ -4,7 +4,7 @@ Status: **designed, not built** (2026-08-04). Research verified against the
 installed models and the CLIs on this machine; nothing here is speculative about
 what rotli already owns.
 
-Seth, 2026-08-04: *"the ability to sit there talk to the AI and it have TTS along
+the maintainer, 2026-08-04: *"the ability to sit there talk to the AI and it have TTS along
 with STT… but we need to do it in a way that users can install only what they
 want. If they want no model we can still just offer standard dictating that the
 device supports. If they want AI to talk back to them like a call they need to
@@ -58,7 +58,7 @@ to install.
 ### Tier 2 — talking with the AI, like a call (mic + TTS + a chat model)
 
 Press to start a conversation: you speak, it answers aloud, you speak again. This
-is the tier that genuinely needs a model, exactly as Seth framed it — the AI
+is the tier that genuinely needs a model, exactly as the maintainer framed it — the AI
 can't talk back without one.
 
 Requires: Tier 1 + `kokoro-82m` + any configured chat model.
@@ -126,6 +126,6 @@ conversation*, and nothing else.
   and a secure-tainted chat must not be read aloud into a room by a remote model
   lane (the existing secure-context rules apply unchanged).
 - No new UI framework; semantic tokens only; loading/empty/error/disabled states
-  covered in all four environments (AGENTS.md).
+  covered in every supported environment (AGENTS.md).
 - Native audio claims need human-managed app evidence — browser fixtures don't
   count.

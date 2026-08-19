@@ -31,6 +31,7 @@ secrets.*
 coverage/
 playwright-report/
 test-results/
-.claude/
+.claude/*
+!.claude/skills
 dist-release
 .eval-local-chat/

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_modified": "2026-08-07T00:00:00.000Z",
+  "last_modified": "2026-08-19T15:29:05.186Z",
   "config": {
     "devmode": false,
     "post_compact_gate": true,
@@ -721,7 +721,7 @@
       "id": "stg-002",
       "proposed_domain": "ROTLI_MEMEX",
       "rule_text": "Secure and locked are independent (supersedes rule 1). SECURE = visibility vs remote: frontier models never receive secure titles, snippets, bodies, or hits, under any setting; on-device models read them BY DEFAULT, withdrawable per note (local_ai_allowed tri-state) or per vault (secureLocalAi). LOCKED = editing: no AI of any class edits a locked note; every class still reads it. The organizer still skips both. Brain memory lanes (identity/, personality/, history/, MAP.md, inbox.md) are Surface::Reference — AI-retrievable, never in the Notes tree, never writable; vault plumbing stays Hidden.",
-      "rationale": "Rule 1 is stale: it required explicit local_ai_allowed for on-device reads and conflated locked with secure. Seth's 2026-08-01 directive flipped the local default and split the two axes; reference lanes replaced the blanket Hidden gating. Implemented and tested on both layers.",
+      "rationale": "Rule 1 is stale: it required explicit local_ai_allowed for on-device reads and conflated locked with secure. the maintainer's 2026-08-01 directive flipped the local default and split the two axes; reference lanes replaced the blanket Hidden gating. Implemented and tested on both layers.",
       "source": "docs/design/ai-visibility-matrix.md",
       "proposed_at": "2026-08-01T15:18:36.448Z",
       "status": "adopted",
@@ -732,7 +732,7 @@
       "id": "stg-003",
       "proposed_domain": "ROTLI_MODELS",
       "rule_text": "Model CLASS decides data access, and class is derived from the endpoint plus the provider registry — never an asserted flag. An on-device model (loopback + mlx/llamacpp/ollama) may see secure notes; a frontier model never may, localhost proxy or not. Class buys VISIBILITY only: no class edits a locked note, and every AI write rides corpus_write_ai (read gate, then locked refusal). Headless workspace agents count as remote for content policy even when their process is local.",
-      "rationale": "ROTLI_MODELS said nothing about what a model class may READ or WRITE, so agents inferred it from the stale ROTLI_MEMEX rule 1. Seth's 2026-08-01 matrix makes class the deciding axis for visibility and makes edit authority class-independent.",
+      "rationale": "ROTLI_MODELS said nothing about what a model class may READ or WRITE, so agents inferred it from the stale ROTLI_MEMEX rule 1. the maintainer's 2026-08-01 matrix makes class the deciding axis for visibility and makes edit authority class-independent.",
       "source": "docs/design/ai-visibility-matrix.md",
       "proposed_at": "2026-08-01T15:18:45.370Z",
       "status": "adopted",
@@ -782,6 +782,15 @@
       "status": "adopted",
       "adopted_at": "2026-08-07T00:00:00.000Z",
       "adopted_as": "ROTLI_CORE rule 10"
+    },
+    {
+      "id": "stg-008",
+      "proposed_domain": "ROTLI_CORE",
+      "rule_text": "The agent surface is four-tool uniform: AGENTS.md is canonical for Claude (@AGENTS.md import in CLAUDE.md), Codex and Cursor (native root read), and Antigravity (.agents/rules/AGENTS.md symlink, byte-equality gated). All four reach the same project CARL MCP server; Cursor and Antigravity launch it with CARL_READONLY=1, which hides and refuses carl_stage_proposal — only Claude or a human stages proposals. Repo skills live canonically in .agents/skills (SKILL.md standard); .claude/skills symlinks there. check:docs asserts wiring, mirror integrity, skills parity, and read-only behavior.",
+      "rationale": "2026-08-19 four-tool parity work: Cursor and Antigravity previously had no repo wiring at all, and the read-only boundary existed only for Codex (config-level). Now the server enforces it and the gate smoke-tests it.",
+      "source": "docs/architecture/ai-context-architecture.md",
+      "proposed_at": "2026-08-19T15:29:05.185Z",
+      "status": "pending"
     }
   ]
 }
