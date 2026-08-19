@@ -12,6 +12,7 @@ import { dispatch } from "../keys/registry";
 import { relativeLabel } from "../lib/dateLabels";
 import { brainLocationLabel, noteDiskFolder, noteLocationLabel } from "../lib/noteLocation";
 import { corpusNoteAbsolutePath, corpusRawFrontmatter, corpusWriteFrontmatterRaw } from "../lib/tauri";
+import { useNow } from "../lib/useNow";
 import { listChatsForNote, openChatForNote, openNoteChat } from "../noteChat/composition";
 import { invalidateNotes, useNote, useNoteIndex } from "../services/hooks";
 import { mainHasNote } from "../services/mainTree";
@@ -59,22 +60,8 @@ function createdLabel(ts: number): string {
  * looking at. Coming back re-ticks immediately, so the label is fresh on sight
  * instead of up to 30s stale — the guard is also the better behavior. */
 function UpdatedAt({ ts }: { ts: number }) {
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const bump = () => setTick((n) => n + 1);
-    const timer = setInterval(() => {
-      if (!document.hidden) bump();
-    }, 30_000);
-    const onVisible = () => {
-      if (!document.hidden) bump();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, []);
-  return <>{relativeLabel(ts)}</>;
+  const now = useNow();
+  return <>{relativeLabel(ts, now)}</>;
 }
 
 function NoteHistoryTrail({ compact }: { compact: boolean }) {
@@ -142,7 +129,7 @@ export function EditorSurface({
   const aaChipRef = useRef<HTMLButtonElement>(null);
   const chatChipRef = useRef<HTMLButtonElement>(null);
 
-  /** The chat chip: a note owns MANY chats (Seth, 2026-07-30). No chats yet →
+  /** The chat chip: a note owns MANY chats (the maintainer, 2026-07-30). No chats yet →
    * create the first directly; otherwise a picker menu lists them (newest work
    * first) + "New chat". ⌥-click skips the picker and continues the latest. */
   const chatChipError = (error: unknown) =>
@@ -194,14 +181,14 @@ export function EditorSurface({
   const setFileMetadata = useUiStore((s) => s.setFileMetadata);
   const revealFocusedNote = useUiStore((s) => s.revealFocusedNote);
   const focusedPane = usePanesStore((s) => s.focusedPaneId === paneId);
-  // "In Main" indicator + the note's right-click menu (Seth #23, 2026-07-03: the
+  // "In Main" indicator + the note's right-click menu (the maintainer #23, 2026-07-03: the
   // metadata popover is gone — the ≡ chip toggles metadata instantly, while
   // lifecycle and security actions live in the right-click menu.
   const inMain = useMainStore((s) => mainHasNote(s.manifest.tree, noteId));
   const openNoteMenu = useNoteMenu();
 
   // the note's real home — its Brain folder + corpus-relative path — shown
-  // on the location chip so "where is this file?" is answerable (Seth, 2026-07-07).
+  // on the location chip so "where is this file?" is answerable (the maintainer, 2026-07-07).
   const [diskPath, setDiskPath] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
@@ -213,7 +200,7 @@ export function EditorSurface({
     };
   }, [noteId]);
 
-  // "Show file metadata" (Seth, 2026-07-01): the raw frontmatter block, verbatim
+  // "Show file metadata" (the maintainer, 2026-07-01): the raw frontmatter block, verbatim
   // from disk, rendered as an editable banner above the body. Fetched only while
   // the setting is on; null keeps the banner out of the CM view entirely.
   const fileMetadata = useUiStore((s) => s.fileMetadata);
@@ -298,7 +285,7 @@ export function EditorSurface({
   // the buffer exists as soon as the note loads — edits always hit one buffer.
   // When disk changes UNDER us (agent / another editor) and this buffer is
   // clean, adopt the new body so Main and Captures never show two versions of
-  // the same file (Seth, 2026-07-09). Dirty local edits still win.
+  // the same file (the maintainer, 2026-07-09). Dirty local edits still win.
   useEffect(() => {
     if (!note) return;
     ensureDocument(note.id, note.body, note.revision);
@@ -357,7 +344,7 @@ export function EditorSurface({
             On this Mac
             <span className="sep" />
             {/* where this note lives — click to reveal + scroll to it in the
-                sidebar (Seth, 2026-07-03). ★ Main shows when it's in Main. */}
+                sidebar (the maintainer, 2026-07-03). ★ Main shows when it's in Main. */}
             <button
               type="button"
               className={inMain ? "ed-loc in-main" : "ed-loc"}

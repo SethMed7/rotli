@@ -1,4 +1,4 @@
-// Seth, 2026-07-28: "I should be able to close all tabs and have an empty
+// the maintainer, 2026-07-28: "I should be able to close all tabs and have an empty
 // state which uses one of my quokkas" — the lone pane goes empty instead of
 // silently refusing the close, and the rest-state actions lead back in.
 

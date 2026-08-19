@@ -264,7 +264,7 @@ export function MermaidVisualEditor({
   const [pendingFrom, setPendingFrom] = useState<string | null>(null);
   const [shapeMenuOpen, setShapeMenuOpen] = useState(false);
   const dragRef = useRef<NodeDrag | null>(null);
-  // the Visual camera (Seth, 2026-07-29: "similar to how Excalidraw is,
+  // the Visual camera (the maintainer, 2026-07-29: "similar to how Excalidraw is,
   // including the zooming") — same tested viewport math as View mode; starts
   // at 1:1 so node-drag pixels stay honest until the user zooms
   const [camera, setCamera] = useState<MermaidViewport>({ x: 0, y: 0, scale: 1 });

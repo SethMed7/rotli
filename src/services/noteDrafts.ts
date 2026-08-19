@@ -1,5 +1,5 @@
 // Session registry for newly-created markdown notes — the ephemeral-note
-// lifecycle ("a new note is just a view until you write into it", Seth
+// lifecycle ("a new note is just a view until you write into it", the maintainer
 // 2026-07-17). Mirrors the DOCX pristine-draft policy: track on create,
 // un-track on the first expressed intent to keep (a keystroke, a frontmatter
 // edit), claim for hard-discard only when the final tab closes. In-memory on

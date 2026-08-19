@@ -1,4 +1,4 @@
-# Memex rule-set — v2 (revised with Seth's redlines, 2026-06-25)
+# Memex rule-set — v2 (revised with the maintainer's redlines, 2026-06-25)
 
 > **SUPERSEDED (2026-06-27) by the ratified v3.6 write contract.** This first-pass
 > proposed rotli *itself* filing notes into `wiki/<area>/`. The shipped model is
@@ -87,13 +87,13 @@ created: 2026-06-25
 updated: 2026-06-25
 
 # AI metadata (the client's LOCAL LLM maintains it; drives placement + retrieval)
-area: projects/myela   # classification (a value from the config vocabulary) → §4 placement
+area: projects/northstar   # classification (a value from the config vocabulary) → §4 placement
 summary: One line an LLM reads to decide relevance without opening the file.
-tags: [myela, payments]
+tags: [northstar, payments]
 links: [[elavon-integration]]
 
 # USER metadata (what the human arranged; drives the view, §5)
-shelf: [Myela/Payments]   # the user's folder(s) — MULTI allowed → §5
+shelf: [Northstar/Payments]   # the user's folder(s) — MULTI allowed → §5
 reach: [seth]             # who can access this note → §7/§8 (default: just the owner-user)
 ---
 # the user's note…
@@ -130,7 +130,7 @@ home(note):
 ## 5. The projection (makes it feel like the user's own)
 
 - rotli groups notes by **`shelf`** (the user's folders), not disk path — so you see
-  `Myela/Payments`, arrange it freely, and never feel the file lives in `wiki/…`. `shelf`
+  `Northstar/Payments`, arrange it freely, and never feel the file lives in `wiki/…`. `shelf`
   is **multi**: a note can appear in several of your folders (tags-as-folders), and that
   same field is how a **shared** note reaches more places.
 - rotli **hides all frontmatter** (already does). **Breve** → a row labeled **"Breve"**

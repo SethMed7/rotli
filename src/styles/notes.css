@@ -36,7 +36,7 @@
 }
 
 /* — rail wrap: the ONE sidebar + its resize grip; width rides the --sidebar-w
-   var (drag-resizable, persisted — Seth 2026-06-13: one rail, not two) — */
+   var (drag-resizable, persisted — the maintainer 2026-06-13: one rail, not two) — */
 .rail-wrap {
   position: relative;
   display: flex;
@@ -69,7 +69,7 @@
   background: var(--accent);
 }
 
-/* — the unified sidebar (Seth, 2026-06-13): ONE scrollable column with the
+/* — the unified sidebar (the maintainer, 2026-06-13): ONE scrollable column with the
    filter row pinned on top and a scrolling tree body below — replaces the old
    .folders + .notelist two-rail pair. One border-right, one background. — */
 .sidebar {
@@ -90,7 +90,7 @@
   padding: 4px 8px 12px;
 }
 
-/* — the FRONT switcher (Seth, 2026-08-01, from Claude Desktop's Home|Code
+/* — the FRONT switcher (the maintainer, 2026-08-01, from Claude Desktop's Home|Code
    pill): two segments in one quiet trough directly under the vault header.
    The trough is the recessed tone, the ACTIVE segment is the raised surface —
    hierarchy by surface contrast, no shadow, no glow (DESIGN.md flat material). — */
@@ -127,20 +127,17 @@
 .sb-switch-seg:hover {
   color: var(--text);
 }
-/* the active segment rides the ONE active-item state — the same solid accent
-   pill the open note + open chat wear (consistency audit extended 2026-08-03;
-   the old surface/border segment was a third active treatment). It sits in the
-   .sb-switch --tint trough; label + glyph flip to --on-accent for contrast. */
+/* The active segment uses the shared low-salience selection wash. */
 .sb-switch-seg.sel {
-  background: var(--accent);
+  background: var(--selected-bg);
   border-color: transparent;
-  color: var(--on-accent);
+  color: var(--selected-ink);
 }
 .sb-switch-seg.sel svg {
-  color: var(--on-accent);
+  color: var(--selected-icon);
 }
 .sb-switch-seg.sel .sb-switch-n {
-  color: var(--on-accent);
+  color: var(--selected-muted);
 }
 .sb-switch-label {
   overflow: hidden;
@@ -176,17 +173,17 @@
 }
 .sb-home-dashboard.sel {
   border-color: transparent;
-  background: var(--accent);
-  color: var(--on-accent);
+  background: var(--selected-bg);
+  color: var(--selected-ink);
 }
 .sb-home-dashboard.sel .sb-home-dashboard-head,
 .sb-home-dashboard.sel .sb-home-dashboard-head > span:first-child,
 .sb-home-dashboard.sel .sb-home-dashboard-row,
 .sb-home-dashboard.sel .sb-home-dashboard-row strong {
-  color: var(--on-accent);
+  color: var(--selected-ink);
 }
 .sb-home-dashboard.sel .sb-home-dashboard-row + .sb-home-dashboard-row {
-  border-top-color: color-mix(in srgb, var(--on-accent) 24%, transparent);
+  border-top-color: var(--border);
 }
 .sb-home-dashboard-head {
   display: flex;
@@ -319,7 +316,7 @@
   font-weight: 600;
 }
 /* per-section "+" pair (new note · new folder): ALWAYS visible on folder rows
-   (Seth, 2026-07-25, from the Zen reference: "the icons are always there, not
+   (the maintainer, 2026-07-25, from the Zen reference: "the icons are always there, not
    only on hover — it's just cleaner"). Whisper-quiet at rest (calm pass,
    2026-07-26) — present, never competing with names and counts; system rows
    (Assets · Archive · Trash · Secure notes) carry none at all. */
@@ -338,7 +335,7 @@
 }
 /* only the FIRST add-icon takes the auto margin — the pair then rides the right
    edge together, 8px apart (the row gap). Both taking `margin-left:auto` split
-   the free space BETWEEN them, stranding one mid-row (Seth, 2026-07-06). */
+   the free space BETWEEN them, stranding one mid-row (the maintainer, 2026-07-06). */
 .frow-add + .frow-add {
   margin-left: 0;
 }
@@ -351,7 +348,7 @@
   opacity: 1;
 }
 /* the disclosure caret: a 14px slot left of the icon, rotated 90° when open —
-   the inline chevron that makes a destination/folder expandable (Seth,
+   the inline chevron that makes a destination/folder expandable (the maintainer,
    2026-06-13). Smart rows omit it, so their icon sits where the caret would. */
 .fchev {
   flex: 0 0 auto;
@@ -368,7 +365,7 @@
 .frow:hover {
   background: var(--hov);
 }
-/* Selection (Seth, 2026-06-15; bar retired 2026-07-28: the wash already says
+/* Selection (the maintainer, 2026-06-15; bar retired 2026-07-28: the wash already says
    it — the extra accent line was redundant): a quiet accent WASH, one calm
    grammar in every theme, distinct from the plain hover. */
 .frow.sel {
@@ -398,7 +395,7 @@
   outline-offset: -2px;
 }
 
-/* — Main: the user's hand-arranged view over the Brain (Seth, 2026-07-01) — */
+/* — Main: the user's hand-arranged view over the Brain (the maintainer, 2026-07-01) — */
 .main-empty,
 .sb-empty {
   margin: 2px 12px 6px;
@@ -417,7 +414,7 @@
   margin-left: 42px;
 }
 .main-row {
-  cursor: pointer; /* pointer, not grab — the open hand read wrong (Seth, 2026-07-26) */
+  cursor: pointer; /* pointer, not grab — the open hand read wrong (the maintainer, 2026-07-26) */
 }
 /* Main and named views are reference lists, not heading stacks. Keep their
    note labels at body weight so a dense hand-arranged view stays calm; the
@@ -425,7 +422,7 @@
 .main-tree .snrow .snt {
   font-weight: 400;
 }
-/* #9 (Seth, 2026-07-03): the star + × sat with an awkward gap between them on a
+/* #9 (the maintainer, 2026-07-03): the star + × sat with an awkward gap between them on a
    short-title row. Root cause — the shared `.snact { margin-left: auto }` absorbed
    ALL the free space, so `.snt`'s flex-grow never kicked in and the title stayed
    content-width. Here we DROP that auto margin: `.snt` (flex:1) grows to fill, so
@@ -472,7 +469,7 @@
   outline-offset: -1px;
   border-radius: 6px;
 }
-/* the section-header hover "+" (Seth, 2026-07-01: "new folder can be a lot more
+/* the section-header hover "+" (the maintainer, 2026-07-01: "new folder can be a lot more
    subtle") — the old always-visible "+ New folder" row folded into the Main
    header. Same reveal grammar as .frow-add, but opacity (not display) so the
    button stays in the tab order; keyboard focus reveals it too. */
@@ -522,7 +519,7 @@
   border-radius: var(--r-control);
   color: var(--text-muted);
   cursor: pointer;
-  /* always visible, whisper-quiet (Seth, 2026-07-25 Zen rule + 2026-07-26
+  /* always visible, whisper-quiet (the maintainer, 2026-07-25 Zen rule + 2026-07-26
      calm pass); full strength on hover/focus */
   opacity: 0.38;
 }
@@ -650,7 +647,7 @@
   font-size: 16px;
   line-height: 1;
 }
-/* Quick-access star (Seth, 2026-07-01): lives OUTSIDE .snact so a starred note
+/* Quick-access star (the maintainer, 2026-07-01): lives OUTSIDE .snact so a starred note
    keeps its mark without hovering. A faint hollow star is the always-there
    affordance; filled + accent = starred; dimmed = the capped set is full. */
 .main-row .mstar {
@@ -675,7 +672,7 @@
   opacity: 0.3;
 }
 .snrow.sel .mstar.on {
-  color: var(--on-accent);
+  color: var(--selected-icon);
 }
 .fsec {
   font-size: 10.5px;
@@ -746,7 +743,7 @@
   cursor: pointer;
   position: relative;
 }
-/* chat FOLDERS (Seth, 2026-07-30) — virtual grouping; the folder row is a
+/* chat FOLDERS (the maintainer, 2026-07-30) — virtual grouping; the folder row is a
    disclosure, its chats indent one step beneath it */
 .sb-chatfolder {
   display: flex;
@@ -793,7 +790,7 @@
   position: relative;
   z-index: 1;
 }
-/* drag-a-chat-into-a-folder feedback (Seth, 2026-07-30): the dragged row dims
+/* drag-a-chat-into-a-folder feedback (the maintainer, 2026-07-30): the dragged row dims
    like a Main row; the hovered folder tints like an mdrop-into target */
 .sb-chatrow.dragging {
   opacity: 0.4;
@@ -801,7 +798,7 @@
 .sb-chatfolder-row.chatdrop {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
-/* inline rename over a chat row (Seth #4, 2026-07-08) — same footprint as the row */
+/* inline rename over a chat row (the maintainer #4, 2026-07-08) — same footprint as the row */
 .sb-chatrename {
   width: 100%;
   margin: 0;
@@ -816,13 +813,13 @@
 .sb-chatrename:focus-visible {
   outline: none;
 }
-/* the pinned-chat marker — quiet, right-aligned (Seth #4, 2026-07-08) */
+/* the pinned-chat marker — quiet, right-aligned (the maintainer #4, 2026-07-08) */
 .sb-chatrow .sb-chatpin {
   margin-left: auto;
   color: var(--text-muted);
   flex: 0 0 auto;
 }
-/* Run signals (Seth, 2026-08-03: "know to click on it") — an answering chat
+/* Run signals (the maintainer, 2026-08-03: "know to click on it") — an answering chat
    holds a quiet static dot; a landed-unwatched reply uses the full-strength
    dot. Entering either state updates immediately, while remaining in it
    schedules no animation. The labeled Working/Unread lanes carry the meaning. */
@@ -837,12 +834,12 @@
 .sb-chatrun.running {
   opacity: 0.7;
 }
-/* THE bug Seth hit (2026-08-04): the chat you're watching is the `sel` row, and
+/* THE bug the maintainer hit (2026-08-04): the chat you're watching is the `sel` row, and
    `sel` fills with --accent — so an --accent dot on it was invisible exactly
    when it mattered most. On a selected row the dot flips to the on-accent ink,
    the same rule .sb-chatpin and .sb-chatmodel already follow. */
 .sb-chatrow.sel .sb-chatrun {
-  background: var(--on-accent);
+  background: var(--accent-text);
 }
 /* a dot pushes the pin off `margin-left:auto` duty */
 .sb-chatrun ~ .sb-chatpin {
@@ -926,15 +923,15 @@
 /* Fallback letters and the monochrome OpenAI mark follow selected-row ink.
    Full-color model marks retain their identifying brand artwork. */
 .sb-chatrow.sel .sb-chatmark:not(.has-logo) {
-  background: var(--on-accent);
-  color: var(--accent);
-  border-color: transparent;
+  background: var(--surface-2);
+  color: var(--selected-icon);
+  border-color: var(--border);
 }
 .sb-chatrow.sel .sb-chatmark.openai {
-  color: var(--on-accent);
+  color: var(--selected-icon);
 }
 
-/* the per-chat model chip (Seth, 2026-08-03) — a quiet right-aligned label,
+/* the per-chat model chip (the maintainer, 2026-08-03) — a quiet right-aligned label,
    hidden while a run signal owns the row's right edge (the JSX renders one or
    the other), clipped before it can crowd the title */
 .sb-chatmodel,
@@ -957,7 +954,7 @@
 .sb-chatrow.sel .sb-chatmodel,
 .sb-chatrow.sel .sb-chattime,
 .sb-chatrow.sel .sb-chatstatus {
-  color: var(--on-accent);
+  color: var(--selected-muted);
 }
 .sb-chatstatus {
   font-weight: 600;
@@ -1055,17 +1052,16 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-/* the OPEN chat rides the ONE active-item state — the same solid accent pill
-   the open note wears (consistency audit 2026-07-30; the old 10% wash cited a
-   "selected folder wash" the tree retired in the one-active-state redesign) */
+/* Open chats and notes use a quiet wash: enough orientation without making the
+   sidebar compete with the work surface. */
 .sb-chatrow.sel,
 .sb-chatrow.sel:hover {
-  background: var(--accent);
-  color: var(--on-accent);
+  background: var(--selected-bg);
+  color: var(--selected-ink);
 }
 .sb-chatrow.sel svg,
 .sb-chatrow.sel .sb-chatpin {
-  color: var(--on-accent);
+  color: var(--selected-icon);
 }
 .sb-chat-empty {
   text-align: left;
@@ -1085,7 +1081,7 @@
   color: var(--text);
 }
 
-/* — compact note rows (Seth, 2026-06-13): title + day label ONLY (no snippet)
+/* — compact note rows (the maintainer, 2026-06-13): title + day label ONLY (no snippet)
    — the expanded body of a destination/folder. Denser than the old .nrow. — */
 .snrow {
   display: flex;
@@ -1097,7 +1093,7 @@
   cursor: pointer;
   position: relative;
 }
-/* leading file glyph (Seth, 2026-06-15: every row has an icon now, like the
+/* leading file glyph (the maintainer, 2026-06-15: every row has an icon now, like the
    reference — and it gives the note's icon a fixed column to align under its
    folder's icon). */
 .snrow .snicon {
@@ -1119,7 +1115,7 @@
   font-size: 11px;
   color: var(--text-muted);
 }
-/* the row-hover affordance slot (Seth, 2026-06-13): the lifecycle icon-buttons
+/* the row-hover affordance slot (the maintainer, 2026-06-13): the lifecycle icon-buttons
    — Archive + Trash on a normal row, a single Restore on an Archive/Trash row.
    Hidden until the row is hovered; margin-left:auto pins them to the row's
    trailing edge regardless of the day label's width. */
@@ -1156,24 +1152,26 @@
 .snrow:hover {
   background: var(--hov);
 }
-/* the open note — the ONE active state: a clean solid accent pill (Seth,
-   2026-06-15, matching the reference). Title, date, and glyph all flip to the
-   on-accent ink for contrast; no separate bar. */
+/* The open note follows the same quiet orientation state as an open chat. */
 .snrow.sel,
 .snrow.sel:hover {
-  background: var(--accent);
+  background: var(--selected-bg);
 }
-.snrow.sel .snt,
-.snrow.sel .snd,
+.snrow.sel .snt {
+  color: var(--selected-ink);
+}
+.snrow.sel .snd {
+  color: var(--selected-muted);
+}
 .snrow.sel svg,
 .snrow.sel .snactbtn {
-  color: var(--on-accent);
+  color: var(--selected-icon);
 }
 .snrow.sel .snactbtn:hover {
-  background: color-mix(in srgb, var(--on-accent) 20%, transparent);
+  background: var(--selected-bg-hover);
 }
 
-/* — focused-list j/k navigation (Seth, 2026-06-13): the roving keyboard cursor
+/* — focused-list j/k navigation (the maintainer, 2026-06-13): the roving keyboard cursor
    is the base.css :focus-visible 2px clay ring; we add a quiet inset background
    so the focused row reads warmly inside the tree even before the ring catches
    the eye. The ring already signals keyboard focus; .sel stays the open-note
@@ -1201,7 +1199,7 @@
   color: var(--text);
   font: inherit;
   font-size: 12.5px;
-  /* calm pass (Seth, 2026-07-26: "clean and simple, not too poppy") — the
+  /* calm pass (the maintainer, 2026-07-26: "clean and simple, not too poppy") — the
      vault name is a quiet header, not a heading; the create toolbar below
      carries the visual weight of actions */
   font-weight: 500;
@@ -1236,6 +1234,116 @@
   opacity: 0.7;
 }
 
+/* Vault switcher: wider than a context menu so names and row actions have room,
+   while keeping Rotli's standard compact menu typography and density. */
+.vault-menu {
+  position: fixed;
+  z-index: 40;
+  width: min(400px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  padding: 4px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-card);
+  font-size: 13px;
+  user-select: none;
+  overscroll-behavior: contain;
+}
+.vault-menu-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.vault-menu-row {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 2px 4px 2px 2px;
+  border-radius: var(--r-inner);
+}
+.vault-menu-row:hover {
+  background: var(--hov);
+}
+.vault-menu-row.active,
+.vault-menu-row.active:hover {
+  color: var(--selected-ink);
+  background: var(--selected-bg);
+  font-weight: 600;
+}
+.vault-menu-target,
+.vault-menu-row-action,
+.vault-menu-connect {
+  border: 0;
+  border-radius: var(--r-inner);
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.vault-menu-target {
+  min-width: 0;
+  min-height: 30px;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  text-align: left;
+}
+.vault-menu-target > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vault-menu-target svg,
+.vault-menu-row-action svg,
+.vault-menu-connect svg {
+  flex: 0 0 auto;
+}
+.vault-menu-row:not(.active) .vault-menu-target svg,
+.vault-menu-row:not(.active) .vault-menu-row-action {
+  color: var(--text-muted);
+}
+.vault-menu-row-action {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: grid;
+  place-items: center;
+}
+.vault-menu-row-action:hover:not(:disabled),
+.vault-menu-target:hover {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+.vault-menu-row-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.vault-menu-separator {
+  height: 1px;
+  margin: 4px 8px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+}
+.vault-menu-connect {
+  width: 100%;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  color: var(--text);
+  text-align: left;
+}
+.vault-menu-connect:hover {
+  background: var(--hov);
+}
+.vault-menu-connect svg {
+  color: var(--text-muted);
+}
+
 /* — the filter row pinned at the sidebar's top (filter on top, no header) — */
 .nl-top {
   display: flex;
@@ -1246,7 +1354,7 @@
   gap: 8px;
   padding: 12px 12px 10px;
   flex: 0 0 auto;
-  /* ONE row always (Seth, 2026-07-28: the wrapped icon line left awkward
+  /* ONE row always (the maintainer, 2026-07-28: the wrapped icon line left awkward
      whitespace) — the vault name shrinks to "…" before any icon moves */
   flex-wrap: nowrap;
 }
@@ -1255,7 +1363,7 @@
 .nl-top .filter {
   min-width: 140px;
 }
-/* the unified sidebar toggle (Seth, 2026-06-13): a quiet 28px icon button,
+/* the unified sidebar toggle (the maintainer, 2026-06-13): a quiet 28px icon button,
    same grammar as the titlebar .icobtn, sitting left of the filter well */
 .sidebtn {
   width: 28px;
@@ -1279,7 +1387,7 @@
   opacity: 1;
   transition-delay: 300ms;
 }
-/* the inline nested new-folder input row (Seth, 2026-06-24): a folder glyph +
+/* the inline nested new-folder input row (the maintainer, 2026-06-24): a folder glyph +
    a bare text field that reads like the filter well's input — same .snrow
    metrics so it sits in the tree where the new folder will land. */
 .sb-newfolder {
@@ -1368,7 +1476,7 @@
   min-height: 0;
   position: relative;
 }
-/* the focused-pane ring (Seth, 2026-08-01: "keep a visible highlight around
+/* the focused-pane ring (the maintainer, 2026-08-01: "keep a visible highlight around
    the pane you're actively in, at all times"). A 1px accent frame drawn on an
    overlay pseudo — inset, inert, and outside layout, so nothing reflows when
    focus moves. Softened to 60% of the accent so it states "you are here"
@@ -1383,7 +1491,7 @@
   pointer-events: none;
   border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
 }
-/* the focus landing light (Seth, 2026-07-30): when a hotkey (or click) moves
+/* the focus landing light (the maintainer, 2026-07-30): when a hotkey (or click) moves
    focus in a split, the arriving pane wears a brief accent outline that fades
    — a border, not a glow (flat law). pointer-events: none keeps it inert. */
 .pane.focus-flash::after {
@@ -1404,14 +1512,14 @@
   }
 }
 /* the editor + drag overlay live here, below the always-on tab strip; it is
-   the positioning context for the split-detach dropzones (Seth, 2026-06-13) */
+   the positioning context for the split-detach dropzones (the maintainer, 2026-06-13) */
 .pane-body {
   flex: 1;
   display: flex;
   min-width: 0;
   min-height: 0;
   position: relative;
-  /* A pane is a BOX (Seth, 2026-08-01): whatever a surface does inside it, it
+  /* A pane is a BOX (the maintainer, 2026-08-01): whatever a surface does inside it, it
      may never paint into the pane next door. Without this, a surface taller
      than its pane — a chat's composer in a short stacked pane — spilled past
      the pane's edge and landed on the neighbour's tab strip and title row.
@@ -1423,7 +1531,7 @@
 /* Every surface root must GROW to fill the pane row — otherwise a surface with
    no intrinsic flex (chat, file) collapses to its content width and pins left,
    dead space on the right, and its own internal `margin:0 auto` has no room to
-   center. The note editor always had this; chat/file did not (Seth, 2026-07-01).
+   center. The note editor always had this; chat/file did not (the maintainer, 2026-07-01).
    The ⌘N chooser needs it MOST: `container-type: inline-size` size-contains it,
    so its content contributes ZERO width and it collapsed to bare padding — a
    ~48px sliver pinned left, headline wrapping four characters a line. */
@@ -1543,7 +1651,7 @@
    tab is mid-drag (PaneTree gates the mount). Five regions — four edge bands
    carve a split, the center moves the tab here. Active edges/the center fill
    follow the divider drag grammar: accent for the carved edge, tint for the
-   move target (Seth, 2026-06-13). */
+   move target (the maintainer, 2026-06-13). */
 .pane-dropzones {
   position: absolute;
   inset: 0;
@@ -1632,7 +1740,7 @@
   outline-offset: -2px;
 }
 
-/* — tab strip (r2 frame A2; EVERY pane renders it now — Seth 2026-06-13) — */
+/* — tab strip (r2 frame A2; EVERY pane renders it now — the maintainer 2026-06-13) — */
 .tabstrip {
   display: flex;
   align-items: flex-end;
@@ -1741,13 +1849,42 @@
   font-weight: 500;
   color: var(--text-muted);
   position: relative;
-  cursor: pointer; /* pointer, not grab — the open hand read wrong (Seth, 2026-07-26) */
+  cursor: pointer; /* pointer, not grab — the open hand read wrong (the maintainer, 2026-07-26) */
   overflow: hidden;
   /* draggable — drag to reorder / move / split */
   z-index: 1;
 }
 .tab:active {
   cursor: grabbing;
+}
+.tab-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+.tab-vault {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+.tab-vault::after {
+  content: "/";
+  margin-left: 6px;
+  color: var(--border-strong);
+}
+.tab-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* inline rename input on a board tab (double-click) — fills the label slot */
 .tab-rename {
@@ -1762,14 +1899,14 @@
   padding: 0;
 }
 /* the tab being dragged dims to half — same source-leaves-faint grammar the
-   divider drag set (Seth, 2026-06-13) */
+   divider drag set (the maintainer, 2026-06-13) */
 .tab.dragging {
   opacity: 0.5;
 }
 /* the floating drag ghost EVERY pointer drag paints at the cursor (the shared
    lib/dragGhost — tabs, Main tree rows, Board cards); positioned imperatively,
    offset off the pointer, pointer-events:none so the drags' elementFromPoint
-   hit-tests pass straight through it (Seth, 2026-06-15 / one impl 2026-07-01) */
+   hit-tests pass straight through it (the maintainer, 2026-06-15 / one impl 2026-07-01) */
 .drag-ghost {
   position: fixed;
   top: 0;
@@ -1856,7 +1993,7 @@
   pointer-events: none;
 }
 /* The 2px accent top edge that marked the focused pane's active tab is GONE
-   (Seth, 2026-07-30: "I don't like the blue line on top of the active tab").
+   (the maintainer, 2026-07-30: "I don't like the blue line on top of the active tab").
    Pane focus still reads from the active tab merging into its editor. */
 .tab .x {
   margin-left: auto;
@@ -1941,7 +2078,7 @@
   /* full-width header: date on the left, the status cluster (chars · updated ·
      On this Mac · Aa) pinned to the window's top-right. The body column below
      stays centered; centering the header too had stranded the status mid-pane
-     with a gap (Seth, 2026-06-26). */
+     with a gap (the maintainer, 2026-06-26). */
   padding: 22px 40px 0;
   font-size: 11.5px;
   color: var(--text-muted);
@@ -1975,7 +2112,7 @@
   background: var(--accent);
   opacity: 0.5;
 }
-/* the strip is a real button now (Seth, 2026-06-13): fills the 14px sliver,
+/* the strip is a real button now (the maintainer, 2026-06-13): fills the 14px sliver,
    cursor invites the click, and carries the discoverable glyph affordance */
 .edge-restore {
   position: absolute;
@@ -2018,7 +2155,7 @@
   z-index: 8;
 }
 /* the reveal overlay honors the persisted width, not the 240px .sidebar
-   fallback (the overlay sidebar is not inside a .rail-wrap) (Seth, 2026-06-13) */
+   fallback (the overlay sidebar is not inside a .rail-wrap) (the maintainer, 2026-06-13) */
 .rail-overlay > .sidebar {
   flex: 0 0 var(--sidebar-w, 240px);
 }
@@ -2027,37 +2164,6 @@
     opacity: 0;
     transform: translateX(-8px);
   }
-}
-
-/* — added external folders (Seth, 2026-06-27): the "Add a folder…" row + the
-   hover × that forgets a folder (files kept). Mirrors the frow-add hover slot. — */
-/* the added-root × keeps its slot (opacity, not display — the reserved-slot
-   affordance law; the old display swap double-shifted the row on every hover) */
-.sb-root-x {
-  display: inline-flex;
-  opacity: 0;
-  margin-left: auto;
-  flex: 0 0 auto;
-  font-size: 11px;
-  line-height: 1;
-  padding: 3px 6px;
-  border-radius: var(--r-inner);
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: opacity var(--motion-exit) var(--motion-ease);
-}
-.frow:hover .sb-root-x,
-.sb-root-x:focus-visible {
-  opacity: 0.7;
-}
-.sb-root-x:hover {
-  background: var(--hov);
-  color: var(--text);
-}
-.sb-root-x.confirm {
-  display: inline-flex;
-  color: var(--accent-text);
-  font-weight: 600;
 }
 
 /* text "▾" carets retired (slice 5, 2026-07-28) — same stroked chevron family
@@ -2070,9 +2176,9 @@
   transform: rotate(90deg);
 }
 
-/* — SYSTEM, pinned (Seth, 2026-07-28): its own uncollapsible zone at the
+/* — SYSTEM, pinned (the maintainer, 2026-07-28): its own uncollapsible zone at the
    sidebar's bottom, separated by a hairline; the scrolling tree lives above.
-   Compact + quiet (Seth, 2026-07-28: "not in the user's face") — smaller,
+   Compact + quiet (the maintainer, 2026-07-28: "not in the user's face") — smaller,
    muted rows that warm up on hover. Active System rows keep only the tinted
    icon — the open surface on the right already says which one is open. — */
 .sb-system {
@@ -2084,7 +2190,7 @@
   padding: 6px 10px 3px;
   font-size: 10px;
 }
-/* the zone header is a DISCLOSURE now (Seth, 2026-08-01: "allow me to collapse
+/* the zone header is a DISCLOSURE now (the maintainer, 2026-08-01: "allow me to collapse
    the system area just to clean up the sidebar more") — the label keeps its
    .fsec voice, the chevron rides the right edge like every other section */
 .sb-syshdr {
@@ -2143,7 +2249,7 @@
 .sb-rows .frow.sel {
   background: none;
 }
-/* — the utility footer (Seth, 2026-07-28, Obsidian reference): Files ·
+/* — the utility footer (the maintainer, 2026-07-28, Obsidian reference): Files ·
    Librarian · Settings split one quiet row under the System rows — */
 /* the footer sits OUTSIDE the System zone since the fronts landed (2026-08-01):
    it shows under Home and Chat alike, so it owns its own inset + hairline */
@@ -2291,14 +2397,14 @@
   margin-top: 18px;
 }
 
-/* Main multi-select (Seth, 2026-07-28): ⌘-clicked rows gather with the quiet
+/* Main multi-select (the maintainer, 2026-07-28): ⌘-clicked rows gather with the quiet
    accent wash (distinct from the focused note's solid pill); dragging any
    gathered row carries the whole selection into a folder */
 .main-row.msel {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
-/* preview tabs (Seth, 2026-07-28: browse without piling up tabs) — the quiet
+/* preview tabs (the maintainer, 2026-07-28: browse without piling up tabs) — the quiet
    italic that says "passing through"; editing or re-clicking un-italicizes */
 .tab.preview > span:not(.tglyph) {
   font-style: italic;

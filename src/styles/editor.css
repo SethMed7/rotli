@@ -114,7 +114,7 @@
   background: var(--border);
 }
 /* The note's location — a clickable chip in the header that reveals + scrolls to
-   the note in the sidebar (Seth, 2026-07-03: "I can't find where this file is").
+   the note in the sidebar (the maintainer, 2026-07-03: "I can't find where this file is").
    Main membership isn't in frontmatter by design, so ★ Main shows here. */
 .status-inline .ed-loc {
   border: none;
@@ -164,7 +164,7 @@
   cursor: text;
   /* native click-drag must be able to select across the rendered (static)
      lines — nothing global blocks it, but pin it here so a future grammar
-     can't silently break multi-line selection (Seth 2026-06-13) */
+     can't silently break multi-line selection (the maintainer 2026-06-13) */
   -webkit-user-select: text;
   user-select: text;
 }
@@ -343,7 +343,7 @@
 /* In-line selection must READ as selected even though the textarea's own text
    is transparent (the visible glyphs live on the twin underneath). A near-full
    peach tint makes the highlight band clearly visible over the twin's glyphs;
-   the textarea text stays transparent so the caret never doubles (Seth 2026-06-13). */
+   the textarea text stays transparent so the caret never doubles (the maintainer 2026-06-13). */
 .raw-input::selection {
   background: color-mix(in srgb, var(--tint) 90%, transparent);
 }
@@ -490,7 +490,7 @@
   opacity: 0.75;
 }
 
-/* — the "/" slash menu (Seth 2026-06-13): a block-insert popover anchored
+/* — the "/" slash menu (the maintainer 2026-06-13): a block-insert popover anchored
      UNDER the active row (rawRowRef is position:relative). Mirrors the format
      bar's .fbmenu/.fbrow voice — same surface, border, radius, pop-in — but
      opens downward. Reduced-motion is handled globally by base.css. */
@@ -716,7 +716,7 @@
   max-width: var(--cm-measure, 660px);
   /* center the writing column so a note doesn't hug the left edge on a wide
      screen — the measure caps line length, margin-auto balances the dead space
-     (Seth, 2026-06-26) */
+     (the maintainer, 2026-06-26) */
   margin-inline: auto;
   box-sizing: border-box;
   padding: 9px 40px 90px;
@@ -853,7 +853,7 @@
    text and every wrapped line align to the same left edge; the column is narrower
    than one nesting step (listGeometry.ts) so the glyph hugs its text instead of
    drifting to the far left of the level. Nesting is spacing only — rotli never
-   draws Obsidian's vertical indent-guide rules (Seth, 2026-08-01). */
+   draws Obsidian's vertical indent-guide rules (the maintainer, 2026-08-01). */
 .rotli-marker {
   display: inline-block;
   width: 1.15em; /* mirrors MARKER_EM in listGeometry.ts */
@@ -944,13 +944,13 @@
   cursor: pointer;
 }
 /* a wikilink that resolves to NO note — visibly inert so a dead click never
-   reads as broken navigation (Seth, 2026-07-28); dashed + muted, no pointer */
+   reads as broken navigation (the maintainer, 2026-07-28); dashed + muted, no pointer */
 .rotli-wikilink-missing {
   color: var(--text-muted);
   text-decoration-style: dashed;
   cursor: text;
 }
-/* fenced-code TOKEN COLORS (Seth, 2026-07-30) — IDE-grade, riding the accent
+/* fenced-code TOKEN COLORS (the maintainer, 2026-07-30) — IDE-grade, riding the accent
    swatch tokens so every theme (and scheme) adapts with zero new raw colors */
 .rotli-tok-kw {
   color: var(--accent-swatch-violet);
@@ -999,7 +999,7 @@
   bottom: calc(100% + 6px);
 }
 
-/* — /image-gen (Seth, 2026-08-04): the AI image popover, same surface voice as
+/* — /image-gen (the maintainer, 2026-08-04): the AI image popover, same surface voice as
    the slash menu it replaces at the caret. Engine chips (only lanes you're
    signed into), a prompt box, then Generate. — */
 .rotli-imagegen {
@@ -1268,7 +1268,7 @@
   background: var(--hov);
 }
 .aaseg.sel {
-  background: var(--tint);
+  background: var(--selected-bg);
   border-color: color-mix(in srgb, var(--seg-accent) 40%, transparent);
   font-weight: 600;
 }
@@ -1313,12 +1313,12 @@
   padding-top: 9px;
 }
 
-/* — block handles (Seth, 2026-06-27; floating rework 2026-07-01): ONE +/⠿ pair
+/* — block handles (the maintainer, 2026-06-27; floating rework 2026-07-01): ONE +/⠿ pair
    floats just left of the HOVERED block's first line (blockHandles.ts positions
    it; .cm-editor is the anchor). Appears instantly on block hover, quick fade
    on leave — never a column of handles, never far from a centered text run. — */
 /* CM's default gutter background is light — kill it so any gutter column is
-   just transparent margin (no white bar), theme-matched (Seth, 2026-06-29). */
+   just transparent margin (no white bar), theme-matched (the maintainer, 2026-06-29). */
 .rotli-cm-host .cm-gutters {
   background: transparent;
   border-right: none;
@@ -1357,7 +1357,7 @@
     color var(--motion-exit) var(--motion-ease);
 }
 .cm-bh-grip {
-  cursor: pointer; /* pointer, not grab — the open hand read wrong (Seth, 2026-07-26) */
+  cursor: pointer; /* pointer, not grab — the open hand read wrong (the maintainer, 2026-07-26) */
 }
 .cm-bh-grip:active {
   cursor: grabbing;
@@ -1384,7 +1384,7 @@
   max-width: 100%;
   height: auto;
   border-radius: var(--r-inner);
-  cursor: pointer; /* pointer, not grab — the open hand read wrong (Seth, 2026-07-26) */
+  cursor: pointer; /* pointer, not grab — the open hand read wrong (the maintainer, 2026-07-26) */
 }
 /* mid column-drag: the whole widget locks selection + keeps the col cursor */
 .rotli-md-tablewrap.rotli-tbl-resizing {
@@ -1395,7 +1395,7 @@
   cursor: col-resize;
 }
 /* a src that resolved to nothing: keep the frame honest — name the file
-   instead of showing an empty box (Seth, 2026-07-30) */
+   instead of showing an empty box (the maintainer, 2026-07-30) */
 .rotli-img.missing img {
   display: none;
 }
@@ -1462,7 +1462,7 @@
   display: none;
 }
 
-/* — beautified GFM tables (Seth, 2026-06-27; in-table editing 2026-07-23):
+/* — beautified GFM tables (the maintainer, 2026-06-27; in-table editing 2026-07-23):
    rendered by tableRender.ts. A clicked cell becomes one inline input while the
    surrounding table stays rendered; the explicit `</>` hatch is the only
    ordinary route to pipe-delimited source. Hover row/col/+ controls live inside

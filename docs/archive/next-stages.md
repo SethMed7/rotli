@@ -314,7 +314,7 @@ now — untouched."*
 ### Goal
 
 Let a reserved destination resolve to a directory **outside** the single corpus
-root — specifically **Brain → `~/memex-vault`** — so rotli reads and writes Seth's
+root — specifically **Brain → `~/memex-vault`** — so rotli reads and writes the maintainer's
 real knowledge base in place, without copying it into `~/Documents/rotli`. Today
 there is exactly one root and one store; this track makes roots plural while
 keeping single-root behavior bit-for-bit unchanged for everyone who never adds a

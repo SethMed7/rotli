@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// build_flow_bottom.mjs — gate round 2 feedback (Seth, 2026-06-11): the stem's bottom terminal was a
+// build_flow_bottom.mjs — gate round 2 feedback (the maintainer, 2026-06-11): the stem's bottom terminal was a
 // flat chord ("the bottom has a flat part — everything should flow"). Surgery, not re-trace: replace
 // the flat run (3 trace segments at max-y) with ONE cubic, tangent-matched to both neighbors
 // (G1-continuous), dipping ~20 units below the old flat — a flowing round terminal w/ baseline overshoot.

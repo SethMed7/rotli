@@ -100,7 +100,7 @@ way a compromised loop would.
 |---|---|---|---|
 | 1 | `chat_messages` → loopback model | SAFE | destination clamp (`endpoint_permitted`), then the local lane is unrestricted by design |
 | 2 | `chat_messages` → Gemini / registered remote | **GAP → FIXED** | `egress_allowed` asked `protected_for_remote`; it now asks `blocked_for_remote`, so stripped secure prose no longer passes |
-| 3 | `cli_complete` → `claude` / `codex` / `agy` | **GAP → FIXED** | same upgrade. This is the lane Seth's frontier models actually use, and it was reachable with the body of any secure note via the ungated `corpus_read` |
+| 3 | `cli_complete` → `claude` / `codex` / `agy` | **GAP → FIXED** | same upgrade. This is the lane the maintainer's frontier models actually use, and it was reachable with the body of any secure note via the ungated `corpus_read` |
 | 4 | `generate_image` → `codex` / `agy` | **GAP → FIXED** | same upgrade; a prompt is an egress channel like any other |
 | 5 | Organizer → `claude` / `agy` (`organizerModel` setting) | **GAP → FIXED** | had **no** transcript backstop at all — the only remote seam in the codebase with a single line of defense. `organizer_egress_allowed` is now that second line, and it also covers the two content paths that never passed `skip_reason`: an area `_index.md` description (excluded from snapshotting) and the enrich prompt built after a filing move without a fresh secure re-read |
 | 6 | Organizer → local MLX | SAFE | `complete_local` is loopback by construction |
@@ -112,6 +112,7 @@ way a compromised loop would.
 | 7 | `web_search` — query to the explicitly selected DuckDuckGo or Brave adapter | **GAP → FIXED** | gate upgraded to `blocked_for_remote`; the query is capped at 512 chars; destinations are literal and redirect-free. Provider choice is per vault, the globe remains per-chat consent, Brave authentication is Keychain-only in Rust, and failures never fall through to a different provider |
 | 8 | `web_fetch` — URL to any public host | **GAP → FIXED** | gate upgraded. SSRF containment (scheme, private-IP, same-host redirects, byte + 2048-char URL caps) was already solid and is untouched |
 | 9 | `open_url` — URL to the OS browser | **GAP → FIXED** | had **no content gate whatsoever**. `url_openable` bounds the SCHEME, which stops an arbitrary app launch, but nothing bounded the payload. The webview can `invoke` it directly, so the agent loop's own `EGRESS_TOOLS` list never applied to it. It now asks the same question every other outbound lane asks |
+| 9a | `private_browser_*` — address to an isolated native child webview | SAFE | user action only; `private_url` applies `blocked_for_remote` and an HTTP(S)-only parser before navigation. WebKit uses a non-persistent data store. The capability file targets the three Rotli-owned webview labels instead of the `main` window, so the remote guest receives no app IPC even if it reaches the development origin |
 
 ### Retrieval — how a model learns what exists
 
@@ -148,7 +149,7 @@ way a compromised loop would.
 ## OPEN — found, not fixed, and why
 
 These are real and they are not silently carried. Each needs either a product
-decision from Seth or a change whose blast radius does not belong in a security
+decision from the maintainer or a change whose blast radius does not belong in a security
 commit.
 
 ### O1 — Breve filesystem exposure (MITIGATED; residual TOCTOU)

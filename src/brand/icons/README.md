@@ -1,6 +1,6 @@
 # rotli icons — v2 (FROZEN 2026-06-11)
 
-**Run:** `engine/RUNS/rotli/2026-06-11-icons-recut` (gate APPROVED by Seth — Tags revised twice to the
+**Run:** `engine/RUNS/rotli/2026-06-11-icons-recut` (gate APPROVED by the maintainer — Tags revised twice to the
 tilted rounded tag; Settings rebuilt segmented; dark olive lifted). Replaces the v1 draft contract
 (10 board-era icons — Calendar/Sheets/Transcript etc. retired; reasons in the run's DECISION.md).
 

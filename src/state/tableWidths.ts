@@ -1,4 +1,4 @@
-// Per-table COLUMN WIDTHS + ROW HEIGHTS (Seth, 2026-07-30/31: "resize the
+// Per-table COLUMN WIDTHS + ROW HEIGHTS (the maintainer, 2026-07-30/31: "resize the
 // sections via a click and drag" — rows joined columns 2026-07-31). View
 // state, never content: the .md never carries sizes — they live in
 // .rotli/settings.json via persist.ts like the per-note Aa layer, keyed by

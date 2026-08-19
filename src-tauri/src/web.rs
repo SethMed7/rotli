@@ -520,7 +520,7 @@ mod tests {
         assert!(url_openable("https://example.com/page?q=1"));
         assert!(url_openable("http://localhost:3000/x"));
         assert!(url_openable("HTTPS://EXAMPLE.COM")); // scheme case-insensitive
-        assert!(url_openable("mailto:seth@example.com"));
+        assert!(url_openable("mailto:alex@example.com"));
         // never these: disk paths, app launches, flags, injection shapes
         assert!(!url_openable("file:///etc/passwd"));
         assert!(!url_openable("javascript:alert(1)"));

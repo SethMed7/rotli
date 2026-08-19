@@ -9,7 +9,8 @@ direction, runtime wiring, and owning documentation must agree.
 | Command | Purpose |
 |---|---|
 | `bun run lint` | All four TypeScript scopes on both compiler implementations, plus formatting, oxlint, code-shape, brand, architecture, IPC, structure, and documentation guards |
-| `bun run test:unit` | Frontend domain, application, adapter, and state tests under `src/` |
+| `bun run test:unit` | Frontend domain, application, adapter, and state tests under `src/`, run in Bun's isolated parallel workers |
+| `bun run test:changed` | Fast local feedback: isolated Bun tests related to files changed against the default branch |
 | `bun run test:evals` | Deterministic offline AI loop, routing, model-policy, prompt, retrieval, and memory-workflow evals |
 | `bun run test:breve` | Breve policy, failure-state, locking, and delivery-claim regressions |
 | `bun run test:tooling` | Fixture tests that prove repository linters detect forbidden code shapes |
@@ -28,24 +29,32 @@ stays complete — every `package.json` script must appear in this document):
 
 | Command | Purpose |
 |---|---|
+| `bun run deps` | Repository-owned dependency workflow over the app, site, and Breve lockfiles: `audit` works on the stable pin; Bun 1.4 adds read-only `audit-plan`, `dedupe-check`, `prune-plan`, `licenses`, and root-explicit `diff` actions. Reviewed maintenance uses `audit-fix`, `dedupe`, or `prune` with one explicit `--root` and `--apply`; audit repair never implies `--latest`. `ROTLI_BUN_DEPENDENCY_BIN` may point at an alternate binary for preview validation without changing the release toolchain |
 | `bun run dev` / `bun run preview` | Vite dev server against the seeded demo corpus / preview of the built bundle |
-| `bun run dev:app` | The native desktop development app, branded `rotli (dev)` with a fixed blue Rotli Dock icon (including an optically matched safe area for the unbundled `tauri dev` runtime); explicitly mounts the production vault writable for real-app testing, while raw `bun run tauri dev` retains the read-only safety default |
+| `bun run dev:app` | The native desktop development app, branded `rotli (dev)` with a fixed blue Rotli Dock icon (including an optically matched safe area for the unbundled `tauri dev` runtime); it uses an isolated `corpus.dev.json` vault selection, keeps the production fallback read-only, and supervises vault-triggered Tauri/Vite restarts from the terminal |
 | `bun run format` / `bun run format:check` | oxfmt write / verify over TypeScript in `src`, `e2e`, and `scripts`, plus `playwright.config.ts` — the same scope the pre-commit hook enforces, with import sorting on (`breve-runtime` keeps hand-aligned tables and stays outside). `format:check` rides the `lint` chain |
 | `bun run typecheck` | The TypeScript compiler over `src` and the Vite/build-policy scope (`tsc --noEmit` — `typescript@7`, the Go port) — the type-correctness source of truth and first step of `lint` (e2e and Breve retain their named lanes) |
 | `bun run typecheck:tsc6` | All four scopes (`src`, Vite/build policy, E2E, and Breve) re-checked on `typescript6` (`npm:typescript@~6.0.3`, the last JavaScript TypeScript) — the independent second implementation, not merely a slower one. It is part of `lint` and is called by explicit path because `typescript@7` owns `node_modules/.bin/tsc` |
 | `bun run lint:oxlint` | The oxlint layer alone (`src`, `e2e`, `scripts`, Breve, and both root TypeScript configs; oxlint's `correctness` category plus the hand-picked rules, type-aware via `oxlint-tsgolint`) — part of `lint` |
+| `bun run check:react-compiler` | Runs Oxlint's React Compiler analysis in lint-only mode. The per-file/category baseline is a ratchet: existing effect/ref debt may shrink, while any increase fails `lint`; no compiler transform enters the production build |
 | `bun run check:knip` | Dead-weight gate — unreferenced files, exports, and dependencies, plus undeclared imports and binaries (`knip.json`); part of `lint`. `knip.json`'s `ignoreUnresolved` entry for headless Chrome is **load-bearing on Linux CI and must not be removed**: `breve-runtime/scripts/email-topic.ts` invokes Chrome through Bun's `$` shell, so knip resolves it as a binary. The path exists on a developer Mac, so knip reports the entry as an unused "configuration hint" locally — following that hint turns the Linux Quality lane red while every local check stays green. JSON takes no comments, hence this row |
 | `bun run check:dup` | Advisory duplication miner over `scripts/dup-judgments.json` — run on demand, deliberately not a gate |
 | `bun run build:mac` | Local signed `.app` bundle (predmg clean + `tauri build`) |
 | `bun run release` | `scripts/release.sh` — gate, sign, notarize, staple, publish; only under an explicitly authorized release |
 
-`bun run tauri dev` mirrors the production-selected vault and uses the same
-revision, filesystem-lock, containment, and secure/locked write gates as the
-installed app. Portable Main and named views therefore remain identical between
-the two applications, as do vault settings such as model choices and Librarian
-consent. Development-only window state stays in the app cache;
-connected-location changes and live delivery tests remain disabled. Treat
-manual dev interaction as interaction with the live vault.
+`bun run dev:app` may display the production-selected vault as a read-only boot
+fallback, but that fallback never counts as a development selection. Creating
+or opening a vault writes only the isolated `corpus.dev.json` binding; after the
+clean relaunch, that explicitly selected folder is writable and supports the
+same new/open/link/switch flows as the installed app. Production's `corpus.json`
+is not repointed. Linking another vault mounts it live and preserves every
+development root in `corpus.dev.json`; it does not require a restart marker. A
+deliberate primary-vault switch writes one exact temporary restart
+request and exits the CLI-owned debug child; the `dev:app` supervisor starts a
+fresh Tauri generation instead of leaving a detached executable behind.
+Development-only window state stays in the app cache, and
+live delivery tests remain disabled. Treat manual interaction with a selected
+development vault as real filesystem interaction.
 
 Use the smallest focused command while iterating, then run the three required
 handoff commands from `AGENTS.md`. Never point an automated test at a live memex,
@@ -87,6 +96,11 @@ CLI/MCP smoke: it creates and removes its own temporary memex and reports
 - **Native/live:** a separate, explicitly authorized check for titlebars,
   filesystem permissions, Keychain, updater, scheduler, and real delivery. It
   supplements automated coverage and is never silently treated as CI evidence.
+  The browser twin can render the vault navigator's loading, empty, error,
+  disabled, keyboard, and narrow-window states, but only Rust adapter tests and
+  a disposable native folder prove Home containment, hidden/file/symlink
+  exclusion, short-lived authorization, and macOS bookmark recovery after a
+  move. Never point that native check at a live vault.
 
 ### The Playwright layer
 
@@ -165,6 +179,10 @@ regressions.
 
 - `check:code-shape` rejects production import cycles, focused or skipped tests,
   production imports of test code, and hidden `@ts-ignore`/`@ts-nocheck` errors.
+- `check:react-compiler` runs the compiler's Rules-of-React analysis without
+  enabling the build transform. Its measured per-file/category baseline can
+  only stay level or shrink, so new synchronous effect updates, render-time
+  impurity/mutation, unsafe ref access, or suppressions fail mechanically.
 - `check:architecture` discovers clean feature roles and enforces inward role
   dependencies, pure ports/policies, the Tauri adapter boundary, and the
   Markdown-only slash-command boundary.
@@ -214,10 +232,11 @@ inputs.
   `bun run check`, the Vite production build, and a frozen Astro site build.
 - **Browser E2E (`ubuntu-24.04`):** `bun run check:e2e-types` plus the Playwright
   Chromium suite against `vite dev`'s seeded demo corpus.
-- **Dependency audit (`ubuntu-24.04`, advisory):** `bun audit` plus RustSec.
-  Findings remain visible in the job log while the documented transitive-only
-  debt is accepted. Installing the pinned scanner is blocking; only its findings
-  are advisory.
+- **Dependency audit (`ubuntu-24.04`, advisory):** the repository-owned
+  `bun run deps audit` scans the app, site, and independently installed Breve
+  lockfiles, followed by RustSec. Findings remain visible in the job log while
+  the documented transitive-only debt is accepted. Installing the pinned
+  scanner is blocking; only its findings are advisory.
 - **Native Rust (`macos-15`):** `cargo clippy --all-targets -- -D warnings` and
   `cargo test` against the shipped macOS branches.
 

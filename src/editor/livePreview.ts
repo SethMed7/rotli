@@ -81,7 +81,7 @@ const INLINE: InlineRule[] = [
     re: /\[\[([^\]]+)\]\]/,
     cls: "rotli-wikilink",
     // a link that resolves to NOTHING must not look identical to a live one —
-    // the silent dead click read as broken (Seth, 2026-07-28)
+    // the silent dead click read as broken (the maintainer, 2026-07-28)
     clsFor: (m) =>
       resolveWikilinkTarget(m[1] ?? "") ? "rotli-wikilink" : "rotli-wikilink rotli-wikilink-missing",
     attrsFor: (m) =>
@@ -125,7 +125,7 @@ const INLINE: InlineRule[] = [
     },
   },
   { re: /\*([^*\s](?:[^*]*[^*\s])?)\*/, cls: "rotli-em", parts: fixed(1, 1) },
-  // a BARE url typed as plain text is a link too (Seth, 2026-07-28: "we should
+  // a BARE url typed as plain text is a link too (the maintainer, 2026-07-28: "we should
   // notice links") — no markers to hide, trailing punctuation stays prose.
   // Sits after the md-link rule: `[t](url)` starts earlier so it wins the scan.
   {
@@ -138,7 +138,7 @@ const INLINE: InlineRule[] = [
 
 // a line that is JUST an image — ![alt](url) or ![caption|width](url)
 /** A list item whose CONTENT is exactly an image renders it inline after the
- * bullet/number/checkbox (Seth, 2026-07-09 — an image inside a bullet used to
+ * bullet/number/checkbox (the maintainer, 2026-07-09 — an image inside a bullet used to
  * stay raw markdown forever: only standalone images matched before). Returns
  * true when it decorated, so the caller skips the normal inline scan. */
 function listItemImage(
@@ -171,7 +171,7 @@ const IMG_SRC_CACHE = new Map<string, string>();
 
 /** The OPEN NOTE's wire id, provided by cmEditor — widgets that need per-note
  * context read it here: images resolve relative srcs against the note's
- * corpus root (Seth, 2026-07-30: photos in non-default-root notes rendered as
+ * corpus root (the maintainer, 2026-07-30: photos in non-default-root notes rendered as
  * broken boxes), and table widgets key their persisted column widths by it. */
 export const noteIdFacet = Facet.define<string, string>({
   combine: (values) => values[0] ?? "",
@@ -349,7 +349,7 @@ class ImgWidget extends WidgetType {
       view.dispatch({ changes: { from, to: from + this.src.length, insert: newRel } });
       return true;
     };
-    // a src that no longer resolves is CLASSIFIED, not abandoned (Seth,
+    // a src that no longer resolves is CLASSIFIED, not abandoned (the maintainer,
     // 2026-07-30): moved → heal the link; archived → still exists, render it;
     // trashed → "photo deleted"; only a truly gone file says "not found"
     const rescue = () =>

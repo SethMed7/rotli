@@ -1,9 +1,10 @@
-# rotli — marketing site
+# Rotli — marketing site
 
-A single, calm landing page for **rotli** (the warm, local-first Mac menu-bar
-notes app). Built with [Astro](https://astro.build). Styled in the rotli brand
-palette (linen ground, clay accent), Ollama-minimal in spirit — generous
-whitespace, one centered column, light + dark.
+A product-led landing page for Rotli, the local-first Mac workspace where one
+ordinary folder remains the durable source of truth. The page explains the
+workspace, editable file surfaces, privacy boundaries, theme families,
+optional quokka companion, Breve routines, and local CLI/MCP integration.
+Built with [Astro](https://astro.build).
 
 ## This is a separate sub-project
 
@@ -34,11 +35,17 @@ bun run preview  # serve the built dist/ locally
 - The download button deliberately opens the newest published release page.
   Do not construct a DMG URL from the app package version: a version bump can
   merge before its signed asset is published.
-- Brand tokens in `src/layouts/Base.astro` mirror
-  `src/brand/tokens/colors.json`.
+- Site tokens in `src/layouts/Base.astro` map the app's six theme families and
+  twelve tuned environments into the marketing surface. Keep their semantics
+  aligned with the source tokens in the repository root's `src/brand/`.
 - Fonts (General Sans body, Baloo 2 wordmark) are copied into
   `public/fonts/` from `src/brand/fonts/`.
-- Hero screenshots are the four `public/rotli-app-*.png` files.
+- The compact mark and companion art are imported from the canonical assets in
+  the repository root so the site does not create a second character system.
+- The product illustration is privacy-safe HTML/CSS rather than a screenshot
+  of a live vault. Keep it synchronized with the current workspace grammar.
+- `public/social-card.svg` is the editable source for the rendered Open Graph
+  image at `public/social-card.png`.
 
 ## Cloudflare Workers deployment
 

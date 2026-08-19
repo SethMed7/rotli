@@ -13,10 +13,10 @@ test("sidebar folder menus align labels and keep explicit Trash reachable", asyn
   await expect(folder).toBeVisible();
 
   await page.locator(".sb-notes-tree .frow", { hasText: "All notes" }).first().click();
-  const source = page.locator(".recent-row", { hasText: "Q3 priorities — Myela" });
+  const source = page.locator(".recent-row", { hasText: "Q3 priorities — Northstar" });
   await pointerDrag(page, source, await centerOf(folder));
   await expect(
-    page.locator('[data-main-id="main:Review"] + *', { hasText: "Q3 priorities — Myela" }),
+    page.locator('[data-main-id="main:Review"] + *', { hasText: "Q3 priorities — Northstar" }),
   ).toBeVisible();
 
   await folder.scrollIntoViewIfNeeded();

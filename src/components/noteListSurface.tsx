@@ -59,7 +59,7 @@ export function NoteListSurface({
   // everything per keypress (perf audit 2026-07-30, finding 12).
   const sorted = useMemo(
     () =>
-      // pinned notes float to the top (Seth, 2026-07-06), then most-recent first
+      // pinned notes float to the top (the maintainer, 2026-07-06), then most-recent first
       [...notes].sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt),
     [notes],
   );
@@ -117,7 +117,7 @@ export function NoteListSurface({
 
       {rows.length === 0 ? (
         <div className="list-empty">
-          {notes.length === 0 && <Character name="notes" size={104} className="be-quokka" />}
+          {notes.length === 0 && <Character name="thoughtful" size={104} className="be-quokka" />}
           <p className="be-title">{notes.length === 0 ? "No notes yet" : "No matches"}</p>
           <p className="be-sub">
             {notes.length === 0

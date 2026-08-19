@@ -12,12 +12,12 @@ RULE 3.1 ("wordmark MUST be set in the brand's display font").
   `lockup.mjs` refactored onto it. Rule hardened in `RULES/04-formalize-svg.md` §4.0; documented in
   `TOOLS/README.md` §2b. Hand-drawing letterforms now explicitly banned.
 
-## Base face — Seth-approved (gate 1)
+## Base face — the maintainer-approved (gate 1)
 **Baloo 2 @600**, Cocoa `#3A3028`, tracking -0.01. Decisive match to the board's rounded `otli`.
 Font vendored to `BRANDS/rotli/font/Baloo2-Variable.ttf`. Base regenerated into `kits/rotli/logo/`.
 
 ## Signature glyph — the quokka-`r` (gate 2 — PENDING)
 The board `r` = a quokka abstracted into a letter: ear (top-left nub) · round head (top-right) ·
 bulged body · curling tail. Rebuilt as clean filled geometry over 6 passes → `r-mark.draft-v6.svg`.
-Close, faithful; final polish (head roundness, proportions) awaiting Seth's call. See
+Close, faithful; final polish (head roundness, proportions) awaiting the maintainer's call. See
 `03-WORDMARK-vs-board.png`. Not yet grafted into the frozen deliverables.

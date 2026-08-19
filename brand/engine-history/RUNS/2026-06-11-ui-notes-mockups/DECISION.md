@@ -1,7 +1,7 @@
 # rotli — UI/UX mockups · notes module · round 1 — DECISION
 
 **Date:** 2026-06-11 · **Gate:** `gate.html` (live render, kit tokens + fonts only — no new colors/type)
-**Scope (Seth-set):** Notes first — "Apple Notes, in markdown" — local storage, structured corpus, UI/UX only.
+**Scope (the maintainer-set):** Notes first — "Apple Notes, in markdown" — local storage, structured corpus, UI/UX only.
 breve excluded this round (seam marked in flow map: local-AI first layer, Resend/Signal delivery, next round).
 
 ## Frames presented
@@ -17,7 +17,7 @@ breve excluded this round (seam marked in flow map: local-AI first layer, Resend
 | G | Onboarding | 3 cards, no account, no model download: welcome → hotkey (⌥Space) → theme |
 | H | Flow map | capture / browse / recall lanes; breve seam noted |
 
-## Round-1 calls for Seth (from gate footer)
+## Round-1 calls for the maintainer (from gate footer)
 
 1. Layout law: three-pane default, splits later — approve?
 2. Module switcher: labeled pills vs quieter icon rail
@@ -28,6 +28,6 @@ breve excluded this round (seam marked in flow map: local-AI first layer, Resend
 
 ## Verdict
 
-**PENDING — awaiting Seth at the gate.**
+**PENDING — awaiting the maintainer at the gate.**
 
 *Agent LOOK record: `_look/` PNGs (frame close-ups, 2x) — agent-only, per the SVG-gate rule; the gate itself is the live HTML.*

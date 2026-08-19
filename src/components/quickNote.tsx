@@ -1,4 +1,4 @@
-// Quick Note — the floating, Raycast-style note window (Seth, 2026-06-15; the
+// Quick Note — the floating, Raycast-style note window (the maintainer, 2026-06-15; the
 // ⌘P picker, 2026-06-19). A third webview (?window=quick), summoned by ⌥Q,
 // hidden on blur. It reuses the EXACT main editor + format bar over ONE open
 // note. The note you're in is decoupled from your pinned favorites: ⌘P (or the
@@ -312,7 +312,7 @@ export function QuickNote() {
         {activeId ? (
           // the title button is content-width and centered, with draggable
           // spacers on either side — so the header stays easy to grab and move
-          // the window, instead of being one big click target (Seth, 2026-06-24)
+          // the window, instead of being one big click target (the maintainer, 2026-06-24)
           <>
             <div className="quick-drag" onMouseDown={onDragRegionMouseDown} aria-hidden="true" />
             <button

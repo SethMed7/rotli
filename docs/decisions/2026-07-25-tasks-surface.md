@@ -46,7 +46,7 @@ workspace with secure/locked exclusion.
 
 ## Amendment 2026-08-04 — the `[/]` in-progress mark
 
-Direction: Seth, from ZenNotes v2.21 — "offer partial complete… click once for
+Direction: the maintainer, from ZenNotes v2.21 — "offer partial complete… click once for
 in progress and again for complete."
 
 A checkbox now has **three** states, not two: `[ ]` open · `[/]` in progress ·

@@ -236,7 +236,7 @@ beforeEach(() => {
     {
       id: "identity/00-identity.md",
       title: "Identity",
-      body: "Seth is a kelpie-adjacent quokkanaut",
+      body: "the maintainer is a kelpie-adjacent quokkanaut",
       folderId: "identity",
       reference: true,
     },

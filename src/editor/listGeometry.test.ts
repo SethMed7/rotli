@@ -1,4 +1,4 @@
-// The rendered list ladder (Seth, 2026-08-01, next to Obsidian): one clean step
+// The rendered list ladder (the maintainer, 2026-08-01, next to Obsidian): one clean step
 // per nesting level, the marker hugging its text in a narrow hanging column, and
 // never a vertical indent-guide rule.
 

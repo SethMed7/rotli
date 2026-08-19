@@ -45,7 +45,7 @@ export function parseBlock(line: string): Block {
     return { kind, prefixLen: h[0].length, text: line.slice(h[0].length) };
   }
   // list kinds may carry a leading indent → nesting depth (2 columns per
-  // level). TAB-tolerant (Seth, 2026-07-28): foreign notes indent with tabs —
+  // level). TAB-tolerant (the maintainer, 2026-07-28): foreign notes indent with tabs —
   // a tab counts one level; prefixLen stays CHARACTER-based for offsets while
   // `indent` carries columns for depth.
   const indentChars = /^[ \t]+/.exec(line)?.[0] ?? "";

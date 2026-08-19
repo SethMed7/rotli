@@ -790,7 +790,7 @@
   position: relative;
   min-width: 0;
   flex: 1;
-  /* the CAMERA owns navigation now (Seth, 2026-07-29) — no native scroll */
+  /* the CAMERA owns navigation now (the maintainer, 2026-07-29) — no native scroll */
   overflow: hidden;
   background: var(--ground);
   cursor: grab;
@@ -804,7 +804,7 @@
   min-width: 100%;
   min-height: 100%;
 }
-/* the INLINE mermaid camera (Seth, 2026-07-29): the fence widget is a small
+/* the INLINE mermaid camera (the maintainer, 2026-07-29): the fence widget is a small
    viewport of its own — scroll zooms, drag pans, double-click fits */
 .rotli-mermaid-inline {
   position: relative;

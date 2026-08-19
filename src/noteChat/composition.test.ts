@@ -63,7 +63,7 @@ void mock.module("../lib/tauri", () => ({
 }));
 void mock.module("../memex/service", () => ({
   ...realService,
-  loadConfig: async () => ({ activeId: INSTANCE.id, instances: [INSTANCE] }),
+  loadConfig: async () => ({ activeId: INSTANCE.id, instances: [INSTANCE], developmentReadOnly: false }),
   listChats: async () => chats.map((chat) => ({ ...chat })),
   setChatAttachedTo: async (_instance: MemexInstance, slug: string, stem: string) => {
     const chat = chats.find((c) => c.slug === slug);

@@ -63,7 +63,7 @@ const creator: NewItemCreator = {
       const selectedMain = selected.startsWith(MAIN_ROOT);
       const routeFolder = selectedMain ? ALL_NOTES : selected;
       // a Mermaid diagram is a NOTE born with the starter flowchart fence —
-      // the same body the slash command inserts (Seth, 2026-07-29)
+      // the same body the slash command inserts (the maintainer, 2026-07-29)
       const body =
         kind === "mermaid"
           ? await import("../editor/slashActions").then(
@@ -96,7 +96,7 @@ const creator: NewItemCreator = {
 
 /** The named view (if any) whose OWN tree carries a folder with this rendered
  * id — folder ids share one grammar ("main:<path>") across Main and every
- * view, so a Main folder mirrored into a view matches by id. Seth, 2026-07-29:
+ * view, so a Main folder mirrored into a view matches by id. the maintainer, 2026-07-29:
  * "if I put a file in a folder that is part of a view it should be seen in
  * that view." */
 export function viewContainingFolder(folderId: string): string | null {
@@ -173,30 +173,6 @@ export async function createManagedItem(
   return item;
 }
 
-/** Turn the transient empty-vault welcome into the user's first real note.
- * The caller supplies a non-empty Markdown body only after the user names it;
- * until then there is no durable file to clean up. */
-export function createNamedMarkdownItem(body: string): Promise<CreatedItem> {
-  if (!body.trim()) return Promise.reject(new Error("name the note before creating it"));
-  const namedCreator: NewItemCreator = {
-    async create() {
-      const selected = useUiStore.getState().selectedFolderId;
-      const selectedMain = selected.startsWith(MAIN_ROOT);
-      const routeFolder = selectedMain ? ALL_NOTES : selected;
-      const id = await createRoutedNote({
-        selectedFolderId: routeFolder,
-        isSmart: routeFolder === ALL_NOTES || routeFolder === RECENT,
-        localFallback: inboxFolderId,
-        body,
-      });
-      return { id, kind: "markdown" };
-    },
-  };
-  return createNewItem({ creator: namedCreator, presenter }, "markdown", {
-    newTab: false,
-  });
-}
-
 /** Create a populated editable Word artifact while retaining the same refresh,
  * Main/view filing, and presentation policy as a toolbar-created document.
  * Populated artifacts are never tracked as discardable blank drafts. */
@@ -254,7 +230,7 @@ export function requestManagedBoardCreation(options: { newTab?: boolean } = {}):
 
 /** Create a populated board atomically while preserving the same Main/view
  * filing and presentation policy used by every other creation entry point.
- * `besideNoteId` (Seth, 2026-07-29: a converted diagram lands "in the same
+ * `besideNoteId` (the maintainer, 2026-07-29: a converted diagram lands "in the same
  * path I am in") files the board beside that note — same Main folder, same
  * named view — instead of reading the ambient selection. */
 export function createManagedBoardWithBody(

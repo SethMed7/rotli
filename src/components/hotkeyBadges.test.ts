@@ -1,4 +1,4 @@
-// The hold-⌘ badge placement rules (Seth, 2026-08-04). The overlay is a
+// The hold-⌘ badge placement rules (the maintainer, 2026-08-04). The overlay is a
 // READ-ONLY view over the registry, so what's worth testing is the placement
 // arithmetic: which tagged controls earn a badge, and where it lands.
 

@@ -20,7 +20,7 @@ export const EMPTY_SCENE = {
   files: {},
 };
 
-/** G — board metadata (Seth, 2026-06-26): a board is an image to a text LLM, so
+/** G — board metadata (the maintainer, 2026-06-26): a board is an image to a text LLM, so
  * it carries a description + tags, stored TOP-LEVEL in the .excalidraw (NOT in
  * appState, which Excalidraw would strip) so the AI can know + search it later. */
 export interface BoardMeta {

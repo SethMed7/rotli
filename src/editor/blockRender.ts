@@ -23,6 +23,7 @@ import { Decoration, type DecorationSet, EditorView, ViewPlugin, WidgetType } fr
 import { createEditableBoardFromMermaid } from "../boards/composition";
 import { isTauri } from "../lib/tauri";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
+import { isDarkDataTheme } from "../state/theme";
 import { useUiStore } from "../state/ui";
 import { installEmbedControls } from "./embedControls";
 import { mountBoardEmbed, mountDocumentEmbed, mountSheetEmbed } from "./embedHosts";
@@ -44,8 +45,7 @@ import { sanitizeSvg } from "./svgSanitizer";
 
 /** Root-theme "is dark?" — for the Expand overlay, which lives on document.body. */
 function isDarkRoot(): boolean {
-  const t = document.documentElement.dataset.theme ?? "";
-  return t === "dark" || t === "charcoal";
+  return isDarkDataTheme(document.documentElement.dataset.theme);
 }
 
 /** "Is dark?" for an IN-EDITOR node — resolved from the node's computed text
@@ -383,7 +383,7 @@ class RenderBlockWidget extends WidgetType {
       body.setAttribute("role", "button");
       body.setAttribute("aria-label", "Open Mermaid diagram viewer");
       // click still opens the workspace — but a DRAG pans and a scroll zooms
-      // in place (Seth, 2026-07-29: "usable without clicking in"), so the
+      // in place (the maintainer, 2026-07-29: "usable without clicking in"), so the
       // open gesture moved from mousedown to the camera's no-travel pointerup
       body.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -477,7 +477,7 @@ function cryptoId(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
-// ——— the inline mermaid camera (Seth, 2026-07-29): scroll zooms, drag pans,
+// ——— the inline mermaid camera (the maintainer, 2026-07-29): scroll zooms, drag pans,
 //     a no-travel click still opens the workspace. Viewports persist per
 //     source across the rebuilds that reveal-on-caret causes. ———
 

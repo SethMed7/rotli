@@ -1,4 +1,4 @@
-// Resize + fit law (Seth, 2026-08-01: "we want to think about the way
+// Resize + fit law (the maintainer, 2026-08-01: "we want to think about the way
 // everything resizes and fits as a whole"). A pane is a BOX: at any window
 // size, at any divider position, a surface either fits inside its pane or
 // scrolls inside it — it never paints into the pane next door, and its own

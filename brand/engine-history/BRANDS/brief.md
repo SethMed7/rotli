@@ -1,14 +1,14 @@
 # rotli — Logo & Identity Brief
 
-*The input the Mark System consumes for `BRANDS/rotli`. Direction is **Seth-approved** via the rotli brand
+*The input the Mark System consumes for `BRANDS/rotli`. Direction is **the maintainer-approved** via the rotli brand
 board (2026-06-06) — see `_reference/NOTE.md`. Generate → Critique → Human-judge → Formalize per
 [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md). Prompt scaffolds:
 [`../../RULES/03-prompt-recipes.md`](../../RULES/03-prompt-recipes.md).*
 
 > **House rule.** AI generates · rules guide · the human judges · code formalizes. The judge is the
-> **EYE + the premium rubric + Seth — never a metric.** Premium = **simplicity that compiles**, not
+> **EYE + the premium rubric + the maintainer — never a metric.** Premium = **simplicity that compiles**, not
 > accumulation. The **16px-mono render is the survival floor**. The logo + colors here are already
-> Seth-judged (the board); what remains is to **formalize** the marks into clean SVG and draw the icon
+> the maintainer-judged (the board); what remains is to **formalize** the marks into clean SVG and draw the icon
 > set, then bring them to the freeze gate.
 
 ---
@@ -39,7 +39,7 @@ LED. The quokka smile is implicit in the roundness; the mark never has to shout.
 
 **MODE: a lowercase, rounded, friendly wordmark with one signature letterform — the `r`.**
 
-The specific concept (Seth-confirmed via the brand board):
+The specific concept (the maintainer-confirmed via the brand board):
 
 > **Primary:** the full word **`rotli`** set lowercase in a warm rounded sans, in **Cocoa `#3A3028`**. The
 > leading **`r` is the signature glyph** — its arm sweeps up and curls with a distinctive looped tail (a
@@ -51,8 +51,8 @@ The specific concept (Seth-confirmed via the brand board):
 
 **Decoded into rules for the engine:**
 
-1. **FORMALIZE FROM SOURCE — do not trace the raster.** The board is Seth's judgment, not the vector
-   source. Get the wordmark + `r` mark as clean outlined SVG from Seth's design source (Figma/AI export),
+1. **FORMALIZE FROM SOURCE — do not trace the raster.** The board is the maintainer's judgment, not the vector
+   source. Get the wordmark + `r` mark as clean outlined SVG from the maintainer's design source (Figma/AI export),
    or rebuild the `r` glyph as exact path geometry. Never auto-trace the board PNG.
 2. **The `r` is the signature.** Its looped/curled tail is the one distinctive move — preserve it exactly;
    everything else stays calm and even.
@@ -61,7 +61,7 @@ The specific concept (Seth-confirmed via the brand board):
 4. **Two masters:** a **MONO** single-color master (knockout/reversal) **and** the brand-color version
    (Cocoa on Linen; Linen/Peach on Cocoa for dark).
 5. **Survival floor:** the secondary `r` mark must read at **16px mono** (favicon) and as a **knockout**.
-   If the curl muddies at 16px, simplify the tail until it holds — the eye + Seth decide, no metric.
+   If the curl muddies at 16px, simplify the tail until it holds — the eye + the maintainer decide, no metric.
 
 **Required variations (the kit must ship all):** wordmark full-color · wordmark mono-black · wordmark
 mono-white/reversed · `r` mark full-color · `r` mark mono-black · `r` mark mono-white · light tile (Linen)
@@ -119,7 +119,7 @@ wordmark). Plus a reversed (knockout) horizontal for dark grounds.
 - **Licensing:** both Satoshi and General Sans are **Fontshare (Indian Type Foundry)** faces — free for
   personal **and** commercial use under the Fontshare/ITF Free Font License. Self-host (download from
   Fontshare). **Caveat:** they are **not OFL** and are **not** in smLab's current Fontsource catalog
-  (Mona Sans / Figtree / Inter). This is a deliberate, Seth-approved deviation for rotli — record it in
+  (Mona Sans / Figtree / Inter). This is a deliberate, the maintainer-approved deviation for rotli — record it in
   `LICENSES.md` at freeze. The wordmark ships **outlined**, so the font is only needed for live UI text.
 - *OFL fallback option (if a strictly-OFL path is later wanted):* the nearest free rounded-humanist swaps
   for live UI text would be evaluated then — a one-line change since the wordmark is outlined.
@@ -139,7 +139,7 @@ A larger display step above `heading` may be added for marketing/empty-state mom
 
 ---
 
-## 7 · Taglines (provisional — to be set with Seth)
+## 7 · Taglines (provisional — to be set with the maintainer)
 
 Drawn from the philosophy: "**I will quietly hold what matters, and I will not get in your way.**" ·
 "**Warm. Quiet. Instant.**" · "**Your island.**" (the quokka metaphor). Not locked.

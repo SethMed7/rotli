@@ -1,5 +1,5 @@
 // What a routine actually DOES, as a pipeline — the model behind the Workflows
-// view (Seth, 2026-08-04: "the different routines are essentially workflows now
+// view (the maintainer, 2026-08-04: "the different routines are essentially workflows now
 // so we can visually see what is happening").
 //
 // THE HONESTY RULE. A routine has no steps on disk: it is

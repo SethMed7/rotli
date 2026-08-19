@@ -266,7 +266,7 @@ export function setAttachedTo(contents: string, stem: string): string {
 }
 
 /** Rewrite (or insert) the `pinned:` frontmatter line on an EXISTING chat file —
- * the sidebar's pin-to-top (Seth #4 fast-follow, 2026-07-08). Pure; same
+ * the sidebar's pin-to-top (the maintainer #4 fast-follow, 2026-07-08). Pure; same
  * first-frontmatter-block discipline as setAttachedTo. Unpinning a chat that was
  * never pinned is a no-op (no line is added just to say `false`). */
 export function setChatPinned(contents: string, pinned: boolean): string {

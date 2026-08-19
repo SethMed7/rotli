@@ -95,3 +95,12 @@ export async function hydrateMain(): Promise<void> {
     console.warn("main.json hydrate failed", e);
   }
 }
+
+export function resetMainForVaultSwitch(): void {
+  useMainStore.setState({
+    manifest: EMPTY_MAIN,
+    saveState: "idle",
+    error: null,
+    dirty: false,
+  });
+}

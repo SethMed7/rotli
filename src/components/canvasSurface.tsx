@@ -52,7 +52,7 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
   void paneId;
 
   // a new board opens in the app's color mode (dark/light), not always-light —
-  // Excalidraw's `theme` prop follows the rotli theme (Seth, 2026-06-26).
+  // Excalidraw's `theme` prop follows the rotli theme (the maintainer, 2026-06-26).
   const themeMode = useUiStore((s) => s.theme);
   const excaliTheme: "dark" | "light" =
     themeMode === "dark" ||
@@ -81,7 +81,7 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
     [boardId],
   );
 
-  // G — board metadata (Seth, 2026-06-26): description + tags ride top-level in
+  // G — board metadata (the maintainer, 2026-06-26): description + tags ride top-level in
   // the .excalidraw (see boards/session.ts BoardMeta).
   const apiRef = useRef<ExcaliApi | null>(null);
   const sourceSceneRef = useRef<Record<string, unknown> | null>(null);

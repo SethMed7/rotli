@@ -1,11 +1,11 @@
 # rotli — UI/UX mockups · notes module · round 4 — DECISION
 
 **Date:** 2026-06-11 · **Gate:** `gate.html` (live render, kit tokens only; root pinned `data-theme="light"`)
-**Input:** Seth's round-3 verdicts (focus mode ✅, ⌘K v2 ✅; footer, rail buttons, light-mode bug, Inbox question).
+**Input:** the maintainer's round-3 verdicts (focus mode ✅, ⌘K v2 ✅; footer, rail buttons, light-mode bug, Inbox question).
 
 ## The bug that mattered
 
-Seth's Mac runs system dark mode. The kit's `tokens/colors.css` contains a `prefers-color-scheme: dark`
+the maintainer's Mac runs system dark mode. The kit's `tokens/colors.css` contains a `prefers-color-scheme: dark`
 auto-switch scoped to `:root:not([data-theme="light"])` — so every gate page (and the "Light" half of the
 side-by-side) rendered dark on his machine. **Fix:** all four gates now pin `<html data-theme="light">`;
 dark renders only via the explicit `.rotli-dark` class. **Product note for Stage 2:** the app's theme
@@ -14,7 +14,7 @@ overrides a demo or a user's pick.
 
 ## Changes in this round
 
-1. **Floating status pill** replaces the attached footer (Seth's call): bottom-center, ground surface,
+1. **Floating status pill** replaces the attached footer (the maintainer's call): bottom-center, ground surface,
    pill radius, exactly three facts — *where it's saved (on this Mac · ~/rotli/Work) · character count ·
    last updated*. Fades to 40% while typing, returns on pause. Shortcut hints removed from chrome
    entirely (⌘K teaches them — approved r3 pattern).
@@ -30,14 +30,14 @@ overrides a demo or a user's pick.
    user's own account; **no rotli server, ever**. Local-first holds — fetching mail was always the one
    stated network exception, opt-in per account. Sequence: **v1 ships Notes only; Inbox is Phase 5.**
 
-## Round-4 calls for Seth
+## Round-4 calls for the maintainer
 
 1. Status pill: bottom-center (as mocked) or bottom-right? Fade-while-typing OK?
 2. Rail toggle buttons: placement + grouping approved?
 3. Markdown law locked (raw active line; doc-style later as a mode)?
 4. Inbox story settled?
 
-## Verdict (Seth, 2026-06-11)
+## Verdict (the maintainer, 2026-06-11)
 
 - ❌ **Selection bubble — rejected** ("it is just random"). Replace with a Raycast-Notes-style persistent
   format bar, floating at the bottom, in rotli's theme → r5.

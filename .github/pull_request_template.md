@@ -17,7 +17,7 @@ Describe the user-visible result and the problem it solves.
 - [ ] Feature covers the happy path, a refusal/failure state, and boundaries
 - [ ] Model behavior includes deterministic offline eval coverage when applicable
 - [ ] Cross-surface interaction includes E2E coverage when applicable
-- [ ] Syntax, naming, Prettier, and TypeScript checks pass
+- [ ] Syntax, naming, oxfmt, and TypeScript checks pass
 - [ ] `bun run check`
 - [ ] `cargo test --manifest-path src-tauri/Cargo.toml`
 - [ ] `NODE_OPTIONS=--max-old-space-size=4096 bun run build`

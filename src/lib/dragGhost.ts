@@ -1,4 +1,4 @@
-// The floating drag ghost (Seth, 2026-07-01: "when I am dragging something it
+// The floating drag ghost (the maintainer, 2026-07-01: "when I am dragging something it
 // should literally come with me"). ONE implementation for every pointer drag —
 // tabs (tabDrag), the Main tree move/add (Sidebar), Board cards (BoardSurface),
 // note images (livePreview's ImgWidget, the image variant below).

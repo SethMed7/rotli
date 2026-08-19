@@ -1,13 +1,14 @@
 #!/usr/bin/env bun
+import { readFileSync } from "node:fs";
 /**
  * Escalation & usage policy ENGINE — reads the rules from policy.json (the config) and
- * answers "may Breve use this model directly, or must it ask Seth first?" + the cost label.
+ * answers "may Breve use this model directly, or must it ask the maintainer first?" + the cost label.
  * The rules are DATA in policy.json (edit there, no code change), mirroring how the client
- * layer's model rules live in clients/models.json. Seth's defaults: local OSS · Haiku · Gemini
+ * layer's model rules live in clients/models.json. the maintainer's defaults: local OSS · Haiku · Gemini
  * = direct; Claude > Haiku and non-image Codex = ask; image gen always direct.
  */
 import { join } from "node:path";
-import { readFileSync } from "node:fs";
+
 import { LLM } from "./llm";
 
 export type Action = "direct" | "ask";
@@ -31,7 +32,7 @@ export function policyFor(model: string): Verdict {
   return { action: d.action, cost: d.cost, label: d.label, key: id || "unknown" };
 }
 
-/** Image generation is always allowed direct (incl. Codex) — Seth's rule (policy.json). */
+/** Image generation is always allowed direct (incl. Codex) — the maintainer's rule (policy.json). */
 export const imageAlwaysDirect: boolean = POLICY.imageAlwaysDirect ?? true;
 
 // CLI check

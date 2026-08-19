@@ -1,4 +1,4 @@
-// Beautified markdown tables (Seth, 2026-06-27; interactive 2026-07-01).
+// Beautified markdown tables (the maintainer, 2026-06-27; interactive 2026-07-01).
 // Mirrors blockRender.ts: a StateField replaces each GFM table range with a
 // rendered <table> widget. livePreview skips table lines (see lineInTable) so
 // the two never collide. The .md is untouched — every edit below is a plain
@@ -158,7 +158,7 @@ function openTableMenu(
 
 // ─── the widget ──────────────────────────────────────────────────────────────
 
-// menu glyphs (2026-07-31, Seth: "use standard icons — instantly understood").
+// menu glyphs (2026-07-31, the maintainer: "use standard icons — instantly understood").
 // The Docs-style horizontal-lines family for alignment, arrow+lines for the
 // move verbs. Raw SVG strings (this widget is imperative DOM, no React) in the
 // shared 24-viewBox / 1.7-stroke voice of formatGlyphs.tsx.
@@ -279,7 +279,7 @@ class TableWidget extends WidgetType {
     scroll.appendChild(table);
     wrap.appendChild(scroll);
 
-    // ── column RESIZE (Seth, 2026-07-30): drag a column boundary; widths are
+    // ── column RESIZE (the maintainer, 2026-07-30): drag a column boundary; widths are
     //    view state persisted per note+table (never the .md), double-click a
     //    boundary to reset the table to auto layout. ──
     const noteId = view.state.facet(noteIdFacet);

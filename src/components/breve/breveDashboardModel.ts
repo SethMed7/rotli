@@ -1,6 +1,7 @@
 export interface BreveDashboardStory {
   title: string;
   summary: string;
+  sources: BreveDashboardResource[];
 }
 
 export interface BreveDashboardResource {
@@ -32,6 +33,19 @@ function withoutFrontmatter(markdown: string): string {
   return match ? markdown.slice(match[0].length) : markdown;
 }
 
+function linkedResources(lines: readonly string[], limit = 2): BreveDashboardResource[] {
+  const resources: BreveDashboardResource[] = [];
+  const seen = new Set<string>();
+  for (const match of lines.join("\n").matchAll(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g)) {
+    const url = match[2] ?? "";
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    resources.push({ label: plain(match[1] ?? url), url });
+    if (resources.length === limit) break;
+  }
+  return resources;
+}
+
 /** Reduce a durable Breve issue into a compact dashboard projection. Nothing
  * here becomes a second news store: the latest Markdown brief remains truth. */
 export function briefDashboardDigest(markdown: string): BreveDashboardDigest {
@@ -61,19 +75,12 @@ export function briefDashboardDigest(markdown: string): BreveDashboardDigest {
     .map((entry) => ({
       title: entry.title,
       summary: plain(entry.lines.filter(Boolean).join(" ")),
+      sources: linkedResources(entry.lines),
     }))
     .filter((entry) => entry.title && entry.summary)
     .slice(0, 5);
 
-  const resources: BreveDashboardResource[] = [];
-  const seen = new Set<string>();
-  for (const match of body.matchAll(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g)) {
-    const url = match[2] ?? "";
-    if (!url || seen.has(url)) continue;
-    seen.add(url);
-    resources.push({ label: plain(match[1] ?? url), url });
-    if (resources.length === 6) break;
-  }
+  const resources = linkedResources([body], 6);
 
   return { headline, actions, stories, resources };
 }

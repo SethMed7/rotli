@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { missingScriptSteps, missingTokens } from "./documentation-contract.mjs";
@@ -32,6 +32,10 @@ const required = [
   ".carl/mcpServer.mjs",
   ".mcp.json",
   ".codex/config.toml",
+  ".cursor/mcp.json",
+  ".agents/mcp_config.json",
+  ".agents/rules/AGENTS.md",
+  ".agents/skills/verify/SKILL.md",
 ];
 
 const failures = [];
@@ -51,6 +55,20 @@ for (const rel of ["CLAUDE.md", ".github/copilot-instructions.md"]) {
   }
   if (rel === "CLAUDE.md" && !text.includes("carl_recall")) {
     failures.push("CLAUDE.md must route topic recall through carl_recall");
+  }
+}
+
+// CLAUDE.md is an adapter, not a mirror: Claude Code only auto-loads AGENTS.md
+// through a real memory import — a bare `@AGENTS.md` line at line start. A
+// Markdown link (or a backticked mention) is NOT an import; it leaves the
+// canonical rules unloaded and relies on the model choosing to read them.
+if (existsSync(join(root, "CLAUDE.md"))) {
+  const adapter = readFileSync(join(root, "CLAUDE.md"), "utf8");
+  if (!/^@AGENTS\.md$/m.test(adapter)) {
+    failures.push("CLAUDE.md must import the canonical rules with a bare `@AGENTS.md` line (a Markdown link is not an import)");
+  }
+  if (Buffer.byteLength(adapter, "utf8") > 1_000) {
+    failures.push("CLAUDE.md exceeds its 1,000-byte adapter budget — rules belong in AGENTS.md, not the adapter");
   }
 }
 
@@ -369,6 +387,76 @@ if (existsSync(join(root, ".codex/config.toml"))) {
   }
 }
 
+// Cursor (.cursor/mcp.json) and Antigravity (.agents/mcp_config.json) reach the
+// same project CARL server. Both run read-only: CARL_READONLY=1 makes the
+// server hide and refuse carl_stage_proposal — only Claude stages proposals.
+for (const rel of [".cursor/mcp.json", ".agents/mcp_config.json"]) {
+  if (!existsSync(join(root, rel))) continue;
+  try {
+    const config = JSON.parse(readFileSync(join(root, rel), "utf8"));
+    const server = config?.mcpServers?.["rotli-carl"];
+    if (server?.command !== "node" || !server?.args?.includes(".carl/mcpServer.mjs")) {
+      failures.push(`${rel} does not launch the project CARL server`);
+    }
+    if (server?.env?.CARL_READONLY !== "1") {
+      failures.push(`${rel} must set CARL_READONLY=1 — only Claude stages CARL proposals`);
+    }
+  } catch (error) {
+    failures.push(`${rel} is invalid JSON: ${error.message}`);
+  }
+}
+
+// Antigravity does not read a root AGENTS.md; it loads workspace rules from
+// .agents/rules/. The mirror there must stay byte-identical to the canonical
+// file (a symlink satisfies this automatically; a copy is caught on drift).
+if (existsSync(join(root, ".agents/rules/AGENTS.md")) && existsSync(join(root, "AGENTS.md"))) {
+  if (readFileSync(join(root, ".agents/rules/AGENTS.md"), "utf8") !== readFileSync(join(root, "AGENTS.md"), "utf8")) {
+    failures.push(".agents/rules/AGENTS.md has drifted from the canonical AGENTS.md");
+  }
+}
+
+// Skills are canonical in .agents/skills (Codex, Cursor, and Antigravity read
+// that path natively). Claude reads .claude/skills, which must resolve to the
+// same directory, and .gitignore must carve the symlink out of the .claude/
+// ignore or it never reaches the repository.
+if (existsSync(join(root, ".agents/skills"))) {
+  try {
+    if (realpathSync(join(root, ".claude/skills")) !== realpathSync(join(root, ".agents/skills"))) {
+      failures.push(".claude/skills must resolve to .agents/skills so every agent sees the same skills");
+    }
+  } catch {
+    failures.push(".claude/skills is missing — link it to .agents/skills");
+  }
+  const gitignore = existsSync(join(root, ".gitignore")) ? readFileSync(join(root, ".gitignore"), "utf8") : "";
+  if (!gitignore.includes("!.claude/skills")) {
+    failures.push(".gitignore must un-ignore .claude/skills (use `.claude/*` + `!.claude/skills`)");
+  }
+  const packageScripts = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).scripts ?? {};
+  for (const name of readdirSync(join(root, ".agents/skills"))) {
+    const dir = join(root, ".agents/skills", name);
+    if (!statSync(dir).isDirectory()) continue;
+    const skillPath = join(dir, "SKILL.md");
+    if (!existsSync(skillPath)) {
+      failures.push(`.agents/skills/${name} is missing SKILL.md`);
+      continue;
+    }
+    const skill = readFileSync(skillPath, "utf8");
+    if (!skill.startsWith("---") || !/^name:\s*\S/m.test(skill) || !/^description:\s*\S/m.test(skill)) {
+      failures.push(`.agents/skills/${name}/SKILL.md needs frontmatter with name and description`);
+    }
+    // Skills point at the canonical proof chain; a named command must exist.
+    for (const match of skill.matchAll(/`bun run ([a-z0-9:_-]+)/g)) {
+      if (!packageScripts[match[1]]) failures.push(`.agents/skills/${name}/SKILL.md references missing script: bun run ${match[1]}`);
+    }
+    for (const match of skill.matchAll(/`([^`\n]+)`/g)) {
+      const candidate = match[1];
+      if (!/^(?:src|src-tauri|scripts|docs|breve-runtime)\//.test(candidate)) continue;
+      if (/[<>*{}\s]/.test(candidate)) continue;
+      if (!existsSync(join(root, candidate))) failures.push(`.agents/skills/${name}/SKILL.md references missing path: ${candidate}`);
+    }
+  }
+}
+
 if (existsSync(join(root, ".carl/mcpServer.mjs"))) {
   const requests = [
     { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "docs-check", version: "1" } } },
@@ -395,6 +483,32 @@ if (existsSync(join(root, ".carl/mcpServer.mjs"))) {
     if (ruleCount > 4) throw new Error("bounded recall returned more than four rules");
   } catch (error) {
     failures.push(`project CARL MCP smoke test failed: ${error.message}`);
+  }
+
+  // Read-only mode (Cursor/Antigravity wiring): carl_stage_proposal must
+  // disappear from tools/list and refuse calls under CARL_READONLY=1.
+  const readOnlyRequests = [
+    requests[0],
+    requests[1],
+    { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
+    { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "carl_stage_proposal", arguments: { proposed_domain: "ROTLI_CORE", rule_text: "smoke", rationale: "smoke" } } },
+  ];
+  const readOnlySmoke = spawnSync(process.execPath, [".carl/mcpServer.mjs"], {
+    cwd: root,
+    env: { ...process.env, CARL_READONLY: "1" },
+    input: `${readOnlyRequests.map(JSON.stringify).join("\n")}\n`,
+    encoding: "utf8",
+  });
+  try {
+    if (readOnlySmoke.status !== 0) throw new Error(readOnlySmoke.stderr || `exit ${readOnlySmoke.status}`);
+    const responses = readOnlySmoke.stdout.trim().split("\n").map((line) => JSON.parse(line));
+    const listed = responses.find((response) => response.id === 2)?.result?.tools ?? [];
+    if (listed.some((tool) => tool.name === "carl_stage_proposal")) throw new Error("carl_stage_proposal is still listed under CARL_READONLY=1");
+    if (!listed.some((tool) => tool.name === "carl_recall")) throw new Error("carl_recall missing from read-only tools/list");
+    const call = responses.find((response) => response.id === 3);
+    if (!call?.error) throw new Error("carl_stage_proposal call was not refused in read-only mode");
+  } catch (error) {
+    failures.push(`read-only CARL smoke test failed: ${error.message}`);
   }
 }
 

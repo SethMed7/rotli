@@ -1,4 +1,4 @@
-// The System browser (Finder rework 2026-07-27/28, from Seth's screenshots):
+// The System browser (Finder rework 2026-07-27/28, from the maintainer's screenshots):
 // Library · Assets · Archive · Trash open HERE as a real Finder — you are IN
 // one folder and see only its direct contents. FOUR views behind Finder's own
 // icons: Icons (grid, image thumbnails), List (Name · Date Modified · Kind,
@@ -76,7 +76,7 @@ const cwdMemo = new Map<string, string>();
 // the Columns view's open chain (relative folder paths), per root
 const colPathMemo = new Map<string, string[]>();
 
-// Image tiles show the PICTURE (Seth, 2026-07-28: "or else I don't know what
+// Image tiles show the PICTURE (the maintainer, 2026-07-28: "or else I don't know what
 // I'm looking at") — asset-protocol URLs resolve once and cache for the
 // session; every other kind keeps its type glyph.
 const thumbCache = new Map<string, string>();
@@ -156,7 +156,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
   // is its own subtree straight from the notes service
   const destData = useNotes(isLibrary ? DEST.secure : rootId).data;
   const { notes: searchable } = useSearchableNotes();
-  // Finder truth for the Library too (Seth, 2026-07-28: "the Library isn't
+  // Finder truth for the Library too (the maintainer, 2026-07-28: "the Library isn't
   // working like Assets"): the projected wiki NOTES alone hid every file and
   // board living inside wiki folders (brief PDFs, images, canvases) — the
   // full index carries them, minus the internal wiki/_ lanes (secure arrives
@@ -190,21 +190,21 @@ export function SystemSurface({ rootId }: { rootId: string }) {
     cwdMemo.set(rootId, path);
     setCwdState(path);
   };
-  // Columns (Seth, 2026-07-28, the Finder column view): a chain of opened
+  // Columns (the maintainer, 2026-07-28, the Finder column view): a chain of opened
   // folders; each column lists one folder, clicking a folder opens the next
   const [colPath, setColPathState] = useState<string[]>(() => colPathMemo.get(rootId) ?? []);
   const setColPath = (chain: string[]) => {
     colPathMemo.set(rootId, chain);
     setColPathState(chain);
   };
-  // Finder selection (Seth, 2026-07-28): the multi-selection lives in the ui
+  // Finder selection (the maintainer, 2026-07-28): the multi-selection lives in the ui
   // store so ⌘⌫'s registry action can trash it; the anchor drives ⇧ ranges;
   // a highlighted folder is its own single slot (folders don't trash).
   const selection = useUiStore((s) => s.systemSelection);
   const setSelection = useUiStore((s) => s.setSystemSelection);
   const selectedIds = useMemo(() => new Set(selection.map((n) => n.id)), [selection]);
   const anchorRef = useRef<string | null>(null);
-  // MULTI folder selection (Seth, 2026-07-30: "can't select multiple things")
+  // MULTI folder selection (the maintainer, 2026-07-30: "can't select multiple things")
   // — an array in selection order; the last entry names the path-bar leaf
   const [folderSel, setFolderSel] = useState<string[]>([]);
   const folderSelSet = useMemo(() => new Set(folderSel), [folderSel]);
@@ -237,7 +237,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
   );
   // the Library hides its SYSTEM LANES (_inbox → the Captures front,
   // _templates → machine plumbing) — as bare tiles they read as broken
-  // empty folders (Seth, 2026-07-30)
+  // empty folders (the maintainer, 2026-07-30)
   const hiddenLanes = useMemo<ReadonlySet<string>>(
     () => (isLibrary ? LIBRARY_HIDDEN_LANES : new Set()),
     [isLibrary],
@@ -353,7 +353,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
         : { key, dir: key === "date" || key === "created" ? -1 : 1 },
     );
 
-  // right-click on EMPTY space — Finder's background menu (Seth, 2026-07-28:
+  // right-click on EMPTY space — Finder's background menu (the maintainer, 2026-07-28:
   // "clean up via right click… sort by"): New folder where creation is
   // offered, and the Sort-by selector (re-pick the active key to flip
   // direction, same as the List headers)
@@ -409,7 +409,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
   };
 
   const visibleItems = searching ? hits : listing.items;
-  /** Folder tiles/rows multi-select exactly like items (Seth, 2026-07-30):
+  /** Folder tiles/rows multi-select exactly like items (the maintainer, 2026-07-30):
    * ⌘ toggles, ⇧ ranges over the listing's folder band, a plain click selects
    * alone (and clears the item selection); ⌘ keeps a MIXED selection alive. */
   const selectFolder = (path: string, e: { metaKey: boolean; shiftKey: boolean }) => {
@@ -658,7 +658,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
 
   return (
     // Space = Quick Look on the single-selected item (Finder muscle memory;
-    // Seth, 2026-07-29) — anywhere in the browser except a text input
+    // the maintainer, 2026-07-29) — anywhere in the browser except a text input
     <div
       className="board allnotes system-browser"
       onKeyDown={(e) => {
@@ -684,7 +684,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
           </button>
         )}
         {/* the full trail lives in the BOTTOM path bar now (Finder's home for
-            it — Seth, 2026-07-28); the header keeps just where-am-I */}
+            it — the maintainer, 2026-07-28); the header keeps just where-am-I */}
         <h2 className="board-title">{crumbs[crumbs.length - 1]?.label ?? root.title}</h2>
         <span className="board-count">{items.length}</span>
         {isLibrary && (
@@ -723,7 +723,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
               Empty Trash…
             </button>
           ))}
-        {/* the view switcher wears Finder's icons (Seth, 2026-07-28: "the
+        {/* the view switcher wears Finder's icons (the maintainer, 2026-07-28: "the
             proper icons people are used to"); the words live in the tooltips */}
         <div className="file-mode-tabs" role="tablist" aria-label="View" style={{ marginLeft: "auto" }}>
           {(
@@ -935,7 +935,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
         </div>
       )}
 
-      {/* — the Finder path bar, at the BOTTOM where people expect it (Seth,
+      {/* — the Finder path bar, at the BOTTOM where people expect it (the maintainer,
           2026-07-28); every segment navigates, the selected item is the leaf — */}
       {!searching && (
         <nav className="fdr-pathbar" aria-label="Folder path">
@@ -967,7 +967,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
   );
 }
 
-// ——— Gallery — Finder's fourth view (Seth, 2026-07-28): one BIG preview of
+// ——— Gallery — Finder's fourth view (the maintainer, 2026-07-28): one BIG preview of
 // the highlighted entry over a horizontal filmstrip of the folder's contents.
 // ←/→ walk the strip, ⏎ opens (or enters a folder), double-click likewise. ———
 

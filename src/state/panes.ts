@@ -1,13 +1,13 @@
 // The pane tree (UI state only — the Zustand law). Implements the r2 pane/tab
 // law: every pane owns tabs; splits DUPLICATE the active tab (never an empty
 // pane); the note list mirrors the focused pane's active tab. OPEN is the
-// standard editor model (Seth, 2026-07-03): a plain click on a file REUSES its
+// standard editor model (the maintainer, 2026-07-03): a plain click on a file REUSES its
 // open tab if the focused pane already has one, else opens a NEW tab — it never
 // replaces the tab you're working in; ⌘T / ⌘-click always force a fresh tab.
 // 320px min pane width — when a split would break the floor, the folders rail
 // auto-collapses first, then the list.
 //
-// Tab discoverability law (Seth, 2026-06-13): EVERY pane shows its tab strip —
+// Tab discoverability law (the maintainer, 2026-06-13): EVERY pane shows its tab strip —
 // the old "single-tab pane renders zero chrome" Apple-Notes default is gone,
 // so every tab is visible and closeable. Drag-and-drop joins it: tabs reorder
 // within a strip (moveTab same-pane), move to another strip (moveTab
@@ -17,6 +17,7 @@
 import { create } from "zustand";
 
 import { clamp } from "../lib/clamp";
+import { seedPrivateBrowserTab } from "../lib/privateBrowser";
 import { initialNoteId, ulid } from "../services/notes";
 import type { LeafNode, PaneNode, SplitDir, Tab } from "../types";
 import { touchItemActivity, touchMru } from "./mru";
@@ -28,10 +29,11 @@ import {
   recordNav,
   retargetNavEntry,
 } from "./navHistory";
+import { canOpenVaultInPanes, contentVaultId } from "./paneVaults";
 import { useUiStore } from "./ui";
 
 export const MIN_PANE_WIDTH = 320;
-/** The height floor is CHROME-derived, not a round number (Seth, 2026-08-01:
+/** The height floor is CHROME-derived, not a round number (the maintainer, 2026-08-01:
  * "the way everything resizes and fits as a whole"). A pane owes its surface
  * room for a 34px tab strip plus the tallest fixed chrome any surface carries —
  * chat's title row + composer, ~150px once both compress — plus a usable sliver
@@ -39,7 +41,7 @@ export const MIN_PANE_WIDTH = 320;
  * start landing on each other; 160 was under the chat composer alone. */
 export const MIN_PANE_HEIGHT = 220;
 /** Fallback width when the ui store hasn't seeded one yet — matches ui.ts's
- * sidebarWidth init (Seth, 2026-06-13: one sidebar, not two rails). */
+ * sidebarWidth init (the maintainer, 2026-06-13: one sidebar, not two rails). */
 const SIDEBAR_WIDTH = 240;
 
 function makeTab(noteId: string): Tab {
@@ -50,8 +52,8 @@ function makeCanvasTab(boardId: string): Tab {
   return { id: ulid(), surfaceKind: "canvas", boardId };
 }
 
-function makeChatTab(chatSlug: string | null): Tab {
-  return { id: ulid(), surfaceKind: "chat", chatSlug };
+function makeChatTab(chatSlug: string | null, vaultId?: string): Tab {
+  return { id: ulid(), surfaceKind: "chat", chatSlug, ...(vaultId ? { vaultId } : {}) };
 }
 
 function makeFileTab(fileId: string): Tab {
@@ -66,13 +68,28 @@ function makeNewItemTab(): Tab {
   return { id: ulid(), surfaceKind: "newItem" };
 }
 
+function makeBrowserTab(url?: string): Tab {
+  const tab: Tab = { id: ulid(), surfaceKind: "browser" };
+  seedPrivateBrowserTab(tab.id, url);
+  return tab;
+}
+
+/** Vault isolation is a navigation guard: a blocked open leaves every existing
+ * (possibly dirty) tab untouched. */
+function allowPaneVault(vaultId: string): boolean {
+  const ui = useUiStore.getState();
+  if (canOpenVaultInPanes(vaultId)) return true;
+  ui.setRowActionError("That item belongs to another vault. Switch vaults from the sidebar name to open it.");
+  return false;
+}
+
 /** The noteId of a tab, or null for a canvas tab — the one place every
  * `.noteId` read funnels through so a CanvasTab never crashes NoteTab code. */
 function tabNoteId(tab: Tab): string | null {
   return tab.surfaceKind === "note" ? tab.noteId : null;
 }
 
-/** The ONE size law for a split's children (Seth, 2026-08-01). Fractions that
+/** The ONE size law for a split's children (the maintainer, 2026-08-01). Fractions that
  * sum to 1, none below `minFrac` — the surplus is taken from the siblings that
  * can spare it, in proportion to how much they have above the floor, so a drag
  * or a window shrink squeezes the roomy pane instead of crushing the small one.
@@ -131,7 +148,7 @@ export function fileTabOpen(root: PaneNode, fileId: string): boolean {
 }
 
 /** An EDIT promotes the item's preview tab(s) to permanent, wherever open —
- * "if I click and edit it should stay open" (Seth, 2026-07-28). Cheap no-op
+ * "if I click and edit it should stay open" (the maintainer, 2026-07-28). Cheap no-op
  * when nothing matches. */
 export function keepTabsFor(itemId: string): void {
   const { root } = usePanesStore.getState();
@@ -164,10 +181,11 @@ export function sidebarItemId(tab: Tab | null): string | null {
 /** Duplicate a tab (its surface target), fresh identity — for splits / ⌘T. */
 function duplicateTab(tab: Tab): Tab {
   if (tab.surfaceKind === "canvas") return makeCanvasTab(tab.boardId);
-  if (tab.surfaceKind === "chat") return makeChatTab(tab.chatSlug);
+  if (tab.surfaceKind === "chat") return makeChatTab(tab.chatSlug, tab.vaultId);
   if (tab.surfaceKind === "file") return makeFileTab(tab.fileId);
   if (tab.surfaceKind === "activity") return makeActivityTab();
   if (tab.surfaceKind === "newItem") return makeNewItemTab();
+  if (tab.surfaceKind === "browser") return makeBrowserTab();
   return makeTab(tab.noteId);
 }
 
@@ -175,7 +193,7 @@ function makeLeaf(tab: Tab): LeafNode {
   return { kind: "leaf", id: ulid(), tabs: [tab], activeTabId: tab.id };
 }
 
-/** The standard editor open, PREVIEW-tab flavored (Seth, 2026-07-28: "every
+/** The standard editor open, PREVIEW-tab flavored (the maintainer, 2026-07-28: "every
  * click shouldn't open a new tab"): a plain open ACTIVATES the target's open
  * tab if there is one — and re-activating the PREVIEW tab's own target KEEPS
  * it (click-again-to-keep). Otherwise the pane's one preview tab is REUSED in
@@ -206,7 +224,7 @@ function placeTab(
     // beside the note: the real (fs) app boots with one note tab whose target is
     // "" (initialNoteId), and the startup effect opens the freshest note into it.
     // Only that uninitialized placeholder has an empty noteId, so this never
-    // swallows a real note (Seth, 2026-07-03 — the pre-release review's blocker).
+    // swallows a real note (the maintainer, 2026-07-03 — the pre-release review's blocker).
     const active = l.tabs.find((t) => t.id === l.activeTabId);
     if (active && active.surfaceKind === "note" && active.noteId === "") {
       const filled = previewable ? { ...make(), preview: true } : make();
@@ -264,7 +282,7 @@ function mapAllTabs(node: PaneNode, fn: (t: Tab) => Tab): PaneNode {
 /** Replace the leaf with a split (or insert a sibling if the parent already
  * splits in the same direction — keeps the tree flat). `before` puts the new
  * leaf on the leading side of the target (left for "row", top for "col");
- * the keyboard split path leaves it false (Seth, 2026-06-13: detach drops
+ * the keyboard split path leaves it false (the maintainer, 2026-06-13: detach drops
  * onto either edge). */
 function splitLeaf(
   node: PaneNode,
@@ -412,7 +430,7 @@ function neighborIn(root: PaneNode, fromId: string, dir: FocusDir): string | nul
 // ——— the store ———
 
 /** The tab currently under an HTML5 drag — set on dragstart, cleared on
- * dragend/drop. Panes read it to arm their split-detach dropzones (Seth,
+ * dragend/drop. Panes read it to arm their split-detach dropzones (the maintainer,
  * 2026-06-13). */
 export interface DraggingTab {
   paneId: string;
@@ -435,7 +453,7 @@ export type DetachDir = "left" | "right" | "up" | "down";
 export type DropZone = DetachDir | "center";
 
 /** What the in-flight pointer drag would do if dropped now — drives the strip
- * insertion line and the pane-body zone highlight (Seth, 2026-06-15: the tab
+ * insertion line and the pane-body zone highlight (the maintainer, 2026-06-15: the tab
  * drag is pointer-based, not HTML5, so it fires in the macOS WKWebView shell). */
 export type DropPreview =
   | { kind: "strip"; paneId: string; index: number }
@@ -460,13 +478,13 @@ interface PanesState {
   openCanvas: (boardId: string, opts?: { newTab?: boolean }) => void;
   /** Retarget every open canvas tab pointing at `oldId` to `newId` (board rename). */
   retargetBoard: (oldId: string, newId: string) => void;
-  /** Re-point every open chat tab from `oldSlug` to `newSlug` after a rename. */
-  retargetChat: (oldSlug: string, newSlug: string) => void;
+  /** Re-point open chat tabs from `oldSlug` to `newSlug` after a rename. */
+  retargetChat: (oldSlug: string, newSlug: string, vaultId?: string) => void;
   /** Point open note tabs at a note's new id after it moved (e.g. the Filer filed it). */
   retargetNote: (oldId: string, newId: string) => void;
   /** Open a chat in the focused pane: reuse its open tab or open a new one
    * (`newTab` forces fresh). `chatSlug` null = a fresh unsent chat, always a new tab. */
-  openChat: (chatSlug: string | null, opts?: { newTab?: boolean }) => void;
+  openChat: (chatSlug: string | null, opts?: { newTab?: boolean; vaultId?: string }) => void;
   /** Open a surfaced binary FILE (audio/pdf/image/text) in-app — mirrors openCanvas. */
   openFile: (fileId: string, opts?: { newTab?: boolean }) => void;
   /** Close every tab pointing at a file that left the corpus (for example after
@@ -475,15 +493,18 @@ interface PanesState {
   closeFileTabs: (fileId: string) => void;
   /** Open the Brain Activity view (the AI-Filer change journal). Singleton per pane. */
   openActivity: () => void;
-  /** ⌘N — a blank NEW TAB with the type chooser (Seth, 2026-07-29). */
+  /** ⌘N — a blank NEW TAB with the type chooser (the maintainer, 2026-07-29). */
   openNewItemTab: () => void;
+  /** Open a fresh session-only private browser tab. The URL never joins the
+   * durable pane tree or viewstate snapshot. */
+  openBrowser: (url?: string) => void;
   /** Open a note/board/file by its summary — the ONE place open-by-kind lives.
    * Dispatches on `kind` and forwards `opts` so ⌘-click / newTab works uniformly
-   * for every row type (Seth, 2026-06-30 — was hand-written in 5 places, files
+   * for every row type (the maintainer, 2026-06-30 — was hand-written in 5 places, files
    * silently dropped newTab). */
   openSummary: (note: { id: string; kind?: string }, opts?: { newTab?: boolean }) => void;
   /** Bind a freshly-created chat (in `paneId`'s active chat tab) to its new slug. */
-  bindChat: (paneId: string, tabId: string, chatSlug: string) => void;
+  bindChat: (paneId: string, tabId: string, chatSlug: string, vaultId?: string) => void;
   /** Focus + activate the surface's open tab in ANY pane (Back/Forward replay
    * must reuse work, never spawn a duplicate in whichever pane holds focus).
    * Returns false when the surface is nowhere open. */
@@ -535,7 +556,7 @@ export function openNavTarget(entry: string): void {
 }
 
 /** Before a row split: does one more column fit at the 320px floor?
- * Auto-collapse the ONE sidebar if that's what it takes (Seth, 2026-06-13: the
+ * Auto-collapse the ONE sidebar if that's what it takes (the maintainer, 2026-06-13: the
  * two-rail cascade collapses to a single case) — but only commit the collapse
  * when the split actually fits afterward: a split that cannot fit must not eat
  * the sidebar as a side effect of a no-op. */
@@ -609,6 +630,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
     },
 
     openNote: (noteId, opts) => {
+      if (!allowPaneVault(contentVaultId(noteId))) return;
       touchMru(noteId);
       recordNav(noteId); // #14: the Back/Forward trail (no-op while replaying)
       // opening a note always returns the content area to the panes — so a
@@ -629,6 +651,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
     },
 
     openCanvas: (boardId, opts) => {
+      if (!allowPaneVault(contentVaultId(boardId))) return;
       // Boards do not join note MRU, but viewing still refreshes the optional
       // Main-retention clock without rewriting the .excalidraw file.
       touchItemActivity(boardId);
@@ -666,21 +689,26 @@ export const usePanesStore = create<PanesState>((set, get) => {
       }));
     },
 
-    retargetChat: (oldSlug, newSlug) => {
+    retargetChat: (oldSlug, newSlug, vaultId) => {
       retargetNavEntry(navEntry("chat", oldSlug), navEntry("chat", newSlug));
       set((s) => ({
         root: mapAllTabs(s.root, (t) =>
-          t.surfaceKind === "chat" && t.chatSlug === oldSlug ? { ...t, chatSlug: newSlug } : t,
+          t.surfaceKind === "chat" &&
+          t.chatSlug === oldSlug &&
+          (vaultId === undefined || t.vaultId === undefined || t.vaultId === vaultId)
+            ? { ...t, chatSlug: newSlug, ...(vaultId ? { vaultId } : {}) }
+            : t,
         ),
       }));
     },
 
     openChat: (chatSlug, opts) => {
+      if (opts?.vaultId && !allowPaneVault(opts.vaultId)) return;
       // chats aren't notes — no touchMru. Like openCanvas, surface the panes.
       if (chatSlug) recordNav(navEntry("chat", chatSlug)); // fresh null chats have no identity yet
       if (chatSlug === null) {
         // remember WHERE the new chat came from: a chat focused right now
-        // seeds the new one's folder on first save (Seth, 2026-07-30)
+        // seeds the new one's folder on first save (the maintainer, 2026-07-30)
         const active = activeTabOf(focusedLeaf());
         useUiStore.getState().setNewChatOrigin(active?.surfaceKind === "chat" ? active.chatSlug : null);
       }
@@ -694,14 +722,18 @@ export const usePanesStore = create<PanesState>((set, get) => {
           placeTab(
             l,
             placeOpts,
-            (t) => t.surfaceKind === "chat" && t.chatSlug === chatSlug,
-            () => makeChatTab(chatSlug),
+            (t) =>
+              t.surfaceKind === "chat" &&
+              t.chatSlug === chatSlug &&
+              (opts?.vaultId === undefined || t.vaultId === undefined || t.vaultId === opts.vaultId),
+            () => makeChatTab(chatSlug, opts?.vaultId),
           ),
         ),
       });
     },
 
     openFile: (fileId, opts) => {
+      if (!allowPaneVault(contentVaultId(fileId))) return;
       // Conventional files do not join note MRU, but viewing still refreshes
       // the optional Main-retention clock without touching their bytes.
       touchItemActivity(fileId);
@@ -775,13 +807,31 @@ export const usePanesStore = create<PanesState>((set, get) => {
       });
     },
 
+    openBrowser: (url) => {
+      const ui = useUiStore.getState();
+      ui.setSidebarMode("notes");
+      // Breve may refuse the mode change while a draft is dirty. Do not create
+      // a hidden browser tab behind that confirmation boundary.
+      if (useUiStore.getState().sidebarMode !== "notes") return;
+      ui.setContentView("panes");
+      const leaf = focusedLeaf();
+      const tab = makeBrowserTab(url);
+      set({
+        root: updateLeaf(get().root, leaf.id, (current) => ({
+          ...current,
+          tabs: [...current.tabs, tab],
+          activeTabId: tab.id,
+        })),
+      });
+    },
+
     openSummary: (note, opts) => {
       if (note.kind === "board") get().openCanvas(note.id, opts);
       else if (note.kind === "file") get().openFile(note.id, opts);
       else get().openNote(note.id, opts);
     },
 
-    bindChat: (paneId, tabId, chatSlug) => {
+    bindChat: (paneId, tabId, chatSlug, vaultId) => {
       recordNav(navEntry("chat", chatSlug)); // the fresh chat just gained its identity
       set((s) => ({
         root: updateLeaf(s.root, paneId, (l) => ({
@@ -789,7 +839,11 @@ export const usePanesStore = create<PanesState>((set, get) => {
           // The create call is asynchronous. The user may activate another tab
           // before it returns, so bind the tab that initiated the send rather
           // than whichever tab happens to be active at completion time.
-          tabs: l.tabs.map((t) => (t.id === tabId && t.surfaceKind === "chat" ? { ...t, chatSlug } : t)),
+          tabs: l.tabs.map((t) =>
+            t.id === tabId && t.surfaceKind === "chat"
+              ? { ...t, chatSlug, ...(vaultId ? { vaultId } : {}) }
+              : t,
+          ),
         })),
       }));
     },
@@ -838,7 +892,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
         const remaining = removeLeaf(get().root, leaf.id);
         if (!remaining) {
           // the LAST tab anywhere: the lone pane stays, empty — the quokka
-          // rest state (Seth, 2026-07-28: "close all tabs, get an empty
+          // rest state (the maintainer, 2026-07-28: "close all tabs, get an empty
           // state"); ⌘⇧T still brings the tab back
           if (!closing) return;
           record();
@@ -892,6 +946,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
     },
 
     openToSide: (kind, id) => {
+      if (kind !== "chat" && !allowPaneVault(contentVaultId(id))) return;
       const tab =
         kind === "canvas"
           ? makeCanvasTab(id)
@@ -1092,6 +1147,21 @@ export const usePanesStore = create<PanesState>((set, get) => {
   };
 });
 
+/** Clear every vault-owned tab after the backend has atomically changed the
+ * default corpus. The target vault's persisted viewstate may replace this
+ * placeholder during hydration; a missing viewstate keeps the honest empty
+ * pane instead of showing stale tabs from the previous vault. */
+export function resetPanesForVaultSwitch(): void {
+  const leaf = makeLeaf(makeTab(initialNoteId));
+  usePanesStore.setState({
+    root: leaf,
+    focusedPaneId: leaf.id,
+    draggingTab: null,
+    dropPreview: null,
+    closedTabs: [],
+  });
+}
+
 /** The window-level singular list selection: the focused pane's active tab. */
 export function useFocusedNoteId(): string | null {
   return usePanesStore((s) => {
@@ -1104,7 +1174,7 @@ export function useFocusedNoteId(): string | null {
 
 /** The focused pane's active TAB itself (a stable reference from the tree — safe
  * as a zustand selector). The Sidebar derives the destination highlight from
- * where this tab's content actually lives (Seth #1, 2026-07-08). */
+ * where this tab's content actually lives (the maintainer #1, 2026-07-08). */
 export function useFocusedTab(): Tab | null {
   return usePanesStore((s) => {
     const leaf = findLeaf(s.root, s.focusedPaneId) ?? leaves(s.root)[0];

@@ -1,11 +1,9 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+
 import sharp from "sharp";
-import {
-  BREVE_PDF_PRESETS,
-  contrastRatio,
-  validateBrevePdfPalette,
-} from "../src/brand/brevePdfThemes.ts";
+
+import { BREVE_PDF_PRESETS, contrastRatio, validateBrevePdfPalette } from "../src/brand/brevePdfThemes.ts";
 import { flatCssViolations } from "./design-system-policy.mjs";
 
 const root = process.cwd();
@@ -22,9 +20,7 @@ const brandDefinition = JSON.parse(read("src/brand/brand.json"));
 const violations = [];
 
 function blocks(css) {
-  const withoutComments = css
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/@import\s+[^;]+;/g, "");
+  const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, "").replace(/@import\s+[^;]+;/g, "");
   return [...withoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((match) => ({
     selectors: match[1].split(",").map((selector) => selector.trim()),
     body: match[2],
@@ -33,18 +29,40 @@ function blocks(css) {
 
 const allBlocks = blocks(`${colors}\n${base}\n${themes}`);
 const requiredTokens = [
-  "ground", "surface", "surface-2", "tint", "text", "text-muted", "border",
-  "accent", "accent-text", "on-accent", "success", "syntax-blue", "syntax-accent",
+  "ground",
+  "surface",
+  "surface-2",
+  "tint",
+  "text",
+  "text-muted",
+  "border",
+  "accent",
+  "accent-text",
+  "on-accent",
+  "success",
+  "syntax-blue",
+  "syntax-accent",
 ];
 const themeSelectors = {
   light: ":root",
   dark: ':root[data-theme="dark"]',
   paper: ':root[data-theme="paper"]',
   charcoal: ':root[data-theme="charcoal"]',
+  "ocean-light": ':root[data-theme="ocean-light"]',
+  "ocean-dark": ':root[data-theme="ocean-dark"]',
+  "grove-light": ':root[data-theme="grove-light"]',
+  "grove-dark": ':root[data-theme="grove-dark"]',
+  "iris-light": ':root[data-theme="iris-light"]',
+  "iris-dark": ':root[data-theme="iris-dark"]',
+  "midnight-light": ':root[data-theme="midnight-light"]',
+  "midnight-dark": ':root[data-theme="midnight-dark"]',
 };
 
 for (const [theme, selector] of Object.entries(themeSelectors)) {
-  const body = allBlocks.filter((block) => block.selectors.includes(selector)).map((block) => block.body).join("\n");
+  const body = allBlocks
+    .filter((block) => block.selectors.includes(selector))
+    .map((block) => block.body)
+    .join("\n");
   for (const token of requiredTokens) {
     if (!new RegExp(`--${token}\\s*:`).test(body)) violations.push(`${theme}: missing --${token}`);
   }
@@ -55,7 +73,10 @@ for (const [theme, selector] of Object.entries(themeSelectors)) {
   }
 }
 
-const rootBody = allBlocks.filter((block) => block.selectors.includes(":root")).map((block) => block.body).join("\n");
+const rootBody = allBlocks
+  .filter((block) => block.selectors.includes(":root"))
+  .map((block) => block.body)
+  .join("\n");
 for (const token of [
   "hov",
   "act",
@@ -68,12 +89,13 @@ for (const token of [
   "icon-clay",
   "icon-olive",
 ]) {
-  if (!new RegExp(`--${token}\\s*:`).test(rootBody)) violations.push(`base state grammar: missing --${token}`);
+  if (!new RegExp(`--${token}\\s*:`).test(rootBody))
+    violations.push(`base state grammar: missing --${token}`);
 }
 
 // Product CSS consumes semantic colors/elevation. Literal functional colors
 // belong only in the token-definition files so every new surface works in all
-// four themes. Static document preview CSS is TypeScript and intentionally has
+// every theme. Static document preview CSS is TypeScript and intentionally has
 // its own paper palette; this check covers the app chrome under src/styles/.
 for (const file of readdirSync(join(root, "src/styles")).filter((name) => name.endsWith(".css"))) {
   const path = `src/styles/${file}`;
@@ -111,7 +133,20 @@ const expectedDataThemes = Object.keys(themeSelectors);
 for (const theme of expectedDataThemes) {
   if (!themeState.includes(`"${theme}"`)) violations.push(`theme.ts: DataTheme omits ${theme}`);
 }
-for (const label of ["Warm Light", "Warm Dark", "Paper", "Charcoal"]) {
+for (const label of [
+  "Warm Light",
+  "Warm Dark",
+  "Paper",
+  "Charcoal",
+  "Ocean Light",
+  "Ocean Dark",
+  "Grove Light",
+  "Grove Dark",
+  "Iris Light",
+  "Iris Dark",
+  "Moonlight",
+  "Midnight",
+]) {
   if (!uiState.includes(`label: "${label}"`)) violations.push(`ui.ts: solid theme picker omits ${label}`);
 }
 
@@ -123,7 +158,8 @@ const importOrder = [
 let cursor = -1;
 for (const statement of importOrder) {
   const next = base.indexOf(statement);
-  if (next < 0 || next <= cursor) violations.push(`base.css: token imports must keep colors → type → themes order (${statement})`);
+  if (next < 0 || next <= cursor)
+    violations.push(`base.css: token imports must keep colors → type → themes order (${statement})`);
   cursor = next;
 }
 
@@ -138,7 +174,7 @@ if (!/@media\s*\(prefers-reduced-motion:\s*reduce\)/.test(base)) {
 // every infinite animation composite while the window is tucked away.
 // lib/idleMotion.ts stamps the attribute; this asserts the rule that consumes it.
 if (!/:root\[data-idle="hidden"\][^{]*\{[^}]*animation-play-state:\s*paused/s.test(base)) {
-  violations.push("base.css: missing the idle animation pause (:root[data-idle=\"hidden\"])");
+  violations.push('base.css: missing the idle animation pause (:root[data-idle="hidden"])');
 }
 // A working chat already moves into the labeled Working lane. Its status mark
 // must remain static: continuous sidebar motion adds compositor work without

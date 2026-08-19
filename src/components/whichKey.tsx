@@ -1,4 +1,4 @@
-// WhichKey — the "hold ⌘ to see the shortcut map" overlay (Seth, 2026-06-13).
+// WhichKey — the "hold ⌘ to see the shortcut map" overlay (the maintainer, 2026-06-13).
 // A NON-MODAL, non-dimming peek: a light floating panel that fades in while ⌘ is
 // held idle, showing every main-surface, currently-bound chord grouped by area.
 // It reads the registry READ-ONLY (allActions / currentChord / formatChord) —

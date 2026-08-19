@@ -238,9 +238,14 @@ second user-visible product or storage location.
   clears that draft; sending it does. The first successful save binds the
   initiating tab rather than whichever tab happens to be active when an async
   write completes.
-- A new empty vault starts on a transient welcome projection, not a Markdown
-  tutorial. Rotli creates no durable file until the user names and confirms
-  their first note; that confirmation uses the ordinary routed-note workflow.
+- A newly scaffolded vault contains one app-owned root note,
+  `Welcome to Rotli.md`. It is real, durable Markdown, opens in the ordinary
+  editor, gives the user a short list of things to try, and may be edited or
+  moved to Trash through the normal note lifecycle. Its exact root path is a
+  narrow interactive write lane; other root Markdown remains hidden and
+  read-only. Because Library is the `wiki/` projection, the welcome note never
+  appears there. Scaffolding still restores Home/Notes navigation after carrying
+  the outgoing vault's reusable appearance and editor preferences.
   Expensive chat, board, and conventional-file surfaces may remain mounted in a
   small recent-tab cache so ordinary tab switching does not rebuild them on the
   WebKit main thread. The cache is bounded, inactive surfaces are inert and
@@ -453,13 +458,15 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   moves. The organizer skips secure notes regardless of interactive local
   access, and skips locked notes entirely.
 - Remote organizer choices apply only to non-secure, unlocked notes.
-- **Lanes (2026-08-01).** In a Rotli vault, `wiki/` and `chats/` are the Notes tree.
-  Both are writable through the interactive lane — all of `wiki/` since
+- **Lanes (2026-08-01).** In a Rotli vault, `wiki/`, `chats/`, and the exact
+  scaffolded root path `Welcome to Rotli.md` are the Notes tree. They are
+  writable through the interactive lane — all of `wiki/` since
   2026-08-03: the Librarian files staged notes into curated areas, and a filed
   note must stay editable rather than silently turning read-only the moment it
   leaves `wiki/_inbox/` (before that, only `_inbox` staging and `_secure`
   wrote). `wiki/_secure/` stays model-gated on read and is never an organizer
-  area; the filer lane still owns the AI metadata keys exclusively.
+  area; the filer lane still owns the AI metadata keys exclusively. The welcome
+  path is the sole root-note exception and remains outside Library.
   The vault's reference lanes — `identity/`, `personality/`, `history/`, `MAP.md`,
   `inbox.md` — are `Surface::Reference`: never in the Notes tree, never writable
   by any lane, and **retrievable by both classes of model** through the AI's
@@ -474,6 +481,47 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   setting keep their internal names for compatibility. Since 2026-07-28 the journal surface
   (formerly the sidebar's "Activity" row) is reached as **Librarian** in the
   sidebar's utility footer; "Activity" survives only in internal identifiers.
+- **Active-vault switches preserve the way back.** Switching or creating the
+  primary vault removes the incoming folder from its linked-library role and,
+  when the outgoing folder is a compatible Rotli vault, records that outgoing
+  folder as a linked library in the same `corpus.json` replacement. One path
+  still has one role, while every known vault remains reachable from the
+  sidebar switcher after the live transition. A switch to an already connected vault sends
+  only its configured id across IPC; Rust resolves and revalidates the stored
+  path. Arbitrary paths remain exclusive to the native-picker authorization
+  flow used for choosing or creating folders.
+- **Every user data surface has one active vault.** The
+  process still owns one active corpus, organizer, and Breve runtime. Switching
+  exchanges the already-open default store in place, retargets the organizer
+  and Breve, and asks each webview to rehydrate its vault-scoped state without a
+  process restart. Once hydration completes, presentation returns to the
+  Home/Notes front; Chat and Breve are never inherited across the vault
+  boundary. Connecting
+  another compatible vault registers its independently routed store and watcher
+  in the current process as a switch target; its notes never enter the active
+  sidebar, panes, search results, System counts, or AI context. In
+  development, an explicit `corpus.dev.json` selection preserves the same linked
+  roots instead of collapsing them into a new primary root on every launch.
+  Removing a connected vault persists the binding removal before dropping its
+  live route and asset scope; it never deletes or rewrites the folder. Manual
+  refresh flushes pending webview work, then reopens and rescans the active
+  store while preserving its route and watcher generation. If the active folder disappears, Rotli promotes the
+  first still-valid connected route and rehydrates Home; with no valid route it
+  returns to vault activation without recreating the missing folder.
+  The legacy `paneVaultMode` setting is normalized to `single`; a root-prefixed
+  open is refused and directs the user to the explicit vault switch. Saved chat
+  viewstate may retain an additive `vaultId` for migration and isolation, but a
+  non-active id cannot open beside the current vault.
+- **Vault identity survives ordinary Finder moves.** `corpus.json` remains the
+  readable absolute-path binding, while the macOS app config may keep a private,
+  machine-local Foundation URL bookmark keyed by the portable `memex.json`
+  `mx_…` id. Startup resolves these references before registering roots and
+  rewrites a stale locator only when the live folder's stable id matches. The
+  bookmark sidecar is recovery metadata, never portable vault state or a
+  content database. Plain adopted folders have no portable vault identity and
+  remain path-based; if macOS cannot resolve a move, activation asks the user to
+  select the folder again instead of falling back to the historical Documents
+  location.
 - **A vault may be raw** (vault-vs-brain, 2026-07-26): the per-vault
   `brainEnabled` setting (missing ⇒ on) turns the Librarian layer off entirely.
   Raw means the organizer never acts and the filer write lane refuses —

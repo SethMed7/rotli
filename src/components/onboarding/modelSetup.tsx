@@ -206,7 +206,7 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
 
         <div className="setup-stage" ref={stageRef}>
           <aside className="setup-companion" aria-hidden="true">
-            <Character name="knowledge" size={152} />
+            <Character name="knowledge" size={152} alwaysVisible />
             <p>Choose one, several, or none. Your vault works without a model.</p>
           </aside>
 

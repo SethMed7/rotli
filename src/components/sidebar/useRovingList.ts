@@ -1,4 +1,4 @@
-// Focused-list j/k navigation for the compact-tree Sidebar (Seth, 2026-06-13).
+// Focused-list j/k navigation for the compact-tree Sidebar (the maintainer, 2026-06-13).
 //
 // SAFETY MODEL — this is a FOCUS-SCOPED keymap, NOT a global one. Every handler
 // here is LOCAL to a sidebar row element (it rides each row's own onKeyDown), so

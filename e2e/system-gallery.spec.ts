@@ -1,4 +1,4 @@
-// The Finder-parity slice (Seth, 2026-07-28): the Gallery view (big preview +
+// The Finder-parity slice (the maintainer, 2026-07-28): the Gallery view (big preview +
 // filmstrip, ←/→ walks it), the bottom path bar, and the background
 // right-click Sort-by menu.
 

@@ -1,4 +1,4 @@
-// The sidebar-front hotkeys (Seth, 2026-08-04: "the ability to toggle through
+// The sidebar-front hotkeys (the maintainer, 2026-08-04: "the ability to toggle through
 // the home and chat with hotkeys"). ⌃1/⌃2 have always jumped directly; this
 // covers the new ONE-key flip and proves all three stay in step with the
 // sidebar state the switcher pill reads.

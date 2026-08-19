@@ -280,7 +280,7 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
         hint: <span className="muted">Chat</span>,
         run: () => {
           useUiStore.getState().setSidebarMode("notes");
-          openChat(c.slug);
+          openChat(c.slug, activeMemex ? { vaultId: activeMemex.id } : undefined);
           onClose();
         },
       }));
@@ -309,6 +309,7 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
     foldersData,
     noteIndex,
     chatsData,
+    activeMemex,
     mruIds,
     overrides,
     root,
@@ -322,6 +323,10 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
   ]);
 
   const flat = useMemo(() => groups.flatMap((g) => g.rows), [groups]);
+  const flatIndexByKey = useMemo(
+    () => new Map(flat.map((row, rowIndex) => [row.key, rowIndex] as const)),
+    [flat],
+  );
   const selected = Math.min(index, Math.max(0, flat.length - 1));
 
   // keep the selected row in view as ↑↓ move
@@ -343,8 +348,6 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
       flat[selected]?.run(event.metaKey);
     }
   };
-
-  let flatIndex = -1;
 
   return (
     <div
@@ -384,8 +387,7 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
             <div key={group.name}>
               <div className="pal-sec">{group.name}</div>
               {group.rows.map((row) => {
-                flatIndex += 1;
-                const i = flatIndex;
+                const i = flatIndexByKey.get(row.key) ?? 0;
                 return (
                   <button
                     type="button"
@@ -397,7 +399,7 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
                     // onMouseMove, NOT onMouseEnter: when ↑↓ scrolls the list,
                     // rows shift under a stationary cursor and Chromium fires
                     // synthetic enter events — snapping the selection back to
-                    // the hovered row and eating the arrow keys (Seth,
+                    // the hovered row and eating the arrow keys (the maintainer,
                     // 2026-07-28). A real pointer move is the only hover vote.
                     onMouseMove={() => setIndex(i)}
                     onClick={(e) => row.run(e.metaKey)}

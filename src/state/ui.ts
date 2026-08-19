@@ -4,6 +4,20 @@ import { create } from "zustand";
 
 import type { HybridPreset, ProviderId } from "../ai/models";
 import { DEFAULT_WEB_SEARCH_PROVIDER, type WebSearchProvider } from "../ai/searchProvider";
+import {
+  DEFAULT_QUOKKA_ACCESSORY_HUE,
+  DEFAULT_QUOKKA_CUSTOM_HUE,
+  type QuokkaAccessory,
+  type QuokkaIdlePose,
+  type QuokkaLineColor,
+  type QuokkaStyle,
+  normalizeQuokkaAccessoryHue,
+  normalizeQuokkaCustomHue,
+} from "../brand/quokka";
+import {
+  DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE,
+  type PrivateBrowserSearchEngine,
+} from "../lib/privateBrowser";
 import { DEFAULT_NEW_ITEM_KIND, type NewItemKind } from "../newItems/model";
 import { inboxFolderId } from "../services/notes";
 import type { NoteSummary } from "../types";
@@ -12,12 +26,14 @@ import type { Measure } from "./noteStyle";
 
 export type ThemeSetting = "light" | "dark" | "system";
 
-/** Theme family: Warm is the branded pair; Mono is Paper and Charcoal. */
-export type ThemeFamily = "warm" | "mono";
+/** Every family is a deliberately tuned light/dark pair. The first two retain
+ * Rotli's original environments; the others are optional personality layers. */
+export const THEME_FAMILIES = ["warm", "mono", "ocean", "grove", "iris", "midnight"] as const;
+export type ThemeFamily = (typeof THEME_FAMILIES)[number];
 export type OnboardingPhase = "preferences" | "vault" | "models";
 export type SyntaxPalette = "rotli" | "mono";
 
-/** The user's PRIMARY color (Seth, 2026-07-28): the active state, folder
+/** The user's PRIMARY color (the maintainer, 2026-07-28): the active state, folder
  * color, selection wash — everything riding --accent. "default" keeps each
  * theme's own truth (warm clay / mono ink); a named accent overrides it in
  * both schemes. Chosen in onboarding, changeable in Settings → Appearance. */
@@ -25,7 +41,12 @@ export const ACCENT_COLORS = ["default", "blue", "green", "violet", "rose", "amb
 export type AccentColor = (typeof ACCENT_COLORS)[number];
 export const DEFAULT_ACCENT_HUE = 210;
 
-/** The four solid themes, in the order the titlebar sun cycles them. */
+/** Quiet long-chat landmarks. Every treatment opens the same accessible prompt
+ * overview; this preference changes only the small trail beside the thread. */
+export const CHAT_NAVIGATOR_STYLES = ["lines", "dots", "paws", "ears"] as const;
+export type ChatNavigatorStyle = (typeof CHAT_NAVIGATOR_STYLES)[number];
+
+/** Solid environments, in the order the titlebar sun cycles them. */
 export const SOLID_THEMES: {
   family: ThemeFamily;
   mode: "light" | "dark";
@@ -35,11 +56,18 @@ export const SOLID_THEMES: {
   { family: "warm", mode: "dark", label: "Warm Dark" },
   { family: "mono", mode: "light", label: "Paper" },
   { family: "mono", mode: "dark", label: "Charcoal" },
+  { family: "ocean", mode: "light", label: "Ocean Light" },
+  { family: "ocean", mode: "dark", label: "Ocean Dark" },
+  { family: "grove", mode: "light", label: "Grove Light" },
+  { family: "grove", mode: "dark", label: "Grove Dark" },
+  { family: "iris", mode: "light", label: "Iris Light" },
+  { family: "iris", mode: "dark", label: "Iris Dark" },
+  { family: "midnight", mode: "light", label: "Moonlight" },
+  { family: "midnight", mode: "dark", label: "Midnight" },
 ];
 
 /** Settings/onboarding presentation. Each family is one theme with a light and
- * dark environment; System chooses between the same pair automatically. The
- * underlying four environments and titlebar cycle above stay unchanged. */
+ * dark environment; System can choose two families independently. */
 export const THEME_FAMILY_PRESENTATIONS: readonly {
   family: ThemeFamily;
   label: string;
@@ -61,6 +89,34 @@ export const THEME_FAMILY_PRESENTATIONS: readonly {
     lightLabel: "Warm Light",
     darkLabel: "Warm Dark",
   },
+  {
+    family: "ocean",
+    label: "Ocean",
+    description: "Airy blue by day, deep water at night.",
+    lightLabel: "Ocean Light",
+    darkLabel: "Ocean Dark",
+  },
+  {
+    family: "grove",
+    label: "Grove",
+    description: "Soft green by day, forest at night.",
+    lightLabel: "Grove Light",
+    darkLabel: "Grove Dark",
+  },
+  {
+    family: "iris",
+    label: "Iris",
+    description: "Lavender by day, inked violet at night.",
+    lightLabel: "Iris Light",
+    darkLabel: "Iris Dark",
+  },
+  {
+    family: "midnight",
+    label: "Midnight",
+    description: "Cool white by day, near-black at night.",
+    lightLabel: "Moonlight",
+    darkLabel: "Midnight",
+  },
 ];
 
 /** The organizer daemon's §4.3 trust ladder, monotonic in risk. Off = dormant ·
@@ -73,13 +129,13 @@ export type AppIcon = "default" | "warm" | "paper" | "charcoal" | "clay";
 export const ORGANIZER_TRUSTS: readonly OrganizerTrust[] = ["off", "suggest", "tidy", "organize"];
 
 /** Which model organizes the Brain: `local` = the on-device MLX server (default,
- * never leaves the Mac); `claude` = `claude -p` Sonnet (Seth's pick — non-secure
+ * never leaves the Mac); `claude` = `claude -p` Sonnet (the maintainer's pick — non-secure
  * notes go remote, secure/locked never do). The Rust daemon re-reads this. */
 export type OrganizerModel = "local" | "claude" | "gemini35";
 
 export const ORGANIZER_MODELS: readonly OrganizerModel[] = ["local", "claude", "gemini35"];
 
-/** How holding ⌘ reveals the keyboard map (Seth, 2026-08-04: "I'd prefer little
+/** How holding ⌘ reveals the keyboard map (the maintainer, 2026-08-04: "I'd prefer little
  * boxes around the UI so I can visually see and instantly toggle exactly where
  * I want to go"). `badges` pins each chord to the control it drives; `panel` is
  * the grouped list; `off` disables the peek entirely. */
@@ -87,7 +143,7 @@ export type HotkeyPeek = "badges" | "panel" | "off";
 
 export const HOTKEY_PEEKS: readonly HotkeyPeek[] = ["badges", "panel", "off"];
 
-/** What a CLICK on a checkbox does (Seth, 2026-08-04, from ZenNotes: "offer
+/** What a CLICK on a checkbox does (the maintainer, 2026-08-04, from ZenNotes: "offer
  * partial complete… click once for in progress and again for complete").
  * `two` is the classic open⇄done. `three` adds the in-progress stop. Typing
  * `[/]` yourself always works — this governs the click only. */
@@ -115,6 +171,12 @@ export const CHAT_NAMINGS: readonly ChatNaming[] = ["ask", "automatic"];
 export type TabLayout = "scroll" | "fit";
 
 export const TAB_LAYOUTS: readonly TabLayout[] = ["scroll", "fit"];
+
+/** Legacy persistence shape. Rotli now normalizes this to `single`: connected
+ * vaults are switch targets, never simultaneous pane data sources. */
+export type PaneVaultMode = "single" | "multiple";
+
+export const PANE_VAULT_MODES: readonly PaneVaultMode[] = ["single"];
 
 /** Clock used beside durable chat-message timestamps. */
 export type TimeFormat = "12" | "24";
@@ -183,7 +245,7 @@ export const TASKS = "tasks";
 /** What the content area (right of the sidebar) renders: the note panes, the
  * Board grid, the searchable All-notes grid, or the Chat surface. All of these
  * are views in the pane area — the sidebar never moves for them, so the
- * left-menu sections (Chat · Notes) stay visible (Seth, 2026-06-24;
+ * left-menu sections (Chat · Notes) stay visible (the maintainer, 2026-06-24;
  * Chat folded in from a full-surface front 2026-06-26). */
 // (the old "chat" contentView is retired — chat is a PANE surface now)
 export type ContentView =
@@ -211,7 +273,7 @@ export type SidebarMode = "notes" | "breve";
  * the durable briefs/routines/watchlist/settings surfaces remain available. */
 export type BreveView = "dashboard" | "briefs" | "notifications" | "routines" | "watchlist" | "settings";
 
-/** The sidebar's FRONTS (Seth, 2026-08-01, from Claude Desktop's Home|Code
+/** The sidebar's FRONTS (the maintainer, 2026-08-01, from Claude Desktop's Home|Code
  * pill): a two-segment switcher under the vault header replaces the old stacked
  * "Chat ›" / "Notes ›" accordions. Home is the notes world — and eventually a
  * dashboard; Chat is the chat world. Each front owns the whole sidebar body and
@@ -219,7 +281,7 @@ export type BreveView = "dashboard" | "briefs" | "notifications" | "routines" | 
  * joins by adding one entry here — see docs/design/sidebar-home-chat.md. */
 export type SidebarView = "home" | "chat";
 
-/** The SYSTEM zone's collapse key (Seth, 2026-08-01: "allow me to collapse the
+/** The SYSTEM zone's collapse key (the maintainer, 2026-08-01: "allow me to collapse the
  * system area just to clean up the sidebar more"). Lives in expandedDests under
  * a reserved "sec:" id so it persists like a destination; default OPEN.
  * The retired section keys ("sec:chat", "sec:notes", and the parked email
@@ -228,7 +290,7 @@ export type SidebarView = "home" | "chat";
 export const SEC_SYSTEM = "sec:system";
 
 /** Sidebar width clamp — small enough to tuck away, never wide enough to eat
- * the editor (one rail now, not two — Seth, 2026-06-13). */
+ * the editor (one rail now, not two — the maintainer, 2026-06-13). */
 export const clampSidebarWidth = (px: number): number => Math.min(460, Math.max(190, Math.round(px)));
 
 /** Sidebar zoom clamp + step (⌘+/⌘− with focus in the sidebar). Rounded to one
@@ -238,7 +300,7 @@ export const clampSidebarZoom = (z: number): number => Math.min(1.4, Math.max(0.
 
 /** The reserved destination ids the sidebar seeds open (Inbox + Vault) and the
  * persistence layer trusts as a valid folder selection before the first list
- * resolves (Seth, 2026-06-13). "vault:" is the external-root MARKER (Track 2);
+ * resolves (the maintainer, 2026-06-13). "vault:" is the external-root MARKER (Track 2);
  * a stale "Brain" key from before the rename is simply absent here, so it
  * degrades to a safe default rather than crashing. */
 export const RESERVED_DESTS = ["Inbox", "vault:", "Storage", "Board", "Archive", "Trash"] as const;
@@ -254,14 +316,6 @@ interface UiState {
   themeFamily: ThemeFamily;
   setThemeFamily: (family: ThemeFamily) => void;
 
-  /** When "Match the system" is on, which theme each OS appearance maps to —
-   * decoupled from the active family so you can pair, say, Paper (light) with
-   * Warm Dark (dark). A theme is (family, mode); these store the family, the
-   * mode is fixed by the OS (Seth, 2026-06-15). */
-  matchLightFamily: ThemeFamily;
-  setMatchLightFamily: (family: ThemeFamily) => void;
-  matchDarkFamily: ThemeFamily;
-  setMatchDarkFamily: (family: ThemeFamily) => void;
   /** Raw Markdown syntax colors. Rotli is the calm blue + active accent
    * default; Mono keeps the grammar but renders it in the environment ink. */
   syntaxPalette: SyntaxPalette;
@@ -272,6 +326,30 @@ interface UiState {
   /** Hue used by the contrast-managed Custom accent (0–359). */
   accentHue: number;
   setAccentHue: (hue: number) => void;
+  /** The optional personal companion layer. Onboarding characters are exempt. */
+  quokkaCompanionEnabled: boolean;
+  setQuokkaCompanionEnabled: (enabled: boolean) => void;
+  /** Canonical full-body quokka treatment used across product character placements. */
+  quokkaStyle: QuokkaStyle;
+  setQuokkaStyle: (style: QuokkaStyle) => void;
+  /** Hue used by the contrast-managed Custom body treatment (0–359). */
+  quokkaCustomHue: number;
+  setQuokkaCustomHue: (hue: number) => void;
+  /** Deliberate black/white ink independent from the workspace theme. */
+  quokkaLineColor: QuokkaLineColor;
+  setQuokkaLineColor: (color: QuokkaLineColor) => void;
+  /** Optional signature accessory used only on eligible full-body placements. */
+  quokkaAccessory: QuokkaAccessory;
+  setQuokkaAccessory: (accessory: QuokkaAccessory) => void;
+  /** Hue used by colorable accessory layers (0–359). */
+  quokkaAccessoryHue: number;
+  setQuokkaAccessoryHue: (hue: number) => void;
+  /** Preferred mood/pose for personal idle placements, never semantic empty states. */
+  quokkaIdlePose: QuokkaIdlePose;
+  setQuokkaIdlePose: (pose: QuokkaIdlePose) => void;
+  /** Visual treatment for the prompt navigator shown in longer chats. */
+  chatNavigatorStyle: ChatNavigatorStyle;
+  setChatNavigatorStyle: (style: ChatNavigatorStyle) => void;
 
   /** General: visitor (click-away hides, default) vs resident (stays open). */
   stayOpen: boolean;
@@ -287,6 +365,12 @@ interface UiState {
   /** Whether crowded pane tabs scroll or shrink to stay in the window. */
   tabLayout: TabLayout;
   setTabLayout: (layout: TabLayout) => void;
+  /** Search provider used by fresh private-browser tabs and address-bar queries. */
+  privateBrowserSearchEngine: PrivateBrowserSearchEngine;
+  setPrivateBrowserSearchEngine: (engine: PrivateBrowserSearchEngine) => void;
+  /** Compatibility field; active sessions are always single-vault. */
+  paneVaultMode: PaneVaultMode;
+  setPaneVaultMode: (mode: PaneVaultMode) => void;
 
   /** First-run gate: false until the user finishes (or skips) onboarding, or
    * after a manual "Reset & re-onboard". Persisted in settings.json; the
@@ -301,8 +385,7 @@ interface UiState {
    * so the next launch must resume at model setup instead of starting over. */
   onboardingPhase: OnboardingPhase;
   setOnboardingPhase: (phase: OnboardingPhase) => void;
-
-  /** The Quick Note window's capped set (Seth, 2026-06-15): up to QUICK_MAX
+  /** The Quick Note window's capped set (the maintainer, 2026-06-15): up to QUICK_MAX
    * note ids, in switcher order. The mutations + cross-webview sync live in
    * state/quick.ts; these are the raw fields the persistence layer reads. */
   quickNoteIds: string[];
@@ -326,7 +409,7 @@ interface UiState {
 
   /** The ONE sidebar — collapse state (remembered per window, persisted in the
    * shell) and width (px; drag the grip on its right edge). The two-rail era is
-   * gone: folders + note-list collapse into a single navigator (Seth,
+   * gone: folders + note-list collapse into a single navigator (the maintainer,
    * 2026-06-13). */
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
@@ -353,24 +436,24 @@ interface UiState {
   setBreveDirty: (dirty: boolean) => void;
 
   /** Which destinations in the sidebar tree are expanded, keyed by dest id —
-   * Inbox + Vault open by default (Seth, 2026-06-13). */
+   * Inbox + Vault open by default (the maintainer, 2026-06-13). */
   expandedDests: Record<string, boolean>;
   toggleDestExpanded: (id: string) => void;
   setDestExpanded: (id: string, open: boolean) => void;
   /** Bumped to ask the sidebar to REVEAL the focused note — expand its folder
-   * chain AND scroll its row into view (Seth, 2026-07-03: "I can't find where
+   * chain AND scroll its row into view (the maintainer, 2026-07-03: "I can't find where
    * this file is"). The editor's location chip fires it. Not persisted. */
   revealNonce: number;
   /** "auto" reveals in Main when the note is pinned there (Main's copy wins);
    * "brain" forces the reveal to the note's REAL home in the Brain, bypassing the
-   * Main short-circuit — the "Open in Brain" menu action (Seth, 2026-07-08). */
+   * Main short-circuit — the "Open in Brain" menu action (the maintainer, 2026-07-08). */
   revealMode: "auto" | "brain";
   /** Explicit target for a menu-triggered reveal. Keeping it beside the nonce
    * avoids a render race where the sidebar still sees the previously focused
    * tab when "Show in Brain" is invoked from another row. */
   revealNoteId: string | null;
   revealFocusedNote: (mode?: "auto" | "brain", noteId?: string) => void;
-  /** TWO-STAGE collapse (the sidebar's collapse-all toolbar button, Seth
+  /** TWO-STAGE collapse (the sidebar's collapse-all toolbar button, the maintainer
    * 2026-07-31): while any folder/dest tree is open, a press folds the TREES
    * and leaves the zones alone; once everything inside is folded, the next
    * press folds the SYSTEM zone itself (sec:system — the fronts replaced the
@@ -412,12 +495,12 @@ interface UiState {
   setFormatBarVisible: (visible: boolean) => void;
 
   /** Spell-check: red squiggles under misspellings in the editor. On by
-   * default (Seth, 2026-06-22); a Settings → Editor switch. Persisted. */
+   * default (the maintainer, 2026-06-22); a Settings → Editor switch. Persisted. */
   spellcheck: boolean;
   setSpellcheck: (on: boolean) => void;
 
   /** Images follow their note into Archive/Trash when only that note uses
-   * them (Seth, 2026-07-30). On by default; a Settings → General switch. */
+   * them (the maintainer, 2026-07-30). On by default; a Settings → General switch. */
   tidyImagesWithNote: boolean;
   setTidyImagesWithNote: (on: boolean) => void;
 
@@ -437,7 +520,7 @@ interface UiState {
   paletteOpen: boolean;
   setPaletteOpen: (open: boolean) => void;
 
-  /** Quick Look peek (Seth, 2026-07-29): the item previewed in a modal without
+  /** Quick Look peek (the maintainer, 2026-07-29): the item previewed in a modal without
    * opening its full surface; null = closed. */
   previewItem: NoteSummary | null;
   setPreviewItem: (item: NoteSummary | null) => void;
@@ -449,7 +532,7 @@ interface UiState {
   /** What the content area (right of the sidebar) shows: the note panes, the
    * Board grid (quick captures), or the All-notes grid. The sidebar stays put —
    * Board/All-notes are VIEWS in the pane area, not full-surface takeovers
-   * (Seth, 2026-06-24). Esc returns to "panes". Not persisted (transient). */
+   * (the maintainer, 2026-06-24). Esc returns to "panes". Not persisted (transient). */
   contentView: ContentView;
   dashboardSection: DashboardSection;
   setDashboardSection: (section: DashboardSection) => void;
@@ -472,7 +555,7 @@ interface UiState {
   setRenamingChatSlug: (slug: string | null) => void;
 
   /** The note whose title is being edited in the rename dialog (opened from the
-   * right-click menu), or null. `current` seeds the input (Seth, 2026-07-01). */
+   * right-click menu), or null. `current` seeds the input (the maintainer, 2026-07-01). */
   renameTarget: { id: string; current: string } | null;
   setRenameTarget: (t: { id: string; current: string } | null) => void;
 
@@ -483,7 +566,7 @@ interface UiState {
   rowActionError: string | null;
   setRowActionError: (e: string | null) => void;
 
-  /** The chat that was focused when a NEW chat was opened (Seth, 2026-07-30:
+  /** The chat that was focused when a NEW chat was opened (the maintainer, 2026-07-30:
    * "this chat should default to folder I was in") — the first save reads it
    * to file the new chat into the same folder, then clears it. Transient. */
   newChatOrigin: string | null;
@@ -508,7 +591,7 @@ interface UiState {
    * Persisted. */
   chatModelId: string | null;
   setChatModelId: (id: string | null) => void;
-  /** Per-chat model pick (Seth, 2026-08-01: two chat panes must be able to run
+  /** Per-chat model pick (the maintainer, 2026-08-01: two chat panes must be able to run
    * different models at once), keyed exactly like chatWeb — the chat slug, or
    * "unsaved:<tabId>" until the first send binds it. Missing key = the
    * `chatModelId` seed; the chat surface pins its own entry as soon as the
@@ -560,7 +643,7 @@ interface UiState {
   /** Which Kokoro voice reads. Persisted. */
   readAloudVoice: string;
   setReadAloudVoice: (id: string) => void;
-  /** What holding ⌘ reveals (Seth, 2026-08-04). `badges` pins each chord to the
+  /** What holding ⌘ reveals (the maintainer, 2026-08-04). `badges` pins each chord to the
    * control it drives, right where the eye already is; `panel` is the original
    * grouped shortcut map; `off` disables the peek. Persisted. */
   hotkeyPeek: HotkeyPeek;
@@ -596,7 +679,7 @@ interface UiState {
    * shipped icon; the rest re-tile the quokka in a theme palette. Persisted. */
   appIcon: AppIcon;
   setAppIcon: (v: AppIcon) => void;
-  /** "Show file metadata" (Seth, 2026-07-01): render the note's raw frontmatter
+  /** "Show file metadata" (the maintainer, 2026-07-01): render the note's raw frontmatter
    * block at the top of the file — monospaced, editable, exactly as it sits on
    * disk — instead of the old panel field list. hide (default) / show. Persisted. */
   fileMetadata: "hide" | "show";
@@ -611,7 +694,7 @@ interface UiState {
    * Flipping it NEVER moves or rewrites a file. */
   brainEnabled: boolean;
   setBrainEnabled: (on: boolean) => void;
-  /** The vault-wide default for secure ⇄ on-device AI visibility (Seth,
+  /** The vault-wide default for secure ⇄ on-device AI visibility (the maintainer,
    * 2026-08-01): true = a model running on this Mac may read secure notes.
    * A per-note `local_ai_allowed` line overrides it in either direction, and
    * NO value here ever opens a secure note to a remote model. Persisted
@@ -621,7 +704,7 @@ interface UiState {
   setSecureLocalAi: (on: boolean) => void;
   organizerTrust: OrganizerTrust;
   setOrganizerTrust: (t: OrganizerTrust) => void;
-  /** Which model the organizer runs (design §4; Seth, 2026-07-03). Persisted;
+  /** Which model the organizer runs (design §4; the maintainer, 2026-07-03). Persisted;
    * the Rust daemon re-reads settings.json each cycle, so no push command. */
   organizerModel: OrganizerModel;
   setOrganizerModel: (m: OrganizerModel) => void;
@@ -662,8 +745,8 @@ interface UiState {
 export const useUiStore = create<UiState>((set, get) => ({
   theme: "light",
   setTheme: (theme) => set({ theme }),
-  // the titlebar sun: Warm Light → Warm Dark → Paper → Charcoal (Seth's law);
-  // a "system" setting resolves to its current mode before stepping on
+  // The titlebar sun walks the same ordered environment catalog shown in Appearance;
+  // a "system" setting resolves to its current mode before stepping on.
   cycleTheme: () =>
     set((s) => {
       const mode =
@@ -680,16 +763,28 @@ export const useUiStore = create<UiState>((set, get) => ({
   themeFamily: "warm",
   setThemeFamily: (family) => set({ themeFamily: family }),
 
-  matchLightFamily: "warm",
-  setMatchLightFamily: (family) => set({ matchLightFamily: family }),
-  matchDarkFamily: "warm",
-  setMatchDarkFamily: (family) => set({ matchDarkFamily: family }),
   syntaxPalette: "rotli",
   setSyntaxPalette: (palette) => set({ syntaxPalette: palette }),
   accentColor: "default",
   setAccentColor: (accent) => set({ accentColor: accent }),
   accentHue: DEFAULT_ACCENT_HUE,
   setAccentHue: (hue) => set({ accentHue: Math.max(0, Math.min(359, Math.round(hue))) }),
+  quokkaCompanionEnabled: false,
+  setQuokkaCompanionEnabled: (enabled) => set({ quokkaCompanionEnabled: enabled }),
+  quokkaStyle: "cocoa",
+  setQuokkaStyle: (style) => set({ quokkaStyle: style }),
+  quokkaCustomHue: DEFAULT_QUOKKA_CUSTOM_HUE,
+  setQuokkaCustomHue: (hue) => set({ quokkaCustomHue: normalizeQuokkaCustomHue(hue) }),
+  quokkaLineColor: "black",
+  setQuokkaLineColor: (color) => set({ quokkaLineColor: color }),
+  quokkaAccessory: "none",
+  setQuokkaAccessory: (accessory) => set({ quokkaAccessory: accessory }),
+  quokkaAccessoryHue: DEFAULT_QUOKKA_ACCESSORY_HUE,
+  setQuokkaAccessoryHue: (hue) => set({ quokkaAccessoryHue: normalizeQuokkaAccessoryHue(hue) }),
+  quokkaIdlePose: "rest",
+  setQuokkaIdlePose: (pose) => set({ quokkaIdlePose: pose }),
+  chatNavigatorStyle: "paws",
+  setChatNavigatorStyle: (style) => set({ chatNavigatorStyle: style }),
 
   stayOpen: false,
   setStayOpen: (on) => set({ stayOpen: on }),
@@ -699,6 +794,10 @@ export const useUiStore = create<UiState>((set, get) => ({
   setNewTabDefault: (kind) => set({ newTabDefault: kind }),
   tabLayout: "scroll",
   setTabLayout: (layout) => set({ tabLayout: layout }),
+  privateBrowserSearchEngine: DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE,
+  setPrivateBrowserSearchEngine: (engine) => set({ privateBrowserSearchEngine: engine }),
+  paneVaultMode: "single",
+  setPaneVaultMode: (mode) => set({ paneVaultMode: mode }),
 
   onboarded: false,
   setOnboarded: (done) => set({ onboarded: done }),
@@ -706,7 +805,6 @@ export const useUiStore = create<UiState>((set, get) => ({
   setOnboardingVersion: (v) => set({ onboardingVersion: v }),
   onboardingPhase: "preferences",
   setOnboardingPhase: (phase) => set({ onboardingPhase: phase }),
-
   quickNoteIds: [],
   setQuickNoteIds: (ids) => set({ quickNoteIds: ids }),
   captureOrder: [],
@@ -778,7 +876,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   revealNoteId: null,
   // an explicit reveal always points at NOTE content, so it moves the sidebar
   // to Home first — revealing into a front that can't render the row is a
-  // silent no-op (Seth's IA, 2026-08-01). Doing it HERE covers every caller.
+  // silent no-op (the maintainer's IA, 2026-08-01). Doing it HERE covers every caller.
   revealFocusedNote: (mode = "auto", noteId) =>
     set((s) => ({
       revealNonce: s.revealNonce + 1,
@@ -798,7 +896,7 @@ export const useUiStore = create<UiState>((set, get) => ({
       const treesFolded = {
         // zone fold states (sec:*) are the user's own arrangement —
         // stage 1 folds the TREES; it must never REOPEN a folded zone
-        // (replacing the map wiped them back to default-open — Seth, 2026-07-27)
+        // (replacing the map wiped them back to default-open — the maintainer, 2026-07-27)
         ...Object.fromEntries(Object.entries(s.expandedDests).filter(([id]) => id.startsWith("sec:"))),
         ...Object.fromEntries(defaultOpenIds.map((id) => [id, false])),
       };
@@ -956,7 +1054,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   setAppIcon: (v) => set({ appIcon: v }),
   fileMetadata: "hide",
   setFileMetadata: (v) => set({ fileMetadata: v }),
-  // Organize by default (Seth, 2026-07-02): the daemon only ever changes a
+  // Organize by default (the maintainer, 2026-07-02): the daemon only ever changes a
   // note's LOCATION + METADATA — journaled and undoable — never the words.
   brainEnabled: true,
   setBrainEnabled: (on) => set({ brainEnabled: on }),
@@ -993,3 +1091,15 @@ export const useUiStore = create<UiState>((set, get) => ({
     return true;
   },
 }));
+
+/** A vault change is a workspace boundary, not a continuation of the outgoing
+ * navigation context. Run this after the target vault has hydrated so its
+ * persisted Chat/Breve selection cannot override the Home landing. */
+export function resetUiForVaultSwitch(): void {
+  useUiStore.setState({
+    sidebarMode: "notes",
+    sidebarView: "home",
+    contentView: "panes",
+    breveDirty: false,
+  });
+}

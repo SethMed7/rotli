@@ -1,4 +1,4 @@
-// Parent-task progress — the "2/4" a parent shows for its subtasks (Seth,
+// Parent-task progress — the "2/4" a parent shows for its subtasks (the maintainer,
 // 2026-08-04, from ZenNotes: "it shows the little 2/4 but it isn't written").
 //
 // THE RULE THAT MATTERS: this is COMPUTED, never written to the file. The

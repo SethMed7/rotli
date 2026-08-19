@@ -2,7 +2,7 @@
  * BREVE model-spawn helper — the ONE place every model subprocess gets OS-sandboxed.
  *
  * The tool-bearing tiers run claude/agy/codex with --dangerously-skip-permissions; without the
- * sandbox they read+write anywhere Seth can. signal-daemon.ts already wraps its spawns in
+ * sandbox they read+write anywhere the maintainer can. signal-daemon.ts already wraps its spawns in
  * `sandboxed(argv)` (see sandbox.ts), but the one-shot scripts (daily-log, email-topic,
  * summarize-url, imagegen) spawned models UNSANDBOXED — a hole. runModel() closes it: every model
  * tier goes through `Bun.spawn(sandboxed(argv), …)`, so the brain+storage write/read boundary is
@@ -12,6 +12,7 @@
  * findAgy() / findCodex() to resolve them (same lookups already used across the daemon).
  */
 import { existsSync } from "node:fs";
+
 import { AGY_BIN_CANDIDATES, CLAUDE_BIN_CANDIDATES, CODEX_BIN_CANDIDATES, expandHome } from "./cli-paths";
 import { sandboxed } from "./sandbox";
 

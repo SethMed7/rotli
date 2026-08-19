@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fast pre-commit guards — STAGED content only, so per-commit latency stays low
 # (CONTRIBUTING's condition for ever adding a hook). Born from review learnings
-# (Seth, 2026-07-30): formatting drift and conflict markers kept reaching PRs.
+# (the maintainer, 2026-07-30): formatting drift and conflict markers kept reaching PRs.
 # Checks the INDEX blobs (`git show :file`), not the working tree, so a
 # partial stage (`git add -p`) is judged on exactly what will be committed
 # (Greptile P1, PR #8). Full enforcement remains `bun run lint` + CI;

@@ -23,13 +23,15 @@ bun install --frozen-lockfile
 
 ```sh
 bun run dev        # browser-only frontend with demo/in-memory behavior
-bun run dev:app    # native rotli (dev); WARNING: reads and writes the production vault
+bun run dev:app    # supervised native rotli (dev); choose a disposable vault
 ```
 
 Browser mode cannot validate the native titlebar, menu-bar lifecycle,
 filesystem permissions, Keychain, updater, launch agents, or the managed Breve
-scheduler. Never point development work at production data unless that exact
-operation has been reviewed and authorized.
+scheduler. Native development may display the production-selected vault as a
+read-only boot fallback, but its explicit choice lives in the isolated
+`corpus.dev.json`. Choose a disposable folder unless real development writes to
+that exact folder have been reviewed and authorized.
 
 ## Repository map
 
@@ -167,6 +169,14 @@ the portable jest/vitest spelling and is what keeps those assertions enforcing
 if bun ever aligns with jest, so stripping it from 18 security assertions to
 satisfy a linter was the wrong trade. Every other correctness rule is at zero
 and now guards for free.
+React Compiler stays out of the production transform, but its Rules-of-React
+analysis runs in lint-only mode through `check:react-compiler`. The first
+measurement found 63 diagnostics; the six render-purity findings and one
+render-time mutation were fixed immediately. The remaining 56 are recorded by
+file and category in `scripts/react-compiler-baseline.json`. That baseline is a
+ratchet, not an exemption list: a file/category count may fall, but any increase
+fails `lint`. This lets effect/ref debt retire incrementally without hiding it
+under inline suppressions or changing runtime code generation.
 The type-aware rules run through the `oxlint-tsgolint` sidecar,
 which is preview-quality: it misreads comma-expression arrow bodies as
 misused promises (three suppressed sites in `src/state/persist.test.ts` —

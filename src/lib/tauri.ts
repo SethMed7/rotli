@@ -281,7 +281,7 @@ export async function downloadAndInstallUpdate(onProgress?: (pct: number) => voi
 //     shell; the guard turns a stray browser call into a loud, clear
 //     rejection instead of a silent hang. ———
 
-/** Folder ids ARE relative paths inside the corpus root ("Work/Myela"). */
+/** Folder ids ARE relative paths inside the corpus root ("Work/Northstar"). */
 export interface CorpusFolder {
   id: string;
   name: string;
@@ -303,7 +303,7 @@ export interface CorpusNoteMeta {
   pinned: boolean;
   /** Where a note came from before it was moved into Archive/Trash — Rust
    * bakes the rule (set on entering a hidden root, cleared on leaving). Null
-   * for a note that lives in a normal folder (Seth, 2026-06-13). */
+   * for a note that lives in a normal folder (the maintainer, 2026-06-13). */
   origin?: string | null;
   /** "note" (a .md file) · "board" (a .excalidraw canvas) · "file" (any other
    * file — image/pdf/…, surfaced read-only, opened in the OS default app). Rust
@@ -341,7 +341,7 @@ export interface CorpusNoteDoc {
   updatedAt: number;
   pinned: boolean;
   /** The restore breadcrumb (see CorpusNoteMeta.origin); corpus_read returns
-   * it so restore can send a note back where it came from (Seth, 2026-06-13). */
+   * it so restore can send a note back where it came from (the maintainer, 2026-06-13). */
   origin?: string | null;
 }
 
@@ -414,7 +414,7 @@ export function corpusDiscardBlank(id: string): Promise<void> {
 /** Move a note into target_folder, PRESERVING its id + index; Rust creates the
  * folder if needed and bakes the origin rule (record where it came from on the
  * way into Archive/Trash, clear it on the way out). Tauri maps JS targetFolder
- * ↔ the Rust target_folder arg (Seth, 2026-06-13). */
+ * ↔ the Rust target_folder arg (the maintainer, 2026-06-13). */
 export function corpusMove(id: string, targetFolder: string): Promise<CorpusNoteMeta> {
   return corpusInvoke("corpus_move", { id, targetFolder });
 }
@@ -753,6 +753,88 @@ export function openUrl(url: string): Promise<void> {
   });
 }
 
+export interface PrivateBrowserBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface PrivateBrowserStateEvent {
+  tabId: string;
+  url: string;
+  title?: string;
+  loading?: boolean;
+}
+
+export interface PrivateBrowserNewWindowEvent {
+  tabId: string;
+  url: string;
+}
+
+/** Native private-browser adapter. Remote pages live in a separate child
+ * webview; they never render inside or receive capabilities from this app
+ * webview. Browser-twin calls stay honest no-ops. */
+export function privateBrowserCreate(
+  tabId: string,
+  url: string,
+  bounds: PrivateBrowserBounds,
+): Promise<void> {
+  if (!isTauri()) return Promise.resolve();
+  return invoke<void>("private_browser_create", { tabId, url, bounds });
+}
+
+export function privateBrowserSetBounds(tabId: string, bounds: PrivateBrowserBounds): Promise<void> {
+  if (!isTauri()) return Promise.resolve();
+  return invoke<void>("private_browser_set_bounds", { tabId, bounds });
+}
+
+export function privateBrowserSetVisible(tabId: string, visible: boolean): Promise<void> {
+  if (!isTauri()) return Promise.resolve();
+  return invoke<void>("private_browser_set_visible", { tabId, visible });
+}
+
+export function privateBrowserNavigate(tabId: string, url: string): Promise<void> {
+  if (!isTauri()) return Promise.resolve();
+  return invoke<void>("private_browser_navigate", { tabId, url });
+}
+
+export function privateBrowserBack(tabId: string): Promise<void> {
+  if (!isTauri()) return Promise.resolve();
+  return invoke<void>("private_browser_back", { tabId });
+}
+
+export function privateBrowserForward(tabId: string): Promise<void> {
+  if (!isTauri()) return Promise.resolve();
+  return invoke<void>("private_browser_forward", { tabId });
+}
+
+export function privateBrowserReload(tabId: string): Promise<void> {
+  if (!isTauri()) return Promise.resolve();
+  return invoke<void>("private_browser_reload", { tabId });
+}
+
+export function privateBrowserClose(tabId: string): Promise<void> {
+  if (!isTauri()) return Promise.resolve();
+  return invoke<void>("private_browser_close", { tabId });
+}
+
+export function onPrivateBrowserState(
+  handler: (event: PrivateBrowserStateEvent) => void,
+): Promise<() => void> {
+  if (!isTauri()) return Promise.resolve(() => {});
+  return listen<PrivateBrowserStateEvent>("private-browser-state", (event) => handler(event.payload));
+}
+
+export function onPrivateBrowserNewWindow(
+  handler: (event: PrivateBrowserNewWindowEvent) => void,
+): Promise<() => void> {
+  if (!isTauri()) return Promise.resolve(() => {});
+  return listen<PrivateBrowserNewWindowEvent>("private-browser-new-window", (event) =>
+    handler(event.payload),
+  );
+}
+
 /** Settings → Storage truth: the real root (home shortened to `~`), every
  * folder, every note file — what actually exists on disk, never a mock. */
 export interface CorpusOverview {
@@ -770,18 +852,6 @@ export interface CorpusRoot {
   id: string;
   label: string;
   absPath: string;
-}
-
-/** Add an arbitrary folder as a browsable + editable root (NOT moved into the
- * memex — opens read-write in place). No path ⇒ native folder picker. Adding a new
- * folder relaunches the app so it surfaces; returns false if the picker was cancelled. */
-export function corpusAddFolder(path?: string): Promise<boolean> {
-  return corpusInvoke("corpus_add_folder", path === undefined ? {} : { path });
-}
-
-/** Forget an added folder root (the files on disk are never touched). Relaunches. */
-export function corpusForgetFolder(id: string): Promise<void> {
-  return corpusInvoke("corpus_forget_folder", { id });
 }
 
 /** Reveal the corpus folder in Finder. */
@@ -1400,9 +1470,11 @@ export interface CorpusRefView {
 export interface CorpusConfigView {
   corpus: CorpusRefView;
   brains: ConnectedBrain[];
-  /** Arbitrary plain folders added to the sidebar (the "add a folder" feature). */
+  /** Legacy added-folder registrations, hidden from the one-vault UI. */
   folders: CorpusRoot[];
   activeBrainId: string | null;
+  /** A debug build is borrowing production's selected vault only to boot. */
+  developmentReadOnly: boolean;
 }
 
 /** True only after the user has selected or created a primary vault. This is a
@@ -1448,13 +1520,99 @@ export async function corpusImportVaultCopy(source: string, destination: string)
   await invoke("corpus_import_vault_copy", { source, destination });
 }
 
+export interface VaultBrowserEntry {
+  name: string;
+}
+
+export interface VaultBrowserView {
+  absolutePath: string;
+  displayPath: string;
+  homePath: string;
+  directories: VaultBrowserEntry[];
+  canGoBack: boolean;
+  canSelect: boolean;
+  selectDisabledReason: string | null;
+}
+
+let browserVaultView: VaultBrowserView = {
+  absolutePath: "/Users/example",
+  displayPath: "~",
+  homePath: "/Users/example",
+  directories: ["Applications", "Desktop", "Documents", "Downloads", "Library"].map((name) => ({ name })),
+  canGoBack: false,
+  canSelect: false,
+  selectDisabledReason:
+    "Choose or create a folder inside Home. Home itself includes private app and credential data.",
+};
+
+/** Open Rotli's directory-only, Home-contained vault navigator. Rust owns the
+ * session and returns no filenames or file contents. */
+export function vaultBrowserStart(requireEmpty: boolean): Promise<VaultBrowserView> {
+  if (!isTauri()) {
+    browserVaultView = { ...browserVaultView, canSelect: false };
+    return Promise.resolve(browserVaultView);
+  }
+  return invoke<VaultBrowserView>("vault_browser_start", { requireEmpty });
+}
+
+export function vaultBrowserOpenChild(name: string): Promise<VaultBrowserView> {
+  if (!isTauri()) {
+    browserVaultView = {
+      absolutePath: `${browserVaultView.absolutePath}/${name}`,
+      displayPath: `${browserVaultView.displayPath}/${name}`,
+      homePath: browserVaultView.homePath,
+      directories: [],
+      canGoBack: true,
+      canSelect: true,
+      selectDisabledReason: null,
+    };
+    return Promise.resolve(browserVaultView);
+  }
+  return invoke<VaultBrowserView>("vault_browser_open_child", { name });
+}
+
+export function vaultBrowserGoBack(): Promise<VaultBrowserView> {
+  if (!isTauri()) return vaultBrowserStart(false);
+  return invoke<VaultBrowserView>("vault_browser_go_back");
+}
+
+export function vaultBrowserRefresh(): Promise<VaultBrowserView> {
+  if (!isTauri()) return Promise.resolve(browserVaultView);
+  return invoke<VaultBrowserView>("vault_browser_refresh");
+}
+
+export function vaultBrowserCreateFolder(name: string): Promise<VaultBrowserView> {
+  if (!isTauri()) return vaultBrowserOpenChild(name);
+  return invoke<VaultBrowserView>("vault_browser_create_folder", { name });
+}
+
+export function vaultBrowserSelect(): Promise<string> {
+  if (!isTauri()) return Promise.resolve(browserVaultView.absolutePath);
+  return invoke<string>("vault_browser_select");
+}
+
+export function vaultBrowserSelectChild(name: string): Promise<string> {
+  if (!isTauri()) return Promise.resolve(`${browserVaultView.absolutePath}/${name}`);
+  return invoke<string>("vault_browser_select_child", { name });
+}
+
+export async function vaultBrowserCancel(): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("vault_browser_cancel");
+}
+
+export async function vaultBrowserReveal(): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("vault_browser_reveal");
+}
+
 /** The whole Location config; migrates the four legacy files in on first read.
  * Browser preview gets a sane empty config so the UI still renders. */
 export function corpusListConfig(): Promise<CorpusConfigView> {
   if (!isTauri()) {
     return Promise.resolve({
       corpus: {
-        absPath: "~/Documents/rotli",
+        absPath: "~/Rotli",
         isMemex: false,
         memexId: null,
         perms: null,
@@ -1463,6 +1621,7 @@ export function corpusListConfig(): Promise<CorpusConfigView> {
       brains: [],
       folders: [],
       activeBrainId: null,
+      developmentReadOnly: false,
     });
   }
   return corpusInvoke("corpus_list_config");
@@ -1470,35 +1629,53 @@ export function corpusListConfig(): Promise<CorpusConfigView> {
 
 /** "Choose folder…" — the ONE smart picker for your notes folder. Detects a memex
  * (browse it), an empty folder (move your notes there / start fresh), or a plain
- * folder (use as-is), then relaunches. False when the picker is cancelled. */
+ * folder (use as-is), then rebinds the live shell. False when the picker is cancelled. */
 export async function corpusChooseFolder(path?: string): Promise<boolean> {
   if (!isTauri()) return false;
   return invoke<boolean>("corpus_choose_folder", { path: path ?? null });
 }
 
+/** Switch to an already-connected vault by its persisted registry id. Rust
+ * resolves and revalidates the path, then rebinds the live default store. */
+export async function corpusSwitchVault(id: string): Promise<boolean> {
+  return corpusInvoke("corpus_switch_vault", { id });
+}
+
 /** Onboarding "create a new vault": scaffold a fresh memex at `path` and make it
- * your corpus (the corpus IS a memex). Relaunches on success. */
-export async function corpusInitMemex(path: string, brainEnabled = true): Promise<void> {
-  if (!isTauri()) return;
-  await invoke("corpus_init_memex", { path, brainEnabled });
+ * your corpus (the corpus IS a memex), without restarting the app. */
+export async function corpusInitMemex(path: string, brainEnabled = true): Promise<string> {
+  if (!isTauri()) return "";
+  return invoke<string>("corpus_init_memex", { path, brainEnabled });
 }
 
 /** Scaffold + switch to a scratch PRACTICE vault at an app-chosen home
  * (2026-07-26): settings carry along, the outgoing vault stays registered as a
- * connected library, and no existing file is touched. Relaunches on success. */
-export async function corpusCreatePracticeVault(): Promise<void> {
-  if (!isTauri()) return;
-  await invoke("corpus_create_practice_vault");
+ * connected library, and no existing file is touched. The shell stays alive. */
+export async function corpusCreatePracticeVault(): Promise<string> {
+  if (!isTauri()) return "";
+  return invoke<string>("corpus_create_practice_vault");
 }
 
-/** Connect a memex as a brain (read + write per its perms); relaunches so its row
- * appears. False when the picker is cancelled. */
+/** Connect a memex as a linked vault and mount it in the current process. False
+ * when the picker is cancelled. */
 export async function corpusConnectBrain(path?: string): Promise<boolean> {
   if (!isTauri()) return false;
   return invoke<boolean>("corpus_connect_brain", { path: path ?? null });
 }
 
-/** Forget a connected brain (binding only; files untouched). Relaunches. */
+/** Reopen and rescan the active vault without reloading Rotli. */
+export async function corpusRefreshActiveVault(): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_refresh_active_vault");
+}
+
+/** Reopen and rescan one registered vault without making it active. */
+export async function corpusRefreshVault(id: string): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("corpus_refresh_vault", { id });
+}
+
+/** Remove a connected vault binding and live route; files stay untouched. */
 export async function corpusForgetBrain(id: string): Promise<void> {
   if (!isTauri()) return;
   await invoke("corpus_forget_brain", { id });
@@ -1575,6 +1752,15 @@ export function onCorpusChanged(cb: () => void): () => void {
   return () => void unlisten.then((fn) => fn());
 }
 
+/** Rust → every webview: the active vault route changed while the process and
+ * native windows stayed alive. Each frontend drops vault-scoped caches and
+ * rehydrates its own surface from the new default store. */
+export function onVaultChanged(cb: () => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listen("rotli:vault-changed", () => cb());
+  return () => void unlisten.then((fn) => fn());
+}
+
 /** Rust → main window: `rotli open <id>` wrote its mailbox and activated the
  * app (the Reopen event) — consume the request NOW. Replaces the app-lifetime
  * 750ms workspaceTakeOpenRequest poll (perf audit 2026-07-30, #15). */
@@ -1625,7 +1811,7 @@ export function onOrganizerProgress(cb: (p: OrganizerProgress) => void): () => v
 
 // ——— the memex seam (Stage 1) — typed wrappers over the Rust memex commands
 //     (src-tauri/src/memex.rs). rotli connects to / initiates a memex instance
-//     (the shared identity/personality/wiki/history/chats/inbox.md spine; for Seth, ~/memex-vault)
+//     (the shared identity/personality/wiki/history/chats/inbox.md spine; for the maintainer, ~/memex-vault)
 //     and OWNS chats/ + note creation in wiki/_inbox (Librarian on) or directly
 //     under wiki/ (Librarian off), nothing else (inbox.md is not a
 //     rotli surface — #96, audit 2026-07). Mirror-not-import: the byte-shape
@@ -1846,11 +2032,16 @@ export function onQuickSet(cb: (state: QuickStatePayload) => void): () => void {
  * cycle; the receiver casts back to the ui store's unions. */
 export interface ThemePayload {
   theme: "light" | "dark" | "system";
-  themeFamily: "warm" | "mono";
-  matchLightFamily: "warm" | "mono";
-  matchDarkFamily: "warm" | "mono";
+  themeFamily: "warm" | "mono" | "ocean" | "grove" | "iris" | "midnight";
   accentColor: "default" | "blue" | "green" | "violet" | "rose" | "amber" | "custom";
   accentHue: number;
+  quokkaCompanionEnabled: boolean;
+  quokkaStyle: "line" | "cocoa" | "green" | "ocean" | "iris" | "berry" | "amber" | "custom";
+  quokkaCustomHue: number;
+  quokkaLineColor: "black" | "white";
+  quokkaAccessory: "none" | "glasses" | "bucket-hat" | "goggles";
+  quokkaAccessoryHue: number;
+  quokkaIdlePose: "base" | "rest" | "thoughtful" | "listening" | "celebrating";
 }
 
 export function emitThemeSet(payload: ThemePayload): void {

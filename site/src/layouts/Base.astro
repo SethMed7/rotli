@@ -1,10 +1,4 @@
 ---
-// Base layout — the four rotli palettes on two axes: warm ⇄ soft, light ⇄ dark.
-// The pre-paint script stamps data-family + data-mode on <html> (stored prefs, or
-// soft + the system mode), so the palette blocks and the matching hero preview are
-// pure attribute selectors — no flash, no media-query juggling.
-// Palettes mirror the app: warm = colors.json (Warm Light/Dark); soft = themes.css
-// (Paper / Charcoal).
 interface Props {
   title?: string;
   description?: string;
@@ -14,16 +8,17 @@ interface Props {
 }
 
 const {
-  title = 'rotli — a local-first notes app for your Mac menu bar',
-  description = 'A local-first notes app that lives in your Mac’s menu bar — summon it, write, dismiss it.',
+  title = 'Rotli — your files remain the product',
+  description = 'A calm, local-first Mac workspace for notes, editable files, boards, and AI conversations. One folder you own; no account required.',
   canonicalPath = Astro.url.pathname,
-  image = '/rotli-app-paper.png',
+  image = '/social-card.png',
   noindex = false,
 } = Astro.props as Props;
 const siteUrl = Astro.site ?? Astro.url;
 const canonicalUrl = new URL(canonicalPath, siteUrl).href;
 const socialImageUrl = new URL(image, siteUrl).href;
 ---
+
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -34,97 +29,418 @@ const socialImageUrl = new URL(image, siteUrl).href;
     <meta name="robots" content={noindex ? 'noindex, nofollow' : 'index, follow'} />
     <link rel="canonical" href={canonicalUrl} />
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="rotli" />
+    <meta property="og:site_name" content="Rotli" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:image" content={socialImageUrl} />
-    <meta property="og:image:alt" content="rotli in its Paper environment" />
+    <meta property="og:image:alt" content="Rotli — your files remain the product" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={socialImageUrl} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <!-- resolve theme before first paint (no flash) -->
     <script is:inline>
       try {
-        const r = document.documentElement;
-        const m = localStorage.getItem('rotli-mode');
-        const f = localStorage.getItem('rotli-family');
-        // Default is Warm Light — the app's own default look. Honor a stored
-        // preference if the visitor has toggled before; otherwise warm + light.
-        r.dataset.mode = m === 'light' || m === 'dark' ? m : 'light';
-        r.dataset.family = f === 'warm' || f === 'soft' ? f : 'warm';
-      } catch (e) {}
+        const root = document.documentElement;
+        const families = ['rotli', 'paper', 'ocean', 'grove', 'iris', 'midnight'];
+        const savedFamily = localStorage.getItem('rotli-site-family');
+        const savedMode = localStorage.getItem('rotli-site-mode');
+        root.dataset.family = families.includes(savedFamily) ? savedFamily : 'rotli';
+        root.dataset.mode = savedMode === 'light' || savedMode === 'dark'
+          ? savedMode
+          : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      } catch (error) {}
     </script>
     <style is:global>
-      @font-face { font-family: 'General Sans'; src: url('/fonts/GeneralSans-Regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
-      @font-face { font-family: 'General Sans'; src: url('/fonts/GeneralSans-Medium.woff2') format('woff2'); font-weight: 500; font-display: swap; }
-      @font-face { font-family: 'General Sans'; src: url('/fonts/GeneralSans-Semibold.woff2') format('woff2'); font-weight: 600; font-display: swap; }
-      @font-face { font-family: 'Baloo 2'; src: url('/fonts/Baloo2-600.ttf') format('truetype'); font-weight: 600; font-display: swap; }
+      @font-face {
+        font-family: 'General Sans';
+        src: url('/fonts/GeneralSans-Regular.woff2') format('woff2');
+        font-weight: 400;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'General Sans';
+        src: url('/fonts/GeneralSans-Medium.woff2') format('woff2');
+        font-weight: 500;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'General Sans';
+        src: url('/fonts/GeneralSans-Semibold.woff2') format('woff2');
+        font-weight: 600;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Baloo 2';
+        src: url('/fonts/Baloo2-600.ttf') format('truetype');
+        font-weight: 600;
+        font-display: swap;
+      }
 
-      /* base tokens + fallback palette (WARM LIGHT — the default) for the no-JS case */
       :root {
         --font-body: 'General Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-        --font-display: 'Baloo 2', var(--font-body);
-        --maxw: 62rem;
-        --ground: #f8f2e9; --surface: #ffffff; --surface-2: #f1e7d8; --tint: #f2d6c2;
-        --text: #3a3028; --text-muted: #6e6155; --border: #e7dbc9;
-        --accent: #c97e62; --accent-text: #8f4e37; --on-accent: #ffffff;
+        --font-wordmark: 'Baloo 2', var(--font-body);
+        --page-max: 76rem;
+        --copy-max: 68ch;
+        --ground: #f8f2e9;
+        --surface: #ffffff;
+        --surface-2: #f1e7d8;
+        --tint: #f2d6c2;
+        --text: #3a3028;
+        --text-muted: #6e6155;
+        --border: #e2d3c1;
+        --border-strong: #cdb8a1;
+        --accent: #c97e62;
+        --accent-text: #8f4e37;
+        --on-accent: #ffffff;
+        --deep: #241d18;
+        --deep-surface: #302720;
+        --deep-text: #f1e7da;
+        --deep-muted: #c6b7a7;
+        --deep-border: #4b3c31;
+        --success: #5f6b49;
+        --selection: #f2d6c2;
+        --quokka-field: #f3e8da;
+        --swatch-rotli-light: #f8f2e9;
+        --swatch-rotli-dark: #241d18;
+        --swatch-paper-light: #fafaf9;
+        --swatch-paper-dark: #161616;
+        --swatch-ocean-light: #f2f6f9;
+        --swatch-ocean-dark: #0e171d;
+        --swatch-grove-light: #f2f6f2;
+        --swatch-grove-dark: #101814;
+        --swatch-iris-light: #f5f3f9;
+        --swatch-iris-dark: #15121d;
+        --swatch-midnight-light: #f4f5f7;
+        --swatch-midnight-dark: #050607;
       }
 
-      /* ── SOFT · light (Paper) ── */
-      :root[data-family='soft'][data-mode='light'] {
-        --ground: #fafaf9; --surface: #ffffff; --surface-2: #f5f5f4; --tint: #ececea;
-        --text: #161616; --text-muted: #6b6b68; --border: #e6e6e3;
-        --accent: #161616; --accent-text: #161616; --on-accent: #ffffff;
-      }
-      /* ── SOFT · dark (Charcoal) ── */
-      :root[data-family='soft'][data-mode='dark'] {
-        --ground: #161616; --surface: #1f1e1c; --surface-2: #2a2825; --tint: #33312d;
-        --text: #e9e7e2; --text-muted: #a8a49c; --border: #2e2c29;
-        --accent: #e9e7e2; --accent-text: #e9e7e2; --on-accent: #161616;
-      }
-      /* ── WARM · light (Warm Light) ── */
-      :root[data-family='warm'][data-mode='light'] {
-        --ground: #f8f2e9; --surface: #ffffff; --surface-2: #f1e7d8; --tint: #f2d6c2;
-        --text: #3a3028; --text-muted: #6e6155; --border: #e7dbc9;
-        --accent: #c97e62; --accent-text: #8f4e37; --on-accent: #ffffff;
-      }
-      /* ── WARM · dark (Warm Dark) ── */
-      :root[data-family='warm'][data-mode='dark'] {
-        --ground: #241d18; --surface: #2e2620; --surface-2: #392f28; --tint: #3e332b;
-        --text: #f1e7da; --text-muted: #b7a593; --border: #3d3229;
-        --accent: #c97e62; --accent-text: #c97e62; --on-accent: #241d18;
+      :root[data-family='rotli'][data-mode='dark'] {
+        --ground: #241d18;
+        --surface: #2e2620;
+        --surface-2: #392f28;
+        --tint: #3e332b;
+        --text: #f1e7da;
+        --text-muted: #b7a593;
+        --border: #493a30;
+        --border-strong: #665142;
+        --accent: #c97e62;
+        --accent-text: #dda087;
+        --on-accent: #241d18;
+        --deep: #171310;
+        --deep-surface: #211b17;
+        --deep-text: #f7ede1;
+        --deep-muted: #c7b7a6;
+        --deep-border: #3d3129;
+        --success: #a4b08d;
+        --selection: #573f34;
+        --quokka-field: #f1e7da;
       }
 
-      * { box-sizing: border-box; }
-      html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+      :root[data-family='paper'][data-mode='light'] {
+        --ground: #fafaf9;
+        --surface: #ffffff;
+        --surface-2: #f2f2f0;
+        --tint: #e7e7e3;
+        --text: #161616;
+        --text-muted: #62625f;
+        --border: #ddddda;
+        --border-strong: #bdbdb8;
+        --accent: #30302e;
+        --accent-text: #161616;
+        --on-accent: #ffffff;
+        --deep: #161616;
+        --deep-surface: #22211f;
+        --deep-text: #efede8;
+        --deep-muted: #b8b4ac;
+        --deep-border: #3b3935;
+        --success: #555d50;
+        --selection: #e7e7e3;
+        --quokka-field: #f0f0ed;
+      }
+
+      :root[data-family='paper'][data-mode='dark'] {
+        --ground: #161616;
+        --surface: #1f1e1c;
+        --surface-2: #2a2825;
+        --tint: #33312d;
+        --text: #e9e7e2;
+        --text-muted: #aaa69e;
+        --border: #383631;
+        --border-strong: #54514a;
+        --accent: #e9e7e2;
+        --accent-text: #ffffff;
+        --on-accent: #161616;
+        --deep: #0d0d0d;
+        --deep-surface: #181716;
+        --deep-text: #f3f1ec;
+        --deep-muted: #b9b5ad;
+        --deep-border: #34322e;
+        --success: #b4bdad;
+        --selection: #33312d;
+        --quokka-field: #efede8;
+      }
+
+      :root[data-family='ocean'][data-mode='light'] {
+        --ground: #f2f6f9;
+        --surface: #ffffff;
+        --surface-2: #e8f0f5;
+        --tint: #dceaf2;
+        --text: #18272f;
+        --text-muted: #526873;
+        --border: #cadbe4;
+        --border-strong: #a8c2ce;
+        --accent: #2e6e91;
+        --accent-text: #285f7e;
+        --on-accent: #ffffff;
+        --deep: #0e171d;
+        --deep-surface: #152229;
+        --deep-text: #e7f0f4;
+        --deep-muted: #a9bdc6;
+        --deep-border: #2c424c;
+        --success: #507b66;
+        --selection: #dceaf2;
+        --quokka-field: #e2edf3;
+      }
+
+      :root[data-family='ocean'][data-mode='dark'] {
+        --ground: #0e171d;
+        --surface: #152229;
+        --surface-2: #1c2d35;
+        --tint: #213843;
+        --text: #e7f0f4;
+        --text-muted: #a1b6c0;
+        --border: #2a404a;
+        --border-strong: #41606e;
+        --accent: #70b2d7;
+        --accent-text: #9acde7;
+        --on-accent: #0e171d;
+        --deep: #081014;
+        --deep-surface: #101b20;
+        --deep-text: #eff7fa;
+        --deep-muted: #adc0c9;
+        --deep-border: #263a43;
+        --success: #8cc4a5;
+        --selection: #213843;
+        --quokka-field: #e4eef2;
+      }
+
+      :root[data-family='grove'][data-mode='light'] {
+        --ground: #f2f6f2;
+        --surface: #fcfefc;
+        --surface-2: #e9f0ea;
+        --tint: #dce8de;
+        --text: #1d2c23;
+        --text-muted: #5d6f64;
+        --border: #cfddd1;
+        --border-strong: #abc1b0;
+        --accent: #427a55;
+        --accent-text: #386c49;
+        --on-accent: #ffffff;
+        --deep: #101814;
+        --deep-surface: #17221b;
+        --deep-text: #e7efe9;
+        --deep-muted: #acbcb0;
+        --deep-border: #2d4033;
+        --success: #427a55;
+        --selection: #dce8de;
+        --quokka-field: #e6eee7;
+      }
+
+      :root[data-family='grove'][data-mode='dark'] {
+        --ground: #101814;
+        --surface: #17221b;
+        --surface-2: #1f2d24;
+        --tint: #26382c;
+        --text: #e7efe9;
+        --text-muted: #a4b5a8;
+        --border: #2c4032;
+        --border-strong: #46644f;
+        --accent: #82be96;
+        --accent-text: #a8d4b6;
+        --on-accent: #101814;
+        --deep: #09100c;
+        --deep-surface: #121b15;
+        --deep-text: #eef5f0;
+        --deep-muted: #afbeb2;
+        --deep-border: #293a2f;
+        --success: #82be96;
+        --selection: #26382c;
+        --quokka-field: #e5ede6;
+      }
+
+      :root[data-family='iris'][data-mode='light'] {
+        --ground: #f5f3f9;
+        --surface: #ffffff;
+        --surface-2: #ebe7f2;
+        --tint: #e3dcf0;
+        --text: #282334;
+        --text-muted: #696176;
+        --border: #dad3e4;
+        --border-strong: #bbb0cb;
+        --accent: #6b58a5;
+        --accent-text: #5e4c96;
+        --on-accent: #ffffff;
+        --deep: #15121d;
+        --deep-surface: #1d1927;
+        --deep-text: #eeeaf5;
+        --deep-muted: #b6acc4;
+        --deep-border: #393047;
+        --success: #557462;
+        --selection: #e3dcf0;
+        --quokka-field: #ebe6f3;
+      }
+
+      :root[data-family='iris'][data-mode='dark'] {
+        --ground: #15121d;
+        --surface: #1d1927;
+        --surface-2: #272132;
+        --tint: #30283f;
+        --text: #eeeaf5;
+        --text-muted: #b2a8c1;
+        --border: #372f45;
+        --border-strong: #55486a;
+        --accent: #ad9ae3;
+        --accent-text: #c8b9ef;
+        --on-accent: #15121d;
+        --deep: #0c0a11;
+        --deep-surface: #17131e;
+        --deep-text: #f4f0f8;
+        --deep-muted: #bbb0c8;
+        --deep-border: #322a3e;
+        --success: #8bb69a;
+        --selection: #30283f;
+        --quokka-field: #eae5f2;
+      }
+
+      :root[data-family='midnight'][data-mode='light'] {
+        --ground: #f4f5f7;
+        --surface: #ffffff;
+        --surface-2: #e9ebef;
+        --tint: #e0e3e8;
+        --text: #181b20;
+        --text-muted: #5e6570;
+        --border: #d3d7dd;
+        --border-strong: #adb4be;
+        --accent: #364152;
+        --accent-text: #2e3745;
+        --on-accent: #ffffff;
+        --deep: #050607;
+        --deep-surface: #0b0d0f;
+        --deep-text: #f1f3f5;
+        --deep-muted: #acb2ba;
+        --deep-border: #24292f;
+        --success: #4f7160;
+        --selection: #e0e3e8;
+        --quokka-field: #e8ebef;
+      }
+
+      :root[data-family='midnight'][data-mode='dark'] {
+        --ground: #050607;
+        --surface: #0b0d0f;
+        --surface-2: #121519;
+        --tint: #191d22;
+        --text: #f1f3f5;
+        --text-muted: #a4aab2;
+        --border: #252a30;
+        --border-strong: #3d454f;
+        --accent: #cfd5dc;
+        --accent-text: #ffffff;
+        --on-accent: #050607;
+        --deep: #000000;
+        --deep-surface: #08090a;
+        --deep-text: #f5f6f7;
+        --deep-muted: #adb2b8;
+        --deep-border: #20252b;
+        --success: #a4c5b2;
+        --selection: #191d22;
+        --quokka-field: #eceff2;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+      }
       body {
-        margin: 0; background: var(--ground); color: var(--text);
-        font-family: var(--font-body); font-weight: 400; line-height: 1.6; font-size: 17px;
+        margin: 0;
+        min-width: 20rem;
+        background: var(--ground);
+        color: var(--text);
+        font-family: var(--font-body);
+        font-size: 17px;
+        line-height: 1.62;
+        transition: background-color 180ms ease-out, color 180ms ease-out;
       }
-      a { color: inherit; }
-      img { max-width: 100%; display: block; }
+      a {
+        color: inherit;
+      }
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+      button {
+        color: inherit;
+      }
+      img,
+      svg {
+        display: block;
+        max-width: 100%;
+      }
+      h1,
+      h2,
+      h3 {
+        text-wrap: balance;
+      }
+      p {
+        text-wrap: pretty;
+      }
       :where(a, button):focus-visible {
         outline: 2px solid var(--accent-text);
         outline-offset: 3px;
       }
+      ::selection {
+        background: var(--selection);
+        color: var(--text);
+      }
+      .skip-link {
+        position: fixed;
+        top: 0.75rem;
+        left: 0.75rem;
+        z-index: 100;
+        padding: 0.65rem 0.9rem;
+        border-radius: 0.5rem;
+        background: var(--text);
+        color: var(--ground);
+        text-decoration: none;
+        transform: translateY(-160%);
+      }
+      .skip-link:focus {
+        transform: translateY(0);
+      }
 
-      .logo-mark, .char { display: inline-block; line-height: 0; color: var(--text); }
-      .logo-mark svg, .char svg { display: block; width: 100%; height: auto; }
-
-      /* the hero screenshot matches the selected theme — one of four, by attributes */
-      .shot { display: none; }
-      :root[data-family='warm'][data-mode='light'] .shot-warm-light { display: block; }
-      :root[data-family='warm'][data-mode='dark'] .shot-warm-dark { display: block; }
-      :root[data-family='soft'][data-mode='light'] .shot-soft-light { display: block; }
-      :root[data-family='soft'][data-mode='dark'] .shot-soft-dark { display: block; }
-
-      ::selection { background: var(--tint); color: var(--text); }
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
     </style>
   </head>
   <body>
+    <a class="skip-link" href="#content">Skip to content</a>
     <slot />
   </body>
 </html>

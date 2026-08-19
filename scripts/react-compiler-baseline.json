@@ -1,0 +1,98 @@
+{
+  "src/app.tsx": {
+    "Suppression": 1
+  },
+  "src/components/activitySurface.tsx": {
+    "EffectSetState": 2
+  },
+  "src/components/boardNameDialog.tsx": {
+    "EffectSetState": 1
+  },
+  "src/components/breve/breveShared.tsx": {
+    "Refs": 2
+  },
+  "src/components/breve/breveSurface.tsx": {
+    "EffectSetState": 8
+  },
+  "src/components/breve/breveWatchlist.tsx": {
+    "EffectSetState": 1
+  },
+  "src/components/browserSurface.tsx": {
+    "Refs": 1
+  },
+  "src/components/canvasSurface.tsx": {
+    "EffectSetState": 1
+  },
+  "src/components/chat/chatSurface.tsx": {
+    "EffectSetState": 7,
+    "Refs": 2
+  },
+  "src/components/contextMenu.tsx": {
+    "EffectSetState": 1
+  },
+  "src/components/documentEditor.tsx": {
+    "Refs": 1
+  },
+  "src/components/fileSurface.tsx": {
+    "EffectSetState": 1
+  },
+  "src/components/hotkeyBadges.tsx": {
+    "EffectSetState": 1
+  },
+  "src/components/paneTree.tsx": {
+    "EffectSetState": 1
+  },
+  "src/components/previewModal.tsx": {
+    "EffectSetState": 1
+  },
+  "src/components/quickNote.tsx": {
+    "EffectSetState": 1
+  },
+  "src/components/renameDialog.tsx": {
+    "EffectSetState": 1
+  },
+  "src/components/settingsSurface.tsx": {
+    "EffectSetState": 1
+  },
+  "src/components/sidebar.tsx": {
+    "Suppression": 1
+  },
+  "src/components/sidebar/sidebarChat.tsx": {
+    "Suppression": 1
+  },
+  "src/components/sidebar/sidebarHome.tsx": {
+    "Suppression": 2
+  },
+  "src/components/sidebar/useRovingList.ts": {
+    "EffectSetState": 1,
+    "Refs": 3
+  },
+  "src/components/systemSurface.tsx": {
+    "EffectSetState": 1,
+    "Suppression": 2
+  },
+  "src/components/vaultFolderBrowserDialog.tsx": {
+    "EffectSetState": 1
+  },
+  "src/editor/cmEditor.tsx": {
+    "Suppression": 1
+  },
+  "src/editor/editorSurface.tsx": {
+    "EffectSetState": 1
+  },
+  "src/editor/embedBoard.tsx": {
+    "EffectSetState": 1
+  },
+  "src/editor/mermaidVisualEditor.tsx": {
+    "EffectSetState": 1
+  },
+  "src/keys/useHeldModifier.ts": {
+    "Refs": 1
+  },
+  "src/lib/popover.ts": {
+    "Refs": 2
+  },
+  "src/sheets/sheetEditor.tsx": {
+    "Refs": 2
+  }
+}

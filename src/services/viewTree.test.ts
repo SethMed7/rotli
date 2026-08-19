@@ -68,12 +68,12 @@ describe("named view membership", () => {
   });
 
   test("assignment is singular and Main is not represented as another view", () => {
-    let manifest = createNamedView(createNamedView(EMPTY_VIEWS, "OpenSource"), "Myela");
+    let manifest = createNamedView(createNamedView(EMPTY_VIEWS, "OpenSource"), "Northstar");
     manifest = assignItemToView(manifest, "note-a", "OpenSource");
     expect(assignedView(manifest, "note-a")).toBe("OpenSource");
-    manifest = assignItemToView(manifest, "note-a", "Myela");
+    manifest = assignItemToView(manifest, "note-a", "Northstar");
     expect(viewTree(manifest, "OpenSource")).toEqual([]);
-    expect(viewTree(manifest, "Myela")).toEqual([{ note: "note-a" }]);
+    expect(viewTree(manifest, "Northstar")).toEqual([{ note: "note-a" }]);
     manifest = assignItemToView(manifest, "note-a", null);
     expect(assignedView(manifest, "note-a")).toBeNull();
   });
@@ -99,17 +99,17 @@ describe("named view membership", () => {
 
   test("moving a Main folder copies its structure while named-view moves remove the source", () => {
     const main = [{ folder: "Rotli", children: [{ note: "a" }, { note: "b" }] }];
-    let manifest = createNamedView(createNamedView(EMPTY_VIEWS, "OpenSource"), "Myela");
+    let manifest = createNamedView(createNamedView(EMPTY_VIEWS, "OpenSource"), "Northstar");
     manifest = transferTreeItemToView(main, manifest, null, "main:Rotli", "OpenSource");
     expect(viewTree(manifest, "OpenSource")).toEqual(main);
-    manifest = transferTreeItemToView(main, manifest, "OpenSource", "main:Rotli", "Myela");
+    manifest = transferTreeItemToView(main, manifest, "OpenSource", "main:Rotli", "Northstar");
     expect(viewTree(manifest, "OpenSource")).toEqual([]);
-    expect(viewTree(manifest, "Myela")).toEqual(main);
+    expect(viewTree(manifest, "Northstar")).toEqual(main);
     expect(main).toEqual([{ folder: "Rotli", children: [{ note: "a" }, { note: "b" }] }]);
   });
 });
 
-// Chats in views (Seth, 2026-08-03: "bring the views into the chat area so
+// Chats in views (the maintainer, 2026-08-03: "bring the views into the chat area so
 // people can organize chats by work vs personal"). Chats key by slug, live in
 // at most one view, and the field round-trips parse/serialize.
 describe("chats in named views", () => {

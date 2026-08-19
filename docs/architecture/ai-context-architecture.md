@@ -8,7 +8,7 @@ automatic; detail is retrieved only when the task needs it.
 
 | Layer | Content | Loading policy |
 |---|---|---|
-| L0 | `AGENTS.md` plus a tiny tool adapter | Always loaded by the coding tool |
+| L0 | `AGENTS.md` plus a tiny tool adapter | Always loaded: Claude imports it (a bare `@AGENTS.md` line in `CLAUDE.md`); Codex, Cursor, and Copilot read the root file natively; Antigravity reads the `.agents/rules/AGENTS.md` mirror |
 | L1 | Matching project CARL domain | Claude hook matches recall phrases; no Rotli domain is always-on |
 | L2 | `carl_recall` result | Agent asks for at most two domains and four rules by default |
 | L3 | One owning project or architecture contract | Open only sources returned by CARL or `docs/README.md` |
@@ -18,6 +18,40 @@ automatic; detail is retrieved only when the task needs it.
 and proof requirements. CARL contains compact facts and decisions grouped by
 capability. Architecture documents explain the contract. Code and tests prove
 the current behavior.
+
+## Surface ownership
+
+One fact, one home. Each surface owns exactly this:
+
+| Surface | Owns |
+|---|---|
+| `AGENTS.md` | Always-loaded rules, canonical for every agent |
+| `CLAUDE.md` | Claude adapter: the `@AGENTS.md` import plus routing notes only (≤ 1,000 bytes) |
+| `.github/copilot-instructions.md` | Copilot adapter: pointer to `AGENTS.md` |
+| `.codex/config.toml` | Codex MCP wiring only (read-only CARL); Codex reads `AGENTS.md` natively, so this is not an instruction surface |
+| `.cursor/mcp.json` | Cursor MCP wiring only (read-only CARL via `CARL_READONLY=1`); Cursor reads `AGENTS.md` natively |
+| `.agents/mcp_config.json` | Antigravity MCP wiring only (read-only CARL via `CARL_READONLY=1`) |
+| `.agents/rules/AGENTS.md` | Antigravity rules mirror — a symlink to the root file; `check:docs` fails on any byte drift |
+| `.agents/skills/` | Canonical repo skills (Agent Skills standard, `SKILL.md`); Codex, Cursor, and Antigravity read this path natively; `.claude/skills` is a symlink here for Claude |
+| `.mcp.json` | Claude MCP wiring for the project CARL server |
+| `.carl/carl.json` | Topic recall and decisions; every rule points at an owning source |
+| `docs/README.md` | Contract map · `docs/architecture/` holds contracts and audits |
+| `ARCHITECTURE.md` / `DESIGN.md` / `SYNTAX.md` | Project contracts |
+| README / CONTRIBUTING / PRODUCT / ROADMAP | Public orientation · `docs/archive/` is history |
+| `breve-runtime/README.md`, `src/brand/README.md` | Runtime and brand detail |
+
+A hook injects matching CARL domains for Claude; Codex, Cursor, and
+Antigravity have no hook and must call `carl_recall` themselves (`check:docs`
+asserts the wiring for all four). Those three run the server read-only:
+`CARL_READONLY=1` hides `carl_stage_proposal` from `tools/list` and refuses
+calls, so only Claude (or a human) stages proposals. Non-Claude tools cannot
+honor `.claude/settings.json` permission gates, so cross-agent safety rules
+live behaviorally in `AGENTS.md`, never only in Claude settings.
+
+Symlink caveat for the future cross-platform port: `.agents/rules/AGENTS.md`
+and `.claude/skills` are git symlinks. On Windows checkouts without symlink
+permission they materialize as text files containing the target path; the
+byte-equality and realpath checks in `check:docs` will catch that state.
 
 ## Project-scoped CARL
 
@@ -54,6 +88,9 @@ The dependency-free `.carl/mcpServer.mjs` exposes five project tools:
 
 Claude reads the tracked `.mcp.json`. Codex reads the trusted project
 `.codex/config.toml`; its configuration exposes only the four read-only tools.
+Cursor reads `.cursor/mcp.json` and Antigravity reads `.agents/mcp_config.json`;
+both launch the server with `CARL_READONLY=1`, which enforces the same
+four-tool read-only surface inside the server itself.
 The server resolves `carl.json` from its own repository location, so it cannot
 accidentally read the home-level Carl file. It has no network access, provider
 credentials, or application dependency.
@@ -69,7 +106,8 @@ session after changing project instructions or MCP configuration.
 
 ## Token and drift budgets
 
-- `AGENTS.md` stays below 5 KiB.
+- `AGENTS.md` stays below 5 KiB. `CLAUDE.md` stays below 1,000 bytes and must
+  contain a bare `@AGENTS.md` import line — a Markdown link is not an import.
 - No project CARL domain is always-on.
 - A rule is at most 600 characters; a decision rationale at most 400.
 - `carl_recall` returns at most two domains/four rules by default and reports the

@@ -1,0 +1,4 @@
+[install]
+# This is an independent lockfile/install root, so it repeats Rotli's
+# supply-chain age gate rather than depending on the repository-root bunfig.
+minimumReleaseAge = 259200

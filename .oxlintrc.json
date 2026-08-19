@@ -15,6 +15,10 @@
   //
   // typescript-eslint's naming-convention has no oxlint equivalent; the same
   // identifier-casing invariant is held by scripts/check-naming.mjs (check:naming).
+  // React Compiler analysis intentionally stays out of this ordinary rule set:
+  // scripts/check-react-compiler.mjs runs oxlint's lint-only compiler rule with
+  // a measured per-file/category ratchet, so existing migration debt is visible
+  // without either 56 inline suppressions or a production compiler transform.
   //
   // The `correctness` category is ON as of 2026-08-01 — measured first, exactly
   // as this config demands. The measurement (correctness=error over src/, e2e/,

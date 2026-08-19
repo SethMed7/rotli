@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en" data-env="charcoal">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="An isolated Rotli catalog for custom quokka colors, canonical emotions, new angles, and removable accessories."
+    />
+    <title>Rotli quokka catalog</title>
+    <link rel="stylesheet" href="quokka-catalog.css" />
+  </head>
+  <body>
+    <header class="catalog-bar">
+      <a href="index.html">← Appearance lab</a>
+      <span>Quokka catalog · experiment only</span>
+      <div class="environment-switch" role="group" aria-label="Preview environment">
+        <button type="button" data-env-choice="paper">Paper</button>
+        <button type="button" data-env-choice="warm-light">Warm</button>
+        <button type="button" data-env-choice="charcoal" class="is-active">Charcoal</button>
+      </div>
+    </header>
+
+    <div class="catalog-shell">
+      <aside class="catalog-nav" aria-label="Catalog sections">
+        <p>Browse</p>
+        <a class="is-current" href="#color">Color lab</a>
+        <a href="#states">Current library</a>
+        <a href="#angles">Angles &amp; emotion</a>
+        <a href="#accessories">Accessories</a>
+        <a href="#placement">Placement map</a>
+        <div class="catalog-note">
+          <strong>Two standards</strong>
+          Exact-shape work can ship. Generated concepts need a canonical redraw first.
+        </div>
+      </aside>
+
+      <main>
+        <section class="hero" aria-labelledby="catalog-title">
+          <div>
+            <p class="hero-date">Character exploration · August 15, 2026</p>
+            <h1 id="catalog-title">One quokka.<br />More ways to feel present.</h1>
+            <p>
+              Color can be personal without changing the drawing. New poses can carry meaning without
+              turning Rotli into a cartoon. Accessories stay optional, removable, and outside the logo.
+            </p>
+          </div>
+          <div class="hero-quokka" aria-label="Canonical celebrating quokka preview">
+            <div
+              class="tint-quokka"
+              style="--quokka-mask: url('assets/quokka-masks/celebrating.png')"
+            >
+              <span aria-hidden="true"></span>
+              <img src="../../../src/assets/characters/celebrating.svg" alt="Celebrating Rotli quokka" />
+            </div>
+            <small>Exact canonical geometry</small>
+          </div>
+        </section>
+
+        <section class="catalog-section color-section" id="color" aria-labelledby="color-title">
+          <div class="section-heading">
+            <div>
+              <span>Personal color</span>
+              <h2 id="color-title">Try the whole character, not a swatch.</h2>
+            </div>
+            <p>
+              These studies flood-fill the existing closed shapes and place the untouched line drawing
+              above them. Custom color never changes the silhouette, expression, or anatomy.
+            </p>
+          </div>
+
+          <div class="color-workbench">
+            <div class="color-stage">
+              <div
+                class="tint-quokka tint-quokka--large"
+                style="--quokka-mask: url('assets/quokka-masks/celebrating.png')"
+              >
+                <span aria-hidden="true"></span>
+                <img src="../../../src/assets/characters/celebrating.svg" alt="Custom-color celebrating quokka" />
+              </div>
+              <div class="color-readout">
+                <span>Body fill</span>
+                <strong data-color-name>Cocoa</strong>
+                <code data-color-value>#C6845F</code>
+              </div>
+            </div>
+
+            <div class="color-controls">
+              <div class="preset-list" role="group" aria-label="Quokka color presets">
+                <button type="button" data-quokka-color="#C6845F" data-color-label="Cocoa" class="is-active">
+                  <i style="--swatch: #c6845f"></i><span><b>Cocoa</b><small>Warm and familiar</small></span>
+                </button>
+                <button type="button" data-quokka-color="#6FA68B" data-color-label="Fern">
+                  <i style="--swatch: #6fa68b"></i><span><b>Fern</b><small>Calm and fresh</small></span>
+                </button>
+                <button type="button" data-quokka-color="#6EABD4" data-color-label="Ocean">
+                  <i style="--swatch: #6eabd4"></i><span><b>Ocean</b><small>Clear and open</small></span>
+                </button>
+                <button type="button" data-quokka-color="#A58BD9" data-color-label="Iris">
+                  <i style="--swatch: #a58bd9"></i><span><b>Iris</b><small>Softly expressive</small></span>
+                </button>
+                <button type="button" data-quokka-color="#C97998" data-color-label="Berry">
+                  <i style="--swatch: #c97998"></i><span><b>Berry</b><small>Warm and playful</small></span>
+                </button>
+                <button type="button" data-quokka-color="#D9A84C" data-color-label="Amber">
+                  <i style="--swatch: #d9a84c"></i><span><b>Amber</b><small>Bright, not loud</small></span>
+                </button>
+              </div>
+
+              <div class="custom-color">
+                <label for="custom-color">Your color</label>
+                <div>
+                  <input id="custom-color" type="color" value="#c6845f" aria-label="Custom quokka color" />
+                  <input id="custom-hex" type="text" value="#C6845F" maxlength="7" spellcheck="false" aria-label="Custom quokka hex color" />
+                  <button type="button" data-copy-color>Copy hex</button>
+                </div>
+                <p>Rotli would validate contrast against every environment before saving this choice.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="color-context" aria-label="One custom color across several canonical poses">
+            <p><strong>One color, four moments.</strong> Check the fill against different amounts of visual detail.</p>
+            <div>
+              <figure>
+                <div class="tint-quokka" style="--quokka-mask: url('assets/quokka-masks/base.png')">
+                  <span aria-hidden="true"></span><img src="../../../src/assets/characters/base.svg" alt="Ready pose" />
+                </div>
+                <figcaption>Ready</figcaption>
+              </figure>
+              <figure>
+                <div class="tint-quokka" style="--quokka-mask: url('assets/quokka-masks/searching.png')">
+                  <span aria-hidden="true"></span><img src="../../../src/assets/characters/searching.svg" alt="Searching pose" />
+                </div>
+                <figcaption>Searching</figcaption>
+              </figure>
+              <figure>
+                <div class="tint-quokka" style="--quokka-mask: url('assets/quokka-masks/rest.png')">
+                  <span aria-hidden="true"></span><img src="../../../src/assets/characters/rest.svg" alt="Resting pose" />
+                </div>
+                <figcaption>Resting</figcaption>
+              </figure>
+              <figure>
+                <div class="tint-quokka" style="--quokka-mask: url('assets/quokka-masks/celebrating.png')">
+                  <span aria-hidden="true"></span><img src="../../../src/assets/characters/celebrating.svg" alt="Celebrating pose" />
+                </div>
+                <figcaption>Complete</figcaption>
+              </figure>
+            </div>
+          </div>
+        </section>
+
+        <section class="catalog-section" id="states" aria-labelledby="states-title">
+          <div class="section-heading">
+            <div>
+              <span>Already canonical</span>
+              <h2 id="states-title">The emotional range Rotli already owns.</h2>
+            </div>
+            <p>
+              The current library covers more states than the interface uses today. The safest expansion
+              is semantic placement before drawing more characters.
+            </p>
+          </div>
+
+          <div class="state-ledger">
+            <article>
+              <div class="tint-quokka" style="--quokka-mask: url('assets/quokka-masks/waving.png')">
+                <span aria-hidden="true"></span><img src="../../../src/assets/characters/waving.svg" alt="Waving quokka" />
+              </div>
+              <div><h3>Welcome</h3><p>New chat, first vault, friendly re-entry.</p></div><em>Momentary</em>
+            </article>
+            <article>
+              <div class="tint-quokka" style="--quokka-mask: url('assets/quokka-masks/base.png')">
+                <span aria-hidden="true"></span><img src="../../../src/assets/characters/base.svg" alt="Ready quokka" />
+              </div>
+              <div><h3>Ready</h3><p>Appearance preview, neutral companion, no implied status.</p></div><em>Persistent</em>
+            </article>
+            <article>
+              <div class="tint-quokka" style="--quokka-mask: url('assets/quokka-masks/searching.png')">
+                <span aria-hidden="true"></span><img src="../../../src/assets/characters/searching.svg" alt="Searching quokka" />
+              </div>
+              <div><h3>Exploring</h3><p>Local search, retrieval, or inspecting a vault result.</p></div><em>Working</em>
+            </article>
+            <article>
+              <div class="tint-quokka" style="--quokka-mask: url('assets/quokka-masks/notes.png')">
+                <span aria-hidden="true"></span><img src="../../../src/assets/characters/notes.svg" alt="Notes quokka" />
+              </div>
+              <div><h3>Reading</h3><p>Librarian summary, note analysis, source review.</p></div><em>Working</em>
+            </article>
+            <article>
+              <div class="tint-quokka" style="--quokka-mask: url('assets/quokka-masks/ai_chat.png')">
+                <span aria-hidden="true"></span><img src="../../../src/assets/characters/ai_chat.svg" alt="Thinking quokka" />
+              </div>
+              <div><h3>Thinking</h3><p>Reserved for a visible model step—not an endless idle loop.</p></div><em>Working</em>
+            </article>
+            <article>
+              <div class="tint-quokka" style="--quokka-mask: url('assets/quokka-masks/rest.png')">
+                <span aria-hidden="true"></span><img src="../../../src/assets/characters/rest.svg" alt="Resting quokka" />
+              </div>
+              <div><h3>Resting</h3><p>Quiet empty state or completed background work.</p></div><em>Still</em>
+            </article>
+            <article>
+              <div class="tint-quokka" style="--quokka-mask: url('assets/quokka-masks/celebrating.png')">
+                <span aria-hidden="true"></span><img src="../../../src/assets/characters/celebrating.svg" alt="Celebrating quokka" />
+              </div>
+              <div><h3>Complete</h3><p>Newest chat end, successful import, meaningful finish.</p></div><em>Momentary</em>
+            </article>
+          </div>
+        </section>
+
+        <section class="catalog-section" id="angles" aria-labelledby="angles-title">
+          <div class="section-heading">
+            <div>
+              <span>New pose concepts</span>
+              <h2 id="angles-title">More dimensional, still emotionally quiet.</h2>
+            </div>
+            <p>
+              These are generated visual hypotheses, not production assets. Approve the pose and feeling;
+              then redraw it into the canonical vector system before it appears in Rotli.
+            </p>
+          </div>
+
+          <div class="angle-showcase">
+            <article class="angle-feature">
+              <div class="concept-art"><img src="assets/quokka-concepts/thoughtful.png" alt="Thoughtful three-quarter quokka concept" /></div>
+              <div><span>Three-quarter</span><h3>Thoughtful</h3><p>Useful while Rotli is reasoning through a choice or composing a meaningful response.</p><small>Best fit · visible reasoning step</small></div>
+            </article>
+            <div class="angle-pair">
+              <article>
+                <div class="concept-art"><img src="assets/quokka-concepts/walking.png" alt="Focused side-profile walking quokka concept" /></div>
+                <div><span>Side profile</span><h3>Moving with purpose</h3><p>A local operation in progress without a spinner becoming the whole personality.</p></div>
+              </article>
+              <article>
+                <div class="concept-art"><img src="assets/quokka-concepts/listening.png" alt="Seated listening quokka concept" /></div>
+                <div><span>Seated</span><h3>Listening</h3><p>Ask-first naming, voice capture, or any moment where Rotli is waiting for you.</p></div>
+              </article>
+            </div>
+            <article class="angle-feature angle-feature--reverse">
+              <div class="concept-art"><img src="assets/quokka-concepts/attention.png" alt="Gentle needs-attention quokka concept" /></div>
+              <div><span>Front-facing</span><h3>Gentle attention</h3><p>Permission requests and recoverable errors. Concerned enough to clarify, never alarming.</p><small>Never use for destructive or security-critical warnings</small></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="catalog-section accessory-section" id="accessories" aria-labelledby="accessories-title">
+          <div class="section-heading">
+            <div>
+              <span>Optional layers</span>
+              <h2 id="accessories-title">A little wardrobe, never a costume system.</h2>
+            </div>
+            <p>
+              One accessory at a time. It belongs to the full-body companion only, never the compact mark,
+              tray icon, app icon, or provider identity.
+            </p>
+          </div>
+
+          <div class="accessory-workbench">
+            <div class="accessory-stage">
+              <img data-accessory-preview src="assets/quokka-concepts/glasses.png" alt="Quokka wearing round glasses" />
+              <div><strong data-accessory-name>Round glasses</strong><span data-accessory-note>Quiet librarian energy</span></div>
+            </div>
+            <div class="accessory-list" role="group" aria-label="Accessory concepts">
+              <button type="button" class="is-active" data-accessory="glasses" data-label="Round glasses" data-note="Quiet librarian energy">
+                <img src="assets/quokka-concepts/glasses.png" alt="" /><span><b>Glasses</b><small>Reading · Librarian</small></span>
+              </button>
+              <button type="button" data-accessory="bucket-hat" data-label="Bucket hat" data-note="Relaxed workspace companion">
+                <img src="assets/quokka-concepts/bucket-hat.png" alt="" /><span><b>Bucket hat</b><small>Personal · everyday</small></span>
+              </button>
+              <button type="button" data-accessory="scarf" data-label="Cozy scarf" data-note="Warm seasonal layer">
+                <img src="assets/quokka-concepts/scarf.png" alt="" /><span><b>Scarf</b><small>Seasonal · comfort</small></span>
+              </button>
+              <button type="button" data-accessory="goggles" data-label="Explorer goggles" data-note="Curious and capable">
+                <img src="assets/quokka-concepts/goggles.png" alt="" /><span><b>Goggles</b><small>Search · exploration</small></span>
+              </button>
+            </div>
+          </div>
+          <p class="concept-warning">
+            Accessory shapes are concepts. Production should store them as independent vector overlays so
+            body color, pose, and accessory color remain separate choices.
+          </p>
+        </section>
+
+        <section class="catalog-section" id="placement" aria-labelledby="placement-title">
+          <div class="section-heading">
+            <div>
+              <span>Behavior map</span>
+              <h2 id="placement-title">Give each appearance a job.</h2>
+            </div>
+            <p>Personality works when it explains state. Repeating the quokka everywhere would make it wallpaper.</p>
+          </div>
+
+          <div class="placement-table" role="table" aria-label="Recommended quokka placements">
+            <div class="placement-row placement-row--head" role="row">
+              <span role="columnheader">Surface</span><span role="columnheader">Character</span><span role="columnheader">Treatment</span><span role="columnheader">Rule</span>
+            </div>
+            <div class="placement-row" role="row">
+              <strong role="cell">Newest chat end</strong><span role="cell">Complete or listening</span><span role="cell">64–80px · chosen color</span><span role="cell">Only newest settled answer</span>
+            </div>
+            <div class="placement-row" role="row">
+              <strong role="cell">New chat</strong><span role="cell">Welcome</span><span role="cell">72–96px · optional accessory</span><span role="cell">One restrained arrival</span>
+            </div>
+            <div class="placement-row" role="row">
+              <strong role="cell">Working state</strong><span role="cell">Searching, reading, thoughtful</span><span role="cell">40–56px · no accessory</span><span role="cell">Only when the state is inspectable</span>
+            </div>
+            <div class="placement-row" role="row">
+              <strong role="cell">Recoverable issue</strong><span role="cell">Gentle attention</span><span role="cell">48–64px · static</span><span role="cell">Never replaces explicit error copy</span>
+            </div>
+            <div class="placement-row" role="row">
+              <strong role="cell">Appearance</strong><span role="cell">Ready</span><span role="cell">96–128px · live preview</span><span role="cell">Color and accessory playground</span>
+            </div>
+            <div class="placement-row" role="row">
+              <strong role="cell">Product identity</strong><span role="cell">Compact line mark</span><span role="cell">16–24px · line only</span><span role="cell">Never filled or accessorized</span>
+            </div>
+          </div>
+        </section>
+
+        <footer class="catalog-footer">
+          <div><strong>Review in this order</strong><span>Body palette → new poses → accessories → placement frequency</span></div>
+          <a href="#color">Return to color lab ↑</a>
+        </footer>
+      </main>
+    </div>
+
+    <script src="quokka-catalog.js"></script>
+  </body>
+</html>

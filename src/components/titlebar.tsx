@@ -3,7 +3,7 @@
 // Dragging is manual startDragging so double-click never triggers the built-in
 // zoom.
 //
-// Rail-toggle law (Seth, 2026-06-13): the two titlebar rail icons (Folders ⌘0,
+// Rail-toggle law (the maintainer, 2026-06-13): the two titlebar rail icons (Folders ⌘0,
 // Notes list ⌥⌘L) are GONE. One unified, memory-based sidebar toggle now lives
 // INLINE left of the note-list filter (and on the warm-edge restore strip when
 // both rails are collapsed). The ⌘0 / ⌥⌘L chords stay rebindable in Keybindings —
@@ -13,17 +13,25 @@ import type { MouseEvent } from "react";
 
 import { dispatch } from "../keys/registry";
 import { startWindowDrag, toggleMaximize } from "../lib/tauri";
-import { openNewItemMenu } from "../newItems/menu";
 import { canBack, canForward, useNavHistory } from "../state/navHistory";
+import { usePanesStore } from "../state/panes";
 import { SOLID_THEMES, useUiStore } from "../state/ui";
 import { QuokkaMark } from "./character";
-import { ChevronRight, PlusGlyph, SidebarGlyph, SplitDownGlyph, SplitRightGlyph, SunGlyph } from "./glyphs";
+import {
+  BrowserGlyph,
+  ChevronRight,
+  PlusGlyph,
+  SidebarGlyph,
+  SplitDownGlyph,
+  SplitRightGlyph,
+  SunGlyph,
+} from "./glyphs";
 import { Icon } from "./icon";
 import { IconButton } from "./iconButton";
 import { Palette } from "./palette";
 
 /** One size for every titlebar icon so the bar reads as one cohesive row
- * (Seth, 2026-06-15). */
+ * (the maintainer, 2026-06-15). */
 const TB_ICON = 16;
 
 function onDragRegionMouseDown(event: MouseEvent) {
@@ -38,7 +46,7 @@ function onDragRegionDoubleClick() {
 
 export function Titlebar() {
   const settingsOpen = useUiStore((s) => s.settingsOpen);
-  // Back/Forward over opened notes (Seth #14) — ‹ › beside the search field
+  // Back/Forward over opened notes (the maintainer #14) — ‹ › beside the search field
   const navBack = useNavHistory(canBack);
   const navForward = useNavHistory(canForward);
   const updateAvailable = useUiStore((s) => s.updateAvailable);
@@ -57,7 +65,7 @@ export function Titlebar() {
   return (
     <header className="titlebar">
       <div className="tb-inset" onMouseDown={onDragRegionMouseDown} onDoubleClick={onDragRegionDoubleClick} />
-      {/* always-visible sidebar toggle (Seth, 2026-06-15): the clear way to
+      {/* always-visible sidebar toggle (the maintainer, 2026-06-15): the clear way to
           reopen a collapsed left menu — replaces the subtle warm-edge strip.
           .tb-lead left-aligns its tooltip so the label never clips off-window. */}
       {!settingsOpen && (
@@ -87,7 +95,7 @@ export function Titlebar() {
       <div className="tb-mid" onMouseDown={onDragRegionMouseDown} onDoubleClick={onDragRegionDoubleClick}>
         {!settingsOpen && (
           <>
-            {/* ‹ › — walk the opened-notes trail (Seth #14; ⌘[ / ⌘]) */}
+            {/* ‹ › — walk the opened-notes trail (the maintainer #14; ⌘[ / ⌘]) */}
             {!breveActive && (
               <>
                 <button
@@ -146,22 +154,39 @@ export function Titlebar() {
         )}
       </div>
       <div className="tb-actions">
-        {/* panes & tabs, visible (Seth 2026-06-12: keyboard-only is not discoverable) */}
+        {/* panes & tabs, visible (the maintainer 2026-06-12: keyboard-only is not discoverable) */}
         {!settingsOpen && !breveActive && (
           <>
-            <IconButton label="New… — ⌘T creates your default" onClick={openNewItemMenu}>
+            <IconButton
+              label="New… — ⌘N"
+              hotkey="tabs.newChooser"
+              onClick={() => dispatch("tabs.newChooser")}
+            >
               <PlusGlyph size={TB_ICON} />
             </IconButton>
-            {/* two distinct split buttons (Seth, 2026-06-13): right = vertical
+            {/* two distinct split buttons (the maintainer, 2026-06-13): right = vertical
                 divider (columns), down = horizontal divider (rows) */}
-            <IconButton label="Split right — ⌘D" onClick={() => dispatch("panes.splitRight")}>
+            <IconButton
+              label="Split right — ⌘D"
+              hotkey="panes.splitRight"
+              onClick={() => dispatch("panes.splitRight")}
+            >
               <SplitRightGlyph size={TB_ICON} />
             </IconButton>
-            <IconButton label="Split down — ⌘⇧D" onClick={() => dispatch("panes.splitDown")}>
+            <IconButton
+              label="Split down — ⌘⇧D"
+              hotkey="panes.splitDown"
+              onClick={() => dispatch("panes.splitDown")}
+            >
               <SplitDownGlyph size={TB_ICON} />
             </IconButton>
             <span className="tb-sep" aria-hidden="true" />
           </>
+        )}
+        {!settingsOpen && (
+          <IconButton label="New private browser" onClick={() => usePanesStore.getState().openBrowser()}>
+            <BrowserGlyph size={TB_ICON} />
+          </IconButton>
         )}
         {/* The sun cycles the four intentional work environments. */}
         <IconButton label={`Theme — ${themeLabel}`} onClick={() => dispatch("theme.cycle")}>
@@ -170,6 +195,7 @@ export function Titlebar() {
         <IconButton
           className="tb-trail"
           label={updateAvailable ? "Update available — open Settings · ⌘," : "Settings — ⌘,"}
+          hotkey="app.settings"
           pressed={settingsOpen}
           onClick={() => dispatch("app.settings")}
         >

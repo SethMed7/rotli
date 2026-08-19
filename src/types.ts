@@ -7,7 +7,7 @@ export interface Folder {
   name: string;
   /** Optional kit icon override; folders default to the folder glyph. */
   icon?: string;
-  /** Folders nest (Work → Myela), mirroring the future on-disk corpus. */
+  /** Folders nest (Work → Northstar), mirroring the future on-disk corpus. */
   parentId: string | null;
 }
 
@@ -88,6 +88,9 @@ export interface ChatTab {
   preview?: boolean;
   surfaceKind: "chat";
   chatSlug: string | null;
+  /** Stable owner of the chat file. Optional only for legacy viewstate and a
+   * pristine chat that has not resolved the active vault yet. */
+  vaultId?: string;
 }
 
 /** A surfaced binary FILE tab (audio/pdf/image/text) — rendered IN-APP, never
@@ -111,7 +114,7 @@ export interface ActivityTab {
   surfaceKind: "activity";
 }
 
-/** The ⌘N chooser — a blank new tab with NO type yet (Seth, 2026-07-29:
+/** The ⌘N chooser — a blank new tab with NO type yet (the maintainer, 2026-07-29:
  * "you have to choose board / md / doc etc"); picking a kind replaces it
  * with the created item's real surface. */
 export interface NewItemTab {
@@ -121,7 +124,15 @@ export interface NewItemTab {
   surfaceKind: "newItem";
 }
 
-export type Tab = NoteTab | CanvasTab | ChatTab | FileTab | ActivityTab | NewItemTab;
+/** A private browser tab holds identity only. Its URL/history belong to the
+ * non-persistent native webview and are intentionally absent from viewstate. */
+export interface BrowserTab {
+  id: string;
+  preview?: boolean;
+  surfaceKind: "browser";
+}
+
+export type Tab = NoteTab | CanvasTab | ChatTab | FileTab | ActivityTab | NewItemTab | BrowserTab;
 
 export type SplitDir = "row" | "col";
 

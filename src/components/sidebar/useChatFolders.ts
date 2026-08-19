@@ -32,7 +32,7 @@ export function chatFolderKey(id: string): string {
 export interface SidebarChatData {
   /** The vault whose chats/ these are — null until a vault is configured. */
   activeMemex: MemexInstance | null;
-  /** Pinned first, then most-recent (Seth, 2026-07-30). */
+  /** Pinned first, then most-recent (the maintainer, 2026-07-30). */
   chatList: MemexChatSummary[];
   manifest: ChatFoldersManifest;
   grouped: GroupedChats<MemexChatSummary>;

@@ -1,4 +1,4 @@
-/* rotli — the Quick Note window (Seth, 2026-06-15). A compact floating card
+/* rotli — the Quick Note window (the maintainer, 2026-06-15). A compact floating card
    that reuses the main editor + format bar (editor.css) over a small switcher.
    Native traffic lights live top-left (Overlay titlebar, conf), so the header
    reserves their space with .quick-inset. No raw hex — kit tokens + base.css
@@ -172,7 +172,7 @@
   background: var(--hov);
 }
 .qsrow.sel {
-  background: var(--tint);
+  background: var(--selected-bg);
 }
 .qslabel {
   flex: 1;

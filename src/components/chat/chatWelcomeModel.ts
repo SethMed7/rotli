@@ -39,7 +39,7 @@ export function chatWelcomeCharacter(hour: number, style: ChatWelcomeStyle): Cha
       return "waving";
     case "afternoon":
     case "noon":
-      return "knowledge";
+      return "waving";
     case "evening":
       return "rest";
   }

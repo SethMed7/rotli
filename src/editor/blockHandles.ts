@@ -1,4 +1,4 @@
-// Block handles (Seth, 2026-06-27; floating rework 2026-07-01) — a Milkdown-
+// Block handles (the maintainer, 2026-06-27; floating rework 2026-07-01) — a Milkdown-
 // style "move things around + add/remove" layer over the CodeMirror markdown,
 // with an Aa-panel escape hatch (ON by default). The .md stays the source of
 // truth: a block is just a run of consecutive non-blank lines (paragraph,
@@ -164,7 +164,7 @@ function hideDropLine() {
 
 // Milkdown/Crepe-style handle marks (currentColor so they theme): a "+" to add a
 // block below, and a 6-dot grip to drag/reorder. Inline SVG — NOT the "⠿" braille
-// char, which font-fell-back to a thin "white bar" (Seth, 2026-06-29).
+// char, which font-fell-back to a thin "white bar" (the maintainer, 2026-06-29).
 const PLUS_SVG =
   '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M8 3.6v8.8M3.6 8h8.8"/></svg>';
 const GRIP_SVG =

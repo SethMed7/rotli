@@ -1,5 +1,5 @@
 // ⌘⌫ in the System browser — move the current multi-selection to Trash
-// (Seth, 2026-07-28: Finder gestures end in Finder's delete). One executor,
+// (the maintainer, 2026-07-28: Finder gestures end in Finder's delete). One executor,
 // reusing the folder-trash ports so notes and files ride their own lanes;
 // errors land in the sidebar's inline lane, partial progress stays honest.
 

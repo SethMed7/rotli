@@ -2,7 +2,7 @@
 
 > **DECIDED (v3.6): `wiki/_inbox` staging won; a separate visible `notes/` root was rejected.**
 
-**Status:** STRAWMAN for Seth to redline. Authored from rotli (2026-06-25) against
+**Status:** STRAWMAN for the maintainer to redline. Authored from rotli (2026-06-25) against
 memex-vault `STRUCTURE.md` **v3.4**. Nothing here is ratified — once you redline, the
 agreed version lands in `~/memex-vault/STRUCTURE.md` (+ a `CHANGELOG.md` bump to v3.5)
 and the `[[smbrain-integration]]` note; then rotli implements strictly against it.
@@ -24,13 +24,13 @@ owns `chats/`, both read everything. v3.5 just adds a root and generalizes the m
 
 ---
 
-## 0. The two-layer model (the load-bearing idea — Seth, 2026-06-25)
+## 0. The two-layer model (the load-bearing idea — the maintainer, 2026-06-25)
 
 **The memex is built for an AI.** It only works with a **local LLM** doing the
 organizing — that's not optional, it's the engine. There are two layers:
 
 - **User layer (loose, theirs).** The user works the way *they* think — a visible
-  folder like `inbox/myela`, notes arranged however suits them. This is all they
+  folder like `inbox/northstar`, notes arranged however suits them. This is all they
   see and touch. rotli shows **meaning, not plumbing**: friendly labels, the user's
   own folders; the strict memex roots (`wiki/`, `self/`, `history/`) are never shown
   as raw names (e.g. Breve's `history/` appears as **"Breve"** — see §3).

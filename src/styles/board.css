@@ -1,4 +1,4 @@
-/* rotli — the Board (Seth, 2026-06-19): quick captures as selectable cards, with
+/* rotli — the Board (the maintainer, 2026-06-19): quick captures as selectable cards, with
    a merge-into-note action bar. Kit tokens only (no raw hex). Fills the
    .app-content area below the titlebar, like the Settings surface. */
 
@@ -12,7 +12,7 @@
   overflow: hidden;
 }
 
-/* — All-notes view: the board grammar + a header search (Seth, 2026-06-24) — */
+/* — All-notes view: the board grammar + a header search (the maintainer, 2026-06-24) — */
 .cv-search {
   margin-left: auto;
   display: flex;
@@ -48,7 +48,7 @@
   outline: none;
 }
 
-/* All-notes LIST: a full-width search bar under the header (Seth, 2026-06-30) */
+/* All-notes LIST: a full-width search bar under the header (the maintainer, 2026-06-30) */
 .allnotes-search {
   flex: 0 0 auto;
   display: flex;
@@ -168,12 +168,16 @@
 }
 .fdr-tile.sel,
 .fdr-tile.sel:hover {
-  background: var(--accent);
+  background: var(--selected-bg);
 }
-.fdr-tile.sel .fdr-tile-name,
-.fdr-tile.sel .fdr-tile-sub,
+.fdr-tile.sel .fdr-tile-name {
+  color: var(--selected-ink);
+}
+.fdr-tile.sel .fdr-tile-sub {
+  color: var(--selected-muted);
+}
 .fdr-tile.sel svg {
-  color: var(--on-accent);
+  color: var(--selected-icon);
 }
 .fdr-tile-icon {
   color: var(--text-muted);
@@ -182,7 +186,7 @@
   color: var(--accent);
 }
 .fdr-tile.sel .fdr-tile-icon.folder {
-  color: var(--on-accent);
+  color: var(--selected-icon);
 }
 .fdr-tile-name {
   max-width: 100%;
@@ -196,7 +200,7 @@
   font-size: 10.5px;
   color: var(--text-muted);
 }
-/* image assets show the PICTURE (Seth, 2026-07-28) — a contained thumb in the
+/* image assets show the PICTURE (the maintainer, 2026-07-28) — a contained thumb in the
    glyph's slot, hairline-bordered so light images hold a shape on any theme */
 .fdr-thumb {
   width: 84px;
@@ -206,7 +210,7 @@
   border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
 }
 
-/* — the Gallery view: big preview over a filmstrip (Seth, 2026-07-28) — */
+/* — the Gallery view: big preview over a filmstrip (the maintainer, 2026-07-28) — */
 .fdrg {
   flex: 1;
   min-height: 0;
@@ -269,7 +273,7 @@
   border-color: var(--accent);
 }
 
-/* — the Finder path bar (Seth, 2026-07-28: crumbs live at the BOTTOM) — */
+/* — the Finder path bar (the maintainer, 2026-07-28: crumbs live at the BOTTOM) — */
 .fdr-pathbar {
   flex: 0 0 auto;
   display: flex;
@@ -389,13 +393,17 @@ span.fdr-col {
 }
 .fdr-row.sel,
 .fdr-row.sel:hover {
-  background: var(--accent);
+  background: var(--selected-bg);
 }
-.fdr-row.sel .fdr-name,
+.fdr-row.sel .fdr-name {
+  color: var(--selected-ink);
+}
 .fdr-row.sel .fdr-date,
-.fdr-row.sel .fdr-kind,
+.fdr-row.sel .fdr-kind {
+  color: var(--selected-muted);
+}
 .fdr-row.sel svg {
-  color: var(--on-accent);
+  color: var(--selected-icon);
 }
 .fdr-name {
   display: inline-flex;
@@ -586,7 +594,7 @@ span.fdr-col {
 }
 
 /* Sticky-note cards use a warm fill and outline, without simulated elevation;
-   pointer-drag reorders them (Seth, 2026-06-29). */
+   pointer-drag reorders them (the maintainer, 2026-06-29). */
 .board-card {
   position: relative;
   display: flex;
@@ -692,7 +700,7 @@ span.fdr-col {
   color: var(--text-muted);
   display: -webkit-box;
   /* captures are one-off quick notes — the card IS the reading surface for
-     most of them, so show enough to actually read (Seth, 2026-07-28:
+     most of them, so show enough to actually read (the maintainer, 2026-07-28:
      "I could just look at it or make it a note"); double-click still opens */
   -webkit-line-clamp: 6;
   -webkit-box-orient: vertical;
@@ -783,7 +791,7 @@ span.fdr-col {
   cursor: default;
 }
 
-/* — Recent: a dated list view (Seth, 2026-06-26). Title left, snippet fills,
+/* — Recent: a dated list view (the maintainer, 2026-06-26). Title left, snippet fills,
    date pinned right; one click opens. Hairline row separators + roomier padding
    so it reads as a clean table, not a run-on (2026-06-26 readability pass). — */
 .recent-list {
@@ -810,17 +818,20 @@ span.fdr-col {
 .recent-row:hover {
   background: var(--hov);
 }
-/* the revealed row ("Show in Library" landed here) — the app's ONE active
-   state: the solid accent pill, all inner ink flipped (mirrors .snrow.sel) */
+/* The revealed row keeps the same subdued selection grammar as the sidebar. */
 .recent-row.sel,
 .recent-row.sel:hover {
-  background: var(--accent);
+  background: var(--selected-bg);
 }
-.recent-row.sel .rr-title,
+.recent-row.sel .rr-title {
+  color: var(--selected-ink);
+}
 .recent-row.sel .rr-snippet,
-.recent-row.sel .rr-date,
+.recent-row.sel .rr-date {
+  color: var(--selected-muted);
+}
 .recent-row.sel svg {
-  color: var(--on-accent);
+  color: var(--selected-icon);
 }
 .recent-row .rr-icon {
   flex: 0 0 auto;
@@ -853,7 +864,7 @@ span.fdr-col {
   font-variant-numeric: tabular-nums;
 }
 /* the "pinned to top" marker on an All-notes row — a quiet accent pin sitting
-   just left of the date (Seth, 2026-07-06). margin-left:auto so it rides the
+   just left of the date (the maintainer, 2026-07-06). margin-left:auto so it rides the
    right edge next to the date even when the snippet is short. */
 .rr-pin {
   flex: 0 0 auto;
@@ -874,7 +885,7 @@ mark.hitmark {
   padding: 0 1px;
 }
 
-/* All-chats list rows — the Chat-front twin of a note row (Seth, 2026-07-01). */
+/* All-chats list rows — the Chat-front twin of a note row (the maintainer, 2026-07-01). */
 .chatlist-row {
   width: 100%;
   display: flex;
@@ -921,7 +932,7 @@ mark.hitmark {
   opacity: 0.75;
 }
 
-/* Finder rubber-band selection (Seth, 2026-07-28) — a quiet accent-mixed
+/* Finder rubber-band selection (the maintainer, 2026-07-28) — a quiet accent-mixed
    rectangle over the browser's empty space; items own their own gestures */
 .system-browser .board-scroll {
   position: relative;
@@ -934,7 +945,7 @@ mark.hitmark {
   pointer-events: none;
 }
 
-/* — Miller columns (Seth, 2026-07-28): the Finder column view — each column
+/* — Miller columns (the maintainer, 2026-07-28): the Finder column view — each column
    lists one folder; clicking a folder opens the next column to its right. — */
 .fdrc-scroll {
   overflow-x: auto;
@@ -971,12 +982,16 @@ mark.hitmark {
 }
 .fdrc-item.sel,
 .fdrc-item.sel:hover {
-  background: var(--accent);
+  background: var(--selected-bg);
 }
-.fdrc-item.sel .fdrc-name,
-.fdrc-item.sel .fdrc-kind,
+.fdrc-item.sel .fdrc-name {
+  color: var(--selected-ink);
+}
+.fdrc-item.sel .fdrc-kind {
+  color: var(--selected-muted);
+}
 .fdrc-item.sel svg {
-  color: var(--on-accent);
+  color: var(--selected-icon);
 }
 /* the column whose child column is open — quiet wash, like Finder's path */
 .fdrc-item.folder.open {

@@ -4,7 +4,7 @@
 // on-device model via the Rust `chat_complete` bridge (the webview CSP can't reach
 // localhost).
 //
-// Pane-able (Seth, 2026-06-29): a chat is a PANE SURFACE now (surfaceKind "chat"),
+// Pane-able (the maintainer, 2026-06-29): a chat is a PANE SURFACE now (surfaceKind "chat"),
 // so multiple chats open at once and a pane can hold a chat OR a note side by side.
 // This component is driven by props { paneId, chatSlug } — chatSlug null = a fresh
 // unsent chat; the first send creates the file and BINDS the tab to its slug.
@@ -106,6 +106,7 @@ import { useMainStore } from "../../state/main";
 import { touchChatActivity } from "../../state/mru";
 import { type Measure } from "../../state/noteStyle";
 import { findLeaf, leaves, usePanesStore } from "../../state/panes";
+import { isDarkDataTheme } from "../../state/theme";
 import {
   type ChatReasoningEffort,
   type ChatServiceTier,
@@ -141,7 +142,7 @@ import { conversationPrompts } from "./chatPromptNavigatorModel";
 import { normalizedReasoning, normalizedServiceTier, reasoningChoices } from "./chatReasoningModel";
 import {
   CHAT_TITLE_MAX_LENGTH,
-  chatTitleAdvanceHint,
+  CHAT_TITLE_PLACEHOLDER,
   deriveChatTitle,
   normalizeChatTitle,
 } from "./chatTitleModel";
@@ -324,7 +325,7 @@ function StopGlyph() {
   );
 }
 
-/** Chat measure widths — comfort keeps the tuned 740 column (Seth, 2026-07-01);
+/** Chat measure widths — comfort keeps the tuned 740 column (the maintainer, 2026-07-01);
  * narrow/wide step around it. Same Aa vocabulary as notes, chat-tuned values. */
 const CHAT_MEASURE_PX: Record<Measure, number> = {
   narrow: 620,
@@ -620,14 +621,14 @@ function modelKindGlyph(kind: ModelKind) {
 
 /** The per-chat model picker — a quiet popover (same grammar as MeasureMenu)
  * grouped On this Mac · Connected · Presets, with a local-vs-"leaves your Mac"
- * cue and a vision badge. Replaces the bare native <select> (Seth, 2026-07-08
+ * cue and a vision badge. Replaces the bare native <select> (the maintainer, 2026-07-08
  * model UX pass, phase 2).
  *
  * The list is PORTALED to <body> and placed in viewport coordinates
  * (anchoredPopover). It used to be a pane-relative absolute box with a 62vh
  * cap: in a split the composer sits mid-window, so the list opened upward
  * straight past the window's top edge and came back clipped — a menu starting
- * mid-air over the transcript (Seth, 2026-08-01). Same idiom as the shared
+ * mid-air over the transcript (the maintainer, 2026-08-01). Same idiom as the shared
  * context-menu host: fixed, clamped, measured. */
 function ModelPicker({
   groups,
@@ -1240,7 +1241,7 @@ function ComposerAddMenu({
   );
 }
 
-/** The processing vocabulary (Seth, 2026-07-30: "add something fun here") —
+/** The processing vocabulary (the maintainer, 2026-07-30: "add something fun here") —
  * quiet, warm, rotli-toned. The loop's generic "thinking…" statuses rotate
  * through these; REAL tool statuses ("searching notes…") always win. */
 const THINK_WORDS = [
@@ -1256,7 +1257,7 @@ const THINK_WORDS = [
 const isThinkWord = (s: string): boolean => (THINK_WORDS as readonly string[]).includes(s);
 
 /** A mermaid fence in a reply, rendered as the real diagram (generative UI,
- * Seth 2026-08-03). Async render off the shared editor engine; while it loads
+ * the maintainer 2026-08-03). Async render off the shared editor engine; while it loads
  * — or when the source doesn't parse (a model mid-stream, or plain wrong) —
  * the source shows as code, so nothing ever blanks out. */
 function ChatMermaid({ code }: { code: string }) {
@@ -1268,7 +1269,7 @@ function ChatMermaid({ code }: { code: string }) {
     if (!host) return;
     const seq = ++renderSeq.current;
     setFailed(false);
-    const dark = ["dark", "charcoal"].includes(document.documentElement.dataset.theme ?? "");
+    const dark = isDarkDataTheme(document.documentElement.dataset.theme);
     void renderMermaidElement(code, {
       dark,
       id: `rotli-chat-mermaid-${seq}-${Date.now()}`,
@@ -1564,7 +1565,7 @@ const ChatMessage = memo(function ChatMessage({
       </div>
       {endMark && (
         <div className="chat-endmark-row">
-          <QuokkaMark size={20} className="chat-endmark" />
+          <Character name="celebrating" size={80} className="chat-endmark" personalIdle />
         </div>
       )}
     </div>
@@ -1598,10 +1599,12 @@ export function ChatSurface({
   paneId,
   tabId,
   chatSlug,
+  vaultId,
 }: {
   paneId: string;
   tabId: string;
   chatSlug: string | null;
+  vaultId?: string;
 }) {
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   // the seed a NEW chat starts on (the last model picked anywhere) + the
@@ -1678,7 +1681,14 @@ export function ChatSurface({
   );
 
   const cfg = useMemexConfig();
-  const active = cfg.data ? activeInstance(cfg.data) : null;
+  // A saved tab stays attached to the vault that owns its chat. Legacy and
+  // pristine tabs resolve the current active vault until their first save
+  // binds that owner into viewstate.
+  const active = cfg.data
+    ? vaultId
+      ? (cfg.data.instances.find((instance) => instance.id === vaultId) ?? null)
+      : activeInstance(cfg.data)
+    : null;
   const chats = useInstanceChats(active);
   const write = useWriteChat();
   const updateTitle = useUpdateChatTitle();
@@ -1746,7 +1756,7 @@ export function ChatSurface({
   const groups: ModelGroups = secureChat ? { ...allGroups, connected: [], presets: [] } : allGroups;
   const modelList = flattenModels(groups);
   // THIS chat's model — its own pick, or the new-chat seed until it has one.
-  // Independent per chat (Seth, 2026-08-01): two chat panes side by side each
+  // Independent per chat (the maintainer, 2026-08-01): two chat panes side by side each
   // send to their own model, and picking in one never moves the other.
   const chatKeyId = chatKey(active?.id ?? null, chatSlug, tabId);
   useEffect(() => {
@@ -1791,6 +1801,13 @@ export function ChatSurface({
   const images = draft.images;
   const pendingQuestion = draft.questionKey === chatKeyId ? draft.question : null;
   const [messages, setMessages] = useState<Msg[]>([]);
+  // The draft store clears as soon as the first prompt sends. Keep the title
+  // chosen/derived for the brief pre-bind interval so the real input retires
+  // immediately into ordinary header text instead of flashing "New chat".
+  const [provisionalTitle, setProvisionalTitle] = useState<string | null>(null);
+  const firstUserPrompt = messages.find((item) => item.speaker === "you")?.text ?? "";
+  const hasSentPrompt = firstUserPrompt !== "";
+  const provisionalDisplayTitle = provisionalTitle ?? deriveChatTitle(firstUserPrompt);
   const prompts = useMemo(
     () => conversationPrompts(messages.map((item) => ({ ...item, text: visibleChatText(item.text) }))),
     [messages],
@@ -2098,7 +2115,7 @@ export function ChatSurface({
       ]);
       return;
     }
-    // An attachment becomes PART OF THE MESSAGE (Seth, 2026-08-04: "like a
+    // An attachment becomes PART OF THE MESSAGE (the maintainer, 2026-08-04: "like a
     // #image one like claude does so we can reference it and talk about it").
     // The portable storage link makes an image referable afterwards and keeps
     // the relationship durable. The bubble hides its storage target; the Rust
@@ -2109,6 +2126,8 @@ export function ChatSurface({
             .map((image, i) => (image.id ? attachmentReference(i + 1, image.id) : `[Image #${i + 1}]`))
             .join(" ")}${typed ? `\n${typed}` : ""}`
         : typed;
+    const sentTitle = normalizeChatTitle(title) || deriveChatTitle(userText);
+    setProvisionalTitle(sentTitle);
     lastSentRef.current = { text: typed, images: imgs };
     clearDraft(tabId);
     // history = the prior turns; the new user message rides as runAgent's userText
@@ -2131,7 +2150,7 @@ export function ChatSurface({
     setStreaming("");
     const myRun = ++runSeq.current;
 
-    // — persist the user turn NOW (Seth, 2026-08-03: "once sent, instantly I
+    // — persist the user turn NOW (the maintainer, 2026-08-03: "once sent, instantly I
     // should see it in the left bar"): the chat file exists (or bumps its
     // mtime) before the model even starts, so the sidebar row appears at the
     // top, pulsing, the moment Send is pressed. A brand-new chat binds its tab
@@ -2140,7 +2159,6 @@ export function ChatSurface({
     // was active in the pane by then). If the write fails (read-only vault,
     // disk trouble), the run continues in-memory and the completion path falls
     // back to the old persist-at-the-end shape — same net behavior as before.
-    const sentTitle = normalizeChatTitle(title) || deriveChatTitle(userText);
     let sentSlug: string | null = chatSlug;
     let sentPersisted = false;
     try {
@@ -2160,9 +2178,9 @@ export function ChatSurface({
           secureContext: attachedSecure,
         });
         sentSlug = res.slug;
-        bindChat(paneId, tabId, res.slug); // this tab IS that chat, from the send on
+        bindChat(paneId, tabId, res.slug, active.id); // this tab IS that chat, from the send on
         // view inheritance: a chat born while a named view is active belongs to
-        // that view (Seth, 2026-08-03: organize chats by work vs personal)
+        // that view (the maintainer, 2026-08-03: organize chats by work vs personal)
         const bornInView = useUiStore.getState().activeView;
         if (bornInView) {
           const views = useViewsStore.getState();
@@ -2170,7 +2188,7 @@ export function ChatSurface({
             views.setManifest(assignChatToView(views.manifest, res.slug, bornInView));
           }
         }
-        // folder inheritance (Seth, 2026-07-30): a new chat opened FROM a
+        // folder inheritance (the maintainer, 2026-07-30): a new chat opened FROM a
         // foldered chat files itself into the same folder. Best-effort — a
         // manifest hiccup must never fail the send.
         const originSlug = useUiStore.getState().newChatOrigin;
@@ -2451,7 +2469,7 @@ export function ChatSurface({
             turns: memoryTurns,
           }).catch((error) => setNoteErr(error instanceof Error ? error.message : String(error)));
         }
-        bindChat(paneId, tabId, res.slug); // this tab now IS that chat
+        bindChat(paneId, tabId, res.slug, active.id); // this tab now IS that chat
         // the run signal + an unread flag follow the unsaved key to the slug
         useChatRuns.getState().retargetRun(runKey, chatKey(active.id, res.slug, tabId));
         // the saved chat's maps ride the VAULT-scoped key (2026-08-03)
@@ -2518,13 +2536,13 @@ export function ChatSurface({
     if (!busy) setQueued(null);
   }, [busy]);
 
-  // Leaving the chat NO LONGER cancels a queued send (flip, Seth 2026-08-03:
+  // Leaving the chat NO LONGER cancels a queued send (flip, the maintainer 2026-08-03:
   // fire off several chats and switch between them — the sidebar's run/unread
   // signals carry the result back). A queued or running turn survives unmount,
   // lands on disk through the same closure, and flips its row to unread.
   // Deliberate abandonment stays one click away: open the chat and Stop.
 
-  /** Stop (Seth, 2026-07-30): orphan the run, kill any CLI child, abort a local
+  /** Stop (the maintainer, 2026-07-30): orphan the run, kill any CLI child, abort a local
    * stream, and free the surface. If the on-device answer had already begun
    * streaming, KEEP that partial text as the answer (the user asked to stop, not
    * to erase what arrived); otherwise the turn never produced anything, so the
@@ -2597,7 +2615,7 @@ export function ChatSurface({
     }
   };
 
-  // — dropped images (Seth, 2026-08-04) — the window handler hands us OS PATHS.
+  // — dropped images (the maintainer, 2026-08-04) — the window handler hands us OS PATHS.
   // Import each into the vault's asset store first (the same lane a drop
   // anywhere else uses), then read it back through the asset protocol: the
   // composer speaks data URLs, and the image becomes a durable vault asset
@@ -2680,7 +2698,7 @@ export function ChatSurface({
    * right split beside the chat. The split path carves the pane WITH the note
    * tab directly (openToSide) — splitRight() duplicates the active tab, so the
    * old splitRight+openNote pair left a copy of the chat riding in the new
-   * pane next to the note (Seth, 2026-07-30: "only the note should open"). */
+   * pane next to the note (the maintainer, 2026-07-30: "only the note should open"). */
   const openAttachedNote = (noteId: string) => {
     if (chatNoteOpen === "split") {
       openToSide("note", noteId);
@@ -2746,13 +2764,13 @@ export function ChatSurface({
           <span className="chat-breadcrumb-separator" aria-hidden="true">
             /
           </span>
-          {!chatSlug && chatNaming === "ask" && writable ? (
+          {!chatSlug && !hasSentPrompt && chatNaming === "ask" && writable ? (
             <label className="chat-title-field">
               <input
                 ref={titleRef}
                 className="chat-title-edit is-new"
                 aria-label="Chat name, optional"
-                placeholder="Name this chat (optional)"
+                placeholder={CHAT_TITLE_PLACEHOLDER}
                 maxLength={CHAT_TITLE_MAX_LENGTH}
                 value={title}
                 onChange={(event) => setDraftTitle(tabId, event.currentTarget.value)}
@@ -2764,7 +2782,6 @@ export function ChatSurface({
                   }
                 }}
               />
-              <span className="chat-title-skip">{chatTitleAdvanceHint(title)}</span>
             </label>
           ) : chatSlug && editingStoredTitle ? (
             <input
@@ -2797,6 +2814,8 @@ export function ChatSurface({
             >
               {displayTitle}
             </button>
+          ) : !chatSlug && hasSentPrompt ? (
+            <span className="chat-title-h">{provisionalDisplayTitle}</span>
           ) : (
             <span className="chat-title-h is-placeholder">New chat</span>
           )}
@@ -2887,12 +2906,12 @@ export function ChatSurface({
 
       {!isTauri() ? (
         <div className="list-empty chat-empty">
-          <Character name="chat" size={120} />
+          <Character name="listening" size={120} accessorized />
           <p>Chat uses your vault as context — it runs in the app.</p>
         </div>
       ) : !active ? (
         <div className="list-empty chat-empty">
-          <Character name="chat" size={120} />
+          <Character name="attention" size={120} />
           <p>No vault connected yet.</p>
           <button type="button" className="chat-cta" onClick={() => setSettingsOpen(true)}>
             Connect one in Settings → Location
@@ -2916,22 +2935,22 @@ export function ChatSurface({
                           name={pristineChat ? chatWelcomeCharacter(welcomeHour, chatWelcomeStyle) : "chat"}
                           size={pristineChat ? 58 : 50}
                           className="chat-welcome-character"
+                          accessorized={pristineChat}
+                          personalIdle={pristineChat}
                         />
                       </div>
                       <p className="chat-hint-title">
                         {pristineChat ? chatWorkPrompt(userName) : "No messages yet."}
                       </p>
                     </div>
-                    <p className="chat-sub">
-                      {pristineChat
-                        ? "Ask, make, or search across this vault."
-                        : "This saved chat is ready for its first message."}
-                    </p>
+                    {!pristineChat && (
+                      <p className="chat-sub">This saved chat is ready for its first message.</p>
+                    )}
                   </div>
                 ) : (
                   // messages are PLAIN text — no per-message author label; the
                   // brand mark appears once at the thread's live edge instead
-                  // (Seth, 2026-07-30: match the premium chat grammar). Options
+                  // (the maintainer, 2026-07-30: match the premium chat grammar). Options
                   // ride each message, revealed on hover/focus.
                   messages.map((m, idx) => (
                     <ChatMessage
@@ -3142,7 +3161,7 @@ export function ChatSurface({
                             onServiceTier={(value) => setChatServiceTier(chatKeyId, value)}
                           />
                         )}
-                        {/* EVERY lane stops now (Seth, 2026-07-30): CLIs die for
+                        {/* EVERY lane stops now (the maintainer, 2026-07-30): CLIs die for
                         real (Rust kills the child); the local lane orphans the
                         run — the reply is discarded and the prompt returns to
                         the composer either way */}

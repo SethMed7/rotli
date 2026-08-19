@@ -1,7 +1,7 @@
-# _reference — rotli brand board (Seth-approved, 2026-06-06)
+# _reference — rotli brand board (the maintainer-approved, 2026-06-06)
 
 This is the **reference** that the `BRANDS/rotli/brief.md` and the seeded `kits/rotli/` were built from.
-It is Seth's judged direction — the input to **formalize**, not a vector source to trace.
+It is the maintainer's judged direction — the input to **formalize**, not a vector source to trace.
 
 ## Drop the source here
 

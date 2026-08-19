@@ -1,4 +1,4 @@
-// The Workflow view for one routine (Seth, 2026-08-04: "so we can visually see
+// The Workflow view for one routine (the maintainer, 2026-08-04: "so we can visually see
 // what is happening"). Stage 1 is deliberately READ-ONLY: it shows what the
 // routine's executor genuinely runs, derived by src/routines/pipeline.ts — the
 // graph is documentation, not a second source of truth, and nothing here can

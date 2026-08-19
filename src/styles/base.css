@@ -15,7 +15,7 @@
   --hov: rgba(58, 48, 40, 0.07);
   --act: rgba(58, 48, 40, 0.11);
   /* the dim behind the ⌘K palette — warm by default; the mono themes override it
-     to a neutral scrim so charcoal doesn't read warm-brown (Seth, 2026-07-06). */
+     to a neutral scrim so charcoal doesn't read warm-brown (the maintainer, 2026-07-06). */
   --scrim: rgba(58, 48, 40, 0.4);
 
   /* — semantic color roles —
@@ -29,6 +29,13 @@
   --seg-accent: var(--rotli-clay);
   --icon-clay: var(--rotli-clay);
   --icon-olive: var(--rotli-olive);
+  /* Persistent selection stays quieter than a primary action: a small accent
+     wash, normal text ink, and accent only for the identifying detail. */
+  --selected-bg: color-mix(in srgb, var(--accent) 11%, transparent);
+  --selected-bg-hover: color-mix(in srgb, var(--accent) 15%, transparent);
+  --selected-ink: var(--text);
+  --selected-muted: var(--text-muted);
+  --selected-icon: var(--accent-text);
 
   /* — radius scale, one family (r3 gate) —
      4 inner elements · 8 controls/rows · 10 tabs/bubbles · 12 cards/panels ·
@@ -79,7 +86,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* selection wears the PRIMARY color (Seth, 2026-07-29) — a translucent wash
+/* selection wears the PRIMARY color (the maintainer, 2026-07-29) — a translucent wash
    of the theme's accent, so a chosen data-accent shows up in every select */
 ::selection {
   background: color-mix(in srgb, var(--accent) 30%, transparent);

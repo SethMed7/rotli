@@ -1,10 +1,10 @@
 # Direction: the vault platform — memex folds into rotli
 
-Date: 2026-07-25 · Status: **direction set by Seth; sidebar affordance changes
+Date: 2026-07-25 · Status: **direction set by the maintainer; sidebar affordance changes
 shipped; the platform items below are proposed scope, each needing its own
 implementation review**
 
-Source: Seth's review of Zen Notes (screenshots, 2026-07-25). Not a copy — a
+Source: the maintainer's review of Zen Notes (screenshots, 2026-07-25). Not a copy — a
 short list of things it gets right that rotli should own in its own voice.
 
 ## Decided and shipped now (sidebar affordances)
@@ -19,7 +19,7 @@ short list of things it gets right that rotli should own in its own voice.
 
 ## 1. Memex becomes rotli's vault layer (the big one)
 
-Seth: the vault should be *just data*; rotli is the layer on top that manages
+the maintainer: the vault should be *just data*; rotli is the layer on top that manages
 and understands it. The separate public `memex` repo/brand retires — the format
 lives wherever rotli names it.
 
@@ -36,7 +36,7 @@ What this means concretely (proposed):
   cross-repo references (memex-vault instance tooling, Breve's pointer,
   CLAUDE.md guidance), and what happens to the public `SethMed7/memex` repo.
   **Archiving/retiring that repo is an external, hard-to-reverse operation that
-  stays Seth's explicit call** — this document does not authorize it.
+  stays the maintainer's explicit call** — this document does not authorize it.
 
 ## 2. Vault switcher in the sidebar header
 
@@ -81,7 +81,7 @@ survive at all is the design question.
    no longer points at the external template repo; the vault format speaks in
    rotli's own voice). The external steps — archiving `SethMed7/memex`,
    migrating memex-vault tooling references, CLAUDE.md guidance — remain
-   Seth's explicit call and are untouched. The vocabulary question is now
+   the maintainer's explicit call and are untouched. The vocabulary question is now
    answered by [`2026-07-26-vault-vs-brain.md`](2026-07-26-vault-vs-brain.md):
    **Vault** (the data) vs **Brain** (the optional AI layer), with a raw-vault
    opt-out designed there.

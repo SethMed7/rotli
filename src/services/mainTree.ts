@@ -1,4 +1,4 @@
-// Main — the user's hand-arranged view over the Brain (Seth, 2026-07-01; design in
+// Main — the user's hand-arranged view over the Brain (the maintainer, 2026-07-01; design in
 // memex-vault wiki/projects/rotli/main-brain-daemon.md). Main holds NO files of its own: it's an ordered,
 // nested tree of Main-only FOLDERS and note-ID references, stored in `.rotli/main.json`.
 // It references notes by `id` only — so when the background daemon refiles a note's
@@ -83,7 +83,7 @@ export function buildMainTree(
         // RENDER only refs whose real home is Main-eligible. A note moved to a
         // sink (Archive/Trash) or living in the external Vault keeps its manifest
         // slot — so it survives GC (which uses the FULL index) — but must not show
-        // as a live Main row (Seth, 2026-07-08: "if it's not in the Brain or
+        // as a live Main row (the maintainer, 2026-07-08: "if it's not in the Brain or
         // Storage, Main shouldn't have it"). Board/Storage/wiki homes pass.
         if (n && !isSink(n.folderId) && !isVault(n.folderId)) {
           notes.push({ ...n, folderId: parentId, mainOrder: order++ });
@@ -147,7 +147,7 @@ function containsNote(nodes: MainNode[], noteId: string): boolean {
  * map re-expanded them — #83, audit 2026-07), and the persisted-map GC keeps
  * only these among "main:*" keys (#78). */
 /** The ONE Main row comparator: pinned notes FLOAT above the hand-arranged
- * order (Seth, 2026-07-09), the manifest itself is never reordered. Both the
+ * order (the maintainer, 2026-07-09), the manifest itself is never reordered. Both the
  * renderer and the roving j/k walk MUST use this — they diverged once and the
  * keyboard cursor visibly teleported (P0 sweep 2026-07-28). */
 export function mainRowSort(
@@ -268,7 +268,7 @@ export function addNoteToMain(tree: MainNode[], noteId: string): MainNode[] {
 /** Add a note INTO the Main folder with rendered id `parentId` ("main:<path>"),
  * or the Main root when `parentId` is MAIN_ROOT / the folder can't be found.
  * A no-op if the note already lives anywhere in Main. Every new note lands in
- * Main, inside the folder the user is working in (Seth #15/#16, 2026-07-03). */
+ * Main, inside the folder the user is working in (the maintainer #15/#16, 2026-07-03). */
 export function addNoteToMainAt(tree: MainNode[], noteId: string, parentId: string): MainNode[] {
   if (containsNote(tree, noteId)) return tree;
   const ref: MainNode = { note: noteId };

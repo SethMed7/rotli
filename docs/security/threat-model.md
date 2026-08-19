@@ -65,6 +65,9 @@ as an encrypted vault.
 - **The webview** is less trusted than the Rust host. It sends intent through
   typed IPC; Rust revalidates paths, permissions, write lanes, and security
   state.
+- **The private-browser guest** is fully untrusted remote content. It runs in a
+  separate non-persistent child webview and matches no Tauri capability; only
+  the app-owned `main`, `capture`, and `quick` labels receive IPC permissions.
 - **Imported content** is untrusted, including Markdown, DOCX packages, sheets,
   Excalidraw scenes, PDFs, fetched web pages, email, and chat memory.
 - **Local models** are untrusted interpreters running on loopback. Locality
@@ -91,6 +94,7 @@ format + corpus adapters ──► application policy ──► presentation
         │ Rust path/write gate    ├──► local model adapter
         │                         ├──► remote provider adapter ──► network
         │                         ├──► web adapter ──────────────► network
+        │                         ├──► private browser guest ───► network
         │                         └──► workspace CLI/MCP ────────► agent process
         ▼
 registered local roots
@@ -112,12 +116,14 @@ transport, credential, or filesystem authority directly.
 | An AI edits a note the user locked | Locked refusal at every AI write path on both layers (`corpus_write_ai`, the host's `update_note`, chat-memory sync, workspace agents, the organizer) | A locked note is still readable by every model; locking is not confidentiality |
 | A local chat launders secure prose into a note a remote chat later reads | One-way `secureContext` chat taint; tainted `create_note` is stamped secure; tainted `update_note` may edit only secure notes; a tainted loose chat writes no memory note; remote egress refuses tainted transcripts | A user who manually copies secure text into an open note is out of scope |
 | A crafted path or writable-lane symlink escapes the corpus | Per-component no-follow metadata, canonical registered-root containment, path/extension checks, declared Rust write lanes, contained atomic-temp parents | Same-user replacement races and a fully compromised Rust host are out of scope |
+| A compromised webview uses the vault chooser to enumerate or authorize arbitrary local paths | Rust-owned session rooted at canonical Home; direct-child component validation; directory names only; hidden names, files, symlinks, and Home ancestors excluded; final native authorization and privileged-root refusal | The explicit native **More locations…** fallback exposes the ordinary macOS picker to the local user; downstream Rust commands still revalidate the selected root |
 | A fetched URL reaches loopback, metadata services, or private networks | Scheme/host limits, vetted DNS resolution, IP pinning, same-host redirects, response caps | Breve owner-configured fetch retains a documented DNS-rebinding residual |
 | A search failure silently sends the query to another provider | The globe grants per-chat internet consent; a separate per-vault provider setting selects one literal Rust adapter; failures are typed observations and never cross-provider retries | DuckDuckGo's unofficial HTML surface may change or challenge clients; the user must explicitly choose another destination |
 | A provider credential leaks into notes, settings, frontend state, or logs | Allowlisted macOS Keychain account; Rust-only read at request time; webview commands expose store/probe/delete but never read; sensitive-log tripwire; auth header never query string | A compromised same-user process can access that user's Keychain subject to macOS policy |
 | A malicious document/board exploits a codec or exhausts resources | Vendor code behind adapters, package preservation tests, PDF source/extracted-text caps and panic refusal, parity-pinned Excalidraw byte/element/action/string/coordinate/depth limits, dependency audit | Complex third-party parsers retain supply-chain and decompression/resource-exhaustion risk |
 | Active content in a Markdown SVG fence reaches the webview | Parse as XML, rebuild only allowlisted SVG elements/attributes, reject event attributes, scripts, `foreignObject`, external resources, unsafe URLs, styles, and foreign namespaces; production CSP remains defense-in-depth | Browser SVG implementations still require dependency/browser regression review |
 | A compromised webview invokes privileged IPC | Strict CSP, narrow Tauri capability grants, typed facade, Rust revalidation | Webview compromise may exercise any intentionally exposed command as the user |
+| A page in the private browser invokes Rotli IPC or retains a session | Separate child webview; capability targets name only app-owned webviews; no remote capability URLs; non-persistent WebKit data store; HTTP(S)-only top-level navigation; browser tabs hydrate as absent | The viewed site still receives ordinary browser request metadata and user-entered data; downloads are intentionally disabled in this first slice |
 | A hostile same-user process invokes the workspace CLI | Registered roots, secure/locked refusal, revisions, remote content gate | Same-user processes can edit ordinary files directly; stronger OS isolation is not claimed |
 | Two writers overwrite one another | Atomic writes, file locks where ownership matters, optimistic revisions for workspace edits | Editor/filesystem races outside revision-aware paths require focused tests |
 | An updater or release channel is replaced | Pinned feed, minisign verification, Developer ID signing, notarization, stapling | Signing-key custody and release provenance remain operational responsibilities |

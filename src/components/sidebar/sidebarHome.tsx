@@ -1,4 +1,4 @@
-// The HOME front (Seth's IA, 2026-08-01): the notes world, in one uninterrupted
+// The HOME front (the maintainer's IA, 2026-08-01): the notes world, in one uninterrupted
 // scroll. All notes · Captures · Tasks, then the MAIN manifest (or the active
 // named view) as a hand-arranged tree, then the pinned SYSTEM zone underneath.
 // "Home, which is notes essentially and eventually a dashboard" — a dashboard
@@ -25,9 +25,9 @@ import { dispatch } from "../../keys/registry";
 import { createDragGhost } from "../../lib/dragGhost";
 import { noteDiskFolder, projectNoteToBrain } from "../../lib/noteLocation";
 import { createPointerDragSession } from "../../lib/pointerDrag";
+import { useNow } from "../../lib/useNow";
 import { DEST, isRootMarker } from "../../services/destinations";
 import {
-  useCorpusRoots,
   useFolders,
   useMainGcIds,
   useNoteIndex,
@@ -76,12 +76,10 @@ import {
   NewFileGlyph,
   NewFolderGlyph,
   PinGlyph,
-  ShieldGlyph,
   StarGlyph,
   StorageGlyph,
   TaskGlyph,
   TrashGlyph,
-  VaultGlyph,
   glyphForNote,
 } from "../glyphs";
 import { InlineRenameInput } from "../inlineRenameInput";
@@ -117,20 +115,9 @@ function CaptureBoardGlyph({ size = 16 }: { size?: number }) {
   );
 }
 
-/** The reserved System destinations, in order, each with its glyph. The
- * note-capture root keeps its on-disk id "Inbox" (the memex contract is
- * unchanged) but is LABELED "Capture" — the word "Inbox" is reserved for the
- * future email front (removed from the sidebar 2026-07-30, see ROADMAP.md).
- * "Capture" (DEST.inbox) is GONE from the rows — captures have ONE home now,
- * the "Captures" row below (Seth, 2026-06-30). */
+/** The fixed System destinations after Library. Switching vaults changes only
+ * their contents and counts; it never adds, removes, or renames these rows. */
 const DEST_ROWS: SystemDestRow[] = [
-  { id: DEST.secure, label: "Secure notes", Glyph: ShieldGlyph },
-  // "Linked library" (2026-07-26): a CONNECTED vault — distinct from both the
-  // local Library and the vault-switcher's whole-vault concept
-  { id: DEST.vault, label: "Linked library", Glyph: VaultGlyph },
-  // "Assets" is the DISPLAY name (decision 2026-07-25, Zen reference) — one
-  // system home for every image/video/PDF/file. The id + disk lane stay
-  // "Storage"/storage/ (persisted expansion keys, folder ids, the contract).
   { id: DEST.storage, label: "Assets", Glyph: StorageGlyph },
   { id: DEST.archive, label: "Archive", Glyph: ArchiveGlyph },
   { id: DEST.trash, label: "Trash", Glyph: TrashGlyph },
@@ -156,21 +143,21 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
       ),
     [chatModelMap, chats.activeMemex, chats.chatList],
   );
+  const now = useNow();
   const dashboard = useMemo(
-    () => homeDashboardSnapshot(searchableNotes, dashboardModels, chats.chatList, Date.now()),
-    [searchableNotes, dashboardModels, chats.chatList],
+    () => homeDashboardSnapshot(searchableNotes, dashboardModels, chats.chatList, now),
+    [searchableNotes, dashboardModels, chats.chatList, now],
   );
   const dashboardSection = useUiStore((s) => s.dashboardSection);
   const setDashboardSection = useUiStore((s) => s.setDashboardSection);
   // the reserved queries — all served from the one cached corpus_list, so
   // these hooks are cache reads, not fetches
   const secureNotes = useNotes(DEST.secure).data ?? [];
-  const vaultNotes = useNotes(DEST.vault).data ?? [];
   const storageNotesFlatData = useNotes(DEST.storage).data;
   const archiveNotes = useNotes(DEST.archive).data ?? [];
   const trashNotes = useNotes(DEST.trash).data ?? [];
   const boardNotesData = useNotes(DEST.board).data;
-  // Storage organization (Seth, 2026-06-30): regroup the flat binaries into a
+  // Storage organization (the maintainer, 2026-06-30): regroup the flat binaries into a
   // synthetic tree (Type / Date / Folder, a Settings knob) IN THE FRONTEND. The
   // synthetic "Storage/<…>" folders merge into the folder list and the storage
   // notes re-home, so the existing recursive renderer + roving cursor just work —
@@ -194,17 +181,9 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     ],
     [foldersData, storageTree.folders],
   );
-  // hide the "Vault" (linked-library) destination until one is actually connected —
-  // an empty Vault row next to the user's own memex-vault folder just confuses
-  // (Seth, 2026-06-30). It returns the moment a vault root has notes/folders.
-  const showVault = vaultNotes.length > 0 || folders.some((f) => f.id.startsWith("vault:"));
-  const visibleDestRows = useMemo(
-    () => DEST_ROWS.filter((d) => d.id !== DEST.secure && (d.id !== DEST.vault || showVault)),
-    [showVault],
-  );
   // the BRAIN — the AI-organized wiki areas (People · Projects · Research · …).
   // Curated notes (no shelf) project to their disk area "wiki/<area>"; the
-  // Library row in the System zone is their door (Seth, 2026-06-30).
+  // Library row in the System zone is their door (the maintainer, 2026-06-30).
   const brainNotes = useMemo(
     () => searchableNotes.map(projectNoteToBrain).filter((n): n is NoteSummary => n !== null),
     [searchableNotes],
@@ -246,10 +225,6 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   const noteIndex = useNoteIndex();
   const liveIds = useMainGcIds();
   const mainProjection = useMemo(() => buildMainTree(activeTree, noteIndex), [activeTree, noteIndex]);
-  // added external folders (Seth, 2026-06-27): roots the user pointed rotli at,
-  // not in the memex — every registered root except the built-in default + vault.
-  const addedRoots = (useCorpusRoots().data ?? []).filter((r) => r.id !== "default" && r.id !== "vault");
-
   const quickNoteIds = useUiStore((s) => s.quickNoteIds);
 
   // Captures count mirrors BoardSurface's curated-note rule: a staged note
@@ -268,7 +243,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   const setDestExpanded = useUiStore((s) => s.setDestExpanded);
   const openNote = usePanesStore((s) => s.openNote);
   const openCanvas = usePanesStore((s) => s.openCanvas);
-  // The DERIVED destination highlight (Seth #1, 2026-07-08): a destination/folder
+  // The DERIVED destination highlight (the maintainer #1, 2026-07-08): a destination/folder
   // row only reads "selected" while the focused tab's content actually LIVES
   // under it — a stale ⌘N create-target (e.g. Storage) no longer glows while you
   // work in a Main note. Full surfaces own selection while they are visible,
@@ -278,7 +253,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   // failed row-menu actions (file-to-brain, board rename) land here — the menu
   // that launched them is gone by the time they fail (#11, audit 2026-07)
   const setRowActionError = useUiStore((s) => s.setRowActionError);
-  // the sidebar's live filter is retired (Seth, 2026-07-07) — the global titlebar
+  // the sidebar's live filter is retired (the maintainer, 2026-07-07) — the global titlebar
   // search covers it; `filter` stays empty so `matches()` passes every row.
   const filter = "";
 
@@ -482,7 +457,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   // — Main pointer-drag reorder (HTML5 DnD is dead in the WKWebView shell, so the
   //   BoardSurface pointer pattern; a threshold distinguishes drag from click) —
   const [mainDragId, setMainDragId] = useState<string | null>(null);
-  // Finder-style multi-select in Main (Seth, 2026-07-28): ⌘-click gathers
+  // Finder-style multi-select in Main (the maintainer, 2026-07-28): ⌘-click gathers
   // rows, dragging any gathered row moves the WHOLE selection into a folder;
   // a plain click still just opens (and clears the gathering).
   const [mainSel, setMainSel] = useState<ReadonlySet<string>>(new Set());
@@ -551,7 +526,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   const matches = (note: NoteSummary): boolean =>
     !q || note.title.toLowerCase().includes(q) || note.snippet.toLowerCase().includes(q);
 
-  // recursive render of the Main tree — mouse + drag + roving j/k (Seth follow-up,
+  // recursive render of the Main tree — mouse + drag + roving j/k (the maintainer follow-up,
   // 2026-07-01). Synthetic folders (id "main:<path>") + notes re-homed by the
   // manifest; a note references the same .md as its Library twin (one file, two
   // views). `rp` is the roving rowProps factory; note rows ride with a "main>"
@@ -561,7 +536,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     depth: number,
     rp: ReturnType<typeof useRovingList>["rowProps"],
   ): ReactNode => {
-    // depth 0 starts flush at the section inset (Seth, 2026-07-28: the extra
+    // depth 0 starts flush at the section inset (the maintainer, 2026-07-28: the extra
     // first step was wasted left whitespace); children advance 16px per level
     const rowPad = 10 + depth * 16;
     // Folder rows reserve 18px for the disclosure chevron. Note rows and
@@ -577,7 +552,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
       .sort(mainRowSort);
     const dropCls = (rowId: string) => (mainDrop?.id === rowId ? ` mdrop-${mainDrop.pos}` : "");
     // Star = "quick access": pins a Main note into the capped set the ⌥ Quick
-    // window cycles (Seth, 2026-07-01 — "anything starred opens with my hotkey").
+    // window cycles (the maintainer, 2026-07-01 — "anything starred opens with my hotkey").
     const starBtn = (id: string) => {
       const starred = quickNoteIds.includes(id);
       const full = !starred && quickNoteIds.length >= QUICK_MAX;
@@ -670,7 +645,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
               {/* the floated pin's marker — same quiet glyph as pinned chats */}
               {n.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
               {starBtn(n.id)}
-              {/* the hover-× is GONE (Seth, 2026-07-09: its reserved slot read as
+              {/* the hover-× is GONE (the maintainer, 2026-07-09: its reserved slot read as
                   a broken gap next to the star) — the context menu owns
                   "Remove from Main"; folder rows keep their × below */}
             </button>
@@ -762,7 +737,6 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   // each destination's subtree notes, by dest id — the System zone's counts
   const notesByDest: Record<string, NoteSummary[]> = {
     [DEST.secure]: secureNotes,
-    [DEST.vault]: vaultNotes,
     [DEST.storage]: storageNotes,
     [DEST.archive]: archiveNotes,
     [DEST.trash]: trashNotes,
@@ -799,7 +773,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     else if (isFile(n)) fileIds.add(n.id);
   }
 
-  // the SYSTEM zone's fold (Seth, 2026-08-01) — default OPEN
+  // the SYSTEM zone's fold (the maintainer, 2026-08-01) — default OPEN
   const systemOpen = expandedDests[SEC_SYSTEM] ?? true;
   const hasBrain = childrenOf("wiki").length > 0 || brainNotes.length > 0 || secureNotes.length > 0;
 
@@ -839,8 +813,8 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     ...mainRovingRows(MAIN_ROOT),
     ...(systemOpen
       ? [
-          ...(hasBrain ? [{ id: "Brain", kind: "folder" } as RovingRow] : []),
-          ...visibleDestRows.map(({ id }) => ({ id, kind: "folder" }) as RovingRow),
+          { id: "Brain", kind: "folder" } as RovingRow,
+          ...DEST_ROWS.map(({ id }) => ({ id, kind: "folder" }) as RovingRow),
         ]
       : []),
   ];
@@ -863,7 +837,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
           return;
         }
         // board rows ride kind:"note" in the roving list — the Set tells them
-        // apart so a board opens its canvas, not the editor (Seth, 2026-06-24)
+        // apart so a board opens its canvas, not the editor (the maintainer, 2026-06-24)
         if (boardIds.has(row.id)) openCanvas(row.id, { newTab });
         else if (fileIds.has(row.id)) usePanesStore.getState().openFile(row.id, { newTab });
         else openNote(row.id, { newTab });
@@ -886,7 +860,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
         setContentView("allNotes");
       } else if (row.id === TASKS) {
         setContentView("tasks");
-      } else if (row.id === "Brain" || visibleDestRows.some((d) => d.id === row.id)) {
+      } else if (row.id === "Brain" || DEST_ROWS.some((d) => d.id === row.id)) {
         // System rows open the browser surface (2026-07-26), never a dropdown
         openSystemRoot(row.id);
       } else {
@@ -955,7 +929,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     if (!targetItemId) return;
     const { mainProjection: proj, noteIndex: idx } = revealRef.current;
     // "brain" mode skips the Main-wins short-circuit so "Open in Brain" reveals the
-    // note's REAL home in the Library even when it's also pinned in Main (Seth #3,
+    // note's REAL home in the Library even when it's also pinned in Main (the maintainer #3,
     // 2026-07-08). "auto" keeps Main's copy winning on ordinary navigation.
     const inMain = mode === "brain" ? undefined : proj.notes.find((n) => n.id === targetItemId);
     if (inMain) {
@@ -1006,7 +980,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     // two frames: the first lets the just-expanded folder chain commit to the
     // DOM, the second scrolls the now-rendered row into view (pre-release review).
     // In "brain" mode, scroll to the LIBRARY occurrence (not the Main copy, which
-    // also carries .sel) by skipping .main-row (Seth #3, 2026-07-08).
+    // also carries .sel) by skipping .main-row (the maintainer #3, 2026-07-08).
     let raf2 = 0;
     const raf1 = requestAnimationFrame(() => {
       raf2 = requestAnimationFrame(() => {
@@ -1126,8 +1100,8 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
 
           {/* — MAIN: your hand-picked notes, arranged your way. Star a row (★) to
               put it in Quick access — the capped set the ⌥ Quick window cycles
-              (Seth, 2026-07-01). Add with the row menu or drag from the Library.
-              The header (reworked 2026-07-28, Seth: "not collapsible — just a way
+              (the maintainer, 2026-07-01). Add with the row menu or drag from the Library.
+              The header (reworked 2026-07-28, the maintainer: "not collapsible — just a way
               to change the views"): the label + ▾ are ONE view switcher. — */}
           <div className="fsec fsec-hdr">
             <button
@@ -1296,11 +1270,9 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
       </div>
       <SidebarSystem
         open={systemOpen}
-        hasBrain={hasBrain}
         brainCount={brainNotes.length + secureNotes.length}
-        destRows={visibleDestRows}
+        destRows={DEST_ROWS}
         notesByDest={notesByDest}
-        addedRoots={addedRoots}
         brainEnabled={brainEnabledUi}
         rowProps={rowProps}
         zoom={zoom}

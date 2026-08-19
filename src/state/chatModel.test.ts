@@ -1,4 +1,4 @@
-// Per-chat model independence (Seth, 2026-08-01): the model picker used to
+// Per-chat model independence (the maintainer, 2026-08-01): the model picker used to
 // write ONE global id, so choosing Claude in the left pane silently moved the
 // right pane's chat onto Claude too. A chat now owns its model; `chatModelId`
 // survives only as the SEED a brand-new chat starts from (the last model picked
@@ -131,7 +131,7 @@ describe("parseSettings — chatModel (durable, additive, session-key free)", ()
   });
 });
 
-// Vault isolation (Seth, 2026-08-03: "each vault holds their own notes and
+// Vault isolation (the maintainer, 2026-08-03: "each vault holds their own notes and
 // chats — nothing travels between vaults"). The chat FILES were always scoped
 // per instance root; these lock the per-chat preference maps to the same rule.
 describe("rescopeChatMapKeys — legacy keys re-home to their one owning vault", () => {

@@ -10,11 +10,11 @@ test("Command-T from a Main note creates a new note in Main immediately", async 
   await gotoApp(page);
 
   await page.locator(".sb-notes-tree .frow", { hasText: "All notes" }).first().click();
-  const source = page.locator(".recent-row", { hasText: "Q3 priorities — Myela" });
+  const source = page.locator(".recent-row", { hasText: "Q3 priorities — Northstar" });
   const mainRoot = page.locator('[data-main-id="main:"]');
   await pointerDrag(page, source, await centerOf(mainRoot));
 
-  const mainNote = page.locator(".main-tree [data-main-id]", { hasText: "Q3 priorities — Myela" });
+  const mainNote = page.locator(".main-tree [data-main-id]", { hasText: "Q3 priorities — Northstar" });
   await mainNote.click();
 
   const tabs = page.getByRole("tab");

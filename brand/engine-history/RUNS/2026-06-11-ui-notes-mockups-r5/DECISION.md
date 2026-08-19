@@ -1,7 +1,7 @@
 # rotli — UI/UX mockups · notes module · round 5 — DECISION
 
 **Date:** 2026-06-11 · **Gate:** `gate.html` (live render, kit tokens only; root pinned light)
-**Input:** Seth's round-4 verdicts (bubble rejected → Raycast-style bottom bar; status relocated; identity
+**Input:** the maintainer's round-4 verdicts (bubble rejected → Raycast-style bottom bar; status relocated; identity
 must have a purpose; Proton first).
 
 ## Changes
@@ -14,7 +14,7 @@ must have a purpose; Proton first).
 2. **Status relocated** (frame A): header-inline next to Aa — saved dot · character count · updated ·
    where. The bottom belongs to the format bar now.
 3. **Module switcher on the identity** (frame B): "Notes ⌄" opens the popover from day one (r2's
-   static-label law overruled by Seth). Current module = tint + clay bar + ⌃1; unshipped modules shown
+   static-label law overruled by the maintainer). Current module = tint + clay bar + ⌃1; unshipped modules shown
    quiet with phase pills (popover doubles as roadmap) — strict only-what-exists variant offered as the
    alternative. ⌃1–⌃5 jump; everything in ⌘K.
 4. **Proton first** (frame D): Proton Mail supported via **Proton Mail Bridge** — runs on the user's Mac,
@@ -22,7 +22,7 @@ must have a purpose; Proton first).
    Proton → Gmail (REST API, needed for split-brain read state) → any IMAP (iCloud/Fastmail/Outlook).
    Caveats recorded: Bridge requires a paid Proton plan; Proton read-state behaves as standard IMAP.
 
-## Round-5 calls for Seth
+## Round-5 calls for the maintainer
 
 1. Format bar — approve?
 2. Header-inline status — approve, or hover-the-dot-for-details quieter variant?
@@ -31,7 +31,7 @@ must have a purpose; Proton first).
 
 ## Verdict
 
-**APPROVED — Seth, 2026-06-11** (format bar ✓ · header-inline status ✓ · phase-pill switcher ✓ · Proton-first ✓).
+**APPROVED — the maintainer, 2026-06-11** (format bar ✓ · header-inline status ✓ · phase-pill switcher ✓ · Proton-first ✓).
 
-**Addendum (same day):** Seth renamed Wiki → **the Memory** and added the **Chat module** (before the
+**Addendum (same day):** the maintainer renamed Wiki → **the Memory** and added the **Chat module** (before the
 Memory) — designed in `../2026-06-11-ui-notes-mockups-r6/`.

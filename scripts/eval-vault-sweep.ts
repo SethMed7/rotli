@@ -256,7 +256,7 @@ async function runCase(
       userText,
       web: false,
       model: { id: modelId },
-      userName: "Seth",
+      userName: "Avery",
     });
     for await (const ev of gen as AsyncGenerator<AgentEvent>) {
       if (ev.type === "tool") {

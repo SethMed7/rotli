@@ -1,4 +1,4 @@
-// HotkeyBadges — "hold ⌘ and the keys appear ON the controls" (Seth,
+// HotkeyBadges — "hold ⌘ and the keys appear ON the controls" (the maintainer,
 // 2026-08-04: "little boxes on what the hotkeys are around the UI so I can
 // visually see and instantly toggle exactly where I want to go").
 //

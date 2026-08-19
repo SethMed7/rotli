@@ -1,4 +1,4 @@
-// Pointer-based tab dragging (Seth, 2026-06-15). HTML5 drag-and-drop is flaky /
+// Pointer-based tab dragging (the maintainer, 2026-06-15). HTML5 drag-and-drop is flaky /
 // often dead in the macOS WKWebView (wry) shell, so the tab strip drags with
 // raw pointer events instead — these fire reliably everywhere. One gesture,
 // owned by the tab you press: past a small threshold it starts a drag, paints a

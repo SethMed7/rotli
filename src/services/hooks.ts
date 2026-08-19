@@ -6,9 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { replaceTitleLine } from "../lib/noteTitle";
 import {
-  type CorpusRoot,
   corpusFileStat,
-  corpusListConfig,
   corpusMoveFileToSink,
   corpusTasks,
   isTauri,
@@ -29,7 +27,7 @@ import { queryClient } from "./query";
 
 /** Surface a lifecycle failure inline instead of swallowing it — the memex write
  * gate can refuse a move, and a silent rejection reads as "nothing happened"
- * (Seth, 2026-07-07). Rendered by the sidebar's row-action error banner. */
+ * (the maintainer, 2026-07-07). Rendered by the sidebar's row-action error banner. */
 export const lifecycleError = (verb: string) => (e: unknown) =>
   useUiStore
     .getState()
@@ -42,7 +40,6 @@ export const keys = {
   // 2026-07). null can never collide with a folder id (ids are strings).
   notes: (folderId?: string) => ["notes", folderId ?? null] as const,
   note: (id: string) => ["note", id] as const,
-  roots: ["corpus-roots"] as const,
   memexRoots: ["memex-root-markers"] as const,
   journal: ["journal"] as const,
   organizer: ["organizer-status"] as const,
@@ -57,21 +54,6 @@ export const keys = {
  * ids are ULIDs, paths, or "<root>:" markers, none of which start with NUL. */
 export const UNIVERSE_KEY = "\u0000universe";
 const EMPTY_MARKERS: ReadonlySet<string> = new Set();
-
-/** The connected brains, as sidebar roots (their `vault:`-style rows). Tauri-only.
- * The set only changes on a relaunch (connecting/forgetting a brain restarts), so
- * it's effectively static per session. Derived from the unified `corpus.json`. */
-export function useCorpusRoots() {
-  return useQuery({
-    queryKey: keys.roots,
-    queryFn: async (): Promise<CorpusRoot[]> => {
-      if (!isTauri()) return [];
-      const cfg = await corpusListConfig();
-      return [...cfg.brains.map((b) => ({ id: b.id, label: b.label, absPath: b.absPath })), ...cfg.folders];
-    },
-    staleTime: Infinity,
-  });
-}
 
 export function useFolders() {
   return useQuery({ queryKey: keys.folders, queryFn: () => notesService.listFolders() });
@@ -114,15 +96,9 @@ function stableLists(next: (NoteSummary[] | undefined)[]): (NoteSummary[] | unde
   return next;
 }
 
-/** The folderIds every note universe view covers, in stable order. undefined is
- * the All-Notes sentinel; the trailing entries are the root markers. */
-function universeFolderIds(roots: CorpusRoot[] | undefined): (string | undefined)[] {
-  // the vault marker ("vault:") is already one of the reserved five — the Set
-  // dedupes it so the vault brain doesn't ride twice
-  const markers = new Set([
-    DEST.vault,
-    ...(roots ?? []).filter((r) => r.id !== "default").map((r) => `${r.id}:`),
-  ]);
+/** The active vault's folder views, in stable order. Connected vaults exist only
+ * as switcher targets; their notes never enter this webview's universe. */
+function universeFolderIds(): (string | undefined)[] {
   return [
     undefined,
     DEST.board,
@@ -131,15 +107,12 @@ function universeFolderIds(roots: CorpusRoot[] | undefined): (string | undefined
     DEST.storage,
     DEST.archive,
     DEST.trash,
-    ...markers,
   ];
 }
 
 function useNoteUniverse(): { lists: (NoteSummary[] | undefined)[]; complete: boolean } {
-  const roots = useCorpusRoots();
-  // which roots' chats/ means transcripts — session-static, like the roots list;
-  // consulted ONLY for the All-Notes view's chats/ exclusion. Shares the key with
-  // useSearchableNotes so the markers resolve once.
+  // Whether the active root's chats/ means transcripts. Consulted only for the
+  // All-Notes view's chats/ exclusion.
   const memexQ = useQuery({
     queryKey: keys.memexRoots,
     queryFn: (): Promise<ReadonlySet<string>> | ReadonlySet<string> =>
@@ -153,11 +126,10 @@ function useNoteUniverse(): { lists: (NoteSummary[] | undefined)[]; complete: bo
     queryKey: keys.notes(UNIVERSE_KEY),
     queryFn: () => notesService.listAll(),
   });
-  const rootData = roots.data;
   const memex = memexQ.data;
   const raw = corpus.data;
   const lists = useMemo(() => {
-    const folderIds = universeFolderIds(rootData);
+    const folderIds = universeFolderIds();
     if (!raw) return stableLists(folderIds.map(() => undefined));
     return stableLists(
       folderIds.map((folderId) =>
@@ -167,14 +139,14 @@ function useNoteUniverse(): { lists: (NoteSummary[] | undefined)[]; complete: bo
         !folderId && !memex ? undefined : scopeCorpusNotes(raw, folderId, memex ?? EMPTY_MARKERS),
       ),
     );
-  }, [raw, memex, rootData]);
-  const complete = roots.isSuccess && corpus.isSuccess && memexQ.isSuccess;
+  }, [raw, memex]);
+  const complete = corpus.isSuccess && memexQ.isSuccess;
   return { lists, complete };
 }
 
 /** The ONE id → summary index over EVERY note that exists. useNotes() alone is
  * a VIEW, not the universe; anything that treats it as "all notes" silently
- * loses staged/vaulted/added-root notes (the bug that GC'd Seth's seeded Main
+ * loses staged/vaulted/added-root notes (the bug that GC'd the maintainer's seeded Main
  * and labeled his tab "Untitled"). The Main projection, tab titles, and the
  * row-menu lookup read THIS instead. */
 export function useNoteIndex(): Map<string, NoteSummary> {

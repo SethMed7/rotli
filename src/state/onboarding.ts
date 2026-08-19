@@ -1,4 +1,4 @@
-// Reset & re-onboard (Seth, 2026-06-19): wipe the user-tunable settings —
+// Reset & re-onboard (the maintainer, 2026-06-19): wipe the user-tunable settings —
 // hotkeys, window behavior, Dock policy, theme — back to their defaults and drop
 // the `onboarded` flag, so the first-run flow runs again. The persistence layer
 // (state/persist.ts) writes the reset state on the next debounce; the OS-side
@@ -9,6 +9,7 @@
 import { useBindingsStore } from "../keys/bindings";
 import { toAccelerator } from "../keys/chords";
 import { allActions } from "../keys/registry";
+import { DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE } from "../lib/privateBrowser";
 import { setDockVisible, setGlobalShortcut, setHideOnBlur } from "../lib/tauri";
 import { DEFAULT_ACCENT_HUE, useUiStore } from "./ui";
 
@@ -62,13 +63,12 @@ export async function resetAndReonboard(): Promise<void> {
   useUiStore.setState({
     theme: "system",
     themeFamily: "mono",
-    matchLightFamily: "mono",
-    matchDarkFamily: "mono",
     syntaxPalette: "rotli",
     accentColor: "default",
     accentHue: DEFAULT_ACCENT_HUE,
     stayOpen: false,
     showInDock: false,
+    privateBrowserSearchEngine: DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE,
     onboarded: false,
     onboardingPhase: "preferences",
   });

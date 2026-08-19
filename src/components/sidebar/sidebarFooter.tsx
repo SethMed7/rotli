@@ -1,6 +1,6 @@
-// The utility footer (Seth, 2026-07-28, from the Obsidian reference): Files ·
+// The utility footer (the maintainer, 2026-07-28, from the Obsidian reference): Files ·
 // Librarian · Settings share one quiet row at the very bottom. It is APP-level,
-// not front-level, so it shows under Home and Chat alike (Seth, 2026-08-01:
+// not front-level, so it shows under Home and Chat alike (the maintainer, 2026-08-01:
 // "the utility footer stays as is").
 //
 // The Librarian entry is the old Activity row — it's the Librarian's journal, so
@@ -19,7 +19,7 @@ import { Icon } from "../icon";
 export function SidebarFooter() {
   // unreviewed daemon proposals — the badge on the Librarian link (§4.4.2);
   // sensitive-data decisions waiting on the user wear the RED variant instead
-  // (Seth, 2026-07-31: "or I will never know")
+  // (the maintainer, 2026-07-31: "or I will never know")
   const pendingProposals = deriveJournal(useJournal().data ?? []).pending.length;
   // detector-only hints awaiting a decision (deriveSecureReview's `confirm`,
   // inlined so the always-mounted sidebar doesn't anchor the secure-repair
@@ -61,7 +61,7 @@ export function SidebarFooter() {
       >
         <ActivityGlyph size={14} />
         <span className="fname">Librarian</span>
-        {/* the ambient working dot (Seth, 2026-07-31): the Librarian's
+        {/* the ambient working dot (the maintainer, 2026-07-31): the Librarian's
             work is visible from anywhere — pulses while a cycle or an
             adopt batch runs, from the SAME narration the surface shows */}
         {organizerWorking && <span className="sb-work-dot" aria-hidden="true" />}

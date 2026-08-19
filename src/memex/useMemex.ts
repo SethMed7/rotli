@@ -4,6 +4,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { queryClient } from "../services/query";
+import { refreshActiveVault } from "../state/activeVault";
 import type { MemexInstance, Perms } from "./config";
 import type { ChatMsg } from "./contract";
 import * as svc from "./service";
@@ -35,15 +36,29 @@ export function useInstanceChats(instance: MemexInstance | null) {
   });
 }
 
-/** "Choose folder…" — the one smart picker for the corpus (relaunches on success). */
+/** "Choose folder…" — the one smart picker for the live corpus. */
 export function useChooseFolder() {
   return useMutation({
     mutationFn: (path?: string) => svc.chooseFolder(path),
-    onSuccess: () => invalidateMemex(),
+    onSuccess: async (changed) => {
+      if (changed) await refreshActiveVault();
+      else await invalidateMemex();
+    },
   });
 }
 
-/** Connect an existing memex as a brain (relaunches on success). */
+/** Switch the live shell to an already-connected vault by registry id. */
+export function useSwitchVault() {
+  return useMutation({
+    mutationFn: (id: string) => svc.switchVault(id),
+    onSuccess: async (changed) => {
+      if (changed) await refreshActiveVault();
+      else await invalidateMemex();
+    },
+  });
+}
+
+/** Register an existing memex as a future vault switch target. */
 export function useConnectBrain() {
   return useMutation({
     mutationFn: (path: string | undefined) => svc.connectBrain(path),
@@ -51,7 +66,7 @@ export function useConnectBrain() {
   });
 }
 
-/** Forget a connected brain (binding only; files untouched). */
+/** Remove a connected vault from Rotli (binding only; files untouched). */
 export function useForgetBrain() {
   return useMutation({
     mutationFn: (id: string) => svc.forget(id),

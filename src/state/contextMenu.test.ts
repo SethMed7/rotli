@@ -21,7 +21,7 @@ describe("context menu alignment", () => {
   });
 
   test("highlight-marked selectors never reserve the gutter — labels stay flush", () => {
-    // the Main view switcher (Seth, 2026-07-24): active state is a row
+    // the Main view switcher (the maintainer, 2026-07-24): active state is a row
     // background, so its siblings must not pick up a checkmark indent
     const items: MenuSpec[] = [
       {

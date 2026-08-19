@@ -126,7 +126,7 @@
   color: var(--danger, var(--accent-text));
 }
 
-/* — G: board metadata (Seth, 2026-06-26). A small floating "ⓘ" opens a panel to
+/* — G: board metadata (the maintainer, 2026-06-26). A small floating "ⓘ" opens a panel to
    describe a board (description + tags) so the AI can find + use it. — */
 .canvas-meta-btn {
   position: absolute;

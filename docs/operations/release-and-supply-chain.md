@@ -41,6 +41,8 @@ authorized operation. Passing local checks does not authorize publication.
 
 The current script:
 
+- requires the private `APPLE_SIGNING_IDENTITY` environment variable at release
+  time; the public repository contains no certificate owner or Apple team id;
 - runs the JavaScript/TypeScript proof chain;
 - requires a successful hosted `Regression suite` conclusion for the exact
   source commit before publication;
@@ -109,6 +111,11 @@ rather than fields that imply evidence the current script does not yet collect.
 ## Dependency policy
 
 - Lockfiles are frozen in CI and changed only in reviewed commits.
+- The app, marketing site, and Breve runtime are independent Bun install roots.
+  Each manifest names the repository's exact `.bun-version`, each root holds the
+  same three-day `install.minimumReleaseAge`, and `bun run deps audit` scans all
+  three lockfiles. The age gate affects new resolution only; frozen installs do
+  not reinterpret an existing lockfile.
 - New dependencies justify the capability, license, maintenance health,
   transitive cost, parser/network risk, and adapter boundary.
 - Runtime dependencies that parse untrusted content receive focused malformed,
@@ -121,6 +128,34 @@ rather than fields that imply evidence the current script does not yet collect.
 - An expired exception blocks release even when the scanner remains advisory.
 - Build-only or unshipped-platform findings may be accepted only with their
   exact dependency path and reason.
+
+The repository-owned `bun run deps` workflow separates observation from
+mutation:
+
+| Action | Contract |
+|---|---|
+| `audit` | Read-only scan of all three lockfiles; available on the stable Bun pin and advisory in CI while dated exceptions remain |
+| `audit-plan` | Bun 1.4+ `bun audit fix --dry-run --json`; emits one combined document and never installs. A maintainer reviews the proposed versions and blocked paths before any mutation |
+| `dedupe-check` | Bun 1.4+ read-only lockfile convergence check. Candidates fail the command so they cannot be mistaken for a clean graph; applying `bun dedupe` is a separate reviewed change because a compatible older locked version may win |
+| `prune-plan` | Bun 1.4+ local stale-install preview. It never replaces the pre-DMG removal of Breve's whole generated `node_modules` resource tree |
+| `licenses` | Bun 1.4+ production-dependency license inventory for every install root. It supplements rather than claims to be the Rust/assets/package SBOM |
+| `diff` | Bun 1.4+ root-explicit package-source comparison. Review high-risk runtime, parser, native, network, lifecycle-script, binary, and entry-point changes before accepting a lockfile update |
+
+Mutating maintenance is maintainer-operated only and requires exactly one root
+plus an explicit acknowledgement: `audit-fix --root=<id> --apply`,
+`dedupe --root=<id> --apply`, or `prune --root=<id> --apply`. Start with the
+matching read-only plan. `audit-fix` suppresses lifecycle scripts and never
+implies `--latest`; do not use a cross-range upgrade as an automatic escape from
+a blocked advisory. After an approved repair, re-run the audit, inspect the
+manifest and lockfile, use `diff` for affected high-risk packages, then run the
+complete Rotli proof chain. Security fixes may intentionally bypass the
+release-age window; the plan must call that out for review.
+
+Bun 1.4 preview binaries may be evaluated by setting
+`ROTLI_BUN_DEPENDENCY_BIN` for `bun run deps`, but a moving canary is never the
+release runtime. `.bun-version`, all three `packageManager` fields, CI, release
+evidence, and the local release check move together only after Bun publishes an
+immutable stable release and the frozen installs plus full proof chain pass.
 
 The current advisory inventory and Rust target-graph exception live in
 [`../development/security.md`](../development/security.md). Do not duplicate

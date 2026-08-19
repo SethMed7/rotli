@@ -1,4 +1,4 @@
-// The sidebar's FRONT switcher (Seth, 2026-08-01, from Claude Desktop's
+// The sidebar's FRONT switcher (the maintainer, 2026-08-01, from Claude Desktop's
 // Home|Code pill): a two-segment control directly under the vault header row.
 // It REPLACES the stacked "Chat ›" / "Notes ›" accordions — each front now owns
 // the whole sidebar body, so nothing has to be folded to make room for anything
@@ -17,7 +17,7 @@ const SIDEBAR_FRONTS: {
   Glyph: typeof HomeGlyph;
   hint: string;
   /** The registry action this segment mirrors — hold ⌘ badges the chord onto
-   * the segment itself (Seth, 2026-08-04). */
+   * the segment itself (the maintainer, 2026-08-04). */
   action: string;
 }[] = [
   {

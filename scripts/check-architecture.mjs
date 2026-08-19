@@ -158,14 +158,21 @@ function importsOf(source) {
 
 // lib is dependency-inward by default. The few cross-capability gesture and
 // shell adapters are explicit, reasoned exceptions; an effectful import in any
-// other lib file is a placement failure, and stale exceptions fail too.
+// other lib file is a placement failure, and stale exceptions fail too. React
+// type-only imports remain pure, while a runtime React import makes the module
+// a presentation hook/adapter that must be named here as well.
 const effectfulLibPrefixes = ["@tauri-apps/", "../memex/", "../newItems/", "../services/", "../state/"];
 const libDir = join(root, "src", "lib");
 const effectfulLibFiles = new Set();
 for (const name of readdirSync(libDir)) {
   if (!/\.tsx?$/.test(name) || /\.test\.tsx?$/.test(name)) continue;
-  const imports = importsOf(readFileSync(join(libDir, name), "utf8"));
-  if (!imports.some((dependency) => effectfulLibPrefixes.some((prefix) => dependency.startsWith(prefix)))) {
+  const source = readFileSync(join(libDir, name), "utf8");
+  const imports = importsOf(source);
+  const hasRuntimeReactImport = /import\s+(?!type\b)[\s\S]*?\sfrom\s+["']react["']/.test(source);
+  if (
+    !hasRuntimeReactImport &&
+    !imports.some((dependency) => effectfulLibPrefixes.some((prefix) => dependency.startsWith(prefix)))
+  ) {
     continue;
   }
   effectfulLibFiles.add(name);

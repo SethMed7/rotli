@@ -1,4 +1,4 @@
-// Inline chat rename, shared by the tab (Seth, 2026-07-07). Mirrors boardRename:
+// Inline chat rename, shared by the tab (the maintainer, 2026-07-07). Mirrors boardRename:
 // `renamingChatSlug` lives in the ui store so a right-click "Rename…" or a tab
 // double-click target the same inline input. Commit renames chats/<slug>.md on
 // disk (memex_rename_chat) and re-points any open chat tab to the new slug.
@@ -37,7 +37,7 @@ export function useChatRename() {
       if (!active) return;
       try {
         const finalSlug = await renameChat(active, oldSlug, newSlug);
-        retargetChat(oldSlug, finalSlug);
+        retargetChat(oldSlug, finalSlug, active.id);
         // the chat keeps its model/provider pick, globe, and measure — a rename
         // used to orphan these maps under the old key (audit 2026-08-03)
         retargetChatMapKeys(chatKey(active.id, oldSlug, ""), chatKey(active.id, finalSlug, ""));

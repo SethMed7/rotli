@@ -17,6 +17,7 @@ const instance = (id: string, perms: MemexInstance["perms"] = "chats+inbox"): Me
 const config: MemexConfig = {
   activeId: "corpus",
   instances: [instance("corpus"), instance("quick"), instance("readonly", "read-only")],
+  developmentReadOnly: false,
 };
 
 describe("capture vault routing", () => {

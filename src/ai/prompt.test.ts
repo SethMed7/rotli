@@ -18,8 +18,8 @@ const base = {
 describe("userName in the prompt", () => {
   test("names the user in both adapters' main prompts", () => {
     for (const adapter of [gemmaAdapter, frontierAdapter]) {
-      const named = adapter.renderPrompt({ ...base, userName: "Seth" });
-      expect(named).toContain("The user's name is Seth");
+      const named = adapter.renderPrompt({ ...base, userName: "the maintainer" });
+      expect(named).toContain("The user's name is the maintainer");
     }
   });
 
@@ -51,9 +51,9 @@ describe("userName in the prompt", () => {
         history: [],
         userText: "hi",
         scratch: [],
-        userName: "Seth",
+        userName: "the maintainer",
       });
-      expect(named).toContain("The user's name is Seth");
+      expect(named).toContain("The user's name is the maintainer");
     }
   });
 
@@ -118,7 +118,7 @@ describe("read-before-answer scaffolding (the 2026-07-29 people-list failure)", 
   test("both adapters forbid answering from a frontmatter links: line", () => {
     // the 2026-08-01 failure: asked for "the people in my vault", gemma read
     // the people/ README — a note whose BODY names nobody — and answered with
-    // its `links:` line, so the project "caminorx" landed in a list of people.
+    // its `links:` line, so the project "trailplan" landed in a list of people.
     // Both prompts must name the hazard AND prescribe the recovery (read a
     // different note, the area's generated _index), not just caution about it.
     for (const adapter of [gemmaAdapter, frontierAdapter]) {
@@ -273,7 +273,7 @@ describe("untrusted prompt data framing", () => {
   });
 });
 
-// The 2026-07-30 directness + formatting pass (Seth: gemma "not quite
+// The 2026-07-30 directness + formatting pass (the maintainer: gemma "not quite
 // answering my questions directly… and no formatting"). Gemma needs the
 // answer contract EXPLICIT: lead with the facts, never "where it lives",
 // Markdown structure — with a BAD/GOOD contrast it can imitate.
@@ -303,7 +303,7 @@ describe("answer style — direct, formatted finals", () => {
   });
 });
 
-// update_note (Seth, 2026-07-30) — both adapters offer the edit tool with the
+// update_note (the maintainer, 2026-07-30) — both adapters offer the edit tool with the
 // full-body contract (a fragment would destroy the rest of the note).
 describe("update_note in the prompts", () => {
   test("both adapters list update_note with the complete-body rule", () => {

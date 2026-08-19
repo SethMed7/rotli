@@ -1,4 +1,4 @@
-// Folder multi-select in the System browser (Seth, 2026-07-30: "in the
+// Folder multi-select in the System browser (the maintainer, 2026-07-30: "in the
 // Library I can't select multiple things via drag or via holding command").
 // Folder tiles now join the same selection grammar items always had:
 // ⌘-click toggles, and the empty-space marquee gathers folder tiles too.

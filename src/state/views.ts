@@ -77,3 +77,14 @@ export async function hydrateViews(): Promise<void> {
     });
   }
 }
+
+export function resetViewsForVaultSwitch(): void {
+  useViewsStore.setState({
+    manifest: EMPTY_VIEWS,
+    writable: true,
+    hydrated: false,
+    saveState: "idle",
+    error: null,
+    dirty: false,
+  });
+}

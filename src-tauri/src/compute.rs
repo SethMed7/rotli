@@ -630,7 +630,7 @@ pub fn local_queue_status(state: tauri::State<'_, ComputeState>) -> QueueSnapsho
     state.0.snapshot()
 }
 
-/// Jump a queued local message to the front of the line (Seth's "but I can
+/// Jump a queued local message to the front of the line (the maintainer's "but I can
 /// prioritize it").
 #[tauri::command]
 pub fn local_queue_prioritize(

@@ -1,6 +1,6 @@
 /** The managed section is a plain HEADING now — HTML comment markers rendered
  * as literal cruft in the editor and the note read like a machine's transcript
- * (Seth, 2026-07-29: notes "as if this was a convo and we were taking notes"). */
+ * (the maintainer, 2026-07-29: notes "as if this was a convo and we were taking notes"). */
 export const CHAT_NOTES_HEADING = "## Conversation notes";
 // legacy pre-0.46 markers — recognized for one-time migration only
 export const CHAT_MEMORY_START = "<!-- rotli:chat-memory:start -->";

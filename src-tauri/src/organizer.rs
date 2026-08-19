@@ -51,7 +51,7 @@ const GEN_MAX_TOKENS: u32 = 512;
 const SWEEP_SETTLE: Duration = Duration::from_secs(3);
 /// Startup grace before the boot reconciliation sweep may be consumed — keeps
 /// its corpus-mutex traffic off the first paint after a (re)launch, which is
-/// exactly when every root walks cold (Seth, 2026-07-31: vault-switch
+/// exactly when every root walks cold (the maintainer, 2026-07-31: vault-switch
 /// beachballs). See `OrganizerInner::sweep_hold`.
 const STARTUP_SWEEP_HOLD: Duration = Duration::from_secs(45);
 /// How long to sleep between gate re-checks WHILE work is pending (the gates —
@@ -65,7 +65,7 @@ const BACKOFF_MAX: Duration = Duration::from_secs(15 * 60);
 /// (`organizerThreshold` / `organizerQuietSecs`) override per cycle.
 const DEFAULT_THRESHOLD: f64 = 0.8;
 /// Default quiet window: organize a note only after it's sat UNTOUCHED this long
-/// (Seth, 2026-07-03: "watch the file, wait 5 minutes, then organize"). The
+/// (the maintainer, 2026-07-03: "watch the file, wait 5 minutes, then organize"). The
 /// `organizerQuietSecs` knob overrides it per cycle.
 const DEFAULT_QUIET: Duration = Duration::from_secs(300);
 /// How much note body rides in a classify/enrich prompt (chars — the model only
@@ -93,7 +93,7 @@ pub enum Trust {
 
 impl Trust {
     /// Settings-read parse: unknown/missing input falls to the DEFAULT rung —
-    /// Organize (Seth, 2026-07-02): the daemon only ever changes a note's
+    /// Organize (the maintainer, 2026-07-02): the daemon only ever changes a note's
     /// location + metadata, journaled and undoable, never the note's words,
     /// so full auto-organize is the intended out-of-box behavior. An explicit
     /// user choice (any valid rung in settings.json) always wins over this.
@@ -206,6 +206,10 @@ pub(crate) struct OrganizerInner {
     stop_now: AtomicBool,
     /// A cycle is executing right now — drives the Activity live band.
     cycle_busy: AtomicBool,
+    /// Vault activation and a Librarian cycle are mutually exclusive. The
+    /// worker holds this across every read/model/write cycle; a live vault
+    /// switch holds it while the default CorpusStore route is exchanged.
+    transition: Mutex<()>,
     /// The journal/filed_by label for the lane that ACTUALLY ran this cycle —
     /// set by the worker per cycle (2026-07-31: a Claude-organized run used to
     /// be stamped as the local model). Tests leave the default.
@@ -278,6 +282,7 @@ impl OrganizerHandle {
             run_now: AtomicBool::new(false),
             stop_now: AtomicBool::new(false),
             cycle_busy: AtomicBool::new(false),
+            transition: Mutex::new(()),
             model_label: Mutex::new(chat::DEFAULT_MODEL.to_string()),
             progress: Mutex::new(None),
             sweep_at: Mutex::new(None),
@@ -331,6 +336,37 @@ impl OrganizerHandle {
     pub fn interactive_guard(&self) -> InteractiveGuard {
         self.0.interactive.fetch_add(1, Ordering::SeqCst);
         InteractiveGuard(self.0.clone())
+    }
+
+    /// Serialize a live vault change against the complete Librarian cycle. A
+    /// switch may wait for one in-flight model call, but it can never redirect
+    /// the store underneath that call's eventual write.
+    pub(crate) fn with_vault_transition<T>(
+        &self,
+        change: impl FnOnce() -> Result<T, String>,
+    ) -> Result<T, String> {
+        let _transition = self
+            .0
+            .transition
+            .lock()
+            .map_err(|_| "Librarian transition lock poisoned".to_string())?;
+        change()
+    }
+
+    /// Forget every vault-local in-memory observation and owe one fresh sweep
+    /// against the newly active default store.
+    pub(crate) fn reset_for_vault_switch(&self) {
+        self.0.queue.lock().unwrap().clear();
+        *self.0.status.lock().unwrap() = StatusSnapshot::default();
+        *self.0.settings_trust.lock().unwrap() = None;
+        *self.0.settings_brain.lock().unwrap() = None;
+        self.0.brain_off.store(false, Ordering::SeqCst);
+        self.0.run_now.store(false, Ordering::SeqCst);
+        self.0.stop_now.store(false, Ordering::SeqCst);
+        *self.0.sweep_at.lock().unwrap() = Some(Instant::now());
+        *self.0.sweep_hold.lock().unwrap() = Some(Instant::now() + STARTUP_SWEEP_HOLD);
+        let _queue = self.0.queue.lock().unwrap();
+        self.0.cv.notify_all();
     }
 }
 
@@ -1123,7 +1159,7 @@ pub(crate) fn plan_wait(
 
 /// Which model the organizer runs (settings.json `organizerModel`). `Local` is
 /// the on-device MLX server (default — organizing never leaves the Mac); `Claude`
-/// routes to `claude -p` Sonnet (Seth's choice — non-secure notes go remote,
+/// routes to `claude -p` Sonnet (the maintainer's choice — non-secure notes go remote,
 /// secure/locked never do). Copy so the per-cycle transport can close over it.
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum OrgModel {
@@ -1956,7 +1992,7 @@ fn sweep(root: &Path, state: &OrganizerFile) -> Vec<String> {
         .collect()
 }
 
-/// Run-now's AUDIT half (Seth, 2026-07-31: "run now is an audit to make sure
+/// Run-now's AUDIT half (the maintainer, 2026-07-31: "run now is an audit to make sure
 /// nothing was left or missed"). The hash diff answers "did I process this
 /// body once?" — an audit asks the different question "is anything MISSING?":
 /// a note whose enrich metadata never landed (the model returned nothing, or
@@ -2142,14 +2178,9 @@ fn app_backgrounded(app: &tauri::AppHandle) -> bool {
 /// the law). An idle corpus costs literally nothing: no tick, no settings
 /// read, no `pmset` shell-out — and the model is never touched, let alone kept
 /// warm (no keep-alive/warm-up calls exist; the server's own idle-unload
-/// rules). `root_id`/`root` name the store whose layout is Memex — the
-/// daemon's only territory; no memex ⇒ this is never called.
-pub fn spawn_organizer(
-    app: tauri::AppHandle,
-    handle: OrganizerHandle,
-    root_id: String,
-    root: PathBuf,
-) {
+/// rules). The default route and its path are resolved fresh at each cycle so
+/// a live vault switch can retarget the one worker without restarting Rotli.
+pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: String) {
     handle.0.running.store(true, Ordering::SeqCst);
     // install the live-progress sink — run_cycle narrates through it and the
     // Activity surface listens ("rotli:organizer-progress"); titles only
@@ -2239,7 +2270,15 @@ pub fn spawn_organizer(
                 Wait::Run => {}
             }
 
+            let Ok(_transition) = inner.transition.lock() else {
+                break;
+            };
             let corpus_state = app.state::<CorpusState>();
+            let Ok(root) = corpus_state.default_root_path() else {
+                inner.queue.lock().unwrap().clear();
+                inner.sweep_at.lock().unwrap().take();
+                continue;
+            };
             let knobs = read_knobs(&corpus_state, &root_id, inner);
             quiet = knobs.quiet; // run_cycle re-reads its own copy; keep the planner's fresh
             if inner.brain_off.load(Ordering::SeqCst) {
@@ -2283,7 +2322,7 @@ pub fn spawn_organizer(
                 let mut state = parse_state(&state_json);
                 let mut targets = sweep(&root, &state);
                 if run_now {
-                    // the explicit nudge is an AUDIT (Seth, 2026-07-31): also
+                    // the explicit nudge is an AUDIT (the maintainer, 2026-07-31): also
                     // re-open coverage for covered notes whose metadata is
                     // missing, so "processed once" can never hide a gap
                     let gaps = audit_gaps(&root, &state);
@@ -2346,7 +2385,7 @@ pub fn spawn_organizer(
                 inner.run_now.store(false, Ordering::SeqCst);
             }
             // which model organizes — re-read each cycle so a Settings change
-            // takes effect on the next wake (Seth, 2026-07-03). Default Local
+            // takes effect on the next wake (the maintainer, 2026-07-03). Default Local
             // (on-device); Claude routes to `claude -p` Sonnet.
             let org_model = {
                 let s = corpus_state
@@ -2454,11 +2493,15 @@ pub struct OrganizerStatus {
 }
 
 #[tauri::command]
-pub fn organizer_status(state: tauri::State<OrganizerState>) -> OrganizerStatus {
+pub fn organizer_status(
+    state: tauri::State<OrganizerState>,
+    corpus_state: tauri::State<CorpusState>,
+) -> OrganizerStatus {
     let inner = &state.0 .0;
     let st = inner.status.lock().unwrap().clone();
     OrganizerStatus {
-        running: inner.running.load(Ordering::SeqCst),
+        running: inner.running.load(Ordering::SeqCst)
+            && corpus_state.default_is_memex().unwrap_or(false),
         trust: inner.trust.lock().unwrap().as_str().to_string(),
         queued: inner.queue.lock().unwrap().len(),
         last_run_at: st.last_run_at,

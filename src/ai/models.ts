@@ -165,7 +165,7 @@ const cli = (provider: ProviderId, id: string, label: string): ChatModelInfo => 
   provider,
   endpoint: "", // remote — fails the locality check on purpose (see header)
   api: "cli",
-  // EVERY frontier lane sees images (Seth, 2026-08-04). Each transport gets
+  // EVERY frontier lane sees images (the maintainer, 2026-08-04). Each transport gets
   // there differently and Rust owns the details: codex takes image files
   // natively (`-i`), claude reads them with a Read-only tool allowlist scoped
   // to the staged dir, and agy needs its permission prompt skipped — granted
@@ -186,8 +186,9 @@ const gemini = (id: string, label: string): ChatModelInfo => ({
 });
 
 /** What each connected lane offers. Model ids are the EXACT strings the CLI /
- * API expects (`--model <id>`); the label carries the human context. Kept to a
- * curated handful per lane — the dropdown is a picker, not a registry dump. */
+ * API expects (`--model <id>`); the label carries the human context. A CLI lane
+ * mirrors the choices its installed provider exposes so Rotli never hides a
+ * capability the user's subscription already includes. */
 export const CLI_CATALOG: Record<ProviderId, ChatModelInfo[]> = {
   claude: [
     cli("claude", "sonnet", "Claude Sonnet 5"),
@@ -205,8 +206,20 @@ export const CLI_CATALOG: Record<ProviderId, ChatModelInfo[]> = {
     cli("codex", "gpt-5.3-codex-spark", "GPT-5.3 Codex Spark"),
   ],
   agy: [
-    cli("agy", "Gemini 3.5 Flash (Medium)", "Gemini 3.5 Flash"),
-    cli("agy", "Gemini 3.1 Pro (High)", "Gemini 3.1 Pro"),
+    cli("agy", "Gemini 3.7 Flash (High)", "Gemini 3.7 Flash (High)"),
+    cli("agy", "Gemini 3.7 Flash (Medium)", "Gemini 3.7 Flash (Medium)"),
+    cli("agy", "Gemini 3.7 Flash (Low)", "Gemini 3.7 Flash (Low)"),
+    cli("agy", "Gemini 3.6 Flash (High)", "Gemini 3.6 Flash (High)"),
+    cli("agy", "Gemini 3.6 Flash (Medium)", "Gemini 3.6 Flash (Medium)"),
+    cli("agy", "Gemini 3.6 Flash (Low)", "Gemini 3.6 Flash (Low)"),
+    cli("agy", "Gemini 3.5 Flash (High)", "Gemini 3.5 Flash (High)"),
+    cli("agy", "Gemini 3.5 Flash (Medium)", "Gemini 3.5 Flash (Medium)"),
+    cli("agy", "Gemini 3.5 Flash (Low)", "Gemini 3.5 Flash (Low)"),
+    cli("agy", "Gemini 3.1 Pro (High)", "Gemini 3.1 Pro (High)"),
+    cli("agy", "Gemini 3.1 Pro (Low)", "Gemini 3.1 Pro (Low)"),
+    cli("agy", "Claude Sonnet 4.6 (Thinking)", "Claude Sonnet 4.6 (Thinking)"),
+    cli("agy", "Claude Opus 4.6 (Thinking)", "Claude Opus 4.6 (Thinking)"),
+    cli("agy", "GPT-OSS 120B (Medium)", "GPT-OSS 120B (Medium)"),
   ],
   gemini: [
     gemini("gemini-3-pro", "Gemini 3 Pro"),
@@ -273,7 +286,7 @@ export const LANE_PING_MODEL: Record<ProviderId, string> = {
 };
 
 /** Ready-made hybrid presets (stable ids so re-adding never duplicates). They
- * reference Seth's real defaults — routes to a lane you haven't enabled simply
+ * reference the maintainer's real defaults — routes to a lane you haven't enabled simply
  * fall away at runtime (runHybrid degrades, never fails a turn). */
 export const STARTER_PRESETS: HybridPreset[] = [
   {
@@ -319,7 +332,7 @@ export function flattenModels(g: ModelGroups): ChatModelInfo[] {
 /** A model id's human label wherever one is known — the local store's listing,
  * any CLI lane's catalog (enabled or not: a sidebar badge should still read
  * well for a lane that's currently off), or a hybrid preset's name — else the
- * raw id. For the sidebar's per-chat model chip (Seth, 2026-08-03). */
+ * raw id. For the sidebar's per-chat model chip (the maintainer, 2026-08-03). */
 /** Which LANE a model id belongs to ("claude", "codex", "agy", "gemini",
  * "preset", or a local model's own provider). Undefined when the id matches
  * nothing rotli knows. Sibling of modelLabel — same three-catalog search, so

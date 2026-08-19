@@ -1,4 +1,4 @@
-// The ambient "the Librarian is working" signal (Seth, 2026-07-31: "I need a
+// The ambient "the Librarian is working" signal (the maintainer, 2026-07-31: "I need a
 // visual way to see that it is working"). One tiny store fed by the daemon's
 // progress events (app.tsx) and the Organize auto-adopter, read by the
 // sidebar's footer button — so the work is visible from ANYWHERE in the app,

@@ -4,7 +4,7 @@
 // on an explicit Approve (the frontend never auto-applies). This is the trust
 // surface: see everything the AI wants to do or has done, and undo any of it.
 //
-// 2026-07-31 rework (Seth): no per-row mascot, proposals grouped per note,
+// 2026-07-31 rework (the maintainer): no per-row mascot, proposals grouped per note,
 // history folded into days (recent first, the long tail behind View all), a
 // first-visit explainer modal (re-openable via the labeled help button), a LIVE run band
 // (the daemon narrates each note it looks at; Stop hands control back), and
@@ -243,7 +243,7 @@ export function ActivitySurface() {
       return next;
     });
   const [stopRequested, setStopRequested] = useState(false);
-  // the explicit Run now must react INSTANTLY (Seth, 2026-07-31: "issues with
+  // the explicit Run now must react INSTANTLY (the maintainer, 2026-07-31: "issues with
   // visually seeing something is even happening") — the band shows on click,
   // and a fallback timer explains the one case a start can't come (a chat)
   const runNowTimer = useRef<number | null>(null);
@@ -260,7 +260,7 @@ export function ActivitySurface() {
   const openNote = usePanesStore((s) => s.openNote);
   // Journal rows can be path-addressed (an _index.md has no frontmatter ULID),
   // but openNote is an id-only door — resolve rel→wire-id first, or the tab
-  // opens on an unresolvable id and renders "Untitled" (Seth, 2026-07-31).
+  // opens on an unresolvable id and renders "Untitled" (the maintainer, 2026-07-31).
   const openRef = (ref: string) => {
     void corpusResolveRef(ref)
       .then((id) => openNote(id))
@@ -315,7 +315,7 @@ export function ActivitySurface() {
             current: null,
             // a REAL cycle (we saw its start) always answers — an explicit
             // Run now that finds nothing must never read as a dead button
-            // (Seth, 2026-07-31). An end WITHOUT a start (a dormant
+            // (the maintainer, 2026-07-31). An end WITHOUT a start (a dormant
             // early-return cycle, review F8) PRESERVES whatever summary is
             // showing — it must never erase the answer under the user's eyes.
             summary:
@@ -382,7 +382,7 @@ export function ActivitySurface() {
     }
   };
 
-  /** The whole Waiting lane in one deliberate click (Seth, 2026-07-31: "clean
+  /** The whole Waiting lane in one deliberate click (the maintainer, 2026-07-31: "clean
    * up of everything pending"). Sequential, continue-on-error — each row keeps
    * its freshness guard, a stale row is skipped and counted, never a batch
    * abort halfway with no report. */
@@ -526,7 +526,7 @@ export function ActivitySurface() {
           ))}
       </header>
       {/* the standing status strip: what the Librarian IS right now — rung,
-          model, last pass — with its settings ONE click away (Seth,
+          model, last pass — with its settings ONE click away (the maintainer,
           2026-07-31: "no way to see my librarian settings from here") */}
       {brainOn && status?.running && (
         <div className="act-strip">
@@ -543,7 +543,7 @@ export function ActivitySurface() {
               <span title={status.lastRunAt}>last pass {relativeLabel(Date.parse(status.lastRunAt))}</span>
             </>
           )}
-          {/* labeled, not a bare icon (Seth, 2026-07-31: "hard to see and
+          {/* labeled, not a bare icon (the maintainer, 2026-07-31: "hard to see and
               understand till I click") */}
           <button
             type="button"
@@ -587,7 +587,7 @@ export function ActivitySurface() {
       {/* the secure-review confirm lane (feature B, decision 2026-07-22): the
           detector PROPOSES, the user disposes — nothing is ever auto-marked
           from here. "Not sensitive" is remembered for that exact content.
-          ALWAYS the surface's first business (Seth, 2026-07-31). */}
+          ALWAYS the surface's first business (the maintainer, 2026-07-31). */}
       {review.confirm.length > 0 && (
         <div className="brain-hint act-pad act-secure-band">
           <p style={{ margin: 0 }}>
@@ -685,7 +685,7 @@ export function ActivitySurface() {
         <p className="main-empty">Loading…</p>
       ) : pending.length === 0 && history.length === 0 ? (
         <div className="list-empty">
-          <Character name="knowledge" size={104} className="be-quokka" />
+          <Character name="thoughtful" size={104} className="be-quokka" />
           <p className="be-title">Nothing yet</p>
           <p className="be-sub">
             When the Librarian files a note or updates its metadata it shows here — and you can undo any of
@@ -867,7 +867,7 @@ export function ActivitySurface() {
                         >
                           <ChevronRight size={11} className={expanded ? "open" : undefined} />
                         </button>
-                        {/* a log row's click SAYS WHAT IT DID (Seth, 2026-07-31)
+                        {/* a log row's click SAYS WHAT IT DID (the maintainer, 2026-07-31)
                             — the before → after lives right here; the note
                             itself is one link away inside the detail */}
                         <button

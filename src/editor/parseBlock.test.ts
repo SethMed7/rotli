@@ -1,4 +1,4 @@
-// The shared block grammar must read TAB-indented lists (Seth, 2026-07-28:
+// The shared block grammar must read TAB-indented lists (the maintainer, 2026-07-28:
 // "shift tab on bullets is very buggy" — notes written by external editors and
 // LLMs indent with tabs, which the space-only grammar treated as raw
 // paragraphs: no bullet, dead Shift-Tab, Tab inserting a soft tab).
@@ -36,7 +36,7 @@ describe("parseBlock — tab-tolerant list indents", () => {
 
 // GFM's ordered task ("1. [ ] x") is a TASK that keeps its number as marker —
 // before 2026-08-03 it parsed as plain numbered and showed a literal "[ ]"
-// (Seth's KEK-rotation checklist).
+// (the maintainer's KEK-rotation checklist).
 describe("parseBlock — ordered tasks", () => {
   test("an open ordered task is a task with its number as marker", () => {
     const b = parseBlock("1. [ ] Generate the new key");

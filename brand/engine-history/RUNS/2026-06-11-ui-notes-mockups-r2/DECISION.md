@@ -1,7 +1,7 @@
 # rotli — UI/UX mockups · notes module · round 2 — DECISION
 
 **Date:** 2026-06-11 · **Gate:** `gate.html` (live render, kit tokens only)
-**Input:** Seth's round-1 feedback + the `rotli-gate-r1-review` workflow (5 dimension reviewers + synthesis; 47 findings → 10 changes; full output: session task `w0ixi9hkb`).
+**Input:** the maintainer's round-1 feedback + the `rotli-gate-r1-review` workflow (5 dimension reviewers + synthesis; 47 findings → 10 changes; full output: session task `w0ixi9hkb`).
 
 ## What changed from round 1
 
@@ -13,7 +13,7 @@
    3px clay bar (one selection grammar); kbd uses tokens; done-check is cocoa-on-olive; flow arrows muted.
 3. **Clay budget — one clay element per pane:** caret is cocoa; pin moved from note title to meta line;
    folder-sel icon de-accented; storage selected card flat + clay border + clay check (olive = save/sync only).
-4. **Panes + tabs-within-panes** (terminal-style, Seth's ask) — see spec below.
+4. **Panes + tabs-within-panes** (terminal-style, the maintainer's ask) — see spec below.
 5. **Chat-on-note future** structurally locked — see spec below; concept shown as Frame I.
 6. Dedup deletions: list header row → filter-on-top; "markdown" footer label gone; raw-line pill gone;
    capture hint line gone (⌘⏎ demoted to palette).
@@ -72,7 +72,7 @@ plus "Go to <module>…" verbs in ⌘K.
    respects reduced-motion, never character shimmer; status = one static muted line; zero AI indicators in
    the note list. Freshest AI edit = peach tint fading to ground.
 
-## Round-2 calls for Seth
+## Round-2 calls for the maintainer
 
 1. Switcher: static identity label in v1, popover spec for later — approve?
 2. Tab law (zero-chrome single-tab pane; click replaces / ⌘-click opens; splits duplicate) — approve?
@@ -82,4 +82,4 @@ plus "Go to <module>…" verbs in ⌘K.
 
 ## Verdict
 
-**PENDING — awaiting Seth at the gate.**
+**PENDING — awaiting the maintainer at the gate.**

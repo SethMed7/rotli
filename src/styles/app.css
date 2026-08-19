@@ -33,7 +33,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  /* 42px — compact top (Seth, 2026-06-15: 52px read as too tall). Content is
+  /* 42px — compact top (the maintainer, 2026-06-15: 52px read as too tall). Content is
      centered here (centerY ≈ 21); the OS traffic lights render a few px HIGH on
      this Tahoe build, so conf trafficLightPosition y is tuned ABOVE height/2
      (y:24) to drop them onto the content line. Raise conf y to lower the lights,
@@ -49,7 +49,7 @@
 /* native traffic lights live here (frameless overlay titlebar). Tahoe's buttons
    are bigger AND the sidebar toggle now follows the inset, so reserve generously
    (14px pad + this 74px + the 10px gap → toggle starts ~98px) so the toggle reads
-   as app chrome, clearly separate from the window controls (Seth, 2026-06-15). */
+   as app chrome, clearly separate from the window controls (the maintainer, 2026-06-15). */
 .tb-inset {
   width: 74px;
   height: 28px;
@@ -83,7 +83,7 @@
   opacity: 0.6;
   transition: opacity 120ms var(--motion-ease);
 }
-/* the home mark (Seth, 2026-06-27): just the quokka, centered in the bar, no
+/* the home mark (the maintainer, 2026-06-27): just the quokka, centered in the bar, no
    wordmark. The dropdown is retired — this lone mark is the identity + home. */
 .identity-wrap.centered {
   position: absolute;
@@ -110,7 +110,7 @@
   flex: 1;
   align-self: stretch;
 }
-/* the center strip that holds the global search field (Seth, 2026-07-06). Still
+/* the center strip that holds the global search field (the maintainer, 2026-07-06). Still
    a window-drag region; the search button inside it captures its own clicks. */
 .tb-mid {
   flex: 1;
@@ -120,7 +120,7 @@
   justify-content: center;
   min-width: 0;
 }
-/* ‹ › — back/forward over opened notes (Seth #14), sitting left of the search
+/* ‹ › — back/forward over opened notes (the maintainer #14), sitting left of the search
    field. Quiet icon buttons; disabled = barely-there (no trail to walk). */
 .tb-nav {
   flex: 0 0 auto;
@@ -195,7 +195,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* the ⌘K hint — quiet inline text, no card (Seth, 2026-07-07) */
+/* the ⌘K hint — quiet inline text, no card (the maintainer, 2026-07-07) */
 .tb-search-kbd {
   flex: 0 0 auto;
   font-family: inherit;
@@ -289,7 +289,7 @@
   transition-delay: 300ms;
 }
 
-/* edge-safe tooltips (Seth, 2026-06-15): a button hugging the window's LEFT edge
+/* edge-safe tooltips (the maintainer, 2026-06-15): a button hugging the window's LEFT edge
    shows its label to the right; one at the RIGHT edge shows it to the left — so a
    centered tooltip never spills past the window and clips ("ide sidebar"). */
 .tb-lead .tip {
@@ -301,10 +301,235 @@
   right: 0;
   transform: none;
 }
+
+/* — private browser tab — app-owned chrome above an isolated native child
+   webview. The host itself remains visually blank in the browser twin. */
+.browser-surface {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+}
+.browser-toolbar {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--ground);
+}
+.browser-nav,
+.browser-reload {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.browser-nav:hover:not(:disabled),
+.browser-reload:hover:not(:disabled) {
+  background: var(--hov);
+  color: var(--text);
+}
+.browser-nav:disabled,
+.browser-reload:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.browser-nav.back svg {
+  transform: scaleX(-1);
+}
+.browser-reload.loading svg {
+  opacity: 0.55;
+}
+.browser-address {
+  height: 28px;
+  min-width: 100px;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+.browser-address:focus-within {
+  border-color: var(--accent-text);
+  background: var(--surface);
+  color: var(--text);
+}
+.browser-address input {
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 11.5px;
+}
+.browser-private {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+.browser-error {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--danger);
+  font-size: 11px;
+}
+.browser-native-host {
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--surface);
+}
+.browser-start {
+  width: 100%;
+  height: 100%;
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  color: var(--text);
+  text-align: center;
+}
+.browser-start-mark {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+  color: var(--accent-text);
+}
+.browser-start-provider {
+  margin-bottom: 4px;
+  color: var(--accent-text);
+  font-size: 11.5px;
+  font-weight: 650;
+}
+.browser-start h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.browser-start > p {
+  max-width: 52ch;
+  margin: 7px 0 20px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+.browser-start-search {
+  width: min(520px, 100%);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+}
+.browser-start-search:focus-within {
+  border-color: var(--accent-text);
+  background: var(--surface);
+}
+.browser-start-search input {
+  min-width: 0;
+  flex: 1;
+  padding: 7px 8px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+.browser-start-search input::placeholder,
+.browser-address input::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+.browser-start-search button {
+  flex: 0 0 auto;
+  padding: 7px 13px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.browser-start-search button:hover {
+  background: color-mix(in srgb, var(--accent) 90%, var(--text));
+}
+.browser-start-private {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 12px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+.browser-twin-empty {
+  position: absolute;
+  inset: 38px 0 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.browser-twin-empty strong {
+  color: var(--text);
+  font-size: 13px;
+}
+.browser-twin-empty span {
+  max-width: 42ch;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .browser-private {
+    width: 26px;
+    overflow: hidden;
+    font-size: 0;
+  }
+}
 /* the sidebar header hugs the WINDOW'S left edge — leading tips anchor left
-   (Seth, 2026-07-28: "hovers close to edge break out of screen"). But .sidebar
+   (the maintainer, 2026-07-28: "hovers close to edge break out of screen"). But .sidebar
    is overflow:hidden, so a left-anchored tip on the TRAILING buttons gets
-   sliced at the sidebar's right edge (Seth, 2026-07-31: "Colla…" clipped) —
+   sliced at the sidebar's right edge (the maintainer, 2026-07-31: "Colla…" clipped) —
    those carry .tb-trail (notes mode only; Breve left-packs the row, see
    sidebar.tsx) and anchor right so the tip extends INTO the sidebar box. */
 .nl-top .icobtn .tip {
@@ -347,7 +572,7 @@
   background: var(--hov);
 }
 .mrow.sel {
-  background: var(--tint);
+  background: var(--selected-bg);
   font-weight: 500;
 }
 .mrow .hk {
@@ -407,7 +632,7 @@ body[data-surface="capture"] {
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* `safe` centering (Seth, 2026-08-01 fit sweep): a plain `center` pushes the
+  /* `safe` centering (the maintainer, 2026-08-01 fit sweep): a plain `center` pushes the
      stage's top out of the box when the pane is shorter than the quokka, and
      overflow at the START edge is unreachable by any scroll. Safe centering
      parks it at the top instead, so the scroll below can actually reach it. */
@@ -420,13 +645,13 @@ body[data-surface="capture"] {
 }
 /* the mascot yields before the words: in a short pane the illustration scales
    down (viewBox letterboxing does the work) instead of pushing the message it
-   decorates out of the box (Seth, 2026-08-01 fit sweep) */
+   decorates out of the box (the maintainer, 2026-08-01 fit sweep) */
 .list-empty > .quokka {
   flex: 0 1 auto;
   min-height: 0;
 }
 
-/* — all tabs closed: the lone pane's quokka rest state (Seth, 2026-07-28) —
+/* — all tabs closed: the lone pane's quokka rest state (the maintainer, 2026-07-28) —
    the .list-empty stage plus quiet inline actions back into the app */
 .pane-empty {
   height: 100%;
@@ -451,140 +676,7 @@ body[data-surface="capture"] {
   color: var(--text);
 }
 
-/* Empty-vault onboarding lives in memory, not in the user's Markdown tree. */
-.vault-welcome {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  padding: clamp(28px, 7vh, 72px) 24px 32px;
-}
-.vault-welcome-inner {
-  width: min(680px, 100%);
-  margin: 0 auto;
-  text-align: center;
-}
-.vault-welcome .quokka {
-  color: var(--text);
-}
-.vault-welcome-eyebrow {
-  margin: 14px 0 6px;
-  color: var(--accent-text);
-  font-size: 11px;
-  font-weight: 750;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.vault-welcome h1 {
-  margin: 0;
-  color: var(--text);
-  font-size: clamp(28px, 4cqw, 42px);
-  letter-spacing: -0.035em;
-}
-.vault-welcome-lede {
-  margin: 8px auto 24px;
-  color: var(--text-muted);
-  font-size: 14px;
-}
-.vault-welcome-create {
-  margin: 0 auto;
-  text-align: left;
-}
-.vault-welcome-create > label {
-  display: block;
-  margin: 0 0 7px 2px;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 650;
-}
-.vault-welcome-field {
-  display: flex;
-  gap: 8px;
-  padding: 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-control);
-  background: var(--surface-2);
-}
-.vault-welcome-field:focus-within {
-  border-color: var(--accent-text);
-}
-.vault-welcome-field input {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: 0 9px;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: 14px;
-}
-.vault-welcome-field button {
-  flex: 0 0 auto;
-  min-height: 34px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: var(--r-control);
-  background: var(--accent);
-  color: var(--accent-ink);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-}
-.vault-welcome-field button:disabled {
-  opacity: 0.45;
-}
-.vault-welcome-create > p {
-  margin: 8px 2px 0;
-  color: var(--danger);
-  font-size: 11px;
-}
-.vault-welcome-tips {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 14px;
-  text-align: left;
-}
-.vault-welcome-tips button {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  min-width: 0;
-  padding: 13px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-control);
-  background: transparent;
-  color: var(--text-muted);
-  font: inherit;
-  text-align: left;
-}
-.vault-welcome-tips button:hover {
-  background: var(--hov);
-  color: var(--text);
-}
-.vault-welcome-tips span {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 3px;
-}
-.vault-welcome-tips strong {
-  color: var(--text);
-  font-size: 12.5px;
-}
-.vault-welcome-tips small {
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.45;
-}
-@media (max-width: 620px) {
-  .vault-welcome-tips {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* — the ⌘N chooser tab (Seth, 2026-07-29): pick what this tab becomes — */
+/* — the ⌘N chooser tab (the maintainer, 2026-07-29): pick what this tab becomes — */
 .ni-surface {
   height: 100%;
   display: grid;
@@ -596,7 +688,7 @@ body[data-surface="capture"] {
   container-type: inline-size;
 }
 /* the inner column centers as ONE block — lead, hint, and grid travel together
-   instead of the grid hugging a side in a wide pane (Seth, 2026-07-30) */
+   instead of the grid hugging a side in a wide pane (the maintainer, 2026-07-30) */
 .ni-inner {
   display: flex;
   flex-direction: column;

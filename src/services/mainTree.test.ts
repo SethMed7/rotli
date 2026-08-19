@@ -107,7 +107,7 @@ describe("gcManifest", () => {
     expect(gcManifest(tree, new Set(["a"]))).toEqual([{ note: "a" }, { folder: "Empty", children: [] }]);
   });
 
-  // The INPUT convention (the bug that silently emptied Seth's seeded Main):
+  // The INPUT convention (the bug that silently emptied the maintainer's seeded Main):
   // liveIds MUST be the FULL note-index keys — the default listing PLUS the
   // hidden roots (staged "Board", "Archive", "Trash"). A note that still exists
   // ANYWHERE is not an orphan; only a truly-deleted id drops.

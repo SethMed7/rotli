@@ -1,18 +1,57 @@
 // Theme application. The setting is explicit (light / dark / system) — the app
 // never silently follows the OS; "system" subscribes to matchMedia only while
 // it is the chosen setting. The family picks which token set the mode resolves
-// into (warm → light/dark, mono → paper/charcoal).
+// into. Warm and mono retain their historic data-theme names; newer families
+// use explicit `<family>-<mode>` names.
 
 import type { AccentColor, SyntaxPalette, ThemeFamily, ThemeSetting } from "./ui";
 
-type DataTheme = "light" | "dark" | "paper" | "charcoal";
+export type DataTheme =
+  | "light"
+  | "dark"
+  | "paper"
+  | "charcoal"
+  | "ocean-light"
+  | "ocean-dark"
+  | "grove-light"
+  | "grove-dark"
+  | "iris-light"
+  | "iris-dark"
+  | "midnight-light"
+  | "midnight-dark";
+
+export const DARK_DATA_THEMES: readonly DataTheme[] = [
+  "dark",
+  "charcoal",
+  "ocean-dark",
+  "grove-dark",
+  "iris-dark",
+  "midnight-dark",
+];
+
+export function isDarkDataTheme(theme: string | undefined): boolean {
+  return DARK_DATA_THEMES.includes(theme as DataTheme);
+}
 
 let media: MediaQueryList | null = null;
 let onChange: ((event: MediaQueryListEvent) => void) | null = null;
 
 export function resolveTheme(family: ThemeFamily, mode: "light" | "dark"): DataTheme {
   if (family === "mono") return mode === "light" ? "paper" : "charcoal";
-  return mode;
+  if (family === "warm") return mode;
+  return `${family}-${mode}`;
+}
+
+/** System only selects the active half of the chosen family. It never owns a
+ * second theme mapping, so changing a family has one predictable result in all
+ * three appearance modes. */
+export function resolveThemeSetting(
+  setting: ThemeSetting,
+  family: ThemeFamily,
+  systemDark: boolean,
+): DataTheme {
+  const mode = setting === "system" ? (systemDark ? "dark" : "light") : setting;
+  return resolveTheme(family, mode);
 }
 
 function setDataTheme(value: DataTheme): void {
@@ -38,23 +77,12 @@ function detachSystemListener(): void {
   onChange = null;
 }
 
-/** When following the system, each OS appearance can map to a theme in EITHER
- * family (Seth, 2026-06-15) — light → matchLightFamily, dark → matchDarkFamily. */
-export interface MatchFamilies {
-  light: ThemeFamily;
-  dark: ThemeFamily;
-}
-
 /** Returns the detach so callers (the App effect) get a real cleanup — the
  * last "system" listener must not survive a root unmount. */
-export function applyTheme(
-  setting: ThemeSetting,
-  family: ThemeFamily,
-  match: MatchFamilies = { light: family, dark: family },
-): () => void {
+export function applyTheme(setting: ThemeSetting, family: ThemeFamily): () => void {
   detachSystemListener();
   if (setting === "system") {
-    const forOs = (dark: boolean) => resolveTheme(dark ? match.dark : match.light, dark ? "dark" : "light");
+    const forOs = (dark: boolean) => resolveThemeSetting(setting, family, dark);
     media = window.matchMedia("(prefers-color-scheme: dark)");
     onChange = (event) => setDataTheme(forOs(event.matches));
     setDataTheme(forOs(media.matches));

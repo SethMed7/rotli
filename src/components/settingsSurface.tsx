@@ -1,12 +1,12 @@
 // Settings — the r1 frame F window grammar: left nav (Keybindings · Appearance ·
 // Storage · Connections) + one surface. Esc closes back to notes (the registry's
-// app.hide chain). Storage shows the corpus story with the future default path
-// ~/Documents/rotli; "Later" cards are quiet and non-interactive. Keybindings is
+// app.hide chain). Storage shows the explicitly selected corpus path; "Later"
+// cards are quiet and non-interactive. Keybindings is
 // the rebind list: click a chord, press the next combo (a quiet inline note if
 // the chord is taken).
 
 import { useQuery } from "@tanstack/react-query";
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { makeTauriHost } from "../ai/host";
 import { suggestPresets } from "../ai/hybrid";
@@ -28,6 +28,14 @@ import {
 } from "../ai/models";
 import { WEB_SEARCH_PROVIDERS, webSearchProviderInfo } from "../ai/searchProvider";
 import { verifyLane } from "../ai/verify";
+import {
+  QUOKKA_ACCESSORY_PRESENTATIONS,
+  QUOKKA_IDLE_POSE_PRESENTATIONS,
+  QUOKKA_LINE_COLORS,
+  QUOKKA_STYLE_PRESENTATIONS,
+  quokkaAccessoryColor,
+  quokkaCustomColor,
+} from "../brand/quokka";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import {
@@ -39,6 +47,7 @@ import {
   rebind,
   setDispatchSuspended,
 } from "../keys/registry";
+import { PRIVATE_BROWSER_SEARCH_ENGINE_PRESENTATIONS } from "../lib/privateBrowser";
 import {
   type ChatModelInfo,
   type MemexValidateReport,
@@ -47,7 +56,6 @@ import {
   chatModels,
   checkForUpdate,
   cliDetect,
-  corpusAddFolder,
   corpusOverview,
   demoMode,
   downloadAndInstallUpdate,
@@ -89,26 +97,34 @@ import {
   useRunValidate,
   useSetActiveMemex,
   useSetMemexPerms,
+  useSwitchVault,
 } from "../memex/useMemex";
 import { NEW_ITEM_DEFINITIONS } from "../newItems/model";
 import { isChatsPath, isHidden, isVault, isWikiPath } from "../services/destinations";
 import { useFolders } from "../services/hooks";
 import { queryClient } from "../services/query";
 import { DEFAULT_RETENTION_DAYS, MAX_RETENTION_DAYS, parseRetentionDays } from "../services/retentionPolicy";
+import { reconnectActiveVault } from "../state/activeVault";
 import { resetAndReonboard } from "../state/onboarding";
 import { usePanesStore } from "../state/panes";
 import { setQuickFolderSynced, setQuickVaultSynced } from "../state/quick";
 import {
   ACCENT_COLORS,
+  CHAT_NAVIGATOR_STYLES,
+  type ChatNavigatorStyle,
   type AppIcon,
   type OrganizerTrust,
   THEME_FAMILY_PRESENTATIONS,
+  type ThemeFamily,
+  type ThemeSetting,
   type TimeFormat,
   useUiStore,
 } from "../state/ui";
+import { requestVaultFolder } from "../state/vaultFolderBrowser";
 import { VOICES } from "../voice/speech";
 import { Character, type CharacterName, QuokkaMark } from "./character";
 import {
+  BrowserGlyph,
   CheckGlyph,
   CloudGlyph,
   CopyGlyph,
@@ -125,6 +141,7 @@ type SettingsPane =
   | "general"
   | "hotkeys"
   | "appearance"
+  | "browser"
   | "brain"
   | "security"
   | "models"
@@ -135,22 +152,23 @@ const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = 
   { id: "general", label: "General", glyph: LaptopGlyph },
   { id: "hotkeys", label: "Keybindings", glyph: KeyboardGlyph },
   { id: "appearance", label: "Appearance", glyph: SunGlyph },
+  { id: "browser", label: "Browser", glyph: BrowserGlyph },
   // the organizer daemon's trust ladder (design §4.3) — minimal Phase-4 pane;
   // capability checkboxes / Pause / Reset Brain are Phase 5 (§4.8)
   { id: "brain", label: "Librarian", glyph: NotesStackGlyph },
   // the secure-note explainer (decision 2026-07-22, feature C) — the ONE plain-
   // language home for the fail-closed rules; contract stays the spec
   { id: "security", label: "Security", glyph: ShieldGlyph },
-  // connected subscription models + hybrid presets (Seth, 2026-07-02)
+  // connected subscription models + hybrid presets (the maintainer, 2026-07-02)
   { id: "models", label: "AI Models", glyph: CloudGlyph },
-  // Storage + Memory collapsed into one "Location" tab (Seth, 2026-06-27): your
+  // Storage + Memory collapsed into one "Location" tab (the maintainer, 2026-06-27): your
   // notes folder *is* (or can become) a brain — one concept, not two overlapping
   // ones. See LocationPane below.
   { id: "location", label: "Location", glyph: DatabaseGlyph },
   { id: "connections", label: "Connections", glyph: ExternalLinkGlyph },
 ];
 
-/** A settings pane heading with its quokka character accent (Seth, 2026-06-26) —
+/** A settings pane heading with its quokka character accent (the maintainer, 2026-06-26) —
  * a small, muted line-art quokka at the top-right of each section. The accent
  * tints with the theme (currentColor) and stays a quiet flourish, never the
  * focus. Each pane gets the character that fits it. */
@@ -163,7 +181,7 @@ function PaneHead({ title, char }: { title: string; char: CharacterName }) {
   );
 }
 
-// ——— shared settings controls (Seth, 2026-06-15) ———
+// ——— shared settings controls (the maintainer, 2026-06-15) ———
 
 /** The sliding track + knob every switch shares — state comes from the parent's
  * .on class (`.swrow`/`.ailane-sw`), so this stays a dumb visual. */
@@ -408,7 +426,7 @@ function HotkeysPane() {
   );
 }
 
-// ——— General: visitor vs resident, dock visibility (Seth, 2026-06-12) ———
+// ——— General: visitor vs resident, dock visibility (the maintainer, 2026-06-12) ———
 
 // ——— Updates: the current version + an explicit manual check, plus the
 // one-click "Install & relaunch" when the signed feed offers a newer build.
@@ -872,12 +890,78 @@ function GeneralPane() {
 
 // ——— Appearance: four intentional working environments. ———
 
-const THEME_SWATCH: Record<string, string> = {
-  "Warm Light": "var(--swatch-warm-light)",
-  "Warm Dark": "var(--swatch-warm-dark)",
-  Paper: "var(--swatch-paper)",
-  Charcoal: "var(--swatch-charcoal)",
+type PreviewEnvironment =
+  | "warm-light"
+  | "warm-dark"
+  | "paper"
+  | "charcoal"
+  | "ocean-light"
+  | "ocean-dark"
+  | "grove-light"
+  | "grove-dark"
+  | "iris-light"
+  | "iris-dark"
+  | "midnight-light"
+  | "midnight-dark";
+
+function previewEnvironment(family: ThemeFamily, mode: "light" | "dark"): PreviewEnvironment {
+  if (family === "warm") return mode === "light" ? "warm-light" : "warm-dark";
+  if (family === "mono") return mode === "light" ? "paper" : "charcoal";
+  return `${family}-${mode}`;
+}
+
+/** A tiny but believable workspace preview. Fixed preview palettes are defined
+ * in themes.css so this component still consumes semantic custom properties. */
+function WorkspacePreview({ environments }: { environments: readonly PreviewEnvironment[] }) {
+  return (
+    <span
+      className={environments.length > 1 ? "workspace-preview split" : "workspace-preview"}
+      aria-hidden="true"
+    >
+      {environments.map((environment) => (
+        <span className={`workspace-preview-canvas preview-${environment}`} key={environment}>
+          <span className="workspace-preview-sidebar">
+            <i />
+            <i />
+            <i className="selected" />
+            <i />
+          </span>
+          <span className="workspace-preview-page">
+            <b />
+            <i />
+            <i />
+            <em />
+          </span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+const NAVIGATOR_PRESENTATIONS: Record<ChatNavigatorStyle, { label: string; description: string }> = {
+  lines: { label: "Quiet lines", description: "Crisp and minimal" },
+  dots: { label: "Soft dots", description: "Small and steady" },
+  paws: { label: "Quokka trail", description: "A path of pawprints" },
+  ears: { label: "Little ears", description: "A playful landmark" },
 };
+
+function NavigatorSample({ style }: { style: ChatNavigatorStyle }) {
+  return (
+    <span className={`navigator-sample ${style}`} aria-hidden="true">
+      {Array.from({ length: 6 }, (_, index) => (
+        <i className={index === 3 ? "active" : undefined} key={index}>
+          {style === "paws" && (
+            <>
+              <b />
+              <b />
+              <b />
+            </>
+          )}
+        </i>
+      ))}
+    </span>
+  );
+}
 
 /** Dock/app icon options — the quokka re-tiled in a few palettes. "default" is
  * the shipped icon; colors live in themes.css (the appicon-tile-- classes). */
@@ -889,7 +973,7 @@ const APP_ICONS: { id: AppIcon; label: string }[] = [
 ];
 
 /** The primary-color swatch row — shared by Appearance and onboarding's theme
- * step (Seth, 2026-07-28: "charcoal theme with blue primary color"). Default
+ * step (the maintainer, 2026-07-28: "charcoal theme with blue primary color"). Default
  * renders as the current theme's own accent. */
 export function AccentRow() {
   const accentColor = useUiStore((s) => s.accentColor);
@@ -950,8 +1034,22 @@ function AppearancePane() {
   const setTheme = useUiStore((s) => s.setTheme);
   const themeFamily = useUiStore((s) => s.themeFamily);
   const setThemeFamily = useUiStore((s) => s.setThemeFamily);
-  const setMatchLightFamily = useUiStore((s) => s.setMatchLightFamily);
-  const setMatchDarkFamily = useUiStore((s) => s.setMatchDarkFamily);
+  const quokkaCompanionEnabled = useUiStore((s) => s.quokkaCompanionEnabled);
+  const setQuokkaCompanionEnabled = useUiStore((s) => s.setQuokkaCompanionEnabled);
+  const quokkaStyle = useUiStore((s) => s.quokkaStyle);
+  const setQuokkaStyle = useUiStore((s) => s.setQuokkaStyle);
+  const quokkaCustomHue = useUiStore((s) => s.quokkaCustomHue);
+  const setQuokkaCustomHue = useUiStore((s) => s.setQuokkaCustomHue);
+  const quokkaLineColor = useUiStore((s) => s.quokkaLineColor);
+  const setQuokkaLineColor = useUiStore((s) => s.setQuokkaLineColor);
+  const quokkaAccessory = useUiStore((s) => s.quokkaAccessory);
+  const setQuokkaAccessory = useUiStore((s) => s.setQuokkaAccessory);
+  const quokkaAccessoryHue = useUiStore((s) => s.quokkaAccessoryHue);
+  const setQuokkaAccessoryHue = useUiStore((s) => s.setQuokkaAccessoryHue);
+  const quokkaIdlePose = useUiStore((s) => s.quokkaIdlePose);
+  const setQuokkaIdlePose = useUiStore((s) => s.setQuokkaIdlePose);
+  const chatNavigatorStyle = useUiStore((s) => s.chatNavigatorStyle);
+  const setChatNavigatorStyle = useUiStore((s) => s.setChatNavigatorStyle);
   const syntaxPalette = useUiStore((s) => s.syntaxPalette);
   const setSyntaxPalette = useUiStore((s) => s.setSyntaxPalette);
   const chatWelcomeStyle = useUiStore((s) => s.chatWelcomeStyle);
@@ -960,23 +1058,42 @@ function AppearancePane() {
   const setChatNaming = useUiStore((s) => s.setChatNaming);
   const appIcon = useUiStore((s) => s.appIcon);
   const setAppIconState = useUiStore((s) => s.setAppIcon);
-  const pickFamily = (family: typeof themeFamily) => {
-    setThemeFamily(family);
-    setMatchLightFamily(family);
-    setMatchDarkFamily(family);
-  };
-  const pickMode = (mode: typeof theme) => {
-    if (mode === "system") {
-      setMatchLightFamily(themeFamily);
-      setMatchDarkFamily(themeFamily);
-    }
-    setTheme(mode);
-  };
+  const pickFamily = (family: ThemeFamily) => setThemeFamily(family);
+  const pickMode = (mode: ThemeSetting) => setTheme(mode);
   return (
     <>
       <PaneHead title="Appearance" char="board" />
-      <h4 className="sethead">Theme</h4>
-      <p className="lead">Choose a visual family. Each includes a light and dark environment.</p>
+      <p className="appearance-intro">
+        Shape Rotli into a workspace that feels like yours. Every family is tuned for readable light and dark
+        work.
+      </p>
+
+      <h4 className="sethead">Color scheme</h4>
+      <p className="lead">Choose a fixed mode, or let Rotli follow your Mac.</p>
+      <div className="appearance-mode-grid" role="radiogroup" aria-label="Color scheme">
+        {(["system", "light", "dark"] as const).map((mode) => {
+          const environments =
+            mode === "system"
+              ? [previewEnvironment(themeFamily, "light"), previewEnvironment(themeFamily, "dark")]
+              : [previewEnvironment(themeFamily, mode)];
+          return (
+            <button
+              type="button"
+              role="radio"
+              aria-checked={theme === mode}
+              className={theme === mode ? "appearance-mode-card sel" : "appearance-mode-card"}
+              key={mode}
+              onClick={() => pickMode(mode)}
+            >
+              <WorkspacePreview environments={environments} />
+              <span>{mode[0]?.toUpperCase() + mode.slice(1)}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <h4 className="sethead">Theme family</h4>
+      <p className="lead">Each family includes a light and dark workspace, tuned as a pair.</p>
       <div className="famrow">
         {THEME_FAMILY_PRESENTATIONS.map(({ family, label, description, lightLabel, darkLabel }) => {
           const selected = themeFamily === family;
@@ -988,27 +1105,15 @@ function AppearancePane() {
               aria-pressed={selected}
               onClick={() => pickFamily(family)}
             >
-              <span className="famswatch famswatch-pair" aria-hidden="true">
-                <span style={{ background: THEME_SWATCH[lightLabel] }} />
-                <span style={{ background: THEME_SWATCH[darkLabel] }} />
-              </span>
+              <WorkspacePreview
+                environments={[previewEnvironment(family, "light"), previewEnvironment(family, "dark")]}
+              />
               <span className="famlabel">{label}</span>
-              <span className="famcaption">{description}</span>
+              <span className="famcaption">{description || `${lightLabel} and ${darkLabel}`}</span>
             </button>
           );
         })}
       </div>
-      <h4 className="sethead">Mode</h4>
-      <p className="lead">Light and Dark are explicit. System follows macOS automatically.</p>
-      <Seg
-        value={theme}
-        options={[
-          ["light", "Light"],
-          ["dark", "Dark"],
-          ["system", "System"],
-        ]}
-        onPick={pickMode}
-      />
 
       <h4 className="sethead">Primary color</h4>
       <p className="lead">
@@ -1016,6 +1121,228 @@ function AppearancePane() {
         while Rotli keeps contrast safe.
       </p>
       <AccentRow />
+
+      <h4 className="sethead" id="appearance-quokka-title">
+        Quokka companion
+      </h4>
+      <p className="lead">
+        Keep a personal quokka around the workspace, or leave characters just for onboarding. The compact
+        product mark always stays its original line drawing.
+      </p>
+      <Toggle
+        on={quokkaCompanionEnabled}
+        onChange={() => setQuokkaCompanionEnabled(!quokkaCompanionEnabled)}
+        title={quokkaCompanionEnabled ? "Companion on" : "Companion off"}
+        desc={
+          quokkaCompanionEnabled
+            ? "Your colors, mood, and accessories follow you through Rotli."
+            : "Quokkas stay in the onboarding flow only."
+        }
+      />
+      {quokkaCompanionEnabled && (
+        <>
+          <section className="quokka-studio" aria-labelledby="appearance-quokka-title">
+            <div className="quokka-studio-preview">
+              <Character name="rest" size={148} accessory={quokkaAccessory} personalIdle />
+              <span>
+                <strong>
+                  {QUOKKA_STYLE_PRESENTATIONS.find((choice) => choice.style === quokkaStyle)?.label ??
+                    "Cocoa"}
+                </strong>
+                <small>
+                  {QUOKKA_ACCESSORY_PRESENTATIONS.find((choice) => choice.accessory === quokkaAccessory)
+                    ?.description ?? "Just the quokka"}{" "}
+                  · {quokkaLineColor === "black" ? "Black" : "White"} lines ·{" "}
+                  {QUOKKA_IDLE_POSE_PRESENTATIONS.find((choice) => choice.pose === quokkaIdlePose)?.label ??
+                    "Peaceful"}
+                </small>
+              </span>
+            </div>
+
+            <div className="quokka-studio-controls">
+              <fieldset>
+                <legend>Body color</legend>
+                <div className="quokka-swatches" role="radiogroup" aria-label="Quokka body color">
+                  {QUOKKA_STYLE_PRESENTATIONS.map((choice) => (
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={quokkaStyle === choice.style}
+                      aria-label={`${choice.label}: ${choice.description}`}
+                      className={
+                        quokkaStyle === choice.style
+                          ? `quokka-swatch ${choice.style} sel`
+                          : `quokka-swatch ${choice.style}`
+                      }
+                      key={choice.style}
+                      style={
+                        choice.style === "line"
+                          ? undefined
+                          : ({
+                              "--quokka-choice-color": choice.color ?? quokkaCustomColor(quokkaCustomHue),
+                            } as CSSProperties)
+                      }
+                      onClick={() => setQuokkaStyle(choice.style)}
+                    >
+                      <span aria-hidden="true" />
+                      <small>{choice.label}</small>
+                    </button>
+                  ))}
+                </div>
+                {quokkaStyle === "custom" && (
+                  <label
+                    className="quokka-custom-hue"
+                    style={{ "--quokka-custom-color": quokkaCustomColor(quokkaCustomHue) } as CSSProperties}
+                  >
+                    <span>Hue {quokkaCustomHue}°</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="359"
+                      value={quokkaCustomHue}
+                      aria-label="Custom quokka body color hue"
+                      onChange={(event) => setQuokkaCustomHue(Number(event.currentTarget.value))}
+                    />
+                  </label>
+                )}
+              </fieldset>
+
+              <fieldset>
+                <legend>Line color</legend>
+                <div className="quokka-line-colors" role="radiogroup" aria-label="Quokka line color">
+                  {QUOKKA_LINE_COLORS.map((color) => (
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={quokkaLineColor === color}
+                      className={
+                        quokkaLineColor === color
+                          ? `quokka-line-choice ${color} sel`
+                          : `quokka-line-choice ${color}`
+                      }
+                      key={color}
+                      onClick={() => setQuokkaLineColor(color)}
+                    >
+                      <span aria-hidden="true" />
+                      {color === "black" ? "Black" : "White"}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend>Idle mood &amp; pose</legend>
+                <p className="quokka-field-note">
+                  This is your quokka at rest. Empty states still pick the expression that best explains the
+                  moment.
+                </p>
+                <div className="quokka-idle-poses" role="radiogroup" aria-label="Quokka idle mood and pose">
+                  {QUOKKA_IDLE_POSE_PRESENTATIONS.map((choice) => (
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={quokkaIdlePose === choice.pose}
+                      className={quokkaIdlePose === choice.pose ? "quokka-idle-pose sel" : "quokka-idle-pose"}
+                      key={choice.pose}
+                      onClick={() => setQuokkaIdlePose(choice.pose)}
+                    >
+                      <Character name={choice.pose} size={52} accessory="none" />
+                      <span>
+                        <strong>{choice.label}</strong>
+                        <small>{choice.description}</small>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              <fieldset>
+                <legend>Accessory</legend>
+                <div className="quokka-accessories" role="radiogroup" aria-label="Quokka accessory">
+                  {QUOKKA_ACCESSORY_PRESENTATIONS.map((choice) => (
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={quokkaAccessory === choice.accessory}
+                      className={
+                        quokkaAccessory === choice.accessory ? "quokka-accessory sel" : "quokka-accessory"
+                      }
+                      key={choice.accessory}
+                      onClick={() => setQuokkaAccessory(choice.accessory)}
+                    >
+                      <Character name="base" size={48} accessory={choice.accessory} />
+                      <span>
+                        <strong>{choice.label}</strong>
+                        <small>{choice.description}</small>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {quokkaAccessory !== "none" && (
+                  <label
+                    className="quokka-accessory-hue"
+                    style={
+                      {
+                        "--quokka-accessory-color": quokkaAccessoryColor(quokkaAccessoryHue),
+                      } as CSSProperties
+                    }
+                  >
+                    <span>Accessory hue {quokkaAccessoryHue}°</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="359"
+                      value={quokkaAccessoryHue}
+                      aria-label="Quokka accessory color hue"
+                      onChange={(event) => setQuokkaAccessoryHue(Number(event.currentTarget.value))}
+                    />
+                  </label>
+                )}
+              </fieldset>
+            </div>
+          </section>
+
+          <div className="quokka-expression-strip" aria-label="Automatic quokka expressions">
+            {(
+              [
+                ["thoughtful", "Thinking"],
+                ["walking", "Moving"],
+                ["listening", "Listening"],
+                ["attention", "Attention"],
+              ] as const satisfies readonly (readonly [CharacterName, string])[]
+            ).map(([name, label]) => (
+              <span key={name}>
+                <Character name={name} size={64} />
+                <small>{label}</small>
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+
+      <h4 className="sethead">Conversation navigator</h4>
+      <p className="lead">
+        Longer chats get a small trail that opens an overview of your prompts. Pick the quiet visual you want
+        beside the conversation.
+      </p>
+      <div className="navigator-picker" role="radiogroup" aria-label="Conversation navigator">
+        {CHAT_NAVIGATOR_STYLES.map((style) => (
+          <button
+            type="button"
+            role="radio"
+            aria-checked={chatNavigatorStyle === style}
+            className={chatNavigatorStyle === style ? "navigator-choice sel" : "navigator-choice"}
+            key={style}
+            onClick={() => setChatNavigatorStyle(style)}
+          >
+            <NavigatorSample style={style} />
+            <span>
+              <strong>{NAVIGATOR_PRESENTATIONS[style].label}</strong>
+              <small>{NAVIGATOR_PRESENTATIONS[style].description}</small>
+            </span>
+          </button>
+        ))}
+      </div>
 
       <h4 className="sethead">Chat naming</h4>
       <p className="lead">
@@ -1085,11 +1412,10 @@ function AppearancePane() {
 
 // ——— Storage: where the corpus lives + how to move it. The structure dump
 //     (file tree + a sample .md) is gone — the sidebar already IS the tree
-//     (Seth, 2026-06-15). What's left is the path, the storage options, and a
+//     (the maintainer, 2026-06-15). What's left is the path, the storage options, and a
 //     way to relocate the whole folder. ———
 
-/** One brain card — the active write target or a connected "other brain". Shows
- * perms, and (per the handlers passed) Make active / Check brain / Forget. */
+/** One vault card — the active write target or a connected switch target. */
 function BrainCard({
   inst,
   isActive,
@@ -1113,6 +1439,7 @@ function BrainCard({
   onValidate: () => void;
   onForget?: (() => void) | undefined;
 }) {
+  const [removeArmed, setRemoveArmed] = useState(false);
   return (
     <div className={isActive ? "memex-card sel" : "memex-card"}>
       <div className="mc-body">
@@ -1150,8 +1477,18 @@ function BrainCard({
             Check the library
           </button>
           {onForget && (
-            <button type="button" className="ghostbtn" disabled={busy} onClick={onForget}>
-              Forget
+            <button
+              type="button"
+              className={`ghostbtn${removeArmed ? " danger" : ""}`}
+              disabled={busy}
+              aria-label={removeArmed ? `Confirm removing ${inst.label} from Rotli` : undefined}
+              onBlur={() => setRemoveArmed(false)}
+              onClick={() => {
+                if (removeArmed) onForget();
+                else setRemoveArmed(true);
+              }}
+            >
+              {removeArmed ? "Remove vault?" : "Remove from Rotli"}
             </button>
           )}
         </div>
@@ -1182,6 +1519,7 @@ function LocationPane() {
   const cfg = useMemexConfig();
   const detect = useDetectMemex(isTauri());
   const chooseMut = useChooseFolder();
+  const switchVaultMut = useSwitchVault();
   const connectBrainMut = useConnectBrain();
   const forgetMut = useForgetBrain();
   const setActiveMut = useSetActiveMemex();
@@ -1195,7 +1533,7 @@ function LocationPane() {
   const storageGrouping = useUiStore((s) => s.storageGrouping);
   const setStorageGrouping = useUiStore((s) => s.setStorageGrouping);
 
-  const rootPath = real.data?.root ?? "~/Documents/rotli";
+  const rootPath = real.data?.root ?? "No vault selected";
   const instances = cfg.data?.instances ?? [];
   const activeId = cfg.data?.activeId ?? null;
   const active = instances.find((i) => i.id === activeId) ?? null;
@@ -1206,6 +1544,8 @@ function LocationPane() {
   const linkedLibraries = instances.filter((i) => i.id !== CORPUS_INSTANCE_ID);
   const registered = new Set(instances.map((i) => i.root));
   const candidates = (detect.data ?? []).filter((d) => !registered.has(d.root));
+  const developmentReadOnly = cfg.data?.developmentReadOnly ?? isDev;
+  const canManageLocations = !developmentReadOnly;
 
   const run = (fn: () => Promise<unknown>) => {
     setErr(null);
@@ -1213,6 +1553,26 @@ function LocationPane() {
     fn()
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : String(e)))
       .finally(() => setBusy(false));
+  };
+
+  const chooseVaultFolder = async () => {
+    const path = await requestVaultFolder({
+      title: "Choose your vault folder",
+      description: "Choose an existing folder to use in place. Empty folders can become a fresh vault.",
+      actionLabel: "Use this folder",
+      requireEmpty: false,
+    });
+    if (path) await chooseMut.mutateAsync(path);
+  };
+
+  const linkVaultFolder = async () => {
+    const path = await requestVaultFolder({
+      title: "Connect another vault",
+      description: "Choose an existing Rotli vault to add to the vault switcher.",
+      actionLabel: "Connect vault",
+      requireEmpty: false,
+    });
+    if (path) await connectBrainMut.mutateAsync(path);
   };
 
   if (!isTauri()) {
@@ -1236,7 +1596,9 @@ function LocationPane() {
       </p>
 
       {/* —— the one folder —— */}
-      <h4 className="sethead">{isDev ? "Production vault" : "Your vault"}</h4>
+      <h4 className="sethead">
+        {isDev ? (developmentReadOnly ? "Production fallback" : "Development vault") : "Your vault"}
+      </h4>
       {!isDev && (
         <div className="store-grid">
           <div className="store sel">
@@ -1263,7 +1625,7 @@ function LocationPane() {
         <div className="loctext">
           <span className="loclabel">{isDev ? "Source" : "Vault folder"}</span>
           <code className="locpath">{rootPath}</code>
-          {isDev ? (
+          {developmentReadOnly ? (
             <span className="memex-badge ro">read-only in dev</span>
           ) : (
             corpusIsBrain && <span className="memex-badge write">vault</span>
@@ -1274,27 +1636,37 @@ function LocationPane() {
           <button type="button" className="ghostbtn" onClick={() => void revealCorpus()}>
             Reveal in Finder
           </button>
-          {!isDev && (
-            <button
-              type="button"
-              className="ghostbtn"
-              onClick={() => run(() => chooseMut.mutateAsync(undefined))}
-              disabled={busy}
-            >
+          <button
+            type="button"
+            className="ghostbtn"
+            disabled={busy}
+            onClick={() => run(reconnectActiveVault)}
+          >
+            Refresh current vault
+          </button>
+          {canManageLocations && (
+            <button type="button" className="ghostbtn" onClick={() => run(chooseVaultFolder)} disabled={busy}>
               Choose folder…
             </button>
           )}
         </div>
       </div>
-      {isDev && (
+      {isDev && developmentReadOnly && (
         <p className="setnote">
-          This is the same vault used by production Rotli. Development reads it directly, but cannot change
-          notes, chats, inbox, boards, metadata, permissions, or its <code>.rotli/</code> sidecar.
-          Development-only appearance and window state stay in the app cache.
+          This production-selected vault is visible only so the development shell can boot. It stays
+          read-only. Create or open a vault in the setup screen to give <b>rotli (dev)</b> its own isolated
+          binding without changing production&rsquo;s choice.
+        </p>
+      )}
+      {isDev && !developmentReadOnly && (
+        <p className="setnote">
+          This folder is selected only for <b>rotli (dev)</b>. Its files are real and writable; production
+          Rotli keeps its own vault binding. Development-only appearance and window state stay in the app
+          cache.
         </p>
       )}
 
-      {/* —— Storage organization (Seth, 2026-06-30) —— */}
+      {/* —— Storage organization (the maintainer, 2026-06-30) —— */}
       <h4 className="sethead">Assets</h4>
       <div className="mprow">
         <span className="mplabel">Organize Storage by</span>
@@ -1312,7 +1684,7 @@ function LocationPane() {
         Your files (audio · images · PDFs · …) group this way under the <b>Assets</b> section.
       </p>
 
-      {!isDev && (
+      {canManageLocations && (
         <p className="setnote">
           <b>Choose folder…</b> takes a Rotli vault (used in place), an empty folder (your notes move there),
           or any folder (used as-is). The hidden <code>.rotli/</code> is just an index — deleting it loses
@@ -1320,15 +1692,17 @@ function LocationPane() {
         </p>
       )}
 
-      {/* —— linked libraries: a SECOND memex you reference (advanced) —— */}
-      {!isDev && (
+      {/* —— connected vaults: switch targets, never simultaneous data —— */}
+      {canManageLocations && (
         <>
-          <h4 className="sethead">Linked libraries</h4>
+          <h4 className="sethead">Connected vaults</h4>
           <p className="lead">
-            A <b>linked library</b> is a <em>second vault</em> you reference alongside your own — for example,
-            a shared, team, or reference vault. <b>Most people never need one.</b> rotli reads the whole
-            library and, per its permissions, writes only <b>chats</b>, <b>inbox</b>, and new notes; it never
-            touches its history or identity, and its curated wiki is read-only.
+            Connect another Rotli vault to make it available in the vault switcher. Rotli shows and searches
+            only one active vault at a time.
+          </p>
+          <p className="setnote">
+            Removing a connected vault only disconnects it from Rotli. Its folder and files stay exactly where
+            they are.
           </p>
           {candidates.length > 0 && (
             <>
@@ -1348,7 +1722,7 @@ function LocationPane() {
                     disabled={busy}
                     onClick={() => run(() => connectBrainMut.mutateAsync(d.root))}
                   >
-                    Link
+                    Connect
                   </button>
                 </div>
               ))}
@@ -1356,8 +1730,7 @@ function LocationPane() {
           )}
           {linkedLibraries.length === 0 ? (
             <p className="setnote">
-              No linked libraries. Link one only if you want a second, shared vault — otherwise your vault is
-              all you need.
+              No other vaults connected. Your current vault is all Rotli shows and searches.
             </p>
           ) : (
             linkedLibraries.map((inst) => (
@@ -1371,7 +1744,7 @@ function LocationPane() {
                 onMakeActive={
                   inst.id === activeId ? undefined : () => run(() => setActiveMut.mutateAsync(inst.id))
                 }
-                onUseAsFolder={() => run(() => chooseMut.mutateAsync(inst.root))}
+                onUseAsFolder={() => run(() => switchVaultMut.mutateAsync(inst.id))}
                 onPerms={(p) => run(() => permsMut.mutateAsync({ id: inst.id, perms: p }))}
                 onValidate={() =>
                   run(() =>
@@ -1383,23 +1756,8 @@ function LocationPane() {
             ))
           )}
           <div className="memex-actions">
-            <button
-              type="button"
-              className="ghostbtn"
-              disabled={busy}
-              onClick={() => run(() => connectBrainMut.mutateAsync(undefined))}
-            >
-              Link a library…
-            </button>
-            {/* moved here from the sidebar's System section (2026-07-26) —
-                browse + edit a plain folder in place, never moved into the vault */}
-            <button
-              type="button"
-              className="ghostbtn"
-              disabled={busy}
-              onClick={() => run(() => corpusAddFolder())}
-            >
-              Add a folder…
+            <button type="button" className="ghostbtn" disabled={busy} onClick={() => run(linkVaultFolder)}>
+              Connect a vault…
             </button>
           </div>
         </>
@@ -1415,7 +1773,7 @@ function LocationPane() {
 
 /** What each rung lets the daemon auto-APPLY — proposals always flow to the
  * Librarian regardless (except Off, which is fully dormant). Tidy vs Organize
- * (Seth, 2026-07-31 — "they look the same"): the ONLY difference today is the
+ * (the maintainer, 2026-07-31 — "they look the same"): the ONLY difference today is the
  * per-area overview page — Tidy proposes its refresh, Organize applies it. */
 const TRUST_CAPTIONS: Record<OrganizerTrust, string> = {
   off: "Dormant — it does nothing at all.",
@@ -1589,7 +1947,7 @@ function BrainPane() {
   );
 }
 
-// ——— AI Models (Seth, 2026-07-02): connected subscription lanes + hybrid presets ———
+// ——— AI Models (the maintainer, 2026-07-02): connected subscription lanes + hybrid presets ———
 
 /** MB → a human size (the catalog's approx, and the live download total). */
 function formatSize(mb: number): string {
@@ -2413,7 +2771,7 @@ function ModelsPane() {
   };
 
   // human model names for the preset cards — "gemma-3-12b-it-qat-4bit · MLX"
-  // reads as "gemma-3-12b" (Seth, 2026-07-02: the raw ids were unreadable)
+  // reads as "gemma-3-12b" (the maintainer, 2026-07-02: the raw ids were unreadable)
   const pretty = (id: string) =>
     (available.find((x) => x.id === id)?.label ?? id)
       .replace(/ · (MLX|llama\.cpp)$/, "")
@@ -2656,7 +3014,7 @@ function ModelsPane() {
 /** The prompt you paste into Claude Code so a project's docs live in your Rotli
  * vault instead of the repo — planning + documentation you organize in rotli,
  * the README the only thing that stays in the repo. Copy-first; you refine the
- * wording to taste (Seth, 2026-07-07). */
+ * wording to taste (the maintainer, 2026-07-07). */
 const CLAUDE_DOCS_COMMAND = `When you create or update documentation for this project, keep it in my Rotli
 vault — NOT this repo. The README is the ONLY doc that stays in the repo.
 
@@ -2739,6 +3097,63 @@ function SecurityPane() {
   );
 }
 
+function BrowserPane() {
+  const privateBrowserSearchEngine = useUiStore((s) => s.privateBrowserSearchEngine);
+  const setPrivateBrowserSearchEngine = useUiStore((s) => s.setPrivateBrowserSearchEngine);
+
+  return (
+    <>
+      <PaneHead title="Browser" char="searching" />
+      <p className="lead">
+        Open links and run quick searches inside Rotli. The browser chrome and start page follow your current
+        light or dark environment; websites still control their own appearance.
+      </p>
+
+      <h4 className="sethead">Default search engine</h4>
+      <p className="setnote browser-engine-note">
+        Choose the search engine shown on every new browser start page. The embedded page itself uses the
+        macOS web engine.
+      </p>
+      <div className="browser-engine-grid" role="radiogroup" aria-label="Default browser search engine">
+        {PRIVATE_BROWSER_SEARCH_ENGINE_PRESENTATIONS.map((engine) => (
+          <button
+            type="button"
+            role="radio"
+            aria-checked={privateBrowserSearchEngine === engine.id}
+            className={
+              privateBrowserSearchEngine === engine.id ? "browser-engine-choice sel" : "browser-engine-choice"
+            }
+            key={engine.id}
+            onClick={() => setPrivateBrowserSearchEngine(engine.id)}
+          >
+            <span className="browser-engine-mark" aria-hidden="true">
+              {engine.label.slice(0, 1)}
+            </span>
+            <span>
+              <strong>{engine.label}</strong>
+              <small>{engine.host}</small>
+            </span>
+            <span className="browser-engine-check" aria-hidden="true">
+              <CheckGlyph size={12} />
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <section className="browser-privacy-note" aria-labelledby="browser-privacy-title">
+        <ShieldGlyph size={18} />
+        <div>
+          <h4 id="browser-privacy-title">Every browser tab is private</h4>
+          <p>
+            Cookies, site data, and history are discarded when the tab closes. This browser is for quick
+            research without leaving Rotli, not a replacement for your everyday browser.
+          </p>
+        </div>
+      </section>
+    </>
+  );
+}
+
 function ConnectionsPane() {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const copyReset = useRef<number | null>(null);
@@ -2772,7 +3187,7 @@ function ConnectionsPane() {
       <WebResearchSection />
 
       {/* Use rotli for your docs — a prompt you paste into Claude Code so a
-          project's docs live in rotli, not the repo (Seth, 2026-07-07). */}
+          project's docs live in rotli, not the repo (the maintainer, 2026-07-07). */}
       <section className="aisection">
         <h4 className="set-subhead">Extensions</h4>
         <p className="setnote">
@@ -2858,6 +3273,7 @@ export function SettingsSurface() {
           {pane === "general" && <GeneralPane />}
           {pane === "hotkeys" && <HotkeysPane />}
           {pane === "appearance" && <AppearancePane />}
+          {pane === "browser" && <BrowserPane />}
           {pane === "brain" && <BrainPane />}
           {pane === "security" && <SecurityPane />}
           {pane === "models" && <ModelsPane />}

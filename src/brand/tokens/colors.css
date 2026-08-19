@@ -1,5 +1,5 @@
 /* rotli — color tokens. Single source of truth for every surface; never raw hex in product code.
-   From the Seth-approved brand board (2026-06-06). Tiered: BRAND CORE (cocoa + clay) ·
+   From the the maintainer-approved brand board (2026-06-06). Tiered: BRAND CORE (cocoa + clay) ·
    SUPPORTING (olive + peach) · SEMANTIC SURFACES (light + dark). Warm, never clinical. */
 :root {
   /* — brand core (the five board colors) — */
@@ -13,7 +13,7 @@
   --rotli-clay-text: #8f4e37; /* clay too light for AA small text on linen — use this for accent text/links */
   --rotli-olive-text: #5f6b49; /* olive too light for AA small text on linen — use this for olive text */
   --rotli-olive-bright: #a9b78f; /* olive lifted for thin strokes/icons on DARK grounds — #8D9A76 clears AA
-                                   for text on cocoa but reads muddy at 1.8px (Seth, 2026-06-11, icon gate) */
+                                   for text on cocoa but reads muddy at 1.8px (the maintainer, 2026-06-11, icon gate) */
 
   /* — semantic: LIGHT surfaces (default) — */
   --ground: #f8f2e9; /* Linen */

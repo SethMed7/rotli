@@ -4,6 +4,7 @@
 
 import { describe, expect, test } from "bun:test";
 
+import { DEFAULT_QUOKKA_ACCESSORY_HUE, DEFAULT_QUOKKA_CUSTOM_HUE } from "../brand/quokka";
 import type { Tab } from "../types";
 import {
   createPersistDrain,
@@ -18,12 +19,21 @@ import {
 describe("userName", () => {
   test("defaults to empty and survives a round-trip", () => {
     expect(parseSettings("{}").userName).toBe("");
-    expect(parseSettings('{"userName":"Seth"}').userName).toBe("Seth");
+    expect(parseSettings('{"userName":"the maintainer"}').userName).toBe("the maintainer");
   });
 
   test("falls back to empty on a non-string value", () => {
     expect(parseSettings('{"userName":42}').userName).toBe("");
     expect(parseSettings('{"userName":null}').userName).toBe("");
+  });
+});
+
+describe("pane vault mode", () => {
+  test("normalizes old multi-vault settings to one active vault", () => {
+    expect(parseSettings("{}").paneVaultMode).toBe("single");
+    expect(parseSettings('{"paneVaultMode":"single"}').paneVaultMode).toBe("single");
+    expect(parseSettings('{"paneVaultMode":"multiple"}').paneVaultMode).toBe("single");
+    expect(parseSettings('{"paneVaultMode":"window"}').paneVaultMode).toBe("single");
   });
 });
 
@@ -70,6 +80,51 @@ describe("custom primary color", () => {
 
     expect(parseSettings('{"accentHue":999}').accentHue).toBe(210);
     expect(parseSettings('{"accentHue":"blue"}').accentHue).toBe(210);
+  });
+});
+
+describe("appearance personality", () => {
+  test("defaults to an optional filled quokka and paw navigator", () => {
+    const settings = parseSettings("{}");
+    expect(settings.quokkaCompanionEnabled).toBe(false);
+    expect(settings.quokkaStyle).toBe("cocoa");
+    expect(settings.quokkaCustomHue).toBe(DEFAULT_QUOKKA_CUSTOM_HUE);
+    expect(settings.quokkaLineColor).toBe("black");
+    expect(settings.quokkaAccessory).toBe("none");
+    expect(settings.quokkaAccessoryHue).toBe(DEFAULT_QUOKKA_ACCESSORY_HUE);
+    expect(settings.quokkaIdlePose).toBe("rest");
+    expect(settings.chatNavigatorStyle).toBe("paws");
+  });
+
+  test("round-trips supported treatments and rejects unknown values", () => {
+    const settings = parseSettings(
+      JSON.stringify({
+        quokkaCompanionEnabled: true,
+        quokkaStyle: "custom",
+        quokkaCustomHue: 287,
+        quokkaLineColor: "white",
+        quokkaAccessory: "bucket-hat",
+        quokkaAccessoryHue: 128,
+        quokkaIdlePose: "thoughtful",
+        chatNavigatorStyle: "dots",
+      }),
+    );
+    expect(settings.quokkaCompanionEnabled).toBe(true);
+    expect(settings.quokkaStyle).toBe("custom");
+    expect(settings.quokkaCustomHue).toBe(287);
+    expect(settings.quokkaLineColor).toBe("white");
+    expect(settings.quokkaAccessory).toBe("bucket-hat");
+    expect(settings.quokkaAccessoryHue).toBe(128);
+    expect(settings.quokkaIdlePose).toBe("thoughtful");
+    expect(settings.chatNavigatorStyle).toBe("dots");
+    expect(parseSettings('{"quokkaStyle":"redrawn","chatNavigatorStyle":"runes"}').quokkaStyle).toBe("cocoa");
+    expect(
+      parseSettings(JSON.stringify({ quokkaCustomColor: ["#", "4a90e2"].join("") })).quokkaCustomHue,
+    ).toBe(212);
+    expect(parseSettings('{"quokkaCustomColor":"night"}').quokkaCustomHue).toBe(DEFAULT_QUOKKA_CUSTOM_HUE);
+    expect(parseSettings('{"quokkaAccessory":"crown"}').quokkaAccessory).toBe("none");
+    expect(parseSettings('{"quokkaAccessory":"scarf"}').quokkaAccessory).toBe("none");
+    expect(parseSettings('{"quokkaIdlePose":"dancing"}').quokkaIdlePose).toBe("rest");
   });
 });
 
@@ -145,7 +200,7 @@ describe("parseSettings — Breve sidebar lens", () => {
 });
 
 describe("parseSettings — organizerTrust", () => {
-  // Organize is the default rung (Seth, 2026-07-02): the daemon touches only
+  // Organize is the default rung (the maintainer, 2026-07-02): the daemon touches only
   // location + metadata (journaled, undoable), never a note's words.
   test("defaults a missing key to organize", () => {
     expect(parseSettings("{}").organizerTrust).toBe("organize");
@@ -254,7 +309,7 @@ describe("parseSettings — frontier controls", () => {
   });
 });
 
-describe("parseSettings — the AI Models keys (Seth, 2026-07-02)", () => {
+describe("parseSettings — the AI Models keys (the maintainer, 2026-07-02)", () => {
   test("defaults: every lane OFF, no presets, codex engine, note opens as tab", () => {
     const s = parseSettings("{}");
     expect(s.aiProviders).toEqual({
@@ -322,7 +377,7 @@ describe("parseSettings — the AI Models keys (Seth, 2026-07-02)", () => {
 
   test("hotkeyPeek round-trips; anything unknown reads as badges, never off", () => {
     // an absent/typo'd value must not silently REMOVE a discoverability aid —
-    // only an explicit "off" turns the hold-⌘ peek off (Seth, 2026-08-04)
+    // only an explicit "off" turns the hold-⌘ peek off (the maintainer, 2026-08-04)
     expect(parseSettings("{}").hotkeyPeek).toBe("badges");
     expect(parseSettings('{"hotkeyPeek":"nonsense"}').hotkeyPeek).toBe("badges");
     expect(parseSettings('{"hotkeyPeek":"panel"}').hotkeyPeek).toBe("panel");
@@ -393,6 +448,22 @@ describe("unknownSettingsKeys — the round-trip remainder (#35)", () => {
     expect(parseSettings(raw).themeFamily).toBe("mono");
     expect(unknownSettingsKeys(raw)).toEqual({ futureKnob: 1 });
   });
+
+  test("drops the retired virtual-welcome dismissal", () => {
+    expect(unknownSettingsKeys('{"vaultWelcomeSeen":true,"futureSetting":7}')).toEqual({
+      futureSetting: 7,
+    });
+  });
+
+  test("retires independent System mappings without losing the selected family", () => {
+    const raw = '{"theme":"system","themeFamily":"ocean","matchLightFamily":"mono","matchDarkFamily":"mono"}';
+    const parsed = parseSettings(raw) as unknown as Record<string, unknown>;
+    expect(parsed.theme).toBe("system");
+    expect(parsed.themeFamily).toBe("ocean");
+    expect("matchLightFamily" in parsed).toBeFalse();
+    expect("matchDarkFamily" in parsed).toBeFalse();
+    expect(unknownSettingsKeys(raw)).toEqual({});
+  });
 });
 
 describe("unknownAppSettingsKeys — machine settings stay additive", () => {
@@ -405,16 +476,24 @@ describe("unknownAppSettingsKeys — machine settings stay additive", () => {
   test("corrupt input has no passthrough payload", () => {
     expect(unknownAppSettingsKeys("not json")).toEqual({});
   });
+
+  test("validates the installation-wide private-browser search engine", () => {
+    expect(parseSettings('{"privateBrowserSearchEngine":"brave"}').privateBrowserSearchEngine).toBe("brave");
+    expect(parseSettings('{"privateBrowserSearchEngine":"unknown"}').privateBrowserSearchEngine).toBe(
+      "google",
+    );
+    expect(unknownAppSettingsKeys('{"privateBrowserSearchEngine":"bing"}')).toEqual({});
+  });
 });
 
-describe("validTab — every surfaceKind survives a relaunch (#34)", () => {
+describe("validTab — durable surface kinds survive a relaunch (#34)", () => {
   const alive = new Set(["note-1"]);
   const roundTrips = (tab: Tab) => {
     // what the pane store persisted must revalidate to itself
     expect(validTab(JSON.parse(JSON.stringify(tab)), alive)).toEqual(tab);
   };
 
-  test("round-trips all five tab kinds", () => {
+  test("round-trips every durable tab kind", () => {
     roundTrips({ id: "t1", surfaceKind: "note", noteId: "note-1" });
     roundTrips({
       id: "t2",
@@ -431,11 +510,21 @@ describe("validTab — every surfaceKind survives a relaunch (#34)", () => {
     roundTrips({ id: "t6", surfaceKind: "activity" });
   });
 
+  test("drops a private browser tab instead of persisting browsing state", () => {
+    expect(validTab({ id: "private", surfaceKind: "browser" }, alive)).toBeNull();
+  });
+
   test("still drops the malformed ones", () => {
     expect(validTab({ id: "x", surfaceKind: "file", fileId: "" }, alive)).toBeNull();
     expect(validTab({ id: "x", surfaceKind: "note", noteId: "gone" }, alive)).toBeNull();
     expect(validTab({ id: "x", surfaceKind: "hologram" }, alive)).toBeNull();
     expect(validTab({ surfaceKind: "activity" }, alive)).toBeNull(); // no id
+  });
+
+  test("a chat keeps its exact vault owner across relaunch", () => {
+    expect(
+      validTab({ id: "chat", surfaceKind: "chat", chatSlug: "daily", vaultId: "project-two" }, new Set()),
+    ).toEqual({ id: "chat", surfaceKind: "chat", chatSlug: "daily", vaultId: "project-two" });
   });
 });
 

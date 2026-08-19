@@ -1,5 +1,5 @@
 // Shared file-name / extension helpers + the raster-image extension set
-// (Seth, 2026-06-30). glyphs.tsx (the row/tab type mark) and FileSurface.tsx
+// (the maintainer, 2026-06-30). glyphs.tsx (the row/tab type mark) and FileSurface.tsx
 // (the in-app viewer) both need "what's this file's basename + extension" and
 // "is it a raster image"; this is the one definition they share.
 

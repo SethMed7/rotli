@@ -3,7 +3,7 @@
 // hides on blur or Esc. Summon shows LIVING windows — never recreates them —
 // so they appear in well under 80ms.
 //
-// THE SUMMON LAW (revised by Seth, 2026-06-12): ⌥Space toggles the MAIN
+// THE SUMMON LAW (revised by the maintainer, 2026-06-12): ⌥Space toggles the MAIN
 // window — "Option+Space is the way we open the app." The quick-capture card
 // has its own chord (default ⌥C), and ⌥A ("ask") summons the main window
 // straight into a chat. ⌘⏎ in the card (save & open) reveals the main window.
@@ -28,15 +28,21 @@ mod organizer;
 #[cfg(test)]
 mod parity_tests;
 mod provider;
+mod private_browser;
 mod routines;
 mod search_index;
 mod secret;
 mod usage;
+mod vault_browser;
+mod vault_location;
 mod web;
 mod web_search;
 mod workspace;
 
-use std::sync::{Condvar, Mutex};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Condvar, Mutex,
+};
 use std::time::{Duration, Instant};
 
 use tauri::{
@@ -55,6 +61,124 @@ const DEFAULT_QUICK: &str = "Alt+Q";
 const DEFAULT_CHAT_SUMMON: &str = "Alt+A";
 const DEFAULT_SEARCH_SUMMON: &str = "Alt+F"; // "find" — summon the window with ⌘K open
 
+fn development_read_only_for(debug: bool, has_development_vault: bool) -> bool {
+    debug && !has_development_vault
+}
+
+/// A native debug build may borrow the production-selected vault only as a
+/// read-only boot fallback. The first folder explicitly selected by onboarding
+/// is recorded in the isolated `corpus.dev.json`; from then on development has
+/// an ordinary writable vault of its own and may exercise location workflows.
+pub(crate) fn development_read_only(app: &AppHandle) -> bool {
+    development_read_only_for(cfg!(debug_assertions), corpus::is_configured(app))
+}
+
+#[cfg(all(target_os = "macos", any(not(debug_assertions), test)))]
+#[derive(Debug, PartialEq, Eq)]
+enum MacosRelaunchTarget {
+    Bundle(std::path::PathBuf),
+    Executable(std::path::PathBuf),
+}
+
+#[cfg(all(target_os = "macos", any(not(debug_assertions), test)))]
+fn macos_relaunch_target(current_binary: &std::path::Path) -> MacosRelaunchTarget {
+    let bundle = current_binary
+        .parent()
+        .filter(|parent| parent.file_name() == Some(std::ffi::OsStr::new("MacOS")))
+        .and_then(std::path::Path::parent)
+        .filter(|parent| parent.file_name() == Some(std::ffi::OsStr::new("Contents")))
+        .and_then(std::path::Path::parent)
+        .filter(|parent| parent.extension() == Some(std::ffi::OsStr::new("app")));
+    match bundle {
+        Some(bundle) => MacosRelaunchTarget::Bundle(bundle.to_path_buf()),
+        None => MacosRelaunchTarget::Executable(current_binary.to_path_buf()),
+    }
+}
+
+#[cfg(debug_assertions)]
+const DEV_RESTART_MARKER_ENV: &str = "ROTLI_DEV_RESTART_MARKER";
+
+#[cfg(debug_assertions)]
+fn valid_dev_restart_marker(path: &std::path::Path) -> bool {
+    path.is_absolute()
+        && path.parent() == Some(std::env::temp_dir().as_path())
+        && path
+            .file_name()
+            .and_then(std::ffi::OsStr::to_str)
+            .is_some_and(|name| name.starts_with("rotli-dev-restart-"))
+}
+
+/// Development is owned by `bun run dev:app`: Tauri owns Vite and the compiled
+/// child, so the child must never detach and re-execute itself. Mark the
+/// requested restart for the terminal supervisor, then let Tauri tear its
+/// generation down cleanly. The supervisor launches the next generation.
+#[cfg(debug_assertions)]
+fn relaunch_app(app: &AppHandle) -> Result<(), String> {
+    let marker = std::env::var_os(DEV_RESTART_MARKER_ENV)
+        .map(std::path::PathBuf::from)
+        .ok_or_else(|| {
+            "The development vault changed. Restart with `bun run dev:app` to open it safely."
+                .to_string()
+        })?;
+    if !valid_dev_restart_marker(&marker) {
+        return Err("The development restart marker is invalid; restart `bun run dev:app`.".into());
+    }
+    std::fs::write(&marker, format!("{}\n", std::process::id()))
+        .map_err(|error| format!("request development restart: {error}"))?;
+    app.exit(0);
+    Ok(())
+}
+
+/// Packaged macOS builds relaunch through LaunchServices so the app returns as
+/// an ordinary bundle and cleanup finishes before the next process starts.
+#[cfg(all(not(debug_assertions), target_os = "macos"))]
+fn relaunch_app(app: &AppHandle) -> Result<(), String> {
+    use std::os::unix::process::CommandExt;
+    use std::process::{Command, Stdio};
+
+    let current = tauri::process::current_binary(&app.env())
+        .map_err(|error| format!("locate Rotli for relaunch: {error}"))?;
+    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+    let mut launch: Vec<std::ffi::OsString> = match macos_relaunch_target(&current) {
+        MacosRelaunchTarget::Bundle(bundle) => {
+            let mut launch = vec!["/usr/bin/open".into(), "-n".into(), bundle.into_os_string()];
+            if !args.is_empty() {
+                launch.push("--args".into());
+                launch.extend(args.iter().cloned());
+            }
+            launch
+        }
+        MacosRelaunchTarget::Executable(executable) => {
+            let mut launch = vec![executable.into_os_string()];
+            launch.extend(args);
+            launch
+        }
+    };
+    let mut command = Command::new("/bin/sh");
+    command
+        // Wait until Tauri cleanup has released global shortcuts, the tray,
+        // and WebKit resources. Every value after the script is a positional
+        // argument, so paths and launch args never enter shell source.
+        .arg("-c")
+        .arg("old_pid=$1; shift; while kill -0 \"$old_pid\" 2>/dev/null; do sleep 0.05; done; exec \"$@\"")
+        .arg("rotli-relaunch")
+        .arg(std::process::id().to_string())
+        .args(launch.drain(..))
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .process_group(0)
+        .spawn()
+        .map_err(|error| format!("relaunch Rotli: {error}"))?;
+    app.exit(0);
+    Ok(())
+}
+
+#[cfg(all(not(debug_assertions), not(target_os = "macos")))]
+fn relaunch_app(app: &AppHandle) -> Result<(), String> {
+    app.restart()
+}
+
 /// Clicking the tray icon steals focus from the window, so blur fires (and
 /// hides it) *before* the tray click arrives. Within this grace window the
 /// tray toggle treats "just hidden by blur" as the intended hide and does not
@@ -63,7 +187,7 @@ const BLUR_TOGGLE_GRACE: Duration = Duration::from_millis(300);
 
 /// Summoning a floating panel (Quick Note / capture card) calls set_focus, which
 /// activates the app and makes macOS fire a Reopen. Within this grace after a
-/// summon, that Reopen is the spurious one — never reopen main (Seth, 2026-06-30).
+/// summon, that Reopen is the spurious one — never reopen main (the maintainer, 2026-06-30).
 /// Generous on purpose (2s, was 700ms): under startup load (corpus watchers,
 /// organizer, Breve supervisor) the Reopen can arrive late and used to escape
 /// the old time-box, surfacing main alongside the panel. Safe to be generous
@@ -87,6 +211,45 @@ fn reopen_should_show_main(
 #[cfg(test)]
 mod reopen_tests {
     use super::*;
+
+    #[test]
+    fn development_uses_a_read_only_fallback_until_its_own_vault_is_selected() {
+        assert!(development_read_only_for(true, false));
+        assert!(!development_read_only_for(true, true));
+        assert!(!development_read_only_for(false, false));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_relaunch_resolves_bundles_and_unbundled_executables() {
+        assert_eq!(
+            macos_relaunch_target(std::path::Path::new(
+                "/Applications/rotli.app/Contents/MacOS/rotli"
+            )),
+            MacosRelaunchTarget::Bundle(std::path::PathBuf::from("/Applications/rotli.app"))
+        );
+        assert_eq!(
+            macos_relaunch_target(std::path::Path::new(
+                "/Users/example/rotli/src-tauri/target/debug/rotli"
+            )),
+            MacosRelaunchTarget::Executable(std::path::PathBuf::from(
+                "/Users/example/rotli/src-tauri/target/debug/rotli"
+            ))
+        );
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn development_restart_marker_is_exact_and_temp_scoped() {
+        let valid = std::env::temp_dir().join("rotli-dev-restart-42");
+        assert!(valid_dev_restart_marker(&valid));
+        assert!(!valid_dev_restart_marker(std::path::Path::new(
+            "/tmp/not-rotli-restart"
+        )));
+        assert!(!valid_dev_restart_marker(std::path::Path::new(
+            "rotli-dev-restart-42"
+        )));
+    }
 
     #[test]
     fn a_recent_panel_summon_swallows_the_reopen() {
@@ -235,6 +398,35 @@ struct GlobalChords {
 /// When the main window was last hidden because it lost focus.
 struct LastBlurHide(Mutex<Option<Instant>>);
 
+/// App-owned native panels temporarily take focus from the webview. That is not
+/// click-away intent, so the visitor-law blur handler must leave the parent
+/// window visible until the panel settles.
+#[derive(Default)]
+pub(crate) struct NativeDialogOpen(AtomicUsize);
+
+pub(crate) struct NativeDialogGuard<'a>(&'a NativeDialogOpen);
+
+impl NativeDialogOpen {
+    pub(crate) fn begin(&self) -> NativeDialogGuard<'_> {
+        self.0.fetch_add(1, Ordering::AcqRel);
+        NativeDialogGuard(self)
+    }
+
+    fn is_open(&self) -> bool {
+        self.0.load(Ordering::Acquire) > 0
+    }
+
+    fn end(&self) {
+        self.0.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
+impl Drop for NativeDialogGuard<'_> {
+    fn drop(&mut self) {
+        self.0.end();
+    }
+}
+
 /// When a floating panel (Quick Note / capture) was last summoned — stamped BEFORE
 /// the panel steals focus, so the spurious Reopen its app-activation triggers is
 /// suppressed even if the window's visibility hasn't registered yet.
@@ -247,20 +439,20 @@ struct HideOnBlur(Mutex<bool>);
 /// Whether the MAIN window was visible when the capture card was last summoned.
 /// Finishing a capture uses it to return focus correctly: back to rotli's main
 /// window if you were already in the app, or to the app you came from otherwise
-/// — so a quick capture from another app never "opens" rotli (Seth, 2026-06-19).
+/// — so a quick capture from another app never "opens" rotli (the maintainer, 2026-06-19).
 struct CaptureReturn(Mutex<bool>);
 
 /// Whether the Quick Note window has been positioned this session. We center it
 /// on the FIRST summon (on the active display); after that we leave it where the
 /// user dragged it — re-centering on every summon meant it felt "stuck in the
-/// middle, can't move it" (Seth, 2026-06-22).
+/// middle, can't move it" (the maintainer, 2026-06-22).
 struct QuickPlaced(Mutex<bool>);
 
 /// Where closing the Quick Note returns focus: true = back to the main window
 /// (you were working in it), false = out of rotli entirely (you came from
 /// another app, or main was tucked away). Captured at summon time so the ⌥Q
 /// chord controls ONLY the quick note — closing it never surfaces the main app
-/// (Seth, 2026-06-24). Mirrors CaptureReturn.
+/// (the maintainer, 2026-06-24). Mirrors CaptureReturn.
 struct QuickReturn(Mutex<bool>);
 
 /// The quit-flush handshake (#4 follow-up, review 2026-07). Dirty spreadsheet
@@ -400,7 +592,10 @@ fn graceful_shutdown(app: &AppHandle, restart: bool) {
     std::thread::spawn(move || {
         if flush_webviews_before_shutdown(&handle).is_ok() {
             if restart {
-                handle.restart();
+                if let Err(error) = relaunch_app(&handle) {
+                    show_main(&handle);
+                    let _ = handle.emit_to("main", "rotli:quit-flush-failed", error);
+                }
             } else {
                 handle.exit(0);
             }
@@ -519,7 +714,7 @@ fn remember_quick_return(app: &AppHandle) {
 }
 
 /// Close the Quick Note via its own chord / Esc. The quick chord controls ONLY
-/// the quick note — closing it NEVER surfaces the main window (Seth, 2026-06-26).
+/// the quick note — closing it NEVER surfaces the main window (the maintainer, 2026-06-26).
 /// If you came from OUTSIDE rotli (main wasn't the focused window), step out of
 /// rotli (NSApp hide) so focus returns to whatever you were in — and so the chord
 /// can never raise main. If you WERE working in main, just hide the quick note and
@@ -554,7 +749,7 @@ fn show_quick(app: &AppHandle) {
     }
     // stamp BEFORE we show/focus — focusing activates the app and can fire the
     // spurious Reopen before the window registers as visible (the race that made
-    // ⌥Q / a rebound ⌥. open main too) (Seth, 2026-06-30).
+    // ⌥Q / a rebound ⌥. open main too) (the maintainer, 2026-06-30).
     *app.state::<LastPanelSummon>().0.lock().unwrap() = Some(Instant::now());
     let _ = window.show();
     let _ = window.set_focus();
@@ -688,7 +883,7 @@ fn corpus_reveal(app: AppHandle) {
 }
 
 /// Add an ARBITRARY folder as a browsable + editable corpus root — the "just add a
-/// folder" feature (Seth, 2026-06-27). It is NOT moved into the memex; it opens as a
+/// folder" feature (the maintainer, 2026-06-27). It is NOT moved into the memex; it opens as a
 /// plain LegacyRotli root (everything writable) so you can use rotli over, say, a
 /// work folder without it living in your brain. Picks natively when no path is given;
 /// generates a unique slug id from the folder name. Relaunches so it surfaces.
@@ -712,7 +907,10 @@ fn vault_lane() -> std::sync::MutexGuard<'static, ()> {
 /// that decide what code and providers Rotli's agent subprocesses trust. If one
 /// of these directories became a writable corpus root, the ordinary file APIs
 /// could rewrite credentials, CLI configuration, or the local-model registry.
-fn reject_privileged_root(app: &AppHandle, candidate: &std::path::Path) -> Result<(), String> {
+pub(crate) fn reject_privileged_root(
+    app: &AppHandle,
+    candidate: &std::path::Path,
+) -> Result<(), String> {
     use tauri::Manager;
     let candidate = std::fs::canonicalize(candidate)
         .map_err(|error| format!("canonicalize selected folder: {error}"))?;
@@ -765,7 +963,7 @@ fn overlaps_any_private_path(
 
 #[cfg(test)]
 mod privileged_root_tests {
-    use super::overlaps_any_private_path;
+    use super::{overlaps_any_private_path, write_new_vault_settings, NativeDialogOpen};
     use std::path::{Path, PathBuf};
 
     #[test]
@@ -784,6 +982,51 @@ mod privileged_root_tests {
             &protected
         ));
     }
+
+    #[test]
+    fn new_vault_reopens_home_navigation_without_virtual_welcome_state() {
+        let root = tempfile::tempdir().unwrap();
+        let dot = root.path().join(".rotli");
+        std::fs::create_dir_all(&dot).unwrap();
+        std::fs::write(
+            dot.join("settings.json"),
+            r#"{
+  "theme": "dark",
+  "futureSetting": 7,
+  "brainEnabled": true,
+  "vaultWelcomeSeen": true,
+  "sidebarCollapsed": true,
+  "sidebarMode": "breve",
+  "sidebarView": "chat"
+}"#,
+        )
+        .unwrap();
+
+        write_new_vault_settings(root.path(), Some(false)).unwrap();
+        let settings: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(dot.join("settings.json")).unwrap())
+                .unwrap();
+
+        assert_eq!(settings["theme"], "dark");
+        assert_eq!(settings["futureSetting"], 7);
+        assert_eq!(settings["brainEnabled"], false);
+        assert!(settings.get("vaultWelcomeSeen").is_none());
+        assert_eq!(settings["sidebarCollapsed"], false);
+        assert_eq!(settings["sidebarMode"], "notes");
+        assert_eq!(settings["sidebarView"], "home");
+    }
+
+    #[test]
+    fn app_owned_native_dialog_suppresses_blur_only_for_its_lifetime() {
+        let state = NativeDialogOpen::default();
+        assert!(!state.is_open());
+        {
+            let _first = state.begin();
+            let _second = state.begin();
+            assert!(state.is_open());
+        }
+        assert!(!state.is_open());
+    }
 }
 
 /// ASYNC command (vault-lane pass, 2026-07-31): the blocking picker + registry
@@ -797,8 +1040,8 @@ async fn corpus_add_folder(app: AppHandle, path: Option<String>) -> Result<bool,
 
 fn corpus_add_folder_blocking(app: AppHandle, path: Option<String>) -> Result<bool, String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
-        return Err("Location changes are disabled in development; use the installed app to change connected vaults or folders.".into());
+    if development_read_only(&app) {
+        return Err("Choose or create a development vault before adding connected folders.".into());
     }
     use tauri_plugin_dialog::DialogExt;
     let abs = match path {
@@ -806,12 +1049,17 @@ fn corpus_add_folder_blocking(app: AppHandle, path: Option<String>) -> Result<bo
             .state::<memex::FolderAuthorizations>()
             .require(std::path::Path::new(&p))?,
         None => {
-            let Some(picked) = app
+            let dialog_state = app.state::<NativeDialogOpen>();
+            let _native_dialog = dialog_state.begin();
+            let mut picker = app
                 .dialog()
                 .file()
                 .set_title("Add a folder to rotli")
-                .blocking_pick_folder()
-            else {
+                .set_directory(vault_location::picker_start(&app));
+            if let Some(parent) = app.get_webview_window("main") {
+                picker = picker.set_parent(&parent);
+            }
+            let Some(picked) = picker.blocking_pick_folder() else {
                 return Ok(false);
             };
             picked.into_path().map_err(|e| e.to_string())?
@@ -825,7 +1073,8 @@ fn corpus_add_folder_blocking(app: AppHandle, path: Option<String>) -> Result<bo
     if !corpus::add_folder(&app, abs)? {
         return Ok(true); // already the corpus / a brain / a folder — no-op, no restart
     }
-    app.restart();
+    relaunch_app(&app)?;
+    Ok(true)
 }
 
 /// Forget an added folder root (refuses the built-in `default` + `vault`). The files
@@ -833,15 +1082,17 @@ fn corpus_add_folder_blocking(app: AppHandle, path: Option<String>) -> Result<bo
 #[tauri::command]
 fn corpus_forget_folder(app: AppHandle, id: String) -> Result<(), String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
-        return Err("Location changes are disabled in development; use the installed app to change connected vaults or folders.".into());
+    if development_read_only(&app) {
+        return Err(
+            "Choose or create a development vault before changing connected folders.".into(),
+        );
     }
     if id == corpus::DEFAULT_ROOT_ID {
         return Err("That's your notes folder — it can't be removed.".into());
     }
     flush_webviews_before_shutdown(&app)?;
     corpus::forget_root(&app, &id)?;
-    app.restart();
+    relaunch_app(&app)
 }
 
 // ─── the unified Location surface (corpus.json) ─────────────────────────────
@@ -894,6 +1145,10 @@ struct CorpusConfigView {
     brains: Vec<BrainRootView>,
     folders: Vec<corpus::CorpusRoot>,
     active_brain_id: Option<String>,
+    /// True only while a debug build is borrowing the production-selected
+    /// vault as a boot fallback. An explicit `corpus.dev.json` selection turns
+    /// this off without changing production's binding.
+    development_read_only: bool,
 }
 
 #[derive(serde::Serialize)]
@@ -1121,8 +1376,7 @@ async fn corpus_import_vault_copy(
         flush_webviews_before_shutdown(&app)?;
         let inspection = inspect_vault_path(&source)?;
         copy_vault_tree(&source, &destination)?;
-        corpus::set_corpus_path(&app, destination, inspection.kind != "memex")?;
-        app.restart();
+        activate_vault_path_live(&app, destination, inspection.kind != "memex").map(|_| ())
     })
     .await
     .map_err(|e| format!("vault import worker failed ({e})"))?
@@ -1139,10 +1393,14 @@ fn corpus_status(app: AppHandle) -> bool {
 #[tauri::command]
 fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
     let cfg = corpus::ensure_corpus_config(&app);
-    let (is_memex, memex_id, perms) = match memex::brain_view(&cfg.corpus.abs_path) {
+    let development_read_only = development_read_only(&app);
+    let (is_memex, memex_id, mut perms) = match memex::brain_view(&cfg.corpus.abs_path) {
         Some((id, p)) => (true, Some(id), Some(p)),
         None => (false, None, None),
     };
+    if development_read_only {
+        perms = Some(memex::MemexPerms::ReadOnly);
+    }
     let corpus_brain_enabled = root_brain_enabled(&cfg.corpus.abs_path);
     CorpusConfigView {
         corpus: CorpusView {
@@ -1165,6 +1423,7 @@ fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
             .collect(),
         folders: cfg.folders,
         active_brain_id: cfg.active_brain_id,
+        development_read_only,
     }
 }
 
@@ -1172,8 +1431,8 @@ fn corpus_list_config(app: AppHandle) -> CorpusConfigView {
 /// Detects what you picked: a memex → browse it as the whole corpus; an empty
 /// folder → move your current notes there (only when the current corpus is a
 /// PLAIN folder — a memex is never scattered by a move) else start fresh; a plain
-/// folder with files → use it as-is, never merged. Relaunches into the new
-/// corpus. Returns false when the picker is cancelled.
+/// folder with files → use it as-is, never merged. Rebinds the running shell to
+/// the new corpus. Returns false when the picker is cancelled.
 /// ASYNC command (vault-lane pass, 2026-07-31): the blocking picker plus a
 /// possible whole-vault `relocate` ran on the main thread — worker now.
 #[tauri::command]
@@ -1191,12 +1450,17 @@ fn corpus_choose_folder_blocking(app: AppHandle, path: Option<String>) -> Result
             .state::<memex::FolderAuthorizations>()
             .require(std::path::Path::new(&p))?,
         None => {
-            let Some(picked) = app
+            let dialog_state = app.state::<NativeDialogOpen>();
+            let _native_dialog = dialog_state.begin();
+            let mut picker = app
                 .dialog()
                 .file()
                 .set_title("Choose your notes folder")
-                .blocking_pick_folder()
-            else {
+                .set_directory(vault_location::picker_start(&app));
+            if let Some(parent) = app.get_webview_window("main") {
+                picker = picker.set_parent(&parent);
+            }
+            let Some(picked) = picker.blocking_pick_folder() else {
                 return Ok(false);
             };
             picked.into_path().map_err(|e| e.to_string())?
@@ -1208,12 +1472,12 @@ fn corpus_choose_folder_blocking(app: AppHandle, path: Option<String>) -> Result
         return Ok(false);
     }
     flush_webviews_before_shutdown(&app)?;
-    match memex::detect_folder(&abs).kind.as_str() {
+    let adopted = match memex::detect_folder(&abs).kind.as_str() {
         "memex" => {
             if let Some(current) = &current {
                 corpus::carry_settings(current, &abs)?;
             }
-            corpus::set_corpus_path(&app, abs, false)?;
+            false
         }
         "fresh" => {
             if let Some(current) = &current {
@@ -1223,21 +1487,266 @@ fn corpus_choose_folder_blocking(app: AppHandle, path: Option<String>) -> Result
                 // relocate carries .rotli/ along; this is a no-op in that case
                 corpus::carry_settings(current, &abs)?;
             }
-            corpus::set_corpus_path(&app, abs, false)?;
+            false
         }
         _ => {
             if let Some(current) = &current {
                 corpus::carry_settings(current, &abs)?;
             }
-            corpus::set_corpus_path(&app, abs, true)?;
+            true
         }
+    };
+    activate_vault_path_live(&app, abs, adopted)
+}
+
+/// Attach one newly opened root to every long-lived runtime service. Existing
+/// connected roots already own this plumbing from startup/connection and must
+/// not receive a duplicate watcher.
+fn recover_missing_active_vault(app: &AppHandle, missing_root: &std::path::Path) -> bool {
+    if missing_root.is_dir() {
+        return false;
     }
-    app.restart();
+    let _lane = vault_lane();
+    let state = app.state::<corpus::CorpusState>();
+    let Ok(active) = state.default_root_path() else {
+        return false;
+    };
+    if active != missing_root || active.is_dir() {
+        return false;
+    }
+
+    let fallback = corpus::read_corpus_config(app).and_then(|cfg| {
+        cfg.brains.into_iter().find(|candidate| {
+            candidate.abs_path.is_dir()
+                && state
+                    .root_id_for_path(&candidate.abs_path)
+                    .ok()
+                    .flatten()
+                    .is_some_and(|id| id == candidate.id)
+        })
+    });
+    if let Some(fallback) = fallback {
+        if let Err(error) = activate_vault_path_live(app, fallback.abs_path, false) {
+            eprintln!("rotli: could not recover from a removed active vault ({error})");
+        }
+    } else {
+        // No surviving route exists. The frontend re-checks corpus_status and
+        // returns to vault activation; never recreate the missing user folder.
+        let breve_supervisor = app.state::<routines::BreveSupervisor>();
+        breve_supervisor.stop();
+        app.state::<organizer::OrganizerState>()
+            .0
+            .reset_for_vault_switch();
+        let _ = app.emit("rotli:vault-changed", ());
+    }
+    true
+}
+
+/// Reopen and rescan the active vault in place. This is the manual recovery
+/// seam behind ⌘R and the vault menu; it never reloads the webview or process.
+#[tauri::command]
+async fn corpus_refresh_active_vault(app: AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        refresh_vault_blocking(app, corpus::DEFAULT_ROOT_ID.to_string())
+    })
+    .await
+    .map_err(|e| format!("vault refresh worker failed ({e})"))?
+}
+
+/// Refresh any row in the vault switcher without changing which vault is
+/// active. The id is resolved only through the registered corpus config and
+/// live store registry; it is never accepted as a filesystem path.
+#[tauri::command]
+async fn corpus_refresh_vault(app: AppHandle, id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || refresh_vault_blocking(app, id))
+        .await
+        .map_err(|e| format!("vault refresh worker failed ({e})"))?
+}
+
+fn refresh_vault_blocking(app: AppHandle, id: String) -> Result<(), String> {
+    let lane = vault_lane();
+    let state = app.state::<corpus::CorpusState>();
+    let active = id == corpus::DEFAULT_ROOT_ID;
+    let config = corpus::ensure_corpus_config(&app);
+    let (root, adopted) = if active {
+        (state.default_root_path()?, config.corpus.adopted)
+    } else {
+        let connected = config
+            .brains
+            .iter()
+            .find(|vault| vault.id == id)
+            .ok_or_else(|| "no such connected vault".to_string())?;
+        if !state.contains_root(&id)? {
+            return Err("the connected vault is not open".into());
+        }
+        (connected.abs_path.clone(), false)
+    };
+    if !root.is_dir() {
+        if active {
+            drop(lane);
+            let _ = recover_missing_active_vault(&app, &root);
+            return Ok(());
+        }
+        return Err("the connected vault folder is unavailable".into());
+    }
+    flush_webviews_before_shutdown(&app)?;
+    let mut store = if development_read_only(&app) {
+        corpus::CorpusStore::open_read_only(root.clone())?
+    } else if adopted {
+        corpus::CorpusStore::open_adopted(root.clone())?
+    } else {
+        corpus::CorpusStore::open(root.clone())?
+    };
+    store.warm_secure_ledger()?;
+    if adopted {
+        store.seed_main_from_disk_if_missing()?;
+    }
+    let organizer = app.state::<organizer::OrganizerState>().0.clone();
+    if active {
+        organizer.with_vault_transition(|| {
+            state.refresh_root(&id, store)?;
+            organizer.reset_for_vault_switch();
+            Ok(())
+        })?;
+        let _ = app.emit("rotli:vault-changed", ());
+    } else {
+        state.refresh_root(&id, store)?;
+    }
+    Ok(())
+}
+
+fn install_live_root_watcher(
+    app: &AppHandle,
+    root: std::path::PathBuf,
+    suppress: corpus::SuppressSet,
+) {
+    let _ = app.asset_protocol_scope().allow_directory(&root, true);
+    let handle = app.clone();
+    let organizer = app.state::<organizer::OrganizerState>().0.clone();
+    let active_root = root.clone();
+    if let Err(error) = corpus::spawn_watcher(root, suppress, move |paths| {
+        if recover_missing_active_vault(&handle, &active_root) {
+            return;
+        }
+        let active = handle
+            .try_state::<corpus::CorpusState>()
+            .and_then(|state| state.default_root_path().ok());
+        if active.as_ref() == Some(&active_root) {
+            organizer.enqueue(&active_root, paths);
+        }
+        let _ = handle.emit_to("main", "rotli:corpus-changed", ());
+    }) {
+        eprintln!(
+            "rotli: new active vault has no live watcher ({error}) — refresh remains available"
+        );
+    }
+}
+
+/// Make an authorized folder the active vault without rebuilding the process.
+/// If startup/Connect already opened it, promote that registered store. For a
+/// new/create/import path, open one store, swap it into the default route, then
+/// attach the same watcher/asset/service plumbing startup would have provided.
+fn activate_vault_path_live(
+    app: &AppHandle,
+    root: std::path::PathBuf,
+    adopted: bool,
+) -> Result<bool, String> {
+    let state = app.state::<corpus::CorpusState>();
+    let existing_id = state.root_id_for_path(&root)?;
+    if existing_id.as_deref() == Some(corpus::DEFAULT_ROOT_ID) {
+        return Ok(false);
+    }
+
+    let mut new_root = None;
+    if existing_id.is_none() {
+        let mut store = if adopted {
+            corpus::CorpusStore::open_adopted(root.clone())?
+        } else {
+            corpus::CorpusStore::open(root.clone())?
+        };
+        store.warm_secure_ledger()?;
+        if adopted {
+            store.seed_main_from_disk_if_missing()?;
+        }
+        let suppress = store.suppress_set();
+        new_root = Some((store, suppress));
+    }
+
+    let organizer = app.state::<organizer::OrganizerState>().0.clone();
+    let mut watcher = None;
+    organizer.with_vault_transition(|| {
+        if let Some(incoming_id) = existing_id.as_deref() {
+            state.activate_registered_root(incoming_id, || {
+                corpus::set_corpus_path_live(app, root.clone(), adopted)
+            })?;
+        } else {
+            let (store, suppress) = new_root
+                .take()
+                .ok_or_else(|| "the selected vault could not be opened".to_string())?;
+            state.activate_new_root(store, || {
+                corpus::set_corpus_path_live(app, root.clone(), adopted)
+            })?;
+            watcher = Some(suppress);
+        }
+        organizer.reset_for_vault_switch();
+
+        let breve_supervisor = app.state::<routines::BreveSupervisor>();
+        breve_supervisor.stop();
+        let active = state.default_root_path()?;
+        if active.join(routines::MANAGED_MARKER).is_file() {
+            if let Err(error) = breve::install_rotli_login_agent() {
+                eprintln!("rotli: Breve login item unavailable after vault switch ({error})");
+            }
+        }
+        if let Err(error) = breve_supervisor.start(app, active) {
+            eprintln!("rotli: Breve scheduler unavailable after vault switch ({error})");
+        }
+        Ok(())
+    })?;
+    if let Some(suppress) = watcher {
+        install_live_root_watcher(app, root, suppress);
+    }
+    let _ = app.emit("rotli:vault-changed", ());
+    Ok(true)
+}
+
+/// Switch to a vault that is already present in Rotli's connected-vault
+/// registry. The frontend supplies only the stable registry id; Rust resolves
+/// and revalidates the path so this route cannot become an arbitrary-folder
+/// authorization bypass. The process and shell stay alive: the open stores swap
+/// default routes, then the Librarian, Breve, and frontend rebind in place.
+#[tauri::command]
+async fn corpus_switch_vault(app: AppHandle, id: String) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || corpus_switch_vault_blocking(app, id))
+        .await
+        .map_err(|e| format!("vault worker failed ({e})"))?
+}
+
+fn corpus_switch_vault_blocking(app: AppHandle, id: String) -> Result<bool, String> {
+    let _lane = vault_lane();
+    let cfg = corpus::ensure_corpus_config(&app);
+    let target = corpus::connected_vault_switch_target(&cfg, &id)?;
+    reject_privileged_root(&app, &target.abs_path)?;
+    let live = memex::brain_connect_view(&target.abs_path)?;
+    if target
+        .memex_id
+        .as_deref()
+        .is_some_and(|expected| expected != live.memex_id)
+    {
+        return Err(
+            "This folder is a different vault than the one Rotli connected to — refusing.".into(),
+        );
+    }
+    flush_webviews_before_shutdown(&app)?;
+    let current = corpus::resolve_corpus(&app);
+    corpus::carry_settings(&current, &target.abs_path)?;
+    activate_vault_path_live(&app, target.abs_path, false)
 }
 
 /// Onboarding "create a new brain": scaffold a fresh memex at `path` and make it
-/// your corpus — the corpus IS a memex (your folder is your brain). Relaunches
-/// into it. `path` is an absolute folder (the native picker creates/names it).
+/// your corpus — the corpus IS a memex (your folder is your brain). The live
+/// shell rebinds to it. `path` is an absolute folder (the native picker
+/// creates/names it).
 /// ASYNC command (vault-lane pass, 2026-07-31): scaffold + settings carry +
 /// config rewrite ran on the main thread right behind the picker — worker now.
 #[tauri::command]
@@ -1245,7 +1754,7 @@ async fn corpus_init_memex(
     app: AppHandle,
     path: String,
     brain_enabled: bool,
-) -> Result<(), String> {
+) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
         corpus_init_memex_blocking(app, path, brain_enabled)
     })
@@ -1257,7 +1766,7 @@ fn corpus_init_memex_blocking(
     app: AppHandle,
     path: String,
     brain_enabled: bool,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let _lane = vault_lane();
     let root = app
         .state::<memex::FolderAuthorizations>()
@@ -1270,12 +1779,18 @@ fn corpus_init_memex_blocking(
     if corpus::is_configured(&app) {
         corpus::carry_settings(&corpus::resolve_corpus(&app), &root)?;
     }
-    write_vault_brain_choice(&root, brain_enabled)?;
-    corpus::set_corpus_path(&app, root, false)?;
-    app.restart();
+    write_new_vault_settings(&root, Some(brain_enabled))?;
+    activate_vault_path_live(&app, root, false)?;
+    app.state::<corpus::CorpusState>()
+        .route(corpus::DEFAULT_ROOT_ID, |store| {
+            store.wire_id_of(memex::WELCOME_PRESET_FILE)
+        })
 }
 
-fn write_vault_brain_choice(root: &std::path::Path, enabled: bool) -> Result<(), String> {
+fn write_new_vault_settings(
+    root: &std::path::Path,
+    brain_enabled: Option<bool>,
+) -> Result<(), String> {
     let dot = root.join(".rotli");
     std::fs::create_dir_all(&dot).map_err(|e| format!("create {}: {e}", dot.display()))?;
     let path = dot.join("settings.json");
@@ -1284,29 +1799,42 @@ fn write_vault_brain_choice(root: &std::path::Path, enabled: bool) -> Result<(),
         .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
         .filter(serde_json::Value::is_object)
         .unwrap_or_else(|| serde_json::json!({ "v": 1 }));
-    value
-        .as_object_mut()
-        .expect("object filtered above")
-        .insert("brainEnabled".into(), serde_json::Value::Bool(enabled));
+    let object = value.as_object_mut().expect("object filtered above");
+    if let Some(enabled) = brain_enabled {
+        object.insert("brainEnabled".into(), serde_json::Value::Bool(enabled));
+    }
+    // The old virtual-welcome dismissal is obsolete: a new vault now owns a
+    // real Markdown note. Drop the stale setting while preserving reusable
+    // appearance/editor preferences and restoring visible Home navigation.
+    object.remove("vaultWelcomeSeen");
+    object.insert("sidebarCollapsed".into(), serde_json::Value::Bool(false));
+    object.insert(
+        "sidebarMode".into(),
+        serde_json::Value::String("notes".into()),
+    );
+    object.insert(
+        "sidebarView".into(),
+        serde_json::Value::String("home".into()),
+    );
     let json = serde_json::to_string_pretty(&value).map_err(|e| e.to_string())? + "\n";
     fsutil::atomic_write(&path, &json, ".rotli-vault-settings-")
 }
 
 /// Create a PRACTICE vault (vault platform, 2026-07-26): scaffold a fresh
-/// scratch vault at an obvious home, carry the current settings along, keep
-/// the vault being left registered as a connected library (one click away in
-/// the switcher), and relaunch into the practice vault. The current vault's
+/// scratch vault at an obvious home, carry the current settings along, and
+/// switch into the practice vault in place. The shared corpus switch policy keeps the
+/// outgoing vault registered as a linked library. The current vault's
 /// FILES are never touched — this is a switch plus a courtesy registration.
 /// ASYNC command (vault-lane pass, 2026-07-31): scaffold + registry writes ran
 /// on the main thread — worker now.
 #[tauri::command]
-async fn corpus_create_practice_vault(app: AppHandle) -> Result<(), String> {
+async fn corpus_create_practice_vault(app: AppHandle) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || corpus_create_practice_vault_blocking(app))
         .await
         .map_err(|e| format!("vault worker failed ({e})"))?
 }
 
-fn corpus_create_practice_vault_blocking(app: AppHandle) -> Result<(), String> {
+fn corpus_create_practice_vault_blocking(app: AppHandle) -> Result<String, String> {
     let _lane = vault_lane();
     use tauri::Manager;
     let current = corpus::is_configured(&app).then(|| corpus::resolve_corpus(&app));
@@ -1322,32 +1850,49 @@ fn corpus_create_practice_vault_blocking(app: AppHandle) -> Result<(), String> {
     if let Some(current) = &current {
         corpus::carry_settings(current, &root)?;
     }
-    // best-effort: the practice vault must open even if the courtesy
-    // registration of the outgoing vault is refused (plain folders have no
-    // memex identity to register — they stay reachable via Location settings)
-    if let Some(current) = current.filter(|path| corpus::is_memex_root(path)) {
-        if let Ok(meta) = memex::prepare_brain_connect(&current) {
-            let _ = corpus::upsert_brain(
-                &app,
-                corpus::ConnectedBrain {
-                    id: String::new(),
-                    label: meta.label,
-                    abs_path: current,
-                    memex_id: Some(meta.memex_id),
-                    mode: meta.mode,
-                    perms: meta.perms,
-                },
-                false, // visible + switchable, never silently the write target
+    write_new_vault_settings(&root, None)?;
+    activate_vault_path_live(&app, root, false)?;
+    app.state::<corpus::CorpusState>()
+        .route(corpus::DEFAULT_ROOT_ID, |store| {
+            store.wire_id_of(memex::WELCOME_PRESET_FILE)
+        })
+}
+
+fn mount_connected_brain(
+    app: &AppHandle,
+    root_id: String,
+    root: std::path::PathBuf,
+    perms: memex::MemexPerms,
+    mut store: corpus::CorpusStore,
+) -> Result<(), String> {
+    let state = app.state::<corpus::CorpusState>();
+    if state.contains_root(&root_id)? {
+        state.route(&root_id, |existing| {
+            existing.set_perms_read_only(perms.read_only());
+            Ok(())
+        })?;
+    } else {
+        let suppress = store.suppress_set();
+        store.set_perms_read_only(perms.read_only());
+        state.insert_root(root_id.clone(), store)?;
+        let _ = app.asset_protocol_scope().allow_directory(&root, true);
+        let handle = app.clone();
+        if let Err(error) = corpus::spawn_watcher(root, suppress, move |_| {
+            let _ = handle.emit_to("main", "rotli:corpus-changed", ());
+        }) {
+            eprintln!(
+                "rotli: connected vault {root_id} has no live watcher ({error}) — refresh remains available"
             );
         }
     }
-    corpus::set_corpus_path(&app, root, false)?;
-    app.restart();
+    let _ = app.emit_to("main", "rotli:corpus-changed", ());
+    Ok(())
 }
 
 /// Connect a brain (a memex) to read — and write into per its perms. Validates +
-/// stamps via the memex module, registers it in corpus.json, makes it active, and
-/// relaunches so its sidebar row appears. False when the picker is cancelled.
+/// stamps via the memex module, registers it in corpus.json, and mounts it in the
+/// live multi-root registry. Connecting is additive and must not tear down the
+/// current vault or require the development restart supervisor.
 /// ASYNC command (vault-lane pass, 2026-07-31): the blocking picker + memex
 /// stamp + registry write ran on the main thread — worker now.
 #[tauri::command]
@@ -1359,8 +1904,8 @@ async fn corpus_connect_brain(app: AppHandle, path: Option<String>) -> Result<bo
 
 fn corpus_connect_brain_blocking(app: AppHandle, path: Option<String>) -> Result<bool, String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
-        return Err("The production vault is already mounted as the single read-only source in development.".into());
+    if development_read_only(&app) {
+        return Err("Choose or create a development vault before linking another vault.".into());
     }
     use tauri_plugin_dialog::DialogExt;
     let abs = match path {
@@ -1368,48 +1913,64 @@ fn corpus_connect_brain_blocking(app: AppHandle, path: Option<String>) -> Result
             .state::<memex::FolderAuthorizations>()
             .require(std::path::Path::new(&p))?,
         None => {
-            let Some(picked) = app
+            let dialog_state = app.state::<NativeDialogOpen>();
+            let _native_dialog = dialog_state.begin();
+            let mut picker = app
                 .dialog()
                 .file()
                 .set_title("Link another Rotli vault")
-                .blocking_pick_folder()
-            else {
+                .set_directory(vault_location::picker_start(&app));
+            if let Some(parent) = app.get_webview_window("main") {
+                picker = picker.set_parent(&parent);
+            }
+            let Some(picked) = picker.blocking_pick_folder() else {
                 return Ok(false);
             };
             picked.into_path().map_err(|e| e.to_string())?
         }
     };
     reject_privileged_root(&app, &abs)?;
-    flush_webviews_before_shutdown(&app)?;
     let meta = memex::prepare_brain_connect(&abs)?;
-    corpus::upsert_brain(
+    let mut store = corpus::CorpusStore::open(abs.clone())?;
+    store.set_perms_read_only(meta.perms.read_only());
+    store.warm_secure_ledger()?;
+    let perms = meta.perms;
+    let root_id = corpus::upsert_brain(
         &app,
         corpus::ConnectedBrain {
             id: String::new(),
             label: meta.label,
-            abs_path: abs,
+            abs_path: abs.clone(),
             memex_id: Some(meta.memex_id),
             mode: meta.mode,
-            perms: meta.perms,
+            perms,
         },
         true,
     )?;
-    app.restart();
+    mount_connected_brain(&app, root_id, abs, perms, store)?;
+    Ok(true)
 }
 
-/// Forget a connected brain (the binding only — its files are never touched).
-/// Relaunches so its sidebar row disappears.
+/// Remove a connected vault from Rotli. This drops only its trusted binding,
+/// live route, and asset scope; its folder and every user file stay untouched.
 #[tauri::command]
 fn corpus_forget_brain(app: AppHandle, id: String) -> Result<(), String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
-        return Err("The production vault binding cannot be changed in development.".into());
+    if development_read_only(&app) {
+        return Err(
+            "Choose or create a development vault before changing linked libraries.".into(),
+        );
     }
-    // forget_root is a superset of the old forget_brain (it also drops a folder by
-    // id, a no-op for a brain id) — one path now handles brains + folders.
-    flush_webviews_before_shutdown(&app)?;
-    corpus::forget_root(&app, &id)?;
-    app.restart();
+    let state = app.state::<corpus::CorpusState>();
+    let root = state.remove_registered_root(&id, || corpus::forget_root(&app, &id))?;
+    if let Err(error) = app.asset_protocol_scope().forbid_directory(&root, true) {
+        eprintln!(
+            "rotli: removed vault route but could not revoke its asset scope {} ({error})",
+            root.display()
+        );
+    }
+    let _ = app.emit_to("main", "rotli:corpus-changed", ());
+    Ok(())
 }
 
 /// Make a connected brain the active write target. No relaunch — the frontend
@@ -1417,8 +1978,10 @@ fn corpus_forget_brain(app: AppHandle, id: String) -> Result<(), String> {
 #[tauri::command]
 fn corpus_set_active_brain(app: AppHandle, id: String) -> Result<(), String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
-        return Err("The production vault is the fixed read-only source in development.".into());
+    if development_read_only(&app) {
+        return Err(
+            "Choose or create a development vault before changing linked libraries.".into(),
+        );
     }
     corpus::set_active_brain(&app, &id)
 }
@@ -1436,8 +1999,11 @@ fn corpus_set_brain_perms(
     perms: memex::MemexPerms,
 ) -> Result<(), String> {
     let _lane = vault_lane();
-    if cfg!(debug_assertions) {
-        return Err("Production vault permissions cannot be changed in development.".into());
+    if development_read_only(&app) {
+        return Err(
+            "Choose or create a development vault before changing linked-library permissions."
+                .into(),
+        );
     }
     corpus::set_brain_perms(&app, &id, perms)?;
     let state = app.state::<corpus::CorpusState>();
@@ -1540,7 +2106,7 @@ fn set_app_icon(app: AppHandle, variant: String) {
 fn set_demo_mode(app: AppHandle, on: bool) -> Result<(), String> {
     flush_webviews_before_shutdown(&app)?;
     corpus::set_demo(&app, on)?;
-    app.restart();
+    relaunch_app(&app)
 }
 
 /// Is demo mode currently on?
@@ -1650,6 +2216,7 @@ pub fn run() {
             search: Mutex::new(Some(DEFAULT_SEARCH_SUMMON.to_string())),
         })
         .manage(LastBlurHide(Mutex::new(None)))
+        .manage(NativeDialogOpen::default())
         .manage(LastPanelSummon(Mutex::new(None)))
         .manage(HideOnBlur(Mutex::new(true)))
         .manage(CaptureReturn(Mutex::new(false)))
@@ -1658,6 +2225,7 @@ pub fn run() {
         .manage(QuitFlush { status: Mutex::new(QuitFlushStatus::default()), cv: Condvar::new() })
         .manage(corpus::ImportAuthorizations::default())
         .manage(memex::FolderAuthorizations::default())
+        .manage(vault_browser::VaultBrowserState::default())
         .manage(provider::ProviderState::default())
         .manage(localmodel::LocalModelState::default())
         .manage(compute::ComputeState::default())
@@ -1679,13 +2247,25 @@ pub fn run() {
             toggle_quick_window,
             hide_quick_window,
             corpus_reveal,
+            vault_browser::vault_browser_start,
+            vault_browser::vault_browser_open_child,
+            vault_browser::vault_browser_go_back,
+            vault_browser::vault_browser_refresh,
+            vault_browser::vault_browser_create_folder,
+            vault_browser::vault_browser_select,
+            vault_browser::vault_browser_select_child,
+            vault_browser::vault_browser_cancel,
+            vault_browser::vault_browser_reveal,
             corpus_add_folder,
             corpus_forget_folder,
             corpus_list_config,
             corpus_status,
             corpus_inspect_folder,
             corpus_import_vault_copy,
+            corpus_refresh_active_vault,
+            corpus_refresh_vault,
             corpus_choose_folder,
+            corpus_switch_vault,
             corpus_init_memex,
             corpus_create_practice_vault,
             corpus_connect_brain,
@@ -1802,6 +2382,14 @@ pub fn run() {
             web_search::web_search,
             web::web_fetch,
             web::open_url,
+            private_browser::private_browser_create,
+            private_browser::private_browser_set_bounds,
+            private_browser::private_browser_set_visible,
+            private_browser::private_browser_navigate,
+            private_browser::private_browser_back,
+            private_browser::private_browser_forward,
+            private_browser::private_browser_reload,
+            private_browser::private_browser_close,
             corpus::corpus_create_folder,
             corpus::corpus_read_board,
             corpus::corpus_write_board,
@@ -1835,6 +2423,13 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
+            // Resolve Finder moves and renames before any root is registered or
+            // watched. A bookmark is accepted only when the live memex.json id
+            // still matches the vault identity that was originally selected.
+            if let Err(error) = vault_location::repair_vault_locations(app.handle()) {
+                eprintln!("rotli: could not repair moved vault locations ({error})");
+            }
+
             // Phase 2 / Track 2 — the corpus, now MULTI-ROOT. Build the root
             // registry (the DEFAULT root is always registered, pointing at
             // today's resolve_root), auto-bind the "vault" root to ~/memex-vault ONLY
@@ -1850,7 +2445,6 @@ pub fn run() {
             // memex root's watcher closure can feed its queue; the worker thread
             // starts only after CorpusState is managed (it writes through route()).
             let organizer_handle = organizer::OrganizerHandle::new();
-            let mut daemon_target: Option<(String, std::path::PathBuf)> = None;
             // #3 (audit 2026-07): a connected brain's USER-SET perms must reach the
             // Rust write gates, not only the TS canWrite — carry them by root id.
             let brain_perms: std::collections::HashMap<String, memex::MemexPerms> =
@@ -1865,14 +2459,18 @@ pub fn run() {
                 };
             let roots = corpus::startup_roots(app.handle());
             for root in roots {
-                let opened = if root.adopted {
+                let opened = if development_read_only(app.handle()) {
+                    corpus::CorpusStore::open_read_only(root.abs_path.clone())
+                } else if root.adopted {
                     corpus::CorpusStore::open_adopted(root.abs_path.clone())
                 } else {
                     corpus::CorpusStore::open(root.abs_path.clone())
                 };
                 match opened {
                     Ok(mut store) => {
-                        if brain_perms.get(&root.id).is_some_and(|p| p.read_only()) {
+                        if development_read_only(app.handle())
+                            || brain_perms.get(&root.id).is_some_and(|p| p.read_only())
+                        {
                             store.set_perms_read_only(true);
                         }
                         let suppress = store.suppress_set();
@@ -1885,31 +2483,24 @@ pub fn run() {
                         // servable path is a registered corpus root, nothing else.
                         let _ = app.asset_protocol_scope().allow_directory(store.root(), true);
                         let handle = app.handle().clone();
-                        // The daemon runs over the DEFAULT root, and only when it is
-                        // a memex (the Filer lane only exists there). Never a connected
-                        // brain: the frontend's journal/approve/undo commands all route
-                        // to the default root, so binding the daemon anywhere else
-                        // would split the §4.5 review loop across two corpora —
-                        // proposals journaled where the UI never reads, approvals
-                        // refused where the daemon never wrote.
-                        let is_target = root.id == corpus::DEFAULT_ROOT_ID
-                            && store.is_memex()
-                            && daemon_target.is_none();
-                        if is_target {
-                            daemon_target = Some((root.id.clone(), store.root().to_path_buf()));
-                        }
-                        let org = is_target
-                            .then(|| (organizer_handle.clone(), store.root().to_path_buf()));
+                        let org = organizer_handle.clone();
+                        let org_root = store.root().to_path_buf();
                         if let Err(e) = corpus::spawn_watcher(watch_root, suppress, move |paths| {
-                            // the memex root also feeds the daemon's queue — the
-                            // watcher already dropped .rotli/, dot-files and our
-                            // own suppressed writes, so no echo can land here.
+                            if recover_missing_active_vault(&handle, &org_root) {
+                                return;
+                            }
+                            // Only the currently active/default vault feeds the
+                            // Librarian. The comparison is live so a vault switch
+                            // retargets existing watchers without another process.
                             // Enqueue BEFORE the event: the frontend refetches the
                             // queue depth on corpus-changed (finding 23), and a
                             // refetch that wins the old ordering read the
                             // pre-enqueue count.
-                            if let Some((org, org_root)) = &org {
-                                org.enqueue(org_root, paths);
+                            let active = handle
+                                .try_state::<corpus::CorpusState>()
+                                .and_then(|state| state.default_root_path().ok());
+                            if active.as_ref() == Some(&org_root) {
+                                org.enqueue(&org_root, paths);
                             }
                             let _ = handle.emit_to("main", "rotli:corpus-changed", ());
                         }) {
@@ -1977,13 +2568,15 @@ pub fn run() {
                 ));
             }
 
-            // Manage the handle either way (the commands must answer), but only
-            // spawn the worker when a memex root exists — organizer_status then
-            // reports running:false on a plain corpus.
+            // One parked worker follows the live default route. Plain folders
+            // produce no Library candidates; switching to a Rotli vault wakes a
+            // fresh reconciliation without rebuilding the app process.
             app.manage(organizer::OrganizerState(organizer_handle.clone()));
-            if let Some((mx_id, mx_root)) = daemon_target {
-                organizer::spawn_organizer(app.handle().clone(), organizer_handle, mx_id, mx_root);
-            }
+            organizer::spawn_organizer(
+                app.handle().clone(),
+                organizer_handle,
+                corpus::DEFAULT_ROOT_ID.to_string(),
+            );
 
             // rotli:// deep links (2026-07-31): a clicked link rides the SAME
             // one-shot mailbox lane `rotli open` uses — the webview consumes it
@@ -2030,7 +2623,7 @@ pub fn run() {
                 }
             }
 
-            // Menu-bar tray: the kit r-mark as a TEMPLATE icon (macOS tints it).
+            // Menu-bar tray: the canonical quokka mark as a TEMPLATE icon (macOS tints it).
             // 44px = 22px logical @2x; tray-icon scales NSImage to the bar height.
             let open = MenuItemBuilder::with_id("open", "Open rotli").build(app)?;
             let quit = MenuItemBuilder::with_id("quit", "Quit rotli").build(app)?;
@@ -2115,6 +2708,9 @@ pub fn run() {
             match window.label() {
                 "main" => {
                     let app = window.app_handle();
+                    if app.state::<NativeDialogOpen>().is_open() {
+                        return;
+                    }
                     if !*app.state::<HideOnBlur>().0.lock().unwrap() {
                         return;
                     }
@@ -2126,7 +2722,7 @@ pub fn run() {
                     let _ = window.hide();
                 }
                 // the floating Quick Note is a visitor by nature — always hide on
-                // click-away (the close-on-blur Seth wanted for quick access)
+                // click-away (the close-on-blur the maintainer wanted for quick access)
                 "quick" => {
                     let _ = window.hide();
                 }
@@ -2141,7 +2737,7 @@ pub fn run() {
             }
             // Clicking the Dock icon (when "Show in Dock" is on) of a running app
             // with no visible window must reopen it — macOS sends Reopen, and
-            // without handling it the Dock icon does nothing (Seth, 2026-06-19).
+            // without handling it the Dock icon does nothing (the maintainer, 2026-06-19).
             // RunEvent::Reopen is a macOS-only variant, so cfg-gate it the same
             // way the rest of this file gates every other macOS API.
             #[cfg(target_os = "macos")]
@@ -2152,7 +2748,7 @@ pub fn run() {
                 // panels that macOS does NOT count there, so summoning Quick — e.g.
                 // ⌥. / ⌥Q, which activates the app — fires a spurious Reopen with
                 // has_visible_windows=false and wrongly surfaces the whole main
-                // window (Seth, 2026-06-30). show_quick() shows the panel BEFORE it
+                // window (the maintainer, 2026-06-30). show_quick() shows the panel BEFORE it
                 // steals focus, so our own is_visible() check sees it and suppresses
                 // the reopen. The quick chord must open ONLY the floating note.
                 if let tauri::RunEvent::Reopen { has_visible_windows, .. } = event {

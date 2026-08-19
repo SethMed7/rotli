@@ -14,6 +14,7 @@ import {
   corpusSetPinned,
   hideMainWindow,
   hideQuickWindow,
+  isTauri,
   openUrl,
   summon,
   toggleMainWindow,
@@ -27,6 +28,7 @@ import { invalidateNotes, lifecycleError } from "../services/hooks";
 import { archiveNoteWithImages, trashNoteWithImages } from "../services/noteLifecycle";
 import { notesService } from "../services/notes";
 import { trashSystemSelection } from "../services/systemTrash";
+import { reconnectActiveVault } from "../state/activeVault";
 import { navigate } from "../state/navHistory";
 import { DEFAULT_NOTE_STYLE, useNoteStyleStore } from "../state/noteStyle";
 import { findLeaf, leaves, openNavTarget, usePanesStore } from "../state/panes";
@@ -40,7 +42,7 @@ const notesWorkspaceActive = (): boolean => useUiStore.getState().sidebarMode !=
 
 /** The focused pane's active tab noteId, read imperatively for action runs
  * (the hook form useFocusedNoteId is for components). null when the pane has no
- * resolvable tab (Seth, 2026-06-13: the lifecycle chords target this note). */
+ * resolvable tab (the maintainer, 2026-06-13: the lifecycle chords target this note). */
 function focusedNoteIdNow(): string | null {
   const { root, focusedPaneId } = usePanesStore.getState();
   const leaf = findLeaf(root, focusedPaneId) ?? leaves(root)[0];
@@ -69,7 +71,7 @@ export function newItemInTab(): void {
   runCreate(useUiStore.getState().newTabDefault, true);
 }
 
-/** ⌘+/⌘− — CONTEXTUAL zoom (Seth, 2026-06-26: "zoom in and out but just where I
+/** ⌘+/⌘− — CONTEXTUAL zoom (the maintainer, 2026-06-26: "zoom in and out but just where I
  * am"): with focus in the sidebar it scales the sidebar tree; otherwise it steps
  * the FOCUSED note's body text size (the per-note Aa render layer — persisted to
  * settings, never written into the .md). Other surfaces (chat/canvas/file) are
@@ -99,6 +101,22 @@ function zoomReset(): void {
 }
 
 export function registerDefaultActions(): void {
+  registerAction({
+    id: "vault.refresh",
+    title: "Refresh current vault",
+    defaultChord: "Meta+R",
+    enabled: () => isTauri(),
+    run: () => {
+      void reconnectActiveVault().catch((error: unknown) =>
+        useUiStore
+          .getState()
+          .setRowActionError(
+            `Couldn’t refresh the vault — ${error instanceof Error ? error.message : String(error)}`,
+          ),
+      );
+    },
+  });
+
   registerAction({
     id: "setup.continue",
     title: "Continue setup",
@@ -139,7 +157,7 @@ export function registerDefaultActions(): void {
   });
 
   // — the two summon surfaces (both global, separately rebindable).
-  // Seth's law (2026-06-12): ⌥Space opens the APP; capture has its own chord. —
+  // the maintainer's law (2026-06-12): ⌥Space opens the APP; capture has its own chord. —
   registerAction({
     id: "app.toggleWindow",
     title: "Open or hide rotli",
@@ -163,7 +181,7 @@ export function registerDefaultActions(): void {
   });
 
   // — the command layer —
-  // Back / Forward over opened notes (Seth #14 — the recorder ran since 0.24.x;
+  // Back / Forward over opened notes (the maintainer #14 — the recorder ran since 0.24.x;
   // this is the player: the titlebar ‹ › buttons + the browser chords). The
   // Meta+Bracket chords are FREE on the main surface (quick.next/prev own them
   // only inside the Quick window — chords scope per surface).
@@ -268,7 +286,7 @@ export function registerDefaultActions(): void {
     },
   });
 
-  // The Board — quick captures collected as cards (Seth, 2026-06-19). A view in
+  // The Board — quick captures collected as cards (the maintainer, 2026-06-19). A view in
   // the content area now (the sidebar stays); ⌘K-reachable + rebindable, opened
   // from the sidebar. Toggles between the board grid and the note panes.
   registerAction({
@@ -293,7 +311,7 @@ export function registerDefaultActions(): void {
   });
 
   // — notes —
-  // ⌘N is the blank NEW-TAB chooser now (Seth, 2026-07-29): "no type selected,
+  // ⌘N is the blank NEW-TAB chooser now (the maintainer, 2026-07-29): "no type selected,
   // you have to choose". notes.new stays palette/menu-reachable, chord-free.
   registerAction({
     id: "notes.new",
@@ -329,7 +347,7 @@ export function registerDefaultActions(): void {
   registerAction({
     id: "boards.new",
     title: "New Excalidraw board",
-    // ⌘⇧T (Seth, 2026-07-29) — reopen-closed-tab moved to ⌘⌥T for it
+    // ⌘⇧T (the maintainer, 2026-07-29) — reopen-closed-tab moved to ⌘⌥T for it
     defaultChord: "Meta+Shift+T",
     run: () => {
       if (useUiStore.getState().sidebarMode === "breve") return;
@@ -337,7 +355,7 @@ export function registerDefaultActions(): void {
     },
   });
 
-  // — note lifecycle (Seth, 2026-06-13): archive / trash / restore the FOCUSED
+  // — note lifecycle (the maintainer, 2026-06-13): archive / trash / restore the FOCUSED
   //   note (the focused pane's active tab). All three reach ⌘K automatically and
   //   are rebindable. Trash is deliberately UNBOUND by default: ⌘⌫ would hijack
   //   the editor's delete-to-line-start AND get preventDefault-ed, so it ships
@@ -372,7 +390,7 @@ export function registerDefaultActions(): void {
       if (id) void notesService.restoreNote(id).then(invalidateNotes).catch(lifecycleError("restore"));
     },
   });
-  // Pin / unpin the FOCUSED note (Seth, 2026-07-06: "a hotkey for pinning the
+  // Pin / unpin the FOCUSED note (the maintainer, 2026-07-06: "a hotkey for pinning the
   // note I am already on"). Reads the note's current pin state, then flips the
   // typed `pinned` frontmatter fact — pinned notes float to the top of every
   // list. Never bumps `updated`, so a pin doesn't reorder by recency.
@@ -389,7 +407,7 @@ export function registerDefaultActions(): void {
   });
 
   // — tabs (created only by explicit gestures; plain click replaces). ⌘T opens
-  //   a fresh blank note in a new tab (Seth #8: "new tab AND note, not a
+  //   a fresh blank note in a new tab (the maintainer #8: "new tab AND note, not a
   //   duplicate of where you already are"), filed into the current Main folder. —
   registerAction({
     id: "tabs.new",
@@ -426,7 +444,7 @@ export function registerDefaultActions(): void {
   registerAction({
     id: "tabs.reopen",
     title: "Reopen closed tab",
-    // ⌘⌥T — ⌘⇧T became New board (Seth, 2026-07-29); rebindable as ever
+    // ⌘⌥T — ⌘⇧T became New board (the maintainer, 2026-07-29); rebindable as ever
     defaultChord: "Meta+Alt+T",
     run: () => {
       if (notesWorkspaceActive()) usePanesStore.getState().reopenClosedTab();
@@ -520,7 +538,7 @@ export function registerDefaultActions(): void {
   });
 
   // — chrome —
-  // ONE sidebar toggle (Seth, 2026-06-13: folders + note-list collapsed into a
+  // ONE sidebar toggle (the maintainer, 2026-06-13: folders + note-list collapsed into a
   // single navigator; chrome.toggleList ⌥⌘L retired). ⌘0 keeps its muscle
   // memory; the inline .sidebtn and the warm-edge restore strip dispatch this
   // same action — one row in Settings, not two.
@@ -531,7 +549,7 @@ export function registerDefaultActions(): void {
     run: () => useUiStore.getState().toggleSidebar(),
   });
 
-  // — contextual zoom (Seth, 2026-06-26): ⌘+/⌘− act where the focus is — the
+  // — contextual zoom (the maintainer, 2026-06-26): ⌘+/⌘− act where the focus is — the
   // sidebar tree, or the focused note's text size. Reset is palette-reachable.
   registerAction({
     id: "view.zoomIn",
@@ -629,7 +647,7 @@ export function registerDefaultActions(): void {
     },
   });
 
-  // — the FRONTS (Seth's IA, 2026-08-01): ⌃⌘1 Home, ⌃⌘2 Chat. The sidebar's
+  // — the FRONTS (the maintainer's IA, 2026-08-01): ⌃⌘1 Home, ⌃⌘2 Chat. The sidebar's
   //   switcher and these chords are the same gesture, and including ⌘ means the
   //   chord shown by the held-Command overlay can be pressed directly without
   //   releasing the reveal key first (review 2026-08-08). —
@@ -657,7 +675,7 @@ export function registerDefaultActions(): void {
     },
   });
 
-  // …and ONE key to flip between them (Seth, 2026-08-04: "toggle through the
+  // …and ONE key to flip between them (the maintainer, 2026-08-04: "toggle through the
   // home and chat with hotkeys"). ⌃1/⌃2 stay the direct jumps; this is the
   // no-look switch for when you just want the other front.
   registerAction({
@@ -689,7 +707,7 @@ export function registerDefaultActions(): void {
       ui.setSidebarMode("notes");
       ui.setSidebarView("chat");
       // chat is a PANE surface now — open a fresh chat pane. The old contentView
-      // "chat" was retired and rendered nothing (Seth, 2026-06-30 — audit).
+      // "chat" was retired and rendered nothing (the maintainer, 2026-06-30 — audit).
       usePanesStore.getState().openChat(null);
     },
   });
@@ -715,7 +733,7 @@ export function registerDefaultActions(): void {
     defaultChord: "Alt+T",
     run: () => void openUrl("https://www.google.com/"),
   });
-  // — note ↔ chat: a note owns MANY chats (Seth, 2026-07-30). ⌘⇧C continues
+  // — note ↔ chat: a note owns MANY chats (the maintainer, 2026-07-30). ⌘⇧C continues
   //   the most recently touched one (creating the first when none exists);
   //   the New variant always adds another. The editor's chat chip is the
   //   full picker; these are its fast paths. —

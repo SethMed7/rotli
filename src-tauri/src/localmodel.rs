@@ -45,9 +45,9 @@ fn registry_path() -> PathBuf {
     memex_ai().join("registry.json")
 }
 fn mlx_plist() -> Result<PathBuf, String> {
-    Ok(home()?.join("Library/LaunchAgents/com.sethmedina.memex-mlx.plist"))
+    Ok(home()?.join("Library/LaunchAgents/com.rotli.memex-mlx.plist"))
 }
-const MLX_LABEL: &str = "com.sethmedina.memex-mlx";
+const MLX_LABEL: &str = "com.rotli.memex-mlx";
 
 /// Live `hf` downloads, keyed by the caller's request id (kill-on-cancel), same
 /// shape as provider.rs. Its own state so the installer stays self-contained.

@@ -2,8 +2,8 @@
   "slug": "rotli",
   "name": "rotli",
   "nameCasing": "lowercase always — never \"Rotli\" or \"ROTLI\" in UI/copy",
-  "status": "SHIPPED — marks approved (gate round 3, 2026-06-11), board frozen, kit.json written. This is the live, app-embedded kit (src/brand/, v0.24.4).",
-  "source": "Seth-approved brand board 2026-06-06, regenerated 2026-06-10 (../../engine/BRANDS/rotli/_reference/brand-board.png; intake run ../../engine/RUNS/rotli/2026-06-10-board-intake/)",
+  "status": "SHIPPED — canonical quokka identity and selectable exact-geometry full-body treatments, 2026-08-15.",
+  "source": "The canonical quokka drawings in src/assets/characters/; historical identity explorations are non-shipping provenance only.",
   "identity": {
     "what": "A warm, local-first, hotkey-driven notes app for Mac — one menu-bar shell where your notes folder *is* a memex (one folder: notes · chats · knowledge · files). Two fronts: Chat (AI chats) · Notes (Capture · the AI-organized 'brain' wiki areas · Storage · Boards); an email Inbox front is on the roadmap. AI rides your own CLI subscriptions (claude/codex/agy) or a local MLX model — rotli bundles no LLM/STT/TTS and has no separate Voice front (dictation lives in a sibling app, voz).",
     "essence": "Warm, quiet, instant — a visitor on your screen, not a resident.",
@@ -20,7 +20,7 @@
       { "key": "Instant", "line": "Anticipates you. No loading states for what you're already doing." },
       { "key": "Yours", "line": "Local-first. Rebindable. The user owns the app." }
     ],
-    "nameRegister": "\"rotli\" is lowercase everywhere in copy/UI. The rounded lowercase wordmark IS the identity. Prefer rephrasing over sentence-start capitalization.",
+    "nameRegister": "Use lowercase \"rotli\" in product identity copy. The canonical line-drawn quokka is the compact visual identity.",
     "voiceRules": [
       "Calm and unhurried — the app makes no demands; the copy doesn't either.",
       "Plainspoken and warm — friendly, never salesy, never gamified (no streaks/achievements/upsell).",
@@ -51,43 +51,42 @@
   },
   "font": {
     "display": "Satoshi",
-    "displayNote": "Bold (700) for headings + wordmark; geometric-humanist, warm, rounded.",
+    "displayNote": "Bold (700) for headings; geometric-humanist, warm, rounded.",
     "body": "General Sans",
     "bodyNote": "Regular (400) / Medium (500) for UI + body; legible at small sizes.",
     "fallback": "Inter, system-ui",
-    "license": "Fontshare (Indian Type Foundry) Free Font License — free for personal AND commercial use. Self-host. NOT OFL and NOT in the studio's standard Fontsource catalog (Mona Sans/Figtree/Inter) — a deliberate, Seth-approved deviation for rotli; recorded in LICENSES.md.",
+    "license": "Fontshare (Indian Type Foundry) Free Font License — free for personal AND commercial use. Self-host. NOT OFL and NOT in the studio's standard Fontsource catalog (Mona Sans/Figtree/Inter) — a deliberate, the maintainer-approved deviation for rotli; recorded in LICENSES.md.",
     "rejected": "Cabin 600 — the prior rotli direction; retired.",
-    "tokens": "tokens/type.css",
-    "wordmarkOutlined": "logo/wordmark.svg (to be formalized — ships as outlined paths, no runtime font dependency)"
+    "tokens": "tokens/type.css"
   },
   "mark": {
-    "kind": "lowercase rounded wordmark + secondary single-glyph mark",
-    "primary": "the full word \"rotli\" set lowercase in a warm rounded sans, Cocoa #3A3028; the leading \"r\" carries a distinctive curled/looped tail — the signature glyph.",
-    "secondary": "the \"r\" mark alone (same curled-tail r) for compact use: app icon, menu bar/tray, favicon, social avatar. Must stand alone and survive 16px mono + knockout.",
+    "kind": "canonical line-drawn quokka",
+    "primary": "The compact quokka drawing is the visual identity in titlebar, menu bar, app icon, site, and About placements.",
+    "secondary": "The product name may sit beside the quokka as ordinary lowercase text; it is not a separate vector wordmark.",
     "meaning": {
-      "warmth": "Rounded terminals + the hand-drawn curl read as friendly, calm, made-for-you — paper under a lamp, not a monitor.",
-      "signature": "The curled r is the one distinctive move; the wordmark and the r mark visibly share it."
+      "warmth": "The familiar quokka reads as friendly, calm, and personal without adding visual noise.",
+      "signature": "The exact silhouette and linework stay consistent from compact mark to full-body companion."
     },
-    "construction": "FORMALIZED 2026-06-11 (RULES/07): quokka-r traced from the 06-10 board (smooth re-trace + flowed-bottom refinement); wordmark = outlined Baloo 2 true-600 static (fonts/Baloo2-600.ttf), tracking -0.01, with the traced r grafted as the leading glyph. Build scripts: engine/RUNS/rotli/2026-06-10-board-intake/.",
-    "files": "logo/ (wordmark + r-mark, each in cocoa/.mono/.mono-white) · tiles/ (favicon, app-icon-512, social-avatar-1024, tile-linen/cocoa/clay)"
+    "construction": "The compact mark and eleven full-body poses are canonical source drawings. Cocoa and Fern fills are deterministic interior color treatments of those drawings, never redraws.",
+    "files": "../assets/characters/_logo.svg · ../assets/characters/*.svg · ../assets/characters/filled/"
   },
   "shape": {
     "boubaKiki": "bouba (rounded/warm)",
     "language": [
       "rounded pill buttons",
       "12px flat cards",
-      "soft/curled wordmark",
+      "rounded character contours",
       "rounded tag/chip shapes",
       "solid surfaces with one-pixel borders"
     ],
     "radii": { "structural": 12, "interactive": 8, "accent": 4, "full": 9999 },
-    "note": "Rounded + soft throughout — nothing sharp or clinical. The wordmark's roundness sets the tone."
+    "note": "Rounded + soft throughout — nothing sharp or clinical. The quokka's linework sets the tone."
   },
   "texture": {
     "register": "matte + warm (lamplit, organic)",
     "candidates": [
       "soft paper-grain / dot texture at very low opacity",
-      "the curled-r flourish as a sparing motif",
+      "small quokka-world details used only in intentional personality moments",
       "rounded tag/pill shapes"
     ],
     "note": "Provisional — explore at the pattern step. Quiet, not busy; opacities below conscious perception. Construct programmatically."
@@ -117,16 +116,14 @@
     ],
     "a11y": "Respect prefers-reduced-motion; all animations skippable."
   },
-  "logo": {
-    "primary": "logo/wordmark.svg — the wordmark IS the primary logo (per the board; no separate lockup)",
-    "wordmark": "logo/wordmark.svg (+ .mono / .mono-white)",
-    "icon": "logo/r-mark.svg (+ .mono / .mono-white) — the secondary logo, compact use",
-    "reversed": "logo/wordmark.mono-white.svg · logo/r-mark.mono-white.svg",
-    "tiles": "tiles/favicon.svg · app-icon-512.svg · social-avatar-1024.svg · tile-{linen,cocoa,clay}.svg",
-    "clearspace": "≥ the x-height of the wordmark on all sides",
-    "minIcon": "the r mark survives 16px mono (favicon floor) + knockout — verified 2026-06-11"
+  "identityAssets": {
+    "compact": "../assets/characters/_logo.svg",
+    "compactBold": "../assets/characters/_logo-bold.svg",
+    "fullBody": "../assets/characters/*.svg",
+    "filled": "../assets/characters/filled/{cocoa,green}/*.webp",
+    "rule": "The compact mark stays line art. The user's My quokka choice applies to full-body companions only."
   },
   "supersedes": {
-    "priorIdentity": "The earlier rotli direction (copper #B87A4E accent, Cabin 600, quokka-face tray icon) is RETIRED. The quokka remains the brand metaphor/voice, not necessarily the literal logo (the curled r is the mark now)."
+    "priorIdentity": "The curled-r mark, outlined wordmark vector family, and generated r-mark tiles were retired and removed from the live kit on 2026-08-15. Historical provenance cannot be imported by shipping code."
   }
 }

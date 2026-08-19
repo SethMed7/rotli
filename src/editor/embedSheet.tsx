@@ -30,10 +30,10 @@ import {
   type SheetFileMode,
 } from "../sheets/session";
 import { fileTabOpen, usePanesStore } from "../state/panes";
+import { isDarkDataTheme } from "../state/theme";
 
 function isDarkTheme(): boolean {
-  const t = document.documentElement.dataset.theme ?? "light";
-  return t === "dark" || t === "charcoal";
+  return isDarkDataTheme(document.documentElement.dataset.theme);
 }
 
 function modeOf(fileId: string): SheetFileMode {

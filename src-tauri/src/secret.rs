@@ -9,7 +9,7 @@
 //! NOTE: `src/ai/guard.ts` is a hand-maintained TS MIRROR of these patterns — the
 //! frontend can't reach into Rust, so the two sets are duplicated ON PURPOSE and
 //! must be kept in sync by hand: change a pattern here, change it there too
-//! (Seth, 2026-06-29).
+//! (the maintainer, 2026-06-29).
 //!
 //! This module also holds the SECURE-PROSE LEDGER (`blocked_for_remote`), the
 //! Rust counterpart of `containsPrivateDataOverlap` — see its own section below.

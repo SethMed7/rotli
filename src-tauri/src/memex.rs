@@ -1,6 +1,6 @@
 //! Stage 1 — the memex seam. rotli connects to (or initiates) a memex instance:
 //! the shared `identity/ personality/ wiki/ history/ chats/ inbox.md MAP.md` spine that
-//! Breve also writes to (for Seth, `~/memex-vault`).
+//! Breve also writes to (for the maintainer, `~/memex-vault`).
 //!
 //! MIRROR-NOT-IMPORT (the boundary law, see breve-runtime/docs/memex-boundary.md): rotli
 //! NEVER imports memex-vault's bun/node engine. It does file I/O here and only ever
@@ -46,7 +46,7 @@ const FOLDER_AUTHORIZATION_TTL: Duration = Duration::from_secs(5 * 60);
 pub struct FolderAuthorizations(Mutex<HashMap<PathBuf, Instant>>);
 
 impl FolderAuthorizations {
-    fn authorize(&self, path: &Path) -> Result<PathBuf, String> {
+    pub(crate) fn authorize(&self, path: &Path) -> Result<PathBuf, String> {
         let canonical = fs::canonicalize(path)
             .map_err(|e| format!("open selected folder {}: {e}", path.display()))?;
         if !canonical.is_dir() {
@@ -431,7 +431,7 @@ fn memex_write_allowed(cfg: &crate::corpus::CorpusConfig, want: &Path) -> bool {
 pub fn memex_detect(app: tauri::AppHandle) -> Result<Vec<DetectedMemex>, String> {
     // A debug shell is an isolated review workspace. Never enumerate or offer
     // the user's production brains from `tauri dev`.
-    if cfg!(debug_assertions) {
+    if crate::development_read_only(&app) {
         return Ok(Vec::new());
     }
     let mut roots: Vec<PathBuf> = Vec::new();
@@ -711,10 +711,10 @@ pub struct BrainConnect {
     pub perms: MemexPerms,
 }
 
-/// Validate + stamp a folder for use as a connected brain. Mirrors `memex_connect`
-/// minus the instance registry: refuses a non-memex, stamps `apps.rotli` only when
-/// the contract is in rotli's band, and returns the id/label/mode/perms.
-pub fn prepare_brain_connect(path: &Path) -> Result<BrainConnect, String> {
+/// Read the metadata needed to retain or connect a vault without changing it.
+/// Keeping an outgoing active vault in the switcher must not depend on being
+/// able to stamp its marker during the switch.
+pub(crate) fn brain_connect_view(path: &Path) -> Result<BrainConnect, String> {
     let card = detect_one(path);
     if card.kind != "memex" {
         return Err("That folder isn't a compatible Rotli vault (its portable format marker is missing or invalid).".into());
@@ -730,16 +730,25 @@ pub fn prepare_brain_connect(path: &Path) -> Result<BrainConnect, String> {
     } else {
         MemexPerms::ReadOnly
     };
-    // additive stamp only when we're allowed to write (in-range contract)
-    if in_range {
-        stamp_rotli(&path.join("memex.json"))?;
-    }
     Ok(BrainConnect {
         memex_id,
         label: card.label,
         mode,
         perms,
     })
+}
+
+/// Validate + stamp a folder for use as a newly connected brain. Mirrors
+/// `memex_connect` minus the instance registry: refuses a non-memex, stamps
+/// `apps.rotli` only when the contract is in rotli's band, and returns the
+/// id/label/mode/perms.
+pub fn prepare_brain_connect(path: &Path) -> Result<BrainConnect, String> {
+    let meta = brain_connect_view(path)?;
+    // additive stamp only when we're allowed to write (in-range contract)
+    if meta.perms == MemexPerms::ChatsInbox {
+        stamp_rotli(&path.join("memex.json"))?;
+    }
+    Ok(meta)
 }
 
 /// Read-only view of a folder AS a brain (no stamp, no side effects):
@@ -759,9 +768,38 @@ pub fn brain_view(path: &Path) -> Option<(String, MemexPerms)> {
     Some((id, perms))
 }
 
-/// Scaffold a FRESH memex at `root` (empty/fresh only) — the v3.6 spine + a new
-/// `mx_` memex.json stamped with `apps.rotli`. Returns the new memex id. Drives
-/// onboarding's "create a new brain" path; refuses a non-empty folder.
+/// The one root-level Markdown note Rotli owns. Keeping it outside `wiki/`
+/// makes it a removable first-run note without projecting it into Library.
+/// The corpus gate exposes this exact path and no other root document.
+pub const WELCOME_PRESET_FILE: &str = "Welcome to Rotli.md";
+
+const WELCOME_PRESET_BODY: &str = r#"# Welcome to Rotli
+
+This is a real Markdown note in your vault. Edit it, experiment here, or delete it when you no longer need it.
+
+## Things to try
+
+1. Change this sentence and press **⌘S**.
+2. Press **⌘N** to create a note.
+3. Press **⌘K** to search notes, files, chats, and actions.
+4. Type `/` on an empty line to explore Markdown blocks.
+5. Select some text and ask Rotli about it in Chat.
+6. Drop an image or file into **Assets**.
+
+## Your vault
+
+- Your files stay in the folder you chose and work in other apps.
+- **Library** is where Rotli organizes lasting notes.
+- **Assets**, **Archive**, and **Trash** are system views of this same vault.
+- This welcome note sits at the vault root, outside Library.
+
+Make it yours.
+"#;
+
+/// Scaffold a FRESH memex at `root` (empty/fresh only) — the v3.6 spine, one
+/// editable welcome note, and a new `mx_` memex.json stamped with `apps.rotli`.
+/// Returns the new memex id. Drives onboarding's "create a new brain" path;
+/// refuses a non-empty folder.
 pub fn scaffold_memex(root: &Path) -> Result<String, String> {
     if root.exists() && !dir_has_no_real_entries(root) {
         return Err("Pick an empty folder — rotli starts a fresh vault there.".into());
@@ -789,6 +827,7 @@ pub fn scaffold_memex(root: &Path) -> Result<String, String> {
         &root.join("MAP.md"),
         "# MAP\n\nThe index of this Rotli vault.\n",
     )?;
+    atomic_write(&root.join(WELCOME_PRESET_FILE), WELCOME_PRESET_BODY)?;
     // the memex is a TEXT tree; binaries live in the gitignored storage/ (referenced
     // by storage: links), and .rotli/ is rotli's rebuildable sidecar.
     atomic_write(&root.join(".gitignore"), "storage/\n.rotli/\n")?;
@@ -1037,7 +1076,7 @@ pub fn memex_rename_chat(
 /// Soft-delete a chat: move `chats/<slug>.md` → `chats/trash/<slug>.md`, a hidden
 /// subfolder `list_chats_at` never scans (it reads the top level only), so the chat
 /// leaves the sidebar but the file survives — recoverable in Finder. Stays under
-/// rotli's writable `chats/` surface. Registered root (#20). (Seth #4, 2026-07-08.)
+/// rotli's writable `chats/` surface. Registered root (#20). (the maintainer #4, 2026-07-08.)
 #[tauri::command]
 pub fn memex_delete_chat(app: tauri::AppHandle, root: String, slug: String) -> Result<(), String> {
     move_chat_to_bucket(&app, &root, &slug, "trash")
@@ -1241,7 +1280,7 @@ pub async fn memex_validate(app: tauri::AppHandle, root: String) -> Result<Valid
 }
 
 fn memex_validate_blocking(app: &tauri::AppHandle, root: &str) -> Result<ValidateReport, String> {
-    if cfg!(debug_assertions) {
+    if crate::development_read_only(app) {
         return Ok(ValidateReport {
             ok: true,
             skipped: true,
@@ -1280,15 +1319,22 @@ fn safe_validation_report(root: &Path) -> ValidateReport {
 pub async fn memex_pick_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         use tauri_plugin_dialog::DialogExt;
-        let picked = app
+        let dialog_state = app.state::<crate::NativeDialogOpen>();
+        let _native_dialog = dialog_state.begin();
+        let mut picker = app
             .dialog()
             .file()
             .set_title("Choose a Rotli vault")
-            .blocking_pick_folder();
+            .set_directory(crate::vault_location::picker_start(&app));
+        if let Some(parent) = app.get_webview_window("main") {
+            picker = picker.set_parent(&parent);
+        }
+        let picked = picker.blocking_pick_folder();
         match picked {
             Some(fp) => {
                 let path = fp.into_path().map_err(|e| e.to_string())?;
                 let canonical = app.state::<FolderAuthorizations>().authorize(&path)?;
+                crate::reject_privileged_root(&app, &canonical)?;
                 Ok(Some(canonical.to_string_lossy().to_string()))
             }
             None => Ok(None),
@@ -1304,7 +1350,7 @@ pub async fn memex_pick_folder(app: tauri::AppHandle) -> Result<Option<String>, 
 mod tests {
     use super::*;
 
-    /// Vault isolation (Seth, 2026-08-03): every chat listing and write is
+    /// Vault isolation (the maintainer, 2026-08-03): every chat listing and write is
     /// rooted — two vaults with the SAME slug never see each other's chats.
     /// (The wire commands add `registered_root` on top; this locks the fs layer.)
     #[test]
@@ -1423,6 +1469,10 @@ mod tests {
         assert!(root.join("storage").is_dir()); // the gitignored binary store
         assert!(root.join("inbox.md").is_file());
         assert!(root.join("MAP.md").is_file());
+        let welcome = fs::read_to_string(root.join(WELCOME_PRESET_FILE)).unwrap();
+        assert!(welcome.starts_with("# Welcome to Rotli\n"));
+        assert!(welcome.contains("## Things to try"));
+        assert!(welcome.contains("outside Library"));
         // refuses to scaffold over a non-empty folder
         assert!(scaffold_memex(&root).is_err());
     }

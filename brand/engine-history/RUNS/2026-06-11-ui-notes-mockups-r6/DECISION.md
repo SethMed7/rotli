@@ -1,10 +1,10 @@
 # rotli — UI/UX mockups · round 6 — Chat module + the Memory — DECISION
 
 **Date:** 2026-06-11 · **Gate:** `gate.html` (live render, kit tokens only; root pinned light)
-**Input:** Seth's calls after the one-brain discussion: Wiki renamed **the Memory** (decided), and a new
+**Input:** the maintainer's calls after the one-brain discussion: Wiki renamed **the Memory** (decided), and a new
 **Chat module** to ship *before* the Memory.
 
-## Decided this round (Seth)
+## Decided this round (the maintainer)
 
 - **Wiki → the Memory.** The corpus is the brain; modules are its fronts. Product psychology line:
   *one brain underneath — Notes writes it, Chat talks with it, the Memory recalls it.*
@@ -30,7 +30,7 @@
    embeddings/RAG + citations and retroactively grounds Chat. Inbox (old phase 5) slides after the
    Memory. ⌃1–⌃6 reserved.
 
-## Round-6 calls for Seth
+## Round-6 calls for the maintainer
 
 1. Chat module chassis + /model + slash verbs — approve?
 2. Chat ⇄ note loop (consent-only edits, two exits) — approve?
@@ -39,8 +39,8 @@
 
 ## Verdict
 
-**APPROVED — Seth, 2026-06-11 ("this is great, now let's lock in all of this").** All calls in this round are locked, including the phase-pill switcher variant, header-inline status, Proton-first order, the chat/voice designs, order v2, and pulling dictation into Notes v1.
+**APPROVED — the maintainer, 2026-06-11 ("this is great, now let's lock in all of this").** All calls in this round are locked, including the phase-pill switcher variant, header-inline status, Proton-first order, the chat/voice designs, order v2, and pulling dictation into Notes v1.
 
-**Addendum (same day):** the frame-D order is superseded — Seth promoted Voice ahead of the Memory as
+**Addendum (same day):** the frame-D order is superseded — the maintainer promoted Voice ahead of the Memory as
 well. Order v2 (Notes → Chat → Voice → Memory → Inbox → Board) is designed in
 `../2026-06-11-ui-notes-mockups-r7/`.

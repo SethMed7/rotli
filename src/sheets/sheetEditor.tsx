@@ -8,6 +8,7 @@ import { fileName } from "../lib/fileKind";
 import { corpusFileBytes, corpusFileStat, corpusFileText } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
+import { isDarkDataTheme } from "../state/theme";
 import { type Workbook, bytesFromB64, fillFromCsvRows, loadXlsx, newWorkbook } from "./codec/xlsx";
 import { parseCsvExact } from "./csv";
 import {
@@ -37,8 +38,7 @@ function currentAppTheme(): string {
 }
 
 function isDarkTheme(theme = currentAppTheme()): boolean {
-  const t = theme;
-  return t === "dark" || t === "charcoal";
+  return isDarkDataTheme(theme);
 }
 
 export default function SheetEditor({

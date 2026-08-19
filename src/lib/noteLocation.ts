@@ -1,5 +1,5 @@
 // Where a note "lives", as a short human label for the editor's location chip
-// (Seth, 2026-07-03: "I can't find where this file is"). Pure — derived from the
+// (the maintainer, 2026-07-03: "I can't find where this file is"). Pure — derived from the
 // note's folderId + whether it's referenced in Main. Main is a shortcut, so a
 // note in Main ALSO has a Brain/disk home; the label shows both ("★ Main · …").
 

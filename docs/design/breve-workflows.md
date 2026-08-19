@@ -3,7 +3,7 @@
 Status: **Stage 1 built** (2026-08-04) — read-only visualization. Stages 2–3 are
 scoped here but not built.
 
-Seth, 2026-08-04, after seeing ZenNotes' Workflows: *"in breve the different
+the maintainer, 2026-08-04, after seeing ZenNotes' Workflows: *"in breve the different
 routines are essentially workflows now so we can visually see what is happening
 and edit it along with manage with AI via a side bar which opens a chat that can
 help manage and create the workflow — keeping things very transparent, usable

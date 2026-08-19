@@ -30,6 +30,7 @@ import { RenameDialog } from "./components/renameDialog";
 import { BoardNameDialog } from "./components/boardNameDialog";
 import { Titlebar } from "./components/titlebar";
 import { WhichKey } from "./components/whichKey";
+import { VaultFolderBrowser } from "./components/vaultFolderBrowserDialog";
 import { registerDefaultActions } from "./keys/actions";
 import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/registry";
 import { hotkeyPeekDelay, useHeldModifier } from "./keys/useHeldModifier";
@@ -48,6 +49,7 @@ import {
   onSummonChat,
   onSummonSearch,
   onThemeSet,
+  onVaultChanged,
   setAppIcon,
   setDockVisible,
   setHideOnBlur,
@@ -69,6 +71,7 @@ import { activeTabOf, leaves, usePanesStore } from "./state/panes";
 import { invalidateMemex } from "./memex/useMemex";
 import { invalidateChatFolders } from "./services/chatFolders";
 import { refreshAfterExternalCorpusChange } from "./services/externalCorpusChange";
+import { refreshActiveVault } from "./state/activeVault";
 import { flushSettingsNow, runAutoRetentionMaintenance } from "./state/persist";
 import { applyQuickState } from "./state/quick";
 import { applyAccent, applySyntaxPalette, applyTheme } from "./state/theme";
@@ -171,7 +174,7 @@ function MainShell() {
   // a modal/popover owns attention, keep the deliberate hold threshold so a
   // model picker or menu does not flash the HUD during ordinary commands.
   const [whichKey, setWhichKey] = useState(false);
-  // WHAT the hold reveals is the user's call (Seth, 2026-08-04): badges pinned
+  // WHAT the hold reveals is the user's call (the maintainer, 2026-08-04): badges pinned
   // to the controls themselves (default), the original grouped panel, or off.
   const hotkeyPeek = useUiStore((s) => s.hotkeyPeek);
   useHeldModifier({
@@ -232,7 +235,7 @@ function MainShell() {
             const noteId = await createVaultCapture(targetId, body);
             if (noteId) {
               // a quick capture is a STAGED NOTE in wiki/_inbox → it shows in the
-              // one Captures surface (Seth, 2026-06-30). ⌘Enter surfaces Captures.
+              // one Captures surface (the maintainer, 2026-06-30). ⌘Enter surfaces Captures.
               await invalidateNotes();
               if (open) useUiStore.getState().setContentView("board");
             } else {
@@ -312,7 +315,7 @@ function MainShell() {
   // the daemon journaled (a proposal or an auto-applied action) — refetch the
   // journal (Activity + the sidebar badge) AND the notes an apply may have
   // moved. At Organize, stale metadata suggestions also adopt themselves
-  // (Seth, 2026-07-31: "it is working for me in the back") — same guarded
+  // (the maintainer, 2026-07-31: "it is working for me in the back") — same guarded
   // approve lane the buttons use, journaled and undoable.
   useEffect(
     () =>
@@ -329,7 +332,7 @@ function MainShell() {
     void adoptPendingAtOrganize();
   }, []);
 
-  // the ambient working signal (Seth, 2026-07-31): the daemon's narration
+  // the ambient working signal (the maintainer, 2026-07-31): the daemon's narration
   // feeds a tiny store the sidebar's footer dot reads — the Librarian's work
   // is visible from anywhere, not only inside its surface
   useEffect(
@@ -366,7 +369,7 @@ function MainShell() {
       const x = px / dpr;
       const y = py / dpr;
       const el = document.elementFromPoint(x, y) as HTMLElement | null;
-      // a CHAT under the pointer claims the images first (Seth, 2026-08-04):
+      // a CHAT under the pointer claims the images first (the maintainer, 2026-08-04):
       // before this, a drop on a chat found no editor and fell through to the
       // storage branch — the file landed in the vault and never attached.
       const chatAttach = el ? chatDropAt(el) : null;
@@ -515,7 +518,7 @@ function MainShell() {
       <main className="app-content">
         {/* Settings is the one full-surface front. Chat · Board · All-notes ·
             Recent all render inside NotesSurface's content area (contentView), so
-            the three left-menu sections stay visible (Seth, 2026-06-26). Memory is
+            the three left-menu sections stay visible (the maintainer, 2026-06-26). Memory is
             no longer a front — the brain is browsed via the Vault tree (2026-06-28). */}
         {settingsOpen ? (
           <Suspense fallback={null}>
@@ -538,21 +541,19 @@ function MainShell() {
 export default function App() {
   const theme = useUiStore((s) => s.theme);
   const themeFamily = useUiStore((s) => s.themeFamily);
-  const matchLightFamily = useUiStore((s) => s.matchLightFamily);
-  const matchDarkFamily = useUiStore((s) => s.matchDarkFamily);
   const syntaxPalette = useUiStore((s) => s.syntaxPalette);
   const accentColor = useUiStore((s) => s.accentColor);
   const accentHue = useUiStore((s) => s.accentHue);
+  const quokkaCompanionEnabled = useUiStore((s) => s.quokkaCompanionEnabled);
+  const quokkaStyle = useUiStore((s) => s.quokkaStyle);
+  const quokkaCustomHue = useUiStore((s) => s.quokkaCustomHue);
+  const quokkaLineColor = useUiStore((s) => s.quokkaLineColor);
+  const quokkaAccessory = useUiStore((s) => s.quokkaAccessory);
+  const quokkaAccessoryHue = useUiStore((s) => s.quokkaAccessoryHue);
+  const quokkaIdlePose = useUiStore((s) => s.quokkaIdlePose);
   const surface = surfaceFromUrl();
 
-  useEffect(
-    () =>
-      applyTheme(theme, themeFamily, {
-        light: matchLightFamily,
-        dark: matchDarkFamily,
-      }),
-    [theme, themeFamily, matchLightFamily, matchDarkFamily],
-  );
+  useEffect(() => applyTheme(theme, themeFamily), [theme, themeFamily]);
   useEffect(() => applySyntaxPalette(syntaxPalette), [syntaxPalette]);
   useEffect(() => applyAccent(accentColor, accentHue), [accentColor, accentHue]);
 
@@ -565,22 +566,45 @@ export default function App() {
     emitThemeSet({
       theme,
       themeFamily,
-      matchLightFamily,
-      matchDarkFamily,
       accentColor,
       accentHue,
+      quokkaCompanionEnabled,
+      quokkaStyle,
+      quokkaCustomHue,
+      quokkaLineColor,
+      quokkaAccessory,
+      quokkaAccessoryHue,
+      quokkaIdlePose,
     });
-  }, [surface, theme, themeFamily, matchLightFamily, matchDarkFamily, accentColor, accentHue]);
+  }, [
+    surface,
+    theme,
+    themeFamily,
+    accentColor,
+    accentHue,
+    quokkaCompanionEnabled,
+    quokkaStyle,
+    quokkaCustomHue,
+    quokkaLineColor,
+    quokkaAccessory,
+    quokkaAccessoryHue,
+    quokkaIdlePose,
+  ]);
   useEffect(() => {
     if (surface === "main") return;
     return onThemeSet((p) =>
       useUiStore.setState({
         theme: p.theme,
         themeFamily: p.themeFamily,
-        matchLightFamily: p.matchLightFamily,
-        matchDarkFamily: p.matchDarkFamily,
         accentColor: p.accentColor,
         accentHue: p.accentHue,
+        quokkaCompanionEnabled: p.quokkaCompanionEnabled,
+        quokkaStyle: p.quokkaStyle,
+        quokkaCustomHue: p.quokkaCustomHue,
+        quokkaLineColor: p.quokkaLineColor,
+        quokkaAccessory: p.quokkaAccessory,
+        quokkaAccessoryHue: p.quokkaAccessoryHue,
+        quokkaIdlePose: p.quokkaIdlePose,
       }),
     );
   }, [surface]);
@@ -598,6 +622,16 @@ export default function App() {
   // the quick-access set is kept in step across webviews (the same pattern) —
   // the quick window emits its edits, the main window records + persists them
   useEffect(() => onQuickSet(applyQuickState), []);
+
+  // A vault switch rebinds the live Rust default store. Keep all native windows
+  // alive and replace only their vault-scoped caches/projections.
+  useEffect(
+    () =>
+      onVaultChanged(() => {
+        void refreshActiveVault();
+      }),
+    [],
+  );
 
   useEffect(() => {
     if (surface !== "main") return;
@@ -618,5 +652,10 @@ export default function App() {
 
   if (surface === "capture") return <CaptureCard />;
   if (surface === "quick") return <QuickNote />;
-  return <MainShell />;
+  return (
+    <>
+      <MainShell />
+      <VaultFolderBrowser />
+    </>
+  );
 }

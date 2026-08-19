@@ -1,4 +1,4 @@
-// Heading folding (Seth, 2026-08-04, from ZenNotes): collapse a section down to
+// Heading folding (the maintainer, 2026-08-04, from ZenNotes): collapse a section down to
 // its heading so a long note reads as an outline.
 //
 // This file is the CodeMirror wiring only — the range math lives in

@@ -2,7 +2,7 @@
 // livePreview (which is DOM/CM-bound) so the shape is unit-testable and lives in
 // ONE place. Mirrored by .rotli-marker / .rotli-check in styles/editor.css.
 //
-// The shape (Seth, 2026-08-01, comparing rotli to Obsidian):
+// The shape (the maintainer, 2026-08-01, comparing rotli to Obsidian):
 //   • every nesting level shifts the WHOLE item right by exactly one STEP, so
 //     depth reads as a clean ladder instead of loose, drifting spacing;
 //   • the marker (bullet/number/checkbox) hangs in a narrow column right next to

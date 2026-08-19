@@ -14,8 +14,9 @@ import { readFileSync } from "node:fs";
 // @vitejs/plugin-react 6 is the Babel-free React plugin for the Vite 8 line: it
 // runs the same oxc/Rolldown-native transform the retired plugin-react-oxc did
 // (its Babel peers are optional and not installed), so no deprecation notice.
-// Dropping Babel also drops the React Compiler until oxc ships native support
-// (accepted; the memoization findings were hand-fixed in #36/#37).
+// Dropping Babel also keeps the React Compiler out of the production transform
+// (accepted; the memoization findings were hand-fixed in #36/#37). Oxlint's
+// lint-only compiler analysis is separately ratcheted by check:react-compiler.
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 

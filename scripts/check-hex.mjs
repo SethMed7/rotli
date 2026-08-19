@@ -1,7 +1,7 @@
 // check-hex — fails if any raw color literal appears under src/, excluding
 // src/brand/ (the frozen kit) and src/styles/themes.css (the app's additional
 // theme token sets — a token-DEFINITION file, same role as the kit's colors.css;
-// Seth 2026-06-12). Those two are the only places hex may live.
+// the maintainer 2026-06-12). Those two are the only places hex may live.
 //
 // Also bans FUNCTIONAL color literals (rgb/rgba/hsl/hsla) across the same walk
 // (added 2026-07-18): check-design-system.mjs bans them only inside

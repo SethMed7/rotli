@@ -1,4 +1,4 @@
-// Remembered embed heights (Seth, 2026-07-29: "when I resize an embedded
+// Remembered embed heights (the maintainer, 2026-07-29: "when I resize an embedded
 // Excalidraw board it should remember"). Keyed by the embed's file id, so the
 // height survives the widget rebuilds that reveal-on-caret causes AND app
 // restarts. UI preference only — rebuildable, never part of the note's text

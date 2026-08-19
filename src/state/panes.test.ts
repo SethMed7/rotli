@@ -3,7 +3,7 @@
 // reorder must land the tab exactly where the preview line showed, in both
 // directions. (Cross-pane moves are exercised via the same clamped-splice path.)
 
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import type { LeafNode, PaneNode, Tab } from "../types";
 import { useNavHistory } from "./navHistory";
@@ -20,6 +20,7 @@ import {
   usePanesStore,
   keepTabsFor,
 } from "./panes";
+import { useUiStore } from "./ui";
 
 const tab = (id: string): Tab => ({
   id,
@@ -102,7 +103,7 @@ describe("moveTab — same-pane reorder (visual-slot semantics)", () => {
   });
 });
 
-// The standard editor open model (Seth, 2026-07-03): clicking a file in the
+// The standard editor open model (the maintainer, 2026-07-03): clicking a file in the
 // sidebar ACTIVATES its open tab if there is one, else opens a NEW tab — it must
 // never REPLACE the tab you're working in. ⌘-click / ⌘T force a fresh tab.
 describe("openNote — reuse-or-new-tab, never replace", () => {
@@ -357,6 +358,30 @@ describe("activateSurface + openNavTarget — replay reuses open tabs anywhere",
   });
 });
 
+describe("one active vault in panes", () => {
+  beforeEach(() => {
+    useUiStore.setState({ paneVaultMode: "single", rowActionError: null });
+    usePanesStore.setState({ root: leaf("p1", ["A"]), focusedPaneId: "p1" });
+  });
+  afterEach(() => useUiStore.setState({ paneVaultMode: "single", rowActionError: null }));
+
+  test("a linked chat is blocked without closing existing work", () => {
+    const before = findLeaf(usePanesStore.getState().root, "p1")?.tabs;
+    usePanesStore.getState().openChat("daily", { vaultId: "project-two" });
+    expect(findLeaf(usePanesStore.getState().root, "p1")?.tabs).toEqual(before);
+    expect(useUiStore.getState().rowActionError).toContain("another vault");
+  });
+
+  test("a linked note is blocked without closing existing work", () => {
+    const before = findLeaf(usePanesStore.getState().root, "p1")?.tabs;
+
+    usePanesStore.getState().openNote("project-two:wiki/linked.md");
+
+    expect(findLeaf(usePanesStore.getState().root, "p1")?.tabs).toEqual(before);
+    expect(useUiStore.getState().rowActionError).toContain("another vault");
+  });
+});
+
 // P0 sweep 2026-07-28: Activity must APPEND like every surface (it was the one
 // opener that mutated the active tab in place, eating the note you were on),
 // Ctrl+Shift+Tab cycles backward, and "Close tabs to the right" needs a pure
@@ -380,6 +405,20 @@ describe("openActivity appends, never replaces", () => {
     const pane = findLeaf(usePanesStore.getState().root, "p1");
     expect(pane?.tabs.length).toBe(2);
     expect(pane?.tabs.find((t) => t.id === pane.activeTabId)?.surfaceKind).toBe("activity");
+  });
+});
+
+describe("openBrowser appends a transient browser surface", () => {
+  beforeEach(() => {
+    usePanesStore.setState({ root: leaf("p1", ["A"]), focusedPaneId: "p1" });
+    useUiStore.setState({ sidebarMode: "notes", contentView: "panes", breveDirty: false });
+  });
+
+  test("keeps the current note and activates a fresh browser tab", () => {
+    usePanesStore.getState().openBrowser("https://example.com/");
+    const pane = findLeaf(usePanesStore.getState().root, "p1");
+    expect(pane?.tabs.map((tab) => tab.surfaceKind)).toEqual(["note", "browser"]);
+    expect(pane?.tabs.find((tab) => tab.id === pane.activeTabId)?.surfaceKind).toBe("browser");
   });
 });
 
@@ -440,7 +479,7 @@ describe("boardTabOpen", () => {
   });
 });
 
-// The chat-note split repro (Seth, 2026-07-30: "only the note should open to a
+// The chat-note split repro (the maintainer, 2026-07-30: "only the note should open to a
 // new pane, not duplicate the chat"): splitting to the side must carve the new
 // pane WITH exactly the passed tab — splitRight() alone duplicates the active
 // tab, which is what put a chat copy beside the opened note.
@@ -586,7 +625,7 @@ describe("the closed-tab stack (⌘⇧T)", () => {
   });
 });
 
-// Seth, 2026-07-28: "I should be able to close all tabs and have an empty
+// the maintainer, 2026-07-28: "I should be able to close all tabs and have an empty
 // state" — the lone pane may go EMPTY instead of silently refusing the close.
 describe("closing the last tab of the lone pane", () => {
   beforeEach(() => {
@@ -641,7 +680,7 @@ describe("openToSide", () => {
   });
 });
 
-// preview tabs (Seth, 2026-07-28: "every click shouldn't open a new tab") —
+// preview tabs (the maintainer, 2026-07-28: "every click shouldn't open a new tab") —
 // browsing reuses ONE preview tab; re-clicking the same item keeps it; edits
 // keep it; ⌘T still appends a permanent tab.
 describe("preview tabs", () => {
@@ -694,7 +733,7 @@ describe("preview tabs", () => {
   });
 });
 
-// The ONE size law for a split (Seth, 2026-08-01: "the way everything resizes
+// The ONE size law for a split (the maintainer, 2026-08-01: "the way everything resizes
 // and fits as a whole"). Both the divider drag and the live re-fit go through
 // clampSplitSizes, so a pane can never be squeezed under the height its own
 // chrome needs — and when the box genuinely cannot hold every child at the

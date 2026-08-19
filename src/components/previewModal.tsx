@@ -1,4 +1,4 @@
-// Quick Look (Seth, 2026-07-29): a modal PEEK at an item without opening its
+// Quick Look (the maintainer, 2026-07-29): a modal PEEK at an item without opening its
 // full surface — Space in the System browser or "Preview" in the row menu.
 // A peek is never the workspace (the preview-catalog law stands): the Open
 // button hands off to the item's real surface, and formats without a cheap

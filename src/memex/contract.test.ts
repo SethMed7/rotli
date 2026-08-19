@@ -456,13 +456,13 @@ describe("composeNote (v3.5 note contract — byte-exact)", () => {
   });
   test("multi-shelf, empty reach (owner-only), and a set area", () => {
     const out = composeNote(
-      { id: ID, title: "x", shelf: ["Myela/Payments", "Work"], reach: [], area: "projects/myela" },
+      { id: ID, title: "x", shelf: ["Northstar/Payments", "Work"], reach: [], area: "projects/northstar" },
       "# x\n",
       DATE,
     );
-    expect(out).toContain("shelf: [Myela/Payments, Work]\n");
+    expect(out).toContain("shelf: [Northstar/Payments, Work]\n");
     expect(out).toContain("reach: []\n");
-    expect(out).toContain("area: projects/myela\n");
+    expect(out).toContain("area: projects/northstar\n");
   });
   test("secure creation writes policy metadata without granting local AI", () => {
     const out = composeNote(

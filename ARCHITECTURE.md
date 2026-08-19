@@ -43,6 +43,18 @@ and a composition root. Exceptions must be named and enforced in
 [`scripts/check-architecture.mjs`](scripts/check-architecture.mjs), not implied
 by directory folklore.
 
+## React synchronization boundary
+
+React effects synchronize presentation with an external system or own an
+external subscription lifecycle; render-derived data does not round-trip
+through effect-owned state. A cross-capability external signal with multiple
+consumers gets one named hook over `useSyncExternalStore` (the shared visible
+wall clock in `src/lib/useNow.ts` is the reference shape) instead of one timer
+or listener per component. React Compiler remains outside the production build.
+Its lint-only Rules-of-React analysis is ratcheted by
+`bun run check:react-compiler`: measured existing diagnostics may retire, but a
+per-file/category increase fails the required `lint` chain.
+
 ## System map
 
 | Area | Ownership |

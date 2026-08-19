@@ -1,6 +1,6 @@
 // The checkbox grammar — ONE definition of what a task's mark may be.
 //
-// rotli understands three: `[ ]` open · `[/]` in progress · `[x]` done (Seth,
+// rotli understands three: `[ ]` open · `[/]` in progress · `[x]` done (the maintainer,
 // 2026-08-04, from ZenNotes: "offer partial complete"). `[/]` is the
 // convention Obsidian's task plugins and ZenNotes already use, so a note
 // written in one reads correctly in the other.

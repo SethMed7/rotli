@@ -11,6 +11,10 @@ describe("Univer app-theme mapping", () => {
   test("paper and charcoal use the monochrome family", () => {
     expect(univerNeutralForTheme("paper")).toBe("mono");
     expect(univerNeutralForTheme("charcoal")).toBe("mono");
+    expect(univerNeutralForTheme("ocean-dark")).toBe("mono");
+    expect(univerNeutralForTheme("grove-light")).toBe("mono");
+    expect(univerNeutralForTheme("iris-dark")).toBe("mono");
+    expect(univerNeutralForTheme("midnight-dark")).toBe("mono");
   });
 
   test("the branded light/dark pair stays warm", () => {

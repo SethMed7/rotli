@@ -1,4 +1,4 @@
-// Sidebar expansion-state locks (Seth, 2026-07-27: "collapse all isn't
+// Sidebar expansion-state locks (the maintainer, 2026-07-27: "collapse all isn't
 // working") — collapse-all folds the TREES (folders + default-open rows) but
 // must never touch the "sec:" ZONE fold states: replacing the whole map wiped
 // the persisted sec:* entries back to default-open, so pressing collapse-all
@@ -8,14 +8,34 @@
 
 import { beforeEach, describe, expect, test } from "bun:test";
 
-import { SEC_SYSTEM, SOLID_THEMES, THEME_FAMILY_PRESENTATIONS, useUiStore } from "./ui";
+import { QUOKKA_STYLES } from "../brand/quokka";
+import {
+  CHAT_NAVIGATOR_STYLES,
+  resetUiForVaultSwitch,
+  SEC_SYSTEM,
+  SOLID_THEMES,
+  THEME_FAMILY_PRESENTATIONS,
+  useUiStore,
+} from "./ui";
 
 describe("theme presentation", () => {
-  test("organizes the same four environments as two families with light and dark modes", () => {
-    expect(THEME_FAMILY_PRESENTATIONS.map((theme) => theme.label)).toEqual(["Paper & Charcoal", "Rotli"]);
+  test("organizes every environment as a complete light and dark family", () => {
+    expect(THEME_FAMILY_PRESENTATIONS.map((theme) => theme.label)).toEqual([
+      "Paper & Charcoal",
+      "Rotli",
+      "Ocean",
+      "Grove",
+      "Iris",
+      "Midnight",
+    ]);
     expect(
       new Set(THEME_FAMILY_PRESENTATIONS.flatMap(({ family }) => [`${family}:light`, `${family}:dark`])),
     ).toEqual(new Set(SOLID_THEMES.map(({ family, mode }) => `${family}:${mode}`)));
+  });
+
+  test("offers only canonical companion and long-chat navigator treatments", () => {
+    expect(QUOKKA_STYLES).toEqual(["line", "cocoa", "green", "ocean", "iris", "berry", "amber", "custom"]);
+    expect(CHAT_NAVIGATOR_STYLES).toEqual(["lines", "dots", "paws", "ears"]);
   });
 });
 
@@ -45,7 +65,7 @@ describe("collapseAllDests", () => {
     expect(d[SEC_SYSTEM]).toBe(true); // an open zone stays exactly as the user left it
   });
 
-  // Two-stage collapse (Seth, 2026-07-31): folders first, the System zone second.
+  // Two-stage collapse (the maintainer, 2026-07-31): folders first, the System zone second.
   test("stage 1 folds trees only; stage 2 folds the System zone", () => {
     const ids = ["main:Review", "chatfolder:abc"];
     useUiStore.getState().collapseAllDests(ids);
@@ -88,5 +108,16 @@ describe("sidebarView — the Home/Chat fronts (2026-08-01)", () => {
     expect(useUiStore.getState().sidebarView).toBe("home");
     useUiStore.getState().setSidebarView("chat");
     expect(useUiStore.getState().sidebarView).toBe("chat");
+  });
+
+  test("a vault switch always returns to the Home notes workspace", () => {
+    useUiStore.setState({ sidebarMode: "breve", sidebarView: "chat", contentView: "allChats" });
+
+    resetUiForVaultSwitch();
+
+    const state = useUiStore.getState();
+    expect(state.sidebarMode).toBe("notes");
+    expect(state.sidebarView).toBe("home");
+    expect(state.contentView).toBe("panes");
   });
 });

@@ -32,7 +32,7 @@ Implement `2026-07-26-vault-vs-brain.md` exactly:
    **Raw** ("just your files, organized by you"). Same format either way.
 5. **Acceptance gate before the switch reaches the UI**: toggle a COPY of a
    real populated memex raw-and-back → zero file diffs, empty journal.
-   Seth's live memex is never an implementation or test target.
+   the maintainer's live memex is never an implementation or test target.
 
 ## Phase 2 — per-vault Brain identity  *(1 session)*
 
@@ -128,13 +128,13 @@ zoom, quick ids, per-note Aa styles are ISOLATED by construction. Findings:
    toggle (privacy-adjacent; narrow). Fix is vault-qualifying the key when the
    settings split happens.
 
-## Phase 4 — consolidation completion  *(Seth's explicit go, per item)*
+## Phase 4 — consolidation completion  *(the maintainer's explicit go, per item)*
 
 - App copy + docs finish adopting **Vault** as the public word (the memex term
   stays internal/contract-level where renaming would churn ids or paths).
-- External steps, each individually Seth-authorized: archive `SethMed7/memex`,
+- External steps, each individually the maintainer-authorized: archive `SethMed7/memex`,
   repoint memex-vault tooling references, update CLAUDE.md guidance.
-  **Executed 2026-07-27 (Seth's go, all three):** `SethMed7/memex` is archived
+  **Executed 2026-07-27 (the maintainer's go, all three):** `SethMed7/memex` is archived
   read-only with a retirement notice pointing at rotli (its local clone
   `~/memex` stays as reference); memex-vault's tooling needed **no** repointing
   — its contracts are self-contained and only a historical CHANGELOG entry
@@ -155,5 +155,5 @@ zoom, quick ids, per-note Aa styles are ISOLATED by construction. Findings:
 ## Sequencing
 
 1 → 2 → C (paper-cut sweep as the palate cleanser) → 3 (spike) → 4 + A/D/E as
-Seth green-lights the external/brand pieces. F stays backlog until the stage
+the maintainer green-lights the external/brand pieces. F stays backlog until the stage
 lands.

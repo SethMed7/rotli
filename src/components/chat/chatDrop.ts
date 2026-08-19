@@ -1,4 +1,4 @@
-// Where a dropped image goes when it lands on a CHAT (Seth, 2026-08-04:
+// Where a dropped image goes when it lands on a CHAT (the maintainer, 2026-08-04:
 // "drag and dropping images into a chat isn't working — they don't attach").
 //
 // The window's drag-drop listener lives in app.tsx and gets OS PATHS, not a

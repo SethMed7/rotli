@@ -1,4 +1,4 @@
-// All chats (Seth, 2026-07-01): a searchable LIST of every chat — the Chat-front
+// All chats (the maintainer, 2026-07-01): a searchable LIST of every chat — the Chat-front
 // twin of All notes. Title on the left, source/attached hint on the right; a
 // full-width search at the top. Click a row to open the chat in a pane.
 
@@ -47,7 +47,7 @@ export function AllChatsSurface() {
 
       {results.length === 0 ? (
         <div className="list-empty">
-          {chats.length === 0 && <Character name="chat" size={104} className="be-quokka" />}
+          {chats.length === 0 && <Character name="listening" size={104} className="be-quokka" />}
           <p className="be-title">{chats.length === 0 ? "No chats yet" : "No matches"}</p>
           <p className="be-sub">
             {chats.length === 0
@@ -63,7 +63,7 @@ export function AllChatsSurface() {
                 <button
                   type="button"
                   className="chatlist-row"
-                  onClick={() => openChat(c.slug)}
+                  onClick={() => openChat(c.slug, activeMemex ? { vaultId: activeMemex.id } : undefined)}
                   title={c.title || c.slug}
                 >
                   <ChatGlyph size={15} className="chatlist-icon" />

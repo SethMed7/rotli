@@ -1,6 +1,13 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useReducer, useRef } from "react";
 
-import { promptMenuOffset, promptPreview, type PromptLocation } from "./chatPromptNavigatorModel";
+import { useUiStore } from "../../state/ui";
+import {
+  promptMenuOffset,
+  promptNavigatorTransition,
+  promptPreview,
+  promptStateClassName,
+  type PromptLocation,
+} from "./chatPromptNavigatorModel";
 
 export function ChatPromptNavigator({
   prompts,
@@ -11,10 +18,13 @@ export function ChatPromptNavigator({
   activeMessageIndex: number | null;
   onJump: (messageIndex: number) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [previewMessageIndex, setPreviewMessageIndex] = useState<number | null>(null);
+  const navigatorStyle = useUiStore((s) => s.chatNavigatorStyle);
+  const [{ open, previewMessageIndex }, dispatch] = useReducer(promptNavigatorTransition, {
+    open: false,
+    previewMessageIndex: null,
+  });
   const rootRef = useRef<HTMLElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const closeTimerRef = useRef<number | null>(null);
 
@@ -25,18 +35,21 @@ export function ChatPromptNavigator({
   };
   const openMenu = () => {
     cancelScheduledClose();
-    setOpen(true);
+    dispatch({ type: "open" });
+  };
+  const previewPrompt = (messageIndex: number) => {
+    cancelScheduledClose();
+    dispatch({ type: "preview", messageIndex });
   };
   const closeMenu = () => {
     cancelScheduledClose();
-    setPreviewMessageIndex(null);
-    setOpen(false);
+    dispatch({ type: "close" });
   };
   const scheduleClose = () => {
     cancelScheduledClose();
     closeTimerRef.current = window.setTimeout(() => {
       closeTimerRef.current = null;
-      setOpen(false);
+      dispatch({ type: "close" });
     }, 180);
   };
 
@@ -114,29 +127,34 @@ export function ChatPromptNavigator({
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) scheduleClose();
       }}
     >
-      <button
-        type="button"
-        ref={triggerRef}
-        className={open ? "chat-prompt-trigger open" : "chat-prompt-trigger"}
-        aria-label="Jump to an earlier prompt"
-        aria-expanded={open}
-        onClick={() => {
-          cancelScheduledClose();
-          setOpen((value) => !value);
-        }}
-      >
+      <div ref={triggerRef} className={`chat-prompt-trigger ${navigatorStyle}${open ? " open" : ""}`}>
         {prompts.slice(-7).map((prompt) => (
-          <span
+          <button
+            type="button"
             key={prompt.messageIndex}
-            className={[
-              prompt.messageIndex === activeMessageIndex ? "active" : "",
-              prompt.messageIndex === previewMessageIndex ? "preview" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          />
+            className={`chat-prompt-marker ${
+              promptStateClassName(prompt.messageIndex, activeMessageIndex, previewMessageIndex) ?? ""
+            }`.trimEnd()}
+            aria-label={`Preview prompt: ${promptPreview(prompt.text, 48)}`}
+            aria-current={prompt.messageIndex === activeMessageIndex ? "location" : undefined}
+            aria-expanded={open}
+            aria-haspopup="true"
+            onPointerEnter={() => previewPrompt(prompt.messageIndex)}
+            onFocus={() => previewPrompt(prompt.messageIndex)}
+            onClick={() => previewPrompt(prompt.messageIndex)}
+          >
+            <span aria-hidden="true">
+              {navigatorStyle === "paws" && (
+                <>
+                  <i />
+                  <i />
+                  <i />
+                </>
+              )}
+            </span>
+          </button>
         ))}
-      </button>
+      </div>
       {open && (
         <div className="chat-prompt-menu" ref={menuRef} aria-label="Jump to prompt">
           <div className="chat-prompt-list">
@@ -144,12 +162,12 @@ export function ChatPromptNavigator({
               <button
                 type="button"
                 key={prompt.messageIndex}
-                className={prompt.messageIndex === activeMessageIndex ? "active" : undefined}
-                title={prompt.text}
-                onPointerEnter={() => setPreviewMessageIndex(prompt.messageIndex)}
-                onPointerLeave={() => setPreviewMessageIndex(null)}
-                onFocus={() => setPreviewMessageIndex(prompt.messageIndex)}
-                onBlur={() => setPreviewMessageIndex(null)}
+                className={promptStateClassName(prompt.messageIndex, activeMessageIndex, previewMessageIndex)}
+                aria-current={prompt.messageIndex === activeMessageIndex ? "location" : undefined}
+                onPointerEnter={() => previewPrompt(prompt.messageIndex)}
+                onPointerLeave={() => dispatch({ type: "clear-preview" })}
+                onFocus={() => previewPrompt(prompt.messageIndex)}
+                onBlur={() => dispatch({ type: "clear-preview" })}
                 onClick={() => {
                   onJump(prompt.messageIndex);
                   closeMenu();
