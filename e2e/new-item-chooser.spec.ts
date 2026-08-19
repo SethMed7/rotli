@@ -34,9 +34,9 @@ test("the chooser answers a bare digit press — no click needed", async ({ page
   await page.locator(".prow", { hasText: "New tab (choose type)" }).click();
 
   // the surface takes focus on open, so the digit lands without a click;
-  // 2 = Markdown note (1 is Chat)
+  // 3 = Markdown note (1 is Chat, 2 is the private Browser)
   await expect(page.locator(".ni-surface")).toBeVisible();
-  await page.keyboard.press("2");
+  await page.keyboard.press("3");
   await expect(page.locator(".ni-surface")).toHaveCount(0);
   await expect(page.locator(".cm-content").last()).toBeVisible();
 });

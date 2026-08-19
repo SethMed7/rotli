@@ -12816,7 +12816,7 @@ mod tests {
         assert_eq!(trashed.folder_id, "Trash");
         assert_eq!(trashed.origin.as_deref(), Some(""));
         assert!(!root.join(crate::memex::WELCOME_PRESET_FILE).exists());
-        assert!(root.join(&store.path_of(&id).unwrap()).is_file());
+        assert!(root.join(store.path_of(&id).unwrap()).is_file());
     }
 
     #[test]
