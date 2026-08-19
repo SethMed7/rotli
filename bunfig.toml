@@ -3,3 +3,8 @@
 # `window`/`document` at import time pick their non-Tauri (in-memory) branch.
 [test]
 preload = ["./test-setup.ts"]
+
+[install]
+# Hold new direct and transitive resolutions for three days so a compromised
+# release has time to be discovered. Frozen lockfile installs are unchanged.
+minimumReleaseAge = 259200

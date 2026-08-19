@@ -1,4 +1,4 @@
-// The ⌘N chooser tab (Seth, 2026-07-29): "cmd+n would be a new tab but no
+// The ⌘N chooser tab (the maintainer, 2026-07-29): "cmd+n would be a new tab but no
 // type selected — you have to choose board / md / doc etc." A blank tab
 // offering every creatable kind; picking one closes this tab and opens the
 // created item in its real surface. Esc (⌘W) closes like any tab.
@@ -11,7 +11,6 @@
 import { useEffect, useRef } from "react";
 
 import { dispatch } from "../keys/registry";
-import { openUrl } from "../lib/tauri";
 import { createManagedItem, requestManagedBoardCreation } from "../newItems/composition";
 import { NEW_ITEM_DEFINITIONS, type NewItemKind } from "../newItems/model";
 import { usePanesStore } from "../state/panes";
@@ -70,11 +69,11 @@ export function NewItemSurface({ paneId, tabId }: { paneId: string; tabId: strin
     {
       digit: "2",
       label: "Browser",
-      description: "Open a new page in your default web browser.",
+      description: "Browse in-app without keeping cookies or history.",
       glyph: <BrowserGlyph size={22} />,
       run: () => {
         close();
-        void openUrl("https://www.google.com/");
+        usePanesStore.getState().openBrowser();
       },
     },
     ...NEW_ITEM_DEFINITIONS.map((def, index) => ({

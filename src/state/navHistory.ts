@@ -1,4 +1,4 @@
-// Back / Forward navigation history over OPENED NOTES (Seth #14, 2026-07-03) —
+// Back / Forward navigation history over OPENED NOTES (the maintainer #14, 2026-07-03) —
 // the Google-style trail the top-bar ‹ › buttons walk. A linear stack with a
 // cursor: opening a note truncates any forward entries and pushes; Back/Forward
 // move the cursor and re-open the note WITHOUT recording (the suppress flag, or

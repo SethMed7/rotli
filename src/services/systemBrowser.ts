@@ -1,4 +1,4 @@
-// The System browser (Finder rework 2026-07-27, from Seth's screenshots): the
+// The System browser (Finder rework 2026-07-27, from the maintainer's screenshots): the
 // browser is SPATIAL, exactly like a traditional Finder — you are IN one
 // folder and see only its direct contents: subfolders rendered as folders,
 // notes as items. You enter a folder to descend, climb back by breadcrumb.
@@ -38,7 +38,7 @@ export function folderSegmentLabel(seg: string): string {
 }
 
 /** The Library's SYSTEM LANES — real directories that are NOT browsable
- * knowledge areas, hidden from the Library grid (Seth, 2026-07-30: they
+ * knowledge areas, hidden from the Library grid (the maintainer, 2026-07-30: they
  * rendered as broken-looking empty tiles). `wiki/_inbox` is the capture
  * staging lane whose notes surface through the Captures front (sidebar +
  * board); `wiki/_templates` is contract-owned machine plumbing (the chat
@@ -67,7 +67,7 @@ const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensiti
  * memex the projection renames lifecycle lanes (disk `storage/…` surfaces as
  * destination "Storage") while `diskFolderId` keeps the on-disk lowercase —
  * comparing them raw made the Assets/Archive/Trash browsers read as empty
- * beside a real count (Seth, 2026-07-28: "Assets shows empty but a count of
+ * beside a real count (the maintainer, 2026-07-28: "Assets shows empty but a count of
  * 422"). A path already under the prefix passes through; a case-twin first
  * segment re-roots onto the prefix; anything else surfaces AT the root
  * rather than vanishing. */
@@ -166,7 +166,7 @@ export function breadcrumbOf(
   return crumbs;
 }
 
-/** Finder's Kind column — extension-aware for files (Seth, 2026-07-28:
+/** Finder's Kind column — extension-aware for files (the maintainer, 2026-07-28:
  * "show file type"), so a PDF says PDF, not the useless "File". */
 const FILE_KINDS: Record<string, string> = {
   pdf: "PDF",

@@ -118,7 +118,7 @@ fn relocate_legacy_bundle(home: &Path, backup_dir: &Path) -> Result<Option<PathB
 /// Install/update executable runtime code while preserving mutable data.
 /// The vault-agnostic Breve defaults dir (app data, outside every vault):
 /// saves mirror INTO it, fresh vault homes seed FROM it — "configurations can
-/// be separate but default should be same" (Seth, 2026-07-31). Both sides are
+/// be separate but default should be same" (the maintainer, 2026-07-31). Both sides are
 /// best-effort: defaults sharing must never fail a save or a vault open.
 fn shared_defaults_dir(app: &AppHandle) -> Option<PathBuf> {
     app.path()
@@ -137,7 +137,7 @@ pub fn mirror_shared_default(app: &AppHandle, name: &str, source: &Path) {
     let _ = fs::copy(source, dir.join(name));
 }
 
-/// Seed a vault's Breve from the vault-agnostic defaults (Seth, 2026-07-31:
+/// Seed a vault's Breve from the vault-agnostic defaults (the maintainer, 2026-07-31:
 /// "configurations can be separate but default should be same") — copy-if-
 /// absent only, so a diverged vault keeps its own values forever. Callers
 /// control ORDER: at takeover this runs AFTER the legacy migration, so the

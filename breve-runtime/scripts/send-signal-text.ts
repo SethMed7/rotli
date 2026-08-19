@@ -1,15 +1,16 @@
 #!/usr/bin/env bun
+import { appendFileSync, mkdirSync } from "node:fs";
 /**
- * Send a text Signal message to Seth — used by the lunch/night brief jobs.
+ * Send a text Signal message to the maintainer — used by the lunch/night brief jobs.
  * Usage: bun send-signal-text.ts --file <markdown path> [--prefix "🥪 Title"]
  *        bun send-signal-text.ts --message "text"
  * Markdown is lightly flattened for chat (headers → ▌HEADER, bold/links cleaned).
  * Logs the send into the daemon transcript so follow-up chat has context.
  */
 import { join } from "node:path";
-import { appendFileSync, mkdirSync } from "node:fs";
-import { BREVE } from "./paths";
+
 import { claimDelivery, type DeliveryClaim } from "./delivery-claim";
+import { BREVE } from "./paths";
 import { safeLockKey } from "./process-lock";
 import { effectiveTz, loadSettings, todayIn } from "./timectx";
 

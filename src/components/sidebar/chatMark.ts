@@ -1,4 +1,4 @@
-// The mark on the left of a chat row (Seth, 2026-08-04: "the little chat icon
+// The mark on the left of a chat row (the maintainer, 2026-08-04: "the little chat icon
 // on the left isn't needed… because all are chats, so having it doesn't make
 // sense anymore — do like the model logo or something else to make this more
 // intuitive and usable").

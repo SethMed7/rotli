@@ -4,7 +4,7 @@ Status: **BUILT** (2026-08-01). Scope: the **local** model lane only
 (`chat_messages` against a loopback endpoint). Claude / Codex / Gemini ride
 provider-side capacity and are untouched by everything below.
 
-Seth's ask, verbatim: *"for opening local and doing multiple just have guard
+the maintainer's ask, verbatim: *"for opening local and doing multiple just have guard
 rails against compute — example I try to open a third it will mention there
 isn't enough compute or something and say message is queued but I can
 prioritize it. This needs to be based on guard rails though not set numbers."*

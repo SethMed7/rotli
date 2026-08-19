@@ -1,4 +1,4 @@
-// Block structure for a chat message (generative UI, Seth 2026-08-03: replies
+// Block structure for a chat message (generative UI, the maintainer 2026-08-03: replies
 // and the notes a chat builds may use tables and diagrams — and the chat must
 // SHOW them). Pure text → blocks; the surface renders each kind. Source of
 // truth stays the transcript markdown — this is display only, so anything the

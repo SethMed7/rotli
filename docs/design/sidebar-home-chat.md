@@ -1,6 +1,6 @@
 # Sidebar IA: Home / Chat, and a collapsible System
 
-Decided by Seth, 2026-08-01, against Claude Desktop's `Home | Code` segmented
+Decided by the maintainer, 2026-08-01, against Claude Desktop's `Home | Code` segmented
 pill. This document owns the new sidebar grammar; `DESIGN.md` carries the
 product-level rules it implies, and `src/components/sidebar.tsx` plus its
 `src/components/sidebar/` parts are the implementation.
@@ -69,7 +69,7 @@ Now the sidebar has **one top switcher and one body**:
     session, and top-model facts from provider-owned local histories and opens
     the Model usage dashboard lens. It never shares a card with vault activity.
 - Neither view is collapsible. Each owns the whole body and scrolls on its own
-  (`.sb-rows`) — the "infinite scroll" in Seth's words.
+  (`.sb-rows`) — the "infinite scroll" in the maintainer's words.
 - **System** (Library · Assets · Archive · Trash, plus any added external
   folders) keeps its pinned bottom zone but its header is now a disclosure:
   one click folds the whole zone away.
@@ -86,7 +86,7 @@ is about the app and the vault, so it stays everywhere.
 
 ## Home dashboard
 
-Seth's Home is "notes essentially and a dashboard". The switcher required no
+the maintainer's Home is "notes essentially and a dashboard". The switcher required no
 second IA change:
 
 - The switcher is a list of **fronts**, not a boolean. `SidebarView` is a string
@@ -242,7 +242,7 @@ new IA — each piece owns one front or one zone.
 | `src/components/sidebar/sidebarSwitcher.tsx` | The two-segment pill (presentational)                                                                                                         |
 | `src/components/sidebar/sidebarHome.tsx`     | The Home body: smart rows, view switcher + editors, the Main tree with its pointer-drag and multi-select, the roving list, the reveal effects |
 | `src/components/sidebar/sidebarChat.tsx`     | The Chat body: New chat, All chats, chat folders, chat rows, chat drag + rename                                                               |
-| `src/components/sidebar/sidebarSystem.tsx`   | The System zone: its disclosure header, Library + destination rows, added external folders                                                    |
+| `src/components/sidebar/sidebarSystem.tsx`   | The invariant System zone: its disclosure header and Library · Assets · Archive · Trash rows                                                |
 | `src/components/sidebar/sidebarFooter.tsx`   | Files · Librarian · Settings, and the Librarian's badges + working dot                                                                        |
 | `src/components/sidebar/useChatFolders.ts`   | The chat-folder query + read-modify-write helper, shared by the Chat body and the shell's collapse-all                                        |
 | `src/services/systemNav.ts`                  | `openSystemRoot(id)` — the one way to open the System browser at a root                                                                       |
@@ -258,3 +258,5 @@ new IA — each piece owns one front or one zone.
 - **No change to Breve.** Breve is still a sidebar _mode_ (a lens over the same
   vault), which replaces the whole body including the switcher — a front
   switcher inside a mode that has its own navigation would be two switchers.
+  The shared vault header remains stable: only its Coffee/Quokka mode control
+  changes, while New, New folder, and Collapse all stay available.

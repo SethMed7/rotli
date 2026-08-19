@@ -304,12 +304,12 @@ describe("apply guards (reviewer B2/S3 — the file's fate hangs on these)", () 
 describe("mutate-don't-regenerate preserves unmodeled workbook features", () => {
   test("workbook properties + defined names survive an apply", async () => {
     const wb = richWorkbook();
-    wb.creator = "Seth Medina";
+    wb.creator = "Avery Reed";
     wb.definedNames.add("Data!$B$1", "TheAnswer");
     const snap = workbookToModel(wb, "t");
     applyModelToWorkbook(wb, snap);
     const wb2 = await reload(wb);
-    expect(wb2.creator).toBe("Seth Medina");
+    expect(wb2.creator).toBe("Avery Reed");
     expect(wb2.definedNames.getRanges("TheAnswer").ranges.length).toBeGreaterThan(0);
   });
 });

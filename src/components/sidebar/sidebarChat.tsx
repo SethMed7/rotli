@@ -1,4 +1,4 @@
-// The CHAT front (Seth's IA, 2026-08-01): a ChatGPT-style front over the
+// The CHAT front (the maintainer's IA, 2026-08-01): a ChatGPT-style front over the
 // memex's chats/ — New chat, a searchable All, the virtual chat folders, then
 // every chat. It owns the whole sidebar body while it is the active front, so
 // there is no cap and no "+N more": the list just scrolls
@@ -12,6 +12,7 @@ import { dispatch } from "../../keys/registry";
 import { createDragGhost } from "../../lib/dragGhost";
 import { createPointerDragSession } from "../../lib/pointerDrag";
 import { type MemexChatSummary, chatModels, isTauri, modelUsage } from "../../lib/tauri";
+import { useNow } from "../../lib/useNow";
 import { archiveChat, deleteChat, pinChat, revealChat } from "../../memex/service";
 import { invalidateMemex } from "../../memex/useMemex";
 import {
@@ -41,6 +42,7 @@ import { type SidebarChatData, chatFolderKey } from "./useChatFolders";
 type ChatDrop = { kind: "folder"; id: string };
 
 export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: number }) {
+  const now = useNow();
   const { activeMemex, chatList, manifest, grouped, update } = chats;
   const contentView = useUiStore((s) => s.contentView);
   const setContentView = useUiStore((s) => s.setContentView);
@@ -130,7 +132,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sidebarFolderNonce]);
 
-  // — drag a chat INTO a folder (Seth, 2026-07-30: "drag chat into the folder
+  // — drag a chat INTO a folder (the maintainer, 2026-07-30: "drag chat into the folder
   //   properly"): the Main tree's pointer-drag grammar (HTML5 DnD stays dead in
   //   the WKWebView shell). Dropping on a folder row assigns through the same
   //   manifest write the row menu uses; an in-folder row is a POSITION target;
@@ -192,7 +194,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         key={c.slug}
         data-chat-slug={c.slug}
         /* a chat row lights only while the PANES actually show it — never
-           alongside an active All-chats (or other) view (Seth, 2026-07-30:
+           alongside an active All-chats (or other) view (the maintainer, 2026-07-30:
            two highlights at once read as wrong) */
         className={`sb-chatrow${folderId ? " in-folder" : ""}${
           !hoisted && contentView === "panes" && focusedChatSlug === c.slug ? " sel" : ""
@@ -201,7 +203,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         onClick={() => {
           if (didDragRef.current) return;
           clearUnread(runKeyOf(c.slug));
-          openChat(c.slug);
+          openChat(c.slug, chats.activeMemex ? { vaultId: chats.activeMemex.id } : undefined);
         }}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -221,12 +223,16 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
           };
           const assignedFolder = manifest.assignments[c.slug];
           openContextMenu(e.clientX, e.clientY, [
-            // the open verbs mirror the note row's menu (Seth, 2026-07-30:
+            // the open verbs mirror the note row's menu (the maintainer, 2026-07-30:
             // "pretty much the same things as the notes")
             {
               kind: "action" as const,
               label: "Open in new tab",
-              onClick: () => openChat(c.slug, { newTab: true }),
+              onClick: () =>
+                openChat(c.slug, {
+                  newTab: true,
+                  ...(chats.activeMemex ? { vaultId: chats.activeMemex.id } : {}),
+                }),
             },
             {
               kind: "action" as const,
@@ -363,7 +369,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         {(() => {
           // the left slot carries the MODEL, not a chat glyph: in a list of
           // nothing but chats, "this is a chat" is the one thing you already
-          // know (Seth, 2026-08-04). A chat with no model picked yet gets a
+          // know (the maintainer, 2026-08-04). A chat with no model picked yet gets a
           // blank badge — it holds the column, and claims nothing.
           const ownModel = chatModelMap[runKeyOf(c.slug)];
           const id = ownModel ?? chatModelId;
@@ -397,7 +403,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
               )}
               {hoisted && run === "unread" && <span className="sb-chatstatus unread">New</span>}
               {hoisted && run === "done" && <span className="sb-chatstatus done">Done</span>}
-              {!hoisted && <span className="sb-chattime">{relativeChatAge(Date.now(), c.modifiedMs)}</span>}
+              {!hoisted && <span className="sb-chattime">{relativeChatAge(now, c.modifiedMs)}</span>}
             </>
           );
         })()}
@@ -437,14 +443,19 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
             <span>{usageSnapshot.sessions.toLocaleString()} sessions</span>
           </div>
         </button>
-        <button type="button" className="sb-chatnew" data-hotkey="chat.new" onClick={() => openChat(null)}>
+        <button
+          type="button"
+          className="sb-chatnew"
+          data-hotkey="chat.new"
+          onClick={() => openChat(null, chats.activeMemex ? { vaultId: chats.activeMemex.id } : undefined)}
+        >
           <PlusGlyph size={14} />
           <span>New chat</span>
         </button>
         <button
           type="button"
           /* highlight "All chats" only when its content view is active — so it
-             never lights up alongside an open chat row (Seth, 2026-07-01) */
+             never lights up alongside an open chat row (the maintainer, 2026-07-01) */
           className={`sb-chatrow all${contentView === "allChats" && !activeView ? " sel" : ""}`}
           data-hotkey="chat.all"
           onClick={showAllChats}
@@ -537,7 +548,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
                       }}
                       title={folder.name}
                     >
-                      {/* the Notes tree's disclosure grammar (Seth,
+                      {/* the Notes tree's disclosure grammar (the maintainer,
                           2026-07-30: "needs to be clear what is a
                           folder") — rotating chevron + folder glyph */}
                       <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title description">
+  <title id="title">Rotli — your files remain the product</title>
+  <desc id="description">A dark cocoa product card showing Rotli as a local-first workspace built around one folder.</desc>
+  <rect width="1200" height="630" fill="#241d18"/>
+  <rect x="42" y="42" width="1116" height="546" rx="22" fill="#2e2620" stroke="#4b3c31" stroke-width="2"/>
+
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="94" y="112" fill="#dda087" font-size="22" font-weight="700" letter-spacing="2">ROTLI / LOCAL-FIRST WORKSPACE</text>
+    <text x="92" y="224" fill="#f1e7da" font-size="72" font-weight="700" letter-spacing="-3">Your files</text>
+    <text x="92" y="306" fill="#f1e7da" font-size="72" font-weight="700" letter-spacing="-3">remain the product.</text>
+    <text x="96" y="376" fill="#b7a593" font-size="25">One folder on your Mac. Notes, editable files,</text>
+    <text x="96" y="414" fill="#b7a593" font-size="25">boards, and AI conversations.</text>
+    <text x="96" y="510" fill="#f1e7da" font-size="24" font-weight="700">rotli</text>
+    <text x="96" y="543" fill="#b7a593" font-size="18">No account · useful offline · free and open source</text>
+  </g>
+
+  <g transform="translate(748 104)">
+    <rect width="344" height="390" rx="16" fill="#211b17" stroke="#665142" stroke-width="2"/>
+    <rect width="344" height="54" rx="16" fill="#302720"/>
+    <path d="M0 54H344" stroke="#4b3c31" stroke-width="2"/>
+    <circle cx="24" cy="27" r="6" fill="#c97e62"/>
+    <circle cx="44" cy="27" r="6" fill="#a4b08d"/>
+    <circle cx="64" cy="27" r="6" fill="#c6b7a7"/>
+    <rect x="92" y="15" width="196" height="24" rx="12" fill="#392f28" stroke="#4b3c31"/>
+
+    <g font-family="Arial, Helvetica, sans-serif">
+      <text x="24" y="92" fill="#dda087" font-size="13" font-weight="700" letter-spacing="1">ONE FOLDER</text>
+      <text x="24" y="128" fill="#f1e7da" font-size="25" font-weight="700">Field Notes</text>
+      <text x="24" y="164" fill="#b7a593" font-size="15">⌄  wiki/</text>
+      <text x="46" y="194" fill="#f1e7da" font-size="15">◇  launch-notes.md</text>
+      <text x="46" y="224" fill="#f1e7da" font-size="15">◇  reading-list.md</text>
+      <text x="24" y="264" fill="#b7a593" font-size="15">⌄  storage/</text>
+      <text x="46" y="294" fill="#f1e7da" font-size="15">□  project-brief.docx</text>
+      <text x="46" y="324" fill="#f1e7da" font-size="15">▦  forecast.xlsx</text>
+      <text x="24" y="364" fill="#b7a593" font-size="15">·  .rotli/  rebuildable metadata</text>
+    </g>
+  </g>
+</svg>

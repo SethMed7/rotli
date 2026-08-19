@@ -14,7 +14,7 @@ test("dragging an All-notes row into Main adds it there", async ({ page }) => {
   await gotoApp(page);
 
   await page.locator(".sb-notes-tree .frow", { hasText: "All notes" }).first().click();
-  const row = page.locator(".recent-row", { hasText: "Q3 priorities — Myela" });
+  const row = page.locator(".recent-row", { hasText: "Q3 priorities — Northstar" });
   await expect(row).toBeVisible();
 
   const mainRoot = page.locator('[data-main-id="main:"]');
@@ -22,7 +22,9 @@ test("dragging an All-notes row into Main adds it there", async ({ page }) => {
 
   await pointerDrag(page, row, await centerOf(mainRoot));
 
-  await expect(page.locator(".main-tree [data-main-id]", { hasText: "Q3 priorities — Myela" })).toBeVisible();
+  await expect(
+    page.locator(".main-tree [data-main-id]", { hasText: "Q3 priorities — Northstar" }),
+  ).toBeVisible();
 });
 
 test("⌘-click gathers Main rows and one drag moves them all into a folder", async ({ page }) => {

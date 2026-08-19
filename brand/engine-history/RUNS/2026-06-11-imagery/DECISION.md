@@ -1,6 +1,6 @@
 # rotli — Stage 1.5 · 2026-06-11 · brand-world assets (illustrated)
 
-**Scope (Seth's direction):** before any app code, generate the assets that take the brand to life —
+**Scope (the maintainer's direction):** before any app code, generate the assets that take the brand to life —
 NOT photoreal (camino's register); illustrated world-building: **quokka characters, environments,
 details**. Freeze (`kit.json`) deliberately deferred until these land in the kit.
 
@@ -44,15 +44,15 @@ Six sections: light hero (island-wide) · character (quokka) · dark hero (lamp-
 3. **paper-linen** vignette is warmer/stronger than "below conscious perception" — usable as a hero
    paper field; the code-only `.ro-linen-field` covers the subtle case.
 4. **island-path** sky runs duskier (brown-peach) than the palette's peach — sells the journey;
-   slightly off-board. Keep/kill is Seth's call.
+   slightly off-board. Keep/kill is the maintainer's call.
 
-## GATE (Seth, 2026-06-11) — SOFT-APPROVED: "overall this is good — we can play around more"
+## GATE (the maintainer, 2026-06-11) — SOFT-APPROVED: "overall this is good — we can play around more"
 
 Direction confirmed; per-asset refinement deliberately left open. Next: **discovery mode** (see
 `apps/rotli/docs/DISCOVERY.md`) — understand the product deeply, then enhance the world from there
 (canonical quokka face, asset aspect fixes, palette drift, in-product asset mapping). Nothing approved
 here gets broken; refinements layer on through their own gates. `kit.json` freeze remains deferred
-until Seth calls the world right.
+until the maintainer calls the world right.
 
 ## Original gate ask (for the record)
 

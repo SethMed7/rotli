@@ -76,11 +76,13 @@ jobs:
           bun-version-file: .bun-version
       - run: bun ci
       # Current transitive advisories are tracked in
-      # docs/development/security.md. Keep both scans visible but advisory
-      # until the dependency trees can be clean without unsafe upgrades.
-      - name: bun audit (JS/TS)
+      # docs/development/security.md. The repository-owned workflow audits the
+      # app, site, and independently installed Breve lockfiles. Keep both
+      # language scans visible but advisory until the dependency trees can be
+      # clean without unsafe upgrades.
+      - name: bun audit (all JS/TS lockfiles)
         continue-on-error: true
-        run: bun audit
+        run: bun run deps audit
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked --version 0.22.2
       - name: cargo audit (Rust)

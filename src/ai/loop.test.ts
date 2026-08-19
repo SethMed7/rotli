@@ -60,11 +60,11 @@ function fakeHost(replies: string[], over: Partial<Host> = {}): { host: Host; ca
     },
     searchNotes: async (q) => {
       calls.searchNotes.push(q);
-      return [{ id: "n1", title: "Pricing", snippet: "Myela pricing", folder: "Projects" }];
+      return [{ id: "n1", title: "Pricing", snippet: "Northstar pricing", folder: "Projects" }];
     },
     readNote: async (id) => {
       calls.readNote.push(id);
-      return `# Pricing\nMyela pricing is $99/mo (note ${id}).`;
+      return `# Pricing\nNorthstar pricing is $99/mo (note ${id}).`;
     },
     searchMemory: async (q) => {
       calls.searchMemory.push(q);
@@ -181,7 +181,7 @@ describe("parse", () => {
 describe("retrieval", () => {
   test("rankNotes scores title > folder > snippet and skips boards/files", () => {
     const notes = [
-      note({ id: "a", title: "Myela Pricing", folderId: "Projects", snippet: "tiers" }),
+      note({ id: "a", title: "Northstar Pricing", folderId: "Projects", snippet: "tiers" }),
       note({ id: "b", title: "Groceries", folderId: "Home", snippet: "milk" }),
       note({ id: "c", title: "board", folderId: "Projects", snippet: "pricing", kind: "board" }),
     ];
@@ -192,12 +192,12 @@ describe("retrieval", () => {
   // ── the 2026-08-01 roster failure ───────────────────────────────────────────
   // Asked "give me a list of the people in my vault", gemma read wiki/people's
   // README — a note whose body names nobody — and answered out of its `links:`
-  // metadata, so the project "caminorx" landed in a list of Seth's family. The
+  // metadata, so the project "trailplan" landed in a list of the maintainer's family. The
   // three pins below cover the three holes that made that possible.
 
   test("folderHits reaches the notes filed under an area (corpus_search sees only title+body)", () => {
     const notes = [
-      note({ id: "p1", title: "Aliyah Grace Medina", folderId: "wiki/people/family" }),
+      note({ id: "p1", title: "Aliyah Grace Reed", folderId: "wiki/people/family" }),
       note({ id: "p2", title: "Subh", folderId: "wiki/people/work", updatedAt: 5 }),
       note({ id: "x1", title: "Breve — July 31", folderId: "wiki/reference/briefs" }),
       note({ id: "b1", title: "canvas", folderId: "wiki/people", kind: "board" }),
@@ -223,7 +223,7 @@ describe("retrieval", () => {
 
   test("isAreaIndex spots the Filer's generated roster by title == area name", () => {
     expect(isAreaIndex("people", "wiki/people")).toBe(true);
-    expect(isAreaIndex("people/ — who's who in Seth's world", "wiki/people")).toBe(false);
+    expect(isAreaIndex("people/ — who's who in the maintainer's world", "wiki/people")).toBe(false);
     expect(isAreaIndex("people", "")).toBe(false);
   });
 
@@ -233,7 +233,12 @@ describe("retrieval", () => {
       {
         ...host,
         searchNotes: async () => [
-          { id: "readme", title: "people/ — who's who in Seth's world", snippet: "", folder: "wiki/people" },
+          {
+            id: "readme",
+            title: "people/ — who's who in the maintainer's world",
+            snippet: "",
+            folder: "wiki/people",
+          },
           { id: "idx", title: "people", snippet: "", folder: "wiki/people" },
         ],
       },
@@ -268,10 +273,10 @@ describe("retrieval", () => {
 
   test("frameLinksMetadata warns on the links: line and leaves the body alone", () => {
     const framed = frameLinksMetadata(
-      "---\nid: 01X\nlinks: [[marisol-medina]], [[caminorx]]\nsummary: who's who\n---\n\n# people/\n\nlinks: not metadata down here\n",
+      "---\nid: 01X\nlinks: [[morgan-reed]], [[trailplan]]\nsummary: who's who\n---\n\n# people/\n\nlinks: not metadata down here\n",
     );
     expect(framed).toContain("links: (pointers to other notes");
-    expect(framed).toContain("[[marisol-medina]], [[caminorx]]");
+    expect(framed).toContain("[[morgan-reed]], [[trailplan]]");
     expect(framed).toContain("\n\n# people/\n\nlinks: not metadata down here\n");
     // idempotent (a re-read must not stack warnings) and a no-op without a fence
     expect(frameLinksMetadata(framed)).toBe(framed);
@@ -579,7 +584,7 @@ describe("runAgent", () => {
     const { host, calls } = fakeHost([
       '{"tool":"search_notes","args":{"query":"pricing"}}',
       '{"tool":"read_note","args":{"id":"n1"}}',
-      '{"final":"Your Myela pricing is $99/mo."}',
+      '{"final":"Your Northstar pricing is $99/mo."}',
     ]);
     const { final, events } = await run(host, { history: [], userText: "what's my pricing?", web: false });
     expect(final).toContain("$99");
@@ -1013,7 +1018,7 @@ describe("runAgent", () => {
   });
 });
 
-// update_note (Seth, 2026-07-30: "chats should have ability to edit notes
+// update_note (the maintainer, 2026-07-30: "chats should have ability to edit notes
 // directly") — argument discipline + the optional-host degrade. The security
 // laws (read gate, secure-context refusal) live in host.ts against Rust gates.
 describe("update_note tool", () => {

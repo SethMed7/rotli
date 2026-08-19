@@ -8,7 +8,7 @@
 //             fence is the user's code.
 //   ⇧Tab    — outdent up to 2 leading spaces.
 //   Space   — "[ ]"/"[]" at line start becomes a task.
-//   In a TABLE (Seth, 2026-07-01): Tab/⇧Tab hop to the next/previous cell
+//   In a TABLE (the maintainer, 2026-07-01): Tab/⇧Tab hop to the next/previous cell
 //   (crossing rows), ↑/↓ hop rows in the same column, Enter moves to the same
 //   cell of the next row, Tab past the last cell APPENDS a row, and Enter on
 //   the last row exits below the table — so the pipes never need
@@ -114,7 +114,7 @@ const enterContinueList: Command = (view) => {
 /** A line's leading indent, tab-tolerant (a tab = one level = 2 columns).
  * Tab/⇧Tab NORMALIZE tab indents into the app's two-space grammar as part of
  * the gesture — foreign notes (external editors, LLM output) indent with tabs,
- * which the space-only grammar used to treat as immovable (Seth, 2026-07-28:
+ * which the space-only grammar used to treat as immovable (the maintainer, 2026-07-28:
  * "shift tab on bullets is very buggy"). */
 const leadingIndent = (text: string): string => /^[ \t]*/.exec(text)?.[0] ?? "";
 
@@ -142,7 +142,7 @@ const tabIndent: Command = (view) => {
   }
   // every other line INDENTS (list or prose): ⇧Tab has always outdented any
   // line, so Tab has to be its mirror. Shoving two spaces in at the caret was
-  // the bug Seth kept hitting (2026-08-01) — typing "test" and then pressing Tab
+  // the bug the maintainer kept hitting (2026-08-01) — typing "test" and then pressing Tab
   // left "test  ", and the "- " typed next stranded at the end ("test  - ",
   // rendered literally, no bullet) instead of nesting the line.
   const indent = leadingIndent(startLine.text);

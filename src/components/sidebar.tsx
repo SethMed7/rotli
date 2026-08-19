@@ -1,7 +1,7 @@
 // The sidebar SHELL. It owns the chrome that is true of every front — the vault
 // header row, the create/collapse toolbar, the inline error lane, the front
 // switcher, and the utility footer — then hands the body to whichever front is
-// active (Seth's IA, 2026-08-01; docs/design/sidebar-home-chat.md):
+// active (the maintainer's IA, 2026-08-01; docs/design/sidebar-home-chat.md):
 //
 //   Home  → src/components/sidebar/sidebarHome.tsx   (notes; System zone)
 //   Chat  → src/components/sidebar/sidebarChat.tsx   (chats; folders)
@@ -11,20 +11,32 @@
 // whole body and scrolls on its own, so nothing has to be folded to make room
 // for anything else.
 
-import { type MouseEvent, useEffect, useRef } from "react";
+import { type MouseEvent, useEffect, useRef, useState } from "react";
 
 import { dispatch } from "../keys/registry";
-import { initMemexAsCorpus, pickFolder } from "../memex/service";
-import { useChooseFolder, useConnectBrain, useMemexConfig } from "../memex/useMemex";
+import { useTransientPopover } from "../lib/popover";
+import { corpusInspectFolder, corpusRefreshVault } from "../lib/tauri";
+import { initMemexAsCorpus } from "../memex/service";
+import { useConnectBrain, useMemexConfig, useSwitchVault } from "../memex/useMemex";
 import { openNewItemMenu } from "../newItems/menu";
 import { mainFolderIds } from "../services/mainTree";
-import { buildVaultMenu, vaultDisplayName } from "../services/vaultSwitcher";
+import { vaultDisplayName, vaultRowLabel, vaultSwitcherItems } from "../services/vaultSwitcher";
+import { reconnectActiveVault, refreshActiveVault } from "../state/activeVault";
 import { useContextMenu } from "../state/contextMenu";
-import { useFocusedTab } from "../state/panes";
+import { useFocusedTab, usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
+import { requestVaultFolder } from "../state/vaultFolderBrowser";
 import { BreveSidebar } from "./breve/breveSidebar";
 import { QuokkaMark } from "./character";
-import { ChevronRight, CoffeeGlyph, NewFileGlyph, NewFolderGlyph, VaultGlyph } from "./glyphs";
+import {
+  ChevronRight,
+  CoffeeGlyph,
+  MoreGlyph,
+  NewFileGlyph,
+  NewFolderGlyph,
+  RefreshGlyph,
+  VaultGlyph,
+} from "./glyphs";
 import { SidebarChat } from "./sidebar/sidebarChat";
 import { SidebarFooter } from "./sidebar/sidebarFooter";
 import { SidebarHome } from "./sidebar/sidebarHome";
@@ -73,31 +85,78 @@ export function Sidebar() {
   const chats = useChatFolders();
   const activeTree = useActiveTree();
 
-  // — the vault switcher (decision 2026-07-25): the sidebar header names the
-  //   current vault and opens one menu — switch (repoints the notes folder,
-  //   which relaunches), connect another, or open Location settings. Menu
-  //   grammar lives in services/vaultSwitcher.ts (pure, tested). —
+  // — the vault switcher: current + connected rows each own refresh/overflow;
+  //   one Connect action handles existing and empty folders. —
   const memexCfg = useMemexConfig();
-  const chooseFolderMut = useChooseFolder();
+  const switchVaultMut = useSwitchVault();
   const connectBrainMut = useConnectBrain();
   const vaultName = vaultDisplayName(memexCfg.data?.instances ?? []);
-  const openVaultMenu = (e: MouseEvent<HTMLButtonElement>) => {
-    const vaultErr = (verb: string) => (err: unknown) =>
-      setRowActionError(`Couldn’t ${verb} — ${err instanceof Error ? err.message : String(err)}`);
-    const items = buildVaultMenu(memexCfg.data?.instances ?? [], {
-      switchTo: (root) => void chooseFolderMut.mutateAsync(root).catch(vaultErr("switch vaults")),
-      connect: () => void connectBrainMut.mutateAsync(undefined).catch(vaultErr("connect the vault")),
-      // "New vault…": pick an empty folder, scaffold a vault, switch into it
-      createNew: () =>
-        void pickFolder()
-          .then((path) => (path ? initMemexAsCorpus(path) : undefined))
-          .catch(vaultErr("create the vault")),
-      // Location lives inside Settings — the pane picker is one click away
-      openSettings: () => dispatch("app.settings"),
+  const vaultItems = vaultSwitcherItems(memexCfg.data?.instances ?? []);
+  const vaultTriggerRef = useRef<HTMLButtonElement>(null);
+  const vaultMenuRef = useRef<HTMLDivElement>(null);
+  const [vaultMenuPosition, setVaultMenuPosition] = useState<{ left: number; top: number } | null>(null);
+  const [refreshingVaultId, setRefreshingVaultId] = useState<string | null>(null);
+  useTransientPopover([vaultTriggerRef, vaultMenuRef], !!vaultMenuPosition, () => setVaultMenuPosition(null));
+
+  const vaultErr = (verb: string) => (err: unknown) =>
+    setRowActionError(`Couldn’t ${verb} — ${err instanceof Error ? err.message : String(err)}`);
+
+  const connectVault = async () => {
+    const path = await requestVaultFolder({
+      title: "Connect vault",
+      description: "Choose an existing Rotli vault, or choose an empty folder to create one.",
+      actionLabel: "Connect vault",
+      requireEmpty: false,
     });
-    const trigger = e.currentTarget;
+    if (!path) return;
+    const report = await corpusInspectFolder(path);
+    if (report.kind === "empty") {
+      const welcomeId = await initMemexAsCorpus(path);
+      await refreshActiveVault();
+      if (welcomeId) usePanesStore.getState().openNote(welcomeId);
+      return;
+    }
+    if (report.kind !== "memex") {
+      throw new Error("Choose an existing Rotli vault or an empty folder.");
+    }
+    await connectBrainMut.mutateAsync(path);
+  };
+
+  const refreshVault = async (id: string, active: boolean) => {
+    if (refreshingVaultId) return;
+    setRefreshingVaultId(id);
+    try {
+      if (active) await reconnectActiveVault();
+      else await corpusRefreshVault(id);
+    } finally {
+      setRefreshingVaultId(null);
+    }
+  };
+
+  const openVaultMenu = (e: MouseEvent<HTMLButtonElement>) => {
+    if (vaultMenuPosition) {
+      setVaultMenuPosition(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const width = Math.min(400, window.innerWidth - 16);
+    setVaultMenuPosition({
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
+      top: rect.bottom + 4,
+    });
+  };
+
+  const openVaultOverflow = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    const trigger = event.currentTarget;
     const rect = trigger.getBoundingClientRect();
-    openContextMenu(rect.left, rect.bottom + 4, items, { returnFocus: () => trigger.focus() });
+    setVaultMenuPosition(null);
+    openContextMenu(
+      Math.max(8, rect.right - 202),
+      rect.bottom + 4,
+      [{ kind: "action", label: "Location settings…", onClick: () => dispatch("app.settings") }],
+      { returnFocus: () => vaultTriggerRef.current?.focus() },
+    );
   };
 
   // — the front follows the focused tab (2026-08-01). Every navigation reveal —
@@ -134,13 +193,15 @@ export function Sidebar() {
     >
       {/* ONE header row: the active vault never disappears. Breve routines and
           notifications are owned by that vault, so hiding the switcher made
-          the mode look detached from its durable home. Creation controls stay
-          notes-only. */}
+          the mode look detached from its durable home. Only the Coffee/Quokka
+          mode mark changes; creation and tree controls remain stable. */}
       <div className={sidebarMode === "breve" ? "nl-top breve-active" : "nl-top"}>
         <button
+          ref={vaultTriggerRef}
           type="button"
           className="vault-switch"
           aria-haspopup="menu"
+          aria-expanded={!!vaultMenuPosition}
           aria-label={`Vault: ${vaultName}. Switch or connect vaults`}
           title={`${vaultName} — switch or connect vaults`}
           onClick={openVaultMenu}
@@ -151,6 +212,77 @@ export function Sidebar() {
             <ChevronRight size={9} />
           </span>
         </button>
+        {vaultMenuPosition && (
+          <div
+            ref={vaultMenuRef}
+            className="vault-menu"
+            role="menu"
+            aria-label="Vaults"
+            style={{ left: vaultMenuPosition.left, top: vaultMenuPosition.top }}
+          >
+            <div className="vault-menu-rows">
+              {vaultItems.map(({ instance, active }) => {
+                const label = vaultRowLabel(instance);
+                const refreshing = refreshingVaultId === instance.id;
+                return (
+                  <div key={instance.id} className={active ? "vault-menu-row active" : "vault-menu-row"}>
+                    <button
+                      type="button"
+                      className="vault-menu-target"
+                      role="menuitem"
+                      aria-current={active ? "true" : undefined}
+                      onClick={() => {
+                        setVaultMenuPosition(null);
+                        if (!active)
+                          void switchVaultMut.mutateAsync(instance.id).catch(vaultErr("switch vaults"));
+                      }}
+                    >
+                      <VaultGlyph size={15} />
+                      <span>{label}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="vault-menu-row-action"
+                      role="menuitem"
+                      aria-label={`Refresh ${label}`}
+                      title={`Refresh ${label}`}
+                      disabled={!!refreshingVaultId}
+                      onClick={() =>
+                        void refreshVault(instance.id, active).catch(vaultErr("refresh the vault"))
+                      }
+                    >
+                      <RefreshGlyph size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      className="vault-menu-row-action"
+                      role="menuitem"
+                      aria-label={`More options for ${label}`}
+                      title={`More options for ${label}`}
+                      onClick={openVaultOverflow}
+                    >
+                      <MoreGlyph size={16} />
+                    </button>
+                    {refreshing && <span className="sr-only">Refreshing</span>}
+                  </div>
+                );
+              })}
+            </div>
+            {vaultItems.length > 0 && <div className="vault-menu-separator" role="separator" />}
+            <button
+              type="button"
+              className="vault-menu-connect"
+              role="menuitem"
+              onClick={() => {
+                setVaultMenuPosition(null);
+                void connectVault().catch(vaultErr("connect the vault"));
+              }}
+            >
+              <NewFolderGlyph size={15} />
+              <span>Connect vault</span>
+            </button>
+          </div>
+        )}
         <button
           type="button"
           className={sidebarMode === "breve" ? "icobtn railon sb-breve-toggle" : "icobtn sb-breve-toggle"}
@@ -164,72 +296,68 @@ export function Sidebar() {
             {sidebarMode === "breve" ? "Back to Rotli" : "Breve"}
           </span>
         </button>
-        {sidebarMode !== "breve" && (
-          <>
-            <span className="nl-mode-sep" aria-hidden="true" />
-            {/* IDE-style create icons (Seth #7/#13, 2026-07-03): the old "+" dropdown
+        <span className="nl-mode-sep" aria-hidden="true" />
+        {/* IDE-style create icons (the maintainer #7/#13, 2026-07-03): the old "+" dropdown
             became explicit, always-visible actions — New… · New folder — mirroring
             VS Code's file-explorer title bar. Each targets the resolved (selected)
             folder. */}
-            <button
-              type="button"
-              /* tb-trail right-anchors the tip inside the sidebar's overflow box —
+        <button
+          type="button"
+          /* tb-trail right-anchors the tip inside the sidebar's overflow box —
              notes mode only: in Breve these buttons sit left-packed and a
              right-anchored tip would clip at the LEFT edge (review 2026-07-31) */
-              className="icobtn tb-trail"
-              aria-label="New…"
-              onClick={openNewItemMenu}
-            >
-              <NewFileGlyph size={16} />
-              <span className="tip" aria-hidden="true">
-                New…
-              </span>
-            </button>
-            <button
-              type="button"
-              className="icobtn tb-trail"
-              aria-label={visibleSidebarView === "chat" ? "New chat folder" : "New folder"}
-              onClick={() => {
-                // the System browser open? create a real folder at its cwd; else the
-                // ACTIVE FRONT answers — Home opens its Main-folder input, Chat mints
-                // a chat folder (the inline notes-tree input died with the 2026-07-26
-                // System fold and left this button a silent no-op, P0)
-                if (contentView === "system") requestSystemFolder();
-                else requestSidebarFolder();
-              }}
-            >
-              <NewFolderGlyph size={16} />
-              <span className="tip" aria-hidden="true">
-                {visibleSidebarView === "chat" ? "New chat folder" : "New folder"}
-              </span>
-            </button>
-            {/* New board lives in the New… dropdown (Seth, 2026-07-28) — its own
+          className="icobtn tb-trail"
+          aria-label="New…"
+          onClick={openNewItemMenu}
+        >
+          <NewFileGlyph size={16} />
+          <span className="tip" aria-hidden="true">
+            New…
+          </span>
+        </button>
+        <button
+          type="button"
+          className="icobtn tb-trail"
+          aria-label={visibleSidebarView === "chat" ? "New chat folder" : "New folder"}
+          onClick={() => {
+            // the System browser open? create a real folder at its cwd; else the
+            // ACTIVE FRONT answers — Home opens its Main-folder input, Chat mints
+            // a chat folder (the inline notes-tree input died with the 2026-07-26
+            // System fold and left this button a silent no-op, P0)
+            if (contentView === "system") requestSystemFolder();
+            else requestSidebarFolder();
+          }}
+        >
+          <NewFolderGlyph size={16} />
+          <span className="tip" aria-hidden="true">
+            {visibleSidebarView === "chat" ? "New chat folder" : "New folder"}
+          </span>
+        </button>
+        {/* New board lives in the New… dropdown (the maintainer, 2026-07-28) — its own
             header icon was one too many for a narrow sidebar */}
-            {/* collapse-all — TWO-STAGE (Seth, 2026-07-31): first press folds the
+        {/* collapse-all — TWO-STAGE (the maintainer, 2026-07-31): first press folds the
             open folders/trees, a second press folds the SYSTEM zone (the
             fronts replaced the Chat/Notes sections, 2026-08-01). Kept last,
             like the IDE. */}
-            <button
-              type="button"
-              className="icobtn tb-trail"
-              aria-label="Collapse all folders"
-              /* default-OPEN rows (Main folders, CHAT folders) need an explicit
+        <button
+          type="button"
+          className="icobtn tb-trail"
+          aria-label="Collapse all folders"
+          /* default-OPEN rows (Main folders, CHAT folders) need an explicit
              false — wiping the map alone re-EXPANDED them (#83, audit 2026-07;
              chat folders were missed until 2026-07-31). "Brain" is NOT passed:
              nothing renders it as default-open anymore, and treating it as
              open made the first press a no-op on a fully-folded sidebar. */
-              onClick={() => collapseAllDests([...mainFolderIds(activeTree), ...chats.folderKeys])}
-            >
-              <FoldGlyph size={16} />
-              <span className="tip" aria-hidden="true">
-                Collapse all
-              </span>
-            </button>
-          </>
-        )}
+          onClick={() => collapseAllDests([...mainFolderIds(activeTree), ...chats.folderKeys])}
+        >
+          <FoldGlyph size={16} />
+          <span className="tip" aria-hidden="true">
+            Collapse all
+          </span>
+        </button>
       </div>
 
-      {/* the FRONT switcher (Seth, 2026-08-01) — directly under the vault
+      {/* the FRONT switcher (the maintainer, 2026-08-01) — directly under the vault
           header, above everything the front renders. Breve is a MODE with its
           own navigation, so it replaces the switcher rather than nesting one. */}
       {sidebarMode !== "breve" && (
@@ -265,7 +393,7 @@ export function Sidebar() {
       )}
 
       {/* the utility footer is APP-level, not front-level: it stays under Home
-          and Chat alike (Seth, 2026-08-01: "the utility footer stays as is") */}
+          and Chat alike (the maintainer, 2026-08-01: "the utility footer stays as is") */}
       {sidebarMode === "notes" && <SidebarFooter />}
     </aside>
   );

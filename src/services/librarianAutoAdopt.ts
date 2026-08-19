@@ -1,4 +1,4 @@
-// Organize means "it works for me in the back" (Seth, 2026-07-31). Metadata
+// Organize means "it works for me in the back" (the maintainer, 2026-07-31). Metadata
 // suggestions can still land in the Waiting lane at the Organize rung — rows
 // minted at a lower rung, or before an update — and they used to sit there
 // until manually approved, which contradicts what Organize promises. This

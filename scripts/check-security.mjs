@@ -233,6 +233,14 @@ function stripComments(src) {
   if (JSON.stringify(perms) !== JSON.stringify(allow.capabilities.default)) {
     failures.push("src-tauri/capabilities/default.json: granted permissions drifted from the pinned snapshot (egress-allowlist.json capabilities.default) — a new plugin permission widens the webview's reach.");
   }
+  const capabilityWebviews = caps.webviews ?? [];
+  if (JSON.stringify(capabilityWebviews) !== JSON.stringify(allow.capabilities.defaultWebviews)) {
+    failures.push("src-tauri/capabilities/default.json: app-owned webview targets drifted from the pinned snapshot — private browser guests must not inherit Rotli IPC.");
+  }
+  const capabilityWindows = caps.windows ?? [];
+  if (JSON.stringify(capabilityWindows) !== JSON.stringify(allow.capabilities.defaultWindows)) {
+    failures.push("src-tauri/capabilities/default.json: window-wide capability targets are forbidden — they grant every child webview Rotli IPC.");
+  }
 }
 
 // ── (d) sensitive-content logging tripwire (heuristic) ────────────────────────

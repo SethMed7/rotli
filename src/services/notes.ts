@@ -46,7 +46,7 @@ export class InMemoryNotesService implements NotesService {
   }
   /** Where an archived/trashed note came from, so Phase 2 restore is
    * reviewable in the browser surface — fs mode carries this on disk instead.
-   * Side Map keeps Note's shape identical to the FS service (Seth, 2026-06-13). */
+   * Side Map keeps Note's shape identical to the FS service (the maintainer, 2026-06-13). */
   readonly origins = new Map<string, string>();
 
   async listFolders(): Promise<Folder[]> {
@@ -217,7 +217,7 @@ export class InMemoryNotesService implements NotesService {
   // ——— lifecycle: move keeps the note's id; only its folderId changes. The
   // origin Map mirrors fs mode's on-disk breadcrumb so restore is reviewable in
   // the browser surface, while the Note's shape stays identical to fs mode —
-  // origin is NEVER a field on Note (Seth, 2026-06-13). ———
+  // origin is NEVER a field on Note (the maintainer, 2026-06-13). ———
 
   async moveNote(id: string, targetFolder: string): Promise<Note> {
     const existing = this.notes.get(id);
@@ -356,7 +356,7 @@ if (!FS_MODE) {
   // A couple of LOCAL user folders under Storage — path-style ids so the tree
   // renders and descendant scoping behaves exactly like fs mode.
   const storageWork = svc.seedReserved(`${DEST.storage}/Work`, "Work", DEST.storage);
-  const storageMyela = svc.seedReserved(`${DEST.storage}/Myela`, "Myela", DEST.storage);
+  const storageNorthstar = svc.seedReserved(`${DEST.storage}/Northstar`, "Northstar", DEST.storage);
 
   if (!SEED_EMPTY) {
     // —— Inbox: the welcome note + a quick capture ——
@@ -384,7 +384,7 @@ Later: breve plugs into the same corpus and the Wiki answers from it. Nothing ch
       updatedAt: now - 2 * DAY,
     });
 
-    // —— Storage: a pinned decision + nested Work/Myela notes ——
+    // —— Storage: a pinned decision + nested Work/Northstar notes ——
     svc.seedNote(
       DEST.storage,
       `# Pricing decision
@@ -408,8 +408,8 @@ Maria owns the reconciliation walkthrough; I take pricing.`,
     );
 
     svc.seedNote(
-      storageMyela.id,
-      `# Q3 priorities — Myela
+      storageNorthstar.id,
+      `# Q3 priorities — Northstar
 
 Ship the gateway migration, land the issuing portal rebuild, and get the partner reporting story straight before the platform review.`,
       { createdAt: todayAt(7, 30), updatedAt: todayAt(7, 30) },
@@ -491,7 +491,7 @@ Filed under **Projects** by the Librarian — same file, reachable from Main and
     );
 
     // —— Board: loose quick-captures, the staging area. Cards, not notes — you
-    // multi-select and merge them into one joint note (Seth, 2026-06-19). ——
+    // multi-select and merge them into one joint note (the maintainer, 2026-06-19). ——
     svc.seedNote(DEST.board, "Ask Maria about the settlement mapping deadline", {
       createdAt: now - 40 * 60 * 1000,
       updatedAt: now - 40 * 60 * 1000,

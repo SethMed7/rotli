@@ -4,7 +4,7 @@ import {
   type WheelEvent as ReactWheelEvent,
   useCallback,
   useEffect,
-  useMemo,
+  useId,
   useRef,
   useState,
 } from "react";
@@ -90,7 +90,7 @@ function MermaidWorkspace({
   const diagramRef = useRef<HTMLDivElement>(null);
   const codeRef = useRef<HTMLTextAreaElement>(null);
   const dragRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
-  const renderId = useMemo(() => Math.random().toString(36).slice(2, 10), []);
+  const renderId = useId().replace(/[^A-Za-z0-9_-]/g, "");
   const dirty = draft !== code;
 
   const fitDiagram = useCallback(() => {

@@ -1,7 +1,7 @@
 // Drag a note (or board) INTO the Main tree from outside the sidebar — the
 // All-notes list rows and (via tabDrag) editor tabs. System-browser items may
 // also land on the sidebar's Trash row. Pointer-based, because HTML5
-// drag is dead in the macOS WKWebView shell (Seth, 2026-07-07). It mirrors the
+// drag is dead in the macOS WKWebView shell (the maintainer, 2026-07-07). It mirrors the
 // sidebar's own "add" drag: a floating ghost rides the cursor, the hovered Main
 // row highlights (`.main-dropover`), and on drop the note is added to Main at that
 // spot. A plain click (no travel) falls through to the row's own handler.
@@ -42,7 +42,7 @@ export function commitMainAdd(noteId: string, drop: { id: string; pos: DropPos }
   if (drop.id !== MAIN_ROOT) tree = moveInTree(tree, noteId, drop.id, drop.pos);
   m.setTree(tree);
   // landing in a folder a named view mirrors makes the item show THERE too
-  // (Seth, 2026-07-29) — runs after the Main write, like every view assign
+  // (the maintainer, 2026-07-29) — runs after the Main write, like every view assign
   const parent = mainParentOfNote(tree, noteId);
   if (parent && parent !== MAIN_ROOT) inheritFolderView(noteId, parent);
 }

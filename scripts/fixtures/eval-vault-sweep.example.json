@@ -13,7 +13,7 @@
       "can you tell me the people in my vault?",
       "great — can you tell me the names of those people"
     ],
-    "expect": [["marisol"], ["diego"], ["lucia"], ["ramon"], ["priya"], ["tom"]],
+    "expect": [["morgan"], ["diego"], ["lucia"], ["ramon"], ["priya"], ["tom"]],
     "minGroups": 5
   },
   {

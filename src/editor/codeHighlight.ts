@@ -1,4 +1,4 @@
-// IDE-grade syntax colors for fenced code (Seth, 2026-07-30: "when code is
+// IDE-grade syntax colors for fenced code (the maintainer, 2026-07-30: "when code is
 // put it renders nice including colors like it would in an IDE"). A StateField
 // of mark decorations over NON-target fences whose info-string names a known
 // language. Parsing rides the Lezer parsers CodeMirror ships (exact offsets,

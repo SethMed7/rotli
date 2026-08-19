@@ -1,4 +1,4 @@
-// Chat folders — VIRTUAL grouping for the sidebar's Chat section (Seth,
+// Chat folders — VIRTUAL grouping for the sidebar's Chat section (the maintainer,
 // 2026-07-30: "folders with chats in them"). Chats stay flat on disk in
 // chats/; the grouping is a rebuildable `.rotli/chat-folders.json` projection
 // per memex instance, in the spirit of Main: organization is a view, never a
@@ -12,7 +12,7 @@ import { queryClient } from "./query";
 export interface ChatFolder {
   id: string;
   name: string;
-  /** A pinned folder floats above the others (Seth, 2026-08-03). Additive
+  /** A pinned folder floats above the others (the maintainer, 2026-08-03). Additive
    * field: absent reads as unpinned. */
   pinned?: boolean;
 }
@@ -172,7 +172,7 @@ export interface GroupedChats<T> {
  * everything unassigned.
  *
  * List order is the caller's pinned-then-recency sort, and it now rules inside
- * folders too (Seth, 2026-08-03: "the moment I get a response it should move
+ * folders too (the maintainer, 2026-08-03: "the moment I get a response it should move
  * to the top of the folder / top of the left bar"). The old per-folder MANUAL
  * drag order is retired by that ask — the `order` field stays parsed for
  * manifest compatibility but no longer changes rendering. */

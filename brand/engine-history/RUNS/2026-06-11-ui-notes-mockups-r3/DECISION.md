@@ -1,7 +1,7 @@
 # rotli — UI/UX mockups · notes module · round 3 — DECISION
 
 **Date:** 2026-06-11 · **Gate:** `gate.html` (live render, kit tokens only)
-**Input:** Seth's round-2 feedback + two web-research passes (competitor love/hate: Apple Notes, GoodNotes,
+**Input:** the maintainer's round-2 feedback + two web-research passes (competitor love/hate: Apple Notes, GoodNotes,
 Evernote, Bear, Craft, Obsidian, Notion, UpNote, iA Writer/Ulysses/Typora · premium standards: Linear,
 Raycast, Things, Arc, Superhuman, Material 3, Radix/Geist). Research briefs: session tasks
 `a799b3e49391cc869` (competitors) + `a2d88b131919531c0` (standards).
@@ -33,7 +33,7 @@ F — **⌘K v2** (centered, dim+blur over the real window).
 G — **Shape & state grammar board** — the law all mocks in this gate already obey, including the new
 `--hov`/`--act` tokens.
 
-## Round-3 calls for Seth
+## Round-3 calls for the maintainer
 
 1. Does Inbox-in-the-chassis settle the "built for modules" doubt? If not, what still feels off?
 2. Collapse grammar (⌘0 / ⌥⌘L / warm edge / remembered) — approve?
@@ -42,13 +42,13 @@ G — **Shape & state grammar board** — the law all mocks in this gate already
 5. ⌘K backdrop: dim+blur as mocked, or dim-only?
 6. Grammar board → fold into DESIGN.md as component law on approval.
 
-## Verdict (Seth, 2026-06-11)
+## Verdict (the maintainer, 2026-06-11)
 
 - ✅ **Focus mode — approved** ("I love the focus mode").
 - ✅ **⌘K v2 — approved** ("and the updated search").
 - 🔁 **Editor footer** — replace with a floating bottom status pill: where saved · character count · last updated → r4.
 - 🔁 **Rail collapsing** — needs visible toggle buttons, not hotkeys-only → r4.
-- 🐛 **Light mode invisible** — Seth's system dark + the kit's `prefers-color-scheme` rule flipped the whole gate dark, including the "Light" demo. Fixed: all gates pin `data-theme="light"`; dark is explicit-only (`.rotli-dark`).
+- 🐛 **Light mode invisible** — the maintainer's system dark + the kit's `prefers-color-scheme` rule flipped the whole gate dark, including the "Light" demo. Fixed: all gates pin `data-theme="light"`; dark is explicit-only (`.rotli-dark`).
 - ❓ **Inbox** — "how are we talking to people, where are conversations saved, v1 is local only?" → answered in r4 frame C (email client over your own accounts; provider is the source of truth; local SQLite cache; no rotli server; v1 = Notes only, Inbox = Phase 5).
 - 📌 Reaffirmed: **v1 editor is markdown-style**; doc-style is a later view mode.
 

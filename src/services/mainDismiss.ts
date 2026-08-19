@@ -1,4 +1,4 @@
-// Dismissing a note from Main discards it when it's blank (Seth, 2026-07-07;
+// Dismissing a note from Main discards it when it's blank (the maintainer, 2026-07-07;
 // hardened 2026-07-17): a blank scratch note you pulled into Main and never
 // wrote in shouldn't linger in the corpus — and it bypasses the in-app Trash
 // (corpus_discard_blank), because a never-written note was "just a view".

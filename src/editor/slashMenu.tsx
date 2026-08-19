@@ -1,4 +1,4 @@
-// The "/" slash menu (Seth 2026-06-13): type "/" at the start of an empty
+// The "/" slash menu (the maintainer 2026-06-13): type "/" at the start of an empty
 // active line in the editor to insert a block. A LOCAL editor affordance, not
 // a global key surface — CmEditor owns the open/query/index state and drives
 // this purely as a presentational popover anchored under the active row. Each
@@ -38,7 +38,7 @@ export type SlashOp =
   | { kind: "divider" }
   | { kind: "fence"; lang: "" | "math" | "mermaid" }
   | { kind: "picker"; mode: SlashPickerMode }
-  /** Opens the AI image popover (engine + prompt) — Seth, 2026-08-04. */
+  /** Opens the AI image popover (engine + prompt) — the maintainer, 2026-08-04. */
   | { kind: "imageGen" };
 
 export interface SlashItem {

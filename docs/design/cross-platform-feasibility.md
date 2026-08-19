@@ -16,11 +16,11 @@ the codebase was written *anticipating* this port: the seam count is small,
 finite, and mostly already fenced. This document maps exactly what it takes to
 honor Tauri's cross-platform nature.
 
-**The vision (Seth):** rotli should run on Linux, macOS, and Windows. The
+**The vision (the maintainer):** rotli should run on Linux, macOS, and Windows. The
 on-device AI layer can stay Mac-only for now (MLX is Apple-Silicon-only), but the
 architecture should make adding a non-Mac AI backend (Ollama / llama.cpp) *easy*
 later — a swappable adapter, not a rewrite. Everything else should run
-everywhere. Seth has only a Mac, so the testing story for Linux/Windows has to
+everywhere. the maintainer has only a Mac, so the testing story for Linux/Windows has to
 lean on CI + VMs/containers + cheap cloud boxes.
 
 ## Headline findings (read this first)
@@ -126,7 +126,7 @@ never builds off-Mac. The Tauri plugins in use — `global-shortcut`, `deep-link
 
 ---
 
-## The AI-backend adapter (the "easy to add later" that Seth wants)
+## The AI-backend adapter (the "easy to add later" that the maintainer wants)
 
 ### Why it's already close
 
@@ -205,7 +205,7 @@ egress.
 
 **Substantive (a week or more, real design):**
 - The **`LocalAiBackend` adapter** + `OllamaBackend` (seam #2/#3/#7). This is
-  the one genuinely new subsystem, and it's the feature Seth explicitly wants
+  the one genuinely new subsystem, and it's the feature the maintainer explicitly wants
   built for extensibility. Mostly a refactor of existing code behind a trait
   plus a modest Ollama implementation.
 - **Doc conversion** off-Mac (seam #8) if we want parity — pandoc integration.
@@ -275,7 +275,7 @@ blocking "usable.")*
 
 ## Testing story for a Mac-only developer
 
-Seth can validate Linux/Windows without owning either, using layers already
+the maintainer can validate Linux/Windows without owning either, using layers already
 partly in place:
 
 1. **CI is the primary gate — and the split already exists.** The regression
@@ -294,7 +294,7 @@ partly in place:
    `windows-latest` lane later.
 
 2. **A Linux VM/container for manual smoke.** A Docker container or a UTM/Lima
-   Linux VM on Seth's Mac runs the AppImage/deb for hands-on verification of the
+   Linux VM on the maintainer's Mac runs the AppImage/deb for hands-on verification of the
    things CI can't see (window chrome, tray, file dialogs, actual reveal-in-files
    behavior). For the Ollama path, the container runs Ollama alongside.
 
@@ -346,7 +346,7 @@ punch-list — and a green build proves the "usable everywhere" MVP (Phase 0) is
 1–2 week reach, not a research project.
 
 Then decide, with that punch-list in hand, whether to chase Phase 1 (Linux local
-AI via Ollama — the extensible adapter Seth wants) immediately or ship the Phase
+AI via Ollama — the extensible adapter the maintainer wants) immediately or ship the Phase
 0 remote-AI Linux build first and let real Linux users pull it.
 
 ---

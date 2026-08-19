@@ -220,7 +220,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
       consecutiveBad += 1;
       // an INVALID reply (e.g. naming a tool that's off for this chat) gets its
       // PRECISE reason back so the model fixes the right thing; only a truly
-      // UNPARSEABLE reply gets the JSON-shape nudge (Seth, 2026-06-30 — audit).
+      // UNPARSEABLE reply gets the JSON-shape nudge (the maintainer, 2026-06-30 — audit).
       const baseResult =
         parsed.kind === "invalid"
           ? `error: ${parsed.reason}. Reply with ONE JSON object: {"tool":…,"args":…}, {"question":"…","options":["…","…"]}, or {"final":"…"}.`

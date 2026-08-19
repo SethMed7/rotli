@@ -13,25 +13,44 @@
  */
 import { readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { renderMp3, parseSegments } from "./tts";
+
+import { LLM } from "./llm";
 import { stripMarkdown } from "./markdown-text";
 import { BRIEFS, AUDIOS } from "./paths";
-import { LLM } from "./llm";
+import { renderMp3, parseSegments } from "./tts";
 import type { GenerateResponse } from "./wire-types";
 
 // 1. Resolve issue
 const stemArg = process.argv[2];
-const mornings = readdirSync(BRIEFS).filter((f) => /^\d{4}-\d{2}-\d{2}\.md$/.test(f)).sort();
+const mornings = readdirSync(BRIEFS)
+  .filter((f) => /^\d{4}-\d{2}-\d{2}\.md$/.test(f))
+  .sort();
 const stem = stemArg ?? mornings.at(-1)?.replace(".md", "");
-if (!stem) { console.error("ERR no briefs found"); process.exit(1); }
-const kind: "morning" | "lunch" | "night" = stem.endsWith("-lunch") ? "lunch" : stem.endsWith("-night") ? "night" : "morning";
+if (!stem) {
+  console.error("ERR no briefs found");
+  process.exit(1);
+}
+const kind: "morning" | "lunch" | "night" = stem.endsWith("-lunch")
+  ? "lunch"
+  : stem.endsWith("-night")
+    ? "night"
+    : "morning";
 const date = stem.slice(0, 10);
 const mdPath = join(BRIEFS, `${stem}.md`);
-const md = await Bun.file(mdPath).text().catch(() => null);
-if (!md) { console.error(`ERR no brief markdown at ${mdPath}`); process.exit(1); }
+const md = await Bun.file(mdPath)
+  .text()
+  .catch(() => null);
+if (!md) {
+  console.error(`ERR no brief markdown at ${mdPath}`);
+  process.exit(1);
+}
 
 // 2. Spoken script — local Gemma rewrite, stripMarkdown (markdown-text.ts) fallback
-const niceDate = new Date(date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+const niceDate = new Date(date + "T12:00:00").toLocaleDateString("en-US", {
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+});
 
 // Shared handoff protocol — prevents hosts referring to themselves in the third person or thanking
 // themselves (an earlier bug: Ava's "thanks, Marcus" landed inside Marcus's own block).
@@ -57,7 +76,7 @@ THE CAST (marker → host):
 [[personal]] — EMMA, the culture host: personal section (chess, entertainment, hobbies)
 Start the script with [[anchor]]; switch markers whenever the topic class changes (usually 4-6 handoffs total). Never hand off by role ("over to the security desk" is banned) — always by name.
 
-BRIEF VOICE — informational and forward-looking, not alarmist: the goal is to help Seth stay ahead of the curve, not to frighten him. Lead with the single biggest or most interesting story of the day (usually a major AI/model/company/ecosystem move — NOT a security item). Give Marcus's security beat only the space it genuinely warrants; never let warnings set the overall tone. Only include Marcus's [[security]] block when the brief has real security items — if it doesn't, skip that handoff entirely.
+BRIEF VOICE — informational and forward-looking, not alarmist: the goal is to help the maintainer stay ahead of the curve, not to frighten him. Lead with the single biggest or most interesting story of the day (usually a major AI/model/company/ecosystem move — NOT a security item). Give Marcus's security beat only the space it genuinely warrants; never let warnings set the overall tone. Only include Marcus's [[security]] block when the brief has real security items — if it doesn't, skip that handoff entirely.
 
 ${HANDOFF}
 
@@ -126,7 +145,12 @@ if (script) {
   script = stripMarkdown(script);
 } else {
   scriptSource = "fallback-strip";
-  const opener = kind === "morning" ? "Good morning" : kind === "lunch" ? "Hey, your lunch pivot" : "Evening, your nightcap";
+  const opener =
+    kind === "morning"
+      ? "Good morning"
+      : kind === "lunch"
+        ? "Hey, your lunch pivot"
+        : "Evening, your nightcap";
   script = `${opener} — ${date}. ${stripMarkdown(md)}`.slice(0, 9000);
 }
 // The saved script file (and the markdown/PDF) must NEVER contain the weekly passphrase — it's
@@ -139,11 +163,15 @@ if (pass && kind === "morning") {
   spoken += `\n\n[[security]]\nOne private note, just for you: this week's Breve access passphrase is "${pass}". You'll need it to enter a protected space. Keep it to yourself.`;
 }
 const segs = parseSegments(spoken);
-console.log(`[audio-brief] script ready (${script.split(/\s+/).length} words, via ${scriptSource}, ${segs.map((s) => s.voice).join(" → ")})${pass && kind === "morning" ? " +passphrase" : ""}`);
+console.log(
+  `[audio-brief] script ready (${script.split(/\s+/).length} words, via ${scriptSource}, ${segs.map((s) => s.voice).join(" → ")})${pass && kind === "morning" ? " +passphrase" : ""}`,
+);
 
 // 3. Render straight into the asset layer (your storage) — the memex keeps only text
 const mp3Path = join(AUDIOS, `${stem}.mp3`);
 const t0 = Date.now();
 const minutes = await renderMp3(spoken, mp3Path);
 const size = Bun.file(mp3Path).size;
-console.log(`OK ${mp3Path} (${(size / 1024 / 1024).toFixed(1)} MB, ${minutes.toFixed(1)} min, rendered in ${((Date.now() - t0) / 1000).toFixed(0)}s)`);
+console.log(
+  `OK ${mp3Path} (${(size / 1024 / 1024).toFixed(1)} MB, ${minutes.toFixed(1)} min, rendered in ${((Date.now() - t0) / 1000).toFixed(0)}s)`,
+);

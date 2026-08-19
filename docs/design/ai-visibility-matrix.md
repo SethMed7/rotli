@@ -1,6 +1,6 @@
 # AI visibility matrix — what each class of model can see and change
 
-Status: ACCEPTED (2026-08-01) · Owner: Seth · Implements Seth's directive of
+Status: ACCEPTED (2026-08-01) · Owner: the maintainer · Implements the maintainer's directive of
 2026-08-01.
 
 The normative rules live in
@@ -19,7 +19,7 @@ that shaped the policy. Where the two disagree, the contract wins.
 > they can see everything but the secure notes. Locked notes open-weight can see
 > but can't edit. There is a difference between locked and secured. Locked means
 > AI can't edit it. Secure means frontier/API-based AI can't see it, only local
-> AI can see secure notes." — Seth, 2026-08-01
+> AI can see secure notes." — the maintainer, 2026-08-01
 
 Two controls, two axes. They are independent and were previously conflated.
 
@@ -227,7 +227,7 @@ persuasion: no prompt makes them yield.
 
 ### T2 — A local chat launders secure content into a note a frontier chat later reads
 
-This is the case Seth's flip makes common: on-device models now read secure
+This is the case the maintainer's flip makes common: on-device models now read secure
 notes routinely, so a chat's transcript is far more often secure-bearing.
 
 **Policy — secure content flows only into secure containers. Taint propagates;

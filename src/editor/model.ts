@@ -161,7 +161,7 @@ export function editDocument(noteId: string, edit: (lines: readonly string[]) =>
   if (!current) return;
   // the single funnel every real keystroke passes through — a session-created
   // note stops being an ephemeral blank draft the moment it's written into,
-  // and an edited PREVIEW tab becomes a kept tab (Seth, 2026-07-28)
+  // and an edited PREVIEW tab becomes a kept tab (the maintainer, 2026-07-28)
   markNoteDraftChanged(noteId);
   keepTabsFor(noteId);
   docs.set(noteId, edit(current));

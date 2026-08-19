@@ -1,4 +1,4 @@
-// The Board (Seth, 2026-06-19): quick captures collected as cards, NOT dumped
+// The Board (the maintainer, 2026-06-19): quick captures collected as cards, NOT dumped
 // into your note list. ⌥C drops a card here (a real .md in Board/, hidden from
 // All Notes until merged). Click cards to multi-select, then MERGE the selected
 // ones into a single joint note (in Inbox) — the originals are archived
@@ -48,7 +48,7 @@ function reportLifecycleFailures(
 
 export function BoardSurface() {
   const stagedData = useNotes(DEST.board).data;
-  // a CURATED note is a full note, not a passing capture (Seth, 2026-07-01: "my
+  // a CURATED note is a full note, not a passing capture (the maintainer, 2026-07-01: "my
   // main note should not be in Captures") — anything placed in Main or starred
   // for Quick access leaves the board, even while it still lives in _inbox
   // staging. Sidebar's Captures count applies the same rule.
@@ -110,7 +110,7 @@ export function BoardSurface() {
   // newest-first spot from listNotes.
   const ordered = useMemo(() => {
     const pos = new Map(captureOrder.map((id, i) => [id, i] as const));
-    // pinned captures FLOAT above the manual order (Seth, 2026-07-09) — the
+    // pinned captures FLOAT above the manual order (the maintainer, 2026-07-09) — the
     // saved order itself is untouched, same rule as Main
     return [...captures].sort(
       (a, b) =>
@@ -278,7 +278,7 @@ export function BoardSurface() {
 
       {captures.length === 0 ? (
         <div className="list-empty">
-          <Character name="rest" size={104} className="be-quokka" />
+          <Character name="listening" size={104} className="be-quokka" />
           <p className="be-title">Nothing captured yet</p>
           <p className="be-sub">
             Press your Quick capture shortcut (⌥C) from anywhere — each thought lands here as a card. Select a

@@ -27,12 +27,12 @@ import {
   corpusResolveRef,
   fileAssetUrl,
   isTauri,
-  openUrl,
   type BreveDeliverySettings,
   type BrevePdfPalette,
   type BrevePdfTheme,
   type BrevePdfThemePreset,
 } from "../../lib/tauri";
+import { useNow } from "../../lib/useNow";
 import {
   EMPTY_BREVE_SNAPSHOT,
   formatNextRoutine,
@@ -287,6 +287,7 @@ function BriefAudio({ path }: { path: string }) {
 
 function DashboardView({ snapshot }: { snapshot: BreveSnapshot }) {
   const setView = useUiStore((s) => s.setBreveView);
+  const openBrowser = usePanesStore((s) => s.openBrowser);
   const issues = useMemo(
     () =>
       sortBriefs(snapshot.briefs)
@@ -321,7 +322,7 @@ function DashboardView({ snapshot }: { snapshot: BreveSnapshot }) {
     queryFn: () => corpusFileText(current!.path!, BRIEF_READ_BYTES),
   });
   const digest = useMemo(() => briefDashboardDigest(body.data ?? ""), [body.data]);
-  const now = Date.now();
+  const now = useNow();
   const upcoming = snapshot.config.routines
     .filter((routine) => routine.enabled)
     .map((routine) => ({
@@ -423,6 +424,25 @@ function DashboardView({ snapshot }: { snapshot: BreveSnapshot }) {
                   <div>
                     <h4>{story.title}</h4>
                     <p>{story.summary}</p>
+                    {story.sources.length > 0 && (
+                      <div
+                        className="breve-dashboard-story-sources"
+                        aria-label={`Sources for ${story.title}`}
+                      >
+                        {story.sources.map((source) => (
+                          <a
+                            key={source.url}
+                            href={source.url}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              openBrowser(source.url);
+                            }}
+                          >
+                            {source.label} <ExternalLinkGlyph size={10} />
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </article>
               ))}
@@ -552,10 +572,17 @@ function DashboardView({ snapshot }: { snapshot: BreveSnapshot }) {
               </div>
               <div className="breve-dashboard-resources">
                 {digest.resources.map((resource) => (
-                  <button type="button" key={resource.url} onClick={() => void openUrl(resource.url)}>
+                  <a
+                    key={resource.url}
+                    href={resource.url}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      openBrowser(resource.url);
+                    }}
+                  >
                     <span>{resource.label}</span>
                     <ExternalLinkGlyph size={12} />
-                  </button>
+                  </a>
                 ))}
               </div>
             </section>
@@ -620,7 +647,7 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
   const [briefQuery, setBriefQuery] = useState("");
   const [briefKind, setBriefKind] = useState<"all" | "morning" | "lunch" | "night">("all");
   // which brief the inline reader shows — reading happens HERE, never by
-  // leaving Breve (Seth, 2026-07-30); default = the latest readable brief
+  // leaving Breve (the maintainer, 2026-07-30); default = the latest readable brief
   const [openStem, setOpenStem] = useState<string | null>(null);
   const readerRef = useRef<HTMLElement | null>(null);
   const briefs = useMemo(() => sortBriefs(snapshot.briefs), [snapshot.briefs]);
@@ -646,7 +673,7 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
       (!normalizedBriefQuery ||
         `${brief.title} ${brief.date} ${brief.kind}`.toLowerCase().includes(normalizedBriefQuery)),
   );
-  const now = Date.now();
+  const now = useNow();
   const nextBriefRoutine = snapshot.config.routines
     .filter((routine) => routine.enabled && routine.kind === "brief")
     .map((routine) => ({
@@ -753,7 +780,7 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
                 setSidebarMode("notes");
                 // briefs travel as REL paths but openNote is an id-only door —
                 // resolve to the note's wire ULID first, or the tab opens on an
-                // unresolvable id and renders "Untitled" (Seth, 2026-07-31)
+                // unresolvable id and renders "Untitled" (the maintainer, 2026-07-31)
                 void corpusResolveRef(current.path!)
                   .then((id) => openNote(id))
                   .catch(() => openNote(current.path!));
@@ -965,7 +992,7 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
   const configJson = useMemo(() => JSON.stringify(config), [config]);
   const baseJson = useMemo(() => JSON.stringify(base), [base]);
   const dirty = configJson !== baseJson;
-  const now = Date.now();
+  const now = useNow();
   useBreveDraftGuard(dirty);
 
   useEffect(() => {
@@ -1035,7 +1062,7 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
     }
   };
 
-  // ── custom routines (Seth, 2026-07-31): add/remove + per-routine prompts ──
+  // ── custom routines (the maintainer, 2026-07-31): add/remove + per-routine prompts ──
   const [promptOpen, setPromptOpen] = useState<string | null>(null);
   /** Which routine's workflow graph is expanded (2026-08-04). */
   const [flowOpen, setFlowOpen] = useState<string | null>(null);
@@ -1468,7 +1495,7 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
   );
 }
 
-/** The brief system prompt, surfaced (Seth, 2026-07-31: "the briefs have a
+/** The brief system prompt, surfaced (the maintainer, 2026-07-31: "the briefs have a
  * system prompt let me see that prompt and I should be able to modify them").
  * Edits write a sync-immune override; Reset returns to the shipped default.
  * Applies to the next scheduled brief — no restart needed. */

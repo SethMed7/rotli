@@ -19,12 +19,30 @@
 
 import { type HybridPreset, PROVIDER_IDS, type ProviderId } from "../ai/models";
 import { parseWebSearchProvider, type WebSearchProvider } from "../ai/searchProvider";
+import {
+  QUOKKA_IDLE_POSES,
+  QUOKKA_ACCESSORIES,
+  QUOKKA_LINE_COLORS,
+  QUOKKA_STYLES,
+  type QuokkaAccessory,
+  type QuokkaIdlePose,
+  type QuokkaLineColor,
+  type QuokkaStyle,
+  normalizeQuokkaAccessoryHue,
+  normalizeQuokkaCustomHue,
+  quokkaHueFromLegacyColor,
+} from "../brand/quokka";
 import { useBindingsStore } from "../keys/bindings";
 import { toAccelerator } from "../keys/chords";
 import { allActions } from "../keys/registry";
 // the quit-flush ack listener must exist from first paint — an idle ⌘Q acks
 // instantly instead of riding out the Rust-side hold (#4).
 import { createDebouncedTask } from "../lib/debouncedTask";
+import {
+  DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE,
+  PRIVATE_BROWSER_SEARCH_ENGINES,
+  type PrivateBrowserSearchEngine,
+} from "../lib/privateBrowser";
 import { onQuitFlush } from "../lib/quitFlush";
 import {
   appSettingsRead,
@@ -64,9 +82,11 @@ import {
   ALL_NOTES,
   type BreveView,
   CHAT_ARTIFACT_OPENS,
+  CHAT_NAVIGATOR_STYLES,
   CHAT_NAMINGS,
   CHAT_WELCOME_STYLES,
   type ChatArtifactOpen,
+  type ChatNavigatorStyle,
   type ChatNaming,
   type ChatReasoningEffort,
   type ChatServiceTier,
@@ -81,10 +101,13 @@ import {
   ORGANIZER_TRUSTS,
   type OrganizerModel,
   type OrganizerTrust,
+  PANE_VAULT_MODES,
+  type PaneVaultMode,
   RECENT,
   RESERVED_DESTS,
   SEC_SYSTEM,
   TAB_LAYOUTS,
+  THEME_FAMILIES,
   TIME_FORMATS,
   type TimeFormat,
   type TabLayout,
@@ -123,7 +146,6 @@ function asEnum<T extends string>(v: unknown, allowed: readonly T[], fallback: T
 }
 
 const THEME_SETTINGS: readonly ThemeSetting[] = ["light", "dark", "system"];
-const THEME_FAMILIES: readonly ThemeFamily[] = ["warm", "mono"];
 const SYNTAX_PALETTES: readonly SyntaxPalette[] = ["rotli", "mono"];
 const MEASURES: readonly Measure[] = ["narrow", "comfort", "wide"];
 
@@ -197,17 +219,27 @@ interface PersistedSettings {
   v: 1;
   theme: ThemeSetting;
   themeFamily: ThemeFamily;
-  matchLightFamily: ThemeFamily;
-  matchDarkFamily: ThemeFamily;
   syntaxPalette: SyntaxPalette;
   accentColor: AccentColor;
   accentHue: number;
+  quokkaCompanionEnabled: boolean;
+  quokkaStyle: QuokkaStyle;
+  quokkaCustomHue: number;
+  quokkaLineColor: QuokkaLineColor;
+  quokkaAccessory: QuokkaAccessory;
+  quokkaAccessoryHue: number;
+  quokkaIdlePose: QuokkaIdlePose;
+  chatNavigatorStyle: ChatNavigatorStyle;
   stayOpen: boolean;
   showInDock: boolean;
   /** What the generic New tab command creates. Markdown remains the safe default. */
   newTabDefault: NewItemKind;
   /** Crowded pane tabs either scroll at a readable floor or shrink to fit. */
   tabLayout: TabLayout;
+  /** Installation-wide provider used for private-browser searches. */
+  privateBrowserSearchEngine: PrivateBrowserSearchEngine;
+  /** Whether linked-vault content may share the pane workspace. */
+  paneVaultMode: PaneVaultMode;
   /** Editor spell-check (red squiggles); on by default. */
   spellcheck: boolean;
   /** Images follow their note into Archive/Trash (sole references only). */
@@ -304,7 +336,7 @@ interface PersistedSettings {
   /** First-run checkpoint that survives a vault-selection relaunch. */
   onboardingPhase: "preferences" | "vault" | "models";
   /** The Quick Note window's capped set, remembered note, and new-note folder
-   * (Seth, 2026-06-15). */
+   * (the maintainer, 2026-06-15). */
   quickNoteIds: string[];
   captureOrder: string[];
   quickActiveId: string | null;
@@ -313,7 +345,7 @@ interface PersistedSettings {
   captureVaultId: string | null;
   /** The ONE sidebar's collapse state + width, and which dests are expanded —
    * the two-rail keys (foldersCollapsed/listCollapsed/lastOpenRails/
-   * foldersWidth/listWidth) are retired (Seth, 2026-06-13). */
+   * foldersWidth/listWidth) are retired (the maintainer, 2026-06-13). */
   sidebarCollapsed: boolean;
   sidebarWidth: number;
   /** Sidebar tree zoom factor (⌘+/⌘− with focus in the sidebar). */
@@ -349,14 +381,29 @@ const APP_SETTINGS_KEYS = new Set([
   "v",
   "theme",
   "themeFamily",
+  // Retired independent System pair. System now follows the OS within the one
+  // selected theme family.
   "matchLightFamily",
   "matchDarkFamily",
   "syntaxPalette",
   "accentColor",
   "accentHue",
+  "quokkaCompanionEnabled",
+  "quokkaStyle",
+  "quokkaCustomHue",
+  "quokkaLineColor",
+  // Retired native color-well key: recognized so it migrates once and is not
+  // preserved forever as an unknown setting.
+  "quokkaCustomColor",
+  "quokkaAccessory",
+  "quokkaAccessoryHue",
+  "quokkaIdlePose",
+  "chatNavigatorStyle",
   "stayOpen",
   "showInDock",
   "tabLayout",
+  "privateBrowserSearchEngine",
+  "paneVaultMode",
   "userName",
   "timeFormat",
   "chatWelcomeStyle",
@@ -463,8 +510,6 @@ export function parseSettings(raw: string): PersistedSettings {
     v: 1,
     theme: asEnum(data.theme, THEME_SETTINGS, "light"),
     themeFamily: asEnum(data.themeFamily, THEME_FAMILIES, "warm"),
-    matchLightFamily: asEnum(data.matchLightFamily, THEME_FAMILIES, "warm"),
-    matchDarkFamily: asEnum(data.matchDarkFamily, THEME_FAMILIES, "warm"),
     syntaxPalette: asEnum(data.syntaxPalette, SYNTAX_PALETTES, "rotli"),
     accentColor: asEnum(data.accentColor, ACCENT_COLORS, "default"),
     accentHue:
@@ -474,10 +519,27 @@ export function parseSettings(raw: string): PersistedSettings {
       data.accentHue <= 359
         ? Math.round(data.accentHue)
         : DEFAULT_ACCENT_HUE,
+    quokkaCompanionEnabled: asBool(data.quokkaCompanionEnabled, false),
+    quokkaStyle: asEnum(data.quokkaStyle, QUOKKA_STYLES, "cocoa"),
+    quokkaCustomHue:
+      data.quokkaCustomHue === undefined
+        ? quokkaHueFromLegacyColor(data.quokkaCustomColor)
+        : normalizeQuokkaCustomHue(data.quokkaCustomHue),
+    quokkaLineColor: asEnum(data.quokkaLineColor, QUOKKA_LINE_COLORS, "black"),
+    quokkaAccessory: asEnum(data.quokkaAccessory, QUOKKA_ACCESSORIES, "none"),
+    quokkaAccessoryHue: normalizeQuokkaAccessoryHue(data.quokkaAccessoryHue),
+    quokkaIdlePose: asEnum(data.quokkaIdlePose, QUOKKA_IDLE_POSES, "rest"),
+    chatNavigatorStyle: asEnum(data.chatNavigatorStyle, CHAT_NAVIGATOR_STYLES, "paws"),
     stayOpen: asBool(data.stayOpen, false),
     showInDock: asBool(data.showInDock, false),
     newTabDefault: asEnum(data.newTabDefault, NEW_ITEM_KINDS, DEFAULT_NEW_ITEM_KIND),
     tabLayout: asEnum(data.tabLayout, TAB_LAYOUTS, "scroll"),
+    privateBrowserSearchEngine: asEnum(
+      data.privateBrowserSearchEngine,
+      PRIVATE_BROWSER_SEARCH_ENGINES,
+      DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE,
+    ),
+    paneVaultMode: asEnum(data.paneVaultMode, PANE_VAULT_MODES, "single"),
     spellcheck: asBool(data.spellcheck, true),
     tidyImagesWithNote: asBool(data.tidyImagesWithNote, true),
     rawEditor: asBool(data.rawEditor, false),
@@ -575,7 +637,7 @@ export function parseSettings(raw: string): PersistedSettings {
         : "default",
     // hide is the safe default — metadata never surprises a fresh (or old) config
     fileMetadata: data.fileMetadata === "show" ? "show" : "hide",
-    // Organize is the DEFAULT rung (Seth, 2026-07-02): the daemon only ever
+    // Organize is the DEFAULT rung (the maintainer, 2026-07-02): the daemon only ever
     // changes a note's location + metadata — journaled and undoable, never the
     // note's words — so full auto-organize is the intended out-of-box behavior.
     // An unknown rung (hand-edit, future build) falls to the same default.
@@ -655,6 +717,9 @@ export function unknownSettingsKeys(raw: string): Record<string, unknown> {
     "glassClarity",
     "glassBlur",
     "glassCanvas",
+    "vaultWelcomeSeen",
+    "matchLightFamily",
+    "matchDarkFamily",
   ]);
   return Object.fromEntries(Object.entries(data).filter(([key]) => !known.has(key) && !retired.has(key)));
 }
@@ -663,15 +728,23 @@ function applySettings(s: PersistedSettings): void {
   useUiStore.setState({
     theme: s.theme,
     themeFamily: s.themeFamily,
-    matchLightFamily: s.matchLightFamily,
-    matchDarkFamily: s.matchDarkFamily,
     syntaxPalette: s.syntaxPalette,
     accentColor: s.accentColor,
     accentHue: s.accentHue,
+    quokkaCompanionEnabled: s.quokkaCompanionEnabled,
+    quokkaStyle: s.quokkaStyle,
+    quokkaCustomHue: s.quokkaCustomHue,
+    quokkaLineColor: s.quokkaLineColor,
+    quokkaAccessory: s.quokkaAccessory,
+    quokkaAccessoryHue: s.quokkaAccessoryHue,
+    quokkaIdlePose: s.quokkaIdlePose,
+    chatNavigatorStyle: s.chatNavigatorStyle,
     stayOpen: s.stayOpen,
     showInDock: s.showInDock,
     newTabDefault: s.newTabDefault,
     tabLayout: s.tabLayout,
+    privateBrowserSearchEngine: s.privateBrowserSearchEngine,
+    paneVaultMode: s.paneVaultMode,
     spellcheck: s.spellcheck,
     tidyImagesWithNote: s.tidyImagesWithNote,
     rawEditor: s.rawEditor,
@@ -739,14 +812,22 @@ function applyAppSettings(s: PersistedSettings): void {
   useUiStore.setState({
     theme: s.theme,
     themeFamily: s.themeFamily,
-    matchLightFamily: s.matchLightFamily,
-    matchDarkFamily: s.matchDarkFamily,
     syntaxPalette: s.syntaxPalette,
     accentColor: s.accentColor,
     accentHue: s.accentHue,
+    quokkaCompanionEnabled: s.quokkaCompanionEnabled,
+    quokkaStyle: s.quokkaStyle,
+    quokkaCustomHue: s.quokkaCustomHue,
+    quokkaLineColor: s.quokkaLineColor,
+    quokkaAccessory: s.quokkaAccessory,
+    quokkaAccessoryHue: s.quokkaAccessoryHue,
+    quokkaIdlePose: s.quokkaIdlePose,
+    chatNavigatorStyle: s.chatNavigatorStyle,
     stayOpen: s.stayOpen,
     showInDock: s.showInDock,
     tabLayout: s.tabLayout,
+    privateBrowserSearchEngine: s.privateBrowserSearchEngine,
+    paneVaultMode: s.paneVaultMode,
     userName: s.userName,
     timeFormat: s.timeFormat,
     chatWelcomeStyle: s.chatWelcomeStyle,
@@ -765,14 +846,22 @@ function withAppSettings(vault: PersistedSettings, app: PersistedSettings): Pers
     ...vault,
     theme: app.theme,
     themeFamily: app.themeFamily,
-    matchLightFamily: app.matchLightFamily,
-    matchDarkFamily: app.matchDarkFamily,
     syntaxPalette: app.syntaxPalette,
     accentColor: app.accentColor,
     accentHue: app.accentHue,
+    quokkaCompanionEnabled: app.quokkaCompanionEnabled,
+    quokkaStyle: app.quokkaStyle,
+    quokkaCustomHue: app.quokkaCustomHue,
+    quokkaLineColor: app.quokkaLineColor,
+    quokkaAccessory: app.quokkaAccessory,
+    quokkaAccessoryHue: app.quokkaAccessoryHue,
+    quokkaIdlePose: app.quokkaIdlePose,
+    chatNavigatorStyle: app.chatNavigatorStyle,
     stayOpen: app.stayOpen,
     showInDock: app.showInDock,
     tabLayout: app.tabLayout,
+    privateBrowserSearchEngine: app.privateBrowserSearchEngine,
+    paneVaultMode: app.paneVaultMode,
     userName: app.userName,
     timeFormat: app.timeFormat,
     chatWelcomeStyle: app.chatWelcomeStyle,
@@ -842,6 +931,7 @@ export function validTab(v: unknown, alive: Set<string>): Tab | null {
       id: o.id,
       surfaceKind: "chat",
       chatSlug: typeof o.chatSlug === "string" ? o.chatSlug : null,
+      ...(typeof o.vaultId === "string" && o.vaultId ? { vaultId: o.vaultId } : {}),
     };
   }
   // file: like canvas, ids are paths (no alive-set) — FileSurface itself shows
@@ -854,6 +944,9 @@ export function validTab(v: unknown, alive: Set<string>): Tab | null {
   if (o.surfaceKind === "activity") {
     return { id: o.id, surfaceKind: "activity" };
   }
+  // Private browser tabs are session-only by product contract. Explicitly
+  // discard them at hydration so URLs/history can never survive a relaunch.
+  if (o.surfaceKind === "browser") return null;
   if (o.surfaceKind !== "note") return null;
   if (typeof o.noteId !== "string" || !alive.has(o.noteId)) return null;
   return { id: o.id, surfaceKind: "note", noteId: o.noteId, ...preview };
@@ -944,7 +1037,7 @@ async function hydrateViewstate(): Promise<void> {
   // reserved dest ids (Inbox/vault:/Storage/Board/Archive/Trash) join the smart
   // rows + real folders in the valid set, so a fresh corpus that selected a
   // destination before its first list resolved isn't reset to All Notes
-  // (Seth, 2026-06-13). A stored "Brain" id from before the rename is no longer
+  // (the maintainer, 2026-06-13). A stored "Brain" id from before the rename is no longer
   // reserved — it's restored only if "Brain" is still a real folder, else
   // ignored (falls back to ALL_NOTES), never a crash (Invariant 6).
   const folderIds = new Set<string>([ALL_NOTES, RECENT, ...RESERVED_DESTS, ...folders.map((f) => f.id)]);
@@ -1204,10 +1297,7 @@ async function gcPersistedMaps(): Promise<void> {
 /** Apply the restored theme before React's first paint. */
 function prePaint(): void {
   const s = useUiStore.getState();
-  applyTheme(s.theme, s.themeFamily, {
-    light: s.matchLightFamily,
-    dark: s.matchDarkFamily,
-  });
+  applyTheme(s.theme, s.themeFamily);
   applySyntaxPalette(s.syntaxPalette);
   applyAccent(s.accentColor, s.accentHue);
 }
@@ -1273,8 +1363,6 @@ export async function hydratePersistedState(): Promise<void> {
     useUiStore.setState({
       theme: "system",
       themeFamily: "mono",
-      matchLightFamily: "mono",
-      matchDarkFamily: "mono",
       syntaxPalette: "rotli",
       accentColor: "default",
       accentHue: DEFAULT_ACCENT_HUE,
@@ -1285,8 +1373,6 @@ export async function hydratePersistedState(): Promise<void> {
       ...shellSettings,
       theme: "system",
       themeFamily: "mono",
-      matchLightFamily: "mono",
-      matchDarkFamily: "mono",
     };
   }
   if (isMainSurface()) {
@@ -1304,14 +1390,22 @@ function appSettingsSnapshot(): string {
     v: 1,
     theme: ui.theme,
     themeFamily: ui.themeFamily,
-    matchLightFamily: ui.matchLightFamily,
-    matchDarkFamily: ui.matchDarkFamily,
     syntaxPalette: ui.syntaxPalette,
     accentColor: ui.accentColor,
     accentHue: ui.accentHue,
+    quokkaCompanionEnabled: ui.quokkaCompanionEnabled,
+    quokkaStyle: ui.quokkaStyle,
+    quokkaCustomHue: ui.quokkaCustomHue,
+    quokkaLineColor: ui.quokkaLineColor,
+    quokkaAccessory: ui.quokkaAccessory,
+    quokkaAccessoryHue: ui.quokkaAccessoryHue,
+    quokkaIdlePose: ui.quokkaIdlePose,
+    chatNavigatorStyle: ui.chatNavigatorStyle,
     stayOpen: ui.stayOpen,
     showInDock: ui.showInDock,
     tabLayout: ui.tabLayout,
+    privateBrowserSearchEngine: ui.privateBrowserSearchEngine,
+    paneVaultMode: ui.paneVaultMode,
     userName: ui.userName,
     timeFormat: ui.timeFormat,
     chatWelcomeStyle: ui.chatWelcomeStyle,
@@ -1331,15 +1425,23 @@ function settingsSnapshot(): string {
     v: 1,
     theme: ui.theme,
     themeFamily: ui.themeFamily,
-    matchLightFamily: ui.matchLightFamily,
-    matchDarkFamily: ui.matchDarkFamily,
     syntaxPalette: ui.syntaxPalette,
     accentColor: ui.accentColor,
     accentHue: ui.accentHue,
+    quokkaCompanionEnabled: ui.quokkaCompanionEnabled,
+    quokkaStyle: ui.quokkaStyle,
+    quokkaCustomHue: ui.quokkaCustomHue,
+    quokkaLineColor: ui.quokkaLineColor,
+    quokkaAccessory: ui.quokkaAccessory,
+    quokkaAccessoryHue: ui.quokkaAccessoryHue,
+    quokkaIdlePose: ui.quokkaIdlePose,
+    chatNavigatorStyle: ui.chatNavigatorStyle,
     stayOpen: ui.stayOpen,
     showInDock: ui.showInDock,
     newTabDefault: ui.newTabDefault,
     tabLayout: ui.tabLayout,
+    privateBrowserSearchEngine: ui.privateBrowserSearchEngine,
+    paneVaultMode: ui.paneVaultMode,
     spellcheck: ui.spellcheck,
     tidyImagesWithNote: ui.tidyImagesWithNote,
     rawEditor: ui.rawEditor,

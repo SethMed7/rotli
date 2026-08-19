@@ -11,6 +11,7 @@ const FALLBACK = "Inbox";
 
 const ROOTS: MemexConfig = {
   activeId: "other",
+  developmentReadOnly: false,
   instances: [
     {
       id: "corpus",
@@ -85,9 +86,9 @@ describe("routeDecision (memex-vs-local)", () => {
 
   test("writable memex + a selected SHELF folder ⇒ memex with that shelf", () => {
     expect(routeDecision("vault:Inbox", false, true, FALLBACK)).toEqual({ kind: "memex", shelf: ["Inbox"] });
-    expect(routeDecision("vault:Myela/Payments", false, true, FALLBACK)).toEqual({
+    expect(routeDecision("vault:Northstar/Payments", false, true, FALLBACK)).toEqual({
       kind: "memex",
-      shelf: ["Myela/Payments"],
+      shelf: ["Northstar/Payments"],
     });
   });
 

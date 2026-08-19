@@ -93,7 +93,7 @@ interface ImageGenState {
 /** The floating format bar (bottom-center, ~42px tall, sitting 16px up) covers
  * the scroller's bottom strip. CM keeps the caret at least this many px above
  * the scroller's bottom edge when scrolling it into view, so typing on the last
- * line pushes the text UP instead of sliding behind the bar (Seth, 2026-06-24).
+ * line pushes the text UP instead of sliding behind the bar (the maintainer, 2026-06-24).
  * Matches the content's 90px bottom padding reserve. */
 const FORMAT_BAR_SCROLL_MARGIN = 88;
 const SCROLL_TO_TOP_THRESHOLD = 160;
@@ -297,7 +297,7 @@ function CmEditorImpl({
   );
   const { notes: searchableNotes } = useSearchableNotes();
   // ARCHIVED notes still exist — their wikilinks must keep resolving (and
-  // opening); only Trash reads as deleted → the missing look (Seth, 2026-07-28:
+  // opening); only Trash reads as deleted → the missing look (the maintainer, 2026-07-28:
   // "if I delete then it should show like that")
   const archivedNotes = useNotes(DEST.archive).data;
 
@@ -584,7 +584,7 @@ function CmEditorImpl({
         EditorView.lineWrapping,
         // never let the caret slide behind the floating format bar: CM treats
         // the bottom strip as invisible when scrolling the caret into view, so
-        // typing the last line pushes the text up instead (Seth, 2026-06-24)
+        // typing the last line pushes the text up instead (the maintainer, 2026-06-24)
         EditorView.scrollMargins.of(() =>
           formatBarRef.current ? { bottom: FORMAT_BAR_SCROLL_MARGIN } : null,
         ),

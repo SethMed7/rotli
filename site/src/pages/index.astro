@@ -1,397 +1,1743 @@
 ---
 import Base from '../layouts/Base.astro';
-import quokka from '../assets/quokka.svg?raw';
-import waving from '../assets/waving.svg?raw';
-import staysLocal from '../assets/stays_local.svg?raw';
+import mark from '../../../src/assets/characters/_logo.svg?raw';
+import waving from '../../../src/assets/characters/filled/cocoa/waving.webp';
+import staysLocal from '../../../src/assets/characters/filled/cocoa/stays_local.webp';
+import celebrating from '../../../src/assets/characters/filled/cocoa/celebrating.webp';
 
-// The release page is the safe indirection: version bumps can land before their
-// signed DMG is published, while /releases/latest always names a real release.
 const RELEASES_URL = 'https://github.com/SethMed7/rotli-releases/releases/latest';
-const DOWNLOAD_URL = RELEASES_URL;
 const GITHUB_URL = 'https://github.com/SethMed7/rotli';
-// the memex-format story — the format lives on as rotli's vault format
-// (the old standalone SethMed7/memex repo is retired), so the story link
-// points at rotli's own releases home rather than a dead repo
-const MEMEX_URL = RELEASES_URL;
 
-const features = [
-  {
-    title: 'your notes, a memex',
-    body: 'one folder holds it all — notes, chats, knowledge, files, even Excalidraw boards. plain files on your Mac, yours to keep.',
-  },
-  {
-    title: 'two fronts',
-    body: 'chat for your models, notes for everything else — with Excalidraw boards built in, saved as plain files in the same folder.',
-  },
-  {
-    title: 'low-pulse',
-    body: '⌥Space and it’s there. dismiss it and it’s gone. no dock icon, no badges, no fuss.',
-  },
+const themeFamilies = [
+  { id: 'rotli', name: 'Rotli' },
+  { id: 'paper', name: 'Paper & Charcoal' },
+  { id: 'ocean', name: 'Ocean' },
+  { id: 'grove', name: 'Grove' },
+  { id: 'iris', name: 'Iris' },
+  { id: 'midnight', name: 'Midnight' },
 ];
 
-const promises = [
-  'Plain Markdown files on your Mac — open them in any editor, back them up, keep them forever.',
-  'Secrets are auto-detected and never sent to a remote model.',
-  'Works fully offline — no account, nothing phones home.',
+const surfaces = [
+  {
+    name: 'Markdown, first',
+    detail: 'Hybrid editing keeps syntax quiet until you need it. Wikilinks, tasks, embeds, Mermaid, and image generation remain readable files on disk.',
+    proof: 'Plain .md · live preview · source view',
+  },
+  {
+    name: 'Documents & sheets',
+    detail: 'DOCX, spreadsheets, and CSV open as conventional editable work surfaces. Rotli preserves their formats instead of flattening everything into notes.',
+    proof: 'Editable locally · ordinary file formats',
+  },
+  {
+    name: 'Boards & diagrams',
+    detail: 'Excalidraw boards live beside everything else. Mermaid keeps readable source while adding visual, code, pan, zoom, and fit modes.',
+    proof: 'Raw .excalidraw · Mermaid stays text',
+  },
+  {
+    name: 'Chat with context',
+    detail: 'Use an on-device model or connect the model tools you already trust. Chat can work from the active vault, create real artifacts, and leave the conversation in place.',
+    proof: 'Local or connected · artifacts stay files',
+  },
 ];
 ---
+
 <Base>
-  <!-- (1) top bar — logo hard-left, GitHub + theme toggle right -->
-  <header class="topbar">
-    <a class="brand" href="/" aria-label="rotli — home">
-      <span class="logo-mark logo-sm" set:html={quokka} />
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Rotli home">
+      <span class="brand-mark" set:html={mark} aria-hidden="true"></span>
       <span class="wordmark">rotli</span>
     </a>
-    <div class="nav-right">
-      <a class="icon-link" href={GITHUB_URL} rel="noopener" aria-label="rotli on GitHub">
-        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
-        </svg>
-      </a>
-      <button id="family-toggle" class="icon-btn thermo" type="button" title="Warm / soft palette" aria-label="Toggle warm / soft palette">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0z"/>
-          <circle class="bulb" cx="12" cy="18" r="3.1" stroke="none"/>
-          <rect class="merc merc-warm" x="10.7" y="6.5" width="2.6" height="9.2" rx="1.3" stroke="none"/>
-          <rect class="merc merc-soft" x="10.7" y="11.5" width="2.6" height="4.2" rx="1.3" stroke="none"/>
-        </svg>
-      </button>
-      <button id="mode-toggle" class="icon-btn" type="button" aria-label="Switch light / dark">
-        <span class="ic ic-moon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    <nav class="primary-nav" aria-label="Primary navigation">
+      <a href="#why-local">Why local</a>
+      <a href="#workspace">Workspace</a>
+      <a href="#personal">Personalize</a>
+      <a href="#beyond-the-app">More than an app</a>
+    </nav>
+    <div class="header-actions">
+      <a class="github-link" href={GITHUB_URL} rel="noopener">GitHub</a>
+      <button class="mode-toggle" id="mode-toggle" type="button" aria-label="Use dark appearance">
+        <span class="mode-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path class="moon-path" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path>
+            <g class="sun-path">
+              <circle cx="12" cy="12" r="4"></circle>
+              <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
+            </g>
+          </svg>
         </span>
-        <span class="ic ic-sun">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
-        </span>
+        <span class="mode-label">Dark</span>
       </button>
     </div>
   </header>
 
-  <main>
-    <!-- (2) hero — a waving quokka greets -->
-    <section class="hero">
-      <span class="char hero-char" set:html={waving} />
-      <h1 class="hero-mark">rotli</h1>
-      <p class="subhead">
-        A local-first notes app that lives in your Mac’s menu bar —
-        summon it, write, dismiss it.
-      </p>
-      <div class="cta">
-        <a class="btn btn-primary" href={DOWNLOAD_URL} rel="noopener">Download for Mac</a>
-        <a class="btn btn-secondary" href={GITHUB_URL} rel="noopener">View on GitHub</a>
-      </div>
-      <p class="cta-meta">
-        macOS · Apple Silicon · <a href={RELEASES_URL} rel="noopener">latest signed release</a>
-      </p>
-    </section>
-
-    <!-- (3) hero screenshot -->
-    <section class="shot-wrap">
-      <div class="shot-frame">
-        <img class="shot shot-warm-light" src="/rotli-app-warm-light.png" alt="rotli in Warm Light" width="1994" height="1250" loading="eager" />
-        <img class="shot shot-warm-dark" src="/rotli-app-warm-dark.png" alt="rotli in Warm Dark" width="1994" height="1250" loading="lazy" />
-        <img class="shot shot-soft-light" src="/rotli-app-paper.png" alt="rotli in Paper (soft light)" width="1994" height="1250" loading="lazy" />
-        <img class="shot shot-soft-dark" src="/rotli-app-charcoal.png" alt="rotli in Charcoal (soft dark)" width="1994" height="1250" loading="lazy" />
-      </div>
-    </section>
-
-    <!-- (4) two fronts -->
-    <section class="features">
-      {features.map((f) => (
-        <div class="feature">
-          <h3>{f.title}</h3>
-          <p>{f.body}</p>
-        </div>
-      ))}
-    </section>
-
-    <!-- (5) your data stays yours -->
-    <section class="privacy">
-      <div class="privacy-text">
-        <h2>Your data stays yours</h2>
-        <ul class="checks">
-          {promises.map((p) => (
-            <li>
-              <span class="check">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-              </span>
-              <span>{p}</span>
-            </li>
-          ))}
-        </ul>
-        <p class="privacy-note">
-          You work how you want in <b>Main</b>; your data organizes itself into your
-          {' '}<b>Brain</b> for the AI — location and metadata only, never the words inside your notes.
+  <main id="content">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="hero-kicker">A local-first workspace for macOS</p>
+        <h1 id="hero-title">Your files remain the product.</h1>
+        <p class="hero-lede">
+          Rotli turns one folder on your Mac into a calm workspace for notes, editable files,
+          boards, and AI conversations—without turning your work into an export from a service.
         </p>
-        <a class="memex-link" href={MEMEX_URL} rel="noopener">
-          Built on the memex vault format — one plain folder, yours to keep →
-        </a>
+        <div class="hero-actions">
+          <a class="button primary" href={RELEASES_URL} rel="noopener">Download for Mac</a>
+          <a class="button secondary" href={GITHUB_URL} rel="noopener">Explore the source</a>
+        </div>
+        <p class="release-note">Free · Apple silicon · signed beta · no account</p>
       </div>
-      <span class="char privacy-char" set:html={staysLocal} />
+
+      <figure class="workspace-figure" aria-label="Rotli workspace overview">
+        <div class="workspace-window">
+          <div class="window-titlebar" aria-hidden="true">
+            <span class="traffic-lights"><i></i><i></i><i></i></span>
+            <span class="search-field"><span class="mini-mark" set:html={mark}></span>Search your vault</span>
+            <span class="window-tools">＋ ◫ ☼</span>
+          </div>
+          <div class="workspace-shell">
+            <aside class="demo-sidebar" aria-hidden="true">
+              <div class="vault-row"><b>Field Notes</b><span>⌄</span></div>
+              <div class="front-switch"><b>Home</b><span>Chat&nbsp; 6</span></div>
+              <div class="sidebar-stat"><span>This week</span><b>18 notes</b><b>4 chats</b></div>
+              <ul>
+                <li>All notes <span>146</span></li>
+                <li>Captures <span>12</span></li>
+                <li>Tasks <span>8</span></li>
+              </ul>
+              <p>Main</p>
+              <ul>
+                <li class="selected">Launch notes</li>
+                <li>Research</li>
+                <li>Reading</li>
+              </ul>
+              <p class="sidebar-bottom">Library&nbsp; · &nbsp;Assets&nbsp; · &nbsp;Trash</p>
+            </aside>
+            <div class="demo-workspace">
+              <div class="demo-tabbar" aria-hidden="true"><b>Home</b><span>Project brief</span><span>×</span></div>
+              <div class="dashboard-copy">
+                <div class="dashboard-title">
+                  <div>
+                    <span>Rotli activity</span>
+                    <h2>Your vault in Rotli</h2>
+                  </div>
+                  <p>Notes, chats, and saved files from this vault.</p>
+                </div>
+                <div class="dashboard-lens"><b>Rotli activity</b><span>Model usage</span></div>
+                <div class="dashboard-stats">
+                  <span><small>Notes</small><b>146</b></span>
+                  <span><small>New this week</small><b>18</b></span>
+                  <span><small>Open tasks</small><b>8</b></span>
+                </div>
+                <div class="dashboard-lists">
+                  <div><b>Recent notes</b><span>Launch notes&nbsp; · &nbsp;today</span><span>Meeting sketch&nbsp; · &nbsp;1d</span></div>
+                  <div><b>Recent chats</b><span>Review this plan&nbsp; · &nbsp;today</span><span>Find connected notes&nbsp; · &nbsp;2d</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <img class="workspace-quokka" src={waving.src} width="400" height="400" alt="A cocoa-colored Rotli quokka waving" />
+        <figcaption>The same quiet shell across notes, chat, files, and Breve.</figcaption>
+      </figure>
+    </section>
+
+    <div class="proof-strip" aria-label="Rotli essentials">
+      <span><b>⌥Space</b> summon from anywhere</span>
+      <span><b>One folder</b> is the durable truth</span>
+      <span><b>Offline</b> remains useful without AI</span>
+      <span><b>Local-first</b> is the architecture</span>
+    </div>
+
+    <section class="folder-story" id="why-local" aria-labelledby="folder-title">
+      <div class="section-copy">
+        <p class="section-label">Not a cloud account with an export button</p>
+        <h2 id="folder-title">One folder. Every path out stays open.</h2>
+        <p>
+          Your vault is an ordinary directory you choose. Markdown stays Markdown. Documents,
+          sheets, images, PDFs, and boards keep familiar formats. Rotli’s hidden metadata is
+          rebuildable structure—not a second content store.
+        </p>
+        <ul class="plain-promises">
+          <li>
+            <span>01</span>
+            <p><b>Open your work in other apps.</b> Rotli never becomes the only door.</p>
+          </li>
+          <li>
+            <span>02</span>
+            <p><b>Back up the folder your way.</b> No proprietary export ritual.</p>
+          </li>
+          <li>
+            <span>03</span>
+            <p><b>Turn intelligence off.</b> A raw vault is still a complete workspace.</p>
+          </li>
+        </ul>
+      </div>
+      <div class="vault-anatomy" aria-label="Example Rotli vault structure">
+        <div class="vault-heading"><span>~/Documents/Field Notes</span><span>Local folder</span></div>
+        <ul class="file-tree">
+          <li><span class="folder-icon">⌄</span><b>wiki/</b><small>your knowledge</small></li>
+          <li class="nested"><span>◇</span>launch-notes.md<small>plain Markdown</small></li>
+          <li class="nested"><span>◇</span>reading-list.md<small>plain Markdown</small></li>
+          <li><span class="folder-icon">⌄</span><b>storage/</b><small>editable work</small></li>
+          <li class="nested"><span>□</span>project-brief.docx<small>Word document</small></li>
+          <li class="nested"><span>▦</span>forecast.xlsx<small>spreadsheet</small></li>
+          <li class="nested"><span>✣</span>system-map.excalidraw<small>board</small></li>
+          <li><span class="folder-icon">⌄</span><b>chats/</b><small>portable transcripts</small></li>
+          <li><span class="folder-icon">·</span><b>.rotli/</b><small>rebuildable projections</small></li>
+        </ul>
+        <p class="anatomy-note">Delete the app and the work still makes sense.</p>
+      </div>
+    </section>
+
+    <section class="workspace-story" id="workspace" aria-labelledby="workspace-title">
+      <div class="workspace-intro">
+        <p class="section-label">A workspace, not a preview catalog</p>
+        <h2 id="workspace-title">Work on the file. Don’t stare at a thumbnail of it.</h2>
+        <p>
+          Markdown is the knowledge surface. Conventional formats are useful bonus surfaces,
+          and Rotli only calls them supported when they can be edited or honestly converted.
+        </p>
+      </div>
+      <div class="surface-list">
+        {surfaces.map((surface) => (
+          <article class="surface-row">
+            <h3>{surface.name}</h3>
+            <p>{surface.detail}</p>
+            <span>{surface.proof}</span>
+          </article>
+        ))}
+      </div>
+      <div class="workflow-ribbon" aria-label="Rotli capture workflow">
+        <span><b>Capture</b><small>⌥C from anywhere</small></span>
+        <i aria-hidden="true">→</i>
+        <span><b>Arrange</b><small>Main and named views</small></span>
+        <i aria-hidden="true">→</i>
+        <span><b>Find</b><small>⌘K across the vault</small></span>
+        <i aria-hidden="true">→</i>
+        <span><b>Use</b><small>write, plan, chat, build</small></span>
+      </div>
+    </section>
+
+    <section class="privacy-story" aria-labelledby="privacy-title">
+      <div class="privacy-visual">
+        <img src={staysLocal.src} width="400" height="400" alt="The Rotli quokka holding a privacy shield" loading="lazy" />
+        <p>Remote models never receive secure notes. Locked notes are readable by you and editable by no AI.</p>
+      </div>
+      <div class="privacy-copy">
+        <p class="section-label">Intelligence with a boundary</p>
+        <h2 id="privacy-title">AI is invited into your workspace. It does not own the house.</h2>
+        <p>
+          Start with an on-device model, connect Claude Code, Codex, or Antigravity when you
+          choose, or use no model at all. Rotli keeps the file and privacy policy underneath
+          every route.
+        </p>
+        <dl class="boundary-list">
+          <div><dt>On-device</dt><dd>Private by default and usable without a network.</dd></div>
+          <div><dt>Connected</dt><dd>Your existing model tools, explicitly labeled as remote.</dd></div>
+          <div><dt>Secure</dt><dd>Detected secrets and protected notes fail closed before egress.</dd></div>
+          <div><dt>Locked</dt><dd>Every model may read; no model may edit.</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="personal-story" id="personal" aria-labelledby="personal-title">
+      <div class="personal-heading">
+        <div>
+          <p class="section-label">A workspace that can feel like yours</p>
+          <h2 id="personal-title">Six families. Twelve tuned environments. One calm grammar.</h2>
+        </div>
+        <p>
+          Light, Dark, and System are separate from the family you choose. Every environment
+          keeps content readable; accent hue and an optional companion add personality without
+          taking over the work.
+        </p>
+      </div>
+
+      <div class="theme-studio">
+        <div class="theme-choices" role="group" aria-label="Preview a Rotli theme family">
+          {themeFamilies.map((family, index) => (
+            <button
+              class="theme-choice"
+              type="button"
+              data-theme-family={family.id}
+              aria-pressed={index === 0 ? 'true' : 'false'}
+            >
+              <span class={`theme-pair theme-pair-${family.id}`} aria-hidden="true"><i></i><i></i></span>
+              <span>{family.name}</span>
+            </button>
+          ))}
+        </div>
+        <div class="companion-preview">
+          <div class="companion-art">
+            <img src={celebrating.src} width="400" height="400" alt="A filled cocoa Rotli quokka celebrating" loading="lazy" />
+          </div>
+          <div class="companion-copy">
+            <span>Optional companion</span>
+            <h3>Your quokka, when you want one.</h3>
+            <p>
+              Choose body color, black or white linework, idle mood, pose, and independently
+              colored glasses, bucket hat, scarf, or goggles. Turn the companion off and it
+              stays in onboarding only.
+            </p>
+            <ul aria-label="Companion customization options">
+              <li>7 body presets + custom hue</li>
+              <li>4 accessories + custom color</li>
+              <li>semantic poses for empty states</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="beyond-story" id="beyond-the-app" aria-labelledby="beyond-title">
+      <div class="beyond-heading">
+        <p class="section-label">The folder is useful beyond the window</p>
+        <h2 id="beyond-title">Rotli is also a routine engine and a workspace for your agents.</h2>
+      </div>
+      <div class="beyond-lanes">
+        <article>
+          <div class="lane-title"><span>Breve</span><b>Quiet routines, owned by Rotli</b></div>
+          <p>
+            Morning briefs, watchlists, reminders, delivery, and scheduler health live in one
+            managed runtime. Generated briefs are ordinary vault Markdown, not a hidden news database.
+          </p>
+          <p class="lane-proof">Vault-owned configuration · sandboxed model work · recoverable runtime updates</p>
+        </article>
+        <article>
+          <div class="lane-title"><span>CLI + MCP</span><b>Your vault can work with Claude, Codex, or the shell</b></div>
+          <p>
+            The installed Rotli binary exposes a bounded JSON CLI and local stdio MCP server.
+            Secure notes stay omitted, locked writes stay refused, and every edit needs a fresh revision.
+          </p>
+          <p class="lane-proof">No local network port · read-only doctor · disposable self-test</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="final-cta" aria-labelledby="final-title">
+      <span class="final-mark" set:html={mark} aria-hidden="true"></span>
+      <div>
+        <h2 id="final-title">A durable place for the work you want to keep.</h2>
+        <p>Warm enough to return to. Quiet enough to disappear. Local enough to remain yours.</p>
+      </div>
+      <a class="button final-button" href={RELEASES_URL} rel="noopener">Download the Mac beta</a>
     </section>
   </main>
 
-  <!-- (6) footer -->
-  <footer class="footer">
-    <span class="logo-mark footer-mark" set:html={quokka} />
-    <span>© rotli</span>
-    <span class="dot">·</span>
-    <span>local-first</span>
+  <footer class="site-footer">
+    <a class="footer-brand" href="/" aria-label="Rotli home"><span set:html={mark} aria-hidden="true"></span><b>rotli</b></a>
+    <p>Local-first, free, and open source.</p>
+    <nav aria-label="Footer navigation">
+      <a href={GITHUB_URL} rel="noopener">GitHub</a>
+      <a href={RELEASES_URL} rel="noopener">Releases</a>
+      <a href="https://github.com/SethMed7/rotli/blob/main/PRIVACY.md" rel="noopener">Privacy</a>
+      <a href="https://github.com/SethMed7/rotli/blob/main/ROADMAP.md" rel="noopener">Roadmap</a>
+    </nav>
   </footer>
 
   <script>
-    // two axes: mode (light/dark) + family (warm/soft) → one of four palettes.
-    // The palette + the matching hero preview are driven by <html> data attributes
-    // (CSS in Base.astro), so toggling just re-stamps the attribute + persists it.
     const root = document.documentElement;
-    const modeBtn = document.getElementById('mode-toggle');
-    const famBtn = document.getElementById('family-toggle');
-    const store = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch (e) {} };
-    const syncMode = () => modeBtn && modeBtn.setAttribute('data-mode', root.dataset.mode || 'light');
-    syncMode();
-    modeBtn &&
-      modeBtn.addEventListener('click', () => {
-        root.dataset.mode = root.dataset.mode === 'dark' ? 'light' : 'dark';
-        store('rotli-mode', root.dataset.mode);
-        syncMode();
-      });
-    // the thermometer toggles palette warmth — warm (mercury high) ⇄ soft (low)
-    famBtn &&
-      famBtn.addEventListener('click', () => {
-        root.dataset.family = root.dataset.family === 'warm' ? 'soft' : 'warm';
-        store('rotli-family', root.dataset.family);
-      });
+    const modeButton = document.querySelector<HTMLButtonElement>('#mode-toggle');
+    const modeLabel = modeButton?.querySelector<HTMLElement>('.mode-label');
+    const familyButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-theme-family]')];
 
-    // the locked top bar grows a hairline once the page scrolls under it
-    const bar = document.querySelector('.topbar');
-    const onScroll = () => bar && bar.classList.toggle('stuck', window.scrollY > 4);
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
+    const savePreference = (key: string, value: string) => {
+      try {
+        localStorage.setItem(key, value);
+      } catch (error) {}
+    };
+
+    const syncMode = () => {
+      const dark = root.dataset.mode === 'dark';
+      if (modeLabel) modeLabel.textContent = dark ? 'Light' : 'Dark';
+      modeButton?.setAttribute('aria-label', dark ? 'Use light appearance' : 'Use dark appearance');
+      modeButton?.setAttribute('data-mode', dark ? 'dark' : 'light');
+    };
+
+    const syncFamily = () => {
+      familyButtons.forEach((button) => {
+        button.setAttribute('aria-pressed', String(button.dataset.themeFamily === root.dataset.family));
+      });
+    };
+
+    modeButton?.addEventListener('click', () => {
+      root.dataset.mode = root.dataset.mode === 'dark' ? 'light' : 'dark';
+      savePreference('rotli-site-mode', root.dataset.mode);
+      syncMode();
+    });
+
+    familyButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        root.dataset.family = button.dataset.themeFamily || 'rotli';
+        savePreference('rotli-site-family', root.dataset.family);
+        syncFamily();
+      });
+    });
+
+    syncMode();
+    syncFamily();
   </script>
 
   <style>
-    main, .footer {
-      max-width: var(--maxw);
+    .site-header,
+    main > section,
+    .proof-strip,
+    .site-footer {
+      width: min(100% - 3rem, var(--page-max));
       margin-inline: auto;
-      padding-inline: 1.5rem;
     }
 
-    /* ---- logo + character sizes ---- */
-    .logo-sm { width: 30px; }
-    .footer-mark { width: 18px; opacity: 0.7; }
-    .hero-char { width: 150px; margin: 0 auto 0.25rem; }
-    .privacy-char { width: 200px; justify-self: center; opacity: 0.9; }
-
-    /* ---- top bar (full-width, logo hard-left, locked to the top) ---- */
-    .topbar {
+    .site-header {
+      min-height: 76px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      padding: 1.1rem 1.75rem;
-      position: sticky;
-      top: 0;
+      gap: 2rem;
+      position: relative;
       z-index: 20;
-      background: var(--ground);
-      border-bottom: 1px solid transparent;
+      border-bottom: 1px solid var(--border);
     }
-    /* a hairline appears once the page scrolls under the locked bar */
-    .topbar.stuck {
-      border-bottom-color: var(--border);
-    }
-    .brand {
+
+    .brand,
+    .footer-brand {
       display: inline-flex;
       align-items: center;
       gap: 0.55rem;
+      color: var(--text);
       text-decoration: none;
     }
-    .wordmark {
-      font-family: var(--font-display);
-      font-weight: 600;
-      font-size: 1.4rem;
-      letter-spacing: -0.01em;
+
+    .brand-mark {
+      width: 30px;
       color: var(--text);
+      line-height: 0;
     }
-    .nav-right {
+
+    .wordmark,
+    .footer-brand b {
+      font-family: var(--font-wordmark);
+      font-size: 1.55rem;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+    }
+
+    .primary-nav {
       display: flex;
       align-items: center;
-      gap: 0.35rem;
-    }
-    .icon-link, .icon-btn {
-      display: inline-grid;
-      place-items: center;
-      width: 40px;
-      height: 40px;
-      border-radius: 0.6rem;
-      color: var(--text-muted);
-      background: none;
-      border: none;
-      cursor: pointer;
-      transition: background 0.15s ease, color 0.15s ease;
-    }
-    .icon-link:hover, .icon-btn:hover { background: var(--surface-2); color: var(--text); }
-    .icon-link svg { width: 20px; height: 20px; display: block; }
-    .icon-btn .ic { display: none; line-height: 0; }
-    .icon-btn .ic svg { width: 20px; height: 20px; display: block; }
-    /* light → show the moon (go dark); dark → show the sun (go light) */
-    .icon-btn:not([data-mode='dark']) .ic-moon { display: block; }
-    .icon-btn[data-mode='dark'] .ic-sun { display: block; }
-
-    /* ---- warm / soft thermometer toggle ---- */
-    .thermo svg { width: 20px; height: 20px; display: block; }
-    /* mercury level: warm = high, soft = low; the bulb + fill take the family hue */
-    .thermo .merc { display: none; }
-    :root[data-family='warm'] .thermo .merc-warm { display: block; }
-    :root[data-family='soft'] .thermo .merc-soft { display: block; }
-    :root[data-family='warm'] .thermo .bulb,
-    :root[data-family='warm'] .thermo .merc-warm { fill: #c97e62; }
-    :root[data-family='soft'] .thermo .bulb,
-    :root[data-family='soft'] .thermo .merc-soft { fill: #8f9199; }
-    .thermo .merc { transition: fill 0.15s ease; }
-
-    /* ---- hero ---- */
-    .hero {
-      text-align: center;
-      padding-top: 3.5rem;
-      padding-bottom: 3rem;
-    }
-    .hero-mark {
-      font-family: var(--font-display);
-      font-weight: 600;
-      font-size: clamp(3rem, 10vw, 5rem);
-      line-height: 1;
-      margin: 0;
-      letter-spacing: -0.02em;
-      color: var(--text);
-    }
-    .subhead {
-      max-width: 34rem;
-      margin: 1rem auto 0;
-      color: var(--text-muted);
-      font-size: 1.1rem;
-    }
-    .cta {
-      display: flex;
-      gap: 0.9rem;
       justify-content: center;
-      flex-wrap: wrap;
-      margin-top: 2rem;
+      gap: clamp(1.1rem, 2.5vw, 2.2rem);
+      margin-inline: auto;
     }
-    .cta-meta {
-      margin: 0.9rem 0 0;
-      font-size: 0.85rem;
-      color: var(--text-muted);
-    }
-    .cta-meta a {
-      color: var(--text-muted);
-      text-decoration: none;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 1px;
-      transition: color 0.15s ease, border-color 0.15s ease;
-    }
-    .cta-meta a:hover { color: var(--text); border-color: var(--text); }
-    .btn {
-      display: inline-block;
-      text-decoration: none;
-      font-weight: 500;
-      font-size: 1rem;
-      padding: 0.7rem 1.4rem;
-      border-radius: 0.7rem;
-      border: 1px solid transparent;
-      transition: transform 0.12s ease, opacity 0.15s ease, border-color 0.15s ease;
-    }
-    .btn:active { transform: translateY(1px); }
-    /* accent-text (the darker accent) keeps white/ink readable in all 4 palettes */
-    .btn-primary { background: var(--accent-text); color: var(--on-accent); }
-    .btn-primary:hover { opacity: 0.88; }
-    .btn-secondary { color: var(--text); border-color: var(--border); background: var(--surface); }
-    .btn-secondary:hover { border-color: var(--text); }
 
-    /* ---- screenshot ---- */
-    .shot-wrap {
-      max-width: calc(var(--maxw) + 4rem);
-      margin: 1.5rem auto 0;
-      padding-inline: 1.5rem;
-    }
-    /* No card — the screenshot sits raw on the page, softly rounded and gently
-       lifted so it reads as a real floating window (not a boxed thumbnail). The
-       captures are opaque + edge-to-edge, so nothing behind them shows through. */
-    .shot-frame {
-      border-radius: 0.9rem;
-      overflow: hidden;
-      box-shadow: 0 40px 80px -44px rgba(0, 0, 0, 0.45), 0 12px 28px -20px rgba(0, 0, 0, 0.25);
-    }
-    /* NB: no `display` here — the four .shot images are toggled by the theme
-       selectors in Base.astro (.shot { display:none } + one match → block); a
-       `display:block` on this selector would out-specify them and show all four. */
-    .shot-frame img { width: 100%; height: auto; }
-
-    /* ---- two fronts ---- */
-    .features {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 2.5rem;
-      padding-block: 6rem 4rem;
-    }
-    .feature h3 {
-      font-family: var(--font-display);
-      font-weight: 600;
-      font-size: 1.15rem;
-      margin: 0 0 0.5rem;
-      color: var(--text);
-    }
-    .feature p { margin: 0; color: var(--text-muted); font-size: 1rem; }
-
-    /* ---- your data stays yours ---- */
-    .privacy {
-      display: grid;
-      grid-template-columns: 1.15fr 0.85fr;
-      gap: 3rem;
+    .primary-nav a,
+    .github-link {
+      min-height: 44px;
+      display: inline-flex;
       align-items: center;
-      padding-block: 3rem 6rem;
-    }
-    .privacy h2 {
-      font-family: var(--font-display);
-      font-weight: 600;
-      font-size: clamp(1.8rem, 4vw, 2.4rem);
-      letter-spacing: -0.01em;
-      margin: 0;
-      color: var(--text);
-    }
-    .checks { list-style: none; padding: 0; margin: 1.5rem 0 0; display: flex; flex-direction: column; gap: 1rem; }
-    .checks li { display: flex; gap: 0.75rem; align-items: flex-start; color: var(--text); }
-    .check { flex: 0 0 auto; color: var(--text-muted); margin-top: 3px; line-height: 0; }
-    .check svg { width: 18px; height: 18px; display: block; }
-    .privacy-note { margin: 1.5rem 0 0; max-width: 36rem; color: var(--text-muted); }
-    .privacy-note b { color: var(--text); font-weight: 600; }
-    .memex-link {
-      display: inline-block;
-      margin-top: 1.25rem;
-      color: var(--text);
-      text-decoration: none;
-      font-weight: 500;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 1px;
-      transition: border-color 0.15s ease;
-    }
-    .memex-link:hover { border-color: var(--text); }
-
-    /* ---- footer ---- */
-    .footer {
-      display: flex;
-      gap: 0.6rem;
-      justify-content: center;
-      align-items: center;
-      padding-block: 3rem 4rem;
       color: var(--text-muted);
       font-size: 0.9rem;
+      text-decoration: none;
     }
-    .footer .dot { opacity: 0.5; }
 
-    @media (max-width: 720px) {
-      .features { grid-template-columns: 1fr; gap: 2rem; padding-block: 4rem 3rem; }
-      .privacy { grid-template-columns: 1fr; gap: 1.5rem; padding-block: 2rem 4rem; }
-      .privacy-char { grid-row: 1; width: 150px; }
-      .hero { padding-top: 2.5rem; }
+    .primary-nav a:hover,
+    .github-link:hover {
+      color: var(--text);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
+    .mode-toggle {
+      min-width: 82px;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .mode-toggle:hover {
+      background: var(--surface-2);
+      border-color: var(--border-strong);
+    }
+
+    .mode-icon,
+    .mode-icon svg {
+      width: 17px;
+      height: 17px;
+    }
+
+    .sun-path,
+    .mode-toggle[data-mode='dark'] .moon-path {
+      display: none;
+    }
+
+    .mode-toggle[data-mode='dark'] .sun-path {
+      display: block;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 0.82fr) minmax(36rem, 1.18fr);
+      gap: clamp(2.5rem, 5vw, 5.5rem);
+      align-items: center;
+      min-height: calc(100vh - 76px);
+      padding-block: clamp(4rem, 8vw, 7rem);
+    }
+
+    .hero-copy {
+      max-width: 34rem;
+    }
+
+    .hero-kicker,
+    .section-label {
+      margin: 0 0 1.1rem;
+      color: var(--accent-text);
+      font-size: 0.88rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(3.4rem, 6.4vw, 5.8rem);
+      line-height: 0.96;
+      letter-spacing: -0.04em;
+      font-weight: 600;
+    }
+
+    .hero-lede {
+      max-width: 34rem;
+      margin: 1.6rem 0 0;
+      color: var(--text-muted);
+      font-size: clamp(1.08rem, 1.7vw, 1.3rem);
+      line-height: 1.55;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 2rem;
+    }
+
+    .button {
+      min-height: 50px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.72rem 1.25rem;
+      border-radius: 0.7rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: transform 120ms ease-out, background-color 140ms ease-out, border-color 140ms ease-out;
+    }
+
+    .button:active {
+      transform: translateY(1px);
+    }
+
+    .button.primary {
+      background: var(--text);
+      color: var(--ground);
+      border: 1px solid var(--text);
+    }
+
+    .button.primary:hover {
+      background: var(--accent-text);
+      border-color: var(--accent-text);
+      color: var(--on-accent);
+    }
+
+    .button.secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border-strong);
+    }
+
+    .button.secondary:hover {
+      background: var(--surface);
+    }
+
+    .release-note {
+      margin: 0.85rem 0 0;
+      color: var(--text-muted);
+      font-size: 0.86rem;
+    }
+
+    .workspace-figure {
+      position: relative;
+      margin: 0;
+      padding-bottom: 2rem;
+    }
+
+    .workspace-window {
+      overflow: hidden;
+      border: 1px solid var(--border-strong);
+      border-radius: 0.9rem;
+      background: var(--surface);
+    }
+
+    .window-titlebar {
+      min-height: 42px;
+      display: grid;
+      grid-template-columns: 1fr minmax(11rem, 1.5fr) 1fr;
+      align-items: center;
+      padding-inline: 0.8rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.7rem;
+    }
+
+    .traffic-lights {
+      display: flex;
+      gap: 0.38rem;
+    }
+
+    .traffic-lights i {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .traffic-lights i:nth-child(2) {
+      background: var(--success);
+    }
+
+    .traffic-lights i:nth-child(3) {
+      background: var(--border-strong);
+    }
+
+    .search-field {
+      min-height: 27px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface-2);
+    }
+
+    .mini-mark {
+      width: 14px;
+      color: var(--text-muted);
+    }
+
+    .window-tools {
+      justify-self: end;
+      letter-spacing: 0.28rem;
+    }
+
+    .workspace-shell {
+      display: grid;
+      grid-template-columns: 10.5rem 1fr;
+      min-height: 30rem;
+    }
+
+    .demo-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      padding: 1rem 0.8rem 0.75rem;
+      border-right: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text-muted);
+      font-size: 0.68rem;
+    }
+
+    .vault-row,
+    .front-switch,
+    .sidebar-stat,
+    .demo-sidebar li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .vault-row b {
+      color: var(--text);
+    }
+
+    .front-switch {
+      padding: 0.45rem;
+      border-radius: 0.5rem;
+      background: var(--tint);
+    }
+
+    .front-switch b {
+      color: var(--text);
+    }
+
+    .sidebar-stat {
+      flex-wrap: wrap;
+      padding: 0.55rem;
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+    }
+
+    .sidebar-stat span {
+      width: 100%;
+      font-size: 0.58rem;
+      font-weight: 600;
+    }
+
+    .demo-sidebar ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 0.2rem;
+    }
+
+    .demo-sidebar li {
+      min-height: 27px;
+      padding-inline: 0.45rem;
+      border-radius: 0.4rem;
+    }
+
+    .demo-sidebar li.selected {
+      background: var(--tint);
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .demo-sidebar > p {
+      margin: 0.1rem 0 -0.35rem;
+      font-size: 0.56rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .sidebar-bottom {
+      margin-top: auto !important;
+      padding-top: 0.7rem;
+      border-top: 1px solid var(--border);
+      text-transform: none !important;
+      letter-spacing: 0 !important;
+    }
+
+    .demo-workspace {
+      min-width: 0;
+      background: var(--ground);
+    }
+
+    .demo-tabbar {
+      min-height: 36px;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      padding-inline: 0.8rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.66rem;
+    }
+
+    .demo-tabbar b {
+      color: var(--text);
+    }
+
+    .dashboard-copy {
+      padding: clamp(1.2rem, 3vw, 2.2rem);
+    }
+
+    .dashboard-title {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .dashboard-title span {
+      color: var(--accent-text);
+      font-size: 0.55rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .dashboard-title h2 {
+      margin: 0.2rem 0 0;
+      font-size: clamp(1rem, 2vw, 1.45rem);
+      line-height: 1.1;
+      letter-spacing: -0.025em;
+    }
+
+    .dashboard-title p {
+      max-width: 10rem;
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 0.58rem;
+      text-align: right;
+    }
+
+    .dashboard-lens {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      margin-top: 1.1rem;
+      border: 1px solid var(--border);
+      border-radius: 0.48rem;
+      overflow: hidden;
+      color: var(--text-muted);
+      font-size: 0.58rem;
+    }
+
+    .dashboard-lens > * {
+      padding: 0.5rem 0.65rem;
+    }
+
+    .dashboard-lens b {
+      background: var(--tint);
+      color: var(--text);
+    }
+
+    .dashboard-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      margin-top: 1rem;
+      border: 1px solid var(--border);
+      border-radius: 0.48rem;
+      overflow: hidden;
+    }
+
+    .dashboard-stats span {
+      display: grid;
+      gap: 0.2rem;
+      padding: 0.65rem;
+      border-right: 1px solid var(--border);
+    }
+
+    .dashboard-stats span:last-child {
+      border-right: 0;
+    }
+
+    .dashboard-stats small {
+      color: var(--text-muted);
+      font-size: 0.5rem;
+    }
+
+    .dashboard-stats b {
+      font-size: 0.9rem;
+    }
+
+    .dashboard-lists {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.7rem;
+      margin-top: 0.7rem;
+    }
+
+    .dashboard-lists > div {
+      min-width: 0;
+      display: grid;
+      gap: 0.45rem;
+      padding: 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: 0.48rem;
+      font-size: 0.54rem;
+    }
+
+    .dashboard-lists b {
+      font-size: 0.62rem;
+    }
+
+    .dashboard-lists span {
+      padding-top: 0.4rem;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .workspace-quokka {
+      position: absolute;
+      right: -2.1rem;
+      bottom: 0.1rem;
+      width: clamp(6.2rem, 12vw, 9rem);
+      height: auto;
+    }
+
+    .workspace-figure figcaption {
+      margin-top: 0.8rem;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+    }
+
+    .proof-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .proof-strip span {
+      min-height: 5.8rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 0.18rem;
+      padding: 1rem clamp(0.8rem, 2vw, 1.6rem);
+      border-right: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.88rem;
+    }
+
+    .proof-strip span:last-child {
+      border-right: 0;
+    }
+
+    .proof-strip b {
+      color: var(--text);
+      font-size: 0.98rem;
+    }
+
+    .folder-story {
+      display: grid;
+      grid-template-columns: 0.9fr 1.1fr;
+      gap: clamp(3rem, 8vw, 8rem);
+      align-items: start;
+      padding-block: clamp(7rem, 12vw, 11rem);
+    }
+
+    .section-copy h2,
+    .workspace-intro h2,
+    .privacy-copy h2,
+    .personal-heading h2,
+    .beyond-heading h2,
+    .final-cta h2 {
+      margin: 0;
+      font-size: clamp(2.35rem, 4.5vw, 4.4rem);
+      line-height: 1.04;
+      letter-spacing: -0.035em;
+      font-weight: 600;
+    }
+
+    .section-copy > p:not(.section-label),
+    .workspace-intro > p:not(.section-label),
+    .privacy-copy > p:not(.section-label) {
+      margin: 1.5rem 0 0;
+      color: var(--text-muted);
+      font-size: 1.08rem;
+    }
+
+    .plain-promises {
+      list-style: none;
+      padding: 0;
+      margin: 2.2rem 0 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .plain-promises li {
+      display: grid;
+      grid-template-columns: 2.5rem 1fr;
+      padding-block: 1rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+
+    .plain-promises li span {
+      color: var(--accent-text);
+      font-size: 0.78rem;
+    }
+
+    .plain-promises li p {
+      margin: 0;
+    }
+
+    .plain-promises li b {
+      color: var(--text);
+    }
+
+    .vault-anatomy {
+      border: 1px solid var(--border-strong);
+      border-radius: 0.85rem;
+      overflow: hidden;
+      background: var(--surface);
+    }
+
+    .vault-heading {
+      min-height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding-inline: 1.2rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+
+    .vault-heading span:first-child {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .file-tree {
+      list-style: none;
+      padding: 0.6rem 1.2rem;
+      margin: 0;
+    }
+
+    .file-tree li {
+      min-height: 48px;
+      display: grid;
+      grid-template-columns: 1.4rem minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 0.55rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+
+    .file-tree li:last-child {
+      border-bottom: 0;
+    }
+
+    .file-tree li.nested {
+      padding-left: 1.4rem;
+      color: var(--text-muted);
+    }
+
+    .file-tree small {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+
+    .folder-icon {
+      color: var(--accent-text);
+    }
+
+    .anatomy-note {
+      margin: 0;
+      padding: 1rem 1.2rem;
+      border-top: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+
+    .workspace-story {
+      padding-block: clamp(7rem, 11vw, 10rem);
+      border-top: 1px solid var(--border);
+    }
+
+    .workspace-intro {
+      max-width: 52rem;
+    }
+
+    .surface-list {
+      margin-top: 4rem;
+      border-top: 1px solid var(--border-strong);
+    }
+
+    .surface-row {
+      display: grid;
+      grid-template-columns: 0.7fr 1.3fr 0.7fr;
+      gap: clamp(1.5rem, 4vw, 4rem);
+      align-items: start;
+      padding-block: 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .surface-row h3,
+    .surface-row p {
+      margin: 0;
+    }
+
+    .surface-row h3 {
+      font-size: clamp(1.25rem, 2vw, 1.65rem);
+      letter-spacing: -0.02em;
+    }
+
+    .surface-row p {
+      max-width: 46rem;
+      color: var(--text-muted);
+    }
+
+    .surface-row > span {
+      color: var(--accent-text);
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-align: right;
+    }
+
+    .workflow-ribbon {
+      display: grid;
+      grid-template-columns: repeat(7, auto);
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-top: 4.5rem;
+      padding: 1.3rem 1.5rem;
+      border: 1px solid var(--border-strong);
+      border-radius: 0.75rem;
+      background: var(--surface);
+    }
+
+    .workflow-ribbon span {
+      display: grid;
+      gap: 0.15rem;
+    }
+
+    .workflow-ribbon small,
+    .workflow-ribbon i {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      font-style: normal;
+    }
+
+    .privacy-story {
+      width: min(100% - 1.5rem, calc(var(--page-max) + 4rem)) !important;
+      display: grid;
+      grid-template-columns: 0.8fr 1.2fr;
+      overflow: hidden;
+      border-radius: 0.9rem;
+      background: var(--deep);
+      color: var(--deep-text);
+    }
+
+    .privacy-visual {
+      min-height: 42rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(2rem, 5vw, 4rem);
+      border-right: 1px solid var(--deep-border);
+      background: var(--deep-surface);
+    }
+
+    .privacy-visual img {
+      width: min(100%, 19rem);
+      height: auto;
+    }
+
+    .privacy-visual p {
+      max-width: 24rem;
+      margin: 1.5rem 0 0;
+      color: var(--deep-muted);
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    .privacy-copy {
+      align-self: center;
+      padding: clamp(3rem, 7vw, 7rem);
+    }
+
+    .privacy-copy .section-label {
+      color: var(--accent);
+    }
+
+    .privacy-copy > p:not(.section-label) {
+      color: var(--deep-muted);
+    }
+
+    .boundary-list {
+      margin: 2.4rem 0 0;
+      border-top: 1px solid var(--deep-border);
+    }
+
+    .boundary-list > div {
+      display: grid;
+      grid-template-columns: 7rem 1fr;
+      gap: 1.2rem;
+      padding-block: 0.95rem;
+      border-bottom: 1px solid var(--deep-border);
+    }
+
+    .boundary-list dt {
+      color: var(--deep-text);
+      font-weight: 600;
+    }
+
+    .boundary-list dd {
+      margin: 0;
+      color: var(--deep-muted);
+    }
+
+    .personal-story {
+      padding-block: clamp(8rem, 12vw, 11rem);
+    }
+
+    .personal-heading {
+      display: grid;
+      grid-template-columns: 1.25fr 0.75fr;
+      gap: clamp(2rem, 7vw, 7rem);
+      align-items: end;
+    }
+
+    .personal-heading > p {
+      margin: 0 0 0.4rem;
+      color: var(--text-muted);
+    }
+
+    .theme-studio {
+      margin-top: 4rem;
+      border: 1px solid var(--border-strong);
+      border-radius: 0.85rem;
+      overflow: hidden;
+      background: var(--surface);
+    }
+
+    .theme-choices {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .theme-choice {
+      min-height: 82px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: center;
+      gap: 0.55rem;
+      padding: 0.8rem;
+      border: 0;
+      border-right: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .theme-choice:last-child {
+      border-right: 0;
+    }
+
+    .theme-choice:hover {
+      background: var(--surface-2);
+      color: var(--text);
+    }
+
+    .theme-choice[aria-pressed='true'] {
+      background: var(--tint);
+      color: var(--text);
+    }
+
+    .theme-choice > span:last-child {
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+
+    .theme-pair {
+      height: 28px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      overflow: hidden;
+      border: 1px solid var(--border-strong);
+      border-radius: 0.4rem;
+    }
+
+    .theme-pair-rotli i:first-child { background: var(--swatch-rotli-light); }
+    .theme-pair-rotli i:last-child { background: var(--swatch-rotli-dark); }
+    .theme-pair-paper i:first-child { background: var(--swatch-paper-light); }
+    .theme-pair-paper i:last-child { background: var(--swatch-paper-dark); }
+    .theme-pair-ocean i:first-child { background: var(--swatch-ocean-light); }
+    .theme-pair-ocean i:last-child { background: var(--swatch-ocean-dark); }
+    .theme-pair-grove i:first-child { background: var(--swatch-grove-light); }
+    .theme-pair-grove i:last-child { background: var(--swatch-grove-dark); }
+    .theme-pair-iris i:first-child { background: var(--swatch-iris-light); }
+    .theme-pair-iris i:last-child { background: var(--swatch-iris-dark); }
+    .theme-pair-midnight i:first-child { background: var(--swatch-midnight-light); }
+    .theme-pair-midnight i:last-child { background: var(--swatch-midnight-dark); }
+
+    .companion-preview {
+      display: grid;
+      grid-template-columns: minmax(18rem, 0.75fr) minmax(0, 1.25fr);
+    }
+
+    .companion-art {
+      min-height: 30rem;
+      display: grid;
+      place-items: center;
+      padding: 2rem;
+      border-right: 1px solid var(--border);
+      background: var(--quokka-field);
+    }
+
+    .companion-art img {
+      width: min(100%, 16rem);
+      height: auto;
+    }
+
+    .companion-copy {
+      align-self: center;
+      padding: clamp(2rem, 6vw, 5rem);
+    }
+
+    .companion-copy > span {
+      color: var(--accent-text);
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+
+    .companion-copy h3 {
+      margin: 0.65rem 0 0;
+      font-size: clamp(1.8rem, 3vw, 3rem);
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+    }
+
+    .companion-copy p {
+      margin: 1.1rem 0 0;
+      color: var(--text-muted);
+    }
+
+    .companion-copy ul {
+      list-style: none;
+      padding: 0;
+      margin: 1.6rem 0 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .companion-copy li {
+      padding: 0.45rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--text-muted);
+      font-size: 0.74rem;
+    }
+
+    .beyond-story {
+      padding-block: clamp(7rem, 11vw, 10rem);
+      border-top: 1px solid var(--border);
+    }
+
+    .beyond-heading {
+      max-width: 58rem;
+    }
+
+    .beyond-lanes {
+      margin-top: 4rem;
+      border-top: 1px solid var(--border-strong);
+    }
+
+    .beyond-lanes article {
+      display: grid;
+      grid-template-columns: 0.8fr 1.2fr;
+      gap: clamp(2rem, 6vw, 6rem);
+      padding-block: 2.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .lane-title {
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .lane-title span {
+      color: var(--accent-text);
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .lane-title b {
+      max-width: 24rem;
+      font-size: clamp(1.3rem, 2vw, 1.75rem);
+      line-height: 1.22;
+      letter-spacing: -0.02em;
+    }
+
+    .beyond-lanes article > p {
+      margin: 0;
+      color: var(--text-muted);
+    }
+
+    .beyond-lanes article > .lane-proof {
+      grid-column: 2;
+      margin-top: -3.2rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      color: var(--accent-text);
+      font-size: 0.78rem;
+    }
+
+    .final-cta {
+      min-height: 19rem;
+      display: grid;
+      grid-template-columns: 4rem minmax(0, 1fr) auto;
+      gap: clamp(1.5rem, 4vw, 4rem);
+      align-items: center;
+      margin-bottom: 1.5rem;
+      padding: clamp(2rem, 6vw, 5rem);
+      border-radius: 0.9rem;
+      background: var(--accent);
+      color: var(--deep);
+    }
+
+    .final-mark {
+      width: 4rem;
+      line-height: 0;
+    }
+
+    .final-cta h2 {
+      max-width: 44rem;
+      font-size: clamp(2rem, 3.6vw, 3.6rem);
+    }
+
+    .final-cta p {
+      margin: 0.8rem 0 0;
+      color: var(--deep);
+    }
+
+    .final-button {
+      border: 1px solid var(--deep);
+      background: var(--deep);
+      color: var(--deep-text);
+      white-space: nowrap;
+    }
+
+    .final-button:hover {
+      background: transparent;
+      color: var(--deep);
+    }
+
+    .site-footer {
+      min-height: 8rem;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 2rem;
+      align-items: center;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.86rem;
+    }
+
+    .footer-brand span {
+      width: 23px;
+    }
+
+    .footer-brand b {
+      font-size: 1.25rem;
+      color: var(--text);
+    }
+
+    .site-footer p {
+      margin: 0;
+    }
+
+    .site-footer nav {
+      display: flex;
+      gap: 1.25rem;
+    }
+
+    .site-footer nav a {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      text-decoration: none;
+    }
+
+    .site-footer nav a:hover {
+      color: var(--text);
+    }
+
+    @media (max-width: 1080px) {
+      .primary-nav {
+        display: none;
+      }
+
+      .header-actions {
+        margin-left: auto;
+      }
+
+      .hero {
+        grid-template-columns: 1fr;
+        min-height: 0;
+      }
+
+      .hero-copy {
+        max-width: 48rem;
+      }
+
+      .workspace-figure {
+        width: min(100%, 54rem);
+      }
+
+      .theme-choices {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .theme-choice:nth-child(3) {
+        border-right: 0;
+      }
+
+      .theme-choice:nth-child(-n + 3) {
+        border-bottom: 1px solid var(--border);
+      }
+    }
+
+    @media (max-width: 820px) {
+      .proof-strip {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .proof-strip span:nth-child(2) {
+        border-right: 0;
+      }
+
+      .proof-strip span:nth-child(-n + 2) {
+        border-bottom: 1px solid var(--border);
+      }
+
+      .folder-story,
+      .personal-heading,
+      .privacy-story,
+      .companion-preview {
+        grid-template-columns: 1fr;
+      }
+
+      .privacy-visual,
+      .companion-art {
+        min-height: 25rem;
+        border-right: 0;
+        border-bottom: 1px solid var(--deep-border);
+      }
+
+      .companion-art {
+        border-bottom-color: var(--border);
+      }
+
+      .surface-row {
+        grid-template-columns: 0.8fr 1.2fr;
+      }
+
+      .surface-row > span {
+        grid-column: 2;
+        text-align: left;
+      }
+
+      .workflow-ribbon {
+        grid-template-columns: 1fr;
+        justify-content: stretch;
+      }
+
+      .workflow-ribbon i {
+        display: none;
+      }
+
+      .workflow-ribbon span {
+        grid-template-columns: 8rem 1fr;
+        padding-block: 0.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .workflow-ribbon span:last-child {
+        border-bottom: 0;
+      }
+
+      .beyond-lanes article {
+        grid-template-columns: 1fr;
+      }
+
+      .beyond-lanes article > .lane-proof {
+        grid-column: 1;
+        margin-top: 0;
+      }
+
+      .final-cta {
+        grid-template-columns: 3rem 1fr;
+      }
+
+      .final-mark {
+        width: 3rem;
+        align-self: start;
+      }
+
+      .final-button {
+        grid-column: 2;
+        justify-self: start;
+      }
+
+      .site-footer {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+        padding-block: 2rem;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .site-header,
+      main > section,
+      .proof-strip,
+      .site-footer {
+        width: min(100% - 1.5rem, var(--page-max));
+      }
+
+      .site-header {
+        gap: 0.75rem;
+      }
+
+      .github-link {
+        display: none;
+      }
+
+      .mode-toggle {
+        min-width: 44px;
+        width: 44px;
+        padding: 0;
+      }
+
+      .mode-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      .hero {
+        padding-top: 3.5rem;
+      }
+
+      h1 {
+        font-size: clamp(3rem, 15vw, 4.2rem);
+      }
+
+      .hero-actions {
+        display: grid;
+      }
+
+      .workspace-shell {
+        grid-template-columns: 1fr;
+        min-height: 24rem;
+      }
+
+      .demo-sidebar {
+        display: none;
+      }
+
+      .window-titlebar {
+        grid-template-columns: auto 1fr auto;
+      }
+
+      .window-tools {
+        letter-spacing: 0.05rem;
+      }
+
+      .dashboard-copy {
+        padding: 1.1rem;
+      }
+
+      .dashboard-title p {
+        display: none;
+      }
+
+      .workspace-quokka {
+        right: -0.6rem;
+      }
+
+      .proof-strip {
+        grid-template-columns: 1fr;
+      }
+
+      .proof-strip span {
+        min-height: 4.5rem;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .proof-strip span:last-child {
+        border-bottom: 0;
+      }
+
+      .plain-promises li {
+        grid-template-columns: 2rem 1fr;
+      }
+
+      .vault-heading span:last-child,
+      .file-tree small {
+        display: none;
+      }
+
+      .file-tree li {
+        grid-template-columns: 1.4rem 1fr;
+      }
+
+      .surface-row {
+        grid-template-columns: 1fr;
+        gap: 0.8rem;
+      }
+
+      .surface-row > span {
+        grid-column: 1;
+      }
+
+      .privacy-story {
+        width: calc(100% - 0.75rem) !important;
+      }
+
+      .privacy-copy {
+        padding: 2.4rem 1.5rem;
+      }
+
+      .boundary-list > div {
+        grid-template-columns: 1fr;
+        gap: 0.25rem;
+      }
+
+      .theme-choices {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .theme-choice,
+      .theme-choice:nth-child(3) {
+        border-right: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .theme-choice:nth-child(even) {
+        border-right: 0;
+      }
+
+      .theme-choice:nth-last-child(-n + 2) {
+        border-bottom: 0;
+      }
+
+      .companion-art {
+        min-height: 21rem;
+      }
+
+      .companion-copy {
+        padding: 2rem 1.3rem;
+      }
+
+      .final-cta {
+        grid-template-columns: 1fr;
+        padding: 2rem 1.4rem;
+      }
+
+      .final-mark {
+        width: 2.8rem;
+      }
+
+      .final-button {
+        grid-column: 1;
+        width: 100%;
+      }
+
+      .site-footer nav {
+        flex-wrap: wrap;
+        gap: 0 1.1rem;
+      }
     }
   </style>
 </Base>

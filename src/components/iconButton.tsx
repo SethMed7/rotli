@@ -12,7 +12,7 @@ interface IconButtonProps {
   className?: string;
   disabled?: boolean;
   /** The registry action this button mirrors — hold ⌘ badges its chord onto the
-   * button itself (Seth, 2026-08-04). Omit for buttons no chord drives. */
+   * button itself (the maintainer, 2026-08-04). Omit for buttons no chord drives. */
   hotkey?: string;
   children: ReactNode;
 }

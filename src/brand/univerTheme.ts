@@ -56,8 +56,7 @@ export type UniverNeutral = "warm" | "mono";
 /** Pick the chrome family from the live app theme. */
 export function univerNeutralForTheme(theme: string | undefined): UniverNeutral {
   if (!theme) return "warm";
-  if (theme === "charcoal" || theme === "paper") return "mono";
-  return "warm";
+  return theme === "light" || theme === "dark" ? "warm" : "mono";
 }
 
 /** The theme Univer's chrome (toolbar · selection · sheet tabs) paints with. */

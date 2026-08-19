@@ -1,4 +1,4 @@
-// The structured table ops (Seth, 2026-07-01) — pure transforms the widget's
+// The structured table ops (the maintainer, 2026-07-01) — pure transforms the widget's
 // row/col menus, the slash menu's Table insert, and the Tab-appends-a-row
 // keymap all dispatch through. These lock: the padded serialization (raw mode
 // stays readable), every row/col op, the delimiter's alignment grammar, the

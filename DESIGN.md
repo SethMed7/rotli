@@ -7,16 +7,44 @@ the token implementation; this file owns the product-level design rules.
 
 ## Environments and tokens
 
-Rotli ships four complete environments: Warm Light, Warm Dark, Paper, and
-Charcoal. Paper and Charcoal are the calm defaults; the warm pair is
-intentional. Every product surface must work in all four.
+Rotli ships six complete theme families: Rotli, Paper & Charcoal, Ocean, Grove,
+Iris, and Midnight. Each family owns a deliberately tuned light and dark
+environment; Midnight's dark environment is the deepest neutral workspace.
+Every product surface must work in every supported environment.
 
-Theme pickers present that same set as two families: Paper & Charcoal, and
-Rotli. Light, Dark, and System are a separate mode choice; Paper is Mono's
-light environment and Charcoal is its dark environment. System follows the OS
-within the selected family instead of becoming a fifth theme.
+Light, Dark, and System are a separate mode choice. System follows the OS within
+the selected family: macOS light uses that family's tuned light environment and
+macOS dark uses its tuned dark environment. It never owns a second mapping UI.
 Primary color starts with the active environment's own accent, then offers the
 shared presets and a contrast-managed custom hue without rewriting theme tokens.
+
+Appearance previews must resemble the real workspace—sidebar, content, and
+composer—not rely on abstract color bars alone. Full-body companion drawings
+offer Line plus Cocoa, Fern, Ocean, Iris, Berry, Amber, and validated custom
+body colors. The original poses use exact canonical geometry; approved new
+expressions use separately colored body, explicit black-or-white ink, and
+preserved-detail layers. Accessories use inset hue-owned fill and ink-owned line
+masks: each mask owns only accessory geometry and must never carry the source
+pose's face, limbs, expression, or outline into another mood. No source color
+may survive those masks, and Line treatment keeps both the body and accessory
+monochrome. Worn layers mount to pose-specific face, brow, and crown
+landmarks; a moving or angled quokka must carry its accessory with it instead
+of reusing the neutral pose's placement. Bucket hats use a compact soft crown
+and a downward front brim seated above the eye line. The crown covers the ears,
+the visible brim crosses in front of the forehead, and the rear brim stays
+occluded behind the crown and head instead of appearing across a front-facing
+quokka. Front, three-quarter, and side poses use dedicated hat drawings; angled
+characters never receive a rotated front hat. Filled and Line treatments both
+occlude the body along the selected brim's curved lower silhouette so no ear,
+body ink, or preserved raster detail pokes through; Rotli never paints a guessed
+surface color behind the accessory.
+The companion itself is optional: when off,
+full-body quokkas appear only during onboarding; the compact product mark is
+unaffected and always remains the original line art. When on, body hue, ink,
+glasses/bucket hat/goggles, accessory hue, and a preferred idle mood/pose are
+machine-level choices that survive vault switches. Personal idle placements use
+the preferred mood. Semantic empty states choose the pose that explains their
+state while preserving the user's body, ink, and accessory treatment.
 
 - Consume semantic color, typography, spacing, focus, and state roles exposed by
   the shared foundation. Fixed `--rotli-*` palette values are foundation inputs,
@@ -60,11 +88,16 @@ exception.
 - Held-Command badges show the complete live chord. Controls that are meant to
   be invoked directly from that reveal state include Command in their default
   chord, and a badge on the active control uses the calm surface voice instead
-  of repeating accent-on-accent.
+  of repeating accent-on-accent. The titlebar New and pane-split controls tag
+  the exact registry action they run; the visible `+` and ⌘N are one new-item
+  chooser, never two creation grammars.
 - The sidebar's active-item grammar follows the focused pane across Markdown,
   boards, PDFs, DOCX, sheets, and other surfaced files. Opening a conventional
   file expands its containing folder and highlights the same durable item id;
   only chat and meta surfaces intentionally leave content rows quiet.
+- Persistent selected and active rows use `--selected-bg` with ordinary text,
+  muted metadata, and an accent identifying detail. Solid accent fills belong
+  to primary actions and small status controls, not orientation rows.
 - Sidebar context menus keep one label column, reserve a checkmark gutter only
   when the visible menu contains toggles, and scroll within the window when a
   long menu would otherwise hide lifecycle actions. Named views distinguish
@@ -79,6 +112,18 @@ exception.
   one. The editor header may
   expose the existing session back/forward trail beside the date, using compact
   adjacent-note labels rather than duplicating the sidebar's folder hierarchy.
+- The titlebar Browser control and New-item chooser open a normal pane tab, not
+  the system browser. A fresh tab opens on a Rotli-owned start page that uses
+  the current environment's semantic light/dark tokens. Settings → Browser
+  selects the app-wide default search provider; only that provider ID persists,
+  while addresses, queries, and destinations never enter vault files or durable
+  pane state. Remote sites still control their own appearance. On desktop every
+  page runs in a separate native child webview using a non-persistent data
+  store; only HTTP(S) navigation is accepted, and closing the tab discards
+  cookies, storage, and history. The browser twin renders the themed start page
+  and surrounding toolbar, then an honest native-only state instead of
+  pretending an iframe can host arbitrary sites. Breve citations use this same
+  private tab.
 - The sidebar has one front switcher and one body. A two-segment pill under the
   vault header picks the active front — Home (the notes world: All notes,
   Captures, Tasks, the Main/named-view tree) or Chat (New chat, All chats, chat
@@ -87,6 +132,17 @@ exception.
   an ordered list of fronts, so a Home dashboard block or the parked email Inbox
   joins without another information-architecture change. Breve is a mode, not a
   front — it replaces the switcher rather than nesting one.
+- The larger vault header menu names the active vault and keeps every linked
+  vault reachable. Each row owns a refresh icon and an overflow menu; Location
+  lives in that overflow instead of competing with switching. One **Connect
+  vault** action handles an existing Rotli vault or scaffolds a selected empty
+  folder. A connection registers a future switch target without mixing its data
+  into the active vault. A switch keeps the native shell alive while its vault-owned data and
+  services rebind; the outgoing compatible Rotli vault remains in the menu so
+  switching is reversible. Every completed switch lands on the Home/Notes
+  front rather than inheriting Chat or Breve navigation from either vault. Breve
+  changes only the Coffee/Quokka mode control in this row; New, New folder, and
+  Collapse all do not move or disappear when the sidebar mode changes.
 - Provider/model marks in Chat use one 14px slot and an optically consistent
   visible footprint; source SVG padding and fine linework must not make one
   family read as a smaller icon than its peers.
@@ -97,6 +153,11 @@ exception.
   price snapshot for comparison, but are never labeled as subscription charges
   or invoices; unknown model IDs remain unpriced. Browser mode never pretends
   to inspect native histories.
+- Breve's editorial dashboard keeps its headline scale fixed within structural
+  breakpoints; a wide window must not inflate type from viewport width, and a
+  narrowing left column steps down before its copy crowds the right rail. Every
+  top story with cited Markdown links exposes those sources beside the story as
+  keyboard-reachable links into the private browser.
 - Full Rotli-activity and model-usage dashboards share one 24-hour / 7-day /
   30-day / 90-day range grammar. Dashboard lens and range selection reuse the
   existing Home/Chat solid-accent segmented state; they do not introduce a
@@ -119,8 +180,9 @@ exception.
   General settings. “Current destination” preserves the default; pinning a
   named writable vault is explicit, and unavailable choices remain visible
   until corrected rather than silently appearing to succeed elsewhere.
-- The System zone (Library · Assets · Archive · Trash, plus added external
-  folders) stays pinned below the body and belongs to Home; its header is a
+- The System zone is always Library · Assets · Archive · Trash. It stays pinned
+  below the body and belongs to Home; switching the active vault changes only
+  the rows' data and counts, never the zone's structure. Its header is a
   disclosure so the whole zone can be folded away. The sidebar ends in a pinned
   utility footer — Files · Librarian · Settings on one quiet row — which is
   app-level and shows under every front. Section and zone disclosure chevrons
@@ -142,9 +204,18 @@ exception.
 - Every tab is closeable, including the last one: the lone pane rests on the
   quokka empty state with quiet ways back in (new note · search · reopen tab).
   An empty pane is a designed state, not an error.
+- A brand-new vault keeps the ordinary titlebar, Home sidebar, tab strip, and
+  pane body visible. Rotli seeds and opens one real `Welcome to Rotli.md` note
+  at the vault root. It uses the ordinary Markdown editor, stays outside
+  Library's `wiki/` projection, and can be edited or trashed like any other
+  note. A newly created vault opens
+  Home with the sidebar expanded even when the outgoing vault was collapsed or
+  showing Chat/Breve.
 - Tab hover is paint-only: close controls reserve their space, and switching
   hover/active state never moves neighboring tabs. Crowded tab bars follow the
-  persisted Scroll or Fit preference.
+  persisted Scroll or Fit preference. The sidebar, panes, search, and System
+  counts always represent one active vault. Connected vaults are reachable only
+  through the explicit switcher; they never mix content into the current shell.
 - Quick Look is a PEEK, never the workspace: Space (or the row menu's Preview)
   opens a modal preview; formats without a faithful cheap render show an
   honest metadata card, and the Open button is always the escalation to the
@@ -153,6 +224,14 @@ exception.
 - Focus is always visible, predictable, and restored after overlays close.
 - Destructive actions are explicit and visually distinct without becoming
   alarmist.
+- Removing a connected vault is a two-step inline action. It drops only Rotli's
+  binding and live access; the folder and every user file remain untouched.
+  If the active folder disappears outside Rotli, the first still-available
+  connected vault becomes active and opens Home. With no surviving vault, Rotli
+  returns to vault activation and never recreates the missing folder.
+- Every vault row can reopen and rescan its folder in place without switching;
+  ⌘R refreshes the current row. Refresh never reloads the application shell,
+  and pending editor work flushes before an active-vault reopen.
 - Motion explains state or spatial change, respects reduced-motion preferences,
   and never delays core work.
 - Copy is direct, specific, and useful: errors say what failed and what the user
@@ -199,8 +278,10 @@ polish work.
 
 - Fresh and saved chats share one quiet header breadcrumb: the current view or
   vault context first, then the chat's display name. In Ask-first mode the new
-  chat name edits in that header and Enter moves to the composer even when the
-  field is empty; First-message mode omits the field and focuses the composer.
+  chat name is a visibly bounded field in that header; “Enter to skip” belongs
+  to its placeholder, and Enter moves to the composer even when the field is
+  empty. The first sent prompt retires the input immediately into ordinary
+  title text. First-message mode omits the field and focuses the composer.
   Saved display names edit in place without changing the durable chat filename.
   The header is always the surface's fixed first row above the conversation;
   content height and fresh-chat layouts must never displace it to the footer.
@@ -209,24 +290,36 @@ polish work.
   machine-level Calm/Lively preference changes the companion
   pose and adds a quiet Morning, Noon, Afternoon, or Evening scene contained
   behind the companion rather than tinting the workspace; sun position, terrain,
-  and dusk treatment convey the period without motion. The Rotli character keeps
-  neutral brand ink and neither setting creates idle animation.
+  and dusk treatment convey the period without motion. The character follows
+  the user's full-body treatment and preferred idle mood/pose; a chosen accessory is
+  layered independently, and neither setting creates idle animation.
 - Saved-chat headers use the available pane width while transcript and composer
   measures remain independently readable.
-- Long-chat prompt markers are uniform in size. Hover or keyboard focus opens
-  their compact, unnumbered prompt list; only semantic accent color identifies
-  the active marker. The list opens beside and top-aligned with the marker,
-  shifting vertically only enough to remain inside its owning chat pane.
+- Long-chat prompt markers may be quiet lines, soft dots, a restrained quokka
+  paw trail, or little quokka ears. All are the same accessible navigator:
+  each marker opens the compact prompt list and previews its matching row. The
+  rail stays unboxed; accent and scale identify the active marker, while hover
+  preview uses lower opacity only. The list stays beside the rail and inside
+  its owning chat pane.
+- A settled thread ends with one larger full-body companion on its own row. It
+  uses the chosen treatment and optional accessory with at most one restrained
+  arrival; the streaming state keeps the compact line mark.
 
 ## First-run setup
 
 - First-run setup is one resumable sequence: app preferences, an explicit vault
   decision, then optional model configuration. Skipping app preferences still
   lands on the vault decision; skipping models is allowed. A successful vault
-  switch may relaunch the native app, so the machine-level checkpoint resumes
-  on model configuration instead of repeating or silently finishing setup.
+  switch keeps the native shell alive and rebinds vault-owned state in place,
+  so the machine-level checkpoint resumes on model configuration instead of
+  repeating or silently finishing setup.
 - The companion character appears directly on the ground, without a card, on
   every setup and activation state. Its state entrance is short and one-shot.
+  First-run Appearance offers the optional companion mode and the same body
+  palette and accessory choice as the full Appearance studio. Thoughtful,
+  walking, listening, and gentle-attention
+  expressions give later steps and empty states semantic variety rather than
+  repeating one neutral pose everywhere.
   Welcome may keep two partly hidden edge companions visible while a slow,
   low-opacity pair alternates positions; reduced motion keeps two static.
   Scanning may use a bounded loading indicator while work is active.
@@ -244,6 +337,14 @@ polish work.
   user's selection; only the isolated development vault binding does. A
   configured installation can explicitly keep its current vault, create a
   tagged Rotli vault, open an existing folder, or start with a practice vault.
+- Vault selection opens Rotli's flat, directory-only navigator at the user's
+  Home folder (`~`, with the absolute `/Users/…` path visible). It lists visible
+  direct-child directories, supports arrow navigation, Enter, Backspace, Esc,
+  refresh, and new-folder creation, and never makes Home itself selectable as a
+  vault because Home contains private credential and application state. Desktop
+  and ordinary folders beneath Home remain valid. Finder is an explicit reveal
+  action; **More locations…** is the deliberate native-picker fallback for
+  external volumes and locations outside the contained Home session.
 - Model setup distinguishes on-device installs from connected subscription
   CLIs. Installing or connecting is always explicit, connected lanes are named
   as remote, unavailable CLIs show actionable setup guidance, and the user can
@@ -324,7 +425,7 @@ polish work.
   hatch, not the default response to a cell click.
 - Raw Markdown is a first-class source view. It uses a monospaced editor voice,
   the active Rotli accent for syntax punctuation, and a contrast-safe semantic
-  blue for headings and emphasis. These roles are theme tokens in all four
+  blue for headings and emphasis. These roles are theme tokens in every
   environments. Appearance offers Rotli (default) and Monochrome palettes;
   customization changes palette, never grammar or source.
 
@@ -336,12 +437,12 @@ polish work.
   the content they affect.
 - Use semantic HTML and accessible names before adding test-only attributes.
 - Do not rely on color alone for state, selection, validation, or urgency.
-- Maintain sufficient contrast across all four environments.
+- Maintain sufficient contrast across every supported environment.
 
 ## Design proof
 
 Automated token, CSS, keyboard, and state checks are necessary but not complete.
-UI changes require desktop review in all four environments and at a narrow
+UI changes require desktop review across the supported theme families and at a narrow
 window. Browser tests prove DOM interaction only; they do not prove native
 titlebar, menu, filesystem, Keychain, updater, scheduler, or OS drag behavior.
 

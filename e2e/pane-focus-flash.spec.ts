@@ -1,4 +1,4 @@
-// The pane-focus landing light (Seth, 2026-07-30): when focus moves between
+// The pane-focus landing light (the maintainer, 2026-07-30): when focus moves between
 // panes in a split, the arriving pane briefly wears an accent outline
 // (.focus-flash) and it fades away — a quick "you are here", not a permanent
 // decoration.

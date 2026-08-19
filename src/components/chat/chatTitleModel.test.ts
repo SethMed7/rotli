@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   CHAT_TITLE_MAX_LENGTH,
-  chatTitleAdvanceHint,
+  CHAT_TITLE_PLACEHOLDER,
   deriveChatTitle,
   normalizeChatTitle,
 } from "./chatTitleModel";
@@ -18,8 +18,7 @@ describe("chat title model", () => {
     expect(deriveChatTitle("   ")).toBe("New chat");
   });
 
-  test("explains whether Enter skips naming or continues", () => {
-    expect(chatTitleAdvanceHint("   ")).toBe("Enter to skip");
-    expect(chatTitleAdvanceHint("Research plan")).toBe("Enter to use");
+  test("keeps the skip instruction inside the pristine input placeholder", () => {
+    expect(CHAT_TITLE_PLACEHOLDER).toBe("Name this chat (optional) · Enter to skip");
   });
 });

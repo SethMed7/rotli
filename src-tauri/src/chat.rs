@@ -8,7 +8,7 @@
 //! (`~/.memex/ai/registry.json`) so the Chat surface offers exactly "what we have
 //! in the memex ai" — the same on-device store Breve and voz draw from. We never
 //! write it; rotli only reads the chat-capable (`kind: "llm-chat"`) entries and
-//! resolves each one's provider endpoint + API shape (Seth, 2026-06-26).
+//! resolves each one's provider endpoint + API shape (the maintainer, 2026-06-26).
 
 use std::time::Duration;
 
@@ -272,7 +272,7 @@ pub async fn chat_messages(
 ) -> Result<String, String> {
     // ASYNC command: a sync command runs on the MAIN thread, and this one holds
     // a blocking HTTP request for a whole model generation — the entire app
-    // beachballed for every local reply (Seth, 2026-07-30). The blocking work
+    // beachballed for every local reply (the maintainer, 2026-07-30). The blocking work
     // moves to a worker; the main thread keeps painting.
     let handle = state.0.clone();
     let compute = compute.inner().clone();
@@ -309,7 +309,7 @@ pub async fn chat_messages(
                 )
             }
         };
-        // COMPUTE GUARDRAILS (Seth, 2026-08-01 — docs/design/local-compute-guardrails.md):
+        // COMPUTE GUARDRAILS (the maintainer, 2026-08-01 — docs/design/local-compute-guardrails.md):
         // the LOCAL lane shares one model slot on one Mac, so admission is gated
         // on MEASURED headroom, never a chat count. A request that doesn't fit
         // queues here (the surface says so, and the user can prioritize it)
@@ -740,10 +740,7 @@ fn ensure_llamacpp_up(endpoint: &str) {
         _ => return,
     };
     let _ = std::process::Command::new("launchctl")
-        .args([
-            "kickstart",
-            &format!("gui/{uid}/com.sethmedina.memex-llamacpp"),
-        ])
+        .args(["kickstart", &format!("gui/{uid}/com.rotli.memex-llamacpp")])
         .output();
 }
 

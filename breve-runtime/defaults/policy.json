@@ -1,5 +1,5 @@
 {
-  "_notes": "Breve's chat usage/escalation policy — which models Breve uses DIRECTLY vs must ASK Seth first, and the cost label shown on each reply. EDIT THIS (no code change); policy.ts is just the engine that reads it. Matched by substring on the lowercased model id; first match wins; no match → `default`. imageAlwaysDirect = image generation never asks (incl. Codex). Mirrors the client layer's clients/models.json pattern.",
+  "_notes": "Breve's chat usage/escalation policy — which models Breve uses DIRECTLY vs must ASK the maintainer first, and the cost label shown on each reply. EDIT THIS (no code change); policy.ts is just the engine that reads it. Matched by substring on the lowercased model id; first match wins; no match → `default`. imageAlwaysDirect = image generation never asks (incl. Codex). Mirrors the client layer's clients/models.json pattern.",
   "imageAlwaysDirect": true,
   "rules": [
     { "match": ["gemma", "qwen", "nemotron", "glm", "llama", "mistral", "deepseek", "phi", "local"], "action": "direct", "cost": "free", "label": "local · free" },

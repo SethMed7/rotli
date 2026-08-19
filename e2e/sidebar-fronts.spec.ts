@@ -1,4 +1,4 @@
-// The sidebar's Home/Chat fronts (Seth's IA, 2026-08-01,
+// The sidebar's Home/Chat fronts (the maintainer's IA, 2026-08-01,
 // docs/design/sidebar-home-chat.md). The stacked Chat/Notes accordions are
 // gone: a two-segment switcher under the vault header picks which world owns
 // the whole body, the System zone folds away, and both bodies scroll.
@@ -97,11 +97,24 @@ test("opening content pulls the sidebar to the front that can show it", async ({
   await expect(page.locator(".sb-chatnew")).toBeVisible();
 });
 
-test("the switcher reads from semantic tokens in all four environments", async ({ page }) => {
+test("the switcher reads from semantic tokens in every environment", async ({ page }) => {
   await gotoApp(page);
   const themeButton = page.getByRole("button", { name: /^Theme —/ });
 
-  for (const theme of ["Warm Light", "Warm Dark", "Paper", "Charcoal"] as const) {
+  for (const theme of [
+    "Warm Light",
+    "Warm Dark",
+    "Paper",
+    "Charcoal",
+    "Ocean Light",
+    "Ocean Dark",
+    "Grove Light",
+    "Grove Dark",
+    "Iris Light",
+    "Iris Dark",
+    "Moonlight",
+    "Midnight",
+  ] as const) {
     await expect(themeButton).toHaveAccessibleName(`Theme — ${theme}`);
 
     const active = homeSeg(page);
@@ -111,8 +124,8 @@ test("the switcher reads from semantic tokens in all four environments", async (
       probe.style.cssText = [
         "position:fixed",
         "visibility:hidden",
-        "background:var(--accent)",
-        "color:var(--on-accent)",
+        "background:var(--selected-bg)",
+        "color:var(--selected-ink)",
       ].join(";");
       document.body.append(probe);
       const actual = getComputedStyle(node);
@@ -132,9 +145,8 @@ test("the switcher reads from semantic tokens in all four environments", async (
       return result;
     });
 
-    // the active segment IS the ONE active-item state: the solid accent pill the
-    // open note + open chat wear, sitting in the recessed --tint trough — same
-    // active language everywhere, hierarchy by contrast never a shadow.
+    // Active state stays a quiet semantic wash in every family: recognizable,
+    // but never the old solid-accent block that competed with the user's work.
     expect(colors.background[0]).toBe(colors.background[1]);
     expect(colors.text[0]).toBe(colors.text[1]);
     // border folds into the fill — no ring competing with the pill
@@ -144,4 +156,20 @@ test("the switcher reads from semantic tokens in all four environments", async (
 
     await themeButton.click();
   }
+});
+
+test("the Activity overview fills the available pane on a wide display", async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await gotoApp(page);
+
+  await page.getByRole("button", { name: "Open Rotli activity dashboard" }).click();
+
+  const pane = page.locator(".dashboard-surface");
+  const header = page.locator(".dashboard-head");
+  await expect(pane).toBeVisible();
+
+  const paneBox = await pane.boundingBox();
+  const headerBox = await header.boundingBox();
+  expect(paneBox?.width).toBeGreaterThan(1500);
+  expect(headerBox?.width).toBeGreaterThan(1300);
 });

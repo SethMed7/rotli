@@ -1,6 +1,6 @@
 import { noteDiskFolder } from "../lib/noteLocation";
 /** Open, create, or list the durable chats attached to one Markdown note. A
- * note owns MANY chats (Seth, 2026-07-30): the default open continues the most
+ * note owns MANY chats (the maintainer, 2026-07-30): the default open continues the most
  * recently touched one; `create` starts another; the editor's chat chip lists
  * them all. */
 import { corpusFrontmatter, corpusNotePath } from "../lib/tauri";
@@ -61,12 +61,12 @@ export async function listChatsForNote(note: NoteSummary): Promise<AttachedChatS
   return (await noteChatContext(note)).attached;
 }
 
-function showChat(slug: string, noteId: string): void {
+function showChat(slug: string, noteId: string, vaultId?: string): void {
   const ui = useUiStore.getState();
   ui.setSettingsOpen(false);
   ui.setSidebarMode("notes");
   rememberChatNote(slug, noteId);
-  usePanesStore.getState().openChat(slug, { newTab: true });
+  usePanesStore.getState().openChat(slug, { newTab: true, ...(vaultId ? { vaultId } : {}) });
 }
 
 /** Open a SPECIFIC chat of this note (a picker row). */
@@ -108,5 +108,5 @@ export async function openChatForNote(note: NoteSummary, opts?: { create?: boole
     await invalidateMemex();
   }
 
-  showChat(slug, note.id);
+  showChat(slug, note.id, instance.id);
 }

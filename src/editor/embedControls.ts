@@ -32,7 +32,7 @@ export function installEmbedControls({
   kind: EmbedKind;
   onOpen: () => void;
   /** File id whose resized height is REMEMBERED across widget rebuilds and
-   * restarts (Seth, 2026-07-29); omitted = per-mount sizing as before. */
+   * restarts (the maintainer, 2026-07-29); omitted = per-mount sizing as before. */
   persistKey?: string;
 }): () => void {
   const actions = document.createElement("div");

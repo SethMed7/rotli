@@ -377,7 +377,7 @@ export function makeTauriHost(
         frontmatterUnknown = true;
       }
       // LOCKED is an EDIT control that binds EVERY model class — "local" buys
-      // visibility, never edit authority (Seth, 2026-08-01). Rust refuses this
+      // visibility, never edit authority (the maintainer, 2026-08-01). Rust refuses this
       // again inside corpus_write_ai; neither layer trusts the other.
       if (frontmatterUnknown || !frontmatter || frontmatter.locked === true) {
         return frontmatterUnknown || !frontmatter

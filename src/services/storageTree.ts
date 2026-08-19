@@ -1,4 +1,4 @@
-// Storage organization (Seth, 2026-06-30). Storage is a flat list of binaries on
+// Storage organization (the maintainer, 2026-06-30). Storage is a flat list of binaries on
 // disk; this regroups them into a clean tree IN THE FRONTEND — no backend change,
 // instant toggle. Three modes (a Settings knob): by Type (the default — Audio /
 // Images / PDFs / Documents / Other), by Date (Year / Month, filename-date first so

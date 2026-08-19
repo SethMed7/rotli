@@ -17,7 +17,7 @@ export function attachedNoteStem(value: string | undefined): string {
 }
 
 /** ALL chats attached to one note, newest work first — a note owns many chats
- * (Seth, 2026-07-30); the default open continues where the user left off. */
+ * (the maintainer, 2026-07-30); the default open continues where the user left off. */
 export function findAttachedChats(chats: AttachedChatSummary[], noteStem: string): AttachedChatSummary[] {
   return chats
     .filter((chat) => attachedNoteStem(chat.attachedTo) === noteStem)

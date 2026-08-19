@@ -140,10 +140,10 @@ describe("slash target filtering", () => {
   });
 });
 
-// /image-gen (Seth, 2026-08-04): "it will only offer models you are actively
+// /image-gen (the maintainer, 2026-08-04): "it will only offer models you are actively
 // logged into that can do image gen such as gemini and gpt".
 describe("/image-gen", () => {
-  test("the command is discoverable by the names Seth types", () => {
+  test("the command is discoverable by the names the maintainer types", () => {
     for (const query of ["image-gen", "imagegen", "image", "generate", "picture", "ai"]) {
       expect(filterSlashItems(query).map((item) => item.label)).toContain("Generate image");
     }

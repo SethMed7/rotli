@@ -16,7 +16,7 @@
 export const VAULT_ROOT_ID = "vault";
 
 /** The Vault root marker id ("vault:"). The sidebar Vault row scopes to it; the
- * external memex (Seth's ~/memex-vault) surfaces its wiki/ + chats/ underneath. */
+ * external memex (the maintainer's ~/memex-vault) surfaces its wiki/ + chats/ underneath. */
 export const VAULT_MARKER = `${VAULT_ROOT_ID}:`;
 
 /** True when folderId targets the external Vault root (the marker itself or any
@@ -90,7 +90,7 @@ export function isTrash(folderId: string): boolean {
 }
 
 /** Does an item whose REAL home is `folderId` live under sidebar destination (or
- * plain folder) `destId`? The sidebar's derived highlight rule (Seth #1,
+ * plain folder) `destId`? The sidebar's derived highlight rule (the maintainer #1,
  * 2026-07-08): a destination row only reads "selected" while the focused
  * content actually lives under it. The two aliased destinations map to their
  * disk shapes — "Brain" ⇔ wiki/*, "Storage" ⇔ memex storage/* AND the legacy

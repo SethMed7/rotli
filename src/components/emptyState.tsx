@@ -20,7 +20,7 @@ export function EmptyState() {
   );
   return (
     <div className="list-empty empty-stage">
-      <Character name="base" size={150} />
+      <Character name="base" size={150} accessorized />
       <div className="et">Your island is ready</div>
       <div className="es">
         Press <kbd>{formatChord(captureChord ?? "Alt+C")}</kbd> anywhere on your Mac and the first thought

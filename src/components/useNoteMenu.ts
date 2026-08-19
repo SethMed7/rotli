@@ -124,7 +124,7 @@ export function useNoteMenu() {
         // don't apply until it's back (mirrors the retired RowMenu's split).
         // Gate on isSink (Archive/Trash), NOT isHidden: a STAGED capture lives
         // in Board (isHidden) yet is a live note that shows in All notes — it
-        // must get the full menu, not a dead "Restore" that no-ops (Seth,
+        // must get the full menu, not a dead "Restore" that no-ops (the maintainer,
         // 2026-07-06: "Restore does nothing but I can see it in All notes").
         if (isSink(note.folderId)) {
           const restoreItem: MenuSpec = restoresByPath
@@ -193,7 +193,7 @@ export function useNoteMenu() {
         const starred = quickIds.includes(note.id);
         const full = !starred && quickIds.length >= QUICK_MAX;
         // lock/secure aren't on NoteSummary — read them from frontmatter so the
-        // menu shows the right toggle label + check (Seth #23, 2026-07-03: these
+        // menu shows the right toggle label + check (the maintainer #23, 2026-07-03: these
         // moved out of the metadata popover into this menu).
         const fm = isNote ? await corpusFrontmatter(note.id).catch(() => null) : null;
         const fileStat = sinkLane === "file" ? await corpusFileStat(note.id).catch(() => null) : null;
@@ -217,7 +217,7 @@ export function useNoteMenu() {
         };
 
         const items: MenuSpec[] = [];
-        // Quick Look (Seth, 2026-07-29): peek without opening fully — Space in
+        // Quick Look (the maintainer, 2026-07-29): peek without opening fully — Space in
         // the System browser opens the same modal
         items.push({
           kind: "action" as const,
@@ -285,7 +285,7 @@ export function useNoteMenu() {
               // reveal their Main/sidebar row instead. Uncurated ones open
               // Captures and highlight the card. FORCE the view open —
               // board.open toggles, so a second click used to bounce back to
-              // panes and look like a no-op (Seth, 2026-07-09).
+              // panes and look like a no-op (the maintainer, 2026-07-09).
               const curated =
                 mainHasNote(useMainStore.getState().manifest.tree, note.id) ||
                 ui.quickNoteIds.includes(note.id);
@@ -312,7 +312,7 @@ export function useNoteMenu() {
           disabled: !isTauri(),
           onClick: () => {
             // failures surfaced in the sidebar's inline error note — this
-            // silently no-op'd for months while the Rust side threw (Seth #63)
+            // silently no-op'd for months while the Rust side threw (the maintainer #63)
             useUiStore.getState().setRowActionError(null);
             void corpusRevealFile(note.id).catch((err) =>
               useUiStore
@@ -333,7 +333,7 @@ export function useNoteMenu() {
           },
         });
         items.push({ kind: "sep" as const });
-        // "Move to…" retired (Seth, 2026-07-28: it listed Library areas no
+        // "Move to…" retired (the maintainer, 2026-07-28: it listed Library areas no
         // matter which view you were in — misleading; the System browser and
         // the Librarian own placement). Duplicate replaces it as the quick
         // by-hand verb: a full copy, "title copy". Placement goes through the
@@ -416,7 +416,7 @@ export function useNoteMenu() {
                 setViewsManifest(assignItemToView(viewsManifest, note.id, null));
               }
               // an empty note dismissed from Main shouldn't linger in the corpus
-              // (Seth, 2026-07-07) — hard-discard, never into the Trash folder
+              // (the maintainer, 2026-07-07) — hard-discard, never into the Trash folder
               // (2026-07-17: Rust re-verifies blankness and refuses otherwise)
               void isEmptyNote(note.id).then((empty) => {
                 if (empty) void discardBlankNote(note.id);
@@ -436,10 +436,10 @@ export function useNoteMenu() {
           items.push({
             kind: "action" as const,
             // LOCKED is an EDIT control — every model still READS a locked note
-            // (Seth, 2026-08-01; docs/design/ai-visibility-matrix.md)
+            // (the maintainer, 2026-08-01; docs/design/ai-visibility-matrix.md)
             label: fm?.locked ? "Unlock — let the AI edit it" : "Lock — no AI may edit it",
             checked: !!fm?.locked,
-            // protection states wear the LOCK, not the star (Seth, 2026-07-29)
+            // protection states wear the LOCK, not the star (the maintainer, 2026-07-29)
             checkedMark: "lock" as const,
             onClick: () => runFm("lock", corpusSetLocked(note.id, !fm?.locked)),
           });
@@ -487,7 +487,7 @@ export function useNoteMenu() {
             kind: "action" as const,
             label: "Archive",
             onClick: () => {
-              // a note leaving for a sink also leaves Main (Seth #5, 2026-07-08)
+              // a note leaving for a sink also leaves Main (the maintainer #5, 2026-07-08)
               if (inMain) setTree(removeFromMain(manifest.tree, note.id), liveIds);
               archive.mutate(note.id);
             },

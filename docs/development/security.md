@@ -7,7 +7,7 @@ that keep it that way, and the residual risks a maintainer still owns.
 
 ## What each class of model may see and change
 
-Two independent controls, on two axes (Seth, 2026-08-01):
+Two independent controls, on two axes (the maintainer, 2026-08-01):
 
 - **`secure` is a VISIBILITY control against remote.** A frontier/API model
   never receives a secure note's title, snippet, body, or search hit. An
@@ -69,8 +69,9 @@ from every diagnostics path. Full record: egress threat model O7, design in
 | Breve safe-fetch | curated public hosts | watchlist/summarize URLs | `safe-fetch.ts` (https-only, SSRF block, same-host redirects, caps) |
 | YouTube probes (`signal-daemon.ts`, `creator-alerts.ts`) | literal `youtube.com` | handle/channelId in the path/query only | host-pinned literal, `checkUrl`-gated |
 | Updater | GitHub releases | — | minisign-signed feed, single pinned HTTPS endpoint |
+| Private browser child webview | user-selected HTTP(S) destination through the chosen search provider | address/search text plus ordinary page traffic | explicit user navigation + `blocked_for_remote` address scan + scheme allowlist; only the provider ID persists; non-persistent datastore; remote guest omitted from every Tauri capability |
 | ImapFlow (`mail.ts`) | configured mail hosts | — | TLS strict except loopback |
-| Webview | nothing | — | CSP `connect-src ipc:` only; no fetch/XHR/WebSocket in `src/` |
+| Rotli app webviews | nothing | — | CSP `connect-src ipc:` only; no fetch/XHR/WebSocket in `src/`; capabilities target only `main`, `capture`, and `quick` labels rather than their whole windows |
 | `rotli` CLI / `rotli-workspace` MCP | local Claude/Codex process | requested non-secure note text or compact board data | registered-root discovery + no-follow containment + remote-AI secure detector + locked-note refusal + optimistic revision check + request/output/schema caps + destructive annotations; stdio only |
 
 The full inventory — every ureq / fetch / network-CLI call site with its
@@ -198,32 +199,44 @@ The 2026-07 audit escalated five product-behavior findings. Disposition:
    step caps, secure-note exclusion, and secret scan remain independent layers.
    Paraphrased semantic leakage is a residual risk for the quarterly review.
 
-### Supply-chain advisories (transitive-only, tracked; reviewed 2026-08-02)
+### Supply-chain advisories (tracked; reviewed 2026-08-18)
 
-All are outside Rotli's own `src/`. The current `bun audit` reports fifteen
-findings (8 high, 6 moderate, 1 low) — one fewer than before the Vite 8 upgrade,
-which bundles Rolldown natively (retiring the `rolldown-vite` alias) and pulls a
-newer `postcss` that clears the source-map advisory below, introducing no new
-advisory of its own:
+All are outside Rotli's own `src/`. The repository has three independent Bun
+lockfiles, so `bun run deps audit` scans each one instead of treating the root
+as the whole product. After compatible repair and dedupe, the current tool
+reports 11 findings in the app graph (6 high, 5 moderate), 5 in the marketing
+site (1 high, 4 moderate), and 1 high finding in Breve's production graph.
+These totals overlap across lockfiles and are not 17 distinct advisories.
 
-- **DOMPurify** ≤ 3.4.11 (low custom-element sanitizer callback bypass) —
-  through Mermaid. Rotli keeps Mermaid at `securityLevel: "strict"` and does
-  not enable custom-element handling; upgrade when Mermaid selects the patched
-  sanitizer.
+The reviewed Bun 1.4 maintenance pass repaired every version permitted by the
+current dependency ranges. The app moved both `brace-expansion` lines,
+DOMPurify, Immutable, `ip-address`, the compatible NanoID line, and tar; the
+site moved JS-YAML, NanoID, and Sharp; Breve moved `ip-address` and tar. Dedupe
+then converged all three graphs, including the site's Sharp line at 0.35.2, and
+the follow-up `audit-plan` reports zero remaining compatible fixes. The
+following findings require an upstream range or deliberately reviewed direct
+dependency change:
 
 - **lodash-es** ≤ 4.17.22 (two high/moderate families: template-key code
   injection and prototype pollution) — through Univer, Mermaid, and Excalidraw.
-- **brace-expansion** 2.0.0–2.1.1 (high exponential-expansion DoS) — through
-  exceljs's archive path (the ESLint/typescript-eslint carrier left with the
-  2026-07-31 oxlint migration).
-- **nanoid** < 3.3.8 and **uuid** < 11.1.1 (moderate) — library-internal ID
-  generation through Excalidraw, Univer, Vite, exceljs, and Mermaid.
-- **sharp** < 0.35.0 (high libvips image-processing family) and **tar**
-  ≤ 7.5.20 (moderate uncontrolled recursion) — through the optional
+- **nanoid** locked 3.x, 4.x, and 5.x lines and **uuid** 8.3.2 (moderate/high) —
+  library-internal ID generation through Excalidraw, Univer, Vite, exceljs, and
+  Mermaid. The compatible NanoID 3.3.16 line is repaired; Excalidraw, Univer,
+  the converter, and exceljs carry exact or major-bounded ranges.
+- **sharp** < 0.35.0 (high libvips image-processing family) — through the optional
   Kokoro/Transformers local voice stack (`@huggingface/transformers` →
-  `onnxruntime-node`).
-- **immutable** < 4.3.9 (two high denial-of-service families) — through Sass in
-  Excalidraw/Vite's build dependency graph.
+  `onnxruntime-node`); Sharp is also an exact direct app build dependency.
+  Transformers blocks Sharp 0.35, while the site's independent Sharp graph is
+  repaired.
+- **undici** 7.28.0 (one high and four moderate request/cache parsing
+  advisories) — through the site's pinned Wrangler/Miniflare toolchain. The
+  current Miniflare alpha pins that exact version, so no compatible repair is
+  available.
+
+The site-only Undici path is a build/deploy input rather than app-bundle runtime
+code, but it still executes in the release pipeline and remains supply-chain
+relevant. Breve's sole remaining finding is the Transformers Sharp range in the
+independently installed runtime graph.
 
 **esbuild** left the tree entirely with the 2026-08-01 rolldown-vite migration
 and stays out under Vite 8 (Vite keeps esbuild as an *optional* peer and Rotli

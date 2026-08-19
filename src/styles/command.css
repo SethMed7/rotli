@@ -82,7 +82,7 @@
   background: var(--hov);
 }
 .prow.sel {
-  background: var(--tint);
+  background: var(--selected-bg);
 }
 .prow .hint {
   margin-left: auto;
@@ -116,7 +116,7 @@
   margin-right: 2px;
 }
 
-/* ——— Quick Look preview (Seth, 2026-07-29): a modal PEEK at an item without
+/* ——— Quick Look preview (the maintainer, 2026-07-29): a modal PEEK at an item without
    opening its full surface. Same flat scrim + bordered surface as ⌘K; the
    Open button escalates to the real surface. ——— */
 .pv-scrim {
@@ -281,9 +281,9 @@
   margin: 2px 0;
 }
 
-/* ——— WhichKey — "hold ⌘ to peek" shortcut map (Seth, 2026-06-13) ———
+/* ——— WhichKey — "hold ⌘ to peek" shortcut map (the maintainer, 2026-06-13) ———
    Centered, pointer-events:none so it can never steal a click, z-index 18 —
-   below the palette (20). Dims behind the panel (Seth, 2026-06-15: the
+   below the palette (20). Dims behind the panel (the maintainer, 2026-06-15: the
    panel-over-live-app was hard to read) — the same scrim values as ⌘K. No raw
    hex — kit tokens + the palette's cocoa values. */
 .whichkey {
@@ -301,7 +301,7 @@
   position: absolute;
   inset: 0;
   /* the THEME's scrim — a hardcoded cocoa here painted the warm theme over
-     Paper/Charcoal whenever ⌘ was held (Seth's "background blurs show
+     Paper/Charcoal whenever ⌘ was held (the maintainer's "background blurs show
      another theme", 2026-07-08) */
   background: var(--scrim);
 }
@@ -365,13 +365,6 @@
 .cap-in {
   padding: 20px 22px 14px;
   display: flex;
-  gap: 12px;
-}
-.cap-in img {
-  width: 22px;
-  height: 22px;
-  margin-top: 3px;
-  flex: 0 0 auto;
 }
 .cap-in textarea {
   flex: 1;
@@ -424,19 +417,55 @@
 /* — the quokka character set: line-art illustrations whose LINE color follows
    the theme (each SVG is a single currentColor path), shape constant. Used in
    the quokka-world placements only: empty states, onboarding, the chat connect
-   state (Seth, 2026-06-26). — */
+   state (the maintainer, 2026-06-26). — */
 .quokka,
 .quokka-mark {
   display: inline-flex;
   flex: 0 0 auto;
   line-height: 0;
+}
+.quokka {
+  position: relative;
+  color: var(--quokka-ink, var(--text));
+}
+.quokka-mark {
   color: var(--text);
 }
-.quokka svg,
+.quokka-line,
+.quokka-line svg,
+.quokka-layer,
+.quokka-detail-layer,
 .quokka-mark svg {
   width: 100%;
   height: 100%;
   display: block;
+}
+.quokka-line,
+.quokka-layer,
+.quokka-detail-layer {
+  position: absolute;
+  inset: 0;
+}
+.quokka-layer {
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+.quokka-body-layer {
+  background: var(--quokka-fill);
+}
+.quokka-ink-layer {
+  background: var(--quokka-ink, currentColor);
+}
+.quokka-accessory-layer {
+  background: var(--quokka-accessory-color);
+}
+.quokka-detail-layer {
+  object-fit: contain;
+  user-select: none;
 }
 /* the empty-state quokka sits in the warm ink, a touch soft so it reads as a
    friendly mascot, not a heavy graphic */
@@ -512,7 +541,7 @@
   font-size: 19px;
   margin-bottom: 4px;
 }
-/* a settings pane heading with its quokka character accent (Seth, 2026-06-26):
+/* a settings pane heading with its quokka character accent (the maintainer, 2026-06-26):
    the title on the left, a small muted line-art quokka at the top-right — a quiet
    flourish that tints with the theme (currentColor), never the focus. */
 .set-panehead {
@@ -651,7 +680,7 @@
   padding: 1.5px 5px;
 }
 
-/* AI Models (Seth, 2026-07-02): connected lanes + hybrid presets */
+/* AI Models (the maintainer, 2026-07-02): connected lanes + hybrid presets */
 .set-subhead {
   font-size: 13px;
   font-weight: 700;
@@ -783,7 +812,7 @@
   max-width: 560px;
 }
 /* a preset card: name + actions up top, the readable route flow under it
-   (the old one-line summary ellipsized into raw ids — Seth, 2026-07-02) */
+   (the old one-line summary ellipsized into raw ids — the maintainer, 2026-07-02) */
 .preset-row {
   display: flex;
   flex-direction: column;
@@ -864,7 +893,7 @@
   margin-left: auto;
 }
 
-/* AI Models pane — section rhythm (Seth, 2026-07-02: air between the groups) */
+/* AI Models pane — section rhythm (the maintainer, 2026-07-02: air between the groups) */
 .aisection {
   margin: 0 0 38px;
 }
@@ -924,7 +953,7 @@
 }
 /* the bare switch (the Toggle row's knob without the row). The .on state must
    be mirrored here — .swrow.on's selectors don't reach this wrapper, which
-   left the knob visually stuck OFF on an enabled lane (Seth, 2026-07-02). */
+   left the knob visually stuck OFF on an enabled lane (the maintainer, 2026-07-02). */
 .ailane-sw {
   border: none;
   background: none;
@@ -987,7 +1016,7 @@
   margin-right: 2px;
 }
 /* allowed = a filled, checked pill; blocked = dashed + struck. The two states
-   must read at a glance (Seth, 2026-07-02: outlines alone were ambiguous). */
+   must read at a glance (the maintainer, 2026-07-02: outlines alone were ambiguous). */
 .ailane-model {
   font: inherit;
   font-size: 12px;
@@ -1167,7 +1196,58 @@
   color: var(--text-muted);
 }
 
-/* appearance — two theme families, with light/dark/system as a separate mode */
+/* appearance — believable workspace previews first, then family and personal
+   companion choices. Selection is a restrained wash rather than a solid fill. */
+.appearance-intro {
+  max-width: 640px;
+  margin: 8px 0 2px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.appearance-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  max-width: 640px;
+  margin-bottom: 14px;
+}
+.appearance-mode-card,
+.famcard,
+.navigator-choice {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    background var(--motion-exit) var(--motion-ease),
+    border-color var(--motion-exit) var(--motion-ease);
+}
+.appearance-mode-card:hover,
+.famcard:hover,
+.navigator-choice:hover {
+  background: var(--hov);
+}
+.appearance-mode-card.sel,
+.famcard.sel,
+.navigator-choice.sel {
+  border-color: color-mix(in srgb, var(--accent-text) 52%, var(--border));
+  background: var(--selected-bg);
+}
+.appearance-mode-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border-radius: var(--r-card);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: center;
+}
+.appearance-mode-card > span:last-child {
+  font-weight: var(--wght-label);
+}
 .famrow {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1181,36 +1261,9 @@
   align-items: flex-start;
   gap: 4px;
   padding: 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
   border-radius: var(--r-card);
-  color: var(--text);
+  font: inherit;
   text-align: left;
-  cursor: pointer;
-  transition: background var(--motion-exit) var(--motion-ease);
-}
-.famcard:hover {
-  background: var(--hov);
-}
-.famcard.sel {
-  border-color: var(--accent);
-  background: var(--tint);
-}
-.famswatch {
-  display: block;
-  width: 100%;
-  height: 34px;
-  border-radius: var(--r-control);
-  border: 1px solid var(--border);
-  margin-bottom: 4px;
-}
-.famswatch-pair {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  overflow: hidden;
-}
-.famswatch-pair > span {
-  min-width: 0;
 }
 .famlabel {
   font-weight: var(--wght-label);
@@ -1220,27 +1273,537 @@
   font-size: var(--fs-label);
   color: var(--text-muted);
 }
-.sysrow {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-top: 4px;
-  padding: 9px 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+.workspace-preview {
+  display: grid;
+  width: 100%;
+  height: 88px;
+  grid-template-columns: 1fr;
+  overflow: hidden;
   border-radius: var(--r-control);
-  color: var(--text-muted);
-  font-size: var(--fs-label);
-  cursor: pointer;
-  transition: background var(--motion-exit) var(--motion-ease);
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+  background: var(--surface-2);
 }
-.sysrow:hover {
+.workspace-preview.split {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.workspace-preview-canvas {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 31% 1fr;
+  background: var(--preview-ground);
+  color: var(--preview-text);
+}
+.workspace-preview-canvas + .workspace-preview-canvas {
+  border-left: 1px solid var(--preview-border);
+}
+.workspace-preview-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 7px;
+  border-right: 1px solid var(--preview-border);
+  background: var(--preview-sidebar);
+}
+.workspace-preview-sidebar i {
+  display: block;
+  width: 72%;
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--preview-muted);
+  opacity: 0.48;
+}
+.workspace-preview-sidebar i.selected {
+  width: 100%;
+  height: 9px;
+  background: var(--preview-selected);
+  opacity: 1;
+}
+.workspace-preview-page {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 14px 10px 9px;
+}
+.workspace-preview-page b,
+.workspace-preview-page i,
+.workspace-preview-page em {
+  display: block;
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: currentColor;
+  opacity: 0.2;
+}
+.workspace-preview-page b {
+  width: 58%;
+  height: 7px;
+  opacity: 0.72;
+}
+.workspace-preview-page i {
+  width: 82%;
+}
+.workspace-preview-page i + i {
+  width: 64%;
+}
+.workspace-preview-page em {
+  width: 100%;
+  height: 17px;
+  margin-top: auto;
+  border: 1px solid var(--preview-border);
+  background: var(--preview-surface);
+  opacity: 1;
+}
+.quokka-studio {
+  display: grid;
+  max-width: 640px;
+  grid-template-columns: 210px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface);
+}
+.quokka-studio-preview {
+  display: flex;
+  min-height: 318px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px;
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+  text-align: center;
+}
+.quokka-studio-preview > span,
+.quokka-accessory > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+.quokka-studio-preview strong {
+  font-size: 13px;
+  font-weight: var(--wght-label);
+}
+.quokka-studio-preview small,
+.quokka-accessory small {
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+.quokka-studio-controls {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px;
+}
+.quokka-studio fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.quokka-studio legend {
+  margin-bottom: 9px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: var(--wght-label);
+}
+.quokka-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.quokka-swatch {
+  display: inline-flex;
+  min-width: 39px;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 2px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+.quokka-swatch:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.quokka-swatch.sel {
+  background: var(--selected-bg);
+  color: var(--text);
+}
+.quokka-swatch > span {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+  border-radius: 50%;
+  background: var(--quokka-choice-color, var(--surface));
+}
+.quokka-swatch.line > span::before,
+.quokka-swatch.line > span::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 1px;
+  border-radius: var(--r-pill);
+  background: var(--text);
+}
+.quokka-swatch.line > span::before {
+  top: 11px;
+}
+.quokka-swatch.line > span::after {
+  top: 17px;
+}
+.quokka-swatch small {
+  font-size: 9.5px;
+}
+.quokka-custom-hue,
+.quokka-accessory-hue {
+  display: grid;
+  width: min(280px, 100%);
+  grid-template-columns: auto minmax(120px, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+.quokka-custom-hue input,
+.quokka-accessory-hue input {
+  width: 100%;
+  height: 8px;
+  margin: 0;
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--accent-hue-track);
+  cursor: pointer;
+}
+.quokka-custom-hue input::-webkit-slider-thumb,
+.quokka-accessory-hue input::-webkit-slider-thumb {
+  width: 18px;
+  height: 18px;
+  appearance: none;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+}
+.quokka-custom-hue input::-webkit-slider-thumb {
+  background: var(--quokka-custom-color);
+}
+.quokka-accessory-hue input::-webkit-slider-thumb {
+  background: var(--quokka-accessory-color);
+}
+.quokka-custom-hue input:focus-visible,
+.quokka-accessory-hue input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.quokka-line-colors {
+  display: flex;
+  gap: 8px;
+}
+.quokka-line-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+.quokka-line-choice:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.quokka-line-choice.sel {
+  border-color: color-mix(in srgb, var(--accent-text) 42%, var(--border));
+  background: var(--selected-bg);
+  color: var(--text);
+}
+.quokka-line-choice > span {
+  width: 22px;
+  height: 22px;
+  border: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
+  border-radius: 50%;
+}
+.quokka-line-choice.black > span {
+  background: var(--quokka-line-black);
+}
+.quokka-line-choice.white > span {
+  background: var(--quokka-line-white);
+}
+.quokka-field-note {
+  margin: -3px 0 8px;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+.quokka-idle-poses {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.quokka-idle-pose {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 52px 1fr;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 7px;
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.quokka-idle-pose:hover {
   background: var(--hov);
 }
-.sysrow.on {
+.quokka-idle-pose.sel {
+  border-color: color-mix(in srgb, var(--accent-text) 42%, var(--border));
+  background: var(--selected-bg);
+}
+.quokka-idle-pose > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+.quokka-idle-pose strong {
+  font-size: 11px;
+  font-weight: var(--wght-label);
+}
+.quokka-idle-pose small {
+  color: var(--text-muted);
+  font-size: 9.5px;
+}
+.quokka-accessories {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.quokka-accessory {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 48px 1fr;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  background: transparent;
   color: var(--text);
-  border-color: var(--accent);
-  background: var(--tint);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.quokka-accessory:hover {
+  background: var(--hov);
+}
+.quokka-accessory.sel {
+  border-color: color-mix(in srgb, var(--accent-text) 42%, var(--border));
+  background: var(--selected-bg);
+}
+.quokka-accessory strong,
+.navigator-choice strong {
+  font-size: 12.5px;
+  font-weight: var(--wght-label);
+}
+.navigator-choice small {
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+.quokka-expression-strip {
+  display: flex;
+  max-width: 640px;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 12px 8px 9px;
+  border-block: 1px solid var(--border);
+}
+.quokka-expression-strip > span {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.quokka-expression-strip small {
+  color: var(--text-muted);
+  font-size: 9.5px;
+}
+.navigator-picker {
+  display: grid;
+  max-width: 640px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.navigator-choice {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 38px 1fr;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border-radius: var(--r-card);
+  font: inherit;
+  text-align: left;
+}
+.navigator-choice > span:last-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+.navigator-sample {
+  display: flex;
+  min-height: 70px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+.navigator-sample.lines i {
+  width: 14px;
+  height: 2px;
+  border-radius: var(--r-pill);
+  background: currentColor;
+  opacity: 0.52;
+}
+.navigator-sample.dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.48;
+}
+.navigator-sample.ears i {
+  position: relative;
+  width: 9px;
+  height: 7px;
+  margin-top: 2px;
+  border-radius: 48% 48% 44% 44%;
+  background: currentColor;
+  opacity: 0.44;
+}
+.navigator-sample.ears i::before,
+.navigator-sample.ears i::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.navigator-sample.ears i::before {
+  left: -1px;
+}
+.navigator-sample.ears i::after {
+  right: -1px;
+}
+.navigator-sample i.active {
+  color: var(--accent-text);
+  opacity: 1;
+}
+.navigator-sample.paws i {
+  position: relative;
+  width: 8px;
+  height: 7px;
+  color: inherit;
+}
+.navigator-sample.paws i::before,
+.navigator-sample.paws i > b {
+  content: "";
+  position: absolute;
+  background: currentColor;
+}
+.navigator-sample.paws i::before {
+  left: 2px;
+  bottom: 0;
+  width: 5px;
+  height: 4px;
+  border-radius: 55% 55% 50% 50%;
+}
+.navigator-sample.paws i > b {
+  top: 0;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+}
+.navigator-sample.paws i > b:nth-child(1) {
+  left: 0;
+  top: 1px;
+}
+.navigator-sample.paws i > b:nth-child(2) {
+  left: 3px;
+}
+.navigator-sample.paws i > b:nth-child(3) {
+  right: 0;
+  top: 1px;
+}
+.navigator-sample.paws i:nth-child(even) {
+  transform: translateX(2px) rotate(7deg);
+}
+.navigator-sample.paws i:nth-child(odd) {
+  transform: translateX(-2px) rotate(-7deg);
+}
+
+@media (max-width: 760px) {
+  .set-main {
+    padding-inline: 24px;
+  }
+  .appearance-mode-grid,
+  .quokka-accessories {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .appearance-mode-card:first-child {
+    grid-column: 1 / -1;
+  }
+  .quokka-studio {
+    grid-template-columns: 168px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .set-nav {
+    flex-basis: 150px;
+  }
+  .set-main {
+    padding-inline: 18px;
+  }
+  .appearance-mode-grid,
+  .famrow,
+  .navigator-picker,
+  .quokka-studio,
+  .quokka-accessories {
+    grid-template-columns: 1fr;
+  }
+  .appearance-mode-card:first-child {
+    grid-column: auto;
+  }
+  .quokka-studio-preview {
+    min-height: 220px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
 }
 .set-back {
   display: flex;
@@ -1311,8 +1874,107 @@
   background: var(--hov);
 }
 
+/* ——— private browser preferences — one familiar provider choice plus the
+   non-persistent research contract, with no browsing state exposed here. */
+.browser-engine-note {
+  max-width: 640px;
+  margin: 0 0 10px;
+}
+.browser-engine-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 640px;
+}
+.browser-engine-choice {
+  min-width: 220px;
+  flex: 1 1 calc(50% - 4px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.browser-engine-choice:hover {
+  background: var(--hov);
+}
+.browser-engine-choice.sel {
+  border-color: var(--accent);
+}
+.browser-engine-mark {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-control);
+  background: var(--ground);
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+.browser-engine-choice > span:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+.browser-engine-choice strong {
+  font-size: 12.5px;
+  font-weight: 650;
+}
+.browser-engine-choice small {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.browser-engine-check {
+  color: var(--accent-text);
+  opacity: 0;
+}
+.browser-engine-choice.sel .browser-engine-check {
+  opacity: 1;
+}
+.browser-privacy-note {
+  max-width: 640px;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin-top: 20px;
+  padding: 13px 14px;
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+.browser-privacy-note > svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--accent-text);
+}
+.browser-privacy-note h4 {
+  margin: 0 0 3px;
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+.browser-privacy-note p {
+  max-width: 66ch;
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
 /* ——— settings layout: cap + center the content so a wide window doesn't
-   strand everything on the left (Seth, 2026-06-15) ——— */
+   strand everything on the left (the maintainer, 2026-06-15) ——— */
 .set-body {
   max-width: 720px;
   margin: 0 auto;
@@ -1326,7 +1988,7 @@
   margin-top: 6px;
   max-width: 640px;
 }
-/* soft filled cards, no hard outline (Seth, 2026-07-06: "I don't like the white
+/* soft filled cards, no hard outline (the maintainer, 2026-07-06: "I don't like the white
    outline style"). The card is a subtle raised fill (--surface-2) on the page's
    --surface, so it reads as a panel WITHOUT a border line — and the accent-border
    the ON state used to draw (near-white in the mono-dark themes) is gone; the
@@ -1356,7 +2018,7 @@
 }
 /* a settings segmented choice stays a compact CONTROL — the Aa panel's
    flex:1 segments stretched each half to ~360px in the 720px body and the
-   pair read as two lost bars (Seth, 2026-07-30) */
+   pair read as two lost bars (the maintainer, 2026-07-30) */
 .set-main .segrow {
   max-width: 344px;
 }
@@ -1545,7 +2207,7 @@
   opacity: 0.5;
   cursor: default;
 }
-/* Settings action hierarchy (low-pulse — Seth 2026-07-08 model UX pass, phase 1):
+/* Settings action hierarchy (low-pulse — the maintainer 2026-07-08 model UX pass, phase 1):
    additive modifiers on .ghostbtn. Constructive actions (Install / Add / Save /
    New) take a RESTRAINED accent — never a loud fill; destructive ones (Uninstall /
    Delete / Remove) de-emphasize to muted so they never read as the row's CTA. */
@@ -1778,7 +2440,7 @@
   transition-duration: var(--motion-exit);
 }
 
-/* — Right-click context menu (Seth, 2026-07-01): a fixed popover, viewport-
+/* — Right-click context menu (the maintainer, 2026-07-01): a fixed popover, viewport-
    clamped, with drill-in sub-lists (Move to…) instead of floating submenus. — */
 .ctxmenu {
   position: fixed;
@@ -1819,31 +2481,15 @@
 .ctxmenu-item.danger {
   color: var(--danger, var(--accent-text));
 }
-/* the "highlight" checked mark — an exclusive selector's active row (the Main
-   view switcher): state as background, no checkmark gutter, flush labels. This
-   is the ONE active-item state, translated for a DENSE dropdown (audit extended
-   2026-08-03): the note row + front switcher wear a SOLID accent pill, but a
-   solid fill on a menu row reads heavy and hurts scanning — worst in Paper
-   (near-black accent) and Charcoal (near-white accent), where a whole row would
-   go black/cream among plain rows. So the same accent identity arrives here as
-   a strengthened accent wash PLUS a solid --accent bar down the leading edge —
-   the accent, unmistakably, without the density cost. Not a third look: the
-   same accent, lighter weight. */
+/* Exclusive selectors share the subdued selection wash. */
 .ctxmenu-item.active,
 .ctxmenu-item.active:hover:not(:disabled) {
-  position: relative;
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--selected-ink);
+  background: var(--selected-bg);
   font-weight: 600;
 }
-.ctxmenu-item.active::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 4px;
-  bottom: 4px;
-  width: 3px;
-  border-radius: 0 var(--r-inner) var(--r-inner) 0;
-  background: var(--accent);
+.ctxmenu-item.active svg {
+  color: var(--selected-icon);
 }
 .ctxmenu-item svg {
   flex: 0 0 auto;
@@ -1882,6 +2528,311 @@
 .ctxmenu-back-chev {
   font-size: 15px;
   line-height: 1;
+}
+
+/* — Vault folder browser — Rotli-native, directory-only selection. The flat
+   bordered card follows the same material law as command and rename surfaces;
+   Rust owns containment and authorization beneath this presentation. — */
+.vault-browser-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--scrim);
+  animation: scrim-in var(--motion-enter) var(--motion-ease);
+}
+.vault-browser-card {
+  width: min(700px, 100%);
+  max-height: min(720px, calc(100vh - 48px));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-card);
+}
+.vault-browser-card:focus {
+  outline: none;
+}
+.vault-browser-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.vault-browser-heading {
+  flex: 1;
+  min-width: 0;
+}
+.vault-browser-eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--accent-text);
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.vault-browser-heading h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1.25;
+}
+.vault-browser-heading p {
+  margin: 5px 0 0;
+  max-width: 58ch;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.vault-browser-close,
+.vault-browser-back,
+.vault-browser-refresh {
+  min-height: 30px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.vault-browser-close {
+  padding: 4px 8px;
+  border-color: var(--border);
+}
+.vault-browser-close:hover,
+.vault-browser-back:hover:not(:disabled),
+.vault-browser-refresh:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--hov);
+}
+.vault-browser-back:disabled,
+.vault-browser-refresh:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.vault-browser-location {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 9px 14px;
+  background: var(--ground);
+  border-bottom: 1px solid var(--border);
+}
+.vault-browser-back {
+  width: 32px;
+  flex: 0 0 32px;
+  padding: 0;
+}
+.vault-browser-back svg {
+  transform: rotate(180deg);
+}
+.vault-browser-path {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.vault-browser-path strong,
+.vault-browser-path span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vault-browser-path strong {
+  font-size: 13.5px;
+  font-weight: 650;
+}
+.vault-browser-path span {
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+.vault-browser-refresh {
+  padding: 4px 9px;
+}
+.vault-browser-list {
+  flex: 1;
+  min-height: 230px;
+  max-height: 390px;
+  overflow-y: auto;
+  padding: 7px;
+  background: var(--surface);
+}
+.vault-browser-row {
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.vault-browser-row:hover {
+  background: var(--hov);
+}
+.vault-browser-row.selected {
+  color: var(--selected-ink);
+  background: var(--selected-bg);
+  border-color: transparent;
+  font-weight: 600;
+}
+.vault-browser-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.vault-browser-row > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vault-browser-row > svg:first-child {
+  color: var(--accent-text);
+}
+.vault-browser-row > svg:last-child {
+  color: var(--text-muted);
+}
+.vault-browser-row.selected > svg {
+  color: var(--selected-icon);
+}
+.vault-browser-status {
+  min-height: 210px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  text-align: center;
+}
+.vault-browser-status.error,
+.vault-browser-reason.error {
+  color: var(--danger);
+}
+.vault-browser-create {
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+}
+.vault-browser-create label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.vault-browser-create > div {
+  display: flex;
+  gap: 7px;
+}
+.vault-browser-create input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-control);
+  font: inherit;
+  font-size: 13px;
+}
+.vault-browser-create input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.vault-browser-reason {
+  margin: 0;
+  padding: 9px 14px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+.vault-browser-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+}
+.vault-browser-tools,
+.vault-browser-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.vault-browser-tools .ghostbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.vault-browser-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 16px;
+  padding: 8px 14px;
+  color: var(--text-muted);
+  background: var(--ground);
+  border-top: 1px solid var(--border);
+  font-size: 10.5px;
+}
+.vault-browser-hints span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.vault-browser-hints kbd {
+  min-width: 18px;
+  text-align: center;
+}
+@media (max-width: 640px), (max-height: 620px) {
+  .vault-browser-overlay {
+    align-items: stretch;
+    padding: 12px;
+  }
+  .vault-browser-card {
+    max-height: calc(100vh - 24px);
+  }
+  .vault-browser-head {
+    padding: 16px;
+  }
+  .vault-browser-list {
+    min-height: 140px;
+  }
+  .vault-browser-foot {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .vault-browser-tools,
+  .vault-browser-actions {
+    justify-content: space-between;
+  }
+  .vault-browser-actions .ghostbtn {
+    flex: 1;
+  }
+  .vault-browser-hints {
+    display: none;
+  }
 }
 
 /* — Rename dialog (opened from the menu's "Rename…") — */
@@ -1957,7 +2908,7 @@
   background: color-mix(in srgb, var(--on-accent) 12%, var(--accent));
 }
 
-/* — hotkey BADGES (Seth, 2026-08-04): the alternative to the whichkey panel —
+/* — hotkey BADGES (the maintainer, 2026-08-04): the alternative to the whichkey panel —
    each chord pinned to the control it drives, so the eye never leaves the UI.
    No scrim: the point is to read the badges AGAINST the live app. Same law as
    .whichkey — pointer-events:none so it can never eat a click, and the layer

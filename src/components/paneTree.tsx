@@ -1,4 +1,4 @@
-// The pane tree. EVERY leaf renders its tab strip now (Seth, 2026-06-13) — the
+// The pane tree. EVERY leaf renders its tab strip now (the maintainer, 2026-06-13) — the
 // old "single-tab pane renders zero chrome / Apple-Notes default" law is gone;
 // a visible strip everywhere buys discoverability + a close x on every tab.
 // Dividers: 1px border line, 8px hit zone, 2px cocoa-at-24% while dragging
@@ -30,25 +30,25 @@ import {
 import { isWarmSurface, nextWarmSurfaceIds } from "../state/paneWarmth";
 import type { LeafNode, PaneNode, SplitNode } from "../types";
 import { ActivitySurface } from "./activitySurface";
+import { BrowserSurface } from "./browserSurface";
 import { Character } from "./character";
 import { ChatSurface } from "./chat/chatSurface";
 import { FileSurface } from "./fileSurface";
 import { NewItemSurface } from "./newItemSurface";
 import { TabStrip } from "./tabStrip";
-import { VaultWelcomeSurface } from "./vaultWelcomeSurface";
 
 // Excalidraw is heavy (~3.5MB with its mermaid/katex deps) and most sessions
 // never open a board — code-split it so it loads only when a canvas tab mounts,
-// keeping the main bundle lean (Seth, 2026-06-24).
+// keeping the main bundle lean (the maintainer, 2026-06-24).
 const CanvasSurface = lazy(() => import("./canvasSurface").then((m) => ({ default: m.CanvasSurface })));
 
 /** All tabs closed (only possible in the lone pane) — the quokka rest state
- * (Seth, 2026-07-28: "close all tabs and have an empty state"). Quiet, with
+ * (the maintainer, 2026-07-28: "close all tabs and have an empty state"). Quiet, with
  * the three ways back in. */
 function PaneEmptyState() {
   return (
     <div className="list-empty pane-empty">
-      <Character name="rest" size={120} className="be-quokka" />
+      <Character name="base" size={120} className="be-quokka" accessorized />
       <p className="be-title">All clear</p>
       <p className="be-sub">
         <button type="button" className="pane-empty-act" onClick={() => dispatch("notes.new")}>
@@ -89,9 +89,9 @@ function LeafView({ node }: { node: LeafNode }) {
   // else to be), both drawn in CSS off the `focused` class — that class is the
   // DOM marker for "you are here" and is load-bearing, not decoration:
   //   · the resident ring — a 1px accent frame that stays for as long as this
-  //     pane holds focus (Seth, 2026-08-01), `.panes.multi .pane.focused::before`
+  //     pane holds focus (the maintainer, 2026-08-01), `.panes.multi .pane.focused::before`
   //   · the landing light — the same frame at 2px, flashed once on ARRIVAL
-  //     (Seth, 2026-07-30: hotkey pane-focus "needs some sort of quick visual
+  //     (the maintainer, 2026-07-30: hotkey pane-focus "needs some sort of quick visual
   //     highlight"), gated by the `flash` state below
   const focused = node.id === focusedPaneId;
   const multi = usePanesStore((s) => s.root.kind === "split");
@@ -129,7 +129,7 @@ function LeafView({ node }: { node: LeafNode }) {
           (tab.noteId ? (
             <EditorSurface key={tab.id} paneId={node.id} noteId={tab.noteId} />
           ) : (
-            <VaultWelcomeSurface key={tab.id} />
+            <PaneEmptyState />
           ))}
         {mountedHeavyTabs.map((heavyTab) => {
           const active = heavyTab.id === tab?.id;
@@ -146,9 +146,15 @@ function LeafView({ node }: { node: LeafNode }) {
                 </Suspense>
               )}
               {heavyTab.surfaceKind === "chat" && (
-                <ChatSurface paneId={node.id} tabId={heavyTab.id} chatSlug={heavyTab.chatSlug} />
+                <ChatSurface
+                  paneId={node.id}
+                  tabId={heavyTab.id}
+                  chatSlug={heavyTab.chatSlug}
+                  {...(heavyTab.vaultId ? { vaultId: heavyTab.vaultId } : {})}
+                />
               )}
               {heavyTab.surfaceKind === "file" && <FileSurface paneId={node.id} fileId={heavyTab.fileId} />}
+              {heavyTab.surfaceKind === "browser" && <BrowserSurface tabId={heavyTab.id} active={active} />}
             </div>
           );
         })}
@@ -180,7 +186,7 @@ function minFracOf(node: SplitNode, total: number): number {
 function SplitView({ node }: { node: SplitNode }) {
   const setSplitSizes = usePanesStore((s) => s.setSplitSizes);
   const containerRef = useRef<HTMLDivElement>(null);
-  // The live re-fit, Seth 2026-08-01: the floors used to be enforced only at
+  // The live re-fit, the maintainer 2026-08-01: the floors used to be enforced only at
   // split time and during a drag, so shrinking the window — or the sidebar, or
   // a parent split — quietly crushed a pane past the point where its own chrome
   // fits, and surfaces started painting into the pane next door. The observer
@@ -267,7 +273,7 @@ function SplitView({ node }: { node: SplitNode }) {
           className="divider"
           role="separator"
           aria-orientation={node.dir === "row" ? "vertical" : "horizontal"}
-          // aria-label, NOT title (Seth, 2026-08-01): a native tooltip on the
+          // aria-label, NOT title (the maintainer, 2026-08-01): a native tooltip on the
           // one element you hover while judging a layout parks a yellow slab
           // over the very content you are sizing. The resize cursor and the
           // accent line the divider lights on hover already say "drag me".

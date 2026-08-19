@@ -29,7 +29,11 @@ Two launches landed today. [Read more](https://example.com/news).
       "Save the useful source.",
     ]);
     expect(digest.stories).toEqual([
-      { title: "AI and tools", summary: "Two launches landed today. Read more." },
+      {
+        title: "AI and tools",
+        summary: "Two launches landed today. Read more.",
+        sources: [{ label: "Read more", url: "https://example.com/news" }],
+      },
     ]);
     expect(digest.resources).toEqual([
       { label: "Local models", url: "https://example.com/models" },

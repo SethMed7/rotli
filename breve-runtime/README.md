@@ -26,7 +26,9 @@ logs, transcripts, pending actions, and scheduler state live only under
 
 Rotli's Breve dashboard is a read projection of those same vault-owned files:
 saved brief Markdown supplies the issue carousel, top stories, actions, and
-source links; routine configuration supplies the schedule; a sanitized bounded
+source links. Each top story keeps its own cited links, and dashboard citations
+open in Rotli's session-only private browser rather than leaving the app;
+routine configuration supplies the schedule; a sanitized bounded
 tail of `logs/rotli-scheduler.log` supplies Notifications. Raw commands,
 prompts, paths, and stderr never cross the native IPC boundary. Watchlist
 editing and web research remain separate effects. **Refresh last 30 days** is

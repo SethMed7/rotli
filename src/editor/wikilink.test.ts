@@ -50,11 +50,11 @@ describe("wikilink", () => {
     const index = buildWikilinkIndex([
       aliasedNote("path/x", "The 3-stage infrastructure plan", [
         "the-3-stage-infrastructure-plan",
-        "myela-stage-plan",
+        "northstar-stage-plan",
       ]),
     ]);
-    expect(resolveWikilink("myela-stage-plan", index)).toBe("path/x");
-    expect(resolveWikilink("MYELA-STAGE-PLAN", index)).toBe("path/x");
+    expect(resolveWikilink("northstar-stage-plan", index)).toBe("path/x");
+    expect(resolveWikilink("NORTHSTAR-STAGE-PLAN", index)).toBe("path/x");
   });
 
   test("resolveWikilink refuses an ambiguous alias", () => {

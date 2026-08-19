@@ -1,4 +1,4 @@
-// Shared editor block glyphs (Seth, 2026-06-30) — the SlashMenu and the
+// Shared editor block glyphs (the maintainer, 2026-06-30) — the SlashMenu and the
 // FormatBar drew byte-identical bullet/numbered/checklist/quote/code marks in
 // the same 24-box, 1.7-stroke, currentColor voice. This is their one home; each
 // surface imports the marks it needs (and keeps its own surface-only glyphs).

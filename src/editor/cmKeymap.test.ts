@@ -158,7 +158,7 @@ describe("Tab on a ragged table row (#3)", () => {
   });
 });
 
-// Seth, 2026-07-28: Shift-Tab on tab-indented bullets (external editors, LLM
+// the maintainer, 2026-07-28: Shift-Tab on tab-indented bullets (external editors, LLM
 // output) was dead — the outdent grammar only spoke spaces. Tab/Shift-Tab now
 // NORMALIZE tab indents to the app's two-space levels as part of the gesture.
 describe("tab-indented lists (foreign notes)", () => {
@@ -198,7 +198,7 @@ describe("tab-indented lists (foreign notes)", () => {
   });
 });
 
-// Seth, 2026-08-01 (still on v0.62.0): bullets, then a third line that had left
+// the maintainer, 2026-08-01 (still on v0.62.0): bullets, then a third line that had left
 // the list — typing the text FIRST and then pressing Tab shoved two invisible
 // spaces in at the caret instead of moving the line, so the "- " typed next
 // stranded at the end and the line read literally as "test  -". Tab indents the

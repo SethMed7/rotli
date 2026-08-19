@@ -194,7 +194,7 @@ export function workbookToModel(wb: Workbook, name: string): SheetModel {
       });
     }
     // pad just enough to add a few rows/cols — the old floor of 100×26 left a
-    // small sheet swimming in empty grid (Seth, 2026-07-09). Used extent from
+    // small sheet swimming in empty grid (the maintainer, 2026-07-09). Used extent from
     // cellData, not exceljs's rowCount (which can inflate past real content).
     const usedRows = extentOf(cellData, "row");
     const usedCols = extentOf(cellData, "col");

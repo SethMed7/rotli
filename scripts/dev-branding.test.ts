@@ -19,9 +19,7 @@ test("the native dev command uses an unmistakable identity without changing prod
     bundle?: { icon?: string[] };
   };
 
-  expect(pkg.scripts?.["dev:app"]).toBe(
-    "env ROTLI_DEV_LIVE_VAULT=1 tauri dev --config src-tauri/tauri.dev.conf.json",
-  );
+  expect(pkg.scripts?.["dev:app"]).toBe("bun --no-orphans scripts/tauri-dev-supervisor.ts");
   expect(development.productName).toBe("rotli (dev)");
   expect(development.bundle?.icon).toContain("icons-dev/icon.icns");
   expect(production.productName).toBe("rotli");
@@ -58,4 +56,12 @@ test("the development icon uses Rotli's blue identity", async () => {
   const nativeSource = readFileSync(join(root, "src-tauri/src/lib.rs"), "utf8");
   expect(nativeSource).toContain('include_bytes!("../icons-dev/runtime.png")');
   expect(nativeSource).toContain("#[cfg(debug_assertions)]");
+});
+
+test("Command-R refreshes the current vault without reloading the webview", () => {
+  const actionsSource = readFileSync(join(root, "src/keys/actions.ts"), "utf8");
+  expect(actionsSource).toContain('id: "vault.refresh"');
+  expect(actionsSource).toContain('defaultChord: "Meta+R"');
+  expect(actionsSource).toContain("reconnectActiveVault()");
+  expect(actionsSource).not.toContain("window.location.reload()");
 });

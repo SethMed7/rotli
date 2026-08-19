@@ -1,5 +1,5 @@
-// Quick capture — the one-breath card (r2 frame C, CSS transfers): r-mark +
-// one field; first line becomes the title; footer = '→ Captures' chip · ⏎ save ·
+// Quick capture — the one-breath card (r2 frame C, CSS transfers): one field;
+// first line becomes the title; footer = '→ Captures' chip · ⏎ save ·
 // Esc dismiss (⌘⏎ save-and-open still works but is demoted to the palette —
 // the r2 dedup call). Lives in its own frameless always-on-top
 // transparent-edged window (?window=capture); renders standalone in a plain
@@ -9,7 +9,6 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import rMark from "../brand/logo/r-mark.svg";
 import { setCaptureHandle } from "../keys/handles";
 import {
   emitCaptureSave,
@@ -93,7 +92,6 @@ export function CaptureCard() {
     <div className="capture-stage">
       <div className="capture" role="dialog" aria-label="Quick capture">
         <div className="cap-in">
-          <img src={rMark} alt="" width={22} height={22} />
           <textarea
             ref={taRef}
             autoFocus

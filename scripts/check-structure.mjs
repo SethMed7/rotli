@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, join, relative } from "node:path";
+import { DEPENDENCY_PROJECTS, dependencyPolicyViolations } from "./dependency-policy.mjs";
 import { SYNTAX_PATTERNS } from "./syntax-contract.mjs";
 
 const root = process.cwd();
@@ -123,22 +124,28 @@ const bunVersion = readFileSync(join(root, ".bun-version"), "utf8").trim();
 const rustToolchain = readFileSync(join(root, "rust-toolchain.toml"), "utf8");
 const rustVersion = rustToolchain.match(/^channel\s*=\s*"([^"]+)"/m)?.[1];
 const sitePackage = JSON.parse(readFileSync(join(root, "site/package.json"), "utf8"));
-for (const [path, manifest] of [
-  ["package.json", packageJson],
-  ["site/package.json", sitePackage],
-]) {
-  if (manifest.packageManager !== `bun@${bunVersion}`) {
-    violations.push(`${path}: packageManager must match .bun-version (${bunVersion})`);
-  }
-}
-if (!/^\d+\.\d+\.\d+$/.test(bunVersion)) violations.push(".bun-version: expected an exact semver");
+const brevePackage = JSON.parse(readFileSync(join(root, "breve-runtime/defaults/package.json"), "utf8"));
+const regressionWorkflow = readFileSync(join(root, ".github/workflows/regression.yml"), "utf8");
+violations.push(
+  ...dependencyPolicyViolations({
+    bunVersion,
+    manifests: {
+      "package.json": packageJson,
+      "site/package.json": sitePackage,
+      "breve-runtime/defaults/package.json": brevePackage,
+    },
+    bunfigs: Object.fromEntries(
+      DEPENDENCY_PROJECTS.map((project) => [project.bunfigPath, readFileSync(join(root, project.bunfigPath), "utf8")]),
+    ),
+    regressionWorkflow,
+  }),
+);
 if (!rustVersion || !/^\d+\.\d+\.\d+$/.test(rustVersion)) {
   violations.push("rust-toolchain.toml: channel must be an exact semver");
 }
 if (!/components\s*=\s*\[[^\]]*"clippy"/.test(rustToolchain)) {
   violations.push("rust-toolchain.toml: the pinned toolchain must include clippy");
 }
-const regressionWorkflow = readFileSync(join(root, ".github/workflows/regression.yml"), "utf8");
 const bunSetupCount = (regressionWorkflow.match(/uses:\s*oven-sh\/setup-bun@/g) ?? []).length;
 const bunPinConsumerCount = (regressionWorkflow.match(/bun-version-file:\s*\.bun-version/g) ?? []).length;
 if (bunSetupCount === 0 || bunPinConsumerCount !== bunSetupCount) {
@@ -165,7 +172,6 @@ if ("xlsx" in jsDependencies) {
 // those modules during development/build. Overlapping dependencies must stay on
 // the exact same range so dev validation cannot pass against a different API
 // than the packaged runtime installs.
-const brevePackage = JSON.parse(readFileSync(join(root, "breve-runtime/defaults/package.json"), "utf8"));
 for (const [dependency, version] of Object.entries(brevePackage.dependencies ?? {})) {
   if (packageJson.dependencies?.[dependency] !== version) {
     violations.push(

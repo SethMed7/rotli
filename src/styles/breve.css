@@ -101,6 +101,7 @@
    columns always stay visible; empty data changes copy, never the hierarchy. */
 .breve-dashboard {
   width: min(100%, 1320px);
+  container-type: inline-size;
 }
 .breve-dashboard-front {
   display: grid;
@@ -189,7 +190,7 @@
   max-width: 720px;
   margin: 2px 0 0;
   font-family: var(--font-display);
-  font-size: clamp(25px, 3vw, 38px);
+  font-size: 30px;
   font-weight: 650;
   line-height: 1.18;
   letter-spacing: -0.025em;
@@ -244,6 +245,25 @@
   line-height: 1.5;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+.breve-dashboard-story-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  margin-top: 7px;
+}
+.breve-dashboard-story-sources a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent-text);
+  font-size: 10px;
+  font-weight: 620;
+  text-decoration: none;
+}
+.breve-dashboard-story-sources a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .breve-dashboard-panel-empty {
   min-height: 218px;
@@ -380,7 +400,7 @@
   display: grid;
   border-bottom: 1px solid var(--border);
 }
-.breve-dashboard-resources button {
+.breve-dashboard-resources a {
   min-width: 0;
   min-height: 44px;
   display: flex;
@@ -396,8 +416,9 @@
   font-size: 11.5px;
   text-align: left;
   cursor: pointer;
+  text-decoration: none;
 }
-.breve-dashboard-resources button:hover {
+.breve-dashboard-resources a:hover {
   color: var(--text);
 }
 .breve-dashboard-resources span {
@@ -479,6 +500,20 @@
   .breve-dashboard-columns {
     grid-template-columns: 1fr;
     gap: 0;
+  }
+}
+
+@media (max-width: 1120px) {
+  .breve-dashboard-current-brief h4 {
+    font-size: 26px;
+    line-height: 1.22;
+  }
+}
+
+@container (max-width: 1050px) {
+  .breve-dashboard-current-brief h4 {
+    font-size: 26px;
+    line-height: 1.22;
   }
 }
 
@@ -642,7 +677,7 @@
 }
 /* the library row currently in the reader */
 .breve-brief-row.sel {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  background: var(--selected-bg);
 }
 /* — merged Settings groups: the former page titles as quiet section anchors — */
 .breve-embed + .breve-embed {
@@ -2256,7 +2291,7 @@
   }
 }
 
-/* — the Workflow view (Seth, 2026-08-04): what a routine ACTUALLY runs, as a
+/* — the Workflow view (the maintainer, 2026-08-04): what a routine ACTUALLY runs, as a
    left-to-right pipeline. Flat material — surface + hairline, no shadow, no
    glow. The strip scrolls sideways on its own so a long pipeline never forces
    the page to scroll horizontally (DESIGN.md layout law). — */

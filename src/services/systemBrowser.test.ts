@@ -1,4 +1,4 @@
-// System-browser locks (Finder rework 2026-07-27, Seth's screenshots): the
+// System-browser locks (Finder rework 2026-07-27, the maintainer's screenshots): the
 // browser is SPATIAL — you are IN one folder and see only its direct contents
 // (subfolders as folders, notes as items), you enter folders and climb back by
 // breadcrumb, empty directories are real, and search flattens across the root.
@@ -194,7 +194,7 @@ describe("rerootDiskPath (the 422-count-but-empty-Assets bug, 2026-07-28)", () =
   });
 });
 
-// Library system lanes (Seth, 2026-07-30): _inbox (→ the Captures front) and
+// Library system lanes (the maintainer, 2026-07-30): _inbox (→ the Captures front) and
 // _templates (contract plumbing) are real directories but NOT browsable
 // areas — hidden from the listing whether they arrive as item paths or seeds.
 describe("hidden lanes", () => {

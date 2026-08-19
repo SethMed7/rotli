@@ -64,11 +64,25 @@ describe("mergedModels", () => {
     expect(g.connected.some((m) => m.provider === "codex")).toBe(false);
   });
 
-  test("Antigravity contributes Gemini models, not duplicate Claude models", () => {
+  test("Antigravity contributes every model exposed by the installed agy catalog", () => {
     const models = CLI_CATALOG.agy;
-    expect(models.length).toBeGreaterThan(0);
-    expect(models.every((m) => m.provider === "agy" && m.label.startsWith("Gemini"))).toBe(true);
-    expect(models.every((m) => !m.label.includes("agy"))).toBe(true);
+    expect(models.map((m) => m.id)).toEqual([
+      "Gemini 3.7 Flash (High)",
+      "Gemini 3.7 Flash (Medium)",
+      "Gemini 3.7 Flash (Low)",
+      "Gemini 3.6 Flash (High)",
+      "Gemini 3.6 Flash (Medium)",
+      "Gemini 3.6 Flash (Low)",
+      "Gemini 3.5 Flash (High)",
+      "Gemini 3.5 Flash (Medium)",
+      "Gemini 3.5 Flash (Low)",
+      "Gemini 3.1 Pro (High)",
+      "Gemini 3.1 Pro (Low)",
+      "Claude Sonnet 4.6 (Thinking)",
+      "Claude Opus 4.6 (Thinking)",
+      "GPT-OSS 120B (Medium)",
+    ]);
+    expect(models.every((m) => m.provider === "agy")).toBe(true);
   });
 
   test("gemini rides the openai wire with its remote base (never local)", () => {
@@ -255,7 +269,7 @@ describe("the frontier/local split (budget + adapter)", () => {
   });
 });
 
-// Which CONNECTED lanes can genuinely see an attached image (Seth, 2026-08-04:
+// Which CONNECTED lanes can genuinely see an attached image (the maintainer, 2026-08-04:
 // "gemini and gpt models should be able to see images"). The flag must track the
 // TRANSPORT's real ability, never the model's marketing capability — a lane that
 // advertises vision it can't deliver silently drops the picture.
@@ -272,7 +286,7 @@ describe("connected-lane vision", () => {
   });
 
   test("EVERY frontier lane sees images — no connected model is blind", () => {
-    // Seth, 2026-08-04: "all frontier models should be able to see images."
+    // the maintainer, 2026-08-04: "all frontier models should be able to see images."
     // Each transport reaches it differently (provider.rs build_args); the
     // catalog just must not leave one lane silently dropping attachments.
     for (const provider of PROVIDER_IDS) {

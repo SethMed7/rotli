@@ -33,5 +33,6 @@ playwright-report/
 test-results/
 .claude/*
 !.claude/skills
+/tmp/
 dist-release
 .eval-local-chat/

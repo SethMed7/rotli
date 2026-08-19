@@ -88,7 +88,7 @@ describe("makeFinalExtractor — tool calls surface nothing", () => {
 
 describe("makeFinalExtractor — prose mode (force-final)", () => {
   it("streams bare prose verbatim", () => {
-    const reply = "Your family: Marisol, Diego, and Lucia.";
+    const reply = "Your family: Morgan, Diego, and Lucia.";
     for (const chunk of [1, 4, 999]) {
       const r = run(reply, chunk, true);
       expect(r.mode).toBe("final");

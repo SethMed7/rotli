@@ -26,7 +26,7 @@ describe("localSourceRoute", () => {
   });
 
   test("leaves an unanchored name ambiguous instead of sending it off-device", () => {
-    expect(localSourceRoute("Who is Marisol?")).toBe("ambiguous");
+    expect(localSourceRoute("Who is Morgan?")).toBe("ambiguous");
     expect(localSourceRoute("Tell me about Northstar.")).toBe("ambiguous");
   });
 });

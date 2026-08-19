@@ -1,4 +1,4 @@
-// GFM table detection (Seth, 2026-06-27) — finds markdown tables so the editor can
+// GFM table detection (the maintainer, 2026-06-27) — finds markdown tables so the editor can
 // render them beautified (tableRender.ts) and livePreview can leave their lines
 // alone, exactly the way fenced code blocks work (fences.ts). A table is a header
 // row of `|`-separated cells, a delimiter row (`---`/`:--`/`--:`/`:-:`), then zero
@@ -122,7 +122,7 @@ export function lineInTable(lineFrom: number, tables: TableBlock[]): boolean {
   return tables.some((t) => lineFrom >= t.from && lineFrom <= t.to);
 }
 
-// ─── structured table ops (Seth, 2026-07-01) ────────────────────────────────
+// ─── structured table ops (the maintainer, 2026-07-01) ────────────────────────────────
 // Pure transforms over the parsed shape — the widget's row/col menus, the slash
 // menu's insert, and the Tab-appends-a-row keymap all funnel through these, and
 // the caller dispatches ONE text transaction over [t.from, t.to]. Serialization

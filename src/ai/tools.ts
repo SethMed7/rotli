@@ -50,8 +50,8 @@ export function stripLeadingFrontmatter(body: string): string {
 /** Frame the `links:` line inside a READ note's metadata fence. That one line
  * reads like a roster — a run of [[names]] — but it mixes people, projects and
  * reference indiscriminately, and a small model kept answering "who are the
- * people in my vault" straight out of it (2026-08-01: the project "caminorx"
- * landed in a list of Seth's family). Same move as `truncateBody`: name the
+ * people in my vault" straight out of it (2026-08-01: the project "trailplan"
+ * landed in a list of the maintainer's family). Same move as `truncateBody`: name the
  * hazard IN the observation, where the model is actually looking, and let the
  * prompts teach the rule. The line keeps its `key: value` shape, so a model
  * that echoes the fence back into update_note still hits

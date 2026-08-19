@@ -1,4 +1,4 @@
-// Note lifecycle with image housekeeping (Seth, 2026-07-30): "if I put a note
+// Note lifecycle with image housekeeping (the maintainer, 2026-07-30): "if I put a note
 // in trash, any linked images should go in trash with it — unless it is in
 // multiple spots. Also consider archived." One chokepoint every trash/archive
 // entry point routes through; the behavior is a Settings toggle

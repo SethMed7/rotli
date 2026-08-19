@@ -93,7 +93,22 @@ pub(crate) const CLIS: &[CliSpec] = &[
     CliSpec {
         id: "agy",
         bins: &["~/.local/bin/agy", "/opt/homebrew/bin/agy"],
-        models: &["Gemini 3.5 Flash (Medium)", "Gemini 3.1 Pro (High)"],
+        models: &[
+            "Gemini 3.7 Flash (High)",
+            "Gemini 3.7 Flash (Medium)",
+            "Gemini 3.7 Flash (Low)",
+            "Gemini 3.6 Flash (High)",
+            "Gemini 3.6 Flash (Medium)",
+            "Gemini 3.6 Flash (Low)",
+            "Gemini 3.5 Flash (High)",
+            "Gemini 3.5 Flash (Medium)",
+            "Gemini 3.5 Flash (Low)",
+            "Gemini 3.1 Pro (High)",
+            "Gemini 3.1 Pro (Low)",
+            "Claude Sonnet 4.6 (Thinking)",
+            "Claude Opus 4.6 (Thinking)",
+            "GPT-OSS 120B (Medium)",
+        ],
     },
 ];
 
@@ -132,7 +147,7 @@ enum PromptVia {
 /// value; everything else is literal.
 /// `imgs` = the attachments staged for THIS turn, or None for an ordinary text
 /// turn. Every image concession below is scoped to `Some` on purpose: a turn
-/// with no picture keeps the tightest posture the lane has always had (Seth,
+/// with no picture keeps the tightest posture the lane has always had (the maintainer,
 /// 2026-08-04 — "all frontier models should be able to see images", without
 /// making every unrelated turn looser).
 fn build_args(
@@ -402,7 +417,7 @@ fn image_preamble(paths: &[String]) -> String {
 /// Did an empty agy reply die on its NATIVE tool-permission prompt? Gemini
 /// occasionally ignores the JSON protocol and reaches for agy's own tools; in
 /// headless print mode the permission prompt auto-denies and the run aborts
-/// with empty stdout (Seth, 2026-08-03: "jetski: no output produced — a tool
+/// with empty stdout (the maintainer, 2026-08-03: "jetski: no output produced — a tool
 /// required the 'command' permission…"). This signature gates the one retry.
 fn agy_tool_denied(stderr: &str) -> bool {
     let s = stderr.to_ascii_lowercase();
@@ -597,7 +612,7 @@ fn run_registered(
 }
 
 /// The Claude model the ORGANIZER uses (the `--model` alias tracks the current
-/// Sonnet — "Sonnet 5" today; Seth, 2026-07-03). Kept separate from the chat
+/// Sonnet — "Sonnet 5" today; the maintainer, 2026-07-03). Kept separate from the chat
 /// lane so tuning one never moves the other.
 pub const ORGANIZER_CLAUDE_MODEL: &str = "sonnet";
 
@@ -1211,7 +1226,7 @@ mod tests {
         assert!(build_args("ollama", "x", "p", 60, None).is_err());
         assert!(build_args("claude", "gpt-5.5", "p", 60, None).is_err());
         assert!(build_args("codex", "sonnet", "p", 60, None).is_err());
-        assert!(build_args("agy", "Claude Sonnet 4.6 (Thinking)", "p", 60, None).is_err());
+        assert!(build_args("agy", "Unknown Model", "p", 60, None).is_err());
     }
 
     #[test]
@@ -1302,6 +1317,31 @@ mod tests {
         assert_eq!(args[1], "hello there");
         assert!(args.contains(&"--sandbox".to_string()));
         assert!(args.contains(&"240s".to_string()));
+    }
+
+    #[test]
+    fn agy_allowlist_includes_the_current_cli_catalog() {
+        let models = spec("agy").unwrap().models;
+        assert_eq!(models.len(), 14);
+        for model in [
+            "Gemini 3.7 Flash (High)",
+            "Gemini 3.7 Flash (Medium)",
+            "Gemini 3.7 Flash (Low)",
+            "Gemini 3.6 Flash (High)",
+            "Gemini 3.6 Flash (Medium)",
+            "Gemini 3.6 Flash (Low)",
+            "Gemini 3.5 Flash (High)",
+            "Gemini 3.5 Flash (Medium)",
+            "Gemini 3.5 Flash (Low)",
+            "Gemini 3.1 Pro (High)",
+            "Gemini 3.1 Pro (Low)",
+            "Claude Sonnet 4.6 (Thinking)",
+            "Claude Opus 4.6 (Thinking)",
+            "GPT-OSS 120B (Medium)",
+        ] {
+            assert!(models.contains(&model));
+            assert!(build_args("agy", model, "ping", 60, None).is_ok());
+        }
     }
 
     #[test]
@@ -1409,7 +1449,7 @@ mod tests {
         assert!(image_destination(&root, "a/b").is_err());
     }
 
-    /// Every frontier lane can see an image (Seth, 2026-08-04) — but the
+    /// Every frontier lane can see an image (the maintainer, 2026-08-04) — but the
     /// concessions that allow it are scoped to a turn that ACTUALLY carries
     /// one. A text turn must keep the byte-identical tight posture it always
     /// had; this is the test that keeps that true.
@@ -1490,7 +1530,7 @@ mod tests {
         );
     }
 
-    /// The retry gate fires on agy's real headless-denial signature (Seth's
+    /// The retry gate fires on agy's real headless-denial signature (the maintainer's
     /// 2026-08-03 screenshot) and stays quiet on ordinary emptiness/noise.
     #[test]
     fn agy_denial_signature_gates_the_retry() {

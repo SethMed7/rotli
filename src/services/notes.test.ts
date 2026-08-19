@@ -22,7 +22,7 @@ function freshService(): InMemoryNotesService {
   svc.seedReserved(DEST.archive, DEST.archive);
   svc.seedReserved(DEST.trash, DEST.trash);
   svc.seedReserved(`${DEST.storage}/Work`, "Work", DEST.storage);
-  svc.seedReserved(`${DEST.storage}/Myela`, "Myela", DEST.storage);
+  svc.seedReserved(`${DEST.storage}/Northstar`, "Northstar", DEST.storage);
   return svc;
 }
 
@@ -107,12 +107,12 @@ describe("listNotes — three-case descendant scoping", () => {
     const svc = freshService();
     await svc.createNote(DEST.storage, "# top brain");
     await svc.createNote(`${DEST.storage}/Work`, "# under work");
-    await svc.createNote(`${DEST.storage}/Myela`, "# under myela");
+    await svc.createNote(`${DEST.storage}/Northstar`, "# under northstar");
     await svc.createNote(DEST.inbox, "# elsewhere");
 
     const inBrain = await svc.listNotes(DEST.storage);
     const titles = inBrain.map((n) => n.title).sort();
-    expect(titles).toEqual(["top brain", "under myela", "under work"]);
+    expect(titles).toEqual(["top brain", "under northstar", "under work"]);
   });
 
   test("a hidden root shows ONLY its own subtree (and is allowed to)", async () => {

@@ -8,10 +8,13 @@ import {
   type CorpusRefView,
   type VaultInspection,
 } from "../../lib/tauri";
-import { chooseFolder, createPracticeVault, initMemexAsCorpus, pickFolder } from "../../memex/service";
+import { chooseFolder, createPracticeVault, initMemexAsCorpus } from "../../memex/service";
+import { refreshActiveVault } from "../../state/activeVault";
 import { ONBOARDING_STEP_NUMBER, ONBOARDING_TOTAL_STEPS } from "../../state/onboarding";
+import { usePanesStore } from "../../state/panes";
 import { flushSettingsNow } from "../../state/persist";
 import { useUiStore } from "../../state/ui";
+import { requestVaultFolder } from "../../state/vaultFolderBrowser";
 import { Character } from "../character";
 import { SetupBack, SetupChoiceGroup, SetupPrimary } from "./setupControls";
 import { SetupSideFriends } from "./setupSideFriends";
@@ -84,10 +87,20 @@ export function VaultActivation({
       if (intent === "practice") {
         await onBeforeSwitch?.();
         await flushSettingsNow();
-        await createPracticeVault();
+        const welcomeId = await createPracticeVault();
+        await refreshActiveVault();
+        if (welcomeId) usePanesStore.getState().openNote(welcomeId);
         return;
       }
-      const path = await pickFolder();
+      const path = await requestVaultFolder({
+        title: intent === "create" ? "Create a Rotli vault" : "Open an existing folder",
+        description:
+          intent === "create"
+            ? "Choose an empty folder inside Home, or create one here. Rotli will keep ordinary local files there."
+            : "Choose the folder that already contains the notes and files you want Rotli to use in place.",
+        actionLabel: intent === "create" ? "Use empty folder" : "Review folder",
+        requireEmpty: intent === "create",
+      });
       if (!path) return;
       if (intent === "create") {
         const report = await corpusInspectFolder(path);
@@ -121,20 +134,28 @@ export function VaultActivation({
         useUiStore.getState().setBrainEnabled(brainEnabled);
         await onBeforeSwitch?.();
         await flushSettingsNow();
-        await initMemexAsCorpus(createPath, brainEnabled);
+        const welcomeId = await initMemexAsCorpus(createPath, brainEnabled);
+        await refreshActiveVault();
+        if (welcomeId) usePanesStore.getState().openNote(welcomeId);
         return;
       }
       if (stage === "review" && inspection) {
         if (importMode === "copy") {
-          const destination = await pickFolder();
+          const destination = await requestVaultFolder({
+            title: "Choose a destination",
+            description: "Choose an empty folder for the reviewed copy, or create a new folder here.",
+            actionLabel: "Import here",
+            requireEmpty: true,
+          });
           if (!destination) return;
           await onBeforeSwitch?.();
           await flushSettingsNow();
           await corpusImportVaultCopy(inspection.path, destination);
+          await refreshActiveVault();
         } else {
           await onBeforeSwitch?.();
           await flushSettingsNow();
-          await chooseFolder(inspection.path);
+          if (await chooseFolder(inspection.path)) await refreshActiveVault();
         }
       }
     } catch (cause) {
@@ -184,6 +205,7 @@ export function VaultActivation({
             <Character
               name={stage === "scanning" ? "searching" : stage === "review" ? "knowledge" : "notes"}
               size={152}
+              alwaysVisible
             />
             <p>
               {stage === "review"

@@ -1,8 +1,8 @@
 [package]
 name = "rotli"
-version = "0.80.0"
+version = "0.82.0"
 description = "rotli — warm, local-first, hotkey-driven notes for the Mac menu bar"
-authors = ["Seth Medina"]
+authors = ["Rotli contributors"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -19,7 +19,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 # macos-private-api: groundwork for the transparent always-on-top capture card (1c).
-tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api", "protocol-asset"] }
+tauri = { version = "2", features = ["tray-icon", "image-png", "macos-private-api", "protocol-asset", "unstable"] }
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-deep-link = "2"                                     # rotli:// links (CLI/MCP → the app)
 tauri-plugin-dialog = "2"                                        # native folder picker (move the corpus)
@@ -48,7 +48,7 @@ tantivy = "0.26.1"
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSImage", "NSResponder"] }
-objc2-foundation = { version = "0.3", features = ["NSData", "NSString"] }
+objc2-foundation = { version = "0.3", features = ["NSArray", "NSData", "NSError", "NSString", "NSURL"] }
 
 # Size diet (2026-07-31): the release binary embeds the whole frontend dist, and
 # without a profile the code portion shipped 16 codegen units, no LTO, and 51k

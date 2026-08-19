@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { stripMarkdown } from "../editor/stripMarkdown";
 import { registerSurfaceFind } from "../keys/surfaceFind";
 import { corpusToggleTask } from "../lib/tauri";
+import { useNow } from "../lib/useNow";
 import { invalidateNotes, useNoteIndex, useTasks } from "../services/hooks";
 import { filterTaskGroups, groupTasks, sectionTaskGroups } from "../services/tasksView";
 import { usePanesStore } from "../state/panes";
@@ -33,7 +34,8 @@ export function TasksSurface() {
   );
   const groups = useMemo(() => groupTasks(items ?? [], updatedAtByNote), [items, updatedAtByNote]);
   const filtered = useMemo(() => filterTaskGroups(groups, query), [groups, query]);
-  const sections = useMemo(() => sectionTaskGroups(filtered, Date.now()), [filtered]);
+  const now = useNow();
+  const sections = useMemo(() => sectionTaskGroups(filtered, now), [filtered, now]);
   const taskKey = (noteId: string, line: number) => `${noteId}:${line}`;
 
   useEffect(() => {
@@ -102,7 +104,7 @@ export function TasksSurface() {
         </div>
       ) : (
         <div className="board-scroll">
-          {/* what this surface IS — the groups below are notes (Seth,
+          {/* what this surface IS — the groups below are notes (the maintainer,
               2026-07-31: "not clear what notes are apart of or what it is") */}
           <p className="task-intro">
             Every open checkbox from your notes, grouped by the note it lives in. Checking one off edits the

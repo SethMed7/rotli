@@ -32,8 +32,9 @@ use ulid::Ulid;
 
 // ─── the one place the corpus root is decided ───────────────────────────────
 
-/// `~/Documents/rotli` — the repo occupies `~/rotli`. User-changeable later
-/// (a setting will feed `CorpusStore::open` a different root).
+/// Historical default folder name, retained only for legacy migration probes.
+/// Fresh installs explicitly select a vault and never derive their location
+/// from this constant.
 pub const CORPUS_DIR_NAME: &str = "rotli";
 /// The app-owned, fully rebuildable sidecar folder inside the corpus root.
 pub const DOT_DIR: &str = ".rotli";
@@ -115,6 +116,8 @@ impl Default for ViewsManifest {
 }
 
 pub fn default_corpus_root(app: &tauri::AppHandle) -> PathBuf {
+    // Compatibility probe only. Fresh installs choose a vault explicitly and
+    // never create or silently bind this historical Documents location.
     use tauri::Manager;
     app.path()
         .document_dir()
@@ -218,20 +221,40 @@ impl RootRegistry {
 /// launch (idempotent, non-destructive).
 pub fn startup_roots(app: &tauri::AppHandle) -> Vec<CorpusRoot> {
     if cfg!(debug_assertions) {
-        let cfg = ensure_corpus_config(app);
-        return vec![CorpusRoot {
+        let Some(cfg) = read_dev_source_config(app) else {
+            return Vec::new();
+        };
+        let fallback_read_only = crate::development_read_only(app);
+        let mut roots = vec![CorpusRoot {
             id: DEFAULT_ROOT_ID.to_string(),
-            label: if is_memex_root(&cfg.corpus.abs_path) {
-                "Production vault".to_string()
-            } else {
-                "Production notes".to_string()
+            label: match (is_memex_root(&cfg.corpus.abs_path), fallback_read_only) {
+                (true, true) => "Production vault · read-only".to_string(),
+                (false, true) => "Production notes · read-only".to_string(),
+                (true, false) => "Development vault".to_string(),
+                (false, false) => "Development notes".to_string(),
             },
             abs_path: cfg.corpus.abs_path,
             adopted: cfg.corpus.adopted,
         }];
+        // A production fallback remains one read-only source. An explicitly
+        // selected development config is different: it must exercise the same
+        // multi-vault registry as the installed app instead of collapsing every
+        // newly linked vault into the next process's primary root.
+        if !fallback_read_only {
+            roots.extend(cfg.brains.into_iter().filter_map(|brain| {
+                is_memex_root(&brain.abs_path).then_some(CorpusRoot {
+                    id: brain.id,
+                    label: brain.label,
+                    abs_path: brain.abs_path,
+                    adopted: false,
+                })
+            }));
+            roots.extend(cfg.folders);
+        }
+        return roots;
     }
     // demo mode: a single isolated demo memex — the real brains/folders are
-    // hidden and corpus.json is never touched (Seth, 2026-07-07).
+    // hidden and corpus.json is never touched (the maintainer, 2026-07-07).
     if demo_active(app) {
         if let Some(demo) = ensure_demo_memex(app) {
             return vec![CorpusRoot {
@@ -360,7 +383,7 @@ pub fn read_corpus_config(app: &tauri::AppHandle) -> Option<CorpusConfig> {
 }
 
 fn configured_at(config_file: &Path, config_dir: &Path, default_root: &Path) -> bool {
-    config_file.exists()
+    read_config_path_or_backup(config_file).is_some_and(|config| config.corpus.abs_path.is_dir())
         || [
             "corpus-root.txt",
             "corpus-memex-root.txt",
@@ -383,9 +406,10 @@ pub fn is_configured(app: &tauri::AppHandle) -> bool {
     }
     // Development may temporarily mirror the production vault so the shell can
     // boot, but that fallback is not an onboarding choice. Only the isolated
-    // corpus.dev.json proves the developer explicitly selected a vault.
+    // corpus.dev.json with a usable root proves the developer explicitly
+    // selected a vault; a stale/deleted selection returns to activation.
     if cfg!(debug_assertions) {
-        return read_corpus_config(app).is_some();
+        return development_source_config(read_corpus_config(app), None).is_some();
     }
     use tauri::Manager;
     let Ok(dir) = app.path().app_config_dir() else {
@@ -431,14 +455,20 @@ fn dev_primary_from_config(cfg: CorpusConfig) -> Option<CorpusConfig> {
     })
 }
 
+fn development_source_config(
+    explicit: Option<CorpusConfig>,
+    production_fallback: Option<CorpusConfig>,
+) -> Option<CorpusConfig> {
+    explicit
+        .filter(|config| config.corpus.abs_path.is_dir())
+        .or_else(|| production_fallback.and_then(dev_primary_from_config))
+}
+
 fn read_dev_source_config(app: &tauri::AppHandle) -> Option<CorpusConfig> {
-    read_corpus_config(app)
-        .and_then(dev_primary_from_config)
-        .or_else(|| {
-            production_corpus_config_file(app)
-                .and_then(|f| read_config_path_or_backup(&f))
-                .and_then(dev_primary_from_config)
-        })
+    development_source_config(
+        read_corpus_config(app),
+        production_corpus_config_file(app).and_then(|f| read_config_path_or_backup(&f)),
+    )
 }
 
 pub fn write_corpus_config(app: &tauri::AppHandle, cfg: &CorpusConfig) -> Result<(), String> {
@@ -460,7 +490,7 @@ pub fn write_corpus_config(app: &tauri::AppHandle, cfg: &CorpusConfig) -> Result
 // memex_detect skip it (it's never offered as a real memex to connect).
 
 /// Bump when the seed content changes so an already-seeded demo memex re-seeds on
-/// next activation (Seth, 2026-07-07 — v2 is the public, rotli-about-rotli seed).
+/// next activation (the maintainer, 2026-07-07 — v2 is the public, rotli-about-rotli seed).
 const DEMO_SEED_VERSION: &str = "3";
 
 /// The bundled seed content, written into memex-demo on first activation. It is a
@@ -850,23 +880,69 @@ pub fn carry_settings(current: &Path, new_root: &Path) -> Result<(), String> {
         .map(|_| ())
 }
 
-/// Repoint the active corpus at `path`. The caller relaunches so it opens.
-pub fn set_corpus_path(app: &tauri::AppHandle, path: PathBuf, adopted: bool) -> Result<(), String> {
-    let mut cfg = if is_configured(app) {
-        ensure_corpus_config(app)
-    } else {
-        CorpusConfig {
-            version: 1,
-            corpus: CorpusRef {
-                abs_path: path.clone(),
-                adopted,
-            },
-            brains: Vec::new(),
-            folders: Vec::new(),
-            active_brain_id: None,
+fn upsert_brain_config(
+    cfg: &mut CorpusConfig,
+    brain: ConnectedBrain,
+    make_active: bool,
+) -> Result<String, String> {
+    let target = canon(&brain.abs_path);
+    if canon(&cfg.corpus.abs_path) == target {
+        return Err(
+            "That folder is already your vault — it can't also be a linked library.".into(),
+        );
+    }
+    let existing = cfg.brains.iter().find(|b| canon(&b.abs_path) == target);
+    if let (Some(existing), Some(new_id)) = (existing, brain.memex_id.as_deref()) {
+        if existing
+            .memex_id
+            .as_deref()
+            .is_some_and(|previous| previous != new_id)
+        {
+            return Err(
+                "This folder is a different vault than the one rotli connected to — refusing."
+                    .into(),
+            );
         }
+    }
+    let id = existing.map(|b| b.id.clone()).unwrap_or_else(|| {
+        if brain.id.is_empty() {
+            unique_brain_id(&cfg.brains, &brain.label)
+        } else {
+            brain.id.clone()
+        }
+    });
+    let entry = ConnectedBrain {
+        id: id.clone(),
+        ..brain
     };
+    cfg.brains.retain(|b| canon(&b.abs_path) != target);
+    cfg.brains.push(entry);
+    if make_active || cfg.active_brain_id.is_none() {
+        cfg.active_brain_id = Some(id.clone());
+    }
+    Ok(id)
+}
+
+/// Apply one active-vault switch in memory. A compatible outgoing Rotli vault
+/// becomes a linked library in the same config write, so the sidebar can switch
+/// back; the incoming linked row is removed to preserve one-path/one-role.
+fn switch_corpus_config(
+    mut cfg: CorpusConfig,
+    path: PathBuf,
+    adopted: bool,
+) -> Result<CorpusConfig, String> {
     let target = canon(&path);
+    let outgoing = (canon(&cfg.corpus.abs_path) != target)
+        .then(|| crate::memex::brain_connect_view(&cfg.corpus.abs_path).ok())
+        .flatten()
+        .map(|meta| ConnectedBrain {
+            id: String::new(),
+            label: meta.label,
+            abs_path: cfg.corpus.abs_path.clone(),
+            memex_id: Some(meta.memex_id),
+            mode: meta.mode,
+            perms: meta.perms,
+        });
     // a folder can't be BOTH the corpus and a brain/added-folder — drop any dup so
     // the same dir never opens as two roots (doubled notes / two watchers).
     let dropped_active = cfg
@@ -884,7 +960,70 @@ pub fn set_corpus_path(app: &tauri::AppHandle, path: PathBuf, adopted: bool) -> 
         abs_path: path,
         adopted,
     };
-    write_corpus_config(app, &cfg)
+    if let Some(outgoing) = outgoing {
+        let _ = upsert_brain_config(&mut cfg, outgoing, false)?;
+    }
+    Ok(cfg)
+}
+
+/// Resolve an active-vault switch through the persisted registry instead of
+/// accepting an arbitrary frontend path. Native picker authorization remains
+/// mandatory for new folders; an already-connected vault is trusted only by
+/// its exact configured id and is revalidated by the command before switching.
+pub(crate) fn connected_vault_switch_target(
+    cfg: &CorpusConfig,
+    id: &str,
+) -> Result<ConnectedBrain, String> {
+    cfg.brains
+        .iter()
+        .find(|brain| brain.id == id)
+        .cloned()
+        .ok_or_else(|| "no such connected vault".into())
+}
+
+fn persist_corpus_path(
+    app: &tauri::AppHandle,
+    path: PathBuf,
+    adopted: bool,
+) -> Result<Option<String>, String> {
+    // Preserve still-valid connected vaults even when the current folder was
+    // removed in Finder. `is_configured` correctly becomes false for that dead
+    // primary, but its readable config is still the recovery map.
+    let cfg = read_corpus_config(app).unwrap_or_else(|| CorpusConfig {
+        version: 1,
+        corpus: CorpusRef {
+            abs_path: path.clone(),
+            adopted,
+        },
+        brains: Vec::new(),
+        folders: Vec::new(),
+        active_brain_id: None,
+    });
+    let outgoing_path = cfg.corpus.abs_path.clone();
+    let cfg = switch_corpus_config(cfg, path, adopted)?;
+    let outgoing_id = cfg
+        .brains
+        .iter()
+        .find(|brain| canon(&brain.abs_path) == canon(&outgoing_path))
+        .map(|brain| brain.id.clone());
+    for vault in
+        std::iter::once(&cfg.corpus.abs_path).chain(cfg.brains.iter().map(|brain| &brain.abs_path))
+    {
+        crate::vault_location::remember_vault(app, vault);
+    }
+    write_corpus_config(app, &cfg)?;
+    Ok(outgoing_id)
+}
+
+/// Persist a new active corpus and return the optional route assigned to the
+/// outgoing folder. Compatible Rotli vaults preserve the way back; first-run
+/// and plain-folder transitions have no connected route to retain.
+pub(crate) fn set_corpus_path_live(
+    app: &tauri::AppHandle,
+    path: PathBuf,
+    adopted: bool,
+) -> Result<Option<String>, String> {
+    persist_corpus_path(app, path, adopted)
 }
 
 /// Connect / update a brain. A same-folder upsert PRESERVES the existing id (so
@@ -895,42 +1034,12 @@ pub fn upsert_brain(
     app: &tauri::AppHandle,
     brain: ConnectedBrain,
     make_active: bool,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let mut cfg = ensure_corpus_config(app);
-    let target = canon(&brain.abs_path);
-    if canon(&cfg.corpus.abs_path) == target {
-        return Err(
-            "That folder is already your vault — it can't also be a linked library.".into(),
-        );
-    }
-    let existing = cfg.brains.iter().find(|b| canon(&b.abs_path) == target);
-    if let (Some(e), Some(new_id)) = (existing, brain.memex_id.as_deref()) {
-        if let Some(prev) = e.memex_id.as_deref() {
-            if prev != new_id {
-                return Err(
-                    "This folder is a different vault than the one rotli connected to — refusing."
-                        .into(),
-                );
-            }
-        }
-    }
-    let id = existing.map(|b| b.id.clone()).unwrap_or_else(|| {
-        if brain.id.is_empty() {
-            unique_brain_id(&cfg.brains, &brain.label)
-        } else {
-            brain.id.clone()
-        }
-    });
-    let entry = ConnectedBrain {
-        id: id.clone(),
-        ..brain
-    };
-    cfg.brains.retain(|b| canon(&b.abs_path) != target);
-    cfg.brains.push(entry);
-    if make_active || cfg.active_brain_id.is_none() {
-        cfg.active_brain_id = Some(id);
-    }
-    write_corpus_config(app, &cfg)
+    crate::vault_location::remember_vault(app, &brain.abs_path);
+    let id = upsert_brain_config(&mut cfg, brain, make_active)?;
+    write_corpus_config(app, &cfg)?;
+    Ok(id)
 }
 
 pub fn set_active_brain(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
@@ -999,12 +1108,29 @@ pub fn add_folder(app: &tauri::AppHandle, path: PathBuf) -> Result<bool, String>
 /// active brain is forgotten, the active pointer falls to the first remaining.
 pub fn forget_root(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
     let mut cfg = ensure_corpus_config(app);
+    if id == DEFAULT_ROOT_ID {
+        return Err("Switch to another vault before removing the current vault.".into());
+    }
+    if !cfg.folders.iter().any(|folder| folder.id == id)
+        && !cfg.brains.iter().any(|brain| brain.id == id)
+    {
+        return Err("no such connected vault".into());
+    }
+    let forgotten_memex_id = cfg
+        .brains
+        .iter()
+        .find(|brain| brain.id == id)
+        .and_then(|brain| brain.memex_id.clone());
     cfg.folders.retain(|f| f.id != id);
     cfg.brains.retain(|b| b.id != id);
     if cfg.active_brain_id.as_deref() == Some(id) {
         cfg.active_brain_id = cfg.brains.first().map(|b| b.id.clone());
     }
-    write_corpus_config(app, &cfg)
+    write_corpus_config(app, &cfg)?;
+    if let Some(memex_id) = forgotten_memex_id {
+        crate::vault_location::forget_vault(app, &memex_id);
+    }
+    Ok(())
 }
 
 /// Split a wire id into `(root_id, rel)`. A `:` splits ONCE at the first colon
@@ -1118,7 +1244,7 @@ pub struct Frontmatter {
     /// `Some(folder)` = restore here; `Some("")` = restore to corpus root (a
     /// deliberate, distinct value from absent — `None` means "never moved into
     /// a hidden root, no origin to honor"). Emitted only when `Some(_)`, so
-    /// normal notes stay byte-identical. (Seth, 2026-06-13)
+    /// normal notes stay byte-identical. (the maintainer, 2026-06-13)
     pub origin: Option<String>,
     pub foreign: Vec<String>,
 }
@@ -1266,7 +1392,7 @@ const RESERVED_KEYS: [&str; 12] = [
 /// The metadata keys the AI FILER owns (contract v3.7). Written ONLY via
 /// `set_ai_field` / `file_note`; the Filer refuses everything NOT in this set, and
 /// these stay disjoint from RESERVED_KEYS (Rust) and the user's `{shelf, reach}` —
-/// two actors, two gates, disjoint territories (Seth, 2026-07-01).
+/// two actors, two gates, disjoint territories (the maintainer, 2026-07-01).
 const AI_KEYS: [&str; 8] = [
     "area",
     "summary",
@@ -1324,7 +1450,7 @@ fn secure_origin_field(line: &str) -> Option<String> {
 
 /// High-signal secret patterns — API keys, private keys, JWTs, SSNs, card numbers.
 /// ANY match → the note holds secrets: it's flagged `secure: true`, its content is
-/// never sent to a REMOTE model, and its path is gitignored (Seth, 2026-06-29).
+/// never sent to a REMOTE model, and its path is gitignored (the maintainer, 2026-06-29).
 /// (Impl lives in `crate::secret` — the single source shared with the web egress guard.)
 fn looks_secure(text: &str) -> bool {
     crate::secret::looks_secure(text)
@@ -1527,7 +1653,7 @@ pub fn merge_raw_frontmatter(original: &str, submitted: &str) -> Result<String, 
 // The disk is the AI's strict structure; the user's VIEW groups notes by their
 // `shelf:` (the folder the human put it in), never by the disk path — so a note
 // that physically lives in wiki/ (or wiki/_inbox staging) appears under "Inbox" or
-// "Myela/Payments" and the user never feels it lives in wiki/. We read the shelf
+// "Northstar/Payments" and the user never feels it lives in wiki/. We read the shelf
 // from the PRESERVED foreign frontmatter lines (parse_fields/compose_document stay
 // untouched, so the byte-exact round-trip + every frontmatter test is unaffected).
 
@@ -1574,8 +1700,8 @@ fn project_folder(layout: Layout, disk_folder: &str, fm: &Frontmatter) -> String
         if disk_folder == "wiki" || disk_folder.starts_with("wiki/") {
             if let Some(primary) = shelf_of(fm).into_iter().next() {
                 // the default capture shelf "Inbox" is the ONE Captures surface — route
-                // it to the reserved "Board" root the sidebar reads as "Captures" (Seth,
-                // 2026-06-30); a real user shelf (Myela/Payments) still projects to it.
+                // it to the reserved "Board" root the sidebar reads as "Captures" (the maintainer,
+                // 2026-06-30); a real user shelf (Northstar/Payments) still projects to it.
                 return if primary == "Inbox" {
                     "Board".to_string()
                 } else {
@@ -1950,7 +2076,7 @@ fn strip_ordered_prefix(trimmed: &str) -> Option<&str> {
 
 /// A hard-wrapped checkbox reads as ONE task: an indented, non-list, non-fence
 /// line directly under a `- [ ]` row is its continuation. Without this, the
-/// Tasks surface cut wrapped items at the first newline (Seth, 2026-07-31:
+/// Tasks surface cut wrapped items at the first newline (the maintainer, 2026-07-31:
 /// "…set as `X` on the").
 fn task_continuation(raw: &str) -> Option<&str> {
     let trimmed = raw.trim_start();
@@ -2166,7 +2292,7 @@ fn preserve_rename_aliases(
 /// (lowercase, non-alnum → single `-`) and keep the lowercased extension. A
 /// spaced/exotic name (e.g. macOS "Screenshot 2026-… AM.png") otherwise becomes
 /// a `storage:` link that breaks markdown AND the memex asset regex
-/// `[A-Za-z0-9._/-]` — the validator then reads it as a broken ref (Seth,
+/// `[A-Za-z0-9._/-]` — the validator then reads it as a broken ref (the maintainer,
 /// 2026-07-03: the recurring Breve check-up failures).
 fn sanitize_asset_name(raw: &str) -> String {
     let p = Path::new(raw);
@@ -2409,7 +2535,7 @@ const WELCOME_BODY: &str = "# Welcome to rotli\n\nThis folder is your corpus —
 /// `root/memex.json` for a valid `mx_` id.
 ///   • `LegacyRotli` — today's `~/Documents/rotli`: reserved folders, first-run,
 ///     everything writable. BYTE-IDENTICAL to before Increment 3.
-///   • `Memex` — the root IS someone's memex spine (for Seth, `~/memex-vault`).
+///   • `Memex` — the root IS someone's memex spine (for the maintainer, `~/memex-vault`).
 ///     `chats/` and `wiki/` are writable + surfaced read-write; `identity/`,
 ///     `personality/`, `history/`, `MAP.md`, `inbox.md` stay out of the tree (Reference)
 ///     and every control file stays HIDDEN. No reserved folders are scaffolded, no
@@ -2449,7 +2575,7 @@ pub enum Surface {
     /// The brain's MEMORY lanes (Memex: identity/ personality/ history/ MAP.md
     /// inbox.md). NOT in the user's Notes tree and never writable by any lane —
     /// but RETRIEVABLE by the AI's own tools (search / knowledge map / read),
-    /// for BOTH model classes (Seth, 2026-08-01: "it shouldn't be invisible").
+    /// for BOTH model classes (the maintainer, 2026-08-01: "it shouldn't be invisible").
     /// See docs/design/ai-visibility-matrix.md.
     Reference,
     /// Never surfaced, never written, never retrievable (Memex: memex.json,
@@ -2461,7 +2587,8 @@ pub enum Surface {
 /// separators ("" = the root itself).
 ///
 /// LegacyRotli surfaces everything read-write (today's behavior). Memex surfaces
-/// ONLY `wiki/` + `chats/` (both read-write) in the Notes tree, marks the
+/// `wiki/`, `chats/`, and the exact welcome preset path as read-write in the
+/// Notes tree, marks the
 /// brain's memory (identity/personality/history/MAP/inbox) `Reference` — out of
 /// the tree but reachable by the AI's retrieval tools — and hides every
 /// memex-vault control file. Top-level memex-vault docs (STRUCTURE.md,
@@ -2472,6 +2599,12 @@ fn surfaced(layout: Layout, rel: &str) -> Surface {
         return Surface::NoteRW;
     }
     let rel = rel.trim_start_matches('/');
+    // A newly scaffolded vault owns one real, editable root-level Markdown
+    // note. It is deliberately outside wiki/ (and therefore Library), while
+    // every other root document remains hidden/control material.
+    if rel == crate::memex::WELCOME_PRESET_FILE {
+        return Surface::NoteRW;
+    }
     // chats/ — rotli's owned, writable surface (the dir itself + everything under)
     if rel == "chats" || rel.starts_with("chats/") {
         return Surface::NoteRW;
@@ -2490,11 +2623,11 @@ fn surfaced(layout: Layout, rel: &str) -> Surface {
     // destinations + is_hidden_root). A note the user archives/trashes lands in
     // these rotli-owned dirs at the memex root; they're never the curated
     // knowledge, so lifecycle moves are a sanctioned write lane even in a memex.
-    // Without this, archive/trash silently no-op in a memex (Seth, 2026-07-07).
+    // Without this, archive/trash silently no-op in a memex (the maintainer, 2026-07-07).
     if is_hidden_root(rel) {
         return Surface::NoteRW;
     }
-    // storage/excalidraw/ — the memex's BOARD lane (Seth, 2026-07-07). Excalidraw
+    // storage/excalidraw/ — the memex's BOARD lane (the maintainer, 2026-07-07). Excalidraw
     // scenes rotli creates + edits live here, so they're WRITABLE even though the
     // rest of storage/ (foreign binary drops) stays read-only below. Must precede
     // the storage/ rule. A board is rotli's own content, not a foreign asset.
@@ -2509,7 +2642,7 @@ fn surfaced(layout: Layout, rel: &str) -> Surface {
         return Surface::NoteRO;
     }
     // The brain's MEMORY lanes: out of the Notes tree, unwritable — but the AI
-    // may retrieve them (Seth, 2026-08-01). Directories are matched with their
+    // may retrieve them (the maintainer, 2026-08-01). Directories are matched with their
     // trailing slash so a sibling like "identity-notes/" never rides this rule.
     if is_reference_lane(rel) {
         return Surface::Reference;
@@ -2812,7 +2945,7 @@ impl CorpusStore {
         store.load_index();
         store.init_search_index();
         // Scaffold the six reserved sidebar destinations every open (idempotent),
-        // so existing corpora gain them too. (Seth, 2026-06-13)
+        // so existing corpora gain them too. (the maintainer, 2026-06-13)
         if !read_only {
             store.ensure_reserved_folders()?;
         }
@@ -3266,7 +3399,7 @@ impl CorpusStore {
     /// lock state and every foreign line (shelf/reach/area/summary/tags/links/…).
     /// Takes a wire id OR a rel path (resolve_note_rel): a `.md` note travels the
     /// wire as its frontmatter ULID, and reading "<root>/<ULID>" off disk was the
-    /// metadata panel's "No such file or directory" (Seth, 2026-07-01).
+    /// metadata panel's "No such file or directory" (the maintainer, 2026-07-01).
     fn read_frontmatter(&mut self, id_or_rel: &str) -> Result<FrontmatterView, String> {
         let rel = self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(&rel);
@@ -3279,7 +3412,7 @@ impl CorpusStore {
         // The detector is the regex pass today; the local LLM refines it later.
         // BEST-EFFORT on this READ path: persist + gitignore, but a write/gitignore
         // hiccup must NEVER break reading the metadata — that left the panel stuck on
-        // "Reading…" (Seth, 2026-06-30). We still report secure=true (the safe
+        // "Reading…" (the maintainer, 2026-06-30). We still report secure=true (the safe
         // direction); the explicit set_secure path keeps hard-failing for the user.
         if !secure && looks_secure(body) {
             fm.foreign.push("secure: true".to_string());
@@ -3482,7 +3615,7 @@ impl CorpusStore {
     /// Append a path to the corpus `.gitignore` (idempotent) — a secure note must
     /// never be pushed when the corpus is a git repo. The write error PROPAGATES: a
     /// note marked secure whose `.gitignore` write failed would silently stay
-    /// committable, so set_secure must learn about it (Seth, 2026-06-30 — audit).
+    /// committable, so set_secure must learn about it (the maintainer, 2026-06-30 — audit).
     fn gitignore_add(&self, rel: &str) -> Result<(), String> {
         self.mutation_allowed()?;
         let path = self.guard_rel(".gitignore")?;
@@ -3823,7 +3956,7 @@ impl CorpusStore {
     /// * A SECURE note is ALWAYS refused to a remote/frontier model. No knob
     ///   changes that and none will exist.
     /// * A SECURE note is readable by a registered on-device model BY DEFAULT
-    ///   (Seth, 2026-08-01: "only local AI can see secure notes" — see, not
+    ///   (the maintainer, 2026-08-01: "only local AI can see secure notes" — see, not
     ///   "see if separately permitted"). Two knobs can still say no: the note's
     ///   own `local_ai_allowed: false`, and the vault's `secureLocalAi: false`.
     ///   The per-note bit wins over the vault default in BOTH directions.
@@ -3903,7 +4036,7 @@ impl CorpusStore {
     ///   1. the same `read_for_ai` gate the model passed to SEE it (a model may
     ///      never edit what it may not read), and
     ///   2. **LOCKED** — no AI of any class edits a locked note. "Local" buys
-    ///      visibility, never edit authority (Seth, 2026-08-01).
+    ///      visibility, never edit authority (the maintainer, 2026-08-01).
     ///
     /// Then the SAME `writable()` surface gate the user's own editor passes — so
     /// the AI's write surface is exactly the human's minus locked notes, never
@@ -4148,7 +4281,7 @@ impl CorpusStore {
     /// reserved local row — the Vault is now an EXTERNAL root (a memex). An
     /// existing on-disk `Brain/` folder is NEVER moved, renamed, or deleted; it
     /// simply stops being scaffolded and surfaces as a plain folder via `walk`
-    /// (Invariant 4 — no data loss). (Seth, 2026-06-13 / 2026-06-24)
+    /// (Invariant 4 — no data loss). (the maintainer, 2026-06-13 / 2026-06-24)
     fn ensure_reserved_folders(&self) -> Result<(), String> {
         for name in [
             "Inbox",
@@ -4944,7 +5077,10 @@ impl CorpusStore {
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_default();
         let desired = filename_for(&title, id);
-        let target_rel = if current_name == desired {
+        // The welcome preset is the one sanctioned root note. Its Markdown is
+        // fully editable, but its path stays stable so changing the H1 cannot
+        // rename it into the otherwise hidden root-document namespace.
+        let target_rel = if rel == crate::memex::WELCOME_PRESET_FILE || current_name == desired {
             rel.clone()
         } else {
             self.free_note_name(&disk_folder, &desired, Some(&rel))
@@ -5015,7 +5151,7 @@ impl CorpusStore {
         // as its rel path and never enters the ULID index, so path_of refused it
         // outright — "note not found: storage/excalidraw/untitled-2.excalidraw"
         // for an item sitting right there in the tree. Trash IS a move, so that
-        // one lookup broke board delete, archive, and move alike (Seth,
+        // one lookup broke board delete, archive, and move alike (the maintainer,
         // 2026-08-04: "I don't understand why I can't delete something that is
         // showing in my view").
         let rel = self.resolve_note_rel(id)?;
@@ -5237,7 +5373,7 @@ impl CorpusStore {
     /// The FILER's write gate: memex-only, and ONLY the brain (`wiki/**` — both the
     /// `_inbox` staging and the curated areas). Refuses a `locked` note (re-read
     /// FRESH so a lock set between the classify-read and the write is honored). The
-    /// USER's `writable()` is unchanged — two disjoint lanes (Seth, 2026-07-01).
+    /// USER's `writable()` is unchanged — two disjoint lanes (the maintainer, 2026-07-01).
     /// The vault's Brain master switch (vault-vs-brain, 2026-07-26). Read from
     /// the settings sidecar per call. A MISSING file/field means ON — existing
     /// vaults keep today's behavior (the frontend's debounced saver later
@@ -5932,7 +6068,7 @@ impl CorpusStore {
         // In a memex, boards live in the storage/excalidraw board lane (writable —
         // see surfaced()). If the caller's folder isn't itself a writable surface,
         // land the board there so ⌘⇧N always saves and every board shares one home
-        // (Seth, 2026-07-07).
+        // (the maintainer, 2026-07-07).
         let body = body.unwrap_or(EMPTY_EXCALIDRAW);
         crate::board::validate_scene(body)?;
         let folder_id = if self.layout == Layout::Memex
@@ -5972,7 +6108,7 @@ impl CorpusStore {
     /// stem (extension optional); path separators are flattened to `-`, the folder
     /// is kept, and the result is collision-guarded. Returns the board's new meta
     /// (its id IS the new relpath). Boards carry no index, so this is a pure file
-    /// move + a fresh meta — no id remap to chase elsewhere (Seth, 2026-06-26).
+    /// move + a fresh meta — no id remap to chase elsewhere (the maintainer, 2026-06-26).
     pub fn rename_board(&mut self, id: &str, new_name: &str) -> Result<NoteMeta, String> {
         if !id.ends_with(".excalidraw") {
             return Err(format!("not a board: {id}"));
@@ -6030,7 +6166,7 @@ impl CorpusStore {
     /// `Trash` folder (still a real `.md` in the corpus, still openable in any
     /// editor), stamped with where it came from so it can be restored. It NEVER
     /// leaves the corpus — emptying the trash (the hard delete) is `purge`.
-    /// (Seth, 2026-06-13)
+    /// (the maintainer, 2026-06-13)
     pub fn delete(&mut self, id: &str) -> Result<(), String> {
         // Soft-delete slides the note into the reserved `Trash` folder. In a
         // memex there is no writable `Trash`, so move_note's target gate refuses
@@ -6081,7 +6217,7 @@ impl CorpusStore {
     }
 
     /// Hard-remove a BLANK note — the ephemeral-note lifecycle ("a new note is
-    /// just a view until you write into it", Seth 2026-07-17). Never the in-app
+    /// just a view until you write into it", the maintainer 2026-07-17). Never the in-app
     /// Trash folder (no clutter): straight to the OS trash / `.rotli/trash`
     /// fallback via the purge internals. Rust re-reads the file and REFUSES any
     /// non-blank body, so this exposed command cannot destroy content even if
@@ -6283,7 +6419,7 @@ pub(crate) fn folder_of(rel: &str) -> String {
 
 /// The two never-delete sinks: a folder is a hidden root when it IS Archive or
 /// Trash, or lives anywhere beneath one. Moving INTO one stamps an origin;
-/// moving back OUT clears it. (Seth, 2026-06-13)
+/// moving back OUT clears it. (the maintainer, 2026-06-13)
 fn is_hidden_root(folder: &str) -> bool {
     folder == "Archive"
         || folder == "Trash"
@@ -6820,6 +6956,179 @@ impl ImportAuthorizations {
 }
 
 impl CorpusState {
+    pub(crate) fn contains_root(&self, root_id: &str) -> Result<bool, String> {
+        Ok(self
+            .0
+            .lock()
+            .map_err(|_| "corpus lock poisoned".to_string())?
+            .stores
+            .contains_key(root_id))
+    }
+
+    pub(crate) fn insert_root(&self, root_id: String, store: CorpusStore) -> Result<(), String> {
+        self.0
+            .lock()
+            .map_err(|_| "corpus lock poisoned".to_string())?
+            .insert(root_id, store)
+    }
+
+    /// Replace one store with a clean reopen of the same folder. Keep the
+    /// shared suppression/generation handle so its existing filesystem watcher
+    /// continues to invalidate the replacement store.
+    pub(crate) fn refresh_root(
+        &self,
+        root_id: &str,
+        mut incoming: CorpusStore,
+    ) -> Result<(), String> {
+        let mut reg = self
+            .0
+            .lock()
+            .map_err(|_| "corpus lock poisoned".to_string())?;
+        let current = reg
+            .stores
+            .get(root_id)
+            .ok_or_else(|| "the selected vault is unavailable".to_string())?;
+        if canon(current.root()) != canon(incoming.root()) {
+            return Err("the refreshed vault does not match the selected vault".into());
+        }
+        incoming.suppress = current.suppress_set();
+        incoming.perms_read_only = current.perms_read_only;
+        reg.stores.insert(root_id.to_string(), incoming);
+        Ok(())
+    }
+
+    /// Disconnect one non-active route after its durable binding has been
+    /// removed. Persistence runs first, so a failed config write leaves the
+    /// live registry and its access boundary untouched.
+    pub(crate) fn remove_registered_root(
+        &self,
+        root_id: &str,
+        persist: impl FnOnce() -> Result<(), String>,
+    ) -> Result<PathBuf, String> {
+        if root_id == DEFAULT_ROOT_ID {
+            return Err("Switch to another vault before removing the current vault.".into());
+        }
+        let mut reg = self
+            .0
+            .lock()
+            .map_err(|_| "corpus lock poisoned".to_string())?;
+        let root = reg
+            .stores
+            .get(root_id)
+            .map(|store| store.root().to_path_buf())
+            .ok_or_else(|| "no such connected vault".to_string())?;
+        persist()?;
+        reg.stores.remove(root_id);
+        Ok(root)
+    }
+
+    /// Resolve an already-open route by its filesystem identity. Native picker
+    /// paths can point at a connected vault; reusing that store avoids opening
+    /// the same folder twice or attaching a duplicate watcher.
+    pub(crate) fn root_id_for_path(&self, root: &Path) -> Result<Option<String>, String> {
+        let target = canon(root);
+        let reg = self
+            .0
+            .lock()
+            .map_err(|_| "corpus lock poisoned".to_string())?;
+        Ok(reg
+            .stores
+            .iter()
+            .find_map(|(id, store)| (canon(store.root()) == target).then(|| id.clone())))
+    }
+
+    /// Promote one already-open connected vault to the default route without
+    /// rebuilding the process. The persistence callback runs after every live
+    /// precondition passes but before store keys move, so a failed config write
+    /// leaves the in-memory registry untouched. It returns the optional route
+    /// assigned to the outgoing vault: compatible Rotli vaults preserve the
+    /// way back, while an unconfigured or plain outgoing folder is detached.
+    pub(crate) fn activate_registered_root(
+        &self,
+        incoming_id: &str,
+        persist: impl FnOnce() -> Result<Option<String>, String>,
+    ) -> Result<(), String> {
+        if incoming_id == DEFAULT_ROOT_ID {
+            return Ok(());
+        }
+        let mut reg = self
+            .0
+            .lock()
+            .map_err(|_| "corpus lock poisoned".to_string())?;
+        if !reg.stores.contains_key(incoming_id) {
+            return Err(format!("corpus root unavailable: {incoming_id}"));
+        }
+        if !reg.stores.contains_key(DEFAULT_ROOT_ID) {
+            return Err("the active vault is unavailable".into());
+        }
+        let outgoing_id = persist()?;
+        if outgoing_id.as_ref().is_some_and(|id| {
+            id.is_empty()
+                || id == DEFAULT_ROOT_ID
+                || id == incoming_id
+                || id.contains(':')
+                || reg.stores.contains_key(id)
+        }) {
+            return Err("the outgoing vault could not be assigned a safe route".into());
+        }
+        let outgoing = reg
+            .stores
+            .remove(DEFAULT_ROOT_ID)
+            .ok_or("the active vault is unavailable")?;
+        let mut incoming = reg
+            .stores
+            .remove(incoming_id)
+            .ok_or_else(|| format!("corpus root unavailable: {incoming_id}"))?;
+        incoming.set_perms_read_only(false);
+        if let Some(outgoing_id) = outgoing_id {
+            reg.stores.insert(outgoing_id, outgoing);
+        }
+        reg.stores.insert(DEFAULT_ROOT_ID.to_string(), incoming);
+        reg.default_id = DEFAULT_ROOT_ID.to_string();
+        Ok(())
+    }
+
+    /// Install a newly opened folder as the live default route. This is the
+    /// creation/import counterpart to `activate_registered_root`: persistence
+    /// happens before the registry changes, and a first-run registry with no
+    /// default store is valid. The caller owns watcher installation after this
+    /// atomic swap succeeds.
+    pub(crate) fn activate_new_root(
+        &self,
+        mut incoming: CorpusStore,
+        persist: impl FnOnce() -> Result<Option<String>, String>,
+    ) -> Result<(), String> {
+        let mut reg = self
+            .0
+            .lock()
+            .map_err(|_| "corpus lock poisoned".to_string())?;
+        let incoming_path = canon(incoming.root());
+        if reg
+            .stores
+            .values()
+            .any(|store| canon(store.root()) == incoming_path)
+        {
+            return Err("the selected vault is already open".into());
+        }
+        let outgoing_id = persist()?;
+        if outgoing_id.as_ref().is_some_and(|id| {
+            id.is_empty()
+                || id == DEFAULT_ROOT_ID
+                || id.contains(':')
+                || reg.stores.contains_key(id)
+        }) {
+            return Err("the outgoing vault could not be assigned a safe route".into());
+        }
+        let outgoing = reg.stores.remove(DEFAULT_ROOT_ID);
+        if let (Some(outgoing_id), Some(outgoing)) = (outgoing_id, outgoing) {
+            reg.stores.insert(outgoing_id, outgoing);
+        }
+        incoming.set_perms_read_only(false);
+        reg.stores.insert(DEFAULT_ROOT_ID.to_string(), incoming);
+        reg.default_id = DEFAULT_ROOT_ID.to_string();
+        Ok(())
+    }
+
     /// The registry's default root id — the memex the journal/organizer
     /// commands ride (their dot-state lives under ITS `.rotli/`).
     pub(crate) fn default_root_id(&self) -> Result<String, String> {
@@ -6844,6 +7153,18 @@ impl CorpusState {
             .get(&reg.default_id)
             .ok_or_else(|| format!("corpus root unavailable: {}", reg.default_id))?;
         Ok(store.root().to_path_buf())
+    }
+
+    pub(crate) fn default_is_memex(&self) -> Result<bool, String> {
+        let reg = self
+            .0
+            .lock()
+            .map_err(|_| "corpus lock poisoned".to_string())?;
+        let store = reg
+            .stores
+            .get(&reg.default_id)
+            .ok_or_else(|| format!("corpus root unavailable: {}", reg.default_id))?;
+        Ok(store.is_memex())
     }
 
     /// Share one registered store's cache generation/suppression set with a
@@ -6929,11 +7250,9 @@ fn prefix_write_result(root_id: &str, mut result: CorpusWriteResult) -> CorpusWr
     result
 }
 
-/// ASYNC + spawn_blocking (perf audit 2026-08): on a cache miss `corpus_list`
-/// runs a full multi-root disk walk under the corpus mutex. As a sync command
-/// that ran on Tauri's main thread, janking the UI; the walk now runs on a
-/// worker so the main thread stays responsive. TS callers already `await` the
-/// invoke, so no caller change.
+/// ASYNC + spawn_blocking: on a cache miss `corpus_list` walks the active vault
+/// under the corpus mutex. Connected vaults are registered switch targets, not
+/// simultaneous data sources. The walk stays off Tauri's main thread.
 #[tauri::command]
 pub async fn corpus_list(app: tauri::AppHandle) -> Result<CorpusList, String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -6945,43 +7264,17 @@ pub async fn corpus_list(app: tauri::AppHandle) -> Result<CorpusList, String> {
     .map_err(|e| format!("corpus list worker failed ({e})"))?
 }
 
-/// The aggregation half of `corpus_list`, shared with `corpus_notes_ai`.
+/// The active-vault half of `corpus_list`, shared with `corpus_notes_ai`.
 fn corpus_list_inner(state: &CorpusState) -> Result<CorpusList, String> {
-    // Aggregate across every registered root, prefixing each emitted folder_id /
-    // board id via compose_root_id (default bare). Note ulids stay bare for the
-    // default root; a non-default root prefixes its ulids too so reads route back.
     let mut reg = state
         .0
         .lock()
         .map_err(|_| "corpus lock poisoned".to_string())?;
-    let mut ids: Vec<String> = reg.stores.keys().cloned().collect();
-    // stable order: default first, then the rest sorted, so the wire is deterministic
-    ids.sort();
-    if let Some(pos) = ids.iter().position(|i| *i == reg.default_id) {
-        let d = ids.remove(pos);
-        ids.insert(0, d);
-    }
-    let mut folders: Vec<FolderMeta> = Vec::new();
-    let mut notes: Vec<NoteMeta> = Vec::new();
-    for id in ids {
-        let store = reg.stores.get_mut(&id).expect("id from keys");
-        let list = store.list()?;
-        for mut f in list.folders {
-            f.parent_id = f.parent_id.map(|p| compose_root_id(&id, &p));
-            f.id = compose_root_id(&id, &f.id);
-            folders.push(f);
-        }
-        for mut n in list.notes {
-            n = prefix_meta(&id, n);
-            if id != reg.default_id && n.kind == NoteKind::Note {
-                // a ulid note in a non-default root: prefix the ulid so a later
-                // read routes back to this store.
-                n.id = compose_root_id(&id, &n.id);
-            }
-            notes.push(n);
-        }
-    }
-    Ok(CorpusList { folders, notes })
+    let default_id = reg.default_id.clone();
+    reg.stores
+        .get_mut(&default_id)
+        .ok_or_else(|| format!("corpus root unavailable: {default_id}"))?
+        .list()
 }
 
 /// The Tasks projection over the DEFAULT corpus (decision 2026-07-25): every
@@ -7018,13 +7311,9 @@ pub fn corpus_toggle_task(
     state.route(&root, |s| s.toggle_task(&rel, line, &expect))
 }
 
-/// FULL-TEXT search across every registered root — the same aggregation +
-/// id-prefixing discipline as `corpus_list` (default root first, ulids prefixed
-/// only for non-default roots so an open routes back). `limit` caps the MERGED
-/// result (default 50); hits re-sort rank→recency after the merge.
-/// ASYNC + spawn_blocking (perf audit 2026-08): full-text search reads (and on a
-/// cache miss walks) every root under the mutex — run it on a worker so a ⌘K
-/// keystroke never janks the main thread. TS callers already `await`.
+/// FULL-TEXT search inside the active vault only. Connected vaults are reached
+/// through an explicit switch, never merged into search results. The disk work
+/// stays off the main thread so a ⌘K keystroke never janks the window.
 #[tauri::command]
 pub async fn corpus_search(
     app: tauri::AppHandle,
@@ -7057,24 +7346,12 @@ fn corpus_search_inner(
         .0
         .lock()
         .map_err(|_| "corpus lock poisoned".to_string())?;
-    let mut ids: Vec<String> = reg.stores.keys().cloned().collect();
-    ids.sort();
-    if let Some(pos) = ids.iter().position(|i| *i == reg.default_id) {
-        let d = ids.remove(pos);
-        ids.insert(0, d);
-    }
     let default_id = reg.default_id.clone();
-    let mut hits: Vec<SearchHit> = Vec::new();
-    for id in ids {
-        let store = reg.stores.get_mut(&id).expect("id from keys");
-        for mut h in store.search(query, cap, include_reference)? {
-            h.folder_id = compose_root_id(&id, &h.folder_id);
-            if id != default_id {
-                h.id = compose_root_id(&id, &h.id);
-            }
-            hits.push(h);
-        }
-    }
+    let store = reg
+        .stores
+        .get_mut(&default_id)
+        .ok_or_else(|| format!("corpus root unavailable: {default_id}"))?;
+    let mut hits = store.search(query, cap, include_reference)?;
     sort_hits(&mut hits);
     hits.truncate(cap);
     Ok(hits)
@@ -7516,7 +7793,7 @@ pub fn corpus_reveal_file(state: tauri::State<'_, CorpusState>, id: String) -> R
     let (root, rel) = split_root_id(&id);
     // a NOTE travels the wire as its frontmatter ULID — joining that to the root
     // was never a file, so "Show in Finder" silently failed for every note
-    // (Seth, 2026-07-09; the same ULID→rel class as the v0.18.1 filing bug).
+    // (the maintainer, 2026-07-09; the same ULID→rel class as the v0.18.1 filing bug).
     // resolve_note_rel passes real file paths through and maps ids via the index.
     let abs = state.route(&root, |s| {
         let resolved = s.resolve_note_rel(&rel)?;
@@ -8047,7 +8324,7 @@ pub fn corpus_move(
 
 /// Rename a board (`.excalidraw`) within its folder. Boards are path-id'd and
 /// carry no note index, so the returned meta has the NEW id — the caller swaps
-/// the open tab's `boardId` to it (Seth, 2026-06-26).
+/// the open tab's `boardId` to it (the maintainer, 2026-06-26).
 #[tauri::command]
 pub fn corpus_rename_board(
     state: tauri::State<'_, CorpusState>,
@@ -8184,7 +8461,7 @@ pub fn corpus_overview(state: tauri::State<'_, CorpusState>) -> Result<CorpusOve
 /// user's look and — crucially — the `onboarded` flag live in settings.json /
 /// viewstate.json, which we keep reading from and writing to the
 /// REAL corpus's `.rotli/` so a demo never forces re-onboarding or resets the theme
-/// (Seth, 2026-07-07). `main.json` is per-MEMEX (it travels with the notes), so it
+/// (the maintainer, 2026-07-07). `main.json` is per-MEMEX (it travels with the notes), so it
 /// is deliberately NOT redirected — it still routes to the active (demo) store.
 fn demo_machine_dot_path(app: &tauri::AppHandle, file: &str) -> Option<PathBuf> {
     if !demo_active(app) {
@@ -8299,7 +8576,7 @@ pub fn corpus_main_read(
 
 /// Write `.rotli/main.json` (the user's durable Main arrangement) AND ensure the
 /// corpus `.gitignore` commits it — separate from settings/viewstate, which stay
-/// per-machine (Seth, 2026-07-01). A stale full-manifest replacement is refused.
+/// per-machine (the maintainer, 2026-07-01). A stale full-manifest replacement is refused.
 #[tauri::command]
 pub fn corpus_main_write(
     state: tauri::State<'_, CorpusState>,
@@ -8442,7 +8719,39 @@ mod tests {
     }
 
     #[test]
-    fn dev_source_promotes_the_production_active_memex_to_the_single_root() {
+    fn development_source_preserves_an_explicit_multi_vault_config() {
+        let tmp = TempDir::new().unwrap();
+        let notes = tmp.path().join("notes");
+        let brain = tmp.path().join("memex-vault");
+        fs::create_dir_all(&notes).unwrap();
+        seed_memex(&brain);
+        let cfg = CorpusConfig {
+            version: 1,
+            corpus: CorpusRef {
+                abs_path: notes.clone(),
+                adopted: false,
+            },
+            brains: vec![ConnectedBrain {
+                id: "vault".into(),
+                label: "Vault".into(),
+                abs_path: brain.clone(),
+                memex_id: Some("mx_test123".into()),
+                mode: Some("secure".into()),
+                perms: crate::memex::MemexPerms::ChatsInbox,
+            }],
+            folders: Vec::new(),
+            active_brain_id: Some("vault".into()),
+        };
+
+        let dev = development_source_config(Some(cfg), None).unwrap();
+        assert_eq!(dev.corpus.abs_path, notes);
+        assert_eq!(dev.brains.len(), 1);
+        assert_eq!(dev.brains[0].abs_path, brain);
+        assert_eq!(dev.active_brain_id.as_deref(), Some("vault"));
+    }
+
+    #[test]
+    fn development_source_promotes_only_the_production_fallback_to_one_root() {
         let tmp = TempDir::new().unwrap();
         let notes = tmp.path().join("notes");
         let brain = tmp.path().join("memex-vault");
@@ -8466,14 +8775,120 @@ mod tests {
             active_brain_id: Some("vault".into()),
         };
 
-        let dev = dev_primary_from_config(cfg).unwrap();
+        let dev = development_source_config(None, Some(cfg)).unwrap();
         assert_eq!(dev.corpus.abs_path, brain);
         assert!(dev.brains.is_empty());
         assert!(dev.folders.is_empty());
         assert!(dev.active_brain_id.is_none());
     }
 
-    /// The load-bearing migration: Seth's live shape (plain `~/Documents/rotli`
+    #[test]
+    fn switching_vaults_keeps_the_outgoing_vault_connected() {
+        let tmp = TempDir::new().unwrap();
+        let outgoing = tmp.path().join("personal");
+        let target = tmp.path().join("work");
+        seed_memex(&outgoing);
+        seed_memex(&target);
+        let cfg = CorpusConfig {
+            version: 1,
+            corpus: CorpusRef {
+                abs_path: outgoing.clone(),
+                adopted: false,
+            },
+            brains: vec![ConnectedBrain {
+                id: "work".into(),
+                label: "Work".into(),
+                abs_path: target.clone(),
+                memex_id: Some("mx_test123".into()),
+                mode: Some("open".into()),
+                perms: crate::memex::MemexPerms::ChatsInbox,
+            }],
+            folders: Vec::new(),
+            active_brain_id: Some("work".into()),
+        };
+
+        let switched = switch_corpus_config(cfg, target.clone(), false).unwrap();
+        assert_eq!(switched.corpus.abs_path, target);
+        assert_eq!(switched.brains.len(), 1);
+        assert_eq!(switched.brains[0].abs_path, outgoing);
+        assert_eq!(switched.brains[0].label, "personal");
+    }
+
+    #[test]
+    fn switching_away_from_a_deleted_vault_keeps_other_valid_connections() {
+        let tmp = TempDir::new().unwrap();
+        let missing = tmp.path().join("deleted-in-finder");
+        let target = tmp.path().join("work");
+        let other = tmp.path().join("archive");
+        seed_memex(&target);
+        seed_memex(&other);
+        let brain = |id: &str, path: PathBuf| ConnectedBrain {
+            id: id.into(),
+            label: id.into(),
+            abs_path: path,
+            memex_id: Some(format!("mx_{id}")),
+            mode: Some("open".into()),
+            perms: crate::memex::MemexPerms::ChatsInbox,
+        };
+        let cfg = CorpusConfig {
+            version: 1,
+            corpus: CorpusRef {
+                abs_path: missing.clone(),
+                adopted: false,
+            },
+            brains: vec![
+                brain("work", target.clone()),
+                brain("archive", other.clone()),
+            ],
+            folders: Vec::new(),
+            active_brain_id: None,
+        };
+
+        let switched = switch_corpus_config(cfg, target.clone(), false).unwrap();
+
+        assert_eq!(switched.corpus.abs_path, target);
+        assert_eq!(switched.brains.len(), 1);
+        assert_eq!(switched.brains[0].abs_path, other);
+        assert!(switched
+            .brains
+            .iter()
+            .all(|connected| connected.abs_path != missing));
+    }
+
+    #[test]
+    fn connected_vault_switch_target_resolves_only_registered_ids() {
+        let target = PathBuf::from("/tmp/work-vault");
+        let cfg = CorpusConfig {
+            version: 1,
+            corpus: CorpusRef {
+                abs_path: PathBuf::from("/tmp/personal-vault"),
+                adopted: false,
+            },
+            brains: vec![ConnectedBrain {
+                id: "work".into(),
+                label: "Work".into(),
+                abs_path: target.clone(),
+                memex_id: Some("mx_work".into()),
+                mode: Some("open".into()),
+                perms: crate::memex::MemexPerms::ChatsInbox,
+            }],
+            folders: Vec::new(),
+            active_brain_id: Some("work".into()),
+        };
+
+        assert_eq!(
+            connected_vault_switch_target(&cfg, "work")
+                .unwrap()
+                .abs_path,
+            target
+        );
+        assert_eq!(
+            connected_vault_switch_target(&cfg, "missing").unwrap_err(),
+            "no such connected vault"
+        );
+    }
+
+    /// The load-bearing migration: the maintainer's live shape (plain `~/Documents/rotli`
     /// corpus + `~/memex-vault` registered BOTH as the `vault` corpus root AND as
     /// the active memex instance) collapses to one corpus + ONE deduped brain that
     /// keeps the `vault` id, carries `chats+inbox`, and stays active.
@@ -8595,7 +9010,7 @@ mod tests {
     #[test]
     fn import_file_slugifies_spaced_names() {
         // a macOS screenshot name (spaces + dots) must become a storage:-safe
-        // slug so the ref passes the memex asset regex (Seth, 2026-07-03).
+        // slug so the ref passes the memex asset regex (the maintainer, 2026-07-03).
         let (dir, store) = bare();
         let src = dir.path().join("Screenshot 2026-07-03 at 8.59.00 AM.png");
         fs::write(&src, b"png").unwrap();
@@ -8711,7 +9126,7 @@ mod tests {
 
     #[test]
     fn storage_sheets_are_editable_in_place() {
-        // the sanctioned exception (Seth, 2026-07-08): an EXISTING .xlsx/.csv in the
+        // the sanctioned exception (the maintainer, 2026-07-08): an EXISTING .xlsx/.csv in the
         // memex storage/ can be overwritten in place — but nothing else in storage.
         let dir = TempDir::new().unwrap();
         let root = dir.path().join("brain");
@@ -9030,15 +9445,15 @@ mod tests {
     fn raw_frontmatter_round_trips_verbatim() {
         // hand-formatted lines (odd spacing, nested yaml, a comment) survive a
         // read → write of the SAME block byte-for-byte — nothing reformats
-        let text = "---\nid:  01RAW0000000000000000000A\ncreated: 2026-06-12T10:00:00Z\nowner: seth\ntags: [a,  b]\nmeta:\n  source: web\n# a comment\n---\n\n# A note\n\nBody stays byte-exact.\n";
+        let text = "---\nid:  01RAW0000000000000000000A\ncreated: 2026-06-12T10:00:00Z\nowner: fixture\ntags: [a,  b]\nmeta:\n  source: web\n# a comment\n---\n\n# A note\n\nBody stays byte-exact.\n";
         let block = raw_frontmatter_block(text);
-        assert_eq!(block, "---\nid:  01RAW0000000000000000000A\ncreated: 2026-06-12T10:00:00Z\nowner: seth\ntags: [a,  b]\nmeta:\n  source: web\n# a comment\n---\n");
+        assert_eq!(block, "---\nid:  01RAW0000000000000000000A\ncreated: 2026-06-12T10:00:00Z\nowner: fixture\ntags: [a,  b]\nmeta:\n  source: web\n# a comment\n---\n");
         assert_eq!(merge_raw_frontmatter(text, block).unwrap(), text);
         // no frontmatter → empty block; an empty submission leaves the file alone
         assert_eq!(raw_frontmatter_block("# Bare\n"), "");
         assert_eq!(merge_raw_frontmatter("# Bare\n", "").unwrap(), "# Bare\n");
         // a trailing-newline / bare (fence-less) submission lands identically
-        let bare = "id:  01RAW0000000000000000000A\ncreated: 2026-06-12T10:00:00Z\nowner: seth\ntags: [a,  b]\nmeta:\n  source: web\n# a comment";
+        let bare = "id:  01RAW0000000000000000000A\ncreated: 2026-06-12T10:00:00Z\nowner: fixture\ntags: [a,  b]\nmeta:\n  source: web\n# a comment";
         assert_eq!(merge_raw_frontmatter(text, bare).unwrap(), text);
     }
 
@@ -9047,7 +9462,7 @@ mod tests {
         let text = "---\nid: 01RAW0000000000000000000B\ncreated: 2026-06-12T10:00:00Z\nupdated: 2026-06-12T11:00:00Z\npinned: false\nowner: breve\nview_tag: OpenSource\nshelf: Inbox\n---\n\nBody.\n";
         // the user retypes the id, drops created + owner, flips pinned, adds
         // locked/secure/tags — provenance comes back, everything else as typed
-        let submitted = "---\nid: HACKED\npinned: true\nlocked: true\nsecure: true\nview_tag: Myela\ntags: [x]\nshelf: Projects\n---\n";
+        let submitted = "---\nid: HACKED\npinned: true\nlocked: true\nsecure: true\nview_tag: Northstar\ntags: [x]\nshelf: Projects\n---\n";
         let out = merge_raw_frontmatter(text, submitted).unwrap();
         let (fm, body) = parse_document(&out);
         let fm = fm.unwrap();
@@ -9066,7 +9481,7 @@ mod tests {
             out.contains("owner: breve"),
             "dropped owner restored:\n{out}"
         );
-        assert!(out.contains("view_tag: OpenSource") && !out.contains("view_tag: Myela"));
+        assert!(out.contains("view_tag: OpenSource") && !out.contains("view_tag: Northstar"));
         assert_eq!(fm.pinned, Some(true), "pinned lands as typed");
         assert!(out.contains("locked: true") && out.contains("secure: true"));
         assert!(out.contains("shelf: Projects") && !out.contains("shelf: Inbox"));
@@ -9367,7 +9782,7 @@ mod tests {
     fn legacy_id_tailed_filename_is_a_human_alias_without_rewriting_the_file() {
         let (_dir, mut store) = bare();
         fs::create_dir_all(store.root().join("Notes")).unwrap();
-        let rel = "Notes/myela-stage-plan-abc123.md";
+        let rel = "Notes/northstar-stage-plan-abc123.md";
         fs::write(
             store.root().join(rel),
             "---\nid: 01LEGACYABC123\ncreated: 2026-07-01\nupdated: 2026-07-01\npinned: false\n---\n\n# The 3-stage infrastructure plan\n",
@@ -9381,13 +9796,19 @@ mod tests {
             .into_iter()
             .find(|note| note.id == "01LEGACYABC123")
             .unwrap();
-        assert!(note.aliases.iter().any(|alias| alias == "myela-stage-plan"));
+        assert!(note
+            .aliases
+            .iter()
+            .any(|alias| alias == "northstar-stage-plan"));
         assert!(note
             .aliases
             .iter()
             .any(|alias| alias == "the-3-stage-infrastructure-plan"));
         assert_eq!(
-            store.search("myela-stage-plan", 10, false).unwrap().len(),
+            store
+                .search("northstar-stage-plan", 10, false)
+                .unwrap()
+                .len(),
             1
         );
         assert!(
@@ -9400,7 +9821,7 @@ mod tests {
     fn deliberate_legacy_filename_repair_keeps_the_exact_old_stem() {
         let (_dir, mut store) = bare();
         fs::create_dir_all(store.root().join("Notes")).unwrap();
-        let rel = "Notes/myela-stage-plan-abc123.md";
+        let rel = "Notes/northstar-stage-plan-abc123.md";
         fs::write(
             store.root().join(rel),
             "---\nid: 01LEGACYABC123\ncreated: 2026-07-01\nupdated: 2026-07-01\npinned: false\naliases: [kept]\n---\n\n# The 3-stage infrastructure plan\n",
@@ -9421,9 +9842,9 @@ mod tests {
         assert!(repaired.is_file());
         assert!(!store.root().join(rel).exists());
         let text = fs::read_to_string(repaired).unwrap();
-        assert!(
-            text.contains("aliases: [\"kept\",\"myela-stage-plan-abc123\",\"myela-stage-plan\"]")
-        );
+        assert!(text.contains(
+            "aliases: [\"kept\",\"northstar-stage-plan-abc123\",\"northstar-stage-plan\"]"
+        ));
         assert!(!text.contains("\"The 3-stage infrastructure plan\""));
     }
 
@@ -10322,10 +10743,10 @@ mod tests {
         assert!(store.create(".rotli", "# nope\n").is_err());
         assert!(store.create_folder("..", None).is_err());
         assert!(store.create_folder("ok", Some("../up")).is_err());
-        let f = store.create_folder("Myela", Some("Work")).unwrap();
-        assert_eq!(f.id, "Work/Myela");
+        let f = store.create_folder("Northstar", Some("Work")).unwrap();
+        assert_eq!(f.id, "Work/Northstar");
         assert_eq!(f.parent_id.as_deref(), Some("Work"));
-        assert!(store.root().join("Work/Myela").is_dir());
+        assert!(store.root().join("Work/Northstar").is_dir());
     }
 
     // ── watcher ──
@@ -10574,7 +10995,7 @@ mod tests {
         // the METADATA PANEL's commands take the ULID too (the same bridge):
         // before this, corpus_frontmatter → read_frontmatter("<ULID>") was a raw
         // fs read of "<root>/<ULID>" — the panel's "No such file or directory"
-        // (Seth's screenshot, 2026-07-01).
+        // (the maintainer's screenshot, 2026-07-01).
         let fm = store.read_frontmatter(&note.id).unwrap();
         assert_eq!(fm.id, note.id);
         store.set_locked(&note.id, true).unwrap();
@@ -11948,8 +12369,8 @@ mod tests {
         };
         assert_eq!(shelf_of(&fm("shelf: [Inbox]")), vec!["Inbox"]);
         assert_eq!(
-            shelf_of(&fm("shelf: [Myela/Payments, Work]")),
-            vec!["Myela/Payments", "Work"]
+            shelf_of(&fm("shelf: [Northstar/Payments, Work]")),
+            vec!["Northstar/Payments", "Work"]
         );
         assert_eq!(shelf_of(&fm("shelf: Inbox")), vec!["Inbox"]); // bare (no brackets)
         assert_eq!(shelf_of(&fm("shelf: []")), Vec::<String>::new());
@@ -11971,7 +12392,7 @@ mod tests {
         // a note filed to a nested shelf (the LLM's eventual home)
         fs::write(
             root.join("wiki/_inbox/q3-cc22dd.md"),
-            "---\nid: 01DEF\nshelf: [Myela/Payments]\nreach: [seth]\n---\n# Q3\n\nbody\n",
+            "---\nid: 01DEF\nshelf: [Northstar/Payments]\nreach: [seth]\n---\n# Q3\n\nbody\n",
         )
         .unwrap();
         // Filing preserves the user's shelf. The wire therefore needs BOTH the
@@ -11999,7 +12420,7 @@ mod tests {
         // staging notes are PROJECTED onto their shelf, not wiki/_inbox. The default
         // "Inbox" shelf routes to the Captures surface ("Board"); a real shelf stays.
         assert_eq!(folder_of_note("Pricing"), "Board");
-        assert_eq!(folder_of_note("Q3"), "Myela/Payments");
+        assert_eq!(folder_of_note("Q3"), "Northstar/Payments");
         assert_eq!(folder_of_note("Cross-project tasks"), "Board");
         // the shelf-less curated note falls back to its disk folder
         assert_eq!(folder_of_note("A wiki note"), "wiki");
@@ -12020,8 +12441,8 @@ mod tests {
         // the shelf folders (+ the nested ancestor) were synthesized — the default
         // "Inbox" shelf lands on "Board" (Captures), a real shelf keeps its path
         assert!(has("Board"));
-        assert!(has("Myela"), "the nested shelf's ancestor must exist");
-        assert!(has("Myela/Payments"));
+        assert!(has("Northstar"), "the nested shelf's ancestor must exist");
+        assert!(has("Northstar/Payments"));
         let parent_of = |id: &str| {
             list.folders
                 .iter()
@@ -12030,8 +12451,11 @@ mod tests {
                 .parent_id
                 .clone()
         };
-        assert_eq!(parent_of("Myela/Payments"), Some("Myela".to_string()));
-        assert_eq!(parent_of("Myela"), None);
+        assert_eq!(
+            parent_of("Northstar/Payments"),
+            Some("Northstar".to_string())
+        );
+        assert_eq!(parent_of("Northstar"), None);
         // the wiki/_inbox staging dir is NOT surfaced as a browsable folder
         assert!(!has("wiki/_inbox"));
         // the real wiki folder still exists (curated notes live there)
@@ -12047,6 +12471,11 @@ mod tests {
         assert_eq!(surfaced(m, "self/x.md"), Surface::Hidden);
         assert_eq!(surfaced(m, "clients/x.md"), Surface::Hidden);
         assert_eq!(surfaced(m, "scripts/organize.ts"), Surface::Hidden);
+        assert_eq!(
+            surfaced(m, crate::memex::WELCOME_PRESET_FILE),
+            Surface::NoteRW
+        );
+        assert_eq!(surfaced(m, "Another root note.md"), Surface::Hidden);
         // REFERENCE (2026-08-01): out of the Notes tree, reachable by the AI
         assert_eq!(surfaced(m, "inbox.md"), Surface::Reference);
         assert_eq!(surfaced(m, "MAP.md"), Surface::Reference);
@@ -12093,7 +12522,7 @@ mod tests {
         fs::create_dir_all(root.join("personality")).unwrap();
         fs::write(
             root.join("identity/00-identity.md"),
-            "# Identity\n\nSeth is a quokkanaut.\n",
+            "# Identity\n\nthe maintainer is a quokkanaut.\n",
         )
         .unwrap();
         fs::write(
@@ -12207,7 +12636,7 @@ mod tests {
         assert!(store.writable("trash/storage/file.pdf").is_ok());
     }
 
-    /// Seth, 2026-08-04: "⚠ Couldn't delete this note — note not found:
+    /// the maintainer, 2026-08-04: "⚠ Couldn't delete this note — note not found:
     /// storage/excalidraw/untitled-2.excalidraw … I don't understand why I
     /// can't delete something that is showing in my view."
     ///
@@ -12264,7 +12693,7 @@ mod tests {
 
         // ⌘⇧N from a non-writable folder (e.g. the hidden self/) no longer FAILS —
         // it lands the board in the storage/excalidraw board lane so a board always
-        // saves (Seth, 2026-07-07). write_board takes an explicit path with no such
+        // saves (the maintainer, 2026-07-07). write_board takes an explicit path with no such
         // redirect, so a hidden root is still refused outright.
         let staged = store.create_named_board("self", "untitled", None).unwrap();
         assert_eq!(staged.kind, NoteKind::Board);
@@ -12310,7 +12739,8 @@ mod tests {
                 "memex open must not scaffold the reserved folder {name}"
             );
         }
-        // and no welcome note seeded into the brain
+        // Opening an existing memex never invents a welcome note. Only the
+        // explicit fresh-vault scaffold owns that preset.
         let list = store.list().unwrap();
         assert!(
             list.notes.iter().all(|n| n.title != "Welcome to rotli"),
@@ -12361,6 +12791,32 @@ mod tests {
             folders_of.iter().all(|f| *f == "wiki" || *f == "chats"),
             "a note outside wiki/+chats/ surfaced: {folders_of:?}"
         );
+    }
+
+    #[test]
+    fn scaffolded_welcome_is_an_editable_root_note_with_normal_trash_lifecycle() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("vault");
+        crate::memex::scaffold_memex(&root).unwrap();
+        let mut store = CorpusStore::open(root.clone()).unwrap();
+        store.os_trash = false;
+
+        let id = store.wire_id_of(crate::memex::WELCOME_PRESET_FILE).unwrap();
+        let initial = store.read(&id).unwrap();
+        assert_eq!(initial.folder_id, "");
+        assert_eq!(initial.disk_folder_id, "");
+
+        store
+            .write(&id, "# My first Rotli note\n\nI changed the welcome.")
+            .unwrap();
+        assert!(root.join(crate::memex::WELCOME_PRESET_FILE).is_file());
+        assert!(!root.join("my-first-rotli-note.md").exists());
+
+        let trashed = store.move_note(&id, "Trash").unwrap();
+        assert_eq!(trashed.folder_id, "Trash");
+        assert_eq!(trashed.origin.as_deref(), Some(""));
+        assert!(!root.join(crate::memex::WELCOME_PRESET_FILE).exists());
+        assert!(root.join(&store.path_of(&id).unwrap()).is_file());
     }
 
     #[test]
@@ -12533,35 +12989,10 @@ mod tests {
         assert_eq!(note.folder_id, "Brain");
     }
 
-    /// Mirror of `corpus_list`'s aggregation, run directly against a registry so
-    /// the routing/prefixing layer is unit-testable without a Tauri State. Keep
-    /// in lockstep with `corpus_list`.
-    fn aggregate(reg: &mut CorpusRegistry) -> CorpusList {
-        let mut ids: Vec<String> = reg.stores.keys().cloned().collect();
-        ids.sort();
-        if let Some(pos) = ids.iter().position(|i| *i == reg.default_id) {
-            let d = ids.remove(pos);
-            ids.insert(0, d);
-        }
-        let mut folders: Vec<FolderMeta> = Vec::new();
-        let mut notes: Vec<NoteMeta> = Vec::new();
-        for id in ids {
-            let store = reg.stores.get_mut(&id).unwrap();
-            let list = store.list().unwrap();
-            for mut f in list.folders {
-                f.parent_id = f.parent_id.map(|p| compose_root_id(&id, &p));
-                f.id = compose_root_id(&id, &f.id);
-                folders.push(f);
-            }
-            for mut n in list.notes {
-                n = prefix_meta(&id, n);
-                if id != reg.default_id && n.kind == NoteKind::Note {
-                    n.id = compose_root_id(&id, &n.id);
-                }
-                notes.push(n);
-            }
-        }
-        CorpusList { folders, notes }
+    /// Mirror of `corpus_list`'s active-vault scope without Tauri State.
+    fn list_active(reg: &mut CorpusRegistry) -> CorpusList {
+        let default_id = reg.default_id.clone();
+        reg.stores.get_mut(&default_id).unwrap().list().unwrap()
     }
 
     #[test]
@@ -12572,7 +13003,7 @@ mod tests {
         store.create("Inbox/Work", "# A routed note\n").unwrap();
         let mut reg = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
         reg.insert(DEFAULT_ROOT_ID.to_string(), store).unwrap();
-        let list = aggregate(&mut reg);
+        let list = list_active(&mut reg);
         for f in &list.folders {
             assert!(
                 !f.id.contains(':'),
@@ -12619,10 +13050,207 @@ mod tests {
     }
 
     #[test]
-    fn vault_root_prefixes_ids_and_scopes_to_wiki_and_chats() {
-        // Invariants 1+2+3 at the routing layer: a memex "vault" root added beside
-        // the default emits "vault:"-prefixed ids, surfaces ONLY wiki/ + chats/,
-        // and never pollutes the default root's bare ids.
+    fn activating_a_registered_vault_swaps_the_default_route_without_a_restart() {
+        let (_outgoing_dir, outgoing) = fresh();
+        let (_incoming_dir, incoming) = fresh();
+        let incoming_path = incoming.root().to_path_buf();
+        let outgoing_path = outgoing.root().to_path_buf();
+        let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+        registry
+            .insert(DEFAULT_ROOT_ID.to_string(), outgoing)
+            .unwrap();
+        registry.insert("work".into(), incoming).unwrap();
+        let state = CorpusState(Mutex::new(registry));
+
+        state
+            .activate_registered_root("work", || Ok(Some("personal".into())))
+            .unwrap();
+
+        assert_eq!(state.default_root_path().unwrap(), incoming_path);
+        let registry = state.0.lock().unwrap();
+        assert_eq!(
+            registry.stores.get("personal").unwrap().root(),
+            outgoing_path
+        );
+        assert!(!registry.stores.contains_key("work"));
+    }
+
+    #[test]
+    fn activating_a_registered_vault_can_detach_a_plain_outgoing_folder() {
+        let (_outgoing_dir, outgoing) = fresh();
+        let (_incoming_dir, incoming) = fresh();
+        let incoming_path = incoming.root().to_path_buf();
+        let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+        registry
+            .insert(DEFAULT_ROOT_ID.to_string(), outgoing)
+            .unwrap();
+        registry.insert("work".into(), incoming).unwrap();
+        let state = CorpusState(Mutex::new(registry));
+
+        state.activate_registered_root("work", || Ok(None)).unwrap();
+
+        assert_eq!(state.default_root_path().unwrap(), incoming_path);
+        let registry = state.0.lock().unwrap();
+        assert_eq!(registry.stores.len(), 1);
+        assert!(!registry.stores.contains_key("work"));
+    }
+
+    #[test]
+    fn a_failed_live_switch_persistence_leaves_routes_untouched() {
+        let (_outgoing_dir, outgoing) = fresh();
+        let (_incoming_dir, incoming) = fresh();
+        let outgoing_path = outgoing.root().to_path_buf();
+        let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+        registry
+            .insert(DEFAULT_ROOT_ID.to_string(), outgoing)
+            .unwrap();
+        registry.insert("work".into(), incoming).unwrap();
+        let state = CorpusState(Mutex::new(registry));
+
+        let error = state
+            .activate_registered_root("work", || Err("config write failed".into()))
+            .unwrap_err();
+
+        assert_eq!(error, "config write failed");
+        assert_eq!(state.default_root_path().unwrap(), outgoing_path);
+        assert!(state.contains_root("work").unwrap());
+    }
+
+    #[test]
+    fn activating_a_new_vault_populates_an_empty_first_run_registry() {
+        let (_incoming_dir, incoming) = fresh();
+        let incoming_path = incoming.root().to_path_buf();
+        let state = CorpusState(Mutex::new(CorpusRegistry::new(DEFAULT_ROOT_ID.to_string())));
+
+        state.activate_new_root(incoming, || Ok(None)).unwrap();
+
+        assert_eq!(state.default_root_path().unwrap(), incoming_path);
+        assert_eq!(state.0.lock().unwrap().stores.len(), 1);
+    }
+
+    #[test]
+    fn a_failed_new_vault_persistence_does_not_change_the_live_registry() {
+        let (_outgoing_dir, outgoing) = fresh();
+        let (_incoming_dir, incoming) = fresh();
+        let outgoing_path = outgoing.root().to_path_buf();
+        let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+        registry
+            .insert(DEFAULT_ROOT_ID.to_string(), outgoing)
+            .unwrap();
+        let state = CorpusState(Mutex::new(registry));
+
+        let error = state
+            .activate_new_root(incoming, || Err("config write failed".into()))
+            .unwrap_err();
+
+        assert_eq!(error, "config write failed");
+        assert_eq!(state.default_root_path().unwrap(), outgoing_path);
+        assert_eq!(state.0.lock().unwrap().stores.len(), 1);
+    }
+
+    #[test]
+    fn removing_a_connected_vault_drops_only_its_live_route() {
+        let (_active_dir, active) = fresh();
+        let (_connected_dir, connected) = fresh();
+        let connected_path = connected.root().to_path_buf();
+        let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+        registry
+            .insert(DEFAULT_ROOT_ID.to_string(), active)
+            .unwrap();
+        registry.insert("work".into(), connected).unwrap();
+        let state = CorpusState(Mutex::new(registry));
+
+        let removed = state.remove_registered_root("work", || Ok(())).unwrap();
+
+        assert_eq!(removed, connected_path);
+        assert!(!state.contains_root("work").unwrap());
+        assert!(
+            connected_path.is_dir(),
+            "disconnecting must never delete files"
+        );
+        assert!(state.contains_root(DEFAULT_ROOT_ID).unwrap());
+    }
+
+    #[test]
+    fn failed_connected_vault_removal_keeps_the_live_route() {
+        let (_active_dir, active) = fresh();
+        let (_connected_dir, connected) = fresh();
+        let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+        registry
+            .insert(DEFAULT_ROOT_ID.to_string(), active)
+            .unwrap();
+        registry.insert("work".into(), connected).unwrap();
+        let state = CorpusState(Mutex::new(registry));
+
+        let error = state
+            .remove_registered_root("work", || Err("config write failed".into()))
+            .unwrap_err();
+
+        assert_eq!(error, "config write failed");
+        assert!(state.contains_root("work").unwrap());
+    }
+
+    #[test]
+    fn refreshing_the_active_vault_replaces_only_the_default_store() {
+        let (_active_dir, active) = fresh();
+        let active_path = active.root().to_path_buf();
+        let (_connected_dir, connected) = fresh();
+        let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+        registry
+            .insert(DEFAULT_ROOT_ID.to_string(), active)
+            .unwrap();
+        registry.insert("work".into(), connected).unwrap();
+        let state = CorpusState(Mutex::new(registry));
+        let reopened = CorpusStore::open(active_path.clone()).unwrap();
+
+        state.refresh_root(DEFAULT_ROOT_ID, reopened).unwrap();
+
+        assert_eq!(state.default_root_path().unwrap(), active_path);
+        assert!(state.contains_root("work").unwrap());
+    }
+
+    #[test]
+    fn refreshing_refuses_a_different_folder() {
+        let (_active_dir, active) = fresh();
+        let active_path = active.root().to_path_buf();
+        let (_other_dir, other) = fresh();
+        let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+        registry
+            .insert(DEFAULT_ROOT_ID.to_string(), active)
+            .unwrap();
+        let state = CorpusState(Mutex::new(registry));
+
+        assert_eq!(
+            state.refresh_root(DEFAULT_ROOT_ID, other).unwrap_err(),
+            "the refreshed vault does not match the selected vault"
+        );
+        assert_eq!(state.default_root_path().unwrap(), active_path);
+    }
+
+    #[test]
+    fn refreshing_a_connected_vault_keeps_the_active_route_untouched() {
+        let (_active_dir, active) = fresh();
+        let active_path = active.root().to_path_buf();
+        let (_connected_dir, connected) = fresh();
+        let connected_path = connected.root().to_path_buf();
+        let mut registry = CorpusRegistry::new(DEFAULT_ROOT_ID.to_string());
+        registry
+            .insert(DEFAULT_ROOT_ID.to_string(), active)
+            .unwrap();
+        registry.insert("work".into(), connected).unwrap();
+        let state = CorpusState(Mutex::new(registry));
+
+        let reopened = CorpusStore::open(connected_path).unwrap();
+        state.refresh_root("work", reopened).unwrap();
+
+        assert_eq!(state.default_root_path().unwrap(), active_path);
+        assert!(state.contains_root("work").unwrap());
+    }
+
+    #[test]
+    fn connected_vault_stays_out_of_the_active_listing() {
+        // A connected vault is a future switch target, not a simultaneous data
+        // source. Its files never enter the current System counts or searches.
         let (_ddir, default_store) = fresh();
         let vdir = TempDir::new().unwrap();
         let vroot = vdir.path().join("brain");
@@ -12635,58 +13263,18 @@ mod tests {
         reg.insert(DEFAULT_ROOT_ID.to_string(), default_store)
             .unwrap();
         reg.insert("vault".to_string(), vault_store).unwrap();
-        let list = aggregate(&mut reg);
+        let list = list_active(&mut reg);
 
-        // default ids stay bare; vault ids are prefixed
-        let default_folders: Vec<&str> = list
-            .folders
-            .iter()
-            .filter(|f| !f.id.contains(':'))
-            .map(|f| f.id.as_str())
-            .collect();
+        let default_folders: Vec<&str> = list.folders.iter().map(|f| f.id.as_str()).collect();
         assert!(
             default_folders.contains(&"Inbox"),
             "default Inbox stays bare"
         );
-        let vault_folders: Vec<&str> = list
-            .folders
-            .iter()
-            .filter(|f| f.id.starts_with("vault:"))
-            .map(|f| f.id.as_str())
-            .collect();
         assert!(
-            vault_folders.contains(&"vault:wiki"),
-            "wiki/ surfaces, prefixed"
+            list.folders.iter().all(|folder| !folder.id.contains(':')),
+            "connected vault folders must stay hidden"
         );
-        assert!(
-            vault_folders.contains(&"vault:chats"),
-            "chats/ surfaces, prefixed"
-        );
-        // the brain's memory never surfaces, even prefixed
-        assert!(
-            !list
-                .folders
-                .iter()
-                .any(|f| f.id.starts_with("vault:self") || f.id.starts_with("vault:history")),
-            "self/ + history/ must never surface from the vault"
-        );
-        // every vault note lives under wiki/ or chats/ and its folder_id is prefixed
-        for n in list
-            .notes
-            .iter()
-            .filter(|n| n.folder_id.starts_with("vault:"))
-        {
-            assert!(
-                n.disk_folder_id.starts_with("vault:"),
-                "vault disk folder must be prefixed: {}",
-                n.disk_folder_id
-            );
-            assert!(
-                n.folder_id == "vault:wiki" || n.folder_id == "vault:chats",
-                "vault note outside wiki/+chats/: {}",
-                n.folder_id
-            );
-        }
+        assert!(list.notes.iter().all(|note| !note.id.starts_with("vault:")));
         // the memex root was never scaffolded with local reserved rows
         for name in ["Inbox", "Vault", "Storage", "Board"] {
             assert!(
@@ -12756,6 +13344,24 @@ mod tests {
         let default_root = dir.path().join("Documents/rotli");
         fs::create_dir_all(config_dir).unwrap();
         assert!(!configured_at(&config, config_dir, &default_root));
+
+        fs::write(
+            &config,
+            serde_json::json!({
+                "version": 1,
+                "corpus": {
+                    "absPath": dir.path().join("moved-away-vault"),
+                    "adopted": false
+                }
+            })
+            .to_string(),
+        )
+        .unwrap();
+        assert!(
+            !configured_at(&config, config_dir, &default_root),
+            "a stale absolute path must return to vault activation"
+        );
+        fs::remove_file(&config).unwrap();
 
         fs::write(config_dir.join("corpus-root.txt"), "/old/notes").unwrap();
         assert!(configured_at(&config, config_dir, &default_root));

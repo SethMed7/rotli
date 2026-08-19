@@ -1,6 +1,6 @@
 # rotli imagery manifest — brand-world assets (Stage 1.5, pre-freeze)
 
-**Register (Seth's direction, 2026-06-11):** NOT photoreal. Illustrated world-building — quokka
+**Register (the maintainer's direction, 2026-06-11):** NOT photoreal. Illustrated world-building — quokka
 characters, environments, textural details — "things that can be used to take this to life."
 Engine: `agy` (Nano Banana Pro) — the imagegen skill's illustration/stylized engine.
 
@@ -42,5 +42,5 @@ Linen #F8F2E9 · Olive Moss #8D9A76 (dark ground #241D18).
 ## Gate
 
 `cohesion.html` — sections composing imagery + patterns + textures + motion + live kit SVGs + real
-fonts; one section code-only. Per-asset keep/kill by Seth. On approval → kit `imagery/` + `pattern/` +
+fonts; one section code-only. Per-asset keep/kill by the maintainer. On approval → kit `imagery/` + `pattern/` +
 `css/`, board.html gains a world section, THEN `kit.json` freeze.

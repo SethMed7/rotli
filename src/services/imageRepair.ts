@@ -1,4 +1,4 @@
-// Self-repair for image links (Seth, 2026-07-30): "when an image gets moved,
+// Self-repair for image links (the maintainer, 2026-07-30): "when an image gets moved,
 // wherever it is attached should also get fixed rather than not found." A src
 // that no longer resolves is classified against the corpus file listing:
 //

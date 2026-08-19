@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
-import { conversationPrompts, promptMenuOffset, promptPreview } from "./chatPromptNavigatorModel";
+import {
+  conversationPrompts,
+  promptMenuOffset,
+  promptNavigatorTransition,
+  promptPreview,
+  promptStateClassName,
+} from "./chatPromptNavigatorModel";
 
 describe("conversation prompt navigation", () => {
   test("uses only user turns and keeps their real message indexes", () => {
@@ -22,6 +28,22 @@ describe("conversation prompt navigation", () => {
 
   test("an image-only turn still has a useful landmark", () => {
     expect(promptPreview("  ")).toBe("Image prompt");
+  });
+
+  test("hovering markers previews each matching prompt without replacing the active prompt", () => {
+    const firstPreview = promptNavigatorTransition(
+      { open: false, previewMessageIndex: null },
+      { type: "preview", messageIndex: 2 },
+    );
+    const nextPreview = promptNavigatorTransition(firstPreview, {
+      type: "preview",
+      messageIndex: 6,
+    });
+
+    expect(firstPreview).toEqual({ open: true, previewMessageIndex: 2 });
+    expect(nextPreview).toEqual({ open: true, previewMessageIndex: 6 });
+    expect(promptStateClassName(4, 4, nextPreview.previewMessageIndex)).toBe("active");
+    expect(promptStateClassName(6, 4, nextPreview.previewMessageIndex)).toBe("preview");
   });
 
   test("top-aligns the prompt list with its marker when the list fits", () => {

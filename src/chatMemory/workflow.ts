@@ -63,7 +63,7 @@ export async function syncChatMemory(
     // is the note→chats link the editor's chat chip lists from; re-pointing it
     // at a freshly written memory note orphaned every chat from the note it was
     // opened on, so the chip listed nothing, fell through to "continue the
-    // deterministic chat", and Seth got the same chat with no picker forever
+    // deterministic chat", and the maintainer got the same chat with no picker forever
     // (2026-08-01). Only an unattached chat adopts its memory note.
     if (!input.attachedStem) await repository.attach(note.stem);
     return note;

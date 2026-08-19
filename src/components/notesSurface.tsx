@@ -1,4 +1,4 @@
-// The Notes surface: ONE sidebar · the pane tree (Seth, 2026-06-13). The
+// The Notes surface: ONE sidebar · the pane tree (the maintainer, 2026-06-13). The
 // two-rail era (folders + note list) is gone — a single unified compact-tree
 // sidebar replaces both. Collapse grammar (r3 frame B) survives intact: a
 // hidden sidebar leaves a warm-edge hover sliver that reveals it as an overlay
@@ -85,21 +85,12 @@ export function NotesSurface() {
   const archived = useNotes(DEST.archive).data;
   const trashed = useNotes(DEST.trash).data;
 
-  // the island empty state (r1 frame E) shows ONLY when the corpus is TRULY
-  // empty. If anything sits in Archive/Trash, keep the sidebar so those notes
-  // stay reachable and restorable — never strand them behind the empty state
-  // (Seth, 2026-06-13).
-  if (
-    sidebarMode === "notes" &&
-    allNotes &&
-    archived &&
-    trashed &&
-    allNotes.length === 0 &&
-    archived.length === 0 &&
-    trashed.length === 0
-  ) {
-    return <EmptyState />;
-  }
+  const notesLoaded = Boolean(allNotes && archived && trashed);
+  const vaultIsEmpty =
+    notesLoaded &&
+    (allNotes?.length ?? 0) === 0 &&
+    (archived?.length ?? 0) === 0 &&
+    (trashed?.length ?? 0) === 0;
 
   const railVars = { "--sidebar-w": `${sidebarWidth}px` } as CSSProperties;
 
@@ -112,7 +103,7 @@ export function NotesSurface() {
         </div>
       )}
       {/* the content area: the note panes, or a grid view (Board / All notes)
-          that renders HERE so the sidebar never moves (Seth, 2026-06-24) */}
+          that renders HERE so the sidebar never moves (the maintainer, 2026-06-24) */}
       {sidebarMode === "breve" ? (
         <Suspense fallback={null}>
           <BreveSurface />
@@ -131,10 +122,12 @@ export function NotesSurface() {
         <SystemSurface key={systemRoot} rootId={systemRoot} />
       ) : contentView === "recent" ? (
         <NoteListSurface title="Recent" glyph={<ClockGlyph size={15} />} />
+      ) : vaultIsEmpty ? (
+        <EmptyState />
       ) : (
         <PaneTree />
       )}
-      {/* collapsed → no warm-edge sliver (Seth, 2026-06-15: it was an unclear,
+      {/* collapsed → no warm-edge sliver (the maintainer, 2026-06-15: it was an unclear,
           disliked line). The titlebar's always-visible sidebar toggle is the
           clear reopen now. */}
     </div>

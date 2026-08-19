@@ -1,4 +1,4 @@
-// The ⌘N chooser tab (Seth, 2026-07-29): a blank new tab with no type — you
+// The ⌘N chooser tab (the maintainer, 2026-07-29): a blank new tab with no type — you
 // choose Markdown / Document / Sheet / Board / Mermaid. Driven through the
 // palette action (real controls; CI has no Meta key for the chord).
 

@@ -36,7 +36,8 @@ changelog entries, generated output, and Carl sessions are historical only.
   Rust enforce both independently.
 - Breve is a Rotli capability. Rotli owns its UI, runtime, configuration,
   lifecycle, and scheduler integration.
-- Environments are Warm Light, Warm Dark, Paper, and Charcoal; all intentional.
+- Theme families are Rotli, Paper & Charcoal, Ocean, Grove, Iris, and Midnight;
+  every family has an intentionally tuned light and dark environment.
 
 ## Architecture, design, and syntax
 
@@ -76,7 +77,7 @@ script. Substantive changes land via Greptile-reviewed PRs (fixes on-thread);
 releases gate on CI conclusion; E2E clicks real controls, never ⌘-chords.
 
 UI work must follow `DESIGN.md`, use semantic tokens from `src/brand/`, remain
-keyboard-safe and readable in all four environments, and cover loading, empty, error, saved,
+keyboard-safe and readable in every supported environment, and cover loading, empty, error, saved,
 disabled, destructive, and narrow-window states. Do not add a UI framework or
 raw colors outside the brand layer.
 

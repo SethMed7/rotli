@@ -16,16 +16,20 @@ test("the prompt menu opens beside and top-aligned with its marker", async ({ pa
       <main class="chat-main">
         <div class="chat-conversation">
           <nav class="chat-prompt-nav" aria-label="Conversation prompts">
-            <button class="chat-prompt-trigger open" type="button" aria-label="Jump to an earlier prompt">
-              <span></span><span></span><span></span><span></span><span class="active"></span>
-            </button>
+            <div class="chat-prompt-trigger lines open">
+              <button class="chat-prompt-marker" type="button"><span></span></button>
+              <button class="chat-prompt-marker preview" type="button"><span></span></button>
+              <button class="chat-prompt-marker" type="button"><span></span></button>
+              <button class="chat-prompt-marker" type="button"><span></span></button>
+              <button class="chat-prompt-marker active" type="button" aria-current="location"><span></span></button>
+            </div>
             <div class="chat-prompt-menu" aria-label="Jump to prompt">
               <div class="chat-prompt-list">
                 <button type="button">Find the architectural boundary</button>
-                <button type="button">Compare the two approaches</button>
+                <button type="button" class="preview">Compare the two approaches</button>
                 <button type="button">Test the failure state</button>
                 <button type="button">Summarize the result</button>
-                <button type="button" class="active">Choose the next step</button>
+                <button type="button" class="active" aria-current="location">Choose the next step</button>
               </div>
             </div>
           </nav>
@@ -45,4 +49,26 @@ test("the prompt menu opens beside and top-aligned with its marker", async ({ pa
 
   expect(geometry).toEqual({ topDifference: 0, horizontalGap: 8 });
   await expect(page.locator(".chat-prompt-menu")).not.toContainText("Jump to prompt");
+
+  const marker = page.locator(".chat-prompt-marker").nth(2);
+  await marker.hover();
+  expect(await marker.evaluate((node) => getComputedStyle(node).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+
+  const rowStates = await page.locator(".chat-prompt-list").evaluate((list) => {
+    const preview = list.querySelector<HTMLElement>(".preview");
+    const active = list.querySelector<HTMLElement>(".active");
+    if (!preview || !active) throw new Error("prompt row state scaffold missing");
+    return {
+      previewBackground: getComputedStyle(preview).backgroundColor,
+      previewDecoration: getComputedStyle(preview).textDecorationLine,
+      previewOpacity: Number(getComputedStyle(preview).opacity),
+      activeBackground: getComputedStyle(active).backgroundColor,
+      activeIndicator: getComputedStyle(active, "::before").content,
+      activeOpacity: Number(getComputedStyle(active).opacity),
+    };
+  });
+  expect(rowStates.previewDecoration).toBe("none");
+  expect(rowStates.previewOpacity).toBeLessThan(rowStates.activeOpacity);
+  expect(rowStates.previewBackground).not.toBe(rowStates.activeBackground);
+  expect(rowStates.activeIndicator).toBe("none");
 });

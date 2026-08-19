@@ -1,4 +1,4 @@
-// Inline board rename, shared by the sidebar row AND the tab (Seth, 2026-06-26).
+// Inline board rename, shared by the sidebar row AND the tab (the maintainer, 2026-06-26).
 // `renamingBoardId` lives in the ui store so a right-click, a tab double-click, or
 // a freshly-created board can all target the same inline input. Commit renames the
 // .excalidraw on disk (corpus_rename_board) and retargets any open canvas tab to

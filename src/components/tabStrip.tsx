@@ -1,4 +1,4 @@
-// The tab strip — rendered for EVERY pane now (Seth, 2026-06-13): the old
+// The tab strip — rendered for EVERY pane now (the maintainer, 2026-06-13): the old
 // "single-tab pane shows zero tab chrome" Apple-Notes default is retired, so a
 // lone tab is still visible and closeable. 34px on ground, 1px bottom border;
 // tabs 96–208px, always-labeled + type glyph; active = surface fill merging
@@ -10,12 +10,12 @@
 // only — the 2026-07-30 removal of the tab's clay top edge moved the cue there);
 // unfocused panes also dim their strips.
 //
-// Tabs drag with POINTER events (Seth, 2026-06-15: HTML5 drag is dead in the
+// Tabs drag with POINTER events (the maintainer, 2026-06-15: HTML5 drag is dead in the
 // macOS WKWebView shell): drag within a strip to reorder, onto another strip to
 // move, or onto a pane edge to split. The gesture + hit-testing live in
 // lib/tabDrag; the strip just starts it on pointerdown and reads the store's
 // dropPreview to paint the 2px insertion line. Every tab is closeable — the
-// last one leaves the lone pane in the quokka rest state (Seth, 2026-07-28).
+// last one leaves the lone pane in the quokka rest state (the maintainer, 2026-07-28).
 
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -40,7 +40,16 @@ import { useMainStore } from "../state/main";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import type { LeafNode, Tab } from "../types";
-import { ChatGlyph, ClockGlyph, ExcalidrawGlyph, FileGlyph, PlusGlyph, XGlyph, glyphForNote } from "./glyphs";
+import {
+  BrowserGlyph,
+  ChatGlyph,
+  ClockGlyph,
+  ExcalidrawGlyph,
+  FileGlyph,
+  PlusGlyph,
+  XGlyph,
+  glyphForNote,
+} from "./glyphs";
 import { InlineRenameInput } from "./inlineRenameInput";
 
 /** A board's display label = its filename minus the .excalidraw extension. */
@@ -66,6 +75,8 @@ function tabLabel(tab: Tab, titles: TitleLookup, chatTitles: ReadonlyMap<string,
       return "Librarian Activity";
     case "newItem":
       return "New…";
+    case "browser":
+      return "Private browser";
   }
 }
 
@@ -75,7 +86,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
   const activateTab = usePanesStore((s) => s.activateTab);
   const draggingTab = usePanesStore((s) => s.draggingTab);
   // Main lives here too — a tab is a note (or board) you're looking at, so
-  // right-click → Add to Main mirrors the note-row menu (Seth, 2026-07-07).
+  // right-click → Add to Main mirrors the note-row menu (the maintainer, 2026-07-07).
   const mainManifest = useMainStore((s) => s.manifest);
   const setMainTree = useMainStore((s) => s.setTree);
   // double-click a board tab to rename it in place (shares the sidebar's flow)
@@ -143,12 +154,12 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
 
   const newTabHere = () => {
     // focus this pane first so the fresh note tab opens HERE, then create a new
-    // blank note (not a duplicate — Seth #8, 2026-07-03).
+    // blank note (not a duplicate — the maintainer #8, 2026-07-03).
     usePanesStore.getState().focusPane(pane.id);
     newItemInTab();
   };
 
-  // right-click a tab → the shared context-menu host (Seth, 2026-07-01: rename a
+  // right-click a tab → the shared context-menu host (the maintainer, 2026-07-01: rename a
   // board "via the tab or left menu"). Rename covers boards (inline strip input)
   // and notes (the title-line dialog); close/close-others round it out.
   const openTabMenu = (event: MouseEvent, tab: Tab) => {
@@ -234,6 +245,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
         >
           {pane.tabs.map((tab, i) => {
             const dragging = draggingTab?.paneId === pane.id && draggingTab.tabId === tab.id;
+            const label = tabLabel(tab, titles, chatTitles);
             return (
               <div key={tab.id} className={tab.id === pane.activeTabId ? "tabslot active" : "tabslot"}>
                 {dropAt === i && <span className="tab-ins" aria-hidden="true" />}
@@ -242,6 +254,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                   data-tab-id={tab.id}
                   data-tab-index={i}
                   data-hotkey={tabHotkeyAction(i, pane.tabs.length)}
+                  title={label}
                   aria-selected={tab.id === pane.activeTabId}
                   className={`${tab.id === pane.activeTabId ? "tab active" : "tab"}${
                     tab.preview ? " preview" : ""
@@ -256,9 +269,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                       closeTabWithDraftCleanup(pane.id, tab.id);
                     }
                   }}
-                  onPointerDown={(event) =>
-                    startTabDrag(event, pane.id, tab.id, tabLabel(tab, titles, chatTitles))
-                  }
+                  onPointerDown={(event) => startTabDrag(event, pane.id, tab.id, label)}
                 >
                   {tab.surfaceKind === "canvas" ? (
                     <ExcalidrawGlyph size={13} className="tglyph" />
@@ -271,6 +282,8 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                     )
                   ) : tab.surfaceKind === "activity" ? (
                     <ClockGlyph size={13} className="tglyph" />
+                  ) : tab.surfaceKind === "browser" ? (
+                    <BrowserGlyph size={13} className="tglyph" />
                   ) : (
                     <FileGlyph size={13} className="tglyph" />
                   )}
@@ -292,6 +305,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                     />
                   ) : (
                     <span
+                      className="tab-label"
                       onDoubleClick={
                         tab.surfaceKind === "canvas"
                           ? () => startRename(tab.boardId)
@@ -300,7 +314,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                             : undefined
                       }
                     >
-                      {tabLabel(tab, titles, chatTitles)}
+                      <span className="tab-title">{label}</span>
                     </span>
                   )}
                   <button

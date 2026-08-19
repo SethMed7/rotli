@@ -1,4 +1,4 @@
-/* rotli — additional appearance themes (Seth, 2026-06-12).
+/* rotli — additional appearance themes (the maintainer, 2026-06-12).
    The frozen kit (src/brand/tokens/colors.css) owns the WARM family — Light + Dark,
    the brand truth and the default. This file adds the MONO family as a user choice
    (PHILOSOPHY §6: opinions live in defaults, not enforcement):
@@ -14,7 +14,7 @@
 /* Native-control appearance follows the APP theme, never the OS. Without this,
    WKWebView renders select popups, scrollbars, the WebKit context menu, and
    autofill chrome in the OS mode — a dark-Mac user in Warm Light saw dark
-   dropdowns "creep in" from another theme (Seth, 2026-07-08). Light is the
+   dropdowns "creep in" from another theme (the maintainer, 2026-07-08). Light is the
    base; every dark theme flips it. */
 :root {
   --accent-hue: 210;
@@ -47,7 +47,11 @@
   --chat-welcome-evening-ground: #bbb6c4;
 }
 :root[data-theme="dark"],
-:root[data-theme="charcoal"] {
+:root[data-theme="charcoal"],
+:root[data-theme="ocean-dark"],
+:root[data-theme="grove-dark"],
+:root[data-theme="iris-dark"],
+:root[data-theme="midnight-dark"] {
   color-scheme: dark;
   --accent-custom-swatch: oklch(78% 0.13 var(--accent-hue));
   --accent-custom-on: #161616;
@@ -74,6 +78,20 @@
   --swatch-warm-dark: #241d18;
   --swatch-paper: #ffffff;
   --swatch-charcoal: #161616;
+  --swatch-ocean-light: #f2f6f9;
+  --swatch-ocean-dark: #0e171d;
+  --swatch-grove-light: #f2f6f2;
+  --swatch-grove-dark: #101814;
+  --swatch-iris-light: #f5f3f9;
+  --swatch-iris-dark: #15121d;
+  --swatch-midnight-light: #f4f5f7;
+  --swatch-midnight-dark: #050607;
+
+  /* Character ink is deliberately independent from app text. */
+  --quokka-line-black: #111214;
+  --quokka-line-white: #ffffff;
+  --quokka-custom-color: oklch(68% 0.12 225);
+  --quokka-accessory-color: oklch(70% 0.15 38);
 
   /* app-icon picker tiles — fixed palettes, theme-independent (Settings → App icon) */
   --appicon-default-tile: #f8f2e9;
@@ -84,6 +102,117 @@
   --appicon-charcoal-ink: #e9e7e2;
   --appicon-clay-tile: #c97e62;
   --appicon-clay-ink: #f8f2e9;
+}
+
+/* Theme-independent workspace thumbnails used in Appearance. Components only
+   read the preview roles; their fixed palettes live here with the themes. */
+.preview-warm-light {
+  --preview-ground: #f8f2e9;
+  --preview-sidebar: #eee3d5;
+  --preview-surface: #fffaf3;
+  --preview-text: #3a3028;
+  --preview-muted: #7f6f61;
+  --preview-border: #ded0c0;
+  --preview-selected: #ead8ca;
+}
+.preview-warm-dark {
+  --preview-ground: #241d18;
+  --preview-sidebar: #2d241e;
+  --preview-surface: #302720;
+  --preview-text: #f1e7da;
+  --preview-muted: #aa9989;
+  --preview-border: #45392f;
+  --preview-selected: #44332b;
+}
+.preview-paper {
+  --preview-ground: #fafaf9;
+  --preview-sidebar: #f1f1ef;
+  --preview-surface: #ffffff;
+  --preview-text: #161616;
+  --preview-muted: #6b6b68;
+  --preview-border: #e1e1de;
+  --preview-selected: #e5e5e2;
+}
+.preview-charcoal {
+  --preview-ground: #161616;
+  --preview-sidebar: #1b1a19;
+  --preview-surface: #242321;
+  --preview-text: #e9e7e2;
+  --preview-muted: #a8a49c;
+  --preview-border: #33312e;
+  --preview-selected: #2c2b28;
+}
+.preview-ocean-light {
+  --preview-ground: #f2f6f9;
+  --preview-sidebar: #e6eef3;
+  --preview-surface: #ffffff;
+  --preview-text: #18272f;
+  --preview-muted: #526873;
+  --preview-border: #d1dfe6;
+  --preview-selected: #dceaf2;
+}
+.preview-ocean-dark {
+  --preview-ground: #0e171d;
+  --preview-sidebar: #121f26;
+  --preview-surface: #152229;
+  --preview-text: #e7f0f4;
+  --preview-muted: #a1b6c0;
+  --preview-border: #263a43;
+  --preview-selected: #213843;
+}
+.preview-grove-light {
+  --preview-ground: #f2f6f2;
+  --preview-sidebar: #e7eee8;
+  --preview-surface: #fcfefc;
+  --preview-text: #1d2c23;
+  --preview-muted: #5d6f64;
+  --preview-border: #d3dfd5;
+  --preview-selected: #dce8de;
+}
+.preview-grove-dark {
+  --preview-ground: #101814;
+  --preview-sidebar: #142019;
+  --preview-surface: #17221b;
+  --preview-text: #e7efe9;
+  --preview-muted: #a4b5a8;
+  --preview-border: #2a3b30;
+  --preview-selected: #26382c;
+}
+.preview-iris-light {
+  --preview-ground: #f5f3f9;
+  --preview-sidebar: #ebe7f2;
+  --preview-surface: #ffffff;
+  --preview-text: #282334;
+  --preview-muted: #696176;
+  --preview-border: #ddd6e6;
+  --preview-selected: #e3dcf0;
+}
+.preview-iris-dark {
+  --preview-ground: #15121d;
+  --preview-sidebar: #1a1623;
+  --preview-surface: #1d1927;
+  --preview-text: #eeeaf5;
+  --preview-muted: #b2a8c1;
+  --preview-border: #342d42;
+  --preview-selected: #30283f;
+}
+.preview-midnight-light {
+  --preview-ground: #f4f5f7;
+  --preview-sidebar: #e9ebef;
+  --preview-surface: #ffffff;
+  --preview-text: #181b20;
+  --preview-muted: #5e6570;
+  --preview-border: #d8dce2;
+  --preview-selected: #e0e3e8;
+}
+.preview-midnight-dark {
+  --preview-ground: #050607;
+  --preview-sidebar: #080a0c;
+  --preview-surface: #0b0d0f;
+  --preview-text: #f1f3f5;
+  --preview-muted: #a4aab2;
+  --preview-border: #20252b;
+  --preview-selected: #191d22;
 }
 
 /* — MONO · paper (light) — */
@@ -154,9 +283,185 @@
   --chat-welcome-evening-ground: #302d35;
 }
 
-/* Mono themes use neutral icon ink; imagery remains warm by design. */
+/* — OCEAN · cool blue without neon chrome — */
+:root[data-theme="ocean-light"] {
+  --ground: #f2f6f9;
+  --surface: #ffffff;
+  --surface-2: #e8f0f5;
+  --tint: #dceaf2;
+  --text: #18272f;
+  --text-muted: #526873;
+  --border: #d1dfe6;
+  --accent: #2e6e91;
+  --theme-accent-swatch: #2e6e91;
+  --theme-on-accent: #ffffff;
+  --accent-text: #285f7e;
+  --on-accent: #ffffff;
+  --success: #507b66;
+  --syntax-blue: #285f7e;
+  --syntax-accent: var(--accent-text);
+  --hov: rgba(24, 39, 47, 0.07);
+  --act: rgba(24, 39, 47, 0.11);
+  --scrim: rgba(14, 23, 29, 0.44);
+}
+:root[data-theme="ocean-dark"] {
+  --ground: #0e171d;
+  --surface: #152229;
+  --surface-2: #1c2d35;
+  --tint: #213843;
+  --text: #e7f0f4;
+  --text-muted: #a1b6c0;
+  --border: #263a43;
+  --accent: #70b2d7;
+  --theme-accent-swatch: #70b2d7;
+  --theme-on-accent: #0e171d;
+  --accent-text: #86c2e0;
+  --on-accent: #0e171d;
+  --success: #8cc4a5;
+  --syntax-blue: #86c2e0;
+  --syntax-accent: var(--accent-text);
+  --hov: rgba(231, 240, 244, 0.08);
+  --act: rgba(231, 240, 244, 0.13);
+  --scrim: rgba(0, 0, 0, 0.58);
+}
+
+/* — GROVE · quiet botanical neutrals — */
+:root[data-theme="grove-light"] {
+  --ground: #f2f6f2;
+  --surface: #fcfefc;
+  --surface-2: #e9f0ea;
+  --tint: #dce8de;
+  --text: #1d2c23;
+  --text-muted: #5d6f64;
+  --border: #d3dfd5;
+  --accent: #427a55;
+  --theme-accent-swatch: #427a55;
+  --theme-on-accent: #ffffff;
+  --accent-text: #386c49;
+  --on-accent: #ffffff;
+  --success: #427a55;
+  --syntax-blue: #3f6c7c;
+  --syntax-accent: var(--accent-text);
+  --hov: rgba(29, 44, 35, 0.07);
+  --act: rgba(29, 44, 35, 0.11);
+  --scrim: rgba(16, 24, 20, 0.44);
+}
+:root[data-theme="grove-dark"] {
+  --ground: #101814;
+  --surface: #17221b;
+  --surface-2: #1f2d24;
+  --tint: #26382c;
+  --text: #e7efe9;
+  --text-muted: #a4b5a8;
+  --border: #2a3b30;
+  --accent: #82be96;
+  --theme-accent-swatch: #82be96;
+  --theme-on-accent: #101814;
+  --accent-text: #95caa6;
+  --on-accent: #101814;
+  --success: #82be96;
+  --syntax-blue: #8bbdcc;
+  --syntax-accent: var(--accent-text);
+  --hov: rgba(231, 239, 233, 0.08);
+  --act: rgba(231, 239, 233, 0.13);
+  --scrim: rgba(0, 0, 0, 0.56);
+}
+
+/* — IRIS · restrained violet, never neon — */
+:root[data-theme="iris-light"] {
+  --ground: #f5f3f9;
+  --surface: #ffffff;
+  --surface-2: #ece8f3;
+  --tint: #e3dcf0;
+  --text: #282334;
+  --text-muted: #696176;
+  --border: #ddd6e6;
+  --accent: #6b58a5;
+  --theme-accent-swatch: #6b58a5;
+  --theme-on-accent: #ffffff;
+  --accent-text: #5e4c96;
+  --on-accent: #ffffff;
+  --success: #557966;
+  --syntax-blue: #456b91;
+  --syntax-accent: var(--accent-text);
+  --hov: rgba(40, 35, 52, 0.07);
+  --act: rgba(40, 35, 52, 0.11);
+  --scrim: rgba(21, 18, 29, 0.44);
+}
+:root[data-theme="iris-dark"] {
+  --ground: #15121d;
+  --surface: #1d1927;
+  --surface-2: #272133;
+  --tint: #30283f;
+  --text: #eeeaf5;
+  --text-muted: #b2a8c1;
+  --border: #342d42;
+  --accent: #ad9ae3;
+  --theme-accent-swatch: #ad9ae3;
+  --theme-on-accent: #15121d;
+  --accent-text: #bcace9;
+  --on-accent: #15121d;
+  --success: #90b8a0;
+  --syntax-blue: #8bb7df;
+  --syntax-accent: var(--accent-text);
+  --hov: rgba(238, 234, 245, 0.08);
+  --act: rgba(238, 234, 245, 0.13);
+  --scrim: rgba(0, 0, 0, 0.58);
+}
+
+/* — MIDNIGHT · cool neutral by day, deliberately deeper than Charcoal at night — */
+:root[data-theme="midnight-light"] {
+  --ground: #f4f5f7;
+  --surface: #ffffff;
+  --surface-2: #eceef1;
+  --tint: #e0e3e8;
+  --text: #181b20;
+  --text-muted: #5e6570;
+  --border: #d8dce2;
+  --accent: #364152;
+  --theme-accent-swatch: #364152;
+  --theme-on-accent: #ffffff;
+  --accent-text: #2e3745;
+  --on-accent: #ffffff;
+  --success: #587565;
+  --syntax-blue: #315f86;
+  --syntax-accent: var(--accent-text);
+  --hov: rgba(24, 27, 32, 0.07);
+  --act: rgba(24, 27, 32, 0.11);
+  --scrim: rgba(5, 6, 7, 0.46);
+}
+:root[data-theme="midnight-dark"] {
+  --ground: #050607;
+  --surface: #0b0d0f;
+  --surface-2: #121519;
+  --tint: #191d22;
+  --text: #f1f3f5;
+  --text-muted: #a4aab2;
+  --border: #20252b;
+  --accent: #cfd5dc;
+  --theme-accent-swatch: #cfd5dc;
+  --theme-on-accent: #08090a;
+  --accent-text: #e1e5e9;
+  --on-accent: #08090a;
+  --success: #91b49c;
+  --syntax-blue: #82bce3;
+  --syntax-accent: var(--accent-text);
+  --hov: rgba(241, 243, 245, 0.08);
+  --act: rgba(241, 243, 245, 0.13);
+  --scrim: rgba(0, 0, 0, 0.72);
+}
+
+/* Non-warm themes use neutral icon ink; imagery remains warm by design. */
 :root[data-theme="paper"],
-:root[data-theme="charcoal"] {
+:root[data-theme="charcoal"],
+:root[data-theme="ocean-light"],
+:root[data-theme="ocean-dark"],
+:root[data-theme="grove-light"],
+:root[data-theme="grove-dark"],
+:root[data-theme="iris-light"],
+:root[data-theme="iris-dark"],
+:root[data-theme="midnight-light"],
+:root[data-theme="midnight-dark"] {
   --icon-clay: currentColor;
   --icon-olive: currentColor;
   /* warm-token leaks re-pointed: done-check ink + Aa segment accent */
@@ -173,83 +478,103 @@
 
 /* The quote bar: peach is warm-family truth; mono goes neutral. */
 :root[data-theme="paper"],
-:root[data-theme="charcoal"] {
+:root[data-theme="charcoal"],
+:root[data-theme="ocean-light"],
+:root[data-theme="ocean-dark"],
+:root[data-theme="grove-light"],
+:root[data-theme="grove-dark"],
+:root[data-theme="iris-light"],
+:root[data-theme="iris-dark"],
+:root[data-theme="midnight-light"],
+:root[data-theme="midnight-dark"] {
   --quote-bar: color-mix(in srgb, var(--text-muted) 55%, transparent);
 }
 
-/* — PRIMARY color (Seth, 2026-07-28): a user-chosen accent riding data-accent
+/* — PRIMARY color (the maintainer, 2026-07-28): a user-chosen accent riding data-accent
    beside data-theme. "default" (no attribute) keeps each theme's own truth —
    warm clay, mono ink. Each named accent carries a light-scheme and a
    dark-scheme value so, e.g., Charcoal + blue reads correctly. Token-layer
    raw hex, same standing as the theme blocks above. — */
 :root[data-theme="light"][data-accent="blue"],
-:root[data-theme="paper"][data-accent="blue"] {
+:root[data-theme="paper"][data-accent="blue"],
+:root[data-theme$="-light"][data-accent="blue"] {
   --accent: #2f6fae;
   --accent-text: #2a64a0;
   --on-accent: #ffffff;
 }
 :root[data-theme="dark"][data-accent="blue"],
-:root[data-theme="charcoal"][data-accent="blue"] {
+:root[data-theme="charcoal"][data-accent="blue"],
+:root[data-theme$="-dark"][data-accent="blue"] {
   --accent: #78b7e3;
   --accent-text: #8cc3e8;
   --on-accent: #14202b;
 }
 :root[data-theme="light"][data-accent="green"],
-:root[data-theme="paper"][data-accent="green"] {
+:root[data-theme="paper"][data-accent="green"],
+:root[data-theme$="-light"][data-accent="green"] {
   --accent: #3f7d51;
   --accent-text: #396f49;
   --on-accent: #ffffff;
 }
 :root[data-theme="dark"][data-accent="green"],
-:root[data-theme="charcoal"][data-accent="green"] {
+:root[data-theme="charcoal"][data-accent="green"],
+:root[data-theme$="-dark"][data-accent="green"] {
   --accent: #8fc9a0;
   --accent-text: #9ed3ae;
   --on-accent: #14231a;
 }
 :root[data-theme="light"][data-accent="violet"],
-:root[data-theme="paper"][data-accent="violet"] {
+:root[data-theme="paper"][data-accent="violet"],
+:root[data-theme$="-light"][data-accent="violet"] {
   --accent: #6a5ab2;
   --accent-text: #5f51a3;
   --on-accent: #ffffff;
 }
 :root[data-theme="dark"][data-accent="violet"],
-:root[data-theme="charcoal"][data-accent="violet"] {
+:root[data-theme="charcoal"][data-accent="violet"],
+:root[data-theme$="-dark"][data-accent="violet"] {
   --accent: #b3a6ee;
   --accent-text: #beb3f1;
   --on-accent: #1c1830;
 }
 :root[data-theme="light"][data-accent="rose"],
-:root[data-theme="paper"][data-accent="rose"] {
+:root[data-theme="paper"][data-accent="rose"],
+:root[data-theme$="-light"][data-accent="rose"] {
   --accent: #ad5470;
   --accent-text: #9d4c66;
   --on-accent: #ffffff;
 }
 :root[data-theme="dark"][data-accent="rose"],
-:root[data-theme="charcoal"][data-accent="rose"] {
+:root[data-theme="charcoal"][data-accent="rose"],
+:root[data-theme$="-dark"][data-accent="rose"] {
   --accent: #e3a0b3;
   --accent-text: #e8adbe;
   --on-accent: #2b1a20;
 }
 :root[data-theme="light"][data-accent="amber"],
-:root[data-theme="paper"][data-accent="amber"] {
+:root[data-theme="paper"][data-accent="amber"],
+:root[data-theme$="-light"][data-accent="amber"] {
   --accent: #9a6f1e;
   --accent-text: #8b641b;
   --on-accent: #ffffff;
 }
 :root[data-theme="dark"][data-accent="amber"],
-:root[data-theme="charcoal"][data-accent="amber"] {
+:root[data-theme="charcoal"][data-accent="amber"],
+:root[data-theme$="-dark"][data-accent="amber"] {
   --accent: #dfb15f;
   --accent-text: #e5bc74;
   --on-accent: #2a2110;
 }
 :root[data-theme="light"][data-accent="custom"],
-:root[data-theme="paper"][data-accent="custom"] {
+:root[data-theme="paper"][data-accent="custom"],
+:root[data-theme$="-light"][data-accent="custom"] {
   --accent: oklch(53% 0.145 var(--accent-hue));
   --accent-text: oklch(47% 0.14 var(--accent-hue));
   --on-accent: #ffffff;
 }
 :root[data-theme="dark"][data-accent="custom"],
-:root[data-theme="charcoal"][data-accent="custom"] {
+:root[data-theme="charcoal"][data-accent="custom"],
+:root[data-theme$="-dark"][data-accent="custom"] {
   --accent: oklch(78% 0.13 var(--accent-hue));
   --accent-text: oklch(83% 0.11 var(--accent-hue));
   --on-accent: #161616;
@@ -265,7 +590,8 @@
   --accent-swatch-amber: #9a6f1e;
 }
 :root[data-theme="dark"],
-:root[data-theme="charcoal"] {
+:root[data-theme="charcoal"],
+:root[data-theme$="-dark"] {
   --accent-swatch-blue: #78b7e3;
   --accent-swatch-green: #8fc9a0;
   --accent-swatch-violet: #b3a6ee;

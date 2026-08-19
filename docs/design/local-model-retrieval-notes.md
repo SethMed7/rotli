@@ -223,7 +223,7 @@ synthetic re-creations of real transcripts.
 
 `corpus_search` (and therefore `search_notes`/the CLI's `notes search`) is
 **exact-substring** matching: `"rent everything"` hits the note containing
-that phrase; `"myela strategy"` returns zero because those tokens are never
+that phrase; `"northstar strategy"` returns zero because those tokens are never
 adjacent. Small models open with whole-question queries ("who are the people
 in my notes") and burn 1–3 of their 5 steps on empty results before
 discovering single keywords work. Observed in a third of gemma's runs and the
@@ -474,7 +474,7 @@ regressions — real but marginal, which is the point: the rest needs code).
 
 ### Shipped 2026-08-01 — F2 (the live roster failure)
 
-Seth hit F2 in the app: "give me a list of the people in my vault" answered
+the maintainer hit F2 in the app: "give me a list of the people in my vault" answered
 with four names, one of them a *project*. The saved transcript shows why —
 gemma read `wiki/people/README.md` (a note whose body names nobody) and
 emitted its frontmatter `links:` line verbatim, project included. Three

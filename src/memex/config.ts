@@ -29,6 +29,7 @@ export interface MemexInstance {
 export interface MemexConfig {
   activeId: string | null;
   instances: MemexInstance[];
+  developmentReadOnly: boolean;
 }
 
 function baseName(p: string): string {
@@ -67,7 +68,7 @@ export function fromCorpusConfig(v: CorpusConfigView): MemexConfig {
     });
   }
   const activeId = v.corpus.isMemex ? CORPUS_INSTANCE_ID : v.activeBrainId;
-  return { activeId, instances };
+  return { activeId, instances, developmentReadOnly: v.developmentReadOnly };
 }
 
 export const activeInstance = (c: MemexConfig): MemexInstance | null =>

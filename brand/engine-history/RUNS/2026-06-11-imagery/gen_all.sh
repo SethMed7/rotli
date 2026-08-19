@@ -2,7 +2,7 @@
 # gen_all.sh — rotli brand-world illustration set, 8 sequential agy (Nano Banana Pro) generations.
 # agy does NOT support concurrent headless sessions — strictly one at a time (imagegen skill rule).
 set -u
-DIR="~/smLab/brand/engine/RUNS/rotli/2026-06-11-imagery"
+DIR="$(cd "$(dirname "$0")" && pwd)"
 LOG="$DIR/gen.log"
 : > "$LOG"
 

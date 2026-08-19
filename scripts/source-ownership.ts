@@ -80,6 +80,7 @@ export const LIB_EFFECTFUL_FILE_OWNERS = {
   "quitFlush.ts": "native quit lifecycle adapter",
   "tabDrag.ts": "cross-surface tab drag workflow",
   "tauri.ts": "typed native-host adapter facade",
+  "useNow.ts": "shared React wall-clock subscription for presentation projections",
 } as const;
 
 /** `src/services` is an application/effect boundary, not a miscellaneous

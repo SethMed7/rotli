@@ -10,8 +10,10 @@ notes, credentials, absolute memex paths, or exploit details in a public thread.
 
 During the current private beta, report security concerns directly to the
 repository owner through the existing private project channel. Before public
-distribution or outside contribution, Rotli must enable a dedicated private
-security-reporting channel and update this section with its exact address.
+distribution or outside contribution, Rotli must enable GitHub private
+vulnerability reporting. Once enabled, use the repository's **Security →
+Advisories → Report a vulnerability** flow; never put a suspected vulnerability
+in a public issue.
 
 Include only what is necessary:
 

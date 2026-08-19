@@ -77,7 +77,8 @@ handwriting-first notebook experience. See [ROADMAP.md](ROADMAP.md).
 ## What's built
 
 - **The editor** — hybrid markdown: the line under your caret shows raw syntax, everything else renders. `- ` starts a list, `[ ]` makes a checkbox, and a quiet format bar floats below. Mermaid diagrams open into a View/Visual/Code workspace: flowcharts can be built from shapes, arrows, labels, direction, and colors without leaving Mermaid, while an optional conversion creates a separate Excalidraw board copy. Typography (`Aa`) is a render layer — never written into your files.
-- **Panes & tabs** — split with `⌘D` / `⌘⇧D`, tabs with `⌘T`; one tab means zero tab chrome. Everything drag-resizable, everything remembered.
+- **Panes & tabs** — split with `⌘D` / `⌘⇧D`, tabs with `⌘T`; every tab stays visible and closeable. Everything drag-resizable, everything remembered.
+- **One active vault** — connect other vaults as switch targets, while the sidebar, panes, search, System counts, Librarian, and AI context remain scoped to the vault currently open.
 - **`⌘K`** — every note and action in one palette, recents first.
 - **Quick capture (`⌥C`)** — from anywhere on your Mac: one breath, type, `⏎` — the thought lands in Captures and the AI files it later.
 - **Chat that knows your notes** — on-device by default; connect the subscription CLIs you already use; attach images; flip the globe for a web lookup. DuckDuckGo works without setup, or choose Brave Search API with your own Keychain-stored key in **Settings → Connections → Web research**.
@@ -98,12 +99,13 @@ and note-native workflows belong to Markdown only. DOCX documents, spreadsheets,
 and Excalidraw boards are useful bonus work surfaces—not parallel note systems—
 and keep the conventional behavior of their own formats.
 
-## Four work environments
+## Personal work environments
 
-The titlebar sun cycles through **Warm Light · Warm Dark · Paper · Charcoal**.
-Paper and Charcoal are the calm defaults; the warm pair is there for people who
-prefer a softer environment. Every product surface shares the same semantic
-tokens, keyboard behavior, and readable hierarchy across all four.
+The titlebar sun cycles through paired light and dark environments in six
+families: **Rotli · Paper & Charcoal · Ocean · Grove · Iris · Midnight**. Paper
+and Charcoal remain the calm defaults, while the additional families let the
+workspace feel more personal without changing its readable hierarchy or
+keyboard behavior.
 
 <div align="center">
 <img src="docs/media/rotli-warm-dark.png" alt="rotli in Warm Dark" width="405">
@@ -131,8 +133,8 @@ You work how you want in **Main**; the Librarian organizes the **Library** under
 ## Run it
 
 ```sh
-bun install
-bun run tauri dev   # the app (menu bar · ⌥Space opens · ⌥C captures)
+bun install --frozen-lockfile
+bun run dev:app     # supervised native rotli (dev), including live vault switching
 bun run dev         # frontend only, in a plain browser (in-memory demo vault)
 bun run check       # TypeScript, tests, runtime, architecture, design, and docs
 cargo test --manifest-path src-tauri/Cargo.toml
@@ -166,7 +168,9 @@ live in the [`agent workspace contract`](docs/architecture/agent-workspace.md).
 
 Contributing or working with an AI coding tool? Start with
 [`CONTRIBUTING.md`](CONTRIBUTING.md), [`AGENTS.md`](AGENTS.md), and the
-[`documentation map`](docs/README.md).
+[`documentation map`](docs/README.md). See [`PRIVACY.md`](PRIVACY.md) for the
+data boundary, [`SECURITY.md`](SECURITY.md) for responsible reporting, and
+[`LICENSE`](LICENSE) for the MIT terms.
 
 **Stack** — Tauri v2 · React 18 · Vite (rolldown) · TypeScript strict · Bun · Zustand + TanStack Query · plain CSS driven entirely by the in-repo brand kit (`src/brand/`, v1.0.0 — the single source of truth for colors, type, and logo, enforced by `bun run check:hex`). Local-first is the architecture, not a feature: nothing phones home, nothing needs an account, offline is the default.
 

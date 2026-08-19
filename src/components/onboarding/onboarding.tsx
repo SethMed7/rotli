@@ -2,8 +2,14 @@
 // second. A user may skip these preferences without silently accepting a notes
 // location; create/open/import remains an explicit next screen.
 
-import { type KeyboardEvent, useEffect, useState } from "react";
+import { type CSSProperties, type KeyboardEvent, useEffect, useState } from "react";
 
+import {
+  DEFAULT_QUOKKA_CUSTOM_HUE,
+  QUOKKA_ACCESSORY_PRESENTATIONS,
+  QUOKKA_STYLE_PRESENTATIONS,
+  quokkaCustomColor,
+} from "../../brand/quokka";
 import { resolveChord, useBindingsStore } from "../../keys/bindings";
 import { chordFromEvent, formatChord, toAccelerator } from "../../keys/chords";
 import { setSetupHandle } from "../../keys/handles";
@@ -144,6 +150,14 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
   const stayOpen = useUiStore((state) => state.stayOpen);
   const userName = useUiStore((state) => state.userName);
   const setUserName = useUiStore((state) => state.setUserName);
+  const quokkaCompanionEnabled = useUiStore((state) => state.quokkaCompanionEnabled);
+  const setQuokkaCompanionEnabled = useUiStore((state) => state.setQuokkaCompanionEnabled);
+  const quokkaStyle = useUiStore((state) => state.quokkaStyle);
+  const setQuokkaStyle = useUiStore((state) => state.setQuokkaStyle);
+  const quokkaCustomHue = useUiStore((state) => state.quokkaCustomHue);
+  const setQuokkaCustomHue = useUiStore((state) => state.setQuokkaCustomHue);
+  const quokkaAccessory = useUiStore((state) => state.quokkaAccessory);
+  const setQuokkaAccessory = useUiStore((state) => state.setQuokkaAccessory);
 
   const move = (delta: -1 | 1) => {
     const next = STEPS[Math.max(0, Math.min(STEPS.length - 1, index + delta))];
@@ -157,18 +171,10 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
   });
 
   const pickFamily = (nextFamily: ThemeFamily) => {
-    const ui = useUiStore.getState();
-    ui.setThemeFamily(nextFamily);
-    ui.setMatchLightFamily(nextFamily);
-    ui.setMatchDarkFamily(nextFamily);
+    useUiStore.getState().setThemeFamily(nextFamily);
   };
   const pickMode = (nextTheme: ThemeSetting) => {
-    const ui = useUiStore.getState();
-    if (nextTheme === "system") {
-      ui.setMatchLightFamily(family);
-      ui.setMatchDarkFamily(family);
-    }
-    ui.setTheme(nextTheme);
+    useUiStore.getState().setTheme(nextTheme);
   };
   const behavior = showInDock && stayOpen ? "resident" : showInDock ? "dock" : "visitor";
   const pickBehavior = (value: "visitor" | "dock" | "resident") => {
@@ -184,11 +190,13 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
     useUiStore.setState({
       theme: "system",
       themeFamily: "mono",
-      matchLightFamily: "mono",
-      matchDarkFamily: "mono",
       syntaxPalette: "rotli",
       accentColor: "default",
       accentHue: DEFAULT_ACCENT_HUE,
+      quokkaCompanionEnabled: false,
+      quokkaStyle: "cocoa",
+      quokkaCustomHue: DEFAULT_QUOKKA_CUSTOM_HUE,
+      quokkaAccessory: "none",
       stayOpen: false,
       showInDock: false,
     });
@@ -223,12 +231,13 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
                 step === "welcome"
                   ? "waving"
                   : step === "appearance"
-                    ? "rest"
+                    ? "thoughtful"
                     : step === "behavior"
-                      ? "base"
-                      : "searching"
+                      ? "walking"
+                      : "listening"
               }
               size={152}
+              alwaysVisible
             />
             <p>
               {step === "shortcuts"
@@ -301,6 +310,80 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
                 <div className="setup-accent">
                   <span>Accent</span>
                   <AccentRow />
+                </div>
+                <div className="setup-quokka-row">
+                  <span className="setup-quokka-preview" aria-hidden="true">
+                    <Character name="base" size={66} accessory={quokkaAccessory} alwaysVisible />
+                  </span>
+                  <div className="setup-quokka-controls">
+                    <label className="setup-quokka-mode">
+                      <input
+                        type="checkbox"
+                        checked={quokkaCompanionEnabled}
+                        onChange={(event) => setQuokkaCompanionEnabled(event.currentTarget.checked)}
+                      />
+                      <span>Keep my quokka throughout Rotli</span>
+                    </label>
+                    {quokkaCompanionEnabled && (
+                      <>
+                        <div className="setup-quokka-swatches" role="radiogroup" aria-label="Companion color">
+                          {QUOKKA_STYLE_PRESENTATIONS.map((choice) => (
+                            <button
+                              type="button"
+                              role="radio"
+                              aria-checked={choice.style === quokkaStyle}
+                              aria-label={`${choice.label}: ${choice.description}`}
+                              className={choice.style === quokkaStyle ? "selected" : ""}
+                              key={choice.style}
+                              onClick={() => setQuokkaStyle(choice.style)}
+                            >
+                              {choice.style === "line" ? (
+                                <span className="setup-quokka-line-swatch" aria-hidden="true" />
+                              ) : (
+                                <span
+                                  aria-hidden="true"
+                                  style={
+                                    {
+                                      backgroundColor: choice.color ?? quokkaCustomColor(quokkaCustomHue),
+                                    } as CSSProperties
+                                  }
+                                />
+                              )}
+                            </button>
+                          ))}
+                          {quokkaStyle === "custom" && (
+                            <input
+                              type="range"
+                              min="0"
+                              max="359"
+                              aria-label="Custom companion color hue"
+                              value={quokkaCustomHue}
+                              onChange={(event) => setQuokkaCustomHue(Number(event.currentTarget.value))}
+                            />
+                          )}
+                        </div>
+                        <label>
+                          <span>Accessory</span>
+                          <select
+                            value={quokkaAccessory}
+                            onChange={(event) =>
+                              setQuokkaAccessory(
+                                event.currentTarget
+                                  .value as (typeof QUOKKA_ACCESSORY_PRESENTATIONS)[number]["accessory"],
+                              )
+                            }
+                          >
+                            {QUOKKA_ACCESSORY_PRESENTATIONS.map((choice) => (
+                              <option key={choice.accessory} value={choice.accessory}>
+                                {choice.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <small>Expressions change with the moment. Your look follows them.</small>
+                      </>
+                    )}
+                  </div>
                 </div>
               </>
             )}

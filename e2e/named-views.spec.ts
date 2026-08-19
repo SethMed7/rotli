@@ -40,7 +40,7 @@ test("named views keep Main global and make Command-T context-sensitive", async 
   ).toBeVisible();
 
   await page.locator(".sb-notes-tree .frow", { hasText: "All notes" }).first().click();
-  const source = page.locator(".recent-row", { hasText: "Q3 priorities — Myela" });
+  const source = page.locator(".recent-row", { hasText: "Q3 priorities — Northstar" });
   await source.click({ button: "right" });
   await page.getByRole("menu").getByRole("menuitem", { name: "Move to view" }).click();
   await page.getByRole("menu").getByRole("menuitemcheckbox", { name: "OpenSource" }).click();
@@ -48,7 +48,7 @@ test("named views keep Main global and make Command-T context-sensitive", async 
   await page.getByRole("button", { name: /Current view: Main/ }).click();
   await page.getByRole("menu").getByRole("menuitemcheckbox", { name: "OpenSource" }).click();
   const projected = page.locator('.main-tree[data-active-view="OpenSource"] [data-main-id]', {
-    hasText: "Q3 priorities — Myela",
+    hasText: "Q3 priorities — Northstar",
   });
   await expect(projected).toBeVisible();
   await projected.click({ button: "right" });
@@ -95,13 +95,13 @@ test("the new-item chooser keeps a named view folder as its creation context", a
   await viewSwitcher.scrollIntoViewIfNeeded();
   await viewSwitcher.click();
   await page.getByRole("menu").getByRole("menuitem", { name: "New view…" }).click();
-  await page.getByRole("textbox", { name: "New view" }).fill("Myela");
+  await page.getByRole("textbox", { name: "New view" }).fill("Northstar");
   await page.getByRole("button", { name: "Save" }).click();
 
-  await page.getByRole("button", { name: "New folder in Myela" }).click();
+  await page.getByRole("button", { name: "New folder in Northstar" }).click();
   await page.getByRole("textbox", { name: "New folder in Main" }).fill("Boards");
   await page.getByRole("textbox", { name: "New folder in Main" }).press("Enter");
-  const folder = page.locator('.main-tree[data-active-view="Myela"] [data-main-folder="1"]', {
+  const folder = page.locator('.main-tree[data-active-view="Northstar"] [data-main-folder="1"]', {
     hasText: "Boards",
   });
   await folder.click();
@@ -114,7 +114,7 @@ test("the new-item chooser keeps a named view folder as its creation context", a
   await page.locator(".ni-surface").getByRole("button", { name: "New Markdown note" }).click();
 
   await expect(folder.locator("..").locator(".main-row", { hasText: "Untitled" })).toHaveCount(1);
-  await page.getByRole("button", { name: /Current view: Myela/ }).click();
+  await page.getByRole("button", { name: /Current view: Northstar/ }).click();
   await page.getByRole("menu").getByRole("menuitemcheckbox", { name: "Main — all items" }).click();
   await expect(
     page.locator('.main-tree[data-active-view="Main"] [data-main-id]', { hasText: "Untitled" }),

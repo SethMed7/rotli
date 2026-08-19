@@ -297,7 +297,7 @@
 }
 
 .setup-mode-choice button:hover { background: var(--hov); color: var(--text); }
-.setup-mode-choice button.selected { background: var(--accent); color: var(--on-accent); }
+.setup-mode-choice button.selected { background: var(--selected-bg); color: var(--selected-ink); }
 .setup-mode-choice button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .setup-accent {
@@ -306,6 +306,134 @@
   gap: 12px;
   color: var(--text-muted);
   font-size: 11.5px;
+}
+
+.setup-quokka-row {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding-block: 10px;
+  border-block: 1px solid var(--border);
+}
+
+.setup-quokka-preview {
+  display: grid;
+  place-items: center;
+  min-height: 74px;
+}
+
+.setup-quokka-controls {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 10px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.setup-quokka-swatches {
+  display: flex;
+  min-width: 0;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.setup-quokka-mode,
+.setup-quokka-controls > label:not(.setup-quokka-mode),
+.setup-quokka-controls > small {
+  grid-column: 1 / -1;
+}
+
+.setup-quokka-mode input {
+  accent-color: var(--accent);
+}
+
+.setup-quokka-swatches button,
+.setup-quokka-swatches input {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 3px;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.setup-quokka-swatches button:hover,
+.setup-quokka-swatches button.selected {
+  border-color: var(--accent);
+  background: var(--selected-bg);
+}
+
+.setup-quokka-swatches button > span {
+  position: relative;
+  width: 15px;
+  height: 15px;
+  border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
+  border-radius: 50%;
+}
+
+.setup-quokka-line-swatch::before,
+.setup-quokka-line-swatch::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  height: 1px;
+  background: var(--text);
+}
+
+.setup-quokka-line-swatch::before {
+  top: 5px;
+}
+
+.setup-quokka-line-swatch::after {
+  top: 9px;
+}
+
+.setup-quokka-swatches input {
+  border-color: var(--border);
+}
+
+.setup-quokka-swatches input[type="range"] {
+  width: 128px;
+  border-radius: var(--r-pill);
+  accent-color: var(--accent);
+}
+
+.setup-quokka-controls label {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.setup-quokka-controls select {
+  min-width: 118px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.setup-quokka-controls > small {
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.setup-quokka-swatches button:focus-visible,
+.setup-quokka-swatches input:focus-visible,
+.setup-quokka-controls select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .setup-arrow-note {
@@ -893,6 +1021,7 @@
   .setup-options { grid-template-columns: 1fr; }
   .setup-mode-row { grid-template-columns: auto 1fr; }
   .setup-mode-row small { grid-column: 2; }
+  .setup-quokka-row { grid-template-columns: 64px minmax(0, 1fr); }
   .setup-side-friends { display: none; }
   .setup-footer { align-items: flex-end; }
   .setup-local-note { display: none; }
@@ -907,6 +1036,9 @@
   .setup-model-summary { align-items: flex-start; }
   .setup-model-summary-meta { padding-top: 2px; }
   .setup-model-row { flex-wrap: wrap; }
+  .setup-quokka-row { grid-template-columns: 1fr; }
+  .setup-quokka-preview { display: none; }
+  .setup-quokka-controls { grid-template-columns: 1fr; }
   .setup-stage-scroll-cue { right: 0; }
   .vault-stats { grid-template-columns: 1fr 1fr 1fr; }
   .vault-preservation { grid-template-columns: 1fr; }

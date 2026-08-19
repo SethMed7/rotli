@@ -16,9 +16,9 @@ import {
   corpusListConfig,
   corpusSetActiveBrain,
   corpusSetBrainPerms,
+  corpusSwitchVault,
   memexDetect,
   memexListChats,
-  memexPickFolder,
   memexReadChat,
   memexReadContract,
   memexValidate,
@@ -63,25 +63,28 @@ export async function loadConfig(): Promise<MemexConfig> {
 }
 
 export const detect = (): Promise<DetectedMemex[]> => memexDetect();
-export const pickFolder = (): Promise<string | null> => memexPickFolder();
 
-/** "Choose folder…" — repoint the corpus (smart: memex / move / plain). Relaunches
- * on success (so it rarely resolves); false when the picker is cancelled. */
+/** "Choose folder…" — repoint the live corpus (smart: memex / move / plain).
+ * False when the picker is cancelled. */
 export const chooseFolder = (path?: string): Promise<boolean> => corpusChooseFolder(path);
 
-/** Connect an existing memex as a brain. Relaunches on success. */
+/** Switch to a vault already registered with Rotli. The backend resolves its
+ * trusted path by id and rebinds the live default store. */
+export const switchVault = (id: string): Promise<boolean> => corpusSwitchVault(id);
+
+/** Register an existing memex as a future vault switch target. */
 export const connectBrain = (path?: string): Promise<boolean> => corpusConnectBrain(path);
 
 /** Onboarding "create a new brain": scaffold a fresh memex at `path` and make it
- * the corpus (the corpus IS a memex). Relaunches on success. */
-export const initMemexAsCorpus = (path: string, brainEnabled = true): Promise<void> =>
+ * the live corpus (the corpus IS a memex). */
+export const initMemexAsCorpus = (path: string, brainEnabled = true): Promise<string> =>
   corpusInitMemex(path, brainEnabled);
 
 /** Scaffold + switch to a scratch PRACTICE vault (2026-07-26); the outgoing
- * vault stays registered and untouched. Relaunches on success. */
-export const createPracticeVault = (): Promise<void> => corpusCreatePracticeVault();
+ * vault stays registered and untouched while the shell remains alive. */
+export const createPracticeVault = (): Promise<string> => corpusCreatePracticeVault();
 
-/** Forget a connected brain (binding only). Returns the refreshed config. */
+/** Remove a connected vault binding. Returns the refreshed config. */
 export async function forget(id: string): Promise<MemexConfig> {
   await corpusForgetBrain(id);
   return loadConfig();

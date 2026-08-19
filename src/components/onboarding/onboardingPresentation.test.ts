@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 const onboardingCss = readFileSync(new URL("../../styles/onboarding.css", import.meta.url), "utf8");
 const onboardingSource = readFileSync(new URL("onboarding.tsx", import.meta.url), "utf8");
+const sideFriendsSource = readFileSync(new URL("setupSideFriends.tsx", import.meta.url), "utf8");
 const vaultSource = readFileSync(new URL("vaultActivation.tsx", import.meta.url), "utf8");
 const modelSource = readFileSync(new URL("modelSetup.tsx", import.meta.url), "utf8");
 
@@ -68,6 +69,18 @@ describe("onboarding companion presentation", () => {
     expect(onboardingCss).toMatch(
       /@media\s*\(max-width:\s*720px\)[\s\S]*\.setup-side-friends\s*\{\s*display:\s*none/,
     );
+  });
+
+  test("approved expressions and companion personalization appear in first run", () => {
+    expect(onboardingSource).toContain('? "thoughtful"');
+    expect(onboardingSource).toContain('? "walking"');
+    expect(onboardingSource).toContain(': "listening"');
+    expect(onboardingSource).toContain("QUOKKA_STYLE_PRESENTATIONS.map");
+    expect(onboardingSource).toContain("QUOKKA_ACCESSORY_PRESENTATIONS.map");
+    expect(sideFriendsSource).toContain('name="thoughtful"');
+    expect(sideFriendsSource).toContain('name="walking"');
+    expect(sideFriendsSource).toContain('name="listening"');
+    expect(sideFriendsSource).toContain('name="attention"');
   });
 
   test("model setup uses compact disclosures and explicit scroll affordances", () => {

@@ -261,6 +261,6 @@ egress ledger cannot go cold because of this change.
 Tantivy is a large dependency (pulls `zstd`, `lz4`, `memmap2`, `rust-stemmers`,
 `tantivy-fst`, …). The binary-size delta and the compile-time cost are measured
 and reported in the PR; if the delta is severe relative to the size-diet baseline
-(the 40→20 MB session), it is flagged for Seth to weigh rather than absorbed
-silently. Seth named Tantivy; the default is to use it unless the measurement is
+(the 40→20 MB session), it is flagged for the maintainer to weigh rather than absorbed
+silently. the maintainer named Tantivy; the default is to use it unless the measurement is
 damning.

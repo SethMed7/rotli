@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.82.0] - 2026-08-19
+
+
 ### Changed
 
 - **The agent surface is now uniform across Claude, Codex, Cursor, and
@@ -33,6 +36,163 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   budget contract) and dropping `README.md` from mandatory per-task reading.
   `bun run check:docs` newly enforces the bare import line and a 1,000-byte
   adapter budget so `CLAUDE.md` cannot regrow into a second rulebook.
+- **Web research can now stay inside Rotli.** A titlebar control and the New
+  chooser open a private browser tab backed by a separate non-persistent native
+  webview. New tabs begin on a start page that follows Rotli's current light or
+  dark environment, while Settings → Browser selects DuckDuckGo, Brave Search,
+  Google, or Bing as the app-wide default. Only that provider choice persists:
+  the browser accepts HTTP(S) pages, keeps remote content outside Rotli's app
+  webview and vault capabilities, and discards cookies, storage, destinations,
+  and history with the tab. Settings explains its narrow purpose as quick,
+  private research rather than a replacement for an everyday browser. Breve's
+  top stories now expose their own clickable Markdown citations in the right
+  column and open them through that same private surface. Its left headline
+  uses fixed breakpoint sizes, so wide windows no longer inflate it and
+  constrained columns step down cleanly.
+- **The marketing site now explains the complete Rotli workspace.** A new
+  product-led story shows the one-folder architecture, editable Markdown and
+  bonus work surfaces, AI privacy boundaries, all six theme families, the
+  optional filled quokka companion, Breve, and the bounded CLI/MCP surface.
+  The responsive page imports canonical character assets, previews light and
+  dark environments interactively, and replaces stale Brain-era screenshots
+  and notes-only positioning with a privacy-safe current workspace view.
+- **Bun 1.3 now shortens the inner development loop without changing Rotli's
+  runtime boundaries.** Unit tests run in isolated parallel workers, and a new
+  `test:changed` command follows Bun's import graph for focused local checks.
+  Bun.Image, Bun.WebView, the experimental global install store, bundler
+  metafiles, and Bun.cron were evaluated; the raw-pixel, Vite/Tauri, frozen
+  runtime, and durable local-time scheduler contracts remain with their current
+  owners.
+- **Time-based views stay current without multiplying component timers.**
+  Dashboard ranges, Tasks sections, Breve schedules, chat ages, and editor
+  timestamps now read one visible-window clock through React's external-store
+  contract. A lint-only React Compiler ratchet also blocks new render impurity,
+  unsafe ref access, synchronous effect-state updates, and hook suppressions
+  without enabling the compiler in production.
+- **Dependency review now covers every Bun graph without allowing tooling to
+  mutate CI.** The app, site, and Breve install roots share one three-day
+  release-age policy and one multi-lockfile audit command. Bun 1.4's audit-fix
+  plan, dedupe check, prune preview, license inventory, and package-source diff
+  are available through a version-gated workflow; mutation requires an explicit
+  root and `--apply`, and compatible audit repair never implies `--latest`. The
+  moving canary can be evaluated separately but cannot become release evidence. Native
+  development also uses Bun's parent-death handling so its supervised Tauri and
+  Vite descendants do not outlive the terminal owner.
+  The first reviewed maintenance pass repaired 21 compatible vulnerability
+  findings across the app, site, and Breve graphs, converged every duplicate,
+  and pruned stale local installs; range-blocked residuals remain documented.
+- **Appearance is now a personal workspace studio.** Realistic workspace
+  previews make Light, Dark, System, Rotli, Paper & Charcoal, Ocean, Grove,
+  Iris, and Midnight easy to judge; System follows macOS within the one selected
+  family. The optional quokka companion can stay onboarding-only or
+  follow the user through Rotli with a selected body hue, black or white ink,
+  idle mood/pose, accessory, and independently colored accessory layer. Rotli keeps
+  semantic poses in empty states while preserving that personal look; personal
+  idle and completed-chat placements use the user's preferred mood. The compact
+  mark remains its original line art. Accessory fills now respond entirely to
+  their hue control, stay clipped beneath their selected ink, and become
+  monochrome with Line treatment instead of leaking source color. Long chats
+  can use quiet lines, soft dots, a functional quokka-paw trail, or little ears.
+  Each marker now previews its matching prompt directly on hover or keyboard
+  focus; the unboxed rail and lower-opacity preview stay distinct from the
+  active prompt. The Activity overview now
+  makes proper use of wide panes. Persistent active rows now
+  use a lower-salience accent wash rather than a solid primary-color field. The
+  retired curled-r vector/tile family has been removed from current product and
+  brand-kit surfaces, including Quick Capture and the native menu-bar icon.
+- **Vaults can be recovered and disconnected without restarting Rotli.**
+  Location settings now uses an explicit two-step Remove from Rotli action that
+  never touches the vault folder or its files. Deleting the active folder in
+  Finder automatically opens the first available connected vault on Home; if
+  none survives, Rotli returns to vault setup and never recreates the missing
+  folder. The larger switcher gives every vault row its own refresh and overflow
+  controls, moves Location into the overflow, and replaces New/Connect with one
+  Connect vault action. ⌘R still refreshes the current vault. Every newly
+  created vault also opens a real,
+  editable `Welcome to Rotli.md` note at the vault root. It stays outside
+  Library and can be trashed through the ordinary note lifecycle.
+- **Antigravity now exposes its complete current model catalog.** The connected
+  lane includes every model reported by `agy models`, including Gemini 3.7 and
+  3.6 Flash at High, Medium, and Low effort, without weakening Rotli's native
+  provider/model allowlist.
+- **Vault selection now stays inside Rotli by default.** Onboarding, the vault
+  menu, and Location settings open a Home-first, directory-only browser with
+  keyboard navigation, direct child-folder selection, new-folder creation,
+  explicit empty-folder guidance, and the real absolute path. Home itself remains visible but cannot become a
+  vault because it contains private app and credential data; Desktop and
+  ordinary child folders work normally. Finder and the macOS picker remain
+  explicit escape hatches for reveal and additional locations.
+- **A new vault now opens inside the ordinary workspace shell.** The Home
+  sidebar, pane tabs, and titlebar actions remain visible around an editable
+  Markdown welcome note with a short list of things to try. Holding Command now
+  badges the titlebar New, Split right,
+  and Split down controls with their live bindings, and the `+` runs the same
+  new-item chooser as ⌘N.
+- **Vault identity is explicit in the pane workspace.** The sidebar remains the
+  one active-vault menu, and connected vaults remain switch targets rather than
+  mixing their notes into panes, search, System counts, or AI context. Saved
+  chat state retains its vault identity for safe migration. Entering Breve now swaps only the Coffee/Quokka mode control;
+  New, New folder, and Collapse all remain in the same header positions.
+- **System stays stable when the active vault changes.** The Home sidebar always
+  shows Library, Assets, Archive, and Trash; only their contents and counts
+  change, and connected vaults no longer appear as a separate Folders block.
+- **Fresh-chat naming now reads as an input, then a title.** The optional name
+  has a visible field boundary and keeps “Enter to skip” inside its placeholder.
+  Sending the first prompt immediately retires the field into ordinary title
+  text, using the entered name or the existing first-prompt title derivation.
+- **Fresh chat starts as a tighter working area.** Its greeting, composer, and
+  starters sit lower in a tall pane, while the unsent composer uses a narrower,
+  shorter measure. Once a conversation begins, the ordinary per-chat reading
+  width takes over again.
+- **⌘R now refreshes the active vault in every build.** It replaces the former
+  development-only webview reload with the same reopen-and-rescan action shown
+  in the vault menu and Location settings.
+
+### Fixed
+
+- **Accessories now follow the quokka's selected mood and movement.** Generated
+  glasses, hat, and goggles layers contain only accessory geometry and mount to
+  pose-specific face, brow, or crown landmarks. The scarf accessory has been
+  removed. Angled and
+  moving poses no longer leave eyewear behind at the neutral coordinates. The
+  bucket hat now has a smaller fitted crown covering the ears and a soft,
+  downward front brim above the eyes. The rear brim stays behind the crown and
+  head instead of appearing across a front-facing quokka. Dedicated front,
+  three-quarter, and side art keeps the crown and visible brim in perspective
+  across every pose instead of rotating one flat front hat. Filled and Line
+  companions clip ears, head strokes, and preserved detail beneath the hat's
+  curved lower silhouette without introducing a background-colored patch.
+  Every pose retains its own face and outline below the brim.
+- **Native development can create, open, link, and switch vaults again.** The
+  production-selected vault remains a read-only boot fallback until rotli (dev)
+  records its own isolated selection. Switching an already-connected vault now
+  keeps the process and native shell alive while the active data, Librarian,
+  Breve, and webview caches rebind in place. Switching or creating a vault
+  also keeps the outgoing Rotli vault linked, so it remains available in the
+  vault menu. Selecting an already-linked vault now switches by its registered
+  id instead of incorrectly demanding a fresh native-picker authorization.
+  Connecting another vault now registers it in the running registry
+  without a relaunch, and explicit development configs retain all linked roots
+  instead of collapsing them to one vault on the next launch.
+- **Every vault change is now a live folder transition.** Creating a vault,
+  creating a practice vault, importing a reviewed copy, choosing another notes
+  folder, and selecting a connected vault all keep the process and native shell
+  alive. After the target vault hydrates, Rotli always lands on the Home/Notes
+  front instead of inheriting Chat or Breve navigation.
+- **A truly empty vault no longer removes the left menu.** The empty-corpus
+  branch now renders inside the three-pane shell, and newly created vaults reset
+  inherited collapsed/Breve/Chat navigation before showing their first-use
+  welcome.
+- **Moved Rotli vaults reconnect by identity on macOS.** A machine-local URL
+  bookmark follows ordinary Finder renames and moves, and startup repoints the
+  readable absolute-path config only after the destination's stable `mx_…`
+  identity matches. An unresolved stale path returns to vault activation instead
+  of silently binding the legacy `~/Documents/rotli` location.
+
+## [0.81.0] - 2026-08-13
+
+### Changed
+
 - **Breve now opens as a vault-specific news dashboard.** The latest saved
   briefs form a most-recent-first carousel on the left while Top stories stays
   visible on the right, with watchlist sources, actions, upcoming routines, and
@@ -2885,7 +3045,7 @@ first foundations of the Breve→rotli merge.
 ## [0.24.3] — 2026-07-03
 
 Feedback sweep, day 2: organizer controls (pick the model + idle delay), the Breve
-check-up fix, and the metadata/onboarding polish from Seth's live pass.
+check-up fix, and the metadata/onboarding polish from the maintainer's live pass.
 
 ### Added
 
@@ -2951,7 +3111,7 @@ Tabs & Main core**.
 
 ## [0.24.1] — 2026-07-02
 
-The first-contact fixes from Seth's live pass over 0.24.0.
+The first-contact fixes from the maintainer's live pass over 0.24.0.
 
 ### Fixed
 
@@ -2994,7 +3154,7 @@ The AI Models pane grows up: verification, per-model control, starter presets, a
   Persisted.
 - **Starter presets** — three ready-made hybrids (Everyday · Private by default ·
   Frontier delegate) with stable ids; add one and tweak it like any preset.
-- **Scan my Mac:** reads the chip, unified memory, and free disk (this M4 Max: 64 GB),
+- **Scan my Mac:** reads the chip, unified memory, and free disk (reference machine: 64 GB),
   says what weight class the machine comfortably runs, and badges every catalog pick
   (great fit / workable / too big). The catalog also gained **Qwen2.5 14B and 32B** for
   the Macs that can carry them.
@@ -4052,7 +4212,7 @@ The left menu becomes the navigator — three sections, no more top dropdown (IA
   retired — the sidebar IS the navigation now. Each section is a collapsible accordion (state
   persists):
   - **Inbox = email** — a clear placeholder of the intended structure (an **All** row + an
-    account accordion: `maintainer@example.com`, `hello@sethmedina.com`, …, thread sub-accordion
+    account accordion: `personal@example.com`, `work@example.com`, …, thread sub-accordion
     later). The mail integration is a later increment; **rotli writes nothing** for it.
   - **Chat** — a ChatGPT-style section over your memex `chats/`: **+ New chat**, a searchable
     **All chats**, and your recent **history** (a limited view; "All chats" opens the full search).
@@ -4197,7 +4357,7 @@ nested folders, and inline diagrams/math from the increments since 0.2.2.
   shelf-projection, read side) — a note in a connected memex now appears in the sidebar
   under its `shelf:` (the folder _you_ put it in), never its disk path. So a note rotli
   staged into `wiki/_inbox/` with `shelf: [Inbox]` shows under **Inbox**; one filed to
-  `Myela/Payments` shows there — and you never feel it physically lives in `wiki/`. The
+  `Northstar/Payments` shows there — and you never feel it physically lives in `wiki/`. The
   `wiki/_inbox/` staging dir is hidden from the tree (it's plumbing); curated notes that
   don't carry a shelf yet keep showing under their wiki area until one is set. Frontmatter
   stays hidden (it always was).

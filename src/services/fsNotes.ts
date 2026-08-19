@@ -1,6 +1,6 @@
 // Phase 2 — the corpus behind the seam. The SAME NotesService interface the
-// UI has consumed since phase 1, now backed by plain .md files in
-// ~/Documents/rotli through the Rust corpus commands (src-tauri/src/corpus.rs).
+// UI has consumed since phase 1, now backed by plain files in the explicitly
+// selected vault through the Rust corpus commands (src-tauri/src/corpus.rs).
 // Only constructed inside the Tauri shell (the switch lives in ./notes.ts);
 // the browser/dev surface keeps the in-memory service — the seam's whole point.
 
@@ -60,14 +60,10 @@ export function scopeCorpusNotes(
   );
 }
 
-/** The MEMEX root markers ("" = the local corpus when it's a memex, "<id>:" per
- * connected brain) — the only roots whose chats/ means Chat-front transcripts.
- * Cached for the session: the Location config only changes across a relaunch
- * (choose/connect/forget all restart the app). */
-let memexMarkersP: Promise<ReadonlySet<string>> | null = null;
+/** The MEMEX root markers used to distinguish Chat transcripts. Vault switches
+ * are live, so this must resolve from current config instead of a session cache. */
 export function memexRootMarkers(): Promise<ReadonlySet<string>> {
-  memexMarkersP ??= corpusListConfig().then(memexMarkersOf);
-  return memexMarkersP;
+  return corpusListConfig().then(memexMarkersOf);
 }
 
 export class FsNotesService implements NotesService {
@@ -161,7 +157,7 @@ export class FsNotesService implements NotesService {
 
   // ——— lifecycle: Rust's corpus_move keeps the id/index and bakes the origin
   // rule on disk; we read the body back so callers get a full Note (the move
-  // meta carries no body), exactly like getNote derives (Seth, 2026-06-13). ———
+  // meta carries no body), exactly like getNote derives (the maintainer, 2026-06-13). ———
 
   async moveNote(id: string, targetFolder: string): Promise<Note> {
     const meta = await corpusMove(id, targetFolder);

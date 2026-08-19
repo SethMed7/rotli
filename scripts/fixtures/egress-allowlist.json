@@ -34,6 +34,9 @@
         "cli_complete",
         "generate_image",
         "organizer_egress_allowed"
+      ],
+      "src-tauri/src/private_browser.rs": [
+        "private_url"
       ]
     }
   },
@@ -86,12 +89,14 @@
     ]
   },
   "capabilities": {
-    "_comment": "The default capability's granted permissions. A new fs/shell/http plugin permission (a real attack-surface widening) fails the check until pinned here.",
+    "_comment": "The default capability's granted permissions and exact app-owned webview targets. A new fs/shell/http plugin permission or window-wide target (which would grant a private-browser child IPC) fails until pinned here.",
     "default": [
       "core:default",
       "core:window:allow-start-dragging",
       "updater:default"
-    ]
+    ],
+    "defaultWebviews": ["main", "capture", "quick"],
+    "defaultWindows": []
   },
   "sensitiveLogging": {
     "_comment": "Heuristic (documented limits in docs/development/security.md): flags a println!/eprintln!/console.log in an egress-adjacent file whose argument names a body/secret/prompt/transcript variable. It catches the obvious regression (logging a note body next to a network call); it CANNOT prove the absence of a leak — a renamed variable or an interpolated helper slips it. It is a tripwire, not a proof.",
@@ -101,6 +106,7 @@
       "src-tauri/src/chat.rs",
       "src-tauri/src/provider.rs",
       "src-tauri/src/breve.rs",
+      "src-tauri/src/private_browser.rs",
       "src/ai/host.ts",
       "src/ai/loop.ts",
       "breve-runtime/scripts/llm.ts",

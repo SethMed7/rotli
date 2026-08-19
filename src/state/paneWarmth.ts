@@ -6,7 +6,12 @@ import type { Tab } from "../types";
 export const WARM_SURFACE_LIMIT = 3;
 
 export function isWarmSurface(tab: Tab): boolean {
-  return tab.surfaceKind === "chat" || tab.surfaceKind === "canvas" || tab.surfaceKind === "file";
+  return (
+    tab.surfaceKind === "chat" ||
+    tab.surfaceKind === "canvas" ||
+    tab.surfaceKind === "file" ||
+    tab.surfaceKind === "browser"
+  );
 }
 
 export function nextWarmSurfaceIds(

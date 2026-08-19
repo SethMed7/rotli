@@ -1,48 +1,34 @@
-# kits/rotli — marks APPROVED · freeze pending
+# rotli brand layer
 
-Stage-1 brand kit for **rotli**, built from the Seth-approved brand board (2026-06-06, regenerated
-2026-06-10). The **marks passed the human gate (round 3, 2026-06-11)** — what remains before the
-`kit.json` freeze is Seth's sign-off on the full board (`board.html`), mainly the icon set.
+The product identity is the canonical line-drawn quokka in
+`src/assets/characters/_logo.svg`. The retired curled-`r` mark and its generated
+wordmark/tile family are intentionally absent from this live kit.
 
-## Confirmed (DATA + approved vectors)
+## Current assets
 
-- `brand.json` — single source of truth: identity, voice, palette, type, shape, icons, motion.
-- `tokens/` — colors.css/json (semantic light/dark surfaces + WCAG contrast matrix) · type.css.
-- `logo/` — **✅ approved**: `wordmark.svg` (outlined Baloo 2 true-600 + traced quokka-r grafted as the
-  leading glyph) and `r-mark.svg` (smooth trace of the board's r, flowed bottom), each in
-  cocoa / `.mono` / `.mono-white`. Built + judged in `engine/RUNS/rotli/2026-06-10-board-intake/`.
-- `tiles/` — favicon · app-icon-512 · social-avatar-1024 · tile-{linen,cocoa,clay}, generated from the
-  approved r (`build_tiles.mjs` in the run).
-- `fonts/` — self-hosted: Satoshi + General Sans (Fontshare, variable + statics) for UI; `Baloo2-600.ttf`
-  (OFL, true static instance) as wordmark source/provenance. See `LICENSES.md`.
+- `tokens/` — light/dark color roles and typography.
+- `icons/` — Rotli's interface glyph system.
+- `providers/` — provider-owned model marks with their own provenance.
+- `../assets/characters/` — the canonical quokka drawings. `_logo.svg` is the
+  compact line mark. `masks/` lets the original full-body geometry accept the
+  complete user-selected palette. `concepts/layers/` holds approved thoughtful,
+  walking, listening, attention, and accessory artwork split into body, ink,
+  preserved expression detail, and strictly colorable accessory masks. Accessory
+  fills are inset under their selected black-or-white ink so original raster
+  color cannot fringe the character.
 
-## Pending (the freeze gate)
+The companion may use Line, Cocoa, Fern, Ocean, Iris, Berry, Amber, or a custom
+hue for its body, plus black or white ink. Glasses, a bucket hat, and goggles
+are optional and carry their own custom hue. The product companion may
+be disabled entirely outside onboarding. None of these choices may alter the
+compact product mark, provider identities, tray icon, or app icon.
 
-- **Icons** — `icons/rotli-icons.sprite.svg` is draft v1 on the 24-grid; judge on `board.html`.
-- **`kit.json`** — the freeze marker. Written only on Seth's board sign-off; freeze opens Stage 2
-  (`apps/rotli` vendors this kit).
+## Product boundary
 
-## Review artifact
+Components consume semantic roles composed in `src/styles/base.css` and
+`src/styles/themes.css`; they do not reach into fixed palette values. Product
+material remains flat: no glows, shadows, backdrop blur, or decorative filters.
 
-`board.html` — the branded guidelines doc, rebuilt 2026-06-11 **from the kit vectors** (live SVG,
-self-hosted fonts, no CDN). Open it in a browser; that's where the freeze call happens.
-
-## To change a frozen kit (once it exists)
-
-Never edit a frozen kit in place — re-enter Stage 1, bump `kit.json`, re-pull into `apps/rotli`.
-
-Brief: `../../engine/BRANDS/rotli/brief.md` · Board source: `../../engine/BRANDS/rotli/_reference/`.
-
-## Product token boundary
-
-`tokens/colors.css` and `tokens/type.css` are the fixed brand inputs. The app's
-`styles/base.css` composes them into semantic product roles (`--surface`,
-`--border-strong`, `--danger`, focus/state roles, and semantic icon roles), while
-`styles/themes.css` supplies Paper and Charcoal values. Component styles consume
-those roles; they never read a fixed `--rotli-*` palette value directly.
-
-The product material is flat. Glows, halos, box/text/drop shadows, backdrop blur,
-and decorative filters are not part of the kit. Popovers and dialogs separate
-with a solid surface, semantic border, spacing, and the flat scrim. Focus and
-selection use outlines or borders. `bun run check:design-system` enforces both
-the effect ban and the fixed-palette boundary across `src/styles/`.
+Historical brand explorations remain under `brand/engine-history/` for
+provenance. They are not current assets and must never be imported by product,
+site, native-shell, or experiment code.

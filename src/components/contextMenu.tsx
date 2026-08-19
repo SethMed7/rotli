@@ -2,7 +2,7 @@
 // menu from the store, renders it as a fixed popover clamped to the viewport,
 // and closes on outside-click / Esc (useTransientPopover) or after an action.
 // "drill" items swap the visible list for a sub-list with a ‹ Back header, so we
-// avoid floating-submenu positioning entirely (Seth, 2026-07-01).
+// avoid floating-submenu positioning entirely (the maintainer, 2026-07-01).
 //
 // Keyboard-first too (the sidebar's "m" key opens this same menu since the
 // RowMenu unification): the first item autofocuses, ArrowUp/Down move focus,

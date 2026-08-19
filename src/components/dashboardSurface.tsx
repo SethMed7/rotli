@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 
 import { relativeLabel } from "../lib/dateLabels";
 import { type ModelUsageRange, type ModelUsageSummary, isTauri, modelUsage } from "../lib/tauri";
+import { useNow } from "../lib/useNow";
 import { useSearchableNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
@@ -72,7 +73,7 @@ function RotliActivity() {
       ),
     [chatModelMap, chats.activeMemex, chats.chatList],
   );
-  const nowMs = Date.now();
+  const nowMs = useNow();
   const sinceMs = nowMs - RANGE_MS[range];
   const snapshot = useMemo(
     () => homeDashboardSnapshot(notes, dashboardModels, chats.chatList, nowMs, RANGE_MS[range]),
@@ -167,7 +168,13 @@ function RotliActivity() {
           </div>
           <div className="dashboard-list">
             {recentChats.map((chat) => (
-              <button type="button" key={chat.slug} onClick={() => openChat(chat.slug)}>
+              <button
+                type="button"
+                key={chat.slug}
+                onClick={() =>
+                  openChat(chat.slug, chats.activeMemex ? { vaultId: chats.activeMemex.id } : undefined)
+                }
+              >
                 <span className="dashboard-list-mark chat" aria-hidden="true">
                   C
                 </span>

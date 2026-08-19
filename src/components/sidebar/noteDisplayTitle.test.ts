@@ -4,8 +4,8 @@ import { noteDisplayTitle } from "./noteDisplayTitle";
 
 describe("noteDisplayTitle", () => {
   test("removes an exact parent-folder prefix separated by a dash", () => {
-    expect(noteDisplayTitle("Myela AI — Strategy (master)", "Myela AI")).toBe("Strategy (master)");
-    expect(noteDisplayTitle("myela ai - Sources", "Myela AI")).toBe("Sources");
+    expect(noteDisplayTitle("Northstar AI — Strategy (master)", "Northstar AI")).toBe("Strategy (master)");
+    expect(noteDisplayTitle("northstar ai - Sources", "Northstar AI")).toBe("Sources");
   });
 
   test("supports the other quiet title separators without consuming the remainder", () => {
@@ -14,8 +14,8 @@ describe("noteDisplayTitle", () => {
   });
 
   test("leaves unrelated and incomplete titles alone", () => {
-    expect(noteDisplayTitle("Strategy for Myela AI", "Myela AI")).toBe("Strategy for Myela AI");
-    expect(noteDisplayTitle("Myela AI", "Myela AI")).toBe("Myela AI");
-    expect(noteDisplayTitle("Myela AI — ", "Myela AI")).toBe("Myela AI —");
+    expect(noteDisplayTitle("Strategy for Northstar AI", "Northstar AI")).toBe("Strategy for Northstar AI");
+    expect(noteDisplayTitle("Northstar AI", "Northstar AI")).toBe("Northstar AI");
+    expect(noteDisplayTitle("Northstar AI — ", "Northstar AI")).toBe("Northstar AI —");
   });
 });

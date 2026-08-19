@@ -1,4 +1,4 @@
-// The sidebar's run signals (Seth, 2026-08-03): running while a turn is in
+// The sidebar's run signals (the maintainer, 2026-08-03): running while a turn is in
 // flight, unread when the reply landed unwatched, gone once seen. Session
 // state only — a relaunch starts quiet by design.
 

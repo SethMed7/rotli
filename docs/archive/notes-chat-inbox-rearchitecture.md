@@ -2,18 +2,18 @@
 
 *Research + design doc. Authored 2026-06-26, from rotli's tree, against the
 memex-vault v3.5 contract. RESEARCH ONLY — no code changed. This is a proposal for
-Seth to redline. **Shipped:** the three-fronts model (Notes · Chat · Inbox)
+the maintainer to redline. **Shipped:** the three-fronts model (Notes · Chat · Inbox)
 proposed here is now live — current truth is `docs/model.md`; Voice/Memory
 references below are the old state this doc moved away from.*
 
-Seth's three early ideas, restated up front:
+the maintainer's three early ideas, restated up front:
 
 1. **Chats and notes live in the same surface.** Not a separate "Chat" module —
    "everything has a chat," so a chat is something a note *carries*, or a peer
    document beside it, not a different place you navigate to.
 2. **Drop the module-switcher dropdown** in the titlebar.
 3. **"Inbox" becomes EMAIL.** Today "Inbox" is a *notes destination* (a folder of
-   captured markdown). Seth wants the word to mean an email inbox, a separate
+   captured markdown). the maintainer wants the word to mean an email inbox, a separate
    later module. The capture concept ("one-breath" ⌥C) does not go away — it just
    stops being called "Inbox."
 
@@ -62,7 +62,7 @@ on-disk "Inbox", "Voice", "Board" the switcher lists are NOT the same things** a
 the sidebar destinations — the switcher's "Inbox/Board" are *unbuilt module
 placeholders*, while a working **Board** view already exists in the sidebar
 (`board.open`, `actions.ts:156-167`) and **Inbox** already exists as a notes
-folder (below). This collision of names is part of what Seth is untangling.
+folder (below). This collision of names is part of what the maintainer is untangling.
 
 ### 1.2 "Inbox" as a notes destination (today)
 
@@ -128,7 +128,7 @@ cheap and chat-as-a-full-front is the awkward path.**
 
 ---
 
-## 2. What Seth is asking for — and the ambiguities
+## 2. What the maintainer is asking for — and the ambiguities
 
 | # | Ask | Ambiguity to pin down |
 |---|-----|-----------------------|
@@ -185,7 +185,7 @@ This is the cleanest of the three to settle, so do it first.
 overload. No contract change — `inbox.md` keeps its on-disk name; email never
 writes the memex.
 
-> Open question for Seth: does the email Inbox **branch into** the memex the way a
+> Open question for the maintainer: does the email Inbox **branch into** the memex the way a
 > Breve day does (turn an email into a `chats/` thread `attachedTo: [[email-…]]`,
 > or a note linking it)? If yes, email is a *read source you can branch from* —
 > same pattern as Breve's `history/` (write-contract-v3.5 §3). If no, it's a pure
@@ -321,7 +321,7 @@ patterns rotli already has (sidebar action rows + ⌘K).
 
 > Alternative considered — **a tab bar of modules** across the top. Rejected: it
 > re-creates the dropdown's "modules are peer places" framing, which is the framing
-> Seth is moving away from. The sidebar+palette split better matches "core
+> the maintainer is moving away from. The sidebar+palette split better matches "core
 > workspace, with lenses."
 
 ---
@@ -350,7 +350,7 @@ the backlink on read-only notes (the chat still links one-way; `validate.ts` wou
 flag the missing back-link — so prefer (a), or surface it as "attached, not
 back-linked"). **This is the single contract-edge of the whole rethink** and it
 already exists today (a chat in the Vault `chats/` folder attached to a `wiki/`
-note hits the same wall). Flag it for Seth; don't widen the gate.
+note hits the same wall). Flag it for the maintainer; don't widen the gate.
 
 **Decision needed (and it predates this rethink):** the v3.5 *proposal* doc
 (`memex-write-contract-v3.5-proposal.md`) argues for a **separate visible `notes/`
@@ -414,7 +414,7 @@ keyboard-first, modal character:
 
 Each phase ships independently and none touches `is_writable`/`canWrite`.
 
-### 7.4 Open questions for Seth
+### 7.4 Open questions for the maintainer
 
 1. **Rename target for the default shelf:** "Notes", "Unsorted", "Quick", or keep
    it as today's "Inbox" *label* but just stop calling email "Inbox"? (Lean:
@@ -463,13 +463,13 @@ Each phase ships independently and none touches `is_writable`/`canWrite`.
 - **Phase it:** words first (free, no contract change) → chat-as-tab → drop the
   dropdown → per-note chat → one list → email. Each phase ships independently.
 
-Doc: `~/rotli/docs/notes-chat-inbox-rearchitecture.md`
+Doc: `docs/archive/notes-chat-inbox-rearchitecture.md`
 
 ---
 
-# Addendum — Seth's decided IA (2026-06-26)
+# Addendum — the maintainer's decided IA (2026-06-26)
 
-This supersedes the recommendation above where they differ. Seth read the analysis and
+This supersedes the recommendation above where they differ. the maintainer read the analysis and
 chose a concrete shape. **The top-bar module dropdown is removed**; the left menu carries
 **three top-level sections**, each with its own accordions. One window blends email, an
 AI chat, and notes — "no need for that top drop down."
@@ -478,7 +478,7 @@ AI chat, and notes — "no need for that top drop down."
 
 1. **Inbox = email** (the word "Inbox" now means email, not note-capture).
    - Accordion **by account**, with an **All** at top to search across everything:
-     `All · maintainer@example.com · hello@sethmedina.com · …` (every connected mailbox).
+     `All · personal@example.com · work@example.com · …` (every connected mailbox).
    - A sub-accordion **by email/thread** under each account.
    - (The capture concept — today's `inbox.md` / ⌥C — needs a new home/name since "Inbox"
      is taken; treat capture as a quick-entry that files into Notes, not the email Inbox.)
@@ -495,7 +495,7 @@ AI chat, and notes — "no need for that top drop down."
 **Memory is NOT a section** — "the memory is simply part of my Vault, so that doesn't make
 sense" as a separate module. It folds into Notes/Vault.
 
-## Chat ⇄ Note relationship (the precise rule Seth gave)
+## Chat ⇄ Note relationship (the precise rule the maintainer gave)
 
 - **Not everything is a chat.** A board is just a board; a note is just a note. But you can
   **open a chat *against* any board/note** (chat is a verb you point at an object).
@@ -528,7 +528,7 @@ These were scoped out of 0.4.x to do correctly; they precede the big IA rebuild:
   `.md` (cleanest for the text-first memex + the `storage:` model) vs. inside the `.excalidraw` appState.
   This is a prerequisite for boards to participate in the Chat section's @-context.
 
-## Phasing (revised to land Seth's IA)
+## Phasing (revised to land the maintainer's IA)
 
 1. **Boards nameable + metadata** (F, G) — small, unblocks board search + @-context. ✅ 0.4.2/0.4.3
 2. **Contextual zoom** (D) — independent polish.
@@ -562,7 +562,7 @@ The **structural** left-menu rework only:
 chat-owns-a-summary-note model, Breve `history/` rendered inside Chat, the email account/thread
 accordion (only stubbed), and the real mail integration.
 
-## Breve / `history/` reads as chat (Seth, 2026-06-26)
+## Breve / `history/` reads as chat (the maintainer, 2026-06-26)
 
 The `history/` dailies should render **in the chat UI**, read-only — you can't add to a day, but it's
 fluid: **take a day → start a new chat with that day as context**, **spin a note off a day** (then

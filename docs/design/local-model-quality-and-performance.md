@@ -6,7 +6,7 @@ marked explicitly as unmeasured.
 
 ## The brief
 
-Seth's priorities, in his order:
+the maintainer's priorities, in his order:
 
 1. **Output quality** — most important.
 2. **Speed.**
@@ -35,7 +35,7 @@ then spend any of the recovered headroom on quality. The standing accept rule fo
 
 ## The harness question, answered honestly
 
-Seth originally asked about integrating third-party agent harnesses (opencode, pi) because
+the maintainer originally asked about integrating third-party agent harnesses (opencode, pi) because
 "these harnesses tend to improve quality of models sometimes." He has since parked that as
 research-only and pointed at ReAct-style reasoning loops as the direction. The fair question
 is: **can rotli's own loop get harness-grade gains?**
@@ -127,7 +127,7 @@ serialized slot an added generation queues in front of the user's next message.
 
 ### Current measured reality: prefill is the cost
 
-Measured against Seth's running server (warm `gemma-3-12b-it-qat-4bit`, M4 Max,
+Measured against a reference development server (warm `gemma-3-12b-it-qat-4bit`, Apple Silicon,
 `temperature 0`, `num_predict 8`):
 
 | Prompt | Generation | Wall |
@@ -289,7 +289,7 @@ yet, because we have never observed `serious` or `critical` here at all.
 
 It **records**. It does **not gate chat**, and it does **not change daemon admission**.
 
-Degrading answers because the machine is warm inverts Seth's own priority order. And post-cache,
+Degrading answers because the machine is warm inverts the maintainer's own priority order. And post-cache,
 most of the heat such a gate would save is already gone. The measured entry condition for
 reconsidering is in Open Questions.
 
@@ -534,7 +534,7 @@ is purely rotli-side work.
 
 **Risk.** This makes rotli the de-facto owner of a runtime two other products depend on (Breve via
 `breve-runtime/scripts/llm.ts`, warble likewise), and a rotli-driven upgrade could break them.
-**That ownership decision is Seth's call and is recorded here, not assumed by the installer.** The
+**That ownership decision is the maintainer's call and is recorded here, not assumed by the installer.** The
 installer being additive and plist-switched is the mitigation that keeps it reversible.
 
 ---
@@ -873,7 +873,7 @@ Things we genuinely do not know. Each is an experiment, not an argument.
    that some cases already flip run-to-run — in which case several historically recorded PASS/FAIL
    claims in existing notes are weaker evidence than they read as.
 7. **Who owns `mlx-server.py`?** Breve and warble consume it. PR 3 makes rotli the de-facto owner of
-   the vendored lane. That is a product decision for Seth, recorded here rather than assumed.
+   the vendored lane. That is a product decision for the maintainer, recorded here rather than assumed.
 8. **Is the counterfactual defect-trigger rate low enough for a re-check to be worth building?**
    PR 1 answers it for free. Low ⇒ a defect-gated re-check has known expected value and is worth a
    PR. High ⇒ the gate is wrong, not the model, and the PR would have been a redesign.
@@ -882,7 +882,7 @@ Things we genuinely do not know. Each is an experiment, not an argument.
 
 ## Deliberately not doing
 
-**Parked, not rejected — research:** *third-party agent harnesses (opencode, pi).* Seth parked
+**Parked, not rejected — research:** *third-party agent harnesses (opencode, pi).* the maintainer parked
 these himself, and the measurement explains why they would not have paid here: **the gap is loop
 COST, not loop SHAPE.** No harness would have found the prefill problem, because it lives in the
 model server, below where a harness sits. If a harness is revisited, the question to ask it is
@@ -897,10 +897,10 @@ Rejected, with reasons:
 | Always-on reflection, self-verification, self-consistency, best-of-N | Multiplies generations unconditionally on a serialized slot, queueing in front of the user's next message. And the improvement would be scored by keyword matching that cannot tell a better answer from a more verbose one. |
 | A defect-gated re-check as a shipped PR | Deferred with a cheap re-entry condition: PR 1 records the counterfactual trigger rate at zero generation cost. Decide with data, not argument. |
 | An adaptive step-budget classifier keyed off the question | `RunInput.maxSteps` is fully plumbed (`src/ai/loop.ts:66`) and no app caller sets it — tempting. But a misclassified question produces a visibly worse answer in the user's face, and post-cache an avoided step saves a few hundred ms instead of ~14 s. The win shrinks by an order of magnitude while the risk stays constant. |
-| A thermal-aware step budget, or any thermal check on chat admission | Trades axis 1 for axis 3, backwards against Seth's ordering; post-cache the heat it would save is largely gone; and it would mix a MEMORY-verdict queue with a QUALITY dial, making the guardrail lie about why someone is waiting. Re-entry: Open Question 1. |
+| A thermal-aware step budget, or any thermal check on chat admission | Trades axis 1 for axis 3, backwards against the maintainer's ordering; post-cache the heat it would save is largely gone; and it would mix a MEMORY-verdict queue with a QUALITY dial, making the guardrail lie about why someone is waiting. Re-entry: Open Question 1. |
 | Constrained JSON decoding via `logits_processors` | Genuinely harness-grade — malformed replies become structurally impossible. But PR 7's cold sampling should capture most of it without a second decode-path change to a shared runtime. Reconsider only if PR 7's malformed-step counter does not reach ~zero. |
 | Speculative decoding with a draft model | Speeds *decode*, the smaller half of a tool step, and needs a gemma-3-family draft sharing the tokenizer — none installed (only `qwen2.5-1.5b/3b` beside `gemma-3-12b`). Second-order behind prefill by a wide margin. On the record so it is not discovered late. |
-| Fixing the compute guardrail's phantom same-model concurrency, and ticketing the daemon's local calls | Both are real honesty bugs — `mlx-server.py`'s `_lock` is held for the whole generation, so two admitted same-model turns serialize inside Python while the queue says "running", and `docs/design/local-compute-guardrails.md:103-106` asserts the opposite. Neither moves Seth's three axes, and folding them in would muddy this stack's proof story. Own PR, against the guardrails doc. |
+| Fixing the compute guardrail's phantom same-model concurrency, and ticketing the daemon's local calls | Both are real honesty bugs — `mlx-server.py`'s `_lock` is held for the whole generation, so two admitted same-model turns serialize inside Python while the queue says "running", and `docs/design/local-compute-guardrails.md:103-106` asserts the opposite. Neither moves the maintainer's three axes, and folding them in would muddy this stack's proof story. Own PR, against the guardrails doc. |
 | Warm-on-intent (`/warmup` on composer focus) | Cheap and real — the model unloads after 600 s idle and only Breve ever warms it — but a one-off cold-load papercut, not a per-turn cost. Papercut batch. |
 | A bigger or less-quantized local model | 7.5 GB resident already, and a swap is a full unload/gc/reload. A larger model raises prefill roughly linearly — the dominant term in both complaints. Wrong direction. |
 | CI-gating the live evals | CI has no MLX server and no vault; `regression.yml` runs only the offline suite. `docs/design/ai-visibility-matrix.md:291-293` already asserts a release gate nothing enforces — wire it into `release.sh` as a **local** pre-release step or delete the claim, but do not restate it as a CI promise this project cannot keep. |

@@ -218,7 +218,7 @@ pub struct BreveBrief {
     pub path: Option<String>,
     /// Vault-relative path of the brief's spoken version when one exists
     /// (`storage/breveAudios/<stem>.mp3`, the runtime's deterministic lane) —
-    /// the reader shows a player for it (Seth, 2026-07-31).
+    /// the reader shows a player for it (the maintainer, 2026-07-31).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audio_path: Option<String>,
 }
@@ -1614,14 +1614,14 @@ pub fn breve_write_config(
     let root = active_root(&state)?;
     write_json(&root.join(CONFIG_FILE), &config)?;
     // mirror to the vault-agnostic defaults so a NEW vault's Breve starts
-    // from the current setup (Seth, 2026-07-31: "configurations can be
+    // from the current setup (the maintainer, 2026-07-31: "configurations can be
     // separate but default should be same") — best-effort, never blocks
     routines::mirror_shared_default(&app, "config.json", &root.join(CONFIG_FILE));
     let legacy = legacy_root();
     Ok(snapshot_at(&root, legacy.as_deref()))
 }
 
-/// The brief instructions surface (Seth, 2026-07-31: "the briefs have a
+/// The brief instructions surface (the maintainer, 2026-07-31: "the briefs have a
 /// system prompt let me see that prompt and I should be able to modify
 /// them"). `default_text` is the materialized SKILL.md the wrappers use;
 /// a user edit lives at `.rotli/routines/skill.custom.md` — OUTSIDE the

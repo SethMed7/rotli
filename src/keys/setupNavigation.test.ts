@@ -9,6 +9,11 @@ registerDefaultActions();
 afterEach(() => setSetupHandle(null));
 
 describe("setup navigation commands", () => {
+  test("Command-R refreshes the current vault instead of reloading the app shell", () => {
+    expect(currentChord("vault.refresh")).toBe("Meta+R");
+    expect(currentChord("app.refreshDevelopment")).toBeNull();
+  });
+
   test("the remappable Back command routes to the mounted setup step", () => {
     let backs = 0;
     setSetupHandle({ continue: () => {}, back: () => backs++ });

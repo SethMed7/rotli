@@ -16,7 +16,7 @@ import {
 export interface NamedView {
   name: string;
   tree: MainNode[];
-  /** Chat slugs belonging to this view (Seth, 2026-08-03: "bring the views
+  /** Chat slugs belonging to this view (the maintainer, 2026-08-03: "bring the views
    * into the chat area — organize chats by work vs personal"). Additive field:
    * absent reads as none. Chats are files without frontmatter view_tags; this
    * list is their whole view membership, and Rust round-trips it verbatim. */

@@ -1,9 +1,8 @@
-/* rotli — type tokens. From the Seth-approved brand board (2026-06-06).
-   Display + headings + wordmark: Satoshi. UI + body: General Sans. Fallback: Inter / system.
+/* rotli — type tokens. From the maintainer-approved brand direction.
+   Display + headings: Satoshi. UI + body: General Sans. Fallback: Inter / system.
    Both faces are Fontshare (ITF) — free for personal AND commercial use, self-hosted. NOT OFL and NOT in
-   the studio's standard Fontsource catalog — a deliberate, Seth-approved deviation for rotli (recorded in
-   LICENSES.md). Drop the font files into ../fonts/ (Fontshare download). The wordmark also ships as outlined
-   SVG paths, so the font is only needed for live UI text. */
+   the studio's standard Fontsource catalog — a deliberate, the maintainer-approved deviation for rotli (recorded in
+   LICENSES.md). */
 @font-face {
   font-family: "Satoshi";
   src: url("../fonts/Satoshi-Variable.woff2") format("woff2");
@@ -18,22 +17,8 @@
   font-style: normal;
   font-display: swap;
 }
-/* Baloo 2 (Fontshare, free for commercial — same license tier as Satoshi/General
-   Sans, recorded in LICENSES.md). The rounded, friendly wordmark face — it pairs
-   with the rounded line-art quokka mark (Seth, 2026-06-26). The brand wordmark was
-   already constructed from Baloo 2 true-600; this loads it for the LIVE "rotli"
-   wordmark in the titlebar (the outlined logo SVG has no runtime font dependency). */
-@font-face {
-  font-family: "Baloo 2";
-  src: url("../fonts/Baloo2-600.ttf") format("truetype");
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-
 :root {
   --font-display: "Satoshi", "Inter", system-ui, sans-serif; /* headings */
-  --font-wordmark: "Baloo 2", "Satoshi", system-ui, sans-serif; /* the rotli wordmark */
   --font-body: "General Sans", "Satoshi", "Inter", system-ui, sans-serif; /* UI + body */
 
   /* scale — exactly as specified on the board (size / line-height) */
@@ -77,10 +62,4 @@
   font-weight: var(--wght-label);
   font-size: var(--fs-label);
   line-height: var(--lh-label);
-}
-.rotli-wordmark {
-  font-family: var(--font-wordmark);
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: lowercase;
 }

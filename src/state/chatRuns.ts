@@ -1,4 +1,4 @@
-// Live chat-run signals for the sidebar (Seth, 2026-08-03: "some sort of
+// Live chat-run signals for the sidebar (the maintainer, 2026-08-03: "some sort of
 // loading on the left sidebar for when the chat is loading and completed —
 // that way I know to click on it"). One tiny in-memory store: a chat is
 // `running` while its turn is in flight, `unread` when the reply settled while

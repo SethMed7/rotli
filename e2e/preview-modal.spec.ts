@@ -1,4 +1,4 @@
-// Quick Look (Seth, 2026-07-29): "offer a preview so I don't have to open it
+// Quick Look (the maintainer, 2026-07-29): "offer a preview so I don't have to open it
 // fully" — the row menu's Preview and Space in the System browser open a modal
 // peek; Esc and × close it; Open escalates to the real surface.
 

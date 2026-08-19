@@ -1,4 +1,4 @@
-// The right-click context menu (Seth, 2026-07-01). A tiny store holding the one
+// The right-click context menu (the maintainer, 2026-07-01). A tiny store holding the one
 // open menu (position + item specs). Item specs carry their own closures, so any
 // surface can build a menu with its own hooks and hand it here; a single
 // <ContextMenu> host renders it. Drill-in submenus (e.g. "Move to…") nest specs.
@@ -13,10 +13,10 @@ export type MenuSpec =
       danger?: boolean;
       disabled?: boolean;
       /** How `checked` shows: a leading ✓ / ★ / 🔒-glyph gutter marker for
-       * toggles ("lock" for protection states — Seth, 2026-07-29: secure is a
+       * toggles ("lock" for protection states — the maintainer, 2026-07-29: secure is a
        * lock, not a star), or "highlight" — an active-row background with NO
        * gutter (a selector among exclusive options, e.g. the Main view
-       * switcher; Seth, 2026-07-24: cleaner than a checkmark indenting every
+       * switcher; the maintainer, 2026-07-24: cleaner than a checkmark indenting every
        * sibling). */
       checked?: boolean;
       checkedMark?: "check" | "star" | "highlight" | "lock";

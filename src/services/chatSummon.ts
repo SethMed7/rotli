@@ -38,11 +38,15 @@ export async function summonChat(): Promise<void> {
     return;
   }
   let slug: string | null = null;
+  let vaultId: string | undefined;
   try {
     const inst = activeInstance(await loadConfig());
-    if (inst) slug = newestChatSlug(await listChats(inst));
+    if (inst) {
+      vaultId = inst.id;
+      slug = newestChatSlug(await listChats(inst));
+    }
   } catch {
     // no memex / listing failed — a fresh chat is still a chat
   }
-  panes.openChat(slug);
+  panes.openChat(slug, vaultId ? { vaultId } : undefined);
 }

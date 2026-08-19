@@ -1,4 +1,4 @@
-// The raw-metadata banner ("Show file metadata", Seth 2026-07-01): the note's
+// The raw-metadata banner ("Show file metadata", the maintainer 2026-07-01): the note's
 // frontmatter EXACTLY as it sits on disk — fences and all — rendered as an
 // editable monospaced block ABOVE the body. It is a CM block widget at doc
 // position 0, so it lives inside the writing column and scrolls/pushes the

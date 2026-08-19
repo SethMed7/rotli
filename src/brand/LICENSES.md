@@ -1,32 +1,29 @@
-# rotli kit — font & asset licenses
+# rotli fonts and asset licenses
 
-All faces are self-hostable. **No rented/metered fonts** (per the brand doctrine — Avenir-class faces banned).
+## Satoshi — display and headings
 
-## Satoshi — display / headings
-
-- **License:** Fontshare (Indian Type Foundry) Free Font License — free for personal & commercial use, web-embeddable. NOT OFL; a deliberate, Seth-approved deviation from the studio's standard Fontsource catalog.
+- **License:** Fontshare (Indian Type Foundry) Free Font License; usable for
+  personal and commercial work and web embedding.
 - **Source:** `fontshare.com`.
-- **Files:** `fonts/Satoshi-Regular.woff2` (400), `Satoshi-Medium.woff2` (500), `Satoshi-Bold.woff2` (700).
+- **Files:** `fonts/Satoshi-{Regular,Medium,Bold}.woff2` and
+  `Satoshi-Variable.woff2`.
 
-## General Sans — UI / body
+## General Sans — UI and body
 
-- **License:** Fontshare (Indian Type Foundry) Free Font License — same terms as Satoshi.
-- **Source:** `fontshare.com` (`api.fontshare.com/v2/fonts/download/general-sans`, 2026-06-11).
-- **Files:** `fonts/GeneralSans-Regular.woff2` (400), `GeneralSans-Medium.woff2` (500), `GeneralSans-Semibold.woff2` (600).
+- **License:** Fontshare (Indian Type Foundry) Free Font License.
+- **Source:** `fontshare.com`.
+- **Files:** `fonts/GeneralSans-{Regular,Medium,Semibold}.woff2` and
+  `GeneralSans-Variable.woff2`.
 
-## Baloo 2 — wordmark source only
+## Rotli character and interface art
 
-- **License:** SIL Open Font License 1.1 (OFL).
-- **Source:** Google Fonts → `ofl/baloo2`; `fonts/Baloo2-600.ttf` is a true static wght=600 instance cut with `fonttools varLib.instancer` from `engine/BRANDS/rotli/font/Baloo2-Variable.ttf` (opentype.js cannot outline variable axes — see RUNS/rotli/2026-06-10-board-intake).
-- The wordmark ships as **outlined SVG paths** (`logo/wordmark.svg`) — production never loads Baloo 2; the file is kept for provenance/regeneration.
-
-## Marks & icons
-
-- The **quokka-r** (`logo/r-mark.svg`) is a smooth trace of Seth's approved 2026-06-10 brand board (gate round 3 approved 2026-06-11), with a judged flowing-bottom refinement; the wordmark is outlined Baloo 2 @600 with the traced r grafted as the leading glyph. Both are original-work transcriptions for rotli, built in `engine/RUNS/rotli/2026-06-10-board-intake/`.
-- The 10-icon sprite (`icons/rotli-icons.sprite.svg`) is constructed original work on the 24-grid.
+The quokka character drawings, compact quokka mark, and Rotli interface icon
+set are original work for Rotli. Filled full-body variants are deterministic
+color treatments of the canonical drawings; they do not alter the silhouette
+or linework.
 
 ## External provider marks
 
 Model-family marks used only to identify chat models live in `providers/` and
-remain the property of their respective owners. Their exact provenance and the
+remain the property of their respective owners. Their provenance and the
 LobeHub MIT notice are recorded in [`providers/README.md`](providers/README.md).

@@ -32,8 +32,8 @@ if [ -n "$(git status --porcelain --untracked-files=normal)" ]; then
 fi
 SOURCE_COMMIT="$(git rev-parse HEAD)"
 
-# ── knobs (env-overridable; safe defaults) ───────────────────────────────────
-DEVID="${APPLE_SIGNING_IDENTITY:-Developer ID Application: Seth Medina (TEAMID0000)}"
+# ── knobs (env-overridable; public defaults only) ─────────────────────────────
+DEVID="${APPLE_SIGNING_IDENTITY:-}"
 NOTARY_PROFILE="${ROTLI_NOTARY_PROFILE:-rotli-notary}"
 RELEASES_REPO="${ROTLI_RELEASES_REPO:-SethMed7/rotli-releases}"
 UPDATER_KEY="${ROTLI_UPDATER_KEY:-$HOME/.rotli-updater.key}"
@@ -101,6 +101,11 @@ if [ "$CHECK_CI_ONLY" -eq 1 ]; then
   exit 0
 fi
 
+if [ -z "$DEVID" ]; then
+  echo "✗ APPLE_SIGNING_IDENTITY is required for a signed release"
+  exit 1
+fi
+
 PINNED_BUN="$(tr -d '[:space:]' < .bun-version)"
 PINNED_RUST="$(awk -F '"' '/^[[:space:]]*channel[[:space:]]*=/ { print $2; exit }' rust-toolchain.toml)"
 command -v bun >/dev/null 2>&1 || {
@@ -158,7 +163,7 @@ DIST="dist-release"
 DMG="$DIST/rotli_${VER}_aarch64.dmg"
 DL_URL="https://github.com/${RELEASES_REPO}/releases/download/v${VER}/rotli.app.tar.gz"
 
-echo "▸ rotli $VER  (publish=$PUBLISH · identity: $DEVID · notary: $NOTARY_PROFILE)"
+echo "▸ rotli $VER  (publish=$PUBLISH · signing identity configured · notary profile configured)"
 [ -f "$UPDATER_KEY" ] || { echo "✗ updater key not found at $UPDATER_KEY"; exit 1; }
 mkdir -p "$DIST"
 

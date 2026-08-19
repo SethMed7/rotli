@@ -1,5 +1,5 @@
 // One row in a note LIST (All notes · Recent) — glyph + title + snippet + date,
-// the whole row a button that opens the note/board/file. Extracted (Seth,
+// the whole row a button that opens the note/board/file. Extracted (the maintainer,
 // 2026-06-30) so the two list surfaces share the exact same markup.
 
 import { type MouseEvent, type ReactNode, memo } from "react";
@@ -41,7 +41,7 @@ function NoteListRowImpl({
         onClick={(e) => onOpen(note, e.metaKey)}
         onPointerDown={
           // drag a note/board row into Main (a plain click still opens it); files
-          // can't be arranged in Main, so they don't drag (Seth, 2026-07-07).
+          // can't be arranged in Main, so they don't drag (the maintainer, 2026-07-07).
           file ? undefined : (e) => startMainAddDrag(e, note.id, note.title || "Empty note")
         }
         onAuxClick={(e) => {

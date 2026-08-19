@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
+import { appendFileSync, mkdirSync } from "node:fs";
 /**
- * Signal delivery for daily briefs — the audio lands in Seth's Signal as a voice note.
+ * Signal delivery for daily briefs — the audio lands in the maintainer's Signal as a voice note.
  * Usage: bun send-signal-brief.ts [stem]
  *   stem = YYYY-MM-DD (morning, default today) | YYYY-MM-DD-lunch | YYYY-MM-DD-night
  *
@@ -8,10 +9,10 @@
  * NOTE: the daemon may hold the signal-cli account lock — signal-cli waits, so retries cover it.
  */
 import { join } from "node:path";
-import { appendFileSync, mkdirSync } from "node:fs";
+
+import { claimDelivery } from "./delivery-claim";
 import { BREVE, BRIEFS, AUDIOS } from "./paths";
 import { loadSettings, effectiveTz, todayIn } from "./timectx";
-import { claimDelivery } from "./delivery-claim";
 
 const { bot, owner } = await Bun.file(join(BREVE, "signal.json")).json();
 
@@ -33,20 +34,27 @@ process.on("exit", () => {
 const kind = stem.endsWith("-lunch") ? "lunch" : stem.endsWith("-night") ? "night" : "morning";
 const date = stem.slice(0, 10);
 const mp3 = join(AUDIOS, `${stem}.mp3`);
-if (!(await Bun.file(mp3).exists())) { console.error(`ERR no mp3 for ${stem}`); process.exit(1); }
+if (!(await Bun.file(mp3).exists())) {
+  console.error(`ERR no mp3 for ${stem}`);
+  process.exit(1);
+}
 
 let mins = "";
 try {
-  const p = Bun.spawn(["ffprobe", "-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0", mp3], { stdout: "pipe" });
+  const p = Bun.spawn(["ffprobe", "-v", "quiet", "-show_entries", "format=duration", "-of", "csv=p=0", mp3], {
+    stdout: "pipe",
+  });
   const d = parseFloat(await new Response(p.stdout).text());
   await p.exited;
   if (d) mins = ` · ${Math.round(d / 60)} min`;
 } catch {}
 
 let text =
-  kind === "morning" ? `☕ Good morning — your Breve brief for ${date}${mins}.\nThe PDF is in your email; say "brief" anytime to hear it again.`
-  : kind === "lunch" ? `🥪 Lunch Pivot — ${date}${mins}. PDF in your email.`
-  : `🌙 Nightcap — ${date}${mins}. PDF in your email.`;
+  kind === "morning"
+    ? `☕ Good morning — your Breve brief for ${date}${mins}.\nThe PDF is in your email; say "brief" anytime to hear it again.`
+    : kind === "lunch"
+      ? `🥪 Lunch Pivot — ${date}${mins}. PDF in your email.`
+      : `🌙 Nightcap — ${date}${mins}. PDF in your email.`;
 
 if (kind === "morning") {
   const sugFile = Bun.file(join(BRIEFS, `${date}.suggestion.json`));
@@ -65,15 +73,21 @@ function logToTranscript() {
   try {
     const dir = join(BREVE, "signal", "transcripts");
     mkdirSync(dir, { recursive: true });
-    appendFileSync(join(dir, `${today}.log`),
-      `Breve: ${text.replace(/\n/g, " ")} [delivered ${kind} audio brief ${stem}]\n`);
+    appendFileSync(
+      join(dir, `${today}.log`),
+      `Breve: ${text.replace(/\n/g, " ")} [delivered ${kind} audio brief ${stem}]\n`,
+    );
   } catch {}
 }
 
 for (let i = 0; i < 4; i++) {
-  const p = Bun.spawn(["signal-cli", "-a", bot, "send", owner, "-m", text, "--attachment", mp3, "--voice-note"], {
-    stdout: "ignore", stderr: "pipe",
-  });
+  const p = Bun.spawn(
+    ["signal-cli", "-a", bot, "send", owner, "-m", text, "--attachment", mp3, "--voice-note"],
+    {
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+  );
   const err = await new Response(p.stderr).text();
   if ((await p.exited) === 0) {
     logToTranscript();

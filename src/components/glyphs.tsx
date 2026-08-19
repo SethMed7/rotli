@@ -32,7 +32,7 @@ function Glyph({ size = 15, className, children }: GlyphProps & { children: Reac
 }
 
 /** Sidebar row disclosure caret — points right when collapsed, the .open class
- * rotates it down (Seth, 2026-06-13: one chevron for every expandable row). */
+ * rotates it down (the maintainer, 2026-06-13: one chevron for every expandable row). */
 export function ChevronRight({ size = 10, className }: GlyphProps) {
   return (
     <Glyph size={size} className={className}>
@@ -116,7 +116,7 @@ export function FolderGlyph(props: GlyphProps) {
 }
 
 /** New note — a page with a corner + (the VS Code "New File" title action;
- * Seth #7/#13, 2026-07-03). Same 1.7-stroke family; the plus rides the
+ * the maintainer #7/#13, 2026-07-03). Same 1.7-stroke family; the plus rides the
  * bottom-right so it reads as "add a file here". */
 export function NewFileGlyph(props: GlyphProps) {
   return (
@@ -135,6 +135,27 @@ export function NewFolderGlyph(props: GlyphProps) {
       <path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v3" />
       <path d="M4 7v11a2 2 0 0 0 2 2h6" />
       <path d="M18 14.5v6M15 17.5h6" />
+    </Glyph>
+  );
+}
+
+/** Refresh/reconnect — one circular arrow, shared by vault row recovery. */
+export function RefreshGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M20 6v5h-5" />
+      <path d="M18.3 16.5A8 8 0 1 1 19.8 11" />
+    </Glyph>
+  );
+}
+
+/** Horizontal overflow menu — three calm dots, never a text ellipsis. */
+export function MoreGlyph(props: GlyphProps) {
+  return (
+    <Glyph {...props}>
+      <circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" />
     </Glyph>
   );
 }
@@ -209,7 +230,7 @@ export function BoardGlyph(props: GlyphProps) {
 // ── real, monochrome FORMAT/BRAND marks for the file kinds. Single-path logos
 // from simple-icons (CC0), filled with currentColor so they theme. We don't HIDE
 // what a file is — Excalidraw reads as Excalidraw, an .svg as the SVG logo — we
-// just decolorize them to match the chrome (Seth, 2026-06-29).
+// just decolorize them to match the chrome (the maintainer, 2026-06-29).
 function BrandGlyph({ size = 15, className, path }: GlyphProps & { path: string }) {
   return (
     <svg
@@ -255,7 +276,7 @@ export function ImageGlyph(props: GlyphProps) {
 }
 
 /** Vision capability — used where a model can inspect image attachments. */
-/* — the System browser's view-switcher family (Seth, 2026-07-28: "the proper
+/* — the System browser's view-switcher family (the maintainer, 2026-07-28: "the proper
    icons people are used to" — Finder's icon/list/columns/gallery marks) — */
 export function GridViewGlyph(props: GlyphProps) {
   return (
@@ -491,7 +512,7 @@ export function SplitGlyph(props: GlyphProps) {
 
 /** Titlebar "split right" — rounded rect, VERTICAL center divider = two
  *  columns. Standalone (not the shared Glyph) but matched to the line-glyph
- *  grammar: strokeWidth 1.7, round joins (Seth, 2026-06-15: one weight across
+ *  grammar: strokeWidth 1.7, round joins (the maintainer, 2026-06-15: one weight across
  *  the titlebar). */
 export function SplitRightGlyph({ size = 16, className }: GlyphProps) {
   return (
@@ -514,7 +535,7 @@ export function SplitRightGlyph({ size = 16, className }: GlyphProps) {
 }
 
 /** Titlebar "split down" — rounded rect, HORIZONTAL center divider = two
- *  rows. Same standalone shape as SplitRightGlyph (Seth, 2026-06-15). */
+ *  rows. Same standalone shape as SplitRightGlyph (the maintainer, 2026-06-15). */
 export function SplitDownGlyph({ size = 16, className }: GlyphProps) {
   return (
     <svg
@@ -535,7 +556,7 @@ export function SplitDownGlyph({ size = 16, className }: GlyphProps) {
   );
 }
 
-/** Unified sidebar toggle (Seth, 2026-06-13) — rounded rect with a filled
+/** Unified sidebar toggle (the maintainer, 2026-06-13) — rounded rect with a filled
  *  left column, reading as "side panels". Lives inline left of the note-list
  *  filter; the one control that hides/shows both rails with memory. */
 export function SidebarGlyph(props: GlyphProps) {
@@ -617,7 +638,7 @@ export function CheckGlyph(props: GlyphProps) {
   );
 }
 
-/* — destination row icons (Seth, 2026-06-13): the five reserved roots in the
+/* — destination row icons (the maintainer, 2026-06-13): the five reserved roots in the
    unified sidebar — Inbox (tray), Brain (head), Storage (database, reused),
    Archive (box), Trash (bin). currentColor only, no hex. — */
 
@@ -668,7 +689,7 @@ export function ChatGlyph(props: GlyphProps) {
   );
 }
 
-/** The HOME front's mark (Seth's IA, 2026-08-01) — a plain house. Home is the
+/** The HOME front's mark (the maintainer's IA, 2026-08-01) — a plain house. Home is the
  * notes world today and a dashboard eventually, so the glyph says "where you
  * land", not "notes" (the stacked-pages mark still labels the Library row). */
 export function HomeGlyph(props: GlyphProps) {

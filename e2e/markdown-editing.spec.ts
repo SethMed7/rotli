@@ -182,7 +182,7 @@ test("bullet outdent works on app-made AND tab-indented (foreign) lists", async 
 
   // a foreign note indented with TABS (external editors, LLM output): the
   // bullet must render as a bullet and Shift-Tab must outdent it — this was
-  // completely dead (raw text, no-op Shift-Tab; Seth, 2026-07-28)
+  // completely dead (raw text, no-op Shift-Tab; the maintainer, 2026-07-28)
   await page.keyboard.insertText("- alpha\n\t- child");
   await expect(page.locator(".rotli-li")).toHaveCount(2); // BOTH lines are bullets
   await page.keyboard.press("End");

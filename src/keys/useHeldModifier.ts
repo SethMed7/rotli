@@ -1,7 +1,7 @@
 // "Hold ⌘ to peek" — a hook that fires when a LONE modifier is held idle past a
 // delay, and releases the moment anything else happens. It is the trigger for
 // the WhichKey overlay (a non-modal shortcut map) and lives DELIBERATELY apart
-// from the registry dispatcher (Seth, 2026-06-13): it is a sibling window
+// from the registry dispatcher (the maintainer, 2026-06-13): it is a sibling window
 // listener that NEVER preventDefaults, so a real ⌘-chord still fires its action
 // AND dismisses the overlay (the chord's first non-modifier keydown cancels us).
 //

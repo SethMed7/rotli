@@ -1,4 +1,4 @@
-// The /image-gen popover (Seth, 2026-08-04: "/image-gen {choose your model}
+// The /image-gen popover (the maintainer, 2026-08-04: "/image-gen {choose your model}
 // {your prompt} — it will only offer models you are actively logged into").
 // Anchored at the slash line like the embed pickers: pick an image engine,
 // type the prompt, Generate. The PNG lands in the memex's storage/images/

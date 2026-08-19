@@ -67,8 +67,8 @@ describe("chat folders (virtual grouping over flat chats/)", () => {
   test("deleting a folder frees its chats; renaming keeps assignments", () => {
     let { manifest, id } = createChatFolder(EMPTY_CHAT_FOLDERS, "Work");
     manifest = assignChatToFolder(manifest, "b", id);
-    const renamed = renameChatFolder(manifest, id, "Myela");
-    expect(renamed.folders[0]?.name).toBe("Myela");
+    const renamed = renameChatFolder(manifest, id, "Northstar");
+    expect(renamed.folders[0]?.name).toBe("Northstar");
     expect(renamed.assignments.b).toBe(id);
     const deleted = deleteChatFolder(renamed, id);
     expect(deleted.folders).toEqual([]);
@@ -93,7 +93,7 @@ describe("chat folders (virtual grouping over flat chats/)", () => {
   });
 });
 
-// In-folder order = the LIST's order (Seth, 2026-08-03: "the moment I get a
+// In-folder order = the LIST's order (the maintainer, 2026-08-03: "the moment I get a
 // response it should move to the top of the folder"). The legacy manual-order
 // field still parses (older builds lose nothing) but no longer changes
 // rendering.
@@ -121,7 +121,7 @@ describe("chat folder ordering — response recency rules", () => {
   });
 });
 
-// Pinned folders (Seth, 2026-08-03): a pinned folder floats above the rest,
+// Pinned folders (the maintainer, 2026-08-03): a pinned folder floats above the rest,
 // manifest order preserved within each band.
 describe("pinned chat folders", () => {
   test("pin floats a folder to the top; unpin returns it to manifest order", () => {

@@ -237,7 +237,7 @@
     <span class="meta">notes module — UI/UX mockups · <strong>round 2</strong> · 2026-06-11 · gate (live render, kit tokens only)</span>
   </div>
   <p class="gate-sub">
-    Round 2 applies the multi-agent review of round 1 + Seth's notes: <strong>(1)</strong> the module pills are gone — a quiet
+    Round 2 applies the multi-agent review of round 1 + the maintainer's notes: <strong>(1)</strong> the module pills are gone — a quiet
     module-identity label replaces them, and no switcher ships while only Notes exists; <strong>(2)</strong> a readability pass —
     gradients deleted, token misuses fixed, clay budget enforced (one clay element per pane); <strong>(3)</strong> the
     <strong>panes + tabs-within-panes</strong> system, terminal-style, designed so a single-tab pane renders zero tab chrome —
@@ -268,7 +268,7 @@
           <div class="fsec">Folders</div>
           <div class="frow"><svg viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/></svg>Inbox<span class="count">4</span></div>
           <div class="frow"><svg viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/></svg>Work<span class="count">61</span></div>
-          <div class="frow child"><svg viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/></svg>Myela<span class="count">38</span></div>
+          <div class="frow child"><svg viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/></svg>Northstar<span class="count">38</span></div>
           <div class="frow child"><svg viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/></svg>1-on-1s<span class="count">12</span></div>
           <div class="frow"><svg viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/></svg>Personal<span class="count">44</span></div>
           <div class="frow child"><svg viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/></svg>Ideas<span class="count">19</span></div>
@@ -329,7 +329,7 @@
   <!-- ——————————————————— A2 · PANES + TABS ——————————————————— -->
   <section class="frame">
     <h2>A2 · Panes + tabs-within-panes — the terminal layer, summoned</h2>
-    <p class="fsub">Seth's ask, designed in from the start: every pane owns its tabs, but a pane with one tab renders <em>zero</em> tab chrome —
+    <p class="fsub">the maintainer's ask, designed in from the start: every pane owns its tabs, but a pane with one tab renders <em>zero</em> tab chrome —
     frame A above is literally this system at rest. Here: a ⌘D split with both panes carrying tabs. Focus is the 2px clay edge on the
     <em>focused pane's active tab only</em> — the left pane has it, the right doesn't. The note list stays singular and mirrors the focused pane
     (peach row = clay tab, two cues, one grammar). The folders sidebar auto-collapsed to honor the 320px pane floor (<kbd>⌘0</kbd> brings it back).</p>
@@ -459,7 +459,7 @@
           <div class="pal-sec">Open tabs</div>
           <div class="prow sel"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>Pricing decision<span class="hint"><kbd>⌘2</kbd></span></div>
           <div class="pal-sec">Notes</div>
-          <div class="prow"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>Q3 priorities — Myela</div>
+          <div class="prow"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>Q3 priorities — Northstar</div>
           <div class="pal-sec">Actions</div>
           <div class="prow"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New note in “Ideas”<span class="hint"><kbd>⌘N</kbd></span></div>
           <div class="prow"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg>Split right<span class="hint"><kbd>⌘D</kbd></span></div>
@@ -536,7 +536,7 @@
               ├─ <b>Inbox/</b><br>
               │&nbsp;&nbsp; └─ call-the-bank.md<br>
               ├─ <b>Work/</b><br>
-              │&nbsp;&nbsp; ├─ Myela/<br>
+              │&nbsp;&nbsp; ├─ Northstar/<br>
               │&nbsp;&nbsp; │&nbsp;&nbsp; └─ pricing-decision.md<br>
               │&nbsp;&nbsp; └─ 1-on-1s/<br>
               │&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; └─ sarah.md<br>
@@ -642,7 +642,7 @@
   <section class="frame">
     <h2>I · Chat on a note — the living summary</h2>
     <div class="concept-banner">Future · concept only — ships with the breve round, shown to lock the structure now</div>
-    <p class="fsub">Seth's idea made concrete: the same note, open twice. Left — the plain editor. Right — the note opened <em>as a chat</em>:
+    <p class="fsub">the maintainer's idea made concrete: the same note, open twice. Left — the plain editor. Right — the note opened <em>as a chat</em>:
     the note body <strong>is</strong> the living summary (always primary, always the artifact you keep); the conversation is scaffolding, collapsed into
     one drawer row. Talking edits the note — the freshest AI edit sits on a peach tint that fades to ground. By the end of any conversation,
     the summary already exists. A chat is just another <em>tab type</em> — which is why the tab system above carries a type glyph from day one.</p>

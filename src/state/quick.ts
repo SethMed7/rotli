@@ -1,4 +1,4 @@
-// The Quick Note set (Seth, 2026-06-15): a small, capped, curated list of
+// The Quick Note set (the maintainer, 2026-06-15): a small, capped, curated list of
 // notes the floating Quick window cycles through. Mutations here apply to the
 // ui store AND emit to the other webview — the same one-keymap-two-webviews
 // sync the rebinds use (lib/tauri emitQuickSet/onQuickSet). Only the MAIN
@@ -8,7 +8,7 @@
 import { type QuickStatePayload, emitQuickSet } from "../lib/tauri";
 import { useUiStore } from "./ui";
 
-/** The cap — Seth: "maybe only have five notes within this." Search swaps the
+/** The cap — the maintainer: "maybe only have five notes within this." Search swaps the
  * set members out without raising the ceiling. */
 export const QUICK_MAX = 5;
 
