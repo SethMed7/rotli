@@ -1,12 +1,15 @@
 // the maintainer, 2026-07-28: "I should be able to close all tabs and have an empty
 // state which uses one of my quokkas" — the lone pane goes empty instead of
-// silently refusing the close, and the rest-state actions lead back in.
+// silently refusing the close, and the rest-state actions lead back in. Since
+// the appearance studio landed, the quokka companion is opt-in
+// (quokkaCompanionEnabled defaults to false), so a fresh profile shows the
+// rest state without character art.
 
 import { expect, test } from "@playwright/test";
 
 import { gotoApp } from "./support";
 
-test("closing every tab shows the quokka rest state, and reopen brings the tab back", async ({ page }) => {
+test("closing every tab shows the rest state, and reopen brings the tab back", async ({ page }) => {
   await gotoApp(page);
   const tabs = page.getByRole("tab");
   const openCount = await tabs.count();
@@ -16,7 +19,9 @@ test("closing every tab shows the quokka rest state, and reopen brings the tab b
   await expect(tabs).toHaveCount(0);
   const empty = page.locator(".pane-empty");
   await expect(empty).toBeVisible();
-  await expect(empty.locator("svg")).toBeVisible(); // the quokka
+  await expect(empty.getByText("All clear")).toBeVisible();
+  // companion off by default — the character renders only when opted in
+  await expect(empty.locator(".quokka")).toHaveCount(0);
   // the inline "reopen tab" action restores the last closed tab
   await empty.getByRole("button", { name: /reopen tab/ }).click();
   await expect(tabs).toHaveCount(1);
