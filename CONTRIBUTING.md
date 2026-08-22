@@ -91,8 +91,14 @@ oxfmt at `printWidth` 110 (`.oxfmtrc.json`) is the adopted TypeScript
 formatter and `format:check` is part of `lint`. It replaced Prettier
 2026-07-31 with a measured 6-file / 19-line drift over 342 files (oxfmt
 breaks long union types one-member-per-line; Prettier at 1.9s vs oxfmt at
-~50ms on the same tree). Use `bun run format` for the formatter-owned trees,
-and keep unrelated format churn out of behavioral commits. Run
+~50ms on the same tree). Use `bun run format` for the formatter-owned trees;
+the package scripts and staged hook pass the root config explicitly so nested
+or ambient configuration cannot change the result. Oxlint likewise owns
+type-aware tsgolint and its zero-warning ceiling in `.oxlintrc.json`; the
+tooling regression suite exercises the actual Oxc binaries. Use
+`bun run lint:serial` when memory pressure or interleaved parallel logs impede
+diagnosis; it runs the same checks as `lint`. Keep unrelated format churn out
+of behavioral commits. Run
 `git config blame.ignoreRevsFile .git-blame-ignore-revs` once locally so
 historical format-only changes stay out of blame (GitHub honors it automatically).
 

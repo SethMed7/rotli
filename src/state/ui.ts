@@ -775,7 +775,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   setQuokkaStyle: (style) => set({ quokkaStyle: style }),
   quokkaCustomHue: DEFAULT_QUOKKA_CUSTOM_HUE,
   setQuokkaCustomHue: (hue) => set({ quokkaCustomHue: normalizeQuokkaCustomHue(hue) }),
-  quokkaLineColor: "black",
+  quokkaLineColor: "auto",
   setQuokkaLineColor: (color) => set({ quokkaLineColor: color }),
   quokkaAccessory: "none",
   setQuokkaAccessory: (accessory) => set({ quokkaAccessory: accessory }),

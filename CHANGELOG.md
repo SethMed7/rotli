@@ -10,8 +10,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.82.0] - 2026-08-19
+### Changed
 
+- **The repository toolchain now runs on Bun 1.4.0.** App, site, Breve, CI,
+  release evidence, dependency maintenance, and frozen lockfile checks share
+  the exact stable runtime pin, with matching Bun 1.4 type definitions.
+- **Bun installs now fail safer and validate faster.** Every install root uses
+  lockfile v2 and script-free isolated resolution with a project-local store;
+  lint fans independent checks out in parallel with an equivalent serial
+  fallback, while CI blocks on lockfile convergence and exact Unknown-license
+  drift and retains a combined production-license inventory.
+- **The Vite 8 build and Oxc gates now fail closed on toolchain drift.** Vite
+  uses native Rolldown options, new Rolldown/Oxc warnings fail the production
+  build, Oxlint's type-aware sidecar and warning ceiling are config-owned, and
+  executable tests prove both Oxlint and Oxfmt behavior rather than only their
+  command strings.
+
+### Fixed
+
+- **The side-view walking quokka wears its accessories credibly.** The
+  bucket hat's side art seats on the profile crown with the ear tucked and
+  the back of the head keeping its full fluff, and face-on eyewear clips to
+  a true profile: glasses show a single lens over the visible eye and
+  goggles a single lens perched on the brow — never the splayed pair.
+- **Accessory color no longer halos around the glasses.** The glasses' hue
+  layer is painted over the ink frames as deliberate colored frames (the
+  same colored-fill-plus-outline language as the hat) instead of peeking
+  out from beneath them as ragged slivers — the artifact on the model-setup
+  companion.
+- **Ocean, Grove, Iris, and Midnight now feel like themselves in light
+  mode.** Their light environments were near-white with a whisper of tint —
+  effectively "white with a colored accent." Grounds, surfaces, chips,
+  borders, and the theme-card previews (and the marketing site's swatches)
+  now carry each family's hue in daylight: an airy blue room, a soft green
+  one, lavender, and a cool steel white — with every text pairing measured
+  at or above AA contrast.
+- **The prompt-trail paws track your prompts, not the responses.** The
+  tracker highlighted a single "nearest" prompt — at the bottom of a chat it
+  marked the reader one up, and answer text counted as "seeing" an exchange.
+  A paw now lights only while its prompt bubble is on screen: two bubbles
+  sharing the screen light two paws, and reading deep into a long answer
+  lights none.
+- **The accessory chooser is now three quokka icons with a color row.**
+  Onboarding's dropdown became icon buttons — the bare quokka, glasses, and
+  bucket hat, each a mini preview — with seven accessory-color dots inline
+  once an accessory is on (Settings keeps the full hue dial). Goggles are
+  parked for now: existing companions keep rendering them, but the pickers
+  no longer offer them. The side-view goggle lens also moved back onto the
+  crown where worn-up goggles sit.
+- **The Line quokka no longer disappears on dark themes.** The line
+  treatment's ink now follows the environment — near-black on light themes,
+  white on dark — while filled treatments keep their designed dark ink
+  everywhere. Existing profiles migrate automatically (black was only ever an
+  implementation default; no control offered a choice).
+- **Ocean, Grove, Iris, and Midnight now show their light/dark preview dots.**
+  The onboarding theme cards only had swatch styles for the first two
+  families; the other four rendered empty rings.
+- **Onboarding's Back now answers ⌘←.** A setup-scoped `setup.back` action
+  joins `setup.continue`; the footer badge advertises the arrow instead of
+  ⌘[, which stays the app-wide notes-navigation chord.
+- **The bucket hat now actually sits on the quokka's head in every pose.**
+  Front-facing poses no longer chop the ears into floating stubs (each pose's
+  brim widens to cover them, and the occlusion edges gained flared corners so
+  no clipped fragment survives beside the hat), the thoughtful companion's hat
+  seats on the crown instead of hovering beside it, and walking and board tuck
+  their side ears under a properly sized brim — which also fixes the
+  detached-hat look on onboarding's leaning edge companions. The clip beside
+  the brim keeps its safe depth so it can never slice visible cheek fur — the
+  three-quarter poses (thoughtful, listening) cover their large ears with the
+  brim itself plus a wider notch at brim height.
+  Verified visually across all fifteen poses, the onboarding companion and
+  preview sizes, and the 72° edge-lean context.
+
+## [0.82.0] - 2026-08-19
 
 ### Changed
 

@@ -18,9 +18,9 @@ while IFS= read -r f; do
     # (measured 2026-07-31: 49/50 differing files there were never formatter-clean).
     src/*.ts | src/*.tsx | e2e/*.ts | scripts/*.ts | playwright.config.ts)
       # oxfmt's --check can't read stdin, so format the index blob and compare.
-      if ! cmp -s <(git show ":$f") <(git show ":$f" | bunx oxfmt --stdin-filepath "$f" 2>/dev/null); then
+      if ! cmp -s <(git show ":$f") <(git show ":$f" | bun run --silent oxfmt -c .oxfmtrc.json --stdin-filepath "$f" 2>/dev/null); then
         echo "✗ pre-commit: the STAGED content of $f is not oxfmt-formatted."
-        echo "  bunx oxfmt \"$f\" && git add \"$f\"   (or: bun run format)"
+        echo "  bun run oxfmt -c .oxfmtrc.json \"$f\" && git add \"$f\"   (or: bun run format)"
         exit 1
       fi
       ;;

@@ -8,12 +8,13 @@ direction, runtime wiring, and owning documentation must agree.
 
 | Command | Purpose |
 |---|---|
-| `bun run lint` | All four TypeScript scopes on both compiler implementations, plus formatting, oxlint, code-shape, brand, architecture, IPC, structure, and documentation guards |
+| `bun run lint` | Concurrent fan-out of all four TypeScript scopes on both compiler implementations, plus formatting, oxlint, code-shape, brand, architecture, IPC, structure, and documentation guards |
+| `bun run lint:serial` | The exact same lint/check set in deterministic sequence. Use it on memory-constrained machines or when one-at-a-time logs are easier to diagnose; CI and the default gate retain the faster parallel path |
 | `bun run test:unit` | Frontend domain, application, adapter, and state tests under `src/`, run in Bun's isolated parallel workers |
 | `bun run test:changed` | Fast local feedback: isolated Bun tests related to files changed against the default branch |
 | `bun run test:evals` | Deterministic offline AI loop, routing, model-policy, prompt, retrieval, and memory-workflow evals |
 | `bun run test:breve` | Breve policy, failure-state, locking, and delivery-claim regressions |
-| `bun run test:tooling` | Fixture tests that prove repository linters detect forbidden code shapes |
+| `bun run test:tooling` | Fixture tests that prove repository linters detect forbidden code shapes, plus the script-free native/generated dependency smoke |
 | `bun run test:e2e` | Playwright regression layer — drives the real browser twin (chromium) against `vite dev`'s seeded demo corpus |
 | `bun run test:e2e:ui` | The same specs in Playwright's interactive UI runner, for local debugging |
 | `bun run check:e2e-types` | Strict-typecheck `e2e/` and `playwright.config.ts` (`tsc -p tsconfig.e2e.json`) — not folded into the root `tsc --noEmit` because that config's `include` is `src` only |
@@ -29,13 +30,13 @@ stays complete — every `package.json` script must appear in this document):
 
 | Command | Purpose |
 |---|---|
-| `bun run deps` | Repository-owned dependency workflow over the app, site, and Breve lockfiles: `audit` works on the stable pin; Bun 1.4 adds read-only `audit-plan`, `dedupe-check`, `prune-plan`, `licenses`, and root-explicit `diff` actions. Reviewed maintenance uses `audit-fix`, `dedupe`, or `prune` with one explicit `--root` and `--apply`; audit repair never implies `--latest`. `ROTLI_BUN_DEPENDENCY_BIN` may point at an alternate binary for preview validation without changing the release toolchain |
+| `bun run deps` | Repository-owned Bun 1.4 dependency workflow over the app, site, and Breve lockfiles: `audit`, `audit-plan`, `dedupe-check`, `prune-plan`, `licenses`, `licenses-check`, and root-explicit `diff` are read-only. `licenses-check` fails on either a new Unknown-license package or a stale reviewed baseline entry. Reviewed maintenance uses `audit-fix`, `dedupe`, or `prune` with one explicit `--root` and `--apply`; audit repair never implies `--latest`. `ROTLI_BUN_DEPENDENCY_BIN` may point at a compatible alternate binary for isolated validation without changing the release toolchain |
 | `bun run dev` / `bun run preview` | Vite dev server against the seeded demo corpus / preview of the built bundle |
 | `bun run dev:app` | The native desktop development app, branded `rotli (dev)` with a fixed blue Rotli Dock icon (including an optically matched safe area for the unbundled `tauri dev` runtime); it uses an isolated `corpus.dev.json` vault selection, keeps the production fallback read-only, and supervises vault-triggered Tauri/Vite restarts from the terminal |
-| `bun run format` / `bun run format:check` | oxfmt write / verify over TypeScript in `src`, `e2e`, and `scripts`, plus `playwright.config.ts` — the same scope the pre-commit hook enforces, with import sorting on (`breve-runtime` keeps hand-aligned tables and stays outside). `format:check` rides the `lint` chain |
+| `bun run format` / `bun run format:check` | oxfmt write / verify with the explicit repository config over TypeScript in `src`, `e2e`, and `scripts`, plus `playwright.config.ts` — the same scope the pre-commit hook enforces, with import sorting on (`breve-runtime` keeps hand-aligned tables and stays outside). `format:check` rides the `lint` chain |
 | `bun run typecheck` | The TypeScript compiler over `src` and the Vite/build-policy scope (`tsc --noEmit` — `typescript@7`, the Go port) — the type-correctness source of truth and first step of `lint` (e2e and Breve retain their named lanes) |
 | `bun run typecheck:tsc6` | All four scopes (`src`, Vite/build policy, E2E, and Breve) re-checked on `typescript6` (`npm:typescript@~6.0.3`, the last JavaScript TypeScript) — the independent second implementation, not merely a slower one. It is part of `lint` and is called by explicit path because `typescript@7` owns `node_modules/.bin/tsc` |
-| `bun run lint:oxlint` | The oxlint layer alone (`src`, `e2e`, `scripts`, Breve, and both root TypeScript configs; oxlint's `correctness` category plus the hand-picked rules, type-aware via `oxlint-tsgolint`) — part of `lint` |
+| `bun run lint:oxlint` | The oxlint layer alone (`src`, `e2e`, `scripts`, Breve, and both root TypeScript configs; oxlint's `correctness` category plus the hand-picked rules). Type awareness and a zero-warning ceiling live in the root config, nested configs are disabled, and an executable contract test proves `oxlint-tsgolint` actually reports a typed promise violation — part of `lint` |
 | `bun run check:react-compiler` | Runs Oxlint's React Compiler analysis in lint-only mode. The per-file/category baseline is a ratchet: existing effect/ref debt may shrink, while any increase fails `lint`; no compiler transform enters the production build |
 | `bun run check:knip` | Dead-weight gate — unreferenced files, exports, and dependencies, plus undeclared imports and binaries (`knip.json`); part of `lint`. `knip.json`'s `ignoreUnresolved` entry for headless Chrome is **load-bearing on Linux CI and must not be removed**: `breve-runtime/scripts/email-topic.ts` invokes Chrome through Bun's `$` shell, so knip resolves it as a binary. The path exists on a developer Mac, so knip reports the entry as an unused "configuration hint" locally — following that hint turns the Linux Quality lane red while every local check stays green. JSON takes no comments, hence this row |
 | `bun run check:dup` | Advisory duplication miner over `scripts/dup-judgments.json` — run on demand, deliberately not a gate |
@@ -187,8 +188,9 @@ regressions.
   dependencies, pure ports/policies, the Tauri adapter boundary, and the
   Markdown-only slash-command boundary.
 - `check:structure` enforces per-tree file/folder naming and dependency
-  invariants (including the SheetJS/`xlsx` ban — the exceljs codec owns every
-  spreadsheet path).
+  invariants, including Bun v2 lockfiles, script-free isolated installs,
+  parallel lint and CI dependency-evidence wiring, and the SheetJS/`xlsx` ban
+  (the exceljs codec owns every spreadsheet path).
 - `check:naming` holds the identifier-casing contract over `src/` (variables
   camelCase/UPPER_CASE/PascalCase with leading-underscore discards and dunder
   build globals exempt; type-likes PascalCase; no I-prefixed interfaces) —
@@ -228,8 +230,11 @@ and notarizes locally. Bun comes from `.bun-version`; Rustup resolves
 `rust-toolchain.toml`, so local, CI, and release builds share the same toolchain
 inputs.
 
-- **Quality and production builds (`ubuntu-24.04`):** frozen root install,
-  `bun run check`, the Vite production build, and a frozen Astro site build.
+- **Quality and production builds (`ubuntu-24.04`):** script-free isolated
+  frozen installs for the app, site, and production Breve graph; a blocking
+  cross-lockfile dedupe check; an exact Unknown-license baseline; a retained
+  production-license inventory; `bun run check`; and warning-ratcheted native
+  Rolldown/Oxc plus Astro production builds.
 - **Browser E2E (`ubuntu-24.04`):** `bun run check:e2e-types` plus the Playwright
   Chromium suite against `vite dev`'s seeded demo corpus.
 - **Dependency audit (`ubuntu-24.04`, advisory):** the repository-owned

@@ -127,6 +127,18 @@ export function registerDefaultActions(): void {
   });
 
   registerAction({
+    id: "setup.back",
+    title: "Back a setup step",
+    // ⌘← during first-run: ⌘[ stays the app-wide nav.back, but the setup
+    // footer advertises the arrow — no editor exists during setup, so the
+    // caret's line-start chord cannot clash here.
+    defaultChord: "Meta+ArrowLeft",
+    enabled: () => setupHandle()?.back !== undefined,
+    transient: true,
+    run: () => setupHandle()?.back?.(),
+  });
+
+  registerAction({
     id: "app.hide",
     title: "Hide rotli",
     defaultChord: "Esc",

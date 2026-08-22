@@ -89,7 +89,7 @@ describe("appearance personality", () => {
     expect(settings.quokkaCompanionEnabled).toBe(false);
     expect(settings.quokkaStyle).toBe("cocoa");
     expect(settings.quokkaCustomHue).toBe(DEFAULT_QUOKKA_CUSTOM_HUE);
-    expect(settings.quokkaLineColor).toBe("black");
+    expect(settings.quokkaLineColor).toBe("auto");
     expect(settings.quokkaAccessory).toBe("none");
     expect(settings.quokkaAccessoryHue).toBe(DEFAULT_QUOKKA_ACCESSORY_HUE);
     expect(settings.quokkaIdlePose).toBe("rest");

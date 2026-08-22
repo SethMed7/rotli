@@ -2038,7 +2038,7 @@ export interface ThemePayload {
   quokkaCompanionEnabled: boolean;
   quokkaStyle: "line" | "cocoa" | "green" | "ocean" | "iris" | "berry" | "amber" | "custom";
   quokkaCustomHue: number;
-  quokkaLineColor: "black" | "white";
+  quokkaLineColor: "auto" | "black" | "white";
   quokkaAccessory: "none" | "glasses" | "bucket-hat" | "goggles";
   quokkaAccessoryHue: number;
   quokkaIdlePose: "base" | "rest" | "thoughtful" | "listening" | "celebrating";

@@ -21,4 +21,13 @@ describe("documentation contract helpers", () => {
       ),
     ).toEqual(["check -> bun run test:regression"]);
   });
+
+  test("recognizes named scripts inside Bun's parallel runner", () => {
+    expect(
+      missingScriptSteps(
+        { lint: "bun run --parallel typecheck format:check lint:oxlint" },
+        { lint: ["bun run typecheck", "bun run format:check", "bun run lint:oxlint"] },
+      ),
+    ).toEqual([]);
+  });
 });

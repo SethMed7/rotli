@@ -37,7 +37,10 @@ describe("quokka personalization", () => {
     expect(artSource).toContain("color: bucketHatThreeQuarterColor");
     expect(artSource).toContain("color: bucketHatSideColor");
     expect(artSource).not.toContain("scarfAccessory");
-    expect(characterSource).toContain("accessoryArtSet.poses?.[resolvedName]");
+    expect(characterSource).toContain("poseAccessoryArt(accessoryArtSet, resolvedName)");
+    // glasses carry the hue as accents painted over their ink frames
+    expect(artSource).toContain("colorOverInk: true");
+    expect(characterSource).toContain("ACCESSORY_COLOR_INSET");
     expect(characterSource).toContain('resolvedAccessory === "bucket-hat"');
     expect(characterSource).toContain("BUCKET_HAT_OCCLUSION_EDGE");
     expect(characterSource).toContain("bucketHatBodyClip(accessoryPlacement, resolvedName)");

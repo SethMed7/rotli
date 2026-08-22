@@ -51,7 +51,10 @@ Rotli runs a production-only frozen install before activation. A missing Bun
 executable or any lockfile/install failure stops Breve startup with an explicit
 error while the prior runtime remains active and complete. An old
 `node_modules` directory is never accepted as proof that the pinned graph is
-current. Bundling Bun itself remains separate future hardening.
+current. The root's Bun 1.4 policy mechanically holds this install to lockfile
+v2, isolated project-local resolution, and disabled package lifecycle scripts;
+the native/generated dependency smoke catches packages that cannot actually
+operate under that policy. Bundling Bun itself remains separate future hardening.
 
 Exactly one scheduler may own a managed Breve home. The scheduler claims an
 atomic, crash-recoverable process lock before loading state; additional Rotli

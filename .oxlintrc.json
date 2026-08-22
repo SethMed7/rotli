@@ -27,6 +27,12 @@
   // else in the category is at zero and now guards for free. Propose additions
   // in a PR; the config must not grow silently.
   "plugins": ["typescript", "react"],
+  "options": {
+    // One source for CLI and editor behavior. The contract smoke proves the
+    // tsgolint sidecar actually executes a type-aware rule.
+    "typeAware": true,
+    "maxWarnings": 0
+  },
   "categories": {
     "correctness": "error"
   },
@@ -47,8 +53,8 @@
     // keeps the real bug class (spreading a Promise, function, or class
     // instance) while permitting the intended string behavior.
     "typescript/no-misused-spread": ["error", { "allow": ["string"] }],
-    // Type-aware (require `--type-aware` + oxlint-tsgolint; without the flag
-    // they silently no-op — the flag lives in the lint:oxlint script).
+    // Type-aware (requires oxlint-tsgolint; without options.typeAware these
+    // silently no-op — scripts/oxc-contract.test.ts proves the config wiring).
     "typescript/no-floating-promises": "error",
     "typescript/no-misused-promises": "error",
     "typescript/no-explicit-any": "error",

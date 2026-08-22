@@ -11,11 +11,11 @@ import {
 
 export function ChatPromptNavigator({
   prompts,
-  activeMessageIndex,
+  activeMessageIndexes,
   onJump,
 }: {
   prompts: readonly PromptLocation[];
-  activeMessageIndex: number | null;
+  activeMessageIndexes: readonly number[];
   onJump: (messageIndex: number) => void;
 }) {
   const navigatorStyle = useUiStore((s) => s.chatNavigatorStyle);
@@ -133,10 +133,10 @@ export function ChatPromptNavigator({
             type="button"
             key={prompt.messageIndex}
             className={`chat-prompt-marker ${
-              promptStateClassName(prompt.messageIndex, activeMessageIndex, previewMessageIndex) ?? ""
+              promptStateClassName(prompt.messageIndex, activeMessageIndexes, previewMessageIndex) ?? ""
             }`.trimEnd()}
             aria-label={`Preview prompt: ${promptPreview(prompt.text, 48)}`}
-            aria-current={prompt.messageIndex === activeMessageIndex ? "location" : undefined}
+            aria-current={prompt.messageIndex === activeMessageIndexes.at(-1) ? "location" : undefined}
             aria-expanded={open}
             aria-haspopup="true"
             onPointerEnter={() => previewPrompt(prompt.messageIndex)}
@@ -162,8 +162,12 @@ export function ChatPromptNavigator({
               <button
                 type="button"
                 key={prompt.messageIndex}
-                className={promptStateClassName(prompt.messageIndex, activeMessageIndex, previewMessageIndex)}
-                aria-current={prompt.messageIndex === activeMessageIndex ? "location" : undefined}
+                className={promptStateClassName(
+                  prompt.messageIndex,
+                  activeMessageIndexes,
+                  previewMessageIndex,
+                )}
+                aria-current={prompt.messageIndex === activeMessageIndexes.at(-1) ? "location" : undefined}
                 onPointerEnter={() => previewPrompt(prompt.messageIndex)}
                 onPointerLeave={() => dispatch({ type: "clear-preview" })}
                 onFocus={() => previewPrompt(prompt.messageIndex)}

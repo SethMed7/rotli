@@ -114,8 +114,8 @@ the source as SVG and express approved fills through the brand token layer.
 
 ## Bun architecture scan
 
-Rotli is already pinned to Bun 1.3.14, the latest stable release found during
-this experiment.
+At the time of this experiment, Rotli was pinned to Bun 1.3.14, the latest
+stable release then available.
 
 High-value follow-ups:
 

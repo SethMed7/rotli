@@ -199,7 +199,7 @@ The 2026-07 audit escalated five product-behavior findings. Disposition:
    step caps, secure-note exclusion, and secret scan remain independent layers.
    Paraphrased semantic leakage is a residual risk for the quarterly review.
 
-### Supply-chain advisories (tracked; reviewed 2026-08-18)
+### Supply-chain advisories (tracked; reviewed 2026-08-22)
 
 All are outside Rotli's own `src/`. The repository has three independent Bun
 lockfiles, so `bun run deps audit` scans each one instead of treating the root
@@ -221,7 +221,7 @@ dependency change:
   injection and prototype pollution) — through Univer, Mermaid, and Excalidraw.
 - **nanoid** locked 3.x, 4.x, and 5.x lines and **uuid** 8.3.2 (moderate/high) —
   library-internal ID generation through Excalidraw, Univer, Vite, exceljs, and
-  Mermaid. The compatible NanoID 3.3.16 line is repaired; Excalidraw, Univer,
+  Mermaid. The compatible NanoID 3.3.18 line is repaired; Excalidraw, Univer,
   the converter, and exceljs carry exact or major-bounded ranges.
 - **sharp** < 0.35.0 (high libvips image-processing family) — through the optional
   Kokoro/Transformers local voice stack (`@huggingface/transformers` →
@@ -265,13 +265,18 @@ fixed at 1.0.103. **glib 0.18.5** (`RUSTSEC-2024-0429`) exists only in Tauri
 is absent from the shipped macOS graph and has no compatible patched GTK3
 release. The audit ignores that exact ID while retaining the dependency path
 here; Tauri's eventual Linux GTK4 move is the removal path. RustSec also reports
-17 unmaintained warnings: ten GTK3 crates plus `proc-macro-error` through the
+18 allowed warnings: ten GTK3 crates plus `proc-macro-error` through the
 Linux-only `tauri → gtk/glib` graph; five UNIC crates through
 `tauri-utils → urlpattern`; and `ttf-parser 0.25.1` (`RUSTSEC-2026-0192`)
 through the shipped `pdf-extract → lopdf` parser boundary described above.
-These are maintenance notices rather than reported vulnerabilities. The GTK3
-items leave with Tauri's Linux GTK4 move; the other paths stay under compatible
-lockfile review and the PDF parser's existing size and failure controls.
+The remaining warning is `lru 0.16.4` (`RUSTSEC-2026-0253`) through current
+`tantivy 0.26.1`. The unsound `pop()` path requires a key whose `Drop` panics;
+Tantivy's only LRU is `LruCache<usize, Block>`, so Rotli cannot supply such a
+key, and the latest Tantivy release does not yet admit patched `lru 0.18.2`.
+These warnings are maintenance/reachability notices rather than scanner-reported
+reachable vulnerabilities. The GTK3 items leave with Tauri's Linux GTK4 move;
+the other paths stay under compatible lockfile review and the PDF/search
+adapters' existing size and failure controls.
 
 The `dependency-audit` CI job is deliberately advisory. `continue-on-error` is
 set only on the two scans; installing the pinned `cargo-audit` binary remains a

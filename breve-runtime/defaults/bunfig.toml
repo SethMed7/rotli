@@ -1,3 +1,6 @@
 [install]
 # Breve installs this production graph independently inside each vault.
 minimumReleaseAge = 259200
+ignoreScripts = true
+linker = "isolated"
+globalStore = false

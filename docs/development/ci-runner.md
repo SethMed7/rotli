@@ -11,7 +11,7 @@ by name for the exact source commit.
 
 | Job | Runner | Proof |
 | --- | --- | --- |
-| Quality and production builds | `ubuntu-24.04` | Frozen root install, `bun run check`, Vite production build, frozen site install, Astro production build |
+| Quality and production builds | `ubuntu-24.04` | Script-free isolated frozen installs for app, site, and Breve; lockfile convergence; exact Unknown-license baseline; retained license inventory; `bun run check`; Vite/Rolldown and Astro production builds |
 | Browser E2E | `ubuntu-24.04` | E2E typecheck, Playwright Chromium install, and the browser suite |
 | Dependency vulnerability audit | `ubuntu-24.04` | `bun audit` and RustSec; current accepted transitive findings remain advisory and are tracked in [`security.md`](security.md) |
 | Rust | `macos-15` | `cargo clippy --all-targets -- -D warnings` and `cargo test` against the shipped operating-system branches |
@@ -32,10 +32,19 @@ updater signing credentials.
 - Use exact hosted image labels (`ubuntu-24.04` and `macos-15`), not `*-latest`.
 - Pin every third-party action to a full reviewed commit SHA and retain its
   release tag in a comment.
-- Install Bun from the root `.bun-version`; keep both manifests' `packageManager`
-  fields identical to it. Let Rustup consume `rust-toolchain.toml` rather than
-  selecting a moving stable channel in workflow YAML.
-- Install JavaScript dependencies from committed lockfiles with `bun ci`.
+- Install Bun from the root `.bun-version`; keep all three manifests'
+  `packageManager` fields identical to it. Let Rustup consume
+  `rust-toolchain.toml` rather than selecting a moving stable channel in
+  workflow YAML.
+- Install JavaScript dependencies from committed v2 lockfiles. Every root's
+  bunfig enforces script-free isolated resolution with the shared global store
+  disabled; CI must not override that policy.
+- Block on `bun run deps dedupe-check` and `bun run deps licenses-check`, then
+  retain the combined production dependency-license inventory as
+  `dependency-licenses` for 30 days. The license check ratchets Bun's Unknown
+  group in both directions: additions require review and removed entries must
+  leave the baseline. This evidence supplements the release SBOM rather than
+  replacing it.
 - Keep the workflow token read-only. Audit results belong in the job log and do
   not need permission to create a separate check run.
 - Keep `concurrency.cancel-in-progress` enabled so a superseded branch commit
@@ -45,12 +54,12 @@ updater signing credentials.
 
 ## Running and diagnosing the suite
 
-Pushes to `main`, pull requests, and manual dispatches run the same workflow.
+Pushes to `main` and `dev`, pull requests, and manual dispatches run the same workflow.
 To request and watch a run without changing source:
 
 ```sh
 gh workflow run "Regression suite" --repo SethMed7/rotli --ref main
-gh run watch --repo SethMed7/rotli
+gh run watch --repo SethMed7/rotli --branch main
 ```
 
 A pull request is green only when all four jobs conclude `success`. The

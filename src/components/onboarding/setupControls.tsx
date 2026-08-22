@@ -139,7 +139,7 @@ export function SetupPrimary({
 }
 
 export function SetupBack({ onClick, disabled = false }: { onClick: () => void; disabled?: boolean }) {
-  const chord = currentChord("nav.back");
+  const chord = currentChord("setup.back");
   return (
     <button type="button" className="setup-button secondary" disabled={disabled} onClick={onClick}>
       <span>Back</span>

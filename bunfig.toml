@@ -8,3 +8,9 @@ preload = ["./test-setup.ts"]
 # Hold new direct and transitive resolutions for three days so a compromised
 # release has time to be discovered. Frozen lockfile installs are unchanged.
 minimumReleaseAge = 259200
+# Repository dependencies must install deterministically without executing
+# package lifecycle hooks. Keep each graph isolated without Bun's shared global
+# store so type and peer resolution remain local to this checkout.
+ignoreScripts = true
+linker = "isolated"
+globalStore = false

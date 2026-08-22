@@ -26,7 +26,7 @@ fix both in the same change.
 | Current system-wide findings and priorities | [`architecture/system-audit-2026-07-29.md`](architecture/system-audit-2026-07-29.md) |
 | Production readiness, security, integrity, lifecycle, IPC, and scale audit | [`architecture/production-readiness-audit-2026-08-10.md`](architecture/production-readiness-audit-2026-08-10.md) |
 | Performance audit (async · imports · bundle) | [`architecture/perf-audit-2026-07-30.md`](architecture/perf-audit-2026-07-30.md) |
-| Bun stable architecture audit and 1.4 package-manager preview | [`architecture/bun-1.3-audit-2026-08-15.md`](architecture/bun-1.3-audit-2026-08-15.md) |
+| Bun 1.4 architecture audit and promotion record | [`architecture/bun-1.4-audit-2026-08-21.md`](architecture/bun-1.4-audit-2026-08-21.md) |
 | Egress threat model (can secure content reach a remote model?) | [`architecture/egress-threat-model.md`](architecture/egress-threat-model.md) |
 | Code organization audit | [`architecture/code-audit.md`](architecture/code-audit.md) |
 | Managed Breve runtime | [`../breve-runtime/README.md`](../breve-runtime/README.md) |

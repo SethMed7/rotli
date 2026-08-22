@@ -83,7 +83,13 @@ export interface AccessoryCharacterArt {
 }
 
 export interface AccessoryCharacterArtSet extends AccessoryCharacterArt {
-  poses?: Partial<Record<CharacterName, AccessoryCharacterArt>>;
+  /** Per-pose override; null means the accessory has no credible art for
+   * that pose (front-only eyewear on a profile head) and stays off it. */
+  poses?: Partial<Record<CharacterName, AccessoryCharacterArt | null>>;
+  /** The glasses' color layer is pure accent shapes (bridge, hinges, rim
+   * dashes) that must sit ON the ink frames; drawing them under the ink
+   * buries them into ragged slivers. */
+  colorOverInk?: boolean;
 }
 
 export const SVGS: Record<CanonicalCharacterName, string> = {
@@ -122,7 +128,7 @@ export const LAYERED_ART: Record<LayeredCharacterName, LayeredCharacterArt> = {
 };
 
 export const ACCESSORY_ART: Record<AccessoryCharacterName, AccessoryCharacterArtSet> = {
-  glasses: { color: glassesAccessory, ink: glassesAccessoryInk },
+  glasses: { color: glassesAccessory, ink: glassesAccessoryInk, colorOverInk: true },
   "bucket-hat": {
     color: bucketHatColor,
     ink: bucketHatInk,

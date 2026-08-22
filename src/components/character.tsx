@@ -78,16 +78,49 @@ function maskStyle(source: string): CSSProperties {
   };
 }
 
-function accessoryMaskStyle(source: string, placement: QuokkaAccessoryPlacement): CSSProperties {
+function accessoryMaskStyle(source: string, placement: QuokkaAccessoryPlacement, inset = 1): CSSProperties {
   return {
     ...maskStyle(source),
     transformOrigin: `${(placement.originX / 512) * 100}% ${(placement.originY / 512) * 100}%`,
-    transform: `translate(${(placement.translateX / 512) * 100}%, ${(placement.translateY / 512) * 100}%) rotate(${placement.rotate}deg) scale(${placement.scaleX}, ${placement.scaleY})`,
+    transform: `translate(${(placement.translateX / 512) * 100}%, ${(placement.translateY / 512) * 100}%) rotate(${placement.rotate}deg) scale(${placement.scaleX * inset}, ${placement.scaleY * inset})`,
+    ...accessoryClipStyle(placement),
   };
 }
 
+function accessoryClipStyle(placement: QuokkaAccessoryPlacement): CSSProperties {
+  const pct = (value: number) => `${((value / 512) * 100).toFixed(2)}%`;
+  const { clipXMin, clipXMax, clipBand } = placement;
+  if (clipXMax !== undefined && clipBand) {
+    // Keep everything left of the cut plus a thin band beyond it — the
+    // bridge bar continuing over the nose without the far lens's rim.
+    const points = [
+      "0% 0%",
+      `${pct(clipXMax)} 0%`,
+      `${pct(clipXMax)} ${pct(clipBand.yMin)}`,
+      `${pct(clipBand.toX)} ${pct(clipBand.yMin)}`,
+      `${pct(clipBand.toX)} ${pct(clipBand.yMax)}`,
+      `${pct(clipXMax)} ${pct(clipBand.yMax)}`,
+      `${pct(clipXMax)} 100%`,
+      "0% 100%",
+    ];
+    return { clipPath: `polygon(${points.join(", ")})` };
+  }
+  if (clipXMin !== undefined || clipXMax !== undefined) {
+    return {
+      clipPath: `inset(0 ${clipXMax !== undefined ? pct(512 - clipXMax) : "0%"} 0 ${clipXMin !== undefined ? pct(clipXMin) : "0%"})`,
+    };
+  }
+  return {};
+}
+
+/** The raster color layer sits a hair proud of its ink outlines; tucking it
+ * slightly beneath the ink keeps a contrasting accessory hue from haloing
+ * around frames and hinges. */
+const ACCESSORY_COLOR_INSET = 0.965;
+
 const BUCKET_HAT_OCCLUSION_EDGE = {
   front: [
+    [116, 58],
     [155, 92],
     [156, 105],
     [200, 124],
@@ -95,9 +128,10 @@ const BUCKET_HAT_OCCLUSION_EDGE = {
     [312, 124],
     [356, 105],
     [357, 92],
+    [396, 58],
   ],
   "three-quarter": [
-    [158, 94],
+    [132, 92],
     [162, 107],
     [207, 128],
     [258, 132],
@@ -106,6 +140,7 @@ const BUCKET_HAT_OCCLUSION_EDGE = {
     [366, 100],
   ],
   side: [
+    [152, 93],
     [186, 94],
     [194, 111],
     [241, 130],
@@ -150,6 +185,11 @@ function bucketHatBodyClip(placement: QuokkaAccessoryPlacement, pose: CharacterN
   const last = edge[edge.length - 1]!;
   const boundary = edge.map(clipPoint).join(", ");
   return `polygon(0 0, ${((first[0] / 512) * 100).toFixed(2)}% 0, ${boundary}, ${((last[0] / 512) * 100).toFixed(2)}% 0, 100% 0, 100% 100%, 0 100%)`;
+}
+
+function poseAccessoryArt(set: AccessoryCharacterArtSet, pose: CharacterName): AccessoryCharacterArt | null {
+  if (set.poses && pose in set.poses) return set.poses[pose] ?? null;
+  return set;
 }
 
 /** A full-body quokka illustration. Without an explicit treatment it follows
@@ -198,7 +238,7 @@ export function Character({
   const accessoryArtSet =
     resolvedAccessory === "none" ? null : art?.accessories[resolvedAccessory as AccessoryCharacterName];
   const accessoryArt: AccessoryCharacterArt | null = accessoryArtSet
-    ? (accessoryArtSet.poses?.[resolvedName] ?? accessoryArtSet)
+    ? poseAccessoryArt(accessoryArtSet, resolvedName)
     : null;
   const accessoryPlacement = quokkaAccessoryPlacement(resolvedName, resolvedAccessory);
   const bodyHatClip =
@@ -210,21 +250,31 @@ export function Character({
     height: size,
     "--quokka-custom-color": quokkaCustomColor(customHue),
     "--quokka-accessory-color": quokkaAccessoryColor(accessoryHue),
-    "--quokka-ink": `var(--quokka-line-${lineColor})`,
+    // "auto" follows the environment only where there is no body fill to
+    // guarantee contrast (the Line treatment); filled treatments keep their
+    // designed dark ink on every theme.
+    "--quokka-ink":
+      lineColor === "auto" && fill ? "var(--quokka-line-black)" : `var(--quokka-line-${lineColor})`,
     ...(fill ? { "--quokka-fill": fill } : {}),
   } as CSSProperties;
+  const accessoryColorLayer = accessoryArt && fill && (
+    <span
+      className="quokka-layer quokka-accessory-layer"
+      style={accessoryMaskStyle(
+        accessoryArt.color,
+        accessoryPlacement,
+        accessoryArtSet?.colorOverInk ? 1 : ACCESSORY_COLOR_INSET,
+      )}
+    />
+  );
   const accessoryLayers = accessoryArt ? (
     <>
-      {fill && (
-        <span
-          className="quokka-layer quokka-accessory-layer"
-          style={accessoryMaskStyle(accessoryArt.color, accessoryPlacement)}
-        />
-      )}
+      {!accessoryArtSet?.colorOverInk && accessoryColorLayer}
       <span
         className="quokka-layer quokka-ink-layer"
         style={accessoryMaskStyle(accessoryArt.ink, accessoryPlacement)}
       />
+      {accessoryArtSet?.colorOverInk && accessoryColorLayer}
     </>
   ) : null;
 

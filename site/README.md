@@ -9,7 +9,9 @@ Built with [Astro](https://astro.build).
 ## This is a separate sub-project
 
 It has **its own dependencies** and does **not** touch the app's root
-`bun.lock` or `package.json`. Install and build from inside `site/` only.
+`bun.lock` or `package.json`. Its Bun 1.4 lockfile uses script-free isolated
+resolution under the same three-day release-age gate as the app and Breve.
+Install and build from inside `site/` only.
 
 ## Develop
 
@@ -58,16 +60,16 @@ owns cache and browser-security headers and is copied into `dist/` by Astro.
 Workers Builds settings are dashboard configuration, not Wrangler runtime
 variables. Connect `SethMed7/rotli` to a Worker with these exact settings:
 
-| Setting | Value |
-|---|---|
-| Worker name | `rotli-site` |
-| Production branch | `main` |
-| Root directory | `site` |
-| Build command | `bun run build` |
-| Deploy command | `bun run deploy` |
+| Setting                       | Value                    |
+| ----------------------------- | ------------------------ |
+| Worker name                   | `rotli-site`             |
+| Production branch             | `main`                   |
+| Root directory                | `site`                   |
+| Build command                 | `bun run build`          |
+| Deploy command                | `bun run deploy`         |
 | Non-production deploy command | `bun run deploy:preview` |
-| Non-production branch builds | Enabled |
-| Build variable | `BUN_VERSION=1.3.14` |
+| Non-production branch builds  | Enabled                  |
+| Build variable                | `BUN_VERSION=1.4.0`      |
 
 The Worker name must match `wrangler.jsonc`. Production uploads go to the
 `rotli.app` Custom Domain; other branches upload versions with public preview

@@ -525,7 +525,13 @@ export function parseSettings(raw: string): PersistedSettings {
       data.quokkaCustomHue === undefined
         ? quokkaHueFromLegacyColor(data.quokkaCustomColor)
         : normalizeQuokkaCustomHue(data.quokkaCustomHue),
-    quokkaLineColor: asEnum(data.quokkaLineColor, QUOKKA_LINE_COLORS, "black"),
+    // "black" was only ever the implementation default (no UI offered the
+    // choice) and it vanishes on dark themes — migrate it to theme-aware auto.
+    quokkaLineColor: asEnum(
+      data.quokkaLineColor === "black" ? "auto" : data.quokkaLineColor,
+      QUOKKA_LINE_COLORS,
+      "auto",
+    ),
     quokkaAccessory: asEnum(data.quokkaAccessory, QUOKKA_ACCESSORIES, "none"),
     quokkaAccessoryHue: normalizeQuokkaAccessoryHue(data.quokkaAccessoryHue),
     quokkaIdlePose: asEnum(data.quokkaIdlePose, QUOKKA_IDLE_POSES, "rest"),

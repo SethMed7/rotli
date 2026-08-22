@@ -413,14 +413,43 @@
   gap: 8px;
 }
 
-.setup-quokka-controls select {
-  min-width: 118px;
-  height: 28px;
+.setup-quokka-accrow {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.setup-quokka-accs {
+  display: flex;
+  gap: 6px;
+}
+
+.setup-quokka-accs button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 2px;
   border: 1px solid var(--border);
   border-radius: var(--r-control);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.setup-quokka-accs button:hover {
+  background: var(--hov);
+}
+
+.setup-quokka-accs button.selected {
+  border-color: var(--accent);
+  background: var(--selected-bg);
+}
+
+.setup-quokka-accs button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .setup-quokka-controls > small {
@@ -430,8 +459,7 @@
 }
 
 .setup-quokka-swatches button:focus-visible,
-.setup-quokka-swatches input:focus-visible,
-.setup-quokka-controls select:focus-visible {
+.setup-quokka-swatches input:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }

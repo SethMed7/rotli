@@ -138,7 +138,7 @@ import { chatMark } from "../sidebar/chatMark";
 import { ModelLogo } from "../sidebar/modelLogo";
 import { CHAT_PANE_ATTR, registerChatDrop } from "./chatDrop";
 import { ChatPromptNavigator } from "./chatPromptNavigator";
-import { conversationPrompts } from "./chatPromptNavigatorModel";
+import { conversationPrompts, visiblePromptIndexes } from "./chatPromptNavigatorModel";
 import { normalizedReasoning, normalizedServiceTier, reasoningChoices } from "./chatReasoningModel";
 import {
   CHAT_TITLE_MAX_LENGTH,
@@ -1812,7 +1812,7 @@ export function ChatSurface({
     () => conversationPrompts(messages.map((item) => ({ ...item, text: visibleChatText(item.text) }))),
     [messages],
   );
-  const [activePromptIndex, setActivePromptIndex] = useState<number | null>(null);
+  const [activePromptIndexes, setActivePromptIndexes] = useState<readonly number[]>([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string>(THINK_WORDS[0]!);
   // the on-device answer forming token-by-token — shown live in the assistant
@@ -2023,23 +2023,26 @@ export function ChatSurface({
   useEffect(() => {
     const scroll = scrollRef.current;
     if (!scroll || prompts.length < 3) {
-      setActivePromptIndex(prompts.at(-1)?.messageIndex ?? null);
+      const last = prompts.at(-1)?.messageIndex;
+      setActivePromptIndexes(last === undefined ? [] : [last]);
       return;
     }
     let frame = 0;
     const update = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        const readingEdge = scroll.getBoundingClientRect().top + 96;
-        let active = prompts[0]?.messageIndex ?? null;
-        for (const prompt of prompts) {
-          const node = scroll.querySelector<HTMLElement>(
-            `[data-chat-message-index="${prompt.messageIndex}"]`,
-          );
-          if (!node || node.getBoundingClientRect().top > readingEdge) break;
-          active = prompt.messageIndex;
-        }
-        setActivePromptIndex(active);
+        const viewRect = scroll.getBoundingClientRect();
+        const bubbles = prompts.map((prompt) => {
+          const rect = scroll
+            .querySelector<HTMLElement>(`[data-chat-message-index="${prompt.messageIndex}"]`)
+            ?.getBoundingClientRect();
+          return {
+            messageIndex: prompt.messageIndex,
+            top: rect?.top ?? null,
+            bottom: rect?.bottom ?? null,
+          };
+        });
+        setActivePromptIndexes(visiblePromptIndexes(bubbles, viewRect.top, viewRect.bottom));
       });
     };
     update();
@@ -2922,7 +2925,7 @@ export function ChatSurface({
           <div className={pristineChat ? "chat-conversation is-new" : "chat-conversation"}>
             <ChatPromptNavigator
               prompts={prompts}
-              activeMessageIndex={activePromptIndex}
+              activeMessageIndexes={activePromptIndexes}
               onJump={jumpToPrompt}
             />
             <div className="chat-scroll" ref={scrollRef}>
