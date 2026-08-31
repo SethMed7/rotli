@@ -15,10 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Remote agents can opt in to the local workspace without uploading the vault.** Rotli can connect
   the running Mac app to a stateless HTTPS MCP relay for Grok Bot and other cloud clients. Pairing
   uses independent Keychain client/device credentials, every launch starts disconnected, vault
-  switches disconnect, and the existing secure-note, locked-note, and optimistic-revision gates
-  remain the only workspace policy engine. The single-replica relay has bounded in-memory sessions,
-  no database or volume, and a pinned Bun container. The public site now includes an MCP setup,
-  safety, verification, and self-hosting guide without advertising an undeployed relay domain.
+  switches disconnect, and an explicit Remove pairing action disconnects and deletes both credentials.
+  The existing secure-note, locked-note, and optimistic-revision gates remain the only workspace policy
+  engine. The single-replica relay has bounded in-memory sessions, no database or volume, and a pinned
+  Bun container. The public site now includes an MCP setup, safety, verification, and self-hosting guide
+  without advertising an undeployed relay domain.
 
 - **The private browser now supports real multi-tab research.** While browsing,
   ⌘T or the pane-strip plus opens another isolated private page, popup links

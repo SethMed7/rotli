@@ -74,6 +74,7 @@ import {
   remoteAgentStart,
   remoteAgentStatus,
   remoteAgentStop,
+  remoteAgentUnpair,
   revealCorpus,
   SECRET_BRAVE_SEARCH_API_KEY,
   SECRET_GEMINI_API_KEY,
@@ -3244,6 +3245,7 @@ function RemoteAgentsSection() {
   const setRelayUrl = useUiStore((state) => state.setRemoteAgentRelayUrl);
   const [pairing, setPairing] = useState<RemoteAgentPairing | null>(null);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [confirmUnpair, setConfirmUnpair] = useState(false);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ text: string; err: boolean } | null>(null);
   const status = useQuery({
@@ -3298,8 +3300,9 @@ function RemoteAgentsSection() {
         setPairing(next);
         setRelayUrl(next.mcpUrl);
         setConfirmRegenerate(false);
+        setConfirmUnpair(false);
         setNote({
-          text: "New pairing created. Copy it now—the client token is shown only once.",
+          text: "New pairing created. Copy it now—Rotli cannot reveal this client token after you leave this screen.",
           err: false,
         });
         refresh();
@@ -3340,6 +3343,7 @@ function RemoteAgentsSection() {
             setRelayUrl(event.target.value);
             setPairing(null);
             setConfirmRegenerate(false);
+            setConfirmUnpair(false);
           }}
           onKeyDown={(event) => event.stopPropagation()}
         />
@@ -3353,6 +3357,7 @@ function RemoteAgentsSection() {
           onClick={() => {
             if (current?.paired && !confirmRegenerate) {
               setConfirmRegenerate(true);
+              setConfirmUnpair(false);
               setNote({
                 text: "Replacing the pairing disconnects this session and permanently invalidates the old client token.",
                 err: false,
@@ -3375,6 +3380,42 @@ function RemoteAgentsSection() {
             }}
           >
             Cancel
+          </button>
+        )}
+        {current?.paired && (
+          <button
+            type="button"
+            className={`ghostbtn${confirmUnpair ? " danger" : " quiet"}`}
+            disabled={!native || busy}
+            onClick={() => {
+              if (!confirmUnpair) {
+                setConfirmUnpair(true);
+                setConfirmRegenerate(false);
+                setNote({
+                  text: "Removing the pairing disconnects this session and deletes both remote-agent tokens from Keychain.",
+                  err: false,
+                });
+                return;
+              }
+              setBusy(true);
+              setNote(null);
+              remoteAgentUnpair()
+                .then(() => {
+                  setPairing(null);
+                  setConfirmUnpair(false);
+                  setNote({
+                    text: "Pairing removed from Keychain. This Mac is no longer available remotely.",
+                    err: false,
+                  });
+                  refresh();
+                })
+                .catch((error) =>
+                  setNote({ text: error instanceof Error ? error.message : String(error), err: true }),
+                )
+                .finally(() => setBusy(false));
+            }}
+          >
+            {confirmUnpair ? "Confirm removal" : "Remove pairing"}
           </button>
         )}
         {current?.active ? (
@@ -3403,6 +3444,7 @@ function RemoteAgentsSection() {
           <div>
             <strong>Paste into Grok Bot</strong>
             <span>{pairing.mcpUrl}</span>
+            <span>{pairing.authorizationHeader}</span>
           </div>
           <button type="button" className="ghostbtn" onClick={() => void copyPairing()}>
             <CopyGlyph size={13} /> Copy setup

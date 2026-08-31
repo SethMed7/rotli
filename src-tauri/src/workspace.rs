@@ -2198,7 +2198,7 @@ fn mcp_config() -> Result<Value, String> {
         "remoteHttp": {
             "transport": "streamable-http",
             "mcpUrl": "https://YOUR-RELAY.example/mcp",
-            "authorization": "Bearer <client token shown once by Settings → Connections → Remote agents>",
+            "authorization": "Bearer <client token returned only when Settings creates the pairing>",
             "grokBot": "Tell Grok Bot to add the MCP URL, then provide the static Authorization bearer header. Rotli must be open and explicitly connected for this app session."
         },
         "verify": {

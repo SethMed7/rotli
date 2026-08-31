@@ -67,7 +67,8 @@ Remote pairing stores independent device and client credentials in Keychain.
 The device credential never leaves Rust; the newly generated client bearer is
 shown once in the owned Settings surface so the user can copy it to the chosen
 cloud MCP client. The non-secret relay URL may persist as an installation
-preference. Switching vaults disconnects the current remote session.
+preference. Remove pairing disconnects the session and deletes both credentials
+from Keychain. Switching vaults disconnects the current remote session.
 
 Rotli does not automatically upload diagnostics. Support reports should follow
 [`docs/operations/support-and-diagnostics.md`](docs/operations/support-and-diagnostics.md)

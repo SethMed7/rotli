@@ -67,7 +67,9 @@ Pairing does not connect. “Connect this session” starts the outbound loop, a
 every app launch begins disconnected even when a token remains paired. The UI
 shows disconnected, error, and connected states and offers an explicit
 disconnect. Replacing a pairing requires a separate destructive confirmation.
-Rotli never edits Grok Bot, Cursor, Claude, or Codex configuration.
+Removing a pairing also requires confirmation, stops the connector, and deletes
+the device/client bundle from Keychain. Rotli never edits Grok Bot, Cursor,
+Claude, or Codex configuration.
 
 The relay does not retry a tool call or retain it for later delivery. A lost Mac
 connection expires the in-flight response. Client retries are new MCP calls and

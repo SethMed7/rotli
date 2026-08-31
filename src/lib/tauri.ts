@@ -750,6 +750,10 @@ export function remoteAgentStop(): Promise<RemoteAgentStatus> {
   return invoke<RemoteAgentStatus>("remote_agent_stop");
 }
 
+export function remoteAgentUnpair(): Promise<RemoteAgentStatus> {
+  return invoke<RemoteAgentStatus>("remote_agent_unpair");
+}
+
 /** One web search result the model sees. */
 export interface WebResult {
   provider: WebSearchProvider;

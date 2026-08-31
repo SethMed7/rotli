@@ -2381,6 +2381,7 @@ pub fn run() {
             remote_agent::remote_agent_pair,
             remote_agent::remote_agent_start,
             remote_agent::remote_agent_stop,
+            remote_agent::remote_agent_unpair,
             organizer::organizer_status,
             organizer::organizer_run_once,
             organizer::organizer_stop,

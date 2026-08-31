@@ -235,6 +235,28 @@ pub(crate) fn remote_agent_stop(
     remote_agent_status(state)
 }
 
+#[tauri::command]
+pub(crate) fn remote_agent_unpair(
+    window: tauri::WebviewWindow,
+    state: tauri::State<'_, RemoteAgentState>,
+) -> Result<RemoteAgentStatus, String> {
+    require_main_webview(&window)?;
+    remove_pairing(&state)?;
+    remote_agent_status(state)
+}
+
+fn remove_pairing(state: &RemoteAgentState) -> Result<(), String> {
+    state.stop_connector()?;
+    crate::keychain::delete_secret(REMOTE_AGENT_TOKEN_ACCOUNT)?;
+    let mut status = state
+        .status
+        .lock()
+        .map_err(|_| "remote agent status lock poisoned")?;
+    status.paired = false;
+    status.relay_url = None;
+    Ok(())
+}
+
 pub(crate) fn disconnect_for_vault_change(app: &tauri::AppHandle) -> Result<(), String> {
     stop_for_vault_change(app.try_state::<RemoteAgentState>().as_deref())
 }
@@ -481,6 +503,39 @@ mod tests {
         assert!(!status.active);
         assert!(!status.connected);
         assert!(status.last_error.is_none());
+    }
+
+    #[test]
+    fn removing_a_pairing_disconnects_and_deletes_the_keychain_bundle() {
+        let pairing = new_pairing();
+        crate::keychain::store_secret(
+            REMOTE_AGENT_TOKEN_ACCOUNT,
+            &serde_json::to_string(&pairing).unwrap(),
+        )
+        .unwrap();
+        let state = RemoteAgentState {
+            status: Arc::new(Mutex::new(RemoteAgentStatus {
+                paired: true,
+                active: true,
+                connected: true,
+                relay_url: Some("https://relay.example/mcp".into()),
+                last_error: None,
+            })),
+            stop: Mutex::new(Some(Arc::new(AtomicBool::new(false)))),
+            generation: Arc::new(AtomicU64::new(3)),
+        };
+        let stop = state.stop.lock().unwrap().as_ref().unwrap().clone();
+
+        remove_pairing(&state).unwrap();
+
+        assert!(stop.load(Ordering::Acquire));
+        assert_eq!(state.generation.load(Ordering::Acquire), 4);
+        assert!(load_pairing().is_none());
+        let status = state.status.lock().unwrap();
+        assert!(!status.paired);
+        assert!(!status.active);
+        assert!(!status.connected);
+        assert!(status.relay_url.is_none());
     }
 
     #[test]
