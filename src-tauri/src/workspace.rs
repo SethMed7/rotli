@@ -5,9 +5,11 @@
 //! an explicit test override), and every note/board mutation passes through the
 //! same `CorpusStore` policy used by the Tauri shell.
 
+use std::cell::RefCell;
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::io::{self, BufRead, Read, Write};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Instant;
@@ -27,6 +29,13 @@ const MCP_MAX_REQUEST_BYTES: usize = 256_000;
 const MCP_MAX_OUTPUT_BYTES: usize = 512_000;
 const MAIN_ROOT: &str = "main:";
 const OPEN_REQUEST_FILE: &str = "workspace-open.json";
+
+thread_local! {
+    /// The GUI connector pins every remote call to the app's current default
+    /// vault. This is thread-local so stdio/CLI discovery and parallel tests
+    /// retain their ordinary registered-root behavior.
+    static CONNECTOR_ROOT: RefCell<Option<(PathBuf, bool)>> = const { RefCell::new(None) };
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1155,6 +1164,15 @@ fn query_metadata(
 }
 
 fn root_targets() -> Result<Vec<RootTarget>, String> {
+    if let Some((path, read_only)) = CONNECTOR_ROOT.with(|value| value.borrow().clone()) {
+        return Ok(vec![RootTarget {
+            id: DEFAULT_ROOT_ID.to_string(),
+            label: "Notes".into(),
+            path,
+            read_only,
+            is_default: true,
+        }]);
+    }
     if let Ok(path) = std::env::var("ROTLI_CORPUS_ROOT") {
         if path.trim().is_empty() {
             return Err("ROTLI_CORPUS_ROOT is empty".into());
@@ -1828,7 +1846,12 @@ fn run_cli(args: &[String]) -> Result<Value, String> {
         if args.get(1).map(String::as_str) == Some("config") {
             return mcp_config();
         }
-        run_mcp()?;
+        if let Some(address) = option(args, "--http") {
+            let token = required_option(args, "--token")?;
+            run_mcp_http(address, token)?;
+        } else {
+            run_mcp()?;
+        }
         return Ok(Value::Null);
     }
     if command == "roots" || command == "status" {
@@ -2172,6 +2195,12 @@ fn mcp_config() -> Result<Value, String> {
         "claudeCode": format!("claude mcp add --transport stdio --scope user rotli-workspace -- {quoted} mcp"),
         "codex": format!("codex mcp add rotli-workspace -- {quoted} mcp"),
         "codexToml": format!("[mcp_servers.rotli-workspace]\ncommand = {:?}\nargs = [\"mcp\"]\ndefault_tools_approval_mode = \"writes\"", command),
+        "remoteHttp": {
+            "transport": "streamable-http",
+            "mcpUrl": "https://YOUR-RELAY.example/mcp",
+            "authorization": "Bearer <client token shown once by Settings → Connections → Remote agents>",
+            "grokBot": "Tell Grok Bot to add the MCP URL, then provide the static Authorization bearer header. Rotli must be open and explicitly connected for this app session."
+        },
         "verify": {
             "rotli": format!("{quoted} agent doctor"),
             "isolatedSelfTest": format!("{quoted} agent self-test"),
@@ -2195,7 +2224,7 @@ fn workspace_policy() -> Value {
         "privacy": "Secure, locked, and secret-shaped Markdown is omitted or refused. Board scenes have no secure classification and must not contain secrets.",
         "mutations": "Write tools require client-side approval. Complete replacement, removal, move, view reassignment, and board action tools advertise destructiveHint so a host can require confirmation.",
         "limits": { "requestBytes": MCP_MAX_REQUEST_BYTES, "outputBytes": MCP_MAX_OUTPUT_BYTES, "boardActions": crate::board::BOARD_MAX_ACTIONS },
-        "transport": "The MCP server uses local stdio only and opens no network listener.",
+        "transport": "Stdio remains local. Optional HTTP binds loopback only and requires a bearer token. Cloud clients reach an explicitly connected app through the stateless relay; the Mac never opens a public listener.",
         "links": "deepLink fields carry rotli://open?id=…&kind=… URLs. The app validates ids inside the corpus only; a link can never name an arbitrary disk path. Show the link to the human when you create or reference an item."
     })
 }
@@ -2406,9 +2435,10 @@ rotli views list|create|rename|delete|assign|unassign|create-folder ...
 rotli boards list|read|create|update|apply ...
 rotli open ID [--kind note|board|file]
 rotli agent doctor [--root ID]                                  # read-only boundary + metrics
-rotli agent config                                              # copy-ready Claude/Codex setup
+rotli agent config                                              # local + remote MCP setup
 rotli agent self-test                                           # disposable end-to-end validation
 rotli mcp                                                        # stdio MCP server
+rotli mcp --http 127.0.0.1:43110 --token TOKEN                   # authenticated loopback HTTP
 rotli mcp config                                                 # Claude/Codex config snippets
 
 Note bodies are text/markdown without YAML frontmatter; Rotli owns frontmatter.
@@ -2450,6 +2480,132 @@ fn run_mcp() -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+fn run_mcp_http(address: &str, token: &str) -> Result<(), String> {
+    if token.trim().len() < 24 {
+        return Err("--token must contain at least 24 characters".into());
+    }
+    let address: SocketAddr = address
+        .parse()
+        .map_err(|_| "--http must be an IP socket address such as 127.0.0.1:43110")?;
+    if !address.ip().is_loopback() {
+        return Err("the MCP HTTP adapter binds loopback only".into());
+    }
+    let listener =
+        TcpListener::bind(address).map_err(|error| format!("bind {address}: {error}"))?;
+    for stream in listener.incoming() {
+        match stream {
+            Ok(stream) => {
+                if let Err(error) = serve_mcp_http(stream, token) {
+                    eprintln!("rotli mcp http: {error}");
+                }
+            }
+            Err(error) => eprintln!("rotli mcp http: accept failed ({error})"),
+        }
+    }
+    Ok(())
+}
+
+fn serve_mcp_http(mut stream: TcpStream, token: &str) -> Result<(), String> {
+    stream
+        .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+        .map_err(|error| error.to_string())?;
+    let mut reader = io::BufReader::new(stream.try_clone().map_err(|error| error.to_string())?);
+    let mut first = String::new();
+    reader
+        .read_line(&mut first)
+        .map_err(|error| error.to_string())?;
+    let is_post = first.split_whitespace().take(2).eq(["POST", "/mcp"]);
+    let mut content_length = None;
+    let mut authorized = false;
+    loop {
+        let mut line = String::new();
+        reader
+            .read_line(&mut line)
+            .map_err(|error| error.to_string())?;
+        if line == "\r\n" || line.is_empty() {
+            break;
+        }
+        let Some((name, value)) = line.split_once(':') else {
+            continue;
+        };
+        let value = value.trim();
+        if name.eq_ignore_ascii_case("content-length") {
+            content_length = value.parse::<usize>().ok();
+        } else if name.eq_ignore_ascii_case("authorization") {
+            authorized = value.strip_prefix("Bearer ") == Some(token);
+        }
+    }
+    if !is_post {
+        return write_http_response(&mut stream, 404, Some(json!({"error":"not found"})));
+    }
+    if !authorized {
+        return write_http_response(&mut stream, 401, Some(json!({"error":"unauthorized"})));
+    }
+    let Some(length) = content_length else {
+        return write_http_response(
+            &mut stream,
+            411,
+            Some(json!({"error":"content-length required"})),
+        );
+    };
+    if length > MCP_MAX_REQUEST_BYTES {
+        return write_http_response(&mut stream, 413, Some(json!({"error":"request too large"})));
+    }
+    let mut body = vec![0; length];
+    reader
+        .read_exact(&mut body)
+        .map_err(|error| error.to_string())?;
+    let request: Value = match serde_json::from_slice(&body) {
+        Ok(value) => value,
+        Err(error) => {
+            return write_http_response(
+                &mut stream,
+                400,
+                Some(mcp_failure(
+                    Value::Null,
+                    -32700,
+                    &format!("parse error: {error}"),
+                )),
+            )
+        }
+    };
+    let response = handle_mcp_request(&request).map(bounded_mcp_response);
+    write_http_response(
+        &mut stream,
+        if response.is_some() { 200 } else { 202 },
+        response,
+    )
+}
+
+fn write_http_response(
+    stream: &mut TcpStream,
+    status: u16,
+    body: Option<Value>,
+) -> Result<(), String> {
+    let encoded = body
+        .map(|value| serde_json::to_vec(&value).map_err(|error| error.to_string()))
+        .transpose()?
+        .unwrap_or_default();
+    let reason = match status {
+        200 => "OK",
+        202 => "Accepted",
+        400 => "Bad Request",
+        401 => "Unauthorized",
+        404 => "Not Found",
+        411 => "Length Required",
+        413 => "Payload Too Large",
+        _ => "Error",
+    };
+    write!(
+        stream,
+        "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        encoded.len()
+    )
+    .and_then(|_| stream.write_all(&encoded))
+    .and_then(|_| stream.flush())
+    .map_err(|error| error.to_string())
 }
 
 fn read_bounded_mcp_line(reader: &mut impl BufRead) -> Result<Option<(String, bool)>, String> {
@@ -2553,6 +2709,17 @@ fn handle_mcp_request(request: &Value) -> Option<Value> {
         method if method.starts_with("notifications/") => None,
         _ => Some(mcp_failure(id, -32601, "method not found")),
     }
+}
+
+pub(crate) fn handle_mcp_request_for_root(
+    request: &Value,
+    root: PathBuf,
+    read_only: bool,
+) -> Option<Value> {
+    CONNECTOR_ROOT.with(|value| *value.borrow_mut() = Some((root, read_only)));
+    let response = handle_mcp_request(request);
+    CONNECTOR_ROOT.with(|value| *value.borrow_mut() = None);
+    response
 }
 
 fn mcp_success(id: Value, result: Value) -> Value {
@@ -2892,6 +3059,7 @@ fn paged_note(result: NoteReadResult, offset: usize, max_chars: usize) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::net::TcpStream;
     use tempfile::TempDir;
 
     fn test_workspace(temp: &TempDir) -> Workspace {
@@ -3461,6 +3629,39 @@ mod tests {
     }
 
     #[test]
+    fn loopback_http_requires_its_bearer_and_serves_the_same_tool_list() {
+        fn exchange(token: Option<&str>) -> String {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let address = listener.local_addr().unwrap();
+            let server = std::thread::spawn(move || {
+                let (stream, _) = listener.accept().unwrap();
+                serve_mcp_http(stream, "fixture-token-with-24-chars").unwrap();
+            });
+            let body = r#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#;
+            let authorization = token
+                .map(|value| format!("Authorization: Bearer {value}\r\n"))
+                .unwrap_or_default();
+            let mut client = TcpStream::connect(address).unwrap();
+            write!(
+                client,
+                "POST /mcp HTTP/1.1\r\nHost: localhost\r\n{authorization}Content-Length: {}\r\n\r\n{body}",
+                body.len()
+            )
+            .unwrap();
+            client.shutdown(std::net::Shutdown::Write).unwrap();
+            let mut response = String::new();
+            client.read_to_string(&mut response).unwrap();
+            server.join().unwrap();
+            response
+        }
+
+        assert!(exchange(None).starts_with("HTTP/1.1 401"));
+        let response = exchange(Some("fixture-token-with-24-chars"));
+        assert!(response.starts_with("HTTP/1.1 200"));
+        assert!(response.contains("rotli_create_note"));
+    }
+
+    #[test]
     fn mcp_never_echoes_an_unsupported_protocol_version() {
         let response = handle_mcp_request(&json!({
             "jsonrpc": "2.0",
@@ -3476,6 +3677,44 @@ mod tests {
                 .and_then(Value::as_str),
             Some(MCP_PROTOCOL)
         );
+    }
+
+    #[test]
+    fn connector_dispatch_creates_in_a_temporary_vault_through_the_shared_service() {
+        let temp = TempDir::new().unwrap();
+        fs::create_dir_all(temp.path().join("wiki/_inbox")).unwrap();
+        fs::create_dir_all(temp.path().join("storage/excalidraw")).unwrap();
+        fs::write(
+            temp.path().join("memex.json"),
+            r#"{"id":"mx_remote_connector_test","contract":"3.4","apps":{}}"#,
+        )
+        .unwrap();
+        let response = handle_mcp_request_for_root(
+            &json!({
+                "jsonrpc": "2.0",
+                "id": 7,
+                "method": "tools/call",
+                "params": {
+                    "name": "rotli_create_note",
+                    "arguments": { "title": "From remote", "body": "relay round trip" }
+                }
+            }),
+            temp.path().to_path_buf(),
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            response.pointer("/result/isError").and_then(Value::as_bool),
+            Some(false)
+        );
+        let note = fs::read_to_string(temp.path().join("wiki/_inbox/from-remote.md")).unwrap();
+        assert!(note.contains("relay round trip"));
+        let id = response
+            .pointer("/result/structuredContent/note/id")
+            .and_then(Value::as_str)
+            .unwrap();
+        let main = fs::read_to_string(temp.path().join(".rotli/main.json")).unwrap();
+        assert!(main.contains(id));
     }
 
     #[test]

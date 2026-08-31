@@ -15,6 +15,7 @@ direction, runtime wiring, and owning documentation must agree.
 | `bun run test:evals` | Deterministic offline AI loop, routing, model-policy, prompt, retrieval, and memory-workflow evals |
 | `bun run test:breve` | Breve policy, failure-state, locking, and delivery-claim regressions |
 | `bun run test:tooling` | Fixture tests that prove repository linters detect forbidden code shapes, plus the script-free native/generated dependency smoke |
+| `bun run test:relay` | Stateless remote-MCP relay role authentication, browser-origin refusal, capacity/body bounds, live-device rendezvous, expiry, and token-isolation tests |
 | `bun run test:e2e` | Playwright regression layer — drives the real browser twin (chromium) against `vite dev`'s seeded demo corpus |
 | `bun run test:e2e:ui` | The same specs in Playwright's interactive UI runner, for local debugging |
 | `bun run check:e2e-types` | Strict-typecheck `e2e/` and `playwright.config.ts` (`tsc -p tsconfig.e2e.json`) — not folded into the root `tsc --noEmit` because that config's `include` is `src` only |

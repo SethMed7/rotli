@@ -26,7 +26,12 @@ limited to declared product capabilities:
 - user-configured Breve email, Signal, mail, and watch services contact their
   configured destinations; and
 - connected Claude, Codex, or other subscription CLIs follow the privacy terms
-  of those tools and providers.
+  of those tools and providers; and
+- when the user explicitly connects Remote agents for the current app session,
+  Rotli sends authenticated MCP request/response frames through the configured
+  HTTPS relay. The relay keeps only in-flight frames in memory and stores no
+  vault or Markdown; the cloud MCP client receives the non-secure workspace
+  data requested through approved tools.
 
 The destination inventory and guards are documented in
 [`docs/development/security.md`](docs/development/security.md). Adding telemetry,
@@ -50,10 +55,19 @@ currently have a secure classification.
 
 ## Workspace agents and diagnostics
 
-The local CLI/MCP server uses stdio and opens no network listener. It treats
+The local CLI/MCP server uses stdio by default. Its optional HTTP mode is
+token-authenticated and loopback-only. The Remote agents control is off after
+every launch and opens an outbound relay connection only after the user clicks
+Connect this session; it never exposes a public port on the Mac. It treats
 agents as remote for content policy, omits secure/secret-shaped notes, refuses
 locked writes, and requires optimistic revisions. The agent process or its model
 provider may still be remote and has its own data practices.
+
+Remote pairing stores independent device and client credentials in Keychain.
+The device credential never leaves Rust; the newly generated client bearer is
+shown once in the owned Settings surface so the user can copy it to the chosen
+cloud MCP client. The non-secret relay URL may persist as an installation
+preference. Switching vaults disconnects the current remote session.
 
 Rotli does not automatically upload diagnostics. Support reports should follow
 [`docs/operations/support-and-diagnostics.md`](docs/operations/support-and-diagnostics.md)

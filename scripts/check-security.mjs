@@ -11,7 +11,7 @@
 // Parity idiom: like check-breve-contract.mjs / check-parity.mjs, the truth is
 // a tracked fixture and this script asserts reality matches it.
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
@@ -240,6 +240,46 @@ function stripComments(src) {
   const capabilityWindows = caps.windows ?? [];
   if (JSON.stringify(capabilityWindows) !== JSON.stringify(allow.capabilities.defaultWindows)) {
     failures.push("src-tauri/capabilities/default.json: window-wide capability targets are forbidden — they grant every child webview Rotli IPC.");
+  }
+}
+
+// ── (c′) public remote-relay deployment boundary ─────────────────────────────
+//
+// The relay is internet-facing and intentionally state-free. Keep the cheap
+// defenses that make arbitrary public traffic an availability problem rather
+// than an unbounded-memory or cross-role authority bug.
+{
+  const relay = allow.remoteRelay;
+  const code = stripComments(read(relay.source));
+  const dockerfile = read(relay.dockerfile);
+  for (const [name, expected] of [
+    ["MAX_FRAME_BYTES", relay.maxFrameBytes],
+    ["MAX_DEVICE_WAITERS", relay.maxDeviceWaiters],
+    ["MAX_CLOUD_REQUESTS", relay.maxCloudRequests],
+  ]) {
+    const match = code.match(new RegExp(`const\\s+${name}\\s*=\\s*([0-9_]+)`));
+    const actual = match ? Number(match[1].replaceAll("_", "")) : Number.NaN;
+    if (actual !== expected) {
+      failures.push(`${relay.source}: ${name} must remain fixture-pinned at ${expected}.`);
+    }
+  }
+  for (const marker of [
+    'type TokenRole = "client" | "device"',
+    'request.headers.has("origin")',
+    '"application/json"',
+    "maxRequestBodySize: MAX_FRAME_BYTES",
+    "devices.size >= maxDeviceWaiters",
+    "cloud.size >= maxCloudRequests",
+  ]) {
+    if (!code.includes(marker)) failures.push(`${relay.source}: missing public-relay guard ${JSON.stringify(marker)}.`);
+  }
+  if (!dockerfile.includes(`FROM ${relay.image}`) || !/^USER bun$/m.test(dockerfile)) {
+    failures.push(`${relay.dockerfile}: must use the pinned ${relay.image} image as the unprivileged bun user.`);
+  }
+  if (existsSync(join(root, "services/rotli-mcp-relay/railway.json"))) {
+    failures.push(
+      "services/rotli-mcp-relay/railway.json: legacy Railway config-as-code is forbidden; use the scoped Dockerfile service profile.",
+    );
   }
 }
 

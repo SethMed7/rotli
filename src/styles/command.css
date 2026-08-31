@@ -906,6 +906,74 @@
 .aisection > .setnote:first-of-type {
   margin-top: 6px;
 }
+.remote-agents {
+  max-width: 640px;
+}
+.remote-agents-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.remote-agents-head .setnote {
+  max-width: 68ch;
+}
+.remote-agents-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.remote-agents-field input {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+.remote-agents-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.remote-agents-pairing {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+}
+.remote-agents-pairing > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.remote-agents-pairing strong {
+  font-size: 12px;
+  color: var(--text);
+}
+.remote-agents-pairing span {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.remote-agents-boundary {
+  max-width: 68ch;
+  margin-top: 12px;
+}
 
 /* connected lanes — one card per provider */
 .ailane {
@@ -940,6 +1008,10 @@
 .ailane-chip.ok {
   color: var(--accent-text);
   border-color: color-mix(in srgb, var(--accent-text) 45%, var(--border));
+}
+.ailane-chip.busy {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent-text) 30%, var(--border));
 }
 .ailane-chip.err {
   color: var(--danger, var(--accent-text));

@@ -1,0 +1,9 @@
+{
+  "name": "rotli-mcp-relay",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun server.ts",
+    "test": "bun test server.test.ts"
+  }
+}

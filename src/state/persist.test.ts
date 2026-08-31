@@ -484,6 +484,16 @@ describe("unknownAppSettingsKeys — machine settings stay additive", () => {
     );
     expect(unknownAppSettingsKeys('{"privateBrowserSearchEngine":"bing"}')).toEqual({});
   });
+
+  test("keeps only a bounded installation-wide relay URL", () => {
+    expect(parseSettings('{"remoteAgentRelayUrl":" https://mcp.example/mcp "}').remoteAgentRelayUrl).toBe(
+      "https://mcp.example/mcp",
+    );
+    expect(parseSettings(JSON.stringify({ remoteAgentRelayUrl: "x".repeat(2049) })).remoteAgentRelayUrl).toBe(
+      "",
+    );
+    expect(unknownAppSettingsKeys('{"remoteAgentRelayUrl":"https://mcp.example/mcp"}')).toEqual({});
+  });
 });
 
 describe("validTab — durable surface kinds survive a relaunch (#34)", () => {

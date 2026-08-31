@@ -41,7 +41,7 @@ or a compromised dependency behaves adversarially:
 |---|---|---|
 | User content | Markdown prose, boards, documents, sheets, attachments, chat history | Local durable truth; no implicit upload; preserve unknown data |
 | Protected content | Secure notes, secret-shaped chat history, locally permitted secure context | Omit from remote maps/search; deny remote reads and sends |
-| Credentials | Provider keys, Resend token, CLI login material, signing/notary credentials | Keychain or external release secret store; never repository or logs |
+| Credentials | Provider keys, Resend token, remote MCP device/client tokens, CLI login material, signing/notary credentials | Keychain or external release secret store; never repository or logs; a newly generated remote client bearer has one explicit copy-only UI disclosure |
 | Control state | `memex.json`, `corpus.json`, permissions, provider settings, updater key | Validate independently; version or fail closed where writes are possible |
 | Rebuildable state | Indexes, view state, open-request mailbox, generated caches | Deletable; corrupt input falls back without changing content |
 | Recovery evidence | Main arrangement, organizer journal, backups, delivery claims | Atomic writes; preserve enough provenance for restore or safe retry |
@@ -77,6 +77,9 @@ as an encrypted vault.
   names.
 - **Workspace agents** are treated as remote for content policy even when their
   stdio process runs locally.
+- **The remote MCP relay and cloud client** are untrusted network actors. The
+  relay receives only bounded in-flight frames and opaque role-bound tokens;
+  neither receives secure notes or independent filesystem authority.
 - **Network services** and DNS responses are untrusted. Each destination class
   is pinned, resolved, bounded, or explicitly approved at its adapter.
 - **Dependencies and release infrastructure** may be compromised. Lockfiles,
@@ -95,7 +98,8 @@ format + corpus adapters ──► application policy ──► presentation
         │                         ├──► remote provider adapter ──► network
         │                         ├──► web adapter ──────────────► network
         │                         ├──► private browser guest ───► network
-        │                         └──► workspace CLI/MCP ────────► agent process
+        │                         ├──► workspace CLI/MCP ────────► agent process
+        │                         └──► remote MCP connector ─────► relay ──► cloud client
         ▼
 registered local roots
 
@@ -120,9 +124,12 @@ transport, credential, or filesystem authority directly.
 | A fetched URL reaches loopback, metadata services, or private networks | Scheme/host limits, vetted DNS resolution, IP pinning, same-host redirects, response caps | Breve owner-configured fetch retains a documented DNS-rebinding residual |
 | A search failure silently sends the query to another provider | The globe grants per-chat internet consent; a separate per-vault provider setting selects one literal Rust adapter; failures are typed observations and never cross-provider retries | DuckDuckGo's unofficial HTML surface may change or challenge clients; the user must explicitly choose another destination |
 | A provider credential leaks into notes, settings, frontend state, or logs | Allowlisted macOS Keychain account; Rust-only read at request time; webview commands expose store/probe/delete but never read; sensitive-log tripwire; auth header never query string | A compromised same-user process can access that user's Keychain subject to macOS policy |
+| A remote MCP credential grants the wrong role or survives replacement | Pair/start IPC is main-Settings-only; the generic webview Keychain commands cannot address the pairing bundle; independent random client/device tokens share only an opaque pair id; relay endpoints enforce role and exact live-poll token matching; regeneration stops the old generation before replacing the Keychain bundle; device token never crosses IPC | The newly generated client bearer intentionally crosses the owned Settings webview once for copying and then resides in the chosen cloud client; compromise of either surface exposes ordinary non-secure workspace authority while Rotli is connected |
+| A public relay caller exhausts memory, queues vault content, or crosses devices | Exact token syntax, client/device role separation, unguessable pair ids, matching live poll required before accepting `/mcp`, bounded frame/body size, bounded device and in-flight maps, request expiry, one replica, no durable store or retry queue, no frame logging | Volumetric traffic can still consume the single relay instance; Railway/network-level denial of service is availability-only because the Mac and vault remain authoritative |
 | A malicious document/board exploits a codec or exhausts resources | Vendor code behind adapters, package preservation tests, PDF source/extracted-text caps and panic refusal, parity-pinned Excalidraw byte/element/action/string/coordinate/depth limits, dependency audit | Complex third-party parsers retain supply-chain and decompression/resource-exhaustion risk |
 | Active content in a Markdown SVG fence reaches the webview | Parse as XML, rebuild only allowlisted SVG elements/attributes, reject event attributes, scripts, `foreignObject`, external resources, unsafe URLs, styles, and foreign namespaces; production CSP remains defense-in-depth | Browser SVG implementations still require dependency/browser regression review |
 | A compromised webview invokes privileged IPC | Strict CSP, narrow Tauri capability grants, typed facade, Rust revalidation | Webview compromise may exercise any intentionally exposed command as the user |
+| A remote session remains attached while the user changes vaults | Connector captures only the Rust-owned active root; every live vault activation stops and generation-invalidates the connector before the route changes; reconnect is explicit | A filesystem writer can still change ordinary files inside the already-authorized vault while a session is active |
 | A page in the private browser invokes Rotli IPC or retains a session | Separate child webview; capability targets name only app-owned webviews; no remote capability URLs; non-persistent WebKit data store; HTTP(S)-only top-level navigation; browser tabs hydrate as absent | The viewed site still receives ordinary browser request metadata and user-entered data; downloads are intentionally disabled in this first slice |
 | A hostile same-user process invokes the workspace CLI | Registered roots, secure/locked refusal, revisions, remote content gate | Same-user processes can edit ordinary files directly; stronger OS isolation is not claimed |
 | Two writers overwrite one another | Atomic writes, file locks where ownership matters, optimistic revisions for workspace edits | Editor/filesystem races outside revision-aware paths require focused tests |

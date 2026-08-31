@@ -3,9 +3,14 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const REACT_COMPILER_CODE = "react(react-compiler)";
+const REACT_COMPILER_KINDS = new Map([
+  ["react(refs)", "Refs"],
+  ["react(set-state-in-effect)", "EffectSetState"],
+]);
 
-function diagnosticKind(message) {
-  return message.split(":", 1)[0];
+function compilerDiagnosticKind(diagnostic) {
+  if (diagnostic.code === REACT_COMPILER_CODE) return diagnostic.message.split(":", 1)[0];
+  return REACT_COMPILER_KINDS.get(diagnostic.code);
 }
 
 function normalizedFile(filename, repositoryRoot, scanRoot) {
@@ -20,9 +25,9 @@ function normalizedFile(filename, repositoryRoot, scanRoot) {
 export function diagnosticBudgets(diagnostics, repositoryRoot, scanRoot) {
   const budgets = {};
   for (const diagnostic of diagnostics) {
-    if (diagnostic.code !== REACT_COMPILER_CODE) continue;
+    const kind = compilerDiagnosticKind(diagnostic);
+    if (!kind) continue;
     const file = normalizedFile(diagnostic.filename, repositoryRoot, scanRoot);
-    const kind = diagnosticKind(diagnostic.message);
     budgets[file] ??= {};
     budgets[file][kind] = (budgets[file][kind] ?? 0) + 1;
   }
@@ -54,6 +59,7 @@ function main() {
   const baselinePath =
     process.env.ROTLI_REACT_COMPILER_BASELINE ?? join(repositoryRoot, "scripts/react-compiler-baseline.json");
   const oxlint = process.env.ROTLI_OXLINT_BIN ?? join(repositoryRoot, "node_modules/.bin/oxlint");
+  const compilerConfig = join(repositoryRoot, "scripts/react-compiler-oxlint.json");
 
   if (!existsSync(sourceRoot)) {
     console.error(`check:react-compiler failed — missing source root ${sourceRoot}`);
@@ -68,10 +74,7 @@ function main() {
     oxlint,
     [
       "--config",
-      join(repositoryRoot, ".oxlintrc.json"),
-      "--react-plugin",
-      "-D",
-      "react/react-compiler",
+      compilerConfig,
       "--format",
       "json",
       sourceRoot,

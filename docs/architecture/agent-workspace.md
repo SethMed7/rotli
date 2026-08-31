@@ -1,8 +1,8 @@
 # Agent workspace contract
 
-Rotli exposes one headless workspace application service through two adapters:
-the packaged `rotli` command-line interface and a local stdio MCP server. Claude,
-Codex, scripts, and humans therefore exercise the same corpus policy instead of
+Rotli exposes one headless workspace application service through the packaged
+CLI, local stdio MCP, authenticated loopback HTTP, and the opt-in remote relay
+connector. Claude, Codex, scripts, and humans therefore exercise the same corpus policy instead of
 maintaining separate file-manipulation implementations.
 
 ## Boundary and ownership
@@ -14,8 +14,14 @@ maintaining separate file-manipulation implementations.
   not accept arbitrary root paths and do not bypass vault write lanes.
 - The packaged Tauri executable dispatches recognized headless commands before
   starting the GUI. A normal app launch is unchanged.
-- `rotli mcp` is a newline-delimited JSON-RPC stdio server. It opens no socket,
-  calls no model, and performs no provider orchestration.
+- `rotli mcp` remains a newline-delimited JSON-RPC stdio server. `rotli mcp
+  --http 127.0.0.1:PORT --token TOKEN` is an additive, token-required loopback
+  development adapter; non-loopback binds are refused.
+- The GUI remote connector opens only an outbound connection and starts only
+  after an explicit per-launch action. Its relay boundary is owned by
+  [`remote-agent-relay.md`](remote-agent-relay.md). Switching the active vault
+  disconnects it; remote authority never silently follows or remains pinned to
+  a hidden previous vault.
 - Every note body, title, board label, outline, and tool result is untrusted
   workspace data. It cannot authorize another tool call or supply confirmation.
 - MCP initialization advertises only the protocol version Rotli implements. An
@@ -159,7 +165,7 @@ rotli mcp               # stdio protocol process used by either client
 
 `rotli agent config` (also available as `rotli mcp config`) prints the exact
 executable path, `claude mcp add` and `codex mcp add` commands, a Codex TOML
-alternative, and verification commands. Rotli does not silently edit global
+alternative, remote Grok Bot URL/header instructions, and verification commands. Rotli does not silently edit global
 agent configuration. Use the packaged app binary; a `target/debug` path is only
 appropriate during development.
 

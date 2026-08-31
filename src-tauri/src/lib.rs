@@ -27,8 +27,9 @@ mod memex_query;
 mod organizer;
 #[cfg(test)]
 mod parity_tests;
-mod provider;
 mod private_browser;
+mod provider;
+mod remote_agent;
 mod routines;
 mod search_index;
 mod secret;
@@ -1672,6 +1673,10 @@ fn activate_vault_path_live(
         new_root = Some((store, suppress));
     }
 
+    // A remote session is authorized for the vault that was active when the
+    // user connected it. Fail closed across an in-place vault switch instead
+    // of leaving the cloud client attached to a now-hidden previous vault.
+    remote_agent::disconnect_for_vault_change(app);
     let organizer = app.state::<organizer::OrganizerState>().0.clone();
     let mut watcher = None;
     organizer.with_vault_transition(|| {
@@ -2229,6 +2234,7 @@ pub fn run() {
         .manage(provider::ProviderState::default())
         .manage(localmodel::LocalModelState::default())
         .manage(compute::ComputeState::default())
+        .manage(remote_agent::RemoteAgentState::default())
         // the app-menu ⌘Q replacement (see setup) — tray menu events have their
         // own handler; the ids are distinct so double-dispatch can't double-quit
         .on_menu_event(|app, event| {
@@ -2371,6 +2377,10 @@ pub fn run() {
             keychain::secret_store,
             keychain::secret_exists,
             keychain::secret_delete,
+            remote_agent::remote_agent_status,
+            remote_agent::remote_agent_pair,
+            remote_agent::remote_agent_start,
+            remote_agent::remote_agent_stop,
             organizer::organizer_status,
             organizer::organizer_run_once,
             organizer::organizer_stop,

@@ -21,7 +21,10 @@ function validPolicy() {
         "format:check": OXFMT_CHECK_COMMAND,
       },
     },
-    oxlintConfig: { options: { typeAware: true, maxWarnings: 0 } },
+    oxlintConfig: {
+      options: { typeAware: true, maxWarnings: 0 },
+      rules: { "react/refs": "off", "react/set-state-in-effect": "off" },
+    },
     oxfmtConfig: { $schema: OXFMT_SCHEMA },
     viteConfig: "build: { rolldownOptions: { onwarn(warning) { buildWarningViolation(warning); } } }",
   };

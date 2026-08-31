@@ -5,11 +5,11 @@ export const SERIAL_LINT_COMMAND =
   "bun run typecheck && bun run check:e2e-types && bun run typecheck:tsc6 && bun run format:check && bun run check:code-shape && bun run check:react-compiler && bun run check:naming && bun run check:hex && bun run check:architecture && bun run check:ipc && bun run check:secret-parity && bun run check:parity && bun run check:structure && bun run check:security && bun run check:knip && bun run check:docs && bun run lint:oxlint";
 
 export const OXLINT_COMMAND =
-  "oxlint --disable-nested-config -c .oxlintrc.json --report-unused-disable-directives-severity=error src e2e scripts breve-runtime playwright.config.ts vite.config.ts";
+  "oxlint --disable-nested-config -c .oxlintrc.json --report-unused-disable-directives-severity=error src e2e scripts breve-runtime services/rotli-mcp-relay playwright.config.ts vite.config.ts";
 export const OXFMT_COMMAND =
-  'oxfmt -c .oxfmtrc.json "src/**/*.{ts,tsx}" "e2e/**/*.ts" "scripts/**/*.ts" playwright.config.ts';
+  'oxfmt -c .oxfmtrc.json "src/**/*.{ts,tsx}" "e2e/**/*.ts" "scripts/**/*.ts" "services/**/*.ts" playwright.config.ts';
 export const OXFMT_CHECK_COMMAND =
-  'oxfmt -c .oxfmtrc.json --check "src/**/*.{ts,tsx}" "e2e/**/*.ts" "scripts/**/*.ts" playwright.config.ts';
+  'oxfmt -c .oxfmtrc.json --check "src/**/*.{ts,tsx}" "e2e/**/*.ts" "scripts/**/*.ts" "services/**/*.ts" playwright.config.ts';
 export const OXFMT_SCHEMA = "./node_modules/oxfmt/configuration_schema.json";
 
 export function toolchainPolicyViolations({ manifest, oxlintConfig, oxfmtConfig, viteConfig }) {
@@ -30,6 +30,11 @@ export function toolchainPolicyViolations({ manifest, oxlintConfig, oxfmtConfig,
   }
   if (oxlintConfig?.options?.maxWarnings !== 0) {
     violations.push(".oxlintrc.json: options.maxWarnings must be 0");
+  }
+  for (const rule of ["react/refs", "react/set-state-in-effect"]) {
+    if (oxlintConfig?.rules?.[rule] !== "off") {
+      violations.push(`.oxlintrc.json: ${rule} must stay delegated to check:react-compiler`);
+    }
   }
   if (oxfmtConfig?.$schema !== OXFMT_SCHEMA) {
     violations.push(`.oxfmtrc.json: $schema must be ${OXFMT_SCHEMA}`);

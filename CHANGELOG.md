@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Remote agents can opt in to the local workspace without uploading the vault.** Rotli can connect
+  the running Mac app to a stateless HTTPS MCP relay for Grok Bot and other cloud clients. Pairing
+  uses independent Keychain client/device credentials, every launch starts disconnected, vault
+  switches disconnect, and the existing secure-note, locked-note, and optimistic-revision gates
+  remain the only workspace policy engine. The single-replica relay has bounded in-memory sessions,
+  no database or volume, and a pinned Bun container. The public site now includes an MCP setup,
+  safety, verification, and self-hosting guide without advertising an undeployed relay domain.
+
 - **The private browser now supports real multi-tab research.** While browsing,
   ⌘T or the pane-strip plus opens another isolated private page, popup links
   open as sibling tabs, and switching among any number of browser tabs keeps
@@ -35,6 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   command strings.
 
 ### Fixed
+
+- **An outdated Bun can no longer rewrite Rotli's dependency graph after
+  rejecting lockfile v2.** Plain installs are frozen in the app, site, and
+  Breve roots; contributor guidance now identifies the exact Bun pin and the
+  recovery command before another resolver can downgrade the lockfile.
 
 - **Small decorative Rotlis are crisp again.** Settings section accents and
   onboarding's quiet edge characters now use one semantic line-art treatment

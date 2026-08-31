@@ -23,3 +23,30 @@ describe("private browser presentation", () => {
     expect(browserSource).not.toContain("privateBrowserNavigate(tabId, event.url)");
   });
 });
+
+describe("remote agent connection presentation", () => {
+  test("requires an explicit connection for each app session", () => {
+    expect(settingsSource).toContain("Connect this session");
+    expect(settingsSource).toMatch(/starts disconnected after every launch/);
+    expect(settingsSource).toMatch(/Rotli must be\s+open and connected for every request/);
+  });
+
+  test("shows pairing details only after an explicit create or regenerate action", () => {
+    expect(settingsSource).toContain("Create pairing");
+    expect(settingsSource).toContain("Regenerate pairing");
+    expect(settingsSource).toContain("Paste into Grok Bot");
+    expect(settingsSource).toContain("authorizationHeader");
+  });
+
+  test("confirms token replacement and explains vault-switch disconnection", () => {
+    expect(settingsSource).toContain("Replace pairing");
+    expect(settingsSource).toMatch(/permanently invalidates the old client token/);
+    expect(settingsSource).toMatch(/Switching vaults disconnects/);
+  });
+
+  test("persists only the relay endpoint and distinguishes active connection states", () => {
+    expect(settingsSource).toContain("remoteAgentRelayUrl");
+    expect(settingsSource).toContain("current?.active");
+    expect(settingsSource).toContain('"Retrying"');
+  });
+});

@@ -721,6 +721,35 @@ export function secretDelete(name: string): Promise<void> {
   return aiInvoke("secret_delete", { name });
 }
 
+export interface RemoteAgentStatus {
+  paired: boolean;
+  active: boolean;
+  connected: boolean;
+  relayUrl: string | null;
+  lastError: string | null;
+}
+
+export interface RemoteAgentPairing {
+  mcpUrl: string;
+  authorizationHeader: string;
+}
+
+export function remoteAgentStatus(): Promise<RemoteAgentStatus> {
+  return invoke<RemoteAgentStatus>("remote_agent_status");
+}
+
+export function remoteAgentPair(relayUrl: string): Promise<RemoteAgentPairing> {
+  return invoke<RemoteAgentPairing>("remote_agent_pair", { relayUrl });
+}
+
+export function remoteAgentStart(relayUrl: string): Promise<RemoteAgentStatus> {
+  return invoke<RemoteAgentStatus>("remote_agent_start", { relayUrl });
+}
+
+export function remoteAgentStop(): Promise<RemoteAgentStatus> {
+  return invoke<RemoteAgentStatus>("remote_agent_stop");
+}
+
 /** One web search result the model sees. */
 export interface WebResult {
   provider: WebSearchProvider;

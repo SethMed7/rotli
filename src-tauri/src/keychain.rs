@@ -1,9 +1,12 @@
 //! macOS Keychain-backed secrets (Settings → AI Models). Native Keychain
 //! Services via `security-framework` — the value never rides argv or `ps`,
 //! never touches a config file (the CARL secrets law), and never crosses IPC
-//! BACK to the webview: `get_secret` is crate-internal, the commands only
-//! store / probe / delete. Names are allowlisted so the webview can't turn
-//! this into a generic keychain browser.
+//! BACK to the webview: `get_secret` is crate-internal, and generic commands
+//! only store / probe / delete. The remote-agent pairing command is the narrow
+//! exception: its Keychain bundle holds independent device/client tokens and it
+//! returns only the newly generated client authorization once so the user can
+//! copy it; there is no later read command. Names are allowlisted so the
+//! webview can't turn this into a generic keychain browser.
 
 use security_framework::passwords::{
     delete_generic_password, get_generic_password, set_generic_password,
@@ -15,15 +18,22 @@ use std::sync::{Mutex, OnceLock};
 /// ROTLI_KEYCHAIN_SERVICE in breve-runtime/scripts/keychain-names.ts (parity.json).
 pub(crate) const SERVICE: &str = "rotli";
 
-/// The only secret names the webview may address — every literal site in the
-/// crate imports these (parity.json keychainAllowedAccounts).
+/// Named Keychain accounts. Only WEBVIEW_ALLOWED may ride the generic IPC
+/// commands; the remote pairing bundle is connector-internal.
 pub(crate) const GEMINI_API_KEY_ACCOUNT: &str = "gemini-api-key";
 pub(crate) const BRAVE_SEARCH_API_KEY_ACCOUNT: &str = "brave-search-api-key";
 pub(crate) const BREVE_RESEND_ACCOUNT: &str = "breve-resend-api-key";
-pub(crate) const ALLOWED: &[&str] = &[
+pub(crate) const REMOTE_AGENT_TOKEN_ACCOUNT: &str = "remote-agent-token";
+pub(crate) const WEBVIEW_ALLOWED: &[&str] = &[
     GEMINI_API_KEY_ACCOUNT,
     BRAVE_SEARCH_API_KEY_ACCOUNT,
     BREVE_RESEND_ACCOUNT,
+];
+const INTERNAL_ALLOWED: &[&str] = &[
+    GEMINI_API_KEY_ACCOUNT,
+    BRAVE_SEARCH_API_KEY_ACCOUNT,
+    BREVE_RESEND_ACCOUNT,
+    REMOTE_AGENT_TOKEN_ACCOUNT,
 ];
 
 /// errSecItemNotFound — deleting a secret that isn't there is not an error.
@@ -35,10 +45,18 @@ fn dev_secrets() -> &'static Mutex<HashMap<String, String>> {
 }
 
 fn allow(name: &str) -> Result<(), String> {
-    if ALLOWED.contains(&name) {
+    if INTERNAL_ALLOWED.contains(&name) {
         Ok(())
     } else {
         Err(format!("unknown secret \"{name}\""))
+    }
+}
+
+fn allow_webview(name: &str) -> Result<(), String> {
+    if WEBVIEW_ALLOWED.contains(&name) {
+        Ok(())
+    } else {
+        Err(format!("unknown webview secret \"{name}\""))
     }
 }
 
@@ -103,17 +121,19 @@ pub(crate) fn delete_secret(name: &str) -> Result<(), String> {
 
 #[tauri::command]
 pub fn secret_store(name: String, value: String) -> Result<(), String> {
+    allow_webview(&name)?;
     store_secret(&name, &value)
 }
 
 #[tauri::command]
 pub fn secret_exists(name: String) -> Result<bool, String> {
-    allow(&name)?;
+    allow_webview(&name)?;
     Ok(get_secret(&name).is_some())
 }
 
 #[tauri::command]
 pub fn secret_delete(name: String) -> Result<(), String> {
+    allow_webview(&name)?;
     delete_secret(&name)
 }
 
@@ -126,6 +146,8 @@ mod tests {
         assert!(allow(GEMINI_API_KEY_ACCOUNT).is_ok());
         assert!(allow(BRAVE_SEARCH_API_KEY_ACCOUNT).is_ok());
         assert!(allow(BREVE_RESEND_ACCOUNT).is_ok());
+        assert!(allow(REMOTE_AGENT_TOKEN_ACCOUNT).is_ok());
+        assert!(allow_webview(REMOTE_AGENT_TOKEN_ACCOUNT).is_err());
         assert!(allow("com.apple.anything").is_err());
         assert!(allow("").is_err());
     }

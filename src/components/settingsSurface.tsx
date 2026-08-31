@@ -69,6 +69,11 @@ import {
   organizerSetBrain,
   organizerSetTrust,
   openUrl,
+  remoteAgentPair,
+  type RemoteAgentPairing,
+  remoteAgentStart,
+  remoteAgentStatus,
+  remoteAgentStop,
   revealCorpus,
   SECRET_BRAVE_SEARCH_API_KEY,
   SECRET_GEMINI_API_KEY,
@@ -3188,6 +3193,8 @@ function ConnectionsPane() {
 
       <WebResearchSection />
 
+      <RemoteAgentsSection />
+
       {/* Use rotli for your docs — a prompt you paste into Claude Code so a
           project's docs live in rotli, not the repo (the maintainer, 2026-07-07). */}
       <section className="aisection">
@@ -3228,6 +3235,192 @@ function ConnectionsPane() {
         </div>
       </section>
     </>
+  );
+}
+
+function RemoteAgentsSection() {
+  const native = isTauri();
+  const relayUrl = useUiStore((state) => state.remoteAgentRelayUrl);
+  const setRelayUrl = useUiStore((state) => state.setRemoteAgentRelayUrl);
+  const [pairing, setPairing] = useState<RemoteAgentPairing | null>(null);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ text: string; err: boolean } | null>(null);
+  const status = useQuery({
+    queryKey: ["remote-agent-status"],
+    queryFn: remoteAgentStatus,
+    enabled: native,
+    refetchInterval: 2000,
+  });
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: ["remote-agent-status"] });
+  const run = (action: () => Promise<unknown>, success: string) => {
+    setBusy(true);
+    setNote(null);
+    action()
+      .then(() => {
+        setNote({ text: success, err: false });
+        refresh();
+      })
+      .catch((error) => setNote({ text: error instanceof Error ? error.message : String(error), err: true }))
+      .finally(() => setBusy(false));
+  };
+  const copyPairing = async () => {
+    if (!pairing || !navigator.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(
+        `MCP URL: ${pairing.mcpUrl}\nAuthorization: ${pairing.authorizationHeader}`,
+      );
+      setNote({ text: "MCP URL and bearer header copied.", err: false });
+    } catch {
+      setNote({ text: "Rotli couldn’t access the clipboard.", err: true });
+    }
+  };
+  const current = status.data;
+  const statusLabel = !native
+    ? "Unavailable"
+    : status.isPending
+      ? "Checking…"
+      : current?.connected
+        ? "Connected"
+        : current?.active
+          ? current.lastError
+            ? "Retrying"
+            : "Connecting…"
+          : current?.paired
+            ? "Ready"
+            : "Off";
+  const feedback = current?.lastError ? { text: current.lastError, err: true } : note;
+  const createPairing = () => {
+    setBusy(true);
+    setNote(null);
+    remoteAgentPair(relayUrl)
+      .then((next) => {
+        setPairing(next);
+        setRelayUrl(next.mcpUrl);
+        setConfirmRegenerate(false);
+        setNote({
+          text: "New pairing created. Copy it now—the client token is shown only once.",
+          err: false,
+        });
+        refresh();
+      })
+      .catch((error) => setNote({ text: error instanceof Error ? error.message : String(error), err: true }))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <section className="aisection remote-agents" aria-labelledby="remote-agents-title">
+      <div className="remote-agents-head">
+        <div>
+          <h4 className="set-subhead" id="remote-agents-title">
+            Remote agents
+          </h4>
+          <p className="setnote">
+            Let a cloud MCP client reach this Mac through your relay. Notes stay in the vault; Rotli must be
+            open and connected for every request.
+          </p>
+        </div>
+        <span className={`ailane-chip ${current?.connected ? "ok" : current?.active ? "busy" : ""}`}>
+          {statusLabel}
+        </span>
+      </div>
+
+      <label className="remote-agents-field">
+        <span>Relay MCP URL</span>
+        <input
+          type="url"
+          value={relayUrl}
+          disabled={!native || busy}
+          maxLength={2048}
+          placeholder="https://your-relay.example/mcp"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          onChange={(event) => {
+            setRelayUrl(event.target.value);
+            setPairing(null);
+            setConfirmRegenerate(false);
+          }}
+          onKeyDown={(event) => event.stopPropagation()}
+        />
+      </label>
+
+      <div className="remote-agents-actions">
+        <button
+          type="button"
+          className="ghostbtn"
+          disabled={!native || busy || !relayUrl.trim()}
+          onClick={() => {
+            if (current?.paired && !confirmRegenerate) {
+              setConfirmRegenerate(true);
+              setNote({
+                text: "Replacing the pairing disconnects this session and permanently invalidates the old client token.",
+                err: false,
+              });
+              return;
+            }
+            createPairing();
+          }}
+        >
+          {confirmRegenerate ? "Replace pairing" : current?.paired ? "Regenerate pairing" : "Create pairing"}
+        </button>
+        {confirmRegenerate && (
+          <button
+            type="button"
+            className="ghostbtn quiet"
+            disabled={busy}
+            onClick={() => {
+              setConfirmRegenerate(false);
+              setNote(null);
+            }}
+          >
+            Cancel
+          </button>
+        )}
+        {current?.active ? (
+          <button
+            type="button"
+            className="ghostbtn quiet"
+            disabled={busy}
+            onClick={() => run(remoteAgentStop, "Remote agents disconnected for this app session.")}
+          >
+            Disconnect
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="ghostbtn primary"
+            disabled={!native || busy || !current?.paired || !relayUrl.trim()}
+            onClick={() => run(() => remoteAgentStart(relayUrl), "Connecting this app session to the relay…")}
+          >
+            Connect this session
+          </button>
+        )}
+      </div>
+
+      {pairing && (
+        <div className="remote-agents-pairing">
+          <div>
+            <strong>Paste into Grok Bot</strong>
+            <span>{pairing.mcpUrl}</span>
+          </div>
+          <button type="button" className="ghostbtn" onClick={() => void copyPairing()}>
+            <CopyGlyph size={13} /> Copy setup
+          </button>
+        </div>
+      )}
+      <p className="setnote remote-agents-boundary">
+        Remote access starts disconnected after every launch. The bearer token lives in macOS Keychain;
+        regenerating it invalidates the old pairing on this Mac. Secure notes stay hidden, locked notes stay
+        read-only, and stale revisions are refused. Switching vaults disconnects the current remote session.
+      </p>
+      {!native && <p className="setnote">Pairing is available only in the native Mac app.</p>}
+      {feedback && (
+        <p className={feedback.err ? "setnote err" : "setnote"} aria-live="polite">
+          {feedback.text}
+        </p>
+      )}
+    </section>
   );
 }
 
