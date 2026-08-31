@@ -5,16 +5,16 @@ export function SetupSideFriends() {
   return (
     <div className="setup-side-friends" aria-hidden="true">
       <span className="setup-side-friend setup-side-friend--left setup-side-friend--upper setup-side-friend--beat-1">
-        <Character name="thoughtful" size={94} alwaysVisible />
+        <Character name="thoughtful" size={94} appearance="quiet-line" alwaysVisible />
       </span>
       <span className="setup-side-friend setup-side-friend--right setup-side-friend--middle setup-side-friend--beat-2">
-        <Character name="walking" size={88} alwaysVisible />
+        <Character name="walking" size={88} appearance="quiet-line" alwaysVisible />
       </span>
       <span className="setup-side-friend setup-side-friend--left setup-side-friend--lower setup-side-friend--beat-3">
-        <Character name="listening" size={90} alwaysVisible />
+        <Character name="listening" size={90} appearance="quiet-line" alwaysVisible />
       </span>
       <span className="setup-side-friend setup-side-friend--right setup-side-friend--upper setup-side-friend--beat-4">
-        <Character name="attention" size={92} alwaysVisible />
+        <Character name="attention" size={92} appearance="quiet-line" alwaysVisible />
       </span>
     </div>
   );

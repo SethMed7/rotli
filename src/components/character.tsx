@@ -60,6 +60,9 @@ interface CharacterProps {
   name: CharacterName;
   size?: number;
   className?: string;
+  /** Small ambient placements use crisp semantic line art rather than fading
+   * a personalized body/accessory composite until its details turn muddy. */
+  appearance?: "personalized" | "quiet-line";
   treatment?: QuokkaStyle;
   /** Explicit accessory for previews. */
   accessory?: QuokkaAccessory;
@@ -198,6 +201,7 @@ export function Character({
   name,
   size = 120,
   className,
+  appearance = "personalized",
   treatment,
   accessory,
   accessorized = true,
@@ -211,8 +215,9 @@ export function Character({
   const preferredAccessory = useUiStore((s) => s.quokkaAccessory);
   const accessoryHue = useUiStore((s) => s.quokkaAccessoryHue);
   const idlePose = useUiStore((s) => s.quokkaIdlePose);
-  const resolvedTreatment = treatment ?? preferredTreatment;
-  const resolvedAccessory = accessory ?? (accessorized ? preferredAccessory : "none");
+  const quietLine = appearance === "quiet-line";
+  const resolvedTreatment = quietLine ? "line" : (treatment ?? preferredTreatment);
+  const resolvedAccessory = quietLine ? "none" : (accessory ?? (accessorized ? preferredAccessory : "none"));
   const resolvedName = personalIdle ? idlePose : name;
   const fill = quokkaFill(resolvedTreatment);
   const [art, setArt] = useState(artCache);
@@ -253,8 +258,12 @@ export function Character({
     // "auto" follows the environment only where there is no body fill to
     // guarantee contrast (the Line treatment); filled treatments keep their
     // designed dark ink on every theme.
-    "--quokka-ink":
-      lineColor === "auto" && fill ? "var(--quokka-line-black)" : `var(--quokka-line-${lineColor})`,
+    ...(quietLine
+      ? {}
+      : {
+          "--quokka-ink":
+            lineColor === "auto" && fill ? "var(--quokka-line-black)" : `var(--quokka-line-${lineColor})`,
+        }),
     ...(fill ? { "--quokka-fill": fill } : {}),
   } as CSSProperties;
   const accessoryColorLayer = accessoryArt && fill && (
@@ -279,7 +288,11 @@ export function Character({
   ) : null;
 
   return (
-    <span className={className ? `quokka ${className}` : "quokka"} style={style} aria-hidden="true">
+    <span
+      className={["quokka", quietLine ? "quokka-quiet-line" : "", className ?? ""].filter(Boolean).join(" ")}
+      style={style}
+      aria-hidden="true"
+    >
       {layered && fill && (
         <span
           className="quokka-layer quokka-body-layer"

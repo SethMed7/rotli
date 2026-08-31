@@ -169,14 +169,14 @@ const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = 
 ];
 
 /** A settings pane heading with its quokka character accent (the maintainer, 2026-06-26) —
- * a small, muted line-art quokka at the top-right of each section. The accent
- * tints with the theme (currentColor) and stays a quiet flourish, never the
- * focus. Each pane gets the character that fits it. */
+ * a small, muted line-art quokka at the top-right of each section. This is an
+ * ambient section marker, not a companion preview: it keeps semantic line ink
+ * instead of shrinking and fading the user's fill and accessory layers. */
 function PaneHead({ title, char }: { title: string; char: CharacterName }) {
   return (
     <div className="set-panehead">
       <h3>{title}</h3>
-      <Character name={char} size={56} className="set-paneaccent" />
+      <Character name={char} size={56} className="set-paneaccent" appearance="quiet-line" />
     </div>
   );
 }
@@ -709,7 +709,8 @@ function GeneralPane() {
       <h4 className="sethead">New tabs</h4>
       <p className="lead">
         Choose what {chordLabel(bindingOverrides, "tabs.new")} and the tab-strip plus create. The New menu
-        always offers every type.
+        always offers every type. While a private browser is active, both create another private browser tab
+        instead.
       </p>
       <label className="setselect-row">
         <span>New tab creates</span>
@@ -3106,7 +3107,8 @@ function BrowserPane() {
       <PaneHead title="Browser" char="searching" />
       <p className="lead">
         Open links and run quick searches inside Rotli. The browser chrome and start page follow your current
-        light or dark environment; websites still control their own appearance.
+        light or dark environment; websites still control their own appearance. Each page is a normal Rotli
+        tab, and ⌘T or the tab-strip plus opens another private page while you browse.
       </p>
 
       <h4 className="sethead">Default search engine</h4>

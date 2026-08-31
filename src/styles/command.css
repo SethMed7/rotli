@@ -428,6 +428,9 @@
   position: relative;
   color: var(--quokka-ink, var(--text));
 }
+.quokka-quiet-line {
+  color: var(--text-muted);
+}
 .quokka-mark {
   color: var(--text);
 }
@@ -542,8 +545,8 @@
   margin-bottom: 4px;
 }
 /* a settings pane heading with its quokka character accent (the maintainer, 2026-06-26):
-   the title on the left, a small muted line-art quokka at the top-right — a quiet
-   flourish that tints with the theme (currentColor), never the focus. */
+   the title on the left, a small semantic line-art quokka at the top-right — a
+   quiet flourish with full-strength muted ink, never a faded multi-layer image. */
 .set-panehead {
   display: flex;
   align-items: flex-start;
@@ -555,7 +558,6 @@
 }
 .set-paneaccent {
   color: var(--text-muted);
-  opacity: 0.5;
   flex: 0 0 auto;
   margin-top: -10px;
   margin-right: -4px;

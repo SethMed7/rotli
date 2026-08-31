@@ -420,6 +420,28 @@ describe("openBrowser appends a transient browser surface", () => {
     expect(pane?.tabs.map((tab) => tab.surfaceKind)).toEqual(["note", "browser"]);
     expect(pane?.tabs.find((tab) => tab.id === pane.activeTabId)?.surfaceKind).toBe("browser");
   });
+
+  test("opens a popup beside its source browser even when another pane held focus", () => {
+    const root: PaneNode = {
+      kind: "split",
+      id: "root",
+      dir: "row",
+      sizes: [0.5, 0.5],
+      children: [leaf("p1", ["A"]), leaf("p2", ["B"])],
+    };
+    usePanesStore.setState({ root, focusedPaneId: "p1" });
+
+    usePanesStore.getState().openBrowser("https://example.com/popup", "p2");
+
+    expect(findLeaf(usePanesStore.getState().root, "p1")?.tabs.map((tab) => tab.surfaceKind)).toEqual([
+      "note",
+    ]);
+    expect(findLeaf(usePanesStore.getState().root, "p2")?.tabs.map((tab) => tab.surfaceKind)).toEqual([
+      "note",
+      "browser",
+    ]);
+    expect(usePanesStore.getState().focusedPaneId).toBe("p2");
+  });
 });
 
 describe("cycleTab walks both directions", () => {

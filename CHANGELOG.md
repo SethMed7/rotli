@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The private browser now supports real multi-tab research.** While browsing,
+  ⌘T or the pane-strip plus opens another isolated private page, popup links
+  open as sibling tabs, and switching among any number of browser tabs keeps
+  each native session alive until that tab closes. Page titles stay in memory
+  only; URLs, history, cookies, and site data still never enter viewstate.
+
 ### Changed
 
 - **The repository toolchain now runs on Bun 1.4.0.** App, site, Breve, CI,
@@ -28,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Small decorative Rotlis are crisp again.** Settings section accents and
+  onboarding's quiet edge characters now use one semantic line-art treatment
+  instead of shrinking and fading personalized fill/accessory composites.
 - **The side-view walking quokka wears its accessories credibly.** The
   bucket hat's side art seats on the profile crown with the ear tucked and
   the back of the head keeping its full fluff, and face-on eyewear clips to

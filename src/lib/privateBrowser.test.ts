@@ -3,8 +3,11 @@ import { describe, expect, test } from "bun:test";
 import {
   forgetPrivateBrowserTab,
   normalizePrivateBrowserInput,
+  privateBrowserDisplayTitle,
   privateBrowserInitialUrl,
   privateBrowserSearchUrl,
+  privateBrowserTabTitle,
+  rememberPrivateBrowserTitle,
   seedPrivateBrowserTab,
 } from "./privateBrowser";
 
@@ -49,5 +52,17 @@ describe("normalizePrivateBrowserInput", () => {
     expect(privateBrowserInitialUrl("source")).toBe("https://example.com/source");
     forgetPrivateBrowserTab("fresh");
     forgetPrivateBrowserTab("source");
+  });
+
+  test("keeps distinguishable page titles in memory only and strips spoofing controls", () => {
+    seedPrivateBrowserTab("research");
+    expect(privateBrowserTabTitle("research")).toBe("Private browser");
+    expect(rememberPrivateBrowserTitle("research", "  Quokka\u202e moc.elpmaxe  \n research ")).toBe(
+      "Quokka moc.elpmaxe research",
+    );
+    expect(privateBrowserTabTitle("research")).toBe("Quokka moc.elpmaxe research");
+    expect(privateBrowserDisplayTitle("🦘".repeat(90))).toBe("🦘".repeat(80));
+    forgetPrivateBrowserTab("research");
+    expect(privateBrowserTabTitle("research")).toBe("Private browser");
   });
 });

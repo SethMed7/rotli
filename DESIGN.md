@@ -120,10 +120,14 @@ exception.
   pane state. Remote sites still control their own appearance. On desktop every
   page runs in a separate native child webview using a non-persistent data
   store; only HTTP(S) navigation is accepted, and closing the tab discards
-  cookies, storage, and history. The browser twin renders the themed start page
-  and surrounding toolbar, then an honest native-only state instead of
-  pretending an iframe can host arbitrary sites. Breve citations use this same
-  private tab.
+  cookies, storage, and history. While a browser tab is active, ⌘T and the pane
+  strip's plus create a sibling private-browser tab; popup/new-window links do
+  the same in their source pane. Every open browser tab keeps its native session
+  until explicit close, and its sanitized page title remains memory-only so the
+  strip can distinguish tabs without writing browsing data to viewstate. The
+  browser twin renders the themed start page and surrounding toolbar, then an
+  honest native-only state instead of pretending an iframe can host arbitrary
+  sites. Breve citations use this same private tab.
 - The sidebar has one front switcher and one body. A two-segment pill under the
   vault header picks the active front — Home (the notes world: All notes,
   Captures, Tasks, the Main/named-view tree) or Chat (New chat, All chats, chat

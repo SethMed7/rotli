@@ -17,4 +17,9 @@ describe("private browser presentation", () => {
     expect(browserSource).toContain("privateBrowserSearchEngine");
     expect(browserSource).toContain("Search with");
   });
+
+  test("opens popup destinations as sibling private tabs", () => {
+    expect(browserSource).toContain("openBrowser(event.url, paneId)");
+    expect(browserSource).not.toContain("privateBrowserNavigate(tabId, event.url)");
+  });
 });

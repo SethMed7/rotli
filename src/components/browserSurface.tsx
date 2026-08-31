@@ -5,7 +5,9 @@ import {
   forgetPrivateBrowserTab,
   normalizePrivateBrowserInput,
   privateBrowserInitialUrl,
+  privateBrowserTabTitle,
   rememberPrivateBrowserUrl,
+  rememberPrivateBrowserTitle,
   seedPrivateBrowserTab,
 } from "../lib/privateBrowser";
 import {
@@ -22,6 +24,7 @@ import {
   privateBrowserSetVisible,
   type PrivateBrowserBounds,
 } from "../lib/tauri";
+import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { BrowserGlyph, ChevronRight, LockGlyph, RefreshGlyph } from "./glyphs";
 
@@ -35,7 +38,15 @@ function boundsOf(element: HTMLElement): PrivateBrowserBounds {
   };
 }
 
-export function BrowserSurface({ tabId, active }: { tabId: string; active: boolean }) {
+export function BrowserSurface({
+  paneId,
+  tabId,
+  active,
+}: {
+  paneId: string;
+  tabId: string;
+  active: boolean;
+}) {
   const [initialUrl] = useState(() => privateBrowserInitialUrl(tabId));
   const privateBrowserSearchEngine = useUiStore((s) => s.privateBrowserSearchEngine);
   const engine =
@@ -50,7 +61,7 @@ export function BrowserSurface({ tabId, active }: { tabId: string; active: boole
   const [started, setStarted] = useState(initialUrl !== null);
   const [url, setUrl] = useState(initialUrl ?? "");
   const [address, setAddress] = useState(initialUrl ?? "");
-  const [title, setTitle] = useState("Private browser");
+  const [title, setTitle] = useState(() => privateBrowserTabTitle(tabId));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const native = isTauri();
@@ -92,16 +103,13 @@ export function BrowserSurface({ tabId, active }: { tabId: string; active: boole
       setUrl(event.url);
       rememberPrivateBrowserUrl(tabId, event.url);
       if (!editingAddress.current) setAddress(event.url);
-      if (event.title !== undefined) setTitle(event.title || "Private browser");
+      if (event.title !== undefined) setTitle(rememberPrivateBrowserTitle(tabId, event.title));
       if (event.loading !== undefined) setLoading(event.loading);
       setError("");
     });
     const unlistenWindow = onPrivateBrowserNewWindow((event) => {
       if (disposed || !webviewCreated.current || event.tabId !== tabId) return;
-      setAddress(event.url);
-      void privateBrowserNavigate(tabId, event.url).catch((reason: unknown) =>
-        setError(reason instanceof Error ? reason.message : String(reason)),
-      );
+      usePanesStore.getState().openBrowser(event.url, paneId);
     });
 
     const frame =
@@ -133,7 +141,7 @@ export function BrowserSurface({ tabId, active }: { tabId: string; active: boole
       webviewCreated.current = false;
       forgetPrivateBrowserTab(tabId);
     };
-  }, [initialUrl, native, syncBounds, tabId]);
+  }, [initialUrl, native, paneId, syncBounds, tabId]);
 
   useEffect(() => {
     if (!native || !webviewCreated.current) return;
@@ -189,7 +197,7 @@ export function BrowserSurface({ tabId, active }: { tabId: string; active: boole
     setStarted(false);
     setUrl("");
     setAddress("");
-    setTitle("Private browser");
+    setTitle(rememberPrivateBrowserTitle(tabId, ""));
     setLoading(false);
     setError("");
   };
