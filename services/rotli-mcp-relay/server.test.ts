@@ -1,12 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
-import { createRelay } from "./server";
+import { createRelay, MAX_FRAME_BYTES, serveRelay } from "./server";
 
 const PAIR_A = "a".repeat(32);
 const PAIR_B = "b".repeat(32);
 const CLIENT_A = `rotli_client_${PAIR_A}_${"1".repeat(64)}`;
 const CLIENT_A_WRONG = `rotli_client_${PAIR_A}_${"9".repeat(64)}`;
 const DEVICE_A = `rotli_device_${PAIR_A}_${"2".repeat(64)}`;
+const DEVICE_A_WRONG = `rotli_device_${PAIR_A}_${"8".repeat(64)}`;
 const CLIENT_B = `rotli_client_${PAIR_B}_${"3".repeat(64)}`;
 const DEVICE_B = `rotli_device_${PAIR_B}_${"4".repeat(64)}`;
 
@@ -88,5 +89,76 @@ describe("Rotli MCP relay", () => {
     const cloudResponse = relay.fetch(request("/mcp", CLIENT_A, { jsonrpc: "2.0", id: 2, method: "ping" }));
     expect((await devicePoll).status).toBe(200);
     expect((await cloudResponse).status).toBe(504);
+  });
+
+  test("refuses a second device secret for an active pair", async () => {
+    const relay = createRelay({ deviceWaitMs: 5 });
+    const activePoll = relay.fetch(poll());
+    await Promise.resolve();
+    expect((await relay.fetch(poll(DEVICE_A_WRONG, CLIENT_A))).status).toBe(409);
+    expect((await activePoll).status).toBe(204);
+  });
+
+  test("bounds all outstanding cloud requests without consuming another device", async () => {
+    const relay = createRelay({ cloudWaitMs: 500, deviceWaitMs: 500, maxCloudRequests: 1 });
+    const pollA = relay.fetch(poll());
+    const pollB = relay.fetch(poll(DEVICE_B, CLIENT_B));
+    await new Promise((resolve) => setTimeout(resolve, 1));
+
+    const cloudA = relay.fetch(request("/mcp", CLIENT_A, { jsonrpc: "2.0", id: 1, method: "ping" }));
+    await new Promise((resolve) => setTimeout(resolve, 1));
+    const envelope = (await (await pollA).json()) as { requestId: string };
+    expect(
+      (await relay.fetch(request("/mcp", CLIENT_B, { jsonrpc: "2.0", id: 2, method: "ping" }))).status,
+    ).toBe(503);
+    expect(
+      (
+        await relay.fetch(
+          request("/device/respond", DEVICE_A, {
+            requestId: envelope.requestId,
+            response: { jsonrpc: "2.0", id: 1, result: {} },
+          }),
+        )
+      ).status,
+    ).toBe(200);
+    expect((await cloudA).status).toBe(200);
+
+    const cloudB = relay.fetch(request("/mcp", CLIENT_B, { jsonrpc: "2.0", id: 2, method: "ping" }));
+    await new Promise((resolve) => setTimeout(resolve, 1));
+    const envelopeB = (await (await pollB).json()) as { requestId: string };
+    expect(
+      (
+        await relay.fetch(
+          request("/device/respond", DEVICE_B, {
+            requestId: envelopeB.requestId,
+            response: { jsonrpc: "2.0", id: 2, result: {} },
+          }),
+        )
+      ).status,
+    ).toBe(200);
+    expect((await cloudB).status).toBe(200);
+  });
+
+  test("enforces the frame cap in the handler and at the Bun server boundary", async () => {
+    const relay = createRelay();
+    expect(
+      (await relay.fetch(request("/device/respond", DEVICE_A, { padding: "x".repeat(MAX_FRAME_BYTES) })))
+        .status,
+    ).toBe(400);
+
+    const server = serveRelay({ hostname: "127.0.0.1", port: 0 });
+    try {
+      const response = await fetch(`http://127.0.0.1:${server.port}/device/respond`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${DEVICE_A}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ padding: "x".repeat(MAX_FRAME_BYTES) }),
+      });
+      expect(response.status).toBe(413);
+    } finally {
+      await server.stop(true);
+    }
   });
 });

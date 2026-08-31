@@ -44,6 +44,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Antigravity chat uses the CLI's real model IDs again.** Rotli now passes the
+  current `agy models` identifiers instead of human display labels, removes the
+  retired Gemini 3.5 choices, and no longer repeats the same stderr tail twice
+  when an empty CLI response fails.
+- **Long chats no longer mount an unbounded React transcript.** The Markdown
+  file still keeps every message, while the active surface mounts the newest
+  500 and states how many earlier messages remain on disk. Model history and
+  tool scratchpads retain their smaller per-model budgets.
+- **Remote-agent transport fails closed at every hop.** The Mac connector no
+  longer follows relay redirects, bounds relay responses before JSON parsing,
+  and refuses a vault switch if the old connector cannot be stopped. Loopback
+  HTTP uses a timing-stable bearer comparison, and regression tests now cover
+  non-loopback binds, stale connector generations, conflicting device tokens,
+  relay capacity, and the Bun server's pre-handler body cap.
+- **The production quality gate accepts only rules supported by the pinned
+  Oxlint.** React Compiler diagnostics remain in their dedicated ratcheted
+  check; the ordinary lint config no longer names rules absent from Oxlint
+  1.78.0, which caused the Linux production job to stop before the build.
 - **An outdated Bun can no longer rewrite Rotli's dependency graph after
   rejecting lockfile v2.** Plain installs are frozen in the app, site, and
   Breve roots; contributor guidance now identifies the exact Bun pin and the

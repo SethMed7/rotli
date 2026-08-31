@@ -575,7 +575,7 @@ fn default_config(enabled: bool) -> BreveConfig {
             primary: brief_model.clone(),
             fallbacks: vec![
                 "haiku".into(),
-                "Gemini 3.5 Flash (Medium)".into(),
+                "gemini-3.7-flash-medium".into(),
                 "gpt-5.4-mini".into(),
             ],
             local_helper: Some("gemma-3-12b-it-qat-4bit".into()),

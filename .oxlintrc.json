@@ -72,13 +72,6 @@
     // React rules never fire in e2e/ (no React there), so one flat config
     // covers both file groups without overrides.
     "react-hooks/rules-of-hooks": "error",
-    "react-hooks/exhaustive-deps": "error",
-    // React Compiler diagnostics are ratcheted by check:react-compiler, which
-    // distinguishes known migration debt from new findings. Oxlint's broad
-    // correctness category also enables these two rules without that baseline;
-    // keeping them here would make the ordinary lint gate fail on the known
-    // diagnostics the dedicated check reports and guards.
-    "react/refs": "off",
-    "react/set-state-in-effect": "off"
+    "react-hooks/exhaustive-deps": "error"
   }
 }

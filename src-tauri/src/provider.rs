@@ -94,20 +94,17 @@ pub(crate) const CLIS: &[CliSpec] = &[
         id: "agy",
         bins: &["~/.local/bin/agy", "/opt/homebrew/bin/agy"],
         models: &[
-            "Gemini 3.7 Flash (High)",
-            "Gemini 3.7 Flash (Medium)",
-            "Gemini 3.7 Flash (Low)",
-            "Gemini 3.6 Flash (High)",
-            "Gemini 3.6 Flash (Medium)",
-            "Gemini 3.6 Flash (Low)",
-            "Gemini 3.5 Flash (High)",
-            "Gemini 3.5 Flash (Medium)",
-            "Gemini 3.5 Flash (Low)",
-            "Gemini 3.1 Pro (High)",
-            "Gemini 3.1 Pro (Low)",
-            "Claude Sonnet 4.6 (Thinking)",
-            "Claude Opus 4.6 (Thinking)",
-            "GPT-OSS 120B (Medium)",
+            "gemini-3.7-flash-high",
+            "gemini-3.7-flash-medium",
+            "gemini-3.7-flash-low",
+            "gemini-3.6-flash-high",
+            "gemini-3.6-flash-medium",
+            "gemini-3.6-flash-low",
+            "gemini-3.1-pro-high",
+            "gemini-3.1-pro-low",
+            "claude-sonnet-4-6",
+            "claude-opus-4-6-thinking",
+            "gpt-oss-120b-medium",
         ],
     },
 ];
@@ -510,25 +507,30 @@ fn parse_codex_jsonl(stdout: &str) -> Result<String, String> {
 fn parse_agy_text(stdout: &str, stderr: &str) -> Result<String, String> {
     let out = stdout.trim();
     if out.is_empty() {
-        let tail: String = stderr
-            .lines()
-            .rev()
-            .take(3)
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .collect::<Vec<_>>()
-            .join(" · ");
-        Err(format!(
-            "agy returned nothing{}",
-            if tail.is_empty() {
-                String::new()
-            } else {
-                format!(" ({tail})")
-            }
-        ))
+        Err(with_stderr_tail("agy returned nothing", stderr, " (", ")"))
     } else {
         Ok(out.to_string())
+    }
+}
+
+/// Add a small diagnostic tail exactly once. `parse_agy_text` already includes
+/// stderr for an empty reply; the non-zero-exit path passes through here again,
+/// and used to duplicate the same model list in the user-visible error.
+fn with_stderr_tail(message: &str, stderr: &str, open: &str, close: &str) -> String {
+    let tail = stderr
+        .lines()
+        .rev()
+        .take(3)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect::<Vec<_>>()
+        .join(" · ");
+    let tail = tail.chars().take(480).collect::<String>();
+    if tail.is_empty() || message.contains(&tail) {
+        message.to_string()
+    } else {
+        format!("{message}{open}{tail}{close}")
     }
 }
 
@@ -684,7 +686,7 @@ pub fn organizer_claude_complete(prompt: &str, timeout: Duration) -> Result<Stri
 /// time gate used by chat; only the fixed model choice differs.
 pub fn organizer_gemini_complete(prompt: &str, timeout: Duration) -> Result<String, String> {
     organizer_egress_allowed(prompt)?;
-    const MODEL: &str = "Gemini 3.5 Flash (Medium)";
+    const MODEL: &str = "gemini-3.7-flash-medium";
     let bin = resolve_bin(spec("agy")?).ok_or("the Antigravity CLI isn't installed")?;
     let (args, via) = build_args("agy", MODEL, prompt, timeout.as_secs(), None)?;
     let mut cmd = Command::new(&bin);
@@ -849,10 +851,7 @@ pub async fn cli_complete(
         };
         match parsed {
             Ok(text) => Ok(text),
-            Err(e) if !ok => {
-                let tail: String = stderr.lines().rev().take(3).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join(" · ");
-                Err(format!("{e}{}", if tail.is_empty() { String::new() } else { format!(" — {tail}") }))
-            }
+            Err(e) if !ok => Err(with_stderr_tail(&e, &stderr, " — ", "")),
             Err(e) => Err(e),
         }
     })
@@ -1297,7 +1296,7 @@ mod tests {
         );
         assert!(build_args_tuned(
             "agy",
-            "Gemini 3.5 Flash (Medium)",
+            "gemini-3.7-flash-medium",
             "p",
             60,
             Some("high"),
@@ -1311,7 +1310,7 @@ mod tests {
     #[test]
     fn agy_args_embed_the_prompt_and_sandbox() {
         let (args, via) =
-            build_args("agy", "Gemini 3.5 Flash (Medium)", "hello there", 240, None).unwrap();
+            build_args("agy", "gemini-3.7-flash-medium", "hello there", 240, None).unwrap();
         assert_eq!(via, PromptVia::Args);
         assert_eq!(args[0], "-p");
         assert_eq!(args[1], "hello there");
@@ -1322,22 +1321,19 @@ mod tests {
     #[test]
     fn agy_allowlist_includes_the_current_cli_catalog() {
         let models = spec("agy").unwrap().models;
-        assert_eq!(models.len(), 14);
+        assert_eq!(models.len(), 11);
         for model in [
-            "Gemini 3.7 Flash (High)",
-            "Gemini 3.7 Flash (Medium)",
-            "Gemini 3.7 Flash (Low)",
-            "Gemini 3.6 Flash (High)",
-            "Gemini 3.6 Flash (Medium)",
-            "Gemini 3.6 Flash (Low)",
-            "Gemini 3.5 Flash (High)",
-            "Gemini 3.5 Flash (Medium)",
-            "Gemini 3.5 Flash (Low)",
-            "Gemini 3.1 Pro (High)",
-            "Gemini 3.1 Pro (Low)",
-            "Claude Sonnet 4.6 (Thinking)",
-            "Claude Opus 4.6 (Thinking)",
-            "GPT-OSS 120B (Medium)",
+            "gemini-3.7-flash-high",
+            "gemini-3.7-flash-medium",
+            "gemini-3.7-flash-low",
+            "gemini-3.6-flash-high",
+            "gemini-3.6-flash-medium",
+            "gemini-3.6-flash-low",
+            "gemini-3.1-pro-high",
+            "gemini-3.1-pro-low",
+            "claude-sonnet-4-6",
+            "claude-opus-4-6-thinking",
+            "gpt-oss-120b-medium",
         ] {
             assert!(models.contains(&model));
             assert!(build_args("agy", model, "ping", 60, None).is_ok());
@@ -1382,6 +1378,8 @@ mod tests {
         let err = parse_agy_text("", "line1\nboom: quota\n").unwrap_err();
         assert!(err.contains("agy returned nothing"));
         assert!(err.contains("boom: quota"));
+        let surfaced = with_stderr_tail(&err, "line1\nboom: quota\n", " — ", "");
+        assert_eq!(surfaced.matches("boom: quota").count(), 1);
     }
 
     #[test]
@@ -1496,14 +1494,14 @@ mod tests {
             .any(|a| a == "--dangerously-skip-permissions"));
 
         // — agy: permissions skipped ONLY with an image, sandbox always on —
-        let (plain, _) = build_args("agy", "Gemini 3.5 Flash (Medium)", "p", 60, None).unwrap();
+        let (plain, _) = build_args("agy", "gemini-3.7-flash-medium", "p", 60, None).unwrap();
         assert!(
             !plain.iter().any(|a| a == "--dangerously-skip-permissions"),
             "a text turn must never skip permissions"
         );
         assert!(plain.iter().any(|a| a == "--sandbox"));
         let (withimg, _) =
-            build_args("agy", "Gemini 3.5 Flash (Medium)", "p", 60, Some(&staged)).unwrap();
+            build_args("agy", "gemini-3.7-flash-medium", "p", 60, Some(&staged)).unwrap();
         assert!(withimg
             .iter()
             .any(|a| a == "--dangerously-skip-permissions"));

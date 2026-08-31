@@ -2,5 +2,8 @@
   "plugins": ["react"],
   "categories": {
     "correctness": "error"
+  },
+  "rules": {
+    "react/react-compiler": "error"
   }
 }

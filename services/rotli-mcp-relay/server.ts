@@ -37,6 +37,11 @@ interface RelayOptions {
   maxDeviceWaiters?: number;
 }
 
+interface RelayServerOptions extends RelayOptions {
+  hostname?: string;
+  port?: number;
+}
+
 function deferred<T>(): Deferred<T> {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((done) => {
@@ -201,11 +206,19 @@ export function createRelay(options: RelayOptions = {}) {
   return { fetch };
 }
 
-if (import.meta.main) {
-  const relay = createRelay();
-  Bun.serve({
-    port: Number(process.env.PORT ?? 3000),
+export function serveRelay(options: RelayServerOptions = {}) {
+  const { hostname, port, ...relayOptions } = options;
+  const relay = createRelay(relayOptions);
+  return Bun.serve({
+    ...(hostname ? { hostname } : {}),
+    port: port ?? Number(process.env.PORT ?? 3000),
+    // This outer cap rejects the request before the handler allocates or
+    // decodes it. `frame` repeats the bound for direct/unit invocation.
     maxRequestBodySize: MAX_FRAME_BYTES,
     fetch: relay.fetch,
   });
+}
+
+if (import.meta.main) {
+  serveRelay();
 }

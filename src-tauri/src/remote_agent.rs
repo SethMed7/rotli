@@ -4,6 +4,7 @@
 //! authenticated connection, then hands each JSON-RPC frame to workspace.rs —
 //! the same application service used by stdio and loopback HTTP MCP.
 
+use std::io::Read as IoRead;
 use std::path::PathBuf;
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
@@ -234,10 +235,34 @@ pub(crate) fn remote_agent_stop(
     remote_agent_status(state)
 }
 
-pub(crate) fn disconnect_for_vault_change(app: &tauri::AppHandle) {
-    if let Some(state) = app.try_state::<RemoteAgentState>() {
-        let _ = state.stop_connector();
+pub(crate) fn disconnect_for_vault_change(app: &tauri::AppHandle) -> Result<(), String> {
+    stop_for_vault_change(app.try_state::<RemoteAgentState>().as_deref())
+}
+
+fn stop_for_vault_change(state: Option<&RemoteAgentState>) -> Result<(), String> {
+    if let Some(state) = state {
+        state.stop_connector()?;
     }
+    Ok(())
+}
+
+fn relay_agent() -> ureq::Agent {
+    // A relay redirect is a new destination and therefore a new trust decision.
+    // Never carry the device credential or a released MCP frame across it.
+    ureq::AgentBuilder::new().redirects(0).build()
+}
+
+fn read_relay_json(response: ureq::Response) -> Result<Value, String> {
+    let mut bytes = Vec::new();
+    response
+        .into_reader()
+        .take((crate::workspace::MCP_MAX_REQUEST_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|_| "relay response could not be read".to_string())?;
+    if bytes.len() > crate::workspace::MCP_MAX_REQUEST_BYTES {
+        return Err("relay response exceeds the 256 KB limit".into());
+    }
+    serde_json::from_slice(&bytes).map_err(|_| "relay returned invalid JSON".into())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -253,8 +278,10 @@ fn connector_loop(
 ) {
     let poll_url = format!("{base}/device/poll");
     let response_url = format!("{base}/device/respond");
+    let agent = relay_agent();
     while !stop.load(Ordering::Acquire) {
-        let response = ureq::post(&poll_url)
+        let response = agent
+            .post(&poll_url)
             .set("Authorization", &format!("Bearer {}", pairing.device_token))
             .timeout(Duration::from_secs(30))
             .send_json(json!({
@@ -265,7 +292,7 @@ fn connector_loop(
             Ok(response) if response.status() == 204 => {
                 set_connected(&status, &active_generation, generation, true, None)
             }
-            Ok(response) => match response.into_json::<Value>() {
+            Ok(response) => match read_relay_json(response) {
                 Ok(envelope) => {
                     // Regeneration and vault switching stop the old connector.
                     // Never dispatch a request released from an outstanding poll
@@ -301,7 +328,8 @@ fn connector_loop(
                         root.clone(),
                         read_only,
                     );
-                    let delivered = ureq::post(&response_url)
+                    let delivered = agent
+                        .post(&response_url)
                         .set("Authorization", &format!("Bearer {}", pairing.device_token))
                         .timeout(Duration::from_secs(10))
                         .send_json(json!({ "requestId": request_id, "response": response }));
@@ -453,6 +481,137 @@ mod tests {
         assert!(!status.active);
         assert!(!status.connected);
         assert!(status.last_error.is_none());
+    }
+
+    #[test]
+    fn vault_change_refuses_to_continue_when_the_connector_cannot_stop() {
+        let state = RemoteAgentState::default();
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _guard = state.stop.lock().unwrap();
+            panic!("poison the stop lock");
+        }));
+        assert_eq!(
+            stop_for_vault_change(Some(&state)).unwrap_err(),
+            "remote agent stop lock poisoned"
+        );
+        assert!(stop_for_vault_change(None).is_ok());
+    }
+
+    #[test]
+    fn relay_transport_refuses_redirects_and_oversized_frames() {
+        let redirected = TcpListener::bind("127.0.0.1:0").unwrap();
+        redirected.set_nonblocking(true).unwrap();
+        let redirected_address = redirected.local_addr().unwrap();
+        let relay = TcpListener::bind("127.0.0.1:0").unwrap();
+        let relay_address = relay.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = relay.accept().unwrap();
+            let _ = read_request(&mut stream);
+            write!(
+                stream,
+                "HTTP/1.1 307 Temporary Redirect\r\nLocation: http://{redirected_address}/device/poll\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            )
+            .unwrap();
+            stream.flush().unwrap();
+        });
+        let result = relay_agent()
+            .post(&format!("http://{relay_address}/device/poll"))
+            .timeout(Duration::from_millis(500))
+            .send_json(json!({}));
+        match result {
+            Ok(response) => assert_eq!(response.status(), 307),
+            Err(ureq::Error::Status(status, _)) => assert_eq!(status, 307),
+            Err(error) => panic!("unexpected redirect result: {error}"),
+        }
+        server.join().unwrap();
+        assert!(matches!(
+            redirected.accept(),
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock
+        ));
+
+        let relay = TcpListener::bind("127.0.0.1:0").unwrap();
+        let relay_address = relay.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = relay.accept().unwrap();
+            let _ = read_request(&mut stream);
+            write_json(
+                &mut stream,
+                &json!({ "padding": "x".repeat(crate::workspace::MCP_MAX_REQUEST_BYTES) }),
+            );
+        });
+        let response = relay_agent()
+            .post(&format!("http://{relay_address}/device/poll"))
+            .send_json(json!({}))
+            .unwrap();
+        assert!(read_relay_json(response)
+            .unwrap_err()
+            .contains("exceeds the 256 KB limit"));
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn stopping_an_outstanding_poll_blocks_dispatch_into_the_old_vault() {
+        let temp = TempDir::new().unwrap();
+        fs::create_dir_all(temp.path().join("wiki/_inbox")).unwrap();
+        fs::write(
+            temp.path().join("memex.json"),
+            r#"{"id":"mx_remote_stop_test","contract":"3.4","apps":{}}"#,
+        )
+        .unwrap();
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let pairing = new_pairing();
+        let (polled_tx, polled_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let relay = std::thread::spawn(move || {
+            let (mut poll, _) = listener.accept().unwrap();
+            let _ = read_request(&mut poll);
+            polled_tx.send(()).unwrap();
+            release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            write_json(
+                &mut poll,
+                &json!({
+                    "requestId": "stale-vault-request",
+                    "request": {
+                        "jsonrpc": "2.0",
+                        "id": 9,
+                        "method": "tools/call",
+                        "params": {
+                            "name": "rotli_create_note",
+                            "arguments": { "title": "Must not land", "body": "stale connector" }
+                        }
+                    }
+                }),
+            );
+        });
+
+        let stop = Arc::new(AtomicBool::new(false));
+        let state = RemoteAgentState {
+            status: Arc::new(Mutex::new(RemoteAgentStatus {
+                paired: true,
+                active: true,
+                connected: false,
+                relay_url: Some(format!("{base}/mcp")),
+                last_error: None,
+            })),
+            stop: Mutex::new(Some(stop.clone())),
+            generation: Arc::new(AtomicU64::new(0)),
+        };
+        let connector = std::thread::spawn({
+            let base = base.clone();
+            let root = temp.path().to_path_buf();
+            let status = state.status.clone();
+            let generation = state.generation.clone();
+            move || connector_loop(&base, &pairing, root, false, stop, status, generation, 0)
+        });
+
+        polled_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        state.stop_connector().unwrap();
+        release_tx.send(()).unwrap();
+        relay.join().unwrap();
+        connector.join().unwrap();
+        assert!(!temp.path().join("wiki/_inbox/must-not-land.md").exists());
     }
 
     #[test]

@@ -1676,7 +1676,7 @@ fn activate_vault_path_live(
     // A remote session is authorized for the vault that was active when the
     // user connected it. Fail closed across an in-place vault switch instead
     // of leaving the cloud client attached to a now-hidden previous vault.
-    remote_agent::disconnect_for_vault_change(app);
+    remote_agent::disconnect_for_vault_change(app)?;
     let organizer = app.state::<organizer::OrganizerState>().0.clone();
     let mut watcher = None;
     organizer.with_vault_transition(|| {

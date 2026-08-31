@@ -42,6 +42,9 @@ The configured relay URL is a non-secret installation preference. It survives
 relaunch, but connection authority does not: every launch remains disconnected.
 Switching the active vault also disconnects the connector so an apparently new
 workspace cannot leave the cloud client attached to the previous root.
+The connector never follows an HTTP redirect from that configured destination,
+never parses a response frame larger than 256 KB, and blocks the vault switch
+itself if the prior connector cannot be stopped cleanly.
 
 ## Public deployment profile
 

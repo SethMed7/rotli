@@ -827,6 +827,15 @@
   margin: 0 auto;
   min-width: 0;
 }
+.chat-thread-window {
+  margin: 0 0 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+}
 .chat-conversation.is-new .chat-scroll {
   flex: 0 1 auto;
   overflow: visible;

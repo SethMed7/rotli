@@ -25,7 +25,7 @@ use crate::corpus::{
 use crate::memex_query::{parse_query, record_matches, ParsedQuery};
 
 const MCP_PROTOCOL: &str = "2025-03-26";
-const MCP_MAX_REQUEST_BYTES: usize = 256_000;
+pub(crate) const MCP_MAX_REQUEST_BYTES: usize = 256_000;
 const MCP_MAX_OUTPUT_BYTES: usize = 512_000;
 const MAIN_ROOT: &str = "main:";
 const OPEN_REQUEST_FILE: &str = "workspace-open.json";
@@ -2507,6 +2507,19 @@ fn run_mcp_http(address: &str, token: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Compare the complete Authorization value in time determined by the expected
+/// token, not by the first mismatching byte. The loopback adapter is still a
+/// credential boundary even though it cannot bind a LAN address.
+fn valid_bearer(value: &str, token: &str) -> bool {
+    let expected = format!("Bearer {token}");
+    let actual = value.as_bytes();
+    let mut difference = expected.len() ^ actual.len();
+    for (index, byte) in expected.bytes().enumerate() {
+        difference |= usize::from(byte ^ actual.get(index).copied().unwrap_or_default());
+    }
+    difference == 0
+}
+
 fn serve_mcp_http(mut stream: TcpStream, token: &str) -> Result<(), String> {
     stream
         .set_read_timeout(Some(std::time::Duration::from_secs(10)))
@@ -2534,7 +2547,7 @@ fn serve_mcp_http(mut stream: TcpStream, token: &str) -> Result<(), String> {
         if name.eq_ignore_ascii_case("content-length") {
             content_length = value.parse::<usize>().ok();
         } else if name.eq_ignore_ascii_case("authorization") {
-            authorized = value.strip_prefix("Bearer ") == Some(token);
+            authorized = valid_bearer(value, token);
         }
     }
     if !is_post {
@@ -3659,6 +3672,28 @@ mod tests {
         let response = exchange(Some("fixture-token-with-24-chars"));
         assert!(response.starts_with("HTTP/1.1 200"));
         assert!(response.contains("rotli_create_note"));
+    }
+
+    #[test]
+    fn loopback_http_refuses_non_loopback_binds_and_near_match_tokens() {
+        assert!(run_mcp_http("0.0.0.0:0", "fixture-token-with-24-chars")
+            .unwrap_err()
+            .contains("loopback only"));
+        assert!(run_mcp_http("[::]:0", "fixture-token-with-24-chars")
+            .unwrap_err()
+            .contains("loopback only"));
+        assert!(valid_bearer(
+            "Bearer fixture-token-with-24-chars",
+            "fixture-token-with-24-chars"
+        ));
+        assert!(!valid_bearer(
+            "Bearer fixture-token-with-24-charx",
+            "fixture-token-with-24-chars"
+        ));
+        assert!(!valid_bearer(
+            "Bearer fixture-token-with-24-chars-extra",
+            "fixture-token-with-24-chars"
+        ));
     }
 
     #[test]

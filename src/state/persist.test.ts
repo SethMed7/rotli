@@ -252,7 +252,7 @@ describe("parseSettings — creation and Brain model", () => {
     expect(parseSettings('{"tabLayout":"compress"}').tabLayout).toBe("scroll");
   });
 
-  test("Gemini 3.5 is an explicit organizer choice; unknown values fail closed to local", () => {
+  test("the legacy Gemini setting remains an explicit organizer choice; unknown values fail closed to local", () => {
     expect(parseSettings('{"organizerModel":"gemini35"}').organizerModel).toBe("gemini35");
     expect(parseSettings('{"organizerModel":"future"}').organizerModel).toBe("local");
   });

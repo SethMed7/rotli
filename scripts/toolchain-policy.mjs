@@ -12,7 +12,13 @@ export const OXFMT_CHECK_COMMAND =
   'oxfmt -c .oxfmtrc.json --check "src/**/*.{ts,tsx}" "e2e/**/*.ts" "scripts/**/*.ts" "services/**/*.ts" playwright.config.ts';
 export const OXFMT_SCHEMA = "./node_modules/oxfmt/configuration_schema.json";
 
-export function toolchainPolicyViolations({ manifest, oxlintConfig, oxfmtConfig, viteConfig }) {
+export function toolchainPolicyViolations({
+  manifest,
+  oxlintConfig,
+  reactCompilerConfig,
+  oxfmtConfig,
+  viteConfig,
+}) {
   const violations = [];
   const scripts = manifest?.scripts ?? {};
   for (const [name, expected] of Object.entries({
@@ -31,10 +37,15 @@ export function toolchainPolicyViolations({ manifest, oxlintConfig, oxfmtConfig,
   if (oxlintConfig?.options?.maxWarnings !== 0) {
     violations.push(".oxlintrc.json: options.maxWarnings must be 0");
   }
-  for (const rule of ["react/refs", "react/set-state-in-effect"]) {
-    if (oxlintConfig?.rules?.[rule] !== "off") {
-      violations.push(`.oxlintrc.json: ${rule} must stay delegated to check:react-compiler`);
+  for (const rule of ["react/react-compiler", "react/refs", "react/set-state-in-effect"]) {
+    if (rule in (oxlintConfig?.rules ?? {})) {
+      violations.push(`.oxlintrc.json: ${rule} belongs only in check:react-compiler`);
     }
+  }
+  if (reactCompilerConfig?.rules?.["react/react-compiler"] !== "error") {
+    violations.push(
+      "scripts/react-compiler-oxlint.json: react/react-compiler must stay enabled for the diagnostic ratchet",
+    );
   }
   if (oxfmtConfig?.$schema !== OXFMT_SCHEMA) {
     violations.push(`.oxfmtrc.json: $schema must be ${OXFMT_SCHEMA}`);

@@ -23,8 +23,9 @@ function validPolicy() {
     },
     oxlintConfig: {
       options: { typeAware: true, maxWarnings: 0 },
-      rules: { "react/refs": "off", "react/set-state-in-effect": "off" },
+      rules: {},
     },
+    reactCompilerConfig: { rules: { "react/react-compiler": "error" } },
     oxfmtConfig: { $schema: OXFMT_SCHEMA },
     viteConfig: "build: { rolldownOptions: { onwarn(warning) { buildWarningViolation(warning); } } }",
   };
@@ -39,6 +40,7 @@ describe("Oxc and Rolldown repository policy", () => {
     const policy = validPolicy();
     policy.manifest.scripts.lint = "bun run typecheck";
     policy.oxlintConfig.options.typeAware = false;
+    policy.reactCompilerConfig.rules["react/react-compiler"] = "off";
     policy.oxfmtConfig.$schema = "https://example.test/schema.json";
     policy.viteConfig = "build: { rollupOptions: {} }";
 
@@ -46,6 +48,7 @@ describe("Oxc and Rolldown repository policy", () => {
       expect.arrayContaining([
         "package.json: lint must stay on the repository-owned command",
         ".oxlintrc.json: options.typeAware must be true",
+        "scripts/react-compiler-oxlint.json: react/react-compiler must stay enabled for the diagnostic ratchet",
         ".oxfmtrc.json: $schema must be ./node_modules/oxfmt/configuration_schema.json",
         "vite.config.ts: Vite 8 must use native build.rolldownOptions",
         "vite.config.ts: deprecated build.rollupOptions compatibility alias is forbidden",

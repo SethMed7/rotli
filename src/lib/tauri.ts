@@ -2252,7 +2252,7 @@ function browserBreveSnapshot(): BreveSnapshot {
       briefModel: "sonnet",
       modelPolicy: {
         primary: "sonnet",
-        fallbacks: ["haiku", "Gemini 3.5 Flash (Medium)", "gpt-5.4-mini"],
+        fallbacks: ["haiku", "gemini-3.7-flash-medium", "gpt-5.4-mini"],
         localHelper: "gemma-3-12b-it-qat-4bit",
       },
       pdfTheme: DEFAULT_BREVE_PDF_THEME,

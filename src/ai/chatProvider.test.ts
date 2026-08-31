@@ -22,7 +22,7 @@ const model = (provider: string, id: string, label: string): ChatModelInfo => ({
 const opus = model("claude", "opus", "Claude Opus");
 const sonnet = model("claude", "sonnet", "Claude Sonnet 5");
 const gpt = model("codex", "gpt-5.6-sol", "GPT-5.6 Sol");
-const geminiCli = model("agy", "Gemini 3.5 Flash (Medium)", "Gemini 3.5 Flash");
+const geminiCli = model("agy", "gemini-3.7-flash-medium", "Gemini 3.7 Flash");
 const geminiApi = model("gemini", "gemini-3-pro", "Gemini 3 Pro");
 const mlx = model("mlx", "gemma", "Gemma");
 

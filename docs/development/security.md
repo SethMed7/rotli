@@ -73,7 +73,7 @@ from every diagnostics path. Full record: egress threat model O7, design in
 | ImapFlow (`mail.ts`) | configured mail hosts | — | TLS strict except loopback |
 | Rotli app webviews | nothing | — | CSP `connect-src ipc:` only; no fetch/XHR/WebSocket in `src/`; capabilities target only `main`, `capture`, and `quick` labels rather than their whole windows |
 | `rotli` CLI / `rotli-workspace` MCP | local Claude/Codex process | requested non-secure note text or compact board data | registered-root discovery + no-follow containment + remote-AI secure detector + locked-note refusal + optimistic revision check + request/output/schema caps + destructive annotations; stdio or authenticated loopback HTTP |
-| Remote-agent connector | user-configured HTTPS relay (loopback HTTP in development) | token-bound MCP frames already filtered by `workspace.rs` | explicit per-launch connect + independent Keychain device/client credentials + no public Mac listener + exact role checks + live matching device poll + bounded relay frames/sessions; vault switches disconnect |
+| Remote-agent connector | user-configured HTTPS relay (loopback HTTP in development) | token-bound MCP frames already filtered by `workspace.rs` | explicit per-launch connect + independent Keychain device/client credentials + no public Mac listener + exact role checks + no redirects + bounded request/response frames and sessions; vault switches fail closed unless the old connector stops |
 
 The full inventory — every ureq / fetch / network-CLI call site with its
 destination class and guard — is tracked in

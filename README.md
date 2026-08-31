@@ -162,9 +162,12 @@ The doctor is read-only, the self-test uses a disposable vault, and the final
 command prints copy-ready Claude Code and Codex MCP configuration for that exact
 installed binary. Note results identify themselves as Markdown and include
 document metrics; Rotli keeps YAML frontmatter outside the agent-editable body.
-The server is stdio-only and loads tools on demand; it does not open a local
-network port or silently change global agent settings. Full commands and policy
-live in the [`agent workspace contract`](docs/architecture/agent-workspace.md).
+The server uses stdio by default and loads tools on demand; its optional HTTP
+adapter is bearer-authenticated and loopback-only. Cloud clients such as Grok
+Bot can reach the same tools only when the user explicitly connects the running
+app to a stateless HTTPS relay for that session. Rotli never opens a public Mac
+port or silently changes global agent settings. See the public [MCP guide](https://rotli.app/mcp/)
+and the [`agent workspace contract`](docs/architecture/agent-workspace.md).
 
 Contributing or working with an AI coding tool? Start with
 [`CONTRIBUTING.md`](CONTRIBUTING.md), [`AGENTS.md`](AGENTS.md), and the

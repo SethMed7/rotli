@@ -1879,7 +1879,7 @@ function BrainPane() {
             options={[
               ["local", "On this Mac"],
               ["claude", "Claude Sonnet 5"],
-              ["gemini35", "Gemini 3.5 Flash"],
+              ["gemini35", "Gemini 3.7 Flash"],
             ]}
             onPick={(m) => setModel(m)}
           />
@@ -1892,7 +1892,7 @@ function BrainPane() {
               </>
             ) : model === "gemini35" ? (
               <>
-                <b>Gemini 3.5 Flash</b> (through the authenticated Antigravity lane) organizes your{" "}
+                <b>Gemini 3.7 Flash</b> (through the authenticated Antigravity lane) organizes your{" "}
                 <b>non-secure</b> notes. <b>Secure</b> and <b>locked</b> notes never enter a remote model.
               </>
             ) : (

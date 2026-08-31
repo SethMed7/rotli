@@ -253,6 +253,13 @@ second user-visible product or storage location.
 - User turns are the navigation landmarks for a long transcript. The chat may
   derive a compact left-edge prompt navigator from rendered messages; it is a
   view only and does not create another chat index or durable identity.
+- The Markdown chat file always keeps the complete transcript. On open, the
+  interactive surface mounts only the newest 500 messages and says how many
+  earlier messages remain in that file; completing another turn keeps the same
+  rolling UI window. Model input is narrower still: the existing per-model
+  character budget keeps only recent conversation history, while retrieval can
+  reopen an older chat explicitly. No provider owns or silently replays a
+  second copy of Rotli's transcript.
 - Every model adapter shares one bounded clarification response shape: one
   concise question with two or three mutually exclusive options. The loop
   accepts it only when a missing material choice changes the result or file

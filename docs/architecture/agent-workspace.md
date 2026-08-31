@@ -136,6 +136,10 @@ workspace only, so a link would be a dead click.
 - One JSON-RPC request is capped at 256 KB before parsing and one response at
   512 KB before writing to stdio. Oversized results must use the existing paging
   and list limits.
+- The loopback adapter compares the complete bearer without an early mismatch
+  exit and refuses every non-loopback bind before opening a listener. The remote
+  connector does not follow relay redirects and caps each relay response at the
+  same 256 KB request-frame boundary before JSON parsing.
 - `rotli_patch_note` applies one exact local replacement and refuses zero or
   ambiguous matches, so a small edit does not require resending a long body.
 - MCP board reads omit raw scene JSON and return a compact outline. Use semantic
