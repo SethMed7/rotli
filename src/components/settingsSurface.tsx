@@ -3341,7 +3341,6 @@ function RemoteAgentsSection() {
           spellCheck={false}
           onChange={(event) => {
             setRelayUrl(event.target.value);
-            setPairing(null);
             setConfirmRegenerate(false);
             setConfirmUnpair(false);
           }}
@@ -3452,8 +3451,9 @@ function RemoteAgentsSection() {
         </div>
       )}
       <p className="setnote remote-agents-boundary">
-        Remote access starts disconnected after every launch. The bearer token lives in macOS Keychain;
-        regenerating it invalidates the old pairing on this Mac. Secure notes stay hidden, locked notes stay
+        Remote access starts disconnected after every launch. The bearer token lives in macOS Keychain; each
+        pairing is bound to the relay URL used to create it, and changing relays requires a new pairing.
+        Regenerating invalidates the old pairing on this Mac. Secure notes stay hidden, locked notes stay
         read-only, and stale revisions are refused. Switching vaults disconnects the current remote session.
       </p>
       {!native && <p className="setnote">Pairing is available only in the native Mac app.</p>}

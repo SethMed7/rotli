@@ -26,7 +26,7 @@ use crate::memex_query::{parse_query, record_matches, ParsedQuery};
 
 const MCP_PROTOCOL: &str = "2025-03-26";
 pub(crate) const MCP_MAX_REQUEST_BYTES: usize = 256_000;
-const MCP_MAX_OUTPUT_BYTES: usize = 512_000;
+pub(crate) const MCP_MAX_OUTPUT_BYTES: usize = 512_000;
 const MAIN_ROOT: &str = "main:";
 const OPEN_REQUEST_FILE: &str = "workspace-open.json";
 
@@ -2660,7 +2660,7 @@ fn read_bounded_mcp_line(reader: &mut impl BufRead) -> Result<Option<(String, bo
     }
 }
 
-fn bounded_mcp_response(response: Value) -> Value {
+pub(crate) fn bounded_mcp_response(response: Value) -> Value {
     if serde_json::to_vec(&response).is_ok_and(|encoded| encoded.len() <= MCP_MAX_OUTPUT_BYTES) {
         return response;
     }

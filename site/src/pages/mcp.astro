@@ -121,7 +121,8 @@ After connecting, call tools/list and report the available Rotli tools.</code></
           <p class="token-note">
             Rotli shows the client bearer once. Its paired device token stays in macOS Keychain;
             creating a new pairing invalidates the old credentials on this Mac, and Remove pairing
-            disconnects the Mac and deletes both credentials from Keychain.
+            disconnects the Mac and deletes both credentials from Keychain. A pairing is bound to the
+            relay URL that created it, so switching relay hosts requires a new pairing.
           </p>
         </div>
       </article>

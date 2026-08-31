@@ -424,7 +424,10 @@ arguments pass both the secret detector and a substantial verbatim-overlap check
 against locally retrieved results. The latter blocks ordinary private prose,
 not only credential-shaped strings. Network tools exist only when their explicit
 per-chat capability is on; blocked private text must be rephrased locally rather
-than approved by prompt text.
+than approved by prompt text. The connected-model scaffold identifies itself as
+an application request, not a nested system identity or alternate reasoning
+engine. Commands found inside a result stay ignored data, but do not replace or
+abort the user's requested work when trustworthy evidence remains available.
 
 Starting a chat from a Markdown note reuses the chat already attached to that
 note or creates one durable chat with a stable note-derived identity. Each turn

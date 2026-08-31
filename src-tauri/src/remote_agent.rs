@@ -8,7 +8,7 @@ use std::io::Read as IoRead;
 use std::path::PathBuf;
 use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
-    Arc, Mutex,
+    Arc, Mutex, MutexGuard,
 };
 use std::time::Duration;
 
@@ -18,7 +18,11 @@ use tauri::Manager;
 
 use crate::keychain::REMOTE_AGENT_TOKEN_ACCOUNT;
 
-const PAIRING_VERSION: u8 = 1;
+const PAIRING_VERSION: u8 = 2;
+const RELAY_REQUEST_ID_MAX_BYTES: usize = 64;
+const RELAY_RESPONSE_ENVELOPE_BYTES: usize = 256;
+const RELAY_MAX_DEVICE_FRAME_BYTES: usize =
+    crate::workspace::MCP_MAX_OUTPUT_BYTES + RELAY_RESPONSE_ENVELOPE_BYTES;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -34,20 +38,23 @@ pub(crate) struct RemoteAgentState {
     status: Arc<Mutex<RemoteAgentStatus>>,
     stop: Mutex<Option<Arc<AtomicBool>>>,
     generation: Arc<AtomicU64>,
+    dispatch: Arc<Mutex<()>>,
 }
 
 impl Default for RemoteAgentState {
     fn default() -> Self {
+        let pairing = load_pairing();
         Self {
             status: Arc::new(Mutex::new(RemoteAgentStatus {
-                paired: load_pairing().is_some(),
+                paired: pairing.is_some(),
                 active: false,
                 connected: false,
-                relay_url: None,
+                relay_url: pairing.as_ref().map(pairing_mcp_url),
                 last_error: None,
             })),
             stop: Mutex::new(None),
             generation: Arc::new(AtomicU64::new(0)),
+            dispatch: Arc::new(Mutex::new(())),
         }
     }
 }
@@ -63,6 +70,14 @@ impl RemoteAgentState {
             stop.store(true, Ordering::Release);
         }
         self.generation.fetch_add(1, Ordering::AcqRel);
+        // A request that already entered the shared workspace dispatcher may
+        // finish on its pinned root, but a disconnect/vault switch does not
+        // complete until both that dispatch and its response delivery finish.
+        // New dispatches observe the generation bump after taking this lock.
+        let _dispatch = self
+            .dispatch
+            .lock()
+            .map_err(|_| "remote agent dispatch lock poisoned")?;
         if let Ok(mut status) = self.status.lock() {
             status.active = false;
             status.connected = false;
@@ -76,6 +91,7 @@ impl RemoteAgentState {
 #[serde(rename_all = "camelCase")]
 struct StoredPairing {
     version: u8,
+    relay_base: String,
     client_token: String,
     device_token: String,
 }
@@ -95,10 +111,11 @@ fn token(role: &str, pair_id: &str) -> String {
     )
 }
 
-fn new_pairing() -> StoredPairing {
+fn new_pairing(relay_base: &str) -> StoredPairing {
     let pair_id = uuid::Uuid::new_v4().simple().to_string();
     StoredPairing {
         version: PAIRING_VERSION,
+        relay_base: relay_base.to_string(),
         client_token: token("client", &pair_id),
         device_token: token("device", &pair_id),
     }
@@ -108,6 +125,21 @@ fn load_pairing() -> Option<StoredPairing> {
     let encoded = crate::keychain::get_secret(REMOTE_AGENT_TOKEN_ACCOUNT)?;
     let pairing: StoredPairing = serde_json::from_str(&encoded).ok()?;
     (pairing.version == PAIRING_VERSION).then_some(pairing)
+}
+
+fn pairing_mcp_url(pairing: &StoredPairing) -> String {
+    format!("{}/mcp", pairing.relay_base)
+}
+
+fn require_pairing_relay(pairing: &StoredPairing, base: &str) -> Result<(), String> {
+    if pairing.relay_base == base {
+        Ok(())
+    } else {
+        Err(format!(
+            "this pairing belongs to {}; create a new pairing before connecting to another relay",
+            pairing_mcp_url(pairing)
+        ))
+    }
 }
 
 fn relay_base(value: &str) -> Result<String, String> {
@@ -144,12 +176,16 @@ fn require_main_webview(window: &tauri::WebviewWindow) -> Result<(), String> {
 pub(crate) fn remote_agent_status(
     state: tauri::State<'_, RemoteAgentState>,
 ) -> Result<RemoteAgentStatus, String> {
+    let pairing = load_pairing();
     let mut status = state
         .status
         .lock()
         .map_err(|_| "remote agent status lock poisoned")?
         .clone();
-    status.paired = load_pairing().is_some();
+    status.paired = pairing.is_some();
+    if !status.active {
+        status.relay_url = pairing.as_ref().map(pairing_mcp_url);
+    }
     Ok(status)
 }
 
@@ -162,7 +198,7 @@ pub(crate) fn remote_agent_pair(
     require_main_webview(&window)?;
     let base = relay_base(&relay_url)?;
     state.stop_connector()?;
-    let pairing = new_pairing();
+    let pairing = new_pairing(&base);
     let encoded = serde_json::to_string(&pairing)
         .map_err(|error| format!("encode remote agent pairing: {error}"))?;
     crate::keychain::store_secret(REMOTE_AGENT_TOKEN_ACCOUNT, &encoded)?;
@@ -186,6 +222,7 @@ pub(crate) fn remote_agent_start(
     require_main_webview(&window)?;
     let base = relay_base(&relay_url)?;
     let pairing = load_pairing().ok_or("pair this Mac before connecting")?;
+    require_pairing_relay(&pairing, &base)?;
     let root = app
         .state::<crate::corpus::CorpusState>()
         .default_root_path()?;
@@ -206,6 +243,7 @@ pub(crate) fn remote_agent_start(
     }
     let status = state.status.clone();
     let active_generation = state.generation.clone();
+    let dispatch = state.dispatch.clone();
     if let Err(error) = std::thread::Builder::new()
         .name("rotli-remote-agent".into())
         .spawn(move || {
@@ -217,6 +255,7 @@ pub(crate) fn remote_agent_start(
                 stop,
                 status,
                 active_generation,
+                dispatch,
                 generation,
             )
         })
@@ -287,6 +326,36 @@ fn read_relay_json(response: ureq::Response) -> Result<Value, String> {
     serde_json::from_slice(&bytes).map_err(|_| "relay returned invalid JSON".into())
 }
 
+fn begin_dispatch<'a>(
+    dispatch: &'a Mutex<()>,
+    stop: &AtomicBool,
+    active_generation: &AtomicU64,
+    generation: u64,
+) -> Result<Option<MutexGuard<'a, ()>>, String> {
+    let guard = dispatch
+        .lock()
+        .map_err(|_| "remote agent dispatch lock poisoned")?;
+    if stop.load(Ordering::Acquire) || active_generation.load(Ordering::Acquire) != generation {
+        return Ok(None);
+    }
+    Ok(Some(guard))
+}
+
+fn relay_response_envelope(request_id: &str, response: Option<Value>) -> Result<Value, String> {
+    if request_id.len() > RELAY_REQUEST_ID_MAX_BYTES || !request_id.is_ascii() {
+        return Err("relay returned an invalid request id".into());
+    }
+    let response = response.map(crate::workspace::bounded_mcp_response);
+    let envelope = json!({ "requestId": request_id, "response": response });
+    if serde_json::to_vec(&envelope)
+        .is_ok_and(|encoded| encoded.len() <= RELAY_MAX_DEVICE_FRAME_BYTES)
+    {
+        Ok(envelope)
+    } else {
+        Err("workspace response exceeds the relay envelope limit".into())
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn connector_loop(
     base: &str,
@@ -296,6 +365,7 @@ fn connector_loop(
     stop: Arc<AtomicBool>,
     status: Arc<Mutex<RemoteAgentStatus>>,
     active_generation: Arc<AtomicU64>,
+    dispatch: Arc<Mutex<()>>,
     generation: u64,
 ) {
     let poll_url = format!("{base}/device/poll");
@@ -345,16 +415,48 @@ fn connector_loop(
                         );
                         continue;
                     };
+                    // Hold this guard through dispatch AND response delivery.
+                    // A disconnect or vault switch first invalidates the
+                    // generation, then waits here, so no old-root result can
+                    // be written or released after the boundary completes.
+                    let _dispatch =
+                        match begin_dispatch(&dispatch, &stop, &active_generation, generation) {
+                            Ok(Some(guard)) => guard,
+                            Ok(None) => break,
+                            Err(_) => {
+                                set_connected(
+                                    &status,
+                                    &active_generation,
+                                    generation,
+                                    false,
+                                    Some("remote agent dispatch is unavailable"),
+                                );
+                                break;
+                            }
+                        };
                     let response = crate::workspace::handle_mcp_request_for_root(
                         request,
                         root.clone(),
                         read_only,
                     );
+                    let response_envelope = match relay_response_envelope(request_id, response) {
+                        Ok(envelope) => envelope,
+                        Err(_) => {
+                            set_connected(
+                                &status,
+                                &active_generation,
+                                generation,
+                                false,
+                                Some("workspace response exceeded the relay limit"),
+                            );
+                            continue;
+                        }
+                    };
                     let delivered = agent
                         .post(&response_url)
                         .set("Authorization", &format!("Bearer {}", pairing.device_token))
                         .timeout(Duration::from_secs(10))
-                        .send_json(json!({ "requestId": request_id, "response": response }));
+                        .send_json(response_envelope);
                     if delivered.is_err() {
                         set_connected(
                             &status,
@@ -469,7 +571,7 @@ mod tests {
 
     #[test]
     fn pairing_uses_independent_role_bound_tokens() {
-        let pairing = new_pairing();
+        let pairing = new_pairing("https://relay.example");
         let client = pairing.client_token.split('_').collect::<Vec<_>>();
         let device = pairing.device_token.split('_').collect::<Vec<_>>();
         assert_eq!(client.len(), 4);
@@ -480,6 +582,11 @@ mod tests {
         assert_ne!(client[3], device[3]);
         assert_eq!(client[2].len(), 32);
         assert_eq!(client[3].len(), 64);
+        assert_eq!(pairing_mcp_url(&pairing), "https://relay.example/mcp");
+        assert!(require_pairing_relay(&pairing, "https://relay.example").is_ok());
+        assert!(require_pairing_relay(&pairing, "https://hostile.example")
+            .unwrap_err()
+            .contains("create a new pairing"));
     }
 
     #[test]
@@ -494,6 +601,7 @@ mod tests {
             })),
             stop: Mutex::new(Some(Arc::new(AtomicBool::new(false)))),
             generation: Arc::new(AtomicU64::new(7)),
+            dispatch: Arc::new(Mutex::new(())),
         };
         let stop = state.stop.lock().unwrap().as_ref().unwrap().clone();
         state.stop_connector().unwrap();
@@ -507,7 +615,7 @@ mod tests {
 
     #[test]
     fn removing_a_pairing_disconnects_and_deletes_the_keychain_bundle() {
-        let pairing = new_pairing();
+        let pairing = new_pairing("https://relay.example");
         crate::keychain::store_secret(
             REMOTE_AGENT_TOKEN_ACCOUNT,
             &serde_json::to_string(&pairing).unwrap(),
@@ -523,6 +631,7 @@ mod tests {
             })),
             stop: Mutex::new(Some(Arc::new(AtomicBool::new(false)))),
             generation: Arc::new(AtomicU64::new(3)),
+            dispatch: Arc::new(Mutex::new(())),
         };
         let stop = state.stop.lock().unwrap().as_ref().unwrap().clone();
 
@@ -605,6 +714,67 @@ mod tests {
     }
 
     #[test]
+    fn connector_bounds_the_complete_response_envelope() {
+        let envelope = relay_response_envelope(
+            "relay-request-1",
+            Some(json!({
+                "jsonrpc": "2.0",
+                "id": 7,
+                "result": { "content": "x".repeat(crate::workspace::MCP_MAX_OUTPUT_BYTES) }
+            })),
+        )
+        .unwrap();
+        assert_eq!(
+            envelope
+                .pointer("/response/error/code")
+                .and_then(Value::as_i64),
+            Some(-32603)
+        );
+        assert!(serde_json::to_vec(&envelope).unwrap().len() <= RELAY_MAX_DEVICE_FRAME_BYTES);
+        assert!(
+            relay_response_envelope(&"x".repeat(RELAY_REQUEST_ID_MAX_BYTES + 1), None).is_err()
+        );
+    }
+
+    #[test]
+    fn disconnect_waits_for_an_in_flight_dispatch_and_blocks_the_next_one() {
+        let state = Arc::new(RemoteAgentState {
+            status: Arc::new(Mutex::new(RemoteAgentStatus {
+                paired: true,
+                active: true,
+                connected: true,
+                relay_url: Some("https://relay.example/mcp".into()),
+                last_error: None,
+            })),
+            stop: Mutex::new(Some(Arc::new(AtomicBool::new(false)))),
+            generation: Arc::new(AtomicU64::new(4)),
+            dispatch: Arc::new(Mutex::new(())),
+        });
+        let in_flight = state.dispatch.lock().unwrap();
+        let (stopped_tx, stopped_rx) = mpsc::channel();
+        let stopping = std::thread::spawn({
+            let state = state.clone();
+            move || {
+                state.stop_connector().unwrap();
+                stopped_tx.send(()).unwrap();
+            }
+        });
+
+        while state.generation.load(Ordering::Acquire) == 4 {
+            std::thread::yield_now();
+        }
+        assert!(stopped_rx.try_recv().is_err());
+        drop(in_flight);
+        stopped_rx.recv_timeout(Duration::from_secs(1)).unwrap();
+        stopping.join().unwrap();
+
+        let stop = Arc::new(AtomicBool::new(false));
+        assert!(begin_dispatch(&state.dispatch, &stop, &state.generation, 4)
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
     fn stopping_an_outstanding_poll_blocks_dispatch_into_the_old_vault() {
         let temp = TempDir::new().unwrap();
         fs::create_dir_all(temp.path().join("wiki/_inbox")).unwrap();
@@ -616,7 +786,7 @@ mod tests {
 
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let base = format!("http://{}", listener.local_addr().unwrap());
-        let pairing = new_pairing();
+        let pairing = new_pairing(&base);
         let (polled_tx, polled_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
         let relay = std::thread::spawn(move || {
@@ -652,13 +822,19 @@ mod tests {
             })),
             stop: Mutex::new(Some(stop.clone())),
             generation: Arc::new(AtomicU64::new(0)),
+            dispatch: Arc::new(Mutex::new(())),
         };
         let connector = std::thread::spawn({
             let base = base.clone();
             let root = temp.path().to_path_buf();
             let status = state.status.clone();
             let generation = state.generation.clone();
-            move || connector_loop(&base, &pairing, root, false, stop, status, generation, 0)
+            let dispatch = state.dispatch.clone();
+            move || {
+                connector_loop(
+                    &base, &pairing, root, false, stop, status, generation, dispatch, 0,
+                )
+            }
         });
 
         polled_rx.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -682,7 +858,7 @@ mod tests {
 
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let base = format!("http://{}", listener.local_addr().unwrap());
-        let pairing = new_pairing();
+        let pairing = new_pairing(&base);
         let expected_device = pairing.device_token.clone();
         let expected_client = pairing.client_token.clone();
         let (delivered_tx, delivered_rx) = mpsc::channel();
@@ -728,12 +904,14 @@ mod tests {
             last_error: None,
         }));
         let active_generation = Arc::new(AtomicU64::new(0));
+        let dispatch = Arc::new(Mutex::new(()));
         let connector_stop = stop.clone();
         let connector = std::thread::spawn({
             let base = base.clone();
             let root = temp.path().to_path_buf();
             let status = status.clone();
             let active_generation = active_generation.clone();
+            let dispatch = dispatch.clone();
             move || {
                 connector_loop(
                     &base,
@@ -743,6 +921,7 @@ mod tests {
                     connector_stop,
                     status,
                     active_generation,
+                    dispatch,
                     0,
                 )
             }

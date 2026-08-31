@@ -133,13 +133,16 @@ workspace only, so a link would be a dead click.
   human explicitly requests them.
 - MCP list/search results are capped. Note reads default to 20,000 characters
   and expose `offset`, `nextOffset`, and `totalChars` for paging.
-- One JSON-RPC request is capped at 256 KB before parsing and one response at
-  512 KB before writing to stdio. Oversized results must use the existing paging
-  and list limits.
+- Every adapter caps one JSON-RPC request at 256 KB before parsing and one MCP
+  response at 512 KB. The relay permits 256 additional bytes only around the
+  Mac's response for its bounded request-id envelope; it never expands the MCP
+  result itself. Oversized results must use the existing paging and list limits.
 - The loopback adapter compares the complete bearer without an early mismatch
   exit and refuses every non-loopback bind before opening a listener. The remote
   connector does not follow relay redirects and caps each relay response at the
-  same 256 KB request-frame boundary before JSON parsing.
+  same 256 KB request-frame boundary before JSON parsing. Disconnect and vault
+  activation wait for any dispatch already inside the shared workspace service,
+  including its response delivery, before completing.
 - `rotli_patch_note` applies one exact local replacement and refuses zero or
   ambiguous matches, so a small edit does not require resending a long body.
 - MCP board reads omit raw scene JSON and return a compact outline. Use semantic

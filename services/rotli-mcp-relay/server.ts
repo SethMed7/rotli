@@ -1,4 +1,6 @@
-export const MAX_FRAME_BYTES = 256_000;
+export const MAX_CLOUD_FRAME_BYTES = 256_000;
+export const MAX_MCP_RESPONSE_BYTES = 512_000;
+export const MAX_DEVICE_FRAME_BYTES = 512_256;
 const DEVICE_WAIT_MS = 25_000;
 const CLOUD_WAIT_MS = 30_000;
 const MAX_DEVICE_WAITERS = 256;
@@ -78,15 +80,15 @@ function acceptsJson(request: Request): boolean {
   return request.headers.get("content-type")?.split(";", 1)[0]?.trim() === "application/json";
 }
 
-async function frame(request: Request): Promise<unknown> {
+async function frame(request: Request, maxBytes: number): Promise<unknown> {
   const rawLength = request.headers.get("content-length");
   if (rawLength !== null) {
     const declared = Number(rawLength);
     if (!Number.isSafeInteger(declared) || declared < 0) throw new Error("invalid content length");
-    if (declared > MAX_FRAME_BYTES) throw new Error("frame too large");
+    if (declared > maxBytes) throw new Error("frame too large");
   }
   const bytes = await request.arrayBuffer();
-  if (bytes.byteLength > MAX_FRAME_BYTES) throw new Error("frame too large");
+  if (bytes.byteLength > maxBytes) throw new Error("frame too large");
   return JSON.parse(new TextDecoder().decode(bytes));
 }
 
@@ -111,7 +113,7 @@ export function createRelay(options: RelayOptions = {}) {
       if (!acceptsJson(request)) return json({ error: "application/json required" }, 415);
       let body: unknown;
       try {
-        body = await frame(request);
+        body = await frame(request, MAX_CLOUD_FRAME_BYTES);
       } catch (error) {
         return json({ error: error instanceof Error ? error.message : "invalid frame" }, 400);
       }
@@ -159,7 +161,7 @@ export function createRelay(options: RelayOptions = {}) {
       if (cloud.size >= maxCloudRequests) return json({ error: "relay request capacity reached" }, 503);
       let requestFrame: unknown;
       try {
-        requestFrame = await frame(request);
+        requestFrame = await frame(request, MAX_CLOUD_FRAME_BYTES);
       } catch (error) {
         return json({ error: error instanceof Error ? error.message : "invalid frame" }, 400);
       }
@@ -182,11 +184,18 @@ export function createRelay(options: RelayOptions = {}) {
       if (!acceptsJson(request)) return json({ error: "application/json required" }, 415);
       let responseFrame: unknown;
       try {
-        responseFrame = await frame(request);
+        responseFrame = await frame(request, MAX_DEVICE_FRAME_BYTES);
       } catch (error) {
         return json({ error: error instanceof Error ? error.message : "invalid frame" }, 400);
       }
       const envelope = responseFrame as { requestId?: unknown; response?: unknown };
+      if (
+        envelope.response !== null &&
+        envelope.response !== undefined &&
+        new TextEncoder().encode(JSON.stringify(envelope.response)).byteLength > MAX_MCP_RESPONSE_BYTES
+      ) {
+        return json({ error: "MCP response too large" }, 400);
+      }
       const requestId = typeof envelope.requestId === "string" ? envelope.requestId : "";
       const pending = cloud.get(requestId);
       if (!pending || pending.deviceToken !== device.value) return json({ error: "request not found" }, 404);
@@ -214,7 +223,7 @@ export function serveRelay(options: RelayServerOptions = {}) {
     port: port ?? Number(process.env.PORT ?? 3000),
     // This outer cap rejects the request before the handler allocates or
     // decodes it. `frame` repeats the bound for direct/unit invocation.
-    maxRequestBodySize: MAX_FRAME_BYTES,
+    maxRequestBodySize: MAX_DEVICE_FRAME_BYTES,
     fetch: relay.fetch,
   });
 }

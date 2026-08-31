@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
-import { createRelay, MAX_FRAME_BYTES, serveRelay } from "./server";
+import {
+  createRelay,
+  MAX_CLOUD_FRAME_BYTES,
+  MAX_DEVICE_FRAME_BYTES,
+  MAX_MCP_RESPONSE_BYTES,
+  serveRelay,
+} from "./server";
 
 const PAIR_A = "a".repeat(32);
 const PAIR_B = "b".repeat(32);
@@ -139,24 +145,78 @@ describe("Rotli MCP relay", () => {
     expect((await cloudB).status).toBe(200);
   });
 
-  test("enforces the frame cap in the handler and at the Bun server boundary", async () => {
+  test("keeps cloud requests at 256 KB and accepts a bounded 512 KB MCP response envelope", async () => {
     const relay = createRelay();
     expect(
-      (await relay.fetch(request("/device/respond", DEVICE_A, { padding: "x".repeat(MAX_FRAME_BYTES) })))
-        .status,
+      (
+        await relay.fetch(
+          request("/device/poll", DEVICE_A, {
+            clientToken: CLIENT_A,
+            padding: "x".repeat(MAX_CLOUD_FRAME_BYTES),
+          }),
+        )
+      ).status,
     ).toBe(400);
 
+    const devicePoll = relay.fetch(poll());
+    await new Promise((resolve) => setTimeout(resolve, 1));
+    const cloudResponse = relay.fetch(request("/mcp", CLIENT_A, { jsonrpc: "2.0", id: 9, method: "ping" }));
+    const envelope = (await (await devicePoll).json()) as { requestId: string };
+    expect(
+      (
+        await relay.fetch(
+          request("/device/respond", DEVICE_A, {
+            requestId: envelope.requestId,
+            response: {
+              jsonrpc: "2.0",
+              id: 9,
+              result: { padding: "x".repeat(MAX_MCP_RESPONSE_BYTES - 128) },
+            },
+          }),
+        )
+      ).status,
+    ).toBe(200);
+    expect((await cloudResponse).status).toBe(200);
+    expect(
+      (
+        await relay.fetch(
+          request("/device/respond", DEVICE_A, {
+            requestId: "not-pending",
+            response: { padding: "x".repeat(MAX_MCP_RESPONSE_BYTES) },
+          }),
+        )
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await relay.fetch(
+          request("/device/respond", DEVICE_A, { padding: "x".repeat(MAX_DEVICE_FRAME_BYTES) }),
+        )
+      ).status,
+    ).toBe(400);
+  });
+
+  test("enforces path-specific caps in the handler and the outer Bun allocation cap", async () => {
     const server = serveRelay({ hostname: "127.0.0.1", port: 0 });
     try {
-      const response = await fetch(`http://127.0.0.1:${server.port}/device/respond`, {
+      const cloudResponse = await fetch(`http://127.0.0.1:${server.port}/device/poll`, {
         method: "POST",
         headers: {
           authorization: `Bearer ${DEVICE_A}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify({ padding: "x".repeat(MAX_FRAME_BYTES) }),
+        body: JSON.stringify({ clientToken: CLIENT_A, padding: "x".repeat(MAX_CLOUD_FRAME_BYTES) }),
       });
-      expect(response.status).toBe(413);
+      expect(cloudResponse.status).toBe(400);
+      const deviceResponse = await fetch(`http://127.0.0.1:${server.port}/device/respond`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${DEVICE_A}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ padding: "x".repeat(MAX_DEVICE_FRAME_BYTES) }),
+      });
+      expect(deviceResponse.status).toBe(413);
     } finally {
       await server.stop(true);
     }

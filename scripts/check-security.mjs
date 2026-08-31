@@ -253,7 +253,9 @@ function stripComments(src) {
   const code = stripComments(read(relay.source));
   const dockerfile = read(relay.dockerfile);
   for (const [name, expected] of [
-    ["MAX_FRAME_BYTES", relay.maxFrameBytes],
+    ["MAX_CLOUD_FRAME_BYTES", relay.maxCloudFrameBytes],
+    ["MAX_MCP_RESPONSE_BYTES", relay.maxMcpResponseBytes],
+    ["MAX_DEVICE_FRAME_BYTES", relay.maxDeviceFrameBytes],
     ["MAX_DEVICE_WAITERS", relay.maxDeviceWaiters],
     ["MAX_CLOUD_REQUESTS", relay.maxCloudRequests],
   ]) {
@@ -267,7 +269,7 @@ function stripComments(src) {
     'type TokenRole = "client" | "device"',
     'request.headers.has("origin")',
     '"application/json"',
-    "maxRequestBodySize: MAX_FRAME_BYTES",
+    "maxRequestBodySize: MAX_DEVICE_FRAME_BYTES",
     "devices.size >= maxDeviceWaiters",
     "cloud.size >= maxCloudRequests",
   ]) {

@@ -54,6 +54,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Connected models no longer mistake Rotli's own tool scaffold for prompt
+  injection.** The frontier prompt is framed as an application request instead
+  of an identity override with a competing “JSON-only system” persona. Real
+  commands inside note or web results remain ignored, while the model is told
+  to continue the requested research from trustworthy evidence rather than
+  making the ignored injection its answer.
 - **Finder image drops no longer race their native file authorization.** Rust
   now grants each exact dropped file before notifying the webview, so a valid
   drop into Chat or Markdown cannot intermittently fail as unauthorized; the
@@ -68,10 +74,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tool scratchpads retain their smaller per-model budgets.
 - **Remote-agent transport fails closed at every hop.** The Mac connector no
   longer follows relay redirects, bounds relay responses before JSON parsing,
-  and refuses a vault switch if the old connector cannot be stopped. Loopback
-  HTTP uses a timing-stable bearer comparison, and regression tests now cover
-  non-loopback binds, stale connector generations, conflicting device tokens,
-  relay capacity, and the Bun server's pre-handler body cap.
+  binds credentials to their minted relay URL, bounds the complete 512 KB MCP
+  response plus relay envelope, and makes disconnect/vault switching wait for
+  any in-flight dispatch and delivery. Loopback HTTP uses a timing-stable bearer
+  comparison, and regression tests cover non-loopback binds, stale connector
+  generations, conflicting device tokens, relay capacity, and both route-level
+  and pre-handler Bun body caps.
 - **The production quality gate accepts only rules supported by the pinned
   Oxlint.** React Compiler diagnostics remain in their dedicated ratcheted
   check; the ordinary lint config no longer names rules absent from Oxlint

@@ -104,7 +104,9 @@
     "source": "services/rotli-mcp-relay/server.ts",
     "dockerfile": "services/rotli-mcp-relay/Dockerfile",
     "image": "oven/bun:1.4.0-alpine",
-    "maxFrameBytes": 256000,
+    "maxCloudFrameBytes": 256000,
+    "maxMcpResponseBytes": 512000,
+    "maxDeviceFrameBytes": 512256,
     "maxDeviceWaiters": 256,
     "maxCloudRequests": 256
   },

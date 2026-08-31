@@ -35,8 +35,10 @@ cloud MCP client. Device endpoints reject client tokens, client endpoints reject
 device tokens, and the relay accepts a client token only when the matching live
 device poll declared that exact token. Regeneration replaces the bundle and
 stops the old connector, so neither old role can reach that Mac. Tokens are
-never written to Markdown or settings JSON. Relay deployments terminate public
-TLS; plain HTTP is accepted only for loopback development.
+never written to Markdown or settings JSON. The Keychain bundle is bound to the
+normalized relay base used when it is minted; changing the URL cannot send those
+credentials to another host and requires a new pairing. Relay deployments
+terminate public TLS; plain HTTP is accepted only for loopback development.
 
 The configured relay URL is a non-secret installation preference. It survives
 relaunch, but connection authority does not: every launch remains disconnected.
@@ -44,7 +46,10 @@ Switching the active vault also disconnects the connector so an apparently new
 workspace cannot leave the cloud client attached to the previous root.
 The connector never follows an HTTP redirect from that configured destination,
 never parses a response frame larger than 256 KB, and blocks the vault switch
-itself if the prior connector cannot be stopped cleanly.
+itself if the prior connector cannot be stopped cleanly. A generation gate and
+dispatch mutex make disconnect wait until an already-started workspace request
+and its response delivery finish; no old-root dispatch continues after the vault
+switch returns.
 
 ## Public deployment profile
 
@@ -56,10 +61,12 @@ already-enabled app session reconnects. `/health` is the content-free startup
 health check.
 
 The public process rejects browser-originated credentialed calls, requires
-exact role-bound bearer syntax and JSON content types, caps frames at 256 KB,
-and bounds both waiting devices and in-flight cloud requests. The Bun server
-also enforces the body cap before the handler buffers a frame. The service emits
-no request, token, note, title, or body logs.
+exact role-bound bearer syntax and JSON content types, caps cloud/device-poll
+requests at 256 KB, and accepts a device response only up to the workspace's
+512 KB MCP output cap plus a fixed 256-byte relay envelope. The Bun server uses
+that larger allocation ceiling while each route applies its narrower semantic
+cap. Waiting devices and in-flight cloud requests are also bounded. The service
+emits no request, token, note, title, or body logs.
 
 ## User control and failure behavior
 

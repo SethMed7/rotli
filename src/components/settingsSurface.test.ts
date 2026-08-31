@@ -37,12 +37,14 @@ describe("remote agent connection presentation", () => {
     expect(settingsSource).toContain("Paste into Grok Bot");
     expect(settingsSource).toContain("authorizationHeader");
     expect(settingsSource).toContain("cannot reveal this client token after you leave this screen");
+    expect(settingsSource).not.toMatch(/setRelayUrl\(event\.target\.value\);\s*setPairing\(null\)/);
   });
 
   test("confirms token replacement and explains vault-switch disconnection", () => {
     expect(settingsSource).toContain("Replace pairing");
     expect(settingsSource).toMatch(/permanently invalidates the old client token/);
     expect(settingsSource).toMatch(/Switching vaults disconnects/);
+    expect(settingsSource).toMatch(/pairing is bound to the relay URL/);
   });
 
   test("can explicitly disconnect and delete the pairing from Keychain", () => {
