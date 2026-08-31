@@ -17,7 +17,7 @@ test("every visible prompt marker is its own labeled control and the active mark
           { messageIndex: 2, text: "Second" },
           { messageIndex: 4, text: "Third" },
         ]}
-        activeMessageIndex={2}
+        activeMessageIndexes={[2]}
         onJump={() => undefined}
       />,
     );

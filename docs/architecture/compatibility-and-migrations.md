@@ -14,7 +14,7 @@ to defaults instead of triggering a content rewrite.
 |---|---|---|---|
 | `memex.json` and Markdown/frontmatter | Memex contract band `3.4` through `3.8` | User-portable durable truth | Out-of-band roots open read-only; unknown frontmatter survives |
 | App `corpus.json` | `version: 1` | Machine-local root registry | Migrate copy-first; never infer or rewrite missing user roots silently |
-| App `app-settings.json` | `v: 1` | Machine-local onboarding/shell preferences | Available without a vault; parse defensively; never place vault content, view state, or AI policy here |
+| App `app-settings.json` | `v: 1` | Machine-local onboarding, shell, and non-secret connection preferences | Available without a vault; parse defensively; never place credentials, vault content, view state, or AI policy here |
 | `.rotli/main.json` | `version: 1` | Portable Main arrangement | References only; preserve unknown items; never copy content into Main |
 | `.rotli/views.json` | `version: 1` | Portable named subset arrangements | Unsupported newer versions stay read-only; names are identifiers; writes synchronize singular Markdown `view_tag` membership |
 | `.rotli/settings.json` | `v: 1` | Explicit user settings | Parse defensively, preserve unknown keys, default invalid values safely |
@@ -25,6 +25,7 @@ to defaults instead of triggering a content rewrite.
 | Breve runtime/config | Runtime package version and documented boundary | Managed runtime plus user config | Mirror contracts explicitly; do not import across the app/runtime boundary |
 | Rotli CLI JSON | App semantic version only today | Public automation surface | Additive fields are compatible; removals/renames require a versioned transition |
 | `rotli-workspace` MCP | MCP protocol plus app semantic version | Public agent surface | Negotiate only supported protocol versions; tool behavior follows the same compatibility law |
+| Remote MCP rendezvous | HTTP endpoint and ephemeral envelope | Public transport, non-durable | Stdio/tool schemas remain authoritative; client/device roles and envelope fields evolve additively; relay state is never durable |
 
 `src/memex/contract.ts` and `src-tauri/src/memex.rs` are deliberately independent
 implementations of the portable memex contract. Shared behavior is proven by

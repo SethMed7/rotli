@@ -55,8 +55,11 @@
   color-scheme: dark;
   --accent-custom-swatch: oklch(78% 0.13 var(--accent-hue));
   --accent-custom-on: #161616;
+  --quokka-line-auto: #ffffff;
 }
-:root[data-theme="dark"] { --theme-on-accent: #241d18; }
+:root[data-theme="dark"] {
+  --theme-on-accent: #241d18;
+}
 :root[data-theme="dark"] {
   --chat-welcome-morning: #392923;
   --chat-welcome-morning-detail: #d89978;
@@ -78,16 +81,18 @@
   --swatch-warm-dark: #241d18;
   --swatch-paper: #ffffff;
   --swatch-charcoal: #161616;
-  --swatch-ocean-light: #f2f6f9;
+  --swatch-ocean-light: #dfebf3;
   --swatch-ocean-dark: #0e171d;
-  --swatch-grove-light: #f2f6f2;
+  --swatch-grove-light: #e3eee4;
   --swatch-grove-dark: #101814;
-  --swatch-iris-light: #f5f3f9;
+  --swatch-iris-light: #e9e4f2;
   --swatch-iris-dark: #15121d;
-  --swatch-midnight-light: #f4f5f7;
+  --swatch-midnight-light: #f0f2f5;
   --swatch-midnight-dark: #050607;
 
-  /* Character ink is deliberately independent from app text. */
+  /* Character ink is deliberately independent from app text. "auto" follows
+     the environment so the Line treatment never vanishes on a dark theme. */
+  --quokka-line-auto: #111214;
   --quokka-line-black: #111214;
   --quokka-line-white: #ffffff;
   --quokka-custom-color: oklch(68% 0.12 225);
@@ -143,13 +148,13 @@
   --preview-selected: #2c2b28;
 }
 .preview-ocean-light {
-  --preview-ground: #f2f6f9;
-  --preview-sidebar: #e6eef3;
-  --preview-surface: #ffffff;
+  --preview-ground: #dfebf3;
+  --preview-sidebar: #d3e3ee;
+  --preview-surface: #f3f8fb;
   --preview-text: #18272f;
-  --preview-muted: #526873;
-  --preview-border: #d1dfe6;
-  --preview-selected: #dceaf2;
+  --preview-muted: #4c6470;
+  --preview-border: #b4cbd9;
+  --preview-selected: #c4d9e7;
 }
 .preview-ocean-dark {
   --preview-ground: #0e171d;
@@ -161,13 +166,13 @@
   --preview-selected: #213843;
 }
 .preview-grove-light {
-  --preview-ground: #f2f6f2;
-  --preview-sidebar: #e7eee8;
-  --preview-surface: #fcfefc;
+  --preview-ground: #e3eee4;
+  --preview-sidebar: #d5e5d8;
+  --preview-surface: #f3f9f4;
   --preview-text: #1d2c23;
-  --preview-muted: #5d6f64;
-  --preview-border: #d3dfd5;
-  --preview-selected: #dce8de;
+  --preview-muted: #54685b;
+  --preview-border: #b7cfbc;
+  --preview-selected: #c6dbca;
 }
 .preview-grove-dark {
   --preview-ground: #101814;
@@ -179,13 +184,13 @@
   --preview-selected: #26382c;
 }
 .preview-iris-light {
-  --preview-ground: #f5f3f9;
-  --preview-sidebar: #ebe7f2;
-  --preview-surface: #ffffff;
+  --preview-ground: #e9e4f2;
+  --preview-sidebar: #ddd5ec;
+  --preview-surface: #f6f4fa;
   --preview-text: #282334;
-  --preview-muted: #696176;
-  --preview-border: #ddd6e6;
-  --preview-selected: #e3dcf0;
+  --preview-muted: #5f5670;
+  --preview-border: #c3b8d8;
+  --preview-selected: #d1c7e4;
 }
 .preview-iris-dark {
   --preview-ground: #15121d;
@@ -197,13 +202,13 @@
   --preview-selected: #30283f;
 }
 .preview-midnight-light {
-  --preview-ground: #f4f5f7;
-  --preview-sidebar: #e9ebef;
-  --preview-surface: #ffffff;
+  --preview-ground: #f0f2f5;
+  --preview-sidebar: #e7eaee;
+  --preview-surface: #fbfcfd;
   --preview-text: #181b20;
-  --preview-muted: #5e6570;
-  --preview-border: #d8dce2;
-  --preview-selected: #e0e3e8;
+  --preview-muted: #565f6b;
+  --preview-border: #ccd2da;
+  --preview-selected: #dde1e7;
 }
 .preview-midnight-dark {
   --preview-ground: #050607;
@@ -285,13 +290,13 @@
 
 /* — OCEAN · cool blue without neon chrome — */
 :root[data-theme="ocean-light"] {
-  --ground: #f2f6f9;
-  --surface: #ffffff;
-  --surface-2: #e8f0f5;
-  --tint: #dceaf2;
+  --ground: #dfebf3;
+  --surface: #f3f8fb;
+  --surface-2: #d3e3ee;
+  --tint: #c4d9e7;
   --text: #18272f;
-  --text-muted: #526873;
-  --border: #d1dfe6;
+  --text-muted: #4c6470;
+  --border: #b4cbd9;
   --accent: #2e6e91;
   --theme-accent-swatch: #2e6e91;
   --theme-on-accent: #ffffff;
@@ -327,13 +332,13 @@
 
 /* — GROVE · quiet botanical neutrals — */
 :root[data-theme="grove-light"] {
-  --ground: #f2f6f2;
-  --surface: #fcfefc;
-  --surface-2: #e9f0ea;
-  --tint: #dce8de;
+  --ground: #e3eee4;
+  --surface: #f3f9f4;
+  --surface-2: #d5e5d8;
+  --tint: #c6dbca;
   --text: #1d2c23;
-  --text-muted: #5d6f64;
-  --border: #d3dfd5;
+  --text-muted: #54685b;
+  --border: #b7cfbc;
   --accent: #427a55;
   --theme-accent-swatch: #427a55;
   --theme-on-accent: #ffffff;
@@ -369,20 +374,20 @@
 
 /* — IRIS · restrained violet, never neon — */
 :root[data-theme="iris-light"] {
-  --ground: #f5f3f9;
-  --surface: #ffffff;
-  --surface-2: #ece8f3;
-  --tint: #e3dcf0;
+  --ground: #e9e4f2;
+  --surface: #f6f4fa;
+  --surface-2: #ddd5ec;
+  --tint: #d1c7e4;
   --text: #282334;
-  --text-muted: #696176;
-  --border: #ddd6e6;
+  --text-muted: #5f5670;
+  --border: #c3b8d8;
   --accent: #6b58a5;
   --theme-accent-swatch: #6b58a5;
   --theme-on-accent: #ffffff;
   --accent-text: #5e4c96;
   --on-accent: #ffffff;
   --success: #557966;
-  --syntax-blue: #456b91;
+  --syntax-blue: #3f628a;
   --syntax-accent: var(--accent-text);
   --hov: rgba(40, 35, 52, 0.07);
   --act: rgba(40, 35, 52, 0.11);
@@ -411,13 +416,13 @@
 
 /* — MIDNIGHT · cool neutral by day, deliberately deeper than Charcoal at night — */
 :root[data-theme="midnight-light"] {
-  --ground: #f4f5f7;
-  --surface: #ffffff;
-  --surface-2: #eceef1;
-  --tint: #e0e3e8;
+  --ground: #f0f2f5;
+  --surface: #fbfcfd;
+  --surface-2: #e7eaee;
+  --tint: #dde1e7;
   --text: #181b20;
-  --text-muted: #5e6570;
-  --border: #d8dce2;
+  --text-muted: #565f6b;
+  --border: #ccd2da;
   --accent: #364152;
   --theme-accent-swatch: #364152;
   --theme-on-accent: #ffffff;

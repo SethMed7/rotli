@@ -16,7 +16,8 @@
       "web_search.rs": "provider-dispatched search to literal DuckDuckGo lite/html or api.search.brave.com; query is secret/private-prose scanned and capped, redirects/body size/time are bounded, Brave auth comes from Keychain",
       "web.rs": "web_fetch (arbitrary public web via the vetted_resolve SSRF-blocked agent, same-host redirects, byte+URL caps)",
       "chat.rs": "the on-device / Gemini model bridge — endpoint_permitted clamps the destination to registered loopback model servers or the pinned Gemini base; egress_allowed refuses secret-shaped transcripts to non-local endpoints",
-      "breve.rs": "breve_test_email — Resend send to the literal https://api.resend.com/emails host, Keychain Bearer, configured recipients only"
+      "breve.rs": "breve_test_email — Resend send to the literal https://api.resend.com/emails host, Keychain Bearer, configured recipients only",
+      "remote_agent.rs": "explicit session connector to the user-entered HTTPS relay (loopback HTTP allowed in development); independent Keychain device/client credentials; redirects refused; request/response frames bounded; MCP responses come only from workspace.rs remote-policy handlers; vault switches fail closed unless disconnect succeeds; no frame logging"
     },
     "gatedEgressSites": {
       "_comment": "Every Rust function that puts CALLER-SUPPLIED text on a network — a model transport, a CLI provider, or a web lane — must ask crate::secret::blocked_for_remote (the marker scan + the secure-prose ledger). Adding an outbound lane without the gate is the class the 2026-08-01 audit found three times: open_url had no content gate at all, the organizer's remote lane had none, and web_search had no size bound. check-security.mjs asserts each function below still calls the gate.",
@@ -70,7 +71,8 @@
     "accounts": [
       "gemini-api-key",
       "brave-search-api-key",
-      "breve-resend-api-key"
+      "breve-resend-api-key",
+      "remote-agent-token"
     ],
     "constantSites": [
       "src-tauri/src/keychain.rs",
@@ -98,6 +100,16 @@
     "defaultWebviews": ["main", "capture", "quick"],
     "defaultWindows": []
   },
+  "remoteRelay": {
+    "source": "services/rotli-mcp-relay/server.ts",
+    "dockerfile": "services/rotli-mcp-relay/Dockerfile",
+    "image": "oven/bun:1.4.0-alpine",
+    "maxCloudFrameBytes": 256000,
+    "maxMcpResponseBytes": 512000,
+    "maxDeviceFrameBytes": 512256,
+    "maxDeviceWaiters": 256,
+    "maxCloudRequests": 256
+  },
   "sensitiveLogging": {
     "_comment": "Heuristic (documented limits in docs/development/security.md): flags a println!/eprintln!/console.log in an egress-adjacent file whose argument names a body/secret/prompt/transcript variable. It catches the obvious regression (logging a note body next to a network call); it CANNOT prove the absence of a leak — a renamed variable or an interpolated helper slips it. It is a tripwire, not a proof.",
     "egressAdjacentFiles": [
@@ -107,6 +119,8 @@
       "src-tauri/src/provider.rs",
       "src-tauri/src/breve.rs",
       "src-tauri/src/private_browser.rs",
+      "src-tauri/src/remote_agent.rs",
+      "services/rotli-mcp-relay/server.ts",
       "src/ai/host.ts",
       "src/ai/loop.ts",
       "breve-runtime/scripts/llm.ts",

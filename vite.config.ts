@@ -22,10 +22,10 @@ import { defineConfig } from "vite";
 
 import {
   bundleBudgetViolations,
+  buildWarningViolation,
   LAZY_LOCALE_STUB_ID,
   LAZY_LOCALE_STUB_SOURCE,
   MAX_LAZY_CHUNK_KIB,
-  shouldIgnoreBuildWarning,
   shouldStubLazyLocale,
 } from "./scripts/build-policy.ts";
 
@@ -80,9 +80,10 @@ export default defineConfig(() => ({
     // lazy and much larger than the startup graph. Replace Vite's one-size-fits-
     // all warning with hard, tested startup/lazy budgets.
     chunkSizeWarningLimit: MAX_LAZY_CHUNK_KIB,
-    rollupOptions: {
-      onwarn(warning, warn) {
-        if (!shouldIgnoreBuildWarning(warning)) warn(warning);
+    rolldownOptions: {
+      onwarn(warning) {
+        const violation = buildWarningViolation(warning);
+        if (violation) throw new Error(`bundle warning regression: ${violation}`);
       },
       plugins: [
         {

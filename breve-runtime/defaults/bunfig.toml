@@ -1,3 +1,7 @@
 [install]
 # Breve installs this production graph independently inside each vault.
+frozenLockfile = true
 minimumReleaseAge = 259200
+ignoreScripts = true
+linker = "isolated"
+globalStore = false

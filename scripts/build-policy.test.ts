@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
-import { bundleBudgetViolations, shouldIgnoreBuildWarning, shouldStubLazyLocale } from "./build-policy";
+import {
+  bundleBudgetViolations,
+  buildWarningViolation,
+  shouldIgnoreBuildWarning,
+  shouldStubLazyLocale,
+} from "./build-policy";
 
 function chunk(fileName: string, sizeKib: number, options: { entry?: boolean; imports?: string[] } = {}) {
   return {
@@ -27,6 +32,22 @@ describe("production build policy", () => {
         id: "/repo/node_modules/jsxgraph/src/parser/jessiecode.js",
       }),
     ).toBe(false);
+  });
+
+  test("turns every unexpected Rolldown/Oxc warning into a build violation", () => {
+    expect(
+      buildWarningViolation({
+        code: "INEFFECTIVE_DYNAMIC_IMPORT",
+        id: "/repo/src/feature.ts",
+        message: "module is also statically imported",
+      }),
+    ).toBe("INEFFECTIVE_DYNAMIC_IMPORT (/repo/src/feature.ts): module is also statically imported");
+    expect(
+      buildWarningViolation({
+        code: "EVAL",
+        id: "/repo/node_modules/jsxgraph/src/parser/jessiecode.js",
+      }),
+    ).toBeNull();
   });
 
   test("counts static entry dependencies against the startup budget", () => {

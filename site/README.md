@@ -3,13 +3,15 @@
 A product-led landing page for Rotli, the local-first Mac workspace where one
 ordinary folder remains the durable source of truth. The page explains the
 workspace, editable file surfaces, privacy boundaries, theme families,
-optional quokka companion, Breve routines, and local CLI/MCP integration.
+optional quokka companion, Breve routines, and local plus opt-in remote MCP integration.
 Built with [Astro](https://astro.build).
 
 ## This is a separate sub-project
 
 It has **its own dependencies** and does **not** touch the app's root
-`bun.lock` or `package.json`. Install and build from inside `site/` only.
+`bun.lock` or `package.json`. Its Bun 1.4 lockfile uses script-free isolated
+resolution under the same three-day release-age gate as the app and Breve.
+Install and build from inside `site/` only.
 
 ## Develop
 
@@ -44,6 +46,9 @@ bun run preview  # serve the built dist/ locally
   the repository root so the site does not create a second character system.
 - The product illustration is privacy-safe HTML/CSS rather than a screenshot
   of a live vault. Keep it synchronized with the current workspace grammar.
+- `/mcp/` is the public connection guide for stdio clients, Grok Bot, the
+  remote safety boundary, disposable verification, and relay self-hosting. Do
+  not publish a hosted relay URL there until that deployment has been verified.
 - `public/social-card.svg` is the editable source for the rendered Open Graph
   image at `public/social-card.png`.
 
@@ -58,16 +63,16 @@ owns cache and browser-security headers and is copied into `dist/` by Astro.
 Workers Builds settings are dashboard configuration, not Wrangler runtime
 variables. Connect `SethMed7/rotli` to a Worker with these exact settings:
 
-| Setting | Value |
-|---|---|
-| Worker name | `rotli-site` |
-| Production branch | `main` |
-| Root directory | `site` |
-| Build command | `bun run build` |
-| Deploy command | `bun run deploy` |
+| Setting                       | Value                    |
+| ----------------------------- | ------------------------ |
+| Worker name                   | `rotli-site`             |
+| Production branch             | `main`                   |
+| Root directory                | `site`                   |
+| Build command                 | `bun run build`          |
+| Deploy command                | `bun run deploy`         |
 | Non-production deploy command | `bun run deploy:preview` |
-| Non-production branch builds | Enabled |
-| Build variable | `BUN_VERSION=1.3.14` |
+| Non-production branch builds  | Enabled                  |
+| Build variable                | `BUN_VERSION=1.4.0`      |
 
 The Worker name must match `wrangler.jsonc`. Production uploads go to the
 `rotli.app` Custom Domain; other branches upload versions with public preview

@@ -8,6 +8,8 @@
  */
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
+import { renderPdf } from "./chrome-pdf";
+import { errText } from "./err-text";
 import { inlineHtml as inline } from "./markdown-text";
 import { BRIEFS, PDFS } from "./paths";
 import { pdfThemeVariables, readPdfTheme } from "./pdf-theme";
@@ -124,12 +126,10 @@ const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 await Bun.write(join(BRIEFS, `${stem}.html`), html);
 
 // ── Render to PDF via headless Chrome ────────────────────────────────────────
-const chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const pdfPath = join(PDFS, `${stem}.pdf`);
-const p = Bun.spawn([chrome, "--headless", "--disable-gpu", "--no-sandbox", "--no-pdf-header-footer",
-  `--print-to-pdf=${pdfPath}`, `file://${join(BRIEFS, `${stem}.html`)}`], { stdout: "ignore", stderr: "pipe" });
-const err = await new Response(p.stderr).text();
-if ((await p.exited) !== 0 || !(await Bun.file(pdfPath).exists())) {
-  console.error(`ERR Chrome PDF render failed: ${err.slice(0, 300)}`); process.exit(1);
+try {
+  await renderPdf(join(BRIEFS, `${stem}.html`), pdfPath);
+} catch (error) {
+  console.error(`ERR ${errText(error)}`); process.exit(1);
 }
 console.log(`OK ${pdfPath} (${(Bun.file(pdfPath).size / 1024).toFixed(0)} KB) + briefs/${stem}.html`);

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { missingScriptSteps, missingTokens } from "./documentation-contract.mjs";
+import { missingScriptSteps, missingTokens, unreferencedNames } from "./documentation-contract.mjs";
 
 const root = process.cwd();
 const required = [
@@ -181,10 +181,17 @@ if (existsSync(join(root, "package.json"))) {
     : "";
   const orphanExemptions = {
     "bump-version.sh": "manual release helper — run by hand per its usage header; release.sh reads the result",
+    "eval-local-chat.ts": "LIVE eval — needs a real on-device model, so it is run by hand, never from a gate",
+    "eval-vault-sweep.ts": "LIVE eval — whole-vault sweep against a real local model; run by hand, never from a gate",
   };
-  const executables = readdirSync(join(root, "scripts")).filter((name) => /\.(mjs|sh)$/.test(name));
+  // `.ts` counts too: an executable that never runs is an orphan whatever its
+  // extension. Test files are excluded from the scan but kept in the haystack,
+  // so a library like build-policy.ts is held up by its own .test.ts sibling.
+  const scriptDir = readdirSync(join(root, "scripts"));
+  const executables = scriptDir.filter((name) => /\.(mjs|sh)$/.test(name) || /(?<!\.test)\.ts$/.test(name));
+  const referenceable = scriptDir.filter((name) => /\.(mjs|sh|ts)$/.test(name));
   const siblingText = (self) =>
-    executables
+    referenceable
       .filter((name) => name !== self)
       .map((name) => readFileSync(join(root, "scripts", name), "utf8"))
       .join("\n");
@@ -192,6 +199,17 @@ if (existsSync(join(root, "package.json"))) {
     if (name in orphanExemptions) continue;
     if (!packageScriptText.includes(name) && !workflowText.includes(name) && !siblingText(name).includes(name)) {
       failures.push(`scripts/${name} is an orphan — wire it into package.json/a workflow, or exempt it with a reason`);
+    }
+  }
+  // (1b) test:breve names its files by hand — the only suite that does.
+  // `bun test src`, `bun test scripts/*.test.ts`, and Playwright's testDir all
+  // glob, so they cannot orphan a file; a new breve-runtime test silently
+  // never runs unless someone remembers to extend the script.
+  const breveTestDir = join(root, "breve-runtime/tests");
+  if (existsSync(breveTestDir)) {
+    const breveTests = readdirSync(breveTestDir).filter((name) => /\.ts$/.test(name));
+    for (const name of unreferencedNames(breveTests, packageJson.scripts?.["test:breve"] ?? "")) {
+      failures.push(`breve-runtime/tests/${name} is never run — add it to the test:breve script`);
     }
   }
   // (2) Every check:* script key must actually run somewhere — referenced by

@@ -497,7 +497,7 @@ interface PanesState {
   openNewItemTab: () => void;
   /** Open a fresh session-only private browser tab. The URL never joins the
    * durable pane tree or viewstate snapshot. */
-  openBrowser: (url?: string) => void;
+  openBrowser: (url?: string, paneId?: string) => void;
   /** Open a note/board/file by its summary — the ONE place open-by-kind lives.
    * Dispatches on `kind` and forwards `opts` so ⌘-click / newTab works uniformly
    * for every row type (the maintainer, 2026-06-30 — was hand-written in 5 places, files
@@ -807,14 +807,14 @@ export const usePanesStore = create<PanesState>((set, get) => {
       });
     },
 
-    openBrowser: (url) => {
+    openBrowser: (url, paneId) => {
       const ui = useUiStore.getState();
       ui.setSidebarMode("notes");
       // Breve may refuse the mode change while a draft is dirty. Do not create
       // a hidden browser tab behind that confirmation boundary.
       if (useUiStore.getState().sidebarMode !== "notes") return;
       ui.setContentView("panes");
-      const leaf = focusedLeaf();
+      const leaf = (paneId ? findLeaf(get().root, paneId) : null) ?? focusedLeaf();
       const tab = makeBrowserTab(url);
       set({
         root: updateLeaf(get().root, leaf.id, (current) => ({
@@ -822,6 +822,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
           tabs: [...current.tabs, tab],
           activeTabId: tab.id,
         })),
+        focusedPaneId: leaf.id,
       });
     },
 

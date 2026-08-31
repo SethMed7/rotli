@@ -238,6 +238,8 @@ interface PersistedSettings {
   tabLayout: TabLayout;
   /** Installation-wide provider used for private-browser searches. */
   privateBrowserSearchEngine: PrivateBrowserSearchEngine;
+  /** Installation-wide remote MCP relay endpoint. Credentials remain in Keychain. */
+  remoteAgentRelayUrl: string;
   /** Whether linked-vault content may share the pane workspace. */
   paneVaultMode: PaneVaultMode;
   /** Editor spell-check (red squiggles); on by default. */
@@ -403,6 +405,7 @@ const APP_SETTINGS_KEYS = new Set([
   "showInDock",
   "tabLayout",
   "privateBrowserSearchEngine",
+  "remoteAgentRelayUrl",
   "paneVaultMode",
   "userName",
   "timeFormat",
@@ -525,7 +528,13 @@ export function parseSettings(raw: string): PersistedSettings {
       data.quokkaCustomHue === undefined
         ? quokkaHueFromLegacyColor(data.quokkaCustomColor)
         : normalizeQuokkaCustomHue(data.quokkaCustomHue),
-    quokkaLineColor: asEnum(data.quokkaLineColor, QUOKKA_LINE_COLORS, "black"),
+    // "black" was only ever the implementation default (no UI offered the
+    // choice) and it vanishes on dark themes — migrate it to theme-aware auto.
+    quokkaLineColor: asEnum(
+      data.quokkaLineColor === "black" ? "auto" : data.quokkaLineColor,
+      QUOKKA_LINE_COLORS,
+      "auto",
+    ),
     quokkaAccessory: asEnum(data.quokkaAccessory, QUOKKA_ACCESSORIES, "none"),
     quokkaAccessoryHue: normalizeQuokkaAccessoryHue(data.quokkaAccessoryHue),
     quokkaIdlePose: asEnum(data.quokkaIdlePose, QUOKKA_IDLE_POSES, "rest"),
@@ -539,6 +548,10 @@ export function parseSettings(raw: string): PersistedSettings {
       PRIVATE_BROWSER_SEARCH_ENGINES,
       DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE,
     ),
+    remoteAgentRelayUrl:
+      typeof data.remoteAgentRelayUrl === "string" && data.remoteAgentRelayUrl.length <= 2048
+        ? data.remoteAgentRelayUrl.trim()
+        : "",
     paneVaultMode: asEnum(data.paneVaultMode, PANE_VAULT_MODES, "single"),
     spellcheck: asBool(data.spellcheck, true),
     tidyImagesWithNote: asBool(data.tidyImagesWithNote, true),
@@ -561,7 +574,7 @@ export function parseSettings(raw: string): PersistedSettings {
     chatReasoning: (() => {
       const out: Record<string, ChatReasoningEffort> = {};
       for (const [k, v] of Object.entries(record(data.chatReasoning))) {
-        if (["minimal", "low", "medium", "high", "xhigh", "max"].includes(String(v))) {
+        if (["minimal", "low", "medium", "high", "xhigh", "max", "ultra"].includes(String(v))) {
           out[k] = v as ChatReasoningEffort;
         }
       }
@@ -744,6 +757,7 @@ function applySettings(s: PersistedSettings): void {
     newTabDefault: s.newTabDefault,
     tabLayout: s.tabLayout,
     privateBrowserSearchEngine: s.privateBrowserSearchEngine,
+    remoteAgentRelayUrl: s.remoteAgentRelayUrl,
     paneVaultMode: s.paneVaultMode,
     spellcheck: s.spellcheck,
     tidyImagesWithNote: s.tidyImagesWithNote,
@@ -827,6 +841,7 @@ function applyAppSettings(s: PersistedSettings): void {
     showInDock: s.showInDock,
     tabLayout: s.tabLayout,
     privateBrowserSearchEngine: s.privateBrowserSearchEngine,
+    remoteAgentRelayUrl: s.remoteAgentRelayUrl,
     paneVaultMode: s.paneVaultMode,
     userName: s.userName,
     timeFormat: s.timeFormat,
@@ -861,6 +876,7 @@ function withAppSettings(vault: PersistedSettings, app: PersistedSettings): Pers
     showInDock: app.showInDock,
     tabLayout: app.tabLayout,
     privateBrowserSearchEngine: app.privateBrowserSearchEngine,
+    remoteAgentRelayUrl: app.remoteAgentRelayUrl,
     paneVaultMode: app.paneVaultMode,
     userName: app.userName,
     timeFormat: app.timeFormat,
@@ -1405,6 +1421,7 @@ function appSettingsSnapshot(): string {
     showInDock: ui.showInDock,
     tabLayout: ui.tabLayout,
     privateBrowserSearchEngine: ui.privateBrowserSearchEngine,
+    remoteAgentRelayUrl: ui.remoteAgentRelayUrl,
     paneVaultMode: ui.paneVaultMode,
     userName: ui.userName,
     timeFormat: ui.timeFormat,
@@ -1441,6 +1458,7 @@ function settingsSnapshot(): string {
     newTabDefault: ui.newTabDefault,
     tabLayout: ui.tabLayout,
     privateBrowserSearchEngine: ui.privateBrowserSearchEngine,
+    remoteAgentRelayUrl: ui.remoteAgentRelayUrl,
     paneVaultMode: ui.paneVaultMode,
     spellcheck: ui.spellcheck,
     tidyImagesWithNote: ui.tidyImagesWithNote,

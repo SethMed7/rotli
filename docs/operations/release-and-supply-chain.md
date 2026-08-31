@@ -113,9 +113,18 @@ rather than fields that imply evidence the current script does not yet collect.
 - Lockfiles are frozen in CI and changed only in reviewed commits.
 - The app, marketing site, and Breve runtime are independent Bun install roots.
   Each manifest names the repository's exact `.bun-version`, each root holds the
-  same three-day `install.minimumReleaseAge`, and `bun run deps audit` scans all
-  three lockfiles. The age gate affects new resolution only; frozen installs do
-  not reinterpret an existing lockfile.
+  same three-day `install.minimumReleaseAge`, uses lockfile v2, defaults even a
+  plain install to `install.frozenLockfile`, and installs without package
+  lifecycle scripts through the isolated linker and a project-local store. An
+  older Bun that cannot read v2 therefore fails without replacing the reviewed
+  graph. `bun run deps audit` scans all three lockfiles. The age gate affects
+  new resolution only; frozen installs do not reinterpret an existing lockfile.
+- Protected CI blocks on cross-lockfile convergence and exact drift from
+  `scripts/dependency-license-baseline.json`, then retains the combined
+  production dependency-license inventory for 30 days. A newly Unknown package
+  requires review, while an entry that gains recognized metadata makes the
+  stale baseline fail until it is removed. The inventory does not claim to be
+  the complete Rust/assets/package SBOM.
 - New dependencies justify the capability, license, maintenance health,
   transitive cost, parser/network risk, and adapter boundary.
 - Runtime dependencies that parse untrusted content receive focused malformed,
@@ -139,6 +148,7 @@ mutation:
 | `dedupe-check` | Bun 1.4+ read-only lockfile convergence check. Candidates fail the command so they cannot be mistaken for a clean graph; applying `bun dedupe` is a separate reviewed change because a compatible older locked version may win |
 | `prune-plan` | Bun 1.4+ local stale-install preview. It never replaces the pre-DMG removal of Breve's whole generated `node_modules` resource tree |
 | `licenses` | Bun 1.4+ production-dependency license inventory for every install root. It supplements rather than claims to be the Rust/assets/package SBOM |
+| `licenses-check` | Bun 1.4+ exact ratchet over the production inventory's Unknown group. It rejects unreviewed additions and stale reviewed entries across all three roots |
 | `diff` | Bun 1.4+ root-explicit package-source comparison. Review high-risk runtime, parser, native, network, lifecycle-script, binary, and entry-point changes before accepting a lockfile update |
 
 Mutating maintenance is maintainer-operated only and requires exactly one root
@@ -151,11 +161,11 @@ manifest and lockfile, use `diff` for affected high-risk packages, then run the
 complete Rotli proof chain. Security fixes may intentionally bypass the
 release-age window; the plan must call that out for review.
 
-Bun 1.4 preview binaries may be evaluated by setting
-`ROTLI_BUN_DEPENDENCY_BIN` for `bun run deps`, but a moving canary is never the
-release runtime. `.bun-version`, all three `packageManager` fields, CI, release
-evidence, and the local release check move together only after Bun publishes an
-immutable stable release and the frozen installs plus full proof chain pass.
+Bun 1.4.0 is the release runtime. `.bun-version`, all three `packageManager`
+fields, CI, release evidence, and the local release check move together on that
+exact stable pin. `ROTLI_BUN_DEPENDENCY_BIN` remains available for isolated
+evaluation of a compatible alternate binary, but a moving canary never becomes
+release evidence.
 
 The current advisory inventory and Rust target-graph exception live in
 [`../development/security.md`](../development/security.md). Do not duplicate
@@ -169,8 +179,9 @@ version-specific findings here.
 - Minimize workflow token permissions per job.
 - Do not run untrusted pull-request code with release secrets.
 - Separate regression credentials from signing/publishing credentials.
-- Treat dependency install scripts and trusted native packages as executable
-  supply-chain inputs.
+- Keep dependency lifecycle scripts disabled. Native or generated packages
+  must pass the repository smoke without a trusted-script exception; any future
+  exception is an executable supply-chain change and requires explicit review.
 - Review changes to lockfiles, workflows, release scripts, entitlements, CSP,
   Tauri capabilities, and updater endpoints as security-sensitive.
 

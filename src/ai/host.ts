@@ -133,7 +133,7 @@ export function makeTauriHost(
   model: ChatModelInfo,
   opts?: {
     requestId?: string;
-    reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+    reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
     serviceTier?: "standard" | "fast";
     image?: HostImageCtx;
     /** Registered root that owns conventional files created by this chat. */

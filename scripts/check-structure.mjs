@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 import { DEPENDENCY_PROJECTS, dependencyPolicyViolations } from "./dependency-policy.mjs";
 import { SYNTAX_PATTERNS } from "./syntax-contract.mjs";
+import { toolchainPolicyViolations } from "./toolchain-policy.mjs";
 
 const root = process.cwd();
 const violations = [];
@@ -137,7 +138,25 @@ violations.push(
     bunfigs: Object.fromEntries(
       DEPENDENCY_PROJECTS.map((project) => [project.bunfigPath, readFileSync(join(root, project.bunfigPath), "utf8")]),
     ),
+    lockfiles: Object.fromEntries(
+      DEPENDENCY_PROJECTS.map((project) => [
+        project.lockfilePath,
+        readFileSync(join(root, project.lockfilePath), "utf8"),
+      ]),
+    ),
     regressionWorkflow,
+  }),
+);
+const viteConfig = readFileSync(join(root, "vite.config.ts"), "utf8");
+violations.push(
+  ...toolchainPolicyViolations({
+    manifest: packageJson,
+    oxlintConfig: JSON.parse(stripJsonComments(readFileSync(join(root, ".oxlintrc.json"), "utf8"))),
+    reactCompilerConfig: JSON.parse(
+      stripJsonComments(readFileSync(join(root, "scripts/react-compiler-oxlint.json"), "utf8")),
+    ),
+    oxfmtConfig: JSON.parse(stripJsonComments(readFileSync(join(root, ".oxfmtrc.json"), "utf8"))),
+    viteConfig,
   }),
 );
 if (!rustVersion || !/^\d+\.\d+\.\d+$/.test(rustVersion)) {
@@ -184,10 +203,9 @@ const blockRender = readFileSync(join(root, "src/editor/blockRender.ts"), "utf8"
 if (!/jc:\s*\{\s*compile:\s*false\s*\}/.test(blockRender)) {
   violations.push("JSXGraph JessieCode must stay in interpreter mode; production CSP forbids unsafe-eval");
 }
-const viteConfig = readFileSync(join(root, "vite.config.ts"), "utf8");
 for (const token of [
   "./scripts/build-policy",
-  "shouldIgnoreBuildWarning",
+  "buildWarningViolation",
   "bundleBudgetViolations",
   "chunkSizeWarningLimit",
 ]) {
@@ -208,5 +226,5 @@ if (violations.length) {
 }
 
 console.log(
-  "check:structure ok — naming, strictness, pinned toolchains, no database, and Breve dependency ranges aligned",
+  "check:structure ok — naming, strictness, hardened Bun installs, native Oxc/Rolldown policy, no database, and Breve dependency ranges aligned",
 );

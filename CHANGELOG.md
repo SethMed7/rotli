@@ -10,8 +10,143 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.82.0] - 2026-08-19
+### Added
 
+- **Remote agents can opt in to the local workspace without uploading the vault.** Rotli can connect
+  the running Mac app to a stateless HTTPS MCP relay for Grok Bot and other cloud clients. Pairing
+  uses independent Keychain client/device credentials, every launch starts disconnected, vault
+  switches disconnect, and an explicit Remove pairing action disconnects and deletes both credentials.
+  The existing secure-note, locked-note, and optimistic-revision gates remain the only workspace policy
+  engine. The single-replica relay has bounded in-memory sessions, no database or volume, and a pinned
+  Bun container. The public site now includes an MCP setup, safety, verification, and self-hosting guide
+  without advertising an undeployed relay domain.
+
+- **The private browser now supports real multi-tab research.** While browsing,
+  ⌘T or the pane-strip plus opens another isolated private page, popup links
+  open as sibling tabs, and switching among any number of browser tabs keeps
+  each native session alive until that tab closes. Page titles stay in memory
+  only; URLs, history, cookies, and site data still never enter viewstate.
+
+### Changed
+
+- **Reasoning controls now follow the selected model, not only its provider.**
+  Claude Haiku no longer offers unsupported effort controls; each Codex model
+  exposes only its own effort ceiling, GPT-5.6 Sol/Terra gain Ultra, and Fast
+  appears only for the GPT-5.6 family. Rust validates the same combinations
+  before launching a provider CLI.
+- **Saved-chat rows have a calmer, keyboard-safe hover action.** Recency yields
+  to one overflow button in the same trailing slot, with the existing row menu
+  behind both overflow and right-click. Active rows keep provider artwork at
+  its normal color instead of tinting the OpenAI mark.
+- **The repository toolchain now runs on Bun 1.4.0.** App, site, Breve, CI,
+  release evidence, dependency maintenance, and frozen lockfile checks share
+  the exact stable runtime pin, with matching Bun 1.4 type definitions.
+- **Bun installs now fail safer and validate faster.** Every install root uses
+  lockfile v2 and script-free isolated resolution with a project-local store;
+  lint fans independent checks out in parallel with an equivalent serial
+  fallback, while CI blocks on lockfile convergence and exact Unknown-license
+  drift and retains a combined production-license inventory.
+- **The Vite 8 build and Oxc gates now fail closed on toolchain drift.** Vite
+  uses native Rolldown options, new Rolldown/Oxc warnings fail the production
+  build, Oxlint's type-aware sidecar and warning ceiling are config-owned, and
+  executable tests prove both Oxlint and Oxfmt behavior rather than only their
+  command strings.
+
+### Fixed
+
+- **Connected models no longer mistake Rotli's own tool scaffold for prompt
+  injection.** The frontier prompt is framed as an application request instead
+  of an identity override with a competing “JSON-only system” persona. Real
+  commands inside note or web results remain ignored, while the model is told
+  to continue the requested research from trustworthy evidence rather than
+  making the ignored injection its answer.
+- **Finder image drops no longer race their native file authorization.** Rust
+  now grants each exact dropped file before notifying the webview, so a valid
+  drop into Chat or Markdown cannot intermittently fail as unauthorized; the
+  same grants remain short-lived and single-use.
+- **Antigravity chat uses the CLI's real model IDs again.** Rotli now passes the
+  current `agy models` identifiers instead of human display labels, removes the
+  retired Gemini 3.5 choices, and no longer repeats the same stderr tail twice
+  when an empty CLI response fails.
+- **Long chats no longer mount an unbounded React transcript.** The Markdown
+  file still keeps every message, while the active surface mounts the newest
+  500 and states how many earlier messages remain on disk. Model history and
+  tool scratchpads retain their smaller per-model budgets.
+- **Remote-agent transport fails closed at every hop.** The Mac connector no
+  longer follows relay redirects, bounds relay responses before JSON parsing,
+  binds credentials to their minted relay URL, bounds the complete 512 KB MCP
+  response plus relay envelope, and makes disconnect/vault switching wait for
+  any in-flight dispatch and delivery. Loopback HTTP uses a timing-stable bearer
+  comparison, and regression tests cover non-loopback binds, stale connector
+  generations, conflicting device tokens, relay capacity, and both route-level
+  and pre-handler Bun body caps.
+- **The production quality gate accepts only rules supported by the pinned
+  Oxlint.** React Compiler diagnostics remain in their dedicated ratcheted
+  check; the ordinary lint config no longer names rules absent from Oxlint
+  1.78.0, which caused the Linux production job to stop before the build.
+- **An outdated Bun can no longer rewrite Rotli's dependency graph after
+  rejecting lockfile v2.** Plain installs are frozen in the app, site, and
+  Breve roots; contributor guidance now identifies the exact Bun pin and the
+  recovery command before another resolver can downgrade the lockfile.
+
+- **Small decorative Rotlis are crisp again.** Settings section accents and
+  onboarding's quiet edge characters now use one semantic line-art treatment
+  instead of shrinking and fading personalized fill/accessory composites.
+- **The side-view walking quokka wears its accessories credibly.** The
+  bucket hat's side art seats on the profile crown with the ear tucked and
+  the back of the head keeping its full fluff, and face-on eyewear clips to
+  a true profile: glasses show a single lens over the visible eye and
+  goggles a single lens perched on the brow — never the splayed pair.
+- **Accessory color no longer halos around the glasses.** The glasses' hue
+  layer is painted over the ink frames as deliberate colored frames (the
+  same colored-fill-plus-outline language as the hat) instead of peeking
+  out from beneath them as ragged slivers — the artifact on the model-setup
+  companion.
+- **Ocean, Grove, Iris, and Midnight now feel like themselves in light
+  mode.** Their light environments were near-white with a whisper of tint —
+  effectively "white with a colored accent." Grounds, surfaces, chips,
+  borders, and the theme-card previews (and the marketing site's swatches)
+  now carry each family's hue in daylight: an airy blue room, a soft green
+  one, lavender, and a cool steel white — with every text pairing measured
+  at or above AA contrast.
+- **The prompt-trail paws track your prompts, not the responses.** The
+  tracker highlighted a single "nearest" prompt — at the bottom of a chat it
+  marked the reader one up, and answer text counted as "seeing" an exchange.
+  A paw now lights only while its prompt bubble is on screen: two bubbles
+  sharing the screen light two paws, and reading deep into a long answer
+  lights none.
+- **The accessory chooser is now three quokka icons with a color row.**
+  Onboarding's dropdown became icon buttons — the bare quokka, glasses, and
+  bucket hat, each a mini preview — with seven accessory-color dots inline
+  once an accessory is on (Settings keeps the full hue dial). Goggles are
+  parked for now: existing companions keep rendering them, but the pickers
+  no longer offer them. The side-view goggle lens also moved back onto the
+  crown where worn-up goggles sit.
+- **The Line quokka no longer disappears on dark themes.** The line
+  treatment's ink now follows the environment — near-black on light themes,
+  white on dark — while filled treatments keep their designed dark ink
+  everywhere. Existing profiles migrate automatically (black was only ever an
+  implementation default; no control offered a choice).
+- **Ocean, Grove, Iris, and Midnight now show their light/dark preview dots.**
+  The onboarding theme cards only had swatch styles for the first two
+  families; the other four rendered empty rings.
+- **Onboarding's Back now answers ⌘←.** A setup-scoped `setup.back` action
+  joins `setup.continue`; the footer badge advertises the arrow instead of
+  ⌘[, which stays the app-wide notes-navigation chord.
+- **The bucket hat now actually sits on the quokka's head in every pose.**
+  Front-facing poses no longer chop the ears into floating stubs (each pose's
+  brim widens to cover them, and the occlusion edges gained flared corners so
+  no clipped fragment survives beside the hat), the thoughtful companion's hat
+  seats on the crown instead of hovering beside it, and walking and board tuck
+  their side ears under a properly sized brim — which also fixes the
+  detached-hat look on onboarding's leaning edge companions. The clip beside
+  the brim keeps its safe depth so it can never slice visible cheek fur — the
+  three-quarter poses (thoughtful, listening) cover their large ears with the
+  brim itself plus a wider notch at brim height.
+  Verified visually across all fifteen poses, the onboarding companion and
+  preview sizes, and the 72° edge-lean context.
+
+## [0.82.0] - 2026-08-19
 
 ### Changed
 

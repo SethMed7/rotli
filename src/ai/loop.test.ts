@@ -376,6 +376,20 @@ describe("budget", () => {
     expect(trimHistory([], 1000)).toEqual([]);
   });
 
+  test("a very long durable thread still sends only a bounded recent history", () => {
+    const history: ChatTurn[] = Array.from({ length: 10_000 }, (_, index) => ({
+      role: index % 2 === 0 ? "user" : "assistant",
+      text: `${index}: ${"x".repeat(96)}`,
+    }));
+    const trimmed = trimHistory(history, budgetFor({ id: "gpt-5.6-sol", api: "cli" }).maxHistoryChars);
+    const textChars = trimmed.reduce((total, turn) => total + turn.text.length, 0);
+
+    expect(trimmed.length).toBeLessThan(250);
+    expect(textChars).toBeLessThan(24_200);
+    expect(trimmed[0]?.text).toContain("earlier conversation trimmed");
+    expect(trimmed.at(-1)?.text).toStartWith("9999:");
+  });
+
   test("pruneScratch keeps the scratchpad within budget", () => {
     const scratch = [
       { action: "a1", result: "X".repeat(2000) },

@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-08-22",
+  "unknownPackages": {
+    "app": [
+      "@univerjs-pro/collaboration@0.25.1",
+      "@univerjs-pro/collaboration-client@0.25.1",
+      "@univerjs-pro/collaboration-client-ui@0.25.1",
+      "@univerjs-pro/docs-exchange-client@0.25.1",
+      "@univerjs-pro/docs-print@0.25.1",
+      "@univerjs-pro/edit-history-loader@0.25.1",
+      "@univerjs-pro/edit-history-viewer@0.25.1",
+      "@univerjs-pro/engine-chart@0.25.1",
+      "@univerjs-pro/engine-formula@0.25.1",
+      "@univerjs-pro/engine-pivot@0.25.1",
+      "@univerjs-pro/engine-shape@0.25.1",
+      "@univerjs-pro/exchange-client@0.25.1",
+      "@univerjs-pro/license@0.25.1",
+      "@univerjs-pro/print@0.25.1",
+      "@univerjs-pro/sheets-chart@0.25.1",
+      "@univerjs-pro/sheets-chart-ui@0.25.1",
+      "@univerjs-pro/sheets-exchange-client@0.25.1",
+      "@univerjs-pro/sheets-outline@0.25.1",
+      "@univerjs-pro/sheets-outline-ui@0.25.1",
+      "@univerjs-pro/sheets-pivot@0.25.1",
+      "@univerjs-pro/sheets-pivot-ui@0.25.1",
+      "@univerjs-pro/sheets-print@0.25.1",
+      "@univerjs-pro/sheets-shape@0.25.1",
+      "@univerjs-pro/sheets-shape-ui@0.25.1",
+      "@univerjs-pro/sheets-sparkline@0.25.1",
+      "@univerjs-pro/sheets-sparkline-ui@0.25.1",
+      "@univerjs-pro/thread-comment-datasource@0.25.1",
+      "@univerjs/telemetry@0.25.1",
+      "buffers@0.1.1",
+      "khroma@2.1.0"
+    ],
+    "site": [],
+    "breve": []
+  }
+}

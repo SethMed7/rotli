@@ -1,5 +1,6 @@
 import { trackNewDocumentDraft } from "../documents/draftComposition";
 import type { DocumentImage } from "../documents/model";
+import { MERMAID_STARTER } from "../editor/slashActions";
 import { corpusCreateBoard, corpusCreateManagedFile } from "../lib/tauri";
 /** Composition root for item creation. Product rules stay in model/workflow. */
 import { invalidateMemex } from "../memex/useMemex";
@@ -64,12 +65,7 @@ const creator: NewItemCreator = {
       const routeFolder = selectedMain ? ALL_NOTES : selected;
       // a Mermaid diagram is a NOTE born with the starter flowchart fence —
       // the same body the slash command inserts (the maintainer, 2026-07-29)
-      const body =
-        kind === "mermaid"
-          ? await import("../editor/slashActions").then(
-              (m) => `# Diagram\n\n\`\`\`mermaid\n${m.MERMAID_STARTER}\n\`\`\`\n`,
-            )
-          : "";
+      const body = kind === "mermaid" ? `# Diagram\n\n\`\`\`mermaid\n${MERMAID_STARTER}\n\`\`\`\n` : "";
       const id = await createRoutedNote({
         selectedFolderId: routeFolder,
         isSmart: routeFolder === ALL_NOTES || routeFolder === RECENT,

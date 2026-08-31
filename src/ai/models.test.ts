@@ -67,15 +67,25 @@ describe("mergedModels", () => {
   test("Antigravity contributes every model exposed by the installed agy catalog", () => {
     const models = CLI_CATALOG.agy;
     expect(models.map((m) => m.id)).toEqual([
+      "gemini-3.7-flash-high",
+      "gemini-3.7-flash-medium",
+      "gemini-3.7-flash-low",
+      "gemini-3.6-flash-high",
+      "gemini-3.6-flash-medium",
+      "gemini-3.6-flash-low",
+      "gemini-3.1-pro-high",
+      "gemini-3.1-pro-low",
+      "claude-sonnet-4-6",
+      "claude-opus-4-6-thinking",
+      "gpt-oss-120b-medium",
+    ]);
+    expect(models.map((m) => m.label)).toEqual([
       "Gemini 3.7 Flash (High)",
       "Gemini 3.7 Flash (Medium)",
       "Gemini 3.7 Flash (Low)",
       "Gemini 3.6 Flash (High)",
       "Gemini 3.6 Flash (Medium)",
       "Gemini 3.6 Flash (Low)",
-      "Gemini 3.5 Flash (High)",
-      "Gemini 3.5 Flash (Medium)",
-      "Gemini 3.5 Flash (Low)",
       "Gemini 3.1 Pro (High)",
       "Gemini 3.1 Pro (Low)",
       "Claude Sonnet 4.6 (Thinking)",

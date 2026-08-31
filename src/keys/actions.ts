@@ -31,7 +31,7 @@ import { trashSystemSelection } from "../services/systemTrash";
 import { reconnectActiveVault } from "../state/activeVault";
 import { navigate } from "../state/navHistory";
 import { DEFAULT_NOTE_STYLE, useNoteStyleStore } from "../state/noteStyle";
-import { findLeaf, leaves, openNavTarget, usePanesStore } from "../state/panes";
+import { activeTabOf, findLeaf, leaves, openNavTarget, usePanesStore } from "../state/panes";
 import { cycleQuick, removeQuickNote } from "../state/quick";
 import { SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
 import { captureHandle, quickHandle, setupHandle } from "./handles";
@@ -51,6 +51,12 @@ function focusedNoteIdNow(): string | null {
   return tab && tab.surfaceKind === "note" ? tab.noteId : null;
 }
 
+function focusedTabNow() {
+  const { root, focusedPaneId } = usePanesStore.getState();
+  const leaf = findLeaf(root, focusedPaneId) ?? leaves(root)[0];
+  return leaf ? activeTabOf(leaf) : null;
+}
+
 function runCreate(kind: NewItemKind, newTab: boolean): void {
   if (kind === "board") {
     requestManagedBoardCreation({ newTab });
@@ -65,9 +71,14 @@ function runCreate(kind: NewItemKind, newTab: boolean): void {
   );
 }
 
-/** ⌘T / the tab-strip plus uses the persisted default; Markdown ships as the
- * default, while explicit New actions remain stable and independently bindable. */
+/** ⌘T / the tab-strip plus is contextual only for the private browser, where
+ * a sibling session is the familiar and privacy-preserving meaning of a new
+ * tab. Every other surface keeps the persisted new-item default. */
 export function newItemInTab(): void {
+  if (focusedTabNow()?.surfaceKind === "browser") {
+    usePanesStore.getState().openBrowser();
+    return;
+  }
   runCreate(useUiStore.getState().newTabDefault, true);
 }
 
@@ -124,6 +135,18 @@ export function registerDefaultActions(): void {
     enabled: () => setupHandle() !== null,
     transient: true,
     run: () => setupHandle()?.continue(),
+  });
+
+  registerAction({
+    id: "setup.back",
+    title: "Back a setup step",
+    // ⌘← during first-run: ⌘[ stays the app-wide nav.back, but the setup
+    // footer advertises the arrow — no editor exists during setup, so the
+    // caret's line-start chord cannot clash here.
+    defaultChord: "Meta+ArrowLeft",
+    enabled: () => setupHandle()?.back !== undefined,
+    transient: true,
+    run: () => setupHandle()?.back?.(),
   });
 
   registerAction({
@@ -406,9 +429,9 @@ export function registerDefaultActions(): void {
     },
   });
 
-  // — tabs (created only by explicit gestures; plain click replaces). ⌘T opens
-  //   a fresh blank note in a new tab (the maintainer #8: "new tab AND note, not a
-  //   duplicate of where you already are"), filed into the current Main folder. —
+  // — tabs (created only by explicit gestures; plain click replaces). ⌘T uses
+  //   the configured item default in the workspace and a fresh private sibling
+  //   in the browser — never a duplicate of the current content. —
   registerAction({
     id: "tabs.new",
     title: "New tab",

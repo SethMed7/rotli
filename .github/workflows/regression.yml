@@ -10,7 +10,7 @@ name: Regression suite
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
   workflow_dispatch:
 
@@ -40,6 +40,17 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
       - run: bun ci
         working-directory: site
+      - name: Check dependency convergence across every lockfile
+        run: bun run deps dedupe-check
+      - name: Check reviewed production-license metadata
+        run: bun run deps licenses-check
+      - name: Capture production dependency licenses
+        run: bun run --silent deps licenses > dependency-licenses.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dependency-licenses
+          path: dependency-licenses.json
+          retention-days: 30
       - run: bun run check
         working-directory: site
       - run: bun run build

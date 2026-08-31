@@ -125,6 +125,7 @@ way a compromised loop would.
 | 14 | `corpus_read` / `corpus_file_text` / `corpus_file_bytes` | **MITIGATED, NOT CLOSED** | these are the USER's editor lanes and cannot refuse the user their own notes. `corpus_read` returns the **frontmatter-stripped** body. The ledger is warm before commands run and blocks verbatim overlap at Rust egress seams, but a hostile webview that obtained the plaintext can transform it before invoking those seams. This is the unresolved trust-boundary contradiction described above |
 | 15 | Workspace `notes list` / `search` / `query` / `read` | SAFE | `read_for_ai(id, false)` per item, filter-before-truncate |
 | 16 | Workspace `list` — files and folders | **GAP → FIXED** | `NoteKind::File` metas and the whole folder tree bypassed every filter (`_ => true`), shipping the reserved `Secure notes/` folder name to a remote agent. Both now pass `agent_listable` |
+| 16a | Remote relay connector | SAFE | every response is produced by the same workspace dispatcher and `read_for_ai`/write gates; the outbound transport adds no alternate corpus reads, starts only by explicit user action, serializes disconnect/vault switch against in-flight dispatch and delivery, binds separate client/device credentials to their minted relay base, bounds the complete response envelope, and logs no frames |
 
 ### Writes — persistence and laundering
 

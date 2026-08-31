@@ -6,6 +6,7 @@ const JSXGRAPH_EVAL_SOURCE = "/node_modules/jsxgraph/src/parser/jessiecode.js";
 type BuildWarning = {
   code?: string;
   id?: string;
+  message?: string;
 };
 
 type BuildChunk = {
@@ -25,6 +26,16 @@ export function shouldIgnoreBuildWarning(warning: BuildWarning): boolean {
   return (
     warning.code === "EVAL" && (warning.id?.replaceAll("\\", "/").endsWith(JSXGRAPH_EVAL_SOURCE) ?? false)
   );
+}
+
+/** Production builds are warning-free except the one unreachable vendor eval
+ * guarded above. A new Rolldown/Oxc warning is a review event, not log noise. */
+export function buildWarningViolation(warning: BuildWarning): string | null {
+  if (shouldIgnoreBuildWarning(warning)) return null;
+  const code = warning.code ?? "UNKNOWN";
+  const id = warning.id ? ` (${warning.id.replaceAll("\\", "/")})` : "";
+  const message = warning.message?.trim() ? `: ${warning.message.trim()}` : "";
+  return `${code}${id}${message}`;
 }
 
 export const LAZY_LOCALE_STUB_ID = "\0rotli-lazy-locale-stub";

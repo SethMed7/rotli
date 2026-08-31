@@ -9,6 +9,7 @@ import {
   QUOKKA_ACCESSORY_PRESENTATIONS,
   QUOKKA_STYLE_PRESENTATIONS,
   quokkaCustomColor,
+  quokkaAccessoryColor,
 } from "../../brand/quokka";
 import { resolveChord, useBindingsStore } from "../../keys/bindings";
 import { chordFromEvent, formatChord, toAccelerator } from "../../keys/chords";
@@ -24,6 +25,10 @@ import {
   useUiStore,
 } from "../../state/ui";
 import { Character } from "../character";
+
+/** Compact accessory palette for first-run; Settings owns the full hue dial.
+ * Amber first — it is the accessory default. */
+const ACCESSORY_HUE_CHOICES = [38, 225, 195, 145, 280, 340, 10] as const;
 import { AccentRow } from "../settingsSurface";
 import { setupChoiceIndex, SetupBack, SetupChoiceGroup, SetupPrimary } from "./setupControls";
 import { SetupSideFriends } from "./setupSideFriends";
@@ -158,6 +163,8 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
   const setQuokkaCustomHue = useUiStore((state) => state.setQuokkaCustomHue);
   const quokkaAccessory = useUiStore((state) => state.quokkaAccessory);
   const setQuokkaAccessory = useUiStore((state) => state.setQuokkaAccessory);
+  const quokkaAccessoryHue = useUiStore((state) => state.quokkaAccessoryHue);
+  const setQuokkaAccessoryHue = useUiStore((state) => state.setQuokkaAccessoryHue);
 
   const move = (delta: -1 | 1) => {
     const next = STEPS[Math.max(0, Math.min(STEPS.length - 1, index + delta))];
@@ -362,24 +369,49 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
                             />
                           )}
                         </div>
-                        <label>
-                          <span>Accessory</span>
-                          <select
-                            value={quokkaAccessory}
-                            onChange={(event) =>
-                              setQuokkaAccessory(
-                                event.currentTarget
-                                  .value as (typeof QUOKKA_ACCESSORY_PRESENTATIONS)[number]["accessory"],
-                              )
-                            }
-                          >
+                        <span>Accessory</span>
+                        <div className="setup-quokka-accrow">
+                          <div className="setup-quokka-accs" role="radiogroup" aria-label="Accessory">
                             {QUOKKA_ACCESSORY_PRESENTATIONS.map((choice) => (
-                              <option key={choice.accessory} value={choice.accessory}>
-                                {choice.label}
-                              </option>
+                              <button
+                                type="button"
+                                role="radio"
+                                aria-checked={quokkaAccessory === choice.accessory}
+                                aria-label={`${choice.label}: ${choice.description}`}
+                                title={choice.label}
+                                className={quokkaAccessory === choice.accessory ? "selected" : ""}
+                                key={choice.accessory}
+                                onClick={() => setQuokkaAccessory(choice.accessory)}
+                              >
+                                <Character name="base" size={34} accessory={choice.accessory} alwaysVisible />
+                              </button>
                             ))}
-                          </select>
-                        </label>
+                          </div>
+                          {quokkaAccessory !== "none" && (
+                            <div
+                              className="setup-quokka-swatches"
+                              role="radiogroup"
+                              aria-label="Accessory color"
+                            >
+                              {ACCESSORY_HUE_CHOICES.map((hue) => (
+                                <button
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={quokkaAccessoryHue === hue}
+                                  aria-label={`Accessory hue ${hue}°`}
+                                  className={quokkaAccessoryHue === hue ? "selected" : ""}
+                                  key={hue}
+                                  onClick={() => setQuokkaAccessoryHue(hue)}
+                                >
+                                  <span
+                                    aria-hidden="true"
+                                    style={{ backgroundColor: quokkaAccessoryColor(hue) } as CSSProperties}
+                                  />
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                         <small>Expressions change with the moment. Your look follows them.</small>
                       </>
                     )}

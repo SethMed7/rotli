@@ -69,6 +69,7 @@ export async function resetAndReonboard(): Promise<void> {
     stayOpen: false,
     showInDock: false,
     privateBrowserSearchEngine: DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE,
+    remoteAgentRelayUrl: "",
     onboarded: false,
     onboardingPhase: "preferences",
   });

@@ -89,7 +89,7 @@ describe("appearance personality", () => {
     expect(settings.quokkaCompanionEnabled).toBe(false);
     expect(settings.quokkaStyle).toBe("cocoa");
     expect(settings.quokkaCustomHue).toBe(DEFAULT_QUOKKA_CUSTOM_HUE);
-    expect(settings.quokkaLineColor).toBe("black");
+    expect(settings.quokkaLineColor).toBe("auto");
     expect(settings.quokkaAccessory).toBe("none");
     expect(settings.quokkaAccessoryHue).toBe(DEFAULT_QUOKKA_ACCESSORY_HUE);
     expect(settings.quokkaIdlePose).toBe("rest");
@@ -252,7 +252,7 @@ describe("parseSettings — creation and Brain model", () => {
     expect(parseSettings('{"tabLayout":"compress"}').tabLayout).toBe("scroll");
   });
 
-  test("Gemini 3.5 is an explicit organizer choice; unknown values fail closed to local", () => {
+  test("the legacy Gemini setting remains an explicit organizer choice; unknown values fail closed to local", () => {
     expect(parseSettings('{"organizerModel":"gemini35"}').organizerModel).toBe("gemini35");
     expect(parseSettings('{"organizerModel":"future"}').organizerModel).toBe("local");
   });
@@ -304,7 +304,7 @@ describe("parseSettings — frontier controls", () => {
     const parsed = parseSettings(
       '{"chatReasoning":{"corpus:a":"xhigh","corpus:b":"ultra","unsaved:p":"high"},"chatServiceTier":{"corpus:a":"fast","corpus:b":"priority"}}',
     );
-    expect(parsed.chatReasoning).toEqual({ "corpus:a": "xhigh" });
+    expect(parsed.chatReasoning).toEqual({ "corpus:a": "xhigh", "corpus:b": "ultra" });
     expect(parsed.chatServiceTier).toEqual({ "corpus:a": "fast" });
   });
 });
@@ -483,6 +483,16 @@ describe("unknownAppSettingsKeys — machine settings stay additive", () => {
       "google",
     );
     expect(unknownAppSettingsKeys('{"privateBrowserSearchEngine":"bing"}')).toEqual({});
+  });
+
+  test("keeps only a bounded installation-wide relay URL", () => {
+    expect(parseSettings('{"remoteAgentRelayUrl":" https://mcp.example/mcp "}').remoteAgentRelayUrl).toBe(
+      "https://mcp.example/mcp",
+    );
+    expect(parseSettings(JSON.stringify({ remoteAgentRelayUrl: "x".repeat(2049) })).remoteAgentRelayUrl).toBe(
+      "",
+    );
+    expect(unknownAppSettingsKeys('{"remoteAgentRelayUrl":"https://mcp.example/mcp"}')).toEqual({});
   });
 });
 

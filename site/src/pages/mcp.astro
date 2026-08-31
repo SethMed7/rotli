@@ -1,0 +1,903 @@
+---
+import Base from '../layouts/Base.astro';
+import mark from '../../../src/assets/characters/_logo.svg?raw';
+
+const GITHUB_URL = 'https://github.com/SethMed7/rotli';
+const WORKSPACE_CONTRACT = `${GITHUB_URL}/blob/main/docs/architecture/agent-workspace.md`;
+const RELAY_CONTRACT = `${GITHUB_URL}/blob/main/docs/architecture/remote-agent-relay.md`;
+const PRIVACY_URL = `${GITHUB_URL}/blob/main/PRIVACY.md`;
+---
+
+<Base
+  title="MCP for Rotli — local files, local policy, optional remote access"
+  description="Connect Claude, Codex, Cursor, Grok Bot, and other MCP clients to the Rotli workspace on your Mac without turning the vault into cloud storage."
+  canonicalPath="/mcp/"
+>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Rotli home">
+      <span class="brand-mark" set:html={mark} aria-hidden="true"></span>
+      <span class="wordmark">rotli</span>
+    </a>
+    <nav class="primary-nav" aria-label="Primary navigation">
+      <a href="/">Product</a>
+      <a href="#connect" aria-current="page">MCP</a>
+      <a href="#policy">Safety</a>
+      <a href="#self-host">Self-host</a>
+    </nav>
+    <div class="header-actions">
+      <a class="github-link" href={GITHUB_URL} rel="noopener">GitHub</a>
+      <button class="mode-toggle" id="mode-toggle" type="button" aria-label="Use dark appearance">
+        <span class="mode-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path class="moon-path" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path>
+            <g class="sun-path">
+              <circle cx="12" cy="12" r="4"></circle>
+              <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
+            </g>
+          </svg>
+        </span>
+        <span class="mode-label">Dark</span>
+      </button>
+    </div>
+  </header>
+
+  <main id="content">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow">Rotli workspace MCP</p>
+        <h1 id="hero-title">Let agents help.<br />Keep the vault here.</h1>
+        <p class="lede">
+          Claude, Codex, Cursor, Grok Bot, and other MCP clients can work through Rotli’s
+          existing note and board tools. Your Mac remains the writer and your files remain
+          the source of truth.
+        </p>
+        <a class="text-link" href="#connect">Choose a connection <span aria-hidden="true">↓</span></a>
+      </div>
+
+      <div class="connection-diagram" aria-label="Remote MCP request flow">
+        <ol>
+          <li><span>01</span><b>Cloud agent</b><small>Grok Bot or another HTTPS MCP client</small></li>
+          <li><span>02</span><b>HTTPS relay</b><small>Opaque, in-flight frames only</small></li>
+          <li><span>03</span><b>Rotli on your Mac</b><small>Outbound, user-started session</small></li>
+          <li><span>04</span><b>Local vault</b><small>Existing CorpusStore policy</small></li>
+        </ol>
+      </div>
+    </section>
+
+    <aside class="status-note" aria-label="Hosted relay status">
+      <strong>Before the hosted relay launches</strong>
+      <p>
+        Use local stdio or a relay you operate. The public Rotli relay domain will be added here
+        after it is deployed and verified; this guide does not point you at an unfinished service.
+      </p>
+    </aside>
+
+    <section class="routes" id="connect" aria-labelledby="routes-title">
+      <div class="section-heading">
+        <p class="eyebrow">Two transports, one workspace service</p>
+        <h2 id="routes-title">Connect from the same Mac or from the cloud.</h2>
+      </div>
+
+      <article class="route-row">
+        <div class="route-number">01</div>
+        <div class="route-intro">
+          <p class="route-label">Local clients</p>
+          <h3>Claude Code, Codex, and Cursor</h3>
+          <p>Use the packaged Rotli binary over stdio. It opens no network listener.</p>
+        </div>
+        <div class="route-instructions">
+          <ol>
+            <li>Open Rotli once and choose the vault you want registered.</li>
+            <li>Print the exact setup snippets for the installed app.</li>
+            <li>Paste the relevant snippet into your client; Rotli never edits global config for you.</li>
+          </ol>
+          <pre><code>/Applications/rotli.app/Contents/MacOS/rotli agent config</code></pre>
+        </div>
+      </article>
+
+      <article class="route-row">
+        <div class="route-number">02</div>
+        <div class="route-intro">
+          <p class="route-label">Cloud clients</p>
+          <h3>Grok Bot over public HTTPS</h3>
+          <p>Rotli connects outward to a stateless relay. No vault is mounted or stored there.</p>
+        </div>
+        <div class="route-instructions">
+          <ol>
+            <li>In Rotli, open <b>Settings → Connections → Remote agents</b>.</li>
+            <li>Enter your relay’s public <code>https://…/mcp</code> URL and choose <b>Create pairing</b>.</li>
+            <li>Copy the setup while the client token is visible, then choose <b>Connect this session</b>.</li>
+            <li>Send the instruction below to Grok Bot. After it connects, ask it to call <code>tools/list</code>.</li>
+          </ol>
+          <div class="prompt-block">
+            <span>Tell Grok Bot</span>
+            <pre><code>Add this MCP server:
+Name: rotli-workspace
+URL: https://&lt;your-relay-domain&gt;/mcp
+Authorization: Bearer rotli_client_…
+
+After connecting, call tools/list and report the available Rotli tools.</code></pre>
+          </div>
+          <p class="token-note">
+            Rotli shows the client bearer once. Its paired device token stays in macOS Keychain;
+            creating a new pairing invalidates the old credentials on this Mac, and Remove pairing
+            disconnects the Mac and deletes both credentials from Keychain. A pairing is bound to the
+            relay URL that created it, so switching relay hosts requires a new pairing.
+          </p>
+        </div>
+      </article>
+    </section>
+
+    <section class="capabilities" aria-labelledby="capabilities-title">
+      <div class="section-heading compact">
+        <p class="eyebrow">Discoverable at runtime</p>
+        <h2 id="capabilities-title">The workspace tools already do the useful work.</h2>
+        <p>Clients receive the current schemas from <code>tools/list</code>; the relay owns none of them.</p>
+      </div>
+      <div class="capability-list">
+        <div><b>Find and understand</b><p>Status, metrics, list, search, structured query, note reads, Main, views, and compact board reads.</p></div>
+        <div><b>Create and edit</b><p>New notes, revision-safe note updates and patches, note moves, and Excalidraw board creation and actions.</p></div>
+        <div><b>Organize and return</b><p>Main folders and placement, named-view organization, and links that open the result back in Rotli.</p></div>
+      </div>
+      <p class="breve-note">
+        <b>Breve convention:</b> a remote <code>rotli_create_note</code> enters intake and Main, so existing
+        briefs can consume it. Routine-specific MCP tools are a later additive change, not a requirement.
+      </p>
+    </section>
+
+    <section class="policy" id="policy" aria-labelledby="policy-title">
+      <div class="policy-heading">
+        <p class="eyebrow">The boundary travels with the tool call</p>
+        <h2 id="policy-title">Remote access does not create a second policy engine.</h2>
+        <p>
+          Stdio, authenticated loopback HTTP, and the relay connector all enter the same Rotli
+          workspace service. The cloud transport cannot bypass the local corpus rules.
+        </p>
+      </div>
+      <dl class="policy-list">
+        <div><dt>Secure notes</dt><dd>Omitted from list, search, query, and reads.</dd></div>
+        <div><dt>Locked notes</dt><dd>Readable under normal policy; every agent write is refused.</dd></div>
+        <div><dt>Concurrent edits</dt><dd>Updates and patches require a revision from a fresh read.</dd></div>
+        <div><dt>New notes</dt><dd>Land in <code>wiki/_inbox</code> (or legacy <code>Inbox</code>) and Main.</dd></div>
+        <div><dt>Offline Mac</dt><dd>No connection, no tool call, and no queued note body waiting in the relay.</dd></div>
+        <div><dt>Every launch</dt><dd>Remote agents start disconnected until you explicitly reconnect.</dd></div>
+      </dl>
+    </section>
+
+    <section class="verification" aria-labelledby="verification-title">
+      <div>
+        <p class="eyebrow">Prove the boundary first</p>
+        <h2 id="verification-title">Check the setup without touching your vault.</h2>
+      </div>
+      <div class="verification-commands">
+        <div>
+          <b>Read-only diagnosis</b>
+          <pre><code>/Applications/rotli.app/Contents/MacOS/rotli agent doctor</code></pre>
+        </div>
+        <div>
+          <b>Disposable end-to-end test</b>
+          <pre><code>/Applications/rotli.app/Contents/MacOS/rotli agent self-test</code></pre>
+          <p>The self-test creates and removes a temporary corpus. It does not target the configured live workspace.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="self-host" id="self-host" aria-labelledby="self-host-title">
+      <div class="section-heading compact">
+        <p class="eyebrow">Relay deployment profile</p>
+        <h2 id="self-host-title">A dumb pipe, deliberately.</h2>
+        <p>
+          Deploy <code>services/rotli-mcp-relay</code> as one instance behind public TLS. Give it no
+          database and no volume, and use <code>/health</code> for the health check. Restarts intentionally
+          drop polls and in-flight requests.
+        </p>
+      </div>
+      <div class="deployment-facts" aria-label="Relay requirements">
+        <span>One replica</span>
+        <span>No durable storage</span>
+        <span>No frame logging</span>
+        <span>256 KB request cap</span>
+      </div>
+      <nav class="contract-links" aria-label="MCP contract documentation">
+        <a href={WORKSPACE_CONTRACT} rel="noopener">Workspace contract <span aria-hidden="true">↗</span></a>
+        <a href={RELAY_CONTRACT} rel="noopener">Relay contract <span aria-hidden="true">↗</span></a>
+        <a href={PRIVACY_URL} rel="noopener">Privacy inventory <span aria-hidden="true">↗</span></a>
+        <a href={`${GITHUB_URL}/tree/main/services/rotli-mcp-relay`} rel="noopener">Relay source <span aria-hidden="true">↗</span></a>
+      </nav>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <a class="footer-brand" href="/" aria-label="Rotli home"><span set:html={mark} aria-hidden="true"></span><b>rotli</b></a>
+    <p>Your vault stays on your Mac.</p>
+    <nav aria-label="Footer navigation">
+      <a href="/">Product</a>
+      <a href={GITHUB_URL} rel="noopener">GitHub</a>
+      <a href={PRIVACY_URL} rel="noopener">Privacy</a>
+    </nav>
+  </footer>
+
+  <script>
+    const root = document.documentElement;
+    const modeButton = document.querySelector<HTMLButtonElement>('#mode-toggle');
+    const modeLabel = modeButton?.querySelector<HTMLElement>('.mode-label');
+
+    const syncMode = () => {
+      const dark = root.dataset.mode === 'dark';
+      if (modeLabel) modeLabel.textContent = dark ? 'Light' : 'Dark';
+      modeButton?.setAttribute('aria-label', dark ? 'Use light appearance' : 'Use dark appearance');
+      modeButton?.setAttribute('data-mode', dark ? 'dark' : 'light');
+    };
+
+    modeButton?.addEventListener('click', () => {
+      root.dataset.mode = root.dataset.mode === 'dark' ? 'light' : 'dark';
+      try {
+        localStorage.setItem('rotli-site-mode', root.dataset.mode);
+      } catch (error) {}
+      syncMode();
+    });
+
+    syncMode();
+  </script>
+
+  <style>
+    .site-header,
+    main > section,
+    .status-note,
+    .site-footer {
+      width: min(100% - 3rem, var(--page-max));
+      margin-inline: auto;
+    }
+
+    .site-header {
+      min-height: 76px;
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand,
+    .footer-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .brand-mark {
+      width: 30px;
+      line-height: 0;
+    }
+
+    .wordmark,
+    .footer-brand b {
+      font-family: var(--font-wordmark);
+      font-size: 1.55rem;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+    }
+
+    .primary-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(1.1rem, 2.5vw, 2.2rem);
+      margin-inline: auto;
+    }
+
+    .primary-nav a,
+    .github-link {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      text-decoration: none;
+    }
+
+    .primary-nav a:hover,
+    .primary-nav a[aria-current='page'],
+    .github-link:hover {
+      color: var(--text);
+    }
+
+    .primary-nav a[aria-current='page'] {
+      text-decoration: underline;
+      text-decoration-color: var(--accent);
+      text-underline-offset: 0.45rem;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
+    .mode-toggle {
+      min-width: 82px;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .mode-toggle:hover {
+      border-color: var(--border-strong);
+      background: var(--surface-2);
+    }
+
+    .mode-icon,
+    .mode-icon svg {
+      width: 17px;
+      height: 17px;
+    }
+
+    .sun-path,
+    .mode-toggle[data-mode='dark'] .moon-path {
+      display: none;
+    }
+
+    .mode-toggle[data-mode='dark'] .sun-path {
+      display: block;
+    }
+
+    .hero {
+      min-height: min(47rem, calc(100vh - 76px));
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(32rem, 1.1fr);
+      gap: clamp(3rem, 7vw, 7rem);
+      align-items: center;
+      padding-block: clamp(4.5rem, 10vw, 8rem);
+    }
+
+    .hero-copy {
+      max-width: 38rem;
+    }
+
+    .eyebrow,
+    .route-label {
+      margin: 0 0 1rem;
+      color: var(--accent-text);
+      font-size: 0.84rem;
+      font-weight: 600;
+      letter-spacing: 0.035em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      max-width: 52rem;
+      margin-bottom: 1.7rem;
+      font-size: clamp(3.5rem, 7.2vw, 6rem);
+      font-weight: 600;
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+    }
+
+    h2 {
+      margin-bottom: 1rem;
+      font-size: clamp(2.15rem, 4.5vw, 4.35rem);
+      font-weight: 600;
+      line-height: 1;
+      letter-spacing: -0.035em;
+    }
+
+    h3 {
+      margin-bottom: 0.8rem;
+      font-size: clamp(1.5rem, 2.3vw, 2.2rem);
+      font-weight: 600;
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+    }
+
+    .lede {
+      max-width: 40rem;
+      margin-bottom: 1.7rem;
+      color: var(--text-muted);
+      font-size: clamp(1.05rem, 1.5vw, 1.25rem);
+    }
+
+    .text-link {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      color: var(--accent-text);
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .text-link:hover {
+      color: var(--text);
+    }
+
+    .connection-diagram {
+      border-top: 1px solid var(--border-strong);
+      border-bottom: 1px solid var(--border-strong);
+    }
+
+    .connection-diagram ol {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .connection-diagram li {
+      display: grid;
+      grid-template-columns: 2.5rem minmax(8rem, 0.7fr) minmax(0, 1fr);
+      gap: 1rem;
+      align-items: baseline;
+      padding: 1.35rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .connection-diagram li:last-child {
+      border-bottom: 0;
+    }
+
+    .connection-diagram span,
+    .route-number {
+      color: var(--accent-text);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+    }
+
+    .connection-diagram b {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .connection-diagram small {
+      color: var(--text-muted);
+      font-size: 0.86rem;
+    }
+
+    .status-note {
+      display: grid;
+      grid-template-columns: minmax(11rem, 0.28fr) minmax(0, 1fr);
+      gap: 2rem;
+      padding: 1.4rem 0;
+      border-top: 1px solid var(--accent);
+      border-bottom: 1px solid var(--accent);
+      color: var(--text-muted);
+    }
+
+    .status-note strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .status-note p {
+      max-width: 60rem;
+      margin-bottom: 0;
+    }
+
+    .routes,
+    .capabilities,
+    .policy,
+    .verification,
+    .self-host {
+      padding-block: clamp(5rem, 10vw, 9rem);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-heading {
+      max-width: 56rem;
+      margin-bottom: clamp(3rem, 7vw, 6rem);
+    }
+
+    .section-heading.compact {
+      max-width: 48rem;
+      margin-bottom: clamp(2.5rem, 5vw, 4rem);
+    }
+
+    .section-heading > p:last-child,
+    .policy-heading > p:last-child {
+      max-width: var(--copy-max);
+      color: var(--text-muted);
+    }
+
+    .route-row {
+      display: grid;
+      grid-template-columns: 3.5rem minmax(15rem, 0.65fr) minmax(24rem, 1.35fr);
+      gap: clamp(1.5rem, 4vw, 4rem);
+      padding-block: clamp(2.5rem, 5vw, 4rem);
+      border-top: 1px solid var(--border);
+    }
+
+    .route-row:last-child {
+      padding-bottom: 0;
+    }
+
+    .route-intro > p:last-child,
+    .token-note {
+      color: var(--text-muted);
+    }
+
+    .route-instructions ol {
+      margin: 0 0 1.5rem;
+      padding-left: 1.4rem;
+    }
+
+    .route-instructions li {
+      margin-bottom: 0.7rem;
+      padding-left: 0.45rem;
+    }
+
+    code,
+    pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    :not(pre) > code {
+      padding: 0.13rem 0.32rem;
+      border: 1px solid var(--border);
+      border-radius: 0.28rem;
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 0.86em;
+    }
+
+    pre {
+      max-width: 100%;
+      margin: 0;
+      padding: 1.1rem 1.2rem;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 0.82rem;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .prompt-block {
+      margin: 2rem 0 1.25rem;
+    }
+
+    .prompt-block > span {
+      display: block;
+      margin-bottom: 0.55rem;
+      color: var(--accent-text);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .token-note {
+      margin-bottom: 0;
+      font-size: 0.9rem;
+    }
+
+    .capability-list {
+      border-top: 1px solid var(--border-strong);
+    }
+
+    .capability-list > div {
+      display: grid;
+      grid-template-columns: minmax(12rem, 0.42fr) minmax(0, 1fr);
+      gap: 2rem;
+      padding: 1.4rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .capability-list b {
+      font-weight: 600;
+    }
+
+    .capability-list p {
+      max-width: 50rem;
+      margin-bottom: 0;
+      color: var(--text-muted);
+    }
+
+    .breve-note {
+      max-width: 60rem;
+      margin: 2.2rem 0 0;
+      color: var(--text-muted);
+    }
+
+    .breve-note b {
+      color: var(--text);
+    }
+
+    .policy {
+      display: grid;
+      grid-template-columns: minmax(18rem, 0.8fr) minmax(28rem, 1.2fr);
+      gap: clamp(3rem, 8vw, 8rem);
+    }
+
+    .policy-heading {
+      align-self: start;
+      position: sticky;
+      top: 2rem;
+    }
+
+    .policy-list {
+      margin: 0;
+      border-top: 1px solid var(--border-strong);
+    }
+
+    .policy-list > div {
+      display: grid;
+      grid-template-columns: minmax(9rem, 0.38fr) minmax(0, 1fr);
+      gap: 1.5rem;
+      padding: 1.3rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .policy-list dt {
+      font-weight: 600;
+    }
+
+    .policy-list dd {
+      margin: 0;
+      color: var(--text-muted);
+    }
+
+    .verification {
+      display: grid;
+      grid-template-columns: minmax(17rem, 0.65fr) minmax(28rem, 1.35fr);
+      gap: clamp(3rem, 8vw, 8rem);
+    }
+
+    .verification-commands {
+      border-top: 1px solid var(--border-strong);
+    }
+
+    .verification-commands > div {
+      padding: 1.4rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .verification-commands b {
+      display: block;
+      margin-bottom: 0.8rem;
+      font-weight: 600;
+    }
+
+    .verification-commands p {
+      margin: 0.75rem 0 0;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .deployment-facts {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      border-top: 1px solid var(--border-strong);
+      border-bottom: 1px solid var(--border-strong);
+    }
+
+    .deployment-facts span {
+      padding: 1.2rem;
+      border-right: 1px solid var(--border);
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    .deployment-facts span:last-child {
+      border-right: 0;
+    }
+
+    .contract-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem 1.6rem;
+      margin-top: 2rem;
+    }
+
+    .contract-links a {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      color: var(--accent-text);
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .contract-links a:hover {
+      color: var(--text);
+    }
+
+    .site-footer {
+      min-height: 8rem;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 2rem;
+      align-items: center;
+      color: var(--text-muted);
+      font-size: 0.86rem;
+    }
+
+    .footer-brand span {
+      width: 23px;
+    }
+
+    .footer-brand b {
+      color: var(--text);
+      font-size: 1.25rem;
+    }
+
+    .site-footer p {
+      margin: 0;
+    }
+
+    .site-footer nav {
+      display: flex;
+      gap: 1.25rem;
+    }
+
+    .site-footer nav a {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      text-decoration: none;
+    }
+
+    .site-footer nav a:hover {
+      color: var(--text);
+    }
+
+    @media (max-width: 1080px) {
+      .primary-nav {
+        display: none;
+      }
+
+      .header-actions {
+        margin-left: auto;
+      }
+
+      .hero {
+        grid-template-columns: 1fr;
+        min-height: 0;
+      }
+
+      .connection-diagram {
+        max-width: 48rem;
+      }
+
+      .route-row {
+        grid-template-columns: 2.5rem minmax(14rem, 0.7fr) minmax(22rem, 1.3fr);
+      }
+
+      .policy,
+      .verification {
+        grid-template-columns: 1fr;
+      }
+
+      .policy-heading {
+        position: static;
+        max-width: 52rem;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .status-note,
+      .route-row,
+      .capability-list > div,
+      .policy-list > div {
+        grid-template-columns: 1fr;
+      }
+
+      .status-note {
+        gap: 0.3rem;
+      }
+
+      .route-number {
+        margin-bottom: -0.4rem;
+      }
+
+      .deployment-facts {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .deployment-facts span:nth-child(2) {
+        border-right: 0;
+      }
+
+      .deployment-facts span:nth-child(-n + 2) {
+        border-bottom: 1px solid var(--border);
+      }
+
+      .site-footer {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+        padding-block: 2rem;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .site-header,
+      main > section,
+      .status-note,
+      .site-footer {
+        width: min(100% - 1.5rem, var(--page-max));
+      }
+
+      .site-header {
+        gap: 0.75rem;
+      }
+
+      .github-link {
+        display: none;
+      }
+
+      .mode-toggle {
+        min-width: 44px;
+        width: 44px;
+        padding: 0;
+      }
+
+      .mode-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      h1 {
+        font-size: clamp(3rem, 17vw, 4.5rem);
+      }
+
+      .connection-diagram li {
+        grid-template-columns: 2rem minmax(0, 1fr);
+        gap: 0.45rem 0.8rem;
+      }
+
+      .connection-diagram small {
+        grid-column: 2;
+      }
+
+      .routes,
+      .capabilities,
+      .policy,
+      .verification,
+      .self-host {
+        padding-block: 4.5rem;
+      }
+
+      .deployment-facts,
+      .verification {
+        grid-template-columns: 1fr;
+      }
+
+      .deployment-facts span {
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .deployment-facts span:last-child {
+        border-bottom: 0;
+      }
+
+      .site-footer nav {
+        flex-wrap: wrap;
+        gap: 0 1.1rem;
+      }
+    }
+  </style>
+</Base>

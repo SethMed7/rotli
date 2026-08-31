@@ -6,11 +6,11 @@
     "scripts/*.mjs",
     "scripts/*.test.ts",
     "scripts/eval-*.ts",
+    "services/rotli-mcp-relay/server.ts",
     "breve-runtime/scripts/*.ts",
     "breve-runtime/tests/*.ts"
   ],
-  "project": ["src/**/*.{ts,tsx}", "e2e/**/*.ts", "scripts/**/*.{ts,mjs}", "breve-runtime/**/*.ts"],
+  "project": ["src/**/*.{ts,tsx}", "e2e/**/*.ts", "scripts/**/*.{ts,mjs}", "services/**/*.ts", "breve-runtime/**/*.ts"],
   "ignoreBinaries": ["mktemp"],
-  "ignoreUnresolved": ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"],
   "ignoreExportsUsedInFile": true
 }

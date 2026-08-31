@@ -1,4 +1,5 @@
 {
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "printWidth": 110,
   // Import sorting (2026-08-01). oxfmt's sorter follows eslint-plugin-perfectionist;
   // `sortSideEffects` stays at its default `false`, so bare `import "..."` statements

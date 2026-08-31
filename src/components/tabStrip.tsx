@@ -17,7 +17,15 @@
 // dropPreview to paint the 2px insertion line. Every tab is closeable — the
 // last one leaves the lone pane in the quokka rest state (the maintainer, 2026-07-28).
 
-import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type MouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import {
   closeOtherTabsWithDraftCleanup,
@@ -27,6 +35,11 @@ import {
 import { newItemInTab } from "../keys/actions";
 import { tabHotkeyAction } from "../keys/tabHotkeys";
 import { fileName } from "../lib/fileKind";
+import {
+  privateBrowserTabTitle,
+  privateBrowserTitleSnapshot,
+  subscribePrivateBrowserTitles,
+} from "../lib/privateBrowser";
 import { startTabDrag } from "../lib/tabDrag";
 import { activeInstance } from "../memex/config";
 import { useInstanceChats, useMemexConfig } from "../memex/useMemex";
@@ -37,7 +50,7 @@ import { useNoteIndex } from "../services/hooks";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useMainStore } from "../state/main";
-import { usePanesStore } from "../state/panes";
+import { activeTabOf, usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import type { LeafNode, Tab } from "../types";
 import {
@@ -76,11 +89,16 @@ function tabLabel(tab: Tab, titles: TitleLookup, chatTitles: ReadonlyMap<string,
     case "newItem":
       return "New…";
     case "browser":
-      return "Private browser";
+      return privateBrowserTabTitle(tab.id);
   }
 }
 
 export function TabStrip({ pane }: { pane: LeafNode }) {
+  useSyncExternalStore(
+    subscribePrivateBrowserTitles,
+    privateBrowserTitleSnapshot,
+    privateBrowserTitleSnapshot,
+  );
   const newTabDefault = useUiStore((s) => s.newTabDefault);
   const tabLayout = useUiStore((s) => s.tabLayout);
   const activateTab = usePanesStore((s) => s.activateTab);
@@ -125,6 +143,10 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [fade, setFade] = useState({ left: false, right: false });
+  const browserActive = activeTabOf(pane)?.surfaceKind === "browser";
+  const newTabLabel = browserActive
+    ? "New private browser tab"
+    : `New ${newItemDefinition(newTabDefault).label} tab`;
   const updateFade = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -338,15 +360,10 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
           })}
         </div>
       </div>
-      <button
-        type="button"
-        className="tabplus"
-        aria-label={`New ${newItemDefinition(newTabDefault).label} tab — ⌘T`}
-        onClick={newTabHere}
-      >
+      <button type="button" className="tabplus" aria-label={`${newTabLabel} — ⌘T`} onClick={newTabHere}>
         <PlusGlyph size={13} />
         <span className="tip" aria-hidden="true">
-          New {newItemDefinition(newTabDefault).label} — ⌘T
+          {newTabLabel} — ⌘T
         </span>
       </button>
     </div>

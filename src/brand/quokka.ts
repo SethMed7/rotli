@@ -41,6 +41,15 @@ export interface QuokkaAccessoryPlacement {
   originX: number;
   originY: number;
   depth: "under-ink" | "over-ink";
+  /** Art-space x below which the accessory is hidden — a profile head shows
+   * one lens of face-on eyewear, never the splayed pair. */
+  clipXMin?: number;
+  /** Art-space x above which the accessory is hidden (the mirror clip). */
+  clipXMax?: number;
+  /** With clipXMax: additionally keep a thin band past the cut — the bridge
+   * bar of profile glasses continuing over the nose as a clean line, without
+   * revealing the far lens's rim. */
+  clipBand?: { toX: number; yMin: number; yMax: number };
 }
 
 interface QuokkaAccessoryMount {
@@ -64,6 +73,9 @@ interface QuokkaAccessoryAdjustment {
   scaleX?: number;
   scaleY?: number;
   rotate?: number;
+  clipXMin?: number;
+  clipXMax?: number;
+  clipBand?: { toX: number; yMin: number; yMax: number };
 }
 
 function mount(x: number, y: number, scaleX = 1, scaleY = scaleX, rotate = 0): QuokkaAccessoryMount {
@@ -190,16 +202,59 @@ const QUOKKA_ACCESSORY_ADJUSTMENTS: Partial<
   Record<QuokkaPose, Partial<Record<QuokkaAccessory, QuokkaAccessoryAdjustment>>>
 > = {
   attention: {
-    "bucket-hat": { y: -6, scaleX: 0.98, scaleY: 0.98 },
+    "bucket-hat": { y: -6, scaleX: 1.18, scaleY: 1.0 },
+  },
+  base: {
+    "bucket-hat": { y: -6, scaleX: 1.18, scaleY: 1.02 },
+  },
+  board: {
+    "bucket-hat": { x: -2, y: -6, scaleX: 1.26, scaleY: 1.06 },
+  },
+  chat: {
+    "bucket-hat": { x: -8, y: -7, scaleX: 1.26, scaleY: 1.04 },
+  },
+  celebrating: {
+    "bucket-hat": { y: -6, scaleX: 1.18, scaleY: 1.02 },
+  },
+  inbox: {
+    "bucket-hat": { y: -6, scaleX: 1.18, scaleY: 1.02 },
+  },
+  knowledge: {
+    "bucket-hat": { y: -6, scaleX: 1.18, scaleY: 1.02 },
+  },
+  notes: {
+    "bucket-hat": { y: -6, scaleX: 1.18, scaleY: 1.02 },
+  },
+  rest: {
+    "bucket-hat": { y: -6, scaleX: 1.18, scaleY: 1.02 },
+  },
+  searching: {
+    "bucket-hat": { y: -6, scaleX: 1.18, scaleY: 1.02 },
+  },
+  local: {
+    "bucket-hat": { y: -6, scaleX: 1.18, scaleY: 1.02 },
+  },
+  waving: {
+    "bucket-hat": { y: -6, scaleX: 1.18, scaleY: 1.02 },
   },
   listening: {
     "bucket-hat": { x: -10, y: -10, scaleX: 1.08, scaleY: 0.96, rotate: 2 },
   },
   thoughtful: {
-    "bucket-hat": { x: -4, y: -5, scaleX: 1.04, scaleY: 0.96, rotate: 3 },
+    "bucket-hat": { x: -15, y: -2, scaleX: 1.2, scaleY: 1.0, rotate: 2 },
   },
   walking: {
-    "bucket-hat": { x: 8, y: -8, scaleX: 1.2, scaleY: 1.04 },
+    "bucket-hat": { x: -8, y: 7, scaleX: 1.34, scaleY: 1.1 },
+    glasses: {
+      x: 29,
+      y: 1,
+      scaleX: 0.9,
+      scaleY: 0.95,
+      rotate: -4,
+      clipXMax: 263,
+      clipBand: { toX: 294, yMin: 134, yMax: 150 },
+    },
+    goggles: { x: -24, y: 0, scaleX: 1.3, scaleY: 1.4, rotate: -6, clipXMin: 254 },
   },
 };
 
@@ -224,10 +279,13 @@ export function quokkaAccessoryPlacement(
     originX: accessoryMount.originX,
     originY: accessoryMount.originY,
     depth: accessoryMount.depth,
+    ...(adjustment?.clipXMin !== undefined ? { clipXMin: adjustment.clipXMin } : {}),
+    ...(adjustment?.clipXMax !== undefined ? { clipXMax: adjustment.clipXMax } : {}),
+    ...(adjustment?.clipBand !== undefined ? { clipBand: adjustment.clipBand } : {}),
   };
 }
 
-export const QUOKKA_LINE_COLORS = ["black", "white"] as const;
+export const QUOKKA_LINE_COLORS = ["auto", "black", "white"] as const;
 
 export type QuokkaLineColor = (typeof QUOKKA_LINE_COLORS)[number];
 
@@ -268,6 +326,9 @@ export const QUOKKA_STYLE_PRESENTATIONS: readonly {
   { style: "custom", label: "Custom", description: "Your own color", color: null },
 ];
 
+// Goggles are parked (the maintainer, 2026-08-21): art, placements, and the
+// stored value stay valid so existing companions keep rendering, but the
+// pickers no longer offer them.
 export const QUOKKA_ACCESSORY_PRESENTATIONS: readonly {
   accessory: QuokkaAccessory;
   label: string;
@@ -276,7 +337,6 @@ export const QUOKKA_ACCESSORY_PRESENTATIONS: readonly {
   { accessory: "none", label: "None", description: "Just the quokka" },
   { accessory: "glasses", label: "Glasses", description: "Quiet librarian" },
   { accessory: "bucket-hat", label: "Bucket hat", description: "Everyday explorer" },
-  { accessory: "goggles", label: "Goggles", description: "Ready to search" },
 ];
 
 const HEX_COLOR = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i;

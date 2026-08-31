@@ -54,9 +54,15 @@ describe("quokka appearance", () => {
     for (const pose of ["thoughtful", "walking", "listening", "attention"] as const) {
       const bucketHat = quokkaAccessoryPlacement(pose, "bucket-hat");
       expect(bucketHat.translateY).toBeGreaterThanOrEqual(-8);
-      expect(bucketHat.translateY).toBeLessThanOrEqual(3);
+      // walking seats the side-view hat low on the profile crown (+12);
+      // upright poses stay within a few px of their mounts
+      expect(bucketHat.translateY).toBeLessThanOrEqual(12);
       expect(bucketHat.scaleY).toBeGreaterThan(0.7);
-      expect(bucketHat.scaleY).toBeLessThan(0.84);
+      // The hat stays a compact accent, but a pose may exceed the 0.84 base
+      // scale slightly when its brim must widen to tuck the ears fully
+      // (walking's tall side-pose ear needs 1.12× — no more clipped stubs or
+      // floating-hat gaps at the onboarding 72° edge lean).
+      expect(bucketHat.scaleY).toBeLessThan(0.9);
     }
 
     expect(quokkaAccessoryPlacement("thoughtful", "bucket-hat").rotate).toBeLessThan(-6);
@@ -67,7 +73,9 @@ describe("quokka appearance", () => {
         const placement = quokkaAccessoryPlacement(pose, accessory);
         expect(Number.isFinite(placement.translateX)).toBeTrue();
         expect(Number.isFinite(placement.translateY)).toBeTrue();
-        expect(placement.scaleX).toBeGreaterThan(0.5);
+        // profile eyewear squishes horizontally to read side-on (walking
+        // glasses land at 0.396) — but never collapses or flips
+        expect(placement.scaleX).toBeGreaterThan(0.3);
         expect(placement.scaleY).toBeGreaterThan(0.5);
       }
     }

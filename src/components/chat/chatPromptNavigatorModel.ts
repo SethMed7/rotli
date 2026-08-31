@@ -34,11 +34,11 @@ export function promptNavigatorTransition(
 
 export function promptStateClassName(
   messageIndex: number,
-  activeMessageIndex: number | null,
+  activeMessageIndexes: readonly number[],
   previewMessageIndex: number | null,
 ): string | undefined {
   const classes = [
-    messageIndex === activeMessageIndex ? "active" : "",
+    activeMessageIndexes.includes(messageIndex) ? "active" : "",
     messageIndex === previewMessageIndex ? "preview" : "",
   ].filter(Boolean);
   return classes.length > 0 ? classes.join(" ") : undefined;
@@ -84,4 +84,31 @@ export function promptMenuOffset({
   const menuTop =
     maximumTop < minimumTop ? minimumTop : Math.min(Math.max(triggerTop, minimumTop), maximumTop);
   return Math.round(menuTop - triggerTop);
+}
+
+export interface PromptBubble {
+  messageIndex: number;
+  top: number | null;
+  bottom: number | null;
+}
+
+/** A hairline overlap at the viewport edge should not flicker a paw on. */
+const VISIBLE_GRACE = 12;
+
+/** The trail tracks the user's PROMPTS, never the responses: a paw lights
+ * only while its prompt bubble is on screen. Reading a long answer with no
+ * bubble in view lights nothing. */
+export function visiblePromptIndexes(
+  bubbles: readonly PromptBubble[],
+  viewTop: number,
+  viewBottom: number,
+): number[] {
+  const visible: number[] = [];
+  for (const bubble of bubbles) {
+    if (bubble.top === null || bubble.bottom === null) continue;
+    if (bubble.top < viewBottom - VISIBLE_GRACE && bubble.bottom > viewTop + VISIBLE_GRACE) {
+      visible.push(bubble.messageIndex);
+    }
+  }
+  return visible;
 }

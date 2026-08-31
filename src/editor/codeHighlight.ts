@@ -7,6 +7,7 @@
 // existing marks map through edits, so colors never flicker while typing.
 // Unknown languages stay PLAIN on purpose: wrong colors are worse than none.
 
+import { StreamLanguage } from "@codemirror/language";
 import { type Extension, type Range, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import type { Parser } from "@lezer/common";
@@ -22,7 +23,7 @@ type ParserLoader = () => Promise<Parser>;
 /** Stream-mode helper: wrap a legacy mode in a Lezer-compatible parser. */
 function legacy(load: () => Promise<{ mode: unknown }>): ParserLoader {
   return async () => {
-    const [{ StreamLanguage }, { mode }] = await Promise.all([import("@codemirror/language"), load()]);
+    const { mode } = await load();
     return StreamLanguage.define(mode as never).parser;
   };
 }

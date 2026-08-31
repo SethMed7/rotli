@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+
 import {
   BUN_PACKAGE_REVIEW_MIN_VERSION,
   actionMutatesDependencies,
@@ -6,6 +8,7 @@ import {
   bunVersionAtLeast,
   combinedExitCode,
   dependencyCommand,
+  dependencyLicenseViolations,
   selectedDependencyProjects,
 } from "./dependency-policy.mjs";
 
@@ -20,6 +23,7 @@ Usage:
   bun run deps dedupe-check [--root=app|site|breve]
   bun run deps prune-plan [--root=app|site|breve]
   bun run deps licenses [--root=app|site|breve]
+  bun run deps licenses-check
   bun run deps diff [--root=app|site|breve] <bun pm diff arguments...>
   bun run deps audit-fix --root=app|site|breve --apply
   bun run deps dedupe --root=app|site|breve --apply
@@ -69,7 +73,10 @@ async function inherit(args, cwd) {
 }
 
 async function bunIdentity() {
-  const [versionResult, revisionResult] = await Promise.all([capture(["--version"]), capture(["--revision"])]);
+  const [versionResult, revisionResult] = await Promise.all([
+    capture(["--version"]),
+    capture(["--revision"]),
+  ]);
   if (versionResult.exitCode !== 0) {
     throw new Error(
       `Unable to run dependency Bun at ${dependencyBinary}: ${versionResult.stderr.trim() || "unknown error"}`,
@@ -120,19 +127,27 @@ async function runJsonAction(action, projects, identity) {
     });
   }
 
-  console.log(
-    JSON.stringify(
-      {
-        schemaVersion: 1,
-        action,
-        bun: identity,
-        roots,
-      },
-      null,
-      2,
-    ),
-  );
-  return combinedExitCode(roots.map((entry) => (entry.parseError ? 1 : entry.exitCode)));
+  const commandExitCode = combinedExitCode(roots.map((entry) => (entry.parseError ? 1 : entry.exitCode)));
+  if (action === "licenses-check") {
+    if (commandExitCode !== 0) return commandExitCode;
+    const baseline = JSON.parse(
+      readFileSync(resolve(root, "scripts/dependency-license-baseline.json"), "utf8"),
+    );
+    const violations = dependencyLicenseViolations(roots, baseline);
+    if (violations.length) {
+      console.error(`dependency license baseline failed:\n${violations.map((line) => `  - ${line}`).join("\n")}`);
+      return 1;
+    }
+    const unknownCount = roots.reduce(
+      (count, entry) => count + (entry.result?.Unknown?.flatMap((item) => item.versions ?? []).length ?? 0),
+      0,
+    );
+    console.log(`dependency license baseline ok — ${unknownCount} reviewed Unknown entries, no drift`);
+    return 0;
+  }
+
+  console.log(JSON.stringify({ schemaVersion: 1, action, bun: identity, roots }, null, 2));
+  return commandExitCode;
 }
 
 async function main() {
@@ -186,11 +201,13 @@ async function main() {
     console.error(
       `${action} requires Bun ${BUN_PACKAGE_REVIEW_MIN_VERSION} or newer; dependency binary is ${identity.revision ?? identity.version}.`,
     );
-    console.error("Rotli's stable release pin stays authoritative until Bun publishes an immutable 1.4 release.");
+    console.error(
+      "Install the exact Bun version pinned in .bun-version or select a compatible alternate binary.",
+    );
     return 1;
   }
 
-  if (action === "audit-plan" || action === "licenses") {
+  if (action === "audit-plan" || action === "licenses" || action === "licenses-check") {
     return runJsonAction(action, projects, identity);
   }
 
