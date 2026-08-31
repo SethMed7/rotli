@@ -189,7 +189,7 @@ export type ChatArtifactOpen = "sidecar" | "split" | "tab";
 
 export const CHAT_ARTIFACT_OPENS: readonly ChatArtifactOpen[] = ["sidecar", "split", "tab"];
 
-export type ChatReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+export type ChatReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
 export type ChatServiceTier = "standard" | "fast";
 
 /** The per-chat key every chat-scoped map uses: `<instanceId>:<slug>` for a

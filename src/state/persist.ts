@@ -574,7 +574,7 @@ export function parseSettings(raw: string): PersistedSettings {
     chatReasoning: (() => {
       const out: Record<string, ChatReasoningEffort> = {};
       for (const [k, v] of Object.entries(record(data.chatReasoning))) {
-        if (["minimal", "low", "medium", "high", "xhigh", "max"].includes(String(v))) {
+        if (["minimal", "low", "medium", "high", "xhigh", "max", "ultra"].includes(String(v))) {
           out[k] = v as ChatReasoningEffort;
         }
       }

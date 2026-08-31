@@ -743,6 +743,21 @@
   cursor: pointer;
   position: relative;
 }
+.sb-chatrow-open {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.sb-chatrow > :not(.sb-chatrow-open) {
+  position: relative;
+  z-index: 1;
+}
 /* chat FOLDERS (the maintainer, 2026-07-30) — virtual grouping; the folder row is a
    disclosure, its chats indent one step beneath it */
 .sb-chatfolder {
@@ -920,15 +935,15 @@
 .sb-chatmark.none {
   border-color: var(--border);
 }
-/* Fallback letters and the monochrome OpenAI mark follow selected-row ink.
-   Full-color model marks retain their identifying brand artwork. */
+/* Fallback letters follow selected-row ink. Provider artwork keeps its own
+   semantic identity: selecting a chat changes the row, never the vendor mark. */
 .sb-chatrow.sel .sb-chatmark:not(.has-logo) {
   background: var(--surface-2);
   color: var(--selected-icon);
   border-color: var(--border);
 }
 .sb-chatrow.sel .sb-chatmark.openai {
-  color: var(--selected-icon);
+  color: var(--text);
 }
 
 /* the per-chat model chip (the maintainer, 2026-08-03) — a quiet right-aligned label,
@@ -949,6 +964,59 @@
 .sb-chatmodel ~ .sb-chatpin,
 .sb-chattime ~ .sb-chatpin,
 .sb-chatstatus ~ .sb-chatpin {
+  margin-left: 0;
+}
+.sb-chattrail {
+  position: relative;
+  margin-left: auto;
+  flex: 0 0 42px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.sb-chattrail .sb-chattime {
+  margin-left: 0;
+  max-width: none;
+  transition: opacity var(--motion-exit) var(--motion-ease);
+}
+.sb-chataction {
+  position: absolute;
+  right: -3px;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text-muted);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition:
+    opacity var(--motion-exit) var(--motion-ease),
+    background var(--motion-exit) var(--motion-ease),
+    color var(--motion-exit) var(--motion-ease);
+  cursor: pointer;
+}
+.sb-chatrow:hover .sb-chattrail .sb-chattime,
+.sb-chatrow:focus-within .sb-chattrail .sb-chattime {
+  opacity: 0;
+}
+.sb-chatrow:hover .sb-chataction,
+.sb-chatrow:focus-within .sb-chataction,
+.sb-chataction:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.sb-chataction:hover {
+  background: var(--act);
+  color: var(--text);
+}
+.sb-chattrail ~ .sb-chatpin {
   margin-left: 0;
 }
 .sb-chatrow.sel .sb-chatmodel,

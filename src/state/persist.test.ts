@@ -304,7 +304,7 @@ describe("parseSettings — frontier controls", () => {
     const parsed = parseSettings(
       '{"chatReasoning":{"corpus:a":"xhigh","corpus:b":"ultra","unsaved:p":"high"},"chatServiceTier":{"corpus:a":"fast","corpus:b":"priority"}}',
     );
-    expect(parsed.chatReasoning).toEqual({ "corpus:a": "xhigh" });
+    expect(parsed.chatReasoning).toEqual({ "corpus:a": "xhigh", "corpus:b": "ultra" });
     expect(parsed.chatServiceTier).toEqual({ "corpus:a": "fast" });
   });
 });

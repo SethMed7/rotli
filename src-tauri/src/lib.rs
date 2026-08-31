@@ -1165,6 +1165,22 @@ struct VaultInspection {
     warnings: Vec<String>,
 }
 
+/// A trusted native drop, emitted only after `ImportAuthorizations` has issued
+/// the matching one-shot grants. The ordinary Tauri drag event is deliberately
+/// not consumed by the webview because its delivery can race this callback.
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthorizedNativeDrop {
+    paths: Vec<String>,
+    position: AuthorizedNativeDropPosition,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct AuthorizedNativeDropPosition {
+    x: f64,
+    y: f64,
+}
+
 fn inspect_vault_path(path: &std::path::Path) -> Result<VaultInspection, String> {
     if !path.is_dir() {
         return Err("Choose an existing folder.".into());
@@ -2701,11 +2717,23 @@ pub fn run() {
         // "Open rotli" would all go dead for the rest of the process.
         .on_window_event(|window, event| {
             match event {
-                WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {
-                    window
+                WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, position }) => {
+                    let paths = window
                         .app_handle()
                         .state::<corpus::ImportAuthorizations>()
                         .authorize_native_drop(paths);
+                    if !paths.is_empty() {
+                        let _ = window.emit(
+                            "rotli:native-drop-authorized",
+                            AuthorizedNativeDrop {
+                                paths,
+                                position: AuthorizedNativeDropPosition {
+                                    x: position.x,
+                                    y: position.y,
+                                },
+                            },
+                        );
+                    }
                     return;
                 }
                 WindowEvent::CloseRequested { api, .. } => {

@@ -228,7 +228,11 @@ second user-visible product or storage location.
   root's managed image lane before the turn is sent. The transcript stores only
   a portable `storage:` reference; Rust bounds the payload, validates its image
   signature and extension, enforces root mutability, and writes atomically.
-  Unsupported drops fail before Rotli imports them.
+  Unsupported drops fail before Rotli imports them. A native Finder drop first
+  creates short-lived, single-use grants for its exact canonical files; only
+  then does Rust emit the authorized paths and drop position to the webview.
+  The ordinary webview drag event is not file-read authority and is never used
+  to begin an import.
 - A requested PDF is an exported copy of a separate editable Markdown source,
   both attached to the originating assistant turn. Rust keeps both in the same
   registered root and refuses secure, secret-shaped, locked, read-only, or
@@ -366,6 +370,13 @@ semantics, and absent-is-valid migration. Rotli must not infer or backfill them.
 Retrieval policy is capability-based. Context size selects bounded search,
 history, note-read, and table-of-contents budgets; provider names do not grant
 capability by themselves.
+
+Chat quality controls are capability-based too. Reasoning effort and service
+tier choices are derived from the exact connected model id, not merely its
+provider: unsupported controls disappear when the model changes, and stale
+per-chat values are omitted from the next request. The trusted provider adapter
+independently validates the same model/choice pair before constructing CLI
+arguments. These controls are local presentation state, never vault metadata.
 
 Model Mapping 0 builds a fresh, bounded vault table of contents for each model
 request:

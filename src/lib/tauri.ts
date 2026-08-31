@@ -626,7 +626,7 @@ export function cliComplete(args: {
   prompt: string;
   timeoutMs?: number;
   /** Provider-native frontier quality control. Rust validates the allowlist. */
-  reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+  reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
   /** Codex account routing. `standard` preserves the configured default. */
   serviceTier?: "standard" | "fast";
   /** Attached images as base64/data URLs. Rust stages them as real files and
@@ -1839,6 +1839,19 @@ export interface OrganizerProgress {
 export function onOrganizerProgress(cb: (p: OrganizerProgress) => void): () => void {
   if (!isTauri()) return () => {};
   const unlisten = listen<OrganizerProgress>("rotli:organizer-progress", (e) => cb(e.payload));
+  return () => void unlisten.then((fn) => fn());
+}
+
+export interface AuthorizedNativeDrop {
+  paths: string[];
+  position: { x: number; y: number };
+}
+
+/** Native Finder paths become visible here only after Rust has granted their
+ * matching single-use import capabilities. */
+export function onNativeDropAuthorized(cb: (drop: AuthorizedNativeDrop) => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listen<AuthorizedNativeDrop>("rotli:native-drop-authorized", (event) => cb(event.payload));
   return () => void unlisten.then((fn) => fn());
 }
 

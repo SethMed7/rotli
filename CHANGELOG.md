@@ -29,6 +29,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Reasoning controls now follow the selected model, not only its provider.**
+  Claude Haiku no longer offers unsupported effort controls; each Codex model
+  exposes only its own effort ceiling, GPT-5.6 Sol/Terra gain Ultra, and Fast
+  appears only for the GPT-5.6 family. Rust validates the same combinations
+  before launching a provider CLI.
+- **Saved-chat rows have a calmer, keyboard-safe hover action.** Recency yields
+  to one overflow button in the same trailing slot, with the existing row menu
+  behind both overflow and right-click. Active rows keep provider artwork at
+  its normal color instead of tinting the OpenAI mark.
 - **The repository toolchain now runs on Bun 1.4.0.** App, site, Breve, CI,
   release evidence, dependency maintenance, and frozen lockfile checks share
   the exact stable runtime pin, with matching Bun 1.4 type definitions.
@@ -45,6 +54,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Finder image drops no longer race their native file authorization.** Rust
+  now grants each exact dropped file before notifying the webview, so a valid
+  drop into Chat or Markdown cannot intermittently fail as unauthorized; the
+  same grants remain short-lived and single-use.
 - **Antigravity chat uses the CLI's real model IDs again.** Rotli now passes the
   current `agy models` identifiers instead of human display labels, removes the
   retired Gemini 3.5 choices, and no longer repeats the same stderr tail twice

@@ -187,9 +187,11 @@ fn build_args_tuned(
                 return Err(format!("service tier \"{tier}\" isn't supported by claude"));
             }
             if let Some(effort) = reasoning_effort {
-                if !matches!(effort, "low" | "medium" | "high" | "xhigh" | "max") {
+                if model == "haiku"
+                    || !matches!(effort, "low" | "medium" | "high" | "xhigh" | "max")
+                {
                     return Err(format!(
-                        "reasoning effort \"{effort}\" isn't allowed for claude"
+                        "reasoning effort \"{effort}\" isn't allowed for claude model \"{model}\""
                     ));
                 }
             }
@@ -222,15 +224,29 @@ fn build_args_tuned(
         // "-" = prompt from stdin. --cd pins it to a scratch dir OUTSIDE any repo.
         "codex" => {
             if let Some(effort) = reasoning_effort {
-                if !matches!(effort, "minimal" | "low" | "medium" | "high" | "xhigh") {
+                let allowed = match model {
+                    "gpt-5.6-sol" | "gpt-5.6-terra" => {
+                        matches!(
+                            effort,
+                            "low" | "medium" | "high" | "xhigh" | "max" | "ultra"
+                        )
+                    }
+                    "gpt-5.6-luna" => {
+                        matches!(effort, "low" | "medium" | "high" | "xhigh" | "max")
+                    }
+                    _ => matches!(effort, "low" | "medium" | "high" | "xhigh"),
+                };
+                if !allowed {
                     return Err(format!(
-                        "reasoning effort \"{effort}\" isn't allowed for codex"
+                        "reasoning effort \"{effort}\" isn't allowed for codex model \"{model}\""
                     ));
                 }
             }
             if let Some(tier) = service_tier {
-                if !matches!(tier, "standard" | "fast") {
-                    return Err(format!("service tier \"{tier}\" isn't allowed for codex"));
+                if !model.starts_with("gpt-5.6-") || !matches!(tier, "standard" | "fast") {
+                    return Err(format!(
+                        "service tier \"{tier}\" isn't allowed for codex model \"{model}\""
+                    ));
                 }
             }
             let scratch = codex_scratch_dir()?;
@@ -1275,20 +1291,45 @@ mod tests {
             "gpt-5.6-sol",
             "ignored",
             60,
-            Some("xhigh"),
+            Some("ultra"),
             Some("fast"),
             None,
         )
         .unwrap();
-        assert!(codex.contains(&"model_reasoning_effort=\"xhigh\"".to_string()));
+        assert!(codex.contains(&"model_reasoning_effort=\"ultra\"".to_string()));
         assert!(codex.contains(&"service_tier=\"fast\"".to_string()));
         assert_eq!(codex.last().unwrap(), "-");
 
         assert!(
-            build_args_tuned("codex", "gpt-5.6-sol", "p", 60, Some("max"), None, None)
+            build_args_tuned("codex", "gpt-5.5", "p", 60, Some("max"), None, None)
                 .unwrap_err()
                 .contains("reasoning effort")
         );
+        assert!(
+            build_args_tuned("codex", "gpt-5.6-luna", "p", 60, Some("ultra"), None, None)
+                .unwrap_err()
+                .contains("reasoning effort")
+        );
+        assert!(
+            build_args_tuned("codex", "gpt-5.4", "p", 60, None, Some("fast"), None)
+                .unwrap_err()
+                .contains("service tier")
+        );
+        assert!(
+            build_args_tuned("claude", "haiku", "p", 60, Some("high"), None, None)
+                .unwrap_err()
+                .contains("reasoning effort")
+        );
+        assert!(build_args_tuned(
+            "codex",
+            "gpt-5.6-luna",
+            "p",
+            60,
+            Some("max"),
+            Some("fast"),
+            None,
+        )
+        .is_ok());
         assert!(
             build_args_tuned("claude", "sonnet", "p", 60, None, Some("fast"), None)
                 .unwrap_err()

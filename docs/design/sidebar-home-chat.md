@@ -60,7 +60,10 @@ Now the sidebar has **one top switcher and one body**:
     `chat-folders.json` entry, while recency remains derived from chat files).
   - **Provider mark + recency** — the left mark identifies the model provider;
     the right edge shows compact last activity (`now`, `4h`, `8d`) rather than
-    repeating the model name.
+    repeating the model name. Hovering a saved chat, or focusing it from the
+    keyboard, swaps that timestamp for one stable overflow action without
+    shifting the title; right-click opens the same menu. Selection changes the
+    row surface and text hierarchy but never recolors the provider mark.
   - **Views** — chats join named views (`chats: [slug]` on the view in
     `views.json`, singular membership like notes): the row menu's "Move to
     view", an active view narrows the front to its chats, and a chat born
