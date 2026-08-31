@@ -234,6 +234,26 @@ dependency change:
   current Miniflare alpha pins that exact version, so no compatible repair is
   available.
 
+**Temporary release exception SC-2026-08-31 — accepted 2026-08-31; owner:
+@SethMed7; expires 2026-09-30.** This exception covers only the exact blocked
+paths above and does not turn the advisory audit green. The current
+`audit-plan` reports zero compatible fixes. Lodash, NanoID, and UUID are
+transitive implementation details of the named document/board libraries;
+Rotli does not call their vulnerable template-import, caller-selected-size, or
+caller-provided-buffer APIs. Sharp's shipped path is the optional local speech
+stack, which does not decode user images; Rotli's direct Sharp calls are
+development checks over repository-owned assets. Undici is confined to the
+site deployment toolchain and is not bundled into Rotli.app. The remaining
+impact is a compromised or unexpectedly unsafe upstream call path: code or
+prototype manipulation, an ID-generation denial of service, a UUID buffer
+write, local image-parser corruption, or site-tool HTTP parsing failure.
+Compensating controls are frozen script-free lockfiles, adapter input/size
+limits, the absence of direct app calls to the vulnerable APIs, and the
+required full regression/build proof. Re-run `bun run deps audit-plan` before
+every release candidate and at expiry; any newly compatible fix, upstream
+range, direct reachability, or exploit evidence ends this exception and blocks
+publication until repaired and reviewed. This exception does not auto-renew.
+
 The site-only Undici path is a build/deploy input rather than app-bundle runtime
 code, but it still executes in the release pipeline and remains supply-chain
 relevant. Breve's sole remaining finding is the Transformers Sharp range in the
