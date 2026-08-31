@@ -5,6 +5,9 @@
 preload = ["./test-setup.ts"]
 
 [install]
+# A plain `bun install` is deterministic too. An older Bun that cannot read
+# lockfile v2 must fail without replacing the reviewed graph.
+frozenLockfile = true
 # Hold new direct and transitive resolutions for three days so a compromised
 # release has time to be discovered. Frozen lockfile installs are unchanged.
 minimumReleaseAge = 259200

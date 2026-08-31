@@ -152,6 +152,9 @@ violations.push(
   ...toolchainPolicyViolations({
     manifest: packageJson,
     oxlintConfig: JSON.parse(stripJsonComments(readFileSync(join(root, ".oxlintrc.json"), "utf8"))),
+    reactCompilerConfig: JSON.parse(
+      stripJsonComments(readFileSync(join(root, "scripts/react-compiler-oxlint.json"), "utf8")),
+    ),
     oxfmtConfig: JSON.parse(stripJsonComments(readFileSync(join(root, ".oxfmtrc.json"), "utf8"))),
     viteConfig,
   }),

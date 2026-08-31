@@ -137,7 +137,7 @@ fn keychain_service_matches_fixture() {
 fn keychain_allowed_accounts_match_fixture() {
     assert_eq!(
         string_list(&entry("keychainAllowedAccounts")),
-        crate::keychain::ALLOWED
+        crate::keychain::WEBVIEW_ALLOWED
     );
 }
 

@@ -25,4 +25,15 @@ describe("warm pane surfaces", () => {
     expect(nextWarmSurfaceIds([], tabs[0]!, tabs)).toEqual(["web"]);
     expect(nextWarmSurfaceIds(["web"], tabs[1]!, tabs)).toEqual(["web"]);
   });
+
+  test("keeps every open private-browser session alive while bounding other heavy surfaces", () => {
+    const tabs = [browser("web-a"), chat("chat-a"), browser("web-b"), browser("web-c"), browser("web-d")];
+    expect(nextWarmSurfaceIds(["web-c", "web-b", "chat-a", "web-a"], tabs[4]!, tabs)).toEqual([
+      "web-d",
+      "web-c",
+      "web-b",
+      "web-a",
+      "chat-a",
+    ]);
+  });
 });

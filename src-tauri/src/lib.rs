@@ -27,8 +27,9 @@ mod memex_query;
 mod organizer;
 #[cfg(test)]
 mod parity_tests;
-mod provider;
 mod private_browser;
+mod provider;
+mod remote_agent;
 mod routines;
 mod search_index;
 mod secret;
@@ -1164,6 +1165,22 @@ struct VaultInspection {
     warnings: Vec<String>,
 }
 
+/// A trusted native drop, emitted only after `ImportAuthorizations` has issued
+/// the matching one-shot grants. The ordinary Tauri drag event is deliberately
+/// not consumed by the webview because its delivery can race this callback.
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthorizedNativeDrop {
+    paths: Vec<String>,
+    position: AuthorizedNativeDropPosition,
+}
+
+#[derive(Clone, serde::Serialize)]
+struct AuthorizedNativeDropPosition {
+    x: f64,
+    y: f64,
+}
+
 fn inspect_vault_path(path: &std::path::Path) -> Result<VaultInspection, String> {
     if !path.is_dir() {
         return Err("Choose an existing folder.".into());
@@ -1672,6 +1689,10 @@ fn activate_vault_path_live(
         new_root = Some((store, suppress));
     }
 
+    // A remote session is authorized for the vault that was active when the
+    // user connected it. Fail closed across an in-place vault switch instead
+    // of leaving the cloud client attached to a now-hidden previous vault.
+    remote_agent::disconnect_for_vault_change(app)?;
     let organizer = app.state::<organizer::OrganizerState>().0.clone();
     let mut watcher = None;
     organizer.with_vault_transition(|| {
@@ -2229,6 +2250,7 @@ pub fn run() {
         .manage(provider::ProviderState::default())
         .manage(localmodel::LocalModelState::default())
         .manage(compute::ComputeState::default())
+        .manage(remote_agent::RemoteAgentState::default())
         // the app-menu ⌘Q replacement (see setup) — tray menu events have their
         // own handler; the ids are distinct so double-dispatch can't double-quit
         .on_menu_event(|app, event| {
@@ -2371,6 +2393,11 @@ pub fn run() {
             keychain::secret_store,
             keychain::secret_exists,
             keychain::secret_delete,
+            remote_agent::remote_agent_status,
+            remote_agent::remote_agent_pair,
+            remote_agent::remote_agent_start,
+            remote_agent::remote_agent_stop,
+            remote_agent::remote_agent_unpair,
             organizer::organizer_status,
             organizer::organizer_run_once,
             organizer::organizer_stop,
@@ -2690,11 +2717,23 @@ pub fn run() {
         // "Open rotli" would all go dead for the rest of the process.
         .on_window_event(|window, event| {
             match event {
-                WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) => {
-                    window
+                WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, position }) => {
+                    let paths = window
                         .app_handle()
                         .state::<corpus::ImportAuthorizations>()
                         .authorize_native_drop(paths);
+                    if !paths.is_empty() {
+                        let _ = window.emit(
+                            "rotli:native-drop-authorized",
+                            AuthorizedNativeDrop {
+                                paths,
+                                position: AuthorizedNativeDropPosition {
+                                    x: position.x,
+                                    y: position.y,
+                                },
+                            },
+                        );
+                    }
                     return;
                 }
                 WindowEvent::CloseRequested { api, .. } => {

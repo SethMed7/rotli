@@ -29,7 +29,7 @@ import { useContextMenu } from "../../state/contextMenu";
 import { useFocusedChatSlug, usePanesStore } from "../../state/panes";
 import { chatKey, useUiStore } from "../../state/ui";
 import { useViewsStore } from "../../state/views";
-import { ChevronRight, FolderGlyph, PinGlyph, PlusGlyph, SearchGlyph } from "../glyphs";
+import { ChevronRight, FolderGlyph, MoreGlyph, PinGlyph, PlusGlyph, SearchGlyph } from "../glyphs";
 import { InlineRenameInput } from "../inlineRenameInput";
 import { compactUsageNumber, modelUsageSnapshot } from "../modelUsageSummary";
 import { chatMark } from "./chatMark";
@@ -174,6 +174,157 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
     });
   };
 
+  const openChatActions = (c: MemexChatSummary, x: number, y: number) => {
+    // failures (e.g. a read-only brain) land in the sidebar's inline error
+    // note — the menu is gone by the time they reject (#11 pattern).
+    const runChatOp = (verb: string, op: Promise<void>) => {
+      setRowActionError(null);
+      void op
+        .then(() => invalidateMemex())
+        .catch((err) =>
+          setRowActionError(
+            `Couldn't ${verb} this chat — ${err instanceof Error ? err.message : String(err)}`,
+          ),
+        );
+    };
+    const assignedFolder = manifest.assignments[c.slug];
+    openContextMenu(x, y, [
+      {
+        kind: "action" as const,
+        label: "Open in new tab",
+        onClick: () =>
+          openChat(c.slug, {
+            newTab: true,
+            ...(chats.activeMemex ? { vaultId: chats.activeMemex.id } : {}),
+          }),
+      },
+      {
+        kind: "action" as const,
+        label: "Open to the right",
+        onClick: () => usePanesStore.getState().openToSide("chat", c.slug),
+      },
+      { kind: "sep" as const },
+      {
+        kind: "action" as const,
+        label: c.pinned ? "Unpin from top" : "Pin to top",
+        checked: c.pinned,
+        onClick: () => {
+          if (activeMemex) runChatOp("pin", pinChat(activeMemex, c.slug, !c.pinned));
+        },
+      },
+      {
+        kind: "action" as const,
+        label: "Rename…",
+        onClick: () => chatRename.start(c.slug),
+      },
+      {
+        kind: "drill" as const,
+        label: "Move to folder",
+        items: [
+          ...manifest.folders.map((folder) => ({
+            kind: "action" as const,
+            label: folder.name,
+            checked: assignedFolder === folder.id,
+            checkedMark: "highlight" as const,
+            onClick: () => update((m) => assignChatToFolder(m, c.slug, folder.id)),
+          })),
+          ...(assignedFolder
+            ? [
+                {
+                  kind: "action" as const,
+                  label: "Remove from folder",
+                  onClick: () => update((m) => assignChatToFolder(m, c.slug, null)),
+                },
+              ]
+            : []),
+          ...(manifest.folders.length > 0 ? [{ kind: "sep" as const }] : []),
+          {
+            kind: "action" as const,
+            label: "New folder…",
+            onClick: () => {
+              let createdId: string | null = null;
+              update(
+                (m) => {
+                  const created = createChatFolder(m, "New folder");
+                  createdId = created.id;
+                  return assignChatToFolder(created.manifest, c.slug, created.id);
+                },
+                () => {
+                  if (createdId) setRenamingFolderId(createdId);
+                },
+              );
+            },
+          },
+        ],
+      },
+      ...(viewsManifest.views.length > 0 && viewsWritable
+        ? [
+            {
+              kind: "drill" as const,
+              label: "Move to view",
+              items: [
+                ...viewsManifest.views.map((view) => ({
+                  kind: "action" as const,
+                  label: view.name,
+                  checked: chatAssignedView(viewsManifest, c.slug) === view.name,
+                  checkedMark: "highlight" as const,
+                  onClick: () => setViewsManifest(assignChatToView(viewsManifest, c.slug, view.name)),
+                })),
+                ...(chatAssignedView(viewsManifest, c.slug)
+                  ? [
+                      {
+                        kind: "action" as const,
+                        label: "Remove from view",
+                        onClick: () => setViewsManifest(assignChatToView(viewsManifest, c.slug, null)),
+                      },
+                    ]
+                  : []),
+              ],
+            },
+          ]
+        : []),
+      {
+        kind: "action" as const,
+        label: "Show in Finder",
+        disabled: !isTauri(),
+        onClick: () => {
+          if (!activeMemex) return;
+          setRowActionError(null);
+          void revealChat(activeMemex, c.slug).catch((err) =>
+            setRowActionError(
+              `Couldn't reveal in Finder — ${err instanceof Error ? err.message : String(err)}`,
+            ),
+          );
+        },
+      },
+      {
+        kind: "action" as const,
+        label: "Copy file path",
+        onClick: () => {
+          if (activeMemex) {
+            void navigator.clipboard.writeText(`${activeMemex.root}/chats/${c.slug}.md`);
+          }
+        },
+      },
+      { kind: "sep" as const },
+      {
+        kind: "action" as const,
+        label: "Archive",
+        onClick: () => {
+          if (activeMemex) runChatOp("archive", archiveChat(activeMemex, c.slug));
+        },
+      },
+      {
+        kind: "action" as const,
+        label: "Delete",
+        danger: true,
+        onClick: () => {
+          if (activeMemex) runChatOp("delete", deleteChat(activeMemex, c.slug));
+        },
+      },
+    ]);
+  };
+
   // one chat row, shared by folder groups and the loose list below them.
   // `hoisted` marks the COPY the Activity lane lifts to the top: the same chat
   // still sits in its real folder below, and only that canonical row carries
@@ -189,8 +340,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         onCancel={chatRename.cancel}
       />
     ) : (
-      <button
-        type="button"
+      <div
         key={c.slug}
         data-chat-slug={c.slug}
         /* a chat row lights only while the PANES actually show it — never
@@ -208,169 +358,23 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         onContextMenu={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          // failures (e.g. a read-only brain) land in the sidebar's inline
-          // error note — the menu is gone by the time they reject (#11
-          // pattern; reviewer, 2026-07-08)
-          const runChatOp = (verb: string, op: Promise<void>) => {
-            setRowActionError(null);
-            void op
-              .then(() => invalidateMemex())
-              .catch((err) =>
-                setRowActionError(
-                  `Couldn't ${verb} this chat — ${err instanceof Error ? err.message : String(err)}`,
-                ),
-              );
-          };
-          const assignedFolder = manifest.assignments[c.slug];
-          openContextMenu(e.clientX, e.clientY, [
-            // the open verbs mirror the note row's menu (the maintainer, 2026-07-30:
-            // "pretty much the same things as the notes")
-            {
-              kind: "action" as const,
-              label: "Open in new tab",
-              onClick: () =>
-                openChat(c.slug, {
-                  newTab: true,
-                  ...(chats.activeMemex ? { vaultId: chats.activeMemex.id } : {}),
-                }),
-            },
-            {
-              kind: "action" as const,
-              label: "Open to the right",
-              onClick: () => usePanesStore.getState().openToSide("chat", c.slug),
-            },
-            { kind: "sep" as const },
-            {
-              kind: "action" as const,
-              label: c.pinned ? "Unpin from top" : "Pin to top",
-              checked: c.pinned,
-              onClick: () => {
-                if (activeMemex) runChatOp("pin", pinChat(activeMemex, c.slug, !c.pinned));
-              },
-            },
-            {
-              kind: "action" as const,
-              label: "Rename…",
-              onClick: () => chatRename.start(c.slug),
-            },
-            {
-              kind: "drill" as const,
-              label: "Move to folder",
-              items: [
-                ...manifest.folders.map((folder) => ({
-                  kind: "action" as const,
-                  label: folder.name,
-                  checked: assignedFolder === folder.id,
-                  checkedMark: "highlight" as const,
-                  onClick: () => update((m) => assignChatToFolder(m, c.slug, folder.id)),
-                })),
-                ...(assignedFolder
-                  ? [
-                      {
-                        kind: "action" as const,
-                        label: "Remove from folder",
-                        onClick: () => update((m) => assignChatToFolder(m, c.slug, null)),
-                      },
-                    ]
-                  : []),
-                ...(manifest.folders.length > 0 ? [{ kind: "sep" as const }] : []),
-                {
-                  kind: "action" as const,
-                  label: "New folder…",
-                  onClick: () => {
-                    // create + assign in one write, then open the rename box
-                    let createdId: string | null = null;
-                    update(
-                      (m) => {
-                        const created = createChatFolder(m, "New folder");
-                        createdId = created.id;
-                        return assignChatToFolder(created.manifest, c.slug, created.id);
-                      },
-                      () => {
-                        if (createdId) setRenamingFolderId(createdId);
-                      },
-                    );
-                  },
-                },
-              ],
-            },
-            // chats organize by named view too (2026-08-03): work vs personal
-            ...(viewsManifest.views.length > 0 && viewsWritable
-              ? [
-                  {
-                    kind: "drill" as const,
-                    label: "Move to view",
-                    items: [
-                      ...viewsManifest.views.map((view) => ({
-                        kind: "action" as const,
-                        label: view.name,
-                        checked: chatAssignedView(viewsManifest, c.slug) === view.name,
-                        checkedMark: "highlight" as const,
-                        onClick: () => setViewsManifest(assignChatToView(viewsManifest, c.slug, view.name)),
-                      })),
-                      ...(chatAssignedView(viewsManifest, c.slug)
-                        ? [
-                            {
-                              kind: "action" as const,
-                              label: "Remove from view",
-                              onClick: () => setViewsManifest(assignChatToView(viewsManifest, c.slug, null)),
-                            },
-                          ]
-                        : []),
-                    ],
-                  },
-                ]
-              : []),
-            {
-              kind: "action" as const,
-              label: "Show in Finder",
-              disabled: !isTauri(),
-              onClick: () => {
-                if (!activeMemex) return;
-                setRowActionError(null);
-                void revealChat(activeMemex, c.slug).catch((err) =>
-                  setRowActionError(
-                    `Couldn't reveal in Finder — ${err instanceof Error ? err.message : String(err)}`,
-                  ),
-                );
-              },
-            },
-            {
-              kind: "action" as const,
-              // the chat IS a file on disk (chats/<slug>.md) — surface that
-              // truth right in the row menu
-              label: "Copy file path",
-              onClick: () => {
-                if (activeMemex) {
-                  void navigator.clipboard.writeText(`${activeMemex.root}/chats/${c.slug}.md`);
-                }
-              },
-            },
-            { kind: "sep" as const },
-            {
-              kind: "action" as const,
-              label: "Archive",
-              onClick: () => {
-                if (activeMemex) runChatOp("archive", archiveChat(activeMemex, c.slug));
-              },
-            },
-            {
-              kind: "action" as const,
-              label: "Delete",
-              danger: true,
-              onClick: () => {
-                if (activeMemex) runChatOp("delete", deleteChat(activeMemex, c.slug));
-              },
-            },
-          ]);
+          openChatActions(c, e.clientX, e.clientY);
         }}
-        title={c.title || c.slug}
       >
+        <button
+          type="button"
+          className="sb-chatrow-open"
+          aria-label={`Open chat ${c.title || c.slug}`}
+          aria-current={
+            !hoisted && contentView === "panes" && focusedChatSlug === c.slug ? "page" : undefined
+          }
+          title={c.title || c.slug}
+        />
         {(() => {
           // the left slot carries the MODEL, not a chat glyph: in a list of
           // nothing but chats, "this is a chat" is the one thing you already
-          // know (the maintainer, 2026-08-04). A chat with no model picked yet gets a
-          // blank badge — it holds the column, and claims nothing.
+          // know. A chat with no model picked yet gets a blank badge — it holds
+          // the column, and claims nothing.
           const ownModel = chatModelMap[runKeyOf(c.slug)];
           const id = ownModel ?? chatModelId;
           if (!id) return <span className="sb-chatmark none" title="No model picked yet" />;
@@ -391,8 +395,8 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         <span className="fname">{c.title || c.slug}</span>
         {(() => {
           // A live session status is the newest fact. Otherwise the right edge
-          // carries compact file activity; the provider mark already identifies
-          // the model family without repeating a long model name.
+          // carries compact file activity; hovering or focusing swaps that fact
+          // for one stable action slot without moving the title.
           const run = runs[runKeyOf(c.slug)];
           return (
             <>
@@ -403,12 +407,31 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
               )}
               {hoisted && run === "unread" && <span className="sb-chatstatus unread">New</span>}
               {hoisted && run === "done" && <span className="sb-chatstatus done">Done</span>}
-              {!hoisted && <span className="sb-chattime">{relativeChatAge(now, c.modifiedMs)}</span>}
+              {!hoisted && (
+                <span className="sb-chattrail">
+                  <span className="sb-chattime">{relativeChatAge(now, c.modifiedMs)}</span>
+                  <button
+                    type="button"
+                    className="sb-chataction"
+                    aria-label={`More actions for ${c.title || c.slug}`}
+                    title="More actions"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      openChatActions(c, rect.right, rect.bottom);
+                    }}
+                  >
+                    <MoreGlyph size={14} />
+                  </button>
+                </span>
+              )}
             </>
           );
         })()}
         {c.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
-      </button>
+      </div>
     );
 
   return (

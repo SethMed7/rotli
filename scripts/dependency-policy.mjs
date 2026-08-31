@@ -195,6 +195,9 @@ export function dependencyPolicyViolations({ bunVersion, manifests, bunfigs, loc
 
     const bunfig = bunfigs[project.bunfigPath];
     const install = bunfigInstallSettings(bunfig);
+    if (install.frozenLockfile !== true) {
+      violations.push(`${project.bunfigPath}: install.frozenLockfile must be true`);
+    }
     if (install.minimumReleaseAge !== MINIMUM_RELEASE_AGE_SECONDS) {
       violations.push(
         `${project.bunfigPath}: install.minimumReleaseAge must be ${MINIMUM_RELEASE_AGE_SECONDS} seconds`,

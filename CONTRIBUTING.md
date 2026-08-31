@@ -19,6 +19,21 @@ Install JavaScript dependencies once:
 bun install --frozen-lockfile
 ```
 
+Rotli's three `bunfig.toml` files also make a plain `bun install` frozen, so a
+wrong runtime cannot silently replace the reviewed dependency graph. If Bun
+reports `Unknown lockfile version`, stop and compare `bun --version` with
+`.bun-version`. For the official-script installation, install Rotli's exact pin
+and retry:
+
+```sh
+curl -fsSL https://bun.com/install | bash -s "bun-v$(cat .bun-version)"
+bun --version
+bun install --frozen-lockfile
+```
+
+Use the package manager that installed Bun instead when applicable; do not
+accept or commit a downgraded lockfile.
+
 ## Development surfaces
 
 ```sh

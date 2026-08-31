@@ -15,6 +15,7 @@ direction, runtime wiring, and owning documentation must agree.
 | `bun run test:evals` | Deterministic offline AI loop, routing, model-policy, prompt, retrieval, and memory-workflow evals |
 | `bun run test:breve` | Breve policy, failure-state, locking, and delivery-claim regressions |
 | `bun run test:tooling` | Fixture tests that prove repository linters detect forbidden code shapes, plus the script-free native/generated dependency smoke |
+| `bun run test:relay` | Stateless remote-MCP relay role authentication, browser-origin refusal, capacity/body bounds, live-device rendezvous, expiry, and token-isolation tests |
 | `bun run test:e2e` | Playwright regression layer — drives the real browser twin (chromium) against `vite dev`'s seeded demo corpus |
 | `bun run test:e2e:ui` | The same specs in Playwright's interactive UI runner, for local debugging |
 | `bun run check:e2e-types` | Strict-typecheck `e2e/` and `playwright.config.ts` (`tsc -p tsconfig.e2e.json`) — not folded into the root `tsc --noEmit` because that config's `include` is `src` only |
@@ -22,6 +23,7 @@ direction, runtime wiring, and owning documentation must agree.
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` | Rust lint gate — warnings fail CI |
 | `bun run test:regression` | All Bun behavior tests plus Breve runtime and design-system checks |
 | `bun run check` | Required JavaScript/TypeScript gate: lint plus the regression suite |
+| `bun run verify` | **The local twin of CI.** Runs the Regression suite's lanes in its order — `check`, the production build, and the three `site/` steps; `check:e2e-types` plus Playwright; `cargo clippy -D warnings` plus `cargo test`. Takes lane names to narrow it (`bun run verify rust`). `bun run check` alone is *not* the CI gate: clippy, Playwright, and every `site/` step live outside it, which is how a change can pass locally and turn `main` red. Excludes only the advisory dependency audit and the signing/notarization steps `release.sh` owns |
 | `cargo test --manifest-path src-tauri/Cargo.toml` | Rust host, filesystem, security, scheduler, and IPC behavior |
 | `NODE_OPTIONS=--max-old-space-size=4096 bun run build` | Production bundling, final TypeScript/runtime validation, and tested startup/lazy chunk budgets |
 
@@ -38,7 +40,7 @@ stays complete — every `package.json` script must appear in this document):
 | `bun run typecheck:tsc6` | All four scopes (`src`, Vite/build policy, E2E, and Breve) re-checked on `typescript6` (`npm:typescript@~6.0.3`, the last JavaScript TypeScript) — the independent second implementation, not merely a slower one. It is part of `lint` and is called by explicit path because `typescript@7` owns `node_modules/.bin/tsc` |
 | `bun run lint:oxlint` | The oxlint layer alone (`src`, `e2e`, `scripts`, Breve, and both root TypeScript configs; oxlint's `correctness` category plus the hand-picked rules). Type awareness and a zero-warning ceiling live in the root config, nested configs are disabled, and an executable contract test proves `oxlint-tsgolint` actually reports a typed promise violation — part of `lint` |
 | `bun run check:react-compiler` | Runs Oxlint's React Compiler analysis in lint-only mode. The per-file/category baseline is a ratchet: existing effect/ref debt may shrink, while any increase fails `lint`; no compiler transform enters the production build |
-| `bun run check:knip` | Dead-weight gate — unreferenced files, exports, and dependencies, plus undeclared imports and binaries (`knip.json`); part of `lint`. `knip.json`'s `ignoreUnresolved` entry for headless Chrome is **load-bearing on Linux CI and must not be removed**: `breve-runtime/scripts/email-topic.ts` invokes Chrome through Bun's `$` shell, so knip resolves it as a binary. The path exists on a developer Mac, so knip reports the entry as an unused "configuration hint" locally — following that hint turns the Linux Quality lane red while every local check stays green. JSON takes no comments, hence this row |
+| `bun run check:knip` | Dead-weight gate — unreferenced files, exports, and dependencies, plus undeclared imports and binaries (`knip.json`); part of `lint`. Never spell an absolute binary path inside Bun's `$` template shell: knip parses the first token as a binary and resolves it against the **local** filesystem, so a macOS-only path is green on a developer Mac and red on Linux CI. That asymmetry cost #118→#120 a red `main`; resolve the binary through a variable instead, the way `breve-runtime/scripts/chrome-pdf.ts` does |
 | `bun run check:dup` | Advisory duplication miner over `scripts/dup-judgments.json` — run on demand, deliberately not a gate |
 | `bun run build:mac` | Local signed `.app` bundle (predmg clean + `tauri build`) |
 | `bun run release` | `scripts/release.sh` — gate, sign, notarize, staple, publish; only under an explicitly authorized release |

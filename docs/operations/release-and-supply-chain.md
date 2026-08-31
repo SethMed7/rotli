@@ -113,11 +113,12 @@ rather than fields that imply evidence the current script does not yet collect.
 - Lockfiles are frozen in CI and changed only in reviewed commits.
 - The app, marketing site, and Breve runtime are independent Bun install roots.
   Each manifest names the repository's exact `.bun-version`, each root holds the
-  same three-day `install.minimumReleaseAge`, uses lockfile v2, and installs
-  without package lifecycle scripts through the isolated linker and a
-  project-local store. `bun run deps audit` scans all three lockfiles. The age
-  gate affects new resolution only; frozen installs do not reinterpret an
-  existing lockfile.
+  same three-day `install.minimumReleaseAge`, uses lockfile v2, defaults even a
+  plain install to `install.frozenLockfile`, and installs without package
+  lifecycle scripts through the isolated linker and a project-local store. An
+  older Bun that cannot read v2 therefore fails without replacing the reviewed
+  graph. `bun run deps audit` scans all three lockfiles. The age gate affects
+  new resolution only; frozen installs do not reinterpret an existing lockfile.
 - Protected CI blocks on cross-lockfile convergence and exact drift from
   `scripts/dependency-license-baseline.json`, then retains the combined
   production dependency-license inventory for 30 days. A newly Unknown package

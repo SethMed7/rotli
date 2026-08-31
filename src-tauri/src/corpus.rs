@@ -6916,12 +6916,17 @@ const IMPORT_AUTHORIZATION_TTL: Duration = Duration::from_secs(30);
 pub struct ImportAuthorizations(Mutex<HashMap<PathBuf, (Instant, usize)>>);
 
 impl ImportAuthorizations {
-    pub(crate) fn authorize_native_drop(&self, paths: &[PathBuf]) {
+    /// Grant one import for every file the OS actually delivered and return the
+    /// canonical paths that are safe to hand to the webview. The caller emits
+    /// this result only after the grants exist, so a fast frontend import can
+    /// never race ahead of native authorization.
+    pub(crate) fn authorize_native_drop(&self, paths: &[PathBuf]) -> Vec<String> {
         let Ok(mut grants) = self.0.lock() else {
-            return;
+            return Vec::new();
         };
         let now = Instant::now();
         grants.retain(|_, (issued, _)| now.duration_since(*issued) <= IMPORT_AUTHORIZATION_TTL);
+        let mut authorized = Vec::with_capacity(paths.len());
         for path in paths {
             let Ok(canonical) = fs::canonicalize(path) else {
                 continue;
@@ -6929,10 +6934,15 @@ impl ImportAuthorizations {
             if !canonical.is_file() {
                 continue;
             }
+            let Some(delivered) = canonical.to_str().map(str::to_owned) else {
+                continue;
+            };
             let entry = grants.entry(canonical).or_insert((now, 0));
             entry.0 = now;
             entry.1 = entry.1.saturating_add(1);
+            authorized.push(delivered);
         }
+        authorized
     }
 
     fn consume(&self, path: &Path) -> Result<PathBuf, String> {
@@ -9027,9 +9037,16 @@ mod tests {
         let grants = ImportAuthorizations::default();
 
         assert!(grants.consume(&source).is_err());
-        grants.authorize_native_drop(std::slice::from_ref(&source));
+        let delivered = grants.authorize_native_drop(std::slice::from_ref(&source));
         assert_eq!(
-            grants.consume(&source).unwrap(),
+            delivered,
+            vec![fs::canonicalize(&source)
+                .unwrap()
+                .to_string_lossy()
+                .to_string()]
+        );
+        assert_eq!(
+            grants.consume(Path::new(&delivered[0])).unwrap(),
             fs::canonicalize(&source).unwrap()
         );
         assert!(

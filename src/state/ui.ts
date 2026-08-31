@@ -189,7 +189,7 @@ export type ChatArtifactOpen = "sidecar" | "split" | "tab";
 
 export const CHAT_ARTIFACT_OPENS: readonly ChatArtifactOpen[] = ["sidecar", "split", "tab"];
 
-export type ChatReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+export type ChatReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
 export type ChatServiceTier = "standard" | "fast";
 
 /** The per-chat key every chat-scoped map uses: `<instanceId>:<slug>` for a
@@ -368,6 +368,10 @@ interface UiState {
   /** Search provider used by fresh private-browser tabs and address-bar queries. */
   privateBrowserSearchEngine: PrivateBrowserSearchEngine;
   setPrivateBrowserSearchEngine: (engine: PrivateBrowserSearchEngine) => void;
+  /** Installation-wide remote MCP endpoint. The bearer stays in Keychain and
+   * every app launch still starts disconnected. */
+  remoteAgentRelayUrl: string;
+  setRemoteAgentRelayUrl: (url: string) => void;
   /** Compatibility field; active sessions are always single-vault. */
   paneVaultMode: PaneVaultMode;
   setPaneVaultMode: (mode: PaneVaultMode) => void;
@@ -796,6 +800,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setTabLayout: (layout) => set({ tabLayout: layout }),
   privateBrowserSearchEngine: DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE,
   setPrivateBrowserSearchEngine: (engine) => set({ privateBrowserSearchEngine: engine }),
+  remoteAgentRelayUrl: "",
+  setRemoteAgentRelayUrl: (url) => set({ remoteAgentRelayUrl: url }),
   paneVaultMode: "single",
   setPaneVaultMode: (mode) => set({ paneVaultMode: mode }),
 

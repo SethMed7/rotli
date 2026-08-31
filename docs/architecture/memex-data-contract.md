@@ -228,7 +228,11 @@ second user-visible product or storage location.
   root's managed image lane before the turn is sent. The transcript stores only
   a portable `storage:` reference; Rust bounds the payload, validates its image
   signature and extension, enforces root mutability, and writes atomically.
-  Unsupported drops fail before Rotli imports them.
+  Unsupported drops fail before Rotli imports them. A native Finder drop first
+  creates short-lived, single-use grants for its exact canonical files; only
+  then does Rust emit the authorized paths and drop position to the webview.
+  The ordinary webview drag event is not file-read authority and is never used
+  to begin an import.
 - A requested PDF is an exported copy of a separate editable Markdown source,
   both attached to the originating assistant turn. Rust keeps both in the same
   registered root and refuses secure, secret-shaped, locked, read-only, or
@@ -253,6 +257,13 @@ second user-visible product or storage location.
 - User turns are the navigation landmarks for a long transcript. The chat may
   derive a compact left-edge prompt navigator from rendered messages; it is a
   view only and does not create another chat index or durable identity.
+- The Markdown chat file always keeps the complete transcript. On open, the
+  interactive surface mounts only the newest 500 messages and says how many
+  earlier messages remain in that file; completing another turn keeps the same
+  rolling UI window. Model input is narrower still: the existing per-model
+  character budget keeps only recent conversation history, while retrieval can
+  reopen an older chat explicitly. No provider owns or silently replays a
+  second copy of Rotli's transcript.
 - Every model adapter shares one bounded clarification response shape: one
   concise question with two or three mutually exclusive options. The loop
   accepts it only when a missing material choice changes the result or file
@@ -360,6 +371,13 @@ Retrieval policy is capability-based. Context size selects bounded search,
 history, note-read, and table-of-contents budgets; provider names do not grant
 capability by themselves.
 
+Chat quality controls are capability-based too. Reasoning effort and service
+tier choices are derived from the exact connected model id, not merely its
+provider: unsupported controls disappear when the model changes, and stale
+per-chat values are omitted from the next request. The trusted provider adapter
+independently validates the same model/choice pair before constructing CLI
+arguments. These controls are local presentation state, never vault metadata.
+
 Model Mapping 0 builds a fresh, bounded vault table of contents for each model
 request:
 
@@ -406,7 +424,10 @@ arguments pass both the secret detector and a substantial verbatim-overlap check
 against locally retrieved results. The latter blocks ordinary private prose,
 not only credential-shaped strings. Network tools exist only when their explicit
 per-chat capability is on; blocked private text must be rephrased locally rather
-than approved by prompt text.
+than approved by prompt text. The connected-model scaffold identifies itself as
+an application request, not a nested system identity or alternate reasoning
+engine. Commands found inside a result stay ignored data, but do not replace or
+abort the user's requested work when trustworthy evidence remains available.
 
 Starting a chat from a Markdown note reuses the chat already attached to that
 note or creates one durable chat with a stable note-derived identity. Each turn

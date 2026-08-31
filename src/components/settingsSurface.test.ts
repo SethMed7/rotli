@@ -17,4 +17,46 @@ describe("private browser presentation", () => {
     expect(browserSource).toContain("privateBrowserSearchEngine");
     expect(browserSource).toContain("Search with");
   });
+
+  test("opens popup destinations as sibling private tabs", () => {
+    expect(browserSource).toContain("openBrowser(event.url, paneId)");
+    expect(browserSource).not.toContain("privateBrowserNavigate(tabId, event.url)");
+  });
+});
+
+describe("remote agent connection presentation", () => {
+  test("requires an explicit connection for each app session", () => {
+    expect(settingsSource).toContain("Connect this session");
+    expect(settingsSource).toMatch(/starts disconnected after every launch/);
+    expect(settingsSource).toMatch(/Rotli must be\s+open and connected for every request/);
+  });
+
+  test("shows pairing details only after an explicit create or regenerate action", () => {
+    expect(settingsSource).toContain("Create pairing");
+    expect(settingsSource).toContain("Regenerate pairing");
+    expect(settingsSource).toContain("Paste into Grok Bot");
+    expect(settingsSource).toContain("authorizationHeader");
+    expect(settingsSource).toContain("cannot reveal this client token after you leave this screen");
+    expect(settingsSource).not.toMatch(/setRelayUrl\(event\.target\.value\);\s*setPairing\(null\)/);
+  });
+
+  test("confirms token replacement and explains vault-switch disconnection", () => {
+    expect(settingsSource).toContain("Replace pairing");
+    expect(settingsSource).toMatch(/permanently invalidates the old client token/);
+    expect(settingsSource).toMatch(/Switching vaults disconnects/);
+    expect(settingsSource).toMatch(/pairing is bound to the relay URL/);
+  });
+
+  test("can explicitly disconnect and delete the pairing from Keychain", () => {
+    expect(settingsSource).toContain("Remove pairing");
+    expect(settingsSource).toContain("Confirm removal");
+    expect(settingsSource).toContain("remoteAgentUnpair");
+    expect(settingsSource).toMatch(/deletes both remote-agent tokens from Keychain/);
+  });
+
+  test("persists only the relay endpoint and distinguishes active connection states", () => {
+    expect(settingsSource).toContain("remoteAgentRelayUrl");
+    expect(settingsSource).toContain("current?.active");
+    expect(settingsSource).toContain('"Retrying"');
+  });
 });

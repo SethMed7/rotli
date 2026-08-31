@@ -52,6 +52,7 @@ const surfaces = [
       <a href="#workspace">Workspace</a>
       <a href="#personal">Personalize</a>
       <a href="#beyond-the-app">More than an app</a>
+      <a href="/mcp/">MCP</a>
     </nav>
     <div class="header-actions">
       <a class="github-link" href={GITHUB_URL} rel="noopener">GitHub</a>
@@ -303,12 +304,16 @@ const surfaces = [
           <p class="lane-proof">Vault-owned configuration · sandboxed model work · recoverable runtime updates</p>
         </article>
         <article>
-          <div class="lane-title"><span>CLI + MCP</span><b>Your vault can work with Claude, Codex, or the shell</b></div>
+          <div class="lane-title"><span>CLI + MCP</span><b>Your vault can work with local and cloud agents</b></div>
           <p>
             The installed Rotli binary exposes a bounded JSON CLI and local stdio MCP server.
-            Secure notes stay omitted, locked writes stay refused, and every edit needs a fresh revision.
+            Opt-in Remote agents let Grok Bot reach your running Mac through a stateless HTTPS relay,
+            without moving the vault into the cloud.
           </p>
-          <p class="lane-proof">No local network port · read-only doctor · disposable self-test</p>
+          <p class="lane-proof">
+            <span>Stdio stays local · remote is session opt-in · one policy engine</span>
+            <a href="/mcp/">Read the MCP guide <span aria-hidden="true">→</span></a>
+          </p>
         </article>
       </div>
     </section>
@@ -329,6 +334,7 @@ const surfaces = [
     <nav aria-label="Footer navigation">
       <a href={GITHUB_URL} rel="noopener">GitHub</a>
       <a href={RELEASES_URL} rel="noopener">Releases</a>
+      <a href="/mcp/">MCP guide</a>
       <a href="https://github.com/SethMed7/rotli/blob/main/PRIVACY.md" rel="noopener">Privacy</a>
       <a href="https://github.com/SethMed7/rotli/blob/main/ROADMAP.md" rel="noopener">Roadmap</a>
     </nav>
@@ -1359,11 +1365,28 @@ const surfaces = [
 
     .beyond-lanes article > .lane-proof {
       grid-column: 2;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 0.65rem 1.5rem;
       margin-top: -3.2rem;
       padding-top: 1rem;
       border-top: 1px solid var(--border);
       color: var(--accent-text);
       font-size: 0.78rem;
+    }
+
+    .lane-proof a {
+      min-height: 2rem;
+      display: inline-flex;
+      align-items: center;
+      color: var(--text);
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .lane-proof a:hover {
+      color: var(--accent-text);
     }
 
     .final-cta {

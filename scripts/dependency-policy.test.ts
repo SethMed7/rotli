@@ -14,6 +14,7 @@ import {
 } from "./dependency-policy.mjs";
 
 const bunfig = `[install]
+frozenLockfile = true
 minimumReleaseAge = ${MINIMUM_RELEASE_AGE_SECONDS}
 ignoreScripts = true
 linker = "isolated"
@@ -91,6 +92,7 @@ describe("dependency policy", () => {
     const policy = validPolicy();
     policy.manifests["site/package.json"].trustedDependencies = ["sharp"];
     policy.bunfigs["site/bunfig.toml"] = `[install]
+frozenLockfile = false
 minimumReleaseAge = ${MINIMUM_RELEASE_AGE_SECONDS}
 ignoreScripts = false
 linker = "hoisted"
@@ -101,6 +103,7 @@ globalStore = true
     expect(dependencyPolicyViolations(policy)).toEqual(
       expect.arrayContaining([
         "site/package.json: trustedDependencies must be absent when lifecycle scripts are disabled",
+        "site/bunfig.toml: install.frozenLockfile must be true",
         "site/bunfig.toml: install.ignoreScripts must be true",
         "site/bunfig.toml: install.linker must be isolated",
         "site/bunfig.toml: install.globalStore must be false",

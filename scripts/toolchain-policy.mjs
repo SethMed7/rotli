@@ -5,14 +5,20 @@ export const SERIAL_LINT_COMMAND =
   "bun run typecheck && bun run check:e2e-types && bun run typecheck:tsc6 && bun run format:check && bun run check:code-shape && bun run check:react-compiler && bun run check:naming && bun run check:hex && bun run check:architecture && bun run check:ipc && bun run check:secret-parity && bun run check:parity && bun run check:structure && bun run check:security && bun run check:knip && bun run check:docs && bun run lint:oxlint";
 
 export const OXLINT_COMMAND =
-  "oxlint --disable-nested-config -c .oxlintrc.json --report-unused-disable-directives-severity=error src e2e scripts breve-runtime playwright.config.ts vite.config.ts";
+  "oxlint --disable-nested-config -c .oxlintrc.json --report-unused-disable-directives-severity=error src e2e scripts breve-runtime services/rotli-mcp-relay playwright.config.ts vite.config.ts";
 export const OXFMT_COMMAND =
-  'oxfmt -c .oxfmtrc.json "src/**/*.{ts,tsx}" "e2e/**/*.ts" "scripts/**/*.ts" playwright.config.ts';
+  'oxfmt -c .oxfmtrc.json "src/**/*.{ts,tsx}" "e2e/**/*.ts" "scripts/**/*.ts" "services/**/*.ts" playwright.config.ts';
 export const OXFMT_CHECK_COMMAND =
-  'oxfmt -c .oxfmtrc.json --check "src/**/*.{ts,tsx}" "e2e/**/*.ts" "scripts/**/*.ts" playwright.config.ts';
+  'oxfmt -c .oxfmtrc.json --check "src/**/*.{ts,tsx}" "e2e/**/*.ts" "scripts/**/*.ts" "services/**/*.ts" playwright.config.ts';
 export const OXFMT_SCHEMA = "./node_modules/oxfmt/configuration_schema.json";
 
-export function toolchainPolicyViolations({ manifest, oxlintConfig, oxfmtConfig, viteConfig }) {
+export function toolchainPolicyViolations({
+  manifest,
+  oxlintConfig,
+  reactCompilerConfig,
+  oxfmtConfig,
+  viteConfig,
+}) {
   const violations = [];
   const scripts = manifest?.scripts ?? {};
   for (const [name, expected] of Object.entries({
@@ -30,6 +36,16 @@ export function toolchainPolicyViolations({ manifest, oxlintConfig, oxfmtConfig,
   }
   if (oxlintConfig?.options?.maxWarnings !== 0) {
     violations.push(".oxlintrc.json: options.maxWarnings must be 0");
+  }
+  for (const rule of ["react/react-compiler", "react/refs", "react/set-state-in-effect"]) {
+    if (rule in (oxlintConfig?.rules ?? {})) {
+      violations.push(`.oxlintrc.json: ${rule} belongs only in check:react-compiler`);
+    }
+  }
+  if (reactCompilerConfig?.rules?.["react/react-compiler"] !== "error") {
+    violations.push(
+      "scripts/react-compiler-oxlint.json: react/react-compiler must stay enabled for the diagnostic ratchet",
+    );
   }
   if (oxfmtConfig?.$schema !== OXFMT_SCHEMA) {
     violations.push(`.oxfmtrc.json: $schema must be ${OXFMT_SCHEMA}`);

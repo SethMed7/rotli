@@ -3,7 +3,7 @@
 A product-led landing page for Rotli, the local-first Mac workspace where one
 ordinary folder remains the durable source of truth. The page explains the
 workspace, editable file surfaces, privacy boundaries, theme families,
-optional quokka companion, Breve routines, and local CLI/MCP integration.
+optional quokka companion, Breve routines, and local plus opt-in remote MCP integration.
 Built with [Astro](https://astro.build).
 
 ## This is a separate sub-project
@@ -46,6 +46,9 @@ bun run preview  # serve the built dist/ locally
   the repository root so the site does not create a second character system.
 - The product illustration is privacy-safe HTML/CSS rather than a screenshot
   of a live vault. Keep it synchronized with the current workspace grammar.
+- `/mcp/` is the public connection guide for stdio clients, Grok Bot, the
+  remote safety boundary, disposable verification, and relay self-hosting. Do
+  not publish a hosted relay URL there until that deployment has been verified.
 - `public/social-card.svg` is the editable source for the rendered Open Graph
   image at `public/social-card.png`.
 

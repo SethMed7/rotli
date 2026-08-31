@@ -154,7 +154,9 @@ function LeafView({ node }: { node: LeafNode }) {
                 />
               )}
               {heavyTab.surfaceKind === "file" && <FileSurface paneId={node.id} fileId={heavyTab.fileId} />}
-              {heavyTab.surfaceKind === "browser" && <BrowserSurface tabId={heavyTab.id} active={active} />}
+              {heavyTab.surfaceKind === "browser" && (
+                <BrowserSurface paneId={node.id} tabId={heavyTab.id} active={active} />
+              )}
             </div>
           );
         })}

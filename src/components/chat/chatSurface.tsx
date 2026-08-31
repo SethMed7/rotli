@@ -139,7 +139,13 @@ import { ModelLogo } from "../sidebar/modelLogo";
 import { CHAT_PANE_ATTR, registerChatDrop } from "./chatDrop";
 import { ChatPromptNavigator } from "./chatPromptNavigator";
 import { conversationPrompts, visiblePromptIndexes } from "./chatPromptNavigatorModel";
-import { normalizedReasoning, normalizedServiceTier, reasoningChoices } from "./chatReasoningModel";
+import {
+  normalizedReasoning,
+  normalizedServiceTier,
+  reasoningChoices,
+  serviceTierChoices,
+} from "./chatReasoningModel";
+import { CHAT_MESSAGE_WINDOW, recentChatThread } from "./chatThreadModel";
 import {
   CHAT_TITLE_MAX_LENGTH,
   CHAT_TITLE_PLACEHOLDER,
@@ -972,12 +978,14 @@ function ModelPicker({
 
 function ReasoningPicker({
   provider,
+  modelId,
   effort,
   serviceTier,
   onEffort,
   onServiceTier,
 }: {
   provider: string;
+  modelId: string;
   effort: ChatReasoningEffort | undefined;
   serviceTier: ChatServiceTier | undefined;
   onEffort: (value: ChatReasoningEffort | null) => void;
@@ -987,7 +995,8 @@ function ReasoningPicker({
   const [box, setBox] = useState<AnchoredPlacement | null>(null);
   const anchorRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
-  const choices = reasoningChoices(provider);
+  const choices = reasoningChoices(provider, modelId);
+  const tiers = serviceTierChoices(provider, modelId);
   const label = choices.find((choice) => choice.value === (effort ?? null))?.label ?? "Default";
   useTransientPopover([popRef, anchorRef], open, () => setOpen(false));
 
@@ -1061,10 +1070,10 @@ function ReasoningPicker({
                 {(effort ?? null) === choice.value && <CheckGlyph size={12} />}
               </button>
             ))}
-            {provider === "codex" && (
+            {tiers.length > 0 && (
               <>
                 <p className="tier">Service tier</p>
-                {(["standard", "fast"] as const).map((tier) => (
+                {tiers.map((tier) => (
                   <button
                     type="button"
                     key={tier}
@@ -1770,8 +1779,8 @@ export function ChatSurface({
   const waitingForSavedPick = !!chatModelId && !catalogSettled && (!savedPick || savedPick.api === "preset");
   const picked = waitingForSavedPick ? null : (savedPick ?? fallbackPick);
   const fallbackFrom = catalogSettled && chatModelId && !savedPick && fallbackPick ? chatModelId : null;
-  const reasoningEffort = normalizedReasoning(picked?.provider, chatReasoning[chatKeyId]);
-  const serviceTier = normalizedServiceTier(picked?.provider, chatServiceTier[chatKeyId]);
+  const reasoningEffort = normalizedReasoning(picked?.provider, picked?.id, chatReasoning[chatKeyId]);
+  const serviceTier = normalizedServiceTier(picked?.provider, picked?.id, chatServiceTier[chatKeyId]);
   // Pin the resolved model onto this chat as soon as the catalog is settled: an
   // inherited seed becomes THIS chat's own choice, so a pick made in another
   // pane (which also moves the seed, for the next new chat) can't move it.
@@ -1801,6 +1810,7 @@ export function ChatSurface({
   const images = draft.images;
   const pendingQuestion = draft.questionKey === chatKeyId ? draft.question : null;
   const [messages, setMessages] = useState<Msg[]>([]);
+  const [hiddenMessageCount, setHiddenMessageCount] = useState(0);
   // The draft store clears as soon as the first prompt sends. Keep the title
   // chosen/derived for the brief pre-bind interval so the real input retires
   // immediately into ordinary header text instead of flashing "New chat".
@@ -1967,7 +1977,9 @@ export function ChatSurface({
         .then((t) => {
           if (cancelled) return;
           const rootPrefix = active.id === CORPUS_INSTANCE_ID ? "" : `${active.id}:`;
-          setMessages(parseMessages(t, rootPrefix));
+          const thread = recentChatThread(parseMessages(t, rootPrefix));
+          setMessages(thread.messages);
+          setHiddenMessageCount(thread.hiddenCount);
           setArtifactRefs(parseChatArtifacts(t));
           const tainted = hasSecureContext(t);
           secureReadRef.current = tainted;
@@ -1976,10 +1988,12 @@ export function ChatSurface({
         .catch(() => {
           if (cancelled) return;
           setMessages([]);
+          setHiddenMessageCount(0);
           setArtifactRefs([]);
         });
     } else {
       setMessages([]);
+      setHiddenMessageCount(0);
       setArtifactRefs([]);
       secureReadRef.current = false;
       setSecureContext(false);
@@ -2350,8 +2364,9 @@ export function ChatSurface({
     const failed = reply.startsWith("⚠");
     if (!reply) reply = "(the model returned nothing)";
     const assistantAt = new Date().toISOString();
-    setMessages((p) => [
-      ...p,
+    const settledThread = recentChatThread([
+      ...messages,
+      { speaker: "you", text: userText, at: userAt, images: imgs.map((image) => image.src) },
       {
         speaker: "rotli",
         text: reply,
@@ -2359,6 +2374,10 @@ export function ChatSurface({
         ...(createdArtifacts.length ? { artifacts: [...createdArtifacts] } : {}),
       },
     ]);
+    setMessages(settledThread.messages);
+    if (settledThread.hiddenCount > 0) {
+      setHiddenMessageCount((count) => count + settledThread.hiddenCount);
+    }
     // the answer is IN — settle the sidebar signal now (not after the slower
     // persistence + note-memory pass): watched clears, unwatched flips unread.
     // A failed turn always clears — its ⚠ only lives in this mounted session,
@@ -2930,6 +2949,12 @@ export function ChatSurface({
             />
             <div className="chat-scroll" ref={scrollRef}>
               <div className="chat-thread">
+                {hiddenMessageCount > 0 && (
+                  <p className="chat-thread-window" role="status">
+                    Showing the latest {CHAT_MESSAGE_WINDOW} messages. {hiddenMessageCount.toLocaleString()}{" "}
+                    earlier messages remain in this chat&rsquo;s Markdown file.
+                  </p>
+                )}
                 {messages.length === 0 ? (
                   <div className={`chat-newhint ${pristineChat ? chatWelcomeStyle : "calm"}`}>
                     <div className="chat-welcome-heading">
@@ -3155,15 +3180,18 @@ export function ChatSurface({
                             }}
                           />
                         ) : null}
-                        {picked && reasoningChoices(picked.provider).length > 0 && (
-                          <ReasoningPicker
-                            provider={picked.provider}
-                            effort={reasoningEffort}
-                            serviceTier={serviceTier}
-                            onEffort={(value) => setChatReasoning(chatKeyId, value)}
-                            onServiceTier={(value) => setChatServiceTier(chatKeyId, value)}
-                          />
-                        )}
+                        {picked &&
+                          (reasoningChoices(picked.provider, picked.id).length > 0 ||
+                            serviceTierChoices(picked.provider, picked.id).length > 0) && (
+                            <ReasoningPicker
+                              provider={picked.provider}
+                              modelId={picked.id}
+                              effort={reasoningEffort}
+                              serviceTier={serviceTier}
+                              onEffort={(value) => setChatReasoning(chatKeyId, value)}
+                              onServiceTier={(value) => setChatServiceTier(chatKeyId, value)}
+                            />
+                          )}
                         {/* EVERY lane stops now (the maintainer, 2026-07-30): CLIs die for
                         real (Rust kills the child); the local lane orphans the
                         run — the reply is discarded and the prompt returns to

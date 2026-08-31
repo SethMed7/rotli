@@ -11,7 +11,6 @@ import "./styles/onboarding.css";
 import "./styles/board.css";
 import "./styles/memex.css";
 import "./styles/breve.css";
-import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEffect, useState } from "react";
 // Excalidraw's vendor stylesheet (~144 KB raw / 23 KB gz) + canvas.css are no
 // longer eager here — they load with the lazy board engine (boards/engine/
@@ -42,6 +41,7 @@ import {
   onBrainJournal,
   onCaptureSave,
   onCorpusChanged,
+  onNativeDropAuthorized,
   onOpenRequest,
   onOrganizerProgress,
   onQuickSet,
@@ -392,23 +392,16 @@ function MainShell() {
       }
       await invalidateNotes();
     };
-    // the registration is async: on a fast unmount the `.then` hadn't run yet,
-    // so a cleanup that read a not-yet-assigned `unlisten` unregistered nothing
-    // and leaked the listener (perf audit 2026-07-30, finding 26). Hold the
-    // PROMISE and resolve it in cleanup; `stopped` keeps a drop that lands in
-    // the same gap from touching an unmounted tree.
-    const listening = getCurrentWebview().onDragDropEvent((event) => {
+    // Rust emits this app event only after it has created the matching one-shot
+    // import grants. Listening to Tauri's built-in webview event here used to
+    // race the native window callback and reject a valid drop as unauthorized.
+    const unlisten = onNativeDropAuthorized((event) => {
       if (stopped) return;
-      if (event.payload.type === "drop" && event.payload.paths.length > 0) {
-        void handleDrop(event.payload.paths, event.payload.position.x, event.payload.position.y).catch(
-          () => {},
-        );
-      }
+      void handleDrop(event.paths, event.position.x, event.position.y).catch(() => {});
     });
-    void listening.catch(() => {});
     return () => {
       stopped = true;
-      void listening.then((un) => un()).catch(() => {});
+      unlisten();
     };
   }, []);
 

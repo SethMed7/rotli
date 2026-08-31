@@ -10,8 +10,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Remote agents can opt in to the local workspace without uploading the vault.** Rotli can connect
+  the running Mac app to a stateless HTTPS MCP relay for Grok Bot and other cloud clients. Pairing
+  uses independent Keychain client/device credentials, every launch starts disconnected, vault
+  switches disconnect, and an explicit Remove pairing action disconnects and deletes both credentials.
+  The existing secure-note, locked-note, and optimistic-revision gates remain the only workspace policy
+  engine. The single-replica relay has bounded in-memory sessions, no database or volume, and a pinned
+  Bun container. The public site now includes an MCP setup, safety, verification, and self-hosting guide
+  without advertising an undeployed relay domain.
+
+- **The private browser now supports real multi-tab research.** While browsing,
+  ⌘T or the pane-strip plus opens another isolated private page, popup links
+  open as sibling tabs, and switching among any number of browser tabs keeps
+  each native session alive until that tab closes. Page titles stay in memory
+  only; URLs, history, cookies, and site data still never enter viewstate.
+
 ### Changed
 
+- **Reasoning controls now follow the selected model, not only its provider.**
+  Claude Haiku no longer offers unsupported effort controls; each Codex model
+  exposes only its own effort ceiling, GPT-5.6 Sol/Terra gain Ultra, and Fast
+  appears only for the GPT-5.6 family. Rust validates the same combinations
+  before launching a provider CLI.
+- **Saved-chat rows have a calmer, keyboard-safe hover action.** Recency yields
+  to one overflow button in the same trailing slot, with the existing row menu
+  behind both overflow and right-click. Active rows keep provider artwork at
+  its normal color instead of tinting the OpenAI mark.
 - **The repository toolchain now runs on Bun 1.4.0.** App, site, Breve, CI,
   release evidence, dependency maintenance, and frozen lockfile checks share
   the exact stable runtime pin, with matching Bun 1.4 type definitions.
@@ -28,6 +54,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Connected models no longer mistake Rotli's own tool scaffold for prompt
+  injection.** The frontier prompt is framed as an application request instead
+  of an identity override with a competing “JSON-only system” persona. Real
+  commands inside note or web results remain ignored, while the model is told
+  to continue the requested research from trustworthy evidence rather than
+  making the ignored injection its answer.
+- **Finder image drops no longer race their native file authorization.** Rust
+  now grants each exact dropped file before notifying the webview, so a valid
+  drop into Chat or Markdown cannot intermittently fail as unauthorized; the
+  same grants remain short-lived and single-use.
+- **Antigravity chat uses the CLI's real model IDs again.** Rotli now passes the
+  current `agy models` identifiers instead of human display labels, removes the
+  retired Gemini 3.5 choices, and no longer repeats the same stderr tail twice
+  when an empty CLI response fails.
+- **Long chats no longer mount an unbounded React transcript.** The Markdown
+  file still keeps every message, while the active surface mounts the newest
+  500 and states how many earlier messages remain on disk. Model history and
+  tool scratchpads retain their smaller per-model budgets.
+- **Remote-agent transport fails closed at every hop.** The Mac connector no
+  longer follows relay redirects, bounds relay responses before JSON parsing,
+  binds credentials to their minted relay URL, bounds the complete 512 KB MCP
+  response plus relay envelope, and makes disconnect/vault switching wait for
+  any in-flight dispatch and delivery. Loopback HTTP uses a timing-stable bearer
+  comparison, and regression tests cover non-loopback binds, stale connector
+  generations, conflicting device tokens, relay capacity, and both route-level
+  and pre-handler Bun body caps.
+- **The production quality gate accepts only rules supported by the pinned
+  Oxlint.** React Compiler diagnostics remain in their dedicated ratcheted
+  check; the ordinary lint config no longer names rules absent from Oxlint
+  1.78.0, which caused the Linux production job to stop before the build.
+- **An outdated Bun can no longer rewrite Rotli's dependency graph after
+  rejecting lockfile v2.** Plain installs are frozen in the app, site, and
+  Breve roots; contributor guidance now identifies the exact Bun pin and the
+  recovery command before another resolver can downgrade the lockfile.
+
+- **Small decorative Rotlis are crisp again.** Settings section accents and
+  onboarding's quiet edge characters now use one semantic line-art treatment
+  instead of shrinking and fading personalized fill/accessory composites.
 - **The side-view walking quokka wears its accessories credibly.** The
   bucket hat's side art seats on the profile crown with the ear tucked and
   the back of the head keeping its full fluff, and face-on eyewear clips to

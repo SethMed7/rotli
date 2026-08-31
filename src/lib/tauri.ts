@@ -626,7 +626,7 @@ export function cliComplete(args: {
   prompt: string;
   timeoutMs?: number;
   /** Provider-native frontier quality control. Rust validates the allowlist. */
-  reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+  reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
   /** Codex account routing. `standard` preserves the configured default. */
   serviceTier?: "standard" | "fast";
   /** Attached images as base64/data URLs. Rust stages them as real files and
@@ -719,6 +719,39 @@ export function secretExists(name: string): Promise<boolean> {
 }
 export function secretDelete(name: string): Promise<void> {
   return aiInvoke("secret_delete", { name });
+}
+
+export interface RemoteAgentStatus {
+  paired: boolean;
+  active: boolean;
+  connected: boolean;
+  relayUrl: string | null;
+  lastError: string | null;
+}
+
+export interface RemoteAgentPairing {
+  mcpUrl: string;
+  authorizationHeader: string;
+}
+
+export function remoteAgentStatus(): Promise<RemoteAgentStatus> {
+  return invoke<RemoteAgentStatus>("remote_agent_status");
+}
+
+export function remoteAgentPair(relayUrl: string): Promise<RemoteAgentPairing> {
+  return invoke<RemoteAgentPairing>("remote_agent_pair", { relayUrl });
+}
+
+export function remoteAgentStart(relayUrl: string): Promise<RemoteAgentStatus> {
+  return invoke<RemoteAgentStatus>("remote_agent_start", { relayUrl });
+}
+
+export function remoteAgentStop(): Promise<RemoteAgentStatus> {
+  return invoke<RemoteAgentStatus>("remote_agent_stop");
+}
+
+export function remoteAgentUnpair(): Promise<RemoteAgentStatus> {
+  return invoke<RemoteAgentStatus>("remote_agent_unpair");
 }
 
 /** One web search result the model sees. */
@@ -1809,6 +1842,19 @@ export function onOrganizerProgress(cb: (p: OrganizerProgress) => void): () => v
   return () => void unlisten.then((fn) => fn());
 }
 
+export interface AuthorizedNativeDrop {
+  paths: string[];
+  position: { x: number; y: number };
+}
+
+/** Native Finder paths become visible here only after Rust has granted their
+ * matching single-use import capabilities. */
+export function onNativeDropAuthorized(cb: (drop: AuthorizedNativeDrop) => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listen<AuthorizedNativeDrop>("rotli:native-drop-authorized", (event) => cb(event.payload));
+  return () => void unlisten.then((fn) => fn());
+}
+
 // ——— the memex seam (Stage 1) — typed wrappers over the Rust memex commands
 //     (src-tauri/src/memex.rs). rotli connects to / initiates a memex instance
 //     (the shared identity/personality/wiki/history/chats/inbox.md spine; for the maintainer, ~/memex-vault)
@@ -2223,7 +2269,7 @@ function browserBreveSnapshot(): BreveSnapshot {
       briefModel: "sonnet",
       modelPolicy: {
         primary: "sonnet",
-        fallbacks: ["haiku", "Gemini 3.5 Flash (Medium)", "gpt-5.4-mini"],
+        fallbacks: ["haiku", "gemini-3.7-flash-medium", "gpt-5.4-mini"],
         localHelper: "gemma-3-12b-it-qat-4bit",
       },
       pdfTheme: DEFAULT_BREVE_PDF_THEME,

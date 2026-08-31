@@ -2,6 +2,53 @@
  * viewstate.json can never become browser history; this in-memory map exists
  * only long enough to hand an initial destination to its mounted surface. */
 const initialUrls = new Map<string, string | null>();
+const tabTitles = new Map<string, string>();
+const titleListeners = new Set<() => void>();
+let titleRevision = 0;
+
+export const PRIVATE_BROWSER_DEFAULT_TITLE = "Private browser";
+
+function publishPrivateBrowserTitle(): void {
+  titleRevision += 1;
+  for (const listener of titleListeners) listener();
+}
+
+export function privateBrowserDisplayTitle(value: unknown): string {
+  if (typeof value !== "string") return PRIVATE_BROWSER_DEFAULT_TITLE;
+  const clean = [...value]
+    .map((character) => {
+      const point = character.codePointAt(0) ?? 0;
+      const control = point <= 0x1f || (point >= 0x7f && point <= 0x9f);
+      const bidiOverride = (point >= 0x202a && point <= 0x202e) || (point >= 0x2066 && point <= 0x2069);
+      return control || bidiOverride ? " " : character;
+    })
+    .join("")
+    .replace(/\s+/g, " ")
+    .trim();
+  return [...clean].slice(0, 80).join("") || PRIVATE_BROWSER_DEFAULT_TITLE;
+}
+
+export function privateBrowserTabTitle(tabId: string): string {
+  return tabTitles.get(tabId) ?? PRIVATE_BROWSER_DEFAULT_TITLE;
+}
+
+export function rememberPrivateBrowserTitle(tabId: string, title: unknown): string {
+  const safe = privateBrowserDisplayTitle(title);
+  if (tabTitles.get(tabId) !== safe) {
+    tabTitles.set(tabId, safe);
+    publishPrivateBrowserTitle();
+  }
+  return safe;
+}
+
+export function subscribePrivateBrowserTitles(listener: () => void): () => void {
+  titleListeners.add(listener);
+  return () => titleListeners.delete(listener);
+}
+
+export function privateBrowserTitleSnapshot(): number {
+  return titleRevision;
+}
 
 export const PRIVATE_BROWSER_SEARCH_ENGINES = ["duckduckgo", "brave", "google", "bing"] as const;
 export type PrivateBrowserSearchEngine = (typeof PRIVATE_BROWSER_SEARCH_ENGINES)[number];
@@ -56,6 +103,7 @@ export function normalizePrivateBrowserInput(
 
 export function seedPrivateBrowserTab(tabId: string, url?: string): void {
   initialUrls.set(tabId, url?.trim() ? normalizePrivateBrowserInput(url) : null);
+  tabTitles.set(tabId, PRIVATE_BROWSER_DEFAULT_TITLE);
 }
 
 export function privateBrowserInitialUrl(tabId: string): string | null {
@@ -69,4 +117,5 @@ export function rememberPrivateBrowserUrl(tabId: string, url: string): void {
 
 export function forgetPrivateBrowserTab(tabId: string): void {
   initialUrls.delete(tabId);
+  if (tabTitles.delete(tabId)) publishPrivateBrowserTitle();
 }
