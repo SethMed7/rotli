@@ -21,6 +21,10 @@
         "tif"
       ]
     },
+    "chatImageAssetMaxBytes": {
+      "sourceOfTruth": "src/lib/chatWork.ts CHAT_IMAGE_ASSET_MAX_BYTES ↔ src-tauri/src/corpus.rs CHAT_IMAGE_ASSET_MAX_BYTES",
+      "value": 25000000
+    },
     "boardLimits": {
       "sourceOfTruth": "src/boards/validation.ts BOARD_LIMITS ↔ src-tauri/src/board.rs BOARD_MAX_*",
       "value": {
@@ -70,7 +74,6 @@
     "keychainAllowedAccounts": {
       "sourceOfTruth": "src-tauri/src/keychain.rs WEBVIEW_ALLOWED ↔ frontend provider constants + breve-runtime ROTLI_RESEND_ACCOUNT; remote-agent-token is connector-internal",
       "value": [
-        "gemini-api-key",
         "brave-search-api-key",
         "breve-resend-api-key"
       ]
@@ -88,9 +91,11 @@
           "~/.local/bin/codex",
           "/usr/local/bin/codex"
         ],
-        "agy": [
-          "~/.local/bin/agy",
-          "/opt/homebrew/bin/agy"
+        "cursor": [
+          "~/.local/bin/agent",
+          "~/.local/bin/cursor-agent",
+          "/opt/homebrew/bin/agent",
+          "/usr/local/bin/agent"
         ]
       }
     },

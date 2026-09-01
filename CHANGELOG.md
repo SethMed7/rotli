@@ -10,6 +10,125 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`/attatch` opens Finder for Markdown image attachments.** The slash command
+  supports multiple images, is also searchable as `/attach`, copies every pick
+  into the note's registered vault, and inserts portable `storage:` links.
+- **Notes can embed playable video.** Drop an `mp4`, `mov`, `webm`, `m4v`, or
+  `ogv` on a note (or pick one through `/attach`) and it lands as the same
+  portable `![](storage:…)` source an image uses, rendered as a native player
+  with seeking, the `|width` suffix, the resize grip, and selection. Video and
+  images remain the only preview-only surfaces; nothing about the file is
+  converted.
+- **Slash commands work inside a result's reason.** Type `/attach`, `/table`,
+  or any other command as the last word of a ` — reason` and the block lands
+  on an indented line beneath the answer; the row keeps its label and reason.
+- **Markdown can hold immediate decisions and one-of-many answers.** Type
+  `[][]` and Space for a left-check/right-red-X pass/fail pair, with bold result
+  labels and an optional portable ` — reason` suffix. Type `()` and Space for
+  adjacent radio-style options backed by `( )` / `(x)`. Every click writes to
+  the note, all controls are keyboard reachable, and neither protocol enters
+  the ordinary Tasks projection.
+- **Connected providers now have explicit, user-editable defaults.** New setups
+  start with Claude&rsquo;s rolling `sonnet` alias, Codex `gpt-5.6-sol`, and Cursor
+  `grok-4.6`; persisted choices are validated against each provider&rsquo;s own
+  native allowlist. Chat can request an attributed independent opinion with
+  `@claude`, `@codex`, or `@cursor`, optionally followed by `:model-id`, without
+  changing the chat&rsquo;s primary model.
+- **AI Models now opens with an account-safety disclosure.** It explains the
+  official-client boundary, links the reviewed provider documentation, and
+  states why an Antigravity subscription cannot be exposed as a Rotli lane.
+
+### Changed
+
+- **Connected chat now has an explicit official-client boundary.** Rotli keeps
+  Claude Code and Codex as opt-in interactive lanes and adds Cursor software
+  chat through Cursor's documented ACP custom-client route. Cursor runs in
+  read-only Ask mode from an empty scratch workspace, advertises no filesystem
+  or terminal capability, and rejects every permission request. Rotli launches
+  only already-authenticated official local clients; it does not present
+  provider login, inspect provider credential stores, or reuse these clients
+  for Breve, the organizer, or background automation.
+- **Cursor now exposes its documented model selector.** Grok 4.6 is the initial
+  default and Cursor Auto remains an alternative; both still run through ACP
+  in read-only Ask mode with no advertised filesystem or terminal capability.
+- **Retired Codex choices are gone.** GPT-5.4 and GPT-5.4 mini retired for
+  ChatGPT-authenticated Codex on August 31, 2026, so they no longer appear in
+  Rotli or the native model allowlist.
+- **Cloud background and image work now fail closed.** Breve configuration is
+  normalized to registered on-device models, the organizer is local-only, and
+  provider-backed image generation is unavailable while provider-authorized
+  integrations are designed.
+
+### Fixed
+
+- **Empty Markdown drafts no longer accumulate as `Untitled` in Main.** A new
+  note stays in its immediate editor tab but outside Main/named-view projections
+  until the first successful non-empty save, when its correctly titled row is
+  filed into the creation context originally selected. Closing ⌘T before
+  background creation/readback finishes now discards the still-blank result
+  instead of filing a late orphan. Existing blank Markdown references are also
+  hidden using exact body-emptiness metadata while their files and Main slots
+  remain intact; an explicitly titled `Untitled` note is not mistaken for one.
+- **Main’s right-click Trash action now honors gathered selection.** ⌘-selected
+  rows produce one explicit `Move N items to Trash` action, mixed item kinds use
+  their guarded note/file lanes, and Main references are removed only after the
+  batch succeeds.
+- **Command-T opens the real editor in the original key event.** Rotli activates
+  a focused, fully editable pending Markdown tab before file I/O, keeps first-
+  paint keystrokes in its shared buffer, and transfers that draft onto the
+  durable note revision before retargeting the same tab. It leaves the tab
+  closed if the user dismissed it while creation and refresh continued in the
+  background.
+- **Librarian moves no longer create false editor conflicts.** Open buffers adopt
+  same-prose location/frontmatter revisions, and the native save gate can merge
+  a stale complete-file hash only when the current disk prose still matches the
+  editor's saved baseline. A genuine concurrent prose edit remains a visible,
+  non-overwriting conflict.
+- **Held-Command tab hints stay in the tab strip.** Shortcut badges now honor
+  overflow clipping, so a scrolled-away `⌘1` cannot paint over the Home/Breve
+  sidebar and a partially visible tab anchors its hint at the visible edge.
+- **Command-W closes before the next paint.** The frontend registry now owns the
+  shortcut in its original key event instead of waiting on a native event
+  round trip, and large-note save assembly starts after the close paint rather
+  than beachballing React's unmount commit.
+- **Finder image drops stay with their note's vault.** Nested editor targets now
+  resolve reliably, native physical/logical coordinate differences are both
+  handled, and a byte-backed webview drop remains as a runtime fallback.
+  Named-root import ids become portable `storage:` links, and a failed import
+  reports its reason instead of silently doing nothing.
+- **Dropping an image on a chat attaches it again.** The composer read the
+  imported asset back with a webview `fetch(asset://…)`, which the ipc-only
+  `connect-src` blocks — every drop failed with “Load failed” after the file
+  had already been copied into the vault. Attachments now read back over the
+  IPC byte lane with the same 25 MB ceiling Rust enforces, the drop lane
+  honors the paperclip’s vision gate instead of attaching an image send would
+  refuse, and an `.svg` dropped on a chat is filed to Storage rather than
+  refused and lost. `check:security` now fails any undeclared raw `fetch(`
+  under `src/`.
+- **Dropping an image on a note’s header or margins inserts it.** Only the text
+  body was a drop target; anywhere else on the note silently imported the file
+  to Storage and inserted nothing.
+- **Unapplied Mermaid edits survive closing the note.** Closing or switching
+  the tab under an open diagram workspace force-closed it and dropped the
+  draft. The draft now waits on the fence it opened from and is restored when
+  that diagram is reopened; Apply or an explicit Discard clears it.
+- **A secondary click no longer answers a result, selects a choice, or toggles
+  a task.** Only the primary button writes to the note; result answers also
+  join the ordinary input undo group.
+- **Tab, Enter, and arrows on plain lines skip the table scan.** The table
+  keymap ran a whole-document table (and nested fence) scan on every press to
+  learn the caret was not in a table; lines without a pipe now return at once.
+
+### Removed
+
+- **Antigravity and direct Gemini model execution.** Antigravity is no longer in the
+  native binary/model allowlist and has no argv, spawn, retry, sandbox, image,
+  detection, Keychain, or Breve resolver path. Old settings are ignored rather
+  than retained as provider state, so they cannot reactivate a Google
+  subscription lane.
+
 ## [0.83.0] - 2026-08-31
 
 ### Added

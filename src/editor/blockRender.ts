@@ -622,6 +622,25 @@ function createInlineMermaidCamera(
 
 const OPEN_OVERLAYS = new Set<() => void>();
 
+/** Unapplied Mermaid workspace drafts, keyed by the fence source they opened
+ * on. Closing the note (⌘W, a tab switch) unmounts the editor and force-closes
+ * the workspace; the draft survives HERE so reopening the same diagram restores
+ * it instead of silently discarding the work (system audit 2026-07-29, #8).
+ * Apply and an explicit Discard clear the entry. Keyed by source, so two
+ * notes holding byte-identical fences share one draft — accepted. */
+const MERMAID_DRAFTS = new Map<string, string>();
+const MERMAID_DRAFT_CAP = 20;
+function rememberMermaidDraft(code: string, draft: string): void {
+  MERMAID_DRAFTS.delete(code);
+  if (draft === code) return;
+  MERMAID_DRAFTS.set(code, draft);
+  while (MERMAID_DRAFTS.size > MERMAID_DRAFT_CAP) {
+    const oldest = MERMAID_DRAFTS.keys().next().value;
+    if (oldest === undefined) break;
+    MERMAID_DRAFTS.delete(oldest);
+  }
+}
+
 function closeAllOverlays(): void {
   for (const close of [...OPEN_OVERLAYS]) close();
 }
@@ -673,6 +692,9 @@ function openMermaidWorkspace(code: string, anchor: HTMLElement, sourceFrom: num
   off = useUiStore.getState().registerTransient(() => requestClose());
   unmount = mountMermaidWorkspace({
     code,
+    draft: MERMAID_DRAFTS.get(code),
+    onDraftChange: (draft) => rememberMermaidDraft(code, draft),
+    onDiscard: () => MERMAID_DRAFTS.delete(code),
     dark: isDarkNode(anchor),
     conversionAvailable: isTauri(),
     onRequestCloseReady: (next) => {
@@ -688,6 +710,7 @@ function openMermaidWorkspace(code: string, anchor: HTMLElement, sourceFrom: num
         return "The diagram changed outside this workspace. Close and reopen it before applying.";
       }
       close();
+      MERMAID_DRAFTS.delete(code);
       view.dispatch({
         changes: { from: range.from, to: range.to, insert: nextCode },
         selection: { anchor: range.from + nextCode.length },
@@ -728,6 +751,7 @@ function openMermaidWorkspace(code: string, anchor: HTMLElement, sourceFrom: num
         },
         scrollIntoView: true,
       });
+      MERMAID_DRAFTS.delete(code);
       return null;
     },
   });

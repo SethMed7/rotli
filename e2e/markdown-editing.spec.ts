@@ -201,6 +201,119 @@ test("bullet outdent works on app-made AND tab-indented (foreign) lists", async 
   await expect(page.locator(".rotli-check")).toHaveCount(2);
 });
 
+test("[][] creates a keyboard-safe pass/fail result with an optional reason", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+
+  await page.keyboard.type("[][]");
+  await page.keyboard.press("Space");
+  await page.keyboard.type("API boots cleanly");
+
+  const no = page.getByRole("button", { name: "No or failed" });
+  const yes = page.getByRole("button", { name: "Yes or passed" });
+  await expect(no).toHaveAttribute("aria-pressed", "false");
+  await expect(yes).toHaveAttribute("aria-pressed", "false");
+
+  const yesBox = await yes.boundingBox();
+  const noBox = await no.boundingBox();
+  if (!yesBox || !noBox) throw new Error("result controls are not visible");
+  expect(yesBox.x).toBeLessThan(noBox.x); // check is left; X is right
+
+  await yes.focus();
+  await expect(yes).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(no).toBeFocused();
+
+  await no.click();
+  await expect(no).toHaveAttribute("aria-pressed", "true");
+  await expect(yes).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator(".rotli-result-text--no")).toContainText("API boots cleanly");
+  await expect(page.locator(".rotli-result-text--no")).toHaveCSS("font-weight", "700");
+  const noColors = await no.evaluate((element) => {
+    const probe = document.createElement("span");
+    probe.style.color = "var(--failure)";
+    const accentProbe = document.createElement("span");
+    accentProbe.style.color = "var(--accent)";
+    document.body.append(probe, accentProbe);
+    const result = {
+      actual: getComputedStyle(element).color,
+      failure: getComputedStyle(probe).color,
+      accent: getComputedStyle(accentProbe).color,
+    };
+    probe.remove();
+    accentProbe.remove();
+    return result;
+  });
+  expect(noColors.actual).toBe(noColors.failure);
+  expect(noColors.actual).not.toBe(noColors.accent);
+
+  await page.getByRole("button", { name: "Add a reason for this result" }).click();
+  await page.keyboard.type("timed out waiting for health check");
+  await expect(page.locator(".rotli-result-reason")).toContainText("timed out waiting for health check");
+  await expect(page.getByRole("button", { name: "Add a reason for this result" })).toHaveCount(0);
+
+  await yes.click();
+  await expect(no).toHaveAttribute("aria-pressed", "false");
+  await expect(yes).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".rotli-result-text--no")).toHaveCount(0);
+  await expect(page.locator(".rotli-result-text--yes")).toContainText("API boots cleanly");
+  await expect(page.locator(".rotli-result-text--yes")).toHaveCSS("font-weight", "700");
+  await expect(page.locator(".rotli-result-reason")).toHaveCSS("font-weight", "400");
+
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  await expect(editor).toContainText("- [x][ ] API boots cleanly — timed out waiting for health check");
+});
+
+test("() creates a tab-navigable Markdown multiple-choice group", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+
+  await page.keyboard.type("()");
+  await page.keyboard.press("Space");
+  await page.keyboard.type("Red");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Blue");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Green");
+
+  const choices = page.locator(".rotli-choice");
+  await expect(choices).toHaveCount(3);
+  await choices.nth(0).focus();
+  await page.keyboard.press("Tab");
+  await expect(choices.nth(1)).toBeFocused();
+
+  await choices.nth(1).click();
+  await expect(choices.nth(0)).toHaveAttribute("aria-pressed", "false");
+  await expect(choices.nth(1)).toHaveAttribute("aria-pressed", "true");
+  await expect(choices.nth(2)).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator(".rotli-choice-text--selected")).toContainText("Blue");
+  await expect(page.locator(".rotli-choice-text--selected")).toHaveCSS("font-weight", "700");
+
+  await choices.nth(2).click();
+  await expect(choices.nth(1)).toHaveAttribute("aria-pressed", "false");
+  await expect(choices.nth(2)).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".rotli-choice-text--selected")).toContainText("Green");
+
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  const rawLines = editor.locator(".cm-line");
+  await expect(rawLines).toHaveCount(3);
+  await expect(rawLines.nth(0)).toHaveText("- ( ) Red");
+  await expect(rawLines.nth(1)).toHaveText("- ( ) Blue");
+  await expect(rawLines.nth(2)).toHaveText("- (x) Green");
+});
+
 test("slash commands work inside a numbered list item", async ({ page }) => {
   await gotoApp(page);
   await page.keyboard.press("Meta+T");
@@ -258,4 +371,63 @@ test("double-clicking a rendered image keeps it selected instead of exposing sou
   await image.dblclick();
   await expect(page.locator(".rotli-img.sel")).toHaveCount(1);
   await expect(editor).not.toContainText("![](storage:double-click-selection.png)");
+});
+
+test("a secondary click on a result control does not answer it", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.type("[][]");
+  await page.keyboard.press("Space");
+  await page.keyboard.type("Right-click stays neutral");
+
+  const no = page.getByRole("button", { name: "No or failed" });
+  const yes = page.getByRole("button", { name: "Yes or passed" });
+  await no.click({ button: "right" });
+  await page.keyboard.press("Escape");
+  await expect(no).toHaveAttribute("aria-pressed", "false");
+  await expect(yes).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator(".rotli-result-text--no")).toHaveCount(0);
+});
+
+test("a video source renders a playable embed with the image contract", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText("![](storage:clip.mp4)\nAfter");
+
+  const embed = page.locator(".rotli-img");
+  await expect(embed).toHaveCount(1);
+  await expect(embed.locator("video")).toHaveCount(1);
+  await expect(embed.locator("video")).toHaveAttribute("controls", "");
+  await expect(embed.locator("img")).toHaveCount(0);
+  await page.keyboard.press("ArrowUp");
+  await expect(page.locator(".rotli-img.sel")).toHaveCount(1);
+});
+
+test("a slash command typed in a result's reason lands its block beneath the row", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.type("[][]");
+  await page.keyboard.press("Space");
+  await page.keyboard.type("API boots");
+  const yes = page.getByRole("button", { name: "Yes or passed" });
+  await yes.click();
+  await page.getByRole("button", { name: "Add a reason for this result" }).click();
+  await page.keyboard.type("slowly /table");
+
+  const menu = page.getByRole("menu", { name: "Insert block" });
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(menu).toBeHidden();
+
+  await expect(yes).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".rotli-result-text--yes")).toContainText("API boots");
+  await expect(page.locator(".rotli-result-reason")).toContainText("slowly");
+  await expect(page.locator(".rotli-result-reason")).not.toContainText("/table");
+  await expect(editor.locator("table")).toHaveCount(1);
 });

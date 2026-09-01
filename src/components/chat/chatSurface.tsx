@@ -27,6 +27,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { attributedConsultReply, parseConsultMention, resolveConsultModel } from "../../ai/chatProvider";
 import { modelIsOnDevice } from "../../ai/guard";
 import { type HostArtifactKind, makeTauriHost } from "../../ai/host";
 import { presetFor, runHybrid } from "../../ai/hybrid";
@@ -51,11 +52,12 @@ import { renderMermaidElement } from "../../editor/mermaidRender";
 import { renderInline } from "../../editor/render";
 import {
   CHAT_IMAGE_ASSET_EXTS,
+  CHAT_IMAGE_ASSET_MAX_BYTES,
   attachmentReference,
   projectChatWorkItems,
   visibleChatText,
 } from "../../lib/chatWork";
-import { extOf, fileName, IMAGE_EXTS } from "../../lib/fileKind";
+import { extOf, fileName, IMAGE_EXTS, imageMimeOf } from "../../lib/fileKind";
 import { type AnchoredPlacement, anchoredPopover, useTransientPopover } from "../../lib/popover";
 import {
   type ChatModelInfo,
@@ -64,6 +66,8 @@ import {
   cliCancel,
   cliDetect,
   corpusCreateImageAsset,
+  corpusFileBytes,
+  corpusFileStat,
   corpusFrontmatter,
   corpusImportFile,
   fileAssetUrl,
@@ -604,13 +608,9 @@ const PICKER_PROVIDER_META: Record<ProviderId, { label: string; hint: string }> 
     label: PROVIDER_LABELS.codex,
     hint: "Uses the ChatGPT account signed in to Codex.",
   },
-  agy: {
-    label: PROVIDER_LABELS.agy,
-    hint: "Uses the Google account signed in to Antigravity.",
-  },
-  gemini: {
-    label: PROVIDER_LABELS.gemini,
-    hint: "Uses the Gemini API key stored in macOS Keychain.",
+  cursor: {
+    label: PROVIDER_LABELS.cursor,
+    hint: "Uses Cursor's official ACP client in read-only Ask mode for software work.",
   },
 };
 
@@ -1639,7 +1639,6 @@ export function ChatSurface({
   const chatArtifactOpen = useUiStore((s) => s.chatArtifactOpen);
   const activeView = useUiStore((s) => s.activeView);
   const userName = useUiStore((s) => s.userName);
-  const imageEngine = useUiStore((s) => s.imageEngine);
   const isFocusedPane = usePanesStore((s) => s.focusedPaneId === paneId);
   const bindChat = usePanesStore((s) => s.bindChat);
   const openNote = usePanesStore((s) => s.openNote);
@@ -1733,6 +1732,7 @@ export function ChatSurface({
   // minus models blocked inside a lane. An unavailable saved pick is surfaced
   // explicitly before the local default takes over.
   const aiProviders = useUiStore((s) => s.aiProviders);
+  const providerDefaults = useUiStore((s) => s.providerDefaults);
   const hybridPresets = useUiStore((s) => s.hybridPresets);
   const blockedModels = useUiStore((s) => s.blockedModels);
   const providerChecks = useQueries({
@@ -1749,7 +1749,7 @@ export function ChatSurface({
       out[id] = !!detected?.installed && !!detected.authenticated;
       return out;
     },
-    { claude: false, codex: false, agy: false, gemini: false },
+    { claude: false, codex: false, cursor: false },
   );
   const providerChecksSettled = PROVIDER_IDS.every(
     (id, index) => !aiProviders[id] || providerChecks[index]?.isFetched,
@@ -2103,6 +2103,44 @@ export function ChatSurface({
       ]);
       return;
     }
+    const consultMention = parseConsultMention(typed);
+    if (consultMention.kind === "error") {
+      setMessages((previous) => [...previous, { speaker: "rotli", text: `⚠ ${consultMention.message}` }]);
+      return;
+    }
+    let turnModel = picked;
+    let providerTyped = typed;
+    if (consultMention.kind === "consult") {
+      const resolved = resolveConsultModel(
+        groups.connected,
+        consultMention.provider,
+        consultMention.modelId,
+        providerDefaults,
+      );
+      if (!resolved.ok) {
+        setMessages((previous) => [...previous, { speaker: "rotli", text: `⚠ ${resolved.message}` }]);
+        return;
+      }
+      if (!consultMention.prompt && imgs.length === 0) {
+        setMessages((previous) => [
+          ...previous,
+          { speaker: "rotli", text: "⚠ Add a question after the provider tag." },
+        ]);
+        return;
+      }
+      turnModel = resolved.model;
+      providerTyped = consultMention.prompt;
+    }
+    if (imgs.length > 0 && !turnModel.vision) {
+      setMessages((previous) => [
+        ...previous,
+        {
+          speaker: "rotli",
+          text: `⚠ ${turnModel.label} cannot receive image attachments through this Rotli integration.`,
+        },
+      ]);
+      return;
+    }
     let attachmentIsSecure = secureAttachmentHint;
     if (attachedNoteId) {
       try {
@@ -2122,7 +2160,7 @@ export function ChatSurface({
     }
     // the whole secure lineage: attached-secure, or the chat's own taint
     const attachedSecure = attachmentIsSecure || secureReadRef.current;
-    if (attachedSecure && !modelIsOnDevice(picked)) {
+    if (attachedSecure && !modelIsOnDevice(turnModel)) {
       setMessages((previous) => [
         ...previous,
         {
@@ -2143,6 +2181,14 @@ export function ChatSurface({
             .map((image, i) => (image.id ? attachmentReference(i + 1, image.id) : `[Image #${i + 1}]`))
             .join(" ")}${typed ? `\n${typed}` : ""}`
         : typed;
+    // Routing syntax remains in the durable user turn, while the provider sees
+    // the question without Rotli's @provider[:model] control token.
+    const providerUserText =
+      imgs.length > 0
+        ? `${imgs
+            .map((image, i) => (image.id ? attachmentReference(i + 1, image.id) : `[Image #${i + 1}]`))
+            .join(" ")}${providerTyped ? `\n${providerTyped}` : ""}`
+        : providerTyped;
     const sentTitle = normalizeChatTitle(title) || deriveChatTitle(userText);
     setProvisionalTitle(sentTitle);
     lastSentRef.current = { text: typed, images: imgs };
@@ -2251,27 +2297,17 @@ export function ChatSurface({
 
     const requestId = crypto.randomUUID();
     requestRef.current = requestId;
-    const model = { id: picked.id, api: picked.api };
-    // the image tool needs a pinned assets dir — a SAVED chat only (which a
-    // just-sent fresh chat now is) — and its engine's lane enabled
-    const image =
-      !attachedSecure && sentSlug && aiProviders[imageEngine]
-        ? {
-            root: active.root,
-            rootId: active.id === CORPUS_INSTANCE_ID ? "default" : active.id,
-            slug: sentSlug,
-            engine: imageEngine,
-          }
-        : undefined;
+    const model = { id: turnModel.id, api: turnModel.api };
     const userName = useUiStore.getState().userName.trim();
     const runInput: RunInput = {
       history,
-      userText,
+      userText: providerUserText,
       web: attachedSecure ? false : globeOn,
       model,
       ...(attachedNoteId ? { noteId: attachedNoteId } : {}),
       ...(imgs.length > 0 ? { images: imgs.map((image) => image.src) } : {}),
-      ...(image ? { imageTool: true } : {}),
+      // Cloud image-provider execution is intentionally absent. Rust refuses
+      // the legacy command too, so stale state cannot restore this tool.
       // The host pins managed files to the chat's registered root; Rust routes
       // and re-validates that capability independently.
       ...(isTauri() ? { documentTool: true } : {}),
@@ -2286,7 +2322,7 @@ export function ChatSurface({
 
     // a preset pick routes through the hybrid layer; everything else is the
     // normal loop. Both yield the same event stream.
-    const preset = presetFor(picked.id, hybridPresets);
+    const preset = presetFor(turnModel.id, hybridPresets);
     // a secure-note read mid-run taints the chat immediately (UI + this
     // turn's persistence) and one-way — the marker lands on the chat file below
     const onSecureNoteRead = () => {
@@ -2299,8 +2335,8 @@ export function ChatSurface({
     const webSearchProvider = useUiStore.getState().webSearchProvider;
     const baseOpts = {
       requestId,
-      ...(reasoningEffort ? { reasoningEffort } : {}),
-      ...(serviceTier ? { serviceTier } : {}),
+      ...(turnModel.id === picked.id && reasoningEffort ? { reasoningEffort } : {}),
+      ...(turnModel.id === picked.id && serviceTier ? { serviceTier } : {}),
       onSecureNoteRead,
       isSecureContext,
       webSearchProvider,
@@ -2328,10 +2364,10 @@ export function ChatSurface({
         }
       },
     };
-    const hostOpts = image ? { ...baseOpts, image } : baseOpts;
+    const hostOpts = baseOpts;
     const events = preset
       ? runHybrid(preset, modelList, runInput, (m, o) => makeTauriHost(m, { ...hostOpts, ...o }), requestId)
-      : runAgent(makeTauriHost(picked, hostOpts), runInput);
+      : runAgent(makeTauriHost(turnModel, hostOpts), runInput);
 
     let reply = "";
     let questionAfterRun: AgentQuestion | null = null;
@@ -2361,8 +2397,11 @@ export function ChatSurface({
     busyRef.current = false;
     setDraftQuestion(tabId, questionAfterRun, questionAfterRun ? runKey : null);
 
-    const failed = reply.startsWith("⚠");
     if (!reply) reply = "(the model returned nothing)";
+    if (consultMention.kind === "consult" && !reply.startsWith("⚠")) {
+      reply = attributedConsultReply(turnModel, reply);
+    }
+    const failed = reply.startsWith("⚠");
     const assistantAt = new Date().toISOString();
     const settledThread = recentChatThread([
       ...messages,
@@ -2397,10 +2436,10 @@ export function ChatSurface({
     // note's "Conversation notes" each turn (a preset routes per-leg, so it
     // falls back to the deterministic topics digest instead)
     const composeNotes =
-      picked.api === "preset"
+      turnModel.api === "preset"
         ? undefined
         : (context: { turns: readonly MemoryTurn[]; currentNotes: string | null }) =>
-            makeTauriHost(picked, {}).complete({
+            makeTauriHost(turnModel, {}).complete({
               messages: [
                 {
                   role: "user",
@@ -2450,7 +2489,7 @@ export function ChatSurface({
             chatSlug: sentSlug,
             ...(memoryStem ? { attachedStem: memoryStem } : {}),
             ...(composeNotes ? { composeNotes } : {}),
-            model: picked,
+            model: turnModel,
             turns: memoryTurns,
           }).catch((error) => setNoteErr(error instanceof Error ? error.message : String(error)));
         }
@@ -2487,7 +2526,7 @@ export function ChatSurface({
             title: sentTitle,
             chatSlug: res.slug,
             ...(composeNotes ? { composeNotes } : {}),
-            model: picked,
+            model: turnModel,
             turns: memoryTurns,
           }).catch((error) => setNoteErr(error instanceof Error ? error.message : String(error)));
         }
@@ -2639,9 +2678,11 @@ export function ChatSurface({
 
   // — dropped images (the maintainer, 2026-08-04) — the window handler hands us OS PATHS.
   // Import each into the vault's asset store first (the same lane a drop
-  // anywhere else uses), then read it back through the asset protocol: the
+  // anywhere else uses), then read it back over the IPC byte lane: the
   // composer speaks data URLs, and the image becomes a durable vault asset
-  // instead of a byte blob that exists only until you hit send.
+  // instead of a byte blob that exists only until you hit send. NOT a webview
+  // network read of asset://… — connect-src is ipc-only, so that fails with
+  // "Load failed" after the file has already been copied in (2026-09-01).
   const attachPaths = useCallback(
     (paths: readonly string[]) => {
       void (async () => {
@@ -2656,12 +2697,14 @@ export function ChatSurface({
           try {
             const id = await corpusImportFile(rootId, path);
             if (!id) continue;
-            const url = await fileAssetUrl(id);
-            if (!url) continue;
-            const blob = await fetch(url).then((r) => r.blob());
+            const stat = await corpusFileStat(id);
+            if (stat && stat.len > CHAT_IMAGE_ASSET_MAX_BYTES) {
+              throw new Error("image is larger than 25 MB");
+            }
+            const base64 = await corpusFileBytes(id, CHAT_IMAGE_ASSET_MAX_BYTES);
+            if (!base64) throw new Error("the imported image could not be read back");
             const name = fileName(path);
-            const src = await readAsDataURL(new File([blob], name, { type: blob.type }));
-            attached.push({ id, name, src });
+            attached.push({ id, name, src: `data:${imageMimeOf(extOf(name))};base64,${base64}` });
           } catch (error) {
             setAttachmentErr(
               `One dropped image could not be attached. ${error instanceof Error ? error.message : String(error)}`,
@@ -2677,7 +2720,21 @@ export function ChatSurface({
     [active, tabId, setDraftImages],
   );
 
-  useEffect(() => registerChatDrop(paneId, attachPaths), [paneId, attachPaths]);
+  // The drop lane mirrors the paperclip's vision gate: a model that cannot see
+  // gets the hint instead of an attachment that send would then refuse. The
+  // gate lives in this wrapper (not the memoized callback) because canVision
+  // derives from the un-memoized pick, which manual deps cannot express.
+  useEffect(
+    () =>
+      registerChatDrop(paneId, (paths) => {
+        if (!canVision) {
+          setVisionHint(true);
+          return;
+        }
+        attachPaths(paths);
+      }),
+    [paneId, attachPaths, canVision],
+  );
 
   // this chat's generated assets: everything under storage/chats/<slug>/ in the
   // active root (wire ids are bare for the corpus, "<rootid>:rel" otherwise)

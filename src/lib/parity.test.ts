@@ -8,9 +8,9 @@
 import { describe, expect, test } from "bun:test";
 
 import {
-  AGY_BIN_CANDIDATES,
   CLAUDE_BIN_CANDIDATES,
   CODEX_BIN_CANDIDATES,
+  CURSOR_BIN_CANDIDATES,
 } from "../../breve-runtime/scripts/cli-paths";
 import { ROTLI_KEYCHAIN_SERVICE, ROTLI_RESEND_ACCOUNT } from "../../breve-runtime/scripts/keychain-names";
 import fixture from "../../scripts/fixtures/parity.json";
@@ -18,13 +18,8 @@ import { containsPrivateDataOverlap, endpointIsLocal } from "../ai/guard";
 import { BOARD_LIMITS } from "../boards/validation";
 import { DOCUMENT_CONVERTIBLE_EXTS } from "../documents/kinds";
 import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
-import { CHAT_IMAGE_ASSET_EXTS } from "./chatWork";
-import {
-  type FrontmatterView,
-  type MemexPerms,
-  SECRET_BRAVE_SEARCH_API_KEY,
-  SECRET_GEMINI_API_KEY,
-} from "./tauri";
+import { CHAT_IMAGE_ASSET_EXTS, CHAT_IMAGE_ASSET_MAX_BYTES } from "./chatWork";
+import { type FrontmatterView, type MemexPerms, SECRET_BRAVE_SEARCH_API_KEY } from "./tauri";
 
 const entries = fixture.entries;
 
@@ -35,6 +30,10 @@ describe("parity.json ↔ TS constants", () => {
 
   test("chatImageAssetExts", () => {
     expect(CHAT_IMAGE_ASSET_EXTS).toEqual(entries.chatImageAssetExts.value);
+  });
+
+  test("chatImageAssetMaxBytes", () => {
+    expect(CHAT_IMAGE_ASSET_MAX_BYTES).toBe(entries.chatImageAssetMaxBytes.value);
   });
 
   test("boardLimits", () => {
@@ -75,7 +74,6 @@ describe("parity.json ↔ TS constants", () => {
 
   test("keychainAllowedAccounts", () => {
     expect(entries.keychainAllowedAccounts.value).toEqual([
-      SECRET_GEMINI_API_KEY,
       SECRET_BRAVE_SEARCH_API_KEY,
       ROTLI_RESEND_ACCOUNT,
     ]);
@@ -84,10 +82,10 @@ describe("parity.json ↔ TS constants", () => {
   test("cliBinCandidates", () => {
     const claude: string[] = [...CLAUDE_BIN_CANDIDATES];
     const codex: string[] = [...CODEX_BIN_CANDIDATES];
-    const agy: string[] = [...AGY_BIN_CANDIDATES];
+    const cursor: string[] = [...CURSOR_BIN_CANDIDATES];
     expect(claude).toEqual(entries.cliBinCandidates.value.claude);
     expect(codex).toEqual(entries.cliBinCandidates.value.codex);
-    expect(agy).toEqual(entries.cliBinCandidates.value.agy);
+    expect(cursor).toEqual(entries.cliBinCandidates.value.cursor);
   });
 
   test("secureOverlap", () => {

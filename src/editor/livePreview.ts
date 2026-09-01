@@ -26,15 +26,24 @@ import {
 } from "@codemirror/view";
 
 import { type DragGhost, createImageDragGhost } from "../lib/dragGhost";
+import { VIDEO_EXTS, extOf } from "../lib/fileKind";
 import { openUrl, resolveImageSrc, rootIdOf } from "../lib/tauri";
 import { locateLostImage } from "../services/imageRepair";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
+import { selectChoiceGroup } from "./choiceState";
 import { scanFences } from "./fences";
 import { imageSourceSpan, selectionCoversImage } from "./imageSelection";
 import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
-import { CHECK_EM, listStyle, MARKER_EM } from "./listGeometry";
+import { CHECK_EM, CHOICE_EM, listStyle, MARKER_EM, RESULT_EM } from "./listGeometry";
 import { parseBlock } from "./render";
+import {
+  chooseResult,
+  RESULT_REASON_SEPARATOR,
+  type ResultChoice,
+  type ResultState,
+  resultTextParts,
+} from "./resultState";
 import { lineInTable, scanTables } from "./tables";
 import { markOf, nextTaskState, type TaskState, TASK_LINE_RE, taskStateOf } from "./taskState";
 import { type TaskNode, type TaskProgress, taskProgress } from "./taskTree";
@@ -269,6 +278,7 @@ class CheckboxWidget extends WidgetType {
     // toggle on mousedown without moving the caret — resolve the line at click
     // time via posAtDOM so renumbered/edited lines still hit the right one
     btn.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return; // a right/middle press must not toggle
       e.preventDefault();
       const pos = view.posAtDOM(btn);
       const line = view.state.doc.lineAt(pos);
@@ -280,6 +290,183 @@ class CheckboxWidget extends WidgetType {
       const next = `${m[1]}[${markOf(nextTaskState(taskStateOf(m[2] ?? " "), threeState))}] `;
       view.dispatch({ changes: { from: line.from, to: line.from + m[0].length, insert: next } });
     });
+    if (!this.marker) return btn;
+    const wrap = document.createElement("span");
+    const num = document.createElement("span");
+    num.className = "rotli-marker num";
+    num.textContent = this.marker;
+    num.setAttribute("aria-hidden", "true");
+    wrap.append(num, btn);
+    return wrap;
+  }
+  ignoreEvent() {
+    return false;
+  }
+}
+
+/** Two exclusive buttons backed by two adjacent Markdown boxes. The first is
+ * yes/pass (✓), the second no/fail (×); choosing either clears the other. */
+class ResultWidget extends WidgetType {
+  constructor(
+    readonly state: ResultState,
+    readonly marker: string | null = null,
+  ) {
+    super();
+  }
+  eq(o: ResultWidget) {
+    return o.state === this.state && o.marker === this.marker;
+  }
+  toDOM(view: EditorView) {
+    const controls = document.createElement("span");
+    controls.className = "rotli-result";
+    controls.setAttribute("role", "group");
+    controls.setAttribute("aria-label", "Yes or no result");
+
+    const choose = (choice: ResultChoice) => {
+      const pos = view.posAtDOM(controls);
+      const line = view.state.doc.lineAt(pos);
+      const next = chooseResult(line.text, choice);
+      if (!next || next === line.text) return;
+      view.dispatch({ changes: { from: line.from, to: line.to, insert: next }, userEvent: "input" });
+    };
+
+    const button = (choice: ResultChoice, glyph: string, label: string) => {
+      const selected = this.state === choice;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `rotli-result-choice rotli-result-choice--${choice}${selected ? " is-selected" : ""}`;
+      btn.textContent = glyph;
+      btn.setAttribute("aria-label", label);
+      btn.setAttribute("aria-pressed", String(selected));
+      btn.title = label;
+      btn.addEventListener("keydown", (event) => {
+        // Tab navigates the embedded controls; Tab while the text caret owns
+        // the row still indents it through cmKeymap.
+        if (event.key === "Tab" || event.key === " " || event.key === "Enter") {
+          event.stopPropagation();
+        }
+      });
+      // Pointer selection must not move the editor caret into the hidden source.
+      btn.addEventListener("mousedown", (event) => {
+        if (event.button !== 0) return; // a right/middle press must not answer
+        event.preventDefault();
+        choose(choice);
+      });
+      // Native button activation covers keyboard and assistive-tech clicks.
+      btn.addEventListener("click", (event) => {
+        event.preventDefault();
+        // A pointer click already committed on mousedown before CodeMirror can
+        // move the caret. detail=0 is keyboard or assistive-tech activation.
+        if (event.detail === 0) choose(choice);
+      });
+      return btn;
+    };
+
+    controls.append(button("yes", "✓", "Yes or passed"), button("no", "×", "No or failed"));
+    if (!this.marker) return controls;
+    const wrap = document.createElement("span");
+    const num = document.createElement("span");
+    num.className = "rotli-marker num";
+    num.textContent = this.marker;
+    num.setAttribute("aria-hidden", "true");
+    wrap.append(num, controls);
+    return wrap;
+  }
+  ignoreEvent() {
+    return false;
+  }
+}
+
+/** A selected row can carry an ordinary Markdown explanation after an em dash.
+ * The affordance inserts only that separator, then returns focus to the text. */
+class ResultReasonWidget extends WidgetType {
+  eq() {
+    return true;
+  }
+  toDOM(view: EditorView) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "rotli-result-reason-add";
+    btn.textContent = "+ reason";
+    btn.setAttribute("aria-label", "Add a reason for this result");
+    const add = () => {
+      const pos = view.posAtDOM(btn);
+      const line = view.state.doc.lineAt(pos);
+      view.dispatch({
+        changes: { from: line.to, insert: RESULT_REASON_SEPARATOR },
+        selection: { anchor: line.to + RESULT_REASON_SEPARATOR.length },
+        scrollIntoView: true,
+        userEvent: "input",
+      });
+      view.focus();
+    };
+    btn.addEventListener("keydown", (event) => {
+      if (event.key === "Tab" || event.key === " " || event.key === "Enter") event.stopPropagation();
+    });
+    btn.addEventListener("mousedown", (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      add();
+    });
+    btn.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (event.detail === 0) add();
+    });
+    return btn;
+  }
+  ignoreEvent() {
+    return false;
+  }
+}
+
+/** One radio-style option backed by `( )` / `(x)`. Adjacent same-indent choice
+ * rows are the group, so selecting one rewrites that group atomically. */
+class ChoiceWidget extends WidgetType {
+  constructor(
+    readonly selected: boolean,
+    readonly marker: string | null = null,
+  ) {
+    super();
+  }
+  eq(other: ChoiceWidget) {
+    return other.selected === this.selected && other.marker === this.marker;
+  }
+  toDOM(view: EditorView) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `rotli-choice${this.selected ? " is-selected" : ""}`;
+    btn.setAttribute("aria-pressed", String(this.selected));
+    btn.setAttribute("aria-label", this.selected ? "Selected option" : "Select option");
+    btn.title = this.selected ? "Selected option" : "Select option";
+
+    const select = () => {
+      const pos = view.posAtDOM(btn);
+      const target = view.state.doc.lineAt(pos);
+      const lines = view.state.doc.toString().split("\n");
+      const planned = selectChoiceGroup(lines, target.number - 1);
+      if (!planned || planned.length === 0) return;
+      const changes = planned.map((edit) => {
+        const line = view.state.doc.line(edit.index + 1);
+        return { from: line.from, to: line.to, insert: edit.line };
+      });
+      view.dispatch({ changes, userEvent: "input" });
+    };
+
+    btn.addEventListener("keydown", (event) => {
+      // A focused embedded choice stays in normal Tab order. A text caret on
+      // the line still delegates Tab to Rotli's line-indent command.
+      if (event.key === "Tab" || event.key === " " || event.key === "Enter") event.stopPropagation();
+    });
+    btn.addEventListener("mousedown", (event) => {
+      if (event.button !== 0) return; // a right/middle press must not select
+      event.preventDefault();
+      select();
+    });
+    btn.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (event.detail === 0) select();
+    });
+
     if (!this.marker) return btn;
     const wrap = document.createElement("span");
     const num = document.createElement("span");
@@ -318,8 +505,20 @@ class ImgWidget extends WidgetType {
     const bar = this.alt.lastIndexOf("|");
     const caption = bar >= 0 ? this.alt.slice(0, bar) : this.alt;
     const w = bar >= 0 ? Number.parseInt(this.alt.slice(bar + 1), 10) : Number.NaN;
-    const img = document.createElement("img");
-    img.alt = caption;
+    // A video source keeps the whole image contract — storage: resolution,
+    // rescue, the |width suffix, the resize grip, selection — and swaps only
+    // the element: WKWebView plays it natively over the asset protocol, which
+    // serves range requests so seeking works. No bytes ride IPC.
+    const isVideo = VIDEO_EXTS.has(extOf(this.src));
+    const img = isVideo ? document.createElement("video") : document.createElement("img");
+    if (img instanceof HTMLVideoElement) {
+      img.controls = true;
+      img.preload = "metadata";
+      img.playsInline = true;
+      if (caption) img.setAttribute("aria-label", caption);
+    } else {
+      img.alt = caption;
+    }
     img.draggable = false;
     if (Number.isFinite(w) && w > 0) img.style.width = `${w}px`;
     wrap.appendChild(img);
@@ -383,8 +582,11 @@ class ImgWidget extends WidgetType {
         })
         .catch(() => showState(`image not found — ${this.src}`));
     }
-    img.addEventListener("mousedown", (e) => {
+    (img as HTMLElement).addEventListener("mousedown", (e) => {
       if (e.button !== 0) return;
+      // native transport controls own the pointer on a video — move it by
+      // selecting its line (double-click) rather than dragging the player
+      if (!(img instanceof HTMLImageElement)) return;
       e.preventDefault();
       // capture every doc position NOW — a mid-drag redraw detaches `wrap`, so
       // nothing may resolve through posAtDOM at mouse-up (the old glitch). The
@@ -531,6 +733,7 @@ class ImgWidget extends WidgetType {
     grip.className = "rotli-img-resize";
     grip.setAttribute("aria-hidden", "true");
     grip.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
       // capture at press (posAtDOM at mouse-up can see a detached node), and
@@ -811,6 +1014,56 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
                 Decoration.widget({ widget: new ProgressWidget(p.done, p.total), side: 1 }).range(line.to),
               );
             }
+          }
+          if (listItemImage(content, contentBase, line.to, lineTouched, sel, decos, atomics)) break;
+          scanInline(content, contentBase, sel, decos, atomics);
+          break;
+        case "result": {
+          const state = block.resultState ?? "unanswered";
+          const parts = resultTextParts(content);
+          decos.push(
+            Decoration.line({
+              class: "rotli-result-line",
+              attributes: { style: listStyle(depth, block.marker ? MARKER_EM + RESULT_EM : RESULT_EM) },
+            }).range(ls),
+          );
+          hidePrefix(ls, prefixEnd, new ResultWidget(state, block.marker ?? null), decos, atomics);
+          if (state !== "unanswered" && parts.label.length > 0) {
+            decos.push(
+              Decoration.mark({ class: `rotli-result-text rotli-result-text--${state}` }).range(
+                prefixEnd,
+                prefixEnd + parts.label.length,
+              ),
+            );
+          }
+          if (state !== "unanswered" && parts.reason !== null) {
+            const reasonFrom = prefixEnd + parts.label.length;
+            if (line.to > reasonFrom) {
+              decos.push(Decoration.mark({ class: "rotli-result-reason" }).range(reasonFrom, line.to));
+            }
+          } else if (state !== "unanswered" && parts.label.trim().length > 0) {
+            decos.push(Decoration.widget({ widget: new ResultReasonWidget(), side: 1 }).range(line.to));
+          }
+          if (listItemImage(content, contentBase, line.to, lineTouched, sel, decos, atomics)) break;
+          scanInline(content, contentBase, sel, decos, atomics);
+          break;
+        }
+        case "choice":
+          decos.push(
+            Decoration.line({
+              class: block.choiceSelected ? "rotli-choice-line is-selected" : "rotli-choice-line",
+              attributes: { style: listStyle(depth, block.marker ? MARKER_EM + CHOICE_EM : CHOICE_EM) },
+            }).range(ls),
+          );
+          hidePrefix(
+            ls,
+            prefixEnd,
+            new ChoiceWidget(block.choiceSelected ?? false, block.marker ?? null),
+            decos,
+            atomics,
+          );
+          if (block.choiceSelected && line.to > prefixEnd) {
+            decos.push(Decoration.mark({ class: "rotli-choice-text--selected" }).range(prefixEnd, line.to));
           }
           if (listItemImage(content, contentBase, line.to, lineTouched, sel, decos, atomics)) break;
           scanInline(content, contentBase, sel, decos, atomics);

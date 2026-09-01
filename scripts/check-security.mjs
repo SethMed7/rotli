@@ -59,6 +59,29 @@ function stripComments(src) {
   }
 }
 
+// src/: the webview's CSP is connect-src ipc-only, so a raw fetch( in app code
+// can never reach the asset protocol or the network — it fails at runtime with
+// "Load failed" (the 2026-09-01 chat-drop regression). Every call site must be
+// declared with its reason; file reads go through the IPC byte lane instead.
+{
+  const fetchFiles = allow.src?.rawFetchFiles ?? {};
+  const walk = (dir) =>
+    readdirSync(join(root, dir), { withFileTypes: true }).flatMap((entry) => {
+      const rel = join(dir, entry.name);
+      if (entry.isDirectory()) return walk(rel);
+      return /\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name) ? [rel] : [];
+    });
+  for (const rel of walk("src")) {
+    const code = stripComments(read(rel));
+    if (/(^|[^.\w])fetch\s*\(/.test(code) && !(rel in fetchFiles)) {
+      failures.push(
+        `${rel}: raw fetch() in the webview is blocked by the ipc-only connect-src. ` +
+          `Read vault files through corpusFileBytes, or declare the call site in egress-allowlist.json src.rawFetchFiles with its destination + guard.`,
+      );
+    }
+  }
+}
+
 // breve-runtime: every raw fetch( site must be a declared egress file; node net
 // modules restricted to the allowlist.
 {

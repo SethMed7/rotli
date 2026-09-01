@@ -60,18 +60,18 @@ from every diagnostics path. Full record: egress threat model O7, design in
 |---|---|---|---|
 | `web_fetch` | arbitrary public web | model-chosen URL text | secret scan + `vetted_resolve` IP-pinned SSRF block + same-host redirects + 2 MB / 2048-char caps (fixtures) |
 | `web_search` | selected literal provider: `lite.duckduckgo.com` / `html.duckduckgo.com`, or `api.search.brave.com` | query | per-chat globe consent + per-vault provider selection + `blocked_for_remote` secret/private-prose scan + 512-char cap + redirect/body/time caps; Brave credential is read from Keychain in Rust at request time |
-| `chat_messages` | registered loopback model server **or** the pinned Gemini base | conversation transcript + images | `endpoint_permitted` destination clamp + `egress_allowed` secret-shaped refusal to non-local endpoints; local llama.cpp Bearer never rides to a remote base |
-| `generate_image` | OpenAI/Google via codex/agy CLI | model-authored prompt | `protected_for_remote`; prompt framed as DATA to the nested agent |
-| CLI lanes (claude/codex/agy) | Anthropic/OpenAI/Google | transcript | binary+model allowlist (parity-pinned), tool-less/sandboxed argv, secret scan |
+| `chat_messages` | registered loopback model server | conversation transcript + images | `endpoint_permitted` accepts only registered on-device loopback destinations; direct Gemini/remote HTTP is unavailable |
+| `generate_image` | none | model-authored prompt | native command returns the provider-image policy error before root/path resolution, credential lookup, or process spawn |
+| CLI lanes (`claude` / `codex` / `cursor`) | Anthropic/OpenAI/Cursor through their official local clients | transcript | native provider allowlist before binary lookup; binary+model allowlists (parity-pinned), safe/tool-less/read-only argv or ACP protocol fields, secret scan; Cursor runs ACP Ask mode from an empty scratch workspace with client capabilities off and permission requests rejected; AGY/Gemini refused |
 | Resend (Rust `breve.rs` + breve-runtime send lanes) | literal `api.resend.com` | brief text | Keychain Bearer (allowlisted names), configured recipients, delivery-claim idempotency |
 | signal-cli sends | configured recipients | brief text | delivery-claim contract |
-| Breve local-model tier (`llm.ts`) | loopback only | memex/Signal/watcher text + prompts | `llmConfig` throws on a non-loopback endpoint unless `llm.allowRemote` is set |
+| Breve local-model tier (`llm.ts`) | loopback only | memex/Signal/watcher text + prompts | managed config is normalized to a registered local model at every native boundary; legacy cloud-spawn helpers refuse before binary lookup |
 | Breve safe-fetch | curated public hosts | watchlist/summarize URLs | `safe-fetch.ts` (https-only, SSRF block, same-host redirects, caps) |
 | YouTube probes (`signal-daemon.ts`, `creator-alerts.ts`) | literal `youtube.com` | handle/channelId in the path/query only | host-pinned literal, `checkUrl`-gated |
 | Updater | GitHub releases | — | minisign-signed feed, single pinned HTTPS endpoint |
 | Private browser child webview | user-selected HTTP(S) destination through the chosen search provider | address/search text plus ordinary page traffic | explicit user navigation + `blocked_for_remote` address scan + scheme allowlist; only the provider ID persists; non-persistent datastore; remote guest omitted from every Tauri capability |
 | ImapFlow (`mail.ts`) | configured mail hosts | — | TLS strict except loopback |
-| Rotli app webviews | nothing | — | CSP `connect-src ipc:` only; no fetch/XHR/WebSocket in `src/`; capabilities target only `main`, `capture`, and `quick` labels rather than their whole windows |
+| Rotli app webviews | nothing | — | CSP `connect-src ipc:` only; no fetch/XHR/WebSocket in `src/` (`check:security` fails any undeclared raw `fetch(` under `src/`); capabilities target only `main`, `capture`, and `quick` labels rather than their whole windows |
 | `rotli` CLI / `rotli-workspace` MCP | local Claude/Codex process | requested non-secure note text or compact board data | registered-root discovery + no-follow containment + remote-AI secure detector + locked-note refusal + optimistic revision check + request/output/schema caps + destructive annotations; stdio or authenticated loopback HTTP |
 | Remote-agent connector | user-configured HTTPS relay (loopback HTTP in development) | token-bound MCP frames already filtered by `workspace.rs` | explicit per-launch connect + independent Keychain device/client credentials + no public Mac listener + exact role checks + no redirects + bounded request/response frames and sessions; vault switches fail closed unless the old connector stops |
 
@@ -186,13 +186,10 @@ The 2026-07 audit escalated five product-behavior findings. Disposition:
 3. **Send-seam secret scan is text-only — ACCEPTED as a consented gap.**
    Attaching an image is an explicit user act; the product promise is precisely
    "**text-shaped** secure content never leaves" and that promise holds.
-4. **`generate_image` agy privilege — FIXED (OS-sandboxed).** The agy image
-   job now runs under `sandbox-exec` with a profile mirroring Breve's policy
-   as independent enforcement: `$HOME` reads/writes denied except the pinned
-   chat-assets dir, the CLI's own state (`~/.gemini`, `~/.antigravity`), the
-   login Keychain (read-only, its auth token), and the binary's directory.
-   Knob: `ROTLI_IMAGE_SANDBOX=0` disables (Configuration Rule safe fallback).
-   *App-smoke on next run: agy image generation still saves its PNG.*
+4. **`generate_image` provider privilege — RETIRED.** Provider-backed image
+   generation is disabled at the native command boundary before path
+   resolution, credential lookup, or process spawn. The former AGY launcher,
+   Seatbelt profile, retry, and image implementation were removed.
 5. **Non-secret private prose via web tool args — FIXED for substantial verbatim
    overlap.** Web/image arguments are compared with locally retrieved tool
    results before dispatch; a five-token, 24-character copied phrase is refused

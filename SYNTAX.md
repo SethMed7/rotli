@@ -68,6 +68,42 @@ imports.
   Render-only ids such as `main:<folder>` stay internal and are never written
   as user metadata.
 
+## Markdown authoring grammar
+
+- Typing `/attatch` at the editable start of a Markdown line and confirming the
+  matching **Attach image** command opens Finder for one or more images. The
+  conventional `/attach` query finds the same command. Selected bytes are
+  copied into the note's registered vault and the note receives only portable
+  `storage:` image links; absolute source paths never enter Markdown.
+- A video file (`mp4`, `mov`, `webm`, `m4v`, `ogv`) dropped on a note or chosen
+  through **Attach image** uses the same portable `storage:` image source as
+  a picture. Rotli renders it as a playable embed with native
+  controls; the `|width` suffix and the resize grip apply. Elsewhere the line
+  stays an ordinary Markdown image reference.
+- Inside a result row's ` — reason`, a `/command` typed as the last word (after
+  a space, or as the whole reason) opens the same slash menu. The picked block
+  lands on a continuation line beneath the row, the row keeps its label and
+  reason, and a reason that was only the slash loses its dangling separator.
+- Typing `[]` and then Space at the start of a line (optionally after `- ` or
+  indentation) expands to the ordinary portable task source `- [ ] `.
+- Typing `[][]` and then Space expands to an exclusive two-choice result row:
+  `- [ ][ ] ` is unanswered, `- [x][ ] ` is yes/passed, and `- [ ][x] ` is
+  no/failed. The check is the left control; the red X is the right control.
+  Clicking one side always clears the other. A hand-edited
+  `- [x][x] ` is ambiguous, so Rotli fails closed and shows it as ordinary
+  Markdown instead of choosing a result.
+- The X and check controls, plus the bold failure/success text shown after a
+  choice, are render layers. The adjacent boxes remain the only file truth.
+  A chosen row may append an ordinary Markdown reason after ` — `; the inline
+  `+ reason` action inserts that separator and leaves the caret ready to type.
+  Result rows do not enter the Tasks projection; ordinary `[ ]`, `[/]`, and
+  `[x]` tasks keep their existing behavior.
+- Typing `()` and then Space expands to `- ( ) `. Adjacent choice rows at the
+  same indent form one exclusive group; selecting one writes `(x)` there and
+  clears its siblings to `( )`. A blank, prose row, or different indent ends
+  the group. Enter continues with an unselected option. Tab on row text indents
+  the row; Tab on a rendered control follows the normal keyboard focus order.
+
 ## CSS and design tokens
 
 - Class selectors use kebab-case; BEM-style `--modifier` suffixes are allowed.

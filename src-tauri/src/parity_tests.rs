@@ -40,6 +40,14 @@ fn chat_image_asset_exts_match_fixture() {
 }
 
 #[test]
+fn chat_image_asset_max_bytes_matches_fixture() {
+    assert_eq!(
+        entry("chatImageAssetMaxBytes").as_u64(),
+        Some(crate::corpus::CHAT_IMAGE_ASSET_MAX_BYTES as u64)
+    );
+}
+
+#[test]
 fn board_limits_match_fixture() {
     let limits = entry("boardLimits");
     assert_eq!(

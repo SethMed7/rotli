@@ -39,3 +39,17 @@ test("the fresh-chat composition is lower, narrower, and shorter than an active 
   );
   expect(messageRule).toContain("min-height: 30px");
 });
+
+test("dropped chat images read back over IPC bytes, never a webview fetch", () => {
+  // connect-src is ipc-only (docs/development/security.md): fetch(asset://…)
+  // fails with "Load failed" after the file has already been copied in.
+  const attach = surfaceSource.slice(
+    surfaceSource.indexOf("const attachPaths = useCallback("),
+    surfaceSource.indexOf("const assetPrefix ="),
+  );
+  expect(surfaceSource).not.toMatch(/(^|[^.\w])fetch\s*\(/);
+  expect(attach).toContain("corpusFileBytes(id, CHAT_IMAGE_ASSET_MAX_BYTES)");
+  // the drop lane mirrors the paperclip's vision gate instead of attaching an
+  // image the send path will then refuse
+  expect(attach).toContain("setVisionHint(true)");
+});

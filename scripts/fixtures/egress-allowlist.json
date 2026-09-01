@@ -15,7 +15,7 @@
     "ureqFiles": {
       "web_search.rs": "provider-dispatched search to literal DuckDuckGo lite/html or api.search.brave.com; query is secret/private-prose scanned and capped, redirects/body size/time are bounded, Brave auth comes from Keychain",
       "web.rs": "web_fetch (arbitrary public web via the vetted_resolve SSRF-blocked agent, same-host redirects, byte+URL caps)",
-      "chat.rs": "the on-device / Gemini model bridge — endpoint_permitted clamps the destination to registered loopback model servers or the pinned Gemini base; egress_allowed refuses secret-shaped transcripts to non-local endpoints",
+      "chat.rs": "the on-device model bridge — endpoint_permitted clamps the destination to registered loopback model servers; egress_allowed refuses protected transcripts to non-local endpoints",
       "breve.rs": "breve_test_email — Resend send to the literal https://api.resend.com/emails host, Keychain Bearer, configured recipients only",
       "remote_agent.rs": "explicit session connector to the user-entered HTTPS relay (loopback HTTP allowed in development); independent Keychain device/client credentials; redirects refused; request/response frames bounded; MCP responses come only from workspace.rs remote-policy handlers; vault switches fail closed unless disconnect succeeds; no frame logging"
     },
@@ -66,10 +66,13 @@
       ]
     }
   },
+  "src": {
+    "_comment": "Webview app code. connect-src is ipc-only, so a raw fetch( here cannot reach the network or the asset protocol; vault bytes ride corpusFileBytes. Declare a call site only with a documented reason.",
+    "rawFetchFiles": {}
+  },
   "keychain": {
     "_comment": "The allowlisted account names may appear ONLY at their named-constant declaration sites + the parity fixture + tests. Any other literal occurrence fails the check — callers must import the constant.",
     "accounts": [
-      "gemini-api-key",
       "brave-search-api-key",
       "breve-resend-api-key",
       "remote-agent-token"
