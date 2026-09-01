@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The public site now shows the real Rotli workspace in the open air.** A
+  coastal, lightly textured hero replaces the synthetic app mockup, while a
+  privacy-safe browser-demo capture anchors the product story. The theme studio
+  now switches among six real, seeded-corpus captures—one representative
+  environment from every theme family—and remains responsive in both site modes.
 - **Reasoning controls now follow the selected model, not only its provider.**
   Claude Haiku no longer offers unsupported effort controls; each Codex model
   exposes only its own effort ceiling, GPT-5.6 Sol/Terra gain Ultra, and Fast

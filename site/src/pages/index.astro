@@ -1,7 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
 import mark from '../../../src/assets/characters/_logo.svg?raw';
-import waving from '../../../src/assets/characters/filled/cocoa/waving.webp';
 import staysLocal from '../../../src/assets/characters/filled/cocoa/stays_local.webp';
 import celebrating from '../../../src/assets/characters/filled/cocoa/celebrating.webp';
 
@@ -9,12 +8,12 @@ const RELEASES_URL = 'https://github.com/SethMed7/rotli-releases/releases/latest
 const GITHUB_URL = 'https://github.com/SethMed7/rotli';
 
 const themeFamilies = [
-  { id: 'rotli', name: 'Rotli' },
-  { id: 'paper', name: 'Paper & Charcoal' },
-  { id: 'ocean', name: 'Ocean' },
-  { id: 'grove', name: 'Grove' },
-  { id: 'iris', name: 'Iris' },
-  { id: 'midnight', name: 'Midnight' },
+  { id: 'rotli', name: 'Rotli', environment: 'Warm Light', screenshot: '/rotli-app-warm-light.png' },
+  { id: 'paper', name: 'Paper & Charcoal', environment: 'Paper', screenshot: '/rotli-app-paper.png' },
+  { id: 'ocean', name: 'Ocean', environment: 'Ocean Light', screenshot: '/rotli-app-ocean-light.png' },
+  { id: 'grove', name: 'Grove', environment: 'Grove Dark', screenshot: '/rotli-app-grove-dark.png' },
+  { id: 'iris', name: 'Iris', environment: 'Iris Light', screenshot: '/rotli-app-iris-light.png' },
+  { id: 'midnight', name: 'Midnight', environment: 'Midnight', screenshot: '/rotli-app-midnight.png' },
 ];
 
 const surfaces = [
@@ -72,73 +71,37 @@ const surfaces = [
   </header>
 
   <main id="content">
-    <section class="hero" aria-labelledby="hero-title">
-      <div class="hero-copy">
-        <p class="hero-kicker">A local-first workspace for macOS</p>
-        <h1 id="hero-title">Your files remain the product.</h1>
-        <p class="hero-lede">
-          Rotli turns one folder on your Mac into a calm workspace for notes, editable files,
-          boards, and AI conversations—without turning your work into an export from a service.
-        </p>
-        <div class="hero-actions">
-          <a class="button primary" href={RELEASES_URL} rel="noopener">Download for Mac</a>
-          <a class="button secondary" href={GITHUB_URL} rel="noopener">Explore the source</a>
-        </div>
-        <p class="release-note">Free · Apple silicon · signed beta · no account</p>
+    <section class="hero-shell" aria-labelledby="hero-title">
+      <div class="hero-backdrop" aria-hidden="true">
+        <img src="/coastline.webp" alt="" width="941" height="1672" fetchpriority="high" />
       </div>
-
-      <figure class="workspace-figure" aria-label="Rotli workspace overview">
-        <div class="workspace-window">
-          <div class="window-titlebar" aria-hidden="true">
-            <span class="traffic-lights"><i></i><i></i><i></i></span>
-            <span class="search-field"><span class="mini-mark" set:html={mark}></span>Search your vault</span>
-            <span class="window-tools">＋ ◫ ☼</span>
+      <div class="hero">
+        <div class="hero-copy">
+          <p class="hero-kicker">A local-first workspace for macOS</p>
+          <h1 id="hero-title">Room to think.<br />Files you keep.</h1>
+          <p class="hero-lede">
+            Rotli turns one folder on your Mac into a calm workspace for notes, editable files,
+            boards, and AI conversations—without turning your work into an export from a service.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href={RELEASES_URL} rel="noopener">Download for Mac</a>
+            <a class="button secondary" href={GITHUB_URL} rel="noopener">Explore the source</a>
           </div>
-          <div class="workspace-shell">
-            <aside class="demo-sidebar" aria-hidden="true">
-              <div class="vault-row"><b>Field Notes</b><span>⌄</span></div>
-              <div class="front-switch"><b>Home</b><span>Chat&nbsp; 6</span></div>
-              <div class="sidebar-stat"><span>This week</span><b>18 notes</b><b>4 chats</b></div>
-              <ul>
-                <li>All notes <span>146</span></li>
-                <li>Captures <span>12</span></li>
-                <li>Tasks <span>8</span></li>
-              </ul>
-              <p>Main</p>
-              <ul>
-                <li class="selected">Launch notes</li>
-                <li>Research</li>
-                <li>Reading</li>
-              </ul>
-              <p class="sidebar-bottom">Library&nbsp; · &nbsp;Assets&nbsp; · &nbsp;Trash</p>
-            </aside>
-            <div class="demo-workspace">
-              <div class="demo-tabbar" aria-hidden="true"><b>Home</b><span>Project brief</span><span>×</span></div>
-              <div class="dashboard-copy">
-                <div class="dashboard-title">
-                  <div>
-                    <span>Rotli activity</span>
-                    <h2>Your vault in Rotli</h2>
-                  </div>
-                  <p>Notes, chats, and saved files from this vault.</p>
-                </div>
-                <div class="dashboard-lens"><b>Rotli activity</b><span>Model usage</span></div>
-                <div class="dashboard-stats">
-                  <span><small>Notes</small><b>146</b></span>
-                  <span><small>New this week</small><b>18</b></span>
-                  <span><small>Open tasks</small><b>8</b></span>
-                </div>
-                <div class="dashboard-lists">
-                  <div><b>Recent notes</b><span>Launch notes&nbsp; · &nbsp;today</span><span>Meeting sketch&nbsp; · &nbsp;1d</span></div>
-                  <div><b>Recent chats</b><span>Review this plan&nbsp; · &nbsp;today</span><span>Find connected notes&nbsp; · &nbsp;2d</span></div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <p class="release-note">Free · Apple silicon · signed beta · no account</p>
         </div>
-        <img class="workspace-quokka" src={waving.src} width="400" height="400" alt="A cocoa-colored Rotli quokka waving" />
-        <figcaption>The same quiet shell across notes, chat, files, and Breve.</figcaption>
-      </figure>
+
+        <figure class="product-figure">
+          <div class="product-shot">
+            <img
+              src="/rotli-app-ocean-light.png"
+              width="1280"
+              height="800"
+              alt="Rotli's browser demo workspace in the Ocean Light environment"
+            />
+          </div>
+          <figcaption><span>Real browser demo</span> Ocean Light · seeded local corpus</figcaption>
+        </figure>
+      </div>
     </section>
 
     <div class="proof-strip" aria-label="Rotli essentials">
@@ -260,6 +223,9 @@ const surfaces = [
               class="theme-choice"
               type="button"
               data-theme-family={family.id}
+              data-theme-name={family.name}
+              data-theme-screenshot={family.screenshot}
+              data-theme-environment={family.environment}
               aria-pressed={index === 0 ? 'true' : 'false'}
             >
               <span class={`theme-pair theme-pair-${family.id}`} aria-hidden="true"><i></i><i></i></span>
@@ -267,6 +233,22 @@ const surfaces = [
             </button>
           ))}
         </div>
+        <figure class="theme-capture">
+          <div class="theme-capture-frame">
+            <img
+              id="theme-preview-image"
+              src={themeFamilies[0].screenshot}
+              width="1280"
+              height="800"
+              alt={`Rotli's browser demo workspace in the ${themeFamilies[0].environment} environment`}
+              loading="lazy"
+            />
+          </div>
+          <figcaption>
+            <span>Captured from Rotli’s browser demo</span>
+            <b id="theme-preview-caption">{themeFamilies[0].name} · {themeFamilies[0].environment}</b>
+          </figcaption>
+        </figure>
         <div class="companion-preview">
           <div class="companion-art">
             <img src={celebrating.src} width="400" height="400" alt="A filled cocoa Rotli quokka celebrating" loading="lazy" />
@@ -345,6 +327,8 @@ const surfaces = [
     const modeButton = document.querySelector<HTMLButtonElement>('#mode-toggle');
     const modeLabel = modeButton?.querySelector<HTMLElement>('.mode-label');
     const familyButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-theme-family]')];
+    const themePreviewImage = document.querySelector<HTMLImageElement>('#theme-preview-image');
+    const themePreviewCaption = document.querySelector<HTMLElement>('#theme-preview-caption');
 
     const savePreference = (key: string, value: string) => {
       try {
@@ -363,6 +347,18 @@ const surfaces = [
       familyButtons.forEach((button) => {
         button.setAttribute('aria-pressed', String(button.dataset.themeFamily === root.dataset.family));
       });
+
+      const activeButton = familyButtons.find((button) => button.dataset.themeFamily === root.dataset.family);
+      const screenshot = activeButton?.dataset.themeScreenshot;
+      const environment = activeButton?.dataset.themeEnvironment;
+      const familyName = activeButton?.dataset.themeName;
+      if (themePreviewImage && screenshot && environment) {
+        themePreviewImage.src = screenshot;
+        themePreviewImage.alt = `Rotli's browser demo workspace in the ${environment} environment`;
+      }
+      if (themePreviewCaption && familyName && environment) {
+        themePreviewCaption.textContent = `${familyName} · ${environment}`;
+      }
     };
 
     modeButton?.addEventListener('click', () => {
@@ -390,6 +386,11 @@ const surfaces = [
     .site-footer {
       width: min(100% - 3rem, var(--page-max));
       margin-inline: auto;
+    }
+
+    main > .hero-shell {
+      width: 100%;
+      max-width: none;
     }
 
     .site-header {
@@ -488,13 +489,56 @@ const surfaces = [
       display: block;
     }
 
+    .hero-shell {
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      background: var(--hero-ground);
+      color: var(--hero-text);
+    }
+
+    .hero-backdrop,
+    .hero-backdrop::before,
+    .hero-backdrop::after {
+      position: absolute;
+      inset: 0;
+    }
+
+    .hero-backdrop img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: 50% 34%;
+      filter: saturate(0.88) contrast(1.04);
+    }
+
+    .hero-backdrop::before {
+      content: '';
+      z-index: 1;
+      background: var(--hero-wash);
+    }
+
+    .hero-backdrop::after {
+      content: '';
+      z-index: 2;
+      background-image: url('/grain.png');
+      background-size: 96px 96px;
+      opacity: 0.32;
+      mix-blend-mode: soft-light;
+      pointer-events: none;
+    }
+
     .hero {
+      position: relative;
+      z-index: 3;
+      width: min(100% - 3rem, var(--page-max));
+      margin-inline: auto;
       display: grid;
-      grid-template-columns: minmax(0, 0.82fr) minmax(36rem, 1.18fr);
-      gap: clamp(2.5rem, 5vw, 5.5rem);
+      grid-template-columns: minmax(20rem, 0.76fr) minmax(36rem, 1.24fr);
+      gap: clamp(2.5rem, 5vw, 5rem);
       align-items: center;
       min-height: calc(100vh - 76px);
-      padding-block: clamp(4rem, 8vw, 7rem);
+      padding-block: clamp(5rem, 9vw, 8rem);
     }
 
     .hero-copy {
@@ -510,6 +554,10 @@ const surfaces = [
       letter-spacing: 0.02em;
     }
 
+    .hero-kicker {
+      color: var(--hero-accent);
+    }
+
     h1 {
       margin: 0;
       font-size: clamp(3.4rem, 6.4vw, 5.8rem);
@@ -521,7 +569,7 @@ const surfaces = [
     .hero-lede {
       max-width: 34rem;
       margin: 1.6rem 0 0;
-      color: var(--text-muted);
+      color: var(--hero-copy);
       font-size: clamp(1.08rem, 1.7vw, 1.3rem);
       line-height: 1.55;
     }
@@ -573,310 +621,63 @@ const surfaces = [
 
     .release-note {
       margin: 0.85rem 0 0;
-      color: var(--text-muted);
+      color: var(--hero-muted);
       font-size: 0.86rem;
     }
 
-    .workspace-figure {
-      position: relative;
+    .hero .button.primary {
+      border-color: var(--hero-text);
+      background: var(--hero-text);
+      color: var(--hero-action-text);
+    }
+
+    .hero .button.primary:hover {
+      border-color: var(--hero-action);
+      background: var(--hero-action);
+      color: var(--hero-action-text);
+    }
+
+    .hero .button.secondary {
+      border-color: var(--hero-border);
+      color: var(--hero-text);
+    }
+
+    .hero .button.secondary:hover {
+      border-color: var(--hero-text);
+      background: var(--hero-hover-wash);
+    }
+
+    .product-figure {
+      min-width: 0;
       margin: 0;
-      padding-bottom: 2rem;
     }
 
-    .workspace-window {
+    .product-shot {
       overflow: hidden;
-      border: 1px solid var(--border-strong);
-      border-radius: 0.9rem;
-      background: var(--surface);
+      border: 1px solid var(--hero-shot-border);
+      border-radius: 0.85rem;
+      background: var(--hero-shot);
+      box-shadow: 0 2rem 5rem var(--hero-shadow);
     }
 
-    .window-titlebar {
-      min-height: 42px;
-      display: grid;
-      grid-template-columns: 1fr minmax(11rem, 1.5fr) 1fr;
-      align-items: center;
-      padding-inline: 0.8rem;
-      border-bottom: 1px solid var(--border);
-      color: var(--text-muted);
-      font-size: 0.7rem;
-    }
-
-    .traffic-lights {
-      display: flex;
-      gap: 0.38rem;
-    }
-
-    .traffic-lights i {
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
-      background: var(--accent);
-    }
-
-    .traffic-lights i:nth-child(2) {
-      background: var(--success);
-    }
-
-    .traffic-lights i:nth-child(3) {
-      background: var(--border-strong);
-    }
-
-    .search-field {
-      min-height: 27px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.35rem;
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      background: var(--surface-2);
-    }
-
-    .mini-mark {
-      width: 14px;
-      color: var(--text-muted);
-    }
-
-    .window-tools {
-      justify-self: end;
-      letter-spacing: 0.28rem;
-    }
-
-    .workspace-shell {
-      display: grid;
-      grid-template-columns: 10.5rem 1fr;
-      min-height: 30rem;
-    }
-
-    .demo-sidebar {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      padding: 1rem 0.8rem 0.75rem;
-      border-right: 1px solid var(--border);
-      background: var(--surface-2);
-      color: var(--text-muted);
-      font-size: 0.68rem;
-    }
-
-    .vault-row,
-    .front-switch,
-    .sidebar-stat,
-    .demo-sidebar li {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.5rem;
-    }
-
-    .vault-row b {
-      color: var(--text);
-    }
-
-    .front-switch {
-      padding: 0.45rem;
-      border-radius: 0.5rem;
-      background: var(--tint);
-    }
-
-    .front-switch b {
-      color: var(--text);
-    }
-
-    .sidebar-stat {
-      flex-wrap: wrap;
-      padding: 0.55rem;
-      border: 1px solid var(--border);
-      border-radius: 0.5rem;
-    }
-
-    .sidebar-stat span {
+    .product-shot img {
+      display: block;
       width: 100%;
-      font-size: 0.58rem;
-      font-weight: 600;
-    }
-
-    .demo-sidebar ul {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      display: grid;
-      gap: 0.2rem;
-    }
-
-    .demo-sidebar li {
-      min-height: 27px;
-      padding-inline: 0.45rem;
-      border-radius: 0.4rem;
-    }
-
-    .demo-sidebar li.selected {
-      background: var(--tint);
-      color: var(--text);
-      font-weight: 600;
-    }
-
-    .demo-sidebar > p {
-      margin: 0.1rem 0 -0.35rem;
-      font-size: 0.56rem;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-
-    .sidebar-bottom {
-      margin-top: auto !important;
-      padding-top: 0.7rem;
-      border-top: 1px solid var(--border);
-      text-transform: none !important;
-      letter-spacing: 0 !important;
-    }
-
-    .demo-workspace {
-      min-width: 0;
-      background: var(--ground);
-    }
-
-    .demo-tabbar {
-      min-height: 36px;
-      display: flex;
-      align-items: center;
-      gap: 0.8rem;
-      padding-inline: 0.8rem;
-      border-bottom: 1px solid var(--border);
-      color: var(--text-muted);
-      font-size: 0.66rem;
-    }
-
-    .demo-tabbar b {
-      color: var(--text);
-    }
-
-    .dashboard-copy {
-      padding: clamp(1.2rem, 3vw, 2.2rem);
-    }
-
-    .dashboard-title {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 1rem;
-    }
-
-    .dashboard-title span {
-      color: var(--accent-text);
-      font-size: 0.55rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-
-    .dashboard-title h2 {
-      margin: 0.2rem 0 0;
-      font-size: clamp(1rem, 2vw, 1.45rem);
-      line-height: 1.1;
-      letter-spacing: -0.025em;
-    }
-
-    .dashboard-title p {
-      max-width: 10rem;
-      margin: 0;
-      color: var(--text-muted);
-      font-size: 0.58rem;
-      text-align: right;
-    }
-
-    .dashboard-lens {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      margin-top: 1.1rem;
-      border: 1px solid var(--border);
-      border-radius: 0.48rem;
-      overflow: hidden;
-      color: var(--text-muted);
-      font-size: 0.58rem;
-    }
-
-    .dashboard-lens > * {
-      padding: 0.5rem 0.65rem;
-    }
-
-    .dashboard-lens b {
-      background: var(--tint);
-      color: var(--text);
-    }
-
-    .dashboard-stats {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      margin-top: 1rem;
-      border: 1px solid var(--border);
-      border-radius: 0.48rem;
-      overflow: hidden;
-    }
-
-    .dashboard-stats span {
-      display: grid;
-      gap: 0.2rem;
-      padding: 0.65rem;
-      border-right: 1px solid var(--border);
-    }
-
-    .dashboard-stats span:last-child {
-      border-right: 0;
-    }
-
-    .dashboard-stats small {
-      color: var(--text-muted);
-      font-size: 0.5rem;
-    }
-
-    .dashboard-stats b {
-      font-size: 0.9rem;
-    }
-
-    .dashboard-lists {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.7rem;
-      margin-top: 0.7rem;
-    }
-
-    .dashboard-lists > div {
-      min-width: 0;
-      display: grid;
-      gap: 0.45rem;
-      padding: 0.7rem;
-      border: 1px solid var(--border);
-      border-radius: 0.48rem;
-      font-size: 0.54rem;
-    }
-
-    .dashboard-lists b {
-      font-size: 0.62rem;
-    }
-
-    .dashboard-lists span {
-      padding-top: 0.4rem;
-      border-top: 1px solid var(--border);
-      color: var(--text-muted);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .workspace-quokka {
-      position: absolute;
-      right: -2.1rem;
-      bottom: 0.1rem;
-      width: clamp(6.2rem, 12vw, 9rem);
       height: auto;
     }
 
-    .workspace-figure figcaption {
-      margin-top: 0.8rem;
-      color: var(--text-muted);
+    .product-figure figcaption {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-top: 0.85rem;
+      color: var(--hero-caption);
       font-size: 0.78rem;
+    }
+
+    .product-figure figcaption span {
+      color: var(--hero-text);
+      font-weight: 600;
     }
 
     .proof-strip {
@@ -1259,6 +1060,41 @@ const surfaces = [
     .theme-pair-midnight i:first-child { background: var(--swatch-midnight-light); }
     .theme-pair-midnight i:last-child { background: var(--swatch-midnight-dark); }
 
+    .theme-capture {
+      margin: 0;
+      padding: clamp(1rem, 2vw, 1.5rem);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+    }
+
+    .theme-capture-frame {
+      overflow: hidden;
+      border: 1px solid var(--border-strong);
+      border-radius: 0.72rem;
+      background: var(--deep);
+    }
+
+    .theme-capture-frame img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .theme-capture figcaption {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.9rem 0.15rem 0.1rem;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+    }
+
+    .theme-capture figcaption b {
+      color: var(--text);
+      font-weight: 600;
+    }
+
     .companion-preview {
       display: grid;
       grid-template-columns: minmax(18rem, 0.75fr) minmax(0, 1.25fr);
@@ -1487,7 +1323,7 @@ const surfaces = [
         max-width: 48rem;
       }
 
-      .workspace-figure {
+      .product-figure {
         width: min(100%, 54rem);
       }
 
@@ -1628,7 +1464,12 @@ const surfaces = [
       }
 
       .hero {
+        width: min(100% - 1.5rem, var(--page-max));
         padding-top: 3.5rem;
+      }
+
+      .hero-backdrop img {
+        object-position: 55% 34%;
       }
 
       h1 {
@@ -1637,35 +1478,6 @@ const surfaces = [
 
       .hero-actions {
         display: grid;
-      }
-
-      .workspace-shell {
-        grid-template-columns: 1fr;
-        min-height: 24rem;
-      }
-
-      .demo-sidebar {
-        display: none;
-      }
-
-      .window-titlebar {
-        grid-template-columns: auto 1fr auto;
-      }
-
-      .window-tools {
-        letter-spacing: 0.05rem;
-      }
-
-      .dashboard-copy {
-        padding: 1.1rem;
-      }
-
-      .dashboard-title p {
-        display: none;
-      }
-
-      .workspace-quokka {
-        right: -0.6rem;
       }
 
       .proof-strip {
@@ -1719,6 +1531,17 @@ const surfaces = [
 
       .theme-choices {
         grid-template-columns: 1fr 1fr;
+      }
+
+      .theme-capture {
+        padding: 0.7rem;
+      }
+
+      .theme-capture figcaption,
+      .product-figure figcaption {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.2rem;
       }
 
       .theme-choice,
