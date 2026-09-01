@@ -42,17 +42,11 @@ Output ONLY the markdown file (${STEM}.md). Do NOT write HTML, PDF, or send anyt
 HARD RULE: everything except $BREVE and your memex is strictly read-only — never edit, commit, or push. Flag needed changes in the brief instead."
 
 # Self-heal (#18): same ladder as the slot wrappers.
-run_model() { caffeinate -i $SANDBOX claude -p --model "$1" --dangerously-skip-permissions "$PROMPT"; }
+run_model() { printf '%s\n' "$PROMPT" | caffeinate -i bun "$BREVE/scripts/local-brief.ts" "$STEM"; }
 brief_exists() { [ -f "$BREVE/briefs/${STEM}.md" ]; }
 
 {
   echo "=== Breve custom brief '$RID' run: $(date) ==="
-  if ! bun "$BREVE/scripts/sandbox.ts" --require >/dev/null 2>&1; then
-    echo "secure model sandbox unavailable — refusing to generate a remote brief"
-    exit 1
-  fi
-  SANDBOX="/usr/bin/sandbox-exec -f $SB"
-  export GH_TOKEN="$(bun "$BREVE/scripts/secret.ts" get breve-gh-readonly 2>/dev/null || true)"
   run_model "$BREVE_MODEL"
   echo "=== claude ($BREVE_MODEL) exit $? at $(date) ==="
 

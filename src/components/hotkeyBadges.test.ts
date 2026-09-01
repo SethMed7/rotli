@@ -74,6 +74,36 @@ describe("collectSpots", () => {
     expect(spots.map((s) => s.id)).toEqual(["modules.notes"]);
   });
 
+  test("a tab hidden behind its horizontal scroller edge earns no global badge", () => {
+    const spots = collectSpots(
+      [
+        {
+          id: "modules.notes",
+          rect: rect(100, 40, 96, 28),
+          clips: [rect(240, 30, 600, 40)],
+        },
+      ],
+      VIEWPORT,
+      chordOf,
+    );
+    expect(spots).toEqual([]);
+  });
+
+  test("a partially visible tab anchors its badge inside the scroller", () => {
+    const spots = collectSpots(
+      [
+        {
+          id: "modules.notes",
+          rect: rect(220, 40, 96, 28),
+          clips: [rect(240, 30, 600, 60)],
+        },
+      ],
+      VIEWPORT,
+      chordOf,
+    );
+    expect(spots[0]).toMatchObject({ left: 242, top: 42 });
+  });
+
   test("a selected control carries an active badge with the complete chord", () => {
     const spots = collectSpots(
       [{ id: "modules.notes", rect: rect(100, 200), active: true }],

@@ -7,7 +7,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
 import type { Note, NoteSummary } from "../types";
-import { UNIVERSE_KEY, applyNoteWrite, keys } from "./hooks";
+import { UNIVERSE_KEY, applyNoteWrite, invalidateNoteLists, keys } from "./hooks";
 import { queryClient } from "./query";
 
 const NOW = 1_800_000_000_000;
@@ -86,5 +86,23 @@ describe("applyNoteWrite", () => {
     await applyNoteWrite(note("a"), { tasksChanged: true });
     expect(queryClient.getQueryState(keys.tasks)?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(keys.notes(undefined))?.isInvalidated).toBe(false);
+  });
+});
+
+describe("invalidateNoteLists", () => {
+  afterEach(() => queryClient.clear());
+
+  test("a new item refetches the listings only — open bodies and the Tasks projection stay fresh", async () => {
+    queryClient.setQueryData(keys.notes(undefined), []);
+    queryClient.setQueryData(keys.notes(UNIVERSE_KEY), []);
+    queryClient.setQueryData(keys.note("open-tab"), { id: "open-tab" });
+    queryClient.setQueryData(keys.tasks, []);
+    await invalidateNoteLists();
+    expect(queryClient.getQueryState(keys.notes(undefined))?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(keys.notes(UNIVERSE_KEY))?.isInvalidated).toBe(true);
+    // Command-T used to refetch every open tab's body and re-walk tasks for a
+    // blank note nobody had typed into (2026-09-01)
+    expect(queryClient.getQueryState(keys.note("open-tab"))?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(keys.tasks)?.isInvalidated).toBe(false);
   });
 });

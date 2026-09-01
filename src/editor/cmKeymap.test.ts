@@ -60,6 +60,20 @@ describe("fenced code is grammar-free (#8)", () => {
     expect(text(v)).toBe(doc);
   });
 
+  test("Space after [][] inside a fence types normally (never becomes a result)", () => {
+    const doc = "```js\n[][]\n```";
+    const v = viewOf(doc, doc.indexOf("[][]") + 4);
+    expect(press(v, "Space")).toBe(false);
+    expect(text(v)).toBe(doc);
+  });
+
+  test("Space after () inside a fence types normally (never becomes a choice)", () => {
+    const doc = "```js\n()\n```";
+    const v = viewOf(doc, doc.indexOf("()") + 2);
+    expect(press(v, "Space")).toBe(false);
+    expect(text(v)).toBe(doc);
+  });
+
   test("Tab on a dash line inside a fence is a soft tab at the caret, not a line indent", () => {
     const doc = "```yaml\n- item\n```";
     const at = doc.indexOf("- item") + 6;
@@ -136,6 +150,99 @@ describe("the []+Space task shorthand (#14, #15)", () => {
     const v = viewOf(doc, doc.length);
     expect(press(v, "Space")).toBe(true);
     expect(text(v)).toBe("  - [ ] ");
+  });
+});
+
+describe("the [][]+Space result shorthand", () => {
+  test("creates an unanswered exclusive result without changing [] tasks", () => {
+    const result = viewOf("[][]", 4);
+    expect(press(result, "Space")).toBe(true);
+    expect(text(result)).toBe("- [ ][ ] ");
+    expect(head(result)).toBe(9);
+
+    const task = viewOf("[]", 2);
+    expect(press(task, "Space")).toBe(true);
+    expect(text(task)).toBe("- [ ] ");
+  });
+
+  test("normalizes indent and upgrades an existing bullet", () => {
+    const tabbed = viewOf("\t[][]", 5);
+    expect(press(tabbed, "Space")).toBe(true);
+    expect(text(tabbed)).toBe("  - [ ][ ] ");
+
+    const bullet = viewOf("- [][]", 6);
+    expect(press(bullet, "Space")).toBe(true);
+    expect(text(bullet)).toBe("- [ ][ ] ");
+  });
+
+  test("Enter continues a test suite with an unanswered pair", () => {
+    const doc = "- [ ][x] API boots";
+    const v = viewOf(doc, doc.length);
+    expect(press(v, "Enter")).toBe(true);
+    expect(text(v)).toBe("- [ ][x] API boots\n- [ ][ ] ");
+  });
+
+  test("ordered result rows count up and renumber following siblings", () => {
+    const doc = "1. [x][ ] first\n2. [ ][x] second";
+    const v = viewOf(doc, doc.indexOf("first") + 5);
+    expect(press(v, "Enter")).toBe(true);
+    expect(text(v)).toBe("1. [x][ ] first\n2. [ ][ ] \n3. [ ][x] second");
+  });
+
+  test("Enter on an empty result row exits the list", () => {
+    const doc = "- [ ][ ] ";
+    const v = viewOf(doc, doc.length);
+    expect(press(v, "Enter")).toBe(true);
+    expect(text(v)).toBe("");
+  });
+});
+
+describe("the ()+Space multiple-choice shorthand", () => {
+  test("creates an unselected option and does not change task/result shorthands", () => {
+    const choice = viewOf("()", 2);
+    expect(press(choice, "Space")).toBe(true);
+    expect(text(choice)).toBe("- ( ) ");
+    expect(head(choice)).toBe(6);
+  });
+
+  test("normalizes indent and upgrades an existing bullet", () => {
+    const tabbed = viewOf("\t( )", 4);
+    expect(press(tabbed, "Space")).toBe(true);
+    expect(text(tabbed)).toBe("  - ( ) ");
+
+    const bullet = viewOf("- ()", 4);
+    expect(press(bullet, "Space")).toBe(true);
+    expect(text(bullet)).toBe("- ( ) ");
+  });
+
+  test("Enter continues the group with an unselected option", () => {
+    const doc = "- (x) Red";
+    const v = viewOf(doc, doc.length);
+    expect(press(v, "Enter")).toBe(true);
+    expect(text(v)).toBe("- (x) Red\n- ( ) ");
+  });
+
+  test("ordered options count up and renumber following siblings", () => {
+    const doc = "1. (x) Red\n2. ( ) Blue";
+    const v = viewOf(doc, doc.indexOf("Red") + 3);
+    expect(press(v, "Enter")).toBe(true);
+    expect(text(v)).toBe("1. (x) Red\n2. ( ) \n3. ( ) Blue");
+  });
+
+  test("Enter on an empty option exits the list", () => {
+    const v = viewOf("- ( ) ", 6);
+    expect(press(v, "Enter")).toBe(true);
+    expect(text(v)).toBe("");
+  });
+
+  test("Tab with a text caret indents choice and result rows as Markdown", () => {
+    const choice = viewOf("- ( ) Blue", 10);
+    expect(press(choice, "Tab")).toBe(true);
+    expect(text(choice)).toBe("  - ( ) Blue");
+
+    const result = viewOf("- [ ][ ] API", 12);
+    expect(press(result, "Tab")).toBe(true);
+    expect(text(result)).toBe("  - [ ][ ] API");
   });
 });
 
@@ -248,5 +355,14 @@ describe("Tab indents the LINE, not the caret", () => {
     press(v, "Tab");
     typeText(v, "test");
     expect(text(v)).toBe("- hello\n- okay\n  - test");
+  });
+});
+
+describe("Tab outside a table", () => {
+  test("indents a bullet even when the note holds a table elsewhere", () => {
+    const doc = "| a | b |\n|---|---|\n| 1 | 2 |\n\n- item";
+    const v = viewOf(doc, doc.length);
+    expect(press(v, "Tab")).toBe(true);
+    expect(text(v)).toBe("| a | b |\n|---|---|\n| 1 | 2 |\n\n  - item");
   });
 });

@@ -92,3 +92,63 @@ describe("parseBlock — in progress", () => {
     expect(parseBlock("  - [/] sub").indent).toBe(2);
   });
 });
+
+describe("parseBlock — two-choice results", () => {
+  test("plain result rows expose their exclusive state and content", () => {
+    const unanswered = parseBlock("- [ ][ ] API boots");
+    expect(unanswered.kind).toBe("result");
+    expect(unanswered.resultState).toBe("unanswered");
+    expect(unanswered.text).toBe("API boots");
+    expect(unanswered.prefixLen).toBe("- [ ][ ] ".length);
+
+    expect(parseBlock("- [ ][x] API fails").resultState).toBe("no");
+    expect(parseBlock("- [X][ ] API passes").resultState).toBe("yes");
+  });
+
+  test("ordered and nested result rows retain their marker and depth", () => {
+    const block = parseBlock("\t4. [x][ ] nested pass");
+    expect(block.kind).toBe("result");
+    expect(block.marker).toBe("4.");
+    expect(block.indent).toBe(2);
+    expect(block.resultState).toBe("yes");
+  });
+
+  test("both sides selected fails closed as ordinary list text", () => {
+    const plain = parseBlock("- [x][x] ambiguous");
+    expect(plain.kind).toBe("bullet");
+    expect(plain.text).toBe("[x][x] ambiguous");
+    expect(parseBlock("2. [x][x] ambiguous").kind).toBe("numbered");
+  });
+
+  test("ordinary task rows remain tasks", () => {
+    expect(parseBlock("- [ ] todo").kind).toBe("task");
+    expect(parseBlock("1. [x] done").kind).toBe("task");
+  });
+});
+
+describe("parseBlock — multiple-choice rows", () => {
+  test("plain options expose selected state and content", () => {
+    const open = parseBlock("- ( ) Red");
+    expect(open.kind).toBe("choice");
+    expect(open.choiceSelected).toBe(false);
+    expect(open.text).toBe("Red");
+    expect(open.prefixLen).toBe(6);
+
+    const selected = parseBlock("- (X) Blue");
+    expect(selected.kind).toBe("choice");
+    expect(selected.choiceSelected).toBe(true);
+  });
+
+  test("ordered and nested options retain their marker and depth", () => {
+    const block = parseBlock("\t12. (x) Blue");
+    expect(block.kind).toBe("choice");
+    expect(block.marker).toBe("12.");
+    expect(block.indent).toBe(2);
+    expect(block.text).toBe("Blue");
+  });
+
+  test("ordinary parenthesized list text remains an ordinary list", () => {
+    expect(parseBlock("- (maybe) later").kind).toBe("bullet");
+    expect(parseBlock("2. (yes) later").kind).toBe("numbered");
+  });
+});

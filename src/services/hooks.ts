@@ -238,15 +238,38 @@ export function useNoteSearch(query: string) {
   });
 }
 
-export function useNote(id: string) {
-  return useQuery({ queryKey: keys.note(id), queryFn: () => notesService.getNote(id) });
+export function useNote(id: string, options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: keys.note(id),
+    queryFn: () => notesService.getNote(id),
+    enabled: options.enabled ?? true,
+  });
+}
+
+/** Seed one just-created note before an optimistic tab retargets. This is a
+ * presentation handoff only; structural list caches still refresh through the
+ * ordinary create workflow. */
+export function primeNote(note: Note): void {
+  queryClient.setQueryData(keys.note(note.id), note);
 }
 
 export async function invalidateNotes(): Promise<void> {
+  // the three umbrellas hit independent Rust commands — refetch them together,
+  // not one after another (each await was a serialized IPC round trip)
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["notes"] }),
+    queryClient.invalidateQueries({ queryKey: ["note"] }),
+    // a body edit can add/complete checkboxes — the Tasks projection re-derives
+    queryClient.invalidateQueries({ queryKey: keys.tasks }),
+  ]);
+}
+
+/** A NEW item exists but no existing note changed: refetch the listings only.
+ * Creation used invalidateNotes(), which also refetched every open tab's body
+ * (`["note"]`) and re-walked the Tasks projection — three corpus round trips
+ * for a blank note nobody has typed into yet (Command-T lag, 2026-09-01). */
+export async function invalidateNoteLists(): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: ["notes"] });
-  await queryClient.invalidateQueries({ queryKey: ["note"] });
-  // a body edit can add/complete checkboxes — the Tasks projection re-derives
-  await queryClient.invalidateQueries({ queryKey: keys.tasks });
 }
 
 /** Scoped cache refresh after ONE note's body sync — the editor's 400ms tick.
@@ -277,6 +300,7 @@ export function applyNoteWrite(note: Note, opts?: { tasksChanged?: boolean }): P
     !!cached &&
     (cached.title !== summary.title ||
       cached.snippet !== summary.snippet ||
+      cached.bodyEmpty !== summary.bodyEmpty ||
       cached.pinned !== summary.pinned ||
       Math.abs(summary.updatedAt - cached.updatedAt) >= 60_000);
   if (rowChanged) {
@@ -383,7 +407,7 @@ export function useTrashItems() {
       useUiStore
         .getState()
         .setRowActionError(
-          `Couldn’t move this folder to Trash — ${error instanceof Error ? error.message : String(error)}`,
+          `Couldn’t move these items to Trash — ${error instanceof Error ? error.message : String(error)}`,
         ),
     onSettled: invalidateBoth,
   });
@@ -398,7 +422,7 @@ export function useRenameNote() {
       if (!t) return;
       const note = await notesService.getNote(id);
       if (!note) throw new Error(`unknown note: ${id}`);
-      await notesService.updateNote(id, replaceTitleLine(note.body ?? "", t), note.revision);
+      await notesService.updateNote(id, replaceTitleLine(note.body ?? "", t), note.revision, note.body);
     },
     onSuccess: async () => {
       await invalidateNotes();

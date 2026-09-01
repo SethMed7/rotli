@@ -2,7 +2,6 @@
   "_notes": "FULFILLMENT MAP — how Breve does what the active model can't (the brain's clients/capabilities.json DECLARES the matrix; this file FULFILLS it, Rule #9). Keys are capability ids from the brain (pdf/image/web/youtube/file_read/email_send/structured_output). `configured: true` = the tool is wired/exists; when a `command` path is given it's verified on disk (gone → treated unconfigured). If a needed capability is neither native to the model nor configured here, Breve alerts the maintainer instead of guessing.",
   "fulfillment": {
     "pdf":   { "tool": "chrome-headless", "command": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "configured": true },
-    "image": { "tool": "codex|agy", "configured": true },
     "web":   { "tool": "safe-fetch", "configured": true }
   }
 }

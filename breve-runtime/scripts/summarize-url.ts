@@ -1,15 +1,13 @@
 #!/usr/bin/env bun
 import { LLM } from "./llm";
-import { runModel, findAgy } from "./run-model";
 /**
  * BREVE URL digester — "summarize this" / "read this to me" for any link.
  * Usage: bun summarize-url.ts <summary|read> <url>
  * Prints the result text to stdout (the daemon turns read-mode into a voice note).
  *
- * Articles: fetched + stripped locally, then local Gemma writes the summary or the
- * clean spoken retelling (free, private). YouTube: Gemini watches the video via the
- * Antigravity CLI `agy` (Google AI Pro sub — same pattern as the imagegen skill;
- * agy must never run concurrently, but the daemon serializes through one spawn).
+ * Articles: fetched + stripped locally, then local Gemma writes the summary or
+ * clean spoken retelling. YouTube understanding is unavailable because Breve
+ * has no authorized cloud-provider integration.
  */
 import { safeFetchText, isYouTubeUrl } from "./safe-fetch";
 import type { GenerateResponse } from "./wire-types";
@@ -20,7 +18,8 @@ if (!["summary", "read"].includes(mode) || !/^https?:\/\//.test(url ?? "")) {
   process.exit(1);
 }
 
-// Strict, host-based check (not substring) — only genuine YouTube hosts reach the agy/Gemini path.
+// Strict, host-based check (not substring) — genuine YouTube links get the
+// explicit unavailable result instead of entering the article fetch lane.
 const isYouTube = isYouTubeUrl(url);
 
 async function gemma(prompt: string): Promise<string> {
@@ -41,25 +40,8 @@ async function gemma(prompt: string): Promise<string> {
 let out = "";
 
 if (isYouTube) {
-  const ask =
-    mode === "summary"
-      ? `Watch this YouTube video and summarize it for the maintainer in 150-300 words of plain text (no markdown): the core argument or story, the key points with any concrete numbers/names, and one line on whether it's worth his full watch. Video: ${url}`
-      : `Watch this YouTube video and retell it for the maintainer as a clean SPOKEN piece, 400-800 words of plain prose (no markdown, no URLs) — cover everything that matters as if he'll never watch it. Video: ${url}`;
-  const agy = findAgy();
-  if (!agy) {
-    console.error("ERR agy not found");
-    process.exit(1);
-  }
-  const p = runModel([agy, "-p", ask, "--dangerously-skip-permissions", "--print-timeout", "4m"], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const [o, e] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
-  if ((await p.exited) !== 0 || o.trim().length < 80) {
-    console.error(`ERR gemini/agy failed: ${(e || o).slice(0, 200)}`);
-    process.exit(1);
-  }
-  out = o.trim();
+  console.error("ERR YouTube understanding is unavailable while cloud-provider integrations are paused");
+  process.exit(1);
 } else {
   // SSRF-guarded fetch + local strip (https-only, no private hosts, same-host bounded redirects, byte cap).
   const r = await safeFetchText(url, { maxChars: 14000 });

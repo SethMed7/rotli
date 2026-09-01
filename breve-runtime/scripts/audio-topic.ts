@@ -3,23 +3,16 @@
  * BREVE on-demand audio topic brief — "/audio <ask>" from Signal lands here.
  * Usage: bun audio-topic.ts "<request>"
  *
- * Claude Sonnet researches the request (read-only: git log/diff, gh PRs, repo
- * files, the web) and writes a spoken script with [[voice]] markers; Kokoro
+ * The on-device model writes a spoken script with [[voice]] markers; Kokoro
  * voices it (tts.ts). Output: briefs/topics/<slug>-YYYY-MM-DD.mp3 (+ .audio.txt).
  * Prints "OK <mp3path>" on success — the Signal daemon parses that line.
  */
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderMp3, parseSegments } from "./tts";
-import { BREVE, TOPICS, AUDIOS } from "./paths";
+import { AUDIOS, TOPICS } from "./paths";
 import { effectiveTz, loadSettings, todayIn } from "./timectx";
-import { sandboxed } from "./sandbox";
-import { readSecret } from "./secret";
-
-const CLAUDE_BIN = Bun.which("claude") ?? "claude"; // absolute path so sandbox-exec can run it
-// Optional read-only GitHub PAT from the isolated breve keychain (readSecret unlocks it first) — passed
-// as GH_TOKEN so any `gh` stays read-only. Absent is fine (gh keeps default auth).
-const GH_PAT = await readSecret("breve-gh-readonly").catch(() => "");
+import { localGenerate } from "./llm";
 
 const request = process.argv.slice(2).join(" ").trim();
 if (!request) { console.error("ERR usage: bun audio-topic.ts \"<request>\""); process.exit(1); }
@@ -32,10 +25,9 @@ const PROMPT = `You are Breve, the owner's personal brief engine, producing an O
 
 Their request: "${request}"
 
-RESEARCH FIRST (read-only). You are sandboxed: locally you can read ONLY the memex, your storage, and ${BREVE} — you CANNOT open the owner's local project folders. Reach repos through GitHub, never the local disk.
-- For repo/change questions: use GitHub via \`gh\` on repos the owner has access to — \`gh repo list\` to find it, \`gh pr list --state merged\`, \`gh search commits\`, \`gh api\` for commits/diffs — so you can speak to WHAT changed and WHY, not just titles. Do NOT try to read the owner's other projects on disk; that's blocked.
-- For anything else: read the memex or search the web.
-HARD RULE: strictly read-only everywhere — never push, open PRs, edit, commit, or send anything.
+You are the ON-DEVICE model. You have no live web, repo, filesystem, or cloud-provider access. Never invent
+current research; if the request depends on information not included in the request, state that limitation
+briefly in the script and give only a cautious, useful treatment from stable knowledge.
 
 THEN OUTPUT ONLY THE SPOKEN SCRIPT — no preamble, no markdown, no headings, no code fences, no URLs. It will be fed directly to text-to-speech.
 
@@ -45,26 +37,16 @@ Script format — a small podcast with named hosts, voice markers each on their 
 [[personal]] — EMMA, culture host: any personal/non-work angle (omit if none)
 Start with [[anchor]]. HANDOFF RULES (exact): each [[marker]] is ONE host speaking in the FIRST PERSON; a host never says their own name (except one optional "Marcus here —" the first time) and never refers to themselves in the third person or thanks themselves. The OUTGOING host's last sentence names the NEXT host ("Marcus, anything the listener should worry about?"); the INCOMING host opens by thanking the previous host by name ("Thanks, Ava.") right AFTER the new marker — the thank-you belongs to whoever receives the mic, never the one handing it off. 350-700 words (2-5 minutes). Plain spoken prose: describe identifiers instead of reading them out, expand abbreviations, no bullet lists. Keep every concrete number, date, and recommendation. End with a one-line sign-off.`;
 
-console.log(`[audio-topic] researching: ${request}`);
+console.log(`[audio-topic] drafting locally: ${request}`);
 const t0 = Date.now();
-const proc = Bun.spawn(sandboxed([CLAUDE_BIN, "-p", "--model", "sonnet", "--dangerously-skip-permissions"]), {
-  cwd: join(process.env.HOME!, "breve"), // in-policy cwd (the sandbox denies reads elsewhere in $HOME)
-  stdin: "pipe",
-  stdout: "pipe",
-  stderr: "pipe",
-  env: GH_PAT ? { ...process.env, GH_TOKEN: GH_PAT } : process.env,
-});
-await proc.stdin.write(PROMPT);
-await proc.stdin.end();
-const [out, err] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
-await proc.exited;
+const out = await localGenerate({ prompt: PROMPT, think: false, options: { num_predict: 2048 } });
 
 let script = out.trim().replace(/^```[a-z]*\n?|\n?```$/g, "").trim();
 // If the model added preamble before the first marker, drop it.
 const firstMarker = script.search(/^\s*\[\[\s*\w+\s*\]\]\s*$/m);
 if (firstMarker > 0) script = script.slice(firstMarker);
 if (script.length < 200) {
-  console.error(`ERR research produced no usable script. stderr: ${err.slice(0, 300)}`);
+  console.error("ERR local model produced no usable script");
   process.exit(1);
 }
 writeFileSync(join(TOPICS, `${stem}.audio.txt`), script + "\n");

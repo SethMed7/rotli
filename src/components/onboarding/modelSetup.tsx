@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { PROVIDER_LABELS, type ProviderId, installableCatalog } from "../../ai/models";
+import {
+  CLI_CATALOG,
+  PROVIDER_LABELS,
+  type ProviderId,
+  installableCatalog,
+  providerDefaultModel,
+} from "../../ai/models";
 import { setSetupHandle } from "../../keys/handles";
 import {
   type ChatModelInfo,
@@ -22,14 +28,17 @@ import { ModelLogo } from "../sidebar/modelLogo";
 import { SetupBack, SetupPrimary } from "./setupControls";
 import { SetupSideFriends } from "./setupSideFriends";
 
-const CONNECTED_PROVIDERS = ["claude", "codex", "agy"] as const satisfies readonly ProviderId[];
+const CONNECTED_PROVIDERS = ["claude", "codex", "cursor"] as const satisfies readonly ProviderId[];
 type ConnectedProvider = (typeof CONNECTED_PROVIDERS)[number];
-type ModelSection = "local" | "install" | "subscriptions";
+type ModelSection = "local" | "install" | "subscription";
 
 const SETUP_HELP: Record<ConnectedProvider, string> = {
-  claude: "Install Claude Code, then run `claude` once in Terminal and sign in.",
-  codex: "Install Codex with `brew install codex`, then run `codex login`.",
-  agy: "Install Antigravity, then run `agy` once in Terminal and sign in.",
+  claude:
+    "Install Claude Code, then run `claude auth login` yourself in Terminal. Rotli only detects and invokes that official local client.",
+  codex:
+    "Install Codex with `brew install codex`, then run `codex login` and sign in with your ChatGPT account.",
+  cursor:
+    "Install Cursor Agent from cursor.com/cli, then run `agent login` yourself in Terminal. Rotli uses Cursor's official ACP custom-client protocol in read-only Ask mode.",
 };
 
 function localSize(mb: number): string {
@@ -55,6 +64,8 @@ function SetupModelMark({ provider, label }: { provider?: string; label: string 
 export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () => void }) {
   const providers = useUiStore((state) => state.aiProviders);
   const setAiProvider = useUiStore((state) => state.setAiProvider);
+  const providerDefaults = useUiStore((state) => state.providerDefaults);
+  const setProviderDefault = useUiStore((state) => state.setProviderDefault);
   const [local, setLocal] = useState<ChatModelInfo[]>([]);
   const [detections, setDetections] = useState<Partial<Record<ProviderId, CliDetect>>>({});
   const [expanded, setExpanded] = useState<ProviderId | null>(null);
@@ -214,8 +225,8 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
             <p className="setup-eyebrow">Optional and changeable</p>
             <h1 id="model-setup-title">How should Rotli think?</h1>
             <p className="setup-lede">
-              Run a model entirely on this Mac, or connect a subscription you already use. Connected models
-              run remotely; secure notes never leave your Mac.
+              Run a model entirely on this Mac, or use your own Claude and ChatGPT accounts through their
+              official local clients. Gemini and Antigravity are not used by Rotli.
             </p>
 
             <div className="setup-model-disclosures">
@@ -370,20 +381,20 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
                 <button
                   type="button"
                   className="setup-model-summary"
-                  aria-expanded={openSection === "subscriptions"}
+                  aria-expanded={openSection === "subscription"}
                   aria-controls="connected-model-panel"
-                  onClick={() => toggleSection("subscriptions")}
+                  onClick={() => toggleSection("subscription")}
                 >
                   <span>
-                    <strong id="connected-model-title">Connect a subscription</strong>
-                    <small>Use an official command-line app already signed in on this Mac.</small>
+                    <strong id="connected-model-title">Connect Claude, ChatGPT, or Cursor</strong>
+                    <small>Use official command-line clients already signed in on this Mac.</small>
                   </span>
                   <span className="setup-model-summary-meta">
                     {readyProviders > 0 ? `${readyProviders} detected` : "Optional"}
                     <ChevronRight className="setup-disclosure-chevron" size={13} />
                   </span>
                 </button>
-                {openSection === "subscriptions" && (
+                {openSection === "subscription" && (
                   <div className="setup-model-panel" id="connected-model-panel">
                     <div className="setup-provider-list">
                       {CONNECTED_PROVIDERS.map((provider) => {
@@ -420,6 +431,27 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
                                 </button>
                               )}
                             </div>
+                            {ready && enabled && (
+                              <label className="setup-provider-default">
+                                <span>
+                                  Default
+                                  <small>Used by @{provider}</small>
+                                </span>
+                                <select
+                                  value={providerDefaultModel(provider, providerDefaults)}
+                                  aria-label={`Default model for ${PROVIDER_LABELS[provider]}`}
+                                  onChange={(event) =>
+                                    setProviderDefault(provider, event.currentTarget.value)
+                                  }
+                                >
+                                  {CLI_CATALOG[provider].map((model) => (
+                                    <option key={model.id} value={model.id}>
+                                      {model.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            )}
                             {expanded === provider && (
                               <p className="setup-provider-help">{SETUP_HELP[provider]}</p>
                             )}
@@ -427,6 +459,10 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
                         );
                       })}
                     </div>
+                    <p className="setup-provider-help">
+                      Rotli never reads or stores provider credentials and never presents a provider login.
+                      Gemini API and Antigravity remain unavailable.
+                    </p>
                   </div>
                 )}
               </section>

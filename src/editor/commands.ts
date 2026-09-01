@@ -4,6 +4,8 @@
 // highlight = ==…== (always peach); bold/italic/strike native syntax.
 
 import { usePanesStore } from "../state/panes";
+import { CHOICE_MARK } from "./choiceState";
+import { RESULT_MARK } from "./resultState";
 import { MARK } from "./taskState";
 
 export type InlineMark = "bold" | "italic" | "underline" | "strike" | "code" | "highlight" | "link";
@@ -150,12 +152,19 @@ export function applyHeading(line: string, level: HeadingLevel): PrefixEdit {
 
 // ——— block prefixes ———
 
-const ANY_BLOCK_PREFIX = new RegExp(`^(\\d+\\. \\[${MARK}\\] |- \\[${MARK}\\] |- |\\d+\\. |> )`);
+const RESULT_PAIR = `\\[${RESULT_MARK}\\]\\[${RESULT_MARK}\\] `;
+const CHOICE_PREFIX = `\\(${CHOICE_MARK}\\) `;
+const ANY_BLOCK_PREFIX = new RegExp(
+  `^(\\d+\\. ${RESULT_PAIR}|- ${RESULT_PAIR}|\\d+\\. ${CHOICE_PREFIX}|- ${CHOICE_PREFIX}|\\d+\\. \\[${MARK}\\] |- \\[${MARK}\\] |- |\\d+\\. |> )`,
+);
 
 const BLOCK_RULES: Record<BlockToggle, { add: string; test: RegExp }> = {
   quote: { add: "> ", test: /^> / },
-  bullet: { add: "- ", test: new RegExp(`^- (?!\\[${MARK}\\] )`) },
-  numbered: { add: "1. ", test: new RegExp(`^\\d+\\. (?!\\[${MARK}\\] )`) },
+  bullet: { add: "- ", test: new RegExp(`^- (?!${RESULT_PAIR}|${CHOICE_PREFIX}|\\[${MARK}\\] )`) },
+  numbered: {
+    add: "1. ",
+    test: new RegExp(`^\\d+\\. (?!${RESULT_PAIR}|${CHOICE_PREFIX}|\\[${MARK}\\] )`),
+  },
   checklist: { add: "- [ ] ", test: new RegExp(`^- \\[${MARK}\\] `) },
 };
 

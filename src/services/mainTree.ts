@@ -85,7 +85,7 @@ export function buildMainTree(
         // slot — so it survives GC (which uses the FULL index) — but must not show
         // as a live Main row (the maintainer, 2026-07-08: "if it's not in the Brain or
         // Storage, Main shouldn't have it"). Board/Storage/wiki homes pass.
-        if (n && !isSink(n.folderId) && !isVault(n.folderId)) {
+        if (n && n.bodyEmpty !== true && !isSink(n.folderId) && !isVault(n.folderId)) {
           notes.push({ ...n, folderId: parentId, mainOrder: order++ });
         }
       }

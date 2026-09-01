@@ -22,6 +22,18 @@ describe("imageSourceSpan", () => {
       alt: "",
       src: "storage:task.png",
     });
+    expect(imageSourceSpan("- [ ][x] ![](storage:fail.png)", 0)).toEqual({
+      from: 9,
+      to: 30,
+      alt: "",
+      src: "storage:fail.png",
+    });
+    expect(imageSourceSpan("- ( ) ![](storage:option.png)", 0)).toEqual({
+      from: 6,
+      to: 29,
+      alt: "",
+      src: "storage:option.png",
+    });
   });
 
   test("does not treat inline images or image-like prose as image widgets", () => {

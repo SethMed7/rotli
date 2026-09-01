@@ -8,8 +8,12 @@ export const EMPTY_BREVE_CONFIG: BreveConfig = {
   deliveryTimes: { morning: "07:00", lunch: "12:00", night: "18:00" },
   leadMinutes: 30,
   leadOverrides: { morning: 60 },
-  briefModel: "sonnet",
-  modelPolicy: { primary: "sonnet", fallbacks: [], localHelper: null },
+  briefModel: "gemma-3-12b-it-qat-4bit",
+  modelPolicy: {
+    primary: "gemma-3-12b-it-qat-4bit",
+    fallbacks: [],
+    localHelper: "gemma-3-12b-it-qat-4bit",
+  },
   pdfTheme: DEFAULT_BREVE_PDF_THEME,
   routines: [],
 };

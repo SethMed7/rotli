@@ -190,3 +190,27 @@ test("the Visual canvas has its own camera: zoom controls and empty-space pan", 
   await page.mouse.up();
   expect(await canvas.getAttribute("style")).not.toBe(before);
 });
+
+test("unapplied diagram edits survive closing the note and reopening it", async ({ page }) => {
+  await gotoApp(page);
+  await createDiagramNote(page);
+  await expect(page.locator(".main-tree [data-main-id]", { hasText: "Diagram workspace" })).toBeVisible();
+
+  await page.locator(".rotli-render-mermaid-trigger").click();
+  const dialog = page.getByRole("dialog", { name: "Mermaid diagram" });
+  await dialog.getByRole("button", { name: "Code" }).click();
+  const draft = "flowchart LR\n  Start[Kept] --> Next[Draft]";
+  await dialog.getByLabel("Mermaid source").fill(draft);
+
+  // Closing the note tab unmounts the editor underneath the open workspace.
+  // That used to force-close the workspace and drop the unapplied draft.
+  await page.keyboard.press("Meta+W");
+  await expect(dialog).toBeHidden();
+
+  await page.locator(".main-tree [data-main-id]", { hasText: "Diagram workspace" }).first().click();
+  await expect(page.locator(".rotli-render-mermaid-trigger")).toBeVisible();
+  await page.locator(".rotli-render-mermaid-trigger").click();
+  await dialog.getByRole("button", { name: "Code" }).click();
+  await expect(dialog.getByLabel("Mermaid source")).toHaveValue(draft);
+  await expect(dialog.getByRole("button", { name: "Apply to note" })).toBeEnabled();
+});

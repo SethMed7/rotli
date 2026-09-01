@@ -118,6 +118,7 @@ export class FsNotesService implements NotesService {
         id: doc.id,
         title: titleOf(doc.body),
         snippet: snippetOf(doc.body),
+        bodyEmpty: !doc.body.trim(),
         folderId: doc.folderId,
         diskFolderId: doc.diskFolderId,
         createdAt: doc.createdAt,
@@ -138,11 +139,11 @@ export class FsNotesService implements NotesService {
     return { ...meta, body, revision: doc.revision };
   }
 
-  async updateNote(id: string, body: string, expectedRevision: string): Promise<Note> {
+  async updateNote(id: string, body: string, expectedRevision: string, expectedBody?: string): Promise<Note> {
     try {
       // pinned is not part of the editor's write — Rust preserves the disk
       // truth itself, so no read-modify-write round-trip (or race) here
-      const result = await corpusWrite(id, body, expectedRevision);
+      const result = await corpusWrite(id, body, expectedRevision, expectedBody);
       return { ...result, body };
     } catch (err) {
       // the editor model evicts dead buffers on this exact message shape
@@ -166,6 +167,7 @@ export class FsNotesService implements NotesService {
       id: meta.id,
       title: titleOf(body),
       snippet: snippetOf(body),
+      bodyEmpty: !body.trim(),
       ...(meta.aliases ? { aliases: meta.aliases } : {}),
       folderId: meta.folderId,
       diskFolderId: meta.diskFolderId,

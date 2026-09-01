@@ -258,8 +258,8 @@ Your answer:`;
   },
 };
 
-// The connected lanes (Claude · Codex · Antigravity · Gemini): the SAME
-// single-JSON protocol (parse.ts stays untouched), but framed system-style and
+// The connected lanes (Claude Code · Codex): the SAME single-JSON protocol
+// (parse.ts stays untouched), but framed system-style and
 // terser — a frontier model follows the instruction without coercion, and the
 // CLI transports have no `format:"json"` anyway (extractJsonObject strips a
 // stray fence as the safety net).

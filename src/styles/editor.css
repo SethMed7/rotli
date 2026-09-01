@@ -844,7 +844,9 @@
   color: var(--text-muted);
 }
 .rotli-cm-host .cm-line.rotli-li,
-.rotli-cm-host .cm-line.rotli-task {
+.rotli-cm-host .cm-line.rotli-task,
+.rotli-cm-host .cm-line.rotli-result-line,
+.rotli-cm-host .cm-line.rotli-choice-line {
   /* a little breathing room between list items — not a loose wall */
   padding-block: 2px;
 }
@@ -904,6 +906,113 @@
   color: var(--text-muted);
   text-decoration: line-through;
   text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+}
+
+/* — exclusive yes/no result, `- [ ][ ]` — two familiar actions rather than a
+   bespoke switch. The first box is yes/pass, the second no/fail. RESULT_EM in
+   listGeometry.ts reserves this exact 2.9em column so wrapped text aligns. */
+.rotli-result {
+  width: 2.9em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2em;
+  vertical-align: -0.15em;
+}
+.rotli-result-choice {
+  width: 1.1em;
+  height: 1.1em;
+  border-radius: var(--r-inner);
+  border: 1.5px solid var(--text-muted);
+  background: none;
+  color: var(--text-muted);
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 1em;
+  font-weight: 700;
+  line-height: 1;
+}
+.rotli-result-choice:hover {
+  border-color: var(--text);
+  color: var(--text);
+}
+.rotli-result-choice:active {
+  transform: scale(0.94);
+}
+.rotli-result-choice--no.is-selected {
+  border-color: var(--failure);
+  background: color-mix(in srgb, var(--failure) 12%, transparent);
+  color: var(--failure);
+}
+.rotli-result-choice--yes.is-selected {
+  border-color: var(--success);
+  background: var(--success);
+  color: var(--check-ink);
+}
+.rotli-result-text {
+  font-weight: 700;
+}
+.rotli-result-text--no {
+  color: var(--failure);
+}
+.rotli-result-text--yes {
+  color: color-mix(in srgb, var(--success) 62%, var(--text));
+}
+.rotli-result-reason {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.rotli-result-reason-add {
+  margin-left: 0.55em;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  padding: 0.1em 0.25em;
+  border-radius: var(--r-inner);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82em;
+}
+.rotli-result-reason-add:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+
+/* — one-of-many choice, `- ( )` / `- (x)` — adjacent same-indent rows form
+   one source-backed group. Selection is accent emphasis, never pass/fail. */
+.rotli-choice {
+  width: 1.1em;
+  height: 1.1em;
+  margin-right: 0.5em;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-muted);
+  background: none;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  vertical-align: -0.15em;
+}
+.rotli-choice::after {
+  content: "";
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: transparent;
+}
+.rotli-choice:hover {
+  border-color: var(--text);
+}
+.rotli-choice.is-selected {
+  border-color: var(--accent-text);
+}
+.rotli-choice.is-selected::after {
+  background: var(--accent-text);
+}
+.rotli-choice-text--selected {
+  color: var(--accent-text);
+  font-weight: 700;
 }
 
 /* — inline marks (mirror editor.css's md-* inline voices) — */
@@ -1386,6 +1495,14 @@
   border-radius: var(--r-inner);
   cursor: pointer; /* pointer, not grab — the open hand read wrong (the maintainer, 2026-07-26) */
 }
+/* a video embed: same frame as an image, native transport controls */
+.rotli-img video {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--r-inner);
+  background: var(--surface-2);
+}
 /* mid column-drag: the whole widget locks selection + keeps the col cursor */
 .rotli-md-tablewrap.rotli-tbl-resizing {
   cursor: col-resize;
@@ -1396,7 +1513,8 @@
 }
 /* a src that resolved to nothing: keep the frame honest — name the file
    instead of showing an empty box (the maintainer, 2026-07-30) */
-.rotli-img.missing img {
+.rotli-img.missing img,
+.rotli-img.missing video {
   display: none;
 }
 .rotli-img-missing {
@@ -1430,7 +1548,8 @@
   opacity: 1;
 }
 /* click-selected image — the widget stays rendered; the outline marks the object */
-.rotli-img.sel img {
+.rotli-img.sel img,
+.rotli-img.sel video {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }

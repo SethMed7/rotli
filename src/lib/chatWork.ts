@@ -4,6 +4,11 @@ import { IMAGE_EXTS, extOf, fileName } from "./fileKind";
  * the same list independently; parity.json prevents one side drifting. */
 export const CHAT_IMAGE_ASSET_EXTS = [...IMAGE_EXTS] as readonly string[];
 
+/** Largest image Chat copies into the asset lane, in bytes. Rust enforces the
+ * same ceiling on the byte-backed lane and the read-back cap; parity.json keeps
+ * the two equal so a dropped file can never be silently truncated mid-read. */
+export const CHAT_IMAGE_ASSET_MAX_BYTES = 25_000_000;
+
 export type ChatWorkKind = "image" | "artifact";
 export type ChatWorkSource = "attachment" | "generated";
 

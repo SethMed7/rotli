@@ -11,10 +11,12 @@
 import { PristineDocumentDrafts } from "../documents/draftLifecycle";
 
 const drafts = new PristineDocumentDrafts();
+const promoteAfterFirstSave = new Map<string, () => void>();
 
 /** A note this session created AND opened — only those can be abandoned-blank. */
-export function trackNewNoteDraft(noteId: string): void {
+export function trackNewNoteDraft(noteId: string, promote?: () => void): void {
   drafts.track(noteId);
+  if (promote) promoteAfterFirstSave.set(noteId, promote);
 }
 
 /** Any expressed intent to keep: a body keystroke, a pin/secure/frontmatter
@@ -23,10 +25,24 @@ export function markNoteDraftChanged(noteId: string): void {
   drafts.markChanged(noteId);
 }
 
+/** Main is an authored-content projection, not a list of open placeholders.
+ * Promote a session-created note only after its body is durably non-empty.
+ * The callback is one-shot because every later save belongs to the ordinary
+ * note-update lane. */
+export function markNoteDraftSaved(noteId: string, body: string): void {
+  if (!body.trim()) return;
+  const promote = promoteAfterFirstSave.get(noteId);
+  if (!promote) return;
+  promoteAfterFirstSave.delete(noteId);
+  promote();
+}
+
 /** Claim closed pristine notes exactly once (duplicate tabs keep them alive). */
 export function claimClosedNoteDrafts(
   noteIds: Iterable<string>,
   stillOpenNoteIds: Iterable<string>,
 ): string[] {
-  return drafts.claimClosed(noteIds, stillOpenNoteIds);
+  const claimed = drafts.claimClosed(noteIds, stillOpenNoteIds);
+  for (const noteId of claimed) promoteAfterFirstSave.delete(noteId);
+  return claimed;
 }

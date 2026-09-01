@@ -38,7 +38,7 @@ time = { version = "0.3", features = ["formatting", "parsing"] } # frontmatter c
 tempfile = "3"                                                   # atomic writes: tmp in the same dir + rename
 trash = "5"                                                     # delete = OS trash, never a hard rm
 uuid = { version = "1", features = ["v4"] }                     # mx_<uuid> ids for a rotli-initiated memex
-security-framework = "3"                                        # Keychain-backed secrets (Gemini API key) — never argv/ps/config
+security-framework = "3"                                        # Keychain-backed user secrets — never argv/ps/config
 # Full-text search index (adapter: src/search_index.rs). DERIVED + gitignored +
 # rebuildable — never a database (the .md files stay durable truth). Large dep;
 # binary-size impact measured in the PR. NOT on check:structure's denied-DB list.
@@ -55,6 +55,14 @@ objc2-foundation = { version = "0.3", features = ["NSArray", "NSData", "NSError"
 # symbols (4.8 MB __LINKEDIT). panic = "abort" is deliberately ABSENT:
 # document_conversion.rs relies on catch_unwind to turn pdf-extract panics on
 # malformed PDFs into a user-facing error instead of a process abort.
+# `tauri dev` builds this profile. Unoptimized, the corpus walk over a real
+# vault is ~16x slower than release (4.6s vs 0.28s for `notes list` on a
+# 250-note memex, 2026-09-01), which made every structural refresh in the dev
+# app read as "lag" that release users never see. opt-level 1 keeps debug info
+# and incremental builds while making the dev app representative.
+[profile.dev]
+opt-level = 1
+
 [profile.release]
 codegen-units = 1
 lto = "thin"

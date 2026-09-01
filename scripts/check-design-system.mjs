@@ -40,6 +40,7 @@ const requiredTokens = [
   "accent-text",
   "on-accent",
   "success",
+  "failure",
   "syntax-blue",
   "syntax-accent",
 ];

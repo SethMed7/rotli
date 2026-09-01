@@ -17,6 +17,7 @@ import { DOCUMENT_SEARCH_KEYWORDS } from "../documents/kinds";
 import type { BlockToggle } from "./commands";
 import { bulletGlyph, checklistGlyph, codeGlyph, numberedGlyph, quoteGlyph } from "./formatGlyphs";
 import { parseBlock } from "./render";
+import { RESULT_REASON_SEPARATOR, resultTextParts } from "./resultState";
 
 // "H1/2/3" read as text glyphs (matches the format bar's H affordance voice)
 function Heading({ level }: { level: 1 | 2 | 3 }) {
@@ -38,6 +39,8 @@ export type SlashOp =
   | { kind: "divider" }
   | { kind: "fence"; lang: "" | "math" | "mermaid" }
   | { kind: "picker"; mode: SlashPickerMode }
+  /** Opens Finder and inserts copied vault image assets at this position. */
+  | { kind: "attachImage" }
   /** Opens the AI image popover (engine + prompt) — the maintainer, 2026-08-04. */
   | { kind: "imageGen" };
 
@@ -281,6 +284,16 @@ export const SLASH_ITEMS: SlashItem[] = [
     keywords: ["diagram", "flowchart", "graph"],
   },
   {
+    label: "Attach image",
+    group: "Insert",
+    hint: "Choose an image from Finder",
+    glyph: imageGenGlyph,
+    op: { kind: "attachImage" },
+    // Keep the user's requested spelling executable while also supporting the
+    // conventional spelling in search.
+    keywords: ["attatch", "attach", "image", "picture", "photo", "finder", "upload"],
+  },
+  {
     label: "Generate image",
     group: "Insert",
     hint: "AI image from a prompt, saved to your assets",
@@ -356,7 +369,13 @@ export interface SlashLineTarget {
 /** The editable slash-command lane for a paragraph or Markdown list item. */
 export function slashLineTarget(line: string): SlashLineTarget {
   const block = parseBlock(line);
-  if (block.kind !== "bullet" && block.kind !== "numbered" && block.kind !== "task") {
+  if (
+    block.kind !== "bullet" &&
+    block.kind !== "numbered" &&
+    block.kind !== "task" &&
+    block.kind !== "result" &&
+    block.kind !== "choice"
+  ) {
     return { from: 0, continuation: "" };
   }
   const prefix = line.slice(0, block.prefixLen).replace(/\t/g, "  ");
@@ -377,11 +396,55 @@ export function adaptSlashInsertion(
   };
 }
 
-/** A slash command owns paragraph or list-item content while the caret trails it. */
-export function slashQueryAtCaret(line: string, caret: number): string | null {
+/** What a picked slash command replaces and where its block lands.
+ * `from..to` is the line span to delete; `lead` is prepended to the insertion
+ * ("" = in place; "\n" + indent = on a fresh continuation line beneath). */
+export interface SlashApplySpan {
+  from: number;
+  to: number;
+  lead: string;
+  continuation: string;
+  query: string;
+}
+
+/** A slash command owns paragraph or list-item content while the caret trails
+ * it. A result row that already carries a ` — reason` is the one exception:
+ * the trailing `/query` token of the reason is the command, and its block goes
+ * on a continuation line beneath the row so the answer keeps its label and
+ * reason. A reason that was only the slash drops its dangling separator. */
+export function slashSpanAtCaret(line: string, caret: number): SlashApplySpan | null {
   if (caret !== line.length) return null;
   const target = slashLineTarget(line);
-  return /^\/([^/]*)$/.exec(line.slice(target.from))?.[1] ?? null;
+  const whole = /^\/([^/]*)$/.exec(line.slice(target.from));
+  if (whole) {
+    return {
+      from: target.from,
+      to: line.length,
+      lead: "",
+      continuation: target.continuation,
+      query: whole[1] ?? "",
+    };
+  }
+  const block = parseBlock(line);
+  if (block.kind !== "result") return null;
+  const parts = resultTextParts(block.text);
+  if (parts.reason === null) return null;
+  const labelEnd = block.prefixLen + parts.label.length;
+  const reasonFrom = labelEnd + RESULT_REASON_SEPARATOR.length;
+  const tail = /(^|\s)\/([^/\s]*)$/.exec(line.slice(reasonFrom));
+  if (!tail) return null;
+  const from = tail.index === 0 ? labelEnd : reasonFrom + tail.index;
+  return {
+    from,
+    to: line.length,
+    lead: `\n${target.continuation}`,
+    continuation: target.continuation,
+    query: tail[2] ?? "",
+  };
+}
+
+export function slashQueryAtCaret(line: string, caret: number): string | null {
+  return slashSpanAtCaret(line, caret)?.query ?? null;
 }
 
 export function SlashMenu({

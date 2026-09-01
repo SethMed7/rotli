@@ -27,7 +27,7 @@ import {
   DOCUMENT_OPEN_WITH_APPS,
 } from "../documents/kinds";
 import { clamp } from "../lib/clamp";
-import { IMAGE_EXTS, extOf, fileName } from "../lib/fileKind";
+import { IMAGE_EXTS, VIDEO_EXTS, extOf, fileName } from "../lib/fileKind";
 import {
   type FileStat,
   corpusFileBytes,
@@ -56,7 +56,7 @@ export type FileKind = "audio" | "video" | "image" | "pdf" | "sheet" | "document
 /** Slot in the file header for sheet chrome (Raw / Save) next to Open externally. */
 
 const AUDIO = new Set(["mp3", "m4a", "wav", "aac", "flac", "ogg", "oga", "opus"]);
-const VIDEO = new Set(["mp4", "mov", "webm", "m4v", "ogv"]);
+const VIDEO = VIDEO_EXTS;
 // the image viewer handles svg/ico too, so it broadens the shared raster set.
 const IMAGE = new Set([...IMAGE_EXTS, "svg", "ico"]);
 // html gets its own two-mode kind (Preview ⇄ Code) — it used to sit in TEXT.

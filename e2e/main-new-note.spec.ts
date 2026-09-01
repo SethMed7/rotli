@@ -1,12 +1,12 @@
 // Regression for the Main creation context: opening a Main reference must make
 // that virtual folder the target for Command-T. The note itself still lives in
-// the memex intake lane; Main receives an immediate reference.
+// the memex intake lane; Main receives a reference only once it has content.
 
 import { expect, test } from "@playwright/test";
 
 import { centerOf, gotoApp, pointerDrag } from "./support";
 
-test("Command-T from a Main note creates a new note in Main immediately", async ({ page }) => {
+test("Command-T keeps a blank draft out of Main, then files its first saved content", async ({ page }) => {
   await gotoApp(page);
 
   await page.locator(".sb-notes-tree .frow", { hasText: "All notes" }).first().click();
@@ -19,11 +19,57 @@ test("Command-T from a Main note creates a new note in Main immediately", async 
 
   const tabs = page.getByRole("tab");
   const countBefore = await tabs.count();
+  const untitledRows = page.locator(".main-tree [data-main-id]", { hasText: "Untitled" });
+  const untitledBefore = await untitledRows.count();
   await page.keyboard.press("Meta+T");
 
   await expect(tabs).toHaveCount(countBefore + 1);
   await expect(page.getByRole("tab", { selected: true })).toContainText("Untitled");
-  await expect(page.locator(".main-tree [data-main-id]", { hasText: "Untitled" })).toBeVisible();
+  await expect(untitledRows).toHaveCount(untitledBefore);
+
+  await page.keyboard.type("# Authored in Main");
+  await expect(page.locator(".main-tree [data-main-id]", { hasText: "Authored in Main" })).toBeVisible();
+});
+
+test("closing an optimistic blank before creation settles leaves no Main row", async ({ page }) => {
+  await gotoApp(page);
+
+  const tabs = page.getByRole("tab");
+  const tabCount = await tabs.count();
+  const untitledRows = page.locator(".main-tree [data-main-id]", { hasText: "Untitled" });
+  const untitledBefore = await untitledRows.count();
+
+  await page.keyboard.press("Meta+T");
+  await page.keyboard.press("Meta+W");
+  await expect(tabs).toHaveCount(tabCount);
+
+  // Let the authorized background creation/read/refresh lane finish. A close
+  // during any of those awaits must discard the blank file instead of filing
+  // an orphan after its tab is already gone.
+  await page.waitForTimeout(800);
+  await expect(untitledRows).toHaveCount(untitledBefore);
+});
+
+test("a Main right-click trashes the whole gathered selection", async ({ page }) => {
+  await gotoApp(page);
+
+  await page.locator(".sb-notes-tree .frow", { hasText: "All notes" }).first().click();
+  const mainRoot = page.locator('[data-main-id="main:"]');
+  for (const title of ["Q3 priorities — Northstar", "Groceries"]) {
+    await pointerDrag(page, page.locator(".recent-row", { hasText: title }), await centerOf(mainRoot));
+  }
+
+  const first = page.locator(".main-tree [data-main-id]", { hasText: "Q3 priorities — Northstar" });
+  const second = page.locator(".main-tree [data-main-id]", { hasText: "Groceries" });
+  await first.click({ modifiers: ["Meta"] });
+  await second.click({ modifiers: ["Meta"] });
+  await expect(page.locator(".main-tree .main-row.msel")).toHaveCount(2);
+
+  await first.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Move 2 items to Trash" }).click();
+
+  await expect(first).toHaveCount(0);
+  await expect(second).toHaveCount(0);
 });
 
 test("browsing reuses one preview tab; re-click keeps; typing keeps", async ({ page }) => {

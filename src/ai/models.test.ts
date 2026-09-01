@@ -10,10 +10,8 @@ import { parseHybridPresets } from "../state/persist";
 import { budgetFor, contextWindowFor } from "./budget";
 import {
   CLI_CATALOG,
-  GEMINI_OPENAI_BASE,
-  type ProviderId,
+  DEFAULT_PROVIDER_MODELS,
   type HybridPreset,
-  LANE_PING_MODEL,
   LOCAL_CATALOG,
   PROVIDER_IDS,
   STARTER_PRESETS,
@@ -25,6 +23,7 @@ import {
   mergedModels,
   nameFromRepo,
   presetModel,
+  providerDefaultModel,
 } from "./models";
 import { adapterFor, frontierAdapter, gemmaAdapter } from "./prompt";
 
@@ -40,7 +39,7 @@ const local: ChatModelInfo[] = [
   },
 ];
 
-const noneEnabled = { claude: false, codex: false, agy: false, gemini: false };
+const noneEnabled = { claude: false, codex: false, cursor: false };
 
 describe("mergedModels", () => {
   test("disabled lanes contribute nothing; the local list passes through", () => {
@@ -50,54 +49,19 @@ describe("mergedModels", () => {
     expect(g.presets).toEqual([]);
   });
 
-  test("an enabled lane surfaces its catalog", () => {
-    const g = mergedModels(local, { ...noneEnabled, claude: true }, []);
-    expect(g.connected).toEqual(CLI_CATALOG.claude);
-    expect(g.connected.every((m) => m.api === "cli" && m.endpoint === "")).toBe(true);
-  });
-
-  test("the chat can require an enabled lane to be detected ready", () => {
-    const enabled = { ...noneEnabled, claude: true, codex: true };
-    const ready = { claude: true, codex: false };
-    const g = mergedModels(local, enabled, [], [], ready);
-    expect(g.connected).toEqual(CLI_CATALOG.claude);
-    expect(g.connected.some((m) => m.provider === "codex")).toBe(false);
-  });
-
-  test("Antigravity contributes every model exposed by the installed agy catalog", () => {
-    const models = CLI_CATALOG.agy;
-    expect(models.map((m) => m.id)).toEqual([
-      "gemini-3.7-flash-high",
-      "gemini-3.7-flash-medium",
-      "gemini-3.7-flash-low",
-      "gemini-3.6-flash-high",
-      "gemini-3.6-flash-medium",
-      "gemini-3.6-flash-low",
-      "gemini-3.1-pro-high",
-      "gemini-3.1-pro-low",
-      "claude-sonnet-4-6",
-      "claude-opus-4-6-thinking",
-      "gpt-oss-120b-medium",
-    ]);
-    expect(models.map((m) => m.label)).toEqual([
-      "Gemini 3.7 Flash (High)",
-      "Gemini 3.7 Flash (Medium)",
-      "Gemini 3.7 Flash (Low)",
-      "Gemini 3.6 Flash (High)",
-      "Gemini 3.6 Flash (Medium)",
-      "Gemini 3.6 Flash (Low)",
-      "Gemini 3.1 Pro (High)",
-      "Gemini 3.1 Pro (Low)",
-      "Claude Sonnet 4.6 (Thinking)",
-      "Claude Opus 4.6 (Thinking)",
-      "GPT-OSS 120B (Medium)",
-    ]);
-    expect(models.every((m) => m.provider === "agy")).toBe(true);
-  });
-
-  test("gemini rides the openai wire with its remote base (never local)", () => {
-    const g = mergedModels(local, { ...noneEnabled, gemini: true }, []);
-    expect(g.connected.every((m) => m.api === "openai" && m.endpoint === GEMINI_OPENAI_BASE)).toBe(true);
+  test("only enabled and ready official connected clients can surface models", () => {
+    const g = mergedModels(local, { claude: true, codex: true, cursor: true }, [], [], {
+      claude: true,
+      codex: true,
+      cursor: true,
+    });
+    expect(PROVIDER_IDS).toEqual(["claude", "codex", "cursor"]);
+    expect(g.connected).toEqual([...CLI_CATALOG.claude, ...CLI_CATALOG.codex, ...CLI_CATALOG.cursor]);
+    expect(
+      g.connected.every(
+        (model) => model.provider === "claude" || model.provider === "codex" || model.provider === "cursor",
+      ),
+    ).toBe(true);
   });
 
   test("presets become pseudo-models the transports can never receive", () => {
@@ -170,13 +134,10 @@ describe("local model catalog", () => {
 });
 
 describe("blocked models (per-lane model control)", () => {
-  test("a blocked connected model disappears from the picker; the rest stay", () => {
-    const g = mergedModels(local, { ...noneEnabled, claude: true }, [], ["opus", "fable"]);
-    const ids = g.connected.map((m) => m.id);
-    expect(ids).toContain("sonnet");
-    expect(ids).toContain("haiku");
-    expect(ids).not.toContain("opus");
-    expect(ids).not.toContain("fable");
+  test("blocking Codex models hides only those models", () => {
+    const g = mergedModels(local, { ...noneEnabled, codex: true }, [], ["gpt-5.5"]);
+    expect(g.connected.some((model) => model.id === "gpt-5.5")).toBe(false);
+    expect(g.connected.some((model) => model.id === "gpt-5.6-sol")).toBe(true);
   });
 
   test("blocking never touches local models or presets", () => {
@@ -187,21 +148,24 @@ describe("blocked models (per-lane model control)", () => {
   });
 });
 
-describe("connected CLI catalog", () => {
-  test("includes every visible model advertised by the current Codex account", () => {
-    expect(CLI_CATALOG.codex.map((model) => model.id)).toEqual([
-      "gpt-5.6-sol",
-      "gpt-5.6-terra",
-      "gpt-5.6-luna",
-      "gpt-5.5",
-      "gpt-5.4",
-      "gpt-5.4-mini",
-      "gpt-5.3-codex-spark",
-    ]);
+describe("connected catalog policy", () => {
+  test("only Claude, Codex, and Cursor have executable catalogs", () => {
+    expect(PROVIDER_IDS).toEqual(["claude", "codex", "cursor"]);
+    expect(CLI_CATALOG.claude.length).toBeGreaterThan(0);
+    expect(CLI_CATALOG.codex.length).toBeGreaterThan(0);
+    expect(CLI_CATALOG.cursor).toContainEqual(
+      expect.objectContaining({ id: "grok-4.6", provider: "cursor", vision: false }),
+    );
   });
 
-  test("labels the rolling Claude alias with its current generation", () => {
-    expect(CLI_CATALOG.claude.find((model) => model.id === "sonnet")?.label).toBe("Claude Sonnet 5");
+  test("reviewed provider defaults are current and stale persisted ids heal", () => {
+    expect(DEFAULT_PROVIDER_MODELS).toEqual({
+      claude: "sonnet",
+      codex: "gpt-5.6-sol",
+      cursor: "grok-4.6",
+    });
+    expect(providerDefaultModel("cursor", { cursor: "cursor-auto" })).toBe("cursor-auto");
+    expect(providerDefaultModel("cursor", { cursor: "removed-model" })).toBe("grok-4.6");
   });
 });
 
@@ -225,7 +189,7 @@ describe("comfort tiers (Scan my Mac)", () => {
   });
 });
 
-describe("starter presets + lane pings", () => {
+describe("starter presets", () => {
   test("every starter preset survives the persistence shape-validator byte-for-byte", () => {
     expect(parseHybridPresets(STARTER_PRESETS)).toEqual(STARTER_PRESETS);
   });
@@ -233,9 +197,17 @@ describe("starter presets + lane pings", () => {
     for (const p of STARTER_PRESETS) expect(p.id.startsWith("starter-")).toBe(true);
     expect(new Set(STARTER_PRESETS.map((p) => p.id)).size).toBe(STARTER_PRESETS.length);
   });
-  test("every lane's ping model exists in its own catalog (gemini included)", () => {
-    for (const id of PROVIDER_IDS) {
-      expect(CLI_CATALOG[id].some((m) => m.id === LANE_PING_MODEL[id])).toBe(true);
+  test("starter presets reference only on-device ids or official connected models", () => {
+    const connected = new Set(
+      [...CLI_CATALOG.claude, ...CLI_CATALOG.codex, ...CLI_CATALOG.cursor].map((model) => model.id),
+    );
+    for (const preset of STARTER_PRESETS) {
+      expect(preset.organizer.startsWith("gemma") || preset.organizer.startsWith("qwen")).toBe(true);
+      for (const route of preset.routes) {
+        expect(
+          route.model.startsWith("gemma") || route.model.startsWith("qwen") || connected.has(route.model),
+        ).toBe(true);
+      }
     }
   });
 });
@@ -279,42 +251,16 @@ describe("the frontier/local split (budget + adapter)", () => {
   });
 });
 
-// Which CONNECTED lanes can genuinely see an attached image (the maintainer, 2026-08-04:
-// "gemini and gpt models should be able to see images"). The flag must track the
-// TRANSPORT's real ability, never the model's marketing capability — a lane that
-// advertises vision it can't deliver silently drops the picture.
 describe("connected-lane vision", () => {
-  const laneOf = (provider: ProviderId) => CLI_CATALOG[provider];
-
-  test("codex carries images — its CLI takes image files natively (-i)", () => {
-    expect(laneOf("codex").length).toBeGreaterThan(0);
-    expect(laneOf("codex").every((m) => m.vision)).toBe(true);
-  });
-
-  test("the Gemini API lane carries images — it rides openai image parts", () => {
-    expect(laneOf("gemini").every((m) => m.vision)).toBe(true);
-  });
-
-  test("EVERY frontier lane sees images — no connected model is blind", () => {
-    // the maintainer, 2026-08-04: "all frontier models should be able to see images."
-    // Each transport reaches it differently (provider.rs build_args); the
-    // catalog just must not leave one lane silently dropping attachments.
-    for (const provider of PROVIDER_IDS) {
-      expect(laneOf(provider).length).toBeGreaterThan(0);
-      expect(laneOf(provider).every((m) => m.vision)).toBe(true);
-    }
-  });
-
-  test("every vision lane is reachable from the flattened picker", () => {
-    const groups = mergedModels([], { claude: true, codex: true, agy: true, gemini: true }, [], [], {
+  test("only Claude and Codex vision models are reachable from the picker", () => {
+    const groups = mergedModels([], { claude: true, codex: true, cursor: true }, [], [], {
       claude: true,
       codex: true,
-      agy: true,
-      gemini: true,
+      cursor: true,
     });
     const visionIds = flattenModels(groups)
       .filter((m) => m.vision)
       .map((m) => m.id);
-    expect(visionIds).toEqual(expect.arrayContaining(laneOf("codex").map((m) => m.id)));
+    expect(visionIds).toEqual([...CLI_CATALOG.claude, ...CLI_CATALOG.codex].map((model) => model.id));
   });
 });

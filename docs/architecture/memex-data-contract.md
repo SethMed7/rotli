@@ -81,10 +81,17 @@ second user-visible product or storage location.
   Ordinary user creation collects a nonblank name before writing anything, then
   creates the collision-safe final filename atomically; cancelling the prompt
   leaves no `untitled.excalidraw` placeholder behind.
-- Creating any item adds its one stable id/path to Main immediately, before the
-  item is opened. A Library-intake note therefore appears in Main while the same
-  file still lives in staging. Refiling the physical item does not duplicate or
-  invalidate the Main arrangement.
+- A populated item adds its one stable id/path to Main after durable creation
+  and identity refresh; presentation may precede that structural work. A new
+  plain Markdown note is the deliberate exception: its durable corpus file and
+  editor tab exist immediately, but the empty session draft stays out of Main
+  and named views until its first successful non-empty body save. That first
+  save files the correctly titled note into the Main/view context captured when
+  creation began. The corpus summary carries exact editor-body emptiness, so
+  Main also suppresses a pre-existing blank Markdown reference without title or
+  snippet heuristics; the manifest slot and user file remain intact and the row
+  returns if content is later authored through another surface. Refiling the
+  physical item does not duplicate or invalidate the Main arrangement.
 - Creation from a named view also adds the item to that view and its current
   virtual folder. Creation from Main adds no `view_tag`. Removing a named-view
   assignment never deletes content or its Main reference.
@@ -94,6 +101,18 @@ second user-visible product or storage location.
   board, or Mermaid. The chooser may also expose non-durable actions such as
   opening the system web browser; those actions create no vault item. Named-view
   creation also retains the global Main reference.
+- ⌘T creates and activates a session-only pending tab synchronously, before file
+  I/O. For Markdown, that tab renders and focuses the ordinary empty editor on
+  its first paint; keystrokes live in a session buffer until creation returns a
+  durable wire id and revision, then move onto that same note before the tab is
+  retargeted. No blank/loading surface or query gap sits between the key event
+  and typing. Closing the pending tab suppresses later reopening. For a plain
+  Markdown draft, the authorized background creation is allowed to settle and
+  Rust then hard-discards the result only if its body is still blank; populated
+  formats remain durable. Main/view filing follows the refreshed identity index
+  and, for plain Markdown, the first successful non-empty save, so projection
+  filtering cannot mistake the new reference for a stale id or expose an
+  empty `Untitled` row.
 - The Librarian waits for the configured quiet window after the note's
   latest edit (five minutes by default) before classifying or refiling it. New
   edits reset that window; filing changes location/metadata, never note prose.
@@ -106,9 +125,14 @@ second user-visible product or storage location.
 
 - Markdown, board, DOCX, sheet, CSV, and generic managed-file reads return a
   content revision derived from the exact bytes read. Every replacement write
-  must present that revision; a mismatch is a conflict and must leave the newer
-  disk bytes untouched. The editor keeps its dirty buffer and surfaces the
-  conflict rather than silently retrying against a fresh revision.
+  must present that revision; a mismatch normally leaves the newer disk bytes
+  untouched. A human Markdown body save also presents the exact editor body
+  associated with its revision. Under the same file lock, Rotli may rebase that
+  save when the complete-file revision changed but the current disk editor body
+  still equals that baseline—the safe location/frontmatter-only case—because
+  the write path re-reads and preserves the newer metadata. If disk prose also
+  changed, it remains a real conflict: the editor keeps its dirty buffer and
+  surfaces it rather than overwriting either version.
 - Saved chat updates use the same rule. Creation refuses an existing slug, and
   `secureContext` is a one-way transition inside the same locked write window,
   so concurrent windows cannot erase taint or overwrite a newer transcript.
@@ -120,8 +144,11 @@ second user-visible product or storage location.
 - A physical path is a locator, not note identity. User and Librarian moves
   rewrite one source file and then rename it while preserving the frontmatter
   id; they never implement identity-preserving moves as copy plus best-effort
-  delete. Open buffers keep their dirty bytes when an external rename/delete
-  makes the old locator temporarily unresolvable.
+  delete. An open clean buffer adopts a move-only complete-file revision even
+  when its visible body is unchanged. A dirty buffer keeps its local prose and
+  adopts that revision only when the freshly read disk body still matches its
+  saved baseline. External rename/delete and genuine body divergence retain the
+  dirty bytes for recovery instead of guessing.
 - Ordinary saves use same-directory temporary files, file sync, atomic replace,
   and a best-effort parent-directory sync. Disk, permission, serialization, and
   revision failures are errors, never reported as saved.
@@ -187,7 +214,12 @@ second user-visible product or storage location.
 - The **Tasks** view is a per-call projection of open `- [ ]` checkboxes across
   ordinary Markdown notes (fenced code skipped; Trash/Archive/chats excluded;
   secure and locked notes included — it is the user's own local screen and is
-  not exposed through the agent workspace). Checking a task off rewrites that
+  not exposed through the agent workspace). Adjacent two-choice result rows
+  (`- [ ][ ]`, `- [x][ ]`, `- [ ][x]`) are explicitly not tasks. Radio-style
+  choice rows (`- ( )`, `- (x)`) are also
+  note content rather than tasks; adjacency plus equal indent defines their
+  exclusive group, with no metadata record or choice database. Checking a
+  task off rewrites that
   one line through the ordinary note write path after re-validating the exact
   text; no task database or task metadata exists. Spec:
   [`2026-07-25-tasks-surface.md`](../decisions/2026-07-25-tasks-surface.md).
@@ -201,16 +233,11 @@ second user-visible product or storage location.
 - Markdown document slash commands list only formats the embedded document
   editor can edit. They may create a blank managed DOCX or embed an existing
   editable DOCX-family file without leaving the parent Markdown tab.
-- **AI image generation has two lanes (2026-08-04), one command.** `generate_image`
-  writes into a Rust-pinned destination under the registered root: a chat slug
-  lands the PNG in that chat's assets (`storage/chats/<slug>/`), and an EMPTY
-  slug is the NOTES lane (`storage/images/`) behind the editor's `/image-gen`
-  slash command, which inserts a Markdown image whose src is the usual
-  `storage:` shorthand for the saved file. The prompt
-  never shapes the path, and the postcondition is unchanged: a non-empty PNG at
-  the pinned path or an error. The command offers only image engines whose lane
-  is enabled AND whose CLI probes installed + authenticated — capability- and
-  login-based, like every other model surface.
+- **Provider-backed AI image generation is unavailable (2026-09-01).** The
+  stable `generate_image` IPC command fails before root/path resolution,
+  credential lookup, or process spawn. Existing generated images remain normal
+  user-owned assets, and attached images remain available only to interactive
+  chat models whose live capability record declares vision support.
 - Chat-created images, boards, and Word documents stay closed after creation
   and are registered in the originating chat's portable `rotliArtifacts`
   frontmatter. A wide chat can reveal that list as a quiet artifact rail; when
@@ -231,8 +258,16 @@ second user-visible product or storage location.
   Unsupported drops fail before Rotli imports them. A native Finder drop first
   creates short-lived, single-use grants for its exact canonical files; only
   then does Rust emit the authorized paths and drop position to the webview.
-  The ordinary webview drag event is not file-read authority and is never used
-  to begin an import.
+  An ordinary webview drag event cannot authorize an arbitrary path. When a
+  runtime supplies byte-backed browser `File` objects instead of native paths,
+  those bytes may use the separately bounded, signature-validating image-asset
+  command. Markdown drops resolve nested pointer hits to the owning editor,
+  accept physical or logical runtime coordinates, copy into that note's
+  registered root, and normalize both default and root-prefixed import ids to a
+  portable root-relative `storage:` source. `/attatch` (also searchable as
+  `/attach`) opens a native multi-image picker whose returned paths receive the
+  same single-use grants before import. A failed copy is surfaced and never
+  reported as an inserted image.
 - A requested PDF is an exported copy of a separate editable Markdown source,
   both attached to the originating assistant turn. Rust keeps both in the same
   registered root and refuses secure, secret-shaped, locked, read-only, or
@@ -262,8 +297,10 @@ second user-visible product or storage location.
   earlier messages remain in that file; completing another turn keeps the same
   rolling UI window. Model input is narrower still: the existing per-model
   character budget keeps only recent conversation history, while retrieval can
-  reopen an older chat explicitly. No provider owns or silently replays a
-  second copy of Rotli's transcript.
+  reopen an older chat explicitly. Rotli never depends on or resumes a
+  provider-owned session for continuity; switching models always uses the
+  Rotli-owned Markdown transcript. A provider may still retain request data
+  under its own policy.
 - Every model adapter shares one bounded clarification response shape: one
   concise question with two or three mutually exclusive options. The loop
   accepts it only when a missing material choice changes the result or file

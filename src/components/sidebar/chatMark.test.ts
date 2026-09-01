@@ -9,10 +9,10 @@ describe("markKeyOf", () => {
   test("each connected lane maps to its vendor", () => {
     expect(markKeyOf("claude")).toBe("anthropic");
     expect(markKeyOf("codex")).toBe("openai");
+    expect(markKeyOf("cursor")).toBe("cursor");
   });
 
-  test("both Google transports share one vendor — agy and the API lane", () => {
-    expect(markKeyOf("agy")).toBe("gemini");
+  test("historical Gemini API chats retain their vendor mark", () => {
     expect(markKeyOf("gemini")).toBe("gemini");
   });
 
@@ -42,11 +42,13 @@ describe("chatMark", () => {
     expect(chatMark("mlx", "Qwen3 30B").title).toBe("Qwen3 30B — this Mac");
   });
 
-  test("known families carry logos; only honest fallbacks carry initials", () => {
-    for (const p of ["claude", "codex", "agy", "gemini"]) {
+  test("known families carry logos; Cursor and honest fallbacks use initials", () => {
+    for (const p of ["claude", "codex", "gemini"]) {
       expect(chatMark(p, "x").logo).toBeDefined();
       expect(chatMark(p, "x").initial).toBeUndefined();
     }
+    expect(chatMark("cursor", "Cursor Auto").initial).toBe("C");
+    expect(chatMark("cursor", "Cursor Auto").logo).toBeUndefined();
     expect(chatMark("mlx", "Gemma 3").logo).toBe("gemma");
     expect(chatMark("mlx", "Qwen3").logo).toBe("qwen");
     expect(chatMark("mlx", "Llama 3.2").logo).toBe("meta");

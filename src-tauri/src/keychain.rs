@@ -20,17 +20,11 @@ pub(crate) const SERVICE: &str = "rotli";
 
 /// Named Keychain accounts. Only WEBVIEW_ALLOWED may ride the generic IPC
 /// commands; the remote pairing bundle is connector-internal.
-pub(crate) const GEMINI_API_KEY_ACCOUNT: &str = "gemini-api-key";
 pub(crate) const BRAVE_SEARCH_API_KEY_ACCOUNT: &str = "brave-search-api-key";
 pub(crate) const BREVE_RESEND_ACCOUNT: &str = "breve-resend-api-key";
 pub(crate) const REMOTE_AGENT_TOKEN_ACCOUNT: &str = "remote-agent-token";
-pub(crate) const WEBVIEW_ALLOWED: &[&str] = &[
-    GEMINI_API_KEY_ACCOUNT,
-    BRAVE_SEARCH_API_KEY_ACCOUNT,
-    BREVE_RESEND_ACCOUNT,
-];
+pub(crate) const WEBVIEW_ALLOWED: &[&str] = &[BRAVE_SEARCH_API_KEY_ACCOUNT, BREVE_RESEND_ACCOUNT];
 const INTERNAL_ALLOWED: &[&str] = &[
-    GEMINI_API_KEY_ACCOUNT,
     BRAVE_SEARCH_API_KEY_ACCOUNT,
     BREVE_RESEND_ACCOUNT,
     REMOTE_AGENT_TOKEN_ACCOUNT,
@@ -143,7 +137,6 @@ mod tests {
 
     #[test]
     fn unknown_names_are_refused() {
-        assert!(allow(GEMINI_API_KEY_ACCOUNT).is_ok());
         assert!(allow(BRAVE_SEARCH_API_KEY_ACCOUNT).is_ok());
         assert!(allow(BREVE_RESEND_ACCOUNT).is_ok());
         assert!(allow(REMOTE_AGENT_TOKEN_ACCOUNT).is_ok());

@@ -30,7 +30,7 @@ export function speakableText(line: string): string {
   return line
     .replace(/^#{1,6}\s+/, "") // heading marks — the words still matter
     .replace(/^\s*>\s?/, "") // quote marker
-    .replace(/^\s*(?:[-*+]|\d+\.)\s+(?:\[[ xX/]\]\s+)?/, "") // list bullet / checkbox
+    .replace(/^\s*(?:[-*+]|\d+\.)\s+(?:(?:\[[ xX]\]){2}\s+|\[[ xX/]\]\s+|\([ xX]\)\s+)?/, "") // list/task/result/choice
     .replace(/!\[[^\]]*\]\([^)]*\)/g, "") // images say nothing aloud
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1") // links: speak the label, not the URL
     .replace(/`([^`]+)`/g, "$1") // inline code: speak the token

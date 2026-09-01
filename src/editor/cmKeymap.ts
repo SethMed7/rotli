@@ -7,7 +7,8 @@
 //             gets a soft 2-space tab at the caret, since indentation inside a
 //             fence is the user's code.
 //   ⇧Tab    — outdent up to 2 leading spaces.
-//   Space   — "[ ]"/"[]" at line start becomes a task.
+//   Space   — "[ ]"/"[]" becomes a task; "[][]" becomes a yes/no result;
+//             "()" becomes a one-of-many choice option.
 //   In a TABLE (the maintainer, 2026-07-01): Tab/⇧Tab hop to the next/previous cell
 //   (crossing rows), ↑/↓ hop rows in the same column, Enter moves to the same
 //   cell of the next row, Tab past the last cell APPENDS a row, and Enter on
@@ -17,8 +18,10 @@
 import { EditorSelection, type EditorState, type Line, type TransactionSpec } from "@codemirror/state";
 import type { Command, EditorView, KeyBinding } from "@codemirror/view";
 
+import { CHOICE_LINE_RE, CHOICE_MARK } from "./choiceState";
 import { lineInFence, scanFences } from "./fences";
 import { imageSourceSpan } from "./imageSelection";
+import { RESULT_LINE_RE, RESULT_MARK, resultStateOf } from "./resultState";
 import {
   type CellRef,
   type TableBlock,
@@ -41,6 +44,28 @@ function inFence(view: EditorView, line: Line): boolean {
  * ordered tasks count up AND reset), quotes. Returns the marker for the NEXT
  * line and whether the item is empty. */
 function listPrefixOf(line: string): { prefixLen: number; next: string; empty: boolean } | null {
+  const result = RESULT_LINE_RE.exec(line);
+  if (result && resultStateOf(result[3] ?? " ", result[4] ?? " ") !== null) {
+    const indent = result[1] ?? "";
+    const numbered = /^(\d+)\. $/.exec(result[2] ?? "");
+    const marker = numbered ? `${Number(numbered[1]) + 1}. ` : "- ";
+    return {
+      prefixLen: result[0].length,
+      next: `${indent}${marker}[ ][ ] `,
+      empty: line.slice(result[0].length).trim() === "",
+    };
+  }
+  const choice = CHOICE_LINE_RE.exec(line);
+  if (choice) {
+    const indent = choice[1] ?? "";
+    const numbered = /^(\d+)\. $/.exec(choice[2] ?? "");
+    const marker = numbered ? `${Number(numbered[1]) + 1}. ` : "- ";
+    return {
+      prefixLen: choice[0].length,
+      next: `${indent}${marker}( ) `,
+      empty: line.slice(choice[0].length).trim() === "",
+    };
+  }
   const m = line.match(
     new RegExp(`^([ \\t]*)((?:\\d+\\. \\[${MARK}\\] |- \\[${MARK}\\] |- |\\d+\\. |> ))(.*)$`),
   );
@@ -61,7 +86,9 @@ function listPrefixOf(line: string): { prefixLen: number; next: string; empty: b
  * (2 → 3 → …) so the list never shows duplicate numbers. Deeper-indented items
  * ride along untouched; anything else (blank, bullet, prose) ends the list. */
 function renumberAfter(state: EditorState, line: Line, nextMarker: string) {
-  const marker = new RegExp(`^( *)(\\d+)\\. (?:\\[${MARK}\\] )?$`).exec(nextMarker);
+  const marker = new RegExp(
+    `^( *)(\\d+)\\. (?:(?:\\[${MARK}\\] |\\[${RESULT_MARK}\\]\\[${RESULT_MARK}\\] |\\(${CHOICE_MARK}\\) ))?$`,
+  ).exec(nextMarker);
   if (!marker) return [];
   const indent = marker[1]?.length ?? 0;
   let num = Number(marker[2]);
@@ -177,12 +204,36 @@ const tabOutdent: Command = (view) => {
   return true; // trap ⇧Tab so it never tabs focus out of the editor
 };
 
-const taskOnSpace: Command = (view) => {
+const listControlOnSpace: Command = (view) => {
   const range = view.state.selection.main;
   if (!range.empty) return false;
   const line = view.state.doc.lineAt(range.head);
   if (inFence(view, line)) return false; // code is code — never rewrite it
   const before = line.text.slice(0, range.head - line.from);
+  // "()" + Space starts a Markdown-native single-choice group. Each row is
+  // ordinary file truth; adjacency and matching indent define its siblings.
+  const choice = /^(\s*)(?:- )?\( ?\)$/.exec(before);
+  if (choice) {
+    const prefix = `${(choice[1] ?? "").replace(/\t/g, "  ")}- ( ) `;
+    view.dispatch({
+      changes: { from: line.from, to: range.head, insert: prefix },
+      selection: EditorSelection.cursor(line.from + prefix.length),
+      userEvent: "input",
+    });
+    return true;
+  }
+  // "[][]" + Space makes a mutually exclusive yes/no result. As with the
+  // task shorthand below, an optional existing bullet upgrades in place.
+  const result = /^(\s*)(?:- )?\[ ?\]\[ ?\]$/.exec(before);
+  if (result) {
+    const prefix = `${(result[1] ?? "").replace(/\t/g, "  ")}- [ ][ ] `;
+    view.dispatch({
+      changes: { from: line.from, to: range.head, insert: prefix },
+      selection: EditorSelection.cursor(line.from + prefix.length),
+      userEvent: "input",
+    });
+    return true;
+  }
   // "[ ]"/"[]" at line start — optionally after an existing bullet ("- []"
   // upgrades the bullet to a task). Pasted tab indents normalize to the two
   // spaces the rest of the grammar speaks.
@@ -212,6 +263,10 @@ function tableCtxAt(view: EditorView): TableCtx | null {
   const sel = view.state.selection.main;
   const line = view.state.doc.lineAt(sel.head);
   if (view.state.doc.lineAt(sel.anchor).number !== line.number) return null;
+  // Every table line carries a pipe. Without this gate, Tab/Enter/arrows on an
+  // ordinary bullet paid a whole-document table scan (plus its nested fence
+  // scan) just to learn the caret is not in a table.
+  if (!line.text.includes("|")) return null;
   const t = scanTables(view.state.doc).find((x) => line.from >= x.from && line.from <= x.to);
   if (!t) return null;
   const rel = line.number - view.state.doc.lineAt(t.from).number; // 0 head, 1 delim, 2.. data
@@ -366,5 +421,5 @@ export const rotliKeymap: KeyBinding[] = [
   { key: "ArrowRight", run: imageArrow("right") },
   { key: "Enter", run: enterContinueList },
   { key: "Tab", run: tabIndent, shift: tabOutdent },
-  { key: "Space", run: taskOnSpace },
+  { key: "Space", run: listControlOnSpace },
 ];

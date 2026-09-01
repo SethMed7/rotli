@@ -34,6 +34,12 @@ interface MermaidWorkspaceProps {
   onConvertAndEmbed?: (code: string) => Promise<string | null>;
   onClose: () => void;
   onRequestCloseReady?: (requestClose: () => void) => void;
+  /** A previously unapplied draft to resume instead of the fence source. */
+  draft?: string | undefined;
+  /** Every draft edit, so the host can keep it across a forced close. */
+  onDraftChange?: (draft: string) => void;
+  /** The user explicitly discarded the draft (the host forgets it). */
+  onDiscard?: () => void;
 }
 
 export type MermaidWorkspaceOptions = MermaidWorkspaceProps;
@@ -71,9 +77,12 @@ function MermaidWorkspace({
   onConvertAndEmbed,
   onClose,
   onRequestCloseReady,
+  draft: initialDraft,
+  onDraftChange,
+  onDiscard,
 }: MermaidWorkspaceProps) {
   const [mode, setMode] = useState<WorkspaceMode>("view");
-  const [draft, setDraft] = useState(code);
+  const [draft, setDraft] = useState(initialDraft ?? code);
   const [viewport, setViewport] = useState(INITIAL_VIEWPORT);
   const [contentSize, setContentSize] = useState<MermaidPoint>({ x: 0, y: 0 });
   const [renderStatus, setRenderStatus] = useState<RenderStatus>(code.trim() ? "loading" : "empty");
@@ -92,6 +101,10 @@ function MermaidWorkspace({
   const dragRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
   const renderId = useId().replace(/[^A-Za-z0-9_-]/g, "");
   const dirty = draft !== code;
+
+  useEffect(() => {
+    onDraftChange?.(draft);
+  }, [draft, onDraftChange]);
 
   const fitDiagram = useCallback(() => {
     const canvas = canvasRef.current;
@@ -433,7 +446,14 @@ function MermaidWorkspace({
             <button type="button" onClick={() => setConfirmClose(false)}>
               Keep editing
             </button>
-            <button type="button" className="is-destructive" onClick={onClose}>
+            <button
+              type="button"
+              className="is-destructive"
+              onClick={() => {
+                onDiscard?.();
+                onClose();
+              }}
+            >
               Discard
             </button>
           </div>

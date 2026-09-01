@@ -62,6 +62,61 @@ const DEFAULT_QUICK: &str = "Alt+Q";
 const DEFAULT_CHAT_SUMMON: &str = "Alt+A";
 const DEFAULT_SEARCH_SUMMON: &str = "Alt+F"; // "find" — summon the window with ⌘K open
 
+#[derive(Debug, PartialEq, Eq)]
+enum NativeCloseAction {
+    CloseMainTab,
+    HideWindow,
+}
+
+fn native_close_action(window_label: &str) -> NativeCloseAction {
+    if window_label == "main" {
+        NativeCloseAction::CloseMainTab
+    } else {
+        NativeCloseAction::HideWindow
+    }
+}
+
+fn focused_webview_window(app: &AppHandle) -> Option<tauri::WebviewWindow> {
+    app.webview_windows()
+        .into_values()
+        .find(|window| window.is_focused().unwrap_or(false))
+}
+
+fn close_tab_from_native_menu(app: &AppHandle) {
+    let Some(window) = focused_webview_window(app) else {
+        return;
+    };
+    match native_close_action(window.label()) {
+        NativeCloseAction::CloseMainTab => {
+            let _ = window.emit("rotli:close-tab", ());
+        }
+        NativeCloseAction::HideWindow => {
+            let _ = window.hide();
+        }
+    }
+}
+
+fn hide_focused_window(app: &AppHandle) {
+    if let Some(window) = focused_webview_window(app) {
+        let _ = window.hide();
+    }
+}
+
+#[cfg(test)]
+mod native_close_tests {
+    use super::{native_close_action, NativeCloseAction};
+
+    #[test]
+    fn command_w_closes_a_main_tab_but_hides_visitor_windows() {
+        assert_eq!(native_close_action("main"), NativeCloseAction::CloseMainTab);
+        assert_eq!(native_close_action("quick"), NativeCloseAction::HideWindow);
+        assert_eq!(
+            native_close_action("capture"),
+            NativeCloseAction::HideWindow
+        );
+    }
+}
+
 fn development_read_only_for(debug: bool, has_development_vault: bool) -> bool {
     debug && !has_development_vault
 }
@@ -1037,6 +1092,47 @@ async fn corpus_add_folder(app: AppHandle, path: Option<String>) -> Result<bool,
     tauri::async_runtime::spawn_blocking(move || corpus_add_folder_blocking(app, path))
         .await
         .map_err(|e| format!("vault worker failed ({e})"))?
+}
+
+/// Native image picker for Markdown's `/attatch` command. The picker runs on a
+/// worker (blocking it on the main thread would beachball the app) and grants
+/// the returned paths to the same single-use import capability used by Finder
+/// drag-and-drop. Picking is authority to copy these exact files once; it is
+/// not general filesystem access for the webview.
+#[tauri::command]
+async fn corpus_pick_images(app: AppHandle) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use tauri_plugin_dialog::DialogExt;
+        let dialog_state = app.state::<NativeDialogOpen>();
+        let _native_dialog = dialog_state.begin();
+        let mut picker = app
+            .dialog()
+            .file()
+            .set_title("Attach images or videos")
+            .add_filter(
+                "Images",
+                &[
+                    "png", "jpg", "jpeg", "gif", "webp", "heic", "heif", "avif", "bmp", "tiff",
+                    "tif", "svg", "ico",
+                ],
+            )
+            // mirrors VIDEO_EXTS in src/lib/fileKind.ts — the embed lane
+            .add_filter("Videos", &["mp4", "mov", "webm", "m4v", "ogv"]);
+        if let Some(parent) = app.get_webview_window("main") {
+            picker = picker.set_parent(&parent);
+        }
+        let paths = picker
+            .blocking_pick_files()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|picked| picked.into_path().map_err(|error| error.to_string()))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(app
+            .state::<corpus::ImportAuthorizations>()
+            .authorize_native_drop(&paths))
+    })
+    .await
+    .map_err(|error| format!("image picker worker failed ({error})"))?
 }
 
 fn corpus_add_folder_blocking(app: AppHandle, path: Option<String>) -> Result<bool, String> {
@@ -2251,11 +2347,14 @@ pub fn run() {
         .manage(localmodel::LocalModelState::default())
         .manage(compute::ComputeState::default())
         .manage(remote_agent::RemoteAgentState::default())
-        // the app-menu ⌘Q replacement (see setup) — tray menu events have their
-        // own handler; the ids are distinct so double-dispatch can't double-quit
+        // App-menu replacements installed in setup. Tray menu events have their
+        // own handler; the ids are distinct so double-dispatch cannot occur.
         .on_menu_event(|app, event| {
-            if event.id().as_ref() == "quit-app" {
-                graceful_quit(app);
+            match event.id().as_ref() {
+                "quit-app" => graceful_quit(app),
+                "close-tab" => close_tab_from_native_menu(app),
+                "close-window" => hide_focused_window(app),
+                _ => {}
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -2322,6 +2421,7 @@ pub fn run() {
             corpus::corpus_open_with_apps,
             corpus::corpus_open_file_with,
             corpus::corpus_import_file,
+            corpus_pick_images,
             corpus::corpus_create_image_asset,
             corpus::corpus_abs,
             corpus::corpus_frontmatter,
@@ -2691,7 +2791,8 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             {
                 let menu = app.menu().ok_or("macOS app menu is unavailable; safe Quit cannot be installed")?;
-                let app_sub = match menu.items()?.into_iter().next() {
+                let menu_items = menu.items()?;
+                let app_sub = match menu_items.first() {
                     Some(tauri::menu::MenuItemKind::Submenu(app_sub)) => app_sub,
                     _ => return Err("macOS app submenu changed; refusing an unsafe unflushed Quit".into()),
                 };
@@ -2705,6 +2806,55 @@ pub fn run() {
                     .build(app)?;
                 app_sub.remove(last)?;
                 app_sub.append(&quit_app)?;
+
+                // The default File and Window menus both install native
+                // CloseWindow items with ⌘W. AppKit consumes that accelerator
+                // before WKWebView, so the registered `tabs.close` action never
+                // sees it; CloseRequested then hides the whole app and its
+                // visibility flush can surface the macOS wait cursor. Replace
+                // both predefined items: the frontend owns ⌘W synchronously;
+                // File → Close Tab remains a pointer-selectable command and
+                // Window keeps an explicit no-shortcut hide.
+                let mut file_sub = None;
+                let mut window_sub = None;
+                for item in &menu_items {
+                    if let tauri::menu::MenuItemKind::Submenu(submenu) = item {
+                        if submenu.text().ok().as_deref() == Some("File") {
+                            file_sub = Some(submenu.clone());
+                        }
+                        if submenu.id().as_ref() == tauri::menu::WINDOW_SUBMENU_ID {
+                            window_sub = Some(submenu.clone());
+                        }
+                    }
+                }
+                let file_sub = file_sub.ok_or("macOS File menu changed; Close Tab cannot be installed")?;
+                let window_sub =
+                    window_sub.ok_or("macOS Window menu changed; Close Window cannot be replaced")?;
+
+                let file_items = file_sub.items()?;
+                let default_file_close = match file_items.first() {
+                    Some(item @ tauri::menu::MenuItemKind::Predefined(_)) => item,
+                    _ => return Err("macOS File menu changed; native close cannot be replaced safely".into()),
+                };
+                file_sub.remove(default_file_close)?;
+
+                let window_items = window_sub.items()?;
+                let default_window_close = match window_items.last() {
+                    Some(item @ tauri::menu::MenuItemKind::Predefined(_)) => item,
+                    _ => return Err("macOS Window menu changed; native close cannot be replaced safely".into()),
+                };
+                window_sub.remove(default_window_close)?;
+
+                // Do not attach ⌘W to the native item: AppKit consumes native
+                // menu accelerators before WKWebView and adds a Rust→event→JS
+                // round trip. With both predefined close accelerators removed,
+                // the frontend registry receives ⌘W in the original key event
+                // and closes the tab before the next paint. File → Close Tab
+                // still uses this item when selected with the pointer.
+                let close_tab = MenuItemBuilder::with_id("close-tab", "Close Tab").build(app)?;
+                let close_window = MenuItemBuilder::with_id("close-window", "Close Window").build(app)?;
+                file_sub.prepend(&close_tab)?;
+                window_sub.append(&close_window)?;
             }
 
             Ok(())
@@ -2712,9 +2862,9 @@ pub fn run() {
         // Click-away hide (the visitor law) — a setting since 2026-06-12:
         // "Stay open" turns it off for the main window. Capture always hides.
         // And closing NEVER destroys (the summon law: summon shows LIVING
-        // windows): the traffic-light close — or Cmd+W reaching the default
-        // macOS menu's Close Window — hides instead, or summon, tray click and
-        // "Open rotli" would all go dead for the rest of the process.
+        // windows): the traffic-light close — or Window → Close Window — hides
+        // instead, or summon, tray click and "Open rotli" would all go dead for
+        // the rest of the process. ⌘W is owned by the frontend registry above.
         .on_window_event(|window, event| {
             match event {
                 WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, position }) => {

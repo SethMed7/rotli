@@ -20,7 +20,11 @@ import {
   toggleMainWindow,
   toggleQuickWindow,
 } from "../lib/tauri";
-import { createManagedItem, requestManagedBoardCreation } from "../newItems/composition";
+import {
+  createManagedItem,
+  createManagedItemInTabOptimistically,
+  requestManagedBoardCreation,
+} from "../newItems/composition";
 import type { NewItemKind } from "../newItems/model";
 import { openChatForNote } from "../noteChat/composition";
 import { summonChat } from "../services/chatSummon";
@@ -79,7 +83,12 @@ export function newItemInTab(): void {
     usePanesStore.getState().openBrowser();
     return;
   }
-  runCreate(useUiStore.getState().newTabDefault, true);
+  const kind = useUiStore.getState().newTabDefault;
+  if (kind === "board") {
+    requestManagedBoardCreation({ newTab: true });
+    return;
+  }
+  createManagedItemInTabOptimistically(kind);
 }
 
 /** ⌘+/⌘− — CONTEXTUAL zoom (the maintainer, 2026-06-26: "zoom in and out but just where I

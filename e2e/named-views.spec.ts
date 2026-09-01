@@ -31,12 +31,16 @@ test("named views keep Main global and make Command-T context-sensitive", async 
   await page.keyboard.press("Meta+T");
   await expect(
     page.locator('.main-tree[data-active-view="OpenSource"] [data-main-id]', { hasText: "Untitled" }),
+  ).toHaveCount(0);
+  await page.keyboard.type("# OpenSource draft");
+  await expect(
+    page.locator('.main-tree[data-active-view="OpenSource"] [data-main-id]', { hasText: "OpenSource draft" }),
   ).toBeVisible();
 
   await page.getByRole("button", { name: /Current view: OpenSource/ }).click();
   await page.getByRole("menu").getByRole("menuitemcheckbox", { name: "Main — all items" }).click();
   await expect(
-    page.locator('.main-tree[data-active-view="Main"] [data-main-id]', { hasText: "Untitled" }),
+    page.locator('.main-tree[data-active-view="Main"] [data-main-id]', { hasText: "OpenSource draft" }),
   ).toBeVisible();
 
   await page.locator(".sb-notes-tree .frow", { hasText: "All notes" }).first().click();
@@ -113,10 +117,13 @@ test("the new-item chooser keeps a named view folder as its creation context", a
   // same shared filing path and proves named-view membership + folder nesting.
   await page.locator(".ni-surface").getByRole("button", { name: "New Markdown note" }).click();
 
-  await expect(folder.locator("..").locator(".main-row", { hasText: "Untitled" })).toHaveCount(1);
+  await expect(folder.locator("..").locator(".main-row", { hasText: "Untitled" })).toHaveCount(0);
+  await page.locator(".pane.focused .cm-content").click();
+  await page.keyboard.type("# Northstar note");
+  await expect(folder.locator("..").locator(".main-row", { hasText: "Northstar note" })).toHaveCount(1);
   await page.getByRole("button", { name: /Current view: Northstar/ }).click();
   await page.getByRole("menu").getByRole("menuitemcheckbox", { name: "Main — all items" }).click();
   await expect(
-    page.locator('.main-tree[data-active-view="Main"] [data-main-id]', { hasText: "Untitled" }),
+    page.locator('.main-tree[data-active-view="Main"] [data-main-id]', { hasText: "Northstar note" }),
   ).toBeVisible();
 });

@@ -31,7 +31,7 @@ function supportedReasoning(
     return ["low", "medium", "high", "xhigh", "max", "ultra"];
   }
   if (modelId === "gpt-5.6-luna") return ["low", "medium", "high", "xhigh", "max"];
-  if (["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex-spark"].includes(modelId ?? "")) {
+  if (["gpt-5.5", "gpt-5.3-codex-spark"].includes(modelId ?? "")) {
     return ["low", "medium", "high", "xhigh"];
   }
   return [];

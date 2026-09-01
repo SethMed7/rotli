@@ -32,16 +32,46 @@ export interface BadgeSpot {
   active: boolean;
 }
 
+export interface BadgeRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
 /** Is this rect worth badging — on screen, and big enough to anchor to? A
  * display:none control measures 0×0; a scrolled-away one lands off-viewport.
  * Pure + exported for tests. */
-export function rectIsBadgeable(
-  rect: { left: number; top: number; width: number; height: number },
-  viewport: { width: number; height: number },
-): boolean {
+export function rectIsBadgeable(rect: BadgeRect, viewport: { width: number; height: number }): boolean {
   if (rect.width < 8 || rect.height < 8) return false;
   if (rect.left + rect.width < 0 || rect.top + rect.height < 0) return false;
   return rect.left < viewport.width && rect.top < viewport.height;
+}
+
+/** The portion of a control that can really paint through all clipping
+ * ancestors. A fixed overlay does not inherit overflow clipping, so its badge
+ * must use this intersection explicitly. */
+export function visibleBadgeRect(
+  rect: BadgeRect,
+  clips: readonly BadgeRect[],
+  viewport: { width: number; height: number },
+): BadgeRect {
+  let left = Math.max(0, rect.left);
+  let top = Math.max(0, rect.top);
+  let right = Math.min(viewport.width, rect.left + rect.width);
+  let bottom = Math.min(viewport.height, rect.top + rect.height);
+  for (const clip of clips) {
+    left = Math.max(left, clip.left);
+    top = Math.max(top, clip.top);
+    right = Math.min(right, clip.left + clip.width);
+    bottom = Math.min(bottom, clip.top + clip.height);
+  }
+  return {
+    left,
+    top,
+    width: Math.max(0, right - left),
+    height: Math.max(0, bottom - top),
+  };
 }
 
 /** Collect the badge spots for the tagged elements currently on screen. Kept
@@ -51,7 +81,9 @@ export function rectIsBadgeable(
 export function collectSpots(
   elements: readonly {
     id: string;
-    rect: { left: number; top: number; width: number; height: number };
+    rect: BadgeRect;
+    /** Visible boxes of overflow-clipping ancestors, nearest first. */
+    clips?: readonly BadgeRect[];
     active?: boolean;
   }[],
   viewport: { width: number; height: number },
@@ -63,15 +95,16 @@ export function collectSpots(
     // one badge per ACTION — a control rendered twice (a footer echoed in a
     // menu) would otherwise stack duplicate badges on the same chord
     if (seen.has(el.id)) continue;
-    if (!rectIsBadgeable(el.rect, viewport)) continue;
+    const visibleRect = visibleBadgeRect(el.rect, el.clips ?? [], viewport);
+    if (!rectIsBadgeable(visibleRect, viewport)) continue;
     const chord = chordOf(el.id);
     if (!chord) continue; // unbound → nothing to teach
     seen.add(el.id);
     out.push({
       id: el.id,
       chord: formatChord(chord),
-      left: Math.max(2, el.rect.left + 2),
-      top: Math.max(2, el.rect.top + 2),
+      left: Math.max(2, visibleRect.left + 2),
+      top: Math.max(2, visibleRect.top + 2),
       active: el.active ?? false,
     });
   }
@@ -90,10 +123,26 @@ export function HotkeyBadges() {
       const id = node.getAttribute(HOTKEY_ATTR);
       if (!id) return [];
       const r = node.getBoundingClientRect();
+      const clips: BadgeRect[] = [];
+      for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+        const style = window.getComputedStyle(parent);
+        const clipsOverflow = [style.overflowX, style.overflowY].some((overflow) =>
+          ["auto", "clip", "hidden", "scroll"].includes(overflow),
+        );
+        if (!clipsOverflow) continue;
+        const parentRect = parent.getBoundingClientRect();
+        clips.push({
+          left: parentRect.left + parent.clientLeft,
+          top: parentRect.top + parent.clientTop,
+          width: parent.clientWidth,
+          height: parent.clientHeight,
+        });
+      }
       return [
         {
           id,
           rect: { left: r.left, top: r.top, width: r.width, height: r.height },
+          clips,
           active:
             node.getAttribute("aria-pressed") === "true" || node.getAttribute("aria-selected") === "true",
         },

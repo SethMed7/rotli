@@ -1,8 +1,9 @@
 # Local-model compute guardrails — admission, queue, prioritize
 
 Status: **BUILT** (2026-08-01). Scope: the **local** model lane only
-(`chat_messages` against a loopback endpoint). Claude / Codex / Gemini ride
-provider-side capacity and are untouched by everything below.
+(`chat_messages` against a loopback endpoint). Interactive Claude Code / Codex
+ride provider-side capacity and are untouched by everything below; Google model
+execution is unavailable.
 
 the maintainer's ask, verbatim: *"for opening local and doing multiple just have guard
 rails against compute — example I try to open a third it will mention there

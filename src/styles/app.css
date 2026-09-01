@@ -658,13 +658,23 @@ body[data-surface="capture"] {
 }
 .pane-empty .be-sub {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 14px;
   margin-top: 4px;
+  /* the three chips outgrow .be-sub's 320px prose measure — without this each
+     chip wrapped its own label ("new / note", "reopen / tab") */
+  max-width: none;
 }
 .pane-empty-act {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  white-space: nowrap;
+  /* a quiet text action, not a UA button: no border, no bevel, inherit type */
+  border: 0;
+  background: transparent;
+  font: inherit;
   font-size: 12px;
   color: var(--text-muted);
   cursor: pointer;

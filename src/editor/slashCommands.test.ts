@@ -3,7 +3,13 @@ import { describe, expect, test } from "bun:test";
 import type { NoteSummary } from "../types";
 import { imageGenMarkdown, readyImageEngines } from "./imageGenPopover";
 import { pickerFence, slashInsertion } from "./slashActions";
-import { adaptSlashInsertion, filterSlashItems, slashLineTarget, SLASH_ITEMS } from "./slashMenu";
+import {
+  adaptSlashInsertion,
+  filterSlashItems,
+  slashLineTarget,
+  slashSpanAtCaret,
+  SLASH_ITEMS,
+} from "./slashMenu";
 import { filterPickerNotes, slashPickerCanCreate } from "./slashPicker";
 
 const file = (id: string): NoteSummary => ({
@@ -35,6 +41,7 @@ describe("slash command catalog", () => {
       "Inline code",
       "Math",
       "Mermaid",
+      "Attach image",
       "Generate image",
       "Link note",
       "Board",
@@ -42,8 +49,10 @@ describe("slash command catalog", () => {
       "Document",
     ]);
     for (const item of SLASH_ITEMS) {
-      // picker + imageGen open a popover first — no immediate scaffold
-      if (item.op.kind === "picker" || item.op.kind === "imageGen") continue;
+      // picker + image commands open a native/popover flow first — no scaffold
+      if (item.op.kind === "picker" || item.op.kind === "attachImage" || item.op.kind === "imageGen") {
+        continue;
+      }
       const insertion = slashInsertion(item.op);
       expect(insertion).not.toBeNull();
       expect(insertion?.caret).toBeGreaterThanOrEqual(0);
@@ -75,6 +84,9 @@ describe("slash command catalog", () => {
       insert: "```math\n\n    ```",
       caret: 8,
     });
+
+    expect(slashLineTarget("- [ ][ ] /table")).toEqual({ from: 9, continuation: "         " });
+    expect(slashLineTarget("- ( ) /table")).toEqual({ from: 6, continuation: "      " });
   });
 
   test("targeted embeds use explicit typed fences", () => {
@@ -102,6 +114,16 @@ describe("slash command catalog", () => {
     expect(filterSlashItems("word").map((item) => item.label)).toEqual(["Document"]);
     expect(filterSlashItems("docx").map((item) => item.label)).toEqual(["Document"]);
     expect(filterSlashItems("rtf")).toEqual([]);
+  });
+});
+
+describe("/attatch", () => {
+  test("the requested spelling opens the native image attachment command", () => {
+    expect(filterSlashItems("attatch").map((item) => item.label)).toEqual(["Attach image"]);
+    expect(SLASH_ITEMS.find((item) => item.label === "Attach image")?.op).toEqual({
+      kind: "attachImage",
+    });
+    expect(slashInsertion({ kind: "attachImage" })).toBeNull();
   });
 });
 
@@ -155,23 +177,8 @@ describe("/image-gen", () => {
     expect(slashInsertion({ kind: "imageGen" })).toBeNull();
   });
 
-  test("only ENABLED lanes that are installed AND authenticated are offered", () => {
-    const ready = { installed: true, version: "1", authenticated: true };
-    const noAuth = { installed: true, version: "1", authenticated: false };
-    const missing = { installed: false, version: null, authenticated: false };
-
-    // both signed in → both offered, codex (GPT) first
-    expect(
-      readyImageEngines({ codex: true, agy: true }, { codex: ready, agy: ready }).map((e) => e.id),
-    ).toEqual(["codex", "agy"]);
-    // installed but signed OUT, or not installed → never offered
-    expect(readyImageEngines({ codex: true, agy: true }, { codex: noAuth, agy: missing })).toEqual([]);
-    // lane disabled in Settings → not offered even when the CLI is ready
-    expect(
-      readyImageEngines({ codex: false, agy: true }, { codex: ready, agy: ready }).map((e) => e.id),
-    ).toEqual(["agy"]);
-    // a probe that hasn't resolved yet is not a green light
-    expect(readyImageEngines({ codex: true }, {})).toEqual([]);
+  test("subscription-authenticated image engines are never offered", () => {
+    expect(readyImageEngines()).toEqual([]);
   });
 
   test("the inserted markdown uses the storage: shorthand and a safe alt", () => {
@@ -185,5 +192,47 @@ describe("/image-gen", () => {
     );
     const long = imageGenMarkdown("x".repeat(200), "storage/images/x.png");
     expect(long.slice(2, long.indexOf("]"))).toHaveLength(80);
+  });
+});
+
+describe("slash commands inside a result row's reason", () => {
+  const nine = " ".repeat(9);
+
+  test("the trailing slash token of a reason is the command; its block lands beneath the row", () => {
+    const line = "- [ ][x] Hello — fail hello /table";
+    const span = slashSpanAtCaret(line, line.length);
+    expect(span).toEqual({
+      from: line.indexOf(" /table"),
+      to: line.length,
+      lead: `\n${nine}`,
+      continuation: nine,
+      query: "table",
+    });
+  });
+
+  test("a reason that was only the slash drops its dangling separator", () => {
+    const line = "- [x][ ] Hello — /attach";
+    const span = slashSpanAtCaret(line, line.length);
+    expect(span?.from).toBe(line.indexOf(" — "));
+    expect(span?.query).toBe("attach");
+    expect(span?.lead).toBe(`\n${nine}`);
+  });
+
+  test("ordinary lines and empty list items keep the in-place contract", () => {
+    expect(slashSpanAtCaret("/math", 5)).toEqual({
+      from: 0,
+      to: 5,
+      lead: "",
+      continuation: "",
+      query: "math",
+    });
+    expect(slashSpanAtCaret("- [ ][ ] /table", 15)).toMatchObject({ from: 9, lead: "", query: "table" });
+  });
+
+  test("a slash mid-word, mid-line, or on an unanswered row's label is not a command", () => {
+    expect(slashSpanAtCaret("- [ ][x] Hello — and/or", 23)).toBeNull();
+    expect(slashSpanAtCaret("- [ ][x] Hello — fail /table", 20)).toBeNull();
+    expect(slashSpanAtCaret("- [ ][x] Hello /table", 21)).toBeNull();
+    expect(slashSpanAtCaret("- item /table", 13)).toBeNull();
   });
 });

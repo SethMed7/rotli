@@ -64,8 +64,13 @@ function makeActivityTab(): Tab {
   return { id: ulid(), surfaceKind: "activity" };
 }
 
-function makeNewItemTab(): Tab {
-  return { id: ulid(), surfaceKind: "newItem" };
+function makeNewItemTab(pendingLabel?: string, pendingNote = false): Tab {
+  return {
+    id: ulid(),
+    surfaceKind: "newItem",
+    ...(pendingLabel ? { pendingLabel } : {}),
+    ...(pendingNote ? { pendingNote: true } : {}),
+  };
 }
 
 function makeBrowserTab(url?: string): Tab {
@@ -495,6 +500,18 @@ interface PanesState {
   openActivity: () => void;
   /** ⌘N — a blank NEW TAB with the type chooser (the maintainer, 2026-07-29). */
   openNewItemTab: () => void;
+  /** ⌘T presentation phase: append and activate a tab before durable creation
+   * starts. Returns stable identity so completion can retarget this exact tab. */
+  openPendingItemTab: (label: string, options?: { note?: boolean }) => { paneId: string; tabId: string };
+  /** Durable creation phase: retarget the original pending tab without opening
+   * a replacement if the user already closed it. */
+  resolvePendingItemTab: (
+    tabId: string,
+    target:
+      | { surfaceKind: "note"; noteId: string }
+      | { surfaceKind: "canvas"; boardId: string }
+      | { surfaceKind: "file"; fileId: string },
+  ) => boolean;
   /** Open a fresh session-only private browser tab. The URL never joins the
    * durable pane tree or viewstate snapshot. */
   openBrowser: (url?: string, paneId?: string) => void;
@@ -805,6 +822,59 @@ export const usePanesStore = create<PanesState>((set, get) => {
           activeTabId: tab.id,
         })),
       });
+    },
+
+    openPendingItemTab: (label, options) => {
+      // Synchronous and intentionally free of creator/cache work: this state
+      // mutation is the whole latency contract for ⌘T.
+      useUiStore.getState().setContentView("panes");
+      const leaf = focusedLeaf();
+      const tab = makeNewItemTab(label, options?.note === true);
+      set({
+        root: updateLeaf(get().root, leaf.id, (current) => ({
+          ...current,
+          tabs: [...current.tabs, tab],
+          activeTabId: tab.id,
+        })),
+      });
+      return { paneId: leaf.id, tabId: tab.id };
+    },
+
+    resolvePendingItemTab: (tabId, target) => {
+      const pending = leaves(get().root)
+        .flatMap((leaf) => leaf.tabs)
+        .find((tab) => tab.id === tabId && tab.surfaceKind === "newItem" && tab.pendingLabel);
+      if (!pending) return false;
+      const focusResolvedNote = pending.surfaceKind === "newItem" && pending.pendingNote === true;
+      const itemId =
+        target.surfaceKind === "note"
+          ? target.noteId
+          : target.surfaceKind === "canvas"
+            ? target.boardId
+            : target.fileId;
+      if (!allowPaneVault(contentVaultId(itemId))) return false;
+      if (target.surfaceKind === "note") {
+        touchMru(target.noteId);
+        recordNav(target.noteId);
+      } else if (target.surfaceKind === "canvas") {
+        touchItemActivity(target.boardId);
+        recordNav(navEntry("canvas", target.boardId));
+      } else {
+        touchItemActivity(target.fileId);
+        recordNav(navEntry("file", target.fileId));
+      }
+      set((state) => ({
+        root: mapAllTabs(state.root, (tab) =>
+          tab.id === tabId && tab.surfaceKind === "newItem" && tab.pendingLabel
+            ? {
+                id: tab.id,
+                ...target,
+                ...(target.surfaceKind === "note" && focusResolvedNote ? { focusOnMount: true } : {}),
+              }
+            : tab,
+        ),
+      }));
+      return true;
     },
 
     openBrowser: (url, paneId) => {

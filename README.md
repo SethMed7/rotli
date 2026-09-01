@@ -69,19 +69,19 @@ file still enters the same intake/Library workflow when the Librarian is on.
 | Front | What it is |
 |---|---|
 | **Notes** | The note system — a hybrid-markdown editor that hides syntax until your caret lands on it, plus Excalidraw **boards**, all saved as plain files. |
-| **Chat** | Your AI conversations. On-device by default, or your own connected models (Claude Code · Codex · Antigravity). Your notes are its knowledge base — it reads them to answer. |
+| **Chat** | Your AI conversations. On-device by default, or through an already-authenticated official Claude Code, Codex, or Cursor client on your Mac. Cursor is a software/code-chat lane. Your notes are its knowledge base — it reads them to answer. |
 
 More fronts are planned — an email **Inbox**, mobile and tablet apps, and a
 handwriting-first notebook experience. See [ROADMAP.md](ROADMAP.md).
 
 ## What's built
 
-- **The editor** — hybrid markdown: the line under your caret shows raw syntax, everything else renders. `- ` starts a list, `[ ]` makes a checkbox, and a quiet format bar floats below. Mermaid diagrams open into a View/Visual/Code workspace: flowcharts can be built from shapes, arrows, labels, direction, and colors without leaving Mermaid, while an optional conversion creates a separate Excalidraw board copy. Typography (`Aa`) is a render layer — never written into your files.
+- **The editor** — hybrid markdown: the line under your caret shows raw syntax, everything else renders. `- ` starts a list, `[]` then Space makes a checkbox, `[][]` makes a left-check/right-red-X result with an optional reason, and `()` makes adjacent one-of-many options. A quiet format bar floats below. Mermaid diagrams open into a View/Visual/Code workspace: flowcharts can be built from shapes, arrows, labels, direction, and colors without leaving Mermaid, while an optional conversion creates a separate Excalidraw board copy. Typography (`Aa`) and decision styling are render layers — never written into your files.
 - **Panes & tabs** — split with `⌘D` / `⌘⇧D`, tabs with `⌘T`; every tab stays visible and closeable. Everything drag-resizable, everything remembered.
 - **One active vault** — connect other vaults as switch targets, while the sidebar, panes, search, System counts, Librarian, and AI context remain scoped to the vault currently open.
 - **`⌘K`** — every note and action in one palette, recents first.
 - **Quick capture (`⌥C`)** — from anywhere on your Mac: one breath, type, `⏎` — the thought lands in Captures and the AI files it later.
-- **Chat that knows your notes** — on-device by default; connect the subscription CLIs you already use; attach images; flip the globe for a web lookup. DuckDuckGo works without setup, or choose Brave Search API with your own Keychain-stored key in **Settings → Connections → Web research**.
+- **Chat that knows your notes** — on-device by default; optionally use an already-authenticated official Claude Code, Codex, or Cursor client installed on your Mac. Cursor uses its documented ACP custom-client protocol in read-only Ask mode for software work, with Grok 4.6 as the initial default. Each provider has a user-editable default, and `@claude`, `@codex`, or `@cursor` requests an attributed opinion without changing the chat&rsquo;s primary model (`:model-id` is optional). Rotli never presents a provider login or reads provider credentials. Attach images on supported lanes or flip the globe for a web lookup. DuckDuckGo works without setup, or choose Brave Search API with your own Keychain-stored key in **Settings → Connections → Web research**.
 - **Autosave** — a quiet olive dot. No spinners, ever.
 - **Every hotkey rebindable** — one searchable registry in Settings.
 

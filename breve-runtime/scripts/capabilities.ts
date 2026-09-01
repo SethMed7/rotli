@@ -3,7 +3,7 @@
  * Capability FULFILLMENT engine — the bridge between the brain's capability MATRIX
  * (the memex's clients/capabilities.json: what each model CAN'T do natively) and Breve's
  * own integrations that fill the gap (./capabilities.json: PDF → headless Chrome,
- * image → codex/agy, web → safe-fetch). The brain only DECLARES; Breve FULFILLS (Rule #9).
+ * web → safe-fetch). The brain only DECLARES; Breve FULFILLS (Rule #9).
  *
  * Flow: ask `ensureCapability(model, cap)` — native if the model has it, else routed to
  * the configured tool, else an alert so the owner wires it up. Matching mirrors policy.ts /

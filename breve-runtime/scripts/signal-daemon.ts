@@ -2,7 +2,7 @@
 /**
  * Breve Signal daemon — receive loop + tier router + reply.
  * Allowlist: ONLY messages from `owner` (signal.json) are processed; everything else is dropped + logged.
- * Tiers: "p:" → local Gemma (private, on-device) · "deep:" or heavy verbs → Sonnet · default → Haiku.
+ * Model policy: every conversational path uses the on-device model.
  * HARD RULE: read-only outside the memex (enforced in every engine prompt).
  * Runs under launchd (its breve-signal job). Logs to stdout (launchd redirects).
  */
@@ -11,13 +11,11 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync, renameSync, existsSync, readdirSync } from "node:fs";
 import { BREVE, BRIEFS, AUDIOS, PDFS, VIEWS, CAPTURES } from "./paths";
 import { knowledgePath, knowledgePathFor, inboxPathFor, assetsPathFor, readMemexRegistry, accessMode, memexInfo, DEFAULT_USER, type MemexRegistry } from "./config";
-import { policyFor } from "./policy";
-import { LLM, warmup } from "./llm";
-import { sandboxed, rootsForPartition, type SandboxRoots } from "./sandbox";
+import { LLM, localGenerate, warmup } from "./llm";
+import { rootsForPartition, type SandboxRoots } from "./sandbox";
 import { resolvePrincipal, canUse, hasPower, keyOf, reloadAccess, memexUsers, boundPhone, boundUuid, type Principal } from "./users";
 import { getActiveUser, setActiveUser } from "./session";
 import { verifyPassphrase, passphraseReady, newCode, emailCode, audit } from "./auth";
-import { readSecret } from "./secret";
 import { cleaned as deterministicClean } from "./voice-clean";
 import { brainPack } from "./brain-context";
 import { renderResourceList, resolveResource } from "./resources";
@@ -46,12 +44,6 @@ async function refreshCfg() {
 }
 setInterval(() => { refreshCfg().catch((e) => logFail("cfg-refresh", String(e))); }, 5 * 60_000);
 const { bot, owner } = await Bun.file(join(BREVE, "signal.json")).json();
-// Absolute path so sandbox-exec can exec it (it doesn't search PATH the way Bun.spawn does).
-const CLAUDE_BIN = Bun.which("claude") ?? "claude";
-// Optional read-only GitHub PAT from the isolated breve keychain (readSecret unlocks it first, so this
-// survives a reboot). When present, passed as GH_TOKEN to model subprocesses so any `gh` they run is
-// read-only. Absent is fine (gh falls back to default auth).
-const GH_PAT = await readSecret("breve-gh-readonly").catch(() => "");
 const TRANSCRIPTS = join(BREVE, "signal", "transcripts");
 mkdirSync(TRANSCRIPTS, { recursive: true });
 
@@ -124,7 +116,7 @@ Reply with the answer ONLY — never narrate your steps ("I'll start by…", "I 
 HARD RULES — ACCESS BOUNDARY (OS-enforced sandbox): Breve is tied to its memex brain + storage — it is NOT a code/repo agent. LOCALLY you may read AND write ONLY within the memex, your storage, and ${BREVE} (Rotli's managed Breve home). You CANNOT read, write, or even open other local projects, documents, or anything else on the Mac. For anything beyond the brain, reach OUT through the web and GitHub read-only. Captures go to the memex inbox; a source framed in a brief gets a lens in ${BREVE}/watchlist.md. Never send email or messages yourself; the trusted daemon performs delivery.
 The daemon around you CAN send files: if the owner wants the brief or audio, don't say you can't — tell him to send "/brief" (inline view), "/brief pdf", "/brief audio", or "/audio <topic>" (researched audio brief).
 The daemon also SAVES media the owner shares: when he sends a photo or PDF with a note like "save this in my coffee-art folder", it's filed automatically into your storage's breveCaptures/<topic>/ (topic picked on-device). So if he asks whether you can keep an image, the answer is yes — he just sends the image with a folder hint; you never handle the file yourself.
-The owner can CHOOSE the model in plain language — "use Gemini to…", "ask Haiku…", "with Sonnet…" — and that tier runs (Gemini/Haiku/local direct; a Sonnet/Opus/Fable pick still confirms — spend gate). If a tier is ever down (e.g. the Claude sub is off), the daemon self-heals: it answers on another tier and tells him what happened, rather than failing silently — so never tell him a request is impossible because a model is unavailable.
+Breve currently uses only the on-device model. Cloud-provider and subscription CLI tiers are unavailable; never claim a Claude, Codex, Gemini, or Antigravity model ran.
 The owner gets THREE daily Breve drops: morning (${BREVE}/briefs/<YYYY-MM-DD>.md), lunch (<date>-lunch.md), and night (<date>-night.md). When he asks about the brief, read the right file for today first.
 NEVER paste or generate a daily brief as chat text — the owner's firm rule is briefs arrive ONLY as audio (Signal) or PDF (email). If a brief ask somehow reaches you, reply one line telling him to say "morning brief" / "lunch brief" / "nightcap" (the daemon generates + delivers properly). Today's date in the owner's timezone matters — check it before claiming which day it is.
 SETUP ACTIONS: Rotli owns scheduling; never create, install, or remove launchd jobs. You may stage a reviewed maintenance script inside ${BREVE}/scripts and write ${BREVE}/signal/pending-action.json with one of:
@@ -183,29 +175,16 @@ async function recentContext(): Promise<string> {
 const CLAUDE_DOWN = "⟪CLAUDE_DOWN⟫";
 const claudeDown = (s: string) => s.startsWith(CLAUDE_DOWN);
 
-// Run `claude -p` with the prompt piped via stdin (so no flag can swallow it).
+// Legacy Claude-shaped callers are routed to the on-device model. No provider
+// binary is resolved or launched.
 async function runClaude(model: string, prompt: string, extraArgs: string[]): Promise<string> {
-  // Sandboxed to the ACTIVE partition (admin → whole brain; member → only their partition). See sandbox.ts.
-  const proc = Bun.spawn(sandboxed([CLAUDE_BIN, "-p", "--model", model, ...extraArgs], ctx().sandboxRoots), {
-    cwd: process.env.HOME,
-    stdin: "pipe",
-    stdout: "pipe",
-    stderr: "pipe",
-    env: GH_PAT ? { ...process.env, GH_TOKEN: GH_PAT } : process.env,
-  });
-  await proc.stdin.write(prompt);
-  await proc.stdin.end();
-  const [out, err] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
-  await proc.exited;
-  const trimmed = out.trim();
-  if (!trimmed) {
-    // Distinguish "model/sub is down" (auth, access, quota, overload) from a one-off empty turn,
-    // so the self-heal can tell the owner *why* and offer to continue on another tier.
-    const unavailable = /not exist|do(n'|n no)t have access|not available|no access|usage limit|rate.?limit|overloaded|unauthor|invalid api|credit balance|quota|forbidden|401|403|429|529/i.test(err);
-    logFail(`claude(${model})`, `empty output${unavailable ? " [unavailable]" : ""}. stderr: ${err.slice(0, 300)}`);
-    return CLAUDE_DOWN + (unavailable ? `:${model}` : "");
+  void extraArgs;
+  try {
+    return (await localGenerate({ prompt, think: false })).trim() || CLAUDE_DOWN;
+  } catch (error) {
+    logFail(`local(${model})`, String(error).slice(0, 300));
+    return CLAUDE_DOWN;
   }
-  return trimmed;
 }
 
 // Quick chat tier: no MCP servers — ~4x faster cold start, no tools. Gets a PRE-ASSEMBLED
@@ -245,27 +224,18 @@ async function claudeTurn(model: "haiku" | "sonnet" | "opus" | "claude-fable-5",
   return tag(out, model === "haiku" ? "haiku" : "sonnet");
 }
 
-// Gemini tier (via agy / Antigravity, the owner's AI-Pro sub): direct, web + file access. Falls back
-// to Haiku if agy is unavailable so chat never hard-fails.
-async function askGemini(text: string, addDirs: string[] = []): Promise<string> {
+// Legacy Gemini-shaped callers also stay on-device. The prompt is explicit
+// about the missing live-data capability so the local model does not bluff.
+async function askGemini(text: string, _addDirs: string[] = []): Promise<string> {
   const c = ctx();
-  const agy = [`${process.env.HOME}/.local/bin/agy`, "/opt/homebrew/bin/agy"].find((p) => existsSync(p));
-  if (!agy) { logFail("gemini", "agy not found"); const h = await askClaudeQuick(text); return claudeDown(h) ? "(Gemini isn't installed and Claude is unreachable — try 'local: …' for the on-device tier.)" : h; }
   const brain = await brainPack("gemini", { root: c.knowledgeRoot });
-  const prompt = `${rulesFor(c)}\nYou are Breve answering over Signal — you have web + file access. Warm and brief unless asked for depth; plain chat text, no markdown headers.\nOutput ONLY your final answer — NEVER your planning or tool steps ("I'll list…", "I will view…", "let me check…"). If you researched or did something, just give the result/confirmation in one or two lines.${brain ? `\n\n${brain}` : ""}${await recentContext()}\nUser (via Signal): ${text}`;
-  // A member's add-dirs are intersected with their sandbox roots so they can't widen access.
-  const safeDirs = c.isAdmin ? addDirs : addDirs.filter((d) => c.sandboxRoots.readRoots.some((r) => d === r || d.startsWith(r + "/")));
-  const args = [agy, "-p", prompt, "--dangerously-skip-permissions", "--print-timeout", "3m", ...safeDirs.flatMap((d) => ["--add-dir", d])];
-  const p = Bun.spawn(sandboxed(args, c.sandboxRoots), { stdout: "pipe", stderr: "pipe", env: GH_PAT ? { ...process.env, GH_TOKEN: GH_PAT } : process.env }); // write-sandboxed (see sandbox.ts)
-  const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
-  await p.exited;
-  const trimmed = out.trim();
-  if (!trimmed) {
-    logFail("gemini", err.slice(0, 300));
-    const h = await askClaudeQuick(text);
-    return claudeDown(h) ? "(Gemini and Claude are both unreachable right now — try 'local: …' for the on-device tier.)" : `${h}\n\n(Gemini was unreachable — answered via Haiku, no web.)`;
+  const prompt = `${rulesFor(c)}\nYou are the LOCAL on-device tier. You have no live web, provider tools, or cloud access. Never invent current facts; say plainly when live research is unavailable. Warm and brief; plain chat text, no markdown headers.${brain ? `\n\n${brain}` : ""}${await recentContext()}\nUser (via Signal): ${text}`;
+  try {
+    return stripStepNarration((await localGenerate({ prompt, think: false })).trim());
+  } catch (error) {
+    logFail("local", String(error).slice(0, 300));
+    return "(local model gave no response)";
   }
-  return stripStepNarration(trimmed); // belt-and-braces: drop any leaked "I'll list…/I will view…" plan
 }
 
 async function askGemma(text: string): Promise<string> {
@@ -323,7 +293,7 @@ async function askGemmaJudge(text: string): Promise<{ answer: string; confidence
   }
 }
 
-const TAGS = { local: "local · free", haiku: "Haiku · sub", gemini: "Gemini · sub", sonnet: "Sonnet · sub" } as const;
+const TAGS = { local: "local · on-device", haiku: "local · on-device", gemini: "local · on-device", sonnet: "local · on-device" } as const;
 // Idempotent: a self-healed reply already carries the tier it actually ran on, so don't double-tag.
 const tag = (reply: string, tier: keyof typeof TAGS) => (reply.includes("\n⟢ ") ? reply : `${reply}\n\n⟢ ${TAGS[tier]}`);
 
@@ -332,15 +302,11 @@ const tag = (reply: string, tier: keyof typeof TAGS) => (reply.includes("\n⟢ "
 // happened. Pretty-names the tier for the relay; tags with the tier that actually answered.
 const PRETTY: Record<string, string> = { haiku: "Haiku", sonnet: "Sonnet", opus: "Opus", "claude-fable-5": "Fable", claude: "Claude" };
 async function healClaude(marker: string, label: string, text: string): Promise<string> {
-  const downModel = marker.includes(":") ? marker.split(":")[1] : "";
-  const why = downModel ? `${PRETTY[downModel] ?? label} looks unavailable (your Claude sub may be down or out of quota)` : `${label} didn't respond`;
-  log(`self-heal: ${label} down → gemini`);
-  const g = await askGemini(text);
-  if (g && !g.startsWith("(")) return tag(`⚠ ${why} — I answered with Gemini so you're not stuck:\n\n${g}`, "gemini");
-  log(`self-heal: gemini also down → local`);
+  void marker;
+  log(`self-heal: ${label} alias → local`);
   const l = await askGemma(text);
-  if (l.startsWith("(")) return tag("⚠ Every tier is unreachable right now — Claude, Gemini, and the on-device model. I've logged it; try again in a moment, or check the Mac.", "local");
-  return tag(`⚠ ${why}, and Gemini was unreachable too — here's the best the on-device model can do:\n\n${l}`, "local");
+  if (l.startsWith("(")) return tag("⚠ The on-device model is unreachable right now. I've logged it; try again in a moment, or check the Mac.", "local");
+  return tag(l, "local");
 }
 
 // Escalation gate: models above the auto-approved tier (Claude > Haiku; non-image Codex) need
@@ -348,11 +314,10 @@ async function healClaude(marker: string, label: string, text: string): Promise<
 // request and warns. Returns the tagged reply, or null if it gated (warning already sent).
 let pendingEscalation: { text: string; runner: () => Promise<string>; label: string; tierTag: keyof typeof TAGS; at: number } | null = null;
 async function viaPolicy(model: string, text: string, runner: () => Promise<string>, tierTag: keyof typeof TAGS): Promise<string | null> {
-  const v = policyFor(model);
-  if (v.action === "direct") { const out = await runner(); return claudeDown(out) ? healClaude(out, PRETTY[model] ?? "Claude", text) : tag(out, tierTag); }
-  pendingEscalation = { text, runner, label: v.label, tierTag, at: Date.now() };
-  await send(`⚠ That needs ${v.label} — above your auto-approved tier (local · Haiku · Gemini are direct). Reply CONFIRM to use it, "gemini" or "haiku" for a direct answer now, or "cancel".`);
-  return null;
+  void model;
+  void runner;
+  void tierTag;
+  return tag(await askGemma(text), "local");
 }
 
 // 3-pass smart router: free heuristics → Gemma self-judge → escalate.
@@ -395,16 +360,12 @@ async function smartRoute(text: string): Promise<string> {
 // relay the constraint and run Sonnet — the top tier Breve carries — behind the same gate.
 async function runDirective(d: ModelTier, text: string): Promise<string | null> {
   switch (d) {
-    case "gemini": return tag(await askGemini(text, [ctx().knowledgeRoot, BREVE]), "gemini");
+    case "gemini": return tag(`Cloud models are paused; here is the on-device answer:\n\n${await askGemma(text)}`, "local");
     case "local": return tag(await askGemma(text), "local");
-    case "haiku": return claudeTurn("haiku", text);
-    case "sonnet": return viaPolicy("sonnet", text, () => askClaudeDeep(text), "sonnet");
+    case "haiku": return tag(`Cloud models are paused; here is the on-device answer:\n\n${await askGemma(text)}`, "local");
+    case "sonnet": return tag(`Cloud models are paused; here is the on-device answer:\n\n${await askGemma(text)}`, "local");
     case "opus":
-    case "fable": {
-      const r = await viaPolicy("sonnet", text, () => askClaudeDeep(text), "sonnet");
-      if (r === null) return null; // gated: CONFIRM prompt already sent
-      return r.startsWith("⚠") ? r : `⚠ ${d === "opus" ? "Opus" : "Fable"} isn't on Breve's chat tiers (cost policy keeps chat on Haiku/Sonnet) — answered with Sonnet, the top tier I run.\n\n${r}`;
-    }
+    case "fable": return tag(`Cloud models are paused; here is the on-device answer:\n\n${await askGemma(text)}`, "local");
   }
 }
 
@@ -431,16 +392,11 @@ function progressEvery(label: string, intervalMs = 120000): () => void {
   return () => clearInterval(iv);
 }
 
-const HELP = `☕ BREVE — commands & tiers
+const HELP = `☕ BREVE — commands
 
 — Just talk (text or voice notes — I transcribe on-device, then clean the dictation into a tidy prompt) —
-I auto-route across your APPROVED-direct tiers (local Gemma · Haiku · Gemini) and size the brain context to whichever model runs. Each reply is tagged with the tier + cost. Anything above Haiku (Sonnet/Opus/Fable) or non-image Codex needs your CONFIRM first.
-Pick a model in plain words — "use Gemini to…", "ask Haiku…", "with Sonnet…" — and that tier runs. Gemini/Haiku/local go direct; a Sonnet/Opus/Fable pick still asks you to CONFIRM (spend gate). If a tier is ever down, I answer on another and tell you what happened — never a silent dead-end.
-Force a tier:
-local: <ask> → free on-device (skip routing)
-c: <ask>     → Claude Haiku (direct)
-g: <ask>     → Gemini, web + files (direct)
-deep: <ask>  → Claude Sonnet + web/repos (asks first — above Haiku)
+Every answer uses the on-device model. Claude, Codex, Gemini, and Antigravity subscription lanes are paused, so no provider account is used.
+local: <ask> forces the same private on-device path.
 
 — Commands —
 /help     this list
@@ -481,7 +437,7 @@ Your words: "work email"=MSD · "company email"=Proton (the LLC inbox) · "gmail
 I can read mail; I can never send, move, or delete — validated, not promised.
 
 — More —
-img: <description>  → I generate the image right here (add --gemini/--codex)
+img: <description>  → currently unavailable while cloud image providers are paused
 remind me in 20m to X / tomorrow 9am …  → ⏰ (see /reminders)
 /creators  → who pings you when they post a new video
 /resources → sources I can pull from (★ favorites); "/resources <name>" pulls the latest
@@ -490,13 +446,8 @@ remind me in 20m to X / tomorrow 9am …  → ⏰ (see /reminders)
 Traveling? "I'll be traveling June 20-27 in Pacific time" — everything follows your local clock, and switches back automatically.
 Setup from your phone: ask for new scheduled briefs/scripts — I build + propose, you reply CONFIRM.`;
 
-const TIERS = `I route each message automatically:
-1) Free local Gemma answers if it's simple and it's confident → most messages, $0 + private.
-2) If a question needs live/web/repo data, or careful reasoning/code, I escalate:
-   • Claude Haiku — needs a smarter model
-   • Claude Sonnet+web — needs current info, your repos, or research
-Every reply is tagged (·local / ·Claude Haiku / ·Claude Sonnet+web) so you see what ran.
-Override anytime: local: / c: / deep: prefixes. Email + topic briefs use Claude Sonnet.`;
+const TIERS = `Breve currently has one model tier: the on-device model registered on this Mac.
+It does not launch Claude, Codex, Gemini, or Antigravity subscription CLIs. Live web research and cloud image generation are unavailable until Rotli ships provider-authorized API integrations.`;
 
 // Slash commands — instant, no model call. Returns true if handled.
 
@@ -2054,22 +2005,7 @@ async function handle(text: string, opts: { asVoice?: boolean } = {}) {
         log("forced: local");
         reply = tag(await askGemma(text.replace(/^(l|local|p):\s*/i, "")), "local");
       } else if (/^(img|image|imagine):/i.test(text)) {
-        const desc = text.replace(/^(img|image|imagine):\s*/i, "").trim();
-        await send(`🎨 Generating "${desc.slice(0, 60)}" — a couple of minutes…`);
-        const p = Bun.spawn(["bun", join(BREVE, "scripts", "imagegen-signal.ts"), desc], {
-          cwd: BREVE, stdout: "pipe", stderr: "pipe",
-        });
-        const [out, errOut] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
-        const ok = out.split("\n").reverse().find((l) => l.startsWith("OK "));
-        if ((await p.exited) === 0 && ok) {
-          const [path, eng] = [ok.slice(3).split(" (")[0].trim(), ok.match(/\((\w+)\)/)?.[1]];
-          await send(`🎨 Done (${eng === "gemini" ? "Nano Banana" : "gpt-image-2"} · saved to storage). Add --gemini or --codex to switch engines.`, path);
-          reply = ""; // already sent
-        } else {
-          logFail("imagegen", `${out} ${errOut}`.slice(0, 300));
-          reply = "⚠ Image generation failed — I've logged it. Try rephrasing, or run /imagegen at the Mac.";
-        }
-        if (!reply) return; // image already sent; finally{} stops typing/progress
+        reply = "Cloud image generation is unavailable while provider integrations are paused. No subscription account was used.";
       } else {
         // "Brief on <topic>" = a quick standing update; "deep/research" widens it.
         // Distinct from the morning/lunch/night drops, which handleBriefRequest owns.

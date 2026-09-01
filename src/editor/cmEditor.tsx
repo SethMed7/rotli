@@ -18,8 +18,9 @@ import { type CSSProperties, memo, useCallback, useEffect, useMemo, useRef, useS
 
 import { ArrowUpGlyph, SearchGlyph } from "../components/glyphs";
 import { clamp } from "../lib/clamp";
+import { corpusImportFile, corpusPickImages, rootIdOf } from "../lib/tauri";
 import { DEST } from "../services/destinations";
-import { useNotes, useSearchableNotes } from "../services/hooks";
+import { invalidateNotes, useNotes, useSearchableNotes } from "../services/hooks";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
@@ -36,6 +37,7 @@ import {
   toggleInlineMark,
   unregisterEditor,
 } from "./commands";
+import { importImagePathsAtPosition, isEmbeddablePath } from "./externalImageDrop";
 import { findTextMatches, nextFindMatch } from "./find";
 import { fmBlock } from "./fmBlock";
 import { focusDim } from "./focusMode";
@@ -46,14 +48,14 @@ import { ensureDocument, getDocumentText, onDocumentChange, setDocumentText } fr
 import { rawMarkdown } from "./rawMarkdown";
 import { pickerFence, slashInsertion } from "./slashActions";
 import {
-  type SlashItem,
-  type SlashPickerMode,
-  SlashMenu,
   adaptSlashInsertion,
   filterSlashItems,
-  slashLineTarget,
+  SlashMenu,
   slashPlacement,
   slashQueryAtCaret,
+  slashSpanAtCaret,
+  type SlashItem,
+  type SlashPickerMode,
 } from "./slashMenu";
 import { SlashPicker } from "./slashPicker";
 import { stripMarkdown } from "./stripMarkdown";
@@ -462,9 +464,17 @@ function CmEditorImpl({
       const view = viewRef.current;
       if (!view) return;
       const line = view.state.doc.lineAt(view.state.selection.main.head);
-      const target = slashLineTarget(line.text);
-      const contentFrom = line.from + target.from;
-      if (item.op.kind === "picker" || item.op.kind === "imageGen") {
+      const span = slashSpanAtCaret(line.text, view.state.selection.main.head - line.from);
+      if (!span) return;
+      const spanFrom = line.from + span.from;
+      // where the command's content begins once the span is cleared — on a
+      // result row's reason that is the fresh continuation line beneath it
+      const contentFrom = spanFrom + span.lead.length;
+      if (item.op.kind === "picker" || item.op.kind === "attachImage" || item.op.kind === "imageGen") {
+        view.dispatch({
+          changes: { from: spanFrom, to: line.to, insert: span.lead },
+          selection: EditorSelection.cursor(contentFrom),
+        });
         const coords = view.coordsAtPos(contentFrom);
         const host = hostRef.current?.getBoundingClientRect();
         const up = coords != null && slashPlacement(coords.top, window.innerHeight - coords.bottom) === "up";
@@ -472,29 +482,50 @@ function CmEditorImpl({
         const top = up
           ? (coords?.top ?? 0) - (host?.top ?? 0) - 4
           : (coords?.bottom ?? 0) - (host?.top ?? 0) + 4;
-        view.dispatch({
-          changes: { from: contentFrom, to: line.to, insert: "" },
-          selection: EditorSelection.cursor(contentFrom),
-        });
-        if (item.op.kind === "imageGen") {
-          setSlash((s) => ({ ...s, open: false }));
-          setImageGen({ insertAt: contentFrom, continuation: target.continuation, left, top, up });
+        if (item.op.kind === "attachImage") {
+          setSlash((state) => ({ ...state, open: false }));
+          void corpusPickImages()
+            .then(async (picked) => {
+              const paths = picked.filter(isEmbeddablePath);
+              if (paths.length === 0) {
+                view.focus();
+                return;
+              }
+              const rootId = rootIdOf(noteId);
+              await importImagePathsAtPosition(view, paths, contentFrom, (path) =>
+                corpusImportFile(rootId, path),
+              );
+              await invalidateNotes();
+            })
+            .catch((error: unknown) => {
+              useUiStore
+                .getState()
+                .setRowActionError(
+                  `Couldn’t attach the image — ${error instanceof Error ? error.message : String(error)}`,
+                );
+              view.focus();
+            });
           return;
         }
-        openPicker(item.op.mode, contentFrom, target.continuation, left, top, up);
+        if (item.op.kind === "imageGen") {
+          setSlash((s) => ({ ...s, open: false }));
+          setImageGen({ insertAt: contentFrom, continuation: span.continuation, left, top, up });
+          return;
+        }
+        openPicker(item.op.mode, contentFrom, span.continuation, left, top, up);
         return;
       }
       const insertion = slashInsertion(item.op);
       if (!insertion) return;
-      const adapted = adaptSlashInsertion(insertion.insert, insertion.caret, target.continuation);
+      const adapted = adaptSlashInsertion(insertion.insert, insertion.caret, span.continuation);
       view.dispatch({
-        changes: { from: contentFrom, to: line.to, insert: adapted.insert },
+        changes: { from: spanFrom, to: line.to, insert: span.lead + adapted.insert },
         selection: EditorSelection.cursor(contentFrom + adapted.caret),
       });
       setSlash((s) => ({ ...s, open: false }));
       view.focus();
     },
-    [openPicker],
+    [noteId, openPicker],
   );
 
   // create the view ONCE per note/pane

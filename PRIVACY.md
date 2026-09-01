@@ -20,18 +20,27 @@ Rotli does not operate an analytics or account endpoint. Network activity is
 limited to declared product capabilities:
 
 - the signed updater may check the pinned GitHub release feed;
-- user-enabled remote model lanes send the bounded conversation/context needed
-  for that request to the selected provider;
+- a user-enabled connected chat lane launches the already-authenticated official
+  Claude Code, Codex, or Cursor client on the same Mac; that client sends the
+  bounded conversation/context needed for the request under its provider's
+  terms. Cursor is exposed only as a software/code-chat lane through its ACP
+  custom-client protocol in read-only Ask mode;
 - web search/fetch sends the query or URL needed for the explicit web action;
 - user-configured Breve email, Signal, mail, and watch services contact their
-  configured destinations; and
-- connected Claude, Codex, or other subscription CLIs follow the privacy terms
-  of those tools and providers; and
+  configured destinations; Breve model generation itself stays on-device; and
 - when the user explicitly connects Remote agents for the current app session,
   Rotli sends authenticated MCP request/response frames through the configured
   HTTPS relay. The relay keeps only in-flight frames in memory and stores no
   vault or Markdown; the cloud MCP client receives the non-secure workspace
   data requested through approved tools.
+
+Rotli never embeds a provider login, reads provider authentication files, or
+stores provider credentials. Provider defaults and routing tags are ordinary
+vault settings/transcript text, never credentials. Antigravity subscription and
+direct Gemini model execution are disabled, as are provider-backed image
+generation and subscription-CLI use by Breve/background jobs. Google permits
+separately billed AI Studio/Vertex API routes, but Rotli does not implement
+either route.
 
 The destination inventory and guards are documented in
 [`docs/development/security.md`](docs/development/security.md). Adding telemetry,

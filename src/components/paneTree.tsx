@@ -17,6 +17,7 @@ import {
 } from "react";
 
 import { EditorSurface } from "../editor/editorSurface";
+import { evictDocument, pendingNoteDocumentId } from "../editor/model";
 import { dispatch } from "../keys/registry";
 import {
   MIN_PANE_HEIGHT,
@@ -67,6 +68,28 @@ function PaneEmptyState() {
       </p>
     </div>
   );
+}
+
+function PendingNoteSurface({ paneId, tabId }: { paneId: string; tabId: string }) {
+  const noteId = pendingNoteDocumentId(tabId);
+  useEffect(
+    () => () => {
+      // StrictMode performs a setup/cleanup probe while the tab still exists.
+      // Defer the orphan check so only a real close/retarget releases the
+      // session buffer (retarget already adopted it under the durable id).
+      queueMicrotask(() => {
+        const state = usePanesStore.getState();
+        const stillPending = leaves(state.root).some((leaf) =>
+          leaf.tabs.some(
+            (tab) => tab.id === tabId && tab.surfaceKind === "newItem" && tab.pendingNote === true,
+          ),
+        );
+        if (!stillPending) evictDocument(noteId);
+      });
+    },
+    [noteId, tabId],
+  );
+  return <EditorSurface noteId={noteId} paneId={paneId} pending focusOnMount />;
 }
 
 function LeafView({ node }: { node: LeafNode }) {
@@ -127,7 +150,12 @@ function LeafView({ node }: { node: LeafNode }) {
         {!tab && <PaneEmptyState />}
         {tab?.surfaceKind === "note" &&
           (tab.noteId ? (
-            <EditorSurface key={tab.id} paneId={node.id} noteId={tab.noteId} />
+            <EditorSurface
+              key={tab.id}
+              paneId={node.id}
+              noteId={tab.noteId}
+              {...(tab.focusOnMount ? { focusOnMount: true } : {})}
+            />
           ) : (
             <PaneEmptyState />
           ))}
@@ -161,7 +189,14 @@ function LeafView({ node }: { node: LeafNode }) {
           );
         })}
         {tab?.surfaceKind === "activity" && <ActivitySurface key={tab.id} />}
-        {tab?.surfaceKind === "newItem" && <NewItemSurface key={tab.id} paneId={node.id} tabId={tab.id} />}
+        {tab?.surfaceKind === "newItem" &&
+          (tab.pendingNote ? (
+            <PendingNoteSurface key={tab.id} paneId={node.id} tabId={tab.id} />
+          ) : tab.pendingLabel ? (
+            <div key={tab.id} className="editor" role="status" aria-label={`Creating ${tab.pendingLabel}`} />
+          ) : (
+            <NewItemSurface key={tab.id} paneId={node.id} tabId={tab.id} />
+          ))}
         {/* split-detach preview — mounted only mid-drag, pointer-events:none
             (the controller hit-tests the pane body, not this overlay) */}
         {draggingTab && (

@@ -109,8 +109,8 @@ live mostly in `localmodel.rs`, `compute.rs`, `chat.rs`, `breve.rs`, and
 | 14 | **Capture card / Quick Note (menu-bar idiom)** | `lib.rs:405-450` (`finish_capture`, `NSApp hide`), `tauri.conf.json` `macOSPrivateApi`, transparent `capture` window | Transparent always-on-top capture card; `app.hide()` (NSApp) to return focus to the prior app | Transparent/always-on-top windows work on all three in Tauri. The `NSApp hide` focus-return is Mac-only (already gated). **`macos-private-api` feature** is Mac-only and harmless elsewhere. Assess whether the transparent capture card is *core* off-Mac or degrade it to a normal borderless window. Global-shortcut summon (`tauri-plugin-global-shortcut`) is cross-platform. | **M** | Med |
 | 15 | **Config path** | `workspace.rs:1121-1124` | `~/Library/Application Support/com.rotli.app` vs `~/.config/...` — **already branched** | Done. Prefer Tauri's `app_config_dir()` everywhere (already used in `breve.rs:280`) so Windows gets `%APPDATA%` correctly. | **S** | Low |
 | 16 | **Power / thermal / idle probes** | `organizer.rs:1970-2020` | `pmset -g batt/therm`, `ioreg` HIDIdleTime — **already** have `not(macos)` fallbacks returning permissive `true` | The daemon already runs everywhere with guardrails defaulting *open*. Add real signals later via [`battery`](https://crates.io/crates/battery) / `sysinfo` if desired. Ship permissive first. | **S** | Low |
-| 17 | **agy image sandbox** | `provider.rs:524-566` | `sandbox-exec` + SBPL profile around the `agy` image CLI | Already `cfg!(target_os = "macos")`-gated (`image_sandbox_enabled`, `provider.rs:563`). The connected-CLI image lanes are a Mac-centric power feature; off-Mac either run unsandboxed (like `codex`, which self-contains) or gate the feature. | **S** | Med |
-| 18 | **CLI-auth detection** | `provider.rs:765` | Shells `/usr/bin/security` to detect a Gemini-CLI Keychain token | Fold into the `keyring` migration or gate; a minor detection nicety, not load-bearing. | **S** | Low |
+| 17 | **Provider-backed image generation** | `provider.rs::generate_image` | Stable IPC boundary returns unavailable before path/credential/process work | No platform port is needed while the provider image lane is retired. | — | Low |
+| 18 | **CLI-auth detection** | `provider.rs::detect` | Runs only official `claude auth status` / `codex login status` clients | Cross-platform where those official clients are supported; Google account detection was removed. | **S** | Low |
 | 19 | **"Open with…" app allowlist** | `corpus.rs:6255-6310` | Hard-coded `.app` bundle names under `/Applications` | Gate to Mac, or replace with per-OS "open with default handler" via the opener plugin. Non-core. | **S** | Low |
 | 20 | **Reveal-`.md`-on-disk in Notes** | `memex.rs:886` | `open -R` | Same as seam #9 — opener plugin. | **S** | Low |
 
@@ -173,14 +173,14 @@ trait LocalAiBackend {
   `compute.rs` sysctl reads are simply not on this path.
 
 - **`RemoteOnly` / `NoLocalAi` (any OS):** no local backend; the chat picker
-  shows only connected models (Gemini via the existing Keychain/keyring key,
-  connected CLIs). This is the **Phase 0** state — the product is fully usable
+  shows only provider-authorized connected clients implemented on that OS.
+  This is the **Phase 0** state — the product is fully usable
   for notes, search, editing, boards, sheets, Breve delivery — just without
   *local* inference.
 
 **What stays Mac-only short-term:** MLX (Apple-Silicon compute), the `launchd`
-model-server management, the transparent capture card's NSApp focus-return, doc
-conversion via `textutil`, and the agy image sandbox. **How a Linux/Windows user
+model-server management, the transparent capture card's NSApp focus-return, and
+doc conversion via `textutil`. **How a Linux/Windows user
 gets local AI:** install Ollama, `ollama pull` a model, rotli's `OllamaBackend`
 discovers it and it appears in the same chat picker — same UI, same secure-note
 gate (loopback = local), same streaming path.

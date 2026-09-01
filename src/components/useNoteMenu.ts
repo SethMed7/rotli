@@ -51,6 +51,14 @@ export interface MenuAnchor {
   stopPropagation?: () => void;
 }
 
+export interface NoteMenuOptions {
+  returnFocus?: () => void;
+  /** Finder-style gathered Main rows. The right-clicked row must belong to
+   * this set; otherwise the menu remains a single-item menu. */
+  selectedItems?: readonly NoteSummary[];
+  trashSelection?: (items: readonly NoteSummary[]) => void;
+}
+
 /** A duplicate's body: the title line gains " copy". The title is the first
  * non-blank line AFTER any leading `---` fence block (Greptile, PR #1: naming
  * the fence itself "--- copy" corrupted YAML frontmatter) — and a line that
@@ -103,13 +111,20 @@ export function useNoteMenu() {
   const trash = useTrashNote();
   const restore = useRestoreNote();
   return useCallback(
-    (e: MenuAnchor, note: NoteSummary, opts?: { returnFocus?: () => void }) => {
+    (e: MenuAnchor, note: NoteSummary, opts?: NoteMenuOptions) => {
       // preventDefault MUST be synchronous (suppress the native menu before any
       // await), then the async build fetches lock/secure state before opening.
       e.preventDefault?.();
       e.stopPropagation?.();
       const x = e.clientX;
       const y = e.clientY;
+      const selectedItems =
+        opts?.trashSelection &&
+        opts.selectedItems &&
+        opts.selectedItems.length > 1 &&
+        opts.selectedItems.some((item) => item.id === note.id)
+          ? [...new Map(opts.selectedItems.map((item) => [item.id, item])).values()]
+          : null;
 
       void (async () => {
         // Boards restore like FILES, not like notes (2026-08-04): a board is
@@ -493,7 +508,14 @@ export function useNoteMenu() {
             },
           });
         }
-        if (sinkLane === "file") {
+        if (selectedItems) {
+          items.push({
+            kind: "action" as const,
+            label: `Move ${selectedItems.length} items to Trash`,
+            danger: true,
+            onClick: () => opts?.trashSelection?.(selectedItems),
+          });
+        } else if (sinkLane === "file") {
           const movable = fileStat?.lifecycleMutable === true;
           const moveFile = (sink: "Archive" | "Trash") => {
             if (!movable) return;

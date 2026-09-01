@@ -10,7 +10,18 @@
 // registerEditor/activeEditor seam, so the drop handler stays ONE listener that
 // asks "who is under the pointer?" rather than growing per-surface knowledge.
 
+import { CHAT_IMAGE_ASSET_EXTS } from "../../lib/chatWork";
+import { extOf } from "../../lib/fileKind";
+
 type AttachImages = (paths: readonly string[]) => void;
+
+/** Whether a dropped OS path is an image the chat asset lane accepts. The
+ * window router partitions with THIS predicate, not the editor's wider one:
+ * an `.svg` routed here by the editor's rule was refused by the chat AND never
+ * reached storage — the user's file simply vanished. */
+export function isChatImagePath(path: string): boolean {
+  return CHAT_IMAGE_ASSET_EXTS.includes(extOf(path));
+}
 
 const targets = new Map<string, AttachImages>();
 

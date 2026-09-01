@@ -25,6 +25,13 @@ export const MARKER_EM = 1.15;
  * land under its text. */
 export const CHECK_EM = 1.6;
 
+/** A single-choice radio uses the same box-plus-gap geometry as a task. */
+export const CHOICE_EM = 1.6;
+
+/** Two 1.1em result buttons, their small internal gap, and the gap before the
+ * row text. Mirrors `.rotli-result` in styles/editor.css. */
+export const RESULT_EM = 2.9;
+
 /** em values are authored by hand, so trim float noise (1.5 * 3 + 1.15) before
  * it reaches a style attribute. */
 const em = (n: number): string => String(Number(n.toFixed(4)));

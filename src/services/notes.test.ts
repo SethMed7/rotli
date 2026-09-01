@@ -88,6 +88,16 @@ describe("createNote / getNote / updateNote", () => {
     await expect(svc.updateNote(opened.id, "# Stale", opened.revision)).rejects.toThrow("revision conflict");
     expect(await svc.getNote(opened.id)).toEqual(external);
   });
+
+  test("merges a stale complete-file revision when the editor body stayed the same", async () => {
+    const svc = freshService();
+    const opened = await svc.createNote(DEST.inbox, "# Original");
+    const metadataOnly = await svc.updateNote(opened.id, opened.body, opened.revision);
+    expect(metadataOnly.revision).not.toBe(opened.revision);
+
+    const merged = await svc.updateNote(opened.id, "# Local draft", opened.revision, opened.body);
+    expect(merged.body).toBe("# Local draft");
+  });
 });
 
 describe("listNotes — three-case descendant scoping", () => {

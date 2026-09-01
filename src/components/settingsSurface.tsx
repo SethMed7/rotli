@@ -24,6 +24,7 @@ import {
   isValidRepo,
   mergedModels,
   nameFromRepo,
+  providerDefaultModel,
   scanVerdict,
 } from "../ai/models";
 import { WEB_SEARCH_PROVIDERS, webSearchProviderInfo } from "../ai/searchProvider";
@@ -77,7 +78,6 @@ import {
   remoteAgentUnpair,
   revealCorpus,
   SECRET_BRAVE_SEARCH_API_KEY,
-  SECRET_GEMINI_API_KEY,
   secretDelete,
   secretExists,
   secretStore,
@@ -1875,30 +1875,9 @@ function BrainPane() {
             <b>Main</b>.
           </p>
           <span className="mplabel">Organizing model</span>
-          <Seg
-            value={model}
-            options={[
-              ["local", "On this Mac"],
-              ["claude", "Claude Sonnet 5"],
-              ["gemini35", "Gemini 3.7 Flash"],
-            ]}
-            onPick={(m) => setModel(m)}
-          />
+          <Seg value={model} options={[["local", "On this Mac"]]} onPick={(m) => setModel(m)} />
           <p className="setnote">
-            {model === "claude" ? (
-              <>
-                <b>Claude Sonnet 5</b> (via <code>claude -p</code>) does the organizing — your{" "}
-                <b>non-secure</b> notes are sent to Anthropic to file. <b>Secure</b> and <b>locked</b> notes
-                are never sent anywhere.
-              </>
-            ) : model === "gemini35" ? (
-              <>
-                <b>Gemini 3.7 Flash</b> (through the authenticated Antigravity lane) organizes your{" "}
-                <b>non-secure</b> notes. <b>Secure</b> and <b>locked</b> notes never enter a remote model.
-              </>
-            ) : (
-              <>A local model on this Mac organizes — nothing ever leaves your machine.</>
-            )}
+            A local model on this Mac organizes — note content never enters a cloud-model provider.
           </p>
           <span className="mplabel">Wait before organizing</span>
           <Seg
@@ -2181,17 +2160,17 @@ function LocalModelsSection({ installed, onChanged }: { installed: ChatModelInfo
 }
 
 const PROVIDER_DESC: Record<ProviderId, string> = {
-  claude: "Claude Code CLI — rides your Claude Pro/Max subscription.",
-  codex: "Codex CLI — rides your ChatGPT subscription.",
-  agy: "Antigravity CLI — Gemini through the Google account signed in to agy.",
-  gemini: "Advanced Gemini API lane — bring your own API key (stored in the macOS Keychain).",
+  claude: "Official Claude Code CLI — uses the Anthropic account you signed into locally.",
+  codex: "Official Codex CLI — uses the ChatGPT account you signed into locally.",
+  cursor:
+    "Official Cursor ACP client — uses the Cursor account you signed into locally, in read-only Ask mode.",
 };
 
 /** How to get a lane working when it isn't installed / signed in. */
 const LANE_SETUP: Record<ProviderId, string[]> = {
   claude: [
     "Install Claude Code — claude.com/claude-code (installer or `npm i -g @anthropic-ai/claude-code`).",
-    "Run `claude` in Terminal once and sign in with your Claude account (Pro or Max).",
+    "Run `claude auth login` yourself in Terminal and sign in with your Claude account.",
     "Come back here — the status flips to ready on its own.",
   ],
   codex: [
@@ -2199,14 +2178,10 @@ const LANE_SETUP: Record<ProviderId, string[]> = {
     "Run `codex login` and sign in with your ChatGPT account.",
     "Come back here — the status flips to ready on its own.",
   ],
-  agy: [
-    "Install Google's Antigravity CLI (antigravity.google).",
-    "Run `agy` once and sign in with your Google account (Google AI Pro/Ultra).",
-    "Come back here — the status flips to ready on its own.",
-  ],
-  gemini: [
-    "Create a free API key at aistudio.google.com/apikey.",
-    "Paste it below — it's stored in the macOS Keychain, never in a file.",
+  cursor: [
+    "Install Cursor Agent from cursor.com/cli (the official installer places `agent` in ~/.local/bin).",
+    "Run `agent login` yourself in Terminal and sign in with your Cursor account.",
+    "Come back here — Rotli uses ACP Ask mode and rejects every requested permission.",
   ],
 };
 
@@ -2240,6 +2215,9 @@ function LaneCard({ id }: { id: ProviderId }) {
   const setAiProvider = useUiStore((s) => s.setAiProvider);
   const blockedModels = useUiStore((s) => s.blockedModels);
   const toggleBlockedModel = useUiStore((s) => s.toggleBlockedModel);
+  const providerDefaults = useUiStore((s) => s.providerDefaults);
+  const setProviderDefault = useUiStore((s) => s.setProviderDefault);
+  const defaultModel = providerDefaultModel(id, providerDefaults);
   const [help, setHelp] = useState(false);
   const [verify, setVerify] = useState<VerifyState>({ state: "idle" });
 
@@ -2260,14 +2238,12 @@ function LaneCard({ id }: { id: ProviderId }) {
       : !d.installed
         ? "not installed"
         : !d.authenticated
-          ? id === "gemini"
-            ? "no key yet"
-            : "not signed in"
+          ? "not signed in"
           : `ready${version ? ` · v${version}` : ""}`;
 
   const runVerify = () => {
     setVerify({ state: "running" });
-    verifyLane(id)
+    verifyLane(id, defaultModel)
       .then((r) =>
         setVerify(
           r.ok ? { state: "ok", ms: r.ms, model: r.model } : { state: "fail", error: r.error ?? "failed" },
@@ -2295,8 +2271,6 @@ function LaneCard({ id }: { id: ProviderId }) {
       </div>
       <p className="ailane-desc">{PROVIDER_DESC[id]}</p>
 
-      {id === "gemini" && enabled && <GeminiKeyRow onSaved={runVerify} />}
-
       {!ready && (
         <div className="ailane-help">
           <button type="button" className="ailane-helptoggle" onClick={() => setHelp((v) => !v)}>
@@ -2310,6 +2284,28 @@ function LaneCard({ id }: { id: ProviderId }) {
             </ol>
           )}
         </div>
+      )}
+
+      {enabled && (
+        <label className="ailane-default">
+          <span>
+            Default model
+            <small>Used by @{id} when no model is specified.</small>
+          </span>
+          <select
+            value={defaultModel}
+            aria-label={`Default model for ${PROVIDER_LABELS[id]}`}
+            onChange={(event) => setProviderDefault(id, event.currentTarget.value)}
+          >
+            {CLI_CATALOG[id]
+              .filter((model) => !blockedModels.includes(model.id) || model.id === defaultModel)
+              .map((model) => (
+                <option value={model.id} key={model.id}>
+                  {model.label}
+                </option>
+              ))}
+          </select>
+        </label>
       )}
 
       {enabled && ready && (
@@ -2334,84 +2330,31 @@ function LaneCard({ id }: { id: ProviderId }) {
             <span className="ailane-modelslabel">Models — click one to hide it from the picker:</span>
             {CLI_CATALOG[id].map((m) => {
               const off = blockedModels.includes(m.id);
+              const isDefault = m.id === defaultModel;
               return (
                 <button
                   type="button"
                   key={m.id}
-                  className={off ? "ailane-model off" : "ailane-model"}
+                  className={`${off ? "ailane-model off" : "ailane-model"}${isDefault ? " default" : ""}`}
                   aria-pressed={!off}
-                  title={off ? "Hidden — click to bring it back" : "In the picker — click to hide"}
+                  disabled={isDefault}
+                  title={
+                    isDefault
+                      ? "Default — choose another default before hiding this model"
+                      : off
+                        ? "Hidden — click to bring it back"
+                        : "In the picker — click to hide"
+                  }
                   onClick={() => toggleBlockedModel(m.id)}
                 >
                   {m.label}
+                  {isDefault ? " · default" : ""}
                 </button>
               );
             })}
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-/** The Gemini key editor — the value goes straight to the Keychain and never
- * comes back out; the row only knows whether one is saved. */
-function GeminiKeyRow({ onSaved }: { onSaved?: () => void }) {
-  const [val, setVal] = useState("");
-  const [note, setNote] = useState<{ text: string; err: boolean } | null>(null);
-  const saved = useQuery({
-    queryKey: ["secret", SECRET_GEMINI_API_KEY],
-    queryFn: () => secretExists(SECRET_GEMINI_API_KEY),
-    enabled: isTauri(),
-  });
-  const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: ["secret", SECRET_GEMINI_API_KEY] });
-    void queryClient.invalidateQueries({ queryKey: ["cli-detect", "gemini"] });
-  };
-  return (
-    <div className="aikey">
-      <input
-        type="password"
-        className="aikey-input"
-        placeholder={saved.data ? "Key saved — paste a new one to replace it" : "Gemini API key…"}
-        value={val}
-        onChange={(e) => setVal(e.target.value)}
-        onKeyDown={(e) => e.stopPropagation()}
-      />
-      <button
-        type="button"
-        className="ghostbtn primary"
-        disabled={!val.trim()}
-        onClick={() => {
-          secretStore(SECRET_GEMINI_API_KEY, val.trim())
-            .then(() => {
-              setVal("");
-              setNote({ text: "Key saved to the Keychain.", err: false });
-              refresh();
-              onSaved?.();
-            })
-            .catch((e) => setNote({ text: e instanceof Error ? e.message : String(e), err: true }));
-        }}
-      >
-        Save key
-      </button>
-      {saved.data && (
-        <button
-          type="button"
-          className="ghostbtn quiet"
-          onClick={() => {
-            secretDelete(SECRET_GEMINI_API_KEY)
-              .then(() => {
-                setNote({ text: "Key removed.", err: false });
-                refresh();
-              })
-              .catch((e) => setNote({ text: e instanceof Error ? e.message : String(e), err: true }));
-          }}
-        >
-          Remove
-        </button>
-      )}
-      {note && <p className={note.err ? "setnote err" : "setnote"}>{note.text}</p>}
     </div>
   );
 }
@@ -2721,8 +2664,6 @@ function ModelsPane() {
   const aiProviders = useUiStore((s) => s.aiProviders);
   const hybridPresets = useUiStore((s) => s.hybridPresets);
   const setHybridPresets = useUiStore((s) => s.setHybridPresets);
-  const imageEngine = useUiStore((s) => s.imageEngine);
-  const setImageEngine = useUiStore((s) => s.setImageEngine);
   const chatNoteOpen = useUiStore((s) => s.chatNoteOpen);
   const chatArtifactOpen = useUiStore((s) => s.chatArtifactOpen);
   const readAloud = useUiStore((s) => s.readAloud);
@@ -2806,10 +2747,45 @@ function ModelsPane() {
   return (
     <>
       <PaneHead title="AI Models" char="knowledge" />
+      <section className="aisection provider-transparency" aria-labelledby="provider-transparency-title">
+        <p className="settings-eyebrow">Transparency &amp; account safety</p>
+        <h4 className="set-subhead" id="provider-transparency-title">
+          Official routes only, with no hidden workaround
+        </h4>
+        <p className="setnote">
+          Rotli enables a connected provider only through that company&rsquo;s published client or integration
+          route. Authentication stays in the official app on this Mac: Rotli does not present provider logins,
+          copy credentials, or replay browser sessions. Provider terms can change and this is not a legal
+          guarantee; Rotli reviews these boundaries and disables a route instead of silently working around a
+          restriction.
+        </p>
+        <p className="setnote">
+          <b>Why Gemini isn&rsquo;t here:</b> Google says third-party tools may not reuse an Antigravity login
+          and warns that doing so can suspend or terminate the account. Google permits Gemini through AI
+          Studio API keys or Vertex AI, but those are separately billed API routes rather than the Antigravity
+          subscription. Rotli has not enabled either route. Reviewed September 1, 2026.
+        </p>
+        <div className="provider-transparency-links">
+          <button
+            type="button"
+            className="ghostbtn quiet"
+            onClick={() => void openUrl("https://www.antigravity.google/docs/faq/")}
+          >
+            Google&rsquo;s account restriction
+          </button>
+          <button
+            type="button"
+            className="ghostbtn quiet"
+            onClick={() => void openUrl("https://cursor.com/docs/cli/acp")}
+          >
+            Cursor&rsquo;s ACP route
+          </button>
+        </div>
+      </section>
+
       <p className="lead">
-        Chat runs on your Mac by default. Install more on-device models below, or connect the subscriptions
-        you already have — their models join the picker, and rotli drives the official CLI on this machine. A
-        connected model runs remotely: the conversation leaves your Mac, secure notes never do.
+        Chat runs on your Mac by default. Claude Code, Codex, and Cursor are optional connected lanes using
+        accounts already signed in to their official local clients.
       </p>
 
       <LocalModelsSection
@@ -2820,8 +2796,11 @@ function ModelsPane() {
       <section className="aisection">
         <h4 className="set-subhead">Connected models</h4>
         <p className="setnote">
-          Turning a lane on runs one tiny test reply in the background — the honest &ldquo;it works&rdquo;.
-          Inside a lane, click a model to block or allow it in the picker.
+          Claude, Codex, and Cursor are opt-in and interactive: turning one on runs one tiny test reply, and
+          each user authenticates directly in that provider&rsquo;s official client. Cursor runs in read-only
+          Ask mode from an empty scratch workspace. Choose each lane&rsquo;s default below; in chat, use
+          <code>@claude</code>, <code>@codex</code>, or <code>@cursor</code>, with an optional
+          <code>:model-id</code>, for an explicitly attributed opinion.
         </p>
         {PROVIDER_IDS.map((id) => (
           <LaneCard key={id} id={id} />
@@ -2831,8 +2810,8 @@ function ModelsPane() {
       <section className="aisection">
         <h4 className="set-subhead">Hybrid presets</h4>
         <p className="setnote">
-          A preset lets one model ORGANIZE each message and route it to the model best suited — e.g. gemma
-          routes, Gemini executes, Claude catches failures. Presets show up in the chat&rsquo;s model picker.
+          A preset lets one on-device model organize each message and route it among local models and enabled
+          connected code/chat lanes. Presets show up in the chat&rsquo;s model picker.
         </p>
         {STARTER_PRESETS.some((sp) => !hybridPresets.some((p) => p.id === sp.id)) && (
           <>
@@ -2947,16 +2926,9 @@ function ModelsPane() {
       <section className="aisection">
         <h4 className="set-subhead">Images in chat</h4>
         <p className="setnote">
-          Which connected engine draws when a chat generates an image (saved into this chat&rsquo;s assets).
+          Provider-backed image generation is unavailable for now. Existing images and every local artifact
+          remain editable in the vault.
         </p>
-        <Seg
-          value={imageEngine}
-          options={[
-            ["codex", "Codex (gpt-image)"],
-            ["agy", "Antigravity (Nano Banana)"],
-          ]}
-          onPick={setImageEngine}
-        />
       </section>
 
       <section className="aisection">

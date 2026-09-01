@@ -25,6 +25,24 @@ function lines(body: string): string[] {
   return body.split("\n").map((l) => (l.endsWith("\r") ? l.slice(0, -1) : l));
 }
 
+const BLOCK_MARKERS = [
+  "- ",
+  "* ",
+  "+ ",
+  "( ) ",
+  "(x) ",
+  "(X) ",
+  "[ ][ ] ",
+  "[x][ ] ",
+  "[X][ ] ",
+  "[ ][x] ",
+  "[ ][X] ",
+  "[ ] ",
+  "[/] ",
+  "[x] ",
+  "[X] ",
+] as const;
+
 /** Mirror of corpus.rs strip_markdown: trim, then iteratively peel a leading
  * run of '#', a leading '>', and one list/checkbox marker per pass until the
  * line stops changing, then drop every '*', '_' and '`' character and trim. */
@@ -34,7 +52,7 @@ function stripMarkdown(line: string): string {
     const before = s;
     s = rustTrimStart(s.replace(/^#+/, ""));
     if (s.startsWith(">")) s = rustTrimStart(s.slice(1));
-    for (const marker of ["- ", "* ", "+ ", "[ ] ", "[/] ", "[x] ", "[X] "]) {
+    for (const marker of BLOCK_MARKERS) {
       if (s.startsWith(marker)) s = s.slice(marker.length);
     }
     if (s === before) break;

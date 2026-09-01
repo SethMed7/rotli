@@ -1798,7 +1798,10 @@ fn strip_markdown(line: &str) -> String {
         if let Some(rest) = s.strip_prefix('>') {
             s = rest.trim_start();
         }
-        for marker in ["- ", "* ", "+ ", "[ ] ", "[/] ", "[x] ", "[X] "] {
+        for marker in [
+            "- ", "* ", "+ ", "( ) ", "(x) ", "(X) ", "[ ][ ] ", "[x][ ] ", "[X][ ] ", "[ ][x] ",
+            "[ ][X] ", "[ ] ", "[/] ", "[x] ", "[X] ",
+        ] {
             if let Some(rest) = s.strip_prefix(marker) {
                 s = rest;
             }
@@ -2021,8 +2024,13 @@ fn is_archive_folder(folder: &str) -> bool {
 /// is not finished, so it still belongs on the Tasks surface. Mirrors the
 /// editor's grammar in src/editor/taskState.ts.
 fn strip_open_box(rest: &str) -> Option<&str> {
-    rest.strip_prefix("[ ]")
-        .or_else(|| rest.strip_prefix("[/]"))
+    let tail = rest
+        .strip_prefix("[ ]")
+        .or_else(|| rest.strip_prefix("[/]"))?;
+    tail.chars()
+        .next()
+        .is_some_and(char::is_whitespace)
+        .then_some(tail)
 }
 
 /// An open `- [ ]` / `* [ ]` / `1. [ ]` checkbox line's own text — or the `[/]`
@@ -2329,6 +2337,9 @@ pub struct NoteMeta {
     pub id: String,
     pub title: String,
     pub snippet: String,
+    /// Exact whitespace-aware emptiness of a Markdown editor body. Boards and
+    /// conventional files are never blank-note placeholders.
+    pub body_empty: bool,
     /// Human-readable selectors for local links and CLI lookup. The stable
     /// identity remains `id`; aliases may include the current filename stem,
     /// canonical title slug, and rename history.
@@ -2666,6 +2677,11 @@ fn is_reference_lane(rel: &str) -> bool {
         .any(|d| rel == *d || rel.starts_with(&format!("{d}/")))
         || FILES.contains(&rel)
 }
+
+/// Byte-identical to CHAT_IMAGE_ASSET_MAX_BYTES in src/lib/chatWork.ts (parity.json).
+/// The byte-backed image lane refuses anything larger; the IPC read-back cap
+/// matches so a copied image is never truncated into a corrupt data URL.
+pub(crate) const CHAT_IMAGE_ASSET_MAX_BYTES: usize = 25_000_000;
 
 pub(crate) const CHAT_IMAGE_ASSET_EXTS: &[&str] = &[
     "png", "jpg", "jpeg", "gif", "webp", "heic", "heif", "avif", "bmp", "tiff", "tif",
@@ -5000,18 +5016,37 @@ impl CorpusStore {
     /// Human/interactive whole-body save with optimistic concurrency. The
     /// comparison happens inside the store's mutation critical section, after
     /// path routing and immediately before the write path re-reads metadata.
-    pub fn write_if_revision(
+    /// A Rotli-owned
+    /// location/frontmatter update changes the complete-file revision while
+    /// preserving editor prose. In that one case the local body edit can be
+    /// applied safely because `write_resolved` re-reads and preserves the
+    /// latest frontmatter under this same file lock. A changed disk body still
+    /// receives the ordinary revision conflict.
+    pub fn write_if_revision_with_body_base(
         &mut self,
         id: &str,
         body: &str,
         expected_revision: &str,
+        expected_body: Option<&str>,
     ) -> Result<CorpusWriteResult, String> {
         let rel = self.path_of(id)?;
         self.writable(&rel)?;
         let abs = self.guard_rel(&rel)?;
         crate::fsutil::with_file_lock(&abs, || {
             let current = fs::read(&abs).map_err(|e| format!("read {rel}: {e}"))?;
-            crate::fsutil::compare_revision(expected_revision, &current)?;
+            if crate::fsutil::revision(&current) != expected_revision {
+                let current_text = std::str::from_utf8(&current)
+                    .map_err(|e| format!("read {rel} as UTF-8: {e}"))?;
+                let (frontmatter, raw_body) = parse_document(current_text);
+                let current_body = if frontmatter.is_some() {
+                    editor_body(raw_body)
+                } else {
+                    raw_body
+                };
+                if expected_body != Some(current_body) {
+                    crate::fsutil::compare_revision(expected_revision, &current)?;
+                }
+            }
             let meta = self.write_resolved(id, body, rel.clone())?;
             let landed_rel = self.path_of(id)?;
             let landed = fs::read(self.guard_rel(&landed_rel)?)
@@ -5120,6 +5155,7 @@ impl CorpusStore {
             id: id.to_string(),
             title,
             snippet: snippet_of(body),
+            body_empty: body.trim().is_empty(),
             aliases: note_aliases(&target_rel, &title_of(body), id, &fm),
             folder_id: folder,
             disk_folder_id: disk_folder.clone(),
@@ -5226,6 +5262,7 @@ impl CorpusStore {
                 name
             },
             snippet: String::new(),
+            body_empty: false,
             aliases: Vec::new(),
             // boards/files carry no frontmatter, so the shelf projection has
             // nothing to read — the lifecycle/storage mapping is the whole answer
@@ -5357,6 +5394,7 @@ impl CorpusStore {
             id: id.to_string(),
             title,
             snippet: snippet_of(&body),
+            body_empty: body.trim().is_empty(),
             aliases: note_aliases(&target_rel, &title_of(&body), id, &fm),
             folder_id: project_lifecycle_folder(self.layout, target_folder),
             disk_folder_id: target_folder.to_string(),
@@ -5946,6 +5984,7 @@ impl CorpusStore {
             id,
             title,
             snippet: snippet_of(body),
+            body_empty: body.trim().is_empty(),
             aliases,
             folder_id: project_folder(self.layout, disk_folder, &fm),
             disk_folder_id: disk_folder.to_string(),
@@ -6016,6 +6055,7 @@ impl CorpusStore {
             id: id.to_string(),
             title: board_title(id),
             snippet: String::new(),
+            body_empty: false,
             aliases: Vec::new(),
             folder_id: folder_of(id),
             disk_folder_id: folder_of(id),
@@ -6093,6 +6133,7 @@ impl CorpusStore {
             id: rel.clone(),
             title: board_title(&rel),
             snippet: String::new(),
+            body_empty: false,
             aliases: Vec::new(),
             folder_id: folder_id.to_string(),
             disk_folder_id: folder_id.to_string(),
@@ -6131,6 +6172,7 @@ impl CorpusStore {
                 id: id.to_string(),
                 title: board_title(id),
                 snippet: String::new(),
+                body_empty: false,
                 aliases: Vec::new(),
                 folder_id: folder.clone(),
                 disk_folder_id: folder,
@@ -6151,6 +6193,7 @@ impl CorpusStore {
             id: new_rel.clone(),
             title: board_title(&new_rel),
             snippet: String::new(),
+            body_empty: false,
             aliases: Vec::new(),
             folder_id: folder.clone(),
             disk_folder_id: folder,
@@ -6546,6 +6589,7 @@ fn walk(
                     id: rel.clone(),
                     title: title_of(body),
                     snippet: snippet_of(body),
+                    body_empty: body.trim().is_empty(),
                     aliases: Vec::new(),
                     folder_id: prefix.to_string(),
                     disk_folder_id: prefix.to_string(),
@@ -6652,6 +6696,7 @@ fn walk(
                 id,
                 title,
                 snippet: snippet_of(body),
+                body_empty: body.trim().is_empty(),
                 aliases,
                 folder_id,
                 disk_folder_id: prefix.to_string(),
@@ -6679,6 +6724,7 @@ fn walk(
                 id: rel.clone(),
                 title: board_title(&rel),
                 snippet: String::new(),
+                body_empty: false,
                 aliases: Vec::new(),
                 folder_id: prefix.to_string(),
                 disk_folder_id: prefix.to_string(),
@@ -6698,6 +6744,7 @@ fn walk(
                 id: rel.clone(),
                 title: name,
                 snippet: String::new(),
+                body_empty: false,
                 aliases: Vec::new(),
                 // a memex storage/ binary re-homes to the Storage destination; a
                 // plain-corpus file stays in its own folder.
@@ -7561,14 +7608,13 @@ pub fn corpus_create_image_asset(
     base64: String,
 ) -> Result<String, String> {
     use base64::Engine;
-    const MAX_IMAGE_BYTES: usize = 25_000_000;
-    if base64.len() > (MAX_IMAGE_BYTES * 4 / 3) + 8 {
+    if base64.len() > (CHAT_IMAGE_ASSET_MAX_BYTES * 4 / 3) + 8 {
         return Err("image is larger than 25 MB".into());
     }
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(base64.as_bytes())
         .map_err(|e| format!("bad image payload: {e}"))?;
-    if bytes.len() > MAX_IMAGE_BYTES {
+    if bytes.len() > CHAT_IMAGE_ASSET_MAX_BYTES {
         return Err("image is larger than 25 MB".into());
     }
     let rel = state.route(&root_id, |store| store.create_image_asset(&name, &bytes))?;
@@ -8261,11 +8307,17 @@ pub fn corpus_write(
     id: String,
     body: String,
     expected_revision: String,
+    expected_body: Option<String>,
 ) -> Result<CorpusWriteResult, String> {
     let (root, rel) = split_root_id(&id);
     state
         .route(&root, |s| {
-            s.write_if_revision(&rel, &body, &expected_revision)
+            s.write_if_revision_with_body_base(
+                &rel,
+                &body,
+                &expected_revision,
+                expected_body.as_deref(),
+            )
         })
         .map(|result| prefix_write_result(&root, result))
 }
@@ -9780,6 +9832,9 @@ mod tests {
         assert_eq!(title_of("- [x] ship it\n"), "ship it");
         // an in-progress task titles by its words too, not "[/] draft…"
         assert_eq!(title_of("- [/] draft the memo\n"), "draft the memo");
+        assert_eq!(title_of("- [ ][x] API fails\n"), "API fails");
+        assert_eq!(title_of("- [x][ ] API passes\n"), "API passes");
+        assert_eq!(title_of("- (x) Blue\n"), "Blue");
         assert_eq!(
             title_of("Preface\n## Section\n# Canonical title\nBody"),
             "Canonical title"
@@ -10205,10 +10260,11 @@ mod tests {
         )
         .unwrap();
 
-        let result = store.write_if_revision(
+        let result = store.write_if_revision_with_body_base(
             &note.id,
             &format!("{}\n\nlocal", opened.body),
             &opened.revision,
+            Some(&opened.body),
         );
         assert!(
             result.is_err(),
@@ -10216,6 +10272,39 @@ mod tests {
         );
         let current = fs::read_to_string(store.root().join(&rel)).unwrap();
         assert!(current.contains("# External\n\nnewer"));
+    }
+
+    #[test]
+    fn stale_complete_revision_merges_when_only_rotli_metadata_changed() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = CorpusStore::open(dir.path().to_path_buf()).unwrap();
+        let note = store.create("Inbox", "# Original\n\nfirst").unwrap();
+        let opened = store.read(&note.id).unwrap();
+
+        // A pin is representative of the Librarian's metadata/location work:
+        // complete-file bytes and revision move, editor prose does not.
+        store.set_pinned(&note.id, true).unwrap();
+        let after_metadata = store.read(&note.id).unwrap();
+        assert_ne!(after_metadata.revision, opened.revision);
+        assert_eq!(after_metadata.body, opened.body);
+
+        let result = store
+            .write_if_revision_with_body_base(
+                &note.id,
+                "# Original\n\nlocal edit",
+                &opened.revision,
+                Some(&opened.body),
+            )
+            .unwrap();
+
+        assert_eq!(
+            store.read(&note.id).unwrap().body,
+            "# Original\n\nlocal edit"
+        );
+        assert!(
+            result.meta.pinned,
+            "the newer metadata must survive the body save"
+        );
     }
 
     #[test]
@@ -10610,6 +10699,7 @@ mod tests {
 
         // a blank note discards for real — no Trash-folder detour
         let blank = store.create("Inbox", "").unwrap();
+        assert!(blank.body_empty, "wire metadata marks a true blank exactly");
         store.discard_blank(&blank.id).unwrap();
         assert!(
             store.read(&blank.id).is_err(),
@@ -10634,11 +10724,16 @@ mod tests {
 
         // whitespace-only still counts as blank
         let spaces = store.create("Inbox", "  \n\n  ").unwrap();
+        assert!(spaces.body_empty);
         store.discard_blank(&spaces.id).unwrap();
         assert!(store.read(&spaces.id).is_err());
 
         // ANY content refuses — the exposed command cannot destroy prose
         let kept = store.create("Inbox", "# Real note\n").unwrap();
+        assert!(
+            !kept.body_empty,
+            "a titled note must never be hidden as blank"
+        );
         assert!(
             store.discard_blank(&kept.id).is_err(),
             "non-blank must refuse"
@@ -11534,7 +11629,7 @@ mod tests {
         let note = store
             .create(
                 "Inbox",
-                "# Plan\n\n- [ ] call the bank\n  about the wire\n- [x] already done\n- [ ]\n```\n- [ ] not a task — code\n```\n* [ ] second style\n1. [ ] rotate the key\n2. [x] ordered but done\n3. plain step, not a task\n",
+                "# Plan\n\n- [ ] call the bank\n  about the wire\n- [x] already done\n- [ ]\n- [ ][ ] unanswered result\n- [ ][x] failed result\n- [x][ ] passed result\n- (x) selected choice\n```\n- [ ] not a task — code\n```\n* [ ] second style\n1. [ ] rotate the key\n2. [x] ordered but done\n3. plain step, not a task\n",
             )
             .unwrap();
         // a task in a sink is not a nag
@@ -11664,6 +11759,9 @@ mod tests {
         assert_eq!(check_off("* [/] star").unwrap(), "* [x] star");
         // already done, or not a task at all
         assert!(check_off("- [x] done").is_none());
+        assert!(check_off("- [ ][ ] unanswered result").is_none());
+        assert!(check_off("- [x][ ] passed result").is_none());
+        assert!(check_off("- (x) selected choice").is_none());
         assert!(check_off("- plain bullet").is_none());
         assert!(check_off("just a line").is_none());
     }
