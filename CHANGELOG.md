@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.83.0] - 2026-08-31
+
 ### Added
 
 - **Remote agents can opt in to the local workspace without uploading the vault.** Rotli can connect
