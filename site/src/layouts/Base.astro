@@ -8,8 +8,8 @@ interface Props {
 }
 
 const {
-  title = 'Rotli — your files remain the product',
-  description = 'A calm, local-first Mac workspace for notes, editable files, boards, and AI conversations. One folder you own; no account required.',
+  title = 'Rotli — room to think, files you keep',
+  description = 'A calm, local-first Mac workspace for notes, editable files, boards, and AI conversations. One folder you own, with no account required.',
   canonicalPath = Astro.url.pathname,
   image = '/social-card.png',
   noindex = false,
@@ -34,7 +34,7 @@ const socialImageUrl = new URL(image, siteUrl).href;
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:image" content={socialImageUrl} />
-    <meta property="og:image:alt" content="Rotli — your files remain the product" />
+    <meta property="og:image:alt" content="Rotli — room to think, files you keep" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
@@ -114,6 +114,20 @@ const socialImageUrl = new URL(image, siteUrl).href;
         --swatch-iris-dark: #15121d;
         --swatch-midnight-light: #f0f2f5;
         --swatch-midnight-dark: #050607;
+        --hero-ground: #0b2f39;
+        --hero-text: #f5fbfc;
+        --hero-accent: #bfeaf0;
+        --hero-action: #6ee0e8;
+        --hero-action-text: #092a32;
+        --hero-shot: #0d2026;
+        --hero-wash: rgba(5, 29, 36, 0.58);
+        --hero-hover-wash: rgba(5, 29, 36, 0.5);
+        --hero-copy: rgba(238, 249, 251, 0.82);
+        --hero-muted: rgba(238, 249, 251, 0.7);
+        --hero-caption: rgba(238, 249, 251, 0.72);
+        --hero-border: rgba(245, 251, 252, 0.56);
+        --hero-shot-border: rgba(245, 251, 252, 0.42);
+        --hero-shadow: rgba(2, 20, 26, 0.3);
       }
 
       :root[data-family='rotli'][data-mode='dark'] {
