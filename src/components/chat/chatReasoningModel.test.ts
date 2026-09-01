@@ -29,7 +29,7 @@ describe("frontier reasoning presentation", () => {
     ]);
     expect(reasoningChoices("codex", "gpt-5.6-luna").at(-1)?.value).toBe("max");
     expect(reasoningChoices("codex", "gpt-5.5").at(-1)?.value).toBe("xhigh");
-    expect(reasoningChoices("agy", "gemini-3.7-flash-high")).toEqual([]);
+    expect(reasoningChoices("unknown", "remote-model")).toEqual([]);
   });
 
   test("switching models never forwards an incompatible stale choice", () => {
@@ -38,7 +38,7 @@ describe("frontier reasoning presentation", () => {
     expect(normalizedReasoning("claude", "haiku", "high")).toBeUndefined();
     expect(normalizedReasoning("claude", "sonnet", "max")).toBe("max");
     expect(normalizedServiceTier("claude", "sonnet", "fast")).toBeUndefined();
-    expect(normalizedServiceTier("codex", "gpt-5.4", "fast")).toBeUndefined();
+    expect(normalizedServiceTier("codex", "gpt-5.5", "fast")).toBeUndefined();
     expect(normalizedServiceTier("codex", "gpt-5.6-luna", "fast")).toBe("fast");
   });
 

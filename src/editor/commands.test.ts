@@ -33,6 +33,16 @@ describe("applyBlockToggle on indented lines", () => {
     const off = applyBlockToggle("  - child", "bullet");
     expect(off.delta).toBe(-2);
   });
+
+  test("format toggles replace a result prefix instead of stacking onto it", () => {
+    expect(applyBlockToggle("  - [ ][x] child", "bullet").line).toBe("  - child");
+    expect(applyBlockToggle("2. [x][ ] child", "checklist").line).toBe("- [ ] child");
+  });
+
+  test("format toggles replace a multiple-choice prefix instead of stacking onto it", () => {
+    expect(applyBlockToggle("  - (x) child", "bullet").line).toBe("  - child");
+    expect(applyBlockToggle("2. ( ) child", "checklist").line).toBe("- [ ] child");
+  });
 });
 
 describe("blockToggleActive on indented lines", () => {
@@ -41,6 +51,16 @@ describe("blockToggleActive on indented lines", () => {
     expect(blockToggleActive("  - child", "bullet")).toBe(true);
     expect(blockToggleActive("    2. deep", "numbered")).toBe(true);
     expect(blockToggleActive("  - child", "checklist")).toBe(false);
+  });
+
+  test("a two-choice result is not misreported as an ordinary bullet", () => {
+    expect(blockToggleActive("- [ ][ ] case", "bullet")).toBe(false);
+    expect(blockToggleActive("2. [ ][x] case", "numbered")).toBe(false);
+  });
+
+  test("a multiple-choice option is not misreported as a generic list", () => {
+    expect(blockToggleActive("- ( ) option", "bullet")).toBe(false);
+    expect(blockToggleActive("2. (x) option", "numbered")).toBe(false);
   });
 });
 

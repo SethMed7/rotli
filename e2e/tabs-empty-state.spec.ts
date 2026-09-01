@@ -9,6 +9,18 @@ import { expect, test } from "@playwright/test";
 
 import { gotoApp } from "./support";
 
+test("Command-W closes the active tab without hiding the workspace", async ({ page }) => {
+  await gotoApp(page);
+  const tabs = page.getByRole("tab");
+  const initial = await tabs.count();
+  await page.keyboard.press("Meta+T");
+  await expect(tabs).toHaveCount(initial + 1);
+
+  await page.keyboard.press("Meta+W");
+  await expect(tabs).toHaveCount(initial);
+  await expect(page.getByRole("main")).toBeVisible();
+});
+
 test("closing every tab shows the rest state, and reopen brings the tab back", async ({ page }) => {
   await gotoApp(page);
   const tabs = page.getByRole("tab");

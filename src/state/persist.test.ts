@@ -252,8 +252,9 @@ describe("parseSettings — creation and Brain model", () => {
     expect(parseSettings('{"tabLayout":"compress"}').tabLayout).toBe("scroll");
   });
 
-  test("the legacy Gemini setting remains an explicit organizer choice; unknown values fail closed to local", () => {
-    expect(parseSettings('{"organizerModel":"gemini35"}').organizerModel).toBe("gemini35");
+  test("legacy remote organizer settings fail closed to local", () => {
+    expect(parseSettings('{"organizerModel":"gemini35"}').organizerModel).toBe("local");
+    expect(parseSettings('{"organizerModel":"claude"}').organizerModel).toBe("local");
     expect(parseSettings('{"organizerModel":"future"}').organizerModel).toBe("local");
   });
 
@@ -310,16 +311,19 @@ describe("parseSettings — frontier controls", () => {
 });
 
 describe("parseSettings — the AI Models keys (the maintainer, 2026-07-02)", () => {
-  test("defaults: every lane OFF, no presets, codex engine, note opens as tab", () => {
+  test("defaults: every lane OFF, reviewed provider defaults, note opens as tab", () => {
     const s = parseSettings("{}");
     expect(s.aiProviders).toEqual({
       claude: false,
       codex: false,
-      agy: false,
-      gemini: false,
+      cursor: false,
+    });
+    expect(s.providerDefaults).toEqual({
+      claude: "sonnet",
+      codex: "gpt-5.6-sol",
+      cursor: "grok-4.6",
     });
     expect(s.hybridPresets).toEqual([]);
-    expect(s.imageEngine).toBe("codex");
     expect(s.chatNoteOpen).toBe("tab");
     expect(s.chatMeasure).toEqual({});
     expect(s.webSearchProvider).toBe("duckduckgo");
@@ -331,13 +335,14 @@ describe("parseSettings — the AI Models keys (the maintainer, 2026-07-02)", ()
     expect(parseSettings('{"webSearchProvider":42}').webSearchProvider).toBe("duckduckgo");
   });
 
-  test("round-trips enabled lanes; unknown lanes and non-booleans are ignored", () => {
-    const s = parseSettings('{"aiProviders":{"claude":true,"gemini":true,"evil":true,"codex":"yes"}}');
+  test("only official client preferences survive; unknown lanes cannot reactivate", () => {
+    const s = parseSettings(
+      '{"aiProviders":{"claude":true,"removed-provider":true,"evil":true,"codex":true,"cursor":true}}',
+    );
     expect(s.aiProviders).toEqual({
       claude: true,
-      codex: false,
-      agy: false,
-      gemini: true,
+      codex: true,
+      cursor: true,
     });
     expect("evil" in s.aiProviders).toBe(false);
   });
@@ -347,9 +352,19 @@ describe("parseSettings — the AI Models keys (the maintainer, 2026-07-02)", ()
     expect(parseSettings(raw).chatMeasure).toEqual({ "my-chat": "wide" });
   });
 
-  test("imageEngine / chatNoteOpen fall to safe defaults on garbage", () => {
-    expect(parseSettings('{"imageEngine":"dalle"}').imageEngine).toBe("codex");
-    expect(parseSettings('{"imageEngine":"agy"}').imageEngine).toBe("agy");
+  test("provider defaults validate against their own catalog", () => {
+    const parsed = parseSettings(
+      '{"providerDefaults":{"claude":"opus","codex":"sonnet","cursor":"cursor-auto"}}',
+    );
+    expect(parsed.providerDefaults).toEqual({
+      claude: "opus",
+      codex: "gpt-5.6-sol",
+      cursor: "cursor-auto",
+    });
+  });
+
+  test("retired image-provider state is dropped and chatNoteOpen falls back safely", () => {
+    expect(unknownSettingsKeys('{"imageEngine":"removed"}')).toEqual({});
     expect(parseSettings('{"chatNoteOpen":"window"}').chatNoteOpen).toBe("tab");
     expect(parseSettings('{"chatNoteOpen":"split"}').chatNoteOpen).toBe("split");
   });

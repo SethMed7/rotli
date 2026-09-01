@@ -263,6 +263,23 @@
   transform: translateX(-1.2em);
   color: var(--text-muted);
 }
+.pv-result-text {
+  font-weight: 700;
+}
+.pv-result-text--no {
+  color: var(--failure);
+}
+.pv-result-text--yes {
+  color: color-mix(in srgb, var(--success) 62%, var(--text));
+}
+.pv-result-reason {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.pv-choice-text--selected {
+  color: var(--accent-text);
+  font-weight: 700;
+}
 .pv-wait {
   color: var(--text-muted);
   font-size: 12.5px;
@@ -906,6 +923,32 @@
 .aisection > .setnote:first-of-type {
   margin-top: 6px;
 }
+.provider-transparency {
+  max-width: 640px;
+  margin-top: 4px;
+  padding: 14px 16px;
+  border-inline-start: 3px solid var(--accent);
+  border-radius: 0 var(--r-card) var(--r-card) 0;
+  background: color-mix(in srgb, var(--tint) 52%, transparent);
+}
+.settings-eyebrow {
+  margin: 0 0 5px;
+  color: var(--accent-text);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.provider-transparency .setnote {
+  max-width: 70ch;
+  line-height: 1.6;
+}
+.provider-transparency-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
 .remote-agents {
   max-width: 640px;
 }
@@ -1049,6 +1092,29 @@
   gap: 10px;
   margin-top: 12px;
 }
+.ailane-default {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 13px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 650;
+}
+.ailane-default span {
+  display: grid;
+  gap: 2px;
+}
+.ailane-default small {
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 450;
+}
+.ailane-default select {
+  min-width: 160px;
+  max-width: 230px;
+}
 .ailane-help {
   margin-top: 10px;
 }
@@ -1115,6 +1181,21 @@
 }
 .ailane-model.off::before {
   content: "";
+}
+.ailane-model.default:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+@media (max-width: 620px) {
+  .ailane-default {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .ailane-default select {
+    max-width: none;
+    width: 100%;
+  }
 }
 
 /* Scan my Mac */

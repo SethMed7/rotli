@@ -1,8 +1,8 @@
-// The model catalog seam. LOCAL models come from the memex-ai store (Rust
-// `chat_models` reads ~/.memex/ai/registry.json); CONNECTED models are the
-// subscription CLIs installed on this Mac (Claude Code · Codex · Antigravity)
-// plus a bring-your-own-key Gemini lane, spawned by the Rust provider bridge.
-// Pure data + merge logic only — no I/O, so it unit-tests.
+// The model catalog seam. LOCAL models come from the memex-ai store. The three
+// connected lanes Rotli exposes are Claude Code, Codex, and Cursor through the
+// user's own authenticated official clients. Cursor is code-chat only and uses
+// its documented ACP custom-client protocol in read-only Ask mode. Unsupported
+// provider ids are rejected again at the native boundary.
 //
 // Connected CLI models carry `endpoint: ""` ON PURPOSE: the secure-note gate
 // derives locality from the endpoint and `endpoint_is_local("")` fails CLOSED
@@ -12,14 +12,23 @@
 import type { ChatModelInfo } from "../lib/tauri";
 
 /** The connectable provider lanes (Settings → AI Models). */
-export type ProviderId = "claude" | "codex" | "agy" | "gemini";
-export const PROVIDER_IDS: readonly ProviderId[] = ["claude", "codex", "agy", "gemini"];
+export type ProviderId = "claude" | "codex" | "cursor";
+export type ConnectedProviderId = ProviderId;
+export const PROVIDER_IDS: readonly ProviderId[] = ["claude", "codex", "cursor"];
 
 export const PROVIDER_LABELS: Record<ProviderId, string> = {
   claude: "Claude Code",
   codex: "Codex",
-  agy: "Antigravity",
-  gemini: "Gemini API · Advanced",
+  cursor: "Cursor · Code chat",
+};
+
+/** Initial explicit choices for a provider tag with no model suffix. Claude's
+ * `sonnet` alias follows the newest Sonnet available to Claude Code; Codex and
+ * Cursor use the newest provider-documented model ids validated for Rotli. */
+export const DEFAULT_PROVIDER_MODELS: Record<ProviderId, string> = {
+  claude: "sonnet",
+  codex: "gpt-5.6-sol",
+  cursor: "grok-4.6",
 };
 
 /** A hybrid preset (Settings → AI Models): an ORGANIZER model reads the prompt
@@ -35,10 +44,6 @@ export interface HybridPreset {
   /** Model id to retry on when the routed executor fails. */
   fallback?: string;
 }
-
-/** Gemini's OpenAI-compatible surface — rides the existing `chat_messages`
- * openai pipeline; the Rust side picks the keychain key for this base. */
-export const GEMINI_OPENAI_BASE = "https://generativelanguage.googleapis.com/v1beta/openai";
 
 /** Model id prefix marking a hybrid preset in the dropdown. */
 export const PRESET_PREFIX = "preset:";
@@ -159,36 +164,18 @@ export function installableCatalog(installedIds: Set<string>): LocalCatalogEntry
   return LOCAL_CATALOG.filter((e) => !installedIds.has(e.name));
 }
 
-const cli = (provider: ProviderId, id: string, label: string): ChatModelInfo => ({
+const cli = (provider: ProviderId, id: string, label: string, vision = true): ChatModelInfo => ({
   id,
   label,
   provider,
   endpoint: "", // remote — fails the locality check on purpose (see header)
   api: "cli",
-  // EVERY frontier lane sees images (the maintainer, 2026-08-04). Each transport gets
-  // there differently and Rust owns the details: codex takes image files
-  // natively (`-i`), claude reads them with a Read-only tool allowlist scoped
-  // to the staged dir, and agy needs its permission prompt skipped — granted
-  // ONLY for a turn that actually carries an image, and contained by the same
-  // seatbelt profile the image lane uses. See provider.rs `build_args`.
-  vision: true,
-  isDefault: false,
+  vision,
+  isDefault: DEFAULT_PROVIDER_MODELS[provider] === id,
 });
 
-const gemini = (id: string, label: string): ChatModelInfo => ({
-  id,
-  label,
-  provider: "gemini",
-  endpoint: GEMINI_OPENAI_BASE,
-  api: "openai",
-  vision: true, // rides the existing openai image parts
-  isDefault: false,
-});
-
-/** What each connected lane offers. Model ids are the EXACT strings the CLI /
- * API expects (`--model <id>`); the label carries the human context. A CLI lane
- * mirrors the choices its installed provider exposes so Rotli never hides a
- * capability the user's subscription already includes. */
+/** Only these catalogs can be merged into a live picker. Rust independently
+ * applies the same provider allowlist before resolving or spawning a binary. */
 export const CLI_CATALOG: Record<ProviderId, ChatModelInfo[]> = {
   claude: [
     cli("claude", "sonnet", "Claude Sonnet 5"),
@@ -201,30 +188,28 @@ export const CLI_CATALOG: Record<ProviderId, ChatModelInfo[]> = {
     cli("codex", "gpt-5.6-terra", "GPT-5.6 Terra"),
     cli("codex", "gpt-5.6-luna", "GPT-5.6 Luna"),
     cli("codex", "gpt-5.5", "GPT-5.5"),
-    cli("codex", "gpt-5.4", "GPT-5.4"),
-    cli("codex", "gpt-5.4-mini", "GPT-5.4 mini"),
     cli("codex", "gpt-5.3-codex-spark", "GPT-5.3 Codex Spark"),
   ],
-  agy: [
-    cli("agy", "gemini-3.7-flash-high", "Gemini 3.7 Flash (High)"),
-    cli("agy", "gemini-3.7-flash-medium", "Gemini 3.7 Flash (Medium)"),
-    cli("agy", "gemini-3.7-flash-low", "Gemini 3.7 Flash (Low)"),
-    cli("agy", "gemini-3.6-flash-high", "Gemini 3.6 Flash (High)"),
-    cli("agy", "gemini-3.6-flash-medium", "Gemini 3.6 Flash (Medium)"),
-    cli("agy", "gemini-3.6-flash-low", "Gemini 3.6 Flash (Low)"),
-    cli("agy", "gemini-3.1-pro-high", "Gemini 3.1 Pro (High)"),
-    cli("agy", "gemini-3.1-pro-low", "Gemini 3.1 Pro (Low)"),
-    cli("agy", "claude-sonnet-4-6", "Claude Sonnet 4.6 (Thinking)"),
-    cli("agy", "claude-opus-4-6-thinking", "Claude Opus 4.6 (Thinking)"),
-    cli("agy", "gpt-oss-120b-medium", "GPT-OSS 120B (Medium)"),
-  ],
-  gemini: [
-    gemini("gemini-3-pro", "Gemini 3 Pro"),
-    gemini("gemini-3-flash", "Gemini 3 Flash"),
-    gemini("gemini-2.5-pro", "Gemini 2.5 Pro"),
-    gemini("gemini-2.5-flash", "Gemini 2.5 Flash"),
+  cursor: [
+    cli("cursor", "grok-4.6", "Grok 4.6", false),
+    // Kept as an explicit alternative for users who prefer Cursor to choose.
+    // Native argv omits --model for this stable Rotli id.
+    cli("cursor", "cursor-auto", "Cursor Auto", false),
   ],
 };
+
+/** A persisted provider default is executable only when it still belongs to
+ * that provider's allowlisted catalog. Stale/hand-edited values heal to the
+ * reviewed default instead of becoming argv or silently crossing providers. */
+export function providerDefaultModel(
+  provider: ProviderId,
+  configured?: Readonly<Partial<Record<ProviderId, string>>> | null,
+): string {
+  const requested = configured?.[provider];
+  return requested && CLI_CATALOG[provider].some((model) => model.id === requested)
+    ? requested
+    : DEFAULT_PROVIDER_MODELS[provider];
+}
 
 export interface ModelGroups {
   local: ChatModelInfo[];
@@ -273,18 +258,15 @@ export function mergedModels(
   return { local, connected, presets: presets.map(presetModel) };
 }
 
-/** The cheapest model per lane for the toggle-on VERIFICATION ping — a real
- * one-line completion is the only honest "this lane works". */
-export const LANE_PING_MODEL: Record<ProviderId, string> = {
+/** Cheapest verification model for each executable connected lane. */
+export const LANE_PING_MODEL: Record<ConnectedProviderId, string> = {
   claude: "haiku",
   codex: "gpt-5.6-luna",
-  agy: "gemini-3.7-flash-medium",
-  gemini: "gemini-3-flash",
+  cursor: "grok-4.6",
 };
 
-/** Ready-made hybrid presets (stable ids so re-adding never duplicates). They
- * reference the maintainer's real defaults — routes to a lane you haven't enabled simply
- * fall away at runtime (runHybrid degrades, never fails a turn). */
+/** Ready-made presets use a local organizer and at most the allowed official
+ * Claude Code/Codex lanes. Disabled routes degrade to the on-device fallback. */
 export const STARTER_PRESETS: HybridPreset[] = [
   {
     id: "starter-everyday",
@@ -293,17 +275,7 @@ export const STARTER_PRESETS: HybridPreset[] = [
     routes: [
       { when: "notes lookups, summaries, quick questions", model: "gemma-3-12b-it-qat-4bit" },
       { when: "deep reasoning, long documents, careful writing", model: "sonnet" },
-      { when: "code questions and debugging", model: "gpt-5.5" },
-    ],
-    fallback: "gemma-3-12b-it-qat-4bit",
-  },
-  {
-    id: "starter-private",
-    name: "Private by default",
-    organizer: "qwen2.5-3b-instruct-4bit",
-    routes: [
-      { when: "almost everything — stay on this Mac", model: "gemma-3-12b-it-qat-4bit" },
-      { when: "only when explicitly asked to go big or use the web's knowledge", model: "gemini-3-flash" },
+      { when: "code questions and debugging", model: "gpt-5.6-sol" },
     ],
     fallback: "gemma-3-12b-it-qat-4bit",
   },
@@ -313,7 +285,7 @@ export const STARTER_PRESETS: HybridPreset[] = [
     organizer: "gemma-3-12b-it-qat-4bit",
     routes: [
       { when: "hard reasoning, analysis, strategy", model: "opus" },
-      { when: "coding, refactors, technical depth", model: "gpt-5.5" },
+      { when: "coding, refactors, technical depth", model: "gpt-5.6-sol" },
       { when: "everything else", model: "sonnet" },
     ],
     fallback: "gemma-3-12b-it-qat-4bit",
@@ -330,7 +302,7 @@ export function flattenModels(g: ModelGroups): ChatModelInfo[] {
  * any CLI lane's catalog (enabled or not: a sidebar badge should still read
  * well for a lane that's currently off), or a hybrid preset's name — else the
  * raw id. For the sidebar's per-chat model chip (the maintainer, 2026-08-03). */
-/** Which LANE a model id belongs to ("claude", "codex", "agy", "gemini",
+/** Which LANE a model id belongs to ("claude", "codex", "cursor",
  * "preset", or a local model's own provider). Undefined when the id matches
  * nothing rotli knows. Sibling of modelLabel — same three-catalog search, so
  * the label and the vendor mark can never disagree about a model. */

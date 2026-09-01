@@ -129,8 +129,9 @@ other is removed, bypassed, or compromised.
 | Filer write | `filer_writable` | locked + secure refusal (unchanged) |
 | Organizer | `snapshot_note` / `auto_applies` | skips secure and locked (unchanged) |
 | Send | `chat::egress_allowed` | a non-local endpoint refuses secret-shaped, secure-marked, or secure-ECHOING transcripts |
-| CLI send | `provider::cli_complete` / `generate_image` | the same predicate on the connected-model and image lanes |
-| Organizer send | `provider::organizer_egress_allowed` | the remote organizer lane's own backstop behind `skip_reason` (added 2026-08-01) |
+| CLI send | `provider::cli_complete` | native policy permits only official local Claude Code, Codex, and Cursor clients, then applies `blocked_for_remote`; provider/model ids are allowlisted, and Cursor additionally uses ACP Ask mode in an empty scratch workspace with client permissions denied; every other provider id is refused before binary lookup |
+| Image send | `provider::generate_image` | provider-backed image generation is unavailable before path, credential, or process work |
+| Organizer send | local MLX transport only | legacy remote organizer settings normalize to local; no remote organizer transport exists |
 | Web | `web.rs` `blocked_for_remote` | search queries, fetch URLs, **and `open_url`** never carry protected content |
 | Agent list | `agent_listable` | files and folders a remote agent may not see are not offered |
 | Agent tag | `agent_frontmatter_writable` | a view tag is an AI write, so it takes the AI write gate |

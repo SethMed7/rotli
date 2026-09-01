@@ -17,13 +17,6 @@ const DEFAULT_ENDPOINT: &str = "http://localhost:11435";
 pub(crate) const DEFAULT_MODEL: &str = "gemma-3-12b-it-qat-4bit";
 const DEFAULT_API: &str = "generate";
 
-/// Gemini's OpenAI-compatible surface (Settings → AI Models, bring-your-own
-/// key). Rides this same openai pipeline; the Bearer comes from the Keychain.
-/// NON-LOCAL on purpose — `egress_allowed` + `corpus_read_ai` treat it as the
-/// remote it is (secure notes never ride to it).
-pub(crate) const GEMINI_OPENAI_BASE: &str =
-    "https://generativelanguage.googleapis.com/v1beta/openai";
-
 /// The interactive paths wait up to two minutes; the background daemon uses a
 /// much shorter caller-set timeout so it never camps on the model server.
 const CHAT_TIMEOUT: Duration = Duration::from_secs(120);
@@ -98,6 +91,19 @@ pub(crate) fn model_is_local(model_id: &str, endpoint: &str) -> bool {
         .any(|model| {
             model.id == model_id
                 && model.endpoint.trim_end_matches('/') == endpoint.trim_end_matches('/')
+                && matches!(model.provider.as_str(), "mlx" | "llamacpp" | "ollama")
+        })
+}
+
+/// Whether an id belongs to a registered on-device chat model. Breve uses this
+/// to normalize legacy remote model policy without trusting a webview label.
+pub(crate) fn is_registered_local_model_id(model_id: &str) -> bool {
+    read_models()
+        .unwrap_or_else(default_models)
+        .iter()
+        .any(|model| {
+            model.id == model_id
+                && endpoint_is_local(&model.endpoint)
                 && matches!(model.provider.as_str(), "mlx" | "llamacpp" | "ollama")
         })
 }
@@ -400,7 +406,7 @@ pub async fn chat_messages_stream(
 
 /// The transport accepts only KNOWN destinations (audit 2026-07, egress #3):
 /// a loopback endpoint (on-device by construction), a registry-declared
-/// provider endpoint, or the pinned Gemini compatibility base. `endpoint` is
+/// provider endpoint. `endpoint` is
 /// webview-supplied, so without this clamp a future (or compromised) TS path
 /// could legally ship an ordinary — non-secret-shaped — transcript to any host
 /// it names; the secret scan alone does not bound the DESTINATION class.
@@ -409,19 +415,8 @@ fn endpoint_permitted(endpoint: &str) -> Result<(), String> {
     if endpoint_is_local(endpoint) {
         return Ok(());
     }
-    let base = endpoint.trim_end_matches('/');
-    if base == GEMINI_OPENAI_BASE.trim_end_matches('/') {
-        return Ok(());
-    }
-    if read_models()
-        .unwrap_or_else(default_models)
-        .iter()
-        .any(|m| m.endpoint.trim_end_matches('/') == base)
-    {
-        return Ok(());
-    }
     Err(format!(
-        "unknown model endpoint \"{endpoint}\" — chat only talks to registered model servers or the Gemini lane."
+        "cloud model endpoints are unavailable — chat only talks to on-device model servers (refused \"{endpoint}\")."
     ))
 }
 
@@ -440,6 +435,9 @@ fn egress_allowed(endpoint: &str, model: &str, messages: &[WireMsg]) -> Result<(
     if model_is_local(model, endpoint) {
         return Ok(());
     }
+    // Provider-account policy is stronger than the secret detector: no remote
+    // transcript may leave this command at all. Keep the scan below as useful
+    // error specificity and defense-in-depth for future authorized API lanes.
     if messages
         .iter()
         .any(|m| crate::secret::blocked_for_remote(&m.content))
@@ -448,7 +446,7 @@ fn egress_allowed(endpoint: &str, model: &str, messages: &[WireMsg]) -> Result<(
             "This conversation carries secret-shaped content and can't be sent to a remote model — switch to a local model to continue.".into(),
         );
     }
-    Ok(())
+    Err("Cloud model execution is unavailable — switch to an on-device model to continue.".into())
 }
 
 /// The organizer daemon's transport (doc §2): the MLX `/api/generate` bridge with
@@ -654,7 +652,7 @@ fn messages_openai(
         "messages": msgs,
     });
     let mut req = ureq::post(&url).timeout(Duration::from_secs(120));
-    if let Some(key) = openai_bearer(base)? {
+    if let Some(key) = openai_bearer(base) {
         req = req.set("Authorization", &format!("Bearer {key}"));
     }
     let resp = req
@@ -689,35 +687,20 @@ fn wire_to_openai(m: &WireMsg) -> serde_json::Value {
     serde_json::json!({ "role": m.role, "content": parts })
 }
 
-/// The chat-completions URL for an openai-shaped base. Local servers
-/// (llama.cpp) mount at `/v1/chat/completions`; Gemini's compatibility base
-/// already ends in `/openai` and mounts directly at `/chat/completions`.
+/// The chat-completions URL for a local OpenAI-shaped server (llama.cpp).
 fn openai_url(base: &str) -> String {
-    if base.ends_with("/openai") {
-        format!("{base}/chat/completions")
-    } else {
-        format!("{base}/v1/chat/completions")
-    }
+    format!("{base}/v1/chat/completions")
 }
 
-/// Which Bearer an openai-shaped base gets: Gemini → the Keychain key (a
-/// MISSING key is a hard, actionable error — never an unauthenticated call);
-/// local llama.cpp → the supervisor's 0600 file key, absent = no header.
+/// A local llama.cpp base gets the supervisor's 0600 file key, absent = no header.
 /// The file key guards the LOOPBACK supervisor ONLY — it must never ride to a
 /// non-local base (audit 2026-07, egress #2: before this gate, any remote
 /// "openai" endpoint received it as a Bearer).
-fn openai_bearer(base: &str) -> Result<Option<String>, String> {
-    if base.starts_with(GEMINI_OPENAI_BASE) {
-        return crate::keychain::get_secret(crate::keychain::GEMINI_API_KEY_ACCOUNT)
-            .map(Some)
-            .ok_or_else(|| {
-                "Gemini needs its API key — add it in Settings → AI Models.".to_string()
-            });
-    }
+fn openai_bearer(base: &str) -> Option<String> {
     if endpoint_is_local(base) {
-        return Ok(read_api_key());
+        return read_api_key();
     }
-    Ok(None)
+    None
 }
 
 /// The 0600 local API key the llama.cpp supervisor expects (`--api-key`). None if
@@ -778,23 +761,11 @@ mod tests {
     }
 
     #[test]
-    fn openai_url_branches_on_the_gemini_base() {
-        // local llama.cpp mounts under /v1; Gemini's compat base already ends
-        // in /openai and mounts directly at /chat/completions
+    fn openai_url_is_local_llamacpp_shape() {
         assert_eq!(
             openai_url("http://localhost:11436"),
             "http://localhost:11436/v1/chat/completions"
         );
-        assert_eq!(
-            openai_url(GEMINI_OPENAI_BASE),
-            format!("{GEMINI_OPENAI_BASE}/chat/completions")
-        );
-    }
-
-    #[test]
-    fn gemini_base_is_never_local() {
-        // the whole secure-note gate hangs on this: the Gemini lane is REMOTE
-        assert!(!endpoint_is_local(GEMINI_OPENAI_BASE));
     }
 
     #[test]
@@ -845,9 +816,9 @@ mod tests {
         }];
         // local endpoint: secure content rides fine
         assert!(egress_allowed(DEFAULT_ENDPOINT, DEFAULT_MODEL, &secret).is_ok());
-        // remote endpoint: the secret refuses, clean text passes
+        // every remote endpoint is refused, whether or not content is secret
         assert!(egress_allowed("https://api.example.com/v1", DEFAULT_MODEL, &secret).is_err());
-        assert!(egress_allowed("https://api.example.com/v1", DEFAULT_MODEL, &clean).is_ok());
+        assert!(egress_allowed("https://api.example.com/v1", DEFAULT_MODEL, &clean).is_err());
         // a frontier model behind localhost is still denied
         assert!(egress_allowed(DEFAULT_ENDPOINT, "claude-proxy", &secret).is_err());
         // ANY turn carrying the secret trips it, not just the last
@@ -868,15 +839,14 @@ mod tests {
         assert!(egress_allowed("", DEFAULT_MODEL, &secret).is_err());
     }
 
-    /// The destination clamp (audit 2026-07, egress #3): loopback and the
-    /// pinned Gemini base always pass; an arbitrary remote host never does,
-    /// no matter how clean the transcript.
+    /// The destination clamp is local-only. No remote provider base passes.
     #[test]
     fn endpoint_permitted_clamps_to_known_destinations() {
         assert!(endpoint_permitted(DEFAULT_ENDPOINT).is_ok());
         assert!(endpoint_permitted("http://127.0.0.1:11436").is_ok());
-        assert!(endpoint_permitted(GEMINI_OPENAI_BASE).is_ok());
-        assert!(endpoint_permitted(&format!("{GEMINI_OPENAI_BASE}/")).is_ok());
+        assert!(
+            endpoint_permitted("https://generativelanguage.googleapis.com/v1beta/openai").is_err()
+        );
         // arbitrary remote hosts are refused — the transcript-egress class
         assert!(endpoint_permitted("https://attacker.example/v1").is_err());
         assert!(endpoint_permitted("https://api.openai.com/v1").is_err());
@@ -893,8 +863,8 @@ mod tests {
     /// (audit 2026-07, egress #2).
     #[test]
     fn local_api_key_never_rides_to_a_remote_base() {
-        assert_eq!(openai_bearer("https://attacker.example/v1").unwrap(), None);
-        assert_eq!(openai_bearer("https://api.openai.com/v1").unwrap(), None);
+        assert_eq!(openai_bearer("https://attacker.example/v1"), None);
+        assert_eq!(openai_bearer("https://api.openai.com/v1"), None);
     }
 
     #[test]

@@ -238,8 +238,19 @@ export function useNoteSearch(query: string) {
   });
 }
 
-export function useNote(id: string) {
-  return useQuery({ queryKey: keys.note(id), queryFn: () => notesService.getNote(id) });
+export function useNote(id: string, options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: keys.note(id),
+    queryFn: () => notesService.getNote(id),
+    enabled: options.enabled ?? true,
+  });
+}
+
+/** Seed one just-created note before an optimistic tab retargets. This is a
+ * presentation handoff only; structural list caches still refresh through the
+ * ordinary create workflow. */
+export function primeNote(note: Note): void {
+  queryClient.setQueryData(keys.note(note.id), note);
 }
 
 export async function invalidateNotes(): Promise<void> {
@@ -277,6 +288,7 @@ export function applyNoteWrite(note: Note, opts?: { tasksChanged?: boolean }): P
     !!cached &&
     (cached.title !== summary.title ||
       cached.snippet !== summary.snippet ||
+      cached.bodyEmpty !== summary.bodyEmpty ||
       cached.pinned !== summary.pinned ||
       Math.abs(summary.updatedAt - cached.updatedAt) >= 60_000);
   if (rowChanged) {
@@ -383,7 +395,7 @@ export function useTrashItems() {
       useUiStore
         .getState()
         .setRowActionError(
-          `Couldn’t move this folder to Trash — ${error instanceof Error ? error.message : String(error)}`,
+          `Couldn’t move these items to Trash — ${error instanceof Error ? error.message : String(error)}`,
         ),
     onSettled: invalidateBoth,
   });
@@ -398,7 +410,7 @@ export function useRenameNote() {
       if (!t) return;
       const note = await notesService.getNote(id);
       if (!note) throw new Error(`unknown note: ${id}`);
-      await notesService.updateNote(id, replaceTitleLine(note.body ?? "", t), note.revision);
+      await notesService.updateNote(id, replaceTitleLine(note.body ?? "", t), note.revision, note.body);
     },
     onSuccess: async () => {
       await invalidateNotes();

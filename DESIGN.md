@@ -88,9 +88,12 @@ exception.
 - Held-Command badges show the complete live chord. Controls that are meant to
   be invoked directly from that reveal state include Command in their default
   chord, and a badge on the active control uses the calm surface voice instead
-  of repeating accent-on-accent. The titlebar New and pane-split controls tag
-  the exact registry action they run; the visible `+` and ⌘N are one new-item
-  chooser, never two creation grammars.
+  of repeating accent-on-accent. A badge may anchor only to the portion of its
+  control that is actually visible through every overflow-clipping ancestor;
+  a tab scrolled behind the strip edge must never paint a shortcut over the
+  sidebar. The titlebar New and pane-split controls tag the exact registry
+  action they run; the visible `+` and ⌘N are one new-item chooser, never two
+  creation grammars.
 - The sidebar's active-item grammar follows the focused pane across Markdown,
   boards, PDFs, DOCX, sheets, and other surfaced files. Opening a conventional
   file expands its containing folder and highlights the same durable item id;
@@ -205,6 +208,12 @@ exception.
   Date modified / Date created; re-picking the active key flips direction. A
   selected item or gathered selection can be dragged onto the System Trash row;
   it uses the same guarded lifecycle operation as `⌘Delete`.
+- Main uses the same gathered-selection expectation for destructive row-menu
+  actions: ⌘-click gathers rows, right-clicking a gathered member preserves the
+  set, and the menu names `Move N items to Trash`. The batch preflights
+  conventional files, routes notes/boards/files through their owning lifecycle
+  lanes, removes Main references only after success, and reports partial
+  progress instead of pretending the group was atomic.
 - Every tab is closeable, including the last one: the lone pane rests on the
   quokka empty state with quiet ways back in (new note · search · reopen tab).
   An empty pane is a designed state, not an error.
@@ -217,9 +226,25 @@ exception.
   showing Chat/Breve.
 - Tab hover is paint-only: close controls reserve their space, and switching
   hover/active state never moves neighboring tabs. Crowded tab bars follow the
-  persisted Scroll or Fit preference. The sidebar, panes, search, and System
-  counts always represent one active vault. Connected vaults are reachable only
-  through the explicit switcher; they never mix content into the current shell.
+  persisted Scroll or Fit preference. ⌘T appends and activates its tab in the
+  originating key event; durable creation and cache refresh continue behind
+  that presentation. Completion retargets the exact pending tab
+  rather than opening another one, and a pending tab the user already closed
+  stays closed. A pending Markdown tab is the full focused editor on its first
+  paint, not an empty loading pane; it accepts keystrokes into a session buffer
+  and transfers that exact draft to the durable revision before retargeting.
+  Plain Markdown remains absent from Main and named views while its body is
+  empty; its first successful non-empty save files the correctly titled row in
+  the creation context captured at ⌘T. If the pending tab closes before
+  creation settles, the still-blank result is discarded after a native
+  blankness check and can never arrive later as an orphaned `Untitled` row.
+  Populated formats still file after the refreshed identity index so a fresh
+  reference can never be mistaken for a stale one. ⌘W likewise removes the tab
+  in its frontend key event; large-note save assembly advances only after that
+  close reaches a paint boundary, while hide/quit flushes remain authoritative.
+  The sidebar, panes, search, and System counts always represent one active
+  vault. Connected vaults are reachable only through the explicit switcher;
+  they never mix content into the current shell.
 - Quick Look is a PEEK, never the workspace: Space (or the row menu's Preview)
   opens a modal preview; formats without a faithful cheap render show an
   honest metadata card, and the Open button is always the escalation to the
@@ -406,16 +431,40 @@ polish work.
 
 ## Markdown editing
 
+- `[][]` followed by Space creates a compact check/X result row. The check is
+  left and means yes/passed; the X is right, uses the semantic failure red (not
+  the theme accent), and means no/failed. Both labeled buttons are mutually
+  exclusive, keyboard-activatable, and individually reachable with Tab. Once
+  chosen, only the result label becomes bold success/failure; a reason after
+  `—` remains quiet body text. The inline `+ reason` action inserts that
+  portable suffix and returns the caret to the row. The source remains
+  `- [x][ ]` for pass and `- [ ][x]` for fail. Unanswered rows stay neutral,
+  and an ambiguous hand-edited pair fails closed as ordinary Markdown.
+- `()` followed by Space creates a radio-style `- ( )` option. Adjacent options
+  at the same indent are one group; selection writes `(x)` to one source row
+  and clears its siblings atomically. Blank/prose rows and indentation changes
+  are explicit group boundaries. Selected option text is bold accent emphasis,
+  never success/failure color. Controls follow Tab order; Tab while the text
+  caret owns a row keeps Rotli's existing line-indent behavior.
 - A Markdown pane reveals one compact scroll-to-top control after meaningful
   downward scrolling. It floats at the pane's bottom-right, remains a labeled
   keyboard-focusable button, and uses reduced-motion-safe spatial feedback.
   Turning file metadata on returns that pane to the top immediately because
   the metadata banner exists only above the note body.
-- Dropping local images into Markdown imports them into the memex and inserts
-  their image links at the pointer's drop position. Capture that document
-  position before asynchronous imports begin so later layout or selection
-  changes cannot redirect the insertion. A drop onto an empty bullet, numbered
-  item, or task fills that item instead of inserting an unlisted image below it.
+- Dropping local images into Markdown imports them into the open note's own
+  registered vault and inserts portable, root-relative image links at the
+  pointer's drop position. Nested rendered content—including an existing image
+  under the pointer—resolves back to its editor before routing. Capture that
+  document position before asynchronous imports begin so later layout or
+  selection changes cannot redirect the insertion. A drop onto an empty bullet,
+  numbered item, task, result, or choice fills that item instead of inserting an
+  unlisted image below it. Import failures remain visible instead of silently
+  discarding the gesture.
+- The **Attach image** slash command is discoverable by both `/attatch` and
+  `/attach`. It opens the native Finder picker, supports multi-select, and uses
+  the same guarded import and portable insertion lane as a drop. Native drop
+  hit-testing accepts both physical and logical runtime coordinates; a webview
+  `File` drop is the byte-backed fallback when no native path event is exposed.
 - A selection that completely contains an image keeps the image rendered and
   visibly selected, including Select All. A caret already inside its source or
   a partial source selection remains an escape hatch for editing the Markdown

@@ -19,7 +19,7 @@ export interface NotesService {
   searchNotes(query: string, limit?: number): Promise<SearchHit[]>;
   getNote(id: string): Promise<Note | null>;
   createNote(folderId: string, body: string, policy?: NoteCreationPolicy): Promise<Note>;
-  updateNote(id: string, body: string, expectedRevision: string): Promise<Note>;
+  updateNote(id: string, body: string, expectedRevision: string, expectedBody?: string): Promise<Note>;
   deleteNote(id: string): Promise<void>;
   /** Lifecycle moves preserve identity; restore applies the durable origin
    * rule and falls back to Inbox when the former home no longer exists. */

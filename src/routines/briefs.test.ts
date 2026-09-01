@@ -36,6 +36,7 @@ describe("Breve workspace model", () => {
       "sonnet",
       "gemini",
       "gemma",
+      "gemma-3-12b-it-qat-4bit",
       "gpt",
     ]);
   });

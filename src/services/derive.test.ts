@@ -25,6 +25,9 @@ describe("titleOf — first non-empty line, markdown stripped (mirrors Rust titl
     // in progress (2026-08-04). Mirrors the Rust title_of vector.
     expect(titleOf("- [x] ship it\n")).toBe("ship it");
     expect(titleOf("- [/] draft the memo\n")).toBe("draft the memo");
+    expect(titleOf("- [ ][x] API fails\n")).toBe("API fails");
+    expect(titleOf("- [x][ ] API passes\n")).toBe("API passes");
+    expect(titleOf("- (x) Blue\n")).toBe("Blue");
   });
 
   test("falls back to Untitled only when NOTHING is non-empty", () => {
@@ -63,6 +66,9 @@ describe("snippetOf — lines after the title, stripped + joined (mirrors Rust s
   test("strips checkbox + list markers on EVERY line (Rust parity — was the TSP-2 bug)", () => {
     // every body line is stripped, not just the first, so both dashes go.
     expect(snippetOf("# T\n- [x] done\n- [ ] todo")).toBe("done todo");
+    expect(snippetOf("# T\n- [ ][ ] pending check\n- [x][ ] passed check")).toBe(
+      "pending check passed check",
+    );
     expect(snippetOf("# T\n- only item")).toBe("only item");
   });
 

@@ -37,12 +37,6 @@ use crate::corpus::{self, CorpusState};
 /// The daemon's model timeout — deliberately far below chat's 120s so a stuck
 /// server never camps a background thread (doc §2: "shorter timeout than chat").
 const MODEL_TIMEOUT: Duration = Duration::from_secs(45);
-/// The Claude lane's timeout — a remote `claude -p` round-trip (spawn, network,
-/// Sonnet) is slower than the local server, so it gets a longer leash than the
-/// local MODEL_TIMEOUT. Still bounded so a hung CLI never camps the thread.
-const CLAUDE_TIMEOUT: Duration = Duration::from_secs(120);
-/// The authenticated Gemini/Antigravity CLI has the same remote latency class.
-const GEMINI_TIMEOUT: Duration = Duration::from_secs(120);
 /// Daemon replies are one small JSON object (classify: an area + confidence;
 /// enrich: a summary line + short tag/link arrays) — cap generation accordingly.
 const GEN_MAX_TOKENS: u32 = 512;
@@ -1157,24 +1151,17 @@ pub(crate) fn plan_wait(
 
 // ─── knobs (settings.json — frontend-owned, Rust READS only) ─────────────────
 
-/// Which model the organizer runs (settings.json `organizerModel`). `Local` is
-/// the on-device MLX server (default — organizing never leaves the Mac); `Claude`
-/// routes to `claude -p` Sonnet (the maintainer's choice — non-secure notes go remote,
-/// secure/locked never do). Copy so the per-cycle transport can close over it.
+/// Which model the organizer runs. Legacy remote values parse to Local so an
+/// old or hand-edited settings file cannot reactivate provider execution.
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum OrgModel {
     Local,
-    Claude,
-    Gemini35,
 }
 
 impl OrgModel {
     fn parse(s: &str) -> Self {
-        match s.trim().to_ascii_lowercase().as_str() {
-            "claude" => OrgModel::Claude,
-            "gemini35" => OrgModel::Gemini35,
-            _ => OrgModel::Local,
-        }
+        let _ = s;
+        OrgModel::Local
     }
 }
 
@@ -2384,38 +2371,23 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                 // the gates passed — the nudge's cycle is really starting (#29)
                 inner.run_now.store(false, Ordering::SeqCst);
             }
-            // which model organizes — re-read each cycle so a Settings change
-            // takes effect on the next wake (the maintainer, 2026-07-03). Default Local
-            // (on-device); Claude routes to `claude -p` Sonnet.
-            let org_model = {
+            // The organizer is structurally on-device. Parse the knob each
+            // cycle only to apply the legacy migration at the native boundary.
+            let _org_model = {
                 let s = corpus_state
                     .route(&root_id, |s| s.dot_read("settings"))
                     .unwrap_or_else(|_| "{}".into());
                 parse_knobs(&s).model
             };
-            let transport = |prompt: &str| match org_model {
-                OrgModel::Claude => {
-                    crate::provider::organizer_claude_complete(prompt, CLAUDE_TIMEOUT)
-                }
-                OrgModel::Gemini35 => {
-                    crate::provider::organizer_gemini_complete(prompt, GEMINI_TIMEOUT)
-                }
-                OrgModel::Local => {
-                    let msgs = [WireMsg {
-                        role: "user".to_string(),
-                        content: prompt.to_string(),
-                        images: Vec::new(),
-                    }];
-                    chat::complete_local(&msgs, true, 0.0, GEN_MAX_TOKENS, MODEL_TIMEOUT)
-                }
+            let transport = |prompt: &str| {
+                let msgs = [WireMsg {
+                    role: "user".to_string(),
+                    content: prompt.to_string(),
+                    images: Vec::new(),
+                }];
+                chat::complete_local(&msgs, true, 0.0, GEN_MAX_TOKENS, MODEL_TIMEOUT)
             };
-            // journal/filed_by must name the lane that ACTUALLY runs — a
-            // Claude-organized cycle used to be stamped as the local model
-            *inner.model_label.lock().unwrap() = match org_model {
-                OrgModel::Claude => "claude-sonnet".to_string(),
-                OrgModel::Gemini35 => "gemini-3.5-flash".to_string(),
-                OrgModel::Local => chat::DEFAULT_MODEL.to_string(),
-            };
+            *inner.model_label.lock().unwrap() = chat::DEFAULT_MODEL.to_string();
             // a Stop belongs to the cycle it interrupted, never to the next
             // one — cleared BEFORE busy goes up, so no press can slip into the
             // gap and be silently eaten while the UI shows busy (review F5)
@@ -3586,18 +3558,18 @@ mod tests {
             OrgModel::Local,
             "absent/garbage organizerModel → on-device"
         );
-        // recognized remote lanes are explicit; everything else stays local
+        // Legacy remote values fail closed to the on-device lane.
         assert_eq!(
             parse_knobs("{\"organizerModel\":\"claude\"}").model,
-            OrgModel::Claude
+            OrgModel::Local
         );
         assert_eq!(
             parse_knobs("{\"organizerModel\":\"Claude\"}").model,
-            OrgModel::Claude
+            OrgModel::Local
         );
         assert_eq!(
             parse_knobs("{\"organizerModel\":\"gemini35\"}").model,
-            OrgModel::Gemini35
+            OrgModel::Local
         );
         assert_eq!(
             parse_knobs("{\"organizerModel\":\"local\"}").model,

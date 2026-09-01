@@ -637,7 +637,25 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
                   usePanesStore.getState().openSummary(n, { newTab: true });
                 }
               }}
-              onContextMenu={(e) => openNoteMenu(e, n)}
+              onContextMenu={(e) => {
+                const selectedItems = mainSel.has(n.id)
+                  ? mainProjection.notes.filter((item) => mainSel.has(item.id))
+                  : [n];
+                if (!mainSel.has(n.id)) setMainSel(new Set([n.id]));
+                openNoteMenu(e, n, {
+                  selectedItems,
+                  trashSelection: (items) => {
+                    trashItems.mutate([...items], {
+                      onSuccess: () => {
+                        let tree = activeTree;
+                        for (const item of items) tree = removeFromMain(tree, item.id);
+                        setActiveTree(tree, liveIds);
+                        setMainSel(new Set());
+                      },
+                    });
+                  },
+                });
+              }}
               {...rp({ id: `main>${n.id}`, kind: "note" })}
             >
               {glyphForNote(n, { size: 14, className: "snicon" })}

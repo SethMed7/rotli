@@ -27,10 +27,15 @@ export async function createNewItem(
   options: { newTab?: boolean; open?: boolean } = {},
 ): Promise<CreatedItem> {
   const item = await dependencies.creator.create(kind);
-  await dependencies.presenter.refresh();
-  dependencies.presenter.fileInMain(item);
+  // Creation is already durable at this point. Present it before the
+  // corpus-wide cache refresh so a large vault cannot make a blank tab feel
+  // like a remote operation. Main/view filing follows the refreshed identity
+  // index: filing sooner can briefly create a reference the projection cannot
+  // resolve and therefore hides as stale.
   if (options.open !== false) {
     dependencies.presenter.open(item, { newTab: options.newTab ?? false });
   }
+  await dependencies.presenter.refresh();
+  dependencies.presenter.fileInMain(item);
   return item;
 }

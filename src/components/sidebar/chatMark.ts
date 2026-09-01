@@ -24,7 +24,7 @@ export type ChatLogoKey =
   | "meta"
   | "microsoft"
   | "mistral";
-export type ChatMarkKey = ChatLogoKey | "local" | "preset";
+export type ChatMarkKey = ChatLogoKey | "cursor" | "local" | "preset";
 
 export interface ChatMark {
   key: ChatMarkKey;
@@ -40,6 +40,7 @@ const MARKS: Record<ChatMarkKey, { initial?: string; logo?: ChatLogoKey; vendor:
   anthropic: { logo: "anthropic", vendor: "Anthropic" },
   openai: { logo: "openai", vendor: "OpenAI" },
   gemini: { logo: "gemini", vendor: "Google" },
+  cursor: { initial: "C", vendor: "Cursor" },
   gemma: { logo: "gemma", vendor: "this Mac" },
   qwen: { logo: "qwen", vendor: "this Mac" },
   meta: { logo: "meta", vendor: "this Mac" },
@@ -62,7 +63,8 @@ export function markKeyOf(provider: string | undefined, modelName = ""): ChatMar
       return "anthropic";
     case "codex":
       return "openai";
-    case "agy":
+    case "cursor":
+      return "cursor";
     case "gemini":
       return "gemini";
     case "preset":

@@ -2,9 +2,16 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
-import { CLI_CATALOG, PROVIDER_IDS, PROVIDER_LABELS, type ProviderId } from "../../ai/models";
 import { BREVE_PDF_PRESETS, validateBrevePdfPalette } from "../../brand/brevePdfThemes";
-import { type Block, parseBlock, renderInline } from "../../editor/render";
+import { choiceGlyph } from "../../editor/choiceState";
+import {
+  type Block,
+  parseBlock,
+  renderChoiceContent,
+  renderInline,
+  renderResultContent,
+} from "../../editor/render";
+import { resultGlyph } from "../../editor/resultState";
 import {
   type BreveRoutine,
   type BreveSnapshot,
@@ -22,7 +29,6 @@ import {
   breveWriteDeliverySettings,
   breveWriteConfig,
   chatModels,
-  cliDetect,
   corpusFileText,
   corpusResolveRef,
   fileAssetUrl,
@@ -237,11 +243,27 @@ function BriefBody({ body }: { body: string }) {
     else if (b.kind === "h2") blocks.push(<h2 key={key}>{renderInline(b.text)}</h2>);
     else if (b.kind === "h3") blocks.push(<h3 key={key}>{renderInline(b.text)}</h3>);
     else if (b.kind === "quote") blocks.push(<blockquote key={key}>{renderInline(b.text)}</blockquote>);
-    else if (b.kind === "bullet" || b.kind === "task" || b.kind === "numbered")
+    else if (
+      b.kind === "bullet" ||
+      b.kind === "task" ||
+      b.kind === "numbered" ||
+      b.kind === "result" ||
+      b.kind === "choice"
+    )
       blocks.push(
         <div key={key} className="pv-li" style={{ paddingLeft: `${(b.indent ?? 0) + 1.2}em` }}>
-          <span className="pv-marker">{b.marker ?? "•"}</span>
-          {renderInline(b.text)}
+          <span className="pv-marker">
+            {b.kind === "result"
+              ? resultGlyph(b.resultState ?? "unanswered")
+              : b.kind === "choice"
+                ? choiceGlyph(b.choiceSelected ?? false)
+                : (b.marker ?? "•")}
+          </span>
+          {b.kind === "result"
+            ? renderResultContent(b)
+            : b.kind === "choice"
+              ? renderChoiceContent(b)
+              : renderInline(b.text)}
         </div>,
       );
     else blocks.push(<p key={key}>{renderInline(b.text)}</p>);
@@ -1573,10 +1595,6 @@ function BriefSkillEditor() {
   );
 }
 
-type DetectMap = Partial<
-  Record<ProviderId, { installed: boolean; authenticated: boolean; version: string | null }>
->;
-
 /** A merged-Settings group heading — the former standalone page titles demoted
  * to quiet section anchors inside the one Settings home. */
 function SettingsGroupHead({ title, detail }: { title: string; detail: string }) {
@@ -1590,8 +1608,6 @@ function SettingsGroupHead({ title, detail }: { title: string; detail: string })
 
 function ModelsView({ snapshot, embedded = false }: { snapshot: BreveSnapshot; embedded?: boolean }) {
   const queryClient = useQueryClient();
-  const aiProviders = useUiStore((s) => s.aiProviders);
-  const blockedModels = useUiStore((s) => s.blockedModels);
   const [config, setConfig] = useState(snapshot.config);
   const [base, setBase] = useState(snapshot.config);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -1623,41 +1639,13 @@ function ModelsView({ snapshot, embedded = false }: { snapshot: BreveSnapshot; e
     queryFn: () => (isTauri() ? chatModels() : Promise.resolve([] as ChatModelInfo[])),
     staleTime: 60_000,
   });
-  const detects = useQuery({
-    queryKey: ["breve", "model-connections"],
-    queryFn: async (): Promise<DetectMap> => {
-      if (!isTauri()) return {};
-      const pairs = await Promise.all(
-        PROVIDER_IDS.map(async (id) => {
-          try {
-            return [id, await cliDetect(id)] as const;
-          } catch {
-            return [id, { installed: false, authenticated: false, version: null }] as const;
-          }
-        }),
-      );
-      return Object.fromEntries(pairs) as DetectMap;
-    },
-    staleTime: 30_000,
-  });
-
-  const connected = PROVIDER_IDS.flatMap((id) => {
-    const ready = detects.data?.[id];
-    // Breve may use any authenticated connection even when that lane is hidden
-    // from the general chat picker. The per-model blocklist still wins.
-    if (!ready?.installed || !ready.authenticated) return [];
-    return CLI_CATALOG[id].filter((model) => !blockedModels.includes(model.id));
-  });
-  const allModels = [...(local.data ?? []), ...connected];
-  const catalogModels = PROVIDER_IDS.flatMap((id) => CLI_CATALOG[id]);
+  const allModels = local.data ?? [];
   const options = modelPolicyOptions(
     config,
     allModels.map((model) => model.id),
   );
   const labelFor = (id: string) =>
-    allModels.find((model) => model.id === id)?.label ??
-    catalogModels.find((model) => model.id === id)?.label ??
-    id.replace(/-(it-qat|instruct)-4bit$/i, "");
+    allModels.find((model) => model.id === id)?.label ?? id.replace(/-(it-qat|instruct)-4bit$/i, "");
 
   const save = async () => {
     if (modelValidation) return;
@@ -1694,15 +1682,9 @@ function ModelsView({ snapshot, embedded = false }: { snapshot: BreveSnapshot; e
   return (
     <div className={embedded ? "breve-embed" : "breve-page"}>
       {embedded ? (
-        <SettingsGroupHead
-          title="Models"
-          detail="Choose the writer, ordered fallbacks, and the local helper used by briefs."
-        />
+        <SettingsGroupHead title="Models" detail="Choose the on-device model used by briefs." />
       ) : (
-        <PageHead
-          title="Models"
-          detail="Choose the writer, ordered fallbacks, and the local helper used by briefs."
-        />
+        <PageHead title="Models" detail="Choose the on-device model used by briefs." />
       )}
       <div className="breve-config-toolbar">
         <span className="breve-toolbar-grow" />
@@ -1727,8 +1709,8 @@ function ModelsView({ snapshot, embedded = false }: { snapshot: BreveSnapshot; e
           <div>
             <h3 id="breve-policy-title">Brief policy</h3>
             <p>
-              Authenticated models stay available to Breve even when hidden from Chat. Individually blocked
-              models remain excluded.
+              Breve uses only models registered on this Mac. Cloud-provider accounts and subscription CLIs are
+              not used by scheduled or Signal work.
             </p>
           </div>
         </div>
@@ -1882,22 +1864,21 @@ function ModelsView({ snapshot, embedded = false }: { snapshot: BreveSnapshot; e
         <div className="breve-section-head copy">
           <div>
             <h3 id="breve-connections-title">Connections</h3>
-            <p>Breve checks model access on this Mac without changing your Chat picker.</p>
+            <p>Only the local model service is eligible. Cloud connection checks are disabled.</p>
           </div>
-          {(local.isError || detects.isError) && (
+          {local.isError && (
             <button
               type="button"
               className="ghostbtn"
               onClick={() => {
                 void local.refetch();
-                void detects.refetch();
               }}
             >
               Check again
             </button>
           )}
         </div>
-        <div className="breve-connection-list" aria-busy={local.isLoading || detects.isLoading}>
+        <div className="breve-connection-list" aria-busy={local.isLoading}>
           <div className="breve-connection-row">
             <span>On this Mac</span>
             <span>
@@ -1917,26 +1898,6 @@ function ModelsView({ snapshot, embedded = false }: { snapshot: BreveSnapshot; e
                     : "Unavailable"}
             </strong>
           </div>
-          {PROVIDER_IDS.map((id) => {
-            const detected = detects.data?.[id];
-            const status =
-              detects.isLoading && !detected
-                ? "Checking"
-                : !detected?.installed
-                  ? "Not installed"
-                  : !detected.authenticated
-                    ? "Sign in required"
-                    : aiProviders[id]
-                      ? "Ready"
-                      : "Ready for Breve";
-            return (
-              <div className="breve-connection-row" key={id}>
-                <span>{PROVIDER_LABELS[id]}</span>
-                <span>{detected?.version ?? ""}</span>
-                <strong>{status}</strong>
-              </div>
-            );
-          })}
         </div>
       </section>
     </div>

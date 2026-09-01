@@ -17,7 +17,7 @@
 // In a plain browser (vite dev) every entry point here is a no-op — the
 // in-memory demo corpus stays exactly as it was (the seam's whole point).
 
-import { type HybridPreset, PROVIDER_IDS, type ProviderId } from "../ai/models";
+import { type HybridPreset, type ProviderId, providerDefaultModel } from "../ai/models";
 import { parseWebSearchProvider, type WebSearchProvider } from "../ai/searchProvider";
 import {
   QUOKKA_IDLE_POSES,
@@ -298,14 +298,14 @@ interface PersistedSettings {
   /** Connected subscription lanes (Settings → AI Models); all off by default —
    * a chat never leaves the Mac without the user flipping a lane on. */
   aiProviders: Record<ProviderId, boolean>;
+  /** Default model for a provider mention without an explicit model id. */
+  providerDefaults: Record<ProviderId, string>;
   /** Search destination for every globe-enabled chat in this vault. */
   webSearchProvider: WebSearchProvider;
   /** Hybrid model presets (organizer → routes → fallback). */
   hybridPresets: HybridPreset[];
   /** Connected models turned off inside an enabled lane (picker-hidden). */
   blockedModels: string[];
-  /** Which connected engine draws generate_image: codex (default) or agy. */
-  imageEngine: "codex" | "agy";
   /** How the Storage destination groups its binaries: Type / Date / Folder. */
   storageGrouping: "type" | "date" | "folder";
   /** The macOS Dock/app icon variant. */
@@ -475,6 +475,13 @@ export function parseSettings(raw: string): PersistedSettings {
       tableHeights[key] = rows.map((h) => Math.max(MIN_TABLE_ROW_PX, Math.round(h)));
     }
   }
+  const savedProviderDefaults = record(data.providerDefaults) as Partial<Record<ProviderId, string>>;
+  const providerDefaults: Record<ProviderId, string> = {
+    claude: providerDefaultModel("claude", savedProviderDefaults),
+    codex: providerDefaultModel("codex", savedProviderDefaults),
+    cursor: providerDefaultModel("cursor", savedProviderDefaults),
+  };
+  const providerDefaultIds = new Set(Object.values(providerDefaults));
   // expandedDests — keep only boolean entries; missing → seed Inbox + Vault so
   // an old config (which lacked this key) opens with the default tree. A stale
   // "Brain" key from before the Brain→Vault rename is harmless: it just expands a
@@ -624,21 +631,19 @@ export function parseSettings(raw: string): PersistedSettings {
     // an unknown value keeps the classic two-state click: a garbled file must
     // never silently change what a click does to someone's tasks
     taskCycle: TASK_CYCLES.includes(data.taskCycle as TaskCycle) ? (data.taskCycle as TaskCycle) : "two",
-    // booleans only, unknown lanes ignored — the safe default is every lane OFF
-    aiProviders: (() => {
-      const src = record(data.aiProviders);
-      const out = { claude: false, codex: false, agy: false, gemini: false };
-      for (const id of PROVIDER_IDS) {
-        if (typeof src[id] === "boolean") out[id] = src[id];
-      }
-      return out;
-    })(),
+    // Provider-account safety migration: only documented official-client
+    // preferences survive. Unknown legacy flags are discarded.
+    aiProviders: {
+      claude: record(data.aiProviders).claude === true,
+      codex: record(data.aiProviders).codex === true,
+      cursor: record(data.aiProviders).cursor === true,
+    },
+    providerDefaults,
     webSearchProvider: parseWebSearchProvider(data.webSearchProvider),
     hybridPresets: parseHybridPresets(data.hybridPresets),
     blockedModels: Array.isArray(data.blockedModels)
-      ? data.blockedModels.filter((x): x is string => typeof x === "string")
+      ? data.blockedModels.filter((x): x is string => typeof x === "string" && !providerDefaultIds.has(x))
       : [],
-    imageEngine: data.imageEngine === "agy" ? "agy" : "codex",
     storageGrouping:
       data.storageGrouping === "date" || data.storageGrouping === "folder" ? data.storageGrouping : "type",
     appIcon:
@@ -733,6 +738,7 @@ export function unknownSettingsKeys(raw: string): Record<string, unknown> {
     "vaultWelcomeSeen",
     "matchLightFamily",
     "matchDarkFamily",
+    "imageEngine",
   ]);
   return Object.fromEntries(Object.entries(data).filter(([key]) => !known.has(key) && !retired.has(key)));
 }
@@ -781,18 +787,18 @@ function applySettings(s: PersistedSettings): void {
     readAloud: s.readAloud,
     readAloudVoice: s.readAloudVoice,
     taskCycle: s.taskCycle,
-    aiProviders: s.aiProviders,
+    aiProviders: { ...s.aiProviders },
+    providerDefaults: { ...s.providerDefaults },
     webSearchProvider: s.webSearchProvider,
     hybridPresets: s.hybridPresets,
     blockedModels: s.blockedModels,
-    imageEngine: s.imageEngine,
     storageGrouping: s.storageGrouping,
     appIcon: s.appIcon,
     fileMetadata: s.fileMetadata,
     brainEnabled: s.brainEnabled,
     secureLocalAi: s.secureLocalAi,
     organizerTrust: s.organizerTrust,
-    organizerModel: s.organizerModel,
+    organizerModel: "local",
     organizerQuietSecs: s.organizerQuietSecs,
     librarianIntroSeen: s.librarianIntroSeen,
     onboarded: s.onboarded,
@@ -1482,18 +1488,18 @@ function settingsSnapshot(): string {
     readAloud: ui.readAloud,
     readAloudVoice: ui.readAloudVoice,
     taskCycle: ui.taskCycle,
-    aiProviders: ui.aiProviders,
+    aiProviders: { ...ui.aiProviders },
+    providerDefaults: { ...ui.providerDefaults },
     webSearchProvider: ui.webSearchProvider,
     hybridPresets: ui.hybridPresets,
     blockedModels: ui.blockedModels,
-    imageEngine: ui.imageEngine,
     storageGrouping: ui.storageGrouping,
     appIcon: ui.appIcon,
     fileMetadata: ui.fileMetadata,
     brainEnabled: ui.brainEnabled,
     secureLocalAi: ui.secureLocalAi,
     organizerTrust: ui.organizerTrust,
-    organizerModel: ui.organizerModel,
+    organizerModel: "local",
     organizerQuietSecs: ui.organizerQuietSecs,
     librarianIntroSeen: ui.librarianIntroSeen,
     onboarded: ui.onboarded,

@@ -47,6 +47,68 @@ Re-derived at every seam, never accepted from a caller:
 - Headless workspace agents (`rotli` CLI, `rotli-workspace` MCP) are remote for
   content policy even though the process is local.
 
+## Provider-account execution policy (2026-09-01)
+
+Interactive connected chat has exactly three executable official-client adapters:
+
+| Lane | Execution boundary | Account boundary |
+|---|---|---|
+| Claude Code | Native allowlist resolves the official local `claude` executable and invokes print mode with `--safe-mode`, no ambient tools for text turns, a bounded model allowlist, and no session persistence | The user authenticates in the official client outside Rotli. Rotli presents no Claude login and never reads or stores Claude credentials |
+| Codex | Native allowlist resolves the official local `codex` executable and invokes `codex exec` with a read-only sandbox, shell tool disabled, ephemeral state, and a bounded model allowlist | The user authenticates in the official client outside Rotli. Rotli presents no OpenAI login and never reads or stores OpenAI credentials |
+| Cursor · Code chat | Native allowlist resolves the official local `agent`/`cursor-agent` executable and speaks Cursor's documented ACP custom-client protocol. The process starts in read-only Ask mode from an empty temporary workspace; Rotli advertises no filesystem/terminal capability, supplies no MCP servers, rejects every permission request, and passes only an allowlisted model id (`grok-4.6` by default, or Cursor Auto) | The user runs `agent login` outside Rotli. Rotli presents no Cursor login and never reads or stores Cursor credentials. The lane is labeled for software work and never participates in Breve, organizer, image, or background execution |
+| Antigravity | **Unavailable** before spec or binary lookup; no launcher, argv builder, retry, sandbox, image, detection, Keychain, or Breve resolver implementation remains | No Google subscription credential is requested, inspected, or used |
+| Direct Gemini API | **Not implemented.** Google documents AI Studio API keys and Vertex AI as authorized, separately billed routes; Rotli has neither transport nor credential slot | No Gemini API key is requested, read, or stored |
+
+Google&rsquo;s Antigravity FAQ explicitly says third-party access through an
+Antigravity login violates its terms and may lead to suspension or termination;
+it directs third-party coding agents to a
+[Vertex or AI Studio API key](https://www.antigravity.google/docs/faq/). That is
+why there is no subscription-lane workaround here.
+
+This is an implementation and release boundary, not a claim that copying
+another application's architecture grants provider approval. OpenAI explicitly
+[documents local and programmatic Codex use with ChatGPT
+plans](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan).
+Anthropic documents [`claude -p` / headless
+mode](https://code.claude.com/docs/en/headless) and currently says
+[third-party Agent SDK use may draw from subscription
+limits](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan),
+but its [legal guidance](https://code.claude.com/docs/en/legal-and-compliance)
+also reserves third-party Claude.ai login or subscription-credential routing
+for approved products. Rotli
+does not implement provider login or credential handling; public distribution
+of the subscription-backed Claude lane still requires the maintainer to retain
+provider confirmation/approval. Without that confirmation, the release-safe
+fallback is Claude API-key billing or disabling the Claude lane—not silently
+routing a subscription.
+
+Cursor explicitly [documents ACP as the interface for custom clients and
+third-party editor integrations](https://cursor.com/docs/cli/acp), including
+authentication through an existing Cursor login. Its
+[Terms](https://cursor.com/en-US/terms-of-service) describe the Service as
+software-development tooling;
+Rotli therefore exposes Cursor only as an interactive software/code-chat lane
+through ACP, never as a general background model service. Rotli does not rent,
+resell, share, or proxy a Cursor account: each local user installs the official
+client and authenticates their own account directly.
+
+Cursor [documents Grok 4.6](https://cursor.com/docs/models/grok-4-6) in its model
+pool, so it is Rotli&rsquo;s reviewed initial
+Cursor default. Grok Bot is a separate persistent cloud-computer product whose
+model selection Cursor manages; Cursor does not document it as an ACP or API
+embedding route. Rotli therefore does not imitate or automate
+[Grok Bot](https://cursor.com/docs/grok-bot).
+
+An explicit `@claude`, `@codex`, or `@cursor` chat tag resolves only against an
+enabled, authenticated, unblocked catalog. An optional `:model-id` must match
+the same provider&rsquo;s allowlist. The tag stays in the durable transcript for
+auditability, is stripped from the provider prompt, and the answer is stamped
+with the provider and model. A tag never changes the chat&rsquo;s primary model.
+
+Breve, the organizer, and scheduled/background jobs are local-only. Provider-
+backed image generation is disabled. Unsupported provider ids and retired
+settings are discarded or rejected; they cannot become process arguments.
+
 ## The three content predicates
 
 Everything in the tables below reduces to which question a seam asks.
@@ -99,10 +161,10 @@ way a compromised loop would.
 | # | Path | Verdict | Enforced by |
 |---|---|---|---|
 | 1 | `chat_messages` → loopback model | SAFE | destination clamp (`endpoint_permitted`), then the local lane is unrestricted by design |
-| 2 | `chat_messages` → Gemini / registered remote | **GAP → FIXED** | `egress_allowed` asked `protected_for_remote`; it now asks `blocked_for_remote`, so stripped secure prose no longer passes |
-| 3 | `cli_complete` → `claude` / `codex` / `agy` | **GAP → FIXED** | same upgrade. This is the lane the maintainer's frontier models actually use, and it was reachable with the body of any secure note via the ungated `corpus_read` |
-| 4 | `generate_image` → `codex` / `agy` | **GAP → FIXED** | same upgrade; a prompt is an egress channel like any other |
-| 5 | Organizer → `claude` / `agy` (`organizerModel` setting) | **GAP → FIXED** | had **no** transcript backstop at all — the only remote seam in the codebase with a single line of defense. `organizer_egress_allowed` is now that second line, and it also covers the two content paths that never passed `skip_reason`: an area `_index.md` description (excluded from snapshotting) and the enrich prompt built after a filing move without a fresh secure re-read |
+| 2 | `chat_messages` → remote HTTP / Gemini | **RETIRED** | `endpoint_permitted` now accepts only registered on-device loopback destinations; the remote HTTP compatibility transport was removed |
+| 3 | `cli_complete` → `claude` / `codex` / `cursor` | **GAP → FIXED** | native policy permits only the three official local clients before spec/binary lookup, then `blocked_for_remote`, binary/model allowlists, and inert argv/protocol fields apply; Cursor additionally uses ACP Ask mode in an empty scratch workspace and denies permissions; AGY/Gemini are refused |
+| 4 | `generate_image` → any provider | **RETIRED** | the stable IPC command returns a native unavailable error before root/path resolution, credential lookup, or process spawn |
+| 5 | Organizer → remote provider | **RETIRED** | the organizer has only the local MLX transport; legacy Claude/Gemini settings normalize to local and no remote organizer function exists |
 | 6 | Organizer → local MLX | SAFE | `complete_local` is loopback by construction |
 
 ### Web lanes
@@ -153,22 +215,15 @@ These are real and they are not silently carried. Each needs either a product
 decision from the maintainer or a change whose blast radius does not belong in a security
 commit.
 
-### O1 — Breve filesystem exposure (MITIGATED; residual TOCTOU)
+### O1 — Breve filesystem exposure (CLOSED for remote models)
 
-Every Claude/Antigravity model spawn now rebuilds a macOS Seatbelt profile from
-the current roots. The final policy denies `.rotli/`, `.git/`, the protected
-lane, secure/tainted Markdown reads, and all writes to locked files. The brief
-scripts pass `--require`: `BREVE_SANDBOX=0`, a missing `sandbox-exec`, or profile
-generation failure refuses model execution. The former Codex knowledge-bearing
-fallback was removed because its native sandbox could not express literal
-secure-file read denies.
-
-This is still not a perfect snapshot boundary. A same-user process can change a
-file's frontmatter after profile generation and before the model opens it. The
-canonical secure lane remains directory-denied, so the residual concerns a
-legacy or externally edited secure file outside that lane. A truly closed design
-would give the model an immutable, filtered projection rather than the live
-corpus.
+Breve no longer spawns Claude, Codex, Antigravity, Gemini, or another remote
+model process. Managed configuration is normalized to a registered on-device
+model at every native read/write/import/takeover boundary; scheduled and Signal
+scripts use the loopback adapter; the retained legacy spawn shim refuses before
+binary lookup. The former remote-model Seatbelt and live-vault TOCTOU concern is
+therefore no longer an egress path. Ordinary local-model filesystem policy
+remains governed by the secure/locked matrix.
 
 ### O2 — the model registry was an unprotected trust anchor (FIXED)
 

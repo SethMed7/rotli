@@ -7,11 +7,28 @@
 import type { MouseEvent, ReactNode } from "react";
 
 import { openUrl } from "../lib/tauri";
+import { CHOICE_RE, ORDERED_CHOICE_RE } from "./choiceState";
+import {
+  ORDERED_RESULT_RE,
+  RESULT_RE,
+  type ResultState,
+  resultStateOf,
+  resultTextParts,
+} from "./resultState";
 import { ORDERED_TASK_RE, TASK_RE, type TaskState, taskStateOf } from "./taskState";
 
 export type HeadingKind = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
 
-export type BlockKind = HeadingKind | "bullet" | "numbered" | "task" | "quote" | "para" | "blank";
+export type BlockKind =
+  | HeadingKind
+  | "bullet"
+  | "numbered"
+  | "task"
+  | "result"
+  | "choice"
+  | "quote"
+  | "para"
+  | "blank";
 
 export interface Block {
   kind: BlockKind;
@@ -23,6 +40,10 @@ export interface Block {
    * every other kind. It replaced a plain boolean on 2026-08-04: a boolean had
    * nowhere to put "in progress", and made a typed `[/]` render as CHECKED. */
   state?: TaskState;
+  /** A two-choice result row's selected side. Undefined for every other kind. */
+  resultState?: ResultState;
+  /** Whether this option is selected within its adjacent single-choice group. */
+  choiceSelected?: boolean;
   /** The `1.` glyph of a numbered item — also set on an ORDERED task
    * (`1. [ ] x`), which parses as kind "task" with a marker. */
   marker?: string;
@@ -51,6 +72,25 @@ export function parseBlock(line: string): Block {
   const indentChars = /^[ \t]+/.exec(line)?.[0] ?? "";
   const indent = indentChars.replace(/\t/g, "  ").length;
   const body = indentChars ? line.slice(indentChars.length) : line;
+  const result = RESULT_RE.exec(body);
+  const resultState = result ? resultStateOf(result[1] ?? " ", result[2] ?? " ") : null;
+  if (result && resultState !== null)
+    return {
+      kind: "result",
+      prefixLen: indentChars.length + result[0].length,
+      text: body.slice(result[0].length),
+      resultState,
+      indent,
+    };
+  const choice = CHOICE_RE.exec(body);
+  if (choice)
+    return {
+      kind: "choice",
+      prefixLen: indentChars.length + choice[0].length,
+      text: body.slice(choice[0].length),
+      choiceSelected: (choice[1] ?? " ").toLowerCase() === "x",
+      indent,
+    };
   const t = TASK_RE.exec(body);
   if (t)
     return {
@@ -62,6 +102,19 @@ export function parseBlock(line: string): Block {
     };
   if (body.startsWith("- "))
     return { kind: "bullet", prefixLen: indentChars.length + 2, text: body.slice(2), indent };
+  const orderedResult = ORDERED_RESULT_RE.exec(body);
+  const orderedResultState = orderedResult
+    ? resultStateOf(orderedResult[2] ?? " ", orderedResult[3] ?? " ")
+    : null;
+  if (orderedResult && orderedResultState !== null)
+    return {
+      kind: "result",
+      prefixLen: indentChars.length + orderedResult[0].length,
+      text: body.slice(orderedResult[0].length),
+      resultState: orderedResultState,
+      marker: `${orderedResult[1]}.`,
+      indent,
+    };
   // GFM's ordered task ("1. [ ] x") — a task that keeps its number as marker;
   // must win over the plain numbered rule below
   const ot = ORDERED_TASK_RE.exec(body);
@@ -72,6 +125,16 @@ export function parseBlock(line: string): Block {
       text: body.slice(ot[0].length),
       state: taskStateOf(ot[2] ?? " "),
       marker: `${ot[1]}.`,
+      indent,
+    };
+  const orderedChoice = ORDERED_CHOICE_RE.exec(body);
+  if (orderedChoice)
+    return {
+      kind: "choice",
+      prefixLen: indentChars.length + orderedChoice[0].length,
+      text: body.slice(orderedChoice[0].length),
+      choiceSelected: (orderedChoice[2] ?? " ").toLowerCase() === "x",
+      marker: `${orderedChoice[1]}.`,
       indent,
     };
   const n = NUMBERED_RE.exec(body);
@@ -182,4 +245,28 @@ export function renderInline(text: string): ReactNode[] {
     rest = rest.slice(best.index + best.match[0].length);
   }
   return out;
+}
+
+/** Static readers mirror the editor's selected-label + optional-reason voice. */
+export function renderResultContent(block: Block): ReactNode {
+  const state = block.resultState ?? "unanswered";
+  if (state === "unanswered") return renderInline(block.text);
+  const parts = resultTextParts(block.text);
+  return (
+    <>
+      <span className={`pv-result-text pv-result-text--${state}`}>{renderInline(parts.label)}</span>
+      {parts.reason !== null ? (
+        <span className="pv-result-reason"> — {renderInline(parts.reason)}</span>
+      ) : null}
+    </>
+  );
+}
+
+/** Multiple-choice selection is emphasis, not success or failure. */
+export function renderChoiceContent(block: Block): ReactNode {
+  return block.choiceSelected ? (
+    <span className="pv-choice-text--selected">{renderInline(block.text)}</span>
+  ) : (
+    renderInline(block.text)
+  );
 }

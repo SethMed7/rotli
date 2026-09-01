@@ -115,7 +115,7 @@ export function endpointIsLocal(endpoint: string): boolean {
 }
 
 /** Frontend fail-closed mirror for retrieval filtering. A localhost proxy for
- * Claude/Codex/Gemini is still frontier AI, so endpoint locality alone is not
+ * any frontier provider is still remote AI, so endpoint locality alone is not
  * enough. Rust validates the model against the registry at the read boundary. */
 export function modelIsOnDevice(model: { provider: string; endpoint: string }): boolean {
   return (

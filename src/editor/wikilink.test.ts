@@ -107,6 +107,7 @@ describe("filterSlashItems", () => {
     expect(slashQueryAtCaret("/code block", 11)).toBe("code block");
     expect(slashQueryAtCaret("1. /", 4)).toBe("");
     expect(slashQueryAtCaret("  - /code", 9)).toBe("code");
+    expect(slashQueryAtCaret("- [ ][ ] /table", 15)).toBe("table");
     expect(slashQueryAtCaret("/code block", 5)).toBeNull();
     expect(slashQueryAtCaret("prefix /code", 12)).toBeNull();
     expect(slashQueryAtCaret("//code", 6)).toBeNull();

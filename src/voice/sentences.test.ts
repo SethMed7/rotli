@@ -13,6 +13,9 @@ describe("speakableText — prose, not markup", () => {
     expect(speakableText("> a quote")).toBe("a quote");
     expect(speakableText("- a bullet")).toBe("a bullet");
     expect(speakableText("  - [ ] a task")).toBe("a task");
+    expect(speakableText("  - [ ][x] a failed check")).toBe("a failed check");
+    expect(speakableText("2. [x][ ] a passed check")).toBe("a passed check");
+    expect(speakableText("- (x) selected option")).toBe("selected option");
     expect(speakableText("3. third")).toBe("third");
   });
 

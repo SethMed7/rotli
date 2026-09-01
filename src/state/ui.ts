@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 
-import type { HybridPreset, ProviderId } from "../ai/models";
+import { DEFAULT_PROVIDER_MODELS, type HybridPreset, type ProviderId } from "../ai/models";
 import { DEFAULT_WEB_SEARCH_PROVIDER, type WebSearchProvider } from "../ai/searchProvider";
 import {
   DEFAULT_QUOKKA_ACCESSORY_HUE,
@@ -128,12 +128,12 @@ export type AppIcon = "default" | "warm" | "paper" | "charcoal" | "clay";
 
 export const ORGANIZER_TRUSTS: readonly OrganizerTrust[] = ["off", "suggest", "tidy", "organize"];
 
-/** Which model organizes the Brain: `local` = the on-device MLX server (default,
- * never leaves the Mac); `claude` = `claude -p` Sonnet (the maintainer's pick — non-secure
- * notes go remote, secure/locked never do). The Rust daemon re-reads this. */
+/** Legacy remote values remain in the type so old settings deserialize without
+ * crashing. The only executable organizer value is `local`; Rust independently
+ * applies the same fail-closed migration. */
 export type OrganizerModel = "local" | "claude" | "gemini35";
 
-export const ORGANIZER_MODELS: readonly OrganizerModel[] = ["local", "claude", "gemini35"];
+export const ORGANIZER_MODELS: readonly OrganizerModel[] = ["local"];
 
 /** How holding ⌘ reveals the keyboard map (the maintainer, 2026-08-04: "I'd prefer little
  * boxes around the UI so I can visually see and instantly toggle exactly where
@@ -657,9 +657,11 @@ interface UiState {
    * Persisted. */
   taskCycle: TaskCycle;
   setTaskCycle: (v: TaskCycle) => void;
-  /** Connected subscription models (Settings → AI Models): which lanes are
-   * enabled. A lane must ALSO detect as installed+authed to serve. Persisted. */
+  /** Connected-provider flags. Only documented official-client lanes exist. */
   aiProviders: Record<ProviderId, boolean>;
+  /** Model used by `@provider` when the message omits `:model`. */
+  providerDefaults: Record<ProviderId, string>;
+  setProviderDefault: (provider: ProviderId, model: string) => void;
   /** The vault's one web-search destination. The chat globe remains the
    * per-chat consent switch and never changes this provider. */
   webSearchProvider: WebSearchProvider;
@@ -672,9 +674,6 @@ interface UiState {
    * Sonnet, block Opus) — hidden from the picker + preset editor. Persisted. */
   blockedModels: string[];
   toggleBlockedModel: (id: string) => void;
-  /** Which connected engine draws the chat's generate_image tool. Persisted. */
-  imageEngine: "codex" | "agy";
-  setImageEngine: (e: "codex" | "agy") => void;
   /** How the Storage destination groups its binaries (a Settings knob): by Type
    * (default), Date, or Folder (raw on-disk). Persisted. */
   storageGrouping: "type" | "date" | "folder";
@@ -1039,8 +1038,17 @@ export const useUiStore = create<UiState>((set, get) => ({
   setReadAloudVoice: (id) => set({ readAloudVoice: id }),
   taskCycle: "two",
   setTaskCycle: (v) => set({ taskCycle: v }),
-  aiProviders: { claude: false, codex: false, agy: false, gemini: false },
-  setAiProvider: (id, on) => set((s) => ({ aiProviders: { ...s.aiProviders, [id]: on } })),
+  aiProviders: { claude: false, codex: false, cursor: false },
+  setAiProvider: (id, on) =>
+    set((s) => ({
+      aiProviders: { ...s.aiProviders, [id]: on },
+    })),
+  providerDefaults: { ...DEFAULT_PROVIDER_MODELS },
+  setProviderDefault: (provider, model) =>
+    set((s) => ({
+      providerDefaults: { ...s.providerDefaults, [provider]: model },
+      blockedModels: s.blockedModels.filter((id) => id !== model),
+    })),
   webSearchProvider: DEFAULT_WEB_SEARCH_PROVIDER,
   setWebSearchProvider: (provider) => set({ webSearchProvider: provider }),
   hybridPresets: [],
@@ -1052,8 +1060,6 @@ export const useUiStore = create<UiState>((set, get) => ({
         ? s.blockedModels.filter((x) => x !== id)
         : [...s.blockedModels, id],
     })),
-  imageEngine: "codex",
-  setImageEngine: (e) => set({ imageEngine: e }),
   storageGrouping: "type",
   setStorageGrouping: (g) => set({ storageGrouping: g }),
   appIcon: "default",
@@ -1069,7 +1075,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   organizerTrust: "organize",
   setOrganizerTrust: (t) => set({ organizerTrust: t }),
   organizerModel: "local",
-  setOrganizerModel: (m) => set({ organizerModel: m }),
+  setOrganizerModel: () => set({ organizerModel: "local" }),
   organizerQuietSecs: 300,
   setOrganizerQuietSecs: (n) => set({ organizerQuietSecs: n }),
   librarianIntroSeen: false,

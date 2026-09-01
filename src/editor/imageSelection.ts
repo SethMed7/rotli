@@ -18,7 +18,9 @@ const IMAGE_ONLY = /^\s*!\[([^\]]*)\]\(([^)]+)\)\s*$/;
  * outside the span so arrow selection preserves the visible list structure. */
 export function imageSourceSpan(lineText: string, lineFrom: number): ImageSourceSpan | null {
   const block = parseBlock(lineText);
-  const prefixLen = ["bullet", "numbered", "task"].includes(block.kind) ? block.prefixLen : 0;
+  const prefixLen = ["bullet", "numbered", "task", "result", "choice"].includes(block.kind)
+    ? block.prefixLen
+    : 0;
   const match = IMAGE_ONLY.exec(lineText.slice(prefixLen));
   if (!match) return null;
   return {

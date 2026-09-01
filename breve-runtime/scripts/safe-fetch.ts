@@ -102,7 +102,7 @@ export async function hostRejection(host: string): Promise<string | null> {
   return null;
 }
 
-/** Validate a single URL (scheme, no creds, public host). Exported for callers that only gate (e.g. the agy/YouTube path). */
+/** Validate a single URL (scheme, no creds, public host). Exported for callers that only gate. */
 export async function checkUrl(raw: string): Promise<{ ok: true; url: URL } | { ok: false; reason: string }> {
   if (raw.length > MAX_URL_CHARS) return { ok: false, reason: "URL too long" };
   let url: URL;
@@ -199,8 +199,8 @@ export async function safeFetchText(
   }
 }
 
-// The one allowed non-local processing path is YouTube → agy/Gemini. Host-pin it STRICTLY (by
-// hostname, not substring) so a crafted URL can't slip a non-YouTube target into that agentic tier.
+// YouTube understanding is currently unavailable. Keep the host check strict so
+// callers can distinguish those URLs without substring confusion.
 const YT_HOSTS = new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "youtube-nocookie.com", "www.youtube-nocookie.com"]);
 export function isYouTubeUrl(raw: string): boolean {
   try { return YT_HOSTS.has(new URL(raw).hostname.toLowerCase()); } catch { return false; }

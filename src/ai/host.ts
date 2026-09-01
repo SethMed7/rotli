@@ -26,7 +26,6 @@ import {
   corpusReadableIds,
   corpusSearchAi,
   corpusWriteAi,
-  generateImage as tauriGenerateImage,
   webFetch as tauriWebFetch,
   webSearch as tauriWebSearch,
 } from "../lib/tauri";
@@ -48,7 +47,7 @@ import { usePanesStore } from "../state/panes";
 import { artifactFileName, editableDocumentText } from "./artifacts";
 import { contextWindowFor } from "./budget";
 import { endpointIsLocal, looksSecret, modelIsOnDevice } from "./guard";
-import { normalizeGeneratedImageLinks, qualifiedArtifactId } from "./imageLinks";
+import { normalizeGeneratedImageLinks } from "./imageLinks";
 import { DEFAULT_WEB_SEARCH_PROVIDER, type WebSearchProvider } from "./searchProvider";
 import { channelStream } from "./stream";
 import {
@@ -111,16 +110,6 @@ async function aiReadableHits<T extends { id: string }>(hits: T[], model: ChatMo
   }
 }
 
-export interface HostImageCtx {
-  /** The active memex root path (Rust re-validates against registered roots). */
-  root: string;
-  /** Corpus router id used to keep presentation in the same vault. */
-  rootId: string;
-  /** The chat's slug — pins the assets dir storage/chats/<slug>/. */
-  slug: string;
-  engine: "codex" | "agy";
-}
-
 export type HostArtifactKind = "note" | "file" | "canvas";
 
 export interface CreatedChatArtifact {
@@ -135,7 +124,6 @@ export function makeTauriHost(
     requestId?: string;
     reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
     serviceTier?: "standard" | "fast";
-    image?: HostImageCtx;
     /** Registered root that owns conventional files created by this chat. */
     artifactRootId?: string;
     /** Fired when this run reads a SECURE note (a local model with per-note
@@ -535,29 +523,8 @@ export function makeTauriHost(
       }
       return tauriWebFetch(url, maxChars);
     },
-    async generateImage(prompt) {
-      // only offered to the loop when the caller wired the chat's assets ctx
-      // (imageTool gate) — this branch is the belt-and-suspenders message
-      if (!opts?.image) return "error: image generation isn't set up for this chat.";
-      if (opts?.isSecureContext?.() === true) {
-        return "blocked: this chat carries secure-note content, so remote image generation is disabled for this run.";
-      }
-      const { root, rootId, slug, engine } = opts.image;
-      const rel = await tauriGenerateImage({
-        requestId: opts?.requestId ?? crypto.randomUUID(),
-        root,
-        slug,
-        prompt,
-        engine,
-      });
-      generatedImagePaths.push(rel);
-      await Promise.all([invalidateNotes(), invalidateMemex()]);
-      await opts?.onArtifactCreated?.({
-        kind: "file",
-        id: qualifiedArtifactId(rootId, rel),
-        label: fileName(rel),
-      });
-      return rel;
+    async generateImage(_prompt) {
+      return "error: provider-backed image generation is unavailable; no provider account was used.";
     },
     async createArtifact(kind, title, content) {
       if (opts?.isSecureContext?.() === true) {

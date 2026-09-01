@@ -168,6 +168,7 @@ export class InMemoryNotesService implements NotesService {
       id: ulid(now),
       title: titleOf(body),
       snippet: snippetOf(body),
+      bodyEmpty: !body.trim(),
       aliases: [noteSlugify(titleOf(body))],
       folderId,
       createdAt: now,
@@ -180,10 +181,10 @@ export class InMemoryNotesService implements NotesService {
     return note;
   }
 
-  async updateNote(id: string, body: string, expectedRevision: string): Promise<Note> {
+  async updateNote(id: string, body: string, expectedRevision: string, expectedBody?: string): Promise<Note> {
     const existing = this.notes.get(id);
     if (!existing) throw new Error(`unknown note: ${id}`);
-    if (!expectedRevision || expectedRevision !== existing.revision) {
+    if (!expectedRevision || (expectedRevision !== existing.revision && expectedBody !== existing.body)) {
       throw new Error(
         `revision conflict: expected ${expectedRevision || "(missing)"}, found ${existing.revision}; the note changed after it was opened`,
       );
@@ -203,6 +204,7 @@ export class InMemoryNotesService implements NotesService {
       title,
       aliases,
       snippet: snippetOf(body),
+      bodyEmpty: !body.trim(),
       updatedAt: Date.now(),
       revision: this.nextRevision(),
     };
@@ -284,6 +286,7 @@ export class InMemoryNotesService implements NotesService {
       id: opts.id ?? ulid(opts.createdAt),
       title: titleOf(body),
       snippet: snippetOf(body),
+      bodyEmpty: !body.trim(),
       aliases: [noteSlugify(titleOf(body))],
       folderId,
       createdAt: opts.createdAt,

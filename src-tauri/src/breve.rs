@@ -20,6 +20,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tauri::Manager;
 use time::OffsetDateTime;
 
+use crate::chat;
 use crate::corpus::CorpusState;
 use crate::keychain;
 use crate::memex::find_bun;
@@ -563,7 +564,7 @@ fn default_config(enabled: bool) -> BreveConfig {
     let delivery_times = BreveDeliveryTimes::default();
     let lead_overrides = BreveLeadOverrides::default();
     let lead_minutes = 30;
-    let brief_model = "sonnet".to_string();
+    let brief_model = chat::DEFAULT_MODEL.to_string();
     BreveConfig {
         version: 1,
         timezone: "America/New_York".into(),
@@ -573,17 +574,33 @@ fn default_config(enabled: bool) -> BreveConfig {
         brief_model: brief_model.clone(),
         model_policy: BreveModelPolicy {
             primary: brief_model.clone(),
-            fallbacks: vec![
-                "haiku".into(),
-                "gemini-3.7-flash-medium".into(),
-                "gpt-5.4-mini".into(),
-            ],
-            local_helper: Some("gemma-3-12b-it-qat-4bit".into()),
+            fallbacks: Vec::new(),
+            local_helper: Some(brief_model.clone()),
         },
         pdf_theme: BrevePdfTheme::default(),
         routines: default_routines(enabled, &delivery_times, lead_minutes, &lead_overrides),
         travel: None,
     }
+}
+
+/// Normalize model metadata at every native read/write seam. This does not
+/// touch a live vault by itself; it makes the runtime snapshot and subsequent
+/// explicit saves local-only, even when an older config names a cloud model.
+fn local_only_config(mut config: BreveConfig) -> BreveConfig {
+    let chosen = [
+        config.model_policy.primary.as_str(),
+        config.model_policy.local_helper.as_deref().unwrap_or(""),
+        config.brief_model.as_str(),
+    ]
+    .into_iter()
+    .find(|id| chat::is_registered_local_model_id(id))
+    .unwrap_or(chat::DEFAULT_MODEL)
+    .to_string();
+    config.brief_model = chosen.clone();
+    config.model_policy.primary = chosen.clone();
+    config.model_policy.fallbacks.clear();
+    config.model_policy.local_helper = Some(chosen);
+    config
 }
 
 fn legacy_config(root: &Path) -> BreveConfig {
@@ -1187,12 +1204,12 @@ fn snapshot_at(active_root: &Path, legacy: Option<&Path>) -> BreveSnapshot {
         BreveSource::Empty
     };
 
-    let config = migrated_config.unwrap_or_else(|| {
+    let config = local_only_config(migrated_config.unwrap_or_else(|| {
         legacy
             .filter(|path| path.is_dir())
             .map(legacy_config)
             .unwrap_or_else(|| default_config(false))
-    });
+    }));
     let watchlist = read_text(&active_root.join(WATCHLIST_FILE))
         .map(|text| strip_frontmatter(&text).to_string())
         .or_else(|| legacy.and_then(|root| read_text(&root.join("watchlist.md"))))
@@ -1605,6 +1622,7 @@ pub fn breve_write_config(
     state: tauri::State<'_, CorpusState>,
     config: BreveConfig,
 ) -> Result<BreveSnapshot, String> {
+    let config = local_only_config(config);
     validate_config(&config)?;
     if cfg!(debug_assertions) {
         let mut snapshot = dev_breve_snapshot(&active_root(&state)?);
@@ -1967,7 +1985,7 @@ fn import_legacy_at(root: &Path, legacy: &Path) -> Result<BreveSnapshot, String>
     let config_written = if config_path.exists() {
         false
     } else {
-        let config = legacy_config(legacy);
+        let config = local_only_config(legacy_config(legacy));
         validate_config(&config)?;
         write_json(&config_path, &config)?;
         true
@@ -2231,12 +2249,13 @@ pub fn breve_takeover(
         return Ok(snapshot_at(&root, None));
     };
     import_legacy_at(&root, &legacy)?;
-    if let Some(mut config) = read_json::<BreveConfig>(&root.join(CONFIG_FILE)) {
+    if let Some(config) = read_json::<BreveConfig>(&root.join(CONFIG_FILE)) {
+        let mut config = local_only_config(config);
         if config.travel.is_none() {
             config.travel = legacy_config(&legacy).travel;
-            validate_config(&config)?;
-            write_json(&root.join(CONFIG_FILE), &config)?;
         }
+        validate_config(&config)?;
+        write_json(&root.join(CONFIG_FILE), &config)?;
     }
     let home = routines::sync_runtime(&app, &root)?;
     migrate_private_runtime(&legacy, &home, &root)?;

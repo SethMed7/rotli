@@ -12,11 +12,14 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
 import {
+  adoptPendingDocument,
   documentSaveError,
   editDocument,
   ensureDocument,
+  ensurePendingDocument,
   evictDocument,
   flushNote,
+  flushNoteAfterPaint,
   reloadDocumentIfClean,
   setWriteNoteBodyForTests,
 } from "./model";
@@ -79,6 +82,54 @@ describe("reloadDocumentIfClean", () => {
     reloadDocumentIfClean("fresh", "hello", "test:fresh:1");
     expect(read("fresh")).toEqual(["hello"]);
   });
+
+  test("adopts a new revision when Rotli moves a clean note without changing its body", async () => {
+    let presented = "";
+    setWriteNoteBodyForTests((_id, _body, expectedRevision) => {
+      presented = expectedRevision;
+      return Promise.resolve();
+    });
+    buffer("moved-clean", "same prose");
+
+    reloadDocumentIfClean("moved-clean", "same prose", "test:moved-clean:2");
+    editDocument("moved-clean", () => ["later edit"]);
+    await flushNote("moved-clean");
+
+    expect(presented).toBe("test:moved-clean:2");
+  });
+
+  test("rebases a dirty draft onto a metadata-only move revision", async () => {
+    const writes: Array<{ body: string; revision: string }> = [];
+    setWriteNoteBodyForTests((_id, body, expectedRevision) => {
+      writes.push({ body, revision: expectedRevision });
+      return Promise.resolve();
+    });
+    buffer("moved-dirty", "disk prose");
+    editDocument("moved-dirty", () => ["local draft"]);
+
+    reloadDocumentIfClean("moved-dirty", "disk prose", "test:moved-dirty:2");
+    await flushNote("moved-dirty");
+
+    expect(writes).toEqual([{ body: "local draft", revision: "test:moved-dirty:2" }]);
+    expect(read("moved-dirty")).toEqual(["local draft"]);
+  });
+
+  test("keeps the old revision when both disk prose and the local draft changed", async () => {
+    let presented = "";
+    setWriteNoteBodyForTests((_id, _body, expectedRevision) => {
+      presented = expectedRevision;
+      return Promise.reject(new Error("revision conflict: external body edit"));
+    });
+    buffer("real-conflict", "original");
+    editDocument("real-conflict", () => ["local draft"]);
+
+    reloadDocumentIfClean("real-conflict", "external draft", "test:real-conflict:2");
+    await flushNote("real-conflict");
+
+    expect(presented).toBe("test:real-conflict:1");
+    expect(read("real-conflict")).toEqual(["local draft"]);
+    expect(documentSaveError("real-conflict")).toContain("revision conflict");
+  });
 });
 
 describe("editDocument", () => {
@@ -100,6 +151,50 @@ describe("editDocument", () => {
       return [];
     });
     expect(ran).toBe(false);
+  });
+});
+
+describe("optimistic pending documents", () => {
+  afterEach(() => {
+    setWriteNoteBodyForTests(null);
+  });
+
+  test("accepts first-paint typing and hands the draft to the durable note revision", async () => {
+    const writes: Array<{ id: string; body: string; revision: string; base: string }> = [];
+    setWriteNoteBodyForTests((id, body, revision, base) => {
+      writes.push({ id, body, revision, base });
+      return Promise.resolve();
+    });
+    touched.add("pending:tab");
+    touched.add("durable-note");
+    ensurePendingDocument("pending:tab");
+    editDocument("pending:tab", () => ["typed before creation returned"]);
+
+    expect(read("pending:tab")).toEqual(["typed before creation returned"]);
+    expect(writes).toEqual([]);
+
+    adoptPendingDocument("pending:tab", {
+      id: "durable-note",
+      title: "Untitled",
+      snippet: "",
+      folderId: "Inbox",
+      createdAt: 1,
+      updatedAt: 1,
+      pinned: false,
+      body: "",
+      revision: "test:durable-note:1",
+    });
+    await flushNote("durable-note");
+
+    expect(read("durable-note")).toEqual(["typed before creation returned"]);
+    expect(writes).toEqual([
+      {
+        id: "durable-note",
+        body: "typed before creation returned",
+        revision: "test:durable-note:1",
+        base: "",
+      },
+    ]);
   });
 });
 
@@ -136,6 +231,27 @@ describe("sync failure surfacing", () => {
     expect(documentSaveError("conflict")).toContain("revision conflict");
   });
 
+  test("a late move-only refresh clears a false conflict and retries the kept draft", async () => {
+    const revisions: string[] = [];
+    setWriteNoteBodyForTests((_id, _body, expectedRevision) => {
+      revisions.push(expectedRevision);
+      return expectedRevision.endsWith(":1")
+        ? Promise.reject(new Error("revision conflict: metadata moved"))
+        : Promise.resolve();
+    });
+    buffer("move-recover", "disk prose");
+    editDocument("move-recover", () => ["local draft"]);
+    await flushNote("move-recover");
+    expect(documentSaveError("move-recover")).toContain("revision conflict");
+
+    reloadDocumentIfClean("move-recover", "disk prose", "test:move-recover:2");
+    await flushNote("move-recover");
+
+    expect(revisions).toEqual(["test:move-recover:1", "test:move-recover:2"]);
+    expect(documentSaveError("move-recover")).toBeNull();
+    expect(read("move-recover")).toEqual(["local draft"]);
+  });
+
   test("a later successful write clears the surfaced error", async () => {
     let failures = 1;
     setWriteNoteBodyForTests(() =>
@@ -167,6 +283,31 @@ describe("sync failure surfacing", () => {
     expect(documentSaveError("gone")).toBe("io error");
     evictDocument("gone");
     expect(documentSaveError("gone")).toBeNull();
+  });
+});
+
+describe("tab-leave flush scheduling", () => {
+  afterEach(() => {
+    setWriteNoteBodyForTests(null);
+  });
+
+  test("does not start the write in the tab-close commit", () => {
+    const writes: string[] = [];
+    const afterPaint: Array<() => void> = [];
+    setWriteNoteBodyForTests((_id, body) => {
+      writes.push(body);
+      return Promise.resolve();
+    });
+    buffer("close-fast", "before");
+    editDocument("close-fast", () => ["after"]);
+
+    flushNoteAfterPaint("close-fast", (task) => {
+      afterPaint.push(task);
+    });
+    expect(writes).toEqual([]);
+
+    afterPaint[0]?.();
+    expect(writes).toEqual(["after"]);
   });
 });
 

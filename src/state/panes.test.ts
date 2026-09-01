@@ -685,6 +685,55 @@ describe("closing the last tab of the lone pane", () => {
   });
 });
 
+describe("optimistic new-item tabs", () => {
+  beforeEach(() => {
+    usePanesStore.setState({
+      root: leaf("p1", ["A"]),
+      focusedPaneId: "p1",
+      closedTabs: [],
+    });
+  });
+
+  test("opens and activates a pending tab synchronously, then retargets that exact tab", () => {
+    const pending = usePanesStore.getState().openPendingItemTab("Untitled", { note: true });
+    const opened = findLeaf(usePanesStore.getState().root, "p1");
+    expect(pending.paneId).toBe("p1");
+    expect(opened?.activeTabId).toBe(pending.tabId);
+    expect(opened?.tabs.at(-1)).toEqual({
+      id: pending.tabId,
+      surfaceKind: "newItem",
+      pendingLabel: "Untitled",
+      pendingNote: true,
+    });
+
+    expect(
+      usePanesStore.getState().resolvePendingItemTab(pending.tabId, {
+        surfaceKind: "note",
+        noteId: "created-note",
+      }),
+    ).toBe(true);
+    expect(findLeaf(usePanesStore.getState().root, "p1")?.tabs.at(-1)).toEqual({
+      id: pending.tabId,
+      surfaceKind: "note",
+      noteId: "created-note",
+      focusOnMount: true,
+    });
+  });
+
+  test("does not reopen a pending tab the user closed before creation completed", () => {
+    const pending = usePanesStore.getState().openPendingItemTab("Document");
+    usePanesStore.getState().closeTabById(pending.paneId, pending.tabId, { record: false });
+
+    expect(
+      usePanesStore.getState().resolvePendingItemTab(pending.tabId, {
+        surfaceKind: "file",
+        fileId: "storage/created.docx",
+      }),
+    ).toBe(false);
+    expect(order("p1")).toEqual(["A"]);
+  });
+});
+
 describe("openToSide", () => {
   test("splits right with the TARGET note — no duplicate of the current tab", () => {
     // the split-time floor check reads window metrics — give it room

@@ -23,7 +23,8 @@
       "accent": "#C97E62",
       "accent-text": "#8F4E37",
       "on-accent": "#FFFFFF",
-      "success": "#8D9A76"
+      "success": "#8D9A76",
+      "failure": "#9F3D3D"
     },
     "dark": {
       "ground": "#241D18",
@@ -36,7 +37,8 @@
       "accent": "#C97E62",
       "accent-text": "#C97E62",
       "on-accent": "#241D18",
-      "success": "#8D9A76"
+      "success": "#8D9A76",
+      "failure": "#E58B8B"
     }
   },
   "contrast": {
@@ -93,6 +95,13 @@
         "pass": "fail-small (use #5F6B49)"
       },
       {
+        "fg": "#9F3D3D",
+        "bg": "#F8F2E9",
+        "ratio": 5.88,
+        "use": "failure text on light linen",
+        "pass": "AA"
+      },
+      {
         "fg": "#F1E7DA",
         "bg": "#241D18",
         "ratio": 13.6,
@@ -101,7 +110,8 @@
       },
       { "fg": "#B7A593", "bg": "#241D18", "ratio": 6.98, "use": "muted text on dark", "pass": "AA" },
       { "fg": "#C97E62", "bg": "#241D18", "ratio": 5.26, "use": "clay accent text on dark", "pass": "AA" },
-      { "fg": "#8D9A76", "bg": "#241D18", "ratio": 5.55, "use": "olive accent text on dark", "pass": "AA" }
+      { "fg": "#8D9A76", "bg": "#241D18", "ratio": 5.55, "use": "olive accent text on dark", "pass": "AA" },
+      { "fg": "#E58B8B", "bg": "#241D18", "ratio": 6.64, "use": "failure text on dark cocoa", "pass": "AA" }
     ]
   }
 }

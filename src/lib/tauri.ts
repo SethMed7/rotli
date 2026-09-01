@@ -292,6 +292,8 @@ export interface CorpusNoteMeta {
   id: string;
   title: string;
   snippet: string;
+  /** True only when a Markdown note's editor body is whitespace-empty. */
+  bodyEmpty?: boolean;
   /** Current filename/title selectors plus durable rename aliases. */
   aliases?: string[];
   /** User-facing shelf/folder projection. */
@@ -385,8 +387,13 @@ export interface CorpusWriteResult extends CorpusNoteMeta {
   revision: string;
 }
 
-export function corpusWrite(id: string, body: string, expectedRevision: string): Promise<CorpusWriteResult> {
-  return corpusInvoke("corpus_write", { id, body, expectedRevision });
+export function corpusWrite(
+  id: string,
+  body: string,
+  expectedRevision: string,
+  expectedBody?: string,
+): Promise<CorpusWriteResult> {
+  return corpusInvoke("corpus_write", { id, body, expectedRevision, expectedBody });
 }
 
 export function corpusCreate(
@@ -602,7 +609,7 @@ export function onLocalQueue(cb: (q: LocalQueueSnapshot) => void): () => void {
   return () => void unlisten.then((fn) => fn());
 }
 
-// ── connected models (the subscription CLIs + the Gemini key lane) ───────────
+// ── connected models (official local clients; remote model execution) ───────
 
 /** Settings → AI Models: one connected lane's cheap local probe (binary +
  * auth artifact; never a model call). */
@@ -616,9 +623,9 @@ export function cliDetect(provider: string): Promise<CliDetect> {
   return aiInvoke("cli_detect", { provider });
 }
 
-/** One TOOL-LESS completion step on a connected CLI. Rust owns the binary +
- * model allowlist and the sandbox flags; the prompt is the only caller-shaped
- * input. `requestId` keys kill-on-cancel across the whole turn. */
+/** One constrained completion step on a connected client. Rust owns the binary
+ * + model allowlist and sandbox/protocol flags; the prompt is the only
+ * caller-shaped input. `requestId` keys kill-on-cancel across the whole turn. */
 export function cliComplete(args: {
   requestId: string;
   provider: string;
@@ -689,24 +696,6 @@ export function systemProfile(): Promise<SystemProfile> {
   return aiInvoke("system_profile");
 }
 
-/** Generate an image via the chosen connected engine. A chat slug lands it in
- * that chat's assets (`storage/chats/<slug>/`); an EMPTY slug is the NOTES lane
- * (`storage/images/` — the editor's /image-gen command, 2026-08-04). Rust pins
- * the destination from the registered root — the prompt never shapes the path.
- * Returns the corpus-relative path. */
-export function generateImage(args: {
-  requestId: string;
-  root: string;
-  slug: string;
-  prompt: string;
-  engine: "codex" | "agy";
-}): Promise<string> {
-  return aiInvoke("generate_image", { ...args });
-}
-
-/** Keychain account for the Gemini API key — one of keychain.rs's ALLOWED
- * names (parity.json keychainAllowedAccounts). */
-export const SECRET_GEMINI_API_KEY = "gemini-api-key";
 export const SECRET_BRAVE_SEARCH_API_KEY = "brave-search-api-key";
 
 /** Keychain-backed secrets (Rust allowlists the names; a stored value never
@@ -906,6 +895,14 @@ export async function corpusOpenFile(id: string): Promise<void> {
 export async function corpusImportFile(rootId: string, path: string): Promise<string> {
   if (!isTauri()) return "";
   return invoke<string>("corpus_import_file", { rootId, path });
+}
+
+/** Open Finder for one or more images. Rust returns only canonical paths with
+ * fresh single-use import grants, so the webview still cannot read arbitrary
+ * filesystem paths. */
+export async function corpusPickImages(): Promise<string[]> {
+  if (!isTauri()) return [];
+  return invoke<string[]>("corpus_pick_images");
 }
 
 /** Persist an image selected in Chat as a collision-safe user-owned asset.
@@ -1803,6 +1800,15 @@ export function onOpenRequest(cb: () => void): () => void {
   return () => void unlisten.then((fn) => fn());
 }
 
+/** macOS File → Close Tab. ⌘W intentionally stays in the frontend registry so
+ * it closes during the original key event instead of taking a native event
+ * round trip; pointer selection of the menu item still forwards here. */
+export function onNativeCloseTab(cb: () => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listen("rotli:close-tab", () => cb());
+  return () => void unlisten.then((fn) => fn());
+}
+
 /** Rust → main window: the organizer daemon appended to the brain journal (a
  * new proposal or an auto-applied action) — refetch it so Activity + the
  * sidebar badge update within a beat, no polling. */
@@ -2266,10 +2272,10 @@ function browserBreveSnapshot(): BreveSnapshot {
       deliveryTimes: { morning: "07:00", lunch: "12:00", night: "18:00" },
       leadMinutes: 30,
       leadOverrides: { morning: 60 },
-      briefModel: "sonnet",
+      briefModel: "gemma-3-12b-it-qat-4bit",
       modelPolicy: {
-        primary: "sonnet",
-        fallbacks: ["haiku", "gemini-3.7-flash-medium", "gpt-5.4-mini"],
+        primary: "gemma-3-12b-it-qat-4bit",
+        fallbacks: [],
         localHelper: "gemma-3-12b-it-qat-4bit",
       },
       pdfTheme: DEFAULT_BREVE_PDF_THEME,

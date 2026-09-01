@@ -93,7 +93,10 @@ test("an item chosen after selecting a Main folder is filed in that folder", asy
   await page.locator(".ni-surface").getByRole("button", { name: "New Markdown note" }).click();
 
   const folderContents = folder.locator("..");
-  await expect(folderContents.locator(".main-row", { hasText: "Untitled" })).toHaveCount(1);
+  await expect(folderContents.locator(".main-row", { hasText: "Untitled" })).toHaveCount(0);
+  await page.locator(".pane.focused .cm-content").click();
+  await page.keyboard.type("# Filed sketch");
+  await expect(folderContents.locator(".main-row", { hasText: "Filed sketch" })).toHaveCount(1);
 });
 
 test("an Excalidraw board asks for its name before creation", async ({ page }) => {

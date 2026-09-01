@@ -4,7 +4,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { CHECK_EM, MARKER_EM, STEP_EM, listStyle } from "./listGeometry";
+import { CHECK_EM, CHOICE_EM, MARKER_EM, RESULT_EM, STEP_EM, listStyle } from "./listGeometry";
 
 /** padding-left, in em, out of a style string. */
 function padEm(style: string): number {
@@ -42,6 +42,18 @@ describe("list geometry", () => {
     const s = listStyle(1, CHECK_EM);
     expect(hangEm(s)).toBe(CHECK_EM);
     expect(padEm(s)).toBeCloseTo(STEP_EM + CHECK_EM, 5);
+  });
+
+  test("a multiple-choice option hangs by its radio control", () => {
+    const s = listStyle(1, CHOICE_EM);
+    expect(hangEm(s)).toBe(CHOICE_EM);
+    expect(padEm(s)).toBeCloseTo(STEP_EM + CHOICE_EM, 5);
+  });
+
+  test("a two-choice result hangs by both buttons", () => {
+    const s = listStyle(2, RESULT_EM);
+    expect(hangEm(s)).toBe(RESULT_EM);
+    expect(padEm(s)).toBeCloseTo(2 * STEP_EM + RESULT_EM, 5);
   });
 
   test("depth is spacing ONLY — no border, guide rule, or background", () => {

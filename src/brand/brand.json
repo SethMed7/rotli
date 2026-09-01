@@ -5,7 +5,7 @@
   "status": "SHIPPED — canonical quokka identity and selectable exact-geometry full-body treatments, 2026-08-15.",
   "source": "The canonical quokka drawings in src/assets/characters/; historical identity explorations are non-shipping provenance only.",
   "identity": {
-    "what": "A warm, local-first, hotkey-driven notes app for Mac — one menu-bar shell where your notes folder *is* a memex (one folder: notes · chats · knowledge · files). Two fronts: Chat (AI chats) · Notes (Capture · the AI-organized 'brain' wiki areas · Storage · Boards); an email Inbox front is on the roadmap. AI rides your own CLI subscriptions (claude/codex/agy) or a local MLX model — rotli bundles no LLM/STT/TTS and has no separate Voice front (dictation lives in a sibling app, voz).",
+    "what": "A warm, local-first, hotkey-driven notes app for Mac — one menu-bar shell where your notes folder *is* a memex (one folder: notes · chats · knowledge · files). Two fronts: Chat (AI chats) · Notes (Capture · the AI-organized 'brain' wiki areas · Storage · Boards); an email Inbox front is on the roadmap. AI rides documented official clients (Claude Code, Codex, Cursor ACP) or a local MLX model — rotli bundles no LLM/STT/TTS and has no separate Voice front (dictation lives in a sibling app, voz).",
     "essence": "Warm, quiet, instant — a visitor on your screen, not a resident.",
     "oneIdea": "Cognitive quiet — it holds what matters and gets out of your way.",
     "oneWord": "Quiet",
@@ -43,7 +43,8 @@
       "accentText": "#8F4E37",
       "tint": "#F2D6C2",
       "ground": "#F8F2E9",
-      "success": "#8D9A76"
+      "success": "#8D9A76",
+      "failure": "#9F3D3D"
     },
     "tokens": "tokens/colors.css",
     "matrix": "tokens/colors.json#contrast",

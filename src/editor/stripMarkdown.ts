@@ -4,6 +4,8 @@
 // 1., >, - [ ]) so a copy reads like what you SEE — no stray ** around a bold
 // word. Raw mode copies the source verbatim instead.
 
+import { CHOICE_MARK } from "./choiceState";
+import { RESULT_MARK } from "./resultState";
 import { MARK } from "./taskState";
 
 export function stripMarkdown(text: string): string {
@@ -28,6 +30,8 @@ export function stripMarkdown(text: string): string {
       inline(
         line
           .replace(/^(\s*)#{1,3}\s+/, "$1")
+          .replace(new RegExp(`^(\\s*)(?:-|\\d+\\.) \\[${RESULT_MARK}\\]\\[${RESULT_MARK}\\]\\s+`), "$1")
+          .replace(new RegExp(`^(\\s*)(?:-|\\d+\\.) \\(${CHOICE_MARK}\\)\\s+`), "$1")
           .replace(new RegExp(`^(\\s*)- \\[${MARK}\\]\\s+`), "$1")
           .replace(/^(\s*)[-*+]\s+/, "$1")
           .replace(/^(\s*)\d+\.\s+/, "$1")

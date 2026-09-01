@@ -9,7 +9,7 @@ import { renderPdf } from "./chrome-pdf";
 import { errText } from "./err-text";
 import { TOPICS, PDFS } from "./paths";
 import { readSecret } from "./secret";
-import { runModel, STRICT_MCP, CLAUDE_BIN } from "./run-model";
+import { localGenerate } from "./llm";
 import { pdfThemeVariables, readPdfTheme } from "./pdf-theme";
 import { effectiveTz, loadSettings, todayIn } from "./timectx";
 import type { ResendResponse } from "./wire-types";
@@ -26,16 +26,13 @@ let apiKey: string;
 try { apiKey = await readSecret("resend-breve"); if (!apiKey) throw new Error("empty"); }
 catch { console.log("ERR no Resend key in Keychain"); process.exit(1); }
 
-// 1. Research + draft the body via Claude (Sonnet, web access).
-const prompt = `Research this topic using current web info and write a concise briefing email body about it: "${topic}".
-Output ONLY an HTML fragment (no <html>/<head>/<body>, no markdown fences): one <h2> title, then <p>/<ul> content (200-450 words), ending with a <p> of 1-3 source links as <a href>. Sharp and factual, written for the owner (a technical reader). No preamble, no sign-off.`;
-const proc = runModel([CLAUDE_BIN, "-p", "--model", "sonnet", "--dangerously-skip-permissions", ...STRICT_MCP], {
-  cwd: process.env.HOME, stdin: "pipe", stdout: "pipe", stderr: "pipe",
-});
-await proc.stdin.write(prompt);
-await proc.stdin.end();
-let body = (await new Response(proc.stdout).text()).trim();
-await proc.exited;
+// Draft locally. No provider account or live-web claim is allowed.
+const prompt = `Write a concise briefing email body about: "${topic}".
+You are the ON-DEVICE model with no live web or cloud-provider access. Never invent current facts or source
+links. Output ONLY an HTML fragment (no <html>/<head>/<body>, no markdown fences): one <h2> title, then
+<p>/<ul> content (200-450 words). Sharp and factual for a technical reader; state plainly when the topic
+requires current research you cannot perform. No preamble or sign-off.`;
+let body = (await localGenerate({ prompt, think: false, options: { num_predict: 1536 } })).trim();
 body = body.replace(/^```html?\s*/i, "").replace(/```\s*$/, "").trim();
 if (!body) { console.log("ERR research produced nothing"); process.exit(1); }
 

@@ -87,7 +87,7 @@ function tabLabel(tab: Tab, titles: TitleLookup, chatTitles: ReadonlyMap<string,
     case "activity":
       return "Librarian Activity";
     case "newItem":
-      return "New…";
+      return tab.pendingLabel ?? "New…";
     case "browser":
       return privateBrowserTabTitle(tab.id);
   }

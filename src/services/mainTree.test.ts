@@ -95,6 +95,24 @@ describe("buildMainTree", () => {
     );
     expect(r.notes.map((n) => n.id)).toEqual(["live"]);
   });
+  test("durable empty Markdown refs stay out of the rendered Main projection", () => {
+    const blank = { ...note("empty"), title: "Untitled", snippet: "", bodyEmpty: true };
+    const namedUntitled = {
+      ...note("named-untitled"),
+      title: "Untitled",
+      snippet: "",
+      bodyEmpty: false,
+    };
+    const r = buildMainTree(
+      [{ note: blank.id }, { note: namedUntitled.id }],
+      new Map([
+        [blank.id, blank],
+        [namedUntitled.id, namedUntitled],
+      ]),
+    );
+
+    expect(r.notes.map((item) => item.id)).toEqual([namedUntitled.id]);
+  });
 });
 
 describe("gcManifest", () => {

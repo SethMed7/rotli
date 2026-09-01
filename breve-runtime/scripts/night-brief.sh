@@ -53,19 +53,11 @@ if [ "$1" = "--test" ]; then
 fi
 
 # Self-heal (#18): if the configured model produces no brief, retry on a fallback, then relay.
-run_model() { caffeinate -i $SANDBOX claude -p --model "$1" --dangerously-skip-permissions "$PROMPT"; }
+run_model() { printf '%s\n' "$PROMPT" | caffeinate -i bun "$BREVE/scripts/local-brief.ts" "${TODAY}-night"; }
 brief_exists() { [ "$1" = "--test" ] || [ -f "$BREVE/briefs/${TODAY}-night.md" ]; }
 
 {
   echo "=== Breve night run: $(date) ==="
-  # Ensure the sandbox profile exists before run_model is used.
-  if ! bun "$BREVE/scripts/sandbox.ts" --require >/dev/null 2>&1; then
-    echo "secure model sandbox unavailable — refusing to generate a remote brief"
-    exit 1
-  fi
-  SANDBOX="/usr/bin/sandbox-exec -f $SB"
-  # Optional read-only gh token (empty = gh uses default auth).
-  export GH_TOKEN="$(bun "$BREVE/scripts/secret.ts" get breve-gh-readonly 2>/dev/null || true)"
   run_model "$BREVE_MODEL"
   echo "=== claude ($BREVE_MODEL) exit $? at $(date) ==="
 
@@ -79,7 +71,7 @@ brief_exists() { [ "$1" = "--test" ] || [ -f "$BREVE/briefs/${TODAY}-night.md" ]
         "⚠ Your brief model ($BREVE_MODEL) was unavailable tonight, so I generated The Archive with $FALLBACK instead. On its way." || true
     else
       bun "$BREVE/scripts/notify.ts" --idempotency-key "night-generation-failure-$TODAY" \
-        "⚠ Couldn't generate your night brief — both $BREVE_MODEL and $FALLBACK look unavailable (Claude sub may be down). Reply \"brief\" to retry, or check the Mac." || true
+        "⚠ Couldn't generate your night brief with the on-device model. No cloud provider was contacted." || true
       echo "=== self-heal exhausted: notified the owner ==="
     fi
   fi

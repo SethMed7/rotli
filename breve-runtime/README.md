@@ -37,13 +37,13 @@ with `inApp` delivery only and writes its Markdown into the canonical briefs
 lane. Debug builds simulate the notification in memory and never start a model,
 scheduler, or production-vault write.
 
-Remote model processes fail closed behind the generated macOS Seatbelt policy.
-The policy is rebuilt at each spawn and denies derived state, Git history,
-secure/tainted Markdown reads, and all AI writes to locked files even though the
-broader vault is an allowed knowledge root. Claude and Antigravity are the only
-knowledge-bearing fallback providers; Codex is deliberately excluded because
-its native sandbox cannot express these literal per-file read denials. A
-disabled/unavailable sandbox stops model generation instead of widening access.
+Breve model generation is on-device only. Managed configuration is normalized
+to a registered local model at read, write, import, and takeover boundaries;
+legacy cloud-model settings cannot reactivate a subscription lane. Scheduled,
+Signal, watcher, and one-shot scripts use the loopback local-model adapter, and
+the retained legacy cloud-spawn shim refuses before binary lookup or process
+creation. Claude Code, Codex, Antigravity, Gemini, and provider-backed image
+generation are not Breve execution paths.
 
 Production dependencies are a separate deployment boundary. The committed
 `defaults/bun.lock` is staged beside the managed runtime's `package.json`, and

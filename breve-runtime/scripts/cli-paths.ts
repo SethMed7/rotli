@@ -7,7 +7,14 @@
 
 export const CLAUDE_BIN_CANDIDATES = ["~/.local/bin/claude", "/opt/homebrew/bin/claude", "/usr/local/bin/claude"] as const;
 export const CODEX_BIN_CANDIDATES = ["/opt/homebrew/bin/codex", "~/.local/bin/codex", "/usr/local/bin/codex"] as const;
-export const AGY_BIN_CANDIDATES = ["~/.local/bin/agy", "/opt/homebrew/bin/agy"] as const;
+// Parity-only: Breve never launches Cursor. The interactive Rust adapter owns
+// this list and uses Cursor's documented ACP custom-client protocol.
+export const CURSOR_BIN_CANDIDATES = [
+  "~/.local/bin/agent",
+  "~/.local/bin/cursor-agent",
+  "/opt/homebrew/bin/agent",
+  "/usr/local/bin/agent",
+] as const;
 
 /** Expand a leading "~/" against the caller's home directory. */
 export function expandHome(path: string, home: string): string {

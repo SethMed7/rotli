@@ -19,10 +19,6 @@ BREVE_MODEL="${BREVE_MODEL:-$(bun "$BREVE/scripts/brief-model.ts" 2>/dev/null ||
 # Resolve the memex + storage roots from config (config.local.json owns the real paths; no hardcoding).
 KNOWLEDGE="$(bun "$BREVE/scripts/print-root.ts" knowledge 2>/dev/null || echo "$HOME/memex-vault")"
 STORE="$(bun "$BREVE/scripts/print-root.ts" storage 2>/dev/null || echo "$HOME/memex-storage")"
-# Cross-provider fallback chain. Anthropic and Google have independent auth, so a Claude outage or
-# 401 does not affect the sandboxed Gemini fallback. argv[0] is absolute for sandbox-exec.
-CLAUDE_BIN="$(command -v claude 2>/dev/null || echo claude)"
-AGY="$([ -x "$HOME/.local/bin/agy" ] && echo "$HOME/.local/bin/agy" || command -v agy 2>/dev/null || true)"
 LOG_DIR="$BREVE/logs"
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/$(date +%F).log"
@@ -46,32 +42,21 @@ fi
 
 TODAY=$(bun "$BREVE/scripts/today.ts")
 
-# Cross-provider self-heal: try Claude (configured model → a fallback model), then GEMINI (agy).
-# Both providers run under the same fail-closed profile. Codex's nested Seatbelt cannot express the
-# per-file secure-note read denies, so it is deliberately not a knowledge-bearing fallback.
+# Provider-account policy: the legacy chain now resolves only to Rotli's
+# on-device generator. Provider-shaped fallback steps fail without spawning.
 brief_made() { [ -f "$BREVE/briefs/$TODAY.md" ]; }
 
 # Run ONE provider. Claude uses $PROMPT (skill invocation); Gemini uses $PROMPT_AGENT (read SKILL.md).
 # Both are wrapped in the generated macOS sandbox.
 gen() {
   case "$1" in
-    claude) caffeinate -i $SANDBOX "$CLAUDE_BIN" -p --model "$2" --dangerously-skip-permissions "$PROMPT" ;;
-    gemini) [ -n "$AGY" ]   && caffeinate -i $SANDBOX "$AGY" -p "$PROMPT_AGENT" --dangerously-skip-permissions --print-timeout 15m \
-              --add-dir "$KNOWLEDGE" --add-dir "$BREVE" || { echo "(gemini/agy unavailable)"; return 1; } ;;
+    claude) printf '%s\n' "$PROMPT" | caffeinate -i bun "$BREVE/scripts/local-brief.ts" "$TODAY" ;;
+    gemini) echo "cloud providers disabled — no process started"; return 78 ;;
   esac
 }
 
 {
   echo "=== Breve morning run: $(date) ==="
-  # Ensure the sandbox profile exists before any model runs.
-  if ! bun "$BREVE/scripts/sandbox.ts" --require >/dev/null 2>&1; then
-    echo "secure model sandbox unavailable — refusing to generate a remote brief"
-    exit 1
-  fi
-  SANDBOX="/usr/bin/sandbox-exec -f $SB"
-  # Optional read-only gh token (empty = gh uses default auth).
-  export GH_TOKEN="$(bun "$BREVE/scripts/secret.ts" get breve-gh-readonly 2>/dev/null || true)"
-
   FALLBACK="haiku"; [ "$BREVE_MODEL" = "haiku" ] && FALLBACK="sonnet"
 
   if [ "$1" = "--test" ]; then
@@ -109,14 +94,14 @@ gen() {
               "ℹ️ Today's brief was generated with $USED — your usual model ($BREVE_MODEL) was unavailable. It's on its way." || true
             ;;
           *)
-            # Fell off Claude entirely (Gemini) — almost always a Claude auth failure (401).
+            # A provider-shaped fallback must never execute in local-only mode.
             # Make this UNMISTAKABLE so a degraded brief never slips by unnoticed. Fully defensive:
             # try the Signal text path, then notify.ts, and never let an alert failure break the run.
             PROV="${USED%% *}"
             bun "$BREVE/scripts/send-signal-text.ts" --idempotency-key "morning-provider-fallback-$TODAY" \
-              --message "⚠ Heads up — this morning's brief fell back to $PROV because Claude auth failed (likely an expired login / 401). The brief still went out, but re-auth Claude when you get a moment." \
+              --message "⚠ Heads up — this morning's brief used the on-device safety fallback. No cloud provider account was used." \
               || bun "$BREVE/scripts/notify.ts" --idempotency-key "morning-provider-fallback-$TODAY" \
-                "⚠⚠ MORNING BRIEF DEGRADED — fell back to $PROV; Claude auth failed (401). Re-auth Claude when you can." \
+                "⚠ Morning brief used the on-device safety fallback; cloud providers remain disabled." \
               || true
             ;;
         esac
@@ -127,7 +112,7 @@ gen() {
       [ -f "$BREVE/briefs/$TODAY.html.prev" ] && mv -f "$BREVE/briefs/$TODAY.html.prev" "$BREVE/briefs/$TODAY.html"
       # On-demand runs let the daemon relay (richer ask + latest-issue pointer); scheduled runs relay here.
       [ -z "$BREVE_ONDEMAND" ] && bun "$BREVE/scripts/notify.ts" --idempotency-key "morning-generation-failure-$TODAY" \
-        "⚠ I couldn't generate your brief — Claude, Gemini AND Codex all look unavailable this morning (very rare — could be your network or all three providers). Reply \"brief\" to retry." || true
+        "⚠ I couldn't generate your brief with the on-device model. No cloud provider was contacted. Reply \"brief\" to retry." || true
       echo "=== all providers exhausted — skipping downstream ==="
     fi
   fi

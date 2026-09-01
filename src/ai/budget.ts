@@ -37,9 +37,10 @@ export interface ModelMeta {
  * conservative default). The client uses this to size every retrieval budget. */
 export function contextWindowFor(model: ModelMeta): number {
   const id = model.id.toLowerCase();
-  // the connected lanes (subscription CLIs + the Gemini key lane) are all
-  // 200k-class. Checked FIRST, and strictly above the local families, so no
-  // local id can drift into the frontier tier (nor the reverse).
+  // Connected CLI models use the conservative 200k frontier tier. Historical Gemini ids retain
+  // frontier sizing so an old chat can render safely even though it cannot run.
+  // Checked FIRST and strictly above the local families, so no local id can
+  // drift into the frontier tier (nor the reverse).
   if (
     model.api === "cli" ||
     /\b(sonnet|opus|haiku|fable)\b/.test(id) ||

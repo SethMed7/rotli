@@ -23,13 +23,14 @@ import { backId, forwardId, useNavHistory } from "../state/navHistory";
 import { MEASURE_MAX_WIDTH, useNoteStyle } from "../state/noteStyle";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
+import type { Note } from "../types";
 import { AaPanel } from "./aaPanel";
 import { BottomSlot } from "./bottomSlot";
 import { CmEditor } from "./cmEditor";
 import { FormatBar } from "./formatBar";
 import {
   ensureDocument,
-  flushNote,
+  flushNoteAfterPaint,
   reloadDocumentIfClean,
   useDocumentDirty,
   useDocumentSaveError,
@@ -107,13 +108,38 @@ export function EditorSurface({
   noteId,
   paneId,
   autoFocus = false,
+  focusOnMount = false,
+  pending = false,
 }: {
   noteId: string;
   paneId: string;
   /** Quick Note: land a typing caret on open (the main editor is click-to-edit). */
   autoFocus?: boolean;
+  /** Keep focus across an optimistic pending → durable note handoff without
+   * inheriting Quick Note's reduced chrome. */
+  focusOnMount?: boolean;
+  /** Command-T's durable file is still being created; a session-only shared
+   * buffer already owns the real editor surface. */
+  pending?: boolean;
 }) {
-  const note = useNote(noteId).data;
+  const [pendingCreatedAt] = useState(() => Date.now());
+  const pendingNote = useMemo<Note>(
+    () => ({
+      id: noteId,
+      title: "Untitled",
+      snippet: "",
+      folderId: "Inbox",
+      diskFolderId: "wiki/_inbox",
+      createdAt: pendingCreatedAt,
+      updatedAt: pendingCreatedAt,
+      pinned: false,
+      body: "",
+      revision: "pending",
+    }),
+    [noteId, pendingCreatedAt],
+  );
+  const storedNote = useNote(noteId, { enabled: !pending }).data;
+  const note = pending ? pendingNote : storedNote;
   const dirty = useDocumentDirty(noteId);
   const saveError = useDocumentSaveError(noteId);
 
@@ -185,12 +211,14 @@ export function EditorSurface({
   // metadata popover is gone — the ≡ chip toggles metadata instantly, while
   // lifecycle and security actions live in the right-click menu.
   const inMain = useMainStore((s) => mainHasNote(s.manifest.tree, noteId));
+  const shownInMain = pending || inMain;
   const openNoteMenu = useNoteMenu();
 
   // the note's real home — its Brain folder + corpus-relative path — shown
   // on the location chip so "where is this file?" is answerable (the maintainer, 2026-07-07).
   const [diskPath, setDiskPath] = useState<string | null>(null);
   useEffect(() => {
+    if (pending) return;
     let alive = true;
     corpusNoteAbsolutePath(noteId)
       .then((p) => alive && setDiskPath(p))
@@ -198,7 +226,7 @@ export function EditorSurface({
     return () => {
       alive = false;
     };
-  }, [noteId]);
+  }, [noteId, pending]);
 
   // "Show file metadata" (the maintainer, 2026-07-01): the raw frontmatter block, verbatim
   // from disk, rendered as an editable banner above the body. Fetched only while
@@ -224,7 +252,7 @@ export function EditorSurface({
   useEffect(() => {
     setFmErr(null); // a refusal never follows the note to another tab
     fmRevision.current = "";
-    if (fileMetadata !== "show") {
+    if (pending || fileMetadata !== "show") {
       setFmRaw(null);
       return;
     }
@@ -242,7 +270,7 @@ export function EditorSurface({
     return () => {
       alive = false;
     };
-  }, [noteId, fileMetadata]);
+  }, [noteId, fileMetadata, pending]);
 
   const commitFm = useCallback(
     (text: string) => {
@@ -287,16 +315,17 @@ export function EditorSurface({
   // clean, adopt the new body so Main and Captures never show two versions of
   // the same file (the maintainer, 2026-07-09). Dirty local edits still win.
   useEffect(() => {
-    if (!note) return;
+    if (!note || pending) return;
     ensureDocument(note.id, note.body, note.revision);
     reloadDocumentIfClean(note.id, note.body, note.revision);
-  }, [note]);
+  }, [note, pending]);
 
-  // leaving a note (tab switch, pane close, note switch) flushes its pending
-  // debounced save — keystrokes are never parked in a timer behind your back
+  // Closing/switching paints first; the existing debounce and quit/visibility
+  // flushes still guarantee durability while the eager save advances after
+  // that paint. Joining a very large note during React cleanup beachballed ⌘W.
   useEffect(
     () => () => {
-      void flushNote(noteId);
+      flushNoteAfterPaint(noteId);
     },
     [noteId],
   );
@@ -326,7 +355,10 @@ export function EditorSurface({
           selection/spellcheck) → the note's lifecycle/security menu. Gated to
           the main editor: the Quick window
           has no context-menu host, so it keeps its native menu. */}
-      <div className="ed-head" onContextMenu={autoFocus ? undefined : (e) => openNoteMenu(e, note)}>
+      <div
+        className="ed-head"
+        onContextMenu={autoFocus || pending ? undefined : (e) => openNoteMenu(e, note)}
+      >
         <div className="ed-context">
           <span className="ed-date">{createdLabel(note.createdAt)}</span>
           {!autoFocus && focusedPane && <NoteHistoryTrail compact={headerCompact} />}
@@ -347,20 +379,22 @@ export function EditorSurface({
                 sidebar (the maintainer, 2026-07-03). ★ Main shows when it's in Main. */}
             <button
               type="button"
-              className={inMain ? "ed-loc in-main" : "ed-loc"}
+              className={shownInMain ? "ed-loc in-main" : "ed-loc"}
               title={`In the Library: ${brainLocation}${
                 shelfLocation !== brainLocation ? `\nShelf: ${shelfLocation}` : ""
               }${diskPath ? `\nOn disk: ${diskPath}` : ""}\nClick to reveal in the Library`}
-              onClick={() => revealFocusedNote("brain", noteId)}
+              onClick={() => {
+                if (!pending) revealFocusedNote("brain", noteId);
+              }}
             >
-              {noteLocationLabel(brainFolder, inMain)}
+              {noteLocationLabel(brainFolder, shownInMain)}
             </button>
           </div>
           <button
             type="button"
             ref={chatChipRef}
             className="aachip"
-            disabled={chatBusy}
+            disabled={chatBusy || pending}
             aria-label="Chats on this note"
             aria-haspopup="menu"
             title="Chats on this note — ⌥-click continues the latest"
@@ -386,6 +420,7 @@ export function EditorSurface({
             type="button"
             data-hotkey="editor.toggleMetadata"
             className={fileMetadata === "show" ? "aachip on" : "aachip"}
+            disabled={pending}
             aria-pressed={fileMetadata === "show"}
             aria-label={fileMetadata === "show" ? "Hide metadata" : "Show metadata"}
             title={fileMetadata === "show" ? "Hide metadata" : "Show metadata"}
@@ -405,7 +440,7 @@ export function EditorSurface({
         key={noteId}
         noteId={noteId}
         paneId={paneId}
-        autoFocus={autoFocus}
+        autoFocus={autoFocus || focusOnMount || pending}
         focusMode={focusMode}
         fontSize={fontSize}
         measureWidth={measureWidth}

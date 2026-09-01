@@ -15,6 +15,10 @@ export interface NoteSummary {
   id: string; // ulid-style
   title: string;
   snippet: string;
+  /** Exact editor-body emptiness from the owning adapter. Main/named views use
+   * it to suppress durable blank placeholders without guessing from a title or
+   * snippet. Optional only for older browser fixtures and compatibility data. */
+  bodyEmpty?: boolean;
   /** Human-readable link/query selectors: current filename stem, canonical
    * title slug, and rename history. Stable identity remains `id`. */
   aliases?: string[];
@@ -66,6 +70,9 @@ export interface NoteTab {
   preview?: boolean;
   surfaceKind: "note";
   noteId: string;
+  /** Session-only handoff hint for a note that began as an optimistic Command-T
+   * editor. The viewstate validator intentionally drops it at persistence. */
+  focusOnMount?: boolean;
 }
 
 /** An Excalidraw canvas tab. boardId IS the board's corpus-relative path
@@ -122,6 +129,12 @@ export interface NewItemTab {
   /** Never set for this kind — present so the union reads uniformly. */
   preview?: boolean;
   surfaceKind: "newItem";
+  /** Present only while ⌘T's durable creator runs. The tab itself is opened in
+   * the key event, then retargeted in place once the file exists. */
+  pendingLabel?: string;
+  /** This pending item already owns a live Markdown buffer and renders the real
+   * editor while its durable file is being created. */
+  pendingNote?: boolean;
 }
 
 /** A private browser tab holds identity only. Its URL/history belong to the

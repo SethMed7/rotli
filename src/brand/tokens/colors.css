@@ -34,6 +34,7 @@
   --accent-text: #8f4e37; /* accent text/links at small sizes (AA) */
   --on-accent: #ffffff; /* text on a clay fill — AA-large/UI only (3.16); for small text prefer cocoa */
   --success: #8d9a76; /* Olive — UI/icons; for small text use --rotli-olive-text */
+  --failure: #9f3d3d; /* Red — explicit failed/incorrect state; AA small text on light surfaces */
   --syntax-blue: #2f6f9e; /* raw Markdown semantic structure — AA on light surfaces */
   --syntax-accent: var(--accent-text); /* source punctuation follows the active Rotli accent */
 }
@@ -52,8 +53,26 @@
   --accent-text: #c97e62;
   --on-accent: #241d18;
   --success: #8d9a76; /* AA (5.55) on the cocoa ground */
+  --failure: #e58b8b; /* Red lifted for AA failure text and controls on dark surfaces */
   --syntax-blue: #78b7e3;
   --syntax-accent: var(--accent-text);
+}
+
+/* Every named dark family keeps explicit failure state red and AA-readable.
+   Their remaining semantic roles are tuned in styles/themes.css. */
+:root[data-theme="paper"],
+:root[data-theme="ocean-light"],
+:root[data-theme="grove-light"],
+:root[data-theme="iris-light"],
+:root[data-theme="midnight-light"] {
+  --failure: #9f3d3d;
+}
+:root[data-theme="charcoal"],
+:root[data-theme="ocean-dark"],
+:root[data-theme="grove-dark"],
+:root[data-theme="iris-dark"],
+:root[data-theme="midnight-dark"] {
+  --failure: #e58b8b;
 }
 
 /* NOTE: the old `prefers-color-scheme: dark` media block was removed
