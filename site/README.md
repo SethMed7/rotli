@@ -44,13 +44,18 @@ bun run preview  # serve the built dist/ locally
   `public/fonts/` from `src/brand/fonts/`.
 - The compact mark and companion art are imported from the canonical assets in
   the repository root so the site does not create a second character system.
-- The product illustration is privacy-safe HTML/CSS rather than a screenshot
-  of a live vault. Keep it synchronized with the current workspace grammar.
+- The hero and theme studio use browser-demo captures from Rotli's seeded demo
+  corpus, never a live vault. Refresh captures at 1280 × 800 through the app's
+  browser twin, and keep each filename tied to the environment shown in it.
+- `public/coastline.webp` is the optimized, user-provided hero photograph.
+  `public/grain.png` is a deterministic raster texture used only as a subtle
+  hero overlay; neither asset is fetched from a third party at runtime.
 - `/mcp/` is the public connection guide for stdio clients, Grok Bot, the
   remote safety boundary, disposable verification, and relay self-hosting. Do
   not publish a hosted relay URL there until that deployment has been verified.
 - `public/social-card.svg` is the editable source for the rendered Open Graph
-  image at `public/social-card.png`.
+  image at `public/social-card.png`; keep its copy and palette aligned with the
+  current hero before rendering a new PNG.
 
 ## Cloudflare Workers deployment
 
