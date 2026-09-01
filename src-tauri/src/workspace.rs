@@ -3661,7 +3661,10 @@ mod tests {
                 body.len()
             )
             .unwrap();
-            client.shutdown(std::net::Shutdown::Write).unwrap();
+            // The server may answer and close before this half-close lands;
+            // macOS then reports ENOTCONN for the shutdown while the response
+            // still sits in the receive buffer (flaked once on CI, 2026-09-01).
+            let _ = client.shutdown(std::net::Shutdown::Write);
             let mut response = String::new();
             client.read_to_string(&mut response).unwrap();
             server.join().unwrap();

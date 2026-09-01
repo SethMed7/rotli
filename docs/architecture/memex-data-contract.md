@@ -493,6 +493,17 @@ but it must remain rebuildable, optional, and behind the retrieval port.
 - Quick captures and notes created from the Quick Note window are secure at
   birth. The user may deliberately remove protection from the note menu or the
   Quick Note shield control.
+- A secure quick capture therefore lives in `wiki/_secure/` but keeps the
+  capture shelf `Inbox`, and Rust projects it to the reserved `Board` root the
+  sidebar reads as **Captures** — the same surface a plain staged capture in
+  `wiki/_inbox/` uses. Captures are not full notes: they never appear under
+  "Secure notes" or All notes until the user curates them into Main or Quick
+  access. Protection is unchanged by the projection (gitignored spine,
+  model-gated reads).
+- Summoning the capture card from another app never surfaces the main window:
+  "in Rotli" means main was visible **and** focused, a visible-but-behind main
+  is tucked away for the capture and restored after Rotli steps out, and
+  finishing a capture never force-raises main (the Quick Note law).
 - **`secure` and `locked` are independent controls on different axes
   (2026-08-01).** `secure` governs VISIBILITY against remote models; `locked`
   governs EDITING by every model. Neither implies the other. The full matrix and

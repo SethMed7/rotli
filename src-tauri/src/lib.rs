@@ -496,7 +496,59 @@ struct HideOnBlur(Mutex<bool>);
 /// Finishing a capture uses it to return focus correctly: back to rotli's main
 /// window if you were already in the app, or to the app you came from otherwise
 /// — so a quick capture from another app never "opens" rotli (the maintainer, 2026-06-19).
-struct CaptureReturn(Mutex<bool>);
+struct CaptureReturn(Mutex<CaptureReturnPlan>);
+
+/// What a capture summon must do about the main window and where a finished
+/// capture returns. Pure so the policy is testable without a window.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct CaptureReturnPlan {
+    /// main was visible AND focused at summon: finishing just hides the card.
+    was_in_main: bool,
+    /// main was visible but NOT focused (rotli behind another app): hide it for
+    /// the capture and restore it after the app steps out of the way.
+    tuck_main: bool,
+}
+
+fn capture_return_plan(main_visible: bool, main_focused: bool) -> CaptureReturnPlan {
+    let was_in_main = main_visible && main_focused;
+    CaptureReturnPlan {
+        was_in_main,
+        tuck_main: main_visible && !was_in_main,
+    }
+}
+
+#[cfg(test)]
+mod capture_return_tests {
+    use super::*;
+
+    #[test]
+    fn working_in_main_returns_there_without_touching_it() {
+        assert_eq!(
+            capture_return_plan(true, true),
+            CaptureReturnPlan { was_in_main: true, tuck_main: false }
+        );
+    }
+
+    #[test]
+    fn rotli_open_behind_another_app_is_away_and_main_is_tucked() {
+        // the reported bug: ⌥C from another app with main open underneath
+        // activated rotli and raised main over the app you were in
+        assert_eq!(
+            capture_return_plan(true, false),
+            CaptureReturnPlan { was_in_main: false, tuck_main: true }
+        );
+    }
+
+    #[test]
+    fn main_hidden_means_away_with_nothing_to_tuck() {
+        assert_eq!(
+            capture_return_plan(false, false),
+            CaptureReturnPlan { was_in_main: false, tuck_main: false }
+        );
+        // focused-but-hidden cannot happen; treat it as away
+        assert!(!capture_return_plan(false, true).was_in_main);
+    }
+}
 
 /// Whether the Quick Note window has been positioned this session. We center it
 /// on the FIRST summon (on the active display); after that we leave it where the
@@ -730,12 +782,20 @@ fn show_capture(app: &AppHandle) {
     let Some(window) = app.get_webview_window("capture") else {
         return;
     };
-    // remember whether main was up — finish_capture returns focus accordingly
-    let main_visible = app
+    // Remember where you came from — the SAME rule the Quick Note uses
+    // (remember_quick_return): "in rotli" means main was visible AND focused.
+    // Visible-but-behind (rotli open under another app) counts as away, and
+    // main is tucked out of sight for the capture so activating the app cannot
+    // raise it over the app you were in (2026-09-01: "⌥C opens the app").
+    let (main_visible, main_focused) = app
         .get_webview_window("main")
-        .map(|w| w.is_visible().unwrap_or(false))
-        .unwrap_or(false);
-    *app.state::<CaptureReturn>().0.lock().unwrap() = main_visible;
+        .map(|w| (w.is_visible().unwrap_or(false), w.is_focused().unwrap_or(false)))
+        .unwrap_or((false, false));
+    let plan = capture_return_plan(main_visible, main_focused);
+    if plan.tuck_main {
+        hide_main(app);
+    }
+    *app.state::<CaptureReturn>().0.lock().unwrap() = plan;
     center_on_cursor_display(app, &window);
     *app.state::<LastPanelSummon>().0.lock().unwrap() = Some(Instant::now());
     let _ = window.show();
@@ -749,12 +809,21 @@ fn show_capture(app: &AppHandle) {
 /// never surfaces rotli (#5). The card is always hidden either way.
 fn finish_capture(app: &AppHandle) {
     hide_capture(app);
-    let was_in_rotli = *app.state::<CaptureReturn>().0.lock().unwrap();
-    if was_in_rotli {
-        show_main(app);
-    } else {
-        #[cfg(target_os = "macos")]
-        let _ = app.hide();
+    let plan = *app.state::<CaptureReturn>().0.lock().unwrap();
+    if plan.was_in_main {
+        // main is already underneath and regains focus naturally — never a
+        // forced raise (the Quick Note law, hide_quick_return)
+        return;
+    }
+    // came from another app — step out of rotli so focus returns there
+    #[cfg(target_os = "macos")]
+    let _ = app.hide();
+    if plan.tuck_main {
+        // put main back for the next time rotli is activated; the app is
+        // hidden, so ordering the window front cannot surface anything now
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.show();
+        }
     }
 }
 
@@ -2336,7 +2405,7 @@ pub fn run() {
         .manage(NativeDialogOpen::default())
         .manage(LastPanelSummon(Mutex::new(None)))
         .manage(HideOnBlur(Mutex::new(true)))
-        .manage(CaptureReturn(Mutex::new(false)))
+        .manage(CaptureReturn(Mutex::new(CaptureReturnPlan::default())))
         .manage(QuickPlaced(Mutex::new(false)))
         .manage(QuickReturn(Mutex::new(false)))
         .manage(QuitFlush { status: Mutex::new(QuitFlushStatus::default()), cv: Condvar::new() })
