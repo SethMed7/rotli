@@ -42,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The dev build is representative.** `tauri dev` now compiles Rust at
+  `opt-level = 1`: listing a 250-note vault dropped from 4.6 s to 0.4 s in the
+  dev app (release: 0.28 s), so structural refreshes no longer read as lag
+  that release users never see.
 - **Connected chat now has an explicit official-client boundary.** Rotli keeps
   Claude Code and Codex as opt-in interactive lanes and adds Cursor software
   chat through Cursor's documented ACP custom-client route. Cursor runs in
@@ -98,6 +102,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   handled, and a byte-backed webview drop remains as a runtime fallback.
   Named-root import ids become portable `storage:` links, and a failed import
   reports its reason instead of silently doing nothing.
+- **Command-T no longer refetches the whole vault.** Creating a note
+  invalidated every open tab's body and re-walked the Tasks projection on top
+  of the note listings; a new item now refreshes the listings only, and the
+  remaining structural refresh runs its three round trips in parallel.
+- **The rest state reads as designed.** Its three actions no longer wrap
+  their labels or render as bevelled buttons, and a filled quokka keeps its
+  dark ink on dark themes instead of drawing light body lines under dark
+  accessory ink.
 - **Dropping an image on a chat attaches it again.** The composer read the
   imported asset back with a webview `fetch(asset://…)`, which the ipc-only
   `connect-src` blocks — every drop failed with “Load failed” after the file

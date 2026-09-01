@@ -23,6 +23,18 @@ real editor in the original key event”); ⌘W defers the large-note save flush
 past the close paint (`editorSurface.tsx` `flushNoteAfterPaint`). Persistence
 is debounced 500 ms and off the hotkey path.
 
+**Measured (same day, follow-up).** In browser mode ⌘T reaches a focused
+editor in 18–25 ms and its first frame by 37–56 ms, with the pending→real
+remount visible ~10 ms later — the frontend is not the lag. The dev app's lag
+was the post-creation refresh against the real vault: `notes list` on the
+250-note memex took 4.6 s in the unoptimized debug build versus 0.28 s in
+release, and creation invalidated the listings, every open tab's body, and the
+Tasks projection. **FIXED**: `tauri dev` now builds Rust at `opt-level = 1`
+(0.40 s for the same walk), creation refetches the note listings only
+(`invalidateNoteLists`), and `invalidateNotes` runs its three refetches in
+parallel. The Rust walk cache still invalidates wholesale on any internal
+write; patching a created note into `list_cache` instead is the next lever.
+
 Still on the path, ranked:
 
 1. **Every ⌘ press runs a whole-document layout.** `hotkeyPeekDelay` returns
@@ -210,6 +222,15 @@ pointed at the bare `src/assets/characters/_logo.svg`. **FIXED**:
 `public/favicon.svg` (white disc, ink quokka, explicit `color`) and
 `index.html` now points there. The marketing site’s `site/public/favicon.svg`
 keeps its linen disc; making it white is a brand call.
+
+## 8b. Rest state (“All clear”)
+
+**FIXED**: the three actions wrapped their labels inside `.be-sub`’s 320 px
+prose measure and rendered as UA-bevelled buttons; and a filled quokka drew
+its body line art in the theme text colour on dark themes because placement
+CSS (`.be-quokka`, `.empty-stage .quokka`) overrode `color` while the
+accessory ink layer kept the dark ink token — the pale contour in the
+screenshot. Filled treatments now pin `color: var(--quokka-ink)` inline.
 
 ## 9. Live charts (`/charts`) — evaluation
 

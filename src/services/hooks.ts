@@ -254,10 +254,22 @@ export function primeNote(note: Note): void {
 }
 
 export async function invalidateNotes(): Promise<void> {
+  // the three umbrellas hit independent Rust commands — refetch them together,
+  // not one after another (each await was a serialized IPC round trip)
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["notes"] }),
+    queryClient.invalidateQueries({ queryKey: ["note"] }),
+    // a body edit can add/complete checkboxes — the Tasks projection re-derives
+    queryClient.invalidateQueries({ queryKey: keys.tasks }),
+  ]);
+}
+
+/** A NEW item exists but no existing note changed: refetch the listings only.
+ * Creation used invalidateNotes(), which also refetched every open tab's body
+ * (`["note"]`) and re-walked the Tasks projection — three corpus round trips
+ * for a blank note nobody has typed into yet (Command-T lag, 2026-09-01). */
+export async function invalidateNoteLists(): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: ["notes"] });
-  await queryClient.invalidateQueries({ queryKey: ["note"] });
-  // a body edit can add/complete checkboxes — the Tasks projection re-derives
-  await queryClient.invalidateQueries({ queryKey: keys.tasks });
 }
 
 /** Scoped cache refresh after ONE note's body sync — the editor's 400ms tick.

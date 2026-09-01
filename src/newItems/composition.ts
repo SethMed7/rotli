@@ -12,7 +12,7 @@ import { corpusCreateBoard, corpusCreateManagedFile } from "../lib/tauri";
 import { invalidateMemex } from "../memex/useMemex";
 import { createRoutedNote } from "../services/createNote";
 import { DEST, isHidden, isStorageLane, isVault } from "../services/destinations";
-import { invalidateNotes, primeNote } from "../services/hooks";
+import { invalidateNoteLists, primeNote } from "../services/hooks";
 import { MAIN_ROOT, addNoteToMainAt, mainFolderIds, mainParentOfNote } from "../services/mainTree";
 import { trackNewNoteDraft } from "../services/noteDrafts";
 import { inboxFolderId, notesService } from "../services/notes";
@@ -155,7 +155,7 @@ function fileItemInMain(item: CreatedItem, context: FilingContext): void {
 
 const presenter: NewItemPresenter = {
   async refresh() {
-    await Promise.all([invalidateNotes(), invalidateMemex()]);
+    await Promise.all([invalidateNoteLists(), invalidateMemex()]);
   },
   fileInMain(item) {
     fileItemInMain(item, currentFilingContext());
