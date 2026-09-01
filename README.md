@@ -122,7 +122,8 @@ keyboard behavior.
 
 - **Plain Markdown files** on your Mac — open them in any editor, back them up, keep them forever.
 - **Secrets are auto-detected** and never sent to a remote model or out to the web.
-- **Works fully offline** — no account, nothing phones home.
+- **Works fully offline** — no account; connected models, web research, updates,
+  and Remote agents use the network only when you explicitly choose them.
 
 You work how you want in **Main**; the Librarian organizes the **Library** underneath — location and metadata only, never the words inside your notes — and a raw vault opts out of AI entirely.
 
@@ -175,7 +176,7 @@ Contributing or working with an AI coding tool? Start with
 data boundary, [`SECURITY.md`](SECURITY.md) for responsible reporting, and
 [`LICENSE`](LICENSE) for the MIT terms.
 
-**Stack** — Tauri v2 · React 18 · Vite (rolldown) · TypeScript strict · Bun · Zustand + TanStack Query · plain CSS driven entirely by the in-repo brand kit (`src/brand/`, v1.0.0 — the single source of truth for colors, type, and logo, enforced by `bun run check:hex`). Local-first is the architecture, not a feature: nothing phones home, nothing needs an account, offline is the default.
+**Stack** — Tauri v2 · React 18 · Vite (rolldown) · TypeScript strict · Bun · Zustand + TanStack Query · plain CSS driven entirely by the in-repo brand kit (`src/brand/`, v1.0.0 — the single source of truth for colors, type, and logo, enforced by `bun run check:hex`). Local-first is the architecture, not a feature: nothing needs an account, offline is the default, and every network connection is an explicit user choice.
 
 ## Where it's going
 
