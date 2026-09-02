@@ -1677,6 +1677,47 @@ fn shelf_of(fm: &Frontmatter) -> Vec<String> {
     Vec::new()
 }
 
+#[cfg(test)]
+mod capture_projection_tests {
+    use super::*;
+
+    fn with_shelf(shelf: &str) -> Frontmatter {
+        let mut fm = Frontmatter::default();
+        fm.foreign.push(format!("shelf: [{shelf}]"));
+        fm
+    }
+
+    #[test]
+    fn a_secure_quick_capture_is_a_capture_not_a_secure_note() {
+        // ⌥C writes `secure: true` + `shelf: [Inbox]` into wiki/_secure; the
+        // sidebar must read it as a Capture, never as a full "Secure notes" row
+        assert_eq!(
+            project_folder(Layout::Memex, "wiki/_secure", &with_shelf("Inbox")),
+            "Board"
+        );
+        assert_eq!(
+            project_folder(Layout::Memex, "wiki/_inbox", &with_shelf("Inbox")),
+            "Board"
+        );
+    }
+
+    #[test]
+    fn curated_and_unshelved_secure_notes_keep_the_secure_row() {
+        assert_eq!(
+            project_folder(Layout::Memex, "wiki/_secure", &with_shelf("Northstar")),
+            "Secure notes"
+        );
+        assert_eq!(
+            project_folder(Layout::Memex, "wiki/_secure/deep", &Frontmatter::default()),
+            "Secure notes"
+        );
+        assert_eq!(
+            project_folder(Layout::Memex, "wiki/_secure", &with_shelf("Secure notes/Keys")),
+            "Secure notes/Keys"
+        );
+    }
+}
+
 /// The folder a note is PROJECTED into. In a Memex, a `wiki/` note appears under
 /// its PRIMARY shelf (the user's view) when one is set; otherwise it falls back to
 /// its disk folder (a curated note with no shelf yet stays where it lives on disk).
@@ -1692,7 +1733,19 @@ fn project_folder(layout: Layout, disk_folder: &str, fm: &Frontmatter) -> String
             return "Storage".to_string();
         }
         if disk_folder == "wiki/_secure" || disk_folder.starts_with("wiki/_secure/") {
-            return shelf_of(fm)
+            let shelves = shelf_of(fm);
+            // A quick capture is secure at birth, so it lives in wiki/_secure —
+            // but its shelf is still the capture shelf "Inbox". It is a CAPTURE,
+            // not a full note: project it to the reserved "Board" root the
+            // sidebar reads as "Captures", exactly like a staged wiki/_inbox
+            // capture, instead of filing it under "Secure notes" beside every
+            // curated secure note (2026-09-01: "quick captures are not full
+            // notes — they are separate"). Protection is unchanged: the file
+            // stays in the gitignored secure spine and model-gated on read.
+            if shelves.first().is_some_and(|shelf| shelf == "Inbox") {
+                return "Board".to_string();
+            }
+            return shelves
                 .into_iter()
                 .find(|shelf| shelf == "Secure notes" || shelf.starts_with("Secure notes/"))
                 .unwrap_or_else(|| "Secure notes".to_string());

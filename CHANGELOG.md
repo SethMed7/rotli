@@ -104,6 +104,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   handled, and a byte-backed webview drop remains as a runtime fallback.
   Named-root import ids become portable `storage:` links, and a failed import
   reports its reason instead of silently doing nothing.
+- **Quick capture never surfaces the app, and captures stay captures.** ⌥C
+  from another app with Rotli open underneath raised the main window over the
+  app you were in; the card now follows the Quick Note law (in Rotli means
+  main was visible *and* focused, and finishing never force-raises main).
+  Secure-at-birth captures were also filed under “Secure notes” beside curated
+  secure notes; a capture that still carries the capture shelf now projects to
+  the Captures board like any staged capture, with its protection unchanged.
 - **Command-T no longer refetches the whole vault.** Creating a note
   invalidated every open tab's body and re-walked the Tasks projection on top
   of the note listings; a new item now refreshes the listings only, and the
