@@ -50,8 +50,10 @@ export function BoardSurface() {
   const stagedData = useNotes(DEST.board).data;
   // a CURATED note is a full note, not a passing capture (the maintainer, 2026-07-01: "my
   // main note should not be in Captures") — anything placed in Main or starred
-  // for Quick access leaves the board, even while it still lives in _inbox
-  // staging. Sidebar's Captures count applies the same rule.
+  // for Quick access leaves the board, even while it still lives in intake
+  // staging (_inbox, or _secure for secure-at-birth captures). Sidebar's
+  // Captures count applies the same rule; a Quick Note is filed into Main at
+  // birth, so it never appears here.
   const mainTree = useMainStore((s) => s.manifest.tree);
   const quickIds = useUiStore((s) => s.quickNoteIds);
   const focusedNoteId = useFocusedNoteId();

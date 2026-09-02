@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A note created in the Quick Note window is a full note again.** 0.84.0
+  taught the Captures board to claim secure-at-birth notes that still carry
+  the capture shelf, and a new Quick Note has exactly that shape, so it landed
+  in Captures and left All notes until it was starred. The main window now
+  files a newborn Quick Note into Main immediately (hidden while blank, like
+  a ⌘T note), which is the one rule that separates full notes from captures.
+  Notes created in the Quick Note window while on 0.84.0 sit in Captures until
+  you add them to Main or star them.
+- **Quick Note settings copy names the real keys.** The picker is ⌘P (not ⌘K)
+  and favorites cycle with ⌘] and ⌘[.
+
 ## [0.84.0] - 2026-09-01
 
 ### Added

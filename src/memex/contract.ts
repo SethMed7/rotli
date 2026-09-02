@@ -542,7 +542,8 @@ export const SPINE = {
  *  READ and is never an organizer area.
  *
  *  `inbox.md` is NOT a rotli write surface (#96, audit 2026-07): no rotli code has
- *  ever appended it — quick captures land as staged notes in wiki/_inbox/ — so the
+ *  ever appended it — quick captures land as staged secure notes in wiki/_secure/
+ *  (projected to Captures) — so the
  *  old allowance was dead gate surface that could only rot. Breve owns its own
  *  inbox.md writes through its own gate; rotli only scaffolds the file when it
  *  INITIATES a brand-new memex. */

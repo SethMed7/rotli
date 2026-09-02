@@ -2077,6 +2077,24 @@ export function onQuickSet(cb: (state: QuickStatePayload) => void): () => void {
   return () => void unlisten.then((fn) => fn());
 }
 
+/** A note born in the Quick Note window. The quick webview creates the file;
+ * the MAIN window (the Main-manifest writer) files it into Main so it is a full
+ * note from birth — never a staged capture (2026-09-01). */
+export interface QuickCreatedPayload {
+  id: string;
+}
+
+export function emitQuickCreated(payload: QuickCreatedPayload): void {
+  if (!isTauri()) return;
+  void emit("rotli:quick-created", payload);
+}
+
+export function onQuickCreated(cb: (payload: QuickCreatedPayload) => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listen<QuickCreatedPayload>("rotli:quick-created", (event) => cb(event.payload));
+  return () => void unlisten.then((fn) => fn());
+}
+
 /** Theme settings, broadcast from the MAIN window so the quick + capture
  * webviews follow the chosen theme live (they each apply their own theme from
  * their store; without this they'd only pick it up from settings.json at launch

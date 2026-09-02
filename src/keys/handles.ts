@@ -9,7 +9,8 @@ export interface CaptureHandle {
 }
 
 export interface QuickHandle {
-  /** Create a fresh note in the quick folder, add it to the set, and open it. */
+  /** Create a fresh note in the quick folder, file it into Main, and open it
+   * (not pinned — ★ pins deliberately). */
   newNote(): void;
   /** Open the search-and-swap overlay. */
   openSearch(): void;
