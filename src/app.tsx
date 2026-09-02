@@ -37,7 +37,7 @@ import {
   corpusCreateImageAsset,
   corpusImportFile,
   emitCaptureAck,
-  emitThemeSet,
+  emitAppearance,
   isTauri,
   onBrainJournal,
   onCaptureSave,
@@ -51,7 +51,7 @@ import {
   onRebind,
   onSummonChat,
   onSummonSearch,
-  onThemeSet,
+  onAppearance,
   onVaultChanged,
   rootIdOf,
   setAppIcon,
@@ -69,6 +69,7 @@ import {
 } from "./editor/externalImageDrop";
 import { noteIdFacet } from "./editor/livePreview";
 import { onQuitFlushFailure } from "./lib/quitFlush";
+import { useBindingsStore } from "./keys/bindings";
 import { fileQuickNoteInMain } from "./newItems/composition";
 import { createVaultCapture } from "./services/captureRouting";
 import { summonChat } from "./services/chatSummon";
@@ -85,7 +86,13 @@ import { invalidateMemex } from "./memex/useMemex";
 import { invalidateChatFolders } from "./services/chatFolders";
 import { refreshAfterExternalCorpusChange } from "./services/externalCorpusChange";
 import { refreshActiveVault } from "./state/activeVault";
-import { flushSettingsNow, runAutoRetentionMaintenance } from "./state/persist";
+import { useNoteStyleStore } from "./state/noteStyle";
+import {
+  appearanceBroadcast,
+  applyAppearanceBroadcast,
+  flushSettingsNow,
+  runAutoRetentionMaintenance,
+} from "./state/persist";
 import { applyQuickState } from "./state/quick";
 import { applyAccent, applySyntaxPalette, applyTheme } from "./state/theme";
 import { useUiStore } from "./state/ui";
@@ -602,69 +609,42 @@ export default function App() {
   const syntaxPalette = useUiStore((s) => s.syntaxPalette);
   const accentColor = useUiStore((s) => s.accentColor);
   const accentHue = useUiStore((s) => s.accentHue);
-  const quokkaCompanionEnabled = useUiStore((s) => s.quokkaCompanionEnabled);
-  const quokkaStyle = useUiStore((s) => s.quokkaStyle);
-  const quokkaCustomHue = useUiStore((s) => s.quokkaCustomHue);
-  const quokkaLineColor = useUiStore((s) => s.quokkaLineColor);
-  const quokkaAccessory = useUiStore((s) => s.quokkaAccessory);
-  const quokkaAccessoryHue = useUiStore((s) => s.quokkaAccessoryHue);
-  const quokkaIdlePose = useUiStore((s) => s.quokkaIdlePose);
   const surface = surfaceFromUrl();
 
   useEffect(() => applyTheme(theme, themeFamily), [theme, themeFamily]);
   useEffect(() => applySyntaxPalette(syntaxPalette), [syntaxPalette]);
   useEffect(() => applyAccent(accentColor, accentHue), [accentColor, accentHue]);
 
-  // theme is broadcast from the MAIN window so the quick + capture webviews
-  // follow it LIVE (each applies its own theme; without this they only read it
-  // from settings.json at launch and go stale — issue #4). Main is the source
-  // and never listens; the others listen and never emit, so there's no echo.
+  // appearance + editor settings are broadcast from the MAIN window so the
+  // quick + capture webviews follow them LIVE (each applies its own theme;
+  // without this they only read settings at launch and go stale — issue #4).
+  // The payload is the persistence module's own serialized snapshot, so every
+  // app setting travels (theme, accent, quokka, syntax palette, hotkey peek,
+  // rebinds, per-note typography), deduplicated against the last emission.
+  // Main is the source and never listens; the others listen and never emit.
   useEffect(() => {
-    if (surface !== "main") return;
-    emitThemeSet({
-      theme,
-      themeFamily,
-      accentColor,
-      accentHue,
-      quokkaCompanionEnabled,
-      quokkaStyle,
-      quokkaCustomHue,
-      quokkaLineColor,
-      quokkaAccessory,
-      quokkaAccessoryHue,
-      quokkaIdlePose,
-    });
-  }, [
-    surface,
-    theme,
-    themeFamily,
-    accentColor,
-    accentHue,
-    quokkaCompanionEnabled,
-    quokkaStyle,
-    quokkaCustomHue,
-    quokkaLineColor,
-    quokkaAccessory,
-    quokkaAccessoryHue,
-    quokkaIdlePose,
-  ]);
+    if (surface !== "main" || !isTauri()) return;
+    let last = "";
+    const push = (): void => {
+      const payload = appearanceBroadcast();
+      const key = `${payload.app}\u0000${payload.noteStyles}`;
+      if (key === last) return;
+      last = key;
+      emitAppearance(payload);
+    };
+    push();
+    const unsubs = [
+      useUiStore.subscribe(push),
+      useBindingsStore.subscribe(push),
+      useNoteStyleStore.subscribe(push),
+    ];
+    return () => {
+      for (const unsub of unsubs) unsub();
+    };
+  }, [surface]);
   useEffect(() => {
     if (surface === "main") return;
-    return onThemeSet((p) =>
-      useUiStore.setState({
-        theme: p.theme,
-        themeFamily: p.themeFamily,
-        accentColor: p.accentColor,
-        accentHue: p.accentHue,
-        quokkaCompanionEnabled: p.quokkaCompanionEnabled,
-        quokkaStyle: p.quokkaStyle,
-        quokkaCustomHue: p.quokkaCustomHue,
-        quokkaLineColor: p.quokkaLineColor,
-        quokkaAccessory: p.quokkaAccessory,
-        quokkaAccessoryHue: p.quokkaAccessoryHue,
-        quokkaIdlePose: p.quokkaIdlePose,
-      }),
-    );
+    return onAppearance(applyAppearanceBroadcast);
   }, [surface]);
 
   useEffect(() => {

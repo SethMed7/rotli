@@ -36,6 +36,7 @@ import {
   QUOKKA_STYLE_PRESENTATIONS,
   quokkaAccessoryColor,
   quokkaCustomColor,
+  type QuokkaLineColor,
 } from "../brand/quokka";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
@@ -973,6 +974,13 @@ function NavigatorSample({ style }: { style: ChatNavigatorStyle }) {
 
 /** Dock/app icon options — the quokka re-tiled in a few palettes. "default" is
  * the shipped icon; colors live in themes.css (the appicon-tile-- classes). */
+/** The three line-colour choices, named honestly: Auto follows the theme. */
+const QUOKKA_LINE_COLOR_LABEL: Record<QuokkaLineColor, string> = {
+  auto: "Auto",
+  black: "Black",
+  white: "White",
+};
+
 const APP_ICONS: { id: AppIcon; label: string }[] = [
   { id: "default", label: "Default" },
   { id: "paper", label: "Paper" },
@@ -1160,7 +1168,7 @@ function AppearancePane() {
                 <small>
                   {QUOKKA_ACCESSORY_PRESENTATIONS.find((choice) => choice.accessory === quokkaAccessory)
                     ?.description ?? "Just the quokka"}{" "}
-                  · {quokkaLineColor === "black" ? "Black" : "White"} lines ·{" "}
+                  · {QUOKKA_LINE_COLOR_LABEL[quokkaLineColor]} lines ·{" "}
                   {QUOKKA_IDLE_POSE_PRESENTATIONS.find((choice) => choice.pose === quokkaIdlePose)?.label ??
                     "Peaceful"}
                 </small>
@@ -1232,7 +1240,7 @@ function AppearancePane() {
                       onClick={() => setQuokkaLineColor(color)}
                     >
                       <span aria-hidden="true" />
-                      {color === "black" ? "Black" : "White"}
+                      {QUOKKA_LINE_COLOR_LABEL[color]}
                     </button>
                   ))}
                 </div>
@@ -1286,7 +1294,7 @@ function AppearancePane() {
                     </button>
                   ))}
                 </div>
-                {quokkaAccessory !== "none" && (
+                {quokkaAccessory !== "none" && quokkaStyle !== "line" && (
                   <label
                     className="quokka-accessory-hue"
                     style={

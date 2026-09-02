@@ -5,11 +5,12 @@
 import { type CSSProperties, type KeyboardEvent, useEffect, useState } from "react";
 
 import {
+  DEFAULT_QUOKKA_ACCESSORY_HUE,
   DEFAULT_QUOKKA_CUSTOM_HUE,
   QUOKKA_ACCESSORY_PRESENTATIONS,
   QUOKKA_STYLE_PRESENTATIONS,
-  quokkaCustomColor,
   quokkaAccessoryColor,
+  quokkaCustomColor,
 } from "../../brand/quokka";
 import { resolveChord, useBindingsStore } from "../../keys/bindings";
 import { chordFromEvent, formatChord, toAccelerator } from "../../keys/chords";
@@ -204,6 +205,9 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
       quokkaStyle: "cocoa",
       quokkaCustomHue: DEFAULT_QUOKKA_CUSTOM_HUE,
       quokkaAccessory: "none",
+      quokkaAccessoryHue: DEFAULT_QUOKKA_ACCESSORY_HUE,
+      quokkaLineColor: "auto",
+      quokkaIdlePose: "base",
       stayOpen: false,
       showInDock: false,
     });
@@ -387,7 +391,7 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
                               </button>
                             ))}
                           </div>
-                          {quokkaAccessory !== "none" && (
+                          {quokkaAccessory !== "none" && quokkaStyle !== "line" && (
                             <div
                               className="setup-quokka-swatches"
                               role="radiogroup"

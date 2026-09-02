@@ -2095,33 +2095,24 @@ export function onQuickCreated(cb: (payload: QuickCreatedPayload) => void): () =
   return () => void unlisten.then((fn) => fn());
 }
 
-/** Theme settings, broadcast from the MAIN window so the quick + capture
- * webviews follow the chosen theme live (they each apply their own theme from
- * their store; without this they'd only pick it up from settings.json at launch
- * and go stale when you change it). Loose string types avoid a ui<->tauri import
- * cycle; the receiver casts back to the ui store's unions. */
-export interface ThemePayload {
-  theme: "light" | "dark" | "system";
-  themeFamily: "warm" | "mono" | "ocean" | "grove" | "iris" | "midnight";
-  accentColor: "default" | "blue" | "green" | "violet" | "rose" | "amber" | "custom";
-  accentHue: number;
-  quokkaCompanionEnabled: boolean;
-  quokkaStyle: "line" | "cocoa" | "green" | "ocean" | "iris" | "berry" | "amber" | "custom";
-  quokkaCustomHue: number;
-  quokkaLineColor: "auto" | "black" | "white";
-  quokkaAccessory: "none" | "glasses" | "bucket-hat" | "goggles";
-  quokkaAccessoryHue: number;
-  quokkaIdlePose: "base" | "rest" | "thoughtful" | "listening" | "celebrating";
+/** Appearance + editor settings, broadcast from the MAIN window so the quick +
+ * capture webviews follow them LIVE. The payload is the persistence module's
+ * own serialized shapes (state/persist.ts appearanceBroadcast), so every app
+ * setting travels — not a hand-picked subset that goes stale. Main is the
+ * source and never listens; the others listen and never emit, so no echo. */
+export interface AppearanceBroadcastPayload {
+  app: string;
+  noteStyles: string;
 }
 
-export function emitThemeSet(payload: ThemePayload): void {
+export function emitAppearance(payload: AppearanceBroadcastPayload): void {
   if (!isTauri()) return;
-  void emit("rotli:theme-set", payload);
+  void emit("rotli:appearance", payload);
 }
 
-export function onThemeSet(cb: (payload: ThemePayload) => void): () => void {
+export function onAppearance(cb: (payload: AppearanceBroadcastPayload) => void): () => void {
   if (!isTauri()) return () => {};
-  const unlisten = listen<ThemePayload>("rotli:theme-set", (event) => cb(event.payload));
+  const unlisten = listen<AppearanceBroadcastPayload>("rotli:appearance", (event) => cb(event.payload));
   return () => void unlisten.then((fn) => fn());
 }
 
