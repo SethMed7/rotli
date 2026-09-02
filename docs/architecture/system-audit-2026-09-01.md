@@ -232,6 +232,56 @@ CSS (`.be-quokka`, `.empty-stage .quokka`) overrode `color` while the
 accessory ink layer kept the dark ink token — the pale contour in the
 screenshot. Filled treatments now pin `color: var(--quokka-ink)` inline.
 
+## 8c. Quick Note (quick access) versus quick capture
+
+Two products that share one on-disk shape. Quick Note (⌥Q) is a floating
+full-note editor over any note, with up to five ★-pinned favourites; quick
+capture (⌥C) is a one-breath card. Both create a secure-at-birth note in
+`wiki/_secure/` with the capture shelf `Inbox`, so nothing in the file says
+which one wrote it.
+
+- **FIXED (0.84.0 regression, #130)**: the capture projection landed in 0.84.0
+  made every new Quick Note a Captures card until starred. Curated-in-Main is
+  the product's own rule for "full note", so the main window now files a
+  newborn Quick Note into Main at birth (announced over IPC by the quick
+  webview; Main hides it while blank). Notes created on 0.84.0 sit in Captures
+  until added to Main or starred.
+- **FIXED**: Settings copy named ⌘K and ‹ › for the picker and cycling; they
+  are ⌘P and ⌘] / ⌘[. Stale "wiki/_inbox" comments corrected; the contract
+  states both rules side by side.
+- Open: Quick Note still creates through the capture writer
+  (`createVaultCapture`) with `secure: true` hard-coded; a positive on-disk
+  capture marker would remove the shape ambiguity for good; the Quick Note
+  return law (`remember_quick_return`) has no unit test and there is no
+  `e2e/quick-note.spec.ts`; empty-state copy never mentions ⌥Q.
+
+## 8d. Theme and quokka consistency
+
+Filled treatments, accessories, and the twelve `data-theme` values are applied
+consistently across placements, and Mermaid/JSXGraph re-theme through a
+`MutationObserver`. Drift found and handled:
+
+- **FIXED (#131)**: only theme, accent, and quokka choices were broadcast to
+  the Quick Note and capture webviews; the syntax palette, per-note
+  typography, hotkey hints, time format, and rebound keys went stale there
+  until relaunch. Main now broadcasts its whole settings snapshot.
+- **FIXED (#131)**: an explicit Black line colour was remapped to Auto on
+  every launch, the picker labelled Auto as "White", Auto had no swatch, and
+  an explicit ink was honoured in the Settings preview but overridden by
+  placement CSS in empty states and the rest state. Lively chat welcomes lost
+  their time-of-day pose to the idle preference; onboarding skip reset only
+  part of the quokka; the accessory hue slider showed under Line; the flatness
+  e2e covered four of twelve environments.
+- Open, ranked: (1) a light-ground flash on launch for dark-theme users
+  (`index.html` pins `data-theme="light"` and the main window is visible before
+  hydration); (2) native chrome never follows the app theme (no
+  `setTheme`/`NSAppearance`, so traffic-light glyphs track the OS, not the
+  theme); (3) Excalidraw's board theme reads `matchMedia` once and misses an OS
+  flip in System mode (copy the `blockRender` observer); (4) Dock icons exist
+  for four families, not six, and a `warm` variant is embedded but unreachable;
+  (5) `check:design-system` does not assert `--quokka-line-*` presence or
+  forbid placement `color` overrides on `.quokka`.
+
 ## 9. Live charts (`/charts`) — evaluation
 
 Request: a `/charts` block that renders a live chart, shows its code, lets
