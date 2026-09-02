@@ -40,6 +40,35 @@ fn chat_image_asset_exts_match_fixture() {
 }
 
 #[test]
+fn secure_notes_folder_matches_fixture() {
+    assert_eq!(
+        entry("secureNotesFolder").as_str(),
+        Some(crate::corpus::SECURE_NOTES_FOLDER)
+    );
+}
+
+#[test]
+fn strip_markers_match_fixture() {
+    assert_eq!(
+        string_list(&entry("stripMarkers")),
+        crate::corpus::STRIP_MARKERS.to_vec()
+    );
+}
+
+#[test]
+fn native_image_picker_exts_match_fixture() {
+    assert_eq!(
+        string_list(&entry("nativeImagePickerExts")),
+        crate::corpus::NATIVE_IMAGE_PICKER_EXTS
+    );
+}
+
+#[test]
+fn video_exts_match_fixture() {
+    assert_eq!(string_list(&entry("videoExts")), crate::corpus::VIDEO_EXTS);
+}
+
+#[test]
 fn chat_image_asset_max_bytes_matches_fixture() {
     assert_eq!(
         entry("chatImageAssetMaxBytes").as_u64(),

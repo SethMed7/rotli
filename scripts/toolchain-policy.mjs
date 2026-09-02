@@ -1,8 +1,8 @@
 export const PARALLEL_LINT_COMMAND =
-  "bun run --parallel typecheck check:e2e-types typecheck:tsc6 format:check check:code-shape check:react-compiler check:naming check:hex check:architecture check:ipc check:secret-parity check:parity check:structure check:security check:knip check:docs lint:oxlint";
+  "bun run --parallel typecheck check:e2e-types typecheck:tsc6 format:check check:code-shape check:react-compiler check:naming check:hex check:architecture check:ipc check:secret-parity check:parity check:structure check:security check:knip check:docs check:ratchets check:window-events check:dup:gate lint:oxlint";
 
 export const SERIAL_LINT_COMMAND =
-  "bun run typecheck && bun run check:e2e-types && bun run typecheck:tsc6 && bun run format:check && bun run check:code-shape && bun run check:react-compiler && bun run check:naming && bun run check:hex && bun run check:architecture && bun run check:ipc && bun run check:secret-parity && bun run check:parity && bun run check:structure && bun run check:security && bun run check:knip && bun run check:docs && bun run lint:oxlint";
+  "bun run typecheck && bun run check:e2e-types && bun run typecheck:tsc6 && bun run format:check && bun run check:code-shape && bun run check:react-compiler && bun run check:naming && bun run check:hex && bun run check:architecture && bun run check:ipc && bun run check:secret-parity && bun run check:parity && bun run check:structure && bun run check:security && bun run check:knip && bun run check:docs && bun run check:ratchets && bun run check:window-events && bun run check:dup:gate && bun run lint:oxlint";
 
 export const OXLINT_COMMAND =
   "oxlint --disable-nested-config -c .oxlintrc.json --report-unused-disable-directives-severity=error src e2e scripts breve-runtime services/rotli-mcp-relay playwright.config.ts vite.config.ts";
@@ -28,7 +28,8 @@ export function toolchainPolicyViolations({
     format: OXFMT_COMMAND,
     "format:check": OXFMT_CHECK_COMMAND,
   })) {
-    if (scripts[name] !== expected) violations.push(`package.json: ${name} must stay on the repository-owned command`);
+    if (scripts[name] !== expected)
+      violations.push(`package.json: ${name} must stay on the repository-owned command`);
   }
 
   if (oxlintConfig?.options?.typeAware !== true) {

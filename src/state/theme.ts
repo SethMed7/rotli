@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 // Theme application. The setting is explicit (light / dark / system) — the app
 // never silently follows the OS; "system" subscribes to matchMedia only while
 // it is the chosen setting. The family picks which token set the mode resolves
@@ -31,6 +32,47 @@ export const DARK_DATA_THEMES: readonly DataTheme[] = [
 
 export function isDarkDataTheme(theme: string | undefined): boolean {
   return DARK_DATA_THEMES.includes(theme as DataTheme);
+}
+
+// ── the applied theme as an external store (ARCHITECTURE.md "React
+// synchronization boundary": one named hook over useSyncExternalStore, the
+// useNow.ts shape). `data-theme` on <html> is the single truth every webview
+// applies; components read it here instead of each owning a MutationObserver
+// or re-reading matchMedia (which misses an OS flip in System mode).
+const themeListeners = new Set<() => void>();
+let themeObserver: MutationObserver | null = null;
+
+/** The applied `data-theme` value, read once (non-React callers; React
+ * consumers use useDataTheme / useIsDarkTheme for a live value). */
+export function readDataTheme(): string {
+  return typeof document === "undefined" ? "light" : (document.documentElement.dataset.theme ?? "light");
+}
+
+function subscribeDataTheme(listener: () => void): () => void {
+  themeListeners.add(listener);
+  if (themeListeners.size === 1 && typeof document !== "undefined") {
+    themeObserver = new MutationObserver(() => {
+      for (const fn of themeListeners) fn();
+    });
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  }
+  return () => {
+    themeListeners.delete(listener);
+    if (themeListeners.size === 0) {
+      themeObserver?.disconnect();
+      themeObserver = null;
+    }
+  };
+}
+
+/** The applied `data-theme` value, live. */
+export function useDataTheme(): string {
+  return useSyncExternalStore(subscribeDataTheme, readDataTheme, () => "light");
+}
+
+/** Whether the applied theme is a dark environment, live across all twelve. */
+export function useIsDarkTheme(): boolean {
+  return isDarkDataTheme(useDataTheme());
 }
 
 let media: MediaQueryList | null = null;
@@ -83,7 +125,7 @@ export function applyTheme(setting: ThemeSetting, family: ThemeFamily): () => vo
   detachSystemListener();
   if (setting === "system") {
     const forOs = (dark: boolean) => resolveThemeSetting(setting, family, dark);
-    media = window.matchMedia("(prefers-color-scheme: dark)");
+    media = window.matchMedia("(prefers-color-scheme: dark)"); // the listener needs the object
     onChange = (event) => setDataTheme(forOs(event.matches));
     setDataTheme(forOs(media.matches));
     media.addEventListener("change", onChange);

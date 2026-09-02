@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+
 import { LIB_EFFECTFUL_FILE_OWNERS, sourceOwnershipViolations } from "./source-ownership.ts";
 
 const root = process.cwd();
@@ -177,7 +178,9 @@ for (const name of readdirSync(libDir)) {
   }
   effectfulLibFiles.add(name);
   if (!(name in LIB_EFFECTFUL_FILE_OWNERS)) {
-    violations.push(`src/lib/${name}: effectful cross-capability code needs a named owner or a services/ home`);
+    violations.push(
+      `src/lib/${name}: effectful cross-capability code needs a named owner or a services/ home`,
+    );
   }
 }
 for (const name of Object.keys(LIB_EFFECTFUL_FILE_OWNERS)) {
@@ -289,6 +292,88 @@ function walkRustVendors(dir) {
   }
 }
 walkRustVendors(join(root, "src-tauri", "src"));
+
+// Presentation reaches the Tauri adapter through services, not directly.
+// ARCHITECTURE.md orders adapters -> composition -> presentation, but the
+// component tree was never held to it: 27 components imported lib/tauri
+// straight (audit 2026-09-01). The allowlist is the measured debt; it only
+// shrinks (a listed file that stops importing must be removed here).
+const componentAdapterDebt = new Set([
+  "src/components/activitySurface.tsx",
+  "src/components/breve/breveSurface.tsx",
+  "src/components/breve/breveWatchlist.tsx",
+  "src/components/breve/useBreve.ts",
+  "src/components/browserSurface.tsx",
+  "src/components/canvasSurface.tsx",
+  "src/components/captureCard.tsx",
+  "src/components/chat/chatSurface.tsx",
+  "src/components/dashboardSurface.tsx",
+  "src/components/documentEditor.tsx",
+  "src/components/fileSurface.tsx",
+  "src/components/modelUsageSummary.ts",
+  "src/components/onboarding/modelSetup.tsx",
+  "src/components/onboarding/onboarding.tsx",
+  "src/components/onboarding/vaultActivation.tsx",
+  "src/components/previewModal.tsx",
+  "src/components/quickNote.tsx",
+  "src/components/settingsSurface.tsx",
+  "src/components/sidebar.tsx",
+  "src/components/sidebar/sidebarChat.tsx",
+  "src/components/sidebar/sidebarFooter.tsx",
+  "src/components/sidebar/useChatFolders.ts",
+  "src/components/systemSurface.tsx",
+  "src/components/tasksSurface.tsx",
+  "src/components/titlebar.tsx",
+  "src/components/useNoteMenu.ts",
+  "src/components/vaultFolderBrowserDialog.tsx",
+]);
+// Cross-cutting idioms with ONE owner each: the OS colour scheme is read only
+// by the theme owner (everything else reads data-theme through state/theme.ts),
+// and query invalidation is a services concern (hooks.ts owns the umbrellas).
+const colourSchemeOwners = new Set(["src/state/systemScheme.ts", "src/state/theme.ts"]);
+const invalidationDebt = new Set(["src/memex/useMemex.ts", "src/components/settingsSurface.tsx"]);
+const seenComponentAdapterImports = new Set();
+const seenInvalidationDebt = new Set();
+function walkIdioms(dir) {
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) walkIdioms(path);
+    else if (/\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name)) {
+      const file = relative(root, path);
+      const source = readFileSync(path, "utf8");
+      if (file.startsWith("src/components/") && importsOf(source).some((d) => /(^|\/)lib\/tauri$/.test(d))) {
+        if (componentAdapterDebt.has(file)) seenComponentAdapterImports.add(file);
+        else
+          violations.push(
+            `${file}: presentation imports lib/tauri directly — route through a services/ function (or extend componentAdapterDebt with a reason)`,
+          );
+      }
+      if (/matchMedia\(\s*["'`]\(prefers-color-scheme/.test(source) && !colourSchemeOwners.has(file)) {
+        violations.push(
+          `${file}: reads prefers-color-scheme — use useIsDarkTheme/useDataTheme (state/theme.ts) or systemPrefersDark`,
+        );
+      }
+      if (/\binvalidateQueries\(/.test(source) && !file.startsWith("src/services/")) {
+        if (invalidationDebt.has(file)) seenInvalidationDebt.add(file);
+        else
+          violations.push(
+            `${file}: raw invalidateQueries outside services/ — call the owning invalidate* helper in services/hooks.ts`,
+          );
+      }
+    }
+  }
+}
+walkIdioms(join(root, "src"));
+for (const file of componentAdapterDebt) {
+  if (!seenComponentAdapterImports.has(file))
+    violations.push(
+      `${file}: no longer imports lib/tauri — remove it from componentAdapterDebt (the list only shrinks)`,
+    );
+}
+for (const file of invalidationDebt) {
+  if (!seenInvalidationDebt.has(file))
+    violations.push(`${file}: no longer calls invalidateQueries — remove it from invalidationDebt`);
+}
 
 if (violations.length) {
   console.error(`clean architecture boundary failed:\n${violations.map((line) => `  - ${line}`).join("\n")}`);

@@ -286,17 +286,19 @@ bun run test:regression  # complete Bun/runtime/design regression suite
 The command ownership, evidence levels, and CI lanes are defined in
 [`docs/development/testing.md`](docs/development/testing.md).
 
-Before handoff, run:
+Before handoff, run CI's local twin:
 
 ```sh
-bun run check
-cargo test --manifest-path src-tauri/Cargo.toml
-NODE_OPTIONS=--max-old-space-size=4096 bun run build
+bun run verify            # check + build + site/, e2e types + Playwright, clippy + cargo test
+bun run verify rust       # or narrow to one lane while iterating: quality | e2e | rust
 ```
 
-Run focused tests while iterating. UI changes require human review in the actual
-desktop app across Warm Light, Warm Dark, Paper, and Charcoal, plus keyboard,
-empty, loading, error, disabled, and narrow-window states.
+`bun run check` alone is not the gate — clippy, Playwright, and the `site/`
+steps sit outside it. Run focused tests while iterating. UI changes require
+human review in the actual desktop app across the six theme families (Rotli,
+Paper & Charcoal, Ocean, Grove, Iris, Midnight) in both their light and dark
+environments, plus keyboard, empty, loading, error, disabled, and
+narrow-window states.
 
 For file capabilities, verify the workspace invariant in
 `docs/architecture/memex-data-contract.md`: images and video are the only

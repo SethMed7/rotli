@@ -8,7 +8,7 @@ import { fileName } from "../lib/fileKind";
 import { corpusFileBytes, corpusFileStat, corpusFileText } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
-import { isDarkDataTheme } from "../state/theme";
+import { isDarkDataTheme, readDataTheme, useDataTheme } from "../state/theme";
 import { type Workbook, bytesFromB64, fillFromCsvRows, loadXlsx, newWorkbook } from "./codec/xlsx";
 import { parseCsvExact } from "./csv";
 import {
@@ -34,7 +34,7 @@ import {
 const themeModeMemo = new Map<string, SheetThemeMode>();
 
 function currentAppTheme(): string {
-  return document.documentElement.dataset.theme ?? "light";
+  return readDataTheme();
 }
 
 function isDarkTheme(theme = currentAppTheme()): boolean {
@@ -60,7 +60,7 @@ export default function SheetEditor({
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [themeMode, setThemeMode] = useState<SheetThemeMode>(() => themeModeMemo.get(fileId) ?? "themed");
-  const [appTheme, setAppTheme] = useState(currentAppTheme);
+  const appTheme = useDataTheme(); // live across all twelve environments
   const [chromeEl, setChromeEl] = useState<HTMLElement | null>(null);
 
   const wbRef = useRef<Workbook | null>(null);
@@ -81,17 +81,9 @@ export default function SheetEditor({
     themeModeMemo.set(fileId, themeMode);
   }, [fileId, themeMode]);
 
-  // Univer's palette is fixed when createUniver runs. Track the concrete app
-  // theme so the mount effect below can rebuild from the preserved workbook
-  // snapshot when warm/paper/charcoal changes.
-  useEffect(() => {
-    const sync = () => setAppTheme(currentAppTheme());
-    sync();
-    const mo = new MutationObserver(sync);
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    return () => mo.disconnect();
-  }, []);
-
+  // Univer's palette is fixed when createUniver runs. `appTheme` (live from
+  // useDataTheme) lets this mount effect rebuild from the preserved workbook
+  // snapshot whenever the applied theme changes.
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;

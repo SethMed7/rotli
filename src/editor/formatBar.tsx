@@ -6,6 +6,7 @@
 
 import { type MouseEvent, type ReactNode, useRef, useState } from "react";
 
+import { EDITOR_ACTION } from "../keys/editorActionIds";
 import { dispatch } from "../keys/registry";
 import { useTransientPopover } from "../lib/popover";
 import {
@@ -108,26 +109,26 @@ export function FormatBar({ ctx, narrow }: { ctx: FormatContext; narrow: boolean
 
   const structureGroup = (
     <>
-      <Fb label="Code" on={markOn("code")} onClick={run("editor.code")}>
+      <Fb label="Code" on={markOn("code")} onClick={run(EDITOR_ACTION.code)}>
         {codeGlyph}
       </Fb>
-      <Fb label="Link" on={markOn("link")} onClick={run("editor.link")}>
+      <Fb label="Link" on={markOn("link")} onClick={run(EDITOR_ACTION.link)}>
         {linkGlyph}
       </Fb>
-      <Fb label="Quote" on={blockOn("quote")} onClick={run("editor.quote")}>
+      <Fb label="Quote" on={blockOn("quote")} onClick={run(EDITOR_ACTION.quote)}>
         {quoteGlyph}
       </Fb>
     </>
   );
   const listGroup = (
     <>
-      <Fb label="Bulleted list" on={blockOn("bullet")} onClick={run("editor.bulletList")}>
+      <Fb label="Bulleted list" on={blockOn("bullet")} onClick={run(EDITOR_ACTION.bulletList)}>
         {bulletGlyph}
       </Fb>
-      <Fb label="Numbered list" on={blockOn("numbered")} onClick={run("editor.numberedList")}>
+      <Fb label="Numbered list" on={blockOn("numbered")} onClick={run(EDITOR_ACTION.numberedList)}>
         {numberedGlyph}
       </Fb>
-      <Fb label="Checklist" on={blockOn("checklist")} onClick={run("editor.checklist")}>
+      <Fb label="Checklist" on={blockOn("checklist")} onClick={run(EDITOR_ACTION.checklist)}>
         {checklistGlyph}
       </Fb>
     </>
@@ -158,16 +159,16 @@ export function FormatBar({ ctx, narrow }: { ctx: FormatContext; narrow: boolean
         )}
       </div>
       <div className="fdiv" />
-      <Fb label="Bold — ⌘B" on={markOn("bold")} onClick={run("editor.bold")}>
+      <Fb label="Bold — ⌘B" on={markOn("bold")} onClick={run(EDITOR_ACTION.bold)}>
         <strong>B</strong>
       </Fb>
-      <Fb label="Italic — ⌘I" on={markOn("italic")} onClick={run("editor.italic")}>
+      <Fb label="Italic — ⌘I" on={markOn("italic")} onClick={run(EDITOR_ACTION.italic)}>
         <em>I</em>
       </Fb>
-      <Fb label="Underline — ⌘U" on={markOn("underline")} onClick={run("editor.underline")}>
+      <Fb label="Underline — ⌘U" on={markOn("underline")} onClick={run(EDITOR_ACTION.underline)}>
         <u>U</u>
       </Fb>
-      <Fb label="Strikethrough" on={markOn("strike")} onClick={run("editor.strike")}>
+      <Fb label="Strikethrough" on={markOn("strike")} onClick={run(EDITOR_ACTION.strike)}>
         <s>S</s>
       </Fb>
       {narrow ? (

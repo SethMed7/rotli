@@ -24,6 +24,7 @@ fix both in the same change.
 | File editing and no-preview-only product law | [`architecture/memex-data-contract.md#editing-capabilities`](architecture/memex-data-contract.md#editing-capabilities) |
 | FileSurface capability matrix | [`architecture/file-surface-capability-audit-2026-07-11.md`](architecture/file-surface-capability-audit-2026-07-11.md) |
 | Current system-wide findings and priorities | [`architecture/system-audit-2026-09-01.md`](architecture/system-audit-2026-09-01.md) (supersedes [`system-audit-2026-07-29.md`](architecture/system-audit-2026-07-29.md)) |
+| Cross-window and host event registry | [`architecture/window-events.md`](architecture/window-events.md) |
 | Code quality, redundancy, and AI-readiness scorecard | [`architecture/code-quality-and-ai-readiness-2026-09-01.md`](architecture/code-quality-and-ai-readiness-2026-09-01.md) |
 | Production readiness, security, integrity, lifecycle, IPC, and scale audit | [`architecture/production-readiness-audit-2026-08-10.md`](architecture/production-readiness-audit-2026-08-10.md) |
 | Performance audit (async · imports · bundle) | [`architecture/perf-audit-2026-07-30.md`](architecture/perf-audit-2026-07-30.md) |

@@ -43,8 +43,8 @@ require translating the project into a new set of duplicated rules.
 4. **Prove:** reproduce bugs with a failing test; cover feature success,
    refusal/failure, and boundary cases; add deterministic offline evals for AI
    behavior. Run oxfmt plus the focused test or guard while iterating, then
-   the full validation matrix. Evidence levels and command ownership are in
-   [`testing.md`](testing.md).
+   `bun run verify` — CI's local twin (`bun run check` alone is not the gate).
+   Evidence levels and command ownership are in [`testing.md`](testing.md).
 5. **Handoff:** summarize changes, exact validation results, remaining warnings,
    and native visual checks. Clearly state whether anything was committed,
    published, installed, or restarted.

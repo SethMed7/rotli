@@ -5,16 +5,20 @@ description: Run Rotli's canonical proof chain — the same phases every agent (
 
 # Verify a change
 
-Run the phases in order. `docs/development/testing.md` owns the full command
-map and evidence levels; never invent alternative commands.
+`bun run verify` is CI's local twin and the completion gate. `bun run check`
+alone is NOT the gate: clippy, Playwright, and every `site/` step live outside
+it, which is how a change can pass locally and turn `main` red.
+`docs/development/testing.md` owns the full command map and evidence levels;
+never invent alternative commands.
 
 1. **Focused loop** while iterating: `bun test <file>` plus the relevant
-   `check:*` script.
-2. **Static gate**: `bun run lint` — typecheck (both implementations), format,
-   structure, docs, naming, knip, oxlint.
-3. **Behavior**: `bun run test:regression` — unit, evals, Breve, design system.
-4. **Rust**: `cargo test --manifest-path src-tauri/Cargo.toml`.
-5. **Build proof**: `NODE_OPTIONS=--max-old-space-size=4096 bun run build`.
+   `check:*` script, and `bun run verify <lane>` to narrow —
+   `quality` (check + production build + `site/`), `e2e` (`check:e2e-types` +
+   Playwright), `rust` (`cargo clippy -D warnings` + `cargo test`).
+2. **Completion proof**: `bun run verify` — all three lanes, in CI's order. It
+   refuses to skip a lane it cannot run rather than reporting a false green.
 
-`bun run check` runs phases 2–3 together. Report exact results in the handoff;
-a passing typecheck alone is never completion proof (AGENTS.md owns that law).
+Report exact results in the handoff, including any lane you could not run and
+what remains unproven in browser mode (native windows, Keychain, scheduler,
+real drops). A passing typecheck alone is never completion proof (AGENTS.md
+owns that law).

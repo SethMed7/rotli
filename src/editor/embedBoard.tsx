@@ -12,17 +12,12 @@ import { type BoardMeta, EMPTY_BOARD_META, EMPTY_SCENE, serializeBoardScene } fr
 import { onQuitFlush } from "../lib/quitFlush";
 import { isTauri } from "../lib/tauri";
 import { boardTabOpen, usePanesStore } from "../state/panes";
-import { useUiStore } from "../state/ui";
+import { useIsDarkTheme } from "../state/theme";
 
 type ExcalidrawInitialData = BoardInitialData;
 
 export function BoardEmbed({ boardId }: { boardId: string }) {
-  const themeMode = useUiStore((s) => s.theme);
-  const excaliTheme: "dark" | "light" =
-    themeMode === "dark" ||
-    (themeMode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches)
-      ? "dark"
-      : "light";
+  const excaliTheme: "dark" | "light" = useIsDarkTheme() ? "dark" : "light";
 
   const [initialData, setInitialData] = useState<ExcalidrawInitialData>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
