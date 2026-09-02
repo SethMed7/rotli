@@ -1,17 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
 
 import { BREVE_PDF_PRESETS, validateBrevePdfPalette } from "../../brand/brevePdfThemes";
-import { choiceGlyph } from "../../editor/choiceState";
-import {
-  type Block,
-  parseBlock,
-  renderChoiceContent,
-  renderInline,
-  renderResultContent,
-} from "../../editor/render";
-import { resultGlyph } from "../../editor/resultState";
 import {
   type BreveRoutine,
   type BreveSnapshot,
@@ -59,6 +50,7 @@ import {
   SearchGlyph,
   XGlyph,
 } from "../glyphs";
+import { MarkdownPeek } from "../markdownPeek";
 import { briefDashboardDigest } from "./breveDashboardModel";
 import {
   BreveSkeleton,
@@ -227,48 +219,6 @@ const BRIEF_READ_BYTES = 262_144;
 function stripBriefFrontmatter(text: string): string {
   const fence = text.match(/^---\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/);
   return fence ? text.slice(fence[0].length) : text;
-}
-
-/** The inline reader's static markdown render — the SAME line grammar the
- * editor and Quick Look use (parseBlock + renderInline). Read-only by design:
- * the brief note itself stays one "Open in Notes" away. */
-function BriefBody({ body }: { body: string }) {
-  const blocks: ReactNode[] = [];
-  let key = 0;
-  for (const line of body.split("\n")) {
-    const b: Block = parseBlock(line);
-    key += 1;
-    if (b.kind === "blank") blocks.push(<div key={key} className="pv-blank" />);
-    else if (b.kind === "h1") blocks.push(<h1 key={key}>{renderInline(b.text)}</h1>);
-    else if (b.kind === "h2") blocks.push(<h2 key={key}>{renderInline(b.text)}</h2>);
-    else if (b.kind === "h3") blocks.push(<h3 key={key}>{renderInline(b.text)}</h3>);
-    else if (b.kind === "quote") blocks.push(<blockquote key={key}>{renderInline(b.text)}</blockquote>);
-    else if (
-      b.kind === "bullet" ||
-      b.kind === "task" ||
-      b.kind === "numbered" ||
-      b.kind === "result" ||
-      b.kind === "choice"
-    )
-      blocks.push(
-        <div key={key} className="pv-li" style={{ paddingLeft: `${(b.indent ?? 0) + 1.2}em` }}>
-          <span className="pv-marker">
-            {b.kind === "result"
-              ? resultGlyph(b.resultState ?? "unanswered")
-              : b.kind === "choice"
-                ? choiceGlyph(b.choiceSelected ?? false)
-                : (b.marker ?? "•")}
-          </span>
-          {b.kind === "result"
-            ? renderResultContent(b)
-            : b.kind === "choice"
-              ? renderChoiceContent(b)
-              : renderInline(b.text)}
-        </div>,
-      );
-    else blocks.push(<p key={key}>{renderInline(b.text)}</p>);
-  }
-  return <div className="pv-note breve-read">{blocks}</div>;
 }
 
 /** Same-day recency for the reader: night is the day's newest, morning its
@@ -826,7 +776,7 @@ function BriefsView({ snapshot }: { snapshot: BreveSnapshot }) {
             />
           ) : (
             <>
-              <BriefBody body={briefText} />
+              <MarkdownPeek className="pv-note breve-read" body={briefText} />
               {/* the finite-edition close: a brief ENDS — no feed, no more-to-load
                   (the anti-infinite-scroll statement, market pass 2026-07-30) */}
               <p className="breve-reader-end">

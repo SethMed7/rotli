@@ -7,15 +7,6 @@
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
-import { choiceGlyph } from "../editor/choiceState";
-import {
-  type Block,
-  parseBlock,
-  renderChoiceContent,
-  renderInline,
-  renderResultContent,
-} from "../editor/render";
-import { resultGlyph } from "../editor/resultState";
 import { longDateLabel } from "../lib/dateLabels";
 import { extOf, fileName } from "../lib/fileKind";
 import { useTransientPopover } from "../lib/popover";
@@ -26,50 +17,9 @@ import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { kindOf } from "./fileSurface";
 import { glyphForNote } from "./glyphs";
+import { MarkdownPeek } from "./markdownPeek";
 
 const TEXT_PEEK_BYTES = 64_000;
-
-/** A tiny static markdown peek — the SAME line grammar the editor uses
- * (parseBlock + renderInline), no editing, no widgets. Faithful enough to
- * read; the full editor stays one Open away. */
-function NotePeek({ body }: { body: string }) {
-  const blocks: ReactNode[] = [];
-  let key = 0;
-  for (const line of body.split("\n")) {
-    const b: Block = parseBlock(line);
-    key += 1;
-    if (b.kind === "blank") blocks.push(<div key={key} className="pv-blank" />);
-    else if (b.kind === "h1") blocks.push(<h1 key={key}>{renderInline(b.text)}</h1>);
-    else if (b.kind === "h2") blocks.push(<h2 key={key}>{renderInline(b.text)}</h2>);
-    else if (b.kind === "h3") blocks.push(<h3 key={key}>{renderInline(b.text)}</h3>);
-    else if (b.kind === "quote") blocks.push(<blockquote key={key}>{renderInline(b.text)}</blockquote>);
-    else if (
-      b.kind === "bullet" ||
-      b.kind === "task" ||
-      b.kind === "numbered" ||
-      b.kind === "result" ||
-      b.kind === "choice"
-    )
-      blocks.push(
-        <div key={key} className="pv-li" style={{ paddingLeft: `${(b.indent ?? 0) + 1.2}em` }}>
-          <span className="pv-marker">
-            {b.kind === "result"
-              ? resultGlyph(b.resultState ?? "unanswered")
-              : b.kind === "choice"
-                ? choiceGlyph(b.choiceSelected ?? false)
-                : (b.marker ?? "•")}
-          </span>
-          {b.kind === "result"
-            ? renderResultContent(b)
-            : b.kind === "choice"
-              ? renderChoiceContent(b)
-              : renderInline(b.text)}
-        </div>,
-      );
-    else blocks.push(<p key={key}>{renderInline(b.text)}</p>);
-  }
-  return <div className="pv-note">{blocks}</div>;
-}
 
 export function PreviewModal() {
   const item = useUiStore((s) => s.previewItem);
@@ -151,7 +101,7 @@ export function PreviewModal() {
   } else if (!isFile) {
     body =
       text !== null ? (
-        <NotePeek body={text} />
+        <MarkdownPeek body={text} />
       ) : (
         <p className="pv-wait">{failed ? "Couldn’t read the note." : "Loading…"}</p>
       );

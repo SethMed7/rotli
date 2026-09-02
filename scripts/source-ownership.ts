@@ -56,6 +56,8 @@ export const COMPONENT_ROOT_FILE_OWNERS = {
   "iconButton.tsx": "shared accessible icon-button primitive",
   "inlineRenameInput.tsx": "shared inline rename primitive",
   "matchText.tsx": "shared search-match renderer",
+  "markdownPeek.tsx":
+    "Static read-only Markdown peek shared by Quick Look and the Breve reader (one parseBlock + renderInline loop)",
   "modelUsageSummary.ts": "shared model-usage presentation projection",
   "noteListRow.tsx": "shared note-list row",
   "palette.tsx": "application-shell command palette overlay",

@@ -30,10 +30,10 @@ import {
   type SheetFileMode,
 } from "../sheets/session";
 import { fileTabOpen, usePanesStore } from "../state/panes";
-import { isDarkDataTheme } from "../state/theme";
+import { isDarkDataTheme, readDataTheme, useIsDarkTheme } from "../state/theme";
 
 function isDarkTheme(): boolean {
-  return isDarkDataTheme(document.documentElement.dataset.theme);
+  return isDarkDataTheme(readDataTheme());
 }
 
 function modeOf(fileId: string): SheetFileMode {
@@ -58,6 +58,12 @@ export function SheetEmbed({ fileId }: { fileId: string }) {
 
   // the sheet's own tab open somewhere? that surface owns the pen
   const tabOpen = usePanesStore((s) => fileTabOpen(s.root, fileId));
+
+  // the applied theme, live — the sheet engine repaints on a theme flip
+  const dark = useIsDarkTheme();
+  useEffect(() => {
+    handleRef.current?.setDarkMode(dark);
+  }, [dark]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -205,13 +211,8 @@ export function SheetEmbed({ fileId }: { fileId: string }) {
 
     void load();
 
-    const syncDark = () => handleRef.current?.setDarkMode(isDarkTheme());
-    const mo = new MutationObserver(syncDark);
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-
     return () => {
       cancelled = true;
-      mo.disconnect();
       if (saveTimer.current) clearTimeout(saveTimer.current);
       unregisterLiveDirty(fileId);
       entryRef.current = null;

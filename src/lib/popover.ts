@@ -3,7 +3,7 @@
 // it before the window — no ad-hoc keydown listeners. Plus the placement math
 // for popovers that must escape a pane: anchoredPopover() below.
 
-import { type RefObject, useEffect, useRef } from "react";
+import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useUiStore } from "../state/ui";
 
@@ -40,6 +40,56 @@ export function useTransientPopover(
 // ─── anchored placement (viewport-clamped, flippable) ────────────────────────
 
 /** The anchor's viewport rect — only the edges the placement needs. */
+/** Keep a `position: fixed` popover placed against its anchor while open:
+ * re-measured on its own resize (a list growing, a notice appearing), the
+ * window resizing, and any ancestor scrolling under it. Returns null while
+ * closed. Identity-guarded so applying `max-height` (which re-fires the
+ * observer) settles instead of re-rendering forever. Three chat pickers used
+ * to carry byte-identical copies of this effect (2026-09-01). */
+export function useAnchoredPopoverBox(
+  open: boolean,
+  anchorRef: RefObject<HTMLElement | null>,
+  popRef: RefObject<HTMLElement | null>,
+): AnchoredPlacement | null {
+  const [box, setBox] = useState<AnchoredPlacement | null>(null);
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const anchor = anchorRef.current?.getBoundingClientRect();
+      const pop = popRef.current;
+      if (!anchor || !pop) return;
+      const next = anchoredPopover(
+        { top: anchor.top, bottom: anchor.bottom, left: anchor.left },
+        // scrollHeight is the UNCAPPED height — offsetHeight would re-read the
+        // cap applied last pass and never flip back
+        { width: pop.offsetWidth, height: pop.scrollHeight },
+        { width: window.innerWidth, height: window.innerHeight },
+      );
+      setBox((current) =>
+        current &&
+        current.left === next.left &&
+        current.top === next.top &&
+        current.maxHeight === next.maxHeight &&
+        current.placement === next.placement
+          ? current
+          : next,
+      );
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    if (popRef.current) observer.observe(popRef.current);
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open, anchorRef, popRef]);
+  // closed = no box; the stale measurement is discarded on reopen by place()
+  return open ? box : null;
+}
+
 export interface AnchorRect {
   top: number;
   bottom: number;

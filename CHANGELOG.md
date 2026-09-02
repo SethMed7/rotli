@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **One live theme signal for every embedded engine.** Excalidraw boards and
+  embeds, sheet editors, and chat Mermaid diagrams now follow the applied
+  theme through one shared hook instead of each re-reading the OS colour
+  scheme or watching the document on their own; a System-mode OS flip now
+  re-themes an open board.
+- **The proof chain is stated once.** The `verify` skill, `CONTRIBUTING.md`,
+  and the AI workflow guide all point at `bun run verify` (CI's local twin);
+  the four-theme lists in the PR template, contributing guide, and CARL design
+  rule now name all six families.
+
 ### Fixed
 
 - **A note created in the Quick Note window is a full note again.** 0.84.0

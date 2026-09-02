@@ -24,7 +24,7 @@ import { type BoardMeta, EMPTY_BOARD_META, serializeBoardScene } from "../boards
 import { onQuitFlush } from "../lib/quitFlush";
 import { isTauri } from "../lib/tauri";
 import { keepTabsFor } from "../state/panes";
-import { useUiStore } from "../state/ui";
+import { useIsDarkTheme } from "../state/theme";
 
 /** The slice of Excalidraw's imperative API we use to re-serialize the scene on a
  * metadata save (a metadata edit isn't an Excalidraw change, so we rebuild it). */
@@ -53,12 +53,9 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
 
   // a new board opens in the app's color mode (dark/light), not always-light —
   // Excalidraw's `theme` prop follows the rotli theme (the maintainer, 2026-06-26).
-  const themeMode = useUiStore((s) => s.theme);
-  const excaliTheme: "dark" | "light" =
-    themeMode === "dark" ||
-    (themeMode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches)
-      ? "dark"
-      : "light";
+  // the applied data-theme, live — a System-mode OS flip re-themes an open
+  // board too (it used to read matchMedia once and go stale)
+  const excaliTheme: "dark" | "light" = useIsDarkTheme() ? "dark" : "light";
 
   const [state, setState] = useState<CanvasState>({ status: "loading", initialData: null });
   const [loadVersion, setLoadVersion] = useState(0);
