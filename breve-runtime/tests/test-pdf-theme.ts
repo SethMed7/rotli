@@ -8,7 +8,27 @@ const check = (condition: boolean, message: string) => {
   console.error(`FAIL ${message}`);
 };
 
-check(resolvePdfTheme({}).preset === "charcoal", "missing settings use Charcoal");
+// The default follows the app theme (2026-09-02). Before the app has synced
+// its palette the renderer stands in with Rotli's own default appearance —
+// never Charcoal, which is not what a Warm/Ocean/Grove user chose.
+check(resolvePdfTheme({}).preset === "rotli", "missing settings follow the Rotli theme");
+check(
+  resolvePdfTheme({}).palette.background === PDF_THEME_PRESETS.warmLight.background,
+  "unsynced Rotli preset renders Warm Light",
+);
+const resolved = {
+  background: "#0e171d", surface: "#152229", text: "#e7f0f4",
+  muted: "#a1b6c0", accent: "#86c2e0", rule: "#263a43",
+};
+check(
+  JSON.stringify(resolvePdfTheme({ pdfTheme: { preset: "rotli", resolved } }).palette) === JSON.stringify(resolved),
+  "the synced app palette is rendered verbatim",
+);
+check(
+  resolvePdfTheme({ pdfTheme: { preset: "rotli", resolved: { ...resolved, accent: "oklch(78% 0.13 210)" } } })
+    .palette.background === PDF_THEME_PRESETS.warmLight.background,
+  "a palette with any invalid channel falls back whole — never a mixed palette",
+);
 check(
   JSON.stringify(PDF_THEME_PRESETS) === JSON.stringify(BREVE_PDF_PRESETS),
   "Rotli's picker and the PDF renderer keep the same preset colors",
@@ -16,6 +36,10 @@ check(
 check(
   resolvePdfTheme({ pdfTheme: { preset: "warmLight" } }).palette.background === PDF_THEME_PRESETS.warmLight.background,
   "preset settings resolve the matching palette",
+);
+check(
+  resolvePdfTheme({ pdfTheme: { preset: "charcoal", resolved } }).palette.background === PDF_THEME_PRESETS.charcoal.background,
+  "an explicit preset ignores the synced app palette",
 );
 
 const custom = resolvePdfTheme({

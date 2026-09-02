@@ -48,13 +48,13 @@ brief_exists() { [ -f "$BREVE/briefs/${STEM}.md" ]; }
 {
   echo "=== Breve custom brief '$RID' run: $(date) ==="
   run_model "$BREVE_MODEL"
-  echo "=== claude ($BREVE_MODEL) exit $? at $(date) ==="
+  echo "=== on-device writer ($BREVE_MODEL) exit $? at $(date) ==="
 
   if ! brief_exists; then
     FALLBACK="haiku"; [ "$BREVE_MODEL" = "haiku" ] && FALLBACK="sonnet"
     echo "=== $BREVE_MODEL produced no custom brief — self-heal: retry on $FALLBACK ==="
     run_model "$FALLBACK"
-    echo "=== claude ($FALLBACK) exit $? at $(date) ==="
+    echo "=== on-device writer ($FALLBACK) exit $? at $(date) ==="
     if ! brief_exists; then
       bun "$BREVE/scripts/notify.ts" --idempotency-key "custom-generation-failure-$STEM" \
         "⚠ Couldn't generate your '$RLABEL' brief — both $BREVE_MODEL and $FALLBACK look unavailable." || true

@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { BREVE } from "./paths";
+import { CONFIG_PATH } from "./config-path";
 
 export type PdfPalette = {
   background: string;
@@ -11,9 +10,11 @@ export type PdfPalette = {
   rule: string;
 };
 
-export type PdfThemePreset = "charcoal" | "warmLight" | "warmDark" | "paper" | "custom";
+/** `rotli` = the user's live Rotli theme, written into `pdfTheme.resolved` by
+ * the app on every appearance change. It is the default since 2026-09-02. */
+export type PdfThemePreset = "rotli" | "charcoal" | "warmLight" | "warmDark" | "paper" | "custom";
 
-export const PDF_THEME_PRESETS: Record<Exclude<PdfThemePreset, "custom">, PdfPalette> = {
+export const PDF_THEME_PRESETS: Record<Exclude<PdfThemePreset, "custom" | "rotli">, PdfPalette> = {
   charcoal: {
     background: "#161616", surface: "#1f1e1c", text: "#e9e7e2",
     muted: "#a8a49c", accent: "#d9a868", rule: "#2e2c29",
@@ -35,12 +36,39 @@ export const PDF_THEME_PRESETS: Record<Exclude<PdfThemePreset, "custom">, PdfPal
 const isColor = (value: unknown): value is string =>
   typeof value === "string" && /^#[\da-f]{6}$/i.test(value);
 
-type PdfThemeSettings = { pdfTheme?: { preset?: PdfThemePreset; custom?: Partial<PdfPalette> } };
+type PdfThemeSettings = {
+  pdfTheme?: {
+    preset?: PdfThemePreset;
+    custom?: Partial<PdfPalette>;
+    /** The app theme's six tokens, last written by Rotli's main window. */
+    resolved?: Partial<PdfPalette>;
+  };
+};
+
+const PALETTE_KEYS = ["background", "surface", "text", "muted", "accent", "rule"] as const;
+
+/** Every field valid, or nothing — a half-written palette never mixes with a
+ * fallback and produces unreadable contrast. */
+function completePalette(candidate: Partial<PdfPalette> | undefined): PdfPalette | null {
+  if (!candidate) return null;
+  const out: Partial<PdfPalette> = {};
+  for (const key of PALETTE_KEYS) {
+    const value = candidate[key];
+    if (!isColor(value)) return null;
+    out[key] = value;
+  }
+  return out as PdfPalette;
+}
 
 export function resolvePdfTheme(raw: PdfThemeSettings): { preset: PdfThemePreset; palette: PdfPalette } {
-  const preset = raw.pdfTheme?.preset ?? "charcoal";
+  const preset = raw.pdfTheme?.preset ?? "rotli";
+  if (preset === "rotli") {
+    // Until the app has synced its theme once (or if it never runs beside the
+    // runtime), Rotli's own default appearance is the honest stand-in.
+    return { preset, palette: completePalette(raw.pdfTheme?.resolved) ?? PDF_THEME_PRESETS.warmLight };
+  }
   if (preset !== "custom" && preset in PDF_THEME_PRESETS) {
-    return { preset, palette: PDF_THEME_PRESETS[preset as Exclude<PdfThemePreset, "custom">] };
+    return { preset, palette: PDF_THEME_PRESETS[preset as Exclude<PdfThemePreset, "custom" | "rotli">] };
   }
   const fallback = PDF_THEME_PRESETS.charcoal;
   const custom = raw.pdfTheme?.custom ?? {};
@@ -60,10 +88,9 @@ export function resolvePdfTheme(raw: PdfThemeSettings): { preset: PdfThemePreset
 export function readPdfTheme(): { preset: PdfThemePreset; palette: PdfPalette } {
   let raw: PdfThemeSettings = {};
   try {
-    const configPath = process.env.ROTLI_BREVE_CONFIG ?? join(BREVE, "settings.json");
-    raw = JSON.parse(readFileSync(configPath, "utf8"));
+    raw = JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
   } catch {
-    // A new install renders with the established charcoal palette.
+    // No routine config yet: render with Rotli's default appearance.
   }
   return resolvePdfTheme(raw);
 }

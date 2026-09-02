@@ -37,7 +37,6 @@ import {
   corpusCreateImageAsset,
   corpusImportFile,
   emitCaptureAck,
-  emitAppearance,
   isTauri,
   onBrainJournal,
   onCaptureSave,
@@ -51,7 +50,6 @@ import {
   onRebind,
   onSummonChat,
   onSummonSearch,
-  onAppearance,
   onVaultChanged,
   rootIdOf,
   setAppIcon,
@@ -69,7 +67,6 @@ import {
 } from "./editor/externalImageDrop";
 import { noteIdFacet } from "./editor/livePreview";
 import { onQuitFlushFailure } from "./lib/quitFlush";
-import { useBindingsStore } from "./keys/bindings";
 import { fileQuickNoteInMain } from "./newItems/composition";
 import { createVaultCapture } from "./services/captureRouting";
 import { summonChat } from "./services/chatSummon";
@@ -86,14 +83,9 @@ import { invalidateMemex } from "./memex/useMemex";
 import { invalidateChatFolders } from "./services/chatFolders";
 import { refreshAfterExternalCorpusChange } from "./services/externalCorpusChange";
 import { refreshActiveVault } from "./state/activeVault";
-import { useNoteStyleStore } from "./state/noteStyle";
-import {
-  appearanceBroadcast,
-  applyAppearanceBroadcast,
-  flushSettingsNow,
-  runAutoRetentionMaintenance,
-} from "./state/persist";
+import { flushSettingsNow, runAutoRetentionMaintenance } from "./state/persist";
 import { applyQuickState } from "./state/quick";
+import { useAppearanceSync } from "./state/appearanceSync";
 import { applyAccent, applySyntaxPalette, applyTheme } from "./state/theme";
 import { useUiStore } from "./state/ui";
 import { useVaultStore } from "./state/vault";
@@ -615,37 +607,7 @@ export default function App() {
   useEffect(() => applySyntaxPalette(syntaxPalette), [syntaxPalette]);
   useEffect(() => applyAccent(accentColor, accentHue), [accentColor, accentHue]);
 
-  // appearance + editor settings are broadcast from the MAIN window so the
-  // quick + capture webviews follow them LIVE (each applies its own theme;
-  // without this they only read settings at launch and go stale — issue #4).
-  // The payload is the persistence module's own serialized snapshot, so every
-  // app setting travels (theme, accent, quokka, syntax palette, hotkey peek,
-  // rebinds, per-note typography), deduplicated against the last emission.
-  // Main is the source and never listens; the others listen and never emit.
-  useEffect(() => {
-    if (surface !== "main" || !isTauri()) return;
-    let last = "";
-    const push = (): void => {
-      const payload = appearanceBroadcast();
-      const key = `${payload.app}\u0000${payload.noteStyles}`;
-      if (key === last) return;
-      last = key;
-      emitAppearance(payload);
-    };
-    push();
-    const unsubs = [
-      useUiStore.subscribe(push),
-      useBindingsStore.subscribe(push),
-      useNoteStyleStore.subscribe(push),
-    ];
-    return () => {
-      for (const unsub of unsubs) unsub();
-    };
-  }, [surface]);
-  useEffect(() => {
-    if (surface === "main") return;
-    return onAppearance(applyAppearanceBroadcast);
-  }, [surface]);
+  useAppearanceSync(surface);
 
   useEffect(() => {
     document.body.dataset.surface = surface;

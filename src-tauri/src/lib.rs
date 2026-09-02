@@ -40,10 +40,7 @@ mod web;
 mod web_search;
 mod workspace;
 
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Condvar, Mutex,
-};
+use std::sync::{atomic::{AtomicUsize, Ordering}, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use tauri::{
@@ -2523,6 +2520,7 @@ pub fn run() {
             breve::breve_snapshot,
             breve::breve_import_legacy,
             breve::breve_write_config,
+            breve::breve_pdf::breve_write_pdf_palette,
             breve::breve_brief_skill,
             breve::breve_write_brief_skill,
             breve::breve_write_watchlist,

@@ -10,7 +10,7 @@ import { join } from "node:path";
 
 try {
   const root = process.env.ROTLI_BREVE_HOME ?? join(import.meta.dir, "..");
-  const path = process.env.ROTLI_BREVE_CONFIG ?? join(root, "settings.json");
+  const path = process.env.ROTLI_BREVE_CONFIG ?? join(root, "..", "routines", "config.json");
   const s = JSON.parse(readFileSync(path, "utf8"));
   console.log(s.briefModel || "sonnet");
 } catch {

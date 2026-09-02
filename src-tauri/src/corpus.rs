@@ -7796,30 +7796,28 @@ pub fn corpus_create_managed_file(
 /// of the frontend host policy.
 #[tauri::command]
 pub async fn corpus_export_note_pdf(
+    app: tauri::AppHandle,
     state: tauri::State<'_, CorpusState>,
     id: String,
     name: String,
     title: String,
 ) -> Result<String, String> {
     let (root, source_id) = split_root_id(&id);
-    let body = state.route(&root, |store| {
+    let (body, root_path) = state.route(&root, |store| {
         store.mutation_allowed()?;
-        store.editable_pdf_source(&source_id)
+        Ok((store.editable_pdf_source(&source_id)?, store.root.clone()))
     })?;
-
-    #[cfg(not(target_os = "macos"))]
-    return Err("Local PDF export is currently available only on macOS.".into());
-
-    #[cfg(target_os = "macos")]
-    {
-        let bytes = tauri::async_runtime::spawn_blocking(move || {
-            crate::document_conversion::export_markdown_pdf_bytes(&title, &body)
-        })
-        .await
-        .map_err(|e| format!("PDF export worker failed ({e})"))??;
-        let rel = state.route(&root, |store| store.create_exported_pdf(&name, &bytes))?;
-        Ok(compose_root_id(&root, &rel))
-    }
+    // themed lane first (the same renderer + palette as the Breve briefs,
+    // 2026-09-02), plain-text macOS exporter as the fallback — see
+    // document_conversion::export_note_pdf_bytes
+    let bundled = crate::routines::source_root(&app).ok();
+    let bytes = tauri::async_runtime::spawn_blocking(move || {
+        crate::document_conversion::export_note_pdf_bytes(&root_path, bundled.as_deref(), &title, &body)
+    })
+    .await
+    .map_err(|e| format!("PDF export worker failed ({e})"))??;
+    let rel = state.route(&root, |store| store.create_exported_pdf(&name, &bytes))?;
+    Ok(compose_root_id(&root, &rel))
 }
 
 /// Byte-identical to DOCUMENT_CONVERTIBLE_EXTS in src/documents/kinds.ts (parity.json).

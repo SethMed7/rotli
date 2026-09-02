@@ -264,7 +264,7 @@ export function registerDefaultActions(): void {
   registerAction({
     id: "view.breve",
     title: "Open or close Breve",
-    defaultChord: null,
+    defaultChord: "Meta+Shift+B", // Breve had no chord at all (audit 2026-09-02 §1.3)
     run: () => {
       const ui = useUiStore.getState();
       ui.setSettingsOpen(false);

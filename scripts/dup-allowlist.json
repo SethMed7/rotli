@@ -14,7 +14,10 @@
     {
       "id": "egress-policy-mirror",
       "signal": "literal",
-      "files": ["breve-runtime/scripts/safe-fetch.ts", "src-tauri/src/web.rs"],
+      "files": [
+        "breve-runtime/scripts/safe-fetch.ts",
+        "src-tauri/src/web.rs"
+      ],
       "reason": "Batch 0 independent_security_enforcement: the egress policy is deliberately implemented on both sides of the process boundary and held in parity by scripts/fixtures/egress-fixtures.json — shared literals (private ranges, redirect caps) are the fixture working as designed."
     },
     {
@@ -26,6 +29,15 @@
       "id": "secret-detector-parity",
       "fingerprint": "034db125d60b7860efa1b594515cc830d2860dbb0dce0a7c338307bd14d237b6",
       "reason": "Fixture-guarded mirror: secret.rs detector tests and loop.test.ts share the same red-team card/SSN vectors; check-secret-parity.mjs holds the two detectors aligned."
+    },
+    {
+      "id": "render-document-cli-contract",
+      "signal": "literal",
+      "files": [
+        "breve-runtime/scripts/render-document.ts",
+        "src-tauri/src/document_conversion.rs"
+      ],
+      "reason": "TS↔Rust process contract: the themed PDF renderer's argv (--in/--out/--title) is spelled by the script that parses it and by the Rust caller that spawns it; the shared literals are the contract, not copied logic (2026-09-02)."
     }
   ]
 }

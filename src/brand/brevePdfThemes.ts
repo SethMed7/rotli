@@ -35,10 +35,23 @@ export const BREVE_PDF_PRESETS = {
   },
 } as const;
 
+/** The default follows the app theme (2026-09-02); the custom slot keeps the
+ * original Charcoal palette as its starting point. */
 export const DEFAULT_BREVE_PDF_THEME = {
-  preset: "charcoal" as const,
+  preset: "rotli" as const,
   custom: { ...BREVE_PDF_PRESETS.charcoal },
 };
+
+/** Which app tokens feed each PDF role when the preset is `rotli`. Links use
+ * the accent's TEXT role (AA at small sizes), not the fill accent. */
+export const BREVE_PDF_TOKEN_ROLES = {
+  background: "--ground",
+  surface: "--surface",
+  text: "--text",
+  muted: "--text-muted",
+  accent: "--accent-text",
+  rule: "--border",
+} as const;
 
 export type BrevePdfPaletteLike = {
   background: string;

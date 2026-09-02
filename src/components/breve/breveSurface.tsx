@@ -1,8 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
 
-import { BREVE_PDF_PRESETS, validateBrevePdfPalette } from "../../brand/brevePdfThemes";
 import {
   type BreveRoutine,
   type BreveSnapshot,
@@ -25,9 +23,6 @@ import {
   fileAssetUrl,
   isTauri,
   type BreveDeliverySettings,
-  type BrevePdfPalette,
-  type BrevePdfTheme,
-  type BrevePdfThemePreset,
 } from "../../lib/tauri";
 import { useNow } from "../../lib/useNow";
 import {
@@ -52,7 +47,9 @@ import {
 } from "../glyphs";
 import { MarkdownPeek } from "../markdownPeek";
 import { briefDashboardDigest } from "./breveDashboardModel";
+import { PdfThemeEditor, pdfThemeValidation } from "./brevePdfTheme";
 import {
+  BreveHealthStrip,
   BreveSkeleton,
   EmptyMessage,
   PageHead,
@@ -312,6 +309,7 @@ function DashboardView({ snapshot }: { snapshot: BreveSnapshot }) {
         title="Today"
         detail="Your latest briefs, watchlist stories, and useful links—kept with this vault."
       />
+      {snapshot.scheduler !== "none" && <BreveHealthStrip snapshot={snapshot} />}
 
       <div className="breve-dashboard-front">
         <section className="breve-dashboard-brief" aria-labelledby="breve-dashboard-briefs">
@@ -1109,15 +1107,7 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
         title="Routines"
         detail="Arrival times, recurring checks, and the jobs that build each brief."
       />
-      <div className="breve-honesty" role="status">
-        <ClockGlyph size={15} />
-        <p>
-          {snapshot.scheduler === "rotli"
-            ? "Rotli is actively managing these routines and the always-on Signal assistant. Saved changes are adopted automatically."
-            : snapshot.scheduler === "legacy-launchd"
-              ? "The previous Breve scheduler is still in charge. Changes are preserved here, but Rotli does not deliver scheduled briefs yet."
-              : "Rotli stores these routines, but its delivery scheduler is not active yet."}
-        </p>
+      <BreveHealthStrip snapshot={snapshot}>
         {/* legacy-less activation (2026-07-31): a fresh vault has nothing to
             "take over" — this scaffolds the managed runtime, seeds it from the
             shared defaults, and starts the supervisor for THIS vault. */}
@@ -1131,7 +1121,7 @@ function RoutinesView({ snapshot }: { snapshot: BreveSnapshot }) {
             {activateState === "saving" ? "Starting…" : "Start Breve in this vault"}
           </button>
         )}
-      </div>
+      </BreveHealthStrip>
       {activateError && (
         <p className="file-err" role="alert">
           ⚠ {activateError}
@@ -1859,152 +1849,6 @@ type DeliveryTest = {
   state: SaveState;
   message: string;
 } | null;
-
-const PDF_THEME_OPTIONS: Array<{
-  value: BrevePdfThemePreset;
-  label: string;
-  detail: string;
-}> = [
-  {
-    value: "charcoal",
-    label: "Charcoal",
-    detail: "Breve’s original dark editorial palette",
-  },
-  {
-    value: "warmLight",
-    label: "Warm Light",
-    detail: "Rotli linen, cocoa, and clay",
-  },
-  {
-    value: "warmDark",
-    label: "Warm Dark",
-    detail: "Rotli cocoa with clay accents",
-  },
-  {
-    value: "paper",
-    label: "Paper",
-    detail: "Neutral white with crisp dark type",
-  },
-  { value: "custom", label: "Custom", detail: "Choose every PDF color" },
-];
-
-const PDF_COLOR_FIELDS: Array<{ key: keyof BrevePdfPalette; label: string }> = [
-  { key: "background", label: "Page" },
-  { key: "surface", label: "Panels" },
-  { key: "text", label: "Text" },
-  { key: "muted", label: "Secondary text" },
-  { key: "accent", label: "Accent and links" },
-  { key: "rule", label: "Rules" },
-];
-
-function resolvedPdfPalette(theme: BrevePdfTheme): BrevePdfPalette {
-  return theme.preset === "custom" ? theme.custom : { ...BREVE_PDF_PRESETS[theme.preset] };
-}
-
-function pdfThemeValidation(theme: BrevePdfTheme): string {
-  return validateBrevePdfPalette(resolvedPdfPalette(theme));
-}
-
-function PdfThemeEditor({
-  theme,
-  onChange,
-}: {
-  theme: BrevePdfTheme;
-  onChange: (theme: BrevePdfTheme) => void;
-}) {
-  const palette = resolvedPdfPalette(theme);
-  const validation = pdfThemeValidation(theme);
-  const style = {
-    "--pdf-preview-bg": palette.background,
-    "--pdf-preview-surface": palette.surface,
-    "--pdf-preview-text": palette.text,
-    "--pdf-preview-muted": palette.muted,
-    "--pdf-preview-accent": palette.accent,
-    "--pdf-preview-rule": palette.rule,
-  } as CSSProperties;
-  return (
-    <section className="breve-delivery-section breve-pdf-section" aria-labelledby="breve-pdf-theme-title">
-      <div className="breve-delivery-head">
-        <div>
-          <h3 id="breve-pdf-theme-title">PDF appearance</h3>
-          <p>New scheduled and on-demand PDFs use this palette. Existing files keep their original colors.</p>
-        </div>
-      </div>
-      <div className="breve-pdf-layout">
-        <div className="breve-pdf-controls">
-          <label className="breve-field" htmlFor="breve-pdf-theme">
-            <span>Theme</span>
-            <select
-              id="breve-pdf-theme"
-              value={theme.preset}
-              aria-describedby="breve-pdf-theme-help"
-              onChange={(event) =>
-                onChange({
-                  ...theme,
-                  preset: event.target.value as BrevePdfThemePreset,
-                })
-              }
-            >
-              {PDF_THEME_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <small id="breve-pdf-theme-help">
-              {PDF_THEME_OPTIONS.find((option) => option.value === theme.preset)?.detail}
-            </small>
-          </label>
-          {theme.preset === "custom" && (
-            <div className="breve-color-grid" aria-label="Custom PDF colors">
-              {PDF_COLOR_FIELDS.map(({ key, label }) => (
-                <label key={key} className="breve-color-field">
-                  <span>{label}</span>
-                  <span className="breve-color-control">
-                    <input
-                      type="color"
-                      value={theme.custom[key]}
-                      aria-label={`${label} color`}
-                      onChange={(event) =>
-                        onChange({
-                          ...theme,
-                          custom: {
-                            ...theme.custom,
-                            [key]: event.target.value,
-                          },
-                        })
-                      }
-                    />
-                    <code>{theme.custom[key].toUpperCase()}</code>
-                  </span>
-                </label>
-              ))}
-            </div>
-          )}
-          {validation && (
-            <p id="breve-pdf-theme-error" className="breve-field-error" role="alert">
-              {validation}
-            </p>
-          )}
-        </div>
-        <div
-          className="breve-pdf-preview"
-          style={style}
-          aria-label={`${PDF_THEME_OPTIONS.find((option) => option.value === theme.preset)?.label} PDF preview`}
-        >
-          <span className="breve-pdf-preview-kicker">Your personal wire</span>
-          <strong>BREVE</strong>
-          <span className="breve-pdf-preview-date">Morning · Friday</span>
-          <div>
-            <b>Today’s signal</b>
-            <p>A quiet preview of headings, reading text, links, and section rules.</p>
-            <span className="breve-pdf-preview-link">Read source</span>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
 
 function DeliveryStatus({ ready, children }: { ready: boolean; children: string }) {
   return (

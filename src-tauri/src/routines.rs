@@ -17,6 +17,9 @@ use tauri::{AppHandle, Manager};
 
 use crate::memex::find_bun;
 
+#[path = "breve_env.rs"]
+pub(crate) mod env;
+
 pub const MANAGED_DIR: &str = ".rotli/breve";
 pub const MANAGED_MARKER: &str = ".rotli/routines/rotli-managed.json";
 pub const ROUTINE_CONFIG: &str = ".rotli/routines/config.json";
@@ -41,7 +44,7 @@ struct SupervisorInner {
     root: Mutex<Option<PathBuf>>,
 }
 
-fn source_root(app: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn source_root(app: &AppHandle) -> Result<PathBuf, String> {
     let dev = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../breve-runtime"));
     if cfg!(debug_assertions) && dev.join("scripts/rotli-scheduler.ts").is_file() {
         return Ok(dev);
@@ -249,11 +252,9 @@ fn prepare_runtime_stage(
         .map_err(|error| format!("stage Breve runtime lockfile: {error}"))?;
     let skill = next.join("skills/breve/SKILL.md");
     if let Ok(text) = fs::read_to_string(&skill) {
-        fs::write(
-            &skill,
-            text.replace("{{BREVE_HOME}}", &home.to_string_lossy()),
-        )
-        .map_err(|error| format!("materialize {}: {error}", skill.display()))?;
+        let root = home.parent().and_then(Path::parent).unwrap_or(home);
+        fs::write(&skill, crate::breve::materialize_skill_text(&text, root, home))
+            .map_err(|error| format!("materialize {}: {error}", skill.display()))?;
     }
 
     let install = Command::new(bun)
@@ -464,30 +465,18 @@ fn scheduler_command(root: &Path) -> Result<Child, String> {
     let stderr = stdout
         .try_clone()
         .map_err(|e| format!("clone scheduler log: {e}"))?;
-    let home_dir = std::env::var("HOME").unwrap_or_default();
-    let inherited_path = std::env::var("PATH").unwrap_or_default();
-    let runtime_path = format!(
-        "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:{home_dir}/.bun/bin:{home_dir}/.claude/local:{home_dir}/.local/bin:{inherited_path}"
-    );
     let mut command = Command::new(find_bun());
     command
         .arg(home.join("scripts/rotli-scheduler.ts"))
         .current_dir(&home)
-        .env("ROTLI_BREVE_HOME", &home)
+        // home, config, the vault's knowledge + storage lanes, and PATH —
+        // the same set every other runtime spawn gets (breve_env.rs)
+        .envs(env::breve_runtime_env(root))
         .env("ROTLI_BREVE_CODE", root.join(".rotli").join(RUNTIME_CODE))
-        .env("ROTLI_BREVE_CONFIG", root.join(ROUTINE_CONFIG))
         .env("ROTLI_BREVE_SKILL", home.join("skills/breve/SKILL.md"))
-        // Pin the runtime's knowledge + storage lanes to THIS vault so the
-        // brief/audio paths agree with rotli by construction — config.ts
-        // honors these over config.local.json, whose example points at
-        // ~/memex-storage (review, 2026-07-31: the audio player would be a
-        // silent no-op on a default configuration).
-        .env("BREVE_KNOWLEDGE", root)
-        .env("BREVE_STORAGE", root.join("storage"))
         // The scheduler exits its entire process group if this owner vanishes
         // without a graceful Tauri Exit event (crash, SIGKILL, updater, etc.).
         .env("ROTLI_PARENT_PID", std::process::id().to_string())
-        .env("PATH", runtime_path)
         .stdout(Stdio::from(stdout))
         .stderr(Stdio::from(stderr));
     #[cfg(unix)]

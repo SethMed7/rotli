@@ -11,11 +11,14 @@
 import { join } from "node:path";
 import { mkdirSync } from "node:fs";
 import { storagePath } from "./config";
+import { BREVE_HOME, CONFIG_PATH } from "./config-path";
 
 /** Mutable Breve state lives in Rotli's managed runtime home. The source-tree
  * fallback keeps direct developer/test runs working. */
-export const BREVE = process.env.ROTLI_BREVE_HOME ?? join(import.meta.dir, "..");
+export const BREVE = BREVE_HOME;
 export const BRIEFS = join(BREVE, "briefs");
+/** Rotli's routine config — see config-path.ts (side-effect-free home). */
+export { CONFIG_PATH };
 
 const STORE = storagePath();
 export const AUDIOS = join(STORE, "breveAudios");

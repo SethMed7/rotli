@@ -10,7 +10,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Breve says when briefs stop arriving.** The scheduler's job ledger now
+  reaches the app as per-routine health: the Breve rail status, the Today
+  page, and the Routines page all say “No brief for N days — morning is
+  failing: <reason>” instead of “Managed by Rotli” while every slot fails
+  (which is what happened silently from 2026-08-16 to 2026-09-02). A failing
+  slot is retried three times (about fifteen minutes), then left for the
+  next slot, instead of every five minutes all day; a longer outage is the
+  doctor's Signal proposal to rerun.
+- **Breve's PDFs match your Rotli theme.** The PDF appearance now defaults to
+  “Match Rotli”: the app writes its live theme tokens (any of the six
+  families, light or dark, plus your accent) into the routine config and
+  every new brief, topic brief, and email render uses them. The four named
+  palettes and Custom remain as explicit choices.
+- **Chat's “create a PDF” uses the same themed renderer.** A PDF artifact is
+  now a readable document — title, headings, lists, task boxes, quotes, code,
+  tables, links — in your theme, through the same lane the briefs use; the
+  plain-text macOS exporter remains the fallback when no Chromium-family
+  browser is installed.
+- **Breve is a labelled segment of the sidebar switcher** (Home · Chat ·
+  Breve) with a default shortcut, ⌘⇧B (remappable). The vault switcher and
+  the utility footer stay visible while you are in Breve, so Settings and the
+  Librarian are never more than one click away.
+
 ### Changed
+
+- **Breve reads and writes off the main thread.** The snapshot, config,
+  watchlist, brief-instruction, and delivery-settings commands were plain
+  sync commands, so a brief-library scan ran on the UI thread every 30 s
+  while the lens was open and again after every save.
+- **On-demand renders honour the chosen PDF palette.** Every runtime entry
+  point now resolves the routine config the app writes; the old fallback
+  pointed at a file a Rotli-managed vault never has.
+- **The brief prompt is vault-scoped.** `SKILL.md` no longer hardcodes
+  `~/memex-vault` for the inbox, storage, and PDF paths; they are templated
+  per vault like the runtime home already was.
+- **Honest run logs.** The brief wrappers log “on-device writer”, not
+  “claude (sonnet)”, for the step that runs the local model.
 
 - **One live theme signal for every embedded engine.** Excalidraw boards and
   embeds, sheet editors, and chat Mermaid diagrams now follow the applied

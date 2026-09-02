@@ -7,6 +7,13 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import type { WebSearchProvider } from "../ai/searchProvider";
 import { DEFAULT_BREVE_PDF_THEME } from "../brand/brevePdfThemes";
+import type {
+  BrevePdfPalette,
+  BreveConfig,
+  BreveSnapshot,
+  BreveBackfillResult,
+  BreveDeliverySettings,
+} from "../routines/breveTypes";
 import type { SearchHit } from "../types";
 
 export function isTauri(): boolean {
@@ -2136,25 +2143,6 @@ export function onRebind(cb: (payload: RebindPayload) => void): () => void {
 // ——— Breve data seam — fixed-path snapshot, copy-only migration, and the
 // explicit legacy → Rotli scheduler takeover.
 
-export type BreveRoutineSchedule =
-  | { kind: "dailyAt"; hhmm: string; leadMinutes: number }
-  | { kind: "everySecs"; secs: number }
-  | { kind: "alwaysOn" };
-
-export interface BreveRoutine {
-  id: string;
-  label: string;
-  /** Built-ins use the five job kinds; CUSTOM routines (2026-07-31) are a
-   * "brief" (scheduled custom-prompt research) or a "reminder". */
-  kind: "brief" | "creators" | "watchers" | "doctor" | "signal" | "reminder";
-  enabled: boolean;
-  schedule: BreveRoutineSchedule;
-  lanes: string[];
-  /** User instructions: required on custom routines, optional extra
-   * instructions on the built-in briefs. */
-  prompt?: string;
-}
-
 /** The brief system-prompt surface: the materialized default SKILL.md plus a
  * user override that survives runtime syncs (see breve_brief_skill). */
 export interface BreveBriefSkill {
@@ -2174,93 +2162,22 @@ export async function breveWriteBriefSkill(text: string | null): Promise<BreveBr
   return invoke<BreveBriefSkill>("breve_write_brief_skill", { text });
 }
 
-export type BrevePdfThemePreset = "charcoal" | "warmLight" | "warmDark" | "paper" | "custom";
-
-export interface BrevePdfPalette {
-  background: string;
-  surface: string;
-  text: string;
-  muted: string;
-  accent: string;
-  rule: string;
-}
-
-export interface BrevePdfTheme {
-  preset: BrevePdfThemePreset;
-  custom: BrevePdfPalette;
-}
-
-export interface BreveConfig {
-  version: 1;
-  timezone: string;
-  deliveryTimes: { morning: string; lunch: string; night: string };
-  leadMinutes: number;
-  leadOverrides: { morning?: number; lunch?: number; night?: number };
-  briefModel: string;
-  modelPolicy: {
-    primary: string;
-    fallbacks: string[];
-    localHelper: string | null;
-  };
-  pdfTheme: BrevePdfTheme;
-  routines: BreveRoutine[];
-  travel?: { start: string; end: string; tz: string } | null;
-}
-
-export interface BreveBrief {
-  stem: string;
-  title: string;
-  /** "morning" | "lunch" | "night" for the slots; a custom routine's briefs
-   * carry its slug (2026-07-31). */
-  kind: string;
-  date: string;
-  imported: boolean;
-  path?: string;
-  /** Vault-relative path of the spoken version (storage/breveAudios/<stem>.mp3)
-   * when the runtime produced one — the reader shows a player. */
-  audioPath?: string;
-}
-
-export interface BreveNotification {
-  id: string;
-  at: string;
-  routine?: string;
-  kind: "running" | "success" | "warning" | "info";
-  title: string;
-  detail: string;
-}
-
-export interface BreveSnapshot {
-  source: "rotli" | "legacy" | "empty";
-  legacyRoot: string | null;
-  config: BreveConfig;
-  watchlist: string;
-  counts: { sections: number; topics: number; creators: number; pages: number };
-  creators: Array<{ name: string; handle: string; channelId?: string }>;
-  pages: Array<{ id: number; url: string; condition: string }>;
-  briefs: BreveBrief[];
-  /** Sanitized projection of the current vault's recent scheduler log. Raw
-   * commands, paths, prompts, and stderr never cross IPC. */
-  notifications: BreveNotification[];
-  artifactCount: number;
-  imported: boolean;
-  scheduler: "rotli" | "legacy-launchd" | "none";
-}
-
-export interface BreveBackfillResult {
-  snapshot: BreveSnapshot;
-  status: "preview" | "complete";
-  message: string;
-}
-
-export interface BreveDeliverySettings {
-  emailFrom: string;
-  emailTo: string[];
-  signalBot: string;
-  signalOwner: string;
-  signalOwnerUuid: string;
-  resendKeyConfigured: boolean;
-}
+// Breve wire types live in src/routines/breveTypes.ts (2026-09-02) and are
+// re-exported here so callers keep their lib/tauri import paths.
+export type {
+  BreveRoutine,
+  BreveRoutineSchedule,
+  BrevePdfThemePreset,
+  BrevePdfPalette,
+  BrevePdfTheme,
+  BreveRoutineHealth,
+  BreveConfig,
+  BreveBrief,
+  BreveNotification,
+  BreveSnapshot,
+  BreveBackfillResult,
+  BreveDeliverySettings,
+} from "../routines/breveTypes";
 
 let browserBreveDelivery: BreveDeliverySettings = {
   emailFrom: "Breve <briefs@example.com>",
@@ -2321,6 +2238,7 @@ function browserBreveSnapshot(): BreveSnapshot {
     artifactCount: 208,
     imported: true,
     scheduler: "rotli",
+    health: [],
   };
 }
 
@@ -2357,6 +2275,14 @@ export function breveWriteConfig(config: BreveConfig): Promise<BreveSnapshot> {
       config,
     });
   return invoke<BreveSnapshot>("breve_write_config", { config });
+}
+
+/** Sync the app theme's resolved palette into Breve's PDF appearance. A
+ * slice write on the Rust side (only `pdfTheme.resolved`), skipped when Breve
+ * is not configured in this vault or the palette is unchanged. */
+export function breveWritePdfPalette(palette: BrevePdfPalette): Promise<void> {
+  if (!isTauri()) return Promise.resolve();
+  return invoke<void>("breve_write_pdf_palette", { palette });
 }
 
 export function breveWriteWatchlist(markdown: string): Promise<BreveSnapshot> {

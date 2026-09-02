@@ -27,16 +27,7 @@ import { useFocusedTab, usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { requestVaultFolder } from "../state/vaultFolderBrowser";
 import { BreveSidebar } from "./breve/breveSidebar";
-import { QuokkaMark } from "./character";
-import {
-  ChevronRight,
-  CoffeeGlyph,
-  MoreGlyph,
-  NewFileGlyph,
-  NewFolderGlyph,
-  RefreshGlyph,
-  VaultGlyph,
-} from "./glyphs";
+import { ChevronRight, MoreGlyph, NewFileGlyph, NewFolderGlyph, RefreshGlyph, VaultGlyph } from "./glyphs";
 import { SidebarChat } from "./sidebar/sidebarChat";
 import { SidebarFooter } from "./sidebar/sidebarFooter";
 import { SidebarHome } from "./sidebar/sidebarHome";
@@ -178,6 +169,15 @@ export function Sidebar() {
   }, [focusedTabKey, setSidebarView]);
   const visibleSidebarView = sidebarFrontBody(sidebarView, contentView, dashboardSection);
   const pickSidebarView = (view: typeof sidebarView) => {
+    // Home/Chat are the way BACK from Breve too (2026-09-02): leave the mode
+    // first — through the same guard the Breve action uses, so a dirty Breve
+    // form still gets its confirm — and stay put if the person declines.
+    const ui = useUiStore.getState();
+    if (ui.sidebarMode === "breve") {
+      ui.setSidebarMode("notes");
+      if (useUiStore.getState().sidebarMode === "breve") return;
+      ui.setContentView("panes");
+    }
     setSidebarView(view);
     if (contentView === "dashboard") setDashboardSection(view === "chat" ? "models" : "rotli");
   };
@@ -283,19 +283,6 @@ export function Sidebar() {
             </button>
           </div>
         )}
-        <button
-          type="button"
-          className={sidebarMode === "breve" ? "icobtn railon sb-breve-toggle" : "icobtn sb-breve-toggle"}
-          aria-label={sidebarMode === "breve" ? "Back to Rotli home" : "Open Breve"}
-          aria-pressed={sidebarMode === "breve"}
-          data-hotkey="view.breve"
-          onClick={() => dispatch("view.breve")}
-        >
-          {sidebarMode === "breve" ? <QuokkaMark size={17} /> : <CoffeeGlyph size={16} />}
-          <span className="tip" aria-hidden="true">
-            {sidebarMode === "breve" ? "Back to Rotli" : "Breve"}
-          </span>
-        </button>
         <span className="nl-mode-sep" aria-hidden="true" />
         {/* IDE-style create icons (the maintainer #7/#13, 2026-07-03): the old "+" dropdown
             became explicit, always-visible actions — New… · New folder — mirroring
@@ -359,14 +346,15 @@ export function Sidebar() {
 
       {/* the FRONT switcher (the maintainer, 2026-08-01) — directly under the vault
           header, above everything the front renders. Breve is a MODE with its
-          own navigation, so it replaces the switcher rather than nesting one. */}
-      {sidebarMode !== "breve" && (
-        <SidebarSwitcher
-          value={sidebarFrontSelection(sidebarView, contentView)}
-          onPick={pickSidebarView}
-          chatCount={chats.chatList.length}
-        />
-      )}
+          own rail below, but it sits in the same control (2026-09-02) so the
+          way in and the way back are the same labelled segments. */}
+      <SidebarSwitcher
+        value={sidebarMode === "breve" ? null : sidebarFrontSelection(sidebarView, contentView)}
+        onPick={pickSidebarView}
+        chatCount={chats.chatList.length}
+        breveActive={sidebarMode === "breve"}
+        onBreve={() => dispatch("view.breve")}
+      />
 
       {/* a failed row-menu action (file-to-brain, board rename) says so HERE —
           inline, dismissible, above the tree it happened in (#11, audit 2026-07) */}
@@ -392,9 +380,11 @@ export function Sidebar() {
         <SidebarHome zoom={sidebarZoom} chats={chats} />
       )}
 
-      {/* the utility footer is APP-level, not front-level: it stays under Home
-          and Chat alike (the maintainer, 2026-08-01: "the utility footer stays as is") */}
-      {sidebarMode === "notes" && <SidebarFooter />}
+      {/* the utility footer is APP-level, not front-level: it stays under Home,
+          Chat, and Breve alike (the maintainer, 2026-08-01: "the utility footer
+          stays as is"; Breve joined 2026-09-02 so Settings and the Librarian
+          never vanish while reading a brief) */}
+      <SidebarFooter />
     </aside>
   );
 }

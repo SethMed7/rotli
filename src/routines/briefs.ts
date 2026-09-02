@@ -2,6 +2,10 @@ import { DEFAULT_BREVE_PDF_THEME } from "../brand/brevePdfThemes";
 import type { BreveBrief, BreveConfig, BreveRoutine, BreveSnapshot } from "../lib/tauri";
 import { nextRun } from "./schedule";
 
+/** The wire shapes Breve's presentation models reason about, re-exported so
+ * a pure model (health, dashboard digest) never imports the adapter itself. */
+export type { BreveRoutineHealth, BreveSnapshot } from "../lib/tauri";
+
 export const EMPTY_BREVE_CONFIG: BreveConfig = {
   version: 1,
   timezone: "America/New_York",
@@ -31,6 +35,7 @@ export const EMPTY_BREVE_SNAPSHOT: BreveSnapshot = {
   artifactCount: 0,
   imported: false,
   scheduler: "none",
+  health: [],
 };
 
 /** A stable display order independent of filesystem enumeration. */

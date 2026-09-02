@@ -77,9 +77,13 @@ gen() {
     fi
     for step in "claude:$BREVE_MODEL" "claude:$FALLBACK" "gemini:-"; do
       prov="${step%%:*}"; mdl="${step#*:}"; [ "$mdl" = "-" ] && mdl=""
-      echo "=== try $prov ${mdl:+($mdl) }at $(date) ==="
+      # the "claude" step label is a compatibility name: since 0.84.0 it runs the
+      # on-device writer (local-brief.ts); say so in the log, or the next outage
+      # gets misread as a cloud-provider failure (audit 2026-09-02 §1.1)
+      label="$prov"; [ "$prov" = claude ] && label="on-device writer"
+      echo "=== try $label ${mdl:+($mdl) }at $(date) ==="
       gen "$prov" "$mdl"
-      echo "=== $prov ${mdl:+($mdl) }exit $? at $(date) ==="
+      echo "=== $label ${mdl:+($mdl) }exit $? at $(date) ==="
       if brief_made; then USED="$prov${mdl:+ $mdl}"; break; fi
     done
 

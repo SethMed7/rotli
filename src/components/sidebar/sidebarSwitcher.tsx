@@ -1,5 +1,5 @@
 // The sidebar's FRONT switcher (the maintainer, 2026-08-01, from Claude Desktop's
-// Home|Code pill): a two-segment control directly under the vault header row.
+// Home|Code pill): a segmented control directly under the vault header row.
 // It REPLACES the stacked "Chat ›" / "Notes ›" accordions — each front now owns
 // the whole sidebar body, so nothing has to be folded to make room for anything
 // else. Design + rationale: docs/design/sidebar-home-chat.md.
@@ -7,9 +7,15 @@
 // Deliberately a LIST of fronts, not a boolean: Home is "notes essentially and
 // eventually a dashboard", and the parked email Inbox is a third front waiting
 // in ROADMAP.md. Both arrive as one entry in SIDEBAR_FRONTS.
+//
+// Breve (2026-09-02) is the third, labelled segment. It is a sidebar MODE
+// rather than a front — it swaps the whole sidebar body for its own rail —
+// but it lives in the same control so it is findable, named, and one click
+// away from Home and Chat in both directions (audit 2026-09-02 §1.3). Before
+// this it was an unlabeled coffee icon in the header row with no shortcut.
 
 import type { ContentView, DashboardSection, SidebarView } from "../../state/ui";
-import { ChatGlyph, HomeGlyph } from "../glyphs";
+import { ChatGlyph, CoffeeGlyph, HomeGlyph } from "../glyphs";
 
 const SIDEBAR_FRONTS: {
   id: SidebarView;
@@ -58,12 +64,18 @@ export function SidebarSwitcher({
   value,
   onPick,
   chatCount,
+  breveActive = false,
+  onBreve,
 }: {
   value: SidebarView | null;
   onPick: (view: SidebarView) => void;
   /** Chats in this vault — a quiet count on the Chat segment, so switching
    * fronts is never a blind jump. Hidden at 0. */
   chatCount: number;
+  /** Breve owns the sidebar body right now; Home and Chat read as unselected. */
+  breveActive?: boolean;
+  /** Present when the Breve segment is offered (the main window). */
+  onBreve?: () => void;
 }) {
   return (
     // role="group" + aria-pressed, NOT a tablist: these segments switch the
@@ -71,7 +83,7 @@ export function SidebarSwitcher({
     // owns the one tablist in the window (the app's segmented-control grammar)
     <div className="sb-switch" role="group" aria-label="Sidebar front">
       {SIDEBAR_FRONTS.map(({ id, label, Glyph, hint, action }) => {
-        const active = value === id;
+        const active = !breveActive && value === id;
         return (
           <button
             key={id}
@@ -88,6 +100,19 @@ export function SidebarSwitcher({
           </button>
         );
       })}
+      {onBreve && (
+        <button
+          type="button"
+          aria-pressed={breveActive}
+          title="Breve — your briefs, watchlist, and routines"
+          data-hotkey="view.breve"
+          className={breveActive ? "sb-switch-seg sel" : "sb-switch-seg"}
+          onClick={onBreve}
+        >
+          <CoffeeGlyph size={14} />
+          <span className="sb-switch-label">Breve</span>
+        </button>
+      )}
     </div>
   );
 }
