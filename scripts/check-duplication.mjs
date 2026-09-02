@@ -1,8 +1,9 @@
 // Duplication miner — deterministic, AI-free (remediation Batch 6a). Mines the
 // three code roots for near-duplicate implementation clusters and emits a
-// suspects report. NEVER part of the `lint` chain and never blocking: cadence is
-// manual + weekly (`bun run check:dup`), with `--diff` scoped to `git diff main`
-// files for non-blocking CI report artifacts (Stage 5 wires that). The opt-in
+// suspects report. The plain run is advisory (`bun run check:dup`, with `--diff`
+// scoped to `git diff main` files); `--gate` (in the `lint` chain as
+// `check:dup:gate`, 2026-09-01) turns the cluster count into a ratchet against
+// scripts/ratchet-baseline.json dupClusters — it may only fall. The opt-in
 // model judge (`bun run check:dup --judge`) sends ONLY mined suspects to
 // `claude -p --model haiku` from a scratch cwd (no CLAUDE.md/CARL bleed) and
 // caches verdicts in scripts/dup-judgments.json keyed by
@@ -964,3 +965,21 @@ for (const c of capped.slice(0, 10)) {
 }
 
 if (flag("--judge")) runJudge(capped, opt("--judge-limit") ? Number(opt("--judge-limit")) : undefined);
+
+// --gate: the cluster count is a ratchet (scripts/ratchet-baseline.json
+// dupClusters). It may only fall; a rise means a copy was pasted.
+if (flag("--gate")) {
+  const baselinePath = new URL("./ratchet-baseline.json", import.meta.url);
+  const baseline = JSON.parse(readFileSync(baselinePath, "utf8"));
+  const ceiling = baseline.dupClusters;
+  if (typeof ceiling !== "number") {
+    console.error("check:dup --gate: scripts/ratchet-baseline.json has no dupClusters ceiling");
+    process.exit(1);
+  }
+  if (reported.length > ceiling) {
+    console.error(
+      `check:dup failed — ${reported.length} clusters exceeds the ${ceiling}-cluster ceiling; extract the shared piece or allowlist with a reason`,
+    );
+    process.exit(1);
+  }
+}

@@ -1178,15 +1178,9 @@ async fn corpus_pick_images(app: AppHandle) -> Result<Vec<String>, String> {
             .dialog()
             .file()
             .set_title("Attach images or videos")
-            .add_filter(
-                "Images",
-                &[
-                    "png", "jpg", "jpeg", "gif", "webp", "heic", "heif", "avif", "bmp", "tiff",
-                    "tif", "svg", "ico",
-                ],
-            )
-            // mirrors VIDEO_EXTS in src/lib/fileKind.ts — the embed lane
-            .add_filter("Videos", &["mp4", "mov", "webm", "m4v", "ogv"]);
+            .add_filter("Images", corpus::NATIVE_IMAGE_PICKER_EXTS)
+            // the embed lane's video containers (parity.json videoExts)
+            .add_filter("Videos", corpus::VIDEO_EXTS);
         if let Some(parent) = app.get_webview_window("main") {
             picker = picker.set_parent(&parent);
         }

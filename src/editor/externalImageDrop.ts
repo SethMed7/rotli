@@ -19,7 +19,9 @@ export interface DropPoint {
   y: number;
 }
 
-const NATIVE_IMAGE_EXTS = new Set([...IMAGE_EXTS, "svg", "ico"]);
+/** Finder/picker image names, incl. the vector/icon kinds the editor can
+ * show; mirrors NATIVE_IMAGE_PICKER_EXTS in Rust (parity.json). */
+export const NATIVE_IMAGE_EXTS = new Set([...IMAGE_EXTS, "svg", "ico"]);
 
 /** Finder/WebKit may omit MIME metadata, so extension is the stable first
  * gate. Rust validates bytes independently for browser File imports. */

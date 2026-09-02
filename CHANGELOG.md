@@ -17,6 +17,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   theme through one shared hook instead of each re-reading the OS colour
   scheme or watching the document on their own; a System-mode OS flip now
   re-themes an open board.
+- **Debt that can only shrink.** New lint-chain guards from the code-quality
+  audit: `check:ratchets` holds per-file line ceilings for every source file at
+  or above 600 lines, the count of source-string test assertions, dated
+  provenance comments, and per-directory test-coverage floors;
+  `check:dup:gate` turns the duplication miner's cluster count into a ceiling;
+  `check:window-events` keeps every cross-window event documented in
+  `docs/architecture/window-events.md` and wired on both sides;
+  `check:architecture` now allowlists (and shrinks) the components that import
+  the Tauri adapter directly, keeps `prefers-color-scheme` reads to the theme
+  owner, and keeps raw query invalidation inside services; `check:docs` fails
+  a CARL rule whose source contract changed after its last review (known
+  backlog in `.carl/freshness-debt.json`) and any adopted or undated staging
+  entry; `parity.json` now pins the "Secure notes" folder name, the
+  title-strip markers, the attach picker's image list, and the video list on
+  both sides of the IPC boundary.
 - **The proof chain is stated once.** The `verify` skill, `CONTRIBUTING.md`,
   and the AI workflow guide all point at `bun run verify` (CI's local twin);
   the four-theme lists in the PR template, contributing guide, and CARL design

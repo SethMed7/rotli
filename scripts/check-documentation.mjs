@@ -1,6 +1,7 @@
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
+
 import { missingScriptSteps, missingTokens, unreferencedNames } from "./documentation-contract.mjs";
 
 const root = process.cwd();
@@ -65,10 +66,14 @@ for (const rel of ["CLAUDE.md", ".github/copilot-instructions.md"]) {
 if (existsSync(join(root, "CLAUDE.md"))) {
   const adapter = readFileSync(join(root, "CLAUDE.md"), "utf8");
   if (!/^@AGENTS\.md$/m.test(adapter)) {
-    failures.push("CLAUDE.md must import the canonical rules with a bare `@AGENTS.md` line (a Markdown link is not an import)");
+    failures.push(
+      "CLAUDE.md must import the canonical rules with a bare `@AGENTS.md` line (a Markdown link is not an import)",
+    );
   }
   if (Buffer.byteLength(adapter, "utf8") > 1_000) {
-    failures.push("CLAUDE.md exceeds its 1,000-byte adapter budget — rules belong in AGENTS.md, not the adapter");
+    failures.push(
+      "CLAUDE.md exceeds its 1,000-byte adapter budget — rules belong in AGENTS.md, not the adapter",
+    );
   }
 }
 
@@ -120,7 +125,15 @@ if (existsSync(join(root, "docs/development/adding-things.md"))) {
 
 if (existsSync(join(root, "package.json"))) {
   const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  for (const script of ["lint", "test:unit", "test:evals", "test:breve", "test:tooling", "test:regression", "check"]) {
+  for (const script of [
+    "lint",
+    "test:unit",
+    "test:evals",
+    "test:breve",
+    "test:tooling",
+    "test:regression",
+    "check",
+  ]) {
     if (!packageJson.scripts?.[script]) failures.push(`package.json is missing documented script: ${script}`);
   }
 
@@ -151,7 +164,8 @@ if (existsSync(join(root, "package.json"))) {
   const releaseScript = existsSync(join(root, "scripts/release.sh"))
     ? readFileSync(join(root, "scripts/release.sh"), "utf8")
     : "";
-  if (!releaseScript.includes("bun run check")) failures.push("scripts/release.sh must run bun run check before building");
+  if (!releaseScript.includes("bun run check"))
+    failures.push("scripts/release.sh must run bun run check before building");
 
   const regressionWorkflow = existsSync(join(root, ".github/workflows/regression.yml"))
     ? readFileSync(join(root, ".github/workflows/regression.yml"), "utf8")
@@ -180,9 +194,11 @@ if (existsSync(join(root, "package.json"))) {
         .join("\n")
     : "";
   const orphanExemptions = {
-    "bump-version.sh": "manual release helper — run by hand per its usage header; release.sh reads the result",
+    "bump-version.sh":
+      "manual release helper — run by hand per its usage header; release.sh reads the result",
     "eval-local-chat.ts": "LIVE eval — needs a real on-device model, so it is run by hand, never from a gate",
-    "eval-vault-sweep.ts": "LIVE eval — whole-vault sweep against a real local model; run by hand, never from a gate",
+    "eval-vault-sweep.ts":
+      "LIVE eval — whole-vault sweep against a real local model; run by hand, never from a gate",
   };
   // `.ts` counts too: an executable that never runs is an orphan whatever its
   // extension. Test files are excluded from the scan but kept in the haystack,
@@ -197,8 +213,14 @@ if (existsSync(join(root, "package.json"))) {
       .join("\n");
   for (const name of executables) {
     if (name in orphanExemptions) continue;
-    if (!packageScriptText.includes(name) && !workflowText.includes(name) && !siblingText(name).includes(name)) {
-      failures.push(`scripts/${name} is an orphan — wire it into package.json/a workflow, or exempt it with a reason`);
+    if (
+      !packageScriptText.includes(name) &&
+      !workflowText.includes(name) &&
+      !siblingText(name).includes(name)
+    ) {
+      failures.push(
+        `scripts/${name} is an orphan — wire it into package.json/a workflow, or exempt it with a reason`,
+      );
     }
   }
   // (1b) test:breve names its files by hand — the only suite that does.
@@ -216,11 +238,14 @@ if (existsSync(join(root, "package.json"))) {
   // another package.json script (the lint/check/test chains) or a CI workflow.
   // Defined-but-never-run checks are how conventions rot while looking enforced.
   const chainExemptions = {
-    "check:dup": "advisory duplication miner — run on demand against dup-judgments.json, deliberately not a gate",
+    "check:dup":
+      "advisory duplication miner — run on demand against dup-judgments.json, deliberately not a gate",
   };
   for (const [key] of scriptEntries) {
     if (!key.startsWith("check:") || key in chainExemptions) continue;
-    const referencedElsewhere = scriptEntries.some(([other, value]) => other !== key && new RegExp(`\\b${key}\\b`).test(value));
+    const referencedElsewhere = scriptEntries.some(
+      ([other, value]) => other !== key && new RegExp(`\\b${key}\\b`).test(value),
+    );
     if (!referencedElsewhere && !new RegExp(`\\b${key}\\b`).test(workflowText)) {
       failures.push(`package.json script ${key} is defined but never run by any chain or workflow`);
     }
@@ -231,8 +256,14 @@ if (existsSync(join(root, "package.json"))) {
     const testingDoc = readFileSync(join(root, "docs/development/testing.md"), "utf8");
     const backtickSpans = [...testingDoc.matchAll(/`([^`\n]+)`/g)].map((match) => match[1]).join("\n");
     for (const [key] of scriptEntries) {
-      if (!new RegExp(`(^|[^-\\w:])${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^-\\w:])`, "m").test(backtickSpans)) {
-        failures.push(`package.json script ${key} is not documented in docs/development/testing.md's command map`);
+      if (
+        !new RegExp(`(^|[^-\\w:])${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^-\\w:])`, "m").test(
+          backtickSpans,
+        )
+      ) {
+        failures.push(
+          `package.json script ${key} is not documented in docs/development/testing.md's command map`,
+        );
       }
     }
   }
@@ -294,14 +325,71 @@ if (existsSync(join(root, ".carl/carl.json"))) {
       if (domain.always_on) failures.push(`${name} is always-on; project detail must be recalled on demand`);
       if (!(domain.recall ?? []).length) failures.push(`${name} has no recall phrases`);
       for (const rule of domain.rules ?? []) {
-        if (String(rule.text ?? "").length > 600) failures.push(`${name} rule ${rule.id} exceeds 600 characters`);
-        if (rule.source && !existsSync(join(root, rule.source))) failures.push(`${name} rule ${rule.id} has missing source: ${rule.source}`);
+        if (String(rule.text ?? "").length > 600)
+          failures.push(`${name} rule ${rule.id} exceeds 600 characters`);
+        if (rule.source && !existsSync(join(root, rule.source)))
+          failures.push(`${name} rule ${rule.id} has missing source: ${rule.source}`);
       }
       for (const decision of domain.decisions ?? []) {
-        if (String(decision.rationale ?? "").length > 400) failures.push(`${decision.id} rationale exceeds 400 characters`);
+        if (String(decision.rationale ?? "").length > 400)
+          failures.push(`${decision.id} rationale exceeds 400 characters`);
       }
     }
-    const glassDecision = domains.flatMap(([, domain]) => domain.decisions ?? [])
+    // Freshness: a rule whose source contract changed after its last review is
+    // stale until someone re-reads it. Known debt lives in .carl/freshness-debt.json
+    // (id + date noted) and only shrinks; a shallow CI clone cannot date files,
+    // so the comparison runs only where history exists.
+    const shallow = (() => {
+      try {
+        return (
+          execSync("git rev-parse --is-shallow-repository", { cwd: root, encoding: "utf8" }).trim() === "true"
+        );
+      } catch {
+        return true;
+      }
+    })();
+    const debtPath = join(root, ".carl/freshness-debt.json");
+    const debt = existsSync(debtPath) ? JSON.parse(readFileSync(debtPath, "utf8")) : {};
+    const seenDebt = new Set();
+    if (!shallow) {
+      for (const [name, domain] of domains) {
+        for (const rule of domain.rules ?? []) {
+          if (!rule.source || !rule.last_reviewed) continue;
+          let changed = "";
+          try {
+            changed = execSync(`git log -1 --format=%cs -- "${rule.source}"`, {
+              cwd: root,
+              encoding: "utf8",
+            }).trim();
+          } catch {
+            changed = "";
+          }
+          if (changed && changed > String(rule.last_reviewed)) {
+            const key = `${name}#${rule.id}`;
+            if (key in debt) seenDebt.add(key);
+            else
+              failures.push(
+                `${key}: source ${rule.source} changed ${changed}, after last_reviewed ${rule.last_reviewed} — re-read the rule and bump last_reviewed (or note it in .carl/freshness-debt.json)`,
+              );
+          }
+        }
+      }
+      for (const key of Object.keys(debt)) {
+        if (!seenDebt.has(key))
+          failures.push(
+            `${key}: no longer stale — remove it from .carl/freshness-debt.json (the list only shrinks)`,
+          );
+      }
+    }
+    for (const entry of carl.staging ?? []) {
+      if (entry.status === "adopted")
+        failures.push(
+          `Carl staging ${entry.id} is adopted — its rule lives in the domain now; prune the staging copy`,
+        );
+      if (!entry.proposed_at) failures.push(`Carl staging ${entry.id} has no proposed_at date`);
+    }
+    const glassDecision = domains
+      .flatMap(([, domain]) => domain.decisions ?? [])
       .find((decision) => decision.id === "rotli-004");
     if (!glassDecision || !/remove.*Liquid Glass|Liquid Glass.*remove/i.test(glassDecision.decision)) {
       failures.push("Carl must remember that Liquid Glass was removed");
@@ -346,8 +434,10 @@ if (existsSync(join(root, ".carl/carl.json"))) {
     };
     const carlDirExemptions = {
       lib: "pure dependency-free utilities with no distinct recall vocabulary — placement law lives in docs/development/adding-things.md",
-      newItems: "small creation workflow; covered by ROTLI_CORE architecture vocabulary — if it ever grows past the threshold, map it",
-      noteChat: "thin note↔chat seam below the threshold; its contract lives in the ROTLI_MEMORY chat-note rule",
+      newItems:
+        "small creation workflow; covered by ROTLI_CORE architecture vocabulary — if it ever grows past the threshold, map it",
+      noteChat:
+        "thin note↔chat seam below the threshold; its contract lives in the ROTLI_MEMORY chat-note rule",
       styles: "CSS only; owned by the ROTLI_DESIGN token rules and check:design-system",
     };
     const carlDirThresholdLines = 2_000;
@@ -361,10 +451,14 @@ if (existsSync(join(root, ".carl/carl.json"))) {
       }
       return lines;
     };
-    const srcDirs = readdirSync(join(root, "src")).filter((name) => statSync(join(root, "src", name)).isDirectory());
+    const srcDirs = readdirSync(join(root, "src")).filter((name) =>
+      statSync(join(root, "src", name)).isDirectory(),
+    );
     for (const [dir, domain] of Object.entries(carlDirDomainMap)) {
-      if (!srcDirs.includes(dir)) failures.push(`CARL dir→domain map references missing directory src/${dir}`);
-      if (!domainNames.has(domain)) failures.push(`CARL dir→domain map: src/${dir} points at unknown domain ${domain}`);
+      if (!srcDirs.includes(dir))
+        failures.push(`CARL dir→domain map references missing directory src/${dir}`);
+      if (!domainNames.has(domain))
+        failures.push(`CARL dir→domain map: src/${dir} points at unknown domain ${domain}`);
     }
     for (const dir of Object.keys(carlDirExemptions)) {
       if (!srcDirs.includes(dir)) failures.push(`CARL dir exemption references missing directory src/${dir}`);
@@ -374,7 +468,9 @@ if (existsSync(join(root, ".carl/carl.json"))) {
       if (dir in carlDirDomainMap || dir in carlDirExemptions) continue;
       const lines = countLines(join(root, "src", dir));
       if (lines > carlDirThresholdLines) {
-        failures.push(`src/${dir} is ${lines} lines with no CARL dir→domain mapping or exemption (add one in check-documentation.mjs)`);
+        failures.push(
+          `src/${dir} is ${lines} lines with no CARL dir→domain mapping or exemption (add one in check-documentation.mjs)`,
+        );
       }
     }
   } catch (error) {
@@ -396,7 +492,7 @@ if (existsSync(join(root, ".mcp.json"))) {
 
 if (existsSync(join(root, ".codex/config.toml"))) {
   const config = readFileSync(join(root, ".codex/config.toml"), "utf8");
-  if (!config.includes("[mcp_servers.rotli_carl]") || !config.includes('.carl/mcpServer.mjs')) {
+  if (!config.includes("[mcp_servers.rotli_carl]") || !config.includes(".carl/mcpServer.mjs")) {
     failures.push(".codex/config.toml does not launch the project CARL server");
   }
   const enabledLine = config.split("\n").find((line) => line.startsWith("enabled_tools")) ?? "";
@@ -428,7 +524,10 @@ for (const rel of [".cursor/mcp.json", ".agents/mcp_config.json"]) {
 // .agents/rules/. The mirror there must stay byte-identical to the canonical
 // file (a symlink satisfies this automatically; a copy is caught on drift).
 if (existsSync(join(root, ".agents/rules/AGENTS.md")) && existsSync(join(root, "AGENTS.md"))) {
-  if (readFileSync(join(root, ".agents/rules/AGENTS.md"), "utf8") !== readFileSync(join(root, "AGENTS.md"), "utf8")) {
+  if (
+    readFileSync(join(root, ".agents/rules/AGENTS.md"), "utf8") !==
+    readFileSync(join(root, "AGENTS.md"), "utf8")
+  ) {
     failures.push(".agents/rules/AGENTS.md has drifted from the canonical AGENTS.md");
   }
 }
@@ -445,7 +544,9 @@ if (existsSync(join(root, ".agents/skills"))) {
   } catch {
     failures.push(".claude/skills is missing — link it to .agents/skills");
   }
-  const gitignore = existsSync(join(root, ".gitignore")) ? readFileSync(join(root, ".gitignore"), "utf8") : "";
+  const gitignore = existsSync(join(root, ".gitignore"))
+    ? readFileSync(join(root, ".gitignore"), "utf8")
+    : "";
   if (!gitignore.includes("!.claude/skills")) {
     failures.push(".gitignore must un-ignore .claude/skills (use `.claude/*` + `!.claude/skills`)");
   }
@@ -464,23 +565,42 @@ if (existsSync(join(root, ".agents/skills"))) {
     }
     // Skills point at the canonical proof chain; a named command must exist.
     for (const match of skill.matchAll(/`bun run ([a-z0-9:_-]+)/g)) {
-      if (!packageScripts[match[1]]) failures.push(`.agents/skills/${name}/SKILL.md references missing script: bun run ${match[1]}`);
+      if (!packageScripts[match[1]])
+        failures.push(`.agents/skills/${name}/SKILL.md references missing script: bun run ${match[1]}`);
     }
     for (const match of skill.matchAll(/`([^`\n]+)`/g)) {
       const candidate = match[1];
       if (!/^(?:src|src-tauri|scripts|docs|breve-runtime)\//.test(candidate)) continue;
       if (/[<>*{}\s]/.test(candidate)) continue;
-      if (!existsSync(join(root, candidate))) failures.push(`.agents/skills/${name}/SKILL.md references missing path: ${candidate}`);
+      if (!existsSync(join(root, candidate)))
+        failures.push(`.agents/skills/${name}/SKILL.md references missing path: ${candidate}`);
     }
   }
 }
 
 if (existsSync(join(root, ".carl/mcpServer.mjs"))) {
   const requests = [
-    { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "docs-check", version: "1" } } },
+    {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: {
+        protocolVersion: "2025-03-26",
+        capabilities: {},
+        clientInfo: { name: "docs-check", version: "1" },
+      },
+    },
     { jsonrpc: "2.0", method: "notifications/initialized" },
     { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
-    { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "carl_recall", arguments: { query: "secure memex retrieval", max_domains: 2, max_rules: 4 } } },
+    {
+      jsonrpc: "2.0",
+      id: 3,
+      method: "tools/call",
+      params: {
+        name: "carl_recall",
+        arguments: { query: "secure memex retrieval", max_domains: 2, max_rules: 4 },
+      },
+    },
   ];
   const smoke = spawnSync(process.execPath, [".carl/mcpServer.mjs"], {
     cwd: root,
@@ -489,9 +609,13 @@ if (existsSync(join(root, ".carl/mcpServer.mjs"))) {
   });
   try {
     if (smoke.status !== 0) throw new Error(smoke.stderr || `exit ${smoke.status}`);
-    const responses = smoke.stdout.trim().split("\n").map((line) => JSON.parse(line));
+    const responses = smoke.stdout
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
     const listed = responses.find((response) => response.id === 2)?.result?.tools ?? [];
-    if (!listed.some((tool) => tool.name === "carl_recall")) throw new Error("carl_recall missing from tools/list");
+    if (!listed.some((tool) => tool.name === "carl_recall"))
+      throw new Error("carl_recall missing from tools/list");
     const recallText = responses.find((response) => response.id === 3)?.result?.content?.[0]?.text;
     const recall = JSON.parse(recallText);
     if (!recall.matched_domains?.some((domain) => domain.domain === "ROTLI_MEMEX")) {
@@ -509,7 +633,15 @@ if (existsSync(join(root, ".carl/mcpServer.mjs"))) {
     requests[0],
     requests[1],
     { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} },
-    { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "carl_stage_proposal", arguments: { proposed_domain: "ROTLI_CORE", rule_text: "smoke", rationale: "smoke" } } },
+    {
+      jsonrpc: "2.0",
+      id: 3,
+      method: "tools/call",
+      params: {
+        name: "carl_stage_proposal",
+        arguments: { proposed_domain: "ROTLI_CORE", rule_text: "smoke", rationale: "smoke" },
+      },
+    },
   ];
   const readOnlySmoke = spawnSync(process.execPath, [".carl/mcpServer.mjs"], {
     cwd: root,
@@ -519,10 +651,15 @@ if (existsSync(join(root, ".carl/mcpServer.mjs"))) {
   });
   try {
     if (readOnlySmoke.status !== 0) throw new Error(readOnlySmoke.stderr || `exit ${readOnlySmoke.status}`);
-    const responses = readOnlySmoke.stdout.trim().split("\n").map((line) => JSON.parse(line));
+    const responses = readOnlySmoke.stdout
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
     const listed = responses.find((response) => response.id === 2)?.result?.tools ?? [];
-    if (listed.some((tool) => tool.name === "carl_stage_proposal")) throw new Error("carl_stage_proposal is still listed under CARL_READONLY=1");
-    if (!listed.some((tool) => tool.name === "carl_recall")) throw new Error("carl_recall missing from read-only tools/list");
+    if (listed.some((tool) => tool.name === "carl_stage_proposal"))
+      throw new Error("carl_stage_proposal is still listed under CARL_READONLY=1");
+    if (!listed.some((tool) => tool.name === "carl_recall"))
+      throw new Error("carl_recall missing from read-only tools/list");
     const call = responses.find((response) => response.id === 3);
     if (!call?.error) throw new Error("carl_stage_proposal call was not refused in read-only mode");
   } catch (error) {
