@@ -20,6 +20,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a ⌘T note), which is the one rule that separates full notes from captures.
   Notes created in the Quick Note window while on 0.84.0 sit in Captures until
   you add them to Main or star them.
+- **Quick Note and quick-capture windows follow every appearance setting
+  live.** Only the theme, accent, and quokka choices used to travel from the
+  main window; the syntax palette, per-note typography, hotkey hints, time
+  format, and rebound keys went stale in the floating windows until relaunch.
+  Main now broadcasts its whole settings snapshot on change.
+- **Your quokka line colour sticks.** Choosing Black in Settings → Appearance
+  silently reverted to Auto on every relaunch, the Auto and White buttons were
+  both labelled "White", and Auto had no swatch. All three choices now persist,
+  are named honestly, and an explicit Black or White is honoured in every
+  placement (empty states, rest state, chat) — not only in the Settings
+  preview. Auto still follows the theme.
+- **Lively chat welcomes keep their time-of-day pose.** The preferred idle
+  pose was overriding the morning/afternoon/evening scene the Lively style
+  promises; Calm keeps the preferred pose.
+- **Skipping onboarding resets the whole quokka**, including line colour,
+  accessory hue, and idle pose, and the accessory hue slider is hidden under
+  the Line treatment where it has nothing to colour.
 - **Quick Note settings copy names the real keys.** The picker is ⌘P (not ⌘K)
   and favorites cycle with ⌘] and ⌘[.
 

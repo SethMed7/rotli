@@ -5,8 +5,12 @@
 import { describe, expect, test } from "bun:test";
 
 import { DEFAULT_QUOKKA_ACCESSORY_HUE, DEFAULT_QUOKKA_CUSTOM_HUE } from "../brand/quokka";
+import { useBindingsStore } from "../keys/bindings";
 import type { Tab } from "../types";
+import { DEFAULT_NOTE_STYLE, useNoteStyleStore } from "./noteStyle";
 import {
+  appearanceBroadcast,
+  applyAppearanceBroadcast,
   createPersistDrain,
   parseHybridPresets,
   parseSettings,
@@ -15,6 +19,7 @@ import {
   unknownSettingsKeys,
   validTab,
 } from "./persist";
+import { useUiStore } from "./ui";
 
 describe("userName", () => {
   test("defaults to empty and survives a round-trip", () => {
@@ -628,5 +633,34 @@ describe("createPersistDrain — settings survive a transient write failure", ()
     await drain(); // settings already landed; only viewstate retries
     expect(landed).toEqual(["S"]);
     expect(failures).toBe(2);
+  });
+});
+
+describe("appearance broadcast (main → quick/capture webviews)", () => {
+  test("every app setting and the per-note typography round-trip through the payload", () => {
+    const ui = useUiStore.getState();
+    useUiStore.setState({ theme: "dark", themeFamily: "ocean", syntaxPalette: "mono", hotkeyPeek: "off" });
+    useBindingsStore.setState({ overrides: { "quick.search": "Meta+Shift+P" } });
+    useNoteStyleStore.setState({ styles: { n1: { ...DEFAULT_NOTE_STYLE, size: 19 } } });
+    const payload = appearanceBroadcast();
+
+    // a stale receiver
+    useUiStore.setState({
+      theme: "light",
+      themeFamily: "warm",
+      syntaxPalette: ui.syntaxPalette,
+      hotkeyPeek: "badges",
+    });
+    useBindingsStore.setState({ overrides: {} });
+    useNoteStyleStore.setState({ styles: {} });
+
+    applyAppearanceBroadcast(payload);
+    const after = useUiStore.getState();
+    expect(after.theme).toBe("dark");
+    expect(after.themeFamily).toBe("ocean");
+    expect(after.syntaxPalette).toBe("mono");
+    expect(after.hotkeyPeek).toBe("off");
+    expect(useBindingsStore.getState().overrides["quick.search"]).toBe("Meta+Shift+P");
+    expect(useNoteStyleStore.getState().styles.n1?.size).toBe(19);
   });
 });

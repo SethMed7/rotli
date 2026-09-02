@@ -535,13 +535,10 @@ export function parseSettings(raw: string): PersistedSettings {
       data.quokkaCustomHue === undefined
         ? quokkaHueFromLegacyColor(data.quokkaCustomColor)
         : normalizeQuokkaCustomHue(data.quokkaCustomHue),
-    // "black" was only ever the implementation default (no UI offered the
-    // choice) and it vanishes on dark themes — migrate it to theme-aware auto.
-    quokkaLineColor: asEnum(
-      data.quokkaLineColor === "black" ? "auto" : data.quokkaLineColor,
-      QUOKKA_LINE_COLORS,
-      "auto",
-    ),
+    // Auto, Black, and White are all real picker choices (Settings → Appearance
+    // → Line color); an explicit Black used to be remapped to Auto here and
+    // silently vanished on every relaunch (2026-09-01).
+    quokkaLineColor: asEnum(data.quokkaLineColor, QUOKKA_LINE_COLORS, "auto"),
     quokkaAccessory: asEnum(data.quokkaAccessory, QUOKKA_ACCESSORIES, "none"),
     quokkaAccessoryHue: normalizeQuokkaAccessoryHue(data.quokkaAccessoryHue),
     quokkaIdlePose: asEnum(data.quokkaIdlePose, QUOKKA_IDLE_POSES, "rest"),
@@ -1404,6 +1401,30 @@ export async function hydratePersistedState(): Promise<void> {
 }
 
 // ─── save (one debounced writer, main window only) ───────────────────────────
+
+/** Everything a floating webview must mirror from the main window, as the
+ * SAME serialized shapes the settings files use: the app-wide settings
+ * (theme, accent, quokka, syntax palette, hotkey peek, time format, rebinds…)
+ * plus the vault's per-note typography. Main emits this on every change and
+ * the quick + capture windows apply it, so a setting never goes stale there
+ * until relaunch (2026-09-01: only theme + quokka used to travel). */
+export interface AppearanceBroadcast {
+  app: string;
+  noteStyles: string;
+}
+
+export function appearanceBroadcast(): AppearanceBroadcast {
+  return { app: appSettingsSnapshot(), noteStyles: JSON.stringify(useNoteStyleStore.getState().styles) };
+}
+
+export function applyAppearanceBroadcast(payload: AppearanceBroadcast): void {
+  applyAppSettings(parseSettings(payload.app));
+  const styles: Record<string, NoteStyle> = {};
+  for (const [id, style] of Object.entries(record(JSON.parse(payload.noteStyles)))) {
+    if (style && typeof style === "object") styles[id] = style as NoteStyle;
+  }
+  useNoteStyleStore.setState({ styles });
+}
 
 function appSettingsSnapshot(): string {
   const ui = useUiStore.getState();

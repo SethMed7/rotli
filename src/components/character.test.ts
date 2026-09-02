@@ -66,7 +66,9 @@ describe("quokka personalization", () => {
   test("personal idle placements use the chosen mood while empty states retain semantic poses", () => {
     expect(chatSource).toContain('className="chat-endmark" personalIdle');
     expect(chatSource).toContain("accessorized={pristineChat}");
-    expect(chatSource).toContain("personalIdle={pristineChat}");
+    // Calm = the preferred idle pose; Lively keeps chatWelcomeCharacter's
+    // time-of-day pose (personalIdle used to override it, 2026-09-01)
+    expect(chatSource).toContain('personalIdle={pristineChat && chatWelcomeStyle === "calm"}');
     expect(paneSource).toContain('className="be-quokka" accessorized');
   });
 

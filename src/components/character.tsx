@@ -265,12 +265,14 @@ export function Character({
             lineColor === "auto" && fill ? "var(--quokka-line-black)" : `var(--quokka-line-${lineColor})`,
         }),
     ...(fill ? { "--quokka-fill": fill } : {}),
-    // A filled body draws its line art from `currentColor`, and placements
-    // (`.be-quokka`, `.empty-stage .quokka`) set `color: var(--text)` for the
-    // Line treatment's theme tint. Inline wins over every placement rule, so a
-    // filled quokka keeps its designed ink on dark themes instead of drawing
-    // light body lines under dark accessory ink (rest state, 2026-09-01).
-    ...(fill && !quietLine ? { color: "var(--quokka-ink)" } : {}),
+    // Line art draws from `currentColor`, and placements (`.be-quokka`,
+    // `.empty-stage .quokka`) set `color: var(--text)` so the Line treatment
+    // on Auto tints with the theme. Inline wins over every placement rule, so
+    // (a) a filled quokka keeps its designed ink on dark themes instead of
+    // drawing light body lines under dark accessory ink (rest state,
+    // 2026-09-01), and (b) an explicit Black/White line choice is honored in
+    // every placement, canonical or layered — not only in the Settings preview.
+    ...((fill || lineColor !== "auto") && !quietLine ? { color: "var(--quokka-ink)" } : {}),
   } as CSSProperties;
   const accessoryColorLayer = accessoryArt && fill && (
     <span

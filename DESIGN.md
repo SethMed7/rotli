@@ -41,7 +41,8 @@ surface color behind the accessory.
 The companion itself is optional: when off,
 full-body quokkas appear only during onboarding; the compact product mark is
 unaffected and always remains the original line art. When on, body hue, ink,
-glasses/bucket hat/goggles, accessory hue, and a preferred idle mood/pose are
+glasses or bucket hat (goggles are parked: stored values still render, pickers
+no longer offer them), accessory hue, and a preferred idle mood/pose are
 machine-level choices that survive vault switches. Personal idle placements use
 the preferred mood. Semantic empty states choose the pose that explains their
 state while preserving the user's body, ink, and accessory treatment.

@@ -3021,7 +3021,10 @@ export function ChatSurface({
                           size={pristineChat ? 58 : 50}
                           className="chat-welcome-character"
                           accessorized={pristineChat}
-                          personalIdle={pristineChat}
+                          // Calm = the user's preferred idle pose; Lively = the
+                          // time-of-day pose from chatWelcomeCharacter (personalIdle
+                          // used to discard it, DESIGN.md "Calm/Lively", 2026-09-01)
+                          personalIdle={pristineChat && chatWelcomeStyle === "calm"}
                         />
                       </div>
                       <p className="chat-hint-title">

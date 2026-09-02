@@ -1692,6 +1692,10 @@
   border: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
   border-radius: 50%;
 }
+.quokka-line-choice.auto > span {
+  /* Auto = whatever this theme draws line art in */
+  background: var(--quokka-line-auto);
+}
 .quokka-line-choice.black > span {
   background: var(--quokka-line-black);
 }
