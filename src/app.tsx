@@ -46,6 +46,7 @@ import {
   onNativeDropAuthorized,
   onOpenRequest,
   onOrganizerProgress,
+  onQuickCreated,
   onQuickSet,
   onRebind,
   onSummonChat,
@@ -68,6 +69,7 @@ import {
 } from "./editor/externalImageDrop";
 import { noteIdFacet } from "./editor/livePreview";
 import { onQuitFlushFailure } from "./lib/quitFlush";
+import { fileQuickNoteInMain } from "./newItems/composition";
 import { createVaultCapture } from "./services/captureRouting";
 import { summonChat } from "./services/chatSummon";
 import { DEST } from "./services/destinations";
@@ -245,8 +247,9 @@ function MainShell() {
           try {
             const noteId = await createVaultCapture(targetId, body);
             if (noteId) {
-              // a quick capture is a STAGED NOTE in wiki/_inbox → it shows in the
-              // one Captures surface (the maintainer, 2026-06-30). ⌘Enter surfaces Captures.
+              // a quick capture is a STAGED NOTE (wiki/_secure, secure at birth,
+              // capture shelf) → Rust projects it to the one Captures surface
+              // (the maintainer, 2026-06-30). ⌘Enter surfaces Captures.
               await invalidateNotes();
               if (open) useUiStore.getState().setContentView("board");
             } else {
@@ -677,6 +680,14 @@ export default function App() {
   // the quick-access set is kept in step across webviews (the same pattern) —
   // the quick window emits its edits, the main window records + persists them
   useEffect(() => onQuickSet(applyQuickState), []);
+
+  // a note born in the Quick Note window is filed into Main here — the quick
+  // webview cannot write the manifest, and a full note must never sit in
+  // Captures beside real captures (2026-09-01)
+  useEffect(() => {
+    if (surface !== "main") return;
+    return onQuickCreated(({ id }) => fileQuickNoteInMain(id));
+  }, [surface]);
 
   // A vault switch rebinds the live Rust default store. Keep all native windows
   // alive and replace only their vault-scoped caches/projections.

@@ -753,9 +753,10 @@ function GeneralPane() {
 
       <h4 className="sethead">Quick note</h4>
       <p className="lead">
-        A floating note you summon with {chordLabel(bindingOverrides, "quick.summon")} — pin up to five notes
-        in it, cycle them with ‹ ›, and ⌘K searches every note to swap one in. It always reopens where you
-        left off and closes when you click away.
+        A floating note you summon with {chordLabel(bindingOverrides, "quick.summon")} — open any note in it,
+        star up to five for quick access, cycle those with ⌘] and ⌘[, and ⌘P searches every note to swap one
+        in. A note you create here is a full note filed into Main, never a capture. It always reopens where
+        you left off and closes when you click away.
       </p>
       <label className="setselect-row">
         <span>Destination vault</span>

@@ -12,7 +12,15 @@ import { type KeyboardEvent, type MouseEvent, useEffect, useMemo, useRef, useSta
 import { EditorSurface } from "../editor/editorSurface";
 import { setQuickHandle } from "../keys/handles";
 import { useTransientPopover } from "../lib/popover";
-import { corpusFrontmatter, corpusSetSecure, onQuickShow, startWindowDrag } from "../lib/tauri";
+import {
+  corpusFrontmatter,
+  corpusSetSecure,
+  emitQuickCreated,
+  isTauri,
+  onQuickShow,
+  startWindowDrag,
+} from "../lib/tauri";
+import { fileQuickNoteInMain } from "../newItems/composition";
 import { createVaultCapture } from "../services/captureRouting";
 import { createRoutedNote } from "../services/createNote";
 import { isChatsPath, isVault, isWikiPath } from "../services/destinations";
@@ -268,6 +276,11 @@ export function QuickNote() {
       .then(async (noteId) => {
         await invalidateNotes();
         setErr(null);
+        // a Quick Note is a FULL note: main files it into Main at birth so it
+        // never sits in Captures (the quick webview cannot write the manifest;
+        // in the browser twin there is no main, so file it here)
+        if (isTauri()) emitQuickCreated({ id: noteId });
+        else fileQuickNoteInMain(noteId);
         setQuickActive(noteId); // open it (not pinned — pin deliberately via ★)
         setPickerOpen(false);
       })

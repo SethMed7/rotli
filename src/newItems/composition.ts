@@ -56,6 +56,17 @@ interface FilingContext {
   activeView: string | null;
 }
 
+/** A note created in the Quick Note window is a FULL note, not a capture: file
+ * it into Main's root at birth, exactly as ⌘T files its note. Curated-in-Main is
+ * the one rule that separates a full note from a Captures card (boardSurface,
+ * sidebarHome), and Main hides the reference while the body is still blank, so
+ * an untouched quick note never shows as an empty row. Runs in the MAIN window
+ * (the manifest writer); the quick webview announces the id over IPC. */
+export function fileQuickNoteInMain(noteId: string): void {
+  fileItemInMain({ id: noteId, kind: "markdown" }, { parent: MAIN_ROOT, activeView: null });
+  void invalidateNoteLists();
+}
+
 /** Snapshot creation placement before any file I/O yields. Chooser tabs close
  * before their async creator returns, and focus recovery can legitimately
  * change the ambient selection while that work is in flight. */

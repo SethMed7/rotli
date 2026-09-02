@@ -500,6 +500,11 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   "Secure notes" or All notes until the user curates them into Main or Quick
   access. Protection is unchanged by the projection (gitignored spine,
   model-gated reads).
+- A note created in the Quick Note window shares that on-disk shape (secure at
+  birth, `wiki/_secure/`, shelf `Inbox`) but is a **full note**: the main window
+  files it into Main's root the moment it is born, and curated-in-Main is the
+  rule that keeps it out of Captures. Main hides the reference while the body
+  is blank, so an untouched quick note never shows as an empty row.
 - Summoning the capture card from another app never surfaces the main window:
   "in Rotli" means main was visible **and** focused, a visible-but-behind main
   is tucked away for the capture and restored after Rotli steps out, and
