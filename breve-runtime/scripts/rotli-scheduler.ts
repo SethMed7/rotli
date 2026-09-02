@@ -11,9 +11,17 @@
 import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { BREVE, BRIEFS } from "./paths";
+import { BREVE, BRIEFS, CONFIG_PATH } from "./paths";
 import { effectiveTz, minutesNowIn, todayIn } from "./timectx";
-import { dailyDue, dailySlot, intervalDue, parseHm, schedulerParentGone } from "./scheduler-core";
+import {
+  MAX_SLOT_ATTEMPTS,
+  dailyDue,
+  dailySlot,
+  intervalDue,
+  parseHm,
+  schedulerParentGone,
+  slotAttemptAllowed,
+} from "./scheduler-core";
 import { processIsAlive, tryAcquireProcessLock, type ProcessLock } from "./process-lock";
 
 type DailySchedule = { kind: "dailyAt"; hhmm: string; leadMinutes: number };
@@ -45,10 +53,15 @@ type JobState = {
   lastFinished?: string;
   lastOk?: boolean;
   lastError?: string;
+  /** Failed attempts at `pendingSlot`. A slot is retried a bounded number of
+   * times, then left for the next slot — the old loop retried every five
+   * minutes for the whole window and logged ~400 failures a day while the
+   * writer was broken (audit 2026-09-02 §1.1). */
+  attempts?: number;
 };
 type State = { version: 1; jobs: Record<string, JobState> };
 
-const CONFIG = process.env.ROTLI_BREVE_CONFIG ?? join(BREVE, "settings.json");
+const CONFIG = CONFIG_PATH;
 const STATE = join(BREVE, "scheduler-state.json");
 const LOG = join(BREVE, "logs", "rotli-scheduler.log");
 const POLL_MS = 15_000;
@@ -175,10 +188,11 @@ async function runOne(routine: Routine, state: State, slot?: string) {
   }
   const started = new Date().toISOString();
   try {
+    const previous = state.jobs[routine.id] ?? {};
     state.jobs[routine.id] = {
-      ...state.jobs[routine.id],
+      ...previous,
       lastStarted: started,
-      ...(slot ? { pendingSlot: slot } : {}),
+      ...(slot ? { pendingSlot: slot, attempts: previous.pendingSlot === slot ? previous.attempts ?? 0 : 0 } : {}),
       lastError: undefined,
     };
     await saveState(state);
@@ -212,15 +226,22 @@ async function runOne(routine: Routine, state: State, slot?: string) {
       ? `${verificationError}${stderr || stdout ? `: ${stderr || stdout}` : ""}`.slice(-1000)
       : undefined;
     const ok = !error;
+    const attempts = ok ? 0 : (state.jobs[routine.id]?.attempts ?? 0) + 1;
     state.jobs[routine.id] = {
       ...state.jobs[routine.id],
       ...(ok && slot ? { lastSlot: slot, pendingSlot: undefined } : {}),
+      ...(slot ? { attempts } : {}),
       lastFinished: new Date().toISOString(),
       lastOk: ok,
       lastError: error,
     };
     await saveState(state);
-    log(`[${routine.id}] ${ok ? "complete" : "failed"}${error ? `: ${error.replace(/\s+/g, " ")}` : ""}`);
+    const exhausted = !ok && slot && attempts >= MAX_SLOT_ATTEMPTS;
+    log(
+      `[${routine.id}] ${ok ? "complete" : "failed"}${error ? `: ${error.replace(/\s+/g, " ")}` : ""}${
+        exhausted ? ` — giving up on slot ${slot} after ${attempts} attempts` : ""
+      }`,
+    );
   } finally {
     running.delete(routine.id);
     jobLock.release();
@@ -317,7 +338,7 @@ async function tick(state: State) {
         log(`[${routine.id}] adopted completed slot ${slot}`);
         continue;
       }
-      if (dailyDue(nowMinutes, fire, slot, job.lastSlot)) {
+      if (dailyDue(nowMinutes, fire, slot, job.lastSlot) && slotAttemptAllowed(job, slot)) {
         void runOne(routine, state, slot).catch((error) => log(`[${routine.id}] run error: ${error}`));
       }
     } else if (routine.schedule.kind === "everySecs") {

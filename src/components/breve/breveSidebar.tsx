@@ -1,8 +1,10 @@
 import type { ComponentType, KeyboardEvent } from "react";
 
+import { useNow } from "../../lib/useNow";
 import type { BreveView } from "../../state/ui";
 import { useUiStore } from "../../state/ui";
 import { ActivityGlyph, ClockGlyph, CoffeeGlyph, EyeGlyph, FileGlyph, GearGlyph, HomeGlyph } from "../glyphs";
+import { breveHealthSummary } from "./breveHealthModel";
 import { useBreveSnapshot } from "./useBreve";
 
 type NavItem = {
@@ -27,6 +29,7 @@ export function BreveSidebar({ zoom }: { zoom: number }) {
   const view = useUiStore((s) => s.breveView);
   const setView = useUiStore((s) => s.setBreveView);
   const snapshot = useBreveSnapshot().data;
+  const now = useNow();
   const enabledRoutines = snapshot?.config.routines.filter((r) => r.enabled).length ?? 0;
   const counts: Record<BreveView, number | null> = {
     dashboard: null,
@@ -36,15 +39,20 @@ export function BreveSidebar({ zoom }: { zoom: number }) {
     watchlist: snapshot ? snapshot.counts.topics : null,
     settings: null,
   };
+  // The rail status is the health sentence's short form: "Managed by Rotli"
+  // only while every enabled routine's last run succeeded; a failing brief
+  // slot says how long it has been (audit 2026-09-02 §1.1).
+  const health = snapshot ? breveHealthSummary(snapshot, now) : null;
   const sourceLabel = !snapshot
     ? "Loading Breve…"
-    : snapshot.scheduler === "rotli"
-      ? "Managed by Rotli"
+    : health && health.level !== "off"
+      ? health.label
       : snapshot.source === "legacy"
         ? "Legacy active"
         : snapshot.source === "rotli"
-          ? "Imported"
+          ? (health?.label ?? "Imported")
           : "Not configured";
+  const statusWarn = health?.level === "warn";
 
   const onNavKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
@@ -72,7 +80,9 @@ export function BreveSidebar({ zoom }: { zoom: number }) {
         <CoffeeGlyph size={16} />
         <span>Breve</span>
       </div>
-      <div className="breve-rail-status">{sourceLabel}</div>
+      <div className={statusWarn ? "breve-rail-status warn" : "breve-rail-status"} title={health?.detail}>
+        {sourceLabel}
+      </div>
       <div className="breve-rail-nav">
         {NAV.map(({ id, label, glyph: Glyph }) => (
           <button

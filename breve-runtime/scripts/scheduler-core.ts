@@ -1,5 +1,21 @@
 export const DAILY_CATCHUP_MINUTES = 6 * 60;
 
+/** Attempts per daily slot before the scheduler stops retrying it. Three
+ * covers a transient model hiccup without turning a broken writer into a
+ * five-minute failure storm (~400 logged failures a day while the writer was
+ * broken, audit 2026-09-02 §1.1); the next slot starts fresh. */
+export const MAX_SLOT_ATTEMPTS = 3;
+
+/** Whether a daily slot still deserves an attempt, given the job's ledger
+ * entry. Pure, so the retry policy is testable without a scheduler. */
+export function slotAttemptAllowed(
+  job: { pendingSlot?: string; attempts?: number },
+  slot: string,
+): boolean {
+  if (job.pendingSlot !== slot) return true;
+  return (job.attempts ?? 0) < MAX_SLOT_ATTEMPTS;
+}
+
 export function parseHm(value: string): number | null {
   const match = /^(\d{2}):(\d{2})$/.exec(value);
   if (!match) return null;

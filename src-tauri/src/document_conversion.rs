@@ -4,7 +4,7 @@
 //! path policy, source preservation, and managed-file creation.
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 const PDF_EXTRACTED_TEXT_MAX_BYTES: usize = 16_000_000;
 
@@ -62,9 +62,101 @@ fn markdown_to_print_text(title: &str, markdown: &str) -> String {
     out
 }
 
+const PDF_EXPORT_MAX_BYTES: usize = 32_000_000;
+
+/// Where the themed renderer's script lives for a vault: the materialized
+/// runtime when Breve manages this vault (it has its dependencies installed),
+/// otherwise Rotli's bundled runtime source (the renderer imports only local,
+/// dependency-free modules, so it runs from there too). None when neither
+/// exists — the caller falls back to the plain-text exporter.
+pub(crate) fn themed_pdf_renderer(root: &Path, bundled_runtime: Option<&Path>) -> Option<PathBuf> {
+    let managed = root
+        .join(crate::routines::MANAGED_DIR)
+        .join("scripts/render-document.ts");
+    if managed.is_file() {
+        return Some(managed);
+    }
+    bundled_runtime
+        .map(|dir| dir.join("scripts/render-document.ts"))
+        .filter(|script| script.is_file())
+}
+
+/// Render a note through the same themed HTML→PDF lane the Breve briefs use
+/// (`render-document.ts` → the user's Rotli palette from the routine config →
+/// headless Chrome). Returns None, with the reason, when the lane cannot run
+/// here (no bun, no Chromium-family browser, renderer error) so the caller can
+/// fall back to the plain-text exporter instead of failing the artifact.
+pub(crate) fn export_markdown_pdf_bytes_themed(
+    root: &Path,
+    renderer: &Path,
+    bun: &Path,
+    title: &str,
+    markdown: &str,
+) -> Result<Vec<u8>, String> {
+    let temp = tempfile::tempdir().map_err(|error| format!("create PDF export workspace: {error}"))?;
+    let input = temp.path().join("note.md");
+    let output = temp.path().join("note.pdf");
+    fs::write(&input, markdown).map_err(|error| format!("prepare PDF source: {error}"))?;
+    let status = std::process::Command::new(bun)
+        .arg(renderer)
+        .arg("--in")
+        .arg(&input)
+        .arg("--out")
+        .arg(&output)
+        .arg("--title")
+        .arg(title)
+        .current_dir(temp.path())
+        .envs(crate::routines::env::breve_runtime_env(root))
+        .stdin(std::process::Stdio::null())
+        .output()
+        .map_err(|error| format!("start the themed PDF renderer: {error}"))?;
+    if !status.status.success() {
+        let detail = String::from_utf8_lossy(&status.stderr).trim().to_string();
+        return Err(if detail.is_empty() {
+            "the themed PDF renderer did not produce a copy".into()
+        } else {
+            format!("themed PDF renderer: {}", detail.chars().take(300).collect::<String>())
+        });
+    }
+    let bytes = fs::read(&output).map_err(|error| format!("read rendered PDF: {error}"))?;
+    if !bytes.starts_with(b"%PDF-") {
+        return Err("the themed PDF renderer did not produce a valid PDF copy".into());
+    }
+    if bytes.len() > PDF_EXPORT_MAX_BYTES {
+        return Err("The generated PDF is too large for the managed export lane.".into());
+    }
+    Ok(bytes)
+}
+
+/// Export a note to PDF bytes: the themed renderer when this vault (or the
+/// bundled runtime) has one and bun + a Chromium-family browser are present,
+/// otherwise the plain-text macOS exporter. Never fails the artifact just
+/// because the pretty lane is unavailable.
+pub(crate) fn export_note_pdf_bytes(
+    root: &Path,
+    bundled_runtime: Option<&Path>,
+    title: &str,
+    markdown: &str,
+) -> Result<Vec<u8>, String> {
+    if let Some(script) = themed_pdf_renderer(root, bundled_runtime) {
+        match export_markdown_pdf_bytes_themed(root, &script, &crate::memex::find_bun(), title, markdown) {
+            Ok(bytes) => return Ok(bytes),
+            Err(reason) => eprintln!("themed PDF export unavailable, using plain text: {reason}"),
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        export_markdown_pdf_bytes(title, markdown)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (title, markdown);
+        Err("Local PDF export needs a Chromium-family browser on this platform.".into())
+    }
+}
+
 #[cfg(target_os = "macos")]
 pub(crate) fn export_markdown_pdf_bytes(title: &str, markdown: &str) -> Result<Vec<u8>, String> {
-    const PDF_EXPORT_MAX_BYTES: usize = 32_000_000;
     let printable = markdown_to_print_text(title, markdown);
     if printable.trim().is_empty() {
         return Err("The editable source is empty, so there is nothing to export.".into());

@@ -57,13 +57,13 @@ brief_exists() { [ "$1" = "--test" ] || [ -f "$BREVE/briefs/${TODAY}-lunch.md" ]
 {
   echo "=== Breve lunch run: $(date) ==="
   run_model "$BREVE_MODEL"
-  echo "=== claude ($BREVE_MODEL) exit $? at $(date) ==="
+  echo "=== on-device writer ($BREVE_MODEL) exit $? at $(date) ==="
 
   if ! brief_exists "$1"; then
     FALLBACK="haiku"; [ "$BREVE_MODEL" = "haiku" ] && FALLBACK="sonnet"
     echo "=== $BREVE_MODEL produced no lunch brief — self-heal: retry on $FALLBACK ==="
     run_model "$FALLBACK"
-    echo "=== claude ($FALLBACK) exit $? at $(date) ==="
+    echo "=== on-device writer ($FALLBACK) exit $? at $(date) ==="
     if brief_exists "$1"; then
       bun "$BREVE/scripts/notify.ts" --idempotency-key "lunch-model-fallback-$TODAY" \
         "⚠ Your brief model ($BREVE_MODEL) was unavailable at lunch, so I generated the Pivot with $FALLBACK instead. On its way." || true

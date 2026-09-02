@@ -23,6 +23,7 @@ import { inboxFolderId } from "../services/notes";
 import type { NoteSummary } from "../types";
 import { DEFAULT_VOICE } from "../voice/speech";
 import type { Measure } from "./noteStyle";
+import { systemPrefersDark } from "./systemScheme";
 
 export type ThemeSetting = "light" | "dark" | "system";
 
@@ -128,10 +129,11 @@ export type AppIcon = "default" | "warm" | "paper" | "charcoal" | "clay";
 
 export const ORGANIZER_TRUSTS: readonly OrganizerTrust[] = ["off", "suggest", "tidy", "organize"];
 
-/** Legacy remote values remain in the type so old settings deserialize without
- * crashing. The only executable organizer value is `local`; Rust independently
- * applies the same fail-closed migration. */
-export type OrganizerModel = "local" | "claude" | "gemini35";
+/** The only organizer value is `local`. Legacy remote values ("claude",
+ * "gemini35") are coerced to `local` by parseSettings (asEnum), so they never
+ * need to live in the type; Rust independently applies the same fail-closed
+ * migration. */
+export type OrganizerModel = "local";
 
 export const ORGANIZER_MODELS: readonly OrganizerModel[] = ["local"];
 
@@ -752,12 +754,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   // a "system" setting resolves to its current mode before stepping on.
   cycleTheme: () =>
     set((s) => {
-      const mode =
-        s.theme === "system"
-          ? window.matchMedia("(prefers-color-scheme: dark)").matches
-            ? "dark"
-            : "light"
-          : s.theme;
+      const mode = s.theme === "system" ? (systemPrefersDark() ? "dark" : "light") : s.theme;
       const i = SOLID_THEMES.findIndex((t) => t.family === s.themeFamily && t.mode === mode);
       const next = SOLID_THEMES[(i + 1) % SOLID_THEMES.length];
       return next ? { themeFamily: next.family, theme: next.mode } : s;

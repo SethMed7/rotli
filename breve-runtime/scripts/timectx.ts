@@ -4,9 +4,8 @@
  * 8pm Eastern it's tomorrow (the bug that served yesterday's brief). Always go
  * through these helpers; they honor settings.json (home tz + travel mode).
  */
-import { join } from "node:path";
 
-import { BREVE } from "./paths";
+import { CONFIG_PATH } from "./paths";
 
 export type Settings = {
   timezone: string;
@@ -18,7 +17,7 @@ export type Settings = {
   _notes?: string;
 };
 
-const SETTINGS_PATH = process.env.ROTLI_BREVE_CONFIG ?? join(BREVE, "settings.json");
+const SETTINGS_PATH = CONFIG_PATH;
 const DEFAULTS: Settings = {
   timezone: "America/New_York",
   leadMinutes: 30,

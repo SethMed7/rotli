@@ -194,6 +194,58 @@
           "it is on us to go"
         ]
       }
+    },
+    "secureNotesFolder": {
+      "sourceOfTruth": "src/security/secureNotes.ts SECURE_NOTES_FOLDER + src/services/destinations.ts DEST.secure ↔ src-tauri/src/corpus.rs SECURE_NOTES_FOLDER",
+      "value": "Secure notes"
+    },
+    "stripMarkers": {
+      "sourceOfTruth": "src/services/derive.ts BLOCK_MARKERS ↔ src-tauri/src/corpus.rs STRIP_MARKERS",
+      "value": [
+        "- ",
+        "* ",
+        "+ ",
+        "( ) ",
+        "(x) ",
+        "(X) ",
+        "[ ][ ] ",
+        "[x][ ] ",
+        "[X][ ] ",
+        "[ ][x] ",
+        "[ ][X] ",
+        "[ ] ",
+        "[/] ",
+        "[x] ",
+        "[X] "
+      ]
+    },
+    "nativeImagePickerExts": {
+      "sourceOfTruth": "src/editor/externalImageDrop.ts NATIVE_IMAGE_EXTS ↔ src-tauri/src/corpus.rs NATIVE_IMAGE_PICKER_EXTS",
+      "value": [
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "webp",
+        "heic",
+        "heif",
+        "avif",
+        "bmp",
+        "tiff",
+        "tif",
+        "svg",
+        "ico"
+      ]
+    },
+    "videoExts": {
+      "sourceOfTruth": "src/lib/fileKind.ts VIDEO_EXTS ↔ src-tauri/src/corpus.rs VIDEO_EXTS",
+      "value": [
+        "mp4",
+        "mov",
+        "webm",
+        "m4v",
+        "ogv"
+      ]
     }
   }
 }

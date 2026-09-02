@@ -49,8 +49,6 @@ const TRUST_WORDS: Record<string, string> = {
 };
 const MODEL_WORDS: Record<string, string> = {
   local: "On this Mac",
-  claude: "Claude Sonnet 5",
-  gemini35: "Gemini 3.5 Flash",
 };
 
 /** History longer than this earns the quiet "clear old logs" nudge (§4.8:

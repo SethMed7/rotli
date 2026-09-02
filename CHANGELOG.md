@@ -10,6 +10,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Breve says when briefs stop arriving.** The scheduler's job ledger now
+  reaches the app as per-routine health: the Breve rail status, the Today
+  page, and the Routines page all say “No brief for N days — morning is
+  failing: <reason>” instead of “Managed by Rotli” while every slot fails
+  (which is what happened silently from 2026-08-16 to 2026-09-02). A failing
+  slot is retried three times (about fifteen minutes), then left for the
+  next slot, instead of every five minutes all day; a longer outage is the
+  doctor's Signal proposal to rerun.
+- **Breve's PDFs match your Rotli theme.** The PDF appearance now defaults to
+  “Match Rotli”: the app writes its live theme tokens (any of the six
+  families, light or dark, plus your accent) into the routine config and
+  every new brief, topic brief, and email render uses them. The four named
+  palettes and Custom remain as explicit choices.
+- **Chat's “create a PDF” uses the same themed renderer.** A PDF artifact is
+  now a readable document — title, headings, lists, task boxes, quotes, code,
+  tables, links — in your theme, through the same lane the briefs use; the
+  plain-text macOS exporter remains the fallback when no Chromium-family
+  browser is installed.
+- **Breve is a labelled segment of the sidebar switcher** (Home · Chat ·
+  Breve) with a default shortcut, ⌘⇧B (remappable). The vault switcher and
+  the utility footer stay visible while you are in Breve, so Settings and the
+  Librarian are never more than one click away.
+
+### Changed
+
+- **Breve reads and writes off the main thread.** The snapshot, config,
+  watchlist, brief-instruction, and delivery-settings commands were plain
+  sync commands, so a brief-library scan ran on the UI thread every 30 s
+  while the lens was open and again after every save.
+- **On-demand renders honour the chosen PDF palette.** Every runtime entry
+  point now resolves the routine config the app writes; the old fallback
+  pointed at a file a Rotli-managed vault never has.
+- **The brief prompt is vault-scoped.** `SKILL.md` no longer hardcodes
+  `~/memex-vault` for the inbox, storage, and PDF paths; they are templated
+  per vault like the runtime home already was.
+- **Honest run logs.** The brief wrappers log “on-device writer”, not
+  “claude (sonnet)”, for the step that runs the local model.
+
+- **One live theme signal for every embedded engine.** Excalidraw boards and
+  embeds, sheet editors, and chat Mermaid diagrams now follow the applied
+  theme through one shared hook instead of each re-reading the OS colour
+  scheme or watching the document on their own; a System-mode OS flip now
+  re-themes an open board.
+- **Debt that can only shrink.** New lint-chain guards from the code-quality
+  audit: `check:ratchets` holds per-file line ceilings for every source file at
+  or above 600 lines, the count of source-string test assertions, dated
+  provenance comments, and per-directory test-coverage floors;
+  `check:dup:gate` turns the duplication miner's cluster count into a ceiling;
+  `check:window-events` keeps every cross-window event documented in
+  `docs/architecture/window-events.md` and wired on both sides;
+  `check:architecture` now allowlists (and shrinks) the components that import
+  the Tauri adapter directly, keeps `prefers-color-scheme` reads to the theme
+  owner, and keeps raw query invalidation inside services; `check:docs` fails
+  a CARL rule whose source contract changed after its last review (known
+  backlog in `.carl/freshness-debt.json`) and any adopted or undated staging
+  entry; `parity.json` now pins the "Secure notes" folder name, the
+  title-strip markers, the attach picker's image list, and the video list on
+  both sides of the IPC boundary.
+- **The proof chain is stated once.** The `verify` skill, `CONTRIBUTING.md`,
+  and the AI workflow guide all point at `bun run verify` (CI's local twin);
+  the four-theme lists in the PR template, contributing guide, and CARL design
+  rule now name all six families.
+
 ### Fixed
 
 - **A note created in the Quick Note window is a full note again.** 0.84.0

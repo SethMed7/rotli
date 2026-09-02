@@ -40,10 +40,7 @@ mod web;
 mod web_search;
 mod workspace;
 
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Condvar, Mutex,
-};
+use std::sync::{atomic::{AtomicUsize, Ordering}, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use tauri::{
@@ -1178,15 +1175,9 @@ async fn corpus_pick_images(app: AppHandle) -> Result<Vec<String>, String> {
             .dialog()
             .file()
             .set_title("Attach images or videos")
-            .add_filter(
-                "Images",
-                &[
-                    "png", "jpg", "jpeg", "gif", "webp", "heic", "heif", "avif", "bmp", "tiff",
-                    "tif", "svg", "ico",
-                ],
-            )
-            // mirrors VIDEO_EXTS in src/lib/fileKind.ts — the embed lane
-            .add_filter("Videos", &["mp4", "mov", "webm", "m4v", "ogv"]);
+            .add_filter("Images", corpus::NATIVE_IMAGE_PICKER_EXTS)
+            // the embed lane's video containers (parity.json videoExts)
+            .add_filter("Videos", corpus::VIDEO_EXTS);
         if let Some(parent) = app.get_webview_window("main") {
             picker = picker.set_parent(&parent);
         }
@@ -2529,6 +2520,7 @@ pub fn run() {
             breve::breve_snapshot,
             breve::breve_import_legacy,
             breve::breve_write_config,
+            breve::breve_pdf::breve_write_pdf_palette,
             breve::breve_brief_skill,
             breve::breve_write_brief_skill,
             breve::breve_write_watchlist,

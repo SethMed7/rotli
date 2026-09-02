@@ -150,6 +150,21 @@ mostly source-string assertions that pin the god-file shape.
    configs carry `CARL_READONLY=1`; CHANGELOG discipline is exemplary (30 of
    the last 30 commits touch it).
 
+## Status (same day)
+
+Landed in the follow-up branch, all guards green under `bun run verify`:
+items 1–4 (verify skill and proof-chain docs, six-family lists, the popover
+hook, the shared markdown peek, editor action ids, `useIsDarkTheme` over
+`data-theme`, organizer residue) and items 5–10 as guards (`check:ratchets`
+with a shrink-only baseline, `check:dup:gate`, CARL freshness with a debt
+file plus staging hygiene, `check:window-events` with a registry doc,
+component→adapter and idiom owners in `check:architecture`, four new
+`parity.json` entries). Not landed: `[lints.clippy] unwrap_used` (would fail
+`-D warnings` on ~110 sites until each is addressed), the source-shape test
+rewrite, and refactors 13–16 (settings, sidebar home, chat, `lib/tauri.ts`,
+task grammar, `corpus.rs`) — the ratchet now holds their sizes so they can
+only be split, not grown.
+
 ## Recommended order
 
 Same-day, near-zero risk:

@@ -17,8 +17,13 @@ import fixture from "../../scripts/fixtures/parity.json";
 import { containsPrivateDataOverlap, endpointIsLocal } from "../ai/guard";
 import { BOARD_LIMITS } from "../boards/validation";
 import { DOCUMENT_CONVERTIBLE_EXTS } from "../documents/kinds";
+import { NATIVE_IMAGE_EXTS } from "../editor/externalImageDrop";
+import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
+import { BLOCK_MARKERS } from "../services/derive";
+import { DEST } from "../services/destinations";
 import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
 import { CHAT_IMAGE_ASSET_EXTS, CHAT_IMAGE_ASSET_MAX_BYTES } from "./chatWork";
+import { VIDEO_EXTS } from "./fileKind";
 import { type FrontmatterView, type MemexPerms, SECRET_BRAVE_SEARCH_API_KEY } from "./tauri";
 
 const entries = fixture.entries;
@@ -34,6 +39,23 @@ describe("parity.json ↔ TS constants", () => {
 
   test("chatImageAssetMaxBytes", () => {
     expect(CHAT_IMAGE_ASSET_MAX_BYTES).toBe(entries.chatImageAssetMaxBytes.value);
+  });
+
+  test("secureNotesFolder", () => {
+    expect<string>(SECURE_NOTES_FOLDER).toBe(entries.secureNotesFolder.value);
+    expect<string>(DEST.secure).toBe(entries.secureNotesFolder.value);
+  });
+
+  test("stripMarkers", () => {
+    expect<string[]>([...BLOCK_MARKERS]).toEqual(entries.stripMarkers.value);
+  });
+
+  test("nativeImagePickerExts", () => {
+    expect([...NATIVE_IMAGE_EXTS]).toEqual(entries.nativeImagePickerExts.value);
+  });
+
+  test("videoExts", () => {
+    expect([...VIDEO_EXTS]).toEqual(entries.videoExts.value);
   });
 
   test("boardLimits", () => {

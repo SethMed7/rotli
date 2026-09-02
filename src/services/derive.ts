@@ -25,7 +25,7 @@ function lines(body: string): string[] {
   return body.split("\n").map((l) => (l.endsWith("\r") ? l.slice(0, -1) : l));
 }
 
-const BLOCK_MARKERS = [
+export const BLOCK_MARKERS = [
   "- ",
   "* ",
   "+ ",

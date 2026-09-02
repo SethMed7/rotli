@@ -1,0 +1,260 @@
+{
+  "ROTLI_CORE#0": {
+    "noted": "2026-09-01",
+    "source": "docs/architecture/memex-data-contract.md",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-07-21"
+  },
+  "ROTLI_CORE#1": {
+    "noted": "2026-09-01",
+    "source": "ARCHITECTURE.md",
+    "sourceChanged": "2026-08-19",
+    "lastReviewed": "2026-07-11"
+  },
+  "ROTLI_CORE#2": {
+    "noted": "2026-09-01",
+    "source": "docs/README.md",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-07-11"
+  },
+  "ROTLI_CORE#3": {
+    "noted": "2026-09-01",
+    "source": "docs/development/adding-things.md",
+    "sourceChanged": "2026-08-13",
+    "lastReviewed": "2026-07-17"
+  },
+  "ROTLI_CORE#5": {
+    "noted": "2026-09-01",
+    "source": "SYNTAX.md",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-07-20"
+  },
+  "ROTLI_CORE#6": {
+    "noted": "2026-09-01",
+    "source": "docs/architecture/agent-workspace.md",
+    "sourceChanged": "2026-08-31",
+    "lastReviewed": "2026-07-21"
+  },
+  "ROTLI_CORE#7": {
+    "noted": "2026-09-01",
+    "source": "docs/architecture/compatibility-and-migrations.md",
+    "sourceChanged": "2026-08-31",
+    "lastReviewed": "2026-07-21"
+  },
+  "ROTLI_CORE#9": {
+    "noted": "2026-09-01",
+    "source": "CONTRIBUTING.md",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-07-31"
+  },
+  "ROTLI_CORE#10": {
+    "noted": "2026-09-01",
+    "source": "docs/design/shell-runtime-decision.md",
+    "sourceChanged": "2026-08-13",
+    "lastReviewed": "2026-08-07"
+  },
+  "ROTLI_MEMEX#0": {
+    "noted": "2026-09-01",
+    "source": "docs/architecture/memex-data-contract.md",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-08-07"
+  },
+  "ROTLI_MEMEX#1": {
+    "noted": "2026-09-01",
+    "source": "docs/design/ai-visibility-matrix.md",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-08-07"
+  },
+  "ROTLI_MEMEX#2": {
+    "noted": "2026-09-01",
+    "source": "docs/architecture/memex-data-contract.md",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-07-11"
+  },
+  "ROTLI_MEMEX#3": {
+    "noted": "2026-09-01",
+    "source": "docs/design/ai-visibility-matrix.md",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-08-07"
+  },
+  "ROTLI_MEMORY#0": {
+    "noted": "2026-09-01",
+    "source": "docs/architecture/memex-data-contract.md",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-07-11"
+  },
+  "ROTLI_MEMORY#1": {
+    "noted": "2026-09-01",
+    "source": "docs/architecture/memex-data-contract.md",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-07-11"
+  },
+  "ROTLI_MEMORY#2": {
+    "noted": "2026-09-01",
+    "source": "docs/architecture/memex-data-contract.md",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-07-11"
+  },
+  "ROTLI_DOCUMENTS#0": {
+    "noted": "2026-09-01",
+    "source": "docs/architecture/memex-data-contract.md",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-07-11"
+  },
+  "ROTLI_DOCUMENTS#1": {
+    "noted": "2026-09-01",
+    "source": "docs/architecture/clean-architecture.md",
+    "sourceChanged": "2026-08-13",
+    "lastReviewed": "2026-07-11"
+  },
+  "ROTLI_DOCUMENTS#2": {
+    "noted": "2026-09-01",
+    "source": "src/documents/README.md",
+    "sourceChanged": "2026-08-13",
+    "lastReviewed": "2026-07-11"
+  },
+  "ROTLI_DOCUMENTS#3": {
+    "noted": "2026-09-01",
+    "source": "docs/architecture/memex-data-contract.md",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-07-11"
+  },
+  "ROTLI_EDITOR#0": {
+    "noted": "2026-09-01",
+    "source": "src/editor/editorSurface.tsx",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-07-17"
+  },
+  "ROTLI_EDITOR#1": {
+    "noted": "2026-09-01",
+    "source": "scripts/check-architecture.mjs",
+    "sourceChanged": "2026-08-19",
+    "lastReviewed": "2026-07-17"
+  },
+  "ROTLI_EDITOR#2": {
+    "noted": "2026-09-01",
+    "source": "DESIGN.md",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-07-22"
+  },
+  "ROTLI_KEYS#0": {
+    "noted": "2026-09-01",
+    "source": "src/keys/actions.ts",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-07-17"
+  },
+  "ROTLI_KEYS#1": {
+    "noted": "2026-09-01",
+    "source": "src/keys/bindings.ts",
+    "sourceChanged": "2026-07-18",
+    "lastReviewed": "2026-07-17"
+  },
+  "ROTLI_BREVE#0": {
+    "noted": "2026-09-01",
+    "source": "breve-runtime/README.md",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-07-11"
+  },
+  "ROTLI_BREVE#1": {
+    "noted": "2026-09-01",
+    "source": "AGENTS.md",
+    "sourceChanged": "2026-08-31",
+    "lastReviewed": "2026-07-11"
+  },
+  "ROTLI_DESIGN#1": {
+    "noted": "2026-09-01",
+    "source": "DESIGN.md",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-07-21"
+  },
+  "ROTLI_DESIGN#2": {
+    "noted": "2026-09-01",
+    "source": "docs/design/shell-runtime-decision.md",
+    "sourceChanged": "2026-08-13",
+    "lastReviewed": "2026-08-07"
+  },
+  "ROTLI_MODELS#0": {
+    "noted": "2026-09-01",
+    "source": "docs/architecture/clean-architecture.md",
+    "sourceChanged": "2026-08-13",
+    "lastReviewed": "2026-07-11"
+  },
+  "ROTLI_MODELS#1": {
+    "noted": "2026-09-01",
+    "source": "docs/architecture/memex-data-contract.md",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-07-11"
+  },
+  "ROTLI_MODELS#2": {
+    "noted": "2026-09-01",
+    "source": "docs/design/ai-visibility-matrix.md",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-08-07"
+  },
+  "ROTLI_SECURITY#0": {
+    "noted": "2026-09-01",
+    "source": "docs/security/threat-model.md",
+    "sourceChanged": "2026-08-31",
+    "lastReviewed": "2026-07-21"
+  },
+  "ROTLI_SECURITY#1": {
+    "noted": "2026-09-01",
+    "source": "docs/security/threat-model.md",
+    "sourceChanged": "2026-08-31",
+    "lastReviewed": "2026-07-21"
+  },
+  "ROTLI_SECURITY#2": {
+    "noted": "2026-09-01",
+    "source": "docs/development/security.md",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-07-21"
+  },
+  "ROTLI_OPERATIONS#0": {
+    "noted": "2026-09-01",
+    "source": "AGENTS.md",
+    "sourceChanged": "2026-08-31",
+    "lastReviewed": "2026-07-11"
+  },
+  "ROTLI_OPERATIONS#1": {
+    "noted": "2026-09-01",
+    "source": "AGENTS.md",
+    "sourceChanged": "2026-08-31",
+    "lastReviewed": "2026-07-11"
+  },
+  "ROTLI_OPERATIONS#2": {
+    "noted": "2026-09-01",
+    "source": "docs/operations/release-and-supply-chain.md",
+    "sourceChanged": "2026-08-31",
+    "lastReviewed": "2026-07-21"
+  },
+  "ROTLI_OPERATIONS#4": {
+    "noted": "2026-09-01",
+    "source": "AGENTS.md",
+    "sourceChanged": "2026-08-31",
+    "lastReviewed": "2026-07-29"
+  },
+  "ROTLI_SHELL#0": {
+    "noted": "2026-09-01",
+    "source": "src/components/systemSurface.tsx",
+    "sourceChanged": "2026-08-19",
+    "lastReviewed": "2026-07-29"
+  },
+  "ROTLI_SHELL#1": {
+    "noted": "2026-09-01",
+    "source": "src/components/sidebar/",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-08-07"
+  },
+  "ROTLI_SHELL#2": {
+    "noted": "2026-09-01",
+    "source": "src/state/panes.ts",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-08-07"
+  },
+  "ROTLI_SHELL#3": {
+    "noted": "2026-09-01",
+    "source": "src/state/panes.ts",
+    "sourceChanged": "2026-09-01",
+    "lastReviewed": "2026-08-07"
+  }
+}

@@ -24,9 +24,9 @@ Describe the user-visible result and the problem it solves.
 - [ ] Current documentation and `CHANGELOG.md` updated when applicable
 - [ ] Dependency/release-sensitive changes record provenance, license, vulnerability, and rollback impact
 
-For UI work, attach desktop screenshots for Warm Light, Warm Dark, Paper, and
-Charcoal and note keyboard, empty, loading, error, disabled, and narrow-window
-checks. For native or Breve work, state what was tested in browser fixtures and
+For UI work, attach desktop screenshots for the theme families you touched
+(Rotli, Paper & Charcoal, Ocean, Grove, Iris, Midnight — light and dark) and
+note keyboard, empty, loading, error, disabled, and narrow-window checks. For native or Breve work, state what was tested in browser fixtures and
 what was tested in the actual app; do not treat them as interchangeable.
 
 ## Operational safety

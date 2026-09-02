@@ -58,7 +58,7 @@ import {
   visibleChatText,
 } from "../../lib/chatWork";
 import { extOf, fileName, IMAGE_EXTS, imageMimeOf } from "../../lib/fileKind";
-import { type AnchoredPlacement, anchoredPopover, useTransientPopover } from "../../lib/popover";
+import { useAnchoredPopoverBox, useTransientPopover } from "../../lib/popover";
 import {
   type ChatModelInfo,
   type LocalQueueEntry,
@@ -110,7 +110,7 @@ import { useMainStore } from "../../state/main";
 import { touchChatActivity } from "../../state/mru";
 import { type Measure } from "../../state/noteStyle";
 import { findLeaf, leaves, usePanesStore } from "../../state/panes";
-import { isDarkDataTheme } from "../../state/theme";
+import { useIsDarkTheme } from "../../state/theme";
 import {
   type ChatReasoningEffort,
   type ChatServiceTier,
@@ -651,55 +651,12 @@ function ModelPicker({
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
-  const [box, setBox] = useState<AnchoredPlacement | null>(null);
   const anchorRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
+  const box = useAnchoredPopoverBox(open, anchorRef, popRef);
   const searchRef = useRef<HTMLInputElement>(null);
   const rowRefs = useRef<Array<HTMLButtonElement | null>>([]);
   useTransientPopover([popRef, anchorRef], open, () => setOpen(false));
-
-  // Place against the trigger's VIEWPORT rect, remeasuring while the list is
-  // open: its own size changes (the fallback notice, a lane finishing its
-  // probe), the window resizes, and any ancestor can scroll under it.
-  useLayoutEffect(() => {
-    if (!open) {
-      setBox(null);
-      return;
-    }
-    const place = () => {
-      const anchor = anchorRef.current?.getBoundingClientRect();
-      const pop = popRef.current;
-      if (!anchor || !pop) return;
-      const next = anchoredPopover(
-        { top: anchor.top, bottom: anchor.bottom, left: anchor.left },
-        // scrollHeight is the list's UNCAPPED height — measuring offsetHeight
-        // would just re-read the cap we applied last pass and never flip back
-        { width: pop.offsetWidth, height: pop.scrollHeight },
-        { width: window.innerWidth, height: window.innerHeight },
-      );
-      // applying max-height resizes the list, which re-fires the observer —
-      // settling on the same numbers ends it instead of re-rendering forever
-      setBox((cur) =>
-        cur &&
-        cur.left === next.left &&
-        cur.top === next.top &&
-        cur.maxHeight === next.maxHeight &&
-        cur.placement === next.placement
-          ? cur
-          : next,
-      );
-    };
-    place();
-    const observer = new ResizeObserver(place);
-    if (popRef.current) observer.observe(popRef.current);
-    window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place, true);
-    };
-  }, [open]);
 
   const localIds = new Set(groups.local.map((m) => m.id));
   const connectedIds = new Set(groups.connected.map((m) => m.id));
@@ -992,39 +949,13 @@ function ReasoningPicker({
   onServiceTier: (value: ChatServiceTier | null) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [box, setBox] = useState<AnchoredPlacement | null>(null);
   const anchorRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
+  const box = useAnchoredPopoverBox(open, anchorRef, popRef);
   const choices = reasoningChoices(provider, modelId);
   const tiers = serviceTierChoices(provider, modelId);
   const label = choices.find((choice) => choice.value === (effort ?? null))?.label ?? "Default";
   useTransientPopover([popRef, anchorRef], open, () => setOpen(false));
-
-  useLayoutEffect(() => {
-    if (!open) {
-      setBox(null);
-      return;
-    }
-    const place = () => {
-      const anchor = anchorRef.current?.getBoundingClientRect();
-      const pop = popRef.current;
-      if (!anchor || !pop) return;
-      setBox(
-        anchoredPopover(
-          { top: anchor.top, bottom: anchor.bottom, left: anchor.left },
-          { width: pop.offsetWidth, height: pop.scrollHeight },
-          { width: window.innerWidth, height: window.innerHeight },
-        ),
-      );
-    };
-    place();
-    window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
-    return () => {
-      window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place, true);
-    };
-  }, [open]);
 
   return (
     <div className="chat-reasoning-pick">
@@ -1113,46 +1044,10 @@ function ComposerAddMenu({
   onToggleWeb: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [box, setBox] = useState<AnchoredPlacement | null>(null);
   const anchorRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
+  const box = useAnchoredPopoverBox(open, anchorRef, popRef);
   useTransientPopover([popRef, anchorRef], open, () => setOpen(false));
-
-  useLayoutEffect(() => {
-    if (!open) {
-      setBox(null);
-      return;
-    }
-    const place = () => {
-      const anchor = anchorRef.current?.getBoundingClientRect();
-      const pop = popRef.current;
-      if (!anchor || !pop) return;
-      const next = anchoredPopover(
-        { top: anchor.top, bottom: anchor.bottom, left: anchor.left },
-        { width: pop.offsetWidth, height: pop.scrollHeight },
-        { width: window.innerWidth, height: window.innerHeight },
-      );
-      setBox((current) =>
-        current &&
-        current.left === next.left &&
-        current.top === next.top &&
-        current.maxHeight === next.maxHeight &&
-        current.placement === next.placement
-          ? current
-          : next,
-      );
-    };
-    place();
-    const observer = new ResizeObserver(place);
-    if (popRef.current) observer.observe(popRef.current);
-    window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place, true);
-    };
-  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -1273,12 +1168,12 @@ function ChatMermaid({ code }: { code: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
   const renderSeq = useRef(0);
+  const dark = useIsDarkTheme(); // re-renders the diagram when the theme flips
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
     const seq = ++renderSeq.current;
     setFailed(false);
-    const dark = isDarkDataTheme(document.documentElement.dataset.theme);
     void renderMermaidElement(code, {
       dark,
       id: `rotli-chat-mermaid-${seq}-${Date.now()}`,
@@ -1292,7 +1187,7 @@ function ChatMermaid({ code }: { code: string }) {
     return () => {
       host.replaceChildren();
     };
-  }, [code]);
+  }, [code, dark]);
   return failed ? (
     <pre className="cmsg-code">
       <code>{code}</code>

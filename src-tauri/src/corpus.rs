@@ -1851,10 +1851,7 @@ fn strip_markdown(line: &str) -> String {
         if let Some(rest) = s.strip_prefix('>') {
             s = rest.trim_start();
         }
-        for marker in [
-            "- ", "* ", "+ ", "( ) ", "(x) ", "(X) ", "[ ][ ] ", "[x][ ] ", "[X][ ] ", "[ ][x] ",
-            "[ ][X] ", "[ ] ", "[/] ", "[x] ", "[X] ",
-        ] {
+        for marker in STRIP_MARKERS {
             if let Some(rest) = s.strip_prefix(marker) {
                 s = rest;
             }
@@ -2730,6 +2727,29 @@ fn is_reference_lane(rel: &str) -> bool {
         .any(|d| rel == *d || rel.starts_with(&format!("{d}/")))
         || FILES.contains(&rel)
 }
+
+/// The reserved secure folder name in the legacy layout and every folder-id
+/// comparison — byte-identical to SECURE_NOTES_FOLDER in src/security/secureNotes.ts
+/// and DEST.secure in src/services/destinations.ts (parity.json).
+pub(crate) const SECURE_NOTES_FOLDER: &str = "Secure notes";
+
+/// Leading block markers `strip_markdown` peels for titles/snippets, in peel
+/// order — byte-identical to BLOCK_MARKERS in src/services/derive.ts (parity.json).
+pub(crate) const STRIP_MARKERS: [&str; 15] = [
+    "- ", "* ", "+ ", "( ) ", "(x) ", "(X) ", "[ ][ ] ", "[x][ ] ", "[X][ ] ", "[ ][x] ",
+    "[ ][X] ", "[ ] ", "[/] ", "[x] ", "[X] ",
+];
+
+/// The native attach picker's image filter — byte-identical to
+/// NATIVE_IMAGE_EXTS in src/editor/externalImageDrop.ts (parity.json).
+pub(crate) const NATIVE_IMAGE_PICKER_EXTS: &[&str] = &[
+    "png", "jpg", "jpeg", "gif", "webp", "heic", "heif", "avif", "bmp", "tiff", "tif", "svg",
+    "ico",
+];
+
+/// Video containers the embed lane accepts — byte-identical to VIDEO_EXTS in
+/// src/lib/fileKind.ts (parity.json).
+pub(crate) const VIDEO_EXTS: &[&str] = &["mp4", "mov", "webm", "m4v", "ogv"];
 
 /// Byte-identical to CHAT_IMAGE_ASSET_MAX_BYTES in src/lib/chatWork.ts (parity.json).
 /// The byte-backed image lane refuses anything larger; the IPC read-back cap
@@ -3805,7 +3825,7 @@ impl CorpusStore {
         let current_folder = folder_of(rel);
         let secure_home = match self.layout {
             Layout::Memex => "wiki/_secure",
-            Layout::LegacyRotli => "Secure notes",
+            Layout::LegacyRotli => SECURE_NOTES_FOLDER,
         };
         let in_secure_home =
             current_folder == secure_home || current_folder.starts_with(&format!("{secure_home}/"));
@@ -3960,7 +3980,7 @@ impl CorpusStore {
         self.set_secure(&rel, true)?;
         let after = match self.layout {
             Layout::Memex => "wiki/_secure",
-            Layout::LegacyRotli => "Secure notes",
+            Layout::LegacyRotli => SECURE_NOTES_FOLDER,
         };
         let ts = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -4354,7 +4374,7 @@ impl CorpusStore {
     fn ensure_reserved_folders(&self) -> Result<(), String> {
         for name in [
             "Inbox",
-            "Secure notes",
+            SECURE_NOTES_FOLDER,
             "Vault",
             "Storage",
             "Board",
@@ -5357,7 +5377,8 @@ impl CorpusStore {
         // not merely a visual label. Moving a normal note into it adds the same
         // durable file policy as secure creation; moving it back out preserves
         // that policy until the user deliberately removes protection.
-        if (target_folder == "Secure notes" || target_folder.starts_with("Secure notes/"))
+        if (target_folder == SECURE_NOTES_FOLDER
+            || target_folder.starts_with(&format!("{SECURE_NOTES_FOLDER}/")))
             && !old_fm
                 .foreign
                 .iter()
@@ -7775,30 +7796,28 @@ pub fn corpus_create_managed_file(
 /// of the frontend host policy.
 #[tauri::command]
 pub async fn corpus_export_note_pdf(
+    app: tauri::AppHandle,
     state: tauri::State<'_, CorpusState>,
     id: String,
     name: String,
     title: String,
 ) -> Result<String, String> {
     let (root, source_id) = split_root_id(&id);
-    let body = state.route(&root, |store| {
+    let (body, root_path) = state.route(&root, |store| {
         store.mutation_allowed()?;
-        store.editable_pdf_source(&source_id)
+        Ok((store.editable_pdf_source(&source_id)?, store.root.clone()))
     })?;
-
-    #[cfg(not(target_os = "macos"))]
-    return Err("Local PDF export is currently available only on macOS.".into());
-
-    #[cfg(target_os = "macos")]
-    {
-        let bytes = tauri::async_runtime::spawn_blocking(move || {
-            crate::document_conversion::export_markdown_pdf_bytes(&title, &body)
-        })
-        .await
-        .map_err(|e| format!("PDF export worker failed ({e})"))??;
-        let rel = state.route(&root, |store| store.create_exported_pdf(&name, &bytes))?;
-        Ok(compose_root_id(&root, &rel))
-    }
+    // themed lane first (the same renderer + palette as the Breve briefs,
+    // 2026-09-02), plain-text macOS exporter as the fallback — see
+    // document_conversion::export_note_pdf_bytes
+    let bundled = crate::routines::source_root(&app).ok();
+    let bytes = tauri::async_runtime::spawn_blocking(move || {
+        crate::document_conversion::export_note_pdf_bytes(&root_path, bundled.as_deref(), &title, &body)
+    })
+    .await
+    .map_err(|e| format!("PDF export worker failed ({e})"))??;
+    let rel = state.route(&root, |store| store.create_exported_pdf(&name, &bytes))?;
+    Ok(compose_root_id(&root, &rel))
 }
 
 /// Byte-identical to DOCUMENT_CONVERTIBLE_EXTS in src/documents/kinds.ts (parity.json).

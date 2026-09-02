@@ -38,6 +38,7 @@ import { DEFAULT_NOTE_STYLE, useNoteStyleStore } from "../state/noteStyle";
 import { activeTabOf, findLeaf, leaves, openNavTarget, usePanesStore } from "../state/panes";
 import { cycleQuick, removeQuickNote } from "../state/quick";
 import { SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
+import { EDITOR_ACTION } from "./editorActionIds";
 import { captureHandle, quickHandle, setupHandle } from "./handles";
 import { registerAction } from "./registry";
 import { runSurfaceFind } from "./surfaceFind";
@@ -263,7 +264,7 @@ export function registerDefaultActions(): void {
   registerAction({
     id: "view.breve",
     title: "Open or close Breve",
-    defaultChord: null,
+    defaultChord: "Meta+Shift+B", // Breve had no chord at all (audit 2026-09-02 §1.3)
     run: () => {
       const ui = useUiStore.getState();
       ui.setSettingsOpen(false);
@@ -605,13 +606,13 @@ export function registerDefaultActions(): void {
   // — editor formatting (the r5 format bar's 11 controls + highlight; chords
   //   from the r3 gate footer, the rest unbound-but-rebindable) —
   const marks: [string, string, InlineMark, string | null][] = [
-    ["editor.bold", "Bold", "bold", "Meta+B"],
-    ["editor.italic", "Italic", "italic", "Meta+I"],
-    ["editor.underline", "Underline", "underline", "Meta+U"],
-    ["editor.strike", "Strikethrough", "strike", null],
-    ["editor.code", "Inline code", "code", null],
-    ["editor.highlight", "Highlight", "highlight", "Meta+Shift+H"],
-    ["editor.link", "Link", "link", null],
+    [EDITOR_ACTION.bold, "Bold", "bold", "Meta+B"],
+    [EDITOR_ACTION.italic, "Italic", "italic", "Meta+I"],
+    [EDITOR_ACTION.underline, "Underline", "underline", "Meta+U"],
+    [EDITOR_ACTION.strike, "Strikethrough", "strike", null],
+    [EDITOR_ACTION.code, "Inline code", "code", null],
+    [EDITOR_ACTION.highlight, "Highlight", "highlight", "Meta+Shift+H"],
+    [EDITOR_ACTION.link, "Link", "link", null],
   ];
   for (const [id, title, mark, defaultChord] of marks) {
     // shared: the format chords act on activeEditor(), which resolves per
@@ -650,10 +651,10 @@ export function registerDefaultActions(): void {
     });
   }
   const blocks: [string, string, BlockToggle][] = [
-    ["editor.quote", "Quote", "quote"],
-    ["editor.bulletList", "Bulleted list", "bullet"],
-    ["editor.numberedList", "Numbered list", "numbered"],
-    ["editor.checklist", "Checklist", "checklist"],
+    [EDITOR_ACTION.quote, "Quote", "quote"],
+    [EDITOR_ACTION.bulletList, "Bulleted list", "bullet"],
+    [EDITOR_ACTION.numberedList, "Numbered list", "numbered"],
+    [EDITOR_ACTION.checklist, "Checklist", "checklist"],
   ];
   for (const [id, title, kind] of blocks) {
     registerAction({
