@@ -12,6 +12,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Antigravity is back as a connected lane, through Google's official ACP
+  agent.** Settings → AI Models → Antigravity installs the exact runtime
+  Google lists on the Agent Client Protocol registry (pinned SHA-256 and size,
+  Apple Silicon only) and signs in with the agent's own Google flow in your
+  browser; Rotli never sees the credential. Chat turns ride the same
+  one-shot, no-tools ACP transport as Cursor, with the model picked per turn
+  from the account's own list (Gemini 3.8 Flash and 3.7 Flash, three thinking
+  levels each; `@gemini` or `@antigravity` consults it mid-chat). Off by
+  default and last in the list; the card states Google's FAQ position and the
+  DeepMind statements so the account risk is a stated choice. Breve keeps
+  refusing every connected provider. Decision record:
+  `docs/decisions/2026-09-03-antigravity-official-acp-lane.md`.
+
+### Added
+
 - **Breve says when briefs stop arriving.** The scheduler's job ledger now
   reaches the app as per-routine health: the Breve rail status, the Today
   page, and the Routines page all say “No brief for N days — morning is

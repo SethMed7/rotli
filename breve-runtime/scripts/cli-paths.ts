@@ -15,6 +15,10 @@ export const CURSOR_BIN_CANDIDATES = [
   "/opt/homebrew/bin/agent",
   "/usr/local/bin/agent",
 ] as const;
+/** Rotli's managed install of Google's official ACP agent (ADR 2026-09-03). */
+export const ANTIGRAVITY_BIN_CANDIDATES = [
+  "~/Library/Application Support/com.rotli.app/antigravity-acp/current/agy_acp_server.par",
+] as const;
 
 /** Expand a leading "~/" against the caller's home directory. */
 export function expandHome(path: string, home: string): string {

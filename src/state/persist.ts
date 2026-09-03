@@ -17,7 +17,7 @@
 // In a plain browser (vite dev) every entry point here is a no-op — the
 // in-memory demo corpus stays exactly as it was (the seam's whole point).
 
-import { type HybridPreset, type ProviderId, providerDefaultModel } from "../ai/models";
+import { type HybridPreset, PROVIDER_IDS, type ProviderId, providerDefaultModel } from "../ai/models";
 import { parseWebSearchProvider, type WebSearchProvider } from "../ai/searchProvider";
 import {
   QUOKKA_IDLE_POSES,
@@ -476,11 +476,9 @@ export function parseSettings(raw: string): PersistedSettings {
     }
   }
   const savedProviderDefaults = record(data.providerDefaults) as Partial<Record<ProviderId, string>>;
-  const providerDefaults: Record<ProviderId, string> = {
-    claude: providerDefaultModel("claude", savedProviderDefaults),
-    codex: providerDefaultModel("codex", savedProviderDefaults),
-    cursor: providerDefaultModel("cursor", savedProviderDefaults),
-  };
+  const providerDefaults = Object.fromEntries(
+    PROVIDER_IDS.map((id) => [id, providerDefaultModel(id, savedProviderDefaults)]),
+  ) as Record<ProviderId, string>;
   const providerDefaultIds = new Set(Object.values(providerDefaults));
   // expandedDests — keep only boolean entries; missing → seed Inbox + Vault so
   // an old config (which lacked this key) opens with the default tree. A stale
@@ -634,6 +632,7 @@ export function parseSettings(raw: string): PersistedSettings {
       claude: record(data.aiProviders).claude === true,
       codex: record(data.aiProviders).codex === true,
       cursor: record(data.aiProviders).cursor === true,
+      antigravity: record(data.aiProviders).antigravity === true,
     },
     providerDefaults,
     webSearchProvider: parseWebSearchProvider(data.webSearchProvider),

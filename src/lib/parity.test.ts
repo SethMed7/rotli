@@ -11,6 +11,7 @@ import {
   CLAUDE_BIN_CANDIDATES,
   CODEX_BIN_CANDIDATES,
   CURSOR_BIN_CANDIDATES,
+  ANTIGRAVITY_BIN_CANDIDATES,
 } from "../../breve-runtime/scripts/cli-paths";
 import { ROTLI_KEYCHAIN_SERVICE, ROTLI_RESEND_ACCOUNT } from "../../breve-runtime/scripts/keychain-names";
 import fixture from "../../scripts/fixtures/parity.json";
@@ -108,6 +109,8 @@ describe("parity.json ↔ TS constants", () => {
     expect(claude).toEqual(entries.cliBinCandidates.value.claude);
     expect(codex).toEqual(entries.cliBinCandidates.value.codex);
     expect(cursor).toEqual(entries.cliBinCandidates.value.cursor);
+    const antigravity: string[] = [...ANTIGRAVITY_BIN_CANDIDATES];
+    expect(antigravity).toEqual(entries.cliBinCandidates.value.antigravity);
   });
 
   test("secureOverlap", () => {

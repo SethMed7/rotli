@@ -43,12 +43,10 @@ mod workspace;
 use std::sync::{atomic::{AtomicUsize, Ordering}, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
-use tauri::{
-    image::Image,
-    menu::{MenuBuilder, MenuItemBuilder},
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager, PhysicalPosition, WindowEvent,
-};
+use tauri::image::Image;
+use tauri::menu::{MenuBuilder, MenuItemBuilder};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WindowEvent};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 /// Default chords — mirror `app.toggleWindow` / `capture.summon` /
@@ -2539,6 +2537,7 @@ pub fn run() {
             provider::cli_detect,
             provider::cli_complete,
             provider::cli_cancel,
+            provider::antigravity::antigravity_manage,
             provider::generate_image,
             usage::model_usage,
             localmodel::local_model_install,

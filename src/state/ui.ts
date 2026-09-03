@@ -1035,7 +1035,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   setReadAloudVoice: (id) => set({ readAloudVoice: id }),
   taskCycle: "two",
   setTaskCycle: (v) => set({ taskCycle: v }),
-  aiProviders: { claude: false, codex: false, cursor: false },
+  aiProviders: { claude: false, codex: false, cursor: false, antigravity: false },
   setAiProvider: (id, on) =>
     set((s) => ({
       aiProviders: { ...s.aiProviders, [id]: on },

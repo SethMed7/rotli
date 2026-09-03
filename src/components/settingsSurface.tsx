@@ -129,6 +129,7 @@ import {
 } from "../state/ui";
 import { requestVaultFolder } from "../state/vaultFolderBrowser";
 import { VOICES } from "../voice/speech";
+import { AntigravitySetup } from "./antigravitySetup";
 import { Character, type CharacterName, QuokkaMark } from "./character";
 import {
   BrowserGlyph,
@@ -2173,6 +2174,8 @@ const PROVIDER_DESC: Record<ProviderId, string> = {
   codex: "Official Codex CLI — uses the ChatGPT account you signed into locally.",
   cursor:
     "Official Cursor ACP client — uses the Cursor account you signed into locally, in read-only Ask mode.",
+  antigravity:
+    "Google's official Antigravity ACP agent, installed and signed in from this card — off by default; Google's FAQ still warns about third-party use of an Antigravity login while DeepMind staff say it is not enforced. Your account, your call.",
 };
 
 /** How to get a lane working when it isn't installed / signed in. */
@@ -2192,6 +2195,7 @@ const LANE_SETUP: Record<ProviderId, string[]> = {
     "Run `agent login` yourself in Terminal and sign in with your Cursor account.",
     "Come back here — Rotli uses ACP Ask mode and rejects every requested permission.",
   ],
+  antigravity: [], // the card below owns install + sign-in
 };
 
 /** A bare switch (the Toggle row's knob, without the full-width row). */
@@ -2280,7 +2284,8 @@ function LaneCard({ id }: { id: ProviderId }) {
       </div>
       <p className="ailane-desc">{PROVIDER_DESC[id]}</p>
 
-      {!ready && (
+      {id === "antigravity" && <AntigravitySetup onChange={() => void det.refetch()} />}
+      {!ready && id !== "antigravity" && (
         <div className="ailane-help">
           <button type="button" className="ailane-helptoggle" onClick={() => setHelp((v) => !v)}>
             {help ? "▾" : "▸"} How to set this up
@@ -2769,19 +2774,11 @@ function ModelsPane() {
           restriction.
         </p>
         <p className="setnote">
-          <b>Why Gemini isn&rsquo;t here:</b> Google says third-party tools may not reuse an Antigravity login
-          and warns that doing so can suspend or terminate the account. Google permits Gemini through AI
-          Studio API keys or Vertex AI, but those are separately billed API routes rather than the Antigravity
-          subscription. Rotli has not enabled either route. Reviewed September 1, 2026.
+          <b>Antigravity</b> runs through Google&rsquo;s official ACP agent (the registry build), never the
+          IDE&rsquo;s login. Its card states the account question; the decision record is
+          docs/decisions/2026-09-03. Reviewed September 3, 2026.
         </p>
         <div className="provider-transparency-links">
-          <button
-            type="button"
-            className="ghostbtn quiet"
-            onClick={() => void openUrl("https://www.antigravity.google/docs/faq/")}
-          >
-            Google&rsquo;s account restriction
-          </button>
           <button
             type="button"
             className="ghostbtn quiet"
@@ -2793,8 +2790,8 @@ function ModelsPane() {
       </section>
 
       <p className="lead">
-        Chat runs on your Mac by default. Claude Code, Codex, and Cursor are optional connected lanes using
-        accounts already signed in to their official local clients.
+        Chat runs on your Mac by default. Claude Code, Codex, Cursor, and Antigravity are optional connected
+        lanes using accounts signed in to their official local clients.
       </p>
 
       <LocalModelsSection

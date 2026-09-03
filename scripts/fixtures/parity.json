@@ -96,6 +96,9 @@
           "~/.local/bin/cursor-agent",
           "/opt/homebrew/bin/agent",
           "/usr/local/bin/agent"
+        ],
+        "antigravity": [
+          "~/Library/Application Support/com.rotli.app/antigravity-acp/current/agy_acp_server.par"
         ]
       }
     },

@@ -65,6 +65,7 @@ export function markKeyOf(provider: string | undefined, modelName = ""): ChatMar
       return "openai";
     case "cursor":
       return "cursor";
+    case "antigravity":
     case "gemini":
       return "gemini";
     case "preset":

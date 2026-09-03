@@ -656,6 +656,36 @@ export function cliCancel(requestId: string): Promise<void> {
   return aiInvoke("cli_cancel", { requestId });
 }
 
+/** Antigravity lane state as the native side reports it (src-tauri/src/antigravity.rs). */
+export interface AntigravityStatus {
+  platformSupported: boolean;
+  installed: boolean;
+  version: string | null;
+  latestVersion: string;
+  updateAvailable: boolean;
+  signedIn: boolean;
+  /** The Google authorization URL of the sign-in that just ran (copy link). */
+  authorizationUrl?: string;
+}
+
+/** One command, one action word: status · install · sign_in · sign_out · remove.
+ * Every action resolves to the lane's status. Browser mode reports an
+ * unsupported platform so the card renders its honest empty state. */
+export function antigravityManage(
+  action: "status" | "install" | "sign_in" | "sign_out" | "remove",
+): Promise<AntigravityStatus> {
+  if (!isTauri())
+    return Promise.resolve({
+      platformSupported: false,
+      installed: false,
+      version: null,
+      latestVersion: "",
+      updateAvailable: false,
+      signedIn: false,
+    });
+  return aiInvoke("antigravity_manage", { action });
+}
+
 // ── local model installer (the shared memex-ai store) ────────────────────────
 
 /** In-flight download progress — the Settings UI polls this while an install
