@@ -43,7 +43,7 @@ async function sendSignal(text: string): Promise<boolean> {
     console.log("[watchers] delivery disabled — skip send");
     return false;
   }
-  return await sendSig(bot, owner, text);
+  return  sendSig(bot, owner, text);
 }
 
 const keep: Watcher[] = [];

@@ -11,7 +11,6 @@ use std::fs;
 use std::io::{self, BufRead, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -1070,7 +1069,7 @@ impl Workspace {
         crate::fsutil::atomic_write(&path, &body, ".rotli-open-")?;
         #[cfg(target_os = "macos")]
         {
-            let status = Command::new("open")
+            let status = std::process::Command::new("open")
                 .args(["-a", "rotli"])
                 .status()
                 .map_err(|e| format!("launch Rotli: {e}"))?;

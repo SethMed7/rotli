@@ -1,4 +1,4 @@
-import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type SyntheticEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import {
   PRIVATE_BROWSER_SEARCH_ENGINE_PRESENTATIONS,
@@ -168,7 +168,7 @@ export function BrowserSurface({
     };
   }, [native, syncBounds]);
 
-  const navigate = (event: FormEvent) => {
+  const navigate = (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     const next = normalizePrivateBrowserInput(address, privateBrowserSearchEngine);
     if (!next) {

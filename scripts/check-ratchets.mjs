@@ -3,7 +3,7 @@
 // The 2026-09-01 code-quality audit found that nothing measured size, and so
 // nothing stopped it: six frontend files over 1,200 lines, one component body
 // of 1,174 lines, a 3,548-line Rust impl block, 231 near-duplicate clusters,
-// 27 source-string test assertions defending the god files, and 368 dated
+// 184 source-string test assertions defending the god files, and 368 dated
 // provenance comments that duplicate git blame and rot. Each is recorded here
 // as a ceiling; a change may lower a ceiling (run with --update) but never
 // raise one. The baseline is scripts/ratchet-baseline.json.
@@ -39,12 +39,16 @@ for (const dir of sizeRoots)
     if (n >= SIZE_FLOOR) fileLines[relative(root, path)] = n;
   }
 
-// 2. Source-shape tests: assertions that read a source file as text.
+// 2. Source-shape tests: toContain/toMatch assertions inside a test file that
+// reads a source file as text. Counting the assertions (not the reads) means a
+// shape file cannot grow unboundedly, and wrapping a read across lines does
+// not hide it.
 const testFiles = walk(join(root, "src"), (p) => /\.test\.tsx?$/.test(p));
-const sourceShapeAssertions = testFiles.reduce(
-  (n, p) => n + (readFileSync(p, "utf8").match(/readFileSync\(new URL\(/g) ?? []).length,
-  0,
-);
+const sourceShapeAssertions = testFiles.reduce((n, p) => {
+  const text = readFileSync(p, "utf8");
+  if (!/readFileSync\(\s*new URL\(/.test(text)) return n;
+  return n + (text.match(/\.(?:not\.)?to(?:Contain|Match)\(/g) ?? []).length;
+}, 0);
 
 // 3. Provenance comments: rationale stays, attribution and phase names do not.
 const prodFiles = [
@@ -111,7 +115,9 @@ for (const [k, v] of Object.entries(provenanceComments)) {
     );
 }
 for (const [dir, ratio] of Object.entries(coverage)) {
-  const floor = Math.min(COVERAGE_FLOOR, baseline.coverage[dir] ?? COVERAGE_FLOOR);
+  // a ratchet: the recorded ratio is the floor once it is above the constant —
+  // Math.min let a directory stay wherever it had sunk to (audit 2026-09-03)
+  const floor = Math.max(COVERAGE_FLOOR, baseline.coverage[dir] ?? COVERAGE_FLOOR);
   if (ratio < floor) failures.push(`${dir}: ${ratio} test files per module, below its ${floor} floor`);
 }
 if (failures.length) {

@@ -23,6 +23,18 @@ function evt(
   } as KeyboardEvent;
 }
 
+describe("chordFromEvent", () => {
+  test("reads modifiers and code only — the same chord on macOS and Linux", () => {
+    // Linux Chromium sets metaKey for a Meta press just like macOS does; the
+    // parser never consults navigator.platform, which is why ⌘ chords in
+    // e2e/ run unchanged on ubuntu CI (CodeMirror's mac-only keymap does not)
+    expect(chordFromEvent(evt("KeyT", { metaKey: true }))).toBe("Meta+T");
+    expect(chordFromEvent(evt("KeyB", { metaKey: true, shiftKey: true }))).toBe("Shift+Meta+B");
+    expect(chordFromEvent(evt("Backspace", { metaKey: true }))).toBe("Meta+Backspace");
+    expect(chordFromEvent(evt("Unidentified", { metaKey: true }))).toBeNull();
+  });
+});
+
 describe("keyFromCode", () => {
   test("maps letter and digit codes to bare tokens", () => {
     expect(keyFromCode("KeyA")).toBe("A");

@@ -54,7 +54,9 @@ function stripComments(src) {
   const cargo = read("src-tauri/Cargo.toml");
   for (const crate of allow.rust.deniedHttpCrates) {
     if (new RegExp(`^\\s*${crate.replace(/[-]/g, "[-_]")}\\s*=`, "m").test(cargo)) {
-      failures.push(`src-tauri/Cargo.toml: HTTP-client crate "${crate}" is denied — ureq is the one vetted client.`);
+      failures.push(
+        `src-tauri/Cargo.toml: HTTP-client crate "${crate}" is denied — ureq is the one vetted client.`,
+      );
     }
   }
 }
@@ -102,7 +104,9 @@ function stripComments(src) {
     }
     // ImapFlow client.fetch — a different (allowlisted) surface
     if (/client\.fetch\s*\(/.test(code) && !(base in imapFiles) && !(base in fetchFiles)) {
-      failures.push(`${rel}: client.fetch (ImapFlow) is not declared in egress-allowlist.json breveRuntime.imapFlowFiles.`);
+      failures.push(
+        `${rel}: client.fetch (ImapFlow) is not declared in egress-allowlist.json breveRuntime.imapFlowFiles.`,
+      );
     }
     // low-level node networking
     for (const mod of ["node:http", "node:https", "node:net", "node:tls", "node:dgram"]) {
@@ -119,11 +123,18 @@ function stripComments(src) {
   // llm.ts must gate its endpoint through the locality guard before fetching
   // (requireMatch idiom): the loopback-only invariant is enforced in config, but
   // pin that llm.ts resolves through llmConfig (which throws on non-loopback).
-  if (!/from ["']\.\/config["']/.test(read("breve-runtime/scripts/llm.ts")) || !/llmConfig\(/.test(read("breve-runtime/scripts/llm.ts"))) {
-    failures.push("breve-runtime/scripts/llm.ts must resolve its endpoint via llmConfig() (the loopback-only locality gate).");
+  if (
+    !/from ["']\.\/config["']/.test(read("breve-runtime/scripts/llm.ts")) ||
+    !/llmConfig\(/.test(read("breve-runtime/scripts/llm.ts"))
+  ) {
+    failures.push(
+      "breve-runtime/scripts/llm.ts must resolve its endpoint via llmConfig() (the loopback-only locality gate).",
+    );
   }
   if (!/llmEndpointIsLocal|allowRemote/.test(read("breve-runtime/scripts/config.ts"))) {
-    failures.push("breve-runtime/scripts/config.ts must keep the loopback-only local-tier gate (llmEndpointIsLocal + allowRemote knob).");
+    failures.push(
+      "breve-runtime/scripts/config.ts must keep the loopback-only local-tier gate (llmEndpointIsLocal + allowRemote knob).",
+    );
   }
 }
 
@@ -174,7 +185,8 @@ function stripComments(src) {
   const types = read("src/ai/types.ts");
   const loop = read("src/ai/loop.ts");
   const toolBlock = types.match(/export type ToolName\s*=([\s\S]*?);/);
-  if (!toolBlock) failures.push("src/ai/types.ts: could not find the ToolName union to check EGRESS_TOOLS completeness.");
+  if (!toolBlock)
+    failures.push("src/ai/types.ts: could not find the ToolName union to check EGRESS_TOOLS completeness.");
   const toolNames = toolBlock ? [...toolBlock[1].matchAll(/"([a-z_]+)"/g)].map((m) => m[1]) : [];
   // create_note/update_note/create_document write INTO the vault and open_note opens a tab —
   // all stay on-device (no bytes leave), so they classify local (PR #4,
@@ -204,9 +216,8 @@ function stripComments(src) {
   ];
   // WEB_TOOLS + IMAGE_TOOLS are spread into EGRESS_TOOLS; collect both arrays.
   const egressListed = [
-    ...[...loop.matchAll(/const (?:WEB_TOOLS|IMAGE_TOOLS): ToolName\[\] = \[([^\]]*)\]/g)]
-      .flatMap((m) => [...m[1].matchAll(/"([a-z_]+)"/g)].map((x) => x[1])),
-  ];
+    ...loop.matchAll(/const (?:WEB_TOOLS|IMAGE_TOOLS): ToolName\[\] = \[([^\]]*)\]/g),
+  ].flatMap((m) => [...m[1].matchAll(/"([a-z_]+)"/g)].map((x) => x[1]));
   for (const t of toolNames) {
     if (localTools.includes(t)) continue;
     if (!egressListed.includes(t)) {
@@ -241,28 +252,42 @@ function stripComments(src) {
   const conf = JSON.parse(read("src-tauri/tauri.conf.json"));
   const sec = conf.app?.security ?? {};
   const snap = allow.tauriConf;
-  if (sec.csp !== snap.csp) failures.push("src-tauri/tauri.conf.json: csp drifted from the pinned snapshot (egress-allowlist.json tauriConf.csp). Update the snapshot in the same change if intentional.");
-  if (sec.devCsp !== snap.devCsp) failures.push("src-tauri/tauri.conf.json: devCsp drifted from the pinned snapshot.");
+  if (sec.csp !== snap.csp)
+    failures.push(
+      "src-tauri/tauri.conf.json: csp drifted from the pinned snapshot (egress-allowlist.json tauriConf.csp). Update the snapshot in the same change if intentional.",
+    );
+  if (sec.devCsp !== snap.devCsp)
+    failures.push("src-tauri/tauri.conf.json: devCsp drifted from the pinned snapshot.");
   const scope = sec.assetProtocol?.scope ?? [];
   if (JSON.stringify(scope) !== JSON.stringify(snap.assetProtocolScope)) {
-    failures.push("src-tauri/tauri.conf.json: assetProtocol.scope drifted from the pinned snapshot — a wider scope exposes more of the filesystem to the webview.");
+    failures.push(
+      "src-tauri/tauri.conf.json: assetProtocol.scope drifted from the pinned snapshot — a wider scope exposes more of the filesystem to the webview.",
+    );
   }
   const endpoints = conf.plugins?.updater?.endpoints ?? [];
   if (JSON.stringify(endpoints) !== JSON.stringify(snap.updaterEndpoints)) {
-    failures.push("src-tauri/tauri.conf.json: updater endpoints drifted from the pinned snapshot — a new update source is a trust decision.");
+    failures.push(
+      "src-tauri/tauri.conf.json: updater endpoints drifted from the pinned snapshot — a new update source is a trust decision.",
+    );
   }
   const caps = JSON.parse(read("src-tauri/capabilities/default.json"));
   const perms = caps.permissions ?? [];
   if (JSON.stringify(perms) !== JSON.stringify(allow.capabilities.default)) {
-    failures.push("src-tauri/capabilities/default.json: granted permissions drifted from the pinned snapshot (egress-allowlist.json capabilities.default) — a new plugin permission widens the webview's reach.");
+    failures.push(
+      "src-tauri/capabilities/default.json: granted permissions drifted from the pinned snapshot (egress-allowlist.json capabilities.default) — a new plugin permission widens the webview's reach.",
+    );
   }
   const capabilityWebviews = caps.webviews ?? [];
   if (JSON.stringify(capabilityWebviews) !== JSON.stringify(allow.capabilities.defaultWebviews)) {
-    failures.push("src-tauri/capabilities/default.json: app-owned webview targets drifted from the pinned snapshot — private browser guests must not inherit Rotli IPC.");
+    failures.push(
+      "src-tauri/capabilities/default.json: app-owned webview targets drifted from the pinned snapshot — private browser guests must not inherit Rotli IPC.",
+    );
   }
   const capabilityWindows = caps.windows ?? [];
   if (JSON.stringify(capabilityWindows) !== JSON.stringify(allow.capabilities.defaultWindows)) {
-    failures.push("src-tauri/capabilities/default.json: window-wide capability targets are forbidden — they grant every child webview Rotli IPC.");
+    failures.push(
+      "src-tauri/capabilities/default.json: window-wide capability targets are forbidden — they grant every child webview Rotli IPC.",
+    );
   }
 }
 
@@ -296,10 +321,13 @@ function stripComments(src) {
     "devices.size >= maxDeviceWaiters",
     "cloud.size >= maxCloudRequests",
   ]) {
-    if (!code.includes(marker)) failures.push(`${relay.source}: missing public-relay guard ${JSON.stringify(marker)}.`);
+    if (!code.includes(marker))
+      failures.push(`${relay.source}: missing public-relay guard ${JSON.stringify(marker)}.`);
   }
   if (!dockerfile.includes(`FROM ${relay.image}`) || !/^USER bun$/m.test(dockerfile)) {
-    failures.push(`${relay.dockerfile}: must use the pinned ${relay.image} image as the unprivileged bun user.`);
+    failures.push(
+      `${relay.dockerfile}: must use the pinned ${relay.image} image as the unprivileged bun user.`,
+    );
   }
   if (existsSync(join(root, "services/rotli-mcp-relay/railway.json"))) {
     failures.push(

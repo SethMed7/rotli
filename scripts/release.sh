@@ -62,13 +62,28 @@ verify_ci_conclusion() {
   local ci_conclusion
 
   echo "▸ verify CI conclusion for $source_commit"
-  ci_runs="$(gh run list --workflow "Regression suite" --branch main \
-    --json headSha,status,conclusion,url --limit 40 2>/dev/null || echo '[]')"
-  ci_conclusion="$(printf '%s' "$ci_runs" \
-    | jq -r --arg sha "$source_commit" \
-        'map(select(.headSha == $sha)) | first | if . == null then "none" elif .status != "completed" then "pending" else (.conclusion // "unknown") end' \
-    2>/dev/null || echo "none")"
-  CI_RUN_URL="$(printf '%s' "$ci_runs" | jq -r --arg sha "$source_commit" 'map(select(.headSha == $sha)) | first | .url // empty')"
+  # Released commits are on main — asserted directly, so the run query can be
+  # commit-scoped instead of "the newest 40 main runs" (which missed a run that
+  # had just completed, 2026-09-03). gh's index can lag a fresh run by seconds;
+  # a bounded retry covers that, and superseded (cancelled) runs never count.
+  git fetch -q origin main 2>/dev/null || true
+  if ! git merge-base --is-ancestor "$source_commit" origin/main 2>/dev/null; then
+    echo "✗ $source_commit is not on origin/main — release from the promoted commit"
+    return 1
+  fi
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    ci_runs="$(gh run list --workflow "Regression suite" --commit "$source_commit" \
+      --json headSha,status,conclusion,url --limit 20 2>/dev/null || echo '[]')"
+    ci_conclusion="$(printf '%s' "$ci_runs" \
+      | jq -r 'map(select(.conclusion != "cancelled")) | first | if . == null then "none" elif .status != "completed" then "pending" else (.conclusion // "unknown") end' \
+      2>/dev/null || echo "none")"
+    case "$ci_conclusion" in
+      none|pending) sleep $((attempt * 10)) ;;
+      *) break ;;
+    esac
+  done
+  CI_RUN_URL="$(printf '%s' "$ci_runs" | jq -r 'map(select(.conclusion != "cancelled")) | first | .url // empty')"
   CI_RUN_RESULT="$ci_conclusion"
   case "$ci_conclusion" in
     success)

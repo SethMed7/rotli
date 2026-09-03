@@ -20,6 +20,7 @@
 :root {
   --font-display: "Satoshi", "Inter", system-ui, sans-serif; /* headings */
   --font-body: "General Sans", "Satoshi", "Inter", system-ui, sans-serif; /* UI + body */
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace; /* code, ids, hashes */
 
   /* scale — exactly as specified on the board (size / line-height) */
   --fs-heading: 2rem; /* 32 / 40  · Satoshi Bold 700 */

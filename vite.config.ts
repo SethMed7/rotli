@@ -81,9 +81,14 @@ export default defineConfig(() => ({
     // all warning with hard, tested startup/lazy budgets.
     chunkSizeWarningLimit: MAX_LAZY_CHUNK_KIB,
     rolldownOptions: {
-      onwarn(warning) {
-        const violation = buildWarningViolation(warning);
-        if (violation) throw new Error(`bundle warning regression: ${violation}`);
+      // onLog replaces the deprecated onwarn (Vite 8 / Rolldown); warnings are
+      // still the budget's failure signal, other levels pass to the default
+      onLog(level, warning, handler) {
+        if (level === "warn") {
+          const violation = buildWarningViolation(warning);
+          if (violation) throw new Error(`bundle warning regression: ${violation}`);
+        }
+        handler(level, warning);
       },
       plugins: [
         {

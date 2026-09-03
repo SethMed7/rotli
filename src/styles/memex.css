@@ -83,7 +83,7 @@
 }
 .chat-breadcrumb-separator {
   flex: 0 0 auto;
-  color: var(--text-faint);
+  color: var(--text-muted);
 }
 .chat-title-field {
   display: flex;
@@ -137,7 +137,7 @@
 }
 .chat-title-error {
   flex: 0 0 auto;
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-size: 11px;
   white-space: nowrap;
 }
@@ -178,7 +178,7 @@
   gap: 5px;
 }
 .chat-head-count {
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 .chat-head-action.icon-only {
@@ -449,7 +449,7 @@
   position: absolute;
   right: 3px;
   bottom: 2px;
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-size: 8px;
   font-variant-numeric: tabular-nums;
 }
@@ -1465,7 +1465,7 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: var(--surface-1, var(--surface-2));
+  background: var(--surface);
 }
 .file-head {
   display: flex;
@@ -1597,7 +1597,7 @@
   flex: 0 0 auto;
   padding: 6px 12px;
   border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--danger) 8%, var(--surface-1));
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
   color: var(--danger);
   font-size: 11.5px;
   line-height: 1.4;
@@ -2076,7 +2076,7 @@
   width: 100%;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: var(--font-mono, ui-monospace, monospace);
+  font-family: var(--font-mono);
   font-size: 12.5px;
   line-height: 1.55;
   color: var(--text);
@@ -2998,7 +2998,7 @@ body:has(.document-editor) [role="dialog"][class*="univer-"] input:disabled {
   padding: 8px 11px;
   background: color-mix(in srgb, var(--text) 9%, transparent);
   border-radius: 9px;
-  font-family: var(--font-mono, ui-monospace, "SF Mono", monospace);
+  font-family: var(--font-mono);
   font-size: 12.5px;
   overflow-x: auto;
   white-space: pre;
@@ -3021,7 +3021,7 @@ body:has(.document-editor) [role="dialog"][class*="univer-"] input:disabled {
   padding: 4px 6px 4px 11px;
   border-bottom: 1px solid var(--border);
   color: var(--text-muted);
-  font-family: var(--font-mono, ui-monospace, "SF Mono", monospace);
+  font-family: var(--font-mono);
   font-size: 10.5px;
 }
 .cmsg-codehead button {

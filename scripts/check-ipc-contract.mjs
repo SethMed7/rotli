@@ -50,7 +50,8 @@ function walk(dir) {
 walk(join(root, "src"));
 
 const calls = new Map();
-const callPattern = /\b(?:invoke|corpusInvoke|aiInvoke|memexInvoke)\s*(?:<[^;\n(]+>)?\s*\(\s*["']([a-zA-Z0-9_]+)["']/g;
+const callPattern =
+  /\b(?:invoke|corpusInvoke|aiInvoke|memexInvoke)\s*(?:<[^;\n(]+>)?\s*\(\s*["']([a-zA-Z0-9_]+)["']/g;
 for (const file of sourceFiles) {
   const source = readFileSync(file, "utf8");
   for (const match of source.matchAll(callPattern)) {
@@ -66,8 +67,12 @@ const missing = [...calls.entries()]
   .map(([command, files]) => `${command} (${[...new Set(files)].join(", ")})`);
 
 if (missing.length) {
-  console.error(`IPC contract check failed — frontend commands missing Rust handlers:\n${missing.map((line) => `  - ${line}`).join("\n")}`);
+  console.error(
+    `IPC contract check failed — frontend commands missing Rust handlers:\n${missing.map((line) => `  - ${line}`).join("\n")}`,
+  );
   process.exit(1);
 }
 
-console.log(`check:ipc ok — ${calls.size} frontend commands resolve to ${registered.size} registered Rust handlers`);
+console.log(
+  `check:ipc ok — ${calls.size} frontend commands resolve to ${registered.size} registered Rust handlers`,
+);

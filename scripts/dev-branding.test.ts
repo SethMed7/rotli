@@ -46,7 +46,7 @@ test("the development icon uses Rotli's blue identity", async () => {
   for (let y = 0; y < runtime.info.height; y += 1) {
     for (let x = 0; x < runtime.info.width; x += 1) {
       const alpha = runtime.data[(y * runtime.info.width + x) * runtime.info.channels + 3];
-      if (alpha >= 128) visiblePixels.push([x, y]);
+      if ((alpha ?? 0) >= 128) visiblePixels.push([x, y]);
     }
   }
   const xs = visiblePixels.map(([x]) => x);

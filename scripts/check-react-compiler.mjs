@@ -1,6 +1,6 @@
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
 
 const REACT_COMPILER_CODE = "react(react-compiler)";
 const REACT_COMPILER_KINDS = new Map([
@@ -70,17 +70,10 @@ function main() {
     process.exit(1);
   }
 
-  const result = spawnSync(
-    oxlint,
-    [
-      "--config",
-      compilerConfig,
-      "--format",
-      "json",
-      sourceRoot,
-    ],
-    { cwd: repositoryRoot, encoding: "utf8" },
-  );
+  const result = spawnSync(oxlint, ["--config", compilerConfig, "--format", "json", sourceRoot], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+  });
   if (result.error) {
     console.error(`check:react-compiler failed — ${result.error.message}`);
     process.exit(1);
@@ -101,10 +94,7 @@ function main() {
   if (regressions.length > 0) {
     console.error(
       `check:react-compiler failed — new Rules-of-React diagnostics:\n${regressions
-        .map(
-          ({ file, kind, count, allowed }) =>
-            `  - ${file}: ${kind} ${count} (baseline allows ${allowed})`,
-        )
+        .map(({ file, kind, count, allowed }) => `  - ${file}: ${kind} ${count} (baseline allows ${allowed})`)
         .join("\n")}`,
     );
     process.exit(1);

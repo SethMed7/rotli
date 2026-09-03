@@ -288,7 +288,6 @@ async function buildConceptLayers(sourceName) {
       target[offset + 2] = 255;
     }
     target[offset + 3] = alpha;
-
   }
 
   if (stem === "glasses") accessory = buildGlassesSilhouette(width, height, channels);

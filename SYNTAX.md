@@ -114,8 +114,10 @@ imports.
 
 ## Formatting and checks
 
-oxfmt is authoritative for TypeScript/TSX under `src/`, E2E TypeScript, and
-`playwright.config.ts`, with a 110-column target. TypeScript strict checking,
+oxfmt is authoritative for TypeScript/TSX under `src/`, E2E TypeScript,
+`scripts/` (TS and MJS), `services/`, `playwright.config.ts`, and
+`vite.config.ts`, with a 110-column target (`breve-runtime/` stays outside it
+by measurement — see CONTRIBUTING). TypeScript strict checking,
 oxlint, and `check:naming` enforce semantic and naming rules. `check:structure` enforces per-tree
 file and folder naming; `check:design-system`, `check:hex`, and `check:ipc`
 enforce CSS and command conventions.

@@ -166,11 +166,9 @@ export function workbookToModel(wb: Workbook, name: string): SheetModel {
         const style = styleToU(cell);
         // a date value needs a date format to READ as a date in Univer
         const withFmt =
-          cell.value instanceof Date && !style?.n
-            ? { ...(style ?? {}), n: { pattern: "yyyy-mm-dd" } }
-            : style;
+          cell.value instanceof Date && !style?.n ? { ...style, n: { pattern: "yyyy-mm-dd" } } : style;
         if (val || withFmt) {
-          (cellData[r - 1] ??= {})[c - 1] = { ...(val ?? {}), ...(withFmt ? { s: withFmt } : {}) };
+          (cellData[r - 1] ??= {})[c - 1] = { ...val, ...(withFmt ? { s: withFmt } : {}) };
         }
       });
     });

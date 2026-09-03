@@ -7860,8 +7860,7 @@ pub async fn corpus_convert_document(
     let (root, rel) = split_root_id(&id);
     let output_name = converted_document_name(&rel)?;
     let source = state.route(&root, |store| store.guard_rel(&rel))?;
-    let metadata =
-        fs::metadata(&source).map_err(|error| format!("read {}: {error}", source.display()))?;
+    let metadata = fs::metadata(&source).map_err(|error| format!("read {}: {error}", source.display()))?;
     if !metadata.is_file() {
         return Err(format!("not a file: {}", source.display()));
     }
@@ -7883,6 +7882,7 @@ pub async fn corpus_convert_document(
         }
     })?;
 
+    let _ = (&output_name, &ext); // read on every platform; only macOS converts
     #[cfg(not(target_os = "macos"))]
     return Err("Local legacy-document conversion is currently available only on macOS.".into());
 

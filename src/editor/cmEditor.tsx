@@ -312,7 +312,7 @@ function CmEditorImpl({
   const wikilinkSource = useMemo(() => {
     const archived = (archivedNotes ?? []).filter((n) => n.kind !== "file");
     const list = archived.length ? [...searchableNotes, ...archived] : searchableNotes;
-    const key = list.map((n) => `${n.id} ${n.title} ${(n.aliases ?? []).join("")}`).join("\n");
+    const key = list.map((n) => `${n.id}\0${n.title}\0${(n.aliases ?? []).join("\x01")}`).join("\n");
     return { list, key };
   }, [searchableNotes, archivedNotes]);
   const wikilinkSourceRef = useRef(wikilinkSource);

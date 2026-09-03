@@ -43,7 +43,9 @@ const BUN_14_ACTIONS = new Set([
 const MUTATING_ACTIONS = new Set(["audit-fix", "dedupe", "prune"]);
 
 export function parseBunVersion(value) {
-  const match = String(value).trim().match(/^(\d+)\.(\d+)\.(\d+)/);
+  const match = String(value)
+    .trim()
+    .match(/^(\d+)\.(\d+)\.(\d+)/);
   if (!match) return null;
   return match.slice(1).map(Number);
 }
@@ -174,7 +176,13 @@ export function dependencyLicenseViolations(roots, baseline) {
   return violations;
 }
 
-export function dependencyPolicyViolations({ bunVersion, manifests, bunfigs, lockfiles, regressionWorkflow }) {
+export function dependencyPolicyViolations({
+  bunVersion,
+  manifests,
+  bunfigs,
+  lockfiles,
+  regressionWorkflow,
+}) {
   const violations = [];
   if (!/^\d+\.\d+\.\d+$/.test(bunVersion)) {
     violations.push(".bun-version: expected an exact stable semver");
@@ -190,7 +198,9 @@ export function dependencyPolicyViolations({ bunVersion, manifests, bunfigs, loc
       violations.push(`${project.manifestPath}: packageManager must match .bun-version (${bunVersion})`);
     }
     if (Object.hasOwn(manifest, "trustedDependencies")) {
-      violations.push(`${project.manifestPath}: trustedDependencies must be absent when lifecycle scripts are disabled`);
+      violations.push(
+        `${project.manifestPath}: trustedDependencies must be absent when lifecycle scripts are disabled`,
+      );
     }
 
     const bunfig = bunfigs[project.bunfigPath];
@@ -225,7 +235,9 @@ export function dependencyPolicyViolations({ bunVersion, manifests, bunfigs, loc
     violations.push("package.json: dev:app must keep the supervised process tree under --no-orphans");
   }
   if (!regressionWorkflow.includes("run: bun run deps audit")) {
-    violations.push("regression.yml: dependency audit must cover every Bun lockfile through bun run deps audit");
+    violations.push(
+      "regression.yml: dependency audit must cover every Bun lockfile through bun run deps audit",
+    );
   }
   if (!regressionWorkflow.includes("branches: [main, dev]")) {
     violations.push("regression.yml: protected automation must run on main and dev pushes");

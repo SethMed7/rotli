@@ -164,12 +164,12 @@
   text-align: left;
   cursor: pointer;
   transition:
-    border-color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease);
+    border-color var(--motion-enter) var(--motion-ease),
+    background var(--motion-enter) var(--motion-ease);
 }
 .sb-home-dashboard:hover {
   border-color: var(--border-strong);
-  background: var(--surface-3);
+  background: var(--surface-2);
 }
 .sb-home-dashboard.sel {
   border-color: transparent;

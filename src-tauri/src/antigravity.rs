@@ -148,7 +148,15 @@ pub(crate) fn env_remove_keys() -> Vec<String> {
 /// is pinned to a no-op so the agent never opens a page by itself: sign-in
 /// opens the URL from Rotli after validating it; a chat turn refuses it.
 pub(crate) fn runtime_env(bin: &Path) -> Result<Vec<(String, OsString)>, String> {
-    let profile = profile_dir()?;
+    runtime_env_in(&profile_dir()?, bin)
+}
+
+/// The env for a given profile directory — the seam the tests use, so no test
+/// ever mutates the process-wide `$HOME` (cargo runs tests as threads of one
+/// process; a `set_var("HOME")` races every other test and outlives its
+/// TempDir).
+fn runtime_env_in(profile: &Path, bin: &Path) -> Result<Vec<(String, OsString)>, String> {
+    let profile = profile.to_path_buf();
     ensure_private_dir(&profile)?;
     ensure_private_dir(&profile.join("antigravity-acp"))?;
     Ok(vec![
@@ -514,16 +522,13 @@ mod tests {
     fn the_runtime_env_pins_a_private_profile_and_a_no_op_browser() {
         let dir = tempfile::tempdir().unwrap();
         let bin = dir.path().join(EXECUTABLE_NAME);
-        // runtime_env creates the profile under $HOME; point HOME at the temp dir
-        std::env::set_var("HOME", dir.path());
-        let env = runtime_env(&bin).unwrap();
+        let profile = dir.path().join("antigravity-profile");
+        let env = runtime_env_in(&profile, &bin).unwrap();
         let get = |k: &str| env.iter().find(|(key, _)| key == k).map(|(_, v)| v.clone()).unwrap();
         assert_eq!(get("BROWSER"), OsString::from("/usr/bin/true"));
         assert_eq!(get("AGY_ACP_FORCE_FILE_STORAGE"), OsString::from("1"));
         assert_eq!(get("ANTIGRAVITY_HARNESS_PATH"), dir.path().join(HARNESS_NAME).into_os_string());
-        assert!(get("GEMINI_HOME").to_string_lossy().ends_with("antigravity-profile"));
-        assert!(dir.path().join(SUPPORT_DIR).join("antigravity-profile/antigravity-acp").is_dir());
-        assert!(!signed_in());
-        assert!(!status().installed);
+        assert_eq!(get("GEMINI_HOME"), profile.clone().into_os_string());
+        assert!(profile.join("antigravity-acp").is_dir());
     }
 }

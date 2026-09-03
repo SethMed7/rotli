@@ -26,7 +26,8 @@ if (!entries || typeof entries !== "object" || Array.isArray(entries)) {
   process.exit(1);
 }
 for (const [key, entry] of Object.entries(entries)) {
-  if (!/^[a-z][A-Za-z0-9]*$/.test(key)) violations.push(`${fixturePath}: entry key "${key}" must be camelCase`);
+  if (!/^[a-z][A-Za-z0-9]*$/.test(key))
+    violations.push(`${fixturePath}: entry key "${key}" must be camelCase`);
   if (typeof entry?.sourceOfTruth !== "string" || !entry.sourceOfTruth.trim()) {
     violations.push(`${fixturePath}: "${key}" must declare its sourceOfTruth`);
   }
@@ -52,4 +53,6 @@ if (violations.length) {
   process.exit(1);
 }
 
-console.log(`check:parity ok — ${Object.keys(entries).length} fixture entries referenced by both parity test suites`);
+console.log(
+  `check:parity ok — ${Object.keys(entries).length} fixture entries referenced by both parity test suites`,
+);

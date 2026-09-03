@@ -9,6 +9,7 @@
 // Scope matches the old rule: src/**/*.{ts,tsx} only.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { extname, join, relative } from "node:path";
+
 // `typescript6` is the npm-aliased TypeScript 6 (see CONTRIBUTING): the last JS
 // implementation, and the only one that still exports the syntactic AST API at
 // the package root. typescript@7 is the Go port — its `exports["."]` resolves to
@@ -37,7 +38,11 @@ function checkVariable(name, file, node) {
   if (DUNDER.test(name)) return;
   const stripped = name.replace(/^_+/, "");
   if (stripped === "" || CAMEL.test(stripped) || UPPER.test(stripped) || PASCAL.test(stripped)) return;
-  report(file, node, `variable \`${name}\` must be camelCase, UPPER_CASE, or PascalCase (leading underscore allowed)`);
+  report(
+    file,
+    node,
+    `variable \`${name}\` must be camelCase, UPPER_CASE, or PascalCase (leading underscore allowed)`,
+  );
 }
 
 function checkTypeLike(name, file, node, kind) {
@@ -63,7 +68,13 @@ function bindingNames(name, out) {
 }
 
 for (const file of files) {
-  const source = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true, extname(file) === ".tsx" ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  const source = ts.createSourceFile(
+    file,
+    readFileSync(file, "utf8"),
+    ts.ScriptTarget.Latest,
+    true,
+    extname(file) === ".tsx" ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
   const visit = (node) => {
     if (ts.isVariableDeclaration(node)) {
       const names = [];

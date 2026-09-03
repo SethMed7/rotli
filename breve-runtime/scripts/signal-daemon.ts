@@ -464,7 +464,7 @@ function writeIdentity(name: string, handle: { phone?: string; uuid?: string; em
     const path = join(knowledgePath(), "identities.local.json");
     let ids: Record<string, { phone?: string; uuid?: string; email?: string }> = {};
     try { ids = JSON.parse(readFileSync(path, "utf8")); } catch { /* new file */ }
-    ids[name] = { ...(ids[name] ?? {}), ...handle };
+    ids[name] = { ...ids[name], ...handle };
     atomicWriteJson(path, ids);
     return true;
   } catch (e) { logFail("write-identity", String(e)); return false; }
@@ -737,7 +737,6 @@ function startTyping(): () => void {
     void runSignalCli(["sendTyping", "-s", owner]);
   };
 }
-
 
 // ── Brief retrieval (PDF / audio over Signal) ────────────────────────────────
 // Durable record → the memex history/ (distilled digest). briefs/ is an ephemeral cache (today's
@@ -1045,8 +1044,9 @@ async function runAction(a: PendingAction): Promise<string> {
       const r = await sh(["/bin/bash", join(BREVE, "scripts", a.script), ...(Array.isArray(a.args) ? a.args.map(String) : [])]);
       return `${r.code === 0 ? "✓" : "⚠"} scripts/${a.script} exited ${r.code}.\n${r.txt.slice(-500)}`;
     }
+    default:
+      return "⚠ unknown action";
   }
-  return "⚠ unknown action";
 }
 
 // Called after every handled message: if the model just proposed an action, surface it.
@@ -2091,8 +2091,8 @@ function releaseSlot() {
 function dispatchEnv(env: SignalEnvelope, replayFile?: string) {
   const msg = env?.dataMessage?.message;
   const atts: SignalAttachment[] = env?.dataMessage?.attachments ?? [];
-  const voiceAtt = atts.find((a) => /^audio\//.test(a?.contentType ?? ""));
-  const mediaAtts = atts.filter((a) => !/^audio\//.test(a?.contentType ?? ""));
+  const voiceAtt = atts.find((a) => (a?.contentType ?? "").startsWith("audio/"));
+  const mediaAtts = atts.filter((a) => !(a?.contentType ?? "").startsWith("audio/"));
   if (!msg && !voiceAtt && !mediaAtts.length) return;
 
   // Journal before dispatch (skip when replaying — the file already exists).
@@ -2169,8 +2169,8 @@ while (true) {
       const srcUuid = env?.sourceUuid ?? null;
       const msg = env?.dataMessage?.message;
       const atts: SignalAttachment[] = env?.dataMessage?.attachments ?? [];
-      const voiceAtt = atts.find((a) => /^audio\//.test(a?.contentType ?? ""));
-      const mediaAtts = atts.filter((a) => !/^audio\//.test(a?.contentType ?? ""));
+      const voiceAtt = atts.find((a) => (a?.contentType ?? "").startsWith("audio/"));
+      const mediaAtts = atts.filter((a) => !(a?.contentType ?? "").startsWith("audio/"));
       if (!msg && !voiceAtt && !mediaAtts.length) continue;
       // Hard allowlist: only whitelisted senders (access.json bindings; or the legacy owner when no
       // access.json) are processed. dispatchEnv re-resolves + scopes the turn to the sender's partition.

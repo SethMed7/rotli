@@ -41,7 +41,7 @@ console.log(`OK wrote ${mdPath}`);
 
 const run = async (cmd: string[]) => {
   const p = Bun.spawn(cmd, { cwd: BREVE, stdout: "inherit", stderr: "inherit" });
-  return await p.exited;
+  return  p.exited;
 };
 
 let failed = false;

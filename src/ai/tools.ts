@@ -350,7 +350,7 @@ export async function runTool(
         ? JSON.stringify(
             ordered.map((hit) => ({ ...hit, snippet: truncate(hit.snippet, budget.snippetChars) })),
           )
-        : await emptySearchObservation(host, q);
+        : emptySearchObservation(host, q);
     }
     case "read_memory": {
       const id = argText(args.id).trim();
@@ -397,7 +397,7 @@ export async function runTool(
       if (title === "" && body === "") {
         return 'error: create_note needs a "title" and a markdown "body".';
       }
-      return await host.createNote(title, body);
+      return host.createNote(title, body);
     }
     case "create_document": {
       const title = argText(args.title).trim();
@@ -415,13 +415,13 @@ export async function runTool(
         return 'error: update_note needs an "id" and the COMPLETE new markdown "body" (it replaces the whole note — read_note first).';
       }
       if (!host.updateNote) return "error: this host cannot edit notes.";
-      return await host.updateNote(id, body);
+      return host.updateNote(id, body);
     }
     case "open_note": {
       const id = argText(args.id).trim();
       if (id === "") return 'error: open_note needs an "id" from search_notes or the index.';
       if (!host.openNote) return "error: this host cannot open notes on screen.";
-      return await host.openNote(id);
+      return host.openNote(id);
     }
     case "read_file": {
       const q = argText(args.query ?? args.name ?? args.file).trim();

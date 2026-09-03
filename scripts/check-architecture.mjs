@@ -121,7 +121,7 @@ violations.push(
       .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name))
       .map((entry) => entry.name),
     serviceFiles: readdirSync(join(root, "src", "services"), { withFileTypes: true })
-      .filter((entry) => entry.isFile() && /\.ts$/.test(entry.name) && !/\.test\.ts$/.test(entry.name))
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".ts") && !entry.name.endsWith(".test.ts"))
       .map((entry) => entry.name),
   }),
 );

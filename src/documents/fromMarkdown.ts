@@ -77,7 +77,7 @@ export function documentDraftFromMarkdown(title: string, body: string): Document
   for (let index = 0; index < lines.length; index += 1) {
     const raw = lines[index] ?? "";
     const trimmed = raw.trim();
-    if (/^```/.test(trimmed)) {
+    if (trimmed.startsWith("```")) {
       flushProse();
       inFence = !inFence;
       continue;

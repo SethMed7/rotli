@@ -30,11 +30,11 @@ describe("Breve workspace model", () => {
   test("model options retain configured models that are temporarily unavailable", () => {
     const config = {
       ...EMPTY_BREVE_CONFIG,
-      modelPolicy: { primary: "sonnet", fallbacks: ["gemini"], localHelper: "gemma" },
+      modelPolicy: { primary: "sonnet", fallbacks: ["sonnet-retired"], localHelper: "gemma" },
     };
     expect(modelPolicyOptions(config, ["sonnet", "gpt", "gemma"])).toEqual([
       "sonnet",
-      "gemini",
+      "sonnet-retired",
       "gemma",
       "gemma-3-12b-it-qat-4bit",
       "gpt",

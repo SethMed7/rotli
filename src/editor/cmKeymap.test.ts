@@ -211,7 +211,7 @@ describe("the ()+Space multiple-choice shorthand", () => {
     expect(head(choice)).toBe(6);
   });
 
-  test("normalizes indent and upgrades an existing bullet", () => {
+  test("normalizes indent and upgrades an existing bullet for a choice", () => {
     const tabbed = viewOf("\t( )", 4);
     expect(press(tabbed, "Space")).toBe(true);
     expect(text(tabbed)).toBe("  - ( ) ");

@@ -14,7 +14,7 @@ export async function createBlankWorkbookBase64(): Promise<string> {
  * ordinary editable XLSX through the same replaceable codec as blank sheets. */
 export async function createWorkbookFromCsvBase64(csv: string, sheetName = "Sheet1"): Promise<string> {
   const rows = parseCsvExact(csv);
-  if (rows.length === 0 || rows.every((row) => row.every((cell) => cell.trim() === ""))) {
+  if (rows.every((row) => row.every((cell) => cell.trim() === ""))) {
     throw new Error("sheet content has no cells");
   }
   const workbook = fillFromCsvRows(newWorkbook(), sheetName, rows);

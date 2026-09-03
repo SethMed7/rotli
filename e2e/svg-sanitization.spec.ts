@@ -14,7 +14,13 @@ test("SVG fences remove active content and external resources before rendering",
   await page.keyboard.insertText(
     `# Safe vector\n\n\`\`\`svg\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><script>window.svgActiveContentRan=true</script><foreignObject><div xmlns="http://www.w3.org/1999/xhtml">blocked</div></foreignObject><image href="https://example.test/tracker.png"/><rect width="20" height="20" onload="window.svgActiveContentRan=true" fill="url(https://example.test/paint)"/><circle cx="10" cy="10" r="4" fill="#abc"/></svg>\n\`\`\`\n\nAfter the vector`,
   );
-  await page.keyboard.press("Meta+Home");
+  // scroll, don't chord: Meta+Home is a macOS-only binding (no-op on Linux CI)
+  await page
+    .locator(".cm-scroller")
+    .last()
+    .evaluate((el) => {
+      el.scrollTop = 0;
+    });
 
   const preview = page.locator(".rotli-render-svg");
   await expect(preview.locator("svg")).toHaveCount(1);

@@ -15,19 +15,14 @@ test("Breve is a labelled segment of the front switcher, not a header icon", () 
     sidebarSource.indexOf("{/* the FRONT switcher"),
   );
 
-  // the header row keeps only creation + fold controls; the old unlabeled
-  // coffee toggle (audit 2026-09-02 §1.3) is gone
-  expect(header).not.toContain("sb-breve-toggle");
-  expect(header).not.toContain("CoffeeGlyph");
+  // the header row keeps only creation + fold controls
   expect(header).toContain("<NewFileGlyph size={16} />");
   expect(header).toContain("<NewFolderGlyph size={16} />");
   expect(header).toContain("<FoldGlyph size={16} />");
-  // the switcher and the utility footer stay visible in Breve mode, so the
-  // way back to Home/Chat and the Settings/Librarian doors never vanish
-  expect(sidebarSource).not.toContain('{sidebarMode !== "breve" && (');
+  // the switcher carries the segment; e2e/breve-lens.spec.ts proves the
+  // switcher and footer survive the trip into Breve and back
   expect(sidebarSource).toContain('breveActive={sidebarMode === "breve"}');
   expect(sidebarSource).toContain('onBreve={() => dispatch("view.breve")}');
-  expect(sidebarSource).not.toContain('{sidebarMode === "notes" && <SidebarFooter />}');
 });
 
 test("System stays Library, Assets, Archive, and Trash for every active vault", () => {

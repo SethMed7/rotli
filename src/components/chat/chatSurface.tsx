@@ -2270,7 +2270,7 @@ export function ChatSurface({
         if (ev.type === "status") {
           // the loop's generic thinking beats join the rotating vocabulary;
           // real tool statuses ("searching notes…") pass through untouched
-          setStatus(/^thinking…/.test(ev.text) ? nextThinkWord() : ev.text);
+          setStatus(ev.text.startsWith("thinking…") ? nextThinkWord() : ev.text);
         } else if (ev.type === "delta") {
           // the on-device answer, arriving as it's written — append to the live
           // row (a tool step or the thought scaffolding emits no deltas)

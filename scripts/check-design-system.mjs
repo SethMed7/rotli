@@ -1,5 +1,5 @@
-import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
 
 import sharp from "sharp";
 
@@ -230,6 +230,50 @@ for (const name of ["claude-spark-clay", "gemini", "gemma", "qwen", "openai-blos
   if (width < 12 || height < 12 || opaquePixels < 32) {
     violations.push(
       `provider mark ${name}: optical footprint ${width}x${height}, ${opaquePixels} alpha-pixels; expected at least 12x12 and 32`,
+    );
+  }
+}
+
+// Every `var(--x)` names a token that exists. A missing definition with no
+// fallback is a silently invalid declaration — the 2026-09-03 audit found 12
+// (a dead transition, an empty focus outline, a missing radius). Definitions
+// count from any stylesheet, TSX style object, setProperty call, or the brand
+// board; JS-injected measure tokens are read with a fallback and listed here.
+const definedTokens = new Set();
+function walkSources(dir, out = []) {
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) walkSources(path, out);
+    else if (/\.(?:tsx?|css)$/.test(name) && !/\.test\.tsx?$/.test(name)) out.push(relative(root, path));
+  }
+  return out;
+}
+const definitionSources = [...walkSources(join(root, "src")), "src/brand/board.html"];
+for (const file of definitionSources) {
+  const text = read(file);
+  for (const m of text.matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)) definedTokens.add(m[1]);
+  for (const m of text.matchAll(/setProperty\(\s*["'](--[a-zA-Z0-9-]+)["']/g)) definedTokens.add(m[1]);
+  for (const m of text.matchAll(/["'](--[a-zA-Z0-9-]+)["']\s*:/g)) definedTokens.add(m[1]);
+}
+const injectedWithFallback = new Set([
+  "--chat-measure",
+  "--cm-measure",
+  "--cmsg-list-depth",
+  "--chat-prompt-menu-left",
+  "--chat-prompt-menu-top",
+  "--chat-prompt-menu-width",
+]);
+const concatenatedPrefixes = ["--accent-swatch-", "--quokka-line-"];
+for (const file of definitionSources.filter((f) => f.endsWith(".css") || f.endsWith(".html"))) {
+  const text = read(file);
+  for (const m of text.matchAll(/var\((--[a-zA-Z0-9-]+)(,[^)]*)?\)/g)) {
+    const token = m[1];
+    if (definedTokens.has(token) || concatenatedPrefixes.some((p) => token.startsWith(p))) continue;
+    if (m[2] && injectedWithFallback.has(token)) continue;
+    violations.push(
+      m[2]
+        ? `${file}: var(${token}, …) falls back because ${token} is never defined — define it or list it as injected`
+        : `${file}: var(${token}) is never defined, so this declaration is silently invalid`,
     );
   }
 }

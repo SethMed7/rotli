@@ -16,7 +16,12 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
+  // fullyParallel was configured but never granted: CI ran 103 specs on ONE
+  // worker (~6 min). Four workers on the hosted runner; local keeps the default.
+  ...(process.env.CI ? { workers: 4 } : {}),
+  // the github reporter annotates a retried-then-passed spec in the run
+  // summary, so a flake is visible without opening the HTML artifact
+  reporter: process.env.CI ? [["list"], ["github"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL,
     trace: "retain-on-failure",

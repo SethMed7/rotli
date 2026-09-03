@@ -229,7 +229,7 @@ if (existsSync(join(root, "package.json"))) {
   // never runs unless someone remembers to extend the script.
   const breveTestDir = join(root, "breve-runtime/tests");
   if (existsSync(breveTestDir)) {
-    const breveTests = readdirSync(breveTestDir).filter((name) => /\.ts$/.test(name));
+    const breveTests = readdirSync(breveTestDir).filter((name) => name.endsWith(".ts"));
     for (const name of unreferencedNames(breveTests, packageJson.scripts?.["test:breve"] ?? "")) {
       failures.push(`breve-runtime/tests/${name} is never run — add it to the test:breve script`);
     }

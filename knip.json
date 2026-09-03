@@ -1,16 +1,25 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": [
+    "index.html!",
     "src/**/*.test.ts",
     "e2e/**/*.spec.ts",
     "scripts/*.mjs",
     "scripts/*.test.ts",
     "scripts/eval-*.ts",
-    "services/rotli-mcp-relay/server.ts",
-    "breve-runtime/scripts/*.ts",
+    "services/rotli-mcp-relay/server.ts!",
+    "breve-runtime/scripts/*.ts!",
     "breve-runtime/tests/*.ts"
   ],
-  "project": ["src/**/*.{ts,tsx}", "e2e/**/*.ts", "scripts/**/*.{ts,mjs}", "services/**/*.ts", "breve-runtime/**/*.ts"],
-  "ignoreBinaries": ["mktemp"],
+  "project": [
+    "src/**/*.{ts,tsx}!",
+    "e2e/**/*.ts",
+    "scripts/**/*.{ts,mjs}",
+    "services/**/*.ts!",
+    "breve-runtime/**/*.ts!"
+  ],
+  "ignoreBinaries": [
+    "mktemp"
+  ],
   "ignoreExportsUsedInFile": true
 }

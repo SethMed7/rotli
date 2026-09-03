@@ -8,9 +8,41 @@
 //! copy it; there is no later read command. Names are allowlisted so the
 //! webview can't turn this into a generic keychain browser.
 
+#[cfg(target_os = "macos")]
 use security_framework::passwords::{
     delete_generic_password, get_generic_password, set_generic_password,
 };
+
+/// Off macOS there is no system keychain wired yet (the cross-platform
+/// punch-list): every production read misses and every write refuses, loudly.
+/// Same three signatures, so the module body compiles unchanged on Linux CI.
+#[cfg(not(target_os = "macos"))]
+mod passwords {
+    #[derive(Debug)]
+    pub struct Error(&'static str);
+    impl Error {
+        pub fn code(&self) -> i32 {
+            -1
+        }
+    }
+    impl std::fmt::Display for Error {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str(self.0)
+        }
+    }
+    const UNAVAILABLE: &str = "the system keychain is available only on macOS";
+    pub fn get_generic_password(_service: &str, _account: &str) -> Result<Vec<u8>, Error> {
+        Err(Error(UNAVAILABLE))
+    }
+    pub fn set_generic_password(_service: &str, _account: &str, _value: &[u8]) -> Result<(), Error> {
+        Err(Error(UNAVAILABLE))
+    }
+    pub fn delete_generic_password(_service: &str, _account: &str) -> Result<(), Error> {
+        Err(Error(UNAVAILABLE))
+    }
+}
+#[cfg(not(target_os = "macos"))]
+use passwords::{delete_generic_password, get_generic_password, set_generic_password};
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 

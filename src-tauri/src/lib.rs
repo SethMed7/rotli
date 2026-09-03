@@ -1,3 +1,5 @@
+// off macOS, code behind macOS-gated entry points is unwired, not dead (Linux cargo-check lane)
+#![cfg_attr(not(target_os = "macos"), allow(dead_code))]
 // rotli — the shell. The window is a visitor, not a resident: it lives in the
 // menu bar (no dock icon, no Cmd-Tab), is summoned by a global shortcut, and
 // hides on blur or Esc. Summon shows LIVING windows — never recreates them —
@@ -24,8 +26,7 @@ mod fsutil;
 mod keychain;
 mod localmodel;
 mod memex;
-mod memex_query;
-mod native_drag;
+mod memex_query; mod native_drag;
 mod organizer;
 #[cfg(test)]
 mod parity_tests;
@@ -2323,8 +2324,7 @@ fn set_summon_shortcut(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_dialog::init()).plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(

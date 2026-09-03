@@ -24,9 +24,7 @@ const secret = readFileSync(join(root, secretPath), "utf8");
 
 // TS: the PATTERNS regex-literal array. `\/` in a literal is a plain `/`.
 const tsBlock = between(guard, "const PATTERNS", "];", guardPath);
-const tsPatterns = [...tsBlock.matchAll(/^\s*\/(.*)\/,\s*$/gm)].map((m) =>
-  m[1].replaceAll("\\/", "/"),
-);
+const tsPatterns = [...tsBlock.matchAll(/^\s*\/(.*)\/,\s*$/gm)].map((m) => m[1].replaceAll("\\/", "/"));
 
 // Rust: the raw strings inside the PATTERNS OnceLock init.
 const rsBlock = between(secret, "PATTERNS.get_or_init", ".iter()", secretPath);
@@ -34,8 +32,10 @@ const rsPatterns = [...rsBlock.matchAll(/r"([^"]*)"/g)].map((m) => m[1]);
 
 // Guard the extractors themselves — an empty match means the file shape moved,
 // not that the lists are in sync.
-if (tsPatterns.length < 10) violations.push(`${guardPath}: extracted only ${tsPatterns.length} patterns — extractor broken?`);
-if (rsPatterns.length < 10) violations.push(`${secretPath}: extracted only ${rsPatterns.length} patterns — extractor broken?`);
+if (tsPatterns.length < 10)
+  violations.push(`${guardPath}: extracted only ${tsPatterns.length} patterns — extractor broken?`);
+if (rsPatterns.length < 10)
+  violations.push(`${secretPath}: extracted only ${rsPatterns.length} patterns — extractor broken?`);
 
 const max = Math.max(tsPatterns.length, rsPatterns.length);
 for (let i = 0; i < max; i++) {

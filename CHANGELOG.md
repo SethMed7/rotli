@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Test suite and tooling audit (2026-09-03): `bun run verify` now mirrors CI's first steps (frozen installs, dependency convergence and license checks, a blocking chromium check); the release gate looks up CI by commit with a bounded retry and asserts the commit is on `origin/main`; Playwright runs on four workers in CI with the GitHub reporter; Linux CI type-checks the Rust crate so its non-macOS `cfg` blocks compile; `Cargo.toml` denies warnings locally; oxlint regains its `unicorn`/`oxc` plugins plus four type-aware rules and a `localStorage` ban; `scripts/*.ts` is typechecked; oxfmt covers `scripts/**/*.mjs` and `vite.config.ts`; `check:design-system` rejects undefined `var(--x)` tokens (twelve fixed); the coverage ratchet can only rise; the source-shape ratchet counts assertions; the site declares `clsx` directly so its prerender build resolves inside `site/` under bun's isolated linker; new fixture tests cover `check:ratchets` and `check:window-events`; `check:structure` fails when a Breve runtime test is not in `test:breve`; `check:code-shape` rejects control bytes in source and macOS-only CodeMirror chords in e2e. Tests: the provider policy test names and pins every admitted lane (Antigravity included), the appearance broadcast and Antigravity service have unit tests, Settings → AI Models has an e2e spec, and stale source-shape pins were retired. Details: `docs/architecture/test-suite-audit-2026-09-03.md`.
+
 ### Fixed
 
 - Ordered lists count on their own: deleting an item closes the gap, a Tab-nested run starts at 1 and counts up, and the toolbar's numbered toggle no longer leaves "1." on every line. One renumbering policy (`src/editor/listNumbers.ts`) rides inside every user edit as a transaction filter — one undo step, caret preserved; undo/redo and programmatic loads pass through untouched.

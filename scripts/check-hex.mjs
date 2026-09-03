@@ -52,7 +52,9 @@ function walk(dir) {
 walk(SRC);
 
 if (hits.length > 0) {
-  console.error(`check:hex FAILED — raw color literals (hex or rgb/hsl) outside the token-definition layer (${hits.length}):`);
+  console.error(
+    `check:hex FAILED — raw color literals (hex or rgb/hsl) outside the token-definition layer (${hits.length}):`,
+  );
   for (const hit of hits) console.error(`  ${hit}`);
   process.exit(1);
 }
