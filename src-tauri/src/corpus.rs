@@ -18,6 +18,7 @@
 //! ignoring private `.rotli/` runtime files and our own in-flight writes while
 //! observing external Main/named-view manifest edits.
 
+pub use crate::search_match::{leading_snippet, search_match, sort_hits, SearchHit, SearchMatch};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -1926,6 +1927,7 @@ fn reduce_md_links(s: &str, image: bool) -> String {
 
 /// First lines after the title, markdown stripped, for list rows (≤140 chars).
 pub fn snippet_of(body: &str) -> String {
+    let body = crate::search_match::strip_html_comments(body);
     let mut past_title = false;
     let mut parts: Vec<String> = Vec::new();
     for line in body.lines() {
@@ -1941,113 +1943,6 @@ pub fn snippet_of(body: &str) -> String {
         }
     }
     parts.join(" ").chars().take(140).collect()
-}
-
-// ─── full-text search (corpus_search) ────────────────────────────────────────
-
-/// One full-text hit on the wire (camelCase → src/types.ts SearchHit). `rank`
-/// 0 = title hit (matchStart/matchLen index the TITLE; `snippet` is the stored
-/// list snippet), 1 = body hit (offsets index the returned `snippet` window).
-/// Offsets are CHAR counts (code points), never bytes/UTF-16 units.
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SearchHit {
-    pub id: String,
-    pub title: String,
-    pub folder_id: String,
-    pub kind: NoteKind,
-    pub rank: u8,
-    pub snippet: String,
-    pub match_start: usize,
-    pub match_len: usize,
-    pub updated_at: i64,
-}
-
-/// The pure core of one hit — what `search_match` derives from a query + note.
-pub struct SearchMatch {
-    pub rank: u8,
-    pub snippet: String,
-    pub match_start: usize,
-    pub match_len: usize,
-}
-
-/// Context chars on each side of a body match in the snippet window.
-const SNIPPET_CTX: usize = 60;
-
-/// Per-char case fold: the FIRST char of each lowercase expansion — strictly
-/// 1:1, so a char offset in the folded text equals the offset in the original.
-/// TS twin: `fold` in src/services/search.ts.
-fn fold_chars(s: &str) -> Vec<char> {
-    s.chars()
-        .map(|c| c.to_lowercase().next().unwrap_or(c))
-        .collect()
-}
-
-/// Char offset of the first occurrence of `needle` in `hay` (both pre-folded).
-fn find_ci(hay: &[char], needle: &[char]) -> Option<usize> {
-    if needle.is_empty() || needle.len() > hay.len() {
-        return None;
-    }
-    (0..=hay.len() - needle.len()).find(|&i| hay[i..i + needle.len()] == *needle)
-}
-
-/// The ranking + snippet grammar (pure, unit-tested). Title match beats body
-/// match. A body hit gets a ±60-char window around the FIRST match: newlines
-/// flatten to spaces, emphasis chars (`*` `_` `` ` ``) are stripped OUTSIDE the
-/// matched span (inside stays verbatim so the offsets always frame exactly what
-/// matched), "…" marks a clipped edge. MUST stay in lockstep with searchMatch
-/// in src/services/search.ts (search.test.ts mirrors these vectors).
-pub fn search_match(
-    query: &str,
-    title: &str,
-    body: &str,
-    stored_snippet: &str,
-) -> Option<SearchMatch> {
-    let q = fold_chars(query.trim());
-    if q.is_empty() {
-        return None;
-    }
-    if let Some(i) = find_ci(&fold_chars(title), &q) {
-        return Some(SearchMatch {
-            rank: 0,
-            snippet: stored_snippet.to_string(),
-            match_start: i,
-            match_len: q.len(),
-        });
-    }
-    let chars: Vec<char> = body.chars().collect();
-    let i = find_ci(&fold_chars(body), &q)?;
-    let start = i.saturating_sub(SNIPPET_CTX);
-    let end = (i + q.len() + SNIPPET_CTX).min(chars.len());
-    let mut snippet = String::new();
-    let mut match_start = i - start;
-    if start > 0 {
-        snippet.push('…');
-        match_start += 1;
-    }
-    for (w, &c) in chars[start..end].iter().enumerate() {
-        let in_match = w >= i - start && w < i - start + q.len();
-        if !in_match && matches!(c, '*' | '_' | '`') {
-            if w < i - start {
-                match_start -= 1;
-            }
-            continue;
-        }
-        snippet.push(if matches!(c, '\n' | '\r' | '\t') {
-            ' '
-        } else {
-            c
-        });
-    }
-    if end < chars.len() {
-        snippet.push('…');
-    }
-    Some(SearchMatch {
-        rank: 1,
-        snippet,
-        match_start,
-        match_len: q.len(),
-    })
 }
 
 /// Trash and its subtree only — the ONE root search never surfaces (Archive
@@ -2179,40 +2074,6 @@ fn joined_task_text(lines: &[&str], start: usize) -> Option<String> {
         text.push_str(cont);
     }
     Some(text)
-}
-
-/// A leading-context snippet for a hit the index found by TOKEN/FUZZY match but
-/// `search_match` cannot frame (no contiguous substring to highlight). Newlines
-/// flatten to spaces, ~140 chars, "…" if clipped. Never used by the substring
-/// lane — only the Tantivy fallback path.
-fn leading_snippet(body: &str) -> String {
-    const MAX: usize = 140;
-    let flat: String = body
-        .chars()
-        .map(|c| {
-            if matches!(c, '\n' | '\r' | '\t') {
-                ' '
-            } else {
-                c
-            }
-        })
-        .collect();
-    let flat = flat.trim();
-    let mut out: String = flat.chars().take(MAX).collect();
-    if flat.chars().count() > MAX {
-        out.push('…');
-    }
-    out
-}
-
-/// rank asc (title hits first) → recency desc → id asc (deterministic wire).
-fn sort_hits(hits: &mut [SearchHit]) {
-    hits.sort_by(|a, b| {
-        a.rank
-            .cmp(&b.rank)
-            .then(b.updated_at.cmp(&a.updated_at))
-            .then(a.id.cmp(&b.id))
-    });
 }
 
 pub fn slugify(title: &str) -> String {
@@ -4801,13 +4662,14 @@ impl CorpusStore {
                     // a purely tokenized/fuzzy hit — nothing contiguous to frame.
                     // Rank it a body hit with a leading snippet and no highlight
                     // span, so it renders honestly and sorts after exact hits.
-                    rank: 1,
+                    rank: crate::search_match::RANK_FUZZY,
                     snippet: leading_snippet(
                         text.map(|t| t.body.as_str())
                             .unwrap_or(meta.snippet.as_str()),
                     ),
                     match_start: 0,
                     match_len: 0,
+                    spans: Vec::new(),
                 });
             hits.push(SearchHit {
                 id: meta.id.clone(),
@@ -4818,6 +4680,7 @@ impl CorpusStore {
                 snippet: m.snippet,
                 match_start: m.match_start,
                 match_len: m.match_len,
+                spans: m.spans,
                 updated_at: meta.updated_at,
             });
         }
@@ -4873,6 +4736,7 @@ impl CorpusStore {
                     snippet: m.snippet,
                     match_start: m.match_start,
                     match_len: m.match_len,
+                    spans: m.spans,
                     updated_at: meta.updated_at,
                 });
             }
@@ -10010,65 +9874,6 @@ mod tests {
     // ── full-text search (corpus_search) — the pure grammar + the store pass ──
 
     #[test]
-    fn search_match_ranks_title_over_body_with_offsets() {
-        // title hit: rank 0, offsets index the TITLE, stored snippet rides through
-        let m = search_match(
-            "groc",
-            "Groceries",
-            "# Groceries\n\nOlive oil.\n",
-            "Olive oil.",
-        )
-        .unwrap();
-        assert_eq!((m.rank, m.match_start, m.match_len), (0, 0, 4));
-        assert_eq!(m.snippet, "Olive oil.");
-
-        // body hit: rank 1, snippet frames the match, offsets index the SNIPPET
-        let m = search_match(
-            "sourdough",
-            "Groceries",
-            "# Groceries\n\nOlive oil, sourdough, butter.\n",
-            "Olive oil, sourdough, butter.",
-        )
-        .unwrap();
-        assert_eq!(m.rank, 1);
-        let chars: Vec<char> = m.snippet.chars().collect();
-        let hit: String = chars[m.match_start..m.match_start + m.match_len]
-            .iter()
-            .collect();
-        assert_eq!(hit, "sourdough");
-
-        // case-insensitive both directions; no match / blank query → None
-        assert!(search_match("OLIVE", "Groceries", "olive oil", "").is_some());
-        assert!(search_match("olive", "Groceries", "OLIVE OIL", "").is_some());
-        assert!(search_match("zebra", "Groceries", "olive oil", "").is_none());
-        assert!(search_match("   ", "Groceries", "olive oil", "").is_none());
-    }
-
-    #[test]
-    fn search_match_snippet_window_strips_and_marks_edges() {
-        // deep in a long body: ±60 chars of context, "…" on both clipped edges
-        let long = format!("{}NEEDLE{}", "a".repeat(100), "b".repeat(100));
-        let m = search_match("needle", "T", &long, "").unwrap();
-        assert!(m.snippet.starts_with('…') && m.snippet.ends_with('…'));
-        let chars: Vec<char> = m.snippet.chars().collect();
-        let hit: String = chars[m.match_start..m.match_start + m.match_len]
-            .iter()
-            .collect();
-        assert_eq!(hit, "NEEDLE");
-        assert_eq!(chars.len(), 1 + 60 + 6 + 60 + 1);
-
-        // emphasis stripped OUTSIDE the match, newlines flattened — offsets stay true
-        let m = search_match("needle", "T", "**bold**\nneedle `x`", "").unwrap();
-        let chars: Vec<char> = m.snippet.chars().collect();
-        let hit: String = chars[m.match_start..m.match_start + m.match_len]
-            .iter()
-            .collect();
-        assert_eq!(hit, "needle");
-        assert!(!m.snippet.contains('*') && !m.snippet.contains('`'));
-        assert!(!m.snippet.contains('\n'));
-    }
-
-    #[test]
     fn store_search_covers_bodies_ranks_titles_first_and_skips_trash() {
         let (_dir, mut store) = bare();
         let a = store
@@ -10100,7 +9905,7 @@ mod tests {
         assert_eq!(hits[0].id, a.id);
         assert_eq!(hits[0].rank, 0);
         let body_hit = hits.iter().find(|h| h.id == b.id).unwrap();
-        assert_eq!(body_hit.rank, 1);
+        assert_eq!(body_hit.rank, crate::search_match::RANK_BODY);
         assert!(body_hit.snippet.contains("wire limit"));
         // blank query is empty, never everything
         assert!(store.search("  ", 50, false).unwrap().is_empty());
@@ -10195,41 +10000,6 @@ mod tests {
                 assert!(!sub.is_empty(), "oracle setup: {q:?} must match mid-word");
             }
         }
-    }
-
-    #[test]
-    fn sort_hits_ranks_then_recency_then_id_lockstep() {
-        // mirrors sortHits in src/services/search.test.ts — the TS twin asserts
-        // this exact vector; a drift here means the shell and the dev surface
-        // rank equal-rank hits differently.
-        let hit = |id: &str, rank: u8, updated_at: i64| SearchHit {
-            id: id.into(),
-            title: "t".into(),
-            folder_id: "Inbox".into(),
-            kind: NoteKind::Note,
-            rank,
-            snippet: String::new(),
-            match_start: 0,
-            match_len: 1,
-            updated_at,
-        };
-        let mut hits = vec![
-            hit("old-body", 1, 10),
-            hit("new-body", 1, 20),
-            hit("title", 0, 1),
-        ];
-        sort_hits(&mut hits);
-        let ids: Vec<&str> = hits.iter().map(|h| h.id.as_str()).collect();
-        assert_eq!(
-            ids,
-            ["title", "new-body", "old-body"],
-            "rank asc → recency desc"
-        );
-        // the id tie-break: identical rank + recency sorts ascending by id
-        let mut ties = vec![hit("b", 1, 5), hit("a", 1, 5)];
-        sort_hits(&mut ties);
-        assert_eq!(ties[0].id, "a");
-        assert_eq!(ties[1].id, "b");
     }
 
     #[test]

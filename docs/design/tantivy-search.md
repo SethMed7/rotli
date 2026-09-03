@@ -60,10 +60,18 @@ story and it is untouched (Security, below).
 
 ### Division of labour: Tantivy decides *membership*, `search_match` decides *presentation*
 
-`search_match` (and its byte-identical TS twin `src/services/search.ts`) owns the
-`SearchHit` grammar: rank (title hit = 0, body hit = 1), the ±60-char snippet
-window, emphasis-stripping, and the char offsets (`matchStart`/`matchLen`). That
-contract, its parity tests, and the UI highlight all stay exactly as they are.
+`search_match` (`src-tauri/src/search_match.rs`, and its byte-identical TS twin
+`src/services/search.ts`) owns the `SearchHit` grammar: rank, the ±60-char
+snippet window, emphasis-stripping, and the char spans. Rank, lower first:
+0 the whole query is a contiguous substring of the title · 1 every query word
+occurs in the title, any order ("checklist launch" finds "Launch checklist") ·
+2 the whole query in the body · 3 every word in the body · 4 an index-only
+(typo-tolerant) hit nothing here can frame. `spans` carries every matched
+word as `[start, len]` char offsets (into the title for 0–1, into the snippet
+for 2–3); `matchStart`/`matchLen` mirror the first span. Until 2026-09-03 only
+the two contiguous ranks existed, so a note whose title carried all the words
+in a different order fell to the fuzzy rank, sorted by recency beneath whatever
+the Filer regenerated that morning, and showed no highlight.
 
 `CorpusStore::search` now works in two stages:
 
@@ -82,9 +90,9 @@ contract, its parity tests, and the UI highlight all stay exactly as they are.
 2. **Presentation (`search_match`).** For each candidate, look up its cached
    `title`/`body`/`metadata`/`aliases` (already resident from the walk) and run
    `search_match` to produce the snippet, offsets, and rank exactly as today. If
-   `search_match` finds no *substring* match (a purely tokenized/fuzzy hit), fall
-   back to a rank-1 hit with a leading-context snippet and zero offsets, so the
-   result still renders without lying about a highlight span.
+   `search_match` finds neither a substring nor every word (a purely fuzzy hit),
+   fall back to rank 4 with a leading-context snippet (HTML comments stripped)
+   and no spans, so the result still renders without lying about a highlight.
 
 The final ordering stays `sort_hits` — `rank asc → recency desc → id asc` — so
 the wire is deterministic and every existing ordering test holds. BM25 relevance

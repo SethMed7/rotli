@@ -212,7 +212,7 @@ describe("retrieval", () => {
     const hit = (id: string) => ({ id, title: id, snippet: "", folder: "wiki/people" });
     const merged = mergeFolderHits(
       [
-        { hit: hit("body"), rank: 1 },
+        { hit: hit("body"), rank: 2 }, // a body hit (ranks 0–1 are title hits)
         { hit: hit("title"), rank: 0 },
       ],
       [hit("folder"), hit("title")],

@@ -148,6 +148,7 @@ export class InMemoryNotesService implements NotesService {
         rank: m.rank,
         matchStart: m.matchStart,
         matchLen: m.matchLen,
+        spans: m.spans,
         updatedAt: n.updatedAt,
       });
     }

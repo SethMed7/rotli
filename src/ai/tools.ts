@@ -152,9 +152,9 @@ export function mergeFolderHits(
     seen.add(hit.id);
     out.push(hit);
   };
-  for (const r of ranked) if (r.rank === 0) push(r.hit);
+  for (const r of ranked) if (r.rank <= 1) push(r.hit); // title hits (whole query or every word)
   for (const hit of folder) push(hit);
-  for (const r of ranked) if (r.rank !== 0) push(r.hit);
+  for (const r of ranked) if (r.rank > 1) push(r.hit);
   return out.slice(0, limit);
 }
 

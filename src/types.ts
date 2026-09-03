@@ -54,9 +54,14 @@ export interface SearchHit {
   snippet: string;
   folderId: string;
   kind: "note" | "board" | "file";
+  /** 0 title substring · 1 every word in the title · 2 body substring ·
+   * 3 every word in the body · 4 index-only (typo) hit with nothing to frame */
   rank: number;
   matchStart: number;
   matchLen: number;
+  /** [start, len] char spans — into the title for ranks 0–1, into `snippet`
+   * for 2–3, empty for 4. matchStart/matchLen mirror the first span. */
+  spans: [number, number][];
   updatedAt: number;
 }
 

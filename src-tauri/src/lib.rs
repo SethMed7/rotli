@@ -34,7 +34,7 @@ mod private_browser;
 mod provider;
 mod remote_agent;
 mod routines;
-mod search_index;
+mod search_index; mod search_match;
 mod secret;
 mod usage;
 mod vault_browser;

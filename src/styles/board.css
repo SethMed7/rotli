@@ -878,11 +878,16 @@ span.fdr-col {
 
 /* Full-text search: the matched span inside a snippet (All notes rows + the
    ⌘K palette hint). Quiet tint, never the browser-default yellow — low pulse. */
+/* a matched word in search results (palette, note lists, board search): a
+   light accent tint plus medium weight — one notch past an email client's
+   bold, never a highlighter stripe (Seth, 2026-09-03) */
 mark.hitmark {
-  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
   color: inherit;
+  font-weight: 600;
   border-radius: 3px;
-  padding: 0 1px;
+  padding: 0 2px;
+  box-decoration-break: clone;
 }
 
 /* All-chats list rows — the Chat-front twin of a note row (the maintainer, 2026-07-01). */

@@ -14,6 +14,7 @@ import { useTransientPopover } from "../lib/popover";
 import { activeInstance } from "../memex/config";
 import { useInstanceChats, useMemexConfig } from "../memex/useMemex";
 import { useFolders, useNoteIndex, useNoteSearch, useSearchableNotes } from "../services/hooks";
+import { isTitleHit } from "../services/search";
 import { useMruStore } from "../state/mru";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
@@ -234,23 +235,23 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
       };
       const home = folderName(h.folderId);
       return {
-        ...noteRow(summary, h.rank === 1 ? h.snippet : ""),
-        // a TITLE hit highlights the match in the title itself; a BODY hit shows
-        // the note's home AND the framed snippet, not one or the other (audit F6)
-        ...(h.rank === 0
+        ...noteRow(summary, isTitleHit(h.rank) ? "" : h.snippet),
+        // a TITLE hit (whole query, or every word) highlights the words in the
+        // title itself; a BODY hit shows the note's home AND the framed snippet
+        // with each word lit; an index-only hit shows its leading snippet plain
+        ...(isTitleHit(h.rank)
           ? {
-              label: <MatchText text={h.title} start={h.matchStart} len={h.matchLen} />,
+              label: <MatchText text={h.title} start={h.matchStart} len={h.matchLen} spans={h.spans} />,
             }
           : {}),
-        hint:
-          h.rank === 1 ? (
-            <span className="muted">
-              {home ? `${home} · ` : ""}
-              <MatchText text={h.snippet} start={h.matchStart} len={h.matchLen} />
-            </span>
-          ) : (
-            <span className="muted">{home}</span>
-          ),
+        hint: isTitleHit(h.rank) ? (
+          <span className="muted">{home}</span>
+        ) : (
+          <span className="muted">
+            {home ? `${home} · ` : ""}
+            <MatchText text={h.snippet} start={h.matchStart} len={h.matchLen} spans={h.spans} />
+          </span>
+        ),
       };
     };
     const hitIds = new Set((hits ?? []).map((h) => h.id));

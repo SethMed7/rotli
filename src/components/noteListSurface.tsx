@@ -11,6 +11,7 @@
 import { type ReactNode, useCallback, useMemo, useState } from "react";
 
 import { useNoteSearch, useSearchableNotes } from "../services/hooks";
+import { isBodyHit } from "../services/search";
 import { usePanesStore } from "../state/panes";
 import type { NoteSummary, SearchHit } from "../types";
 import { Character } from "./character";
@@ -88,7 +89,7 @@ export function NoteListSurface({
             pinned: false,
             kind: h.kind,
           } satisfies NoteSummary),
-        hit: h.rank === 1 ? h : undefined,
+        hit: isBodyHit(h.rank) ? h : undefined,
       })),
       ...local.filter((n) => !seen.has(n.id)).map((note) => ({ note })),
     ];
@@ -134,7 +135,12 @@ export function NoteListSurface({
                 note={r.note}
                 snippetNode={
                   r.hit ? (
-                    <MatchText text={r.hit.snippet} start={r.hit.matchStart} len={r.hit.matchLen} />
+                    <MatchText
+                      text={r.hit.snippet}
+                      start={r.hit.matchStart}
+                      len={r.hit.matchLen}
+                      spans={r.hit.spans}
+                    />
                   ) : undefined
                 }
                 onOpen={onOpenRow}

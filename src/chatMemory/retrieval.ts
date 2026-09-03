@@ -25,7 +25,8 @@ export function mergeKeywordHits<T extends KeywordSearchHit>(resultSets: readonl
   const merged = new Map<string, { hit: T; score: number }>();
   resultSets.forEach((hits, queryIndex) => {
     for (const hit of hits) {
-      const score = (hit.rank === 0 ? 8 : 4) + (queryIndex === 0 ? 6 : 0);
+      // ranks 0–1 are title hits (whole query, or every word), 2+ body/index hits
+      const score = (hit.rank <= 1 ? 8 : 4) + (queryIndex === 0 ? 6 : 0);
       const previous = merged.get(hit.id);
       if (previous) previous.score += score;
       else merged.set(hit.id, { hit, score });
