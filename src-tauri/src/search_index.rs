@@ -339,11 +339,7 @@ impl SearchIndex {
 /// boundaries closely enough for query building (indexing does the authoritative
 /// split). Punctuation is dropped so a stray comma does not break a term.
 fn tokenize(s: &str) -> Vec<String> {
-    s.split(|c: char| !c.is_alphanumeric())
-        .filter(|t| !t.is_empty())
-        .take(16)
-        .map(|t| t.to_lowercase())
-        .collect()
+    crate::search_match::query_tokens(s)
 }
 
 /// Escape the regex metacharacters that can appear in a query token. Tokens are
@@ -690,7 +686,7 @@ mod bench {
         for _ in 0..rounds {
             for q in queries {
                 for d in &docs {
-                    if crate::corpus::search_match(q, &d.title, &d.body, "").is_some() {
+                    if crate::search_match::search_match(q, &d.title, &d.body, "").is_some() {
                         hits_sub += 1;
                     }
                 }

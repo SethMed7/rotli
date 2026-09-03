@@ -113,3 +113,16 @@ test("palette: arrows keep working while the cursor rests over the list", async 
   for (let i = 0; i < count - 1; i++) await page.keyboard.press("ArrowDown");
   await expect(rows.nth(count - 1)).toHaveClass(/sel/);
 });
+
+test("a title with every word in another order ranks first and lights each word", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /Search notes and actions/ }).click();
+  const input = page.getByRole("combobox", { name: /Search/ });
+  await input.fill("checklist launch");
+  const first = page.locator(".prow").first();
+  await expect(first.locator(".plabel")).toContainText("Launch checklist");
+  const lit = first.locator(".plabel mark.hitmark");
+  await expect(lit).toHaveText(["Launch", "checklist"]);
+  // evident but subtle: a tint plus medium weight, not a highlighter stripe
+  await expect(lit.first()).toHaveCSS("font-weight", "600");
+});

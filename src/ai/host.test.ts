@@ -120,6 +120,7 @@ void mock.module("../lib/tauri", () => ({
         snippet: r.body.slice(0, 40),
         matchStart: 0,
         matchLen: 1,
+        spans: [],
         updatedAt: 0,
       }));
   },

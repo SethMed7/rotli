@@ -56,6 +56,15 @@
         "src/components/settingsSurface.tsx"
       ],
       "reason": "The Antigravity setup card deliberately speaks the AI Models settings vocabulary (.ailane-* rows, .ghostbtn variants, chip states) so it reads as one surface; the shared literals are class names, not copied logic (2026-09-03)."
+    },
+    {
+      "id": "search-grammar-lockstep-vectors",
+      "files": [
+        "src-tauri/src/search_match.rs",
+        "src/services/search.test.ts"
+      ],
+      "signal": "literal",
+      "reason": "MIRROR-NOT-IMPORT: the Rust search grammar tests and the TS twin's vectors share their literals ON PURPOSE (Groceries/sourdough/Launch checklist…) — the same inputs asserted on both sides of the app/shell boundary are the lockstep proof, not a copy to extract (docs/design/tantivy-search.md)."
     }
   ]
 }
