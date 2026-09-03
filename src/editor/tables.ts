@@ -318,3 +318,38 @@ export function nextCell(t: TableShape, ref: CellRef, dir: 1 | -1): CellRef | nu
   if (idx < 0 || idx >= (t.rows.length + 1) * cols) return null;
   return { row: Math.floor(idx / cols) - 1, col: idx % cols };
 }
+
+/** Where the caret belongs after a table's source is replaced (a row/column
+ * operation, a cell commit). CodeMirror maps a caret that sat INSIDE the
+ * replaced range to the end of the insertion — the bottom of the table — and
+ * a caret that sat elsewhere stays there, which is where `view.focus()` then
+ * scrolls to (a long note + a stale caret = "deleting a column threw me to
+ * the bottom", 2026-09-03). Keep the same line within the table instead,
+ * clamped to the new table's line count; a caret outside the table lands on
+ * the table's first line, the thing the user was working on. */
+export function caretAfterTableEdit(head: number, from: number, to: number, insert: string): number {
+  const inside = head >= from && head <= to;
+  const lines = insert.split("\n");
+  if (!inside) return from;
+  // the start of the new-text line that contains the old offset (rows keep
+  // their order across every table op, so this is the same row or its nearest
+  // survivor)
+  const rel = Math.min(head - from, insert.length);
+  let offset = 0;
+  for (const line of lines) {
+    if (offset + line.length >= rel) return from + offset;
+    offset += line.length + 1;
+  }
+  return from + Math.max(0, insert.length - (lines.at(-1)?.length ?? 0));
+}
+
+/** Persisted column widths are absolute pixels, which made a table wider than
+ * its pane overflow instead of following a resize. Scale them down together
+ * (never below `min` per column) so the table keeps the user's proportions
+ * and fits the space it has; widths that already fit are returned as-is. */
+export function fitColumnWidths(widths: readonly number[], available: number, min: number): number[] {
+  const total = widths.reduce((a, b) => a + b, 0);
+  if (!Number.isFinite(available) || available <= 0 || total <= available) return [...widths];
+  const scale = available / total;
+  return widths.map((w) => Math.max(min, Math.round(w * scale)));
+}

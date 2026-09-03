@@ -17,19 +17,16 @@ import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemir
 
 import { MIN_TABLE_COL_PX, MIN_TABLE_ROW_PX, tableWidthKey, useTableWidthsStore } from "../state/tableWidths";
 import { noteIdFacet } from "./livePreview";
+import { GRIP_H, GRIP_V, applyOp, openTableMenu } from "./tableMenu";
 import {
   type Align,
   type TableBlock,
   type TableShape,
   addColRight,
   addRowBelow,
-  deleteCol,
-  deleteRow,
-  moveCol,
-  moveRow,
+  fitColumnWidths,
   nextCell,
   scanTables,
-  setColAlign,
   setCellText,
   tableToText,
 } from "./tables";
@@ -50,135 +47,6 @@ function inlineCell(raw: string): string {
 /** Reveal the whole table raw: the `</>` escape hatch. Cleared automatically
  * when the caret leaves the table (see the field's update). */
 export const setTableRaw = StateEffect.define<number>();
-
-// ─── the row/col mini menu (module-level singleton, like the drop line) ──────
-
-let menuEl: HTMLDivElement | null = null;
-let backdropEl: HTMLDivElement | null = null;
-function closeTableMenu(): void {
-  menuEl?.remove();
-  backdropEl?.remove();
-  menuEl = null;
-  backdropEl = null;
-}
-
-/** Resolve the table containing the widget NOW (offsets go stale; posAtDOM at
- * action time is the truth) and replace its source with the transformed text. */
-function applyOp(view: EditorView, wrap: HTMLElement, fn: (t: TableBlock) => TableShape | null): void {
-  if (!wrap.isConnected) return; // the widget was rebuilt/unmounted under the menu
-  const pos = view.posAtDOM(wrap);
-  const t = scanTables(view.state.doc).find((x) => pos >= x.from && pos <= x.to);
-  if (!t) return;
-  const next = fn(t);
-  if (!next) return;
-  view.dispatch({ changes: { from: t.from, to: t.to, insert: tableToText(next) } });
-}
-
-function openTableMenu(
-  view: EditorView,
-  wrap: HTMLElement,
-  kind: "row" | "col",
-  index: number,
-  align: Align,
-  anchor: DOMRect,
-): void {
-  closeTableMenu();
-  const backdrop = document.createElement("div");
-  backdrop.className = "rotli-tblmenu-backdrop";
-  backdrop.addEventListener("mousedown", (e) => {
-    e.preventDefault();
-    closeTableMenu();
-  });
-  const menu = document.createElement("div");
-  menu.className = "rotli-tblmenu";
-  menu.setAttribute("role", "menu");
-
-  const act = (fn: (t: TableBlock) => TableShape | null) => {
-    applyOp(view, wrap, fn);
-    closeTableMenu();
-    view.focus();
-  };
-  const item = (label: string, run: () => void, opts?: { danger?: boolean; icon?: string }) => {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = opts?.danger ? "rotli-tblmenu-item danger" : "rotli-tblmenu-item";
-    b.setAttribute("role", "menuitem");
-    if (opts?.icon) {
-      const ico = document.createElement("span");
-      ico.className = "rotli-tblmenu-ico";
-      ico.innerHTML = opts.icon;
-      b.appendChild(ico);
-    }
-    b.appendChild(document.createTextNode(label));
-    b.addEventListener("mousedown", (e) => e.preventDefault());
-    b.addEventListener("click", run);
-    menu.appendChild(b);
-  };
-
-  if (kind === "row") {
-    item("Add row above", () => act((t) => addRowBelow(t, index - 1)));
-    item("Add row below", () => act((t) => addRowBelow(t, index)));
-    item("Move up", () => act((t) => moveRow(t, index, -1)), { icon: MOVE_UP });
-    item("Move down", () => act((t) => moveRow(t, index, 1)), { icon: MOVE_DOWN });
-    item("Delete row", () => act((t) => deleteRow(t, index)), { danger: true });
-  } else {
-    // alignment first — a small segmented row (the delimiter cell rewrite).
-    // Docs-style line glyphs (2026-07-31): instantly readable, not arrows.
-    const seg = document.createElement("div");
-    seg.className = "rotli-tblmenu-align";
-    for (const a of ["left", "center", "right"] as const) {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = align === a ? "rotli-tblalign sel" : "rotli-tblalign";
-      b.title = `Align ${a}`;
-      b.setAttribute("aria-label", `Align ${a}`);
-      b.innerHTML = ALIGN_ICONS[a];
-      b.addEventListener("mousedown", (e) => e.preventDefault());
-      b.addEventListener("click", () => act((t) => setColAlign(t, index, align === a ? "" : a)));
-      seg.appendChild(b);
-    }
-    menu.appendChild(seg);
-    item("Add column left", () => act((t) => addColRight(t, index - 1)));
-    item("Add column right", () => act((t) => addColRight(t, index)));
-    item("Move left", () => act((t) => moveCol(t, index, -1)), { icon: MOVE_LEFT });
-    item("Move right", () => act((t) => moveCol(t, index, 1)), { icon: MOVE_RIGHT });
-    item("Delete column", () => act((t) => deleteCol(t, index)), { danger: true });
-  }
-
-  document.body.appendChild(backdrop);
-  document.body.appendChild(menu);
-  backdropEl = backdrop;
-  menuEl = menu;
-  // place beside the chip, clamped to the viewport
-  const mw = menu.offsetWidth;
-  const mh = menu.offsetHeight;
-  menu.style.left = `${Math.min(anchor.right + 4, window.innerWidth - mw - 8)}px`;
-  menu.style.top = `${Math.max(8, Math.min(anchor.top, window.innerHeight - mh - 8))}px`;
-}
-
-// ─── the widget ──────────────────────────────────────────────────────────────
-
-// menu glyphs (2026-07-31, the maintainer: "use standard icons — instantly understood").
-// The Docs-style horizontal-lines family for alignment, arrow+lines for the
-// move verbs. Raw SVG strings (this widget is imperative DOM, no React) in the
-// shared 24-viewBox / 1.7-stroke voice of formatGlyphs.tsx.
-const svg = (paths: string) =>
-  `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
-const ALIGN_ICONS: Record<"left" | "center" | "right", string> = {
-  left: svg('<path d="M4 6h16M4 10h9M4 14h16M4 18h9"/>'),
-  center: svg('<path d="M4 6h16M7.5 10h9M4 14h16M7.5 18h9"/>'),
-  right: svg('<path d="M4 6h16M11 10h9M4 14h16M11 18h9"/>'),
-};
-const MOVE_LEFT = svg('<path d="M13 6h7M13 12h7M13 18h7"/><path d="M9 12H3m3-3-3 3 3 3"/>');
-const MOVE_RIGHT = svg('<path d="M4 6h7M4 12h7M4 18h7"/><path d="M15 12h6m-3-3 3 3-3 3"/>');
-const MOVE_UP = svg('<path d="M6 13h12M6 17h12M6 21h12"/><path d="M12 9V3M9 6l3-3 3 3"/>');
-const MOVE_DOWN = svg('<path d="M6 3h12M6 7h12M6 11h12"/><path d="M12 15v6m-3-3 3 3 3-3"/>');
-
-// chip glyphs — the block-handle grip voice, sized for an 18px chip
-const GRIP_V =
-  '<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true"><circle cx="6" cy="4" r="1.25"/><circle cx="10" cy="4" r="1.25"/><circle cx="6" cy="8" r="1.25"/><circle cx="10" cy="8" r="1.25"/><circle cx="6" cy="12" r="1.25"/><circle cx="10" cy="12" r="1.25"/></svg>';
-const GRIP_H =
-  '<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true"><circle cx="4" cy="6" r="1.25"/><circle cx="4" cy="10" r="1.25"/><circle cx="8" cy="6" r="1.25"/><circle cx="8" cy="10" r="1.25"/><circle cx="12" cy="6" r="1.25"/><circle cx="12" cy="10" r="1.25"/></svg>';
 
 function plainCellLabel(raw: string, col: number): string {
   const label = raw
@@ -213,8 +81,10 @@ class TableWidget extends WidgetType {
   /** Live only while a column drag is in flight — destroy() runs it so the
    * window-level drag listeners never outlive the widget (PR #9 review). */
   private dropResizeCleanup: (() => void) | null = null;
+  private dropObserver: (() => void) | null = null;
   destroy(): void {
     this.dropResizeCleanup?.();
+    this.dropObserver?.();
   }
   eq(o: TableWidget): boolean {
     return (
@@ -307,15 +177,26 @@ class TableWidget extends WidgetType {
         });
         table.insertBefore(group, table.firstChild);
       }
-      cols.forEach((w, i) => {
+      // persisted pixels are the user's proportions; the pane's width is the
+      // budget — a table wider than its pane scales down together instead of
+      // overflowing (2026-09-03), and grows back when the pane does
+      const fitted = fitColumnWidths(cols, scroll.clientWidth, MIN_TABLE_COL_PX);
+      fitted.forEach((w, i) => {
         const col = widthColgroup?.[i];
         if (col) col.style.width = `${w}px`;
       });
       table.style.tableLayout = "fixed";
-      table.style.width = `${cols.reduce((a, b) => a + b, 0)}px`;
+      table.style.width = `${fitted.reduce((a, b) => a + b, 0)}px`;
     };
     if (userWidths && userWidths.length === this.cols) applyColWidths(userWidths);
     else userWidths = null;
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(() => {
+        if (userWidths && !wrap.classList.contains("rotli-tbl-resizing")) applyColWidths(userWidths);
+      });
+      observer.observe(scroll);
+      this.dropObserver = () => observer.disconnect();
+    }
 
     // ── row HEIGHTS (2026-07-31, the column story's twin): drag a row's
     //    bottom edge; heights act as minimums (content can still grow a row),
@@ -400,9 +281,11 @@ class TableWidget extends WidgetType {
         const next = visual.slice();
         next[boundary] = dragged;
         applyRowHeights(next);
+        showRowGrip(boundary);
       };
       const onUp = () => {
         cleanupResize();
+        hideGrips();
         persisted[boundary] = dragged;
         userHeights = persisted;
         // re-apply the PERSISTED shape — a transiently inflated row snaps back
@@ -432,9 +315,11 @@ class TableWidget extends WidgetType {
         next[boundary] = Math.max(MIN_TABLE_COL_PX, (startWidths[boundary] ?? 0) + ev.clientX - startX);
         userWidths = next;
         applyColWidths(next);
+        showColGrip(boundary);
       };
       const onUp = () => {
         cleanupResize();
+        hideGrips();
         if (userWidths) useTableWidthsStore.getState().setTableWidths(widthKey, userWidths);
       };
       const cleanupResize = () => {
@@ -449,10 +334,57 @@ class TableWidget extends WidgetType {
       // — destroy() runs this so no window listener outlives the widget
       this.dropResizeCleanup = cleanupResize;
     };
+    // ── the visible handle (2026-09-03): a line on the boundary under the
+    //    pointer, with a small grip pill, so a resizable edge is seen before it
+    //    is felt; it stays lit for the whole drag ──
+    const colGrip = document.createElement("div");
+    colGrip.className = "rotli-tbl-grip col";
+    colGrip.setAttribute("aria-hidden", "true");
+    const rowGrip = document.createElement("div");
+    rowGrip.className = "rotli-tbl-grip row";
+    rowGrip.setAttribute("aria-hidden", "true");
+    wrap.appendChild(colGrip);
+    wrap.appendChild(rowGrip);
+    const hideGrips = () => {
+      colGrip.classList.remove("on");
+      rowGrip.classList.remove("on");
+    };
+    const showColGrip = (boundary: number) => {
+      const cell = table.rows.item(0)?.cells.item(boundary);
+      if (!cell) return hideGrips();
+      const wrapRect = wrap.getBoundingClientRect();
+      const cellRect = cell.getBoundingClientRect();
+      const tableRect = table.getBoundingClientRect();
+      colGrip.style.left = `${cellRect.right - wrapRect.left - 1}px`;
+      colGrip.style.top = `${tableRect.top - wrapRect.top}px`;
+      colGrip.style.height = `${tableRect.height}px`;
+      colGrip.classList.add("on");
+      rowGrip.classList.remove("on");
+    };
+    const showRowGrip = (boundary: number) => {
+      const tr = table.rows.item(boundary);
+      if (!tr) return hideGrips();
+      const wrapRect = wrap.getBoundingClientRect();
+      const rowRect = tr.getBoundingClientRect();
+      const tableRect = table.getBoundingClientRect();
+      rowGrip.style.top = `${rowRect.bottom - wrapRect.top - 1}px`;
+      rowGrip.style.left = `${tableRect.left - wrapRect.left}px`;
+      rowGrip.style.width = `${tableRect.width}px`;
+      rowGrip.classList.add("on");
+      colGrip.classList.remove("on");
+    };
     table.addEventListener("mousemove", (e) => {
-      if (e.buttons) return; // an active drag owns the cursor
+      if (e.buttons) return; // an active drag owns the cursor and the grip
       // column boundaries win the corner (they came first; rows are the twin)
-      table.style.cursor = boundaryAt(e) >= 0 ? "col-resize" : rowBoundaryAt(e) >= 0 ? "row-resize" : "";
+      const col = boundaryAt(e);
+      const row = col >= 0 ? -1 : rowBoundaryAt(e);
+      table.style.cursor = col >= 0 ? "col-resize" : row >= 0 ? "row-resize" : "";
+      if (col >= 0) showColGrip(col);
+      else if (row >= 0) showRowGrip(row);
+      else hideGrips();
+    });
+    wrap.addEventListener("mouseleave", () => {
+      if (!wrap.classList.contains("rotli-tbl-resizing")) hideGrips();
     });
     table.addEventListener("dblclick", (e) => {
       if (!widthKey) return;

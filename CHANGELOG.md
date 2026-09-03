@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Tables follow the pane and show their resize handles.** A table with
+  saved column widths overflowed the editor instead of following a narrower
+  window; widths now scale down together to the space available (never
+  below a column's floor) and grow back with the pane, and tables without
+  saved widths wrap to fit before they scroll. Hovering a column or row edge
+  shows a visible grip that stays lit through the drag. Deleting or moving a
+  row or column no longer throws the view to wherever the caret last was
+  (often the bottom of a long note); the caret stays on the table.
+
 - **A note that changed on disk no longer freezes, and never blocks quitting.**
   When something other than the editor rewrote an open note — a task ticked
   from the Tasks view, a chat edit, the Librarian, another app — the next
