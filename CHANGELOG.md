@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Copy is a true copy: the clipboard carries the selection as readable text with its numbers, bullets, and task boxes, and as real HTML (nested `<ol>`/`<ul>`, headings, quotes, code) with images inlined as `data:` URLs — so a paste into an AI chat, Google Docs, or Notes keeps the list and the picture. Images resolve through a guarded corpus command and the host's clipboard plugin.
 - Dropping a file from Finder onto a note draws a drop line under the pointer while the drag hovers, and the drop lands where the line was — or in the editor the drag last hovered, or at the focused note's caret — instead of silently filing the image into storage when the coordinates missed the editor.
 
+## [0.86.0] - 2026-09-03
+
 ### Fixed
 
 - **Tables follow the pane and show their resize handles.** A table with
