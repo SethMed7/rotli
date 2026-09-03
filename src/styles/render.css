@@ -36,12 +36,15 @@
   width: 100%;
   height: 320px;
 }
+/* block + centred inline-block, not flex: a flex item SVG with width="100%"
+   resolved to the 300px default and a viewBox-only fence drew empty */
 .rotli-render-svg {
-  display: flex;
-  justify-content: center;
-  max-width: 100%;
+  display: block;
+  width: 100%;
+  text-align: center;
 }
 .rotli-render-svg svg {
+  display: inline-block;
   max-width: 100%;
   height: auto;
 }

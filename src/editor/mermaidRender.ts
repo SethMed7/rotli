@@ -27,7 +27,13 @@ export async function renderMermaidElement(
   // Mermaid configuration is process-global, and the board converter also
   // initializes that same runtime. Reassert the render policy every time so a
   // conversion can never leak its font/theme/security config into note views.
-  mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme });
+  // charts sit on the note's card: no opaque plate behind a pie or xychart
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: "strict",
+    theme,
+    themeVariables: { background: "transparent", xyChart: { backgroundColor: "transparent" } },
+  });
 
   const element = document.createElement("div");
   element.className = "rotli-render-mermaid";

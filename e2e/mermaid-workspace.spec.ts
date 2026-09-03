@@ -20,6 +20,30 @@ async function createDiagramNote(page: import("@playwright/test").Page): Promise
   await expect(page.locator(".rotli-render-mermaid-trigger")).toBeVisible();
 }
 
+test("the inline diagram fills its card instead of drawing small in a corner", async ({ page }) => {
+  await gotoApp(page);
+  await createDiagramNote(page);
+  const card = page.locator(".rotli-render-block", { has: page.locator(".rotli-mermaid-inline-stage") });
+  const svg = card.locator(".rotli-mermaid-inline-stage svg");
+  // a diagram narrower than the card renders at its natural size, centred;
+  // a wider one fills the card — never the 300px default in a corner
+  await expect
+    .poll(async () => {
+      const [cardBox, svgBox, natural] = await Promise.all([
+        card.boundingBox(),
+        svg.boundingBox(),
+        svg.evaluate((el) => (el as SVGSVGElement).viewBox.baseVal.width),
+      ]);
+      if (!cardBox || !svgBox || !natural) return "unrendered";
+      const expected = Math.min(natural, cardBox.width - 48);
+      const centred = Math.abs(svgBox.x + svgBox.width / 2 - (cardBox.x + cardBox.width / 2)) < 24;
+      return svgBox.width >= expected * 0.95 && centred
+        ? "fits"
+        : `width ${svgBox.width.toFixed(0)} of ${expected.toFixed(0)} centred ${centred}`;
+    })
+    .toBe("fits");
+});
+
 test("Mermaid diagrams open a keyboard-safe pan, zoom, and source workspace", async ({ page }) => {
   await gotoApp(page);
   await createDiagramNote(page);
