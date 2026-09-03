@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Mermaid diagrams inline in a note (pie, bar/line charts, sequence, flowcharts) drew at less than half size in the top-left of their card: Mermaid's `width="100%"` SVG fell back to the 300px default inside the shrink-to-fit stage while the fit math assumed the diagram's real size, and the card's own padding then shrank even small diagrams. The SVG is now laid out at its natural size and the fit pads by the same 12px the card does — a small diagram renders at natural size, centred; a wide one fills the card.
+- A ` ```svg ` fence that carried only a `viewBox` (no width/height) collapsed to an empty card; it now fills the card's width and keeps its aspect ratio.
+
+## [0.87.0] - 2026-09-03
+
 ### Changed
 
 - Test suite and tooling audit (2026-09-03): `bun run verify` now mirrors CI's first steps (frozen installs, dependency convergence and license checks, a blocking chromium check); the release gate looks up CI by commit with a bounded retry and asserts the commit is on `origin/main`; Playwright runs on four workers in CI with the GitHub reporter; Linux CI type-checks the Rust crate so its non-macOS `cfg` blocks compile; `Cargo.toml` denies warnings locally; oxlint regains its `unicorn`/`oxc` plugins plus four type-aware rules and a `localStorage` ban; `scripts/*.ts` is typechecked; oxfmt covers `scripts/**/*.mjs` and `vite.config.ts`; `check:design-system` rejects undefined `var(--x)` tokens (twelve fixed); the coverage ratchet can only rise; the source-shape ratchet counts assertions; the site declares `clsx` directly so its prerender build resolves inside `site/` under bun's isolated linker; new fixture tests cover `check:ratchets` and `check:window-events`; `check:structure` fails when a Breve runtime test is not in `test:breve`; `check:code-shape` rejects control bytes in source and macOS-only CodeMirror chords in e2e. Tests: the provider policy test names and pins every admitted lane (Antigravity included), the appearance broadcast and Antigravity service have unit tests, Settings → AI Models has an e2e spec, and stale source-shape pins were retired. Details: `docs/architecture/test-suite-audit-2026-09-03.md`.

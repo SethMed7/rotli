@@ -25,6 +25,10 @@ test("SVG fences remove active content and external resources before rendering",
   const preview = page.locator(".rotli-render-svg");
   await expect(preview.locator("svg")).toHaveCount(1);
   await expect(preview.locator("circle")).toHaveCount(1);
+  // a viewBox-only SVG used to collapse to 0×18 inside the flex card
+  await expect
+    .poll(async () => (await preview.locator("svg").boundingBox())?.width ?? 0)
+    .toBeGreaterThan(100);
   await expect(preview.locator("script, foreignObject, image, [onload], [href], [style]")).toHaveCount(0);
   await expect(preview.locator("rect")).not.toHaveAttribute("fill", /url/);
   await expect
