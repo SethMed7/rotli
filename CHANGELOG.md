@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A note that changed on disk no longer freezes, and never blocks quitting.**
+  When something other than the editor rewrote an open note — a task ticked
+  from the Tasks view, a chat edit, the Librarian, another app — the next
+  autosave hit a revision conflict that never cleared, and ⌘Q refused with
+  “Rotli stayed open because some changes could not be saved”. Rotli now
+  folds the two versions together when they touched different lines (the
+  common case) and saves on. When both sides changed the same lines, quitting
+  keeps your unsaved edits as a sibling note titled “… (unsaved edits <time>)”
+  and the open note shows the disk version, so nothing is lost and the app
+  quits.
+
 ### Added
 
 - **Antigravity is back as a connected lane, through Google's official ACP
