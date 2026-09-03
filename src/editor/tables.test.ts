@@ -9,6 +9,8 @@ import { describe, expect, test } from "bun:test";
 import { Text } from "@codemirror/state";
 
 import {
+  caretAfterTableEdit,
+  fitColumnWidths,
   type TableShape,
   addColRight,
   addRowBelow,
@@ -267,5 +269,42 @@ describe("nextCell", () => {
   test("returns null past either end (Tab appends; ⇧Tab stops)", () => {
     expect(nextCell(t, { row: 1, col: 1 }, 1)).toBeNull();
     expect(nextCell(t, { row: -1, col: 0 }, -1)).toBeNull();
+  });
+});
+
+describe("caretAfterTableEdit", () => {
+  const from = 100;
+  const insert = "| a | b |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |";
+  test("a caret outside the table lands on the table's first line, not the stale spot", () => {
+    expect(caretAfterTableEdit(5000, from, from + 60, insert)).toBe(from);
+    expect(caretAfterTableEdit(0, from, from + 60, insert)).toBe(from);
+  });
+  test("a caret inside the table keeps its line start", () => {
+    // "| a | b |" is 9 chars, "| --- | --- |" is 13: the third line starts at 24
+    expect(caretAfterTableEdit(from + 26, from, from + 60, insert)).toBe(from + 24);
+    expect(caretAfterTableEdit(from + 12, from, from + 60, insert)).toBe(from + 10);
+    expect(caretAfterTableEdit(from, from, from + 60, insert)).toBe(from);
+  });
+  test("a caret past the new (shorter) table clamps to its last line", () => {
+    const shorter = "| a |\n| --- |\n| 1 |";
+    expect(caretAfterTableEdit(from + 55, from, from + 60, shorter)).toBe(
+      from + shorter.lastIndexOf("\n") + 1,
+    );
+  });
+});
+
+describe("fitColumnWidths", () => {
+  test("widths that fit are untouched", () => {
+    expect(fitColumnWidths([200, 300], 600, 56)).toEqual([200, 300]);
+  });
+  test("a table wider than its pane scales down proportionally", () => {
+    expect(fitColumnWidths([200, 600], 400, 56)).toEqual([100, 300]);
+  });
+  test("no column drops below the floor even when that means overflow", () => {
+    expect(fitColumnWidths([60, 600], 120, 56)).toEqual([56, 109]);
+  });
+  test("an unknown pane width leaves the widths alone", () => {
+    expect(fitColumnWidths([200, 600], 0, 56)).toEqual([200, 600]);
+    expect(fitColumnWidths([200, 600], Number.NaN, 56)).toEqual([200, 600]);
   });
 });

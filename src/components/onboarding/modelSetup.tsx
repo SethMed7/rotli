@@ -28,7 +28,12 @@ import { ModelLogo } from "../sidebar/modelLogo";
 import { SetupBack, SetupPrimary } from "./setupControls";
 import { SetupSideFriends } from "./setupSideFriends";
 
-const CONNECTED_PROVIDERS = ["claude", "codex", "cursor"] as const satisfies readonly ProviderId[];
+const CONNECTED_PROVIDERS = [
+  "claude",
+  "codex",
+  "cursor",
+  "antigravity",
+] as const satisfies readonly ProviderId[];
 type ConnectedProvider = (typeof CONNECTED_PROVIDERS)[number];
 type ModelSection = "local" | "install" | "subscription";
 
@@ -39,6 +44,8 @@ const SETUP_HELP: Record<ConnectedProvider, string> = {
     "Install Codex with `brew install codex`, then run `codex login` and sign in with your ChatGPT account.",
   cursor:
     "Install Cursor Agent from cursor.com/cli, then run `agent login` yourself in Terminal. Rotli uses Cursor's official ACP custom-client protocol in read-only Ask mode.",
+  antigravity:
+    "Google's official Antigravity ACP agent. Install it and sign in with Google from Settings → AI Models after setup; it stays off until you turn it on there.",
 };
 
 function localSize(mb: number): string {
@@ -225,8 +232,9 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
             <p className="setup-eyebrow">Optional and changeable</p>
             <h1 id="model-setup-title">How should Rotli think?</h1>
             <p className="setup-lede">
-              Run a model entirely on this Mac, or use your own Claude and ChatGPT accounts through their
-              official local clients. Gemini and Antigravity are not used by Rotli.
+              Run a model entirely on this Mac, or use your own Claude, ChatGPT, Cursor, or Google accounts
+              through each company&rsquo;s official local client. Every connected lane stays off until you
+              turn it on.
             </p>
 
             <div className="setup-model-disclosures">
@@ -461,7 +469,8 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
                     </div>
                     <p className="setup-provider-help">
                       Rotli never reads or stores provider credentials and never presents a provider login.
-                      Gemini API and Antigravity remain unavailable.
+                      Antigravity signs in through Google&rsquo;s own agent, from Settings, and stays off by
+                      default.
                     </p>
                   </div>
                 )}

@@ -318,15 +318,12 @@ describe("parseSettings — frontier controls", () => {
 describe("parseSettings — the AI Models keys (the maintainer, 2026-07-02)", () => {
   test("defaults: every lane OFF, reviewed provider defaults, note opens as tab", () => {
     const s = parseSettings("{}");
-    expect(s.aiProviders).toEqual({
-      claude: false,
-      codex: false,
-      cursor: false,
-    });
+    expect(s.aiProviders).toEqual({ claude: false, codex: false, cursor: false, antigravity: false });
     expect(s.providerDefaults).toEqual({
       claude: "sonnet",
       codex: "gpt-5.6-sol",
       cursor: "grok-4.6",
+      antigravity: "gemini-3.8-flash-high",
     });
     expect(s.hybridPresets).toEqual([]);
     expect(s.chatNoteOpen).toBe("tab");
@@ -342,13 +339,10 @@ describe("parseSettings — the AI Models keys (the maintainer, 2026-07-02)", ()
 
   test("only official client preferences survive; unknown lanes cannot reactivate", () => {
     const s = parseSettings(
-      '{"aiProviders":{"claude":true,"removed-provider":true,"evil":true,"codex":true,"cursor":true}}',
+      '{"aiProviders":{"claude":true,"removed-provider":true,"evil":true,"codex":true,"cursor":true,"agy":true}}',
     );
-    expect(s.aiProviders).toEqual({
-      claude: true,
-      codex: true,
-      cursor: true,
-    });
+    // the retired `agy` flag never reactivates the new lane
+    expect(s.aiProviders).toEqual({ claude: true, codex: true, cursor: true, antigravity: false });
     expect("evil" in s.aiProviders).toBe(false);
   });
 
@@ -365,6 +359,7 @@ describe("parseSettings — the AI Models keys (the maintainer, 2026-07-02)", ()
       claude: "opus",
       codex: "gpt-5.6-sol",
       cursor: "cursor-auto",
+      antigravity: "gemini-3.8-flash-high",
     });
   });
 

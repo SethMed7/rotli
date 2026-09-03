@@ -1606,8 +1606,11 @@
   font-size: 0.95em;
   line-height: 1.5;
   width: auto;
-  /* no max-width (2026-07-31): a wide table SCROLLS inside .rotli-tbl-scroll
-     instead of squeezing its columns below readability */
+  /* fit the pane first (2026-09-03): auto layout wraps cell text to the
+     space it has; only once every column is at its floor does the table
+     scroll inside .rotli-tbl-scroll. Persisted widths scale the same way
+     (fitColumnWidths). */
+  max-width: 100%;
 }
 .rotli-md-table th,
 .rotli-md-table td {
@@ -1615,6 +1618,51 @@
   padding: 6px 11px;
   text-align: left;
   vertical-align: top;
+  min-width: 56px; /* MIN_TABLE_COL_PX */
+}
+
+/* the resize handle: a line on the hovered boundary with a grip pill at its
+   middle — visible before the drag, lit during it */
+.rotli-tbl-grip {
+  position: absolute;
+  z-index: 6;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--motion-ease);
+}
+.rotli-tbl-grip.col {
+  width: 2px;
+  margin-left: -0.5px;
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.rotli-tbl-grip.row {
+  height: 2px;
+  margin-top: -0.5px;
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.rotli-tbl-grip::after {
+  content: "";
+  position: absolute;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+}
+.rotli-tbl-grip.col::after {
+  left: -2px;
+  top: calc(50% - 11px);
+  width: 6px;
+  height: 22px;
+}
+.rotli-tbl-grip.row::after {
+  top: -2px;
+  left: calc(50% - 11px);
+  width: 22px;
+  height: 6px;
+}
+.rotli-tbl-grip.on {
+  opacity: 1;
+}
+.rotli-md-tablewrap.rotli-tbl-resizing .rotli-tbl-grip.on {
+  background: var(--accent);
 }
 .rotli-md-table thead th {
   font-weight: 700;

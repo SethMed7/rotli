@@ -38,6 +38,24 @@
         "src-tauri/src/document_conversion.rs"
       ],
       "reason": "TS↔Rust process contract: the themed PDF renderer's argv (--in/--out/--title) is spelled by the script that parses it and by the Rust caller that spawns it; the shared literals are the contract, not copied logic (2026-09-02)."
+    },
+    {
+      "id": "antigravity-manage-contract",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/antigravity.rs",
+        "src/lib/tauri.ts"
+      ],
+      "reason": "TS↔Rust IPC contract: the five Antigravity action words are spelled once by the command that dispatches them and once by the wrapper that sends them (2026-09-03)."
+    },
+    {
+      "id": "antigravity-settings-card-vocabulary",
+      "signal": "literal",
+      "files": [
+        "src/components/antigravitySetup.tsx",
+        "src/components/settingsSurface.tsx"
+      ],
+      "reason": "The Antigravity setup card deliberately speaks the AI Models settings vocabulary (.ailane-* rows, .ghostbtn variants, chip states) so it reads as one surface; the shared literals are class names, not copied logic (2026-09-03)."
     }
   ]
 }

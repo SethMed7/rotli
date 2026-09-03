@@ -20,21 +20,26 @@
 //!   `cli_cancel` (or the per-request watchdog at the deadline) kills them.
 
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+#[path = "acp.rs"]
+pub(crate) mod acp;
+#[path = "antigravity.rs"]
+pub(crate) mod antigravity;
+
 pub(crate) const CONNECTED_PROVIDER_POLICY_MESSAGE: &str =
-    "This provider lane is unavailable. Rotli supports only the user's locally authenticated official Claude Code, Codex, and Cursor clients; choose one of those or an on-device model.";
+    "This provider lane is unavailable. Rotli supports only the user's locally authenticated official Claude Code, Codex, Cursor, and Antigravity clients; choose one of those or an on-device model.";
 pub(crate) const CLOUD_IMAGE_POLICY_MESSAGE: &str =
     "Provider-backed image generation is unavailable; no provider account was used.";
 
 fn connected_provider_execution_allowed(provider: &str) -> Result<(), String> {
     match provider {
-        "claude" | "codex" | "cursor" => Ok(()),
+        "claude" | "codex" | "cursor" | "antigravity" => Ok(()),
         other => Err(format!("unknown provider \"{other}\"")),
     }
 }
@@ -48,9 +53,9 @@ fn refuse_cloud_image_generation<T>() -> Result<T, String> {
 const DEFAULT_TIMEOUT_MS: u64 = 180_000;
 const MAX_TIMEOUT_MS: u64 = 600_000;
 
-struct Running {
-    token: u64,
-    child: Child,
+pub(crate) struct Running {
+    pub(crate) token: u64,
+    pub(crate) child: Child,
 }
 
 #[derive(Default)]
@@ -58,12 +63,12 @@ pub struct ProviderState {
     /// request_id → the live child, so cancel/watchdog can kill it. The token
     /// disambiguates sequential steps that reuse one request id — a stale
     /// watchdog must never kill a newer child under the same id.
-    children: Arc<Mutex<HashMap<String, Running>>>,
+    pub(crate) children: Arc<Mutex<HashMap<String, Running>>>,
 }
 
 /// Process-global run token — unique across every spawn, so a finished step's
 /// watchdog can never shoot a successor that reused its request id.
-static NEXT_TOKEN: AtomicU64 = AtomicU64::new(1);
+pub(crate) static NEXT_TOKEN: AtomicU64 = AtomicU64::new(1);
 
 // ── the allowlist ─────────────────────────────────────────────────────────────
 
@@ -110,6 +115,21 @@ pub(crate) const CLIS: &[CliSpec] = &[
             "/usr/local/bin/agent",
         ],
         models: &["grok-4.6", "cursor-auto"],
+    },
+    // Google's official ACP agent, managed by Rotli at a fixed path (ADR
+    // 2026-09-03). The roster is the agent's current offering as observed on
+    // 2026-09-02; a turn re-validates the id against the account's own list.
+    CliSpec {
+        id: "antigravity",
+        bins: &[antigravity::BIN_CANDIDATE],
+        models: &[
+            "gemini-3.8-flash-high",
+            "gemini-3.8-flash-medium",
+            "gemini-3.8-flash-low",
+            "gemini-3.7-flash-high",
+            "gemini-3.7-flash-medium",
+            "gemini-3.7-flash-low",
+        ],
     },
 ];
 
@@ -319,6 +339,20 @@ fn build_args_tuned(
             args.extend(own(&["--mode", "ask", "acp"]));
             Ok((args, PromptVia::Acp))
         }
+        // Google's ACP agent takes no argv: the model is a session config
+        // option selected after session/new (acp.rs), the profile rides env.
+        "antigravity" => {
+            if let Some(effort) = reasoning_effort {
+                return Err(format!("reasoning effort \"{effort}\" isn't supported by antigravity"));
+            }
+            if let Some(tier) = service_tier {
+                return Err(format!("service tier \"{tier}\" isn't supported by antigravity"));
+            }
+            if imgs.is_some() {
+                return Err("Antigravity chat does not accept image attachments in Rotli".into());
+            }
+            Ok((Vec::new(), PromptVia::Acp))
+        }
         _ => Err(format!("unknown provider \"{provider}\"")),
     }
 }
@@ -479,7 +513,7 @@ fn parse_codex_jsonl(stdout: &str) -> Result<String, String> {
 }
 
 /// Add a small diagnostic tail exactly once.
-fn with_stderr_tail(message: &str, stderr: &str, open: &str, close: &str) -> String {
+pub(crate) fn with_stderr_tail(message: &str, stderr: &str, open: &str, close: &str) -> String {
     let tail = stderr
         .lines()
         .rev()
@@ -576,272 +610,6 @@ fn run_registered(
     Ok((stdout, stderr, ok))
 }
 
-fn write_json_line(writer: &mut impl Write, value: &serde_json::Value) -> Result<(), String> {
-    serde_json::to_writer(&mut *writer, value)
-        .map_err(|e| format!("couldn't encode Cursor ACP request: {e}"))?;
-    writer
-        .write_all(b"\n")
-        .and_then(|_| writer.flush())
-        .map_err(|e| format!("couldn't write Cursor ACP request: {e}"))
-}
-
-/// Cursor ACP can ask the client to authorize a tool. Rotli's code-chat lane
-/// never grants one: Ask mode is defense one, this protocol answer is defense
-/// two, and the empty scratch cwd is defense three.
-fn cursor_client_response(message: &serde_json::Value) -> Option<serde_json::Value> {
-    let id = message.get("id")?.clone();
-    let method = message.get("method")?.as_str()?;
-    let result = match method {
-        "session/request_permission" => {
-            let rejection = message
-                .pointer("/params/options")
-                .and_then(|v| v.as_array())
-                .and_then(|options| {
-                    options.iter().find(|option| {
-                        option
-                            .get("kind")
-                            .and_then(|v| v.as_str())
-                            .is_some_and(|kind| kind.contains("reject"))
-                            || option
-                                .get("optionId")
-                                .and_then(|v| v.as_str())
-                                .is_some_and(|option_id| option_id.contains("reject"))
-                    })
-                })
-                .and_then(|option| option.get("optionId"))
-                .and_then(|v| v.as_str());
-            match rejection {
-                Some(option_id) => serde_json::json!({
-                    "outcome": { "outcome": "selected", "optionId": option_id }
-                }),
-                None => serde_json::json!({ "outcome": { "outcome": "cancelled" } }),
-            }
-        }
-        "cursor/ask_question" => serde_json::json!({
-            "outcome": {
-                "outcome": "skipped",
-                "reason": "Rotli code chat accepts clarification in the next user turn."
-            }
-        }),
-        "cursor/create_plan" => serde_json::json!({
-            "outcome": {
-                "outcome": "rejected",
-                "reason": "Rotli runs Cursor in read-only code-chat mode."
-            }
-        }),
-        _ => {
-            return Some(serde_json::json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "error": { "code": -32601, "message": "method not available in Rotli code chat" }
-            }));
-        }
-    };
-    Some(serde_json::json!({ "jsonrpc": "2.0", "id": id, "result": result }))
-}
-
-fn cursor_acp_request(
-    writer: &mut impl Write,
-    reader: &mut impl BufRead,
-    id: u64,
-    method: &str,
-    params: serde_json::Value,
-    assistant: &mut String,
-) -> Result<serde_json::Value, String> {
-    write_json_line(
-        writer,
-        &serde_json::json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "method": method,
-            "params": params
-        }),
-    )?;
-
-    loop {
-        let mut line = String::new();
-        if reader
-            .read_line(&mut line)
-            .map_err(|e| format!("couldn't read Cursor ACP response: {e}"))?
-            == 0
-        {
-            return Err("Cursor ACP closed before completing the request".into());
-        }
-        let message: serde_json::Value = serde_json::from_str(line.trim())
-            .map_err(|e| format!("Cursor ACP returned malformed JSON: {e}"))?;
-
-        if message.get("method").is_some() && message.get("id").is_some() {
-            if let Some(response) = cursor_client_response(&message) {
-                write_json_line(writer, &response)?;
-            }
-            continue;
-        }
-
-        if message.get("method").and_then(|v| v.as_str()) == Some("session/update") {
-            let update = message.pointer("/params/update");
-            if update
-                .and_then(|v| v.get("sessionUpdate"))
-                .and_then(|v| v.as_str())
-                == Some("agent_message_chunk")
-            {
-                if let Some(text) = update
-                    .and_then(|v| v.pointer("/content/text"))
-                    .and_then(|v| v.as_str())
-                {
-                    assistant.push_str(text);
-                }
-            }
-            continue;
-        }
-
-        if message.get("id").and_then(|v| v.as_u64()) != Some(id) {
-            continue;
-        }
-        if let Some(error) = message.get("error") {
-            return Err(error
-                .get("message")
-                .and_then(|v| v.as_str())
-                .unwrap_or("Cursor ACP request failed")
-                .to_string());
-        }
-        return Ok(message.get("result").cloned().unwrap_or_default());
-    }
-}
-
-/// One Cursor turn through the vendor's custom-client protocol. The process is
-/// deliberately one-shot: Rotli's Markdown transcript is the durable history
-/// and is replayed by the normal chat loop, so switching providers never needs
-/// Cursor-owned session state.
-fn run_cursor_acp_registered(
-    children: &Arc<Mutex<HashMap<String, Running>>>,
-    request_id: &str,
-    bin: &PathBuf,
-    args: &[String],
-    prompt: &str,
-    timeout: Duration,
-) -> Result<String, String> {
-    let scratch = tempfile::Builder::new()
-        .prefix("rotli-cursor-")
-        .tempdir()
-        .map_err(|e| format!("couldn't create the Cursor scratch workspace: {e}"))?;
-    let mut cmd = Command::new(bin);
-    cmd.args(args)
-        .current_dir(scratch.path())
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("couldn't launch the Cursor client: {e}"))?;
-    let mut stdin = child
-        .stdin
-        .take()
-        .ok_or_else(|| "Cursor ACP did not open stdin".to_string())?;
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| "Cursor ACP did not open stdout".to_string())?;
-    let mut stderr = child.stderr.take();
-
-    let token = NEXT_TOKEN.fetch_add(1, Ordering::Relaxed);
-    children
-        .lock()
-        .unwrap()
-        .insert(request_id.to_string(), Running { token, child });
-    let map = Arc::clone(children);
-    let id_for_watchdog = request_id.to_string();
-    std::thread::spawn(move || {
-        std::thread::sleep(timeout);
-        if let Some(r) = map.lock().unwrap().get_mut(&id_for_watchdog) {
-            if r.token == token {
-                let _ = r.child.kill();
-            }
-        }
-    });
-
-    let err_thread = std::thread::spawn(move || {
-        let mut text = String::new();
-        if let Some(pipe) = stderr.as_mut() {
-            let _ = pipe.read_to_string(&mut text);
-        }
-        text
-    });
-    let mut reader = BufReader::new(stdout);
-    let mut assistant = String::new();
-    let protocol: Result<String, String> = (|| -> Result<String, String> {
-        cursor_acp_request(
-            &mut stdin,
-            &mut reader,
-            1,
-            "initialize",
-            serde_json::json!({
-                "protocolVersion": 1,
-                "clientCapabilities": {
-                    "fs": { "readTextFile": false, "writeTextFile": false },
-                    "terminal": false
-                },
-                "clientInfo": { "name": "rotli", "version": env!("CARGO_PKG_VERSION") }
-            }),
-            &mut assistant,
-        )?;
-        cursor_acp_request(
-            &mut stdin,
-            &mut reader,
-            2,
-            "authenticate",
-            serde_json::json!({ "methodId": "cursor_login" }),
-            &mut assistant,
-        )?;
-        let session = cursor_acp_request(
-            &mut stdin,
-            &mut reader,
-            3,
-            "session/new",
-            serde_json::json!({
-                "cwd": scratch.path().to_string_lossy(),
-                "mcpServers": []
-            }),
-            &mut assistant,
-        )?;
-        let session_id = session
-            .get("sessionId")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| "Cursor ACP did not return a session id".to_string())?;
-        cursor_acp_request(
-            &mut stdin,
-            &mut reader,
-            4,
-            "session/prompt",
-            serde_json::json!({
-                "sessionId": session_id,
-                "prompt": [{ "type": "text", "text": prompt }]
-            }),
-            &mut assistant,
-        )?;
-        let answer = assistant.trim().to_string();
-        if answer.is_empty() {
-            Err("Cursor returned no assistant message".into())
-        } else {
-            Ok(answer)
-        }
-    })();
-
-    drop(stdin);
-    let reaped = {
-        let mut map = children.lock().unwrap();
-        match map.get(request_id) {
-            Some(r) if r.token == token => map.remove(request_id),
-            _ => None,
-        }
-    };
-    if let Some(mut running) = reaped {
-        let _ = running.child.kill();
-        let _ = running.child.wait();
-    }
-    let stderr = err_thread.join().unwrap_or_default();
-    protocol.map_err(|e| with_stderr_tail(&e, &stderr, " — ", ""))
-}
-
 /// Historical organizer-egress predicate retained for deterministic security
 /// evals. The live organizer is local-only and has no remote transport function.
 #[cfg(test)]
@@ -912,14 +680,15 @@ pub async fn cli_complete(
         // keeps the temp dir alive for the whole run.
         let _staged = staged;
         if matches!(via, PromptVia::Acp) {
-            return run_cursor_acp_registered(
-                &children,
-                &request_id,
-                &bin,
-                &args,
-                &prompt,
-                timeout,
-            );
+            let lane = acp::AcpLane::for_provider(&provider)
+                .ok_or_else(|| format!("{provider} has no ACP lane"))?;
+            let (env, env_remove) = if lane == acp::AcpLane::Antigravity {
+                (antigravity::runtime_env(&bin)?, antigravity::env_remove_keys())
+            } else {
+                (Vec::new(), Vec::new())
+            };
+            let turn = acp::AcpTurn { lane, bin: &bin, args: &args, env, env_remove, model: &model };
+            return acp::run_acp_registered(&children, &request_id, turn, &prompt, timeout);
         }
         let mut cmd = Command::new(&bin);
         cmd.args(&args);
@@ -1021,6 +790,16 @@ pub async fn cli_detect(provider: String) -> Result<CliDetect, String> {
 }
 
 fn detect(provider: &str) -> Result<CliDetect, String> {
+    if provider == "antigravity" {
+        // no CLI to probe: installed = the managed runtime is present,
+        // authenticated = the agent's own credential file exists
+        let status = antigravity::status();
+        return Ok(CliDetect {
+            installed: status.installed,
+            version: status.version,
+            authenticated: status.signed_in,
+        });
+    }
     if matches!(provider, "claude" | "codex" | "cursor") {
         let bin = resolve_bin(spec(provider)?);
         let version = bin.as_ref().and_then(|b| version_of(b, &["--version"]));
@@ -1230,54 +1009,6 @@ mod tests {
         let failed = r#"{"type":"turn.failed","error":{"message":"quota exhausted"}}"#;
         assert_eq!(parse_codex_jsonl(failed).unwrap_err(), "quota exhausted");
         assert!(parse_codex_jsonl("").is_err());
-    }
-
-    #[test]
-    fn cursor_acp_collects_only_assistant_chunks() {
-        let inbound = concat!(
-            r#"{"jsonrpc":"2.0","method":"session/update","params":{"update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Hello "}}}}"#,
-            "\n",
-            r#"{"jsonrpc":"2.0","method":"session/update","params":{"update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"there."}}}}"#,
-            "\n",
-            r#"{"jsonrpc":"2.0","id":4,"result":{"stopReason":"end_turn"}}"#,
-            "\n",
-        );
-        let mut reader = std::io::Cursor::new(inbound.as_bytes());
-        let mut written = Vec::new();
-        let mut assistant = String::new();
-        let result = cursor_acp_request(
-            &mut written,
-            &mut reader,
-            4,
-            "session/prompt",
-            serde_json::json!({"sessionId":"s","prompt":[]}),
-            &mut assistant,
-        )
-        .unwrap();
-        assert_eq!(assistant, "Hello there.");
-        assert_eq!(result["stopReason"], "end_turn");
-        let request: serde_json::Value =
-            serde_json::from_slice(written.strip_suffix(b"\n").unwrap()).unwrap();
-        assert_eq!(request["method"], "session/prompt");
-    }
-
-    #[test]
-    fn cursor_acp_rejects_permission_requests() {
-        let request = serde_json::json!({
-            "jsonrpc": "2.0",
-            "id": 91,
-            "method": "session/request_permission",
-            "params": {
-                "options": [
-                    { "optionId": "allow-once", "kind": "allow_once" },
-                    { "optionId": "reject-once", "kind": "reject_once" }
-                ]
-            }
-        });
-        let response = cursor_client_response(&request).unwrap();
-        assert_eq!(response["id"], 91);
-        assert_eq!(response["result"]["outcome"]["outcome"], "selected");
-        assert_eq!(response["result"]["outcome"]["optionId"], "reject-once");
     }
 
     #[test]

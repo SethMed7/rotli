@@ -600,17 +600,15 @@ function shortModelLabel(label: string): string {
 type ModelKind = "local" | "connected" | "preset";
 
 const PICKER_PROVIDER_META: Record<ProviderId, { label: string; hint: string }> = {
-  claude: {
-    label: PROVIDER_LABELS.claude,
-    hint: "Uses the Claude account signed in to Claude Code.",
-  },
-  codex: {
-    label: PROVIDER_LABELS.codex,
-    hint: "Uses the ChatGPT account signed in to Codex.",
-  },
+  claude: { label: PROVIDER_LABELS.claude, hint: "Uses the Claude account signed in to Claude Code." },
+  codex: { label: PROVIDER_LABELS.codex, hint: "Uses the ChatGPT account signed in to Codex." },
   cursor: {
     label: PROVIDER_LABELS.cursor,
     hint: "Uses Cursor's official ACP client in read-only Ask mode for software work.",
+  },
+  antigravity: {
+    label: PROVIDER_LABELS.antigravity,
+    hint: "Uses the Google account signed in to Google's Antigravity agent.",
   },
 };
 
@@ -1644,7 +1642,7 @@ export function ChatSurface({
       out[id] = !!detected?.installed && !!detected.authenticated;
       return out;
     },
-    { claude: false, codex: false, cursor: false },
+    { claude: false, codex: false, cursor: false, antigravity: false },
   );
   const providerChecksSettled = PROVIDER_IDS.every(
     (id, index) => !aiProviders[id] || providerChecks[index]?.isFetched,

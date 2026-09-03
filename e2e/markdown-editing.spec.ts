@@ -431,3 +431,58 @@ test("a slash command typed in a result's reason lands its block beneath the row
   await expect(page.locator(".rotli-result-reason")).not.toContainText("/table");
   await expect(editor.locator("table")).toHaveCount(1);
 });
+
+const LONG_TABLE_NOTE = `# Column actions stay put
+
+| Note | Summary | Extra |
+| ---- | ------- | ----- |
+| One | First row summary | x |
+| Two | Second row summary | y |
+
+${Array.from({ length: 80 }, (_, i) => `Paragraph ${i + 1} of filler text that makes the note tall enough to scroll.`).join("\n\n")}
+`;
+
+test("deleting a column keeps the table in view and shows a resize grip on the boundary", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText(LONG_TABLE_NOTE);
+  // the caret now sits at the very end of a tall note. Scroll (not the caret)
+  // back to the top — CodeMirror only renders the viewport, so the table is
+  // not even in the DOM until then; the stale far-away caret is the point.
+  const scroller = page.locator(".cm-scroller").last();
+  await scroller.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  const table = page.locator(".rotli-md-table");
+  await expect(table).toBeInViewport();
+  await expect(table.locator("thead th")).toHaveCount(3);
+
+  // hover a boundary: the visible grip lights on the edge between Note and Summary
+  const first = table.locator("thead th").first();
+  const box = await first.boundingBox();
+  if (!box) throw new Error("no header cell box");
+  await page.mouse.move(box.x + box.width - 2, box.y + box.height / 2);
+  await expect(page.locator(".rotli-tbl-grip.col.on")).toBeVisible();
+
+  // the column chip → Delete column: the table stays where it was, the caret
+  // lands on the table instead of the note's far end
+  await table.locator("thead th").nth(2).hover();
+  await page.locator(".rotli-tbl-chip.colchip.on").click();
+  await page.getByRole("menuitem", { name: "Delete column" }).click();
+  await expect(table.locator("thead th")).toHaveCount(2);
+  await expect(table).toBeInViewport();
+  // the editor may nudge a few pixels to show the caret line; it must not be
+  // anywhere near the bottom of the 80-paragraph note
+  await expect
+    .poll(() =>
+      page
+        .locator(".cm-scroller")
+        .last()
+        .evaluate((el) => el.scrollTop),
+    )
+    .toBeLessThan(200);
+});

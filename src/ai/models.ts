@@ -12,14 +12,15 @@
 import type { ChatModelInfo } from "../lib/tauri";
 
 /** The connectable provider lanes (Settings → AI Models). */
-export type ProviderId = "claude" | "codex" | "cursor";
+export type ProviderId = "claude" | "codex" | "cursor" | "antigravity";
 export type ConnectedProviderId = ProviderId;
-export const PROVIDER_IDS: readonly ProviderId[] = ["claude", "codex", "cursor"];
+export const PROVIDER_IDS: readonly ProviderId[] = ["claude", "codex", "cursor", "antigravity"];
 
 export const PROVIDER_LABELS: Record<ProviderId, string> = {
   claude: "Claude Code",
   codex: "Codex",
   cursor: "Cursor · Code chat",
+  antigravity: "Antigravity · Gemini",
 };
 
 /** Initial explicit choices for a provider tag with no model suffix. Claude's
@@ -29,6 +30,7 @@ export const DEFAULT_PROVIDER_MODELS: Record<ProviderId, string> = {
   claude: "sonnet",
   codex: "gpt-5.6-sol",
   cursor: "grok-4.6",
+  antigravity: "gemini-3.8-flash-high",
 };
 
 /** A hybrid preset (Settings → AI Models): an ORGANIZER model reads the prompt
@@ -196,6 +198,17 @@ export const CLI_CATALOG: Record<ProviderId, ChatModelInfo[]> = {
     // Native argv omits --model for this stable Rotli id.
     cli("cursor", "cursor-auto", "Cursor Auto", false),
   ],
+  // Google's official ACP agent (ADR 2026-09-03). Ids are the agent's own
+  // config-option values; Rust re-validates each turn against the account's
+  // list and names what is available on mismatch. No image lane yet.
+  antigravity: [
+    cli("antigravity", "gemini-3.8-flash-high", "Gemini 3.8 Flash (High)", false),
+    cli("antigravity", "gemini-3.8-flash-medium", "Gemini 3.8 Flash (Medium)", false),
+    cli("antigravity", "gemini-3.8-flash-low", "Gemini 3.8 Flash (Low)", false),
+    cli("antigravity", "gemini-3.7-flash-high", "Gemini 3.7 Flash (High)", false),
+    cli("antigravity", "gemini-3.7-flash-medium", "Gemini 3.7 Flash (Medium)", false),
+    cli("antigravity", "gemini-3.7-flash-low", "Gemini 3.7 Flash (Low)", false),
+  ],
 };
 
 /** A persisted provider default is executable only when it still belongs to
@@ -263,6 +276,7 @@ export const LANE_PING_MODEL: Record<ConnectedProviderId, string> = {
   claude: "haiku",
   codex: "gpt-5.6-luna",
   cursor: "grok-4.6",
+  antigravity: "gemini-3.8-flash-low",
 };
 
 /** Ready-made presets use a local organizer and at most the allowed official

@@ -14,6 +14,7 @@ import {
   type HybridPreset,
   LOCAL_CATALOG,
   PROVIDER_IDS,
+  type ProviderId,
   STARTER_PRESETS,
   comfortFor,
   fitLabel,
@@ -39,7 +40,7 @@ const local: ChatModelInfo[] = [
   },
 ];
 
-const noneEnabled = { claude: false, codex: false, cursor: false };
+const noneEnabled = { claude: false, codex: false, cursor: false, antigravity: false };
 
 describe("mergedModels", () => {
   test("disabled lanes contribute nothing; the local list passes through", () => {
@@ -50,18 +51,20 @@ describe("mergedModels", () => {
   });
 
   test("only enabled and ready official connected clients can surface models", () => {
-    const g = mergedModels(local, { claude: true, codex: true, cursor: true }, [], [], {
+    const g = mergedModels(local, { claude: true, codex: true, cursor: true, antigravity: true }, [], [], {
       claude: true,
       codex: true,
       cursor: true,
+      antigravity: true,
     });
-    expect(PROVIDER_IDS).toEqual(["claude", "codex", "cursor"]);
-    expect(g.connected).toEqual([...CLI_CATALOG.claude, ...CLI_CATALOG.codex, ...CLI_CATALOG.cursor]);
-    expect(
-      g.connected.every(
-        (model) => model.provider === "claude" || model.provider === "codex" || model.provider === "cursor",
-      ),
-    ).toBe(true);
+    expect(PROVIDER_IDS).toEqual(["claude", "codex", "cursor", "antigravity"]);
+    expect(g.connected).toEqual([
+      ...CLI_CATALOG.claude,
+      ...CLI_CATALOG.codex,
+      ...CLI_CATALOG.cursor,
+      ...CLI_CATALOG.antigravity,
+    ]);
+    expect(g.connected.every((model) => PROVIDER_IDS.includes(model.provider as ProviderId))).toBe(true);
   });
 
   test("presets become pseudo-models the transports can never receive", () => {
@@ -149,8 +152,21 @@ describe("blocked models (per-lane model control)", () => {
 });
 
 describe("connected catalog policy", () => {
-  test("only Claude, Codex, and Cursor have executable catalogs", () => {
-    expect(PROVIDER_IDS).toEqual(["claude", "codex", "cursor"]);
+  test("only Claude, Codex, Cursor, and Antigravity have executable catalogs", () => {
+    expect(PROVIDER_IDS).toEqual(["claude", "codex", "cursor", "antigravity"]);
+    // Antigravity is last on purpose: off by default, newest, account caveat
+    expect(PROVIDER_IDS.at(-1)).toBe("antigravity");
+    expect(CLI_CATALOG.antigravity.map((model) => model.id)).toEqual([
+      "gemini-3.8-flash-high",
+      "gemini-3.8-flash-medium",
+      "gemini-3.8-flash-low",
+      "gemini-3.7-flash-high",
+      "gemini-3.7-flash-medium",
+      "gemini-3.7-flash-low",
+    ]);
+    expect(CLI_CATALOG.antigravity.every((model) => model.vision === false && model.api === "cli")).toBe(
+      true,
+    );
     expect(CLI_CATALOG.claude.length).toBeGreaterThan(0);
     expect(CLI_CATALOG.codex.length).toBeGreaterThan(0);
     expect(CLI_CATALOG.cursor).toContainEqual(
@@ -163,7 +179,14 @@ describe("connected catalog policy", () => {
       claude: "sonnet",
       codex: "gpt-5.6-sol",
       cursor: "grok-4.6",
+      antigravity: "gemini-3.8-flash-high",
     });
+    expect(providerDefaultModel("antigravity", { antigravity: "gemini-3.7-flash-low" })).toBe(
+      "gemini-3.7-flash-low",
+    );
+    expect(providerDefaultModel("antigravity", { antigravity: "gemini-2.5-pro" })).toBe(
+      "gemini-3.8-flash-high",
+    );
     expect(providerDefaultModel("cursor", { cursor: "cursor-auto" })).toBe("cursor-auto");
     expect(providerDefaultModel("cursor", { cursor: "removed-model" })).toBe("grok-4.6");
   });
@@ -253,9 +276,10 @@ describe("the frontier/local split (budget + adapter)", () => {
 
 describe("connected-lane vision", () => {
   test("only Claude and Codex vision models are reachable from the picker", () => {
-    const groups = mergedModels([], { claude: true, codex: true, cursor: true }, [], [], {
+    const groups = mergedModels([], { claude: true, codex: true, cursor: true, antigravity: true }, [], [], {
       claude: true,
       codex: true,
+      antigravity: true,
       cursor: true,
     });
     const visionIds = flattenModels(groups)

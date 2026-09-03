@@ -58,6 +58,7 @@ export const COMPONENT_ROOT_FILE_OWNERS = {
   "matchText.tsx": "shared search-match renderer",
   "markdownPeek.tsx":
     "Static read-only Markdown peek shared by Quick Look and the Breve reader (one parseBlock + renderInline loop)",
+  "antigravitySetup.tsx": "Antigravity lane setup card (Settings → AI Models install + Google sign-in)",
   "modelUsageSummary.ts": "shared model-usage presentation projection",
   "noteListRow.tsx": "shared note-list row",
   "palette.tsx": "application-shell command palette overlay",
@@ -104,6 +105,7 @@ export const SERVICE_FILE_OWNERS = {
   "externalCorpusChange.ts": "vault lifecycle",
   "folderTrash.ts": "vault lifecycle",
   "fsNotes.ts": "notes adapter",
+  "antigravity.ts": "connected-provider lane management (Antigravity runtime + sign-in)",
   "hooks.ts": "notes query adapter",
   "imageRepair.ts": "file storage",
   "itemLifecycle.ts": "vault lifecycle",

@@ -11,6 +11,7 @@
 
 import { afterEach, describe, expect, test } from "bun:test";
 
+import { notesService } from "../services/notes";
 import {
   adoptPendingDocument,
   documentSaveError,
@@ -20,7 +21,9 @@ import {
   evictDocument,
   flushNote,
   flushNoteAfterPaint,
+  flushSyncs,
   reloadDocumentIfClean,
+  setReadNoteForTests,
   setWriteNoteBodyForTests,
 } from "./model";
 
@@ -46,6 +49,8 @@ function read(id: string): readonly string[] | undefined {
 afterEach(() => {
   for (const id of touched) evictDocument(id);
   touched.clear();
+  setWriteNoteBodyForTests(null);
+  setReadNoteForTests(null);
 });
 
 describe("ensureDocument", () => {
@@ -320,5 +325,88 @@ describe("evictDocument", () => {
 
   test("is safe to call on a buffer that never existed", () => {
     expect(() => evictDocument("never")).not.toThrow();
+  });
+});
+
+describe("conflicts resolve themselves (2026-09-03)", () => {
+  const base = "# Plan\n\n- [ ] buy milk\n\nNotes.";
+
+  test("a disk change on other lines folds into a dirty buffer and the save rebases on disk", async () => {
+    const writes: Array<{ body: string; revision: string; expectedBody: string }> = [];
+    setWriteNoteBodyForTests((_id, body, revision, expectedBody) => {
+      writes.push({ body, revision, expectedBody });
+      return Promise.resolve();
+    });
+    buffer("fold", base);
+    editDocument("fold", (lines) => [...lines, "Typed meanwhile."]);
+    // the Tasks view ticked the box on disk while the buffer was dirty
+    const disk = base.replace("- [ ] buy milk", "- [x] buy milk");
+    reloadDocumentIfClean("fold", disk, "test:fold:2");
+    expect(read("fold")).toEqual(["# Plan", "", "- [x] buy milk", "", "Notes.", "Typed meanwhile."]);
+    await flushNote("fold");
+    expect(writes.at(-1)).toEqual({
+      body: `${disk}\nTyped meanwhile.`,
+      revision: "test:fold:2",
+      expectedBody: disk,
+    });
+    expect(documentSaveError("fold")).toBeNull();
+  });
+
+  test("a revision conflict on save reads disk and merges instead of staying stuck", async () => {
+    let attempts = 0;
+    const disk = base.replace("Notes.", "Notes.\nAppended by the assistant.");
+    setWriteNoteBodyForTests((_id, _body, revision) => {
+      attempts += 1;
+      if (revision === "test:stuck:1")
+        return Promise.reject(new Error("revision conflict: expected a, found b"));
+      return Promise.resolve();
+    });
+    setReadNoteForTests(() =>
+      Promise.resolve({
+        id: "stuck",
+        title: "Plan",
+        folderId: "f",
+        body: disk,
+        revision: "test:stuck:2",
+      } as never),
+    );
+    buffer("stuck", base);
+    editDocument("stuck", (lines) => ["# Plan for Monday", ...lines.slice(1)]);
+    await flushNote("stuck");
+    // the failed save triggered the reconcile; give it a tick, then flush the queued save
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushNote("stuck");
+    expect(attempts).toBe(2);
+    expect(read("stuck")).toEqual([
+      "# Plan for Monday",
+      "",
+      "- [ ] buy milk",
+      "",
+      "Notes.",
+      "Appended by the assistant.",
+    ]);
+    expect(documentSaveError("stuck")).toBeNull();
+  });
+
+  test("an unresolvable conflict never blocks quit: the edits become a sibling note", async () => {
+    const folder = await notesService.createFolder("Conflicts");
+    const seeded = await notesService.createNote(folder.id, "# Plan\n\nNotes, theirs.");
+    touched.add(seeded.id);
+    setWriteNoteBodyForTests(() => Promise.reject(new Error("revision conflict: expected a, found b")));
+    setReadNoteForTests(() => notesService.getNote(seeded.id));
+    ensureDocument(seeded.id, "# Plan\n\nNotes.", "test:seeded:1");
+    editDocument(seeded.id, () => ["# Plan", "", "Notes, mine."]);
+    await flushNote(seeded.id);
+    expect(documentSaveError(seeded.id)).toContain("revision conflict");
+
+    await flushSyncs(); // must resolve, not throw
+    const copies = (await notesService.listNotes(folder.id)).filter((n) => n.id !== seeded.id);
+    expect(copies).toHaveLength(1);
+    const copy = await notesService.getNote(copies[0]!.id);
+    expect(copy?.body.startsWith("# Plan (unsaved edits ")).toBe(true);
+    expect(copy?.body).toContain("Notes, mine.");
+    // the open note now shows the disk version, clean
+    expect(read(seeded.id)).toEqual(["# Plan", "", "Notes, theirs."]);
+    expect(documentSaveError(seeded.id)).toBeNull();
   });
 });

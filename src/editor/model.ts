@@ -12,6 +12,7 @@ import { markNoteDraftChanged, markNoteDraftSaved } from "../services/noteDrafts
 import { notesService } from "../services/notes";
 import { keepTabsFor } from "../state/panes";
 import type { Note } from "../types";
+import { threeWayMerge } from "./merge";
 import { MARK } from "./taskState";
 
 const SYNC_DEBOUNCE_MS = 400;
@@ -198,11 +199,22 @@ export function reloadDocumentIfClean(noteId: string, body: string, revision: st
     return;
   }
   if (dirtyIds.has(noteId)) {
-    // The Librarian owns location/AI metadata only. If disk still carries the
-    // exact prose this draft started from, its new complete-file revision is a
-    // safe base for the unsaved local text. Different prose remains a durable,
-    // visible conflict.
-    if (persistedBodies.get(noteId) !== body) return;
+    // Disk changed under unsaved edits. Metadata-only writes (the Librarian)
+    // keep the prose, so the new revision is simply a safe base. When the
+    // PROSE changed too — a task ticked from the Tasks view, a chat edit,
+    // another app — fold both edits together when they touched different
+    // lines; only overlapping edits stay a visible conflict (2026-09-03).
+    const base = persistedBodies.get(noteId);
+    if (base !== body) {
+      const mine = (docs.get(noteId) ?? []).join("\n");
+      const merged = base === undefined ? null : threeWayMerge(base, mine, body);
+      if (!merged?.ok) return;
+      const lines = merged.merged.split("\n");
+      docs.set(noteId, lines);
+      taskSigs.set(noteId, taskSignature(lines));
+      const set = subs.get(noteId);
+      if (set) for (const fn of set) fn();
+    }
     const changedRevision = revisions.get(noteId) !== revision;
     revisions.set(noteId, revision);
     persistedBodies.set(noteId, body);
@@ -307,16 +319,62 @@ function syncNow(noteId: string): Promise<void> {
       // and a retry timer keeps the sync alive even with no further keystroke.
       // The retry rides the timers map, so quit-flush picks it up too.
       setSaveError(noteId, err instanceof Error ? err.message : String(err));
-      // A conflict is durable until the user resolves the two versions. Blind
-      // retries would only hammer the disk and can never become safe on their
-      // own; the live local buffer stays intact and visibly dirty.
-      if (
-        err instanceof Error &&
-        (err.message.startsWith("revision conflict") || err.message.startsWith("unknown note"))
-      )
+      // A conflict never retries blindly: the live buffer stays intact and
+      // dirty. It does get ONE honest attempt at self-resolution — read the
+      // disk version and fold it in (reloadDocumentIfClean merges when the
+      // two edits touched different lines and queues the save that lands).
+      if (err instanceof Error && err.message.startsWith("revision conflict")) {
+        void reconcileFromDisk(noteId);
         return;
+      }
+      if (err instanceof Error && err.message.startsWith("unknown note")) return;
       scheduleRetry(noteId);
     });
+}
+
+let readNote: (noteId: string) => Promise<Note | null> = (noteId) => notesService.getNote(noteId);
+
+export function setReadNoteForTests(fn: typeof readNote | null): void {
+  readNote = fn ?? ((noteId) => notesService.getNote(noteId));
+}
+
+async function reconcileFromDisk(noteId: string): Promise<void> {
+  const note = await readNote(noteId).catch(() => null);
+  if (!note || !dirtyIds.has(noteId)) return;
+  reloadDocumentIfClean(noteId, note.body, note.revision);
+}
+
+/** Quit must never be held hostage by a conflict. The unsaved buffer becomes
+ * a sibling note (same folder, title suffixed) so nothing is lost, and the
+ * open note adopts the disk version. Returns the ids it copied. */
+async function keepConflictCopies(): Promise<string[]> {
+  const kept: string[] = [];
+  for (const noteId of [...dirtyIds]) {
+    if (!saveErrors.get(noteId)?.startsWith("revision conflict")) continue;
+    const mine = docs.get(noteId)?.join("\n");
+    const note = await readNote(noteId).catch(() => null);
+    if (mine === undefined || !note) continue;
+    const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
+    const body = mine.startsWith("# ")
+      ? mine.replace(/^# (.*)$/m, `# $1 (unsaved edits ${stamp})`)
+      : `# Unsaved edits ${stamp}\n\n${mine}`;
+    try {
+      await notesService.createNote(note.folderId, body);
+    } catch {
+      continue; // still dirty: the flush reports it honestly below
+    }
+    const lines = note.body.split("\n");
+    docs.set(noteId, lines);
+    taskSigs.set(noteId, taskSignature(lines));
+    revisions.set(noteId, note.revision);
+    persistedBodies.set(noteId, note.body);
+    setSaveError(noteId, null);
+    setDirty(noteId, false);
+    const set = subs.get(noteId);
+    if (set) for (const fn of set) fn();
+    kept.push(noteId);
+  }
+  return kept;
 }
 
 function scheduleRetry(noteId: string): void {
@@ -391,6 +449,7 @@ export async function flushSyncs(): Promise<void> {
   }
   timers.clear();
   await Promise.allSettled(pending);
+  await keepConflictCopies();
   const unsaved = [...dirtyIds];
   if (unsaved.length > 0) {
     const detail = unsaved

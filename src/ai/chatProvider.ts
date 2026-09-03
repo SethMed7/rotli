@@ -10,10 +10,11 @@ export type ConsultMention =
   | { kind: "consult"; provider: ConsultProvider; modelId: string | null; prompt: string };
 
 const CONSULT_TAG =
-  /(^|\s)@(claude|gpt|chatgpt|codex|openai|cursor)(?::(?:\{([a-z0-9][a-z0-9._-]*)\}|([a-z0-9][a-z0-9._-]*)))?(?=$|\s|[),.!?;])/gi;
+  /(^|\s)@(claude|gpt|chatgpt|codex|openai|cursor|antigravity|gemini|agy)(?::(?:\{([a-z0-9][a-z0-9._-]*)\}|([a-z0-9][a-z0-9._-]*)))?(?=$|\s|[),.!?;])/gi;
 
 function consultProvider(alias: string): ConsultProvider {
   if (/^(gpt|chatgpt|codex|openai)$/i.test(alias)) return "codex";
+  if (/^(gemini|agy)$/i.test(alias)) return "antigravity";
   return alias.toLowerCase() as ConsultProvider;
 }
 
@@ -21,6 +22,7 @@ export function providerFamilyFromProvider(provider: string): PrimaryProvider | 
   if (provider === "claude") return "claude";
   if (provider === "codex") return "codex";
   if (provider === "cursor") return "cursor";
+  if (provider === "antigravity") return "antigravity";
   if (provider === "preset" || !provider) return null;
   if (provider === "mlx" || provider === "llamacpp" || provider === "ollama") return `local:${provider}`;
   return `provider:${provider}`;
@@ -34,6 +36,7 @@ export function providerFamilyLabel(provider: PrimaryProvider): string {
   if (provider === "claude") return "Claude";
   if (provider === "codex") return "Codex";
   if (provider === "cursor") return "Cursor";
+  if (provider === "antigravity") return "Antigravity";
   if (provider.startsWith("local:")) return "On this Mac";
   const name = provider.slice("provider:".length);
   return name ? name[0]!.toUpperCase() + name.slice(1) : "Provider";

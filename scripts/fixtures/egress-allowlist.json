@@ -17,7 +17,8 @@
       "web.rs": "web_fetch (arbitrary public web via the vetted_resolve SSRF-blocked agent, same-host redirects, byte+URL caps)",
       "chat.rs": "the on-device model bridge — endpoint_permitted clamps the destination to registered loopback model servers; egress_allowed refuses protected transcripts to non-local endpoints",
       "breve.rs": "breve_test_email — Resend send to the literal https://api.resend.com/emails host, Keychain Bearer, configured recipients only",
-      "remote_agent.rs": "explicit session connector to the user-entered HTTPS relay (loopback HTTP allowed in development); independent Keychain device/client credentials; redirects refused; request/response frames bounded; MCP responses come only from workspace.rs remote-policy handlers; vault switches fail closed unless disconnect succeeds; no frame logging"
+      "remote_agent.rs": "explicit session connector to the user-entered HTTPS relay (loopback HTTP allowed in development); independent Keychain device/client credentials; redirects refused; request/response frames bounded; MCP responses come only from workspace.rs remote-policy handlers; vault switches fail closed unless disconnect succeeds; no frame logging",
+      "antigravity.rs": "antigravity_manage install — one pinned-hash download of Google's registry-listed ACP runtime from the literal https://dl.google.com archive URL (byte-capped stream, SHA-256 + size verified before extraction); no credential, no user content, off by default (ADR 2026-09-03)"
     },
     "gatedEgressSites": {
       "_comment": "Every Rust function that puts CALLER-SUPPLIED text on a network — a model transport, a CLI provider, or a web lane — must ask crate::secret::blocked_for_remote (the marker scan + the secure-prose ledger). Adding an outbound lane without the gate is the class the 2026-08-01 audit found three times: open_url had no content gate at all, the organizer's remote lane had none, and web_search had no size bound. check-security.mjs asserts each function below still calls the gate.",
@@ -100,7 +101,11 @@
       "core:window:allow-start-dragging",
       "updater:default"
     ],
-    "defaultWebviews": ["main", "capture", "quick"],
+    "defaultWebviews": [
+      "main",
+      "capture",
+      "quick"
+    ],
     "defaultWindows": []
   },
   "remoteRelay": {

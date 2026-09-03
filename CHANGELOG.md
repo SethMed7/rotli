@@ -10,6 +10,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Tables follow the pane and show their resize handles.** A table with
+  saved column widths overflowed the editor instead of following a narrower
+  window; widths now scale down together to the space available (never
+  below a column's floor) and grow back with the pane, and tables without
+  saved widths wrap to fit before they scroll. Hovering a column or row edge
+  shows a visible grip that stays lit through the drag. Deleting or moving a
+  row or column no longer throws the view to wherever the caret last was
+  (often the bottom of a long note); the caret stays on the table.
+
+- **A note that changed on disk no longer freezes, and never blocks quitting.**
+  When something other than the editor rewrote an open note — a task ticked
+  from the Tasks view, a chat edit, the Librarian, another app — the next
+  autosave hit a revision conflict that never cleared, and ⌘Q refused with
+  “Rotli stayed open because some changes could not be saved”. Rotli now
+  folds the two versions together when they touched different lines (the
+  common case) and saves on. When both sides changed the same lines, quitting
+  keeps your unsaved edits as a sibling note titled “… (unsaved edits <time>)”
+  and the open note shows the disk version, so nothing is lost and the app
+  quits.
+
+### Added
+
+- **Antigravity is back as a connected lane, through Google's official ACP
+  agent.** Settings → AI Models → Antigravity installs the exact runtime
+  Google lists on the Agent Client Protocol registry (pinned SHA-256 and size,
+  Apple Silicon only) and signs in with the agent's own Google flow in your
+  browser; Rotli never sees the credential. Chat turns ride the same
+  one-shot, no-tools ACP transport as Cursor, with the model picked per turn
+  from the account's own list (Gemini 3.8 Flash and 3.7 Flash, three thinking
+  levels each; `@gemini` or `@antigravity` consults it mid-chat). Off by
+  default and last in the list; the card states Google's FAQ position and the
+  DeepMind statements so the account risk is a stated choice. Breve keeps
+  refusing every connected provider. Decision record:
+  `docs/decisions/2026-09-03-antigravity-official-acp-lane.md`.
+
 ## [0.85.0] - 2026-09-02
 
 ### Added
