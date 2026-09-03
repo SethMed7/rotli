@@ -506,18 +506,13 @@ function rankFixture(query: string, limit: number): NoteHit[] {
   return mergeFolderHits(hits, folderHits(FIXTURE_META, query, limit), limit);
 }
 
-interface StepLog {
-  kind: "complete";
-  formatJson: boolean;
-  prompt: string;
-  raw: string;
-  ms: number;
-}
+type StepLog = { kind: "complete"; formatJson: boolean; prompt: string; raw: string; ms: number };
 
 function makeFixtureHost(modelId: string, log: StepLog[], webFixtureName: WebFixtureName): Host {
   const meta = { id: modelId };
   const webFixture = WEB_FIXTURES[webFixtureName];
   return {
+    createNote: async () => "error: the fixture host cannot create notes",
     async complete({ messages, formatJson }) {
       const prompt = messages.map((m) => m.content).join("\n\n");
       const body: Record<string, unknown> = {

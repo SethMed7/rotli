@@ -143,7 +143,7 @@ function strip(html: string, maxChars: number): { title: string; text: string } 
 
 // Read the body but ABORT past maxBytes so a huge/slow response can't balloon memory.
 async function readCapped(res: Response, maxBytes: number): Promise<string> {
-  if (!res.body) return await res.text();
+  if (!res.body) return  res.text();
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   let out = "";

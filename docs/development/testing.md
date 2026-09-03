@@ -19,7 +19,7 @@ direction, runtime wiring, and owning documentation must agree.
 | `bun run test:e2e` | Playwright regression layer — drives the real browser twin (chromium) against `vite dev`'s seeded demo corpus |
 | `bun run test:e2e:ui` | The same specs in Playwright's interactive UI runner, for local debugging |
 | `bun run check:e2e-types` | Strict-typecheck `e2e/` and `playwright.config.ts` (`tsc -p tsconfig.e2e.json`) — not folded into the root `tsc --noEmit` because that config's `include` is `src` only |
-| `bun run check:ratchets` | Numbers that only move one way (`scripts/ratchet-baseline.json`): per-file line ceilings for every source file at or above 600 lines, the count of source-string test assertions, dated provenance comments, and per-directory test-coverage floors. Lower a ceiling with `--update`; never raise one |
+| `bun run check:ratchets` | Numbers that only move one way (`scripts/ratchet-baseline.json`): per-file line ceilings for every source file at or above 600 lines, the count of source-string test assertions, dated provenance comments, and per-directory test-coverage floors (the recorded ratio is the floor once it sits above the 0.40 constant — coverage may only rise). The source-shape number counts `toContain`/`toMatch` assertions inside files that read source text, not the reads. Lower a ceiling with `--update`; never raise one. The checker has its own fixture tests (`scripts/check-ratchets.test.ts`, as do `check:window-events` and `check:code-shape`) |
 | `bun run check:window-events` | Every `rotli:*` / `private-browser-*` event literal in `src/` and `src-tauri/src/` has a row in `docs/architecture/window-events.md` and is wired on a sending and a receiving side |
 | `bun run check:dup:gate` | The duplication miner's cluster count as a ratchet (`ratchet-baseline.json` `dupClusters`); `bun run check:dup` alone stays the advisory report |
 | `bun run check:breve-runtime` | Bundle every runtime entry point, strict-typecheck the runtime (`tsc -p breve-runtime`), validate shell syntax, and verify scheduler/delivery wiring |
@@ -209,7 +209,10 @@ regressions.
 - `check:design-system` proves the four themes define every semantic token, that
   product CSS consumes semantic roles rather than literal or fixed-palette
   colors, that first-party CSS contains no glow/shadow/filter/backdrop effects,
-  and that class selectors stay kebab-case (BEM `--modifier` allowed).
+  that class selectors stay kebab-case (BEM `--modifier` allowed), and that
+  every `var(--x)` names a token defined somewhere in `src/` (a missing
+  definition with no fallback is a silently invalid declaration; JS-injected
+  measure tokens are read with a fallback and listed in the checker).
 - `check:parity` guards the TS↔Rust shared-constant fixture harness itself.
 - `check:security` is the egress/CSP/keychain/capability tripwire layer
   ([`security.md`](security.md)).

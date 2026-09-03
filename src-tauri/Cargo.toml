@@ -43,6 +43,7 @@ security-framework = "3"                                        # Keychain-backe
 # rebuildable — never a database (the .md files stay durable truth). Large dep;
 # binary-size impact measured in the PR. NOT on check:structure's denied-DB list.
 tantivy = "0.26.1"
+tauri-plugin-clipboard-manager = "2"
 
 # macOS-only: swap the Dock/app icon at runtime (Settings → Appearance → App icon)
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -60,6 +61,14 @@ objc2-foundation = { version = "0.3", features = ["NSArray", "NSData", "NSError"
 # 250-note memex, 2026-09-01), which made every structural refresh in the dev
 # app read as "lag" that release users never see. opt-level 1 keeps debug info
 # and incremental builds while making the dev app representative.
+# CI runs clippy with -D warnings; without this table a local `cargo clippy`
+# passed code CI rejects (audit 2026-09-03). Now the crate says so itself.
+[lints.rust]
+warnings = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+
 [profile.dev]
 opt-level = 1
 

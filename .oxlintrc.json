@@ -26,7 +26,10 @@
   // the rules adopted, 18 are one deferred rule, recorded below. Everything
   // else in the category is at zero and now guards for free. Propose additions
   // in a PR; the config must not grow silently.
-  "plugins": ["typescript", "react"],
+  // `plugins` REPLACES oxlint's default set; typescript+react alone had silently
+  // dropped `unicorn` and `oxc` (audit 2026-09-03: 25 findings in 4 mechanical
+  // rules, all fixed; the 14 oxc correctness rules were already at zero).
+  "plugins": ["typescript", "react", "unicorn", "oxc"],
   "options": {
     // One source for CLI and editor behavior. The contract smoke proves the
     // tsgolint sidecar actually executes a type-aware rule.
@@ -72,6 +75,29 @@
     // React rules never fire in e2e/ (no React there), so one flat config
     // covers both file groups without overrides.
     "react-hooks/rules-of-hooks": "error",
-    "react-hooks/exhaustive-deps": "error"
-  }
+    "react-hooks/exhaustive-deps": "error",
+    // ── adopted 2026-09-03 (measured: 14 findings across the four, fixed) ────
+    // SYNTAX.md prefers discriminated unions; a non-exhaustive switch is the
+    // bug class that follows.
+    // a `default` counts for unions (the four measured sites all had one and
+    // switched on `string | undefined`); a union WITHOUT a default still fails
+    "typescript/switch-exhaustiveness-check": ["error", { "considerDefaultExhaustiveForUnions": true }],
+    "typescript/return-await": "error",
+    "typescript/no-deprecated": "error",
+    "typescript/only-throw-error": "error",
+    // Persisted UI state lives in the vault's settings, never in the webview's
+    // localStorage (system-audit-2026-07-29 §3 asked for the mechanical check).
+    // The one recorded exception is listed in overrides, not suppressed inline.
+    "no-restricted-globals": ["error", "localStorage", "sessionStorage"],
+    // OFF by measurement: all 9 findings spread a Set/Map into for…of on
+    // purpose — the loop body mutates the collection (overlays closing, dirty
+    // ids draining, sessions parking). A snapshot is the intent, not waste.
+    "unicorn/no-useless-spread": "off"
+  },
+  "overrides": [
+    {
+      "files": ["src/editor/embedSizeMemory.ts"],
+      "rules": { "no-restricted-globals": "off" }
+    }
+  ]
 }

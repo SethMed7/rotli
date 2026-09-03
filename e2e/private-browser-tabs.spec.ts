@@ -20,7 +20,7 @@ test("private-browser tabs create, switch, and close through Rotli's pane strip"
 
   const newTab = page.getByRole("button", { name: "New private browser tab — ⌘T", exact: true });
   await newTab.click();
-  await page.keyboard.press("Meta+t");
+  await page.keyboard.press("Meta+T");
   await newTab.click();
 
   await expect(allTabs).toHaveCount(initialCount + 4);

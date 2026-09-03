@@ -1,5 +1,3 @@
-import { EditorView } from "@codemirror/view";
-
 import "./styles/base.css";
 import "./styles/app.css";
 import "./styles/notes.css";
@@ -19,7 +17,6 @@ import { useEffect, useState } from "react";
 import { Suspense, lazy } from "react";
 
 import { CaptureCard } from "./components/captureCard";
-import { chatDropAt, isChatImagePath } from "./components/chat/chatDrop";
 import { ContextMenu } from "./components/contextMenu";
 import { HotkeyBadges } from "./components/hotkeyBadges";
 import { NotesSurface } from "./components/notesSurface";
@@ -34,15 +31,12 @@ import { registerDefaultActions } from "./keys/actions";
 import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/registry";
 import { hotkeyPeekDelay, useHeldModifier } from "./keys/useHeldModifier";
 import {
-  corpusCreateImageAsset,
-  corpusImportFile,
   emitCaptureAck,
   isTauri,
   onBrainJournal,
   onCaptureSave,
   onCorpusChanged,
   onNativeCloseTab,
-  onNativeDropAuthorized,
   onOpenRequest,
   onOrganizerProgress,
   onQuickCreated,
@@ -51,21 +45,12 @@ import {
   onSummonChat,
   onSummonSearch,
   onVaultChanged,
-  rootIdOf,
   setAppIcon,
   setDockVisible,
   setHideOnBlur,
   workspaceTakeOpenRequest,
 } from "./lib/tauri";
-import {
-  dropEditorHost,
-  importImageFilesAtDrop,
-  importImagesAtDrop,
-  isImagePath,
-  isEmbeddablePath,
-  nativeDropPoints,
-} from "./editor/externalImageDrop";
-import { noteIdFacet } from "./editor/livePreview";
+import { useNativeFileDrop } from "./editor/nativeFileDrop";
 import { onQuitFlushFailure } from "./lib/quitFlush";
 import { fileQuickNoteInMain } from "./newItems/composition";
 import { createVaultCapture } from "./services/captureRouting";
@@ -375,99 +360,9 @@ function MainShell() {
   // ⌥F fired OS-side — land in the ⌘K palette ("find", ⌥A's search twin)
   useEffect(() => onSummonSearch(() => useUiStore.getState().setPaletteOpen(true)), []);
 
-  // external file drop. Tauri's OS drag-drop gives PATHS + the drop position. An
-  // IMAGE or VIDEO dropped over the editor is imported into storage/ AND inserted
-  // at the caret as a `![](storage:…)` link; everything else just lands in storage/.
-  useEffect(() => {
-    if (!isTauri()) return;
-    let stopped = false;
-    const handleDrop = async (paths: string[], px: number, py: number) => {
-      const hits = nativeDropPoints(px, py, window.devicePixelRatio || 1).map((point) => ({
-        point,
-        element: document.elementFromPoint(point.x, point.y) as HTMLElement | null,
-      }));
-      // a CHAT under the pointer claims the images first (the maintainer, 2026-08-04):
-      // before this, a drop on a chat found no editor and fell through to the
-      // storage branch — the file landed in the vault and never attached.
-      const chatAttach = hits.map(({ element }) => (element ? chatDropAt(element) : null)).find(Boolean);
-      if (chatAttach) {
-        const dropped = paths.filter(isChatImagePath);
-        const rest = paths.filter((path) => !isChatImagePath(path));
-        if (dropped.length > 0) chatAttach(dropped);
-        if (rest.length > 0) await Promise.all(rest.map((p) => corpusImportFile("default", p)));
-        await invalidateNotes();
-        return;
-      }
-      const editorHit = hits
-        .map(({ point, element }) => ({ point, host: dropEditorHost(element) }))
-        .find(({ host }) => host !== null);
-      const editorHost = editorHit?.host ?? null;
-      const view = editorHost ? EditorView.findFromDOM(editorHost) : null;
-      const rootId = view ? rootIdOf(view.state.facet(noteIdFacet)) : "default";
-      const images = view ? paths.filter(isEmbeddablePath) : [];
-      const toStorage = view ? paths.filter((path) => !isEmbeddablePath(path)) : paths;
-      if (toStorage.length) {
-        await Promise.all(toStorage.map((p) => corpusImportFile(rootId, p)));
-      }
-      if (view && images.length) {
-        await importImagesAtDrop(view, images, editorHit?.point ?? hits[0]!.point, (path) =>
-          corpusImportFile(rootId, path),
-        );
-      }
-      await invalidateNotes();
-    };
-    // Rust emits this app event only after it has created the matching one-shot
-    // import grants. Listening to Tauri's built-in webview event here used to
-    // race the native window callback and reject a valid drop as unauthorized.
-    const unlisten = onNativeDropAuthorized((event) => {
-      if (stopped) return;
-      void handleDrop(event.paths, event.position.x, event.position.y).catch((error: unknown) => {
-        const detail = error instanceof Error ? error.message : String(error);
-        useUiStore.getState().setRowActionError(`Couldn’t import dropped files — ${detail}`);
-      });
-    });
-    return () => {
-      stopped = true;
-      unlisten();
-    };
-  }, []);
-
-  // Some WebKit/Tauri combinations surface an ordinary DataTransfer instead
-  // of the native path event. Keep an editor-local fallback so image drops do
-  // not depend on one runtime's drag protocol.
-  useEffect(() => {
-    const onDragOver = (event: DragEvent) => {
-      if (!event.dataTransfer?.types.includes("Files")) return;
-      if (!dropEditorHost(event.target as Element | null)) return;
-      event.preventDefault();
-      event.dataTransfer.dropEffect = "copy";
-    };
-    const onDrop = (event: DragEvent) => {
-      const host = dropEditorHost(event.target as Element | null);
-      if (!host || !event.dataTransfer) return;
-      const files = [...event.dataTransfer.files].filter((file) => isImagePath(file.name));
-      if (files.length === 0) return;
-      const view = EditorView.findFromDOM(host);
-      if (!view) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const rootId = rootIdOf(view.state.facet(noteIdFacet));
-      void importImageFilesAtDrop(view, files, { x: event.clientX, y: event.clientY }, (name, base64) =>
-        corpusCreateImageAsset(rootId, name, base64),
-      )
-        .then(invalidateNotes)
-        .catch((error: unknown) => {
-          const detail = error instanceof Error ? error.message : String(error);
-          useUiStore.getState().setRowActionError(`Couldn’t import dropped images — ${detail}`);
-        });
-    };
-    window.addEventListener("dragover", onDragOver, true);
-    window.addEventListener("drop", onDrop, true);
-    return () => {
-      window.removeEventListener("dragover", onDragOver, true);
-      window.removeEventListener("drop", onDrop, true);
-    };
-  }, []);
+  // Finder drops: preview line while hovering, insertion at the drop (or the
+  // hovered/focused editor), storage for everything else
+  useNativeFileDrop();
 
   // fs mode: the window opens on the freshest note. The in-memory seed decides
   // this synchronously at module init; the disk corpus answers async — fill

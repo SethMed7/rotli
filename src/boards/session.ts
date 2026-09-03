@@ -89,7 +89,7 @@ export function serializeBoardScene(parts: {
       return element;
     }
     const id = (element as { id: string }).id;
-    return { ...(originalElements.get(id) ?? {}), ...(element as Record<string, unknown>) };
+    return { ...originalElements.get(id), ...(element as Record<string, unknown>) };
   });
   const originalFiles =
     source.files && typeof source.files === "object" ? (source.files as Record<string, unknown>) : {};

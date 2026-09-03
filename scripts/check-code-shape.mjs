@@ -22,14 +22,12 @@ function walkFiles(relRoot, predicate) {
   return files;
 }
 
-const productionFiles = sourceRoots.flatMap((dir) => walkFiles(
-  dir,
-  (path) => sourceExtensions.includes(extname(path)) && !/\.(?:test|spec)\.[^.]+$/.test(path),
-));
-const testFiles = testRoots.flatMap((dir) => walkFiles(
-  dir,
-  (path) => /(?:\.(?:test|spec)|\/test-[^/]+)\.tsx?$/.test(path),
-));
+const productionFiles = sourceRoots.flatMap((dir) =>
+  walkFiles(dir, (path) => sourceExtensions.includes(extname(path)) && !/\.(?:test|spec)\.[^.]+$/.test(path)),
+);
+const testFiles = testRoots.flatMap((dir) =>
+  walkFiles(dir, (path) => /(?:\.(?:test|spec)|\/test-[^/]+)\.tsx?$/.test(path)),
+);
 
 // Pane surfaces and modal dialogs have one home (docs/development/adding-things.md).
 // Feature-owned surfaces are enumerated exceptions; extending this set requires a
@@ -43,7 +41,9 @@ for (const file of productionFiles) {
   if (!file.startsWith("src/") || !/(?:Surface|Dialog)\.tsx$/.test(file)) continue;
   if (surfaceHomeExceptions.has(file)) continue;
   if (dirname(file) !== "src/components") {
-    violations.push(`${file}: pane surfaces and dialogs live in src/components/ (docs/development/adding-things.md)`);
+    violations.push(
+      `${file}: pane surfaces and dialogs live in src/components/ (docs/development/adding-things.md)`,
+    );
   }
 }
 
@@ -55,6 +55,29 @@ for (const file of [...productionFiles, ...testFiles]) {
   if (/\/\/\s*@ts-(?:ignore|nocheck)\b|\/\*\s*@ts-(?:ignore|nocheck)\b/.test(source)) {
     violations.push(`${file}: @ts-ignore and @ts-nocheck hide type regressions`);
   }
+  // a NUL or control byte makes git and grep treat the file as binary, which
+  // blinds every regex guard at once (two files shipped that way in 0.85)
+  const control = [...source].find((ch) => {
+    const code = ch.codePointAt(0);
+    return code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d;
+  });
+  if (control) {
+    const hex = control.codePointAt(0).toString(16).padStart(4, "0").toUpperCase();
+    violations.push(
+      `${file}: control character U+${hex} — escape it (\\u${hex}); raw control bytes read as binary`,
+    );
+  }
+  // Meta+Arrow/Home/End/Page are CodeMirror's mac-only bindings: a silent
+  // no-op on Linux CI, so a spec that presses them proves nothing there
+  if (file.startsWith("e2e/")) {
+    const chord = source.match(
+      /press\("(?:Meta|ControlOrMeta)\+(?:Arrow(?:Up|Down|Left|Right)|Home|End|Page(?:Up|Down))"\)/,
+    );
+    if (chord)
+      violations.push(
+        `${file}: ${chord[0]} is a macOS-only CodeMirror binding — scroll or move the caret programmatically`,
+      );
+  }
 }
 
 const graph = new Map(productionFiles.map((file) => [file, []]));
@@ -65,9 +88,9 @@ function resolveImport(fromFile, specifier) {
   const candidates = extname(base)
     ? [base]
     : [
-      ...sourceExtensions.map((extension) => `${base}${extension}`),
-      ...sourceExtensions.map((extension) => join(base, `index${extension}`)),
-    ];
+        ...sourceExtensions.map((extension) => `${base}${extension}`),
+        ...sourceExtensions.map((extension) => join(base, `index${extension}`)),
+      ];
   const found = candidates.find((path) => existsSync(path));
   return found ? relative(root, found) : null;
 }
@@ -130,4 +153,6 @@ if (violations.length) {
   process.exit(1);
 }
 
-console.log(`check:code-shape ok — ${productionFiles.length} production modules are cycle-free; ${testFiles.length} test files contain no focus/skip or hidden type errors`);
+console.log(
+  `check:code-shape ok — ${productionFiles.length} production modules are cycle-free; ${testFiles.length} test files contain no focus/skip or hidden type errors`,
+);

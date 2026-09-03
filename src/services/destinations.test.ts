@@ -189,7 +189,7 @@ describe("isWikiPath — the pure curated-wiki shape test (#6)", () => {
     expect(isWikiPath("vault:wiki/people")).toBe(true);
   });
 
-  test("never matches notes folders or lookalikes", () => {
+  test("isWikiPath never matches notes folders or lookalikes", () => {
     expect(isWikiPath("Inbox")).toBe(false);
     expect(isWikiPath("chats")).toBe(false);
     expect(isWikiPath("wikipedia")).toBe(false); // prefix must be a path segment

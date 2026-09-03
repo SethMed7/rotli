@@ -51,7 +51,10 @@ function validPolicy() {
     bunVersion: "1.4.0",
     manifests: {
       "package.json": rootManifest,
-      "site/package.json": { packageManager: "bun@1.4.0" },
+      "site/package.json": { packageManager: "bun@1.4.0" } as {
+        packageManager: string;
+        trustedDependencies?: string[];
+      },
       "breve-runtime/defaults/package.json": { packageManager: "bun@1.4.0" },
     },
     bunfigs: {

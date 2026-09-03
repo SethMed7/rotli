@@ -135,7 +135,9 @@ async function runJsonAction(action, projects, identity) {
     );
     const violations = dependencyLicenseViolations(roots, baseline);
     if (violations.length) {
-      console.error(`dependency license baseline failed:\n${violations.map((line) => `  - ${line}`).join("\n")}`);
+      console.error(
+        `dependency license baseline failed:\n${violations.map((line) => `  - ${line}`).join("\n")}`,
+      );
       return 1;
     }
     const unknownCount = roots.reduce(

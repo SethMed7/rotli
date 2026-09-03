@@ -1,3 +1,5 @@
+// off macOS, code behind macOS-gated entry points is unwired, not dead (Linux cargo-check lane)
+#![cfg_attr(not(target_os = "macos"), allow(dead_code))]
 // rotli — the shell. The window is a visitor, not a resident: it lives in the
 // menu bar (no dock icon, no Cmd-Tab), is summoned by a global shortcut, and
 // hides on blur or Esc. Summon shows LIVING windows — never recreates them —
@@ -15,6 +17,7 @@ mod app_settings;
 mod board;
 mod breve;
 mod chat;
+mod clipboard_assets;
 mod compute;
 mod containment;
 mod corpus;
@@ -23,7 +26,7 @@ mod fsutil;
 mod keychain;
 mod localmodel;
 mod memex;
-mod memex_query;
+mod memex_query; mod native_drag;
 mod organizer;
 #[cfg(test)]
 mod parity_tests;
@@ -1319,22 +1322,6 @@ struct VaultInspection {
     warnings: Vec<String>,
 }
 
-/// A trusted native drop, emitted only after `ImportAuthorizations` has issued
-/// the matching one-shot grants. The ordinary Tauri drag event is deliberately
-/// not consumed by the webview because its delivery can race this callback.
-#[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct AuthorizedNativeDrop {
-    paths: Vec<String>,
-    position: AuthorizedNativeDropPosition,
-}
-
-#[derive(Clone, serde::Serialize)]
-struct AuthorizedNativeDropPosition {
-    x: f64,
-    y: f64,
-}
-
 fn inspect_vault_path(path: &std::path::Path) -> Result<VaultInspection, String> {
     if !path.is_dir() {
         return Err("Choose an existing folder.".into());
@@ -2337,7 +2324,7 @@ fn set_summon_shortcut(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_dialog::init()).plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(
@@ -2482,6 +2469,7 @@ pub fn run() {
             corpus_pick_images,
             corpus::corpus_create_image_asset,
             corpus::corpus_abs,
+            clipboard_assets::corpus_image_data_url,
             corpus::corpus_frontmatter,
             corpus::corpus_raw_frontmatter,
             corpus::corpus_write_frontmatter_raw,
@@ -2927,23 +2915,8 @@ pub fn run() {
         // the rest of the process. ⌘W is owned by the frontend registry above.
         .on_window_event(|window, event| {
             match event {
-                WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, position }) => {
-                    let paths = window
-                        .app_handle()
-                        .state::<corpus::ImportAuthorizations>()
-                        .authorize_native_drop(paths);
-                    if !paths.is_empty() {
-                        let _ = window.emit(
-                            "rotli:native-drop-authorized",
-                            AuthorizedNativeDrop {
-                                paths,
-                                position: AuthorizedNativeDropPosition {
-                                    x: position.x,
-                                    y: position.y,
-                                },
-                            },
-                        );
-                    }
+                WindowEvent::DragDrop(event) => {
+                    native_drag::handle(window, event);
                     return;
                 }
                 WindowEvent::CloseRequested { api, .. } => {

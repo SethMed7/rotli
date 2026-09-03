@@ -15,13 +15,13 @@
 //   the last row exits below the table — so the pipes never need
 //   hand-navigation and Enter can't split a row.
 
-import { EditorSelection, type EditorState, type Line, type TransactionSpec } from "@codemirror/state";
+import { EditorSelection, type Line, type TransactionSpec } from "@codemirror/state";
 import type { Command, EditorView, KeyBinding } from "@codemirror/view";
 
-import { CHOICE_LINE_RE, CHOICE_MARK } from "./choiceState";
+import { CHOICE_LINE_RE } from "./choiceState";
 import { lineInFence, scanFences } from "./fences";
 import { imageSourceSpan } from "./imageSelection";
-import { RESULT_LINE_RE, RESULT_MARK, resultStateOf } from "./resultState";
+import { RESULT_LINE_RE, resultStateOf } from "./resultState";
 import {
   type CellRef,
   type TableBlock,
@@ -82,32 +82,6 @@ function listPrefixOf(line: string): { prefixLen: number; next: string; empty: b
   };
 }
 
-/** After inserting a numbered item, renumber the following SAME-indent siblings
- * (2 → 3 → …) so the list never shows duplicate numbers. Deeper-indented items
- * ride along untouched; anything else (blank, bullet, prose) ends the list. */
-function renumberAfter(state: EditorState, line: Line, nextMarker: string) {
-  const marker = new RegExp(
-    `^( *)(\\d+)\\. (?:(?:\\[${MARK}\\] |\\[${RESULT_MARK}\\]\\[${RESULT_MARK}\\] |\\(${CHOICE_MARK}\\) ))?$`,
-  ).exec(nextMarker);
-  if (!marker) return [];
-  const indent = marker[1]?.length ?? 0;
-  let num = Number(marker[2]);
-  const changes: { from: number; to: number; insert: string }[] = [];
-  for (let n = line.number + 1; n <= state.doc.lines; n++) {
-    const l = state.doc.line(n);
-    const m = /^( *)(\d+)\. /.exec(l.text);
-    if (!m) break;
-    const ind = m[1]?.length ?? 0;
-    if (ind > indent) continue;
-    if (ind < indent) break;
-    num++;
-    if (Number(m[2]) !== num) {
-      changes.push({ from: l.from + ind, to: l.from + ind + (m[2]?.length ?? 0), insert: String(num) });
-    }
-  }
-  return changes;
-}
-
 const enterContinueList: Command = (view) => {
   const range = view.state.selection.main;
   if (!range.empty) return false; // a selection-replacing Enter → default split
@@ -130,7 +104,7 @@ const enterContinueList: Command = (view) => {
   }
   const insert = `\n${list.next}`;
   view.dispatch({
-    changes: [{ from: range.head, insert }, ...renumberAfter(view.state, line, list.next)],
+    changes: { from: range.head, insert },
     selection: EditorSelection.cursor(range.head + insert.length),
     scrollIntoView: true,
     userEvent: "input",

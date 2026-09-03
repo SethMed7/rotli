@@ -275,7 +275,7 @@ describe("the frontier/local split (budget + adapter)", () => {
 });
 
 describe("connected-lane vision", () => {
-  test("only Claude and Codex vision models are reachable from the picker", () => {
+  test("no connected lane exposes a vision model except Claude and Codex", () => {
     const groups = mergedModels([], { claude: true, codex: true, cursor: true, antigravity: true }, [], [], {
       claude: true,
       codex: true,

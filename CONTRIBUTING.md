@@ -189,7 +189,19 @@ bun's matcher enforces eagerly and returns a non-thenable — but the `await` is
 the portable jest/vitest spelling and is what keeps those assertions enforcing
 if bun ever aligns with jest, so stripping it from 18 security assertions to
 satisfy a linter was the wrong trade. Every other correctness rule is at zero
-and now guards for free.
+and now guards for free. The 2026-09-03 tooling audit found that `plugins`
+REPLACES oxlint's default set, so `unicorn` and `oxc` had been silently off;
+both are on now (25 findings fixed; `unicorn/no-useless-spread` is off by
+measurement — all nine sites spread a Set/Map into `for…of` because the loop
+body mutates it). Four type-aware rules joined at the same time
+(`switch-exhaustiveness-check`, `return-await`, `no-deprecated`,
+`only-throw-error`; 14 findings fixed), and `no-restricted-globals` bans
+`localStorage`/`sessionStorage` with the one recorded exception listed in
+`overrides`. The same audit gave `scripts/*.ts` its first typecheck
+(`tsconfig.scripts.json`, two real errors surfaced), moved `lint:oxlint` after
+the parallel group so a tsc failure reads as a tsc failure instead of a
+tsgolint crash, and put the crate's `-D warnings` policy in `Cargo.toml`
+`[lints]` so a local `cargo clippy` matches CI.
 React Compiler stays out of the production transform, but its Rules-of-React
 analysis runs in lint-only mode through `check:react-compiler`. The first
 measurement found 63 diagnostics; the six render-purity findings and one

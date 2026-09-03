@@ -21,7 +21,12 @@ export function missingScriptSteps(scripts, requiredSteps) {
     for (const step of steps) {
       const parallelSteps = commandSteps.flatMap((commandStep) => {
         const match = commandStep.match(/^bun run --parallel\s+(.+)$/);
-        return match ? match[1].trim().split(/\s+/).map((name) => `bun run ${name}`) : [];
+        return match
+          ? match[1]
+              .trim()
+              .split(/\s+/)
+              .map((name) => `bun run ${name}`)
+          : [];
       });
       if (!commandSteps.includes(step) && !parallelSteps.includes(step)) {
         missing.push(`${script} -> ${step}`);

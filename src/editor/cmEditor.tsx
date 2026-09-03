@@ -37,12 +37,14 @@ import {
   toggleInlineMark,
   unregisterEditor,
 } from "./commands";
+import { copyHandlers } from "./copyHandlers";
 import { importImagePathsAtPosition, isEmbeddablePath } from "./externalImageDrop";
 import { findTextMatches, nextFindMatch } from "./find";
 import { fmBlock } from "./fmBlock";
 import { focusDim } from "./focusMode";
 import { headingFolding, toggleHeadingFold } from "./headingFold";
 import { ImageGenPopover } from "./imageGenPopover";
+import { listNumbering } from "./listNumbers";
 import { linkOpener, livePreview, noteIdFacet } from "./livePreview";
 import { ensureDocument, getDocumentText, onDocumentChange, setDocumentText } from "./model";
 import { rawMarkdown } from "./rawMarkdown";
@@ -58,7 +60,6 @@ import {
   type SlashPickerMode,
 } from "./slashMenu";
 import { SlashPicker } from "./slashPicker";
-import { stripMarkdown } from "./stripMarkdown";
 import { tableRender } from "./tableRender";
 import { buildTitleCounts, wikilinkLabel } from "./wikilink";
 import { setWikilinkNotes } from "./wikilinkIndex";
@@ -311,7 +312,7 @@ function CmEditorImpl({
   const wikilinkSource = useMemo(() => {
     const archived = (archivedNotes ?? []).filter((n) => n.kind !== "file");
     const list = archived.length ? [...searchableNotes, ...archived] : searchableNotes;
-    const key = list.map((n) => `${n.id} ${n.title} ${(n.aliases ?? []).join("")}`).join("\n");
+    const key = list.map((n) => `${n.id}\0${n.title}\0${(n.aliases ?? []).join("\x01")}`).join("\n");
     return { list, key };
   }, [searchableNotes, archivedNotes]);
   const wikilinkSourceRef = useRef(wikilinkSource);
@@ -580,28 +581,11 @@ function CmEditorImpl({
       });
     };
 
-    // beautified copy: strip markdown markers from the selection so a copy reads
-    // like what you see (no ** around a bold word). Raw mode copies verbatim.
-    const copyStripped = (event: ClipboardEvent, v: EditorView, isCut: boolean): boolean => {
-      if (rawEditorRef.current) return false;
-      const r = v.state.selection.main;
-      if (r.empty) return false;
-      event.clipboardData?.setData("text/plain", stripMarkdown(v.state.sliceDoc(r.from, r.to)));
-      event.preventDefault();
-      if (isCut) {
-        v.dispatch({
-          changes: { from: r.from, to: r.to },
-          selection: EditorSelection.cursor(r.from),
-          userEvent: "delete.cut",
-        });
-      }
-      return true;
-    };
-
     const state = EditorState.create({
       doc: startText,
       extensions: [
         history(),
+        listNumbering,
         // the slash menu owns ↑/↓/Enter/Esc while open — highest precedence so
         // it wins before the keymaps; stops propagation so Esc closes the menu
         // and never also hides the window (the old stopImmediatePropagation)
@@ -635,10 +619,7 @@ function CmEditorImpl({
         ),
         blockComp.of(blockHandlesRef.current ? blockHandles(openBlockMenu) : []),
         fmComp.of(fmExt(fmRawRef.current, fmGenRef.current, fmErrRef.current)),
-        EditorView.domEventHandlers({
-          copy: (e, v) => copyStripped(e, v, false),
-          cut: (e, v) => copyStripped(e, v, true),
-        }),
+        copyHandlers(() => rawEditorRef.current),
         spellComp.of(EditorView.contentAttributes.of({ spellcheck: String(spellcheckRef.current) })),
         focusComp.of(focusModeRef.current ? focusDim : []),
         placeholder("Write…"),

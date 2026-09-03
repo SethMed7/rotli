@@ -2,10 +2,16 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for Rotli-owned app webviews; private browser guests receive none",
-  "webviews": ["main", "capture", "quick"],
+  "webviews": [
+    "main",
+    "capture",
+    "quick"
+  ],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
-    "updater:default"
+    "updater:default",
+    "clipboard-manager:allow-write-text",
+    "clipboard-manager:allow-write-html"
   ]
 }

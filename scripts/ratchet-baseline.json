@@ -1,8 +1,7 @@
 {
   "fileLines": {
-    "src/app.tsx": 670,
     "src/state/panes.test.ts": 848,
-    "src/state/persist.test.ts": 662,
+    "src/state/persist.test.ts": 630,
     "src/state/persist.ts": 1679,
     "src/state/ui.ts": 1115,
     "src/state/panes.ts": 1267,
@@ -21,14 +20,14 @@
     "src/documents/codec/docx.ts": 793,
     "src/documents/engine/univer.ts": 818,
     "src/editor/livePreview.ts": 1190,
-    "src/editor/tableRender.ts": 865,
+    "src/editor/tableRender.ts": 797,
     "src/editor/mermaidVisualEditor.tsx": 799,
     "src/editor/blockRender.ts": 919,
-    "src/editor/cmEditor.tsx": 927,
+    "src/editor/cmEditor.tsx": 908,
     "src-tauri/src/memex.rs": 1892,
     "src-tauri/src/search_index.rs": 721,
-    "src-tauri/src/lib.rs": 3034,
-    "src-tauri/src/provider.rs": 1092,
+    "src-tauri/src/lib.rs": 3007,
+    "src-tauri/src/provider.rs": 1083,
     "src-tauri/src/localmodel.rs": 709,
     "src-tauri/src/remote_agent.rs": 954,
     "src-tauri/src/usage.rs": 941,
@@ -42,23 +41,23 @@
     "src-tauri/src/acp.rs": 642,
     "src-tauri/src/chat.rs": 906,
     "breve-runtime/scripts/signal-daemon.ts": 2190,
-    "scripts/eval-local-chat.ts": 1118,
+    "scripts/eval-local-chat.ts": 1113,
     "scripts/check-documentation.mjs": 676,
     "scripts/check-duplication.mjs": 986
   },
-  "sourceShapeAssertions": 27,
+  "sourceShapeAssertions": 178,
   "provenanceComments": {
-    "maintainerDated": 334,
+    "maintainerDated": 333,
     "phaseOrIncrement": 34
   },
   "coverage": {
     "src/sheets": 0.43,
-    "src/state": 0.65,
+    "src/state": 0.7,
     "src/components": 0.41,
     "src/ai": 0.68,
     "src/lib": 0.72,
     "src/documents": 0.61,
-    "src/services": 0.62,
+    "src/services": 0.65,
     "src/editor": 0.5
   },
   "dupClusters": 226

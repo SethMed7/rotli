@@ -1,15 +1,20 @@
+// oxlint runs AFTER the parallel group: its tsgolint sidecar dies on a tree
+// tsc rejects, and in the parallel log that crash buried the real type error
+// (audit 2026-09-03). +0.6s on green; the same failures, readable.
 export const PARALLEL_LINT_COMMAND =
-  "bun run --parallel typecheck check:e2e-types typecheck:tsc6 format:check check:code-shape check:react-compiler check:naming check:hex check:architecture check:ipc check:secret-parity check:parity check:structure check:security check:knip check:docs check:ratchets check:window-events check:dup:gate lint:oxlint";
+  "bun run --parallel typecheck check:e2e-types typecheck:tsc6 format:check check:code-shape check:react-compiler check:naming check:hex check:architecture check:ipc check:secret-parity check:parity check:structure check:security check:knip check:docs check:ratchets check:window-events check:dup:gate && bun run lint:oxlint";
 
 export const SERIAL_LINT_COMMAND =
   "bun run typecheck && bun run check:e2e-types && bun run typecheck:tsc6 && bun run format:check && bun run check:code-shape && bun run check:react-compiler && bun run check:naming && bun run check:hex && bun run check:architecture && bun run check:ipc && bun run check:secret-parity && bun run check:parity && bun run check:structure && bun run check:security && bun run check:knip && bun run check:docs && bun run check:ratchets && bun run check:window-events && bun run check:dup:gate && bun run lint:oxlint";
 
 export const OXLINT_COMMAND =
   "oxlint --disable-nested-config -c .oxlintrc.json --report-unused-disable-directives-severity=error src e2e scripts breve-runtime services/rotli-mcp-relay playwright.config.ts vite.config.ts";
+// scripts/**/*.mjs and vite.config.ts joined the formatter 2026-09-03: lint
+// already covered them, and 15 of 28 had drifted with nobody paying the churn.
 export const OXFMT_COMMAND =
-  'oxfmt -c .oxfmtrc.json "src/**/*.{ts,tsx}" "e2e/**/*.ts" "scripts/**/*.ts" "services/**/*.ts" playwright.config.ts';
+  'oxfmt -c .oxfmtrc.json "src/**/*.{ts,tsx}" "e2e/**/*.ts" "scripts/**/*.{ts,mjs}" "services/**/*.ts" playwright.config.ts vite.config.ts';
 export const OXFMT_CHECK_COMMAND =
-  'oxfmt -c .oxfmtrc.json --check "src/**/*.{ts,tsx}" "e2e/**/*.ts" "scripts/**/*.ts" "services/**/*.ts" playwright.config.ts';
+  'oxfmt -c .oxfmtrc.json --check "src/**/*.{ts,tsx}" "e2e/**/*.ts" "scripts/**/*.{ts,mjs}" "services/**/*.ts" playwright.config.ts vite.config.ts';
 export const OXFMT_SCHEMA = "./node_modules/oxfmt/configuration_schema.json";
 
 export function toolchainPolicyViolations({

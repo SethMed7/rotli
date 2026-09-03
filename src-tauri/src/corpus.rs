@@ -4420,7 +4420,7 @@ impl CorpusStore {
     /// Resolve a corpus-relative path without following any symlink component.
     /// Call this at every read boundary; mutation boundaries receive the same
     /// check centrally through `writable` / `filer_writable`.
-    fn guard_rel(&self, rel: &str) -> Result<PathBuf, String> {
+    pub(crate) fn guard_rel(&self, rel: &str) -> Result<PathBuf, String> {
         crate::containment::resolve_beneath(&self.root, Path::new(rel))
     }
 
@@ -6549,7 +6549,7 @@ fn is_hidden_root(folder: &str) -> bool {
 }
 
 /// Folder ids come from the frontend — keep them inside the corpus root.
-fn validate_rel(rel: &str) -> Result<(), String> {
+pub(crate) fn validate_rel(rel: &str) -> Result<(), String> {
     if rel.starts_with('/') {
         return Err(format!("folder path must be relative: {rel}"));
     }
@@ -7860,8 +7860,7 @@ pub async fn corpus_convert_document(
     let (root, rel) = split_root_id(&id);
     let output_name = converted_document_name(&rel)?;
     let source = state.route(&root, |store| store.guard_rel(&rel))?;
-    let metadata =
-        fs::metadata(&source).map_err(|error| format!("read {}: {error}", source.display()))?;
+    let metadata = fs::metadata(&source).map_err(|error| format!("read {}: {error}", source.display()))?;
     if !metadata.is_file() {
         return Err(format!("not a file: {}", source.display()));
     }
@@ -7883,6 +7882,7 @@ pub async fn corpus_convert_document(
         }
     })?;
 
+    let _ = (&output_name, &ext); // read on every platform; only macOS converts
     #[cfg(not(target_os = "macos"))]
     return Err("Local legacy-document conversion is currently available only on macOS.".into());
 

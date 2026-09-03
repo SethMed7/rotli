@@ -55,7 +55,8 @@ export function channelStream(
       });
     }
     await settledP; // errors were captured, not thrown, by the handlers above
-    if (error) throw error;
+    if (error)
+      throw error instanceof Error ? error : new Error(typeof error === "string" ? error : "stream failed");
     return full;
   })();
 }

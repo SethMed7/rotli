@@ -9,4 +9,3 @@ export function matchesSyntaxName(name, style) {
   if (!pattern) throw new Error(`unknown syntax style: ${style}`);
   return pattern.test(name);
 }
-

@@ -145,7 +145,7 @@ describe("rewriteNav", () => {
     expect(s).toEqual({ stack: ["a"], index: 0 });
   });
 
-  test("an id not in the trail is a no-op (same object)", () => {
+  test("rewriting an id not in the trail is a no-op (same object)", () => {
     const s = pushNav(EMPTY_NAV, "a");
     expect(rewriteNav(s, "zz", "yy")).toBe(s);
   });

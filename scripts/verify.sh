@@ -43,27 +43,25 @@ require() {
 }
 
 if wants quality; then
+  # CI's first steps: a frozen install of every lockfile. Locally this is
+  # what turns "my node_modules happen to work" into "the lockfile works"
+  # (audit 2026-09-03: a lockfile drift was invisible to a green verify).
+  step "quality — frozen installs (app, Breve defaults, site)"
+  bun ci
+  (cd breve-runtime/defaults && bun install --production --frozen-lockfile)
+  [ -d site ] && (cd site && bun ci)
+
   step "quality — bun run check"
   bun run check
 
   step "quality — production build"
   NODE_OPTIONS=--max-old-space-size=4096 bun run build
 
+  step "quality — dependency convergence and reviewed licenses"
+  bun run deps dedupe-check
+  bun run deps licenses-check
+
   if [ -d site ]; then
-    # `site/node_modules` existing proves nothing — a half-installed tree is the
-    # common case, and astro then fails deep inside a config import. Check that
-    # every declared dependency actually resolves, and name the missing ones.
-    MISSING="$(cd site && bun -e '
-      const pkg = await Bun.file("package.json").json();
-      const declared = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
-      const { existsSync } = await import("node:fs");
-      console.log(declared.filter((name) => !existsSync(`node_modules/${name}`)).join(" "));
-    ')"
-    if [ -n "$MISSING" ]; then
-      echo "✗ site dependencies are not installed: $MISSING"
-      echo "  run: (cd site && bun ci)"
-      exit 1
-    fi
     step "quality — site check, build, and deploy dry-run"
     # CI=true: astro offers to install @astrojs/check interactively, and a gate
     # must never wait on a prompt.
@@ -76,9 +74,16 @@ if wants e2e; then
   bun run check:e2e-types
 
   step "e2e — Playwright (chromium)"
-  # CI installs chromium with its OS deps; locally it is a one-time setup.
+  # CI installs chromium and fails without it; a lane that cannot run must
+  # never read as a lane that passed (the rule at the top of this file).
   if ! bunx playwright install --dry-run chromium >/dev/null 2>&1; then
-    echo "  (could not confirm the chromium install; continuing — Playwright reports its own missing-browser error)"
+    echo "✗ chromium is not installed for Playwright"
+    echo "  run: bunx playwright install chromium"
+    exit 1
+  fi
+  # a stale `vite dev` on 1420 would make Playwright prove the wrong build
+  if lsof -nP -iTCP:1420 -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "  ⚠ something already listens on :1420 — Playwright will reuse it (reuseExistingServer); stop it to prove THIS tree"
   fi
   bun run test:e2e
 fi

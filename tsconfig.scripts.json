@@ -1,0 +1,8 @@
+{
+  // scripts/*.ts was typechecked by nothing (tsconfig.node.json covers only
+  // vite.config.ts + build-policy.ts) — audit 2026-09-03 found two real type
+  // errors hiding there. bun-types: several scripts use Bun.spawn.
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": { "composite": false, "allowJs": true, "types": ["node", "bun-types"] },
+  "include": ["scripts/**/*.ts"]
+}

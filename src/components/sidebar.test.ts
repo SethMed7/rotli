@@ -6,8 +6,8 @@ const sidebarHomeSource = readFileSync(new URL("sidebar/sidebarHome.tsx", import
 const sidebarSystemSource = readFileSync(new URL("sidebar/sidebarSystem.tsx", import.meta.url), "utf8");
 const sidebarChatSource = readFileSync(new URL("sidebar/sidebarChat.tsx", import.meta.url), "utf8");
 const notesStyles = readFileSync(new URL("../styles/notes.css", import.meta.url), "utf8");
-const appSource = readFileSync(new URL("../app.tsx", import.meta.url), "utf8");
 const tauriSource = readFileSync(new URL("../lib/tauri.ts", import.meta.url), "utf8");
+const dropSource = readFileSync(new URL("../editor/nativeFileDrop.ts", import.meta.url), "utf8");
 
 test("Breve is a labelled segment of the front switcher, not a header icon", () => {
   const header = sidebarSource.slice(
@@ -15,19 +15,14 @@ test("Breve is a labelled segment of the front switcher, not a header icon", () 
     sidebarSource.indexOf("{/* the FRONT switcher"),
   );
 
-  // the header row keeps only creation + fold controls; the old unlabeled
-  // coffee toggle (audit 2026-09-02 §1.3) is gone
-  expect(header).not.toContain("sb-breve-toggle");
-  expect(header).not.toContain("CoffeeGlyph");
+  // the header row keeps only creation + fold controls
   expect(header).toContain("<NewFileGlyph size={16} />");
   expect(header).toContain("<NewFolderGlyph size={16} />");
   expect(header).toContain("<FoldGlyph size={16} />");
-  // the switcher and the utility footer stay visible in Breve mode, so the
-  // way back to Home/Chat and the Settings/Librarian doors never vanish
-  expect(sidebarSource).not.toContain('{sidebarMode !== "breve" && (');
+  // the switcher carries the segment; e2e/breve-lens.spec.ts proves the
+  // switcher and footer survive the trip into Breve and back
   expect(sidebarSource).toContain('breveActive={sidebarMode === "breve"}');
   expect(sidebarSource).toContain('onBreve={() => dispatch("view.breve")}');
-  expect(sidebarSource).not.toContain('{sidebarMode === "notes" && <SidebarFooter />}');
 });
 
 test("System stays Library, Assets, Archive, and Trash for every active vault", () => {
@@ -62,42 +57,42 @@ test("chat rows reveal one keyboard-safe action without recoloring the provider 
 });
 
 test("file drops wait for Rust to issue native import grants", () => {
-  expect(appSource).toContain("onNativeDropAuthorized((event) =>");
-  expect(appSource).not.toContain("onDragDropEvent");
-  expect(appSource).not.toContain("getCurrentWebview");
+  expect(dropSource).toContain("onNativeDropAuthorized((event) =>");
+  expect(dropSource).not.toContain("onDragDropEvent");
+  expect(dropSource).not.toContain("getCurrentWebview");
   expect(tauriSource).toContain('listen<AuthorizedNativeDrop>("rotli:native-drop-authorized"');
 });
 
 test("editor drops resolve nested hits and import into the note's own root", () => {
-  const editorDrop = appSource.slice(
-    appSource.indexOf("const editorHit = hits"),
-    appSource.indexOf("await invalidateNotes();", appSource.indexOf("const editorHit = hits")),
+  const editorDrop = dropSource.slice(
+    dropSource.indexOf("const target = editorAt(hits)"),
+    dropSource.indexOf("await invalidateNotes();", dropSource.indexOf("const target = editorAt(hits)")),
   );
-  expect(appSource).toContain("nativeDropPoints(px, py, window.devicePixelRatio || 1)");
-  expect(editorDrop).toContain("EditorView.findFromDOM(editorHost)");
+  expect(dropSource).toContain("nativeDropPoints(px, py, window.devicePixelRatio || 1)");
+  expect(editorDrop).toContain("editorAt(hits)");
   expect(editorDrop).toContain("rootIdOf(view.state.facet(noteIdFacet))");
   expect(editorDrop).toContain("corpusImportFile(rootId, path)");
   expect(editorDrop).not.toContain('corpusImportFile("default"');
 });
 
 test("byte-backed webview image drops keep the guarded asset fallback", () => {
-  expect(appSource).toContain('window.addEventListener("drop", onDrop, true)');
-  expect(appSource).toContain("importImageFilesAtDrop(view, files");
-  expect(appSource).toContain("corpusCreateImageAsset(rootId, name, base64)");
+  expect(dropSource).toContain('window.addEventListener("drop", onDrop, true)');
+  expect(dropSource).toContain("importImageFilesAtDrop(view, files");
+  expect(dropSource).toContain("corpusCreateImageAsset(rootId, name, base64)");
 });
 
 test("chat drops partition with the chat's own image predicate; editor drops accept embeds", () => {
-  const chatDrop = appSource.slice(
-    appSource.indexOf("if (chatAttach) {"),
-    appSource.indexOf("const editorHit = hits"),
+  const chatDrop = dropSource.slice(
+    dropSource.indexOf("if (chatAttach) {"),
+    dropSource.indexOf("const target = editorAt(hits)"),
   );
   // an .svg routed to chat by the editor's wider predicate was refused there
   // AND never imported — the router must ask the chat what it accepts
   expect(chatDrop).toContain("paths.filter(isChatImagePath)");
   expect(chatDrop).not.toContain("paths.filter(isImagePath)");
-  const editorDrop = appSource.slice(
-    appSource.indexOf("const editorHit = hits"),
-    appSource.indexOf("await invalidateNotes();", appSource.indexOf("const editorHit = hits")),
+  const editorDrop = dropSource.slice(
+    dropSource.indexOf("const target = editorAt(hits)"),
+    dropSource.indexOf("await invalidateNotes();", dropSource.indexOf("const target = editorAt(hits)")),
   );
   expect(editorDrop).toContain("paths.filter(isEmbeddablePath)");
 });

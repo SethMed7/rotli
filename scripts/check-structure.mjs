@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, join, relative } from "node:path";
+
 import { DEPENDENCY_PROJECTS, dependencyPolicyViolations } from "./dependency-policy.mjs";
 import { SYNTAX_PATTERNS } from "./syntax-contract.mjs";
 import { toolchainPolicyViolations } from "./toolchain-policy.mjs";
@@ -82,10 +83,13 @@ const TSCONFIG_FILES = [
 // turns the flag on.
 const TSCONFIG_DIVERGENCES = {
   "breve-runtime/tsconfig.json": {
-    exactOptionalPropertyTypes: "11 errors (scheduler JobState + daemon spawn options; measured 2026-07-18) — semantic fixes in the delivery hot path, deferred",
-    noUnusedLocals: "9 errors (measured 2026-07-18) — deletions touch live daemon files, deferred to a quiet boundary",
+    exactOptionalPropertyTypes:
+      "11 errors (scheduler JobState + daemon spawn options; measured 2026-07-18) — semantic fixes in the delivery hot path, deferred",
+    noUnusedLocals:
+      "9 errors (measured 2026-07-18) — deletions touch live daemon files, deferred to a quiet boundary",
     noUnusedParameters: "3 errors (measured 2026-07-18) — same batch as noUnusedLocals",
-    noUncheckedIndexedAccess: "86 errors (measured 2026-07-18) — far over the 15-site adoption threshold; revisit with the breve-runtime any-debt",
+    noUncheckedIndexedAccess:
+      "86 errors (measured 2026-07-18) — far over the 15-site adoption threshold; revisit with the breve-runtime any-debt",
   },
 };
 const stripJsonComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
@@ -94,13 +98,16 @@ for (const rel of TSCONFIG_FILES) {
   const divergences = TSCONFIG_DIVERGENCES[rel] ?? {};
   for (const flag of REQUIRED_STRICT_FLAGS) {
     if (options[flag] === true && flag in divergences) {
-      violations.push(`${rel}: stale divergence entry — ${flag} is enabled; delete it from TSCONFIG_DIVERGENCES`);
+      violations.push(
+        `${rel}: stale divergence entry — ${flag} is enabled; delete it from TSCONFIG_DIVERGENCES`,
+      );
     } else if (options[flag] !== true && !(flag in divergences)) {
       violations.push(`${rel}: ${flag} is not enabled and has no divergence entry in check-structure.mjs`);
     }
   }
   for (const flag of Object.keys(divergences)) {
-    if (!REQUIRED_STRICT_FLAGS.includes(flag)) violations.push(`${rel}: divergence entry for unknown flag ${flag}`);
+    if (!REQUIRED_STRICT_FLAGS.includes(flag))
+      violations.push(`${rel}: divergence entry for unknown flag ${flag}`);
   }
 }
 
@@ -136,7 +143,10 @@ violations.push(
       "breve-runtime/defaults/package.json": brevePackage,
     },
     bunfigs: Object.fromEntries(
-      DEPENDENCY_PROJECTS.map((project) => [project.bunfigPath, readFileSync(join(root, project.bunfigPath), "utf8")]),
+      DEPENDENCY_PROJECTS.map((project) => [
+        project.bunfigPath,
+        readFileSync(join(root, project.bunfigPath), "utf8"),
+      ]),
     ),
     lockfiles: Object.fromEntries(
       DEPENDENCY_PROJECTS.map((project) => [
@@ -211,6 +221,16 @@ for (const token of [
 ]) {
   if (!viteConfig.includes(token)) {
     violations.push(`vite.config.ts must wire the tested production build policy (${token})`);
+  }
+}
+// test:breve is a hand-list; a test file that exists but is not named there
+// runs nowhere (a 2026-09-03 audit found two such files).
+const breveTestsOnDisk = readdirSync(join(root, "breve-runtime/tests")).filter((name) =>
+  /^test-.*\.ts$/.test(name),
+);
+for (const name of breveTestsOnDisk) {
+  if (!packageJson.scripts["test:breve"].includes(`breve-runtime/tests/${name}`)) {
+    violations.push(`breve-runtime/tests/${name}: not listed in package.json test:breve — it runs nowhere`);
   }
 }
 const cargo = readFileSync(join(root, "src-tauri/Cargo.toml"), "utf8");

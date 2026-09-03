@@ -30,7 +30,7 @@ export async function loadSettings(): Promise<Settings> {
     (await Bun.file(SETTINGS_PATH)
       .json()
       .catch(() => null)) ?? {};
-  return { ...DEFAULTS, ...s, deliveryTimes: { ...DEFAULTS.deliveryTimes, ...(s.deliveryTimes ?? {}) } };
+  return { ...DEFAULTS, ...s, deliveryTimes: { ...DEFAULTS.deliveryTimes, ...s.deliveryTimes } };
 }
 export async function saveSettings(s: Settings) {
   await Bun.write(SETTINGS_PATH, JSON.stringify(s, null, 2));

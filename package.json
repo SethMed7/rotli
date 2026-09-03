@@ -32,9 +32,9 @@
     "test:relay": "bun test services/rotli-mcp-relay/server.test.ts",
     "test:breve": "bun breve-runtime/tests/test-actions.ts && bun breve-runtime/tests/test-intents.ts && bun breve-runtime/tests/test-timectx.ts && bun breve-runtime/tests/test-retention.ts && bun breve-runtime/tests/test-pdf-theme.ts && bun breve-runtime/tests/test-scheduler-retry.ts && bun breve-runtime/tests/test-doctor-findings.ts && bun test ./breve-runtime/tests/test-chrome-pdf.ts ./breve-runtime/tests/test-secret-stdin.ts ./breve-runtime/tests/test-process-lock.ts ./breve-runtime/tests/test-delivery-claim.ts ./breve-runtime/tests/test-watcher-failure.ts ./breve-runtime/tests/test-safe-fetch-fixtures.ts ./breve-runtime/tests/test-markdown-text.ts ./breve-runtime/tests/test-config-locality.ts ./breve-runtime/tests/test-provider-policy.ts ./breve-runtime/tests/test-render-document.ts",
     "test:regression": "bun run test && bun run test:evals && bun run check:breve-runtime && bun run check:design-system",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p services/rotli-mcp-relay",
-    "typecheck:tsc6": "node_modules/typescript6/bin/tsc --noEmit && node_modules/typescript6/bin/tsc --noEmit -p tsconfig.node.json && node_modules/typescript6/bin/tsc --noEmit -p tsconfig.e2e.json && node_modules/typescript6/bin/tsc --noEmit -p breve-runtime && node_modules/typescript6/bin/tsc --noEmit -p services/rotli-mcp-relay",
-    "lint": "bun run --parallel typecheck check:e2e-types typecheck:tsc6 format:check check:code-shape check:react-compiler check:naming check:hex check:architecture check:ipc check:secret-parity check:parity check:structure check:security check:knip check:docs check:ratchets check:window-events check:dup:gate lint:oxlint",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.scripts.json && tsc --noEmit -p services/rotli-mcp-relay",
+    "typecheck:tsc6": "node_modules/typescript6/bin/tsc --noEmit && node_modules/typescript6/bin/tsc --noEmit -p tsconfig.node.json && node_modules/typescript6/bin/tsc --noEmit -p tsconfig.scripts.json && node_modules/typescript6/bin/tsc --noEmit -p tsconfig.e2e.json && node_modules/typescript6/bin/tsc --noEmit -p breve-runtime && node_modules/typescript6/bin/tsc --noEmit -p services/rotli-mcp-relay",
+    "lint": "bun run --parallel typecheck check:e2e-types typecheck:tsc6 format:check check:code-shape check:react-compiler check:naming check:hex check:architecture check:ipc check:secret-parity check:parity check:structure check:security check:knip check:docs check:ratchets check:window-events check:dup:gate && bun run lint:oxlint",
     "lint:serial": "bun run typecheck && bun run check:e2e-types && bun run typecheck:tsc6 && bun run format:check && bun run check:code-shape && bun run check:react-compiler && bun run check:naming && bun run check:hex && bun run check:architecture && bun run check:ipc && bun run check:secret-parity && bun run check:parity && bun run check:structure && bun run check:security && bun run check:knip && bun run check:docs && bun run check:ratchets && bun run check:window-events && bun run check:dup:gate && bun run lint:oxlint",
     "lint:oxlint": "oxlint --disable-nested-config -c .oxlintrc.json --report-unused-disable-directives-severity=error src e2e scripts breve-runtime services/rotli-mcp-relay playwright.config.ts vite.config.ts",
     "check:naming": "bun scripts/check-naming.mjs",
@@ -57,8 +57,8 @@
     "check:dup": "bun scripts/check-duplication.mjs",
     "check:breve-runtime": "bun build breve-runtime/scripts/*.ts --target bun --outdir $(mktemp -d) && tsc --noEmit -p breve-runtime && bash -n breve-runtime/scripts/morning-brief.sh && bash -n breve-runtime/scripts/lunch-brief.sh && bash -n breve-runtime/scripts/night-brief.sh && bash -n breve-runtime/scripts/custom-brief.sh && bun run check:breve-contract",
     "check": "bun run lint && bun run test:regression",
-    "format": "oxfmt -c .oxfmtrc.json \"src/**/*.{ts,tsx}\" \"e2e/**/*.ts\" \"scripts/**/*.ts\" \"services/**/*.ts\" playwright.config.ts",
-    "format:check": "oxfmt -c .oxfmtrc.json --check \"src/**/*.{ts,tsx}\" \"e2e/**/*.ts\" \"scripts/**/*.ts\" \"services/**/*.ts\" playwright.config.ts"
+    "format": "oxfmt -c .oxfmtrc.json \"src/**/*.{ts,tsx}\" \"e2e/**/*.ts\" \"scripts/**/*.{ts,mjs}\" \"services/**/*.ts\" playwright.config.ts vite.config.ts",
+    "format:check": "oxfmt -c .oxfmtrc.json --check \"src/**/*.{ts,tsx}\" \"e2e/**/*.ts\" \"scripts/**/*.{ts,mjs}\" \"services/**/*.ts\" playwright.config.ts vite.config.ts"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",
@@ -85,6 +85,7 @@
     "@lezer/highlight": "^1.2.3",
     "@tanstack/react-query": "^5.101.4",
     "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-clipboard-manager": "^2.3.3",
     "@tauri-apps/plugin-updater": "^2.10.1",
     "@univerjs/preset-docs-core": "^0.25.1",
     "@univerjs/preset-docs-drawing": "^0.25.1",

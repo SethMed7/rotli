@@ -2,7 +2,7 @@
 // only read view.state and call view.dispatch). press() mirrors CodeMirror's
 // precedence: bindings for a key run in rotliKeymap order until one consumes.
 // Locks the paper-cut sweep fixes (2026-07-27): fenced code is grammar-free,
-// numbered lists renumber on Enter, the empty-item exit ramp needs the caret
+// numbered lists renumber on Enter (listNumbers.ts), the empty-item exit ramp needs the caret
 // past the marker, the task shorthand normalizes tabs and upgrades bullets,
 // and Tab is never stuck on a ragged table row.
 
@@ -12,11 +12,17 @@ import { EditorSelection, EditorState, type TransactionSpec } from "@codemirror/
 import type { EditorView } from "@codemirror/view";
 
 import { rotliKeymap } from "./cmKeymap";
+import { listNumbering } from "./listNumbers";
 
 type FakeView = EditorView & { state: EditorState };
 
 function viewOf(doc: string, head: number, anchor = head): FakeView {
-  let state = EditorState.create({ doc, selection: EditorSelection.range(anchor, head) });
+  // the renumbering filter rides along, as it does in the real editor
+  let state = EditorState.create({
+    doc,
+    selection: EditorSelection.range(anchor, head),
+    extensions: [listNumbering],
+  });
   return {
     get state() {
       return state;
@@ -205,7 +211,7 @@ describe("the ()+Space multiple-choice shorthand", () => {
     expect(head(choice)).toBe(6);
   });
 
-  test("normalizes indent and upgrades an existing bullet", () => {
+  test("normalizes indent and upgrades an existing bullet for a choice", () => {
     const tabbed = viewOf("\t( )", 4);
     expect(press(tabbed, "Space")).toBe(true);
     expect(text(tabbed)).toBe("  - ( ) ");

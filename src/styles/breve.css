@@ -149,7 +149,7 @@
   place-items: center;
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-inner);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
@@ -1439,7 +1439,7 @@
 }
 .breve-skill-editor textarea {
   width: 100%;
-  font-family: var(--mono, ui-monospace, monospace);
+  font-family: var(--font-mono);
   font-size: 11.5px;
   line-height: 1.5;
 }

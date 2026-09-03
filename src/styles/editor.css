@@ -741,7 +741,7 @@
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: var(--r-card);
   background: var(--ground);
   color: var(--text);
@@ -1250,7 +1250,7 @@
   line-height: 1.45;
 }
 .rotli-fm-path span {
-  font-family: var(--font-ui);
+  font-family: var(--font-body);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -1559,6 +1559,16 @@
   height: 2px;
   border-radius: 1px;
   background: var(--accent);
+  pointer-events: none;
+  z-index: 60;
+}
+/* a Finder drag hovering the editor: the line where the image will land */
+.rotli-native-drop {
+  position: fixed;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  outline: 3px solid color-mix(in srgb, var(--accent) 22%, transparent);
   pointer-events: none;
   z-index: 60;
 }

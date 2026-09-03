@@ -850,11 +850,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn provider_policy_allows_only_official_claude_codex_and_cursor_clients() {
+    fn provider_policy_allows_only_official_claude_codex_cursor_and_antigravity_clients() {
         assert!(connected_provider_execution_allowed("claude").is_ok());
         assert!(connected_provider_execution_allowed("codex").is_ok());
         assert!(connected_provider_execution_allowed("cursor").is_ok());
-        assert!(connected_provider_execution_allowed("unknown").is_err());
+        assert!(connected_provider_execution_allowed("antigravity").is_ok());
+        assert!(connected_provider_execution_allowed("gemini").is_err()); // never a raw Gemini CLI
+    }
+
+    #[test]
+    fn antigravity_takes_no_argv_and_refuses_effort_tier_and_images() {
+        let m = "gemini-3.8-flash-high";
+        let (args, via) = build_args("antigravity", m, "ignored", 60, None).unwrap();
+        assert!(args.is_empty(), "the model is a session config option, never argv");
+        assert_eq!(via, PromptVia::Acp);
+        assert!(build_args_tuned("antigravity", m, "p", 60, Some("high"), None, None).is_err());
+        assert!(build_args_tuned("antigravity", m, "p", 60, None, Some("fast"), None).is_err());
+        let imgs = ImageFiles { dir: std::env::temp_dir().join("rotli-no-such-dir"), paths: Vec::new() };
+        let refused = build_args("antigravity", m, "p", 60, Some(&imgs)).unwrap_err();
+        assert!(refused.contains("image attachments"), "{refused}");
     }
 
     #[test]
@@ -869,26 +883,20 @@ mod tests {
         assert!(build_args("claude", "gpt-5.5", "p", 60, None).is_err());
         assert!(build_args("codex", "sonnet", "p", 60, None).is_err());
         assert!(build_args("cursor", "sonnet", "p", 60, None).is_err());
+        // model ids never leak across lanes, newest lane included
+        assert!(build_args("antigravity", "grok-4.6", "p", 60, None).is_err());
+        assert!(build_args("cursor", "gemini-3.8-flash-high", "p", 60, None).is_err());
+        assert!(build_args("claude", "gemini-3.8-flash-high", "p", 60, None).is_err());
         assert!(spec("unknown").is_err());
     }
 
     #[test]
     fn claude_args_are_toolless_json_print_mode() {
         let (args, via) = build_args("claude", "sonnet", "ignored", 60, None).unwrap();
-        assert_eq!(
-            args,
-            vec![
-                "-p",
-                "--safe-mode",
-                "--tools",
-                "",
-                "--model",
-                "sonnet",
-                "--output-format",
-                "json",
-                "--no-session-persistence"
-            ]
-        );
+        let expected = ["-p", "--safe-mode", "--tools", "", "--model", "sonnet", "--output-format", "json"];
+        assert_eq!(&args[..expected.len()], expected);
+        assert_eq!(args.last().unwrap(), "--no-session-persistence");
+        assert_eq!(args.len(), expected.len() + 1);
         assert_eq!(via, PromptVia::Stdin);
     }
 
@@ -928,16 +936,8 @@ mod tests {
         let effort = claude.iter().position(|arg| arg == "--effort").unwrap();
         assert_eq!(claude[effort + 1], "max");
 
-        let (codex, _) = build_args_tuned(
-            "codex",
-            "gpt-5.6-sol",
-            "ignored",
-            60,
-            Some("ultra"),
-            Some("fast"),
-            None,
-        )
-        .unwrap();
+        let (codex, _) =
+            build_args_tuned("codex", "gpt-5.6-sol", "ignored", 60, Some("ultra"), Some("fast"), None).unwrap();
         assert!(codex.contains(&"model_reasoning_effort=\"ultra\"".to_string()));
         assert!(codex.contains(&"service_tier=\"fast\"".to_string()));
         assert_eq!(codex.last().unwrap(), "-");
@@ -962,16 +962,7 @@ mod tests {
                 .unwrap_err()
                 .contains("reasoning effort")
         );
-        assert!(build_args_tuned(
-            "codex",
-            "gpt-5.6-luna",
-            "p",
-            60,
-            Some("max"),
-            Some("fast"),
-            None,
-        )
-        .is_ok());
+        assert!(build_args_tuned("codex", "gpt-5.6-luna", "p", 60, Some("max"), Some("fast"), None).is_ok());
         assert!(
             build_args_tuned("claude", "sonnet", "p", 60, None, Some("fast"), None)
                 .unwrap_err()
