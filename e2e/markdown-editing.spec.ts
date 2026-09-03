@@ -450,8 +450,13 @@ test("deleting a column keeps the table in view and shows a resize grip on the b
   const editor = page.locator(".cm-content").last();
   await editor.click();
   await page.keyboard.insertText(LONG_TABLE_NOTE);
-  // the caret now sits at the very end of a tall note; scroll back up to the table
-  await page.keyboard.press("Meta+ArrowUp");
+  // the caret now sits at the very end of a tall note. Scroll (not the caret)
+  // back to the top — CodeMirror only renders the viewport, so the table is
+  // not even in the DOM until then; the stale far-away caret is the point.
+  const scroller = page.locator(".cm-scroller").last();
+  await scroller.evaluate((el) => {
+    el.scrollTop = 0;
+  });
   const table = page.locator(".rotli-md-table");
   await expect(table).toBeInViewport();
   await expect(table.locator("thead th")).toHaveCount(3);
