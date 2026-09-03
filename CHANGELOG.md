@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.88.0] - 2026-09-03
+
 ### Fixed
 
 - Mermaid diagrams inline in a note (pie, bar/line charts, sequence, flowcharts) drew at less than half size in the top-left of their card: Mermaid's `width="100%"` SVG fell back to the 300px default inside the shrink-to-fit stage while the fit math assumed the diagram's real size, and the card's own padding then shrank even small diagrams. The SVG is now laid out at its natural size and the fit pads by the same 12px the card does — a small diagram renders at natural size, centred; a wide one fills the card.
