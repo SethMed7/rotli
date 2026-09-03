@@ -223,7 +223,14 @@ for (const dir of cleanFeatureDirs) {
 // allowed to touch it directly; all feature code uses the typed lib/tauri.ts
 // façade so command names, browser fallbacks, and error normalization stay in
 // one place.
-const tauriAllowlist = new Set(["src/app.tsx", "src/lib/quitFlush.ts", "src/lib/tauri.ts"]);
+// the shell plus the lib adapters that own a native seam (LIB_EFFECTFUL_FILE_OWNERS)
+const tauriAllowlist = new Set([
+  "src/app.tsx",
+  "src/lib/clipboard.ts",
+  "src/lib/nativeDrag.ts",
+  "src/lib/quitFlush.ts",
+  "src/lib/tauri.ts",
+]);
 function walkSource(dir) {
   for (const name of readdirSync(dir)) {
     const path = join(dir, name);

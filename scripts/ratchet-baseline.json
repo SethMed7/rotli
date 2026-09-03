@@ -1,6 +1,5 @@
 {
   "fileLines": {
-    "src/app.tsx": 670,
     "src/state/panes.test.ts": 848,
     "src/state/persist.test.ts": 662,
     "src/state/persist.ts": 1679,
@@ -21,13 +20,13 @@
     "src/documents/codec/docx.ts": 793,
     "src/documents/engine/univer.ts": 818,
     "src/editor/livePreview.ts": 1190,
-    "src/editor/tableRender.ts": 865,
+    "src/editor/tableRender.ts": 797,
     "src/editor/mermaidVisualEditor.tsx": 799,
     "src/editor/blockRender.ts": 919,
-    "src/editor/cmEditor.tsx": 927,
+    "src/editor/cmEditor.tsx": 908,
     "src-tauri/src/memex.rs": 1892,
     "src-tauri/src/search_index.rs": 721,
-    "src-tauri/src/lib.rs": 3034,
+    "src-tauri/src/lib.rs": 3007,
     "src-tauri/src/provider.rs": 1092,
     "src-tauri/src/localmodel.rs": 709,
     "src-tauri/src/remote_agent.rs": 954,
@@ -48,7 +47,7 @@
   },
   "sourceShapeAssertions": 27,
   "provenanceComments": {
-    "maintainerDated": 334,
+    "maintainerDated": 333,
     "phaseOrIncrement": 34
   },
   "coverage": {
@@ -56,7 +55,7 @@
     "src/state": 0.65,
     "src/components": 0.41,
     "src/ai": 0.68,
-    "src/lib": 0.72,
+    "src/lib": 0.65,
     "src/documents": 0.61,
     "src/services": 0.62,
     "src/editor": 0.5

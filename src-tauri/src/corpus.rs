@@ -4420,7 +4420,7 @@ impl CorpusStore {
     /// Resolve a corpus-relative path without following any symlink component.
     /// Call this at every read boundary; mutation boundaries receive the same
     /// check centrally through `writable` / `filer_writable`.
-    fn guard_rel(&self, rel: &str) -> Result<PathBuf, String> {
+    pub(crate) fn guard_rel(&self, rel: &str) -> Result<PathBuf, String> {
         crate::containment::resolve_beneath(&self.root, Path::new(rel))
     }
 
@@ -6549,7 +6549,7 @@ fn is_hidden_root(folder: &str) -> bool {
 }
 
 /// Folder ids come from the frontend — keep them inside the corpus root.
-fn validate_rel(rel: &str) -> Result<(), String> {
+pub(crate) fn validate_rel(rel: &str) -> Result<(), String> {
     if rel.starts_with('/') {
         return Err(format!("folder path must be relative: {rel}"));
     }

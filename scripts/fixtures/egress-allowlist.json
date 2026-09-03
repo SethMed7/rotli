@@ -99,7 +99,9 @@
     "default": [
       "core:default",
       "core:window:allow-start-dragging",
-      "updater:default"
+      "updater:default",
+      "clipboard-manager:allow-write-text",
+      "clipboard-manager:allow-write-html"
     ],
     "defaultWebviews": [
       "main",

@@ -23,6 +23,7 @@ writer, the floating windows announce), **W→R** webview to Rust.
 | `rotli:corpus-changed` | R→W | The watcher or an internal write changed the vault; listings and the note universe refetch. |
 | `rotli:flush-before-quit` | R→W | Quit was requested; every webview flushes pending saves before the host exits. |
 | `rotli:local-queue` | R→W | The on-device model queue changed (position, running, prioritized); chat rows update. |
+| `rotli:native-drag` | R→W | A Finder drag is hovering (physical pointer, file count) or has left; the editor under the pointer draws its drop line. |
 | `rotli:native-drop-authorized` | R→W | The host issued one-shot import grants for a Finder drop and reports the paths plus drop position. |
 | `rotli:open-request` | R→W | `rotli open <id>` (CLI/deep link) or a Reopen wants the main webview to consume the open mailbox. |
 | `rotli:organizer-progress` | R→W | Librarian run progress for the live Activity lane. |

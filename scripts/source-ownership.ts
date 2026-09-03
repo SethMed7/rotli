@@ -78,7 +78,9 @@ export const COMPONENT_ROOT_FILE_OWNERS = {
  * Tauri. A new exception needs a responsibility here instead of quietly
  * turning lib into a general dumping ground. */
 export const LIB_EFFECTFUL_FILE_OWNERS = {
+  "clipboard.ts": "host pasteboard adapter (HTML copies with inlined image bytes)",
   "mainAddDrag.ts": "cross-surface Main drag workflow",
+  "nativeDrag.ts": "native Finder drag hover relay adapter",
   "popover.ts": "shared transient-popover hook backed by UI state",
   "quitFlush.ts": "native quit lifecycle adapter",
   "tabDrag.ts": "cross-surface tab drag workflow",

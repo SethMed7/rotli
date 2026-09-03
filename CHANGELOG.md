@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Ordered lists count on their own: deleting an item closes the gap, a Tab-nested run starts at 1 and counts up, and the toolbar's numbered toggle no longer leaves "1." on every line. One renumbering policy (`src/editor/listNumbers.ts`) rides inside every user edit as a transaction filter — one undo step, caret preserved; undo/redo and programmatic loads pass through untouched.
+- Copy is a true copy: the clipboard carries the selection as readable text with its numbers, bullets, and task boxes, and as real HTML (nested `<ol>`/`<ul>`, headings, quotes, code) with images inlined as `data:` URLs — so a paste into an AI chat, Google Docs, or Notes keeps the list and the picture. Images resolve through a guarded corpus command and the host's clipboard plugin.
+- Dropping a file from Finder onto a note draws a drop line under the pointer while the drag hovers, and the drop lands where the line was — or in the editor the drag last hovered, or at the focused note's caret — instead of silently filing the image into storage when the coordinates missed the editor.
+
+### Fixed
+
 - **Tables follow the pane and show their resize handles.** A table with
   saved column widths overflowed the editor instead of following a narrower
   window; widths now scale down together to the space available (never

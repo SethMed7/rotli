@@ -43,6 +43,7 @@ security-framework = "3"                                        # Keychain-backe
 # rebuildable — never a database (the .md files stay durable truth). Large dep;
 # binary-size impact measured in the PR. NOT on check:structure's denied-DB list.
 tantivy = "0.26.1"
+tauri-plugin-clipboard-manager = "2"
 
 # macOS-only: swap the Dock/app icon at runtime (Settings → Appearance → App icon)
 [target.'cfg(target_os = "macos")'.dependencies]
