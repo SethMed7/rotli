@@ -3661,12 +3661,12 @@ mod tests {
                 body.len()
             )
             .unwrap();
-            // The server may answer and close before this half-close lands;
-            // macOS then reports ENOTCONN for the shutdown while the response
-            // still sits in the receive buffer (flaked once on CI, 2026-09-01).
+            // The peer may finish first: ENOTCONN on this half-close (CI 2026-09-01) or
+            // ECONNRESET on the last read after the whole reply arrived (CI 2026-09-02).
             let _ = client.shutdown(std::net::Shutdown::Write);
-            let mut response = String::new();
-            client.read_to_string(&mut response).unwrap();
+            let mut bytes = Vec::new();
+            let _ = client.read_to_end(&mut bytes); // EOF or a peer-first reset — judge the bytes
+            let response = String::from_utf8(bytes).unwrap();
             server.join().unwrap();
             response
         }
