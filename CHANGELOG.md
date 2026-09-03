@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refusing every connected provider. Decision record:
   `docs/decisions/2026-09-03-antigravity-official-acp-lane.md`.
 
+## [0.85.0] - 2026-09-02
+
 ### Added
 
 - **Breve says when briefs stop arriving.** The scheduler's job ledger now
