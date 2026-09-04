@@ -26,7 +26,7 @@ mod fsutil;
 mod keychain;
 mod localmodel;
 mod memex;
-mod memex_query; mod native_drag;
+mod memex_query; mod native_drag; mod practice_playground;
 mod organizer;
 #[cfg(test)]
 mod parity_tests;
@@ -2008,8 +2008,7 @@ fn corpus_create_practice_vault_blocking(app: AppHandle) -> Result<String, Strin
         root = home.join(format!("rotli Practice Vault {n}"));
     }
     flush_webviews_before_shutdown(&app)?;
-    memex::scaffold_memex(&root)?;
-    memex::scaffold_practice_playground(&root)?;
+    practice_playground::scaffold_practice_vault(&root)?;
     if let Some(current) = &current {
         corpus::carry_settings(current, &root)?;
     }
