@@ -404,7 +404,7 @@ test("hash choices and switches stay interactive while inline code stays literal
   const editor = page.locator(".cm-content").last();
   await editor.click();
   await page.keyboard.insertText(
-    "- [#] Red\n- [#] Blue\n\n- [##] Email\n- [##] SMS\n\n- [|x] Feature flag\n- [True:green|x False:red] Sync\n- [:blue|:green] Color only\n\n`[#]` and `[|]` stay literal",
+    "- [#] Red\n- [#] Blue\n\n- [##] Email\n- [##] SMS\n\n- [|x] Feature flag\n- [True:green|x False:red] Sync\n- [:blue|:purple] Color only\n\n`[#]` and `[|]` stay literal",
   );
   await page.locator(".ed-date").click();
 
@@ -435,6 +435,35 @@ test("hash choices and switches stay interactive while inline code stays literal
   await expect(page.locator(".rotli-toggle")).toHaveCount(3);
   await expect(page.locator(".rotli-choice-line--multi.is-group-first")).toHaveCount(1);
   await expect(page.locator(".rotli-choice-line--multi.is-group-last")).toHaveCount(1);
+  const multiPanel = page.locator(".rotli-choice-line--multi").first();
+  const multiGeometry = await multiPanel.evaluate((line) => {
+    const panel = line.getBoundingClientRect();
+    const control = line.querySelector(".rotli-choice")?.getBoundingClientRect();
+    const style = getComputedStyle(line);
+    return {
+      width: panel.width,
+      controlInset: control ? control.left - panel.left : 0,
+      paddingBlockStart: style.paddingBlockStart,
+      paddingInlineEnd: style.paddingInlineEnd,
+    };
+  });
+  expect(multiGeometry.width).toBeLessThanOrEqual(481);
+  expect(multiGeometry.controlInset).toBeGreaterThanOrEqual(11);
+  expect(multiGeometry.paddingBlockStart).toBe("4px");
+  expect(multiGeometry.paddingInlineEnd).toBe("12px");
+  const purpleToggle = page.locator(".rotli-toggle").last();
+  const purpleColors = await purpleToggle.evaluate((toggle) => {
+    const probe = document.createElement("span");
+    probe.style.backgroundColor = "var(--accent-swatch-violet)";
+    document.body.append(probe);
+    const result = {
+      actual: getComputedStyle(toggle.querySelector(".rotli-toggle-track")!).backgroundColor,
+      expected: getComputedStyle(probe).backgroundColor,
+    };
+    probe.remove();
+    return result;
+  });
+  expect(purpleColors.actual).toBe(purpleColors.expected);
   const literal = page.locator(".rotli-control-literal", { hasText: "[#]" });
   await expect(literal).toBeVisible();
   await expect(literal).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
@@ -451,6 +480,7 @@ test("hash choices and switches stay interactive while inline code stays literal
   await expect(editor).toContainText("- [##x] SMS");
   await expect(editor).toContainText("- [x|] Feature flag");
   await expect(editor).toContainText("- [x True:green|False:red] Sync");
+  await expect(editor).toContainText("- [:blue|:purple] Color only");
   await expect(editor).toContainText("`[#]` and `[|]` stay literal");
 });
 

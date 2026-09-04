@@ -35,7 +35,7 @@ import { isControlLiteral } from "./controlState";
 import { scanFences } from "./fences";
 import { imageSourceSpan, selectionCoversImage } from "./imageSelection";
 import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
-import { CHECK_EM, CHOICE_EM, listStyle, MARKER_EM, RESULT_EM } from "./listGeometry";
+import { CHECK_EM, CHOICE_EM, GROUP_INSET_PX, listStyle, MARKER_EM, RESULT_EM } from "./listGeometry";
 import { parseBlock } from "./render";
 import { resultTextParts } from "./resultState";
 import { ChoiceControlWidget, ResultReasonWidget, ResultWidget, ToggleWidget } from "./resultWidget";
@@ -962,7 +962,11 @@ function build(view: EditorView): {
             Decoration.line({
               class: `rotli-choice-line${groupClass}${block.choiceSelected ? " is-selected" : ""}`,
               attributes: {
-                style: listStyle(depth, block.marker ? MARKER_EM + CHOICE_EM : CHOICE_EM),
+                style: listStyle(
+                  depth,
+                  block.marker ? MARKER_EM + CHOICE_EM : CHOICE_EM,
+                  multi ? GROUP_INSET_PX : 0,
+                ),
               },
             }).range(ls),
           );

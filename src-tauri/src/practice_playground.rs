@@ -87,7 +87,7 @@ Backticks keep examples literal in beautified notes. The backticks disappear, wh
 - `[True|False]` creates a labeled switch.
 - `[True:green][Draw:#E3B341][False:red]` creates colored result buttons.
 
-Named colors include accent, blue, green, yellow, red, and neutral. Custom colors accept strict three- or six-digit hex. Invalid colors remain ordinary Markdown instead of becoming a half-working control.
+Named colors include accent, blue, green, yellow, purple, red, and neutral. Custom colors accept strict three- or six-digit hex. Invalid colors remain ordinary Markdown instead of becoming a half-working control.
 "#,
     ),
 ];

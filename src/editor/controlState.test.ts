@@ -67,6 +67,10 @@ describe("portable toggle controls", () => {
         { color: "green", source: ":green" },
       ],
     });
+    expect(parseToggleLine("- [:blue|:purple] Feature")).toMatchObject({
+      labels: ["On", "Off"],
+      options: [{ color: "blue" }, { color: "purple" }],
+    });
   });
 
   test("writes an unambiguous active side while preserving labels and colors", () => {

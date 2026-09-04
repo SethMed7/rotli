@@ -47,6 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Compact results cross out the rejected side after a choice, `[##]` rows read
   as a grouped multi-choice panel, toggle colors accept `[:blue|:green]`, and
   backticked control examples render as plain source text without a code chip.
+- Purple is now a token-backed named result/toggle color, including
+  `[:blue|:purple]`. Grouped `[##]` choices now use a compact centered measure,
+  even panel gutters, calmer selected rows, and optically aligned controls.
 
 ## [0.89.0] - 2026-09-03
 

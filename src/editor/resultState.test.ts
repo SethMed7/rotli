@@ -67,6 +67,9 @@ describe("two-choice result grammar", () => {
     expect(
       parseResultLine("- [True:blue][False:yellow] Decision")?.options.map((option) => option.color),
     ).toEqual(["blue", "yellow"]);
+    expect(
+      parseResultLine("- [Purple:purple][Blue:green] Decision")?.options.map((option) => option.color),
+    ).toEqual(["purple", "green"]);
   });
 
   test("an unlabeled binary result defaults to semantic green and red", () => {
@@ -85,7 +88,7 @@ describe("two-choice result grammar", () => {
   test("labeled results fail closed when selection or color syntax is ambiguous", () => {
     expect(parseResultLine("- [x True][x False] Pick one")).toBeNull();
     expect(parseResultLine("- [True:#12][False:red] Pick one")).toBeNull();
-    expect(parseResultLine("- [True:purple][False:red] Pick one")).toBeNull();
+    expect(parseResultLine("- [True:orange][False:red] Pick one")).toBeNull();
     expect(parseResultLine("- [Only one] not a result")).toBeNull();
   });
 

@@ -216,6 +216,10 @@ describe("the [][]+Space result shorthand", () => {
     expect(press(result, "Space")).toBe(true);
     expect(text(result)).toBe("- [True][False] ");
     expect(head(result)).toBe(16);
+
+    const colored = viewOf("[Purple:purple][Blue:green]", 27);
+    expect(press(colored, "Space")).toBe(true);
+    expect(text(colored)).toBe("- [Purple:purple][Blue:green] ");
   });
 
   test("normalizes indent and upgrades an existing bullet", () => {
@@ -316,6 +320,9 @@ describe("hash choice and toggle shorthands", () => {
     const labeled = viewOf("[True|False]", 12);
     expect(press(labeled, "Space")).toBe(true);
     expect(text(labeled)).toBe("- [True|x False] ");
+    const colored = viewOf("[:blue|:purple]", 15);
+    expect(press(colored, "Space")).toBe(true);
+    expect(text(colored)).toBe("- [:blue|x :purple] ");
   });
 });
 

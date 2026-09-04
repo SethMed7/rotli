@@ -469,8 +469,9 @@ polish work.
 - Labeled adjacent boxes such as `[True][False]` use the same exclusive result
   model but render as restrained text buttons. A leading `x ` records the
   selected label in portable source. An uncolored two-option result defaults to
-  green/red; the semantic suffixes `accent`, `blue`, `green`, `yellow`, `red`, and
-  `neutral`, plus strict `#RGB`/`#RRGGBB` values, may override a button. Runtime
+  green/red; the semantic suffixes `accent`, `blue`, `green`, `yellow`,
+  `purple`, `red`, and `neutral`, plus strict `#RGB`/`#RRGGBB` values, may
+  override a button. Runtime
   hex is validated user data, never a new design token. Every option exposes
   pressed state, retains keyboard focus after selection, and remains legible
   without relying on color. Compact `[][]` intentionally keeps its established
@@ -484,7 +485,9 @@ polish work.
 - `[#]` is the current single-choice source: a circle that writes `[#x]` and
   clears adjacent same-indent `[#]` siblings. `[##]` is the independent
   multi-choice source: a square that toggles only its own `[##x]` state, with
-  adjacent rows visually joined into one option panel.
+  adjacent rows visually joined into a compact option panel. The panel uses
+  even gutters, aligned control/text columns, and quiet row selection so it
+  reads as one answer set without overpowering the note.
   Legacy `( )` rows remain supported without migration churn.
 - `[True|False]` and compact `[|]` render as switches whose active side is
   always explicit after first creation or activation. The thumb position,

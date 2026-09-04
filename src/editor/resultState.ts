@@ -15,7 +15,15 @@ export const RESULT_MARK = "[ xX]";
 
 export type ResultState = "unanswered" | "no" | "yes";
 export type ResultChoice = Exclude<ResultState, "unanswered">;
-export type ResultColor = "accent" | "blue" | "green" | "yellow" | "red" | "neutral" | `#${string}`;
+export type ResultColor =
+  | "accent"
+  | "blue"
+  | "green"
+  | "yellow"
+  | "purple"
+  | "red"
+  | "neutral"
+  | `#${string}`;
 export const RESULT_REASON_SEPARATOR = " — ";
 
 export interface ResultOption {
@@ -63,7 +71,15 @@ export function resultStateOf(yesMark: string, noMark: string): ResultState | nu
   return yes ? "yes" : "unanswered";
 }
 
-const RESULT_COLOR_NAMES = new Set<ResultColor>(["accent", "blue", "green", "yellow", "red", "neutral"]);
+const RESULT_COLOR_NAMES = new Set<ResultColor>([
+  "accent",
+  "blue",
+  "green",
+  "yellow",
+  "purple",
+  "red",
+  "neutral",
+]);
 const RESULT_HEX_RE = /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i;
 
 export function resultOptionOf(body: string, fallbackLabel?: string): ResultOption | null {

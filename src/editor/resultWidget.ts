@@ -23,6 +23,7 @@ function colorValue(color: ResultColor | null): string {
   if (color === "blue") return "var(--accent-swatch-blue)";
   if (color === "green") return "var(--success)";
   if (color === "yellow") return "var(--accent-swatch-amber)";
+  if (color === "purple") return "var(--accent-swatch-violet)";
   if (color === "red") return "var(--failure)";
   if (color === "neutral") return "var(--text-muted)";
   return color;
@@ -33,6 +34,7 @@ function selectedInk(color: ResultColor | null): string {
   if (color === "blue") return "var(--on-accent)";
   if (color === "green") return "var(--check-ink)";
   if (color === "yellow") return "var(--rotli-cocoa)";
+  if (color === "purple") return "var(--on-accent)";
   if (color === "red") return "var(--on-accent)";
   if (color === "neutral") return "var(--surface)";
   const value = color.slice(1);

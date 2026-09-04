@@ -102,7 +102,8 @@ imports.
   writes `[True][x False]`. Two or more options are supported and exactly one
   may be selected.
 - A labeled result can add a color after its label: `[True:green]`,
-  `[Draw:yellow]`, `[False:red]`, `[Later:accent]`, `[Info:blue]`, or `[Skip:neutral]`.
+  `[Draw:yellow]`, `[False:red]`, `[Later:accent]`, `[Info:blue]`,
+  `[Maybe:purple]`, or `[Skip:neutral]`.
   `#RGB` and `#RRGGBB` values are also accepted, for example
   `[Draw:#E3B341]`. An uncolored two-option result defaults to green then red;
   other uncolored labeled options use the active theme accent.
@@ -126,7 +127,8 @@ imports.
   and are never silently rewritten.
 - Typing `[##]` and then Space creates an independent multi-select row. Its
   square control writes `[##x]` when selected, and any number of adjacent
-  options may remain selected. Adjacent rows render as one grouped option panel.
+  options may remain selected. Adjacent rows render as one compact, evenly
+  inset option panel rather than stretching across the whole writing measure.
 - `[True|False]` followed by Space becomes the explicit-off switch
   `- [True|x False] `; `[|]` becomes the compact green/red switch `- [|x] `.
   Switching on writes `[x True|False]` or `[x|]`. Toggle labels accept the same
