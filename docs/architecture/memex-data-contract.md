@@ -285,6 +285,10 @@ second user-visible product or storage location.
   read-only. Because Library is the `wiki/` projection, the welcome note never
   appears there. Scaffolding still restores Home/Notes navigation after carrying
   the outgoing vault's reusable appearance and editor preferences.
+- The explicit Practice Vault flow additionally writes a versioned
+  `wiki/Playground/` lesson folder and links it from the root welcome note. The
+  playground is ordinary Markdown, has no `.rotli/` dependency, and is safe to
+  copy as one folder into another vault or remove through normal file tools.
   Expensive chat, board, and conventional-file surfaces may remain mounted in a
   small recent-tab cache so ordinary tab switching does not rebuild them on the
   WebKit main thread. The cache is bounded, inactive surfaces are inert and

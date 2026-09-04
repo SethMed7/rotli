@@ -225,6 +225,11 @@ exception.
   note. A newly created vault opens
   Home with the sidebar expanded even when the outgoing vault was collapsed or
   showing Chat/Breve.
+- The explicit Practice Vault adds `wiki/Playground/`: a versioned, removable
+  set of ordinary Markdown lessons for tasks, result buttons, choices, toggles,
+  custom colors, and literal backtick examples. The welcome note links into the
+  folder. Because the lesson is one self-contained folder with no sidecar
+  dependency, a user can copy it into another vault or delete it outright.
 - Tab hover is paint-only: close controls reserve their space, and switching
   hover/active state never moves neighboring tabs. Crowded tab bars follow the
   persisted Scroll or Fit preference. ⌘T appends and activates its tab in the

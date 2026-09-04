@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   multi-select options, and `[True|False]` or compact `[|]` creates a portable
   switch with explicit source state. The new controls support pointer and
   keyboard activation, preserve focus, and remain literal inside backticks.
+- New Practice Vaults now include a versioned `wiki/Playground/` folder with
+  editable Markdown lessons for tasks, result colors, choices, toggles, raw
+  source, and backtick literals. It is self-contained, copyable, and removable.
 
 ### Fixed
 

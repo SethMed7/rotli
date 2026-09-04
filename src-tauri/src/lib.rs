@@ -2009,6 +2009,7 @@ fn corpus_create_practice_vault_blocking(app: AppHandle) -> Result<String, Strin
     }
     flush_webviews_before_shutdown(&app)?;
     memex::scaffold_memex(&root)?;
+    memex::scaffold_practice_playground(&root)?;
     if let Some(current) = &current {
         corpus::carry_settings(current, &root)?;
     }
