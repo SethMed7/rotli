@@ -432,6 +432,14 @@ polish work.
 
 ## Markdown editing
 
+- A bare task token followed by Space becomes a portable Markdown list task:
+  `[]`/`[ ]` becomes `- [ ] `, `[/]` becomes `- [/] `, and `[x]` becomes
+  `- [x] `. Single-task open, in-progress, and done states use the current
+  theme's control vocabulary: in-progress is an accent half-fill and done is
+  an accent fill with contrasting check ink. Success green and failure red are
+  reserved for result semantics. Task controls expose native checkbox state,
+  activate from pointer or keyboard, and retain keyboard focus across their
+  source-backed rerender.
 - `[][]` followed by Space creates a compact check/X result row. The check is
   left and means yes/passed; the X is right, uses the semantic failure red (not
   the theme accent), and means no/failed. Both labeled buttons are mutually

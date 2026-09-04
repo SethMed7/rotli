@@ -52,11 +52,13 @@ const text = (view: FakeView) => view.state.doc.toString();
 const head = (view: FakeView) => view.state.selection.main.head;
 
 describe("fenced code is grammar-free (#8)", () => {
-  test("Space after [] inside a fence types normally (never becomes a task)", () => {
-    const doc = "```js\n[]\n```";
-    const v = viewOf(doc, doc.indexOf("[]") + 2);
-    expect(press(v, "Space")).toBe(false);
-    expect(text(v)).toBe(doc);
+  test("Space after any task-state token inside a fence types normally", () => {
+    for (const token of ["[]", "[/]", "[x]"]) {
+      const doc = `\`\`\`js\n${token}\n\`\`\``;
+      const v = viewOf(doc, doc.indexOf(token) + token.length);
+      expect(press(v, "Space")).toBe(false);
+      expect(text(v)).toBe(doc);
+    }
   });
 
   test("Enter after a dash line inside a fence never continues a list", () => {
@@ -136,6 +138,23 @@ describe("the empty-item exit ramp needs the caret past the marker (#11)", () =>
 });
 
 describe("the []+Space task shorthand (#14, #15)", () => {
+  test("preserves explicit in-progress and done states while adding the portable list marker", () => {
+    const cases = [
+      { source: "[/]", expected: "- [/] " },
+      { source: "- [/]", expected: "- [/] " },
+      { source: "[x]", expected: "- [x] " },
+      { source: "[X]", expected: "- [x] " },
+      { source: "- [x]", expected: "- [x] " },
+    ];
+
+    for (const { source, expected } of cases) {
+      const view = viewOf(source, source.length);
+      expect(press(view, "Space")).toBe(true);
+      expect(text(view)).toBe(expected);
+      expect(head(view)).toBe(expected.length);
+    }
+  });
+
   test("normalizes a pasted tab indent into spaces so the task is a real task", () => {
     const doc = "\t[]";
     const v = viewOf(doc, doc.length);

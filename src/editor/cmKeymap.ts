@@ -7,7 +7,7 @@
 //             gets a soft 2-space tab at the caret, since indentation inside a
 //             fence is the user's code.
 //   ⇧Tab    — outdent up to 2 leading spaces.
-//   Space   — "[ ]"/"[]" becomes a task; "[][]" becomes a yes/no result;
+//   Space   — "[]"/"[ ]"/"[/]"/"[x]" becomes a task; "[][]" becomes a yes/no result;
 //             "()" becomes a one-of-many choice option.
 //   In a TABLE (the maintainer, 2026-07-01): Tab/⇧Tab hop to the next/previous cell
 //   (crossing rows), ↑/↓ hop rows in the same column, Enter moves to the same
@@ -31,7 +31,7 @@ import {
   scanTables,
   tableToText,
 } from "./tables";
-import { MARK } from "./taskState";
+import { MARK, markOf, taskStateOf } from "./taskState";
 
 /** Fenced code is grammar-free: no list continuation, no task shorthand, no
  * list indent — `[]` or `- item` inside a ``` fence is the user's code. */
@@ -208,12 +208,14 @@ const listControlOnSpace: Command = (view) => {
     });
     return true;
   }
-  // "[ ]"/"[]" at line start — optionally after an existing bullet ("- []"
-  // upgrades the bullet to a task). Pasted tab indents normalize to the two
-  // spaces the rest of the grammar speaks.
-  const m = /^(\s*)(?:- )?\[ ?\]$/.exec(before);
+  // Any task-state token at line start — `[]`/`[ ]`, `[/]`, or `[x]` — may be
+  // typed without its list marker. Space upgrades it to portable task source;
+  // an optional existing bullet upgrades in place. Pasted tab indents normalize
+  // to the two spaces the rest of the grammar speaks.
+  const m = new RegExp(`^(\\s*)(?:- )?\\[(${MARK})?\\]$`).exec(before);
   if (!m) return false; // not a task shorthand → space types normally
-  const prefix = `${(m[1] ?? "").replace(/\t/g, "  ")}- [ ] `;
+  const mark = markOf(taskStateOf(m[2] ?? " "));
+  const prefix = `${(m[1] ?? "").replace(/\t/g, "  ")}- [${mark}] `;
   view.dispatch({
     changes: { from: line.from, to: range.head, insert: prefix },
     selection: EditorSelection.cursor(line.from + prefix.length),

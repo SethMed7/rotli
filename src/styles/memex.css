@@ -2954,8 +2954,8 @@ body:has(.document-editor) [role="dialog"][class*="univer-"] input:disabled {
   color: var(--text-muted);
 }
 .cmsg-list li.task.done .cmsg-task-mark {
-  border-color: var(--success);
-  background: var(--success);
+  border-color: var(--accent);
+  background: var(--accent);
 }
 /* **bold** in a reply was falling to the browser's default 700 — General Sans
    Bold, which reads far too heavy against a dark thread (the maintainer, 2026-08-03:

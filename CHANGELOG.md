@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Typing a bare in-progress or completed task marker (`[/]` or `[x]`) and then
+  Space now adds the portable Markdown list prefix while preserving that state,
+  just as `[]` already did. Single-task completion now uses the active theme
+  accent instead of pass/fail green, and keyboard activation retains focus so
+  repeated two- or three-state cycling remains possible. The separate `[][]`
+  result control keeps its green pass and red fail semantics.
+
 ## [0.89.0] - 2026-09-03
 
 ## [0.88.0] - 2026-09-03

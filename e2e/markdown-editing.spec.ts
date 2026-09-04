@@ -201,6 +201,69 @@ test("bullet outdent works on app-made AND tab-indented (foreign) lists", async 
   await expect(page.locator(".rotli-check")).toHaveCount(2);
 });
 
+test("bare task states become portable tasks and single checkboxes use the theme accent", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+
+  await page.keyboard.type("[/]");
+  await page.keyboard.press("Space");
+  await page.keyboard.type("Drafting");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("[x]");
+  await page.keyboard.press("Space");
+  await page.keyboard.type("Shipped");
+
+  const doing = page.getByRole("checkbox", { name: "In progress" });
+  const done = page.getByRole("checkbox", { name: "Done" });
+  await expect(doing).toHaveAttribute("aria-checked", "mixed");
+  await expect(done).toHaveAttribute("aria-checked", "true");
+
+  const colors = await done.evaluate((element) => {
+    const accentProbe = document.createElement("span");
+    accentProbe.style.backgroundColor = "var(--accent)";
+    const successProbe = document.createElement("span");
+    successProbe.style.backgroundColor = "var(--success)";
+    document.body.append(accentProbe, successProbe);
+    const result = {
+      actual: getComputedStyle(element).backgroundColor,
+      accent: getComputedStyle(accentProbe).backgroundColor,
+      success: getComputedStyle(successProbe).backgroundColor,
+    };
+    accentProbe.remove();
+    successProbe.remove();
+    return result;
+  });
+  expect(colors.actual).toBe(colors.accent);
+  expect(colors.actual).not.toBe(colors.success);
+
+  await done.focus();
+  await page.keyboard.press("Space");
+  const reopened = page.getByRole("checkbox", { name: "Not started" });
+  await expect(reopened).toHaveAttribute("aria-checked", "false");
+  await expect(reopened).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(page.getByRole("checkbox", { name: "Done" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("checkbox", { name: "Done" })).toBeFocused();
+
+  await page.getByRole("checkbox", { name: "Done" }).click();
+  await expect(page.getByRole("checkbox", { name: "Not started" })).toHaveAttribute("aria-checked", "false");
+  await page.getByRole("checkbox", { name: "Not started" }).click();
+  await expect(page.getByRole("checkbox", { name: "Done" })).toHaveAttribute("aria-checked", "true");
+
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  await expect(editor).toContainText("- [/] Drafting");
+  await expect(editor).toContainText("- [x] Shipped");
+});
+
 test("[][] creates a keyboard-safe pass/fail result with an optional reason", async ({ page }) => {
   await gotoApp(page);
   await page.keyboard.press("Meta+T");
@@ -261,6 +324,23 @@ test("[][] creates a keyboard-safe pass/fail result with an optional reason", as
   await expect(page.locator(".rotli-result-text--yes")).toContainText("API boots cleanly");
   await expect(page.locator(".rotli-result-text--yes")).toHaveCSS("font-weight", "700");
   await expect(page.locator(".rotli-result-reason")).toHaveCSS("font-weight", "400");
+  const yesColors = await yes.evaluate((element) => {
+    const successProbe = document.createElement("span");
+    successProbe.style.backgroundColor = "var(--success)";
+    const accentProbe = document.createElement("span");
+    accentProbe.style.backgroundColor = "var(--accent)";
+    document.body.append(successProbe, accentProbe);
+    const result = {
+      actual: getComputedStyle(element).backgroundColor,
+      success: getComputedStyle(successProbe).backgroundColor,
+      accent: getComputedStyle(accentProbe).backgroundColor,
+    };
+    successProbe.remove();
+    accentProbe.remove();
+    return result;
+  });
+  expect(yesColors.actual).toBe(yesColors.success);
+  expect(yesColors.actual).not.toBe(yesColors.accent);
 
   await page.getByRole("button", { name: "Aa" }).click();
   await page

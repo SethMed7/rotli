@@ -30,7 +30,6 @@ import { VIDEO_EXTS, extOf } from "../lib/fileKind";
 import { openUrl, resolveImageSrc, rootIdOf } from "../lib/tauri";
 import { locateLostImage } from "../services/imageRepair";
 import { usePanesStore } from "../state/panes";
-import { useUiStore } from "../state/ui";
 import { selectChoiceGroup } from "./choiceState";
 import { scanFences } from "./fences";
 import { imageSourceSpan, selectionCoversImage } from "./imageSelection";
@@ -45,8 +44,8 @@ import {
   resultTextParts,
 } from "./resultState";
 import { lineInTable, scanTables } from "./tables";
-import { markOf, nextTaskState, type TaskState, TASK_LINE_RE, taskStateOf } from "./taskState";
 import { type TaskNode, type TaskProgress, taskProgress } from "./taskTree";
+import { CheckboxWidget } from "./taskWidget";
 import { editorLinkOpensOnClick, WIKILINK_RE } from "./wikilink";
 import { resolveWikilinkTarget } from "./wikilinkIndex";
 
@@ -243,64 +242,6 @@ class NumberWidget extends WidgetType {
     s.textContent = this.marker;
     s.setAttribute("aria-hidden", "true");
     return s;
-  }
-}
-
-/** What each state says out loud, and what a click will do next. Three states
- * mean "Mark done" is no longer a complete description of the click. */
-const CHECK_LABEL: Record<TaskState, string> = {
-  open: "Not started",
-  doing: "In progress",
-  done: "Done",
-};
-
-class CheckboxWidget extends WidgetType {
-  /** `marker` carries the `1.` glyph of an ORDERED task ("1. [ ] x") — rendered
-   * before the box so the step number survives; null for a plain `- [ ]`. */
-  constructor(
-    readonly state: TaskState,
-    readonly marker: string | null = null,
-  ) {
-    super();
-  }
-  eq(o: CheckboxWidget) {
-    return o.state === this.state && o.marker === this.marker;
-  }
-  toDOM(view: EditorView) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = this.state === "open" ? "rotli-check" : `rotli-check ${this.state}`;
-    btn.setAttribute("role", "checkbox");
-    // "mixed" is ARIA's own word for a partly-checked box — `[/]` is exactly
-    // that, so assistive tech reads it without rotli inventing a vocabulary
-    btn.setAttribute("aria-checked", this.state === "doing" ? "mixed" : String(this.state === "done"));
-    btn.setAttribute("aria-label", CHECK_LABEL[this.state]);
-    // toggle on mousedown without moving the caret — resolve the line at click
-    // time via posAtDOM so renumbered/edited lines still hit the right one
-    btn.addEventListener("mousedown", (e) => {
-      if (e.button !== 0) return; // a right/middle press must not toggle
-      e.preventDefault();
-      const pos = view.posAtDOM(btn);
-      const line = view.state.doc.lineAt(pos);
-      const m = TASK_LINE_RE.exec(line.text);
-      if (!m) return;
-      // the setting is read HERE, at click time, so changing it takes effect
-      // in every open editor at once — no remount, no stale extension
-      const threeState = useUiStore.getState().taskCycle === "three";
-      const next = `${m[1]}[${markOf(nextTaskState(taskStateOf(m[2] ?? " "), threeState))}] `;
-      view.dispatch({ changes: { from: line.from, to: line.from + m[0].length, insert: next } });
-    });
-    if (!this.marker) return btn;
-    const wrap = document.createElement("span");
-    const num = document.createElement("span");
-    num.className = "rotli-marker num";
-    num.textContent = this.marker;
-    num.setAttribute("aria-hidden", "true");
-    wrap.append(num, btn);
-    return wrap;
-  }
-  ignoreEvent() {
-    return false;
   }
 }
 

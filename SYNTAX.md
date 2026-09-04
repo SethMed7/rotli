@@ -84,8 +84,9 @@ imports.
   a space, or as the whole reason) opens the same slash menu. The picked block
   lands on a continuation line beneath the row, the row keeps its label and
   reason, and a reason that was only the slash loses its dangling separator.
-- Typing `[]` and then Space at the start of a line (optionally after `- ` or
-  indentation) expands to the ordinary portable task source `- [ ] `.
+- Typing `[]`/`[ ]`, `[/]`, or `[x]` and then Space at the start of a line
+  (optionally after `- ` or indentation) expands to ordinary portable task
+  source while preserving its state: `- [ ] `, `- [/] `, or `- [x] `.
 - Typing `[][]` and then Space expands to an exclusive two-choice result row:
   `- [ ][ ] ` is unanswered, `- [x][ ] ` is yes/passed, and `- [ ][x] ` is
   no/failed. The check is the left control; the red X is the right control.

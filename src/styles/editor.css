@@ -240,13 +240,13 @@
   cursor: pointer;
 }
 .task.done .box {
-  background: var(--success);
-  border-color: var(--success);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 .task .box svg {
   width: 10px;
   height: 10px;
-  stroke: var(--check-ink); /* cocoa check on olive; mono re-points */
+  stroke: var(--on-accent);
   stroke-width: 2.4;
   fill: none;
   stroke-linecap: round;
@@ -882,13 +882,13 @@
   line-height: 1;
 }
 .rotli-check.done {
-  background: var(--success);
-  border-color: var(--success);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 .rotli-check.done::after {
   content: "✓";
   font-size: 11px;
-  color: var(--check-ink);
+  color: var(--on-accent);
 }
 /* — in progress, `[/]` (2026-08-04). Half the box is filled, so "partway" is
    legible at a glance and from across the room — no glyph to squint at, and it
