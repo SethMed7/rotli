@@ -8,6 +8,7 @@ import type { MouseEvent, ReactNode } from "react";
 
 import { openUrl } from "../lib/tauri";
 import { CHOICE_RE, ORDERED_CHOICE_RE } from "./choiceState";
+import { type ChoiceControlKind, parseChoiceControlLine, parseToggleLine } from "./controlState";
 import { type ResultOption, type ResultState, parseResultLine, resultTextParts } from "./resultState";
 import { ORDERED_TASK_RE, TASK_RE, type TaskState, taskStateOf } from "./taskState";
 
@@ -20,6 +21,7 @@ export type BlockKind =
   | "task"
   | "result"
   | "choice"
+  | "toggle"
   | "quote"
   | "para"
   | "blank";
@@ -42,6 +44,12 @@ export interface Block {
   resultSelectedIndex?: number;
   /** Whether this option is selected within its adjacent single-choice group. */
   choiceSelected?: boolean;
+  /** Legacy `( )`, new `[#]` radio, or `[##]` multi-select square. */
+  choiceVariant?: "legacy" | ChoiceControlKind;
+  toggleOn?: boolean;
+  toggleCompact?: boolean;
+  toggleOptions?: ResultOption[];
+  toggleLabels?: [string, string];
   /** The `1.` glyph of a numbered item — also set on an ORDERED task
    * (`1. [ ] x`), which parses as kind "task" with a marker. */
   marker?: string;
@@ -91,6 +99,30 @@ export function parseBlock(line: string): Block {
       ...(result.marker === "- " ? {} : { marker: result.marker.trim() }),
       indent,
     };
+  const toggle = parseToggleLine(line);
+  if (toggle)
+    return {
+      kind: "toggle",
+      prefixLen: toggle.prefixLen,
+      text: toggle.text,
+      toggleOn: toggle.on,
+      toggleCompact: toggle.compact,
+      toggleOptions: toggle.options,
+      toggleLabels: toggle.labels,
+      ...(toggle.marker === "- " ? {} : { marker: toggle.marker.trim() }),
+      indent,
+    };
+  const choiceControl = parseChoiceControlLine(line);
+  if (choiceControl)
+    return {
+      kind: "choice",
+      prefixLen: choiceControl.prefixLen,
+      text: choiceControl.text,
+      choiceSelected: choiceControl.selected,
+      choiceVariant: choiceControl.kind,
+      ...(choiceControl.marker === "- " ? {} : { marker: choiceControl.marker.trim() }),
+      indent,
+    };
   const choice = CHOICE_RE.exec(body);
   if (choice)
     return {
@@ -98,6 +130,7 @@ export function parseBlock(line: string): Block {
       prefixLen: indentChars.length + choice[0].length,
       text: body.slice(choice[0].length),
       choiceSelected: (choice[1] ?? " ").toLowerCase() === "x",
+      choiceVariant: "legacy",
       indent,
     };
   const t = TASK_RE.exec(body);
@@ -282,5 +315,15 @@ export function renderChoiceContent(block: Block): ReactNode {
     <span className="pv-choice-text--selected">{renderInline(block.text)}</span>
   ) : (
     renderInline(block.text)
+  );
+}
+
+export function renderToggleContent(block: Block): ReactNode {
+  const labels = block.toggleLabels ?? ["On", "Off"];
+  return (
+    <>
+      <span className="pv-toggle-state">{block.toggleOn ? labels[0] : labels[1]}</span>{" "}
+      {renderInline(block.text)}
+    </>
   );
 }

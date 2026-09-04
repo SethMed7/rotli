@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   semantic names and strict three- or six-digit hex colors are supported.
   Selection writes a portable leading `x ` to the chosen box, keyboard focus
   survives the rerender, and invalid or ambiguous source fails closed.
+- `[#]` now creates exclusive radio groups, `[##]` creates independent square
+  multi-select options, and `[True|False]` or compact `[|]` creates a portable
+  switch with explicit source state. The new controls support pointer and
+  keyboard activation, preserve focus, and remain literal inside backticks.
 
 ### Fixed
 

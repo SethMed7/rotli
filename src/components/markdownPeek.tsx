@@ -12,6 +12,7 @@ import {
   renderChoiceContent,
   renderInline,
   renderResultContent,
+  renderToggleContent,
 } from "../editor/render";
 import { resultGlyph } from "../editor/resultState";
 
@@ -31,7 +32,8 @@ export function MarkdownPeek({ body, className = "pv-note" }: { body: string; cl
       b.kind === "task" ||
       b.kind === "numbered" ||
       b.kind === "result" ||
-      b.kind === "choice"
+      b.kind === "choice" ||
+      b.kind === "toggle"
     )
       blocks.push(
         <div key={key} className="pv-li" style={{ paddingLeft: `${(b.indent ?? 0) + 1.2}em` }}>
@@ -43,14 +45,24 @@ export function MarkdownPeek({ body, className = "pv-note" }: { body: string; cl
                   : "◇"
                 : resultGlyph(b.resultState ?? "unanswered")
               : b.kind === "choice"
-                ? choiceGlyph(b.choiceSelected ?? false)
-                : (b.marker ?? "•")}
+                ? b.choiceVariant === "multi"
+                  ? b.choiceSelected
+                    ? "☑"
+                    : "☐"
+                  : choiceGlyph(b.choiceSelected ?? false)
+                : b.kind === "toggle"
+                  ? b.toggleOn
+                    ? "●"
+                    : "○"
+                  : (b.marker ?? "•")}
           </span>
           {b.kind === "result"
             ? renderResultContent(b)
             : b.kind === "choice"
               ? renderChoiceContent(b)
-              : renderInline(b.text)}
+              : b.kind === "toggle"
+                ? renderToggleContent(b)
+                : renderInline(b.text)}
         </div>,
       );
     else blocks.push(<p key={key}>{renderInline(b.text)}</p>);

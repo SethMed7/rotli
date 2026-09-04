@@ -116,6 +116,20 @@ imports.
   clears its siblings to `( )`. A blank, prose row, or different indent ends
   the group. Enter continues with an unselected option. Tab on row text indents
   the row; Tab on a rendered control follows the normal keyboard focus order.
+- Typing `[#]` and then Space creates a portable single-choice row. Adjacent
+  same-indent rows form one group; the chosen row writes `[#x]` and clears its
+  siblings. The render is a circle. Legacy `( )`/`(x)` rows remain supported
+  and are never silently rewritten.
+- Typing `[##]` and then Space creates an independent multi-select row. Its
+  square control writes `[##x]` when selected, and any number of adjacent
+  options may remain selected.
+- `[True|False]` followed by Space becomes the explicit-off switch
+  `- [True|x False] `; `[|]` becomes the compact green/red switch `- [|x] `.
+  Switching on writes `[x True|False]` or `[x|]`. Toggle labels accept the same
+  semantic and strict hex color suffixes as labeled results.
+- Inline code is opaque to the control grammar. `` `[#]` ``, `` `[##]` ``, and
+  `` `[|]` `` render as literal code text with their brackets intact; only the
+  backticks are hidden in beautified mode.
 
 ## CSS and design tokens
 

@@ -166,3 +166,39 @@ describe("parseBlock — multiple-choice rows", () => {
     expect(parseBlock("2. (yes) later").kind).toBe("numbered");
   });
 });
+
+describe("parseBlock — hash choices and toggles", () => {
+  test("new one-of-many and many-of-many markers stay distinct", () => {
+    const radio = parseBlock("- [#x] Blue");
+    expect(radio).toMatchObject({
+      kind: "choice",
+      choiceVariant: "radio",
+      choiceSelected: true,
+      text: "Blue",
+    });
+    const multi = parseBlock("  3. [##] Green");
+    expect(multi).toMatchObject({
+      kind: "choice",
+      choiceVariant: "multi",
+      choiceSelected: false,
+      marker: "3.",
+      indent: 2,
+    });
+  });
+
+  test("compact and labeled switches expose their active state", () => {
+    expect(parseBlock("- [|x] Alerts")).toMatchObject({
+      kind: "toggle",
+      toggleOn: false,
+      toggleCompact: true,
+      text: "Alerts",
+    });
+    expect(parseBlock("2. [x True:green|False:red] Sync")).toMatchObject({
+      kind: "toggle",
+      toggleOn: true,
+      toggleCompact: false,
+      toggleLabels: ["True", "False"],
+      marker: "2.",
+    });
+  });
+});

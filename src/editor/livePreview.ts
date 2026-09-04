@@ -37,7 +37,7 @@ import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from ".
 import { CHECK_EM, CHOICE_EM, listStyle, MARKER_EM, RESULT_EM } from "./listGeometry";
 import { parseBlock } from "./render";
 import { resultTextParts } from "./resultState";
-import { ResultReasonWidget, ResultWidget } from "./resultWidget";
+import { ChoiceControlWidget, ResultReasonWidget, ResultWidget, ToggleWidget } from "./resultWidget";
 import { lineInTable, scanTables } from "./tables";
 import { type TaskNode, type TaskProgress, taskProgress } from "./taskTree";
 import { CheckboxWidget } from "./taskWidget";
@@ -892,7 +892,13 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
           hidePrefix(
             ls,
             prefixEnd,
-            new ChoiceWidget(block.choiceSelected ?? false, block.marker ?? null),
+            block.choiceVariant === "radio" || block.choiceVariant === "multi"
+              ? new ChoiceControlWidget(
+                  block.choiceVariant,
+                  block.choiceSelected ?? false,
+                  block.marker ?? null,
+                )
+              : new ChoiceWidget(block.choiceSelected ?? false, block.marker ?? null),
             decos,
             atomics,
           );
@@ -900,6 +906,30 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
             decos.push(Decoration.mark({ class: "rotli-choice-text--selected" }).range(prefixEnd, line.to));
           }
           if (listItemImage(content, contentBase, line.to, lineTouched, sel, decos, atomics)) break;
+          scanInline(content, contentBase, sel, decos, atomics);
+          break;
+        case "toggle":
+          decos.push(
+            Decoration.line({
+              class: "rotli-toggle-line",
+              attributes: { style: listStyle(depth, block.marker ? MARKER_EM + RESULT_EM : RESULT_EM) },
+            }).range(ls),
+          );
+          hidePrefix(
+            ls,
+            prefixEnd,
+            new ToggleWidget(
+              block.toggleOptions ?? [
+                { label: "On", selected: block.toggleOn === true, color: "green", source: "" },
+                { label: "Off", selected: block.toggleOn !== true, color: "red", source: "" },
+              ],
+              block.toggleCompact ?? true,
+              block.toggleOn ?? false,
+              block.marker ?? null,
+            ),
+            decos,
+            atomics,
+          );
           scanInline(content, contentBase, sel, decos, atomics);
           break;
         case "quote":

@@ -389,6 +389,57 @@ test("labeled result buttons preserve source labels and apply semantic or custom
   await expect(editor).toContainText("- [True:green][Draw:#E3B341][x False:red] Release decision");
 });
 
+test("hash choices and switches stay interactive while inline code stays literal", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText(
+    "- [#] Red\n- [#] Blue\n\n- [##] Email\n- [##] SMS\n\n- [|x] Feature flag\n- [True:green|x False:red] Sync\n\n`[#]` and `[|]` stay literal",
+  );
+  await page.locator(".ed-date").click();
+
+  const radios = page.getByRole("radio", { name: "Choose option" });
+  await expect(radios).toHaveCount(2);
+  await radios.nth(1).click();
+  await expect(radios.nth(0)).toHaveAttribute("aria-checked", "false");
+  await expect(radios.nth(1)).toHaveAttribute("aria-checked", "true");
+
+  const multis = page.getByRole("checkbox", { name: "Toggle option" });
+  await expect(multis).toHaveCount(2);
+  await multis.nth(0).click();
+  await multis.nth(1).click();
+  await expect(multis.nth(0)).toHaveAttribute("aria-checked", "true");
+  await expect(multis.nth(1)).toHaveAttribute("aria-checked", "true");
+
+  const compactToggle = page.getByRole("switch", { name: "On or Off" });
+  const labeledToggle = page.getByRole("switch", { name: "True or False" });
+  await expect(compactToggle).toHaveAttribute("aria-checked", "false");
+  await compactToggle.focus();
+  await page.keyboard.press("Space");
+  await expect(compactToggle).toHaveAttribute("aria-checked", "true");
+  await expect(compactToggle).toBeFocused();
+  await labeledToggle.click();
+  await expect(labeledToggle).toHaveAttribute("aria-checked", "true");
+
+  await expect(page.locator(".rotli-choice")).toHaveCount(4);
+  await expect(page.locator(".rotli-toggle")).toHaveCount(2);
+  await expect(page.locator(".rotli-code", { hasText: "[#]" })).toBeVisible();
+  await expect(page.locator(".rotli-code", { hasText: "[|]" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  await expect(editor).toContainText("- [#x] Blue");
+  await expect(editor).toContainText("- [##x] Email");
+  await expect(editor).toContainText("- [##x] SMS");
+  await expect(editor).toContainText("- [x|] Feature flag");
+  await expect(editor).toContainText("- [x True:green|False:red] Sync");
+  await expect(editor).toContainText("`[#]` and `[|]` stay literal");
+});
+
 test("() creates a tab-navigable Markdown multiple-choice group", async ({ page }) => {
   await gotoApp(page);
   await page.keyboard.press("Meta+T");

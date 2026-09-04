@@ -43,6 +43,9 @@ describe("applyBlockToggle on indented lines", () => {
   test("format toggles replace a multiple-choice prefix instead of stacking onto it", () => {
     expect(applyBlockToggle("  - (x) child", "bullet").line).toBe("  - child");
     expect(applyBlockToggle("2. ( ) child", "checklist").line).toBe("- [ ] child");
+    expect(applyBlockToggle("- [#x] child", "bullet").line).toBe("- child");
+    expect(applyBlockToggle("- [##] child", "numbered").line).toBe("1. child");
+    expect(applyBlockToggle("- [True|x False] child", "checklist").line).toBe("- [ ] child");
   });
 });
 
@@ -63,6 +66,9 @@ describe("blockToggleActive on indented lines", () => {
   test("a multiple-choice option is not misreported as a generic list", () => {
     expect(blockToggleActive("- ( ) option", "bullet")).toBe(false);
     expect(blockToggleActive("2. (x) option", "numbered")).toBe(false);
+    expect(blockToggleActive("- [#] option", "bullet")).toBe(false);
+    expect(blockToggleActive("- [##x] option", "bullet")).toBe(false);
+    expect(blockToggleActive("- [|x] option", "bullet")).toBe(false);
   });
 });
 

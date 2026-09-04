@@ -19,6 +19,7 @@ import { EditorSelection, type Line, type TransactionSpec } from "@codemirror/st
 import type { Command, EditorView, KeyBinding } from "@codemirror/view";
 
 import { CHOICE_LINE_RE } from "./choiceState";
+import { parseChoiceControlLine, parseToggleLine, setToggleOn } from "./controlState";
 import { lineInFence, scanFences } from "./fences";
 import { imageSourceSpan } from "./imageSelection";
 import { parseResultLine } from "./resultState";
@@ -55,6 +56,34 @@ function listPrefixOf(line: string): { prefixLen: number; next: string; empty: b
       prefixLen: parsedResult.prefixLen,
       next: `${parsedResult.indent}${marker}${controls} `,
       empty: parsedResult.text.trim() === "",
+    };
+  }
+  const toggle = parseToggleLine(line);
+  if (toggle) {
+    const numbered = /^(\d+)\. $/.exec(toggle.marker);
+    const marker = numbered ? `${Number(numbered[1]) + 1}. ` : "- ";
+    const reset = setToggleOn(line, false);
+    if (reset) {
+      const control = reset.slice(
+        toggle.indentSource.length + toggle.marker.length,
+        reset.length - toggle.text.length,
+      );
+      return {
+        prefixLen: toggle.prefixLen,
+        next: `${toggle.indentSource}${marker}${control}`,
+        empty: toggle.text.trim() === "",
+      };
+    }
+  }
+  const choiceControl = parseChoiceControlLine(line);
+  if (choiceControl) {
+    const numbered = /^(\d+)\. $/.exec(choiceControl.marker);
+    const marker = numbered ? `${Number(numbered[1]) + 1}. ` : "- ";
+    const hashes = choiceControl.kind === "radio" ? "#" : "##";
+    return {
+      prefixLen: choiceControl.prefixLen,
+      next: `${choiceControl.indentSource}${marker}[${hashes}] `,
+      empty: choiceControl.text.trim() === "",
     };
   }
   const choice = CHOICE_LINE_RE.exec(line);
@@ -216,6 +245,30 @@ const listControlOnSpace: Command = (view) => {
     const controls = labeledResult[2] ?? "";
     if (parseResultLine(`${indent}- ${controls} `)) {
       const prefix = `${indent}- ${controls} `;
+      view.dispatch({
+        changes: { from: line.from, to: range.head, insert: prefix },
+        selection: EditorSelection.cursor(line.from + prefix.length),
+        userEvent: "input",
+      });
+      return true;
+    }
+  }
+  const hashChoice = /^(\s*)(?:- )?\[(##?)\]$/.exec(before);
+  if (hashChoice) {
+    const prefix = `${(hashChoice[1] ?? "").replace(/\t/g, "  ")}- [${hashChoice[2]}] `;
+    view.dispatch({
+      changes: { from: line.from, to: range.head, insert: prefix },
+      selection: EditorSelection.cursor(line.from + prefix.length),
+      userEvent: "input",
+    });
+    return true;
+  }
+  const toggle = /^(\s*)(?:- )?(\[[^\]\r\n]*\|[^\]\r\n]*\])$/.exec(before);
+  if (toggle) {
+    const indent = (toggle[1] ?? "").replace(/\t/g, "  ");
+    const candidate = `${indent}- ${toggle[2]} `;
+    const prefix = setToggleOn(candidate, false);
+    if (prefix) {
       view.dispatch({
         changes: { from: line.from, to: range.head, insert: prefix },
         selection: EditorSelection.cursor(line.from + prefix.length),

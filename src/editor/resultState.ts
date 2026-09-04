@@ -66,7 +66,7 @@ export function resultStateOf(yesMark: string, noMark: string): ResultState | nu
 const RESULT_COLOR_NAMES = new Set<ResultColor>(["accent", "green", "yellow", "red", "neutral"]);
 const RESULT_HEX_RE = /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i;
 
-function labeledOptionOf(body: string): ResultOption | null {
+export function resultOptionOf(body: string): ResultOption | null {
   const trimmed = body.trim();
   const selectedMatch = /^x\s+(.+)$/i.exec(trimmed);
   const source = (selectedMatch?.[1] ?? trimmed).trim();
@@ -113,7 +113,7 @@ export function parseResultLine(line: string): ParsedResultLine | null {
       { label: "No", selected: state === "no", color: "red", source: "" },
     ];
   } else {
-    const parsed = bodies.map(labeledOptionOf);
+    const parsed = bodies.map(resultOptionOf);
     if (parsed.some((option) => option === null)) return null;
     options = parsed as ResultOption[];
     if (options.filter((option) => option.selected).length > 1) return null;

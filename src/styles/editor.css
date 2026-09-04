@@ -846,7 +846,8 @@
 .rotli-cm-host .cm-line.rotli-li,
 .rotli-cm-host .cm-line.rotli-task,
 .rotli-cm-host .cm-line.rotli-result-line,
-.rotli-cm-host .cm-line.rotli-choice-line {
+.rotli-cm-host .cm-line.rotli-choice-line,
+.rotli-cm-host .cm-line.rotli-toggle-line {
   /* a little breathing room between list items — not a loose wall */
   padding-block: 2px;
 }
@@ -1038,9 +1039,75 @@
 .rotli-choice.is-selected::after {
   background: var(--accent-text);
 }
+.rotli-choice--multi {
+  border-radius: var(--r-inner);
+}
+.rotli-choice--multi::after {
+  width: 0.58em;
+  height: 0.36em;
+  border: 0 solid var(--on-accent);
+  border-width: 0 0 1.5px 1.5px;
+  border-radius: 0;
+  transform: translateY(-0.08em) rotate(-45deg);
+}
+.rotli-choice--multi.is-selected {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.rotli-choice--multi.is-selected::after {
+  background: transparent;
+}
 .rotli-choice-text--selected {
   color: var(--accent-text);
   font-weight: 700;
+}
+
+.rotli-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38em;
+  margin-right: 0.55em;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  padding: 0;
+  font: inherit;
+  font-size: 0.82em;
+  cursor: pointer;
+  vertical-align: -0.18em;
+}
+.rotli-toggle-track {
+  width: 2.25em;
+  height: 1.22em;
+  padding: 0.13em;
+  border-radius: var(--r-pill);
+  background: var(--toggle-off);
+  display: inline-flex;
+  align-items: center;
+  transition: background var(--motion-enter) var(--motion-ease);
+}
+.rotli-toggle-thumb {
+  width: 0.96em;
+  height: 0.96em;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--text) 20%, transparent);
+  transform: translateX(0);
+  transition: transform var(--motion-enter) var(--motion-ease);
+}
+.rotli-toggle.is-on .rotli-toggle-track {
+  background: var(--toggle-on);
+}
+.rotli-toggle.is-on .rotli-toggle-thumb {
+  transform: translateX(1.03em);
+}
+.rotli-toggle.is-on .rotli-toggle-label--on,
+.rotli-toggle.is-off .rotli-toggle-label--off {
+  color: var(--text);
+  font-weight: 700;
+}
+.rotli-toggle:hover .rotli-toggle-label {
+  color: var(--text);
 }
 
 /* — inline marks (mirror editor.css's md-* inline voices) — */

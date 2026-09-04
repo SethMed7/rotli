@@ -7,7 +7,7 @@ import type { ResultOption } from "./resultState";
 (document as unknown as { documentElement: { style: Record<string, never> } }).documentElement = {
   style: {},
 };
-const { ResultWidget } = await import("./resultWidget");
+const { ChoiceControlWidget, ResultWidget, ToggleWidget } = await import("./resultWidget");
 
 const OPTIONS: ResultOption[] = [
   { label: "True", selected: true, color: "green", source: "True:green" },
@@ -24,5 +24,14 @@ describe("result widget identity", () => {
     ).toBe(false);
     expect(new ResultWidget(OPTIONS, false).eq(new ResultWidget(OPTIONS, true))).toBe(false);
     expect(new ResultWidget(OPTIONS, false, "2.").eq(new ResultWidget(OPTIONS, false, "3."))).toBe(false);
+  });
+});
+
+describe("structured control widget identity", () => {
+  test("keeps radio, multi-select, and toggle state distinct", () => {
+    expect(new ChoiceControlWidget("radio", false).eq(new ChoiceControlWidget("multi", false))).toBe(false);
+    expect(new ChoiceControlWidget("radio", true).eq(new ChoiceControlWidget("radio", false))).toBe(false);
+    expect(new ToggleWidget(OPTIONS, false, true).eq(new ToggleWidget(OPTIONS, false, true))).toBe(true);
+    expect(new ToggleWidget(OPTIONS, false, true).eq(new ToggleWidget(OPTIONS, false, false))).toBe(false);
   });
 });

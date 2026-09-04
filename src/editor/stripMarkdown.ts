@@ -5,6 +5,7 @@
 // word. Raw mode copies the source verbatim instead.
 
 import { CHOICE_MARK } from "./choiceState";
+import { parseChoiceControlLine, parseToggleLine } from "./controlState";
 import { parseResultLine, RESULT_MARK } from "./resultState";
 import { MARK } from "./taskState";
 
@@ -27,6 +28,13 @@ export function stripMarkdown(text: string): string {
   return text
     .split("\n")
     .map((line) => {
+      const toggle = parseToggleLine(line);
+      if (toggle)
+        return inline(
+          `${toggle.indentSource}${toggle.on ? toggle.labels[0] : toggle.labels[1]} ${toggle.text}`,
+        );
+      const choiceControl = parseChoiceControlLine(line);
+      if (choiceControl) return inline(`${choiceControl.indentSource}${choiceControl.text}`);
       const result = parseResultLine(line);
       if (result && !result.compact) {
         return inline(

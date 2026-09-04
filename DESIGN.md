@@ -464,6 +464,17 @@ polish work.
   are explicit group boundaries. Selected option text is bold accent emphasis,
   never success/failure color. Controls follow Tab order; Tab while the text
   caret owns a row keeps Rotli's existing line-indent behavior.
+- `[#]` is the current single-choice source: a circle that writes `[#x]` and
+  clears adjacent same-indent `[#]` siblings. `[##]` is the independent
+  multi-choice source: a square that toggles only its own `[##x]` state.
+  Legacy `( )` rows remain supported without migration churn.
+- `[True|False]` and compact `[|]` render as switches whose active side is
+  always explicit after first creation or activation. The thumb position,
+  `role="switch"`, accessible checked state, and active label carry meaning in
+  addition to color. Compact defaults are semantic green/on and red/off;
+  labeled sides accept the result-control color grammar.
+- Backtick-delimited inline code wins before every control grammar. Its content
+  stays literal and selectable while beautified mode hides only the backticks.
 - A Markdown pane reveals one compact scroll-to-top control after meaningful
   downward scrolling. It floats at the pane's bottom-right, remains a labeled
   keyboard-focusable button, and uses reduced-motion-safe spatial feedback.

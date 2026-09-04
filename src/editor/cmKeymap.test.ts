@@ -278,6 +278,26 @@ describe("the ()+Space multiple-choice shorthand", () => {
   });
 });
 
+describe("hash choice and toggle shorthands", () => {
+  test("creates radio and multi-select list rows", () => {
+    const radio = viewOf("[#]", 3);
+    expect(press(radio, "Space")).toBe(true);
+    expect(text(radio)).toBe("- [#] ");
+    const multi = viewOf("[##]", 4);
+    expect(press(multi, "Space")).toBe(true);
+    expect(text(multi)).toBe("- [##] ");
+  });
+
+  test("creates explicit-off compact and labeled toggles", () => {
+    const compact = viewOf("[|]", 3);
+    expect(press(compact, "Space")).toBe(true);
+    expect(text(compact)).toBe("- [|x] ");
+    const labeled = viewOf("[True|False]", 12);
+    expect(press(labeled, "Space")).toBe(true);
+    expect(text(labeled)).toBe("- [True|x False] ");
+  });
+});
+
 describe("Tab on a ragged table row (#3)", () => {
   test("skips the missing cells and appends a row instead of sticking", () => {
     const doc = "| a | b | c |\n| --- | --- | --- |\n| x |";
