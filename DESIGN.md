@@ -77,6 +77,11 @@ exception.
 
 - Every user action remains keyboard reachable and participates in the shared
   action/keybinding system.
+- Compact titlebar, sidebar, tab-strip, and editor-header chrome keeps glyphs
+  visually quiet while giving each standalone pointer action at least a 24×24
+  CSS-pixel target. Inline text actions and content-native controls preserve
+  their line-height grammar. Icon hover labels also appear on keyboard focus;
+  expanding a target must not shift adjacent content between states.
 - Global search is the real titlebar field: clicking it or invoking ⌘K focuses
   that same field and opens a results list directly beneath it. It is not a
   centered modal. A uniform semantic fade quiets the surrounding workspace

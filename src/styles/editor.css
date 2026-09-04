@@ -138,6 +138,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
+  min-height: 28px;
   padding: 4px 9px;
   border: none;
   border-radius: var(--r-control);

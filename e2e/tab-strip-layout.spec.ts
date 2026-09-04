@@ -39,6 +39,36 @@ test("hovering an inactive tab does not move the tab strip", async ({ page }) =>
   await expect(hovered).toHaveAttribute("aria-selected", "true");
 });
 
+test("compact shell actions keep useful pointer targets in a narrow window", async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 600 });
+  await gotoApp(page);
+
+  const sidebarToggle = page.getByRole("button", { name: "Hide sidebar" });
+  await sidebarToggle.focus();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Shift+Tab");
+  await expect(sidebarToggle).toBeFocused();
+  await expect(sidebarToggle.locator(".tip")).toBeVisible();
+
+  const actions = [
+    page.getByRole("button", { name: "New note in Main" }),
+    page.getByRole("button", { name: "New folder in Main" }),
+    page.getByRole("button", { name: "Close tab" }),
+  ];
+  for (const action of actions) {
+    const box = await action.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box?.width).toBeGreaterThanOrEqual(24);
+    expect(box?.height).toBeGreaterThanOrEqual(24);
+  }
+
+  for (const name of ["Chats on this note", "Aa", "Show metadata"]) {
+    const box = await page.getByRole("button", { name, exact: true }).boundingBox();
+    expect(box).not.toBeNull();
+    expect(box?.height).toBeGreaterThanOrEqual(28);
+  }
+});
+
 test("General settings switch the crowded tab bar between scroll and fit", async ({ page }) => {
   await gotoApp(page);
 

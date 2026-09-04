@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New Practice Vaults now include a versioned `wiki/Playground/` folder with
   editable Markdown lessons for tasks, result colors, choices, toggles, raw
   source, and backtick literals. It is self-contained, copyable, and removable.
+- Compact sidebar, tab, and editor-header actions now keep at least a 24px
+  pointer target, and icon labels appear for keyboard focus as well as hover.
 
 ### Fixed
 
