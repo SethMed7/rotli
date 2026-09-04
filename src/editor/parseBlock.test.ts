@@ -7,6 +7,8 @@ import { describe, expect, test } from "bun:test";
 
 import { parseBlock } from "./render";
 
+const CUSTOM_AMBER = `#${"E3B341"}`;
+
 describe("parseBlock — tab-tolerant list indents", () => {
   test("a tab-indented bullet is a bullet (tab = one nesting level)", () => {
     const b = parseBlock("\t- child");
@@ -123,6 +125,18 @@ describe("parseBlock — two-choice results", () => {
   test("ordinary task rows remain tasks", () => {
     expect(parseBlock("- [ ] todo").kind).toBe("task");
     expect(parseBlock("1. [x] done").kind).toBe("task");
+  });
+
+  test("labeled result rows expose every option without swallowing the question", () => {
+    const block = parseBlock(`- [True:green][Draw:${CUSTOM_AMBER}][x False:red] Release?`);
+    expect(block.kind).toBe("result");
+    expect(block.prefixLen).toBe(`- [True:green][Draw:${CUSTOM_AMBER}][x False:red] `.length);
+    expect(block.text).toBe("Release?");
+    expect(block.resultOptions?.map(({ label, selected, color }) => ({ label, selected, color }))).toEqual([
+      { label: "True", selected: false, color: "green" },
+      { label: "Draw", selected: false, color: CUSTOM_AMBER },
+      { label: "False", selected: true, color: "red" },
+    ]);
   });
 });
 

@@ -21,7 +21,7 @@ import type { Command, EditorView, KeyBinding } from "@codemirror/view";
 import { CHOICE_LINE_RE } from "./choiceState";
 import { lineInFence, scanFences } from "./fences";
 import { imageSourceSpan } from "./imageSelection";
-import { RESULT_LINE_RE, resultStateOf } from "./resultState";
+import { parseResultLine } from "./resultState";
 import {
   type CellRef,
   type TableBlock,
@@ -44,15 +44,17 @@ function inFence(view: EditorView, line: Line): boolean {
  * ordered tasks count up AND reset), quotes. Returns the marker for the NEXT
  * line and whether the item is empty. */
 function listPrefixOf(line: string): { prefixLen: number; next: string; empty: boolean } | null {
-  const result = RESULT_LINE_RE.exec(line);
-  if (result && resultStateOf(result[3] ?? " ", result[4] ?? " ") !== null) {
-    const indent = result[1] ?? "";
-    const numbered = /^(\d+)\. $/.exec(result[2] ?? "");
+  const parsedResult = parseResultLine(line);
+  if (parsedResult) {
+    const numbered = /^(\d+)\. $/.exec(parsedResult.marker);
     const marker = numbered ? `${Number(numbered[1]) + 1}. ` : "- ";
+    const controls = parsedResult.compact
+      ? "[ ][ ]"
+      : parsedResult.options.map((option) => `[${option.source}]`).join("");
     return {
-      prefixLen: result[0].length,
-      next: `${indent}${marker}[ ][ ] `,
-      empty: line.slice(result[0].length).trim() === "",
+      prefixLen: parsedResult.prefixLen,
+      next: `${parsedResult.indent}${marker}${controls} `,
+      empty: parsedResult.text.trim() === "",
     };
   }
   const choice = CHOICE_LINE_RE.exec(line);
@@ -207,6 +209,20 @@ const listControlOnSpace: Command = (view) => {
       userEvent: "input",
     });
     return true;
+  }
+  const labeledResult = /^(\s*)(?:- )?((?:\[[^\]\r\n]+\]){2,})$/.exec(before);
+  if (labeledResult) {
+    const indent = (labeledResult[1] ?? "").replace(/\t/g, "  ");
+    const controls = labeledResult[2] ?? "";
+    if (parseResultLine(`${indent}- ${controls} `)) {
+      const prefix = `${indent}- ${controls} `;
+      view.dispatch({
+        changes: { from: line.from, to: range.head, insert: prefix },
+        selection: EditorSelection.cursor(line.from + prefix.length),
+        userEvent: "input",
+      });
+      return true;
+    }
   }
   // Any task-state token at line start — `[]`/`[ ]`, `[/]`, or `[x]` — may be
   // typed without its list marker. Space upgrades it to portable task source;

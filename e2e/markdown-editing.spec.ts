@@ -350,6 +350,45 @@ test("[][] creates a keyboard-safe pass/fail result with an optional reason", as
   await expect(editor).toContainText("- [x][ ] API boots cleanly — timed out waiting for health check");
 });
 
+test("labeled result buttons preserve source labels and apply semantic or custom colors", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+
+  await page.keyboard.type("[True:green][Draw:#E3B341][False:red]");
+  await page.keyboard.press("Space");
+  await page.keyboard.type("Release decision");
+
+  const truth = page.getByRole("button", { name: "True" });
+  const draw = page.getByRole("button", { name: "Draw" });
+  const falsity = page.getByRole("button", { name: "False" });
+  await expect(truth).toHaveAttribute("aria-pressed", "false");
+  await expect(draw).toHaveAttribute("aria-pressed", "false");
+  await expect(falsity).toHaveAttribute("aria-pressed", "false");
+
+  await draw.focus();
+  await page.keyboard.press("Space");
+  await expect(draw).toHaveAttribute("aria-pressed", "true");
+  await expect(draw).toBeFocused();
+  await expect(truth).toHaveAttribute("aria-pressed", "false");
+  await expect(falsity).toHaveAttribute("aria-pressed", "false");
+  await expect(draw).toHaveCSS("background-color", "rgb(227, 179, 65)");
+
+  await falsity.click();
+  await expect(draw).toHaveAttribute("aria-pressed", "false");
+  await expect(falsity).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  await expect(editor).toContainText("- [True:green][Draw:#E3B341][x False:red] Release decision");
+});
+
 test("() creates a tab-navigable Markdown multiple-choice group", async ({ page }) => {
   await gotoApp(page);
   await page.keyboard.press("Meta+T");

@@ -93,6 +93,18 @@ imports.
   Clicking one side always clears the other. A hand-edited
   `- [x][x] ` is ambiguous, so Rotli fails closed and shows it as ordinary
   Markdown instead of choosing a result.
+- Labels inside adjacent boxes render as mutually exclusive text buttons:
+  `[True][False]` followed by Space becomes `- [True][False] `. A selection is
+  portable source—a leading `x ` inside the chosen box—so selecting False
+  writes `[True][x False]`. Two or more options are supported and exactly one
+  may be selected.
+- A labeled result can add a color after its label: `[True:green]`,
+  `[Draw:yellow]`, `[False:red]`, `[Later:accent]`, or `[Skip:neutral]`.
+  `#RGB` and `#RRGGBB` values are also accepted, for example
+  `[Draw:#E3B341]`. Labels without a color use the active theme accent.
+  Unknown names, malformed hex values, and multiple selected boxes fail closed
+  as ordinary Markdown. Color is presentation only; the label and pressed
+  state keep the choice understandable without color.
 - The X and check controls, plus the bold failure/success text shown after a
   choice, are render layers. The adjacent boxes remain the only file truth.
   A chosen row may append an ordinary Markdown reason after ` — `; the inline

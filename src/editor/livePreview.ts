@@ -36,13 +36,8 @@ import { imageSourceSpan, selectionCoversImage } from "./imageSelection";
 import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
 import { CHECK_EM, CHOICE_EM, listStyle, MARKER_EM, RESULT_EM } from "./listGeometry";
 import { parseBlock } from "./render";
-import {
-  chooseResult,
-  RESULT_REASON_SEPARATOR,
-  type ResultChoice,
-  type ResultState,
-  resultTextParts,
-} from "./resultState";
+import { resultTextParts } from "./resultState";
+import { ResultReasonWidget, ResultWidget } from "./resultWidget";
 import { lineInTable, scanTables } from "./tables";
 import { type TaskNode, type TaskProgress, taskProgress } from "./taskTree";
 import { CheckboxWidget } from "./taskWidget";
@@ -242,121 +237,6 @@ class NumberWidget extends WidgetType {
     s.textContent = this.marker;
     s.setAttribute("aria-hidden", "true");
     return s;
-  }
-}
-
-/** Two exclusive buttons backed by two adjacent Markdown boxes. The first is
- * yes/pass (✓), the second no/fail (×); choosing either clears the other. */
-class ResultWidget extends WidgetType {
-  constructor(
-    readonly state: ResultState,
-    readonly marker: string | null = null,
-  ) {
-    super();
-  }
-  eq(o: ResultWidget) {
-    return o.state === this.state && o.marker === this.marker;
-  }
-  toDOM(view: EditorView) {
-    const controls = document.createElement("span");
-    controls.className = "rotli-result";
-    controls.setAttribute("role", "group");
-    controls.setAttribute("aria-label", "Yes or no result");
-
-    const choose = (choice: ResultChoice) => {
-      const pos = view.posAtDOM(controls);
-      const line = view.state.doc.lineAt(pos);
-      const next = chooseResult(line.text, choice);
-      if (!next || next === line.text) return;
-      view.dispatch({ changes: { from: line.from, to: line.to, insert: next }, userEvent: "input" });
-    };
-
-    const button = (choice: ResultChoice, glyph: string, label: string) => {
-      const selected = this.state === choice;
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = `rotli-result-choice rotli-result-choice--${choice}${selected ? " is-selected" : ""}`;
-      btn.textContent = glyph;
-      btn.setAttribute("aria-label", label);
-      btn.setAttribute("aria-pressed", String(selected));
-      btn.title = label;
-      btn.addEventListener("keydown", (event) => {
-        // Tab navigates the embedded controls; Tab while the text caret owns
-        // the row still indents it through cmKeymap.
-        if (event.key === "Tab" || event.key === " " || event.key === "Enter") {
-          event.stopPropagation();
-        }
-      });
-      // Pointer selection must not move the editor caret into the hidden source.
-      btn.addEventListener("mousedown", (event) => {
-        if (event.button !== 0) return; // a right/middle press must not answer
-        event.preventDefault();
-        choose(choice);
-      });
-      // Native button activation covers keyboard and assistive-tech clicks.
-      btn.addEventListener("click", (event) => {
-        event.preventDefault();
-        // A pointer click already committed on mousedown before CodeMirror can
-        // move the caret. detail=0 is keyboard or assistive-tech activation.
-        if (event.detail === 0) choose(choice);
-      });
-      return btn;
-    };
-
-    controls.append(button("yes", "✓", "Yes or passed"), button("no", "×", "No or failed"));
-    if (!this.marker) return controls;
-    const wrap = document.createElement("span");
-    const num = document.createElement("span");
-    num.className = "rotli-marker num";
-    num.textContent = this.marker;
-    num.setAttribute("aria-hidden", "true");
-    wrap.append(num, controls);
-    return wrap;
-  }
-  ignoreEvent() {
-    return false;
-  }
-}
-
-/** A selected row can carry an ordinary Markdown explanation after an em dash.
- * The affordance inserts only that separator, then returns focus to the text. */
-class ResultReasonWidget extends WidgetType {
-  eq() {
-    return true;
-  }
-  toDOM(view: EditorView) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "rotli-result-reason-add";
-    btn.textContent = "+ reason";
-    btn.setAttribute("aria-label", "Add a reason for this result");
-    const add = () => {
-      const pos = view.posAtDOM(btn);
-      const line = view.state.doc.lineAt(pos);
-      view.dispatch({
-        changes: { from: line.to, insert: RESULT_REASON_SEPARATOR },
-        selection: { anchor: line.to + RESULT_REASON_SEPARATOR.length },
-        scrollIntoView: true,
-        userEvent: "input",
-      });
-      view.focus();
-    };
-    btn.addEventListener("keydown", (event) => {
-      if (event.key === "Tab" || event.key === " " || event.key === "Enter") event.stopPropagation();
-    });
-    btn.addEventListener("mousedown", (event) => {
-      if (event.button !== 0) return;
-      event.preventDefault();
-      add();
-    });
-    btn.addEventListener("click", (event) => {
-      event.preventDefault();
-      if (event.detail === 0) add();
-    });
-    return btn;
-  }
-  ignoreEvent() {
-    return false;
   }
 }
 
@@ -968,7 +848,20 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
               attributes: { style: listStyle(depth, block.marker ? MARKER_EM + RESULT_EM : RESULT_EM) },
             }).range(ls),
           );
-          hidePrefix(ls, prefixEnd, new ResultWidget(state, block.marker ?? null), decos, atomics);
+          hidePrefix(
+            ls,
+            prefixEnd,
+            new ResultWidget(
+              block.resultOptions ?? [
+                { label: "Yes", selected: state === "yes", color: "green", source: "" },
+                { label: "No", selected: state === "no", color: "red", source: "" },
+              ],
+              block.resultCompact ?? true,
+              block.marker ?? null,
+            ),
+            decos,
+            atomics,
+          );
           if (state !== "unanswered" && parts.label.length > 0) {
             decos.push(
               Decoration.mark({ class: `rotli-result-text rotli-result-text--${state}` }).range(

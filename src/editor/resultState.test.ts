@@ -6,9 +6,12 @@ import {
   RESULT_LINE_RE,
   RESULT_RE,
   resultGlyph,
+  parseResultLine,
   resultStateOf,
   resultTextParts,
 } from "./resultState";
+
+const CUSTOM_AMBER = `#${"E3B341"}`;
 
 describe("two-choice result grammar", () => {
   test("reads unanswered, no, and yes while accepting a capital X", () => {
@@ -30,6 +33,40 @@ describe("two-choice result grammar", () => {
   test("choosing one side clears the other and preserves the row", () => {
     expect(chooseResult("  - [ ][ ] API boots", "no")).toBe("  - [ ][x] API boots");
     expect(chooseResult("3. [ ][x] API boots", "yes")).toBe("3. [x][ ] API boots");
+  });
+
+  test("reads portable labeled choices with semantic and custom colors", () => {
+    expect(parseResultLine(`- [True:green][Draw:${CUSTOM_AMBER}][False:red] Ship it`)).toEqual({
+      indent: "",
+      marker: "- ",
+      prefixLen: `- [True:green][Draw:${CUSTOM_AMBER}][False:red] `.length,
+      text: "Ship it",
+      compact: false,
+      options: [
+        { label: "True", selected: false, color: "green", source: "True:green" },
+        { label: "Draw", selected: false, color: CUSTOM_AMBER, source: `Draw:${CUSTOM_AMBER}` },
+        { label: "False", selected: false, color: "red", source: "False:red" },
+      ],
+    });
+    expect(parseResultLine("  3. [x Ready][Later:neutral] Decision")?.options[0]).toEqual({
+      label: "Ready",
+      selected: true,
+      color: null,
+      source: "Ready",
+    });
+  });
+
+  test("choosing a labeled option preserves labels and colors and clears its siblings", () => {
+    expect(chooseResult(`- [x True:green][Draw:${CUSTOM_AMBER}][False:red] Ship it`, 1)).toBe(
+      `- [True:green][x Draw:${CUSTOM_AMBER}][False:red] Ship it`,
+    );
+  });
+
+  test("labeled results fail closed when selection or color syntax is ambiguous", () => {
+    expect(parseResultLine("- [x True][x False] Pick one")).toBeNull();
+    expect(parseResultLine("- [True:#12][False:red] Pick one")).toBeNull();
+    expect(parseResultLine("- [True:purple][False:red] Pick one")).toBeNull();
+    expect(parseResultLine("- [Only one] not a result")).toBeNull();
   });
 
   test("a malformed or unrelated line is never rewritten", () => {

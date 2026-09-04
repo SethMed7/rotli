@@ -22,6 +22,7 @@ describe("stripMarkdown (beautified copy)", () => {
     expect(stripMarkdown("> quote")).toBe("quote");
     expect(stripMarkdown("- [ ] todo")).toBe("todo");
     expect(stripMarkdown("- [ ][x] failed\n2. [x][ ] passed")).toBe("failed\npassed");
+    expect(stripMarkdown("- [True:green][x False:red] decision")).toBe("True / False decision");
     expect(stripMarkdown("- ( ) Red\n2. (x) Blue")).toBe("Red\nBlue");
   });
   test("a multi-line list copies clean", () => {

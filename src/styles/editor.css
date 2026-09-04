@@ -918,6 +918,13 @@
   gap: 0.2em;
   vertical-align: -0.15em;
 }
+.rotli-result.is-labeled {
+  width: auto;
+  max-width: 100%;
+  gap: 0.3em;
+  margin-right: 0.55em;
+  vertical-align: -0.18em;
+}
 .rotli-result-choice {
   width: 1.1em;
   height: 1.1em;
@@ -939,6 +946,27 @@
 }
 .rotli-result-choice:active {
   transform: scale(0.94);
+}
+.rotli-result-choice.is-labeled {
+  width: auto;
+  min-width: 2.2em;
+  height: 1.65em;
+  padding: 0 0.55em;
+  border-color: color-mix(in srgb, var(--result-color) 55%, var(--border));
+  border-radius: var(--r-control);
+  color: color-mix(in srgb, var(--result-color) 75%, var(--text));
+  font-size: 0.78em;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.rotli-result-choice.is-labeled:hover {
+  border-color: var(--result-color);
+  color: color-mix(in srgb, var(--result-color) 85%, var(--text));
+}
+.rotli-result-choice.is-labeled.is-selected {
+  border-color: var(--result-color);
+  background: var(--result-color);
+  color: var(--result-selected-ink);
 }
 .rotli-result-choice--no.is-selected {
   border-color: var(--failure);

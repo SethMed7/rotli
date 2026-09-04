@@ -190,6 +190,13 @@ describe("the [][]+Space result shorthand", () => {
     expect(text(task)).toBe("- [ ] ");
   });
 
+  test("adds portable list structure to labeled result controls", () => {
+    const result = viewOf("[True][False]", 13);
+    expect(press(result, "Space")).toBe(true);
+    expect(text(result)).toBe("- [True][False] ");
+    expect(head(result)).toBe(16);
+  });
+
   test("normalizes indent and upgrades an existing bullet", () => {
     const tabbed = viewOf("\t[][]", 5);
     expect(press(tabbed, "Space")).toBe(true);

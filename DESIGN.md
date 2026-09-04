@@ -449,6 +449,15 @@ polish work.
   portable suffix and returns the caret to the row. The source remains
   `- [x][ ]` for pass and `- [ ][x]` for fail. Unanswered rows stay neutral,
   and an ambiguous hand-edited pair fails closed as ordinary Markdown.
+- Labeled adjacent boxes such as `[True][False]` use the same exclusive result
+  model but render as restrained text buttons. A leading `x ` records the
+  selected label in portable source. Uncolored labels use the active theme
+  accent; the semantic suffixes `accent`, `green`, `yellow`, `red`, and
+  `neutral`, plus strict `#RGB`/`#RRGGBB` values, may override a button. Runtime
+  hex is validated user data, never a new design token. Every option exposes
+  pressed state, retains keyboard focus after selection, and remains legible
+  without relying on color. Compact `[][]` intentionally keeps its established
+  green pass/red failure meaning.
 - `()` followed by Space creates a radio-style `- ( )` option. Adjacent options
   at the same indent are one group; selection writes `(x)` to one source row
   and clears its siblings atomically. Blank/prose rows and indentation changes

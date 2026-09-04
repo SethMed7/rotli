@@ -8,13 +8,7 @@ import type { MouseEvent, ReactNode } from "react";
 
 import { openUrl } from "../lib/tauri";
 import { CHOICE_RE, ORDERED_CHOICE_RE } from "./choiceState";
-import {
-  ORDERED_RESULT_RE,
-  RESULT_RE,
-  type ResultState,
-  resultStateOf,
-  resultTextParts,
-} from "./resultState";
+import { type ResultOption, type ResultState, parseResultLine, resultTextParts } from "./resultState";
 import { ORDERED_TASK_RE, TASK_RE, type TaskState, taskStateOf } from "./taskState";
 
 export type HeadingKind = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
@@ -42,6 +36,10 @@ export interface Block {
   state?: TaskState;
   /** A two-choice result row's selected side. Undefined for every other kind. */
   resultState?: ResultState;
+  /** Source-backed labeled result options. Compact `[][]` also supplies these. */
+  resultOptions?: ResultOption[];
+  resultCompact?: boolean;
+  resultSelectedIndex?: number;
   /** Whether this option is selected within its adjacent single-choice group. */
   choiceSelected?: boolean;
   /** The `1.` glyph of a numbered item — also set on an ORDERED task
@@ -72,14 +70,25 @@ export function parseBlock(line: string): Block {
   const indentChars = /^[ \t]+/.exec(line)?.[0] ?? "";
   const indent = indentChars.replace(/\t/g, "  ").length;
   const body = indentChars ? line.slice(indentChars.length) : line;
-  const result = RESULT_RE.exec(body);
-  const resultState = result ? resultStateOf(result[1] ?? " ", result[2] ?? " ") : null;
-  if (result && resultState !== null)
+  const result = parseResultLine(line);
+  if (result)
     return {
       kind: "result",
-      prefixLen: indentChars.length + result[0].length,
-      text: body.slice(result[0].length),
-      resultState,
+      prefixLen: result.prefixLen,
+      text: result.text,
+      ...(result.compact
+        ? {
+            resultState: result.options[0]?.selected
+              ? ("yes" as const)
+              : result.options[1]?.selected
+                ? ("no" as const)
+                : ("unanswered" as const),
+          }
+        : {}),
+      resultOptions: result.options,
+      resultCompact: result.compact,
+      resultSelectedIndex: result.options.findIndex((option) => option.selected),
+      ...(result.marker === "- " ? {} : { marker: result.marker.trim() }),
       indent,
     };
   const choice = CHOICE_RE.exec(body);
@@ -102,19 +111,6 @@ export function parseBlock(line: string): Block {
     };
   if (body.startsWith("- "))
     return { kind: "bullet", prefixLen: indentChars.length + 2, text: body.slice(2), indent };
-  const orderedResult = ORDERED_RESULT_RE.exec(body);
-  const orderedResultState = orderedResult
-    ? resultStateOf(orderedResult[2] ?? " ", orderedResult[3] ?? " ")
-    : null;
-  if (orderedResult && orderedResultState !== null)
-    return {
-      kind: "result",
-      prefixLen: indentChars.length + orderedResult[0].length,
-      text: body.slice(orderedResult[0].length),
-      resultState: orderedResultState,
-      marker: `${orderedResult[1]}.`,
-      indent,
-    };
   // GFM's ordered task ("1. [ ] x") — a task that keeps its number as marker;
   // must win over the plain numbered rule below
   const ot = ORDERED_TASK_RE.exec(body);
@@ -249,6 +245,24 @@ export function renderInline(text: string): ReactNode[] {
 
 /** Static readers mirror the editor's selected-label + optional-reason voice. */
 export function renderResultContent(block: Block): ReactNode {
+  if (!block.resultCompact && block.resultOptions) {
+    return (
+      <>
+        <span className="pv-result-options" aria-label="Result options">
+          {block.resultOptions.map((option, index) => (
+            <span
+              className={option.selected ? "pv-result-option is-selected" : "pv-result-option"}
+              key={index}
+            >
+              {option.selected ? "✓ " : ""}
+              {option.label}
+            </span>
+          ))}
+        </span>{" "}
+        {renderInline(block.text)}
+      </>
+    );
+  }
   const state = block.resultState ?? "unanswered";
   if (state === "unanswered") return renderInline(block.text);
   const parts = resultTextParts(block.text);

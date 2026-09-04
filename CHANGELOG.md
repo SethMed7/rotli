@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Adjacent labeled boxes now render as source-backed exclusive result buttons:
+  `[True][False]`, or colored forms such as
+  `[True:green][Draw:#E3B341][False:red]`. Labels default to the active accent;
+  semantic names and strict three- or six-digit hex colors are supported.
+  Selection writes a portable leading `x ` to the chosen box, keyboard focus
+  survives the rerender, and invalid or ambiguous source fails closed.
+
 ### Fixed
 
 - Typing a bare in-progress or completed task marker (`[/]` or `[x]`) and then

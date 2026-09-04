@@ -5,7 +5,7 @@
 // word. Raw mode copies the source verbatim instead.
 
 import { CHOICE_MARK } from "./choiceState";
-import { RESULT_MARK } from "./resultState";
+import { parseResultLine, RESULT_MARK } from "./resultState";
 import { MARK } from "./taskState";
 
 export function stripMarkdown(text: string): string {
@@ -26,8 +26,14 @@ export function stripMarkdown(text: string): string {
   };
   return text
     .split("\n")
-    .map((line) =>
-      inline(
+    .map((line) => {
+      const result = parseResultLine(line);
+      if (result && !result.compact) {
+        return inline(
+          `${result.indent}${result.options.map((option) => option.label).join(" / ")} ${result.text}`,
+        );
+      }
+      return inline(
         line
           .replace(/^(\s*)#{1,3}\s+/, "$1")
           .replace(new RegExp(`^(\\s*)(?:-|\\d+\\.) \\[${RESULT_MARK}\\]\\[${RESULT_MARK}\\]\\s+`), "$1")
@@ -36,7 +42,7 @@ export function stripMarkdown(text: string): string {
           .replace(/^(\s*)[-*+]\s+/, "$1")
           .replace(/^(\s*)\d+\.\s+/, "$1")
           .replace(/^(\s*)>\s+/, "$1"),
-      ),
-    )
+      );
+    })
     .join("\n");
 }

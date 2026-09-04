@@ -37,7 +37,11 @@ export function MarkdownPeek({ body, className = "pv-note" }: { body: string; cl
         <div key={key} className="pv-li" style={{ paddingLeft: `${(b.indent ?? 0) + 1.2}em` }}>
           <span className="pv-marker">
             {b.kind === "result"
-              ? resultGlyph(b.resultState ?? "unanswered")
+              ? b.resultCompact === false
+                ? b.resultSelectedIndex !== undefined && b.resultSelectedIndex >= 0
+                  ? "◆"
+                  : "◇"
+                : resultGlyph(b.resultState ?? "unanswered")
               : b.kind === "choice"
                 ? choiceGlyph(b.choiceSelected ?? false)
                 : (b.marker ?? "•")}
