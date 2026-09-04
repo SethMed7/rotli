@@ -5,6 +5,12 @@ import { resultOptionOf, type ResultOption } from "./resultState";
 
 export type ChoiceControlKind = "radio" | "multi";
 
+const CONTROL_LITERAL = /^(?:\[(?:[ /xX]|#{1,2}x?)?\]|\[[^\r\n]*(?:\]\[|\|)[^\r\n]*\])$/;
+
+export function isControlLiteral(value: string): boolean {
+  return CONTROL_LITERAL.test(value);
+}
+
 export interface ChoiceControlLine {
   kind: ChoiceControlKind;
   indent: number;
@@ -97,8 +103,8 @@ export function parseToggleLine(line: string): ToggleLine | null {
       { label: "Off", selected: right || !left, color: "red", source: "" },
     ];
   } else {
-    const left = resultOptionOf(leftBody);
-    const right = resultOptionOf(rightBody);
+    const left = resultOptionOf(leftBody, "On");
+    const right = resultOptionOf(rightBody, "Off");
     if (!left || !right || (left.selected && right.selected)) return null;
     options = [left, { ...right, selected: right.selected || !left.selected }];
   }

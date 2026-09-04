@@ -119,6 +119,27 @@ describe("numbered lists renumber on Enter (#9)", () => {
     expect(press(v, "Enter")).toBe(true);
     expect(text(v)).toBe("1. [x] done step\n2. [ ] \n3. [ ] next step");
   });
+
+  test("an in-progress task always continues as a fresh unchecked task", () => {
+    const plainDoc = "- [/] drafting";
+    const plain = viewOf(plainDoc, plainDoc.length);
+    expect(press(plain, "Enter")).toBe(true);
+    expect(text(plain)).toBe("- [/] drafting\n- [ ] ");
+
+    const orderedDoc = "4. [/] drafting";
+    const ordered = viewOf(orderedDoc, orderedDoc.length);
+    expect(press(ordered, "Enter")).toBe(true);
+    expect(text(ordered)).toBe("4. [/] drafting\n5. [ ] ");
+  });
+});
+
+describe("raw task-state editing", () => {
+  test("ArrowLeft at task text selects the state mark for direct replacement", () => {
+    const doc = "- [ ] Drafting";
+    const view = viewOf(doc, 6);
+    expect(press(view, "ArrowLeft")).toBe(true);
+    expect(view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to)).toBe(" ");
+  });
 });
 
 describe("the empty-item exit ramp needs the caret past the marker (#11)", () => {

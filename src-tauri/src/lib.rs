@@ -2433,7 +2433,7 @@ pub fn run() {
             corpus_choose_folder,
             corpus_switch_vault,
             corpus_init_memex,
-            corpus_create_practice_vault,
+            corpus_create_practice_vault, practice_playground::corpus_import_playground,
             corpus_connect_brain,
             corpus_forget_brain,
             corpus_set_active_brain,

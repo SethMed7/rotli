@@ -11,6 +11,12 @@ export interface Folder {
   parentId: string | null;
 }
 
+export interface PlaygroundImportResult {
+  imported: boolean;
+  viewName: string;
+  noteCount: number;
+}
+
 export interface NoteSummary {
   id: string; // ulid-style
   title: string;

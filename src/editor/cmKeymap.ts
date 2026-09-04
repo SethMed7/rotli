@@ -32,7 +32,7 @@ import {
   scanTables,
   tableToText,
 } from "./tables";
-import { MARK, markOf, taskStateOf } from "./taskState";
+import { MARK, markOf, TASK_LINE_RE, taskStateOf } from "./taskState";
 
 /** Fenced code is grammar-free: no list continuation, no task shorthand, no
  * list indent — `[]` or `- item` inside a ``` fence is the user's code. */
@@ -105,7 +105,7 @@ function listPrefixOf(line: string): { prefixLen: number; next: string; empty: b
   const prefix = m[2] ?? "";
   const content = m[3] ?? "";
   const num = prefix.match(new RegExp(`^(\\d+)\\. (\\[${MARK}\\] )?$`));
-  const marker = num ? `${Number(num[1]) + 1}. ${num[2] ? "[ ] " : ""}` : prefix.replace(/\[[xX]\]/, "[ ]");
+  const marker = num ? `${Number(num[1]) + 1}. ${num[2] ? "[ ] " : ""}` : prefix.replace(/\[[/xX]\]/, "[ ]");
   return {
     prefixLen: indent.length + prefix.length,
     next: indent + marker,
@@ -161,7 +161,11 @@ const tabIndent: Command = (view) => {
     for (let n = startLine.number; n <= endLine.number; n++) {
       const l = state.doc.line(n);
       const indent = leadingIndent(l.text);
-      changes.push({ from: l.from, to: l.from + indent.length, insert: `  ${indent.replace(/\t/g, "  ")}` });
+      changes.push({
+        from: l.from,
+        to: l.from + indent.length,
+        insert: `  ${indent.replace(/\t/g, "  ")}`,
+      });
     }
     view.dispatch({ changes, userEvent: "input.indent" });
     return true;
@@ -180,7 +184,11 @@ const tabIndent: Command = (view) => {
   const indent = leadingIndent(startLine.text);
   const insert = `  ${indent.replace(/\t/g, "  ")}`;
   const spec: TransactionSpec = {
-    changes: { from: startLine.from, to: startLine.from + indent.length, insert },
+    changes: {
+      from: startLine.from,
+      to: startLine.from + indent.length,
+      insert,
+    },
     userEvent: "input.indent",
   };
   // the caret rides the shift — an insertion AT the caret (column 0, or an empty
@@ -289,6 +297,24 @@ const listControlOnSpace: Command = (view) => {
     changes: { from: line.from, to: range.head, insert: prefix },
     selection: EditorSelection.cursor(line.from + prefix.length),
     userEvent: "input",
+  });
+  return true;
+};
+
+/** Arrow into an atomic task marker to edit its raw state character. The
+ * blank mark is selected, so typing `/` is the direct open → in-progress path
+ * without making every ordinary click abandon live preview. */
+const taskMarkerArrowLeft: Command = (view) => {
+  const range = view.state.selection.main;
+  if (!range.empty) return false;
+  const line = view.state.doc.lineAt(range.head);
+  const task = TASK_LINE_RE.exec(line.text);
+  if (!task || range.head !== line.from + task[0].length) return false;
+  const markFrom = line.from + task[0].length - 3;
+  view.dispatch({
+    selection: EditorSelection.range(markFrom, markFrom + 1),
+    scrollIntoView: true,
+    userEvent: "select",
   });
   return true;
 };
@@ -442,7 +468,10 @@ const tableEnter: Command = (view) => {
   // last row → exit below the table (never split a row with a newline)
   const after = t.to >= view.state.doc.length ? null : view.state.doc.lineAt(t.to + 1);
   if (after) {
-    view.dispatch({ selection: EditorSelection.cursor(after.from), scrollIntoView: true });
+    view.dispatch({
+      selection: EditorSelection.cursor(after.from),
+      scrollIntoView: true,
+    });
   } else {
     view.dispatch({
       changes: { from: t.to, insert: "\n" },
@@ -462,6 +491,7 @@ export const rotliKeymap: KeyBinding[] = [
   { key: "ArrowDown", run: tableArrow(1) },
   { key: "ArrowUp", run: imageArrow("up") },
   { key: "ArrowDown", run: imageArrow("down") },
+  { key: "ArrowLeft", run: taskMarkerArrowLeft },
   { key: "ArrowLeft", run: imageArrow("left") },
   { key: "ArrowRight", run: imageArrow("right") },
   { key: "Enter", run: enterContinueList },

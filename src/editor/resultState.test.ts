@@ -43,17 +43,37 @@ describe("two-choice result grammar", () => {
       text: "Ship it",
       compact: false,
       options: [
-        { label: "True", selected: false, color: "green", source: "True:green" },
-        { label: "Draw", selected: false, color: CUSTOM_AMBER, source: `Draw:${CUSTOM_AMBER}` },
+        {
+          label: "True",
+          selected: false,
+          color: "green",
+          source: "True:green",
+        },
+        {
+          label: "Draw",
+          selected: false,
+          color: CUSTOM_AMBER,
+          source: `Draw:${CUSTOM_AMBER}`,
+        },
         { label: "False", selected: false, color: "red", source: "False:red" },
       ],
     });
     expect(parseResultLine("  3. [x Ready][Later:neutral] Decision")?.options[0]).toEqual({
       label: "Ready",
       selected: true,
-      color: null,
+      color: "green",
       source: "Ready",
     });
+    expect(
+      parseResultLine("- [True:blue][False:yellow] Decision")?.options.map((option) => option.color),
+    ).toEqual(["blue", "yellow"]);
+  });
+
+  test("an unlabeled binary result defaults to semantic green and red", () => {
+    expect(parseResultLine("- [True][False] Decision")?.options).toMatchObject([
+      { label: "True", color: "green" },
+      { label: "False", color: "red" },
+    ]);
   });
 
   test("choosing a labeled option preserves labels and colors and clears its siblings", () => {
@@ -81,7 +101,10 @@ describe("two-choice result grammar", () => {
   });
 
   test("an em-dash suffix remains an ordinary portable reason", () => {
-    expect(resultTextParts("API boots")).toEqual({ label: "API boots", reason: null });
+    expect(resultTextParts("API boots")).toEqual({
+      label: "API boots",
+      reason: null,
+    });
     expect(resultTextParts("API boots — timed out after 30 seconds")).toEqual({
       label: "API boots",
       reason: "timed out after 30 seconds",

@@ -289,6 +289,10 @@ second user-visible product or storage location.
   `wiki/Playground/` lesson folder and links it from the root welcome note. The
   playground is ordinary Markdown, has no `.rotli/` dependency, and is safe to
   copy as one folder into another vault or remove through normal file tools.
+- Settings → Location may install those lessons into the active writable vault
+  and create a `Playground` named-view projection over their stable note ids.
+  Deleting the view removes only projection membership. A later import reuses
+  exact-title lessons in the Playground folder and never overwrites user edits.
   Expensive chat, board, and conventional-file surfaces may remain mounted in a
   small recent-tab cache so ordinary tab switching does not rebuild them on the
   WebKit main thread. The cache is bounded, inactive surfaces are inert and

@@ -20,6 +20,7 @@ import {
 
 function colorValue(color: ResultColor | null): string {
   if (color === null || color === "accent") return "var(--accent)";
+  if (color === "blue") return "var(--accent-swatch-blue)";
   if (color === "green") return "var(--success)";
   if (color === "yellow") return "var(--accent-swatch-amber)";
   if (color === "red") return "var(--failure)";
@@ -29,6 +30,7 @@ function colorValue(color: ResultColor | null): string {
 
 function selectedInk(color: ResultColor | null): string {
   if (color === null || color === "accent") return "var(--on-accent)";
+  if (color === "blue") return "var(--on-accent)";
   if (color === "green") return "var(--check-ink)";
   if (color === "yellow") return "var(--rotli-cocoa)";
   if (color === "red") return "var(--on-accent)";
@@ -80,7 +82,10 @@ export class ResultWidget extends WidgetType {
       const line = view.state.doc.lineAt(pos);
       const next = chooseResult(line.text, choice);
       if (!next || next === line.text) return;
-      view.dispatch({ changes: { from: line.from, to: line.to, insert: next }, userEvent: "input" });
+      view.dispatch({
+        changes: { from: line.from, to: line.to, insert: next },
+        userEvent: "input",
+      });
       if (!restoreFocus) return;
       const lineFrom = line.from;
       const index = typeof choice === "number" ? choice : choice === "yes" ? 0 : 1;
@@ -96,7 +101,9 @@ export class ResultWidget extends WidgetType {
       const choice: ResultChoice | number = this.compact ? (index === 0 ? "yes" : "no") : index;
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = `rotli-result-choice${this.compact ? ` rotli-result-choice--${choice}` : " is-labeled"}${option.selected ? " is-selected" : ""}`;
+      const rejected =
+        this.compact && this.options.some((candidate) => candidate.selected) && !option.selected;
+      btn.className = `rotli-result-choice${this.compact ? ` rotli-result-choice--${choice}` : " is-labeled"}${option.selected ? " is-selected" : ""}${rejected ? " is-rejected" : ""}`;
       btn.textContent = this.compact ? (index === 0 ? "✓" : "×") : option.label;
       btn.dataset.resultIndex = String(index);
       btn.style.setProperty("--result-color", colorValue(option.color));
@@ -312,7 +319,10 @@ export class ToggleWidget extends WidgetType {
       const line = view.state.doc.lineAt(pos);
       const next = setToggleOn(line.text, !this.on);
       if (!next) return;
-      view.dispatch({ changes: { from: line.from, to: line.to, insert: next }, userEvent: "input" });
+      view.dispatch({
+        changes: { from: line.from, to: line.to, insert: next },
+        userEvent: "input",
+      });
       if (!restoreFocus) return;
       const lineFrom = line.from;
       requestAnimationFrame(() => {

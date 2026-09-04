@@ -87,6 +87,9 @@ imports.
 - Typing `[]`/`[ ]`, `[/]`, or `[x]` and then Space at the start of a line
   (optionally after `- ` or indentation) expands to ordinary portable task
   source while preserving its state: `- [ ] `, `- [/] `, or `- [x] `.
+  Enter after any task always starts the next row as `[ ]`. Arrow-left from the
+  start of its text selects the raw state character for replacement; lingering
+  over an empty box also reveals an **In progress** action.
 - Typing `[][]` and then Space expands to an exclusive two-choice result row:
   `- [ ][ ] ` is unanswered, `- [x][ ] ` is yes/passed, and `- [ ][x] ` is
   no/failed. The check is the left control; the red X is the right control.
@@ -99,9 +102,10 @@ imports.
   writes `[True][x False]`. Two or more options are supported and exactly one
   may be selected.
 - A labeled result can add a color after its label: `[True:green]`,
-  `[Draw:yellow]`, `[False:red]`, `[Later:accent]`, or `[Skip:neutral]`.
+  `[Draw:yellow]`, `[False:red]`, `[Later:accent]`, `[Info:blue]`, or `[Skip:neutral]`.
   `#RGB` and `#RRGGBB` values are also accepted, for example
-  `[Draw:#E3B341]`. Labels without a color use the active theme accent.
+  `[Draw:#E3B341]`. An uncolored two-option result defaults to green then red;
+  other uncolored labeled options use the active theme accent.
   Unknown names, malformed hex values, and multiple selected boxes fail closed
   as ordinary Markdown. Color is presentation only; the label and pressed
   state keep the choice understandable without color.
@@ -122,14 +126,15 @@ imports.
   and are never silently rewritten.
 - Typing `[##]` and then Space creates an independent multi-select row. Its
   square control writes `[##x]` when selected, and any number of adjacent
-  options may remain selected.
+  options may remain selected. Adjacent rows render as one grouped option panel.
 - `[True|False]` followed by Space becomes the explicit-off switch
   `- [True|x False] `; `[|]` becomes the compact green/red switch `- [|x] `.
   Switching on writes `[x True|False]` or `[x|]`. Toggle labels accept the same
-  semantic and strict hex color suffixes as labeled results.
+  semantic and strict hex color suffixes as labeled results. Color-only sides
+  use fallback labels, so `[:blue|:green]` renders as an On/Off switch.
 - Inline code is opaque to the control grammar. `` `[#]` ``, `` `[##]` ``, and
-  `` `[|]` `` render as literal code text with their brackets intact; only the
-  backticks are hidden in beautified mode.
+  `` `[|]` `` render as plain literal text with their brackets intact and no
+  code-chip background; only the backticks are hidden in beautified mode.
 
 ## CSS and design tokens
 

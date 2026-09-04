@@ -1,12 +1,18 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  isControlLiteral,
   parseChoiceControlLine,
   parseToggleLine,
   selectChoiceControlGroup,
   setChoiceControlSelected,
   setToggleOn,
 } from "./controlState";
+
+test("control examples are identifiable without treating ordinary code as controls", () => {
+  expect(["[#]", "[##]", "[|]", "[True][False]", "[:blue|:green]"].every(isControlLiteral)).toBe(true);
+  expect(isControlLiteral("const values = [1, 2]")).toBe(false);
+});
 
 describe("hash choice controls", () => {
   test("reads exclusive circles and independent square choices", () => {
@@ -38,12 +44,28 @@ describe("hash choice controls", () => {
 
 describe("portable toggle controls", () => {
   test("reads compact and labeled toggles with off as the explicit default", () => {
-    expect(parseToggleLine("- [|] Enabled")).toMatchObject({ compact: true, on: false, text: "Enabled" });
-    expect(parseToggleLine("- [x|] Enabled")).toMatchObject({ compact: true, on: true });
+    expect(parseToggleLine("- [|] Enabled")).toMatchObject({
+      compact: true,
+      on: false,
+      text: "Enabled",
+    });
+    expect(parseToggleLine("- [x|] Enabled")).toMatchObject({
+      compact: true,
+      on: true,
+    });
     expect(parseToggleLine("- [True|False] Feature")).toMatchObject({
       compact: false,
       on: false,
       labels: ["True", "False"],
+    });
+    expect(parseToggleLine("- [:blue|:green] Feature")).toMatchObject({
+      compact: false,
+      on: false,
+      labels: ["On", "Off"],
+      options: [
+        { color: "blue", source: ":blue" },
+        { color: "green", source: ":green" },
+      ],
     });
   });
 
@@ -53,6 +75,7 @@ describe("portable toggle controls", () => {
       "- [True:green|x False:red] Feature",
     );
     expect(setToggleOn("- [|] Feature", true)).toBe("- [x|] Feature");
+    expect(setToggleOn("- [:blue|:green] Feature", true)).toBe("- [x :blue|:green] Feature");
   });
 
   test("fails closed for two active sides or malformed color", () => {

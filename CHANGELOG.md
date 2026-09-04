@@ -14,8 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Adjacent labeled boxes now render as source-backed exclusive result buttons:
   `[True][False]`, or colored forms such as
-  `[True:green][Draw:#E3B341][False:red]`. Labels default to the active accent;
-  semantic names and strict three- or six-digit hex colors are supported.
+  `[True:green][Draw:#E3B341][False:red]`. Uncolored binary labels default to
+  green/red; accent, blue, green, yellow, red, neutral, and strict three- or
+  six-digit hex colors are supported.
   Selection writes a portable leading `x ` to the chosen box, keyboard focus
   survives the rerender, and invalid or ambiguous source fails closed.
 - `[#]` now creates exclusive radio groups, `[##]` creates independent square
@@ -25,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New Practice Vaults now include a versioned `wiki/Playground/` folder with
   editable Markdown lessons for tasks, result colors, choices, toggles, raw
   source, and backtick literals. It is self-contained, copyable, and removable.
+- Settings → Location can import those lessons into an existing writable vault
+  as a deletable `Playground` named view. Re-importing reuses intact lesson
+  notes and never overwrites user edits.
 - Compact sidebar, tab, and editor-header actions now keep at least a 24px
   pointer target, and icon labels appear for keyboard focus as well as hover.
 
@@ -36,6 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   accent instead of pass/fail green, and keyboard activation retains focus so
   repeated two- or three-state cycling remains possible. The separate `[][]`
   result control keeps its green pass and red fail semantics.
+- Enter after an in-progress task now starts an unchecked task instead of
+  leaking `[/]` down the list. Arrow-left can expose the raw state mark, and a
+  one-second hover on an empty task reveals an accessible In progress action.
+  Completed single checkboxes are solid accent fills without a check glyph.
+- Compact results cross out the rejected side after a choice, `[##]` rows read
+  as a grouped multi-choice panel, toggle colors accept `[:blue|:green]`, and
+  backticked control examples render as plain source text without a code chip.
 
 ## [0.89.0] - 2026-09-03
 

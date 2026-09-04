@@ -2356,6 +2356,12 @@
   font-size: var(--fs-label);
   color: var(--text-muted);
 }
+.locdetail {
+  max-width: 440px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
 .locpath {
   font-family: ui-monospace, Menlo, monospace;
   font-size: 12px;

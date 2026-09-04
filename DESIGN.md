@@ -235,6 +235,10 @@ exception.
   custom colors, and literal backtick examples. The welcome note links into the
   folder. Because the lesson is one self-contained folder with no sidecar
   dependency, a user can copy it into another vault or delete it outright.
+- Settings → Location offers **Import playground** for an existing writable
+  vault. It creates or reuses the same ordinary lesson notes and adds them to a
+  deletable `Playground` named view. Deleting that projection never deletes the
+  notes; importing again reuses unchanged lessons rather than overwriting them.
 - Tab hover is paint-only: close controls reserve their space, and switching
   hover/active state never moves neighboring tabs. Crowded tab bars follow the
   persisted Scroll or Fit preference. ⌘T appends and activates its tab in the
@@ -446,10 +450,13 @@ polish work.
   `[]`/`[ ]` becomes `- [ ] `, `[/]` becomes `- [/] `, and `[x]` becomes
   `- [x] `. Single-task open, in-progress, and done states use the current
   theme's control vocabulary: in-progress is an accent half-fill and done is
-  an accent fill with contrasting check ink. Success green and failure red are
+  a solid accent fill without an added glyph. Success green and failure red are
   reserved for result semantics. Task controls expose native checkbox state,
   activate from pointer or keyboard, and retain keyboard focus across their
   source-backed rerender.
+  Enter always continues with an unchecked task. Arrow-left from the text edge
+  reveals and selects the raw mark, while a one-second hover on an empty box
+  exposes a keyboard-reachable **In progress** action.
 - `[][]` followed by Space creates a compact check/X result row. The check is
   left and means yes/passed; the X is right, uses the semantic failure red (not
   the theme accent), and means no/failed. Both labeled buttons are mutually
@@ -461,8 +468,8 @@ polish work.
   and an ambiguous hand-edited pair fails closed as ordinary Markdown.
 - Labeled adjacent boxes such as `[True][False]` use the same exclusive result
   model but render as restrained text buttons. A leading `x ` records the
-  selected label in portable source. Uncolored labels use the active theme
-  accent; the semantic suffixes `accent`, `green`, `yellow`, `red`, and
+  selected label in portable source. An uncolored two-option result defaults to
+  green/red; the semantic suffixes `accent`, `blue`, `green`, `yellow`, `red`, and
   `neutral`, plus strict `#RGB`/`#RRGGBB` values, may override a button. Runtime
   hex is validated user data, never a new design token. Every option exposes
   pressed state, retains keyboard focus after selection, and remains legible
@@ -476,15 +483,18 @@ polish work.
   caret owns a row keeps Rotli's existing line-indent behavior.
 - `[#]` is the current single-choice source: a circle that writes `[#x]` and
   clears adjacent same-indent `[#]` siblings. `[##]` is the independent
-  multi-choice source: a square that toggles only its own `[##x]` state.
+  multi-choice source: a square that toggles only its own `[##x]` state, with
+  adjacent rows visually joined into one option panel.
   Legacy `( )` rows remain supported without migration churn.
 - `[True|False]` and compact `[|]` render as switches whose active side is
   always explicit after first creation or activation. The thumb position,
   `role="switch"`, accessible checked state, and active label carry meaning in
   addition to color. Compact defaults are semantic green/on and red/off;
-  labeled sides accept the result-control color grammar.
+  labeled sides accept the result-control color grammar; `[:blue|:green]`
+  supplies color-only sides with accessible On/Off fallback labels.
 - Backtick-delimited inline code wins before every control grammar. Its content
-  stays literal and selectable while beautified mode hides only the backticks.
+  stays literal and selectable while beautified mode hides only the backticks;
+  control examples render as ordinary text without an inline-code chip.
 - A Markdown pane reveals one compact scroll-to-top control after meaningful
   downward scrolling. It floats at the pane's bottom-right, remains a labeled
   keyboard-focusable button, and uses reduced-motion-safe spatial feedback.

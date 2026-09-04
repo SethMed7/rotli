@@ -144,7 +144,7 @@ import {
   ShieldGlyph,
   SunGlyph,
 } from "./glyphs";
-
+import { PlaygroundImport } from "./playgroundImport";
 type SettingsPane =
   | "general"
   | "hotkeys"
@@ -1549,7 +1549,6 @@ function LocationPane() {
   const [err, setErr] = useState<string | null>(null);
   const storageGrouping = useUiStore((s) => s.storageGrouping);
   const setStorageGrouping = useUiStore((s) => s.setStorageGrouping);
-
   const rootPath = real.data?.root ?? "No vault selected";
   const instances = cfg.data?.instances ?? [];
   const activeId = cfg.data?.activeId ?? null;
@@ -1683,6 +1682,7 @@ function LocationPane() {
         </p>
       )}
 
+      <PlaygroundImport disabled={developmentReadOnly} />
       {/* —— Storage organization (the maintainer, 2026-06-30) —— */}
       <h4 className="sethead">Assets</h4>
       <div className="mprow">

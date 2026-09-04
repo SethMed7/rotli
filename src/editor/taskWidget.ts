@@ -5,7 +5,7 @@
 import { EditorView, WidgetType } from "@codemirror/view";
 
 import { useUiStore } from "../state/ui";
-import { markOf, nextTaskState, type TaskState, TASK_LINE_RE, taskStateOf } from "./taskState";
+import { markOf, nextTaskState, type TaskState, TASK_LINE_RE } from "./taskState";
 
 /** What each state says out loud. "Mark done" cannot describe all three. */
 const CHECK_LABEL: Record<TaskState, string> = {
@@ -36,27 +36,37 @@ export class CheckboxWidget extends WidgetType {
     // that, so assistive tech reads it without Rotli inventing a vocabulary.
     btn.setAttribute("aria-checked", this.state === "doing" ? "mixed" : String(this.state === "done"));
     btn.setAttribute("aria-label", CHECK_LABEL[this.state]);
+    btn.title = this.state === "open" ? "Not started — linger for In progress" : CHECK_LABEL[this.state];
 
-    const toggle = (restoreFocus: boolean) => {
+    const setState = (nextState: TaskState, restoreFocus: boolean, selector = ".rotli-check") => {
       const pos = view.posAtDOM(btn);
       const line = view.state.doc.lineAt(pos);
       const match = TASK_LINE_RE.exec(line.text);
       if (!match) return;
-      // Read the setting at activation time so every open editor responds to a
-      // change immediately, without a remount or stale extension.
-      const threeState = useUiStore.getState().taskCycle === "three";
-      const next = `${match[1]}[${markOf(nextTaskState(taskStateOf(match[2] ?? " "), threeState))}] `;
-      view.dispatch({ changes: { from: line.from, to: line.from + match[0].length, insert: next } });
+      const next = `${match[1]}[${markOf(nextState)}] `;
+      view.dispatch({
+        changes: {
+          from: line.from,
+          to: line.from + match[0].length,
+          insert: next,
+        },
+      });
 
       if (restoreFocus) {
         const lineFrom = line.from;
         requestAnimationFrame(() => {
-          const replacement = Array.from(view.dom.querySelectorAll<HTMLButtonElement>(".rotli-check")).find(
+          const replacement = Array.from(view.dom.querySelectorAll<HTMLButtonElement>(selector)).find(
             (candidate) => view.state.doc.lineAt(view.posAtDOM(candidate)).from === lineFrom,
           );
           replacement?.focus();
         });
       }
+    };
+    const toggle = (restoreFocus: boolean) => {
+      // Read the setting at activation time so every open editor responds to a
+      // change immediately, without a remount or stale extension.
+      const threeState = useUiStore.getState().taskCycle === "three";
+      setState(nextTaskState(this.state, threeState), restoreFocus);
     };
 
     btn.addEventListener("keydown", (event) => {
@@ -75,13 +85,38 @@ export class CheckboxWidget extends WidgetType {
       if (event.detail === 0) toggle(true);
     });
 
-    if (!this.marker) return btn;
+    const checkWrap = document.createElement("span");
+    checkWrap.className = "rotli-check-wrap";
+    checkWrap.append(btn);
+    if (this.state === "open") {
+      const doing = document.createElement("button");
+      doing.type = "button";
+      doing.className = "rotli-check-doing-action";
+      doing.textContent = "In progress";
+      doing.setAttribute("aria-label", "Mark task in progress");
+      doing.addEventListener("keydown", (event) => {
+        if (event.key === "Tab" || event.key === " " || event.key === "Enter") event.stopPropagation();
+      });
+      doing.addEventListener("mousedown", (event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setState("doing", false);
+      });
+      doing.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.detail === 0) setState("doing", true);
+      });
+      checkWrap.append(doing);
+    }
+    if (!this.marker) return checkWrap;
     const wrap = document.createElement("span");
     const num = document.createElement("span");
     num.className = "rotli-marker num";
     num.textContent = this.marker;
     num.setAttribute("aria-hidden", "true");
-    wrap.append(num, btn);
+    wrap.append(num, checkWrap);
     return wrap;
   }
 

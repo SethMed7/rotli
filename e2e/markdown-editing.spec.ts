@@ -213,6 +213,7 @@ test("bare task states become portable tasks and single checkboxes use the theme
   await page.keyboard.press("Space");
   await page.keyboard.type("Drafting");
   await page.keyboard.press("Enter");
+  await expect(page.getByRole("checkbox", { name: "Not started" })).toBeVisible();
   await page.keyboard.press("Enter");
   await page.keyboard.type("[x]");
   await page.keyboard.press("Space");
@@ -240,6 +241,7 @@ test("bare task states become portable tasks and single checkboxes use the theme
   });
   expect(colors.actual).toBe(colors.accent);
   expect(colors.actual).not.toBe(colors.success);
+  expect(await done.evaluate((element) => getComputedStyle(element, "::after").content)).toBe("none");
 
   await done.focus();
   await page.keyboard.press("Space");
@@ -251,9 +253,15 @@ test("bare task states become portable tasks and single checkboxes use the theme
   await expect(page.getByRole("checkbox", { name: "Done" })).toBeFocused();
 
   await page.getByRole("checkbox", { name: "Done" }).click();
-  await expect(page.getByRole("checkbox", { name: "Not started" })).toHaveAttribute("aria-checked", "false");
-  await page.getByRole("checkbox", { name: "Not started" }).click();
-  await expect(page.getByRole("checkbox", { name: "Done" })).toHaveAttribute("aria-checked", "true");
+  const open = page.getByRole("checkbox", { name: "Not started" });
+  await expect(open).toHaveAttribute("aria-checked", "false");
+  await open.hover();
+  const partial = page.getByRole("button", { name: "Mark task in progress" });
+  await expect(partial).toBeVisible();
+  await partial.click();
+  await expect(page.getByRole("checkbox", { name: "In progress" })).toHaveCount(2);
+  await page.getByRole("checkbox", { name: "In progress" }).last().click();
+  await expect(page.getByRole("checkbox", { name: "Done" })).toBeVisible();
 
   await page.getByRole("button", { name: "Aa" }).click();
   await page
@@ -292,6 +300,7 @@ test("[][] creates a keyboard-safe pass/fail result with an optional reason", as
   await no.click();
   await expect(no).toHaveAttribute("aria-pressed", "true");
   await expect(yes).toHaveAttribute("aria-pressed", "false");
+  await expect(yes).toHaveClass(/is-rejected/);
   await expect(page.locator(".rotli-result-text--no")).toContainText("API boots cleanly");
   await expect(page.locator(".rotli-result-text--no")).toHaveCSS("font-weight", "700");
   const noColors = await no.evaluate((element) => {
@@ -395,7 +404,7 @@ test("hash choices and switches stay interactive while inline code stays literal
   const editor = page.locator(".cm-content").last();
   await editor.click();
   await page.keyboard.insertText(
-    "- [#] Red\n- [#] Blue\n\n- [##] Email\n- [##] SMS\n\n- [|x] Feature flag\n- [True:green|x False:red] Sync\n\n`[#]` and `[|]` stay literal",
+    "- [#] Red\n- [#] Blue\n\n- [##] Email\n- [##] SMS\n\n- [|x] Feature flag\n- [True:green|x False:red] Sync\n- [:blue|:green] Color only\n\n`[#]` and `[|]` stay literal",
   );
   await page.locator(".ed-date").click();
 
@@ -412,7 +421,7 @@ test("hash choices and switches stay interactive while inline code stays literal
   await expect(multis.nth(0)).toHaveAttribute("aria-checked", "true");
   await expect(multis.nth(1)).toHaveAttribute("aria-checked", "true");
 
-  const compactToggle = page.getByRole("switch", { name: "On or Off" });
+  const compactToggle = page.getByRole("switch", { name: "On or Off" }).first();
   const labeledToggle = page.getByRole("switch", { name: "True or False" });
   await expect(compactToggle).toHaveAttribute("aria-checked", "false");
   await compactToggle.focus();
@@ -423,8 +432,13 @@ test("hash choices and switches stay interactive while inline code stays literal
   await expect(labeledToggle).toHaveAttribute("aria-checked", "true");
 
   await expect(page.locator(".rotli-choice")).toHaveCount(4);
-  await expect(page.locator(".rotli-toggle")).toHaveCount(2);
-  await expect(page.locator(".rotli-code", { hasText: "[#]" })).toBeVisible();
+  await expect(page.locator(".rotli-toggle")).toHaveCount(3);
+  await expect(page.locator(".rotli-choice-line--multi.is-group-first")).toHaveCount(1);
+  await expect(page.locator(".rotli-choice-line--multi.is-group-last")).toHaveCount(1);
+  const literal = page.locator(".rotli-control-literal", { hasText: "[#]" });
+  await expect(literal).toBeVisible();
+  await expect(literal).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(literal).toHaveCSS("padding-left", "0px");
   await expect(page.locator(".rotli-code", { hasText: "[|]" })).toBeVisible();
 
   await page.getByRole("button", { name: "Aa" }).click();

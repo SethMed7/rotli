@@ -8,6 +8,7 @@ import type { MouseEvent, ReactNode } from "react";
 
 import { openUrl } from "../lib/tauri";
 import { CHOICE_RE, ORDERED_CHOICE_RE } from "./choiceState";
+import { isControlLiteral } from "./controlState";
 import { type ChoiceControlKind, parseChoiceControlLine, parseToggleLine } from "./controlState";
 import { type ResultOption, type ResultState, parseResultLine, resultTextParts } from "./resultState";
 import { ORDERED_TASK_RE, TASK_RE, type TaskState, taskStateOf } from "./taskState";
@@ -204,7 +205,7 @@ const INLINE_RULES: InlineRule[] = [
   {
     re: /`([^`]+)`/,
     render: (m, key) => (
-      <code className="md-code" key={key}>
+      <code className={isControlLiteral(m[1] ?? "") ? "md-code control-literal" : "md-code"} key={key}>
         {m[1]}
       </code>
     ),
