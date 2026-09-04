@@ -61,6 +61,9 @@ interface InlineRule {
   /** Per-MATCH class/attrs override (the wikilink's resolved-vs-missing look). */
   clsFor?: (m: RegExpExecArray) => string;
   attrsFor?: (m: RegExpExecArray) => Record<string, string> | undefined;
+  /** Keep delimiters invisible even at the caret. Used for literal backticks;
+   * Raw Markdown is the explicit delimiter-editing surface. */
+  alwaysHideMarkers?: boolean;
   /** Marker + content ranges RELATIVE to the match start. */
   parts: (m: RegExpExecArray) => {
     markers: [number, number][];
@@ -87,6 +90,7 @@ const INLINE: InlineRule[] = [
     re: /`([^`]+)`/,
     cls: "rotli-code",
     clsFor: (m) => (isControlLiteral(m[1] ?? "") ? "rotli-code rotli-control-literal" : "rotli-code"),
+    alwaysHideMarkers: true,
     parts: fixed(1, 1),
   },
   {
@@ -668,7 +672,7 @@ function scanInline(
       const a = matchStart + s;
       const b = matchStart + e;
       if (b <= a) continue;
-      if (touched) {
+      if (touched && !rule.alwaysHideMarkers) {
         decos.push(Decoration.mark({ class: "rotli-syntax" }).range(a, b));
       } else {
         const d = Decoration.replace({});
@@ -945,6 +949,7 @@ function build(view: EditorView): {
           break;
         }
         case "choice": {
+          const prompt = block.choiceVariant === "prompt";
           const multi = block.choiceVariant === "multi";
           const siblingIsMulti = (number: number) => {
             if (number < 1 || number > doc.lines) return false;
@@ -955,8 +960,31 @@ function build(view: EditorView): {
               sibling.indent === block.indent
             );
           };
+          const siblingIsPrompt = (number: number) => {
+            if (number < 1 || number > doc.lines) return false;
+            const sibling = parseBlock(doc.line(number).text);
+            return (
+              sibling.kind === "choice" &&
+              sibling.choiceVariant === "prompt" &&
+              sibling.indent === block.indent
+            );
+          };
+          if (prompt) {
+            const nextIsMulti = siblingIsMulti(line.number + 1);
+            decos.push(
+              Decoration.line({
+                class: `rotli-choice-line rotli-choice-line--multi rotli-choice-prompt is-group-first${nextIsMulti ? "" : " is-group-last"}`,
+                attributes: {
+                  style: listStyle(depth, block.marker ? MARKER_EM : 0, GROUP_INSET_PX),
+                },
+              }).range(ls),
+            );
+            hidePrefix(ls, prefixEnd, null, decos, atomics);
+            scanInline(content, contentBase, sel, decos, atomics);
+            break;
+          }
           const groupClass = multi
-            ? ` rotli-choice-line--multi${siblingIsMulti(line.number - 1) ? "" : " is-group-first"}${siblingIsMulti(line.number + 1) ? "" : " is-group-last"}`
+            ? ` rotli-choice-line--multi${siblingIsMulti(line.number - 1) || siblingIsPrompt(line.number - 1) ? "" : " is-group-first"}${siblingIsMulti(line.number + 1) ? "" : " is-group-last"}`
             : "";
           decos.push(
             Decoration.line({

@@ -485,9 +485,11 @@ polish work.
 - `[#]` is the current single-choice source: a circle that writes `[#x]` and
   clears adjacent same-indent `[#]` siblings. `[##]` is the independent
   multi-choice source: a square that toggles only its own `[##x]` state, with
-  adjacent rows visually joined into a compact option panel. The panel uses
-  even gutters, aligned control/text columns, and quiet row selection so it
-  reads as one answer set without overpowering the note.
+  adjacent rows visually joined into a compact, right-aligned option panel.
+  An immediately preceding `[##?]` row is its optional question/prompt. The
+  shared panel uses even gutters, aligned control/text centers and columns,
+  denser answers beneath the prompt, and quiet row selection so it reads as
+  one answer set without overpowering the note.
   Legacy `( )` rows remain supported without migration churn.
 - `[True|False]` and compact `[|]` render as switches whose active side is
   always explicit after first creation or activation. The thumb position,
@@ -496,8 +498,9 @@ polish work.
   labeled sides accept the result-control color grammar; `[:blue|:green]`
   supplies color-only sides with accessible On/Off fallback labels.
 - Backtick-delimited inline code wins before every control grammar. Its content
-  stays literal and selectable while beautified mode hides only the backticks;
-  control examples render as ordinary text without an inline-code chip.
+  stays literal and selectable while beautified mode hides only the backticks
+  and presents the content as ordinary text without an inline-code chip.
+  Fenced code blocks remain visually distinct code surfaces.
 - A Markdown pane reveals one compact scroll-to-top control after meaningful
   downward scrolling. It floats at the pane's bottom-right, remains a labeled
   keyboard-focusable button, and uses reduced-motion-safe spatial feedback.

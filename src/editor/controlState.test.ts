@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   isControlLiteral,
   parseChoiceControlLine,
+  parseChoicePromptLine,
   parseToggleLine,
   selectChoiceControlGroup,
   setChoiceControlSelected,
@@ -10,11 +11,24 @@ import {
 } from "./controlState";
 
 test("control examples are identifiable without treating ordinary code as controls", () => {
-  expect(["[#]", "[##]", "[|]", "[True][False]", "[:blue|:green]"].every(isControlLiteral)).toBe(true);
+  expect(["[#]", "[##]", "[##?]", "[|]", "[True][False]", "[:blue|:green]"].every(isControlLiteral)).toBe(
+    true,
+  );
   expect(isControlLiteral("const values = [1, 2]")).toBe(false);
 });
 
 describe("hash choice controls", () => {
+  test("reads an optional question row without treating it as an answer", () => {
+    expect(parseChoicePromptLine("- [##?] Which channels should we use?")).toEqual({
+      indent: 0,
+      indentSource: "",
+      marker: "- ",
+      prefixLen: 8,
+      text: "Which channels should we use?",
+    });
+    expect(parseChoiceControlLine("- [##?] Which channels should we use?")).toBeNull();
+  });
+
   test("reads exclusive circles and independent square choices", () => {
     expect(parseChoiceControlLine("- [#] Alpha")).toMatchObject({
       kind: "radio",

@@ -861,6 +861,7 @@ function GeneralPane() {
         ones in its <code>2/4</code>.
       </p>
 
+      <PlaygroundImport disabled={memexConfig.data?.developmentReadOnly ?? import.meta.env.DEV} />
       <UpdatesSection />
 
       <h4 className="sethead">Demo mode</h4>
@@ -1682,7 +1683,6 @@ function LocationPane() {
         </p>
       )}
 
-      <PlaygroundImport disabled={developmentReadOnly} />
       {/* —— Storage organization (the maintainer, 2026-06-30) —— */}
       <h4 className="sethead">Assets</h4>
       <div className="mprow">

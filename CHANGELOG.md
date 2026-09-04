@@ -48,8 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as a grouped multi-choice panel, toggle colors accept `[:blue|:green]`, and
   backticked control examples render as plain source text without a code chip.
 - Purple is now a token-backed named result/toggle color, including
-  `[:blue|:purple]`. Grouped `[##]` choices now use a compact centered measure,
-  even panel gutters, calmer selected rows, and optically aligned controls.
+  `[:blue|:purple]`. Grouped `[##]` choices now use a compact right-aligned
+  measure, even panel gutters, calmer selected rows, aligned controls, and an
+  optional `[##?]` question row. Backticked examples render as ordinary text,
+  and the importable Playground is discoverable in General settings.
 
 ## [0.89.0] - 2026-09-03
 
@@ -305,7 +307,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Quick capture never surfaces the app, and captures stay captures.** ⌥C
   from another app with Rotli open underneath raised the main window over the
   app you were in; the card now follows the Quick Note law (in Rotli means
-  main was visible *and* focused, and finishing never force-raises main).
+  main was visible _and_ focused, and finishing never force-raises main).
   Secure-at-birth captures were also filed under “Secure notes” beside curated
   secure notes; a capture that still carries the capture shelf now projects to
   the Captures board like any staged capture, with its protection unchanged.

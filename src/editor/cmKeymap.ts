@@ -19,7 +19,7 @@ import { EditorSelection, type Line, type TransactionSpec } from "@codemirror/st
 import type { Command, EditorView, KeyBinding } from "@codemirror/view";
 
 import { CHOICE_LINE_RE } from "./choiceState";
-import { parseChoiceControlLine, parseToggleLine, setToggleOn } from "./controlState";
+import { parseChoiceControlLine, parseChoicePromptLine, parseToggleLine, setToggleOn } from "./controlState";
 import { lineInFence, scanFences } from "./fences";
 import { imageSourceSpan } from "./imageSelection";
 import { parseResultLine } from "./resultState";
@@ -84,6 +84,16 @@ function listPrefixOf(line: string): { prefixLen: number; next: string; empty: b
       prefixLen: choiceControl.prefixLen,
       next: `${choiceControl.indentSource}${marker}[${hashes}] `,
       empty: choiceControl.text.trim() === "",
+    };
+  }
+  const choicePrompt = parseChoicePromptLine(line);
+  if (choicePrompt) {
+    const numbered = /^(\d+)\. $/.exec(choicePrompt.marker);
+    const marker = numbered ? `${Number(numbered[1]) + 1}. ` : "- ";
+    return {
+      prefixLen: choicePrompt.prefixLen,
+      next: `${choicePrompt.indentSource}${marker}[##] `,
+      empty: choicePrompt.text.trim() === "",
     };
   }
   const choice = CHOICE_LINE_RE.exec(line);
@@ -261,7 +271,7 @@ const listControlOnSpace: Command = (view) => {
       return true;
     }
   }
-  const hashChoice = /^(\s*)(?:- )?\[(##?)\]$/.exec(before);
+  const hashChoice = /^(\s*)(?:- )?\[(##\?|##|#)\]$/.exec(before);
   if (hashChoice) {
     const prefix = `${(hashChoice[1] ?? "").replace(/\t/g, "  ")}- [${hashChoice[2]}] `;
     view.dispatch({

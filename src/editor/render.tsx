@@ -9,7 +9,12 @@ import type { MouseEvent, ReactNode } from "react";
 import { openUrl } from "../lib/tauri";
 import { CHOICE_RE, ORDERED_CHOICE_RE } from "./choiceState";
 import { isControlLiteral } from "./controlState";
-import { type ChoiceControlKind, parseChoiceControlLine, parseToggleLine } from "./controlState";
+import {
+  type ChoiceControlKind,
+  parseChoiceControlLine,
+  parseChoicePromptLine,
+  parseToggleLine,
+} from "./controlState";
 import { type ResultOption, type ResultState, parseResultLine, resultTextParts } from "./resultState";
 import { ORDERED_TASK_RE, TASK_RE, type TaskState, taskStateOf } from "./taskState";
 
@@ -46,7 +51,7 @@ export interface Block {
   /** Whether this option is selected within its adjacent single-choice group. */
   choiceSelected?: boolean;
   /** Legacy `( )`, new `[#]` radio, or `[##]` multi-select square. */
-  choiceVariant?: "legacy" | ChoiceControlKind;
+  choiceVariant?: "legacy" | ChoiceControlKind | "prompt";
   toggleOn?: boolean;
   toggleCompact?: boolean;
   toggleOptions?: ResultOption[];
@@ -111,6 +116,16 @@ export function parseBlock(line: string): Block {
       toggleOptions: toggle.options,
       toggleLabels: toggle.labels,
       ...(toggle.marker === "- " ? {} : { marker: toggle.marker.trim() }),
+      indent,
+    };
+  const choicePrompt = parseChoicePromptLine(line);
+  if (choicePrompt)
+    return {
+      kind: "choice",
+      prefixLen: choicePrompt.prefixLen,
+      text: choicePrompt.text,
+      choiceVariant: "prompt",
+      ...(choicePrompt.marker === "- " ? {} : { marker: choicePrompt.marker.trim() }),
       indent,
     };
   const choiceControl = parseChoiceControlLine(line);

@@ -311,6 +311,17 @@ describe("hash choice and toggle shorthands", () => {
     const multi = viewOf("[##]", 4);
     expect(press(multi, "Space")).toBe(true);
     expect(text(multi)).toBe("- [##] ");
+
+    const prompt = viewOf("[##?]", 5);
+    expect(press(prompt, "Space")).toBe(true);
+    expect(text(prompt)).toBe("- [##?] ");
+  });
+
+  test("Enter after a multi-choice prompt starts its first answer", () => {
+    const source = "- [##?] Pick channels";
+    const prompt = viewOf(source, source.length);
+    expect(press(prompt, "Enter")).toBe(true);
+    expect(text(prompt)).toBe(`${source}\n- [##] `);
   });
 
   test("creates explicit-off compact and labeled toggles", () => {

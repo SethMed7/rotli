@@ -65,6 +65,7 @@ The single task uses your theme accent. Green and red stay reserved for pass/fai
 
 `[##]` is choose-many. Each square is independent.
 
+- [##?] Which channels should we use?
 - [##x] Email
 - [##] SMS
 - [##x] In-app
@@ -216,6 +217,7 @@ mod tests {
         assert!(start.contains("ordinary Markdown"));
         let controls = fs::read_to_string(playground.join("02 Choices and toggles.md")).unwrap();
         assert!(controls.contains("- [#x] Medium"));
+        assert!(controls.contains("- [##?] Which channels should we use?"));
         assert!(controls.contains("- [##x] Email"));
         assert!(controls.contains("- [True:green|x False:red] Labeled switch"));
         assert!(controls.contains("- [:blue|:green] Color-only switch"));

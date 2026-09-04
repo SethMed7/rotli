@@ -45,11 +45,13 @@ export function MarkdownPeek({ body, className = "pv-note" }: { body: string; cl
                   : "◇"
                 : resultGlyph(b.resultState ?? "unanswered")
               : b.kind === "choice"
-                ? b.choiceVariant === "multi"
-                  ? b.choiceSelected
-                    ? "☑"
-                    : "☐"
-                  : choiceGlyph(b.choiceSelected ?? false)
+                ? b.choiceVariant === "prompt"
+                  ? ""
+                  : b.choiceVariant === "multi"
+                    ? b.choiceSelected
+                      ? "☑"
+                      : "☐"
+                    : choiceGlyph(b.choiceSelected ?? false)
                 : b.kind === "toggle"
                   ? b.toggleOn
                     ? "●"
@@ -59,7 +61,9 @@ export function MarkdownPeek({ body, className = "pv-note" }: { body: string; cl
           {b.kind === "result"
             ? renderResultContent(b)
             : b.kind === "choice"
-              ? renderChoiceContent(b)
+              ? b.choiceVariant === "prompt"
+                ? renderInline(b.text)
+                : renderChoiceContent(b)
               : b.kind === "toggle"
                 ? renderToggleContent(b)
                 : renderInline(b.text)}

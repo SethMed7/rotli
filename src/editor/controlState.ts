@@ -5,7 +5,7 @@ import { resultOptionOf, type ResultOption } from "./resultState";
 
 export type ChoiceControlKind = "radio" | "multi";
 
-const CONTROL_LITERAL = /^(?:\[(?:[ /xX]|#{1,2}x?)?\]|\[[^\r\n]*(?:\]\[|\|)[^\r\n]*\])$/;
+const CONTROL_LITERAL = /^(?:\[(?:[ /xX]|#{1,2}x?|##\?)?\]|\[[^\r\n]*(?:\]\[|\|)[^\r\n]*\])$/;
 
 export function isControlLiteral(value: string): boolean {
   return CONTROL_LITERAL.test(value);
@@ -21,9 +21,30 @@ export interface ChoiceControlLine {
   text: string;
 }
 
+export interface ChoicePromptLine {
+  indent: number;
+  indentSource: string;
+  marker: string;
+  prefixLen: number;
+  text: string;
+}
+
 export interface ControlEdit {
   index: number;
   line: string;
+}
+
+/** An optional heading for the immediately following `[##]` answer rows. */
+export function parseChoicePromptLine(line: string): ChoicePromptLine | null {
+  const match = /^(\s*)((?:-|\d+\.) )\[##\?\] (.*)$/.exec(line);
+  if (!match) return null;
+  return {
+    indent: (match[1] ?? "").replace(/\t/g, "  ").length,
+    indentSource: match[1] ?? "",
+    marker: match[2] ?? "- ",
+    prefixLen: match[0].length - (match[3] ?? "").length,
+    text: match[3] ?? "",
+  };
 }
 
 export function parseChoiceControlLine(line: string): ChoiceControlLine | null {

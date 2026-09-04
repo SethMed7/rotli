@@ -6,11 +6,11 @@ intent and the few measured exceptions.
 
 ## Files and folders
 
-| Tree | Files | Folders |
-|---|---|---|
-| `src/` | camelCase TypeScript/TSX stems | camelCase |
-| `scripts/`, `e2e/`, `docs/`, `breve-runtime/` | kebab-case | kebab-case |
-| `src-tauri/src/` | snake_case Rust module files | snake_case |
+| Tree                                          | Files                          | Folders    |
+| --------------------------------------------- | ------------------------------ | ---------- |
+| `src/`                                        | camelCase TypeScript/TSX stems | camelCase  |
+| `scripts/`, `e2e/`, `docs/`, `breve-runtime/` | kebab-case                     | kebab-case |
+| `src-tauri/src/`                              | snake_case Rust module files   | snake_case |
 
 Conventional host files such as `README.md` and generated declarations may be
 explicitly exempted by the owning check. New exemptions require a reason in the
@@ -112,7 +112,7 @@ imports.
   state keep the choice understandable without color.
 - The X and check controls, plus the bold failure/success text shown after a
   choice, are render layers. The adjacent boxes remain the only file truth.
-  A chosen row may append an ordinary Markdown reason after ` — `; the inline
+  A chosen row may append an ordinary Markdown reason after `—`; the inline
   `+ reason` action inserts that separator and leaves the caret ready to type.
   Result rows do not enter the Tasks projection; ordinary `[ ]`, `[/]`, and
   `[x]` tasks keep their existing behavior.
@@ -127,16 +127,19 @@ imports.
   and are never silently rewritten.
 - Typing `[##]` and then Space creates an independent multi-select row. Its
   square control writes `[##x]` when selected, and any number of adjacent
-  options may remain selected. Adjacent rows render as one compact, evenly
-  inset option panel rather than stretching across the whole writing measure.
+  options may remain selected. An optional `- [##?] Question` row immediately
+  before the answers becomes the panel prompt; typing `[##?]` and then Space
+  creates that source. Adjacent rows render as one compact, evenly inset,
+  right-aligned option panel rather than stretching across the whole writing
+  measure.
 - `[True|False]` followed by Space becomes the explicit-off switch
   `- [True|x False] `; `[|]` becomes the compact green/red switch `- [|x] `.
   Switching on writes `[x True|False]` or `[x|]`. Toggle labels accept the same
   semantic and strict hex color suffixes as labeled results. Color-only sides
   use fallback labels, so `[:blue|:green]` renders as an On/Off switch.
-- Inline code is opaque to the control grammar. `` `[#]` ``, `` `[##]` ``, and
-  `` `[|]` `` render as plain literal text with their brackets intact and no
-  code-chip background; only the backticks are hidden in beautified mode.
+- Inline code is opaque to the control grammar. Backticked content renders as
+  ordinary literal text with no code-chip background; only the backticks are
+  hidden in beautified mode. Fenced code blocks retain their code styling.
 
 ## CSS and design tokens
 

@@ -275,11 +275,11 @@
 
 /* — inline marks — */
 .md-code {
-  font-family: ui-monospace, Menlo, monospace;
-  font-size: 0.862em; /* the gate's 12.5px at base */
-  background: var(--surface-2);
-  border-radius: var(--r-inner);
-  padding: 1.5px 5px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border-radius: 0;
+  padding: 0;
 }
 .md-code.control-literal {
   padding: 0;
@@ -1073,7 +1073,9 @@
   display: inline-grid;
   place-items: center;
   cursor: pointer;
-  vertical-align: -0.15em;
+  font: inherit;
+  line-height: 1;
+  vertical-align: middle;
 }
 .rotli-choice::after {
   content: "";
@@ -1093,7 +1095,7 @@
 }
 .rotli-choice--multi {
   border-radius: var(--r-inner);
-  vertical-align: -0.1em;
+  transform: translateY(-0.08em);
 }
 .rotli-choice--multi::after {
   width: 0.58em;
@@ -1117,7 +1119,8 @@
 .rotli-cm-host .cm-line.rotli-choice-line--multi {
   box-sizing: border-box;
   width: min(100%, 30rem);
-  margin-inline: auto;
+  margin-inline-start: auto;
+  margin-inline-end: 0;
   background: var(--surface-2);
   border-inline: 1px solid var(--border);
   padding-block: 4px;
@@ -1143,6 +1146,11 @@
   background: color-mix(in srgb, var(--accent) 6%, var(--surface-2));
 }
 .rotli-cm-host .cm-line.rotli-choice-line--multi .rotli-choice-text--selected {
+  color: var(--text);
+  font-weight: 600;
+}
+.rotli-cm-host .cm-line.rotli-choice-prompt {
+  padding-block: 8px;
   color: var(--text);
   font-weight: 600;
 }
@@ -1209,11 +1217,11 @@
   text-decoration: underline;
 }
 .rotli-code {
-  font-family: ui-monospace, Menlo, monospace;
-  font-size: 0.9em;
-  background: var(--surface-2);
-  border-radius: var(--r-inner);
-  padding: 1.5px 5px;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border-radius: 0;
+  padding: 0;
 }
 .rotli-control-literal {
   padding: 0;

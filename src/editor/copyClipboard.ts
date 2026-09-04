@@ -68,6 +68,7 @@ export function clipboardText(markdown: string): string {
           return `${indent}${num}${glyph} ${stripMarkdown(block.text)}`;
         }
         case "choice":
+          if (block.choiceVariant === "prompt") return `${indent}${stripMarkdown(block.text)}`;
           return `${indent}${block.marker ? `${block.marker} ` : ""}${block.choiceVariant === "multi" ? (block.choiceSelected ? "☑" : "☐") : block.choiceSelected ? "◉" : "○"} ${stripMarkdown(block.text)}`;
         case "toggle":
           return `${indent}${block.marker ? `${block.marker} ` : ""}${block.toggleOn ? "On" : "Off"} ${stripMarkdown(block.text)}`;
@@ -185,7 +186,9 @@ export function clipboardHtml(markdown: string, images: ImageDataUrls = new Map(
         listItem(
           block.marker ? "ol" : "ul",
           indent,
-          `${block.choiceVariant === "multi" ? (block.choiceSelected ? "☑" : "☐") : block.choiceSelected ? "◉" : "○"} ${body}`,
+          block.choiceVariant === "prompt"
+            ? body
+            : `${block.choiceVariant === "multi" ? (block.choiceSelected ? "☑" : "☐") : block.choiceSelected ? "◉" : "○"} ${body}`,
         );
         break;
       case "toggle":

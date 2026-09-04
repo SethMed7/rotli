@@ -404,7 +404,7 @@ test("hash choices and switches stay interactive while inline code stays literal
   const editor = page.locator(".cm-content").last();
   await editor.click();
   await page.keyboard.insertText(
-    "- [#] Red\n- [#] Blue\n\n- [##] Email\n- [##] SMS\n\n- [|x] Feature flag\n- [True:green|x False:red] Sync\n- [:blue|:purple] Color only\n\n`[#]` and `[|]` stay literal",
+    "- [#] Red\n- [#] Blue\n\n- [##?] Which channels should we use?\n- [##] Email\n- [##] SMS\n\n- [|x] Feature flag\n- [True:green|x False:red] Sync\n- [:blue|:purple] Color only\n\n`[#]` and `[|]` stay literal\n\n`[#] raw data` and `plain example` stay visually plain too",
   );
   await page.locator(".ed-date").click();
 
@@ -435,22 +435,35 @@ test("hash choices and switches stay interactive while inline code stays literal
   await expect(page.locator(".rotli-toggle")).toHaveCount(3);
   await expect(page.locator(".rotli-choice-line--multi.is-group-first")).toHaveCount(1);
   await expect(page.locator(".rotli-choice-line--multi.is-group-last")).toHaveCount(1);
-  const multiPanel = page.locator(".rotli-choice-line--multi").first();
+  await expect(page.locator(".rotli-choice-prompt")).toHaveText("Which channels should we use?");
+  const multiPanel = page.locator(".rotli-choice-line--multi:not(.rotli-choice-prompt)").first();
   const multiGeometry = await multiPanel.evaluate((line) => {
     const panel = line.getBoundingClientRect();
+    const editorNode = line.closest(".cm-content");
+    const editor = editorNode?.getBoundingClientRect();
     const control = line.querySelector(".rotli-choice")?.getBoundingClientRect();
     const style = getComputedStyle(line);
     return {
       width: panel.width,
+      rightGap: editor ? editor.right - panel.right : -1,
+      editorPaddingEnd: editorNode ? Number.parseFloat(getComputedStyle(editorNode).paddingInlineEnd) : -1,
       controlInset: control ? control.left - panel.left : 0,
       paddingBlockStart: style.paddingBlockStart,
       paddingInlineEnd: style.paddingInlineEnd,
     };
   });
   expect(multiGeometry.width).toBeLessThanOrEqual(481);
+  expect(Math.abs(multiGeometry.rightGap - multiGeometry.editorPaddingEnd)).toBeLessThanOrEqual(1);
   expect(multiGeometry.controlInset).toBeGreaterThanOrEqual(11);
   expect(multiGeometry.paddingBlockStart).toBe("4px");
   expect(multiGeometry.paddingInlineEnd).toBe("12px");
+  const selectedOption = page.locator(".rotli-choice-line--multi.is-selected").first();
+  const centerOffset = await selectedOption.evaluate((line) => {
+    const control = line.querySelector(".rotli-choice")!.getBoundingClientRect();
+    const text = line.querySelector(".rotli-choice-text--selected")!.getBoundingClientRect();
+    return control.top + control.height / 2 - (text.top + text.height / 2);
+  });
+  expect(Math.abs(centerOffset)).toBeLessThanOrEqual(1);
   const purpleToggle = page.locator(".rotli-toggle").last();
   const purpleColors = await purpleToggle.evaluate((toggle) => {
     const probe = document.createElement("span");
@@ -469,6 +482,16 @@ test("hash choices and switches stay interactive while inline code stays literal
   await expect(literal).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   await expect(literal).toHaveCSS("padding-left", "0px");
   await expect(page.locator(".rotli-code", { hasText: "[|]" })).toBeVisible();
+  const plainLiteral = page.locator(".rotli-code", { hasText: "plain example" });
+  await expect(plainLiteral).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(plainLiteral).toHaveCSS("padding-left", "0px");
+  expect(
+    await plainLiteral.evaluate(
+      (node) => getComputedStyle(node).fontFamily === getComputedStyle(node.parentElement!).fontFamily,
+    ),
+  ).toBe(true);
+  const plainLiteralLine = plainLiteral.locator("xpath=ancestor::*[contains(@class, 'cm-line')][1]");
+  await expect(plainLiteralLine).toHaveText("[#] raw data and plain example stay visually plain too");
 
   await page.getByRole("button", { name: "Aa" }).click();
   await page
@@ -476,6 +499,7 @@ test("hash choices and switches stay interactive while inline code stays literal
     .getByRole("button", { name: "Raw markdown" })
     .click();
   await expect(editor).toContainText("- [#x] Blue");
+  await expect(editor).toContainText("- [##?] Which channels should we use?");
   await expect(editor).toContainText("- [##x] Email");
   await expect(editor).toContainText("- [##x] SMS");
   await expect(editor).toContainText("- [x|] Feature flag");

@@ -168,6 +168,16 @@ describe("parseBlock — multiple-choice rows", () => {
 });
 
 describe("parseBlock — hash choices and toggles", () => {
+  test("an optional multi-choice question remains distinct from its answers", () => {
+    expect(parseBlock("- [##?] Which channels should we use?")).toMatchObject({
+      kind: "choice",
+      choiceVariant: "prompt",
+      text: "Which channels should we use?",
+      prefixLen: 8,
+      indent: 0,
+    });
+  });
+
   test("new one-of-many and many-of-many markers stay distinct", () => {
     const radio = parseBlock("- [#x] Blue");
     expect(radio).toMatchObject({

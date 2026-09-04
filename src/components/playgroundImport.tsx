@@ -30,25 +30,13 @@ export function PlaygroundImport({ disabled = false }: { disabled?: boolean }) {
   return (
     <>
       <h4 className="sethead">Playground</h4>
-      <div className="locrow">
-        <div className="loctext">
-          <span className="loclabel">Learn with editable examples</span>
-          <span className="locdetail">
-            Adds four Markdown lessons as a named view. Delete the view whenever you&rsquo;re done; your notes
-            stay in the vault.
-          </span>
-        </div>
-        <div className="locact">
-          <button
-            type="button"
-            className="ghostbtn"
-            disabled={busy || unavailable}
-            onClick={() => void run()}
-          >
-            {busy ? "Importing…" : "Import playground"}
-          </button>
-        </div>
-      </div>
+      <p className="lead">
+        Add four editable Markdown lessons in a named Playground view. Delete the view whenever you&rsquo;re
+        done; your notes stay in the vault.
+      </p>
+      <button type="button" className="ghostbtn" disabled={busy || unavailable} onClick={() => void run()}>
+        {busy ? "Importing…" : "Import playground"}
+      </button>
       {unavailable && (
         <p className="setnote">Finish any pending view save and make this vault writable before importing.</p>
       )}
