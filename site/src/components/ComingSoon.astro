@@ -3,8 +3,9 @@
 // with no download and no account. Shares Base tokens so it reads correctly in
 // every theme family, light and dark.
 import Base from '../layouts/Base.astro';
-import mark from '../../../src/assets/characters/_logo.svg?raw';
-import waving from '../assets/waving.svg?raw';
+import waving from '../../../src/assets/characters/waving.svg?raw';
+import SiteFooter from './SiteFooter.astro';
+import SiteHeader from './SiteHeader.astro';
 
 const promises = [
   {
@@ -30,24 +31,7 @@ const promises = [
   description="Rotli is a warm, local-first Mac workspace for notes, editable files, boards, and AI conversations. One folder you own. Coming soon."
   canonicalPath="/"
 >
-  <header class="site-header">
-    <span class="brand" aria-label="Rotli">
-      <span class="brand-mark" set:html={mark} aria-hidden="true"></span>
-      <span class="wordmark">rotli</span>
-    </span>
-    <button class="mode-toggle" id="mode-toggle" type="button" aria-label="Use dark appearance">
-      <span class="mode-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path class="moon-path" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path>
-          <g class="sun-path">
-            <circle cx="12" cy="12" r="4"></circle>
-            <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
-          </g>
-        </svg>
-      </span>
-      <span class="mode-label">Dark</span>
-    </button>
-  </header>
+  <SiteHeader github={false} />
 
   <main id="content" class="soon">
     <section class="soon-copy" aria-labelledby="soon-title">
@@ -77,102 +61,12 @@ const promises = [
     </figure>
   </main>
 
-  <footer class="site-footer">
-    <p>A local-first workspace for your Mac.</p>
-    <p>© 2026 Rotli</p>
-  </footer>
-
-  <script>
-    const root = document.documentElement;
-    const modeButton = document.querySelector<HTMLButtonElement>('#mode-toggle');
-    const modeLabel = modeButton?.querySelector<HTMLElement>('.mode-label');
-
-    const syncMode = () => {
-      const dark = root.dataset.mode === 'dark';
-      if (modeLabel) modeLabel.textContent = dark ? 'Light' : 'Dark';
-      modeButton?.setAttribute('aria-label', dark ? 'Use light appearance' : 'Use dark appearance');
-      modeButton?.setAttribute('data-mode', dark ? 'dark' : 'light');
-    };
-
-    modeButton?.addEventListener('click', () => {
-      root.dataset.mode = root.dataset.mode === 'dark' ? 'light' : 'dark';
-      try {
-        localStorage.setItem('rotli-site-mode', root.dataset.mode);
-      } catch (error) {}
-      syncMode();
-    });
-
-    syncMode();
-  </script>
+  <SiteFooter tagline="A local-first workspace for your Mac. © 2026 Rotli" />
 
   <style>
-    .site-header,
-    .soon,
-    .site-footer {
+    .soon {
       width: min(100% - 3rem, var(--page-max));
       margin-inline: auto;
-    }
-
-    .site-header {
-      min-height: 76px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 2rem;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.55rem;
-      color: var(--text);
-    }
-
-    .brand-mark {
-      width: 30px;
-      line-height: 0;
-    }
-
-    .wordmark {
-      font-family: var(--font-wordmark);
-      font-size: 1.55rem;
-      font-weight: 600;
-      letter-spacing: -0.015em;
-    }
-
-    .mode-toggle {
-      min-width: 82px;
-      min-height: 44px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.45rem;
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      background: var(--surface);
-      color: var(--text);
-      cursor: pointer;
-    }
-
-    .mode-toggle:hover {
-      background: var(--surface-2);
-      border-color: var(--border-strong);
-    }
-
-    .mode-icon,
-    .mode-icon svg {
-      width: 17px;
-      height: 17px;
-    }
-
-    .sun-path,
-    .mode-toggle[data-mode='dark'] .moon-path {
-      display: none;
-    }
-
-    .mode-toggle[data-mode='dark'] .sun-path {
-      display: block;
     }
 
     .soon {
@@ -285,22 +179,6 @@ const promises = [
       height: 100%;
     }
 
-    .site-footer {
-      min-height: 5rem;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      gap: 0.5rem 2rem;
-      align-items: center;
-      border-top: 1px solid var(--border);
-      color: var(--text-muted);
-      font-size: 0.86rem;
-    }
-
-    .site-footer p {
-      margin: 0;
-    }
-
     @media (max-width: 880px) {
       .soon {
         grid-template-columns: 1fr;
@@ -319,18 +197,8 @@ const promises = [
     }
 
     @media (max-width: 480px) {
-      .site-header,
-      .soon,
-      .site-footer {
+      .soon {
         width: min(100% - 2rem, var(--page-max));
-      }
-
-      .mode-label {
-        display: none;
-      }
-
-      .mode-toggle {
-        min-width: 44px;
       }
     }
   </style>

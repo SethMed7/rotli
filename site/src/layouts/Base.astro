@@ -445,6 +445,233 @@ const socialImageUrl = new URL(image, siteUrl).href;
         transform: translateY(0);
       }
 
+      /* Site chrome: one header, one footer, one button grammar. Markup lives in
+         src/components/SiteHeader.astro and SiteFooter.astro. */
+      .site-header,
+      .site-footer {
+        width: min(100% - 3rem, var(--page-max));
+        margin-inline: auto;
+      }
+      .site-header {
+        min-height: 76px;
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+        position: relative;
+        z-index: 20;
+        border-bottom: 1px solid var(--border);
+      }
+      .brand,
+      .footer-brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        color: var(--text);
+        text-decoration: none;
+      }
+      .brand-mark {
+        width: 30px;
+        line-height: 0;
+      }
+      .wordmark,
+      .footer-brand b {
+        font-family: var(--font-wordmark);
+        font-size: 1.55rem;
+        font-weight: 600;
+        letter-spacing: -0.015em;
+      }
+      .primary-nav {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: clamp(1.1rem, 2.5vw, 2.2rem);
+        margin-inline: auto;
+      }
+      .primary-nav a,
+      .github-link {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        text-decoration: none;
+      }
+      .primary-nav a:hover,
+      .primary-nav a[aria-current='page'],
+      .github-link:hover {
+        color: var(--text);
+      }
+      .primary-nav a[aria-current='page'] {
+        text-decoration: underline;
+        text-decoration-color: var(--accent);
+        text-underline-offset: 0.45rem;
+      }
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        margin-left: auto;
+      }
+      .primary-nav + .header-actions {
+        margin-left: 0;
+      }
+      .github-link {
+        gap: 0.45rem;
+        padding-inline: 0.35rem;
+      }
+      .github-link svg {
+        width: 18px;
+        height: 18px;
+      }
+      .mode-toggle {
+        min-width: 82px;
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--surface);
+        color: var(--text);
+        cursor: pointer;
+      }
+      .mode-toggle:hover {
+        background: var(--surface-2);
+        border-color: var(--border-strong);
+      }
+      .mode-icon,
+      .mode-icon svg {
+        width: 17px;
+        height: 17px;
+      }
+      .sun-path,
+      .mode-toggle[data-mode='dark'] .moon-path {
+        display: none;
+      }
+      .mode-toggle[data-mode='dark'] .sun-path {
+        display: block;
+      }
+      .button {
+        min-height: 50px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.72rem 1.25rem;
+        border-radius: 0.7rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: transform 120ms ease-out, background-color 140ms ease-out, border-color 140ms ease-out;
+      }
+      .button:active {
+        transform: translateY(1px);
+      }
+      .button.primary {
+        background: var(--text);
+        color: var(--ground);
+        border: 1px solid var(--text);
+      }
+      .button.primary:hover {
+        background: var(--accent-text);
+        border-color: var(--accent-text);
+        color: var(--on-accent);
+      }
+      .button.secondary {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid var(--border-strong);
+      }
+      .button.secondary:hover {
+        background: var(--surface);
+      }
+      .button.pending,
+      .button.pending:hover,
+      .button.pending:active {
+        transform: none;
+        cursor: default;
+        opacity: 0.82;
+      }
+      .site-footer {
+        min-height: 8rem;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 2rem;
+        align-items: center;
+        border-top: 1px solid var(--border);
+        color: var(--text-muted);
+        font-size: 0.86rem;
+      }
+      .footer-brand span {
+        width: 23px;
+        line-height: 0;
+      }
+      .footer-brand b {
+        font-size: 1.25rem;
+        color: var(--text);
+      }
+      .site-footer p {
+        margin: 0;
+      }
+      .site-footer nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0 1.25rem;
+      }
+      .site-footer nav a {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        text-decoration: none;
+      }
+      .site-footer nav a:hover {
+        color: var(--text);
+      }
+      @media (max-width: 1080px) {
+        .primary-nav {
+          display: none;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .site-footer {
+          grid-template-columns: 1fr;
+          gap: 0.5rem;
+          padding-block: 2rem;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .site-header,
+        .site-footer {
+          width: min(100% - 1.5rem, var(--page-max));
+        }
+        .site-header {
+          gap: 0.75rem;
+        }
+        .github-link {
+          min-width: 44px;
+          justify-content: center;
+          padding-inline: 0;
+        }
+        .github-link span,
+        .mode-label {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0, 0, 0, 0);
+          white-space: nowrap;
+          border: 0;
+        }
+        .mode-toggle {
+          min-width: 44px;
+          width: 44px;
+          padding: 0;
+        }
+      }
+
       @media (prefers-reduced-motion: reduce) {
         html {
           scroll-behavior: auto;
@@ -462,5 +689,28 @@ const socialImageUrl = new URL(image, siteUrl).href;
   <body>
     <a class="skip-link" href="#content">Skip to content</a>
     <slot />
+    <script>
+      // Appearance toggle for the shared site header (SiteHeader.astro).
+      const root = document.documentElement;
+      const modeButton = document.querySelector<HTMLButtonElement>('#mode-toggle');
+      const modeLabel = modeButton?.querySelector<HTMLElement>('.mode-label');
+
+      const syncMode = () => {
+        const dark = root.dataset.mode === 'dark';
+        if (modeLabel) modeLabel.textContent = dark ? 'Light' : 'Dark';
+        modeButton?.setAttribute('aria-label', dark ? 'Use light appearance' : 'Use dark appearance');
+        modeButton?.setAttribute('data-mode', dark ? 'dark' : 'light');
+      };
+
+      modeButton?.addEventListener('click', () => {
+        root.dataset.mode = root.dataset.mode === 'dark' ? 'light' : 'dark';
+        try {
+          localStorage.setItem('rotli-site-mode', root.dataset.mode);
+        } catch (error) {}
+        syncMode();
+      });
+
+      syncMode();
+    </script>
   </body>
 </html>

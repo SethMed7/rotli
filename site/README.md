@@ -53,7 +53,10 @@ bun run preview  # serve the built dist/ locally
 - Fonts (General Sans body, Baloo 2 wordmark) are copied into
   `public/fonts/` from `src/brand/fonts/`.
 - The compact mark and companion art are imported from the canonical assets in
-  the repository root so the site does not create a second character system.
+  the repository root (`src/assets/characters/`); the site keeps no copies.
+- `src/components/SiteHeader.astro` and `SiteFooter.astro` are the only header
+  and footer; their styles and the appearance toggle live in
+  `src/layouts/Base.astro`. Pages own only their sections.
 - The hero and theme studio use browser-demo captures from Rotli's seeded demo
   corpus, never a live vault. Refresh captures at 1280 × 800 through the app's
   browser twin, and keep each filename tied to the environment shown in it.

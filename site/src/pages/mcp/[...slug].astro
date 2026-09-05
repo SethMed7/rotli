@@ -1,17 +1,16 @@
 ---
 import Base from '../../layouts/Base.astro';
-import mark from '../../../../src/assets/characters/_logo.svg?raw';
-import { site } from '../../site';
+import SiteFooter from '../../components/SiteFooter.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import { GITHUB_URL, PRIVACY_URL, site } from '../../site';
 
 // The guide exists only when the full site does; a coming-soon build emits no /mcp/.
 export function getStaticPaths() {
   return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
 }
 
-const GITHUB_URL = 'https://github.com/SethMed7/rotli';
 const WORKSPACE_CONTRACT = `${GITHUB_URL}/blob/main/docs/architecture/agent-workspace.md`;
 const RELAY_CONTRACT = `${GITHUB_URL}/blob/main/docs/architecture/remote-agent-relay.md`;
-const PRIVACY_URL = `${GITHUB_URL}/blob/main/PRIVACY.md`;
 ---
 
 <Base
@@ -20,33 +19,14 @@ const PRIVACY_URL = `${GITHUB_URL}/blob/main/PRIVACY.md`;
   canonicalPath="/mcp/"
   noindex={!site.indexable}
 >
-  <header class="site-header">
-    <a class="brand" href="/" aria-label="Rotli home">
-      <span class="brand-mark" set:html={mark} aria-hidden="true"></span>
-      <span class="wordmark">rotli</span>
-    </a>
-    <nav class="primary-nav" aria-label="Primary navigation">
-      <a href="/">Product</a>
-      <a href="#connect" aria-current="page">MCP</a>
-      <a href="#policy">Safety</a>
-      <a href="#self-host">Self-host</a>
-    </nav>
-    <div class="header-actions">
-      <a class="github-link" href={GITHUB_URL} rel="noopener">GitHub</a>
-      <button class="mode-toggle" id="mode-toggle" type="button" aria-label="Use dark appearance">
-        <span class="mode-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path class="moon-path" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path>
-            <g class="sun-path">
-              <circle cx="12" cy="12" r="4"></circle>
-              <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
-            </g>
-          </svg>
-        </span>
-        <span class="mode-label">Dark</span>
-      </button>
-    </div>
-  </header>
+  <SiteHeader
+    nav={[
+      { href: '/', label: 'Product' },
+      { href: '#connect', label: 'MCP', current: true },
+      { href: '#policy', label: 'Safety' },
+      { href: '#self-host', label: 'Self-host' },
+    ]}
+  />
 
   <main id="content">
     <section class="hero" aria-labelledby="hero-title">
@@ -214,146 +194,20 @@ After connecting, call tools/list and report the available Rotli tools.</code></
     </section>
   </main>
 
-  <footer class="site-footer">
-    <a class="footer-brand" href="/" aria-label="Rotli home"><span set:html={mark} aria-hidden="true"></span><b>rotli</b></a>
-    <p>Your vault stays on your Mac.</p>
-    <nav aria-label="Footer navigation">
-      <a href="/">Product</a>
-      <a href={GITHUB_URL} rel="noopener">GitHub</a>
-      <a href={PRIVACY_URL} rel="noopener">Privacy</a>
-    </nav>
-  </footer>
-
-  <script>
-    const root = document.documentElement;
-    const modeButton = document.querySelector<HTMLButtonElement>('#mode-toggle');
-    const modeLabel = modeButton?.querySelector<HTMLElement>('.mode-label');
-
-    const syncMode = () => {
-      const dark = root.dataset.mode === 'dark';
-      if (modeLabel) modeLabel.textContent = dark ? 'Light' : 'Dark';
-      modeButton?.setAttribute('aria-label', dark ? 'Use light appearance' : 'Use dark appearance');
-      modeButton?.setAttribute('data-mode', dark ? 'dark' : 'light');
-    };
-
-    modeButton?.addEventListener('click', () => {
-      root.dataset.mode = root.dataset.mode === 'dark' ? 'light' : 'dark';
-      try {
-        localStorage.setItem('rotli-site-mode', root.dataset.mode);
-      } catch (error) {}
-      syncMode();
-    });
-
-    syncMode();
-  </script>
+  <SiteFooter
+    tagline="Your vault stays on your Mac. Open source under the MIT license."
+    links={[
+      { href: '/', label: 'Product' },
+      { href: GITHUB_URL, label: 'GitHub' },
+      { href: PRIVACY_URL, label: 'Privacy' },
+    ]}
+  />
 
   <style>
-    .site-header,
     main > section,
-    .status-note,
-    .site-footer {
+    .status-note {
       width: min(100% - 3rem, var(--page-max));
       margin-inline: auto;
-    }
-
-    .site-header {
-      min-height: 76px;
-      display: flex;
-      align-items: center;
-      gap: 2rem;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .brand,
-    .footer-brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.55rem;
-      color: var(--text);
-      text-decoration: none;
-    }
-
-    .brand-mark {
-      width: 30px;
-      line-height: 0;
-    }
-
-    .wordmark,
-    .footer-brand b {
-      font-family: var(--font-wordmark);
-      font-size: 1.55rem;
-      font-weight: 600;
-      letter-spacing: -0.015em;
-    }
-
-    .primary-nav {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: clamp(1.1rem, 2.5vw, 2.2rem);
-      margin-inline: auto;
-    }
-
-    .primary-nav a,
-    .github-link {
-      min-height: 44px;
-      display: inline-flex;
-      align-items: center;
-      color: var(--text-muted);
-      font-size: 0.9rem;
-      text-decoration: none;
-    }
-
-    .primary-nav a:hover,
-    .primary-nav a[aria-current='page'],
-    .github-link:hover {
-      color: var(--text);
-    }
-
-    .primary-nav a[aria-current='page'] {
-      text-decoration: underline;
-      text-decoration-color: var(--accent);
-      text-underline-offset: 0.45rem;
-    }
-
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.8rem;
-    }
-
-    .mode-toggle {
-      min-width: 82px;
-      min-height: 44px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.45rem;
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      background: var(--surface);
-      color: var(--text);
-      cursor: pointer;
-    }
-
-    .mode-toggle:hover {
-      border-color: var(--border-strong);
-      background: var(--surface-2);
-    }
-
-    .mode-icon,
-    .mode-icon svg {
-      width: 17px;
-      height: 17px;
-    }
-
-    .sun-path,
-    .mode-toggle[data-mode='dark'] .moon-path {
-      display: none;
-    }
-
-    .mode-toggle[data-mode='dark'] .sun-path {
-      display: block;
     }
 
     .hero {
@@ -725,54 +579,7 @@ After connecting, call tools/list and report the available Rotli tools.</code></
       color: var(--text);
     }
 
-    .site-footer {
-      min-height: 8rem;
-      display: grid;
-      grid-template-columns: auto 1fr auto;
-      gap: 2rem;
-      align-items: center;
-      color: var(--text-muted);
-      font-size: 0.86rem;
-    }
-
-    .footer-brand span {
-      width: 23px;
-    }
-
-    .footer-brand b {
-      color: var(--text);
-      font-size: 1.25rem;
-    }
-
-    .site-footer p {
-      margin: 0;
-    }
-
-    .site-footer nav {
-      display: flex;
-      gap: 1.25rem;
-    }
-
-    .site-footer nav a {
-      min-height: 44px;
-      display: inline-flex;
-      align-items: center;
-      text-decoration: none;
-    }
-
-    .site-footer nav a:hover {
-      color: var(--text);
-    }
-
     @media (max-width: 1080px) {
-      .primary-nav {
-        display: none;
-      }
-
-      .header-actions {
-        margin-left: auto;
-      }
-
       .hero {
         grid-template-columns: 1fr;
         min-height: 0;
@@ -824,46 +631,12 @@ After connecting, call tools/list and report the available Rotli tools.</code></
       .deployment-facts span:nth-child(-n + 2) {
         border-bottom: 1px solid var(--border);
       }
-
-      .site-footer {
-        grid-template-columns: 1fr;
-        gap: 0.5rem;
-        padding-block: 2rem;
-      }
     }
 
     @media (max-width: 560px) {
-      .site-header,
       main > section,
-      .status-note,
-      .site-footer {
+      .status-note {
         width: min(100% - 1.5rem, var(--page-max));
-      }
-
-      .site-header {
-        gap: 0.75rem;
-      }
-
-      .github-link {
-        display: none;
-      }
-
-      .mode-toggle {
-        min-width: 44px;
-        width: 44px;
-        padding: 0;
-      }
-
-      .mode-label {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        white-space: nowrap;
-        border: 0;
       }
 
       h1 {
@@ -899,11 +672,6 @@ After connecting, call tools/list and report the available Rotli tools.</code></
 
       .deployment-facts span:last-child {
         border-bottom: 0;
-      }
-
-      .site-footer nav {
-        flex-wrap: wrap;
-        gap: 0 1.1rem;
       }
     }
   </style>

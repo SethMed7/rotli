@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The marketing site shares one header and footer across the landing, MCP,
+  and coming-soon pages, shows the GitHub mark in the header, says "open
+  source under the MIT license" in the footer, and offers "View on GitHub"
+  beside the download slot. Unused site-local artwork and captures are gone;
+  the site now reads every quokka from the app's canonical assets. Dev
+  deployments add an `X-Robots-Tag: noindex` header.
+
 - The marketing site now opens in the Rotli light environment regardless of
   the operating system appearance; the header toggle still switches to dark
   and remembers the choice.
