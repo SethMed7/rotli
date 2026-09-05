@@ -1,0 +1,48 @@
+# Serves the static Astro build on Railway. This file is the one home for the
+# site's browser-security and cache headers (the former Cloudflare _headers).
+{
+	admin off
+	auto_https off
+	persist_config off
+}
+
+(security) {
+	header {
+		Content-Security-Policy "default-src 'self'; base-uri 'none'; connect-src 'none'; font-src 'self'; form-action 'none'; frame-ancestors 'none'; img-src 'self' data:; object-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self'; upgrade-insecure-requests"
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
+		Permissions-Policy "camera=(), geolocation=(), microphone=()"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		-Server
+	}
+}
+
+:{$PORT:8080} {
+	root * /srv
+	encode zstd gzip
+
+	import security
+
+	@immutable path /_astro/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+	@fonts path /fonts/*
+	header @fonts Cache-Control "public, max-age=604800, stale-while-revalidate=86400"
+
+	@captures path /rotli-app-*.png
+	header @captures Cache-Control "public, max-age=86400, stale-while-revalidate=86400"
+
+	# Astro's directory format: /mcp/ -> /mcp/index.html. Caddy redirects a bare
+	# /mcp to /mcp/ on its own. Unknown paths fall through to the 404 page.
+	handle_errors {
+		import security
+		@notfound expression {http.error.status_code} == 404
+		rewrite @notfound /404.html
+		file_server
+	}
+
+	file_server
+}

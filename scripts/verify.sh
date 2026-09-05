@@ -62,10 +62,11 @@ if wants quality; then
   bun run deps licenses-check
 
   if [ -d site ]; then
-    step "quality — site check, build, and deploy dry-run"
+    step "quality — site check and builds (full + coming-soon modes)"
     # CI=true: astro offers to install @astrojs/check interactively, and a gate
-    # must never wait on a prompt.
-    (cd site && CI=true bun run check && CI=true bun run build && bun run deploy:dry-run)
+    # must never wait on a prompt. The second build proves the production
+    # holding page (SITE_MODE=coming-soon) still emits; see site/src/site.ts.
+    (cd site && CI=true bun run check && CI=true bun run build && CI=true SITE_MODE=coming-soon bun run build)
   fi
 fi
 

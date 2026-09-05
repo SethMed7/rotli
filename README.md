@@ -167,7 +167,7 @@ The server uses stdio by default and loads tools on demand; its optional HTTP
 adapter is bearer-authenticated and loopback-only. Cloud clients such as Grok
 Bot can reach the same tools only when the user explicitly connects the running
 app to a stateless HTTPS relay for that session. Rotli never opens a public Mac
-port or silently changes global agent settings. See the public [MCP guide](https://rotli.app/mcp/)
+port or silently changes global agent settings. See the public [MCP guide](https://rotli.co/mcp/)
 and the [`agent workspace contract`](docs/architecture/agent-workspace.md).
 
 Contributing or working with an AI coding tool? Start with

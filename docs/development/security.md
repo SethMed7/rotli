@@ -233,9 +233,10 @@ dependency change:
   Transformers blocks Sharp 0.35, while the site's independent Sharp graph is
   repaired.
 - **undici** 7.28.0 (one high and four moderate request/cache parsing
-  advisories) — through the site's pinned Wrangler/Miniflare toolchain. The
-  current Miniflare alpha pins that exact version, so no compatible repair is
-  available.
+  advisories) — was reachable only through the site's pinned Wrangler/Miniflare
+  toolchain. **Retired 2026-09-05:** the site moved to a Railway Docker/Caddy
+  deployment and `wrangler` left `site/bun.lock`; only the `undici-types` type
+  stubs (via `@types/node`) remain, which carry no runtime code.
 
 **Temporary release exception SC-2026-08-31 — accepted 2026-08-31; owner:
 @SethMed7; expires 2026-09-30.** This exception covers only the exact blocked
@@ -270,10 +271,11 @@ no-caller-selected-size boundary still applies; it is not a general assurance
 about downstream consumers or a renewal of the exception. Any future
 caller-controlled size requires repair/review before release.
 
-The site-only Undici path is a build/deploy input rather than app-bundle runtime
-code, but it still executes in the release pipeline and remains supply-chain
-relevant. Breve's sole remaining finding is the Transformers Sharp range in the
-independently installed runtime graph.
+The site-only Undici path was a build/deploy input rather than app-bundle
+runtime code; it ended on 2026-09-05 when the Wrangler toolchain was removed
+with the Railway migration (see `site/README.md`). Breve's sole remaining
+finding is the Transformers Sharp range in the independently installed runtime
+graph.
 
 **esbuild** left the tree entirely with the 2026-08-01 rolldown-vite migration
 and stays out under Vite 8 (Vite keeps esbuild as an *optional* peer and Rotli

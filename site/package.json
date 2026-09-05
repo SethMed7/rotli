@@ -4,15 +4,12 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "bun@1.4.0",
-  "description": "Marketing website for rotli — a warm, local-first Mac menu-bar notes app.",
+  "description": "Marketing website for rotli — a warm, local-first Mac workspace.",
   "scripts": {
     "dev": "astro dev",
     "check": "astro check",
     "build": "astro build",
-    "preview": "astro preview",
-    "deploy": "wrangler deploy",
-    "deploy:preview": "wrangler versions upload",
-    "deploy:dry-run": "wrangler deploy --dry-run"
+    "preview": "astro preview"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.3",
@@ -21,7 +18,6 @@
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
     "clsx": "2.1.1",
-    "typescript": "6.0.3",
-    "wrangler": "4.119.0"
+    "typescript": "6.0.3"
   }
 }

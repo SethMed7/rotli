@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The marketing site now deploys on Railway (Caddy-served static build) instead
+  of Cloudflare Workers, with a build-time `SITE_MODE`: `coming-soon` is the
+  `rotli.co` holding page, `dev` is the full `dev.rotli.co` site with no
+  download and no indexing, `full` is the launch site. robots.txt and the
+  sitemap follow the same policy; `wrangler` and `_headers` are gone.
+
 ## [0.90.0] - 2026-09-05
 
 ### Added

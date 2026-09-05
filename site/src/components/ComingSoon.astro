@@ -1,0 +1,337 @@
+---
+// The holding page for rotli.co before launch: what Rotli is, in one screen,
+// with no download and no account. Shares Base tokens so it reads correctly in
+// every theme family, light and dark.
+import Base from '../layouts/Base.astro';
+import mark from '../../../src/assets/characters/_logo.svg?raw';
+import waving from '../assets/waving.svg?raw';
+
+const promises = [
+  {
+    title: 'One folder is the truth.',
+    detail:
+      'Markdown stays Markdown. Documents, sheets, images, and boards keep their ordinary formats. Delete the app and the work still makes sense.',
+  },
+  {
+    title: 'A workspace, not a viewer.',
+    detail:
+      'Write, plan, draw, and chat in one calm window. Summon it from anywhere, and keep working when the network is gone.',
+  },
+  {
+    title: 'AI with a boundary.',
+    detail:
+      'Start with an on-device model, connect the model tools you already trust, or use none. Secure notes never leave your Mac.',
+  },
+];
+---
+
+<Base
+  title="Rotli — coming soon"
+  description="Rotli is a warm, local-first Mac workspace for notes, editable files, boards, and AI conversations. One folder you own. Coming soon."
+  canonicalPath="/"
+>
+  <header class="site-header">
+    <span class="brand" aria-label="Rotli">
+      <span class="brand-mark" set:html={mark} aria-hidden="true"></span>
+      <span class="wordmark">rotli</span>
+    </span>
+    <button class="mode-toggle" id="mode-toggle" type="button" aria-label="Use dark appearance">
+      <span class="mode-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path class="moon-path" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path>
+          <g class="sun-path">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
+          </g>
+        </svg>
+      </span>
+      <span class="mode-label">Dark</span>
+    </button>
+  </header>
+
+  <main id="content" class="soon">
+    <section class="soon-copy" aria-labelledby="soon-title">
+      <p class="kicker">Coming soon for macOS</p>
+      <h1 id="soon-title">Room to think.<br />Files you keep.</h1>
+      <p class="lede">
+        Rotli is a warm, local-first workspace that turns one ordinary folder on your Mac into a
+        calm place for notes, editable files, boards, and AI conversations. No account. No cloud
+        copy you did not ask for.
+      </p>
+      <ul class="promises">
+        {promises.map((promise, index) => (
+          <li>
+            <span class="index" aria-hidden="true">0{index + 1}</span>
+            <p><b>{promise.title}</b> {promise.detail}</p>
+          </li>
+        ))}
+      </ul>
+      <p class="status">
+        <span class="status-mark" aria-hidden="true"></span>
+        Public beta on its way · Free · Apple silicon · no account required
+      </p>
+    </section>
+
+    <figure class="soon-art" aria-hidden="true">
+      <div class="art-field" set:html={waving}></div>
+    </figure>
+  </main>
+
+  <footer class="site-footer">
+    <p>A local-first workspace for your Mac.</p>
+    <p>© 2026 Rotli</p>
+  </footer>
+
+  <script>
+    const root = document.documentElement;
+    const modeButton = document.querySelector<HTMLButtonElement>('#mode-toggle');
+    const modeLabel = modeButton?.querySelector<HTMLElement>('.mode-label');
+
+    const syncMode = () => {
+      const dark = root.dataset.mode === 'dark';
+      if (modeLabel) modeLabel.textContent = dark ? 'Light' : 'Dark';
+      modeButton?.setAttribute('aria-label', dark ? 'Use light appearance' : 'Use dark appearance');
+      modeButton?.setAttribute('data-mode', dark ? 'dark' : 'light');
+    };
+
+    modeButton?.addEventListener('click', () => {
+      root.dataset.mode = root.dataset.mode === 'dark' ? 'light' : 'dark';
+      try {
+        localStorage.setItem('rotli-site-mode', root.dataset.mode);
+      } catch (error) {}
+      syncMode();
+    });
+
+    syncMode();
+  </script>
+
+  <style>
+    .site-header,
+    .soon,
+    .site-footer {
+      width: min(100% - 3rem, var(--page-max));
+      margin-inline: auto;
+    }
+
+    .site-header {
+      min-height: 76px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      color: var(--text);
+    }
+
+    .brand-mark {
+      width: 30px;
+      line-height: 0;
+    }
+
+    .wordmark {
+      font-family: var(--font-wordmark);
+      font-size: 1.55rem;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+    }
+
+    .mode-toggle {
+      min-width: 82px;
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .mode-toggle:hover {
+      background: var(--surface-2);
+      border-color: var(--border-strong);
+    }
+
+    .mode-icon,
+    .mode-icon svg {
+      width: 17px;
+      height: 17px;
+    }
+
+    .sun-path,
+    .mode-toggle[data-mode='dark'] .moon-path {
+      display: none;
+    }
+
+    .mode-toggle[data-mode='dark'] .sun-path {
+      display: block;
+    }
+
+    .soon {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(16rem, 0.85fr);
+      gap: clamp(2.5rem, 6vw, 6rem);
+      align-items: center;
+      min-height: calc(100vh - 76px - 8rem);
+      padding-block: clamp(3.5rem, 8vw, 7rem);
+    }
+
+    .soon-copy {
+      max-width: 38rem;
+    }
+
+    .kicker {
+      margin: 0 0 1.1rem;
+      color: var(--accent-text);
+      font-size: 0.88rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(3rem, 6.2vw, 5.4rem);
+      line-height: 0.98;
+      letter-spacing: -0.04em;
+      font-weight: 600;
+    }
+
+    .lede {
+      max-width: 34rem;
+      margin: 1.5rem 0 0;
+      color: var(--text-muted);
+      font-size: clamp(1.08rem, 1.6vw, 1.25rem);
+      line-height: 1.55;
+    }
+
+    .promises {
+      display: grid;
+      gap: 1rem;
+      margin: 2.25rem 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .promises li {
+      display: grid;
+      grid-template-columns: 2.25rem minmax(0, 1fr);
+      gap: 0.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .promises .index {
+      color: var(--accent-text);
+      font-size: 0.8rem;
+      font-weight: 600;
+      line-height: 1.9;
+    }
+
+    .promises p {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 0.98rem;
+    }
+
+    .promises b {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin: 2.25rem 0 0;
+      color: var(--text-muted);
+      font-size: 0.88rem;
+    }
+
+    .status-mark {
+      flex: none;
+      width: 0.6rem;
+      height: 0.6rem;
+      border-radius: 999px;
+      border: 1px solid var(--accent-text);
+      background: var(--accent);
+    }
+
+    .soon-art {
+      min-width: 0;
+      margin: 0;
+    }
+
+    .art-field {
+      aspect-ratio: 1;
+      max-width: 26rem;
+      margin-inline: auto;
+      padding: 12%;
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      background: var(--surface-2);
+      color: var(--text);
+    }
+
+    .art-field :global(svg) {
+      width: 100%;
+      height: 100%;
+    }
+
+    .site-footer {
+      min-height: 5rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 0.5rem 2rem;
+      align-items: center;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.86rem;
+    }
+
+    .site-footer p {
+      margin: 0;
+    }
+
+    @media (max-width: 880px) {
+      .soon {
+        grid-template-columns: 1fr;
+        min-height: 0;
+        padding-block: 3rem;
+      }
+
+      .soon-art {
+        order: -1;
+      }
+
+      .art-field {
+        max-width: 16rem;
+        margin-inline: 0;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .site-header,
+      .soon,
+      .site-footer {
+        width: min(100% - 2rem, var(--page-max));
+      }
+
+      .mode-label {
+        display: none;
+      }
+
+      .mode-toggle {
+        min-width: 44px;
+      }
+    }
+  </style>
+</Base>
