@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The marketing site now opens in the Rotli light environment regardless of
+  the operating system appearance; the header toggle still switches to dark
+  and remembers the choice.
+
+### Changed
+
 - The marketing site now deploys on Railway (Caddy-served static build) instead
   of Cloudflare Workers, with a build-time `SITE_MODE`: `coming-soon` is the
   `rotli.co` holding page, `dev` is the full `dev.rotli.co` site with no

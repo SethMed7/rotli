@@ -23,7 +23,7 @@ const socialImageUrl = new URL(image, siteUrl).href;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="light" />
     <title>{title}</title>
     <meta name="description" content={description} />
     <meta name="robots" content={noindex ? 'noindex, nofollow' : 'index, follow'} />
@@ -47,9 +47,9 @@ const socialImageUrl = new URL(image, siteUrl).href;
         const savedFamily = localStorage.getItem('rotli-site-family');
         const savedMode = localStorage.getItem('rotli-site-mode');
         root.dataset.family = families.includes(savedFamily) ? savedFamily : 'rotli';
-        root.dataset.mode = savedMode === 'light' || savedMode === 'dark'
-          ? savedMode
-          : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        // The site opens in the Rotli light environment; the toggle's saved
+        // choice wins, the operating system's appearance does not.
+        root.dataset.mode = savedMode === 'dark' ? 'dark' : 'light';
       } catch (error) {}
     </script>
     <style is:global>
@@ -372,6 +372,12 @@ const socialImageUrl = new URL(image, siteUrl).href;
         --quokka-field: #eceff2;
       }
 
+      :root {
+        color-scheme: light;
+      }
+      :root[data-mode='dark'] {
+        color-scheme: dark;
+      }
       * {
         box-sizing: border-box;
       }
