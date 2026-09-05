@@ -14,6 +14,14 @@ import {
 const CUSTOM_AMBER = `#${"E3B341"}`;
 
 describe("two-choice result grammar", () => {
+  test("literal X labels and escaped lowercase x labels survive every selection", () => {
+    for (const label of ["X Ray", "\\x axis"]) {
+      const row = `- [${label}][Other] Question`;
+      expect(parseResultLine(row)?.options[0]?.selected).toBe(false);
+      expect(chooseResult(chooseResult(row, 0)!, 1)).toBe(`- [${label}][x Other] Question`);
+    }
+    expect(parseResultLine("- [\\x axis][Other] Question")?.options[0]?.label).toBe("x axis");
+  });
   test("reads unanswered, no, and yes while accepting a capital X", () => {
     expect(resultStateOf(" ", " ")).toBe("unanswered");
     expect(resultStateOf("x", " ")).toBe("yes");

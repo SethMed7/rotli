@@ -390,12 +390,18 @@ test("labeled result buttons preserve source labels and apply semantic or custom
   await expect(draw).toHaveAttribute("aria-pressed", "false");
   await expect(falsity).toHaveAttribute("aria-pressed", "true");
 
+  await page.getByRole("button", { name: "Add a reason for this result" }).click();
+  await page.keyboard.type("needs review");
+  await expect(page.locator(".rotli-result-reason")).toContainText("needs review");
+
   await page.getByRole("button", { name: "Aa" }).click();
   await page
     .getByRole("dialog", { name: "Typography" })
     .getByRole("button", { name: "Raw markdown" })
     .click();
-  await expect(editor).toContainText("- [True:green][Draw:#E3B341][x False:red] Release decision");
+  await expect(editor).toContainText(
+    "- [True:green][Draw:#E3B341][x False:red] Release decision — needs review",
+  );
 });
 
 test("hash choices and switches stay interactive while inline code stays literal", async ({ page }) => {

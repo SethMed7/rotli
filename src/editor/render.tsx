@@ -179,6 +179,7 @@ export function parseBlock(line: string): Block {
       prefixLen: indentChars.length + orderedChoice[0].length,
       text: body.slice(orderedChoice[0].length),
       choiceSelected: (orderedChoice[2] ?? " ").toLowerCase() === "x",
+      choiceVariant: "legacy",
       marker: `${orderedChoice[1]}.`,
       indent,
     };
@@ -294,6 +295,7 @@ export function renderInline(text: string): ReactNode[] {
 
 /** Static readers mirror the editor's selected-label + optional-reason voice. */
 export function renderResultContent(block: Block): ReactNode {
+  const parts = resultTextParts(block.text);
   if (!block.resultCompact && block.resultOptions) {
     return (
       <>
@@ -308,13 +310,21 @@ export function renderResultContent(block: Block): ReactNode {
             </span>
           ))}
         </span>{" "}
-        {renderInline(block.text)}
+        {(block.resultSelectedIndex ?? -1) < 0 ? (
+          renderInline(block.text)
+        ) : (
+          <>
+            <span className="pv-result-text">{renderInline(parts.label)}</span>
+            {parts.reason !== null ? (
+              <span className="pv-result-reason"> — {renderInline(parts.reason)}</span>
+            ) : null}
+          </>
+        )}
       </>
     );
   }
   const state = block.resultState ?? "unanswered";
   if (state === "unanswered") return renderInline(block.text);
-  const parts = resultTextParts(block.text);
   return (
     <>
       <span className={`pv-result-text pv-result-text--${state}`}>{renderInline(parts.label)}</span>

@@ -235,7 +235,7 @@ exception.
   custom colors, and literal backtick examples. The welcome note links into the
   folder. Because the lesson is one self-contained folder with no sidecar
   dependency, a user can copy it into another vault or delete it outright.
-- Settings → Location offers **Import playground** for an existing writable
+- Settings → General offers **Import playground** for an existing writable
   vault. It creates or reuses the same ordinary lesson notes and adds them to a
   deletable `Playground` named view. Deleting that projection never deletes the
   notes; importing again reuses unchanged lessons rather than overwriting them.

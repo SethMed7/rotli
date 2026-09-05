@@ -18,6 +18,15 @@ test("control examples are identifiable without treating ordinary code as contro
 });
 
 describe("hash choice controls", () => {
+  test("capital X selections parse and clear like lowercase selections", () => {
+    for (const marker of ["#X", "##X"]) {
+      expect(isControlLiteral(`[${marker}]`)).toBe(true);
+      expect(parseChoiceControlLine(`- [${marker}] Selected`)?.selected).toBe(true);
+      expect(setChoiceControlSelected(`- [${marker}] Selected`, false)).toBe(
+        `- [${marker.slice(0, -1)}] Selected`,
+      );
+    }
+  });
   test("reads an optional question row without treating it as an answer", () => {
     expect(parseChoicePromptLine("- [##?] Which channels should we use?")).toEqual({
       indent: 0,

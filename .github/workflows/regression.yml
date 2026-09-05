@@ -55,8 +55,10 @@ jobs:
         working-directory: site
       - run: bun run build
         working-directory: site
-      - run: bun run deploy:dry-run
+      - run: bun run build
         working-directory: site
+        env:
+          SITE_MODE: coming-soon
 
   e2e:
     name: Browser E2E (Playwright)

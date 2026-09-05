@@ -891,6 +891,7 @@ function build(view: EditorView): {
           break;
         case "result": {
           const state = block.resultState ?? "unanswered";
+          const answered = (block.resultSelectedIndex ?? -1) >= 0;
           const parts = resultTextParts(content);
           decos.push(
             Decoration.line({
@@ -924,19 +925,19 @@ function build(view: EditorView): {
             decos,
             atomics,
           );
-          if (state !== "unanswered" && parts.label.length > 0) {
+          if (answered && parts.label.length > 0) {
             decos.push(
               Decoration.mark({
-                class: `rotli-result-text rotli-result-text--${state}`,
+                class: `rotli-result-text${block.resultCompact ? ` rotli-result-text--${state}` : ""}`,
               }).range(prefixEnd, prefixEnd + parts.label.length),
             );
           }
-          if (state !== "unanswered" && parts.reason !== null) {
+          if (answered && parts.reason !== null) {
             const reasonFrom = prefixEnd + parts.label.length;
             if (line.to > reasonFrom) {
               decos.push(Decoration.mark({ class: "rotli-result-reason" }).range(reasonFrom, line.to));
             }
-          } else if (state !== "unanswered" && parts.label.trim().length > 0) {
+          } else if (answered && parts.label.trim().length > 0) {
             decos.push(
               Decoration.widget({
                 widget: new ResultReasonWidget(),

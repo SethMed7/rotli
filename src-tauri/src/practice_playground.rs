@@ -105,7 +105,29 @@ fn write(path: &Path, contents: &str) -> Result<(), String> {
     crate::fsutil::atomic_write(path, contents, ".rotli-playground-")
 }
 
+fn read_views(raw: &str) -> Result<ViewsManifest, String> {
+    if raw.trim().is_empty() || raw.trim() == "{}" {
+        return Ok(ViewsManifest::default());
+    }
+    serde_json::from_str(raw).map_err(|e| format!("invalid views manifest: {e}"))
+}
+
 pub fn scaffold_practice_vault(root: &Path) -> Result<(), String> {
+    let parent = root
+        .parent()
+        .ok_or("practice vault needs a parent folder")?;
+    fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    let staging = tempfile::Builder::new()
+        .prefix(".rotli-practice-")
+        .tempdir_in(parent)
+        .map_err(|e| e.to_string())?;
+    scaffold_practice_contents(staging.path())?;
+    // Publish the complete scaffold at once. Rename refuses a populated target;
+    // failure drops only our temporary tree, leaving the chosen path retryable.
+    fs::rename(staging.path(), root).map_err(|e| e.to_string())
+}
+
+fn scaffold_practice_contents(root: &Path) -> Result<(), String> {
     scaffold_memex(root)?;
     let playground = root.join(DIR);
     if playground.exists() {
@@ -140,15 +162,15 @@ pub fn scaffold_practice_vault(root: &Path) -> Result<(), String> {
  * named-view projection. Re-importing after the view is deleted reuses intact
  * lessons by exact title and physical folder; user edits are never overwritten. */
 pub fn import_playground(store: &mut CorpusStore) -> Result<PlaygroundImport, String> {
-    let current: ViewsManifest = serde_json::from_str(&store.views_read()?).unwrap_or_default();
-    if current
+    let current = read_views(&store.views_read()?)?;
+    if let Some(view) = current
         .views
         .iter()
-        .any(|view| view.name.eq_ignore_ascii_case(VIEW_NAME))
+        .find(|view| view.name.eq_ignore_ascii_case(VIEW_NAME))
     {
         return Ok(PlaygroundImport {
             imported: false,
-            view_name: VIEW_NAME.into(),
+            view_name: view.name.clone(),
             note_count: LESSONS.len(),
         });
     }
@@ -156,7 +178,7 @@ pub fn import_playground(store: &mut CorpusStore) -> Result<PlaygroundImport, St
     let folder = if store.is_memex() { DIR } else { VIEW_NAME };
     let listed = store.list()?;
     let mut refs = Vec::with_capacity(LESSONS.len());
-    for (_, body) in LESSONS {
+    for (filename, body) in LESSONS {
         let title = crate::corpus::title_of(body);
         let existing = listed
             .notes
@@ -165,13 +187,24 @@ pub fn import_playground(store: &mut CorpusStore) -> Result<PlaygroundImport, St
             .map(|note| note.id.clone());
         let id = match existing {
             Some(id) => id,
-            None => store.create(folder, body)?.id,
+            None => {
+                // Import the same plain Markdown as the Practice Vault. Generic
+                // note creation adds Inbox shelf metadata, which means Captures.
+                store.new_file_bytes(folder, filename, body.as_bytes())?;
+                store
+                    .list()?
+                    .notes
+                    .into_iter()
+                    .find(|note| note.disk_folder_id == folder && note.title == title)
+                    .ok_or("imported playground lesson was not indexed")?
+                    .id
+            }
         };
         refs.push(ReferenceNode::Note { note: id });
     }
 
     store.views_update(|raw| {
-        let mut manifest: ViewsManifest = serde_json::from_str(raw).unwrap_or_default();
+        let mut manifest = read_views(raw)?;
         if !manifest
             .views
             .iter()
@@ -205,6 +238,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn malformed_view_data_fails_closed_but_an_uninitialized_view_is_empty() {
+        assert!(read_views("{}").unwrap().views.is_empty());
+        assert!(read_views("{broken").is_err());
+        assert!(read_views(r#"{"version":1}"#).is_err());
+    }
+
+    #[test]
     fn practice_playground_is_a_versioned_importable_markdown_folder() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("practice");
@@ -226,6 +266,11 @@ mod tests {
         let welcome = fs::read_to_string(root.join(WELCOME_PRESET_FILE)).unwrap();
         assert!(welcome.contains("[[Playground — Start Here]]"));
         assert!(scaffold_practice_vault(&root).is_err());
+        assert_eq!(
+            fs::read_to_string(playground.join("00 Start Here.md")).unwrap(),
+            start
+        );
+        assert_eq!(fs::read_dir(tmp.path()).unwrap().count(), 1);
     }
 
     #[test]
@@ -242,6 +287,13 @@ mod tests {
         assert_eq!(views.views[0].name, VIEW_NAME);
         assert_eq!(views.views[0].tree.len(), 4);
         let note_count = store.list().unwrap().notes.len();
+        assert!(store
+            .list()
+            .unwrap()
+            .notes
+            .iter()
+            .filter(|note| note.disk_folder_id == DIR)
+            .all(|note| note.folder_id == DIR));
 
         store
             .views_update(|_| {
@@ -254,5 +306,37 @@ mod tests {
         assert!(import_playground(&mut store).unwrap().imported);
         assert_eq!(store.list().unwrap().notes.len(), note_count);
         assert!(!import_playground(&mut store).unwrap().imported);
+    }
+
+    #[test]
+    fn partial_import_reuses_edited_lessons_and_existing_view_casing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("vault");
+        scaffold_memex(&root).unwrap();
+        let mut store = CorpusStore::open(root).unwrap();
+        let edited = format!("{}\nMy tutorial edits.\n", LESSONS[0].1);
+        let rel = store
+            .new_file_bytes(DIR, LESSONS[0].0, edited.as_bytes())
+            .unwrap();
+        assert!(import_playground(&mut store).unwrap().imported);
+        assert!(fs::read_to_string(store.root().join(rel))
+            .unwrap()
+            .contains("My tutorial edits."));
+        assert_eq!(
+            store
+                .list()
+                .unwrap()
+                .notes
+                .iter()
+                .filter(|note| note.disk_folder_id == DIR)
+                .count(),
+            4
+        );
+        store
+            .views_update(|raw| Ok((raw.replace("Playground", "playground"), ())))
+            .unwrap();
+        let result = import_playground(&mut store).unwrap();
+        assert!(!result.imported);
+        assert_eq!(result.view_name, "playground");
     }
 }

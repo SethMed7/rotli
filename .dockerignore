@@ -1,0 +1,10 @@
+# Docker build context for site/Dockerfile is the repository root; keep it small.
+.git
+**/node_modules
+**/dist
+dist-release
+src-tauri/target
+test-results
+playwright-report
+tmp
+_review

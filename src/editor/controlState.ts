@@ -5,7 +5,7 @@ import { resultOptionOf, type ResultOption } from "./resultState";
 
 export type ChoiceControlKind = "radio" | "multi";
 
-const CONTROL_LITERAL = /^(?:\[(?:[ /xX]|#{1,2}x?|##\?)?\]|\[[^\r\n]*(?:\]\[|\|)[^\r\n]*\])$/;
+const CONTROL_LITERAL = /^(?:\[(?:[ /xX]|#{1,2}[xX]?|##\?)?\]|\[[^\r\n]*(?:\]\[|\|)[^\r\n]*\])$/;
 
 export function isControlLiteral(value: string): boolean {
   return CONTROL_LITERAL.test(value);
@@ -48,7 +48,7 @@ export function parseChoicePromptLine(line: string): ChoicePromptLine | null {
 }
 
 export function parseChoiceControlLine(line: string): ChoiceControlLine | null {
-  const match = /^(\s*)((?:-|\d+\.) )\[(#{1,2})(x?)\] (.*)$/.exec(line);
+  const match = /^(\s*)((?:-|\d+\.) )\[(#{1,2})([xX]?)\] (.*)$/.exec(line);
   if (!match) return null;
   return {
     kind: match[3] === "#" ? "radio" : "multi",

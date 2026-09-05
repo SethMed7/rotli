@@ -198,14 +198,19 @@ The 2026-07 audit escalated five product-behavior findings. Disposition:
    step caps, secure-note exclusion, and secret scan remain independent layers.
    Paraphrased semantic leakage is a residual risk for the quarterly review.
 
-### Supply-chain advisories (tracked; reviewed 2026-08-22)
+### Supply-chain advisories (tracked; reviewed 2026-09-05)
 
 All are outside Rotli's own `src/`. The repository has three independent Bun
 lockfiles, so `bun run deps audit` scans each one instead of treating the root
 as the whole product. After compatible repair and dedupe, the current tool
-reports 11 findings in the app graph (6 high, 5 moderate), 5 in the marketing
+reports 13 findings in the app graph (8 high, 5 moderate), 5 in the marketing
 site (1 high, 4 moderate), and 1 high finding in Breve's production graph.
-These totals overlap across lockfiles and are not 17 distinct advisories.
+These totals overlap across lockfiles and are not 19 distinct advisories.
+
+The 0.90.0 release pass also repaired compatible fflate 0.4.8 → 0.4.9
+(archive extra-field bounds) and site fast-uri 3.1.5 → 3.1.6 (URI parsing).
+Package diffs were reviewed: no new runtime dependencies, entry points, or
+install hooks; the existing script-free frozen-install policy remains intact.
 
 The reviewed Bun 1.4 maintenance pass repaired every version permitted by the
 current dependency ranges. The app moved both `brace-expansion` lines,
@@ -228,9 +233,10 @@ dependency change:
   Transformers blocks Sharp 0.35, while the site's independent Sharp graph is
   repaired.
 - **undici** 7.28.0 (one high and four moderate request/cache parsing
-  advisories) — through the site's pinned Wrangler/Miniflare toolchain. The
-  current Miniflare alpha pins that exact version, so no compatible repair is
-  available.
+  advisories) — was reachable only through the site's pinned Wrangler/Miniflare
+  toolchain. **Retired 2026-09-05:** the site moved to a Railway Docker/Caddy
+  deployment and `wrangler` left `site/bun.lock`; only the `undici-types` type
+  stubs (via `@types/node`) remain, which carry no runtime code.
 
 **Temporary release exception SC-2026-08-31 — accepted 2026-08-31; owner:
 @SethMed7; expires 2026-09-30.** This exception covers only the exact blocked
@@ -252,10 +258,24 @@ every release candidate and at expiry; any newly compatible fix, upstream
 range, direct reachability, or exploit evidence ends this exception and blocks
 publication until repaired and reviewed. This exception does not auto-renew.
 
-The site-only Undici path is a build/deploy input rather than app-bundle runtime
-code, but it still executes in the release pipeline and remains supply-chain
-relevant. Breve's sole remaining finding is the Transformers Sharp range in the
-independently installed runtime graph.
+**2026-09-05 revalidation of SC-2026-08-31 (same owner and expiry):** after
+the two compatible repairs above, `audit-plan` reports zero compatible fixes
+across all three roots. The two additional app findings are the 3.x/4.x forms
+of [NanoID integer overflow](https://github.com/advisories/GHSA-xwg4-73v4-xw9w).
+It corrupts the Node RNG pool when a caller supplies an overflowing size,
+potentially making later IDs predictable. The affected shipped paths remain
+Excalidraw 0.18.1 → NanoID 3.3.3 and mermaid-to-excalidraw 2.2.2 → 4.0.2;
+inspection of their installed call sites found default-size `nanoid()` calls,
+not user-supplied sizes. Rotli has no direct NanoID calls. Thus the existing
+no-caller-selected-size boundary still applies; it is not a general assurance
+about downstream consumers or a renewal of the exception. Any future
+caller-controlled size requires repair/review before release.
+
+The site-only Undici path was a build/deploy input rather than app-bundle
+runtime code; it ended on 2026-09-05 when the Wrangler toolchain was removed
+with the Railway migration (see `site/README.md`). Breve's sole remaining
+finding is the Transformers Sharp range in the independently installed runtime
+graph.
 
 **esbuild** left the tree entirely with the 2026-08-01 rolldown-vite migration
 and stays out under Vite 8 (Vite keeps esbuild as an *optional* peer and Rotli

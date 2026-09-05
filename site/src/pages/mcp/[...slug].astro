@@ -1,6 +1,12 @@
 ---
-import Base from '../layouts/Base.astro';
-import mark from '../../../src/assets/characters/_logo.svg?raw';
+import Base from '../../layouts/Base.astro';
+import mark from '../../../../src/assets/characters/_logo.svg?raw';
+import { site } from '../../site';
+
+// The guide exists only when the full site does; a coming-soon build emits no /mcp/.
+export function getStaticPaths() {
+  return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
+}
 
 const GITHUB_URL = 'https://github.com/SethMed7/rotli';
 const WORKSPACE_CONTRACT = `${GITHUB_URL}/blob/main/docs/architecture/agent-workspace.md`;
@@ -12,6 +18,7 @@ const PRIVACY_URL = `${GITHUB_URL}/blob/main/PRIVACY.md`;
   title="MCP for Rotli — local files, local policy, optional remote access"
   description="Connect Claude, Codex, Cursor, Grok Bot, and other MCP clients to the Rotli workspace on your Mac without turning the vault into cloud storage."
   canonicalPath="/mcp/"
+  noindex={!site.indexable}
 >
   <header class="site-header">
     <a class="brand" href="/" aria-label="Rotli home">

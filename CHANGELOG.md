@@ -10,12 +10,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The marketing site now opens in the Rotli light environment regardless of
+  the operating system appearance; the header toggle still switches to dark
+  and remembers the choice.
+
+### Changed
+
+- The marketing site now deploys on Railway (Caddy-served static build) instead
+  of Cloudflare Workers, with a build-time `SITE_MODE`: `coming-soon` is the
+  `rotli.co` holding page, `dev` is the full `dev.rotli.co` site with no
+  download and no indexing, `full` is the launch site. robots.txt and the
+  sitemap follow the same policy; `wrangler` and `_headers` are gone.
+
+## [0.90.0] - 2026-09-05
+
 ### Added
 
 - Adjacent labeled boxes now render as source-backed exclusive result buttons:
   `[True][False]`, or colored forms such as
   `[True:green][Draw:#E3B341][False:red]`. Uncolored binary labels default to
-  green/red; accent, blue, green, yellow, red, neutral, and strict three- or
+  green/red; accent, blue, green, yellow, purple, red, neutral, and strict three- or
   six-digit hex colors are supported.
   Selection writes a portable leading `x ` to the chosen box, keyboard focus
   survives the rerender, and invalid or ambiguous source fails closed.
@@ -26,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New Practice Vaults now include a versioned `wiki/Playground/` folder with
   editable Markdown lessons for tasks, result colors, choices, toggles, raw
   source, and backtick literals. It is self-contained, copyable, and removable.
-- Settings → Location can import those lessons into an existing writable vault
+- Settings → General can import those lessons into an existing writable vault
   as a deletable `Playground` named view. Re-importing reuses intact lesson
   notes and never overwrites user edits.
 - Compact sidebar, tab, and editor-header actions now keep at least a 24px
@@ -34,6 +50,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Labels beginning with `X ` remain literal; a lowercase literal `x ` prefix
+  can be escaped. Hash choices accept uppercase `X`, and copied choice prompts
+  no longer retain their hidden marker.
+- Labeled results now offer the same optional reason action as compact results.
+  Playground imports stay in Library instead of Captures, preserve existing
+  view-name casing, and reuse partially imported lessons. Practice Vault setup
+  stages the complete scaffold before publishing it, so failures leave no
+  half-created vault at the selected destination.
+- Updated compatible transitive fflate and fast-uri dependencies for archive
+  bounds and URI-parsing security fixes.
 - Typing a bare in-progress or completed task marker (`[/]` or `[x]`) and then
   Space now adds the portable Markdown list prefix while preserving that state,
   just as `[]` already did. Single-task completion now uses the active theme

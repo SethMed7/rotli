@@ -101,6 +101,9 @@ imports.
   portable source—a leading `x ` inside the chosen box—so selecting False
   writes `[True][x False]`. Two or more options are supported and exactly one
   may be selected.
+  Only lowercase `x ` is reserved in labeled options; `X Ray` is literal.
+  Escape a literal lowercase prefix as `[\x axis][Other]`; Rotli displays
+  `x axis` and preserves the escape when choosing either result or toggle side.
 - A labeled result can add a color after its label: `[True:green]`,
   `[Draw:yellow]`, `[False:red]`, `[Later:accent]`, `[Info:blue]`,
   `[Maybe:purple]`, or `[Skip:neutral]`.
@@ -124,6 +127,7 @@ imports.
 - Typing `[#]` and then Space creates a portable single-choice row. Adjacent
   same-indent rows form one group; the chosen row writes `[#x]` and clears its
   siblings. The render is a circle. Legacy `( )`/`(x)` rows remain supported
+  (hash choices also accept uppercase `X` when reading source)
   and are never silently rewritten.
 - Typing `[##]` and then Space creates an independent multi-select row. Its
   square control writes `[##x]` when selected, and any number of adjacent

@@ -159,6 +159,7 @@ describe("parseBlock — multiple-choice rows", () => {
     expect(block.marker).toBe("12.");
     expect(block.indent).toBe(2);
     expect(block.text).toBe("Blue");
+    expect(block.choiceVariant).toBe("legacy");
   });
 
   test("ordinary parenthesized list text remains an ordinary list", () => {

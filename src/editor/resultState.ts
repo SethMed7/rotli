@@ -84,7 +84,7 @@ const RESULT_HEX_RE = /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i;
 
 export function resultOptionOf(body: string, fallbackLabel?: string): ResultOption | null {
   const trimmed = body.trim();
-  const selectedMatch = /^x\s+(.+)$/i.exec(trimmed);
+  const selectedMatch = /^x\s+(.+)$/.exec(trimmed);
   const source = (selectedMatch?.[1] ?? trimmed).trim();
   if (!source) return null;
 
@@ -103,7 +103,7 @@ export function resultOptionOf(body: string, fallbackLabel?: string): ResultOpti
     if (!fallbackLabel || color === null) return null;
     label = fallbackLabel;
   }
-  return { label, selected: selectedMatch !== null, color, source };
+  return { label: label.replace(/^\\(?=[xX]\s)/, ""), selected: selectedMatch !== null, color, source };
 }
 
 /** Parse the whole portable result prefix. Labeled options are adjacent boxes:

@@ -32,11 +32,21 @@ bun run preview  # serve the built dist/ locally
 
 ## Production details
 
-- The canonical production origin is `https://rotli.app` in
-  `astro.config.mjs`; the sitemap and canonical metadata derive from it.
-- The download button deliberately opens the newest published release page.
-  Do not construct a DMG URL from the app package version: a version bump can
-  merge before its signed asset is published.
+- The canonical origin comes from `SITE_URL` (default `https://rotli.co`) in
+  `src/site.ts`; the sitemap, robots.txt, and canonical metadata derive from it.
+- `SITE_MODE` decides what a build contains (one policy, `src/site.ts`):
+
+  | Mode          | Deployment                    | Pages                    | Downloads | Indexed |
+  | ------------- | ----------------------------- | ------------------------ | --------- | ------- |
+  | `coming-soon` | production · `rotli.co`       | holding page + 404       | no        | yes     |
+  | `dev`         | live dev site · `dev.rotli.co`| landing + `/mcp/` + 404  | no        | no      |
+  | `full`        | launch (default for local dev)| landing + `/mcp/` + 404  | yes       | yes     |
+
+  An unknown value fails the build. Flipping production to launch is a variable
+  change (`SITE_MODE=full`), not a code change.
+- The download button, when enabled, deliberately opens the newest published
+  release page. Do not construct a DMG URL from the app package version: a
+  version bump can merge before its signed asset is published.
 - Site tokens in `src/layouts/Base.astro` map the app's six theme families and
   twelve tuned environments into the marketing surface. Keep their semantics
   aligned with the source tokens in the repository root's `src/brand/`.
@@ -57,42 +67,48 @@ bun run preview  # serve the built dist/ locally
   image at `public/social-card.png`; keep its copy and palette aligned with the
   current hero before rendering a new PNG.
 
-## Cloudflare Workers deployment
+## Railway deployment
 
-The production site is an Astro static build served by **Workers Static
-Assets**. It has no Worker script, SSR, Cloudflare Astro adapter, Pages project,
-or container. [`wrangler.jsonc`](wrangler.jsonc) owns the asset directory,
-custom domain, preview URLs, and 404 behavior. [`public/_headers`](public/_headers)
-owns cache and browser-security headers and is copied into `dist/` by Astro.
+The site is a static Astro build served by Caddy from a pinned two-stage
+[`Dockerfile`](Dockerfile). [`Caddyfile`](Caddyfile) is the one home for the
+browser-security and cache headers. There is no SSR, adapter, or Worker.
 
-Workers Builds settings are dashboard configuration, not Wrangler runtime
-variables. Connect `SethMed7/rotli` to a Worker with these exact settings:
+The Docker build context is the **repository root**, because the pages import
+the canonical mark and companion art from `src/assets/characters/`. The
+service therefore has no root directory; it points at the Dockerfile with a
+variable. Both environments deploy the `main` branch and differ only in
+variables and domain:
 
-| Setting                       | Value                    |
-| ----------------------------- | ------------------------ |
-| Worker name                   | `rotli-site`             |
-| Production branch             | `main`                   |
-| Root directory                | `site`                   |
-| Build command                 | `bun run build`          |
-| Deploy command                | `bun run deploy`         |
-| Non-production deploy command | `bun run deploy:preview` |
-| Non-production branch builds  | Enabled                  |
-| Build variable                | `BUN_VERSION=1.4.0`      |
+| Railway project `rotli-site`, service `site` | production                   | dev                          |
+| -------------------------------------------- | ---------------------------- | ---------------------------- |
+| `RAILWAY_DOCKERFILE_PATH`                    | `site/Dockerfile`            | `site/Dockerfile`            |
+| `SITE_MODE`                                  | `coming-soon`                | `dev`                        |
+| `SITE_URL`                                   | `https://rotli.co`           | `https://dev.rotli.co`       |
+| Custom domain                                | `rotli.co`                   | `dev.rotli.co`               |
 
-The Worker name must match `wrangler.jsonc`. Production uploads go to the
-`rotli.app` Custom Domain; other branches upload versions with public preview
-URLs instead of promoting them. Put preview URLs behind Cloudflare Access if
-they should not be public.
+Railway forwards service variables to the Dockerfile as build args; the image
+listens on `$PORT`. DNS lives in Cloudflare (registrar: GoDaddy, nameservers
+delegated to Cloudflare): each hostname needs **two** records, the CNAME to the
+target Railway prints for `railway domain <host>` and the `_railway-verify.<host>`
+TXT ownership token (the CLI omits it; read it from the dashboard or the API's
+`customDomain.status.verificationToken`). Without the TXT record Railway answers
+`Application not found` even though the CNAME routes. Cloudflare's proxy may
+stay on with the SSL/TLS mode set to **Full** (not Full strict).
 
-For local validation:
+Deploy from a checkout when needed (`railway up` uploads the repository root):
+
+```sh
+railway up --ci -e production   # holding page
+railway up --ci -e dev          # live dev site
+```
+
+For local validation (`bun run verify` runs the check and both builds):
 
 ```sh
 cd site
 bun ci
 bun run check
-bun run build
-bun run deploy:dry-run
+CI=true bun run build                          # full
+CI=true SITE_MODE=coming-soon bun run build    # production holding page
+docker build -f site/Dockerfile --build-arg SITE_MODE=dev -t rotli-site:dev ..  # from site/
 ```
-
-The download CTA points to GitHub's latest published release page, so deploying
-the site after a version bump cannot advertise an unpublished DMG.
