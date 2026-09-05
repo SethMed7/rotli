@@ -88,8 +88,12 @@ variables and domain:
 
 Railway forwards service variables to the Dockerfile as build args; the image
 listens on `$PORT`. DNS lives in Cloudflare (registrar: GoDaddy, nameservers
-delegated to Cloudflare): each hostname is a CNAME to the target Railway prints
-for `railway domain <host>`, with the Cloudflare SSL/TLS mode set to **Full**.
+delegated to Cloudflare): each hostname needs **two** records, the CNAME to the
+target Railway prints for `railway domain <host>` and the `_railway-verify.<host>`
+TXT ownership token (the CLI omits it; read it from the dashboard or the API's
+`customDomain.status.verificationToken`). Without the TXT record Railway answers
+`Application not found` even though the CNAME routes. Cloudflare's proxy may
+stay on with the SSL/TLS mode set to **Full** (not Full strict).
 
 Deploy from a checkout when needed (`railway up` uploads the repository root):
 
