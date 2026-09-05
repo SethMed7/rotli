@@ -22,13 +22,17 @@ describe("stripMarkdown (beautified copy)", () => {
     expect(stripMarkdown("> quote")).toBe("quote");
     expect(stripMarkdown("- [ ] todo")).toBe("todo");
     expect(stripMarkdown("- [ ][x] failed\n2. [x][ ] passed")).toBe("failed\npassed");
+    expect(stripMarkdown("- [True:green][x False:red] decision")).toBe("True / False decision");
     expect(stripMarkdown("- ( ) Red\n2. (x) Blue")).toBe("Red\nBlue");
+    expect(stripMarkdown("- [#x] Red\n- [##] Email\n- [True|x False] Flag")).toBe("Red\nEmail\nFalse Flag");
   });
   test("a multi-line list copies clean", () => {
     expect(stripMarkdown("- **a**\n- b\n  - c")).toBe("a\nb\n  c");
   });
   test("plain text is untouched", () => {
     expect(stripMarkdown("just words")).toBe("just words");
+    expect(stripMarkdown("- [##?] Question\n- [##X] Answer")).toBe("Question\nAnswer");
+    expect(stripMarkdown("`[##?]` literal")).toBe("[##?] literal");
   });
 });
 

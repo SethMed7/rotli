@@ -28,6 +28,11 @@ export const CHECK_EM = 1.6;
 /** A single-choice radio uses the same box-plus-gap geometry as a task. */
 export const CHOICE_EM = 1.6;
 
+/** A compact answer panel needs breathing room before its hanging control.
+ * Kept in px so the panel gutter follows Rotli's 4-point spacing scale while
+ * the marker column continues to scale with editor typography. */
+export const GROUP_INSET_PX = 12;
+
 /** Two 1.1em result buttons, their small internal gap, and the gap before the
  * row text. Mirrors `.rotli-result` in styles/editor.css. */
 export const RESULT_EM = 2.9;
@@ -41,6 +46,8 @@ const em = (n: number): string => String(Number(n.toFixed(4)));
  * is the hanging marker column — MARKER_EM for bullets/numbers, CHECK_EM for
  * tasks.
  */
-export function listStyle(depth: number, markerEm: number = MARKER_EM): string {
-  return `padding-left:${em(depth * STEP_EM + markerEm)}em;text-indent:-${em(markerEm)}em`;
+export function listStyle(depth: number, markerEm: number = MARKER_EM, insetPx: number = 0): string {
+  const padding = `${em(depth * STEP_EM + markerEm)}em`;
+  const padded = insetPx > 0 ? `calc(${padding} + ${insetPx}px)` : padding;
+  return `padding-left:${padded};text-indent:-${em(markerEm)}em`;
 }

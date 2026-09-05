@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { replaceTitleLine } from "../lib/noteTitle";
 import {
+  corpusImportPlayground,
   corpusFileStat,
   corpusMoveFileToSink,
   corpusTasks,
@@ -15,7 +16,8 @@ import {
   secureRepairScan,
 } from "../lib/tauri";
 import { useUiStore } from "../state/ui";
-import type { Note, NoteSummary } from "../types";
+import { hydrateViews } from "../state/views";
+import type { Note, NoteSummary, PlaygroundImportResult } from "../types";
 import { readJournal } from "./brainJournalStore";
 import { summaryOrder } from "./derive";
 import { DEST, isChats, isChatsPath, isSink } from "./destinations";
@@ -317,6 +319,13 @@ export function applyNoteWrite(note: Note, opts?: { tasksChanged?: boolean }): P
 
 export async function invalidateFolders(): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: keys.folders });
+}
+
+/** Import tutorial notes, then refresh both their listings and named view. */
+export async function importPlayground(): Promise<PlaygroundImportResult> {
+  const result = await corpusImportPlayground();
+  await Promise.all([hydrateViews(), invalidateNoteLists(), invalidateFolders()]);
+  return result;
 }
 
 /** Notes AND folders together — a lifecycle change shifts both the lists and

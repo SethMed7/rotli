@@ -276,7 +276,30 @@
   color: var(--text-muted);
   font-weight: 400;
 }
+.pv-result-options {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.3em;
+  margin-right: 0.35em;
+}
+.pv-result-option {
+  padding: 0.08em 0.42em;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  color: var(--text-muted);
+  font-size: 0.86em;
+}
+.pv-result-option.is-selected {
+  border-color: var(--accent);
+  background: var(--selected-bg);
+  color: var(--accent-text);
+  font-weight: 700;
+}
 .pv-choice-text--selected {
+  color: var(--accent-text);
+  font-weight: 700;
+}
+.pv-toggle-state {
   color: var(--accent-text);
   font-weight: 700;
 }
@@ -2331,6 +2354,12 @@
 }
 .loclabel {
   font-size: var(--fs-label);
+  color: var(--text-muted);
+}
+.locdetail {
+  max-width: 440px;
+  font-size: 12px;
+  line-height: 1.5;
   color: var(--text-muted);
 }
 .locpath {

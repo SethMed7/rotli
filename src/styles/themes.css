@@ -469,7 +469,7 @@
 :root[data-theme="midnight-dark"] {
   --icon-clay: currentColor;
   --icon-olive: currentColor;
-  /* warm-token leaks re-pointed: done-check ink + Aa segment accent */
+  /* warm-token leaks re-pointed: pass-result ink + Aa segment accent */
   --check-ink: var(--on-accent);
   --seg-accent: var(--accent);
 }

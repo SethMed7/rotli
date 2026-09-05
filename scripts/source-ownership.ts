@@ -64,6 +64,7 @@ export const COMPONENT_ROOT_FILE_OWNERS = {
   "palette.tsx": "application-shell command palette overlay",
   "paletteModel.ts": "command palette presentation projection",
   "paneTree.tsx": "application-shell pane composition",
+  "playgroundImport.tsx": "Settings tutorial-import action",
   "previewModal.tsx": "shared media preview overlay",
   "quickNote.tsx": "application-shell auxiliary quick-note window",
   "sidebar.tsx": "sidebar feature entry point",

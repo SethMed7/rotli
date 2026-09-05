@@ -4,7 +4,15 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { CHECK_EM, CHOICE_EM, MARKER_EM, RESULT_EM, STEP_EM, listStyle } from "./listGeometry";
+import {
+  CHECK_EM,
+  CHOICE_EM,
+  GROUP_INSET_PX,
+  MARKER_EM,
+  RESULT_EM,
+  STEP_EM,
+  listStyle,
+} from "./listGeometry";
 
 /** padding-left, in em, out of a style string. */
 function padEm(style: string): number {
@@ -48,6 +56,11 @@ describe("list geometry", () => {
     const s = listStyle(1, CHOICE_EM);
     expect(hangEm(s)).toBe(CHOICE_EM);
     expect(padEm(s)).toBeCloseTo(STEP_EM + CHOICE_EM, 5);
+  });
+
+  test("a grouped multi-choice row keeps an even panel inset without losing its hanging column", () => {
+    const style = listStyle(0, CHOICE_EM, GROUP_INSET_PX);
+    expect(style).toBe(`padding-left:calc(${CHOICE_EM}em + ${GROUP_INSET_PX}px);text-indent:-${CHOICE_EM}em`);
   });
 
   test("a two-choice result hangs by both buttons", () => {

@@ -47,6 +47,10 @@
   --r-window: 14px;
   --r-pill: 999px;
 
+  /* The smallest discrete pointer target used by compact desktop chrome.
+     Glyphs may remain visually smaller; their actionable box may not. */
+  --control-hit-min: 24px;
+
   /* — motion (r3 gate law) — 120–180ms ease-out, exit faster than enter.
      Frequent actions animate opacity/transform only, or not at all. */
   --motion-enter: 160ms;

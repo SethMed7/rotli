@@ -14,7 +14,7 @@ import type {
   BreveBackfillResult,
   BreveDeliverySettings,
 } from "../routines/breveTypes";
-import type { SearchHit } from "../types";
+import type { PlaygroundImportResult, SearchHit } from "../types";
 
 export function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window;
@@ -1715,13 +1715,13 @@ export async function corpusInitMemex(path: string, brainEnabled = true): Promis
   return invoke<string>("corpus_init_memex", { path, brainEnabled });
 }
 
-/** Scaffold + switch to a scratch PRACTICE vault at an app-chosen home
- * (2026-07-26): settings carry along, the outgoing vault stays registered as a
- * connected library, and no existing file is touched. The shell stays alive. */
 export async function corpusCreatePracticeVault(): Promise<string> {
   if (!isTauri()) return "";
   return invoke<string>("corpus_create_practice_vault");
 }
+
+export const corpusImportPlayground = (): Promise<PlaygroundImportResult> =>
+  corpusInvoke("corpus_import_playground");
 
 /** Connect a memex as a linked vault and mount it in the current process. False
  * when the picker is cancelled. */

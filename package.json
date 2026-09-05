@@ -1,7 +1,7 @@
 {
   "name": "rotli",
   "private": true,
-  "version": "0.89.0",
+  "version": "0.90.0",
   "packageManager": "bun@1.4.0",
   "overrides": {
     "@codemirror/lang-html": "6.4.12",

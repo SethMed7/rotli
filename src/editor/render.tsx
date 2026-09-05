@@ -8,13 +8,14 @@ import type { MouseEvent, ReactNode } from "react";
 
 import { openUrl } from "../lib/tauri";
 import { CHOICE_RE, ORDERED_CHOICE_RE } from "./choiceState";
+import { isControlLiteral } from "./controlState";
 import {
-  ORDERED_RESULT_RE,
-  RESULT_RE,
-  type ResultState,
-  resultStateOf,
-  resultTextParts,
-} from "./resultState";
+  type ChoiceControlKind,
+  parseChoiceControlLine,
+  parseChoicePromptLine,
+  parseToggleLine,
+} from "./controlState";
+import { type ResultOption, type ResultState, parseResultLine, resultTextParts } from "./resultState";
 import { ORDERED_TASK_RE, TASK_RE, type TaskState, taskStateOf } from "./taskState";
 
 export type HeadingKind = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
@@ -26,6 +27,7 @@ export type BlockKind =
   | "task"
   | "result"
   | "choice"
+  | "toggle"
   | "quote"
   | "para"
   | "blank";
@@ -42,8 +44,18 @@ export interface Block {
   state?: TaskState;
   /** A two-choice result row's selected side. Undefined for every other kind. */
   resultState?: ResultState;
+  /** Source-backed labeled result options. Compact `[][]` also supplies these. */
+  resultOptions?: ResultOption[];
+  resultCompact?: boolean;
+  resultSelectedIndex?: number;
   /** Whether this option is selected within its adjacent single-choice group. */
   choiceSelected?: boolean;
+  /** Legacy `( )`, new `[#]` radio, or `[##]` multi-select square. */
+  choiceVariant?: "legacy" | ChoiceControlKind | "prompt";
+  toggleOn?: boolean;
+  toggleCompact?: boolean;
+  toggleOptions?: ResultOption[];
+  toggleLabels?: [string, string];
   /** The `1.` glyph of a numbered item — also set on an ORDERED task
    * (`1. [ ] x`), which parses as kind "task" with a marker. */
   marker?: string;
@@ -72,14 +84,59 @@ export function parseBlock(line: string): Block {
   const indentChars = /^[ \t]+/.exec(line)?.[0] ?? "";
   const indent = indentChars.replace(/\t/g, "  ").length;
   const body = indentChars ? line.slice(indentChars.length) : line;
-  const result = RESULT_RE.exec(body);
-  const resultState = result ? resultStateOf(result[1] ?? " ", result[2] ?? " ") : null;
-  if (result && resultState !== null)
+  const result = parseResultLine(line);
+  if (result)
     return {
       kind: "result",
-      prefixLen: indentChars.length + result[0].length,
-      text: body.slice(result[0].length),
-      resultState,
+      prefixLen: result.prefixLen,
+      text: result.text,
+      ...(result.compact
+        ? {
+            resultState: result.options[0]?.selected
+              ? ("yes" as const)
+              : result.options[1]?.selected
+                ? ("no" as const)
+                : ("unanswered" as const),
+          }
+        : {}),
+      resultOptions: result.options,
+      resultCompact: result.compact,
+      resultSelectedIndex: result.options.findIndex((option) => option.selected),
+      ...(result.marker === "- " ? {} : { marker: result.marker.trim() }),
+      indent,
+    };
+  const toggle = parseToggleLine(line);
+  if (toggle)
+    return {
+      kind: "toggle",
+      prefixLen: toggle.prefixLen,
+      text: toggle.text,
+      toggleOn: toggle.on,
+      toggleCompact: toggle.compact,
+      toggleOptions: toggle.options,
+      toggleLabels: toggle.labels,
+      ...(toggle.marker === "- " ? {} : { marker: toggle.marker.trim() }),
+      indent,
+    };
+  const choicePrompt = parseChoicePromptLine(line);
+  if (choicePrompt)
+    return {
+      kind: "choice",
+      prefixLen: choicePrompt.prefixLen,
+      text: choicePrompt.text,
+      choiceVariant: "prompt",
+      ...(choicePrompt.marker === "- " ? {} : { marker: choicePrompt.marker.trim() }),
+      indent,
+    };
+  const choiceControl = parseChoiceControlLine(line);
+  if (choiceControl)
+    return {
+      kind: "choice",
+      prefixLen: choiceControl.prefixLen,
+      text: choiceControl.text,
+      choiceSelected: choiceControl.selected,
+      choiceVariant: choiceControl.kind,
+      ...(choiceControl.marker === "- " ? {} : { marker: choiceControl.marker.trim() }),
       indent,
     };
   const choice = CHOICE_RE.exec(body);
@@ -89,6 +146,7 @@ export function parseBlock(line: string): Block {
       prefixLen: indentChars.length + choice[0].length,
       text: body.slice(choice[0].length),
       choiceSelected: (choice[1] ?? " ").toLowerCase() === "x",
+      choiceVariant: "legacy",
       indent,
     };
   const t = TASK_RE.exec(body);
@@ -102,19 +160,6 @@ export function parseBlock(line: string): Block {
     };
   if (body.startsWith("- "))
     return { kind: "bullet", prefixLen: indentChars.length + 2, text: body.slice(2), indent };
-  const orderedResult = ORDERED_RESULT_RE.exec(body);
-  const orderedResultState = orderedResult
-    ? resultStateOf(orderedResult[2] ?? " ", orderedResult[3] ?? " ")
-    : null;
-  if (orderedResult && orderedResultState !== null)
-    return {
-      kind: "result",
-      prefixLen: indentChars.length + orderedResult[0].length,
-      text: body.slice(orderedResult[0].length),
-      resultState: orderedResultState,
-      marker: `${orderedResult[1]}.`,
-      indent,
-    };
   // GFM's ordered task ("1. [ ] x") — a task that keeps its number as marker;
   // must win over the plain numbered rule below
   const ot = ORDERED_TASK_RE.exec(body);
@@ -134,6 +179,7 @@ export function parseBlock(line: string): Block {
       prefixLen: indentChars.length + orderedChoice[0].length,
       text: body.slice(orderedChoice[0].length),
       choiceSelected: (orderedChoice[2] ?? " ").toLowerCase() === "x",
+      choiceVariant: "legacy",
       marker: `${orderedChoice[1]}.`,
       indent,
     };
@@ -175,7 +221,7 @@ const INLINE_RULES: InlineRule[] = [
   {
     re: /`([^`]+)`/,
     render: (m, key) => (
-      <code className="md-code" key={key}>
+      <code className={isControlLiteral(m[1] ?? "") ? "md-code control-literal" : "md-code"} key={key}>
         {m[1]}
       </code>
     ),
@@ -249,9 +295,36 @@ export function renderInline(text: string): ReactNode[] {
 
 /** Static readers mirror the editor's selected-label + optional-reason voice. */
 export function renderResultContent(block: Block): ReactNode {
+  const parts = resultTextParts(block.text);
+  if (!block.resultCompact && block.resultOptions) {
+    return (
+      <>
+        <span className="pv-result-options" aria-label="Result options">
+          {block.resultOptions.map((option, index) => (
+            <span
+              className={option.selected ? "pv-result-option is-selected" : "pv-result-option"}
+              key={index}
+            >
+              {option.selected ? "✓ " : ""}
+              {option.label}
+            </span>
+          ))}
+        </span>{" "}
+        {(block.resultSelectedIndex ?? -1) < 0 ? (
+          renderInline(block.text)
+        ) : (
+          <>
+            <span className="pv-result-text">{renderInline(parts.label)}</span>
+            {parts.reason !== null ? (
+              <span className="pv-result-reason"> — {renderInline(parts.reason)}</span>
+            ) : null}
+          </>
+        )}
+      </>
+    );
+  }
   const state = block.resultState ?? "unanswered";
   if (state === "unanswered") return renderInline(block.text);
-  const parts = resultTextParts(block.text);
   return (
     <>
       <span className={`pv-result-text pv-result-text--${state}`}>{renderInline(parts.label)}</span>
@@ -268,5 +341,15 @@ export function renderChoiceContent(block: Block): ReactNode {
     <span className="pv-choice-text--selected">{renderInline(block.text)}</span>
   ) : (
     renderInline(block.text)
+  );
+}
+
+export function renderToggleContent(block: Block): ReactNode {
+  const labels = block.toggleLabels ?? ["On", "Off"];
+  return (
+    <>
+      <span className="pv-toggle-state">{block.toggleOn ? labels[0] : labels[1]}</span>{" "}
+      {renderInline(block.text)}
+    </>
   );
 }

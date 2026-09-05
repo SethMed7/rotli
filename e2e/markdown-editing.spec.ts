@@ -201,6 +201,77 @@ test("bullet outdent works on app-made AND tab-indented (foreign) lists", async 
   await expect(page.locator(".rotli-check")).toHaveCount(2);
 });
 
+test("bare task states become portable tasks and single checkboxes use the theme accent", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+
+  await page.keyboard.type("[/]");
+  await page.keyboard.press("Space");
+  await page.keyboard.type("Drafting");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("checkbox", { name: "Not started" })).toBeVisible();
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("[x]");
+  await page.keyboard.press("Space");
+  await page.keyboard.type("Shipped");
+
+  const doing = page.getByRole("checkbox", { name: "In progress" });
+  const done = page.getByRole("checkbox", { name: "Done" });
+  await expect(doing).toHaveAttribute("aria-checked", "mixed");
+  await expect(done).toHaveAttribute("aria-checked", "true");
+
+  const colors = await done.evaluate((element) => {
+    const accentProbe = document.createElement("span");
+    accentProbe.style.backgroundColor = "var(--accent)";
+    const successProbe = document.createElement("span");
+    successProbe.style.backgroundColor = "var(--success)";
+    document.body.append(accentProbe, successProbe);
+    const result = {
+      actual: getComputedStyle(element).backgroundColor,
+      accent: getComputedStyle(accentProbe).backgroundColor,
+      success: getComputedStyle(successProbe).backgroundColor,
+    };
+    accentProbe.remove();
+    successProbe.remove();
+    return result;
+  });
+  expect(colors.actual).toBe(colors.accent);
+  expect(colors.actual).not.toBe(colors.success);
+  expect(await done.evaluate((element) => getComputedStyle(element, "::after").content)).toBe("none");
+
+  await done.focus();
+  await page.keyboard.press("Space");
+  const reopened = page.getByRole("checkbox", { name: "Not started" });
+  await expect(reopened).toHaveAttribute("aria-checked", "false");
+  await expect(reopened).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(page.getByRole("checkbox", { name: "Done" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("checkbox", { name: "Done" })).toBeFocused();
+
+  await page.getByRole("checkbox", { name: "Done" }).click();
+  const open = page.getByRole("checkbox", { name: "Not started" });
+  await expect(open).toHaveAttribute("aria-checked", "false");
+  await open.hover();
+  const partial = page.getByRole("button", { name: "Mark task in progress" });
+  await expect(partial).toBeVisible();
+  await partial.click();
+  await expect(page.getByRole("checkbox", { name: "In progress" })).toHaveCount(2);
+  await page.getByRole("checkbox", { name: "In progress" }).last().click();
+  await expect(page.getByRole("checkbox", { name: "Done" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  await expect(editor).toContainText("- [/] Drafting");
+  await expect(editor).toContainText("- [x] Shipped");
+});
+
 test("[][] creates a keyboard-safe pass/fail result with an optional reason", async ({ page }) => {
   await gotoApp(page);
   await page.keyboard.press("Meta+T");
@@ -229,6 +300,7 @@ test("[][] creates a keyboard-safe pass/fail result with an optional reason", as
   await no.click();
   await expect(no).toHaveAttribute("aria-pressed", "true");
   await expect(yes).toHaveAttribute("aria-pressed", "false");
+  await expect(yes).toHaveClass(/is-rejected/);
   await expect(page.locator(".rotli-result-text--no")).toContainText("API boots cleanly");
   await expect(page.locator(".rotli-result-text--no")).toHaveCSS("font-weight", "700");
   const noColors = await no.evaluate((element) => {
@@ -261,6 +333,23 @@ test("[][] creates a keyboard-safe pass/fail result with an optional reason", as
   await expect(page.locator(".rotli-result-text--yes")).toContainText("API boots cleanly");
   await expect(page.locator(".rotli-result-text--yes")).toHaveCSS("font-weight", "700");
   await expect(page.locator(".rotli-result-reason")).toHaveCSS("font-weight", "400");
+  const yesColors = await yes.evaluate((element) => {
+    const successProbe = document.createElement("span");
+    successProbe.style.backgroundColor = "var(--success)";
+    const accentProbe = document.createElement("span");
+    accentProbe.style.backgroundColor = "var(--accent)";
+    document.body.append(successProbe, accentProbe);
+    const result = {
+      actual: getComputedStyle(element).backgroundColor,
+      success: getComputedStyle(successProbe).backgroundColor,
+      accent: getComputedStyle(accentProbe).backgroundColor,
+    };
+    successProbe.remove();
+    accentProbe.remove();
+    return result;
+  });
+  expect(yesColors.actual).toBe(yesColors.success);
+  expect(yesColors.actual).not.toBe(yesColors.accent);
 
   await page.getByRole("button", { name: "Aa" }).click();
   await page
@@ -268,6 +357,161 @@ test("[][] creates a keyboard-safe pass/fail result with an optional reason", as
     .getByRole("button", { name: "Raw markdown" })
     .click();
   await expect(editor).toContainText("- [x][ ] API boots cleanly — timed out waiting for health check");
+});
+
+test("labeled result buttons preserve source labels and apply semantic or custom colors", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+
+  await page.keyboard.type("[True:green][Draw:#E3B341][False:red]");
+  await page.keyboard.press("Space");
+  await page.keyboard.type("Release decision");
+
+  const truth = page.getByRole("button", { name: "True" });
+  const draw = page.getByRole("button", { name: "Draw" });
+  const falsity = page.getByRole("button", { name: "False" });
+  await expect(truth).toHaveAttribute("aria-pressed", "false");
+  await expect(draw).toHaveAttribute("aria-pressed", "false");
+  await expect(falsity).toHaveAttribute("aria-pressed", "false");
+
+  await draw.focus();
+  await page.keyboard.press("Space");
+  await expect(draw).toHaveAttribute("aria-pressed", "true");
+  await expect(draw).toBeFocused();
+  await expect(truth).toHaveAttribute("aria-pressed", "false");
+  await expect(falsity).toHaveAttribute("aria-pressed", "false");
+  await expect(draw).toHaveCSS("background-color", "rgb(227, 179, 65)");
+
+  await falsity.click();
+  await expect(draw).toHaveAttribute("aria-pressed", "false");
+  await expect(falsity).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByRole("button", { name: "Add a reason for this result" }).click();
+  await page.keyboard.type("needs review");
+  await expect(page.locator(".rotli-result-reason")).toContainText("needs review");
+
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  await expect(editor).toContainText(
+    "- [True:green][Draw:#E3B341][x False:red] Release decision — needs review",
+  );
+});
+
+test("hash choices and switches stay interactive while inline code stays literal", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText(
+    "- [#] Red\n- [#] Blue\n\n- [##?] Which channels should we use?\n- [##] Email\n- [##] SMS\n\n- [|x] Feature flag\n- [True:green|x False:red] Sync\n- [:blue|:purple] Color only\n\n`[#]` and `[|]` stay literal\n\n`[#] raw data` and `plain example` stay visually plain too",
+  );
+  await page.locator(".ed-date").click();
+
+  const radios = page.getByRole("radio", { name: "Choose option" });
+  await expect(radios).toHaveCount(2);
+  await radios.nth(1).click();
+  await expect(radios.nth(0)).toHaveAttribute("aria-checked", "false");
+  await expect(radios.nth(1)).toHaveAttribute("aria-checked", "true");
+
+  const multis = page.getByRole("checkbox", { name: "Toggle option" });
+  await expect(multis).toHaveCount(2);
+  await multis.nth(0).click();
+  await multis.nth(1).click();
+  await expect(multis.nth(0)).toHaveAttribute("aria-checked", "true");
+  await expect(multis.nth(1)).toHaveAttribute("aria-checked", "true");
+
+  const compactToggle = page.getByRole("switch", { name: "On or Off" }).first();
+  const labeledToggle = page.getByRole("switch", { name: "True or False" });
+  await expect(compactToggle).toHaveAttribute("aria-checked", "false");
+  await compactToggle.focus();
+  await page.keyboard.press("Space");
+  await expect(compactToggle).toHaveAttribute("aria-checked", "true");
+  await expect(compactToggle).toBeFocused();
+  await labeledToggle.click();
+  await expect(labeledToggle).toHaveAttribute("aria-checked", "true");
+
+  await expect(page.locator(".rotli-choice")).toHaveCount(4);
+  await expect(page.locator(".rotli-toggle")).toHaveCount(3);
+  await expect(page.locator(".rotli-choice-line--multi.is-group-first")).toHaveCount(1);
+  await expect(page.locator(".rotli-choice-line--multi.is-group-last")).toHaveCount(1);
+  await expect(page.locator(".rotli-choice-prompt")).toHaveText("Which channels should we use?");
+  const multiPanel = page.locator(".rotli-choice-line--multi:not(.rotli-choice-prompt)").first();
+  const multiGeometry = await multiPanel.evaluate((line) => {
+    const panel = line.getBoundingClientRect();
+    const editorNode = line.closest(".cm-content");
+    const editor = editorNode?.getBoundingClientRect();
+    const control = line.querySelector(".rotli-choice")?.getBoundingClientRect();
+    const style = getComputedStyle(line);
+    return {
+      width: panel.width,
+      rightGap: editor ? editor.right - panel.right : -1,
+      editorPaddingEnd: editorNode ? Number.parseFloat(getComputedStyle(editorNode).paddingInlineEnd) : -1,
+      controlInset: control ? control.left - panel.left : 0,
+      paddingBlockStart: style.paddingBlockStart,
+      paddingInlineEnd: style.paddingInlineEnd,
+    };
+  });
+  expect(multiGeometry.width).toBeLessThanOrEqual(481);
+  expect(Math.abs(multiGeometry.rightGap - multiGeometry.editorPaddingEnd)).toBeLessThanOrEqual(1);
+  expect(multiGeometry.controlInset).toBeGreaterThanOrEqual(11);
+  expect(multiGeometry.paddingBlockStart).toBe("4px");
+  expect(multiGeometry.paddingInlineEnd).toBe("12px");
+  const selectedOption = page.locator(".rotli-choice-line--multi.is-selected").first();
+  const centerOffset = await selectedOption.evaluate((line) => {
+    const control = line.querySelector(".rotli-choice")!.getBoundingClientRect();
+    const text = line.querySelector(".rotli-choice-text--selected")!.getBoundingClientRect();
+    return control.top + control.height / 2 - (text.top + text.height / 2);
+  });
+  expect(Math.abs(centerOffset)).toBeLessThanOrEqual(1);
+  const purpleToggle = page.locator(".rotli-toggle").last();
+  const purpleColors = await purpleToggle.evaluate((toggle) => {
+    const probe = document.createElement("span");
+    probe.style.backgroundColor = "var(--accent-swatch-violet)";
+    document.body.append(probe);
+    const result = {
+      actual: getComputedStyle(toggle.querySelector(".rotli-toggle-track")!).backgroundColor,
+      expected: getComputedStyle(probe).backgroundColor,
+    };
+    probe.remove();
+    return result;
+  });
+  expect(purpleColors.actual).toBe(purpleColors.expected);
+  const literal = page.locator(".rotli-control-literal", { hasText: "[#]" });
+  await expect(literal).toBeVisible();
+  await expect(literal).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(literal).toHaveCSS("padding-left", "0px");
+  await expect(page.locator(".rotli-code", { hasText: "[|]" })).toBeVisible();
+  const plainLiteral = page.locator(".rotli-code", { hasText: "plain example" });
+  await expect(plainLiteral).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(plainLiteral).toHaveCSS("padding-left", "0px");
+  expect(
+    await plainLiteral.evaluate(
+      (node) => getComputedStyle(node).fontFamily === getComputedStyle(node.parentElement!).fontFamily,
+    ),
+  ).toBe(true);
+  const plainLiteralLine = plainLiteral.locator("xpath=ancestor::*[contains(@class, 'cm-line')][1]");
+  await expect(plainLiteralLine).toHaveText("[#] raw data and plain example stay visually plain too");
+
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  await expect(editor).toContainText("- [#x] Blue");
+  await expect(editor).toContainText("- [##?] Which channels should we use?");
+  await expect(editor).toContainText("- [##x] Email");
+  await expect(editor).toContainText("- [##x] SMS");
+  await expect(editor).toContainText("- [x|] Feature flag");
+  await expect(editor).toContainText("- [x True:green|False:red] Sync");
+  await expect(editor).toContainText("- [:blue|:purple] Color only");
+  await expect(editor).toContainText("`[#]` and `[|]` stay literal");
 });
 
 test("() creates a tab-navigable Markdown multiple-choice group", async ({ page }) => {

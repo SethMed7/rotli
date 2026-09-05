@@ -30,23 +30,18 @@ import { VIDEO_EXTS, extOf } from "../lib/fileKind";
 import { openUrl, resolveImageSrc, rootIdOf } from "../lib/tauri";
 import { locateLostImage } from "../services/imageRepair";
 import { usePanesStore } from "../state/panes";
-import { useUiStore } from "../state/ui";
 import { selectChoiceGroup } from "./choiceState";
+import { isControlLiteral } from "./controlState";
 import { scanFences } from "./fences";
 import { imageSourceSpan, selectionCoversImage } from "./imageSelection";
 import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
-import { CHECK_EM, CHOICE_EM, listStyle, MARKER_EM, RESULT_EM } from "./listGeometry";
+import { CHECK_EM, CHOICE_EM, GROUP_INSET_PX, listStyle, MARKER_EM, RESULT_EM } from "./listGeometry";
 import { parseBlock } from "./render";
-import {
-  chooseResult,
-  RESULT_REASON_SEPARATOR,
-  type ResultChoice,
-  type ResultState,
-  resultTextParts,
-} from "./resultState";
+import { resultTextParts } from "./resultState";
+import { ChoiceControlWidget, ResultReasonWidget, ResultWidget, ToggleWidget } from "./resultWidget";
 import { lineInTable, scanTables } from "./tables";
-import { markOf, nextTaskState, type TaskState, TASK_LINE_RE, taskStateOf } from "./taskState";
 import { type TaskNode, type TaskProgress, taskProgress } from "./taskTree";
+import { CheckboxWidget } from "./taskWidget";
 import { editorLinkOpensOnClick, WIKILINK_RE } from "./wikilink";
 import { resolveWikilinkTarget } from "./wikilinkIndex";
 
@@ -66,8 +61,14 @@ interface InlineRule {
   /** Per-MATCH class/attrs override (the wikilink's resolved-vs-missing look). */
   clsFor?: (m: RegExpExecArray) => string;
   attrsFor?: (m: RegExpExecArray) => Record<string, string> | undefined;
+  /** Keep delimiters invisible even at the caret. Used for literal backticks;
+   * Raw Markdown is the explicit delimiter-editing surface. */
+  alwaysHideMarkers?: boolean;
   /** Marker + content ranges RELATIVE to the match start. */
-  parts: (m: RegExpExecArray) => { markers: [number, number][]; content: [number, number] };
+  parts: (m: RegExpExecArray) => {
+    markers: [number, number][];
+    content: [number, number];
+  };
 }
 
 /** Fixed open/close lengths: markers wrap the content symmetrically. */
@@ -85,7 +86,13 @@ function fixed(open: number, close: number) {
 }
 
 const INLINE: InlineRule[] = [
-  { re: /`([^`]+)`/, cls: "rotli-code", parts: fixed(1, 1) },
+  {
+    re: /`([^`]+)`/,
+    cls: "rotli-code",
+    clsFor: (m) => (isControlLiteral(m[1] ?? "") ? "rotli-code rotli-control-literal" : "rotli-code"),
+    alwaysHideMarkers: true,
+    parts: fixed(1, 1),
+  },
   {
     re: /\[\[([^\]]+)\]\]/,
     cls: "rotli-wikilink",
@@ -112,7 +119,11 @@ const INLINE: InlineRule[] = [
       };
     },
   },
-  { re: /\*\*((?:[^*]|\*(?!\*))+)\*\*/, cls: "rotli-strong", parts: fixed(2, 2) },
+  {
+    re: /\*\*((?:[^*]|\*(?!\*))+)\*\*/,
+    cls: "rotli-strong",
+    parts: fixed(2, 2),
+  },
   { re: /==([^=]+)==/, cls: "rotli-hl", parts: fixed(2, 2) },
   { re: /~~([^~]+)~~/, cls: "rotli-strike", parts: fixed(2, 2) },
   { re: /<u>(.*?)<\/u>/, cls: "rotli-u", parts: fixed(3, 4) },
@@ -141,7 +152,10 @@ const INLINE: InlineRule[] = [
     re: /https?:\/\/[^\s<>()[\]]*[^\s<>()[\].,;:!?'"]/,
     cls: "rotli-link rotli-autolink",
     attrs: { title: "⌘-click to open" },
-    parts: (m) => ({ markers: [], content: [0, m[0].length] as [number, number] }),
+    parts: (m) => ({
+      markers: [],
+      content: [0, m[0].length] as [number, number],
+    }),
   },
 ];
 
@@ -165,7 +179,9 @@ function listItemImage(
   // a caret/partial selection still reveals source for direct Markdown edits
   const selected = selectionCoversImage(sel, contentBase, lineEnd);
   if (lineTouched && !selected) return false;
-  const d = Decoration.replace({ widget: new ImgWidget(image.alt, image.src, selected) });
+  const d = Decoration.replace({
+    widget: new ImgWidget(image.alt, image.src, selected),
+  });
   decos.push(d.range(contentBase, lineEnd));
   atomics.push(d.range(contentBase, lineEnd));
   return true;
@@ -243,179 +259,6 @@ class NumberWidget extends WidgetType {
     s.textContent = this.marker;
     s.setAttribute("aria-hidden", "true");
     return s;
-  }
-}
-
-/** What each state says out loud, and what a click will do next. Three states
- * mean "Mark done" is no longer a complete description of the click. */
-const CHECK_LABEL: Record<TaskState, string> = {
-  open: "Not started",
-  doing: "In progress",
-  done: "Done",
-};
-
-class CheckboxWidget extends WidgetType {
-  /** `marker` carries the `1.` glyph of an ORDERED task ("1. [ ] x") — rendered
-   * before the box so the step number survives; null for a plain `- [ ]`. */
-  constructor(
-    readonly state: TaskState,
-    readonly marker: string | null = null,
-  ) {
-    super();
-  }
-  eq(o: CheckboxWidget) {
-    return o.state === this.state && o.marker === this.marker;
-  }
-  toDOM(view: EditorView) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = this.state === "open" ? "rotli-check" : `rotli-check ${this.state}`;
-    btn.setAttribute("role", "checkbox");
-    // "mixed" is ARIA's own word for a partly-checked box — `[/]` is exactly
-    // that, so assistive tech reads it without rotli inventing a vocabulary
-    btn.setAttribute("aria-checked", this.state === "doing" ? "mixed" : String(this.state === "done"));
-    btn.setAttribute("aria-label", CHECK_LABEL[this.state]);
-    // toggle on mousedown without moving the caret — resolve the line at click
-    // time via posAtDOM so renumbered/edited lines still hit the right one
-    btn.addEventListener("mousedown", (e) => {
-      if (e.button !== 0) return; // a right/middle press must not toggle
-      e.preventDefault();
-      const pos = view.posAtDOM(btn);
-      const line = view.state.doc.lineAt(pos);
-      const m = TASK_LINE_RE.exec(line.text);
-      if (!m) return;
-      // the setting is read HERE, at click time, so changing it takes effect
-      // in every open editor at once — no remount, no stale extension
-      const threeState = useUiStore.getState().taskCycle === "three";
-      const next = `${m[1]}[${markOf(nextTaskState(taskStateOf(m[2] ?? " "), threeState))}] `;
-      view.dispatch({ changes: { from: line.from, to: line.from + m[0].length, insert: next } });
-    });
-    if (!this.marker) return btn;
-    const wrap = document.createElement("span");
-    const num = document.createElement("span");
-    num.className = "rotli-marker num";
-    num.textContent = this.marker;
-    num.setAttribute("aria-hidden", "true");
-    wrap.append(num, btn);
-    return wrap;
-  }
-  ignoreEvent() {
-    return false;
-  }
-}
-
-/** Two exclusive buttons backed by two adjacent Markdown boxes. The first is
- * yes/pass (✓), the second no/fail (×); choosing either clears the other. */
-class ResultWidget extends WidgetType {
-  constructor(
-    readonly state: ResultState,
-    readonly marker: string | null = null,
-  ) {
-    super();
-  }
-  eq(o: ResultWidget) {
-    return o.state === this.state && o.marker === this.marker;
-  }
-  toDOM(view: EditorView) {
-    const controls = document.createElement("span");
-    controls.className = "rotli-result";
-    controls.setAttribute("role", "group");
-    controls.setAttribute("aria-label", "Yes or no result");
-
-    const choose = (choice: ResultChoice) => {
-      const pos = view.posAtDOM(controls);
-      const line = view.state.doc.lineAt(pos);
-      const next = chooseResult(line.text, choice);
-      if (!next || next === line.text) return;
-      view.dispatch({ changes: { from: line.from, to: line.to, insert: next }, userEvent: "input" });
-    };
-
-    const button = (choice: ResultChoice, glyph: string, label: string) => {
-      const selected = this.state === choice;
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = `rotli-result-choice rotli-result-choice--${choice}${selected ? " is-selected" : ""}`;
-      btn.textContent = glyph;
-      btn.setAttribute("aria-label", label);
-      btn.setAttribute("aria-pressed", String(selected));
-      btn.title = label;
-      btn.addEventListener("keydown", (event) => {
-        // Tab navigates the embedded controls; Tab while the text caret owns
-        // the row still indents it through cmKeymap.
-        if (event.key === "Tab" || event.key === " " || event.key === "Enter") {
-          event.stopPropagation();
-        }
-      });
-      // Pointer selection must not move the editor caret into the hidden source.
-      btn.addEventListener("mousedown", (event) => {
-        if (event.button !== 0) return; // a right/middle press must not answer
-        event.preventDefault();
-        choose(choice);
-      });
-      // Native button activation covers keyboard and assistive-tech clicks.
-      btn.addEventListener("click", (event) => {
-        event.preventDefault();
-        // A pointer click already committed on mousedown before CodeMirror can
-        // move the caret. detail=0 is keyboard or assistive-tech activation.
-        if (event.detail === 0) choose(choice);
-      });
-      return btn;
-    };
-
-    controls.append(button("yes", "✓", "Yes or passed"), button("no", "×", "No or failed"));
-    if (!this.marker) return controls;
-    const wrap = document.createElement("span");
-    const num = document.createElement("span");
-    num.className = "rotli-marker num";
-    num.textContent = this.marker;
-    num.setAttribute("aria-hidden", "true");
-    wrap.append(num, controls);
-    return wrap;
-  }
-  ignoreEvent() {
-    return false;
-  }
-}
-
-/** A selected row can carry an ordinary Markdown explanation after an em dash.
- * The affordance inserts only that separator, then returns focus to the text. */
-class ResultReasonWidget extends WidgetType {
-  eq() {
-    return true;
-  }
-  toDOM(view: EditorView) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "rotli-result-reason-add";
-    btn.textContent = "+ reason";
-    btn.setAttribute("aria-label", "Add a reason for this result");
-    const add = () => {
-      const pos = view.posAtDOM(btn);
-      const line = view.state.doc.lineAt(pos);
-      view.dispatch({
-        changes: { from: line.to, insert: RESULT_REASON_SEPARATOR },
-        selection: { anchor: line.to + RESULT_REASON_SEPARATOR.length },
-        scrollIntoView: true,
-        userEvent: "input",
-      });
-      view.focus();
-    };
-    btn.addEventListener("keydown", (event) => {
-      if (event.key === "Tab" || event.key === " " || event.key === "Enter") event.stopPropagation();
-    });
-    btn.addEventListener("mousedown", (event) => {
-      if (event.button !== 0) return;
-      event.preventDefault();
-      add();
-    });
-    btn.addEventListener("click", (event) => {
-      event.preventDefault();
-      if (event.detail === 0) add();
-    });
-    return btn;
-  }
-  ignoreEvent() {
-    return false;
   }
 }
 
@@ -545,7 +388,9 @@ class ImgWidget extends WidgetType {
       const at = text.indexOf(target);
       if (at < 0) return false;
       const from = line.from + at + 2;
-      view.dispatch({ changes: { from, to: from + this.src.length, insert: newRel } });
+      view.dispatch({
+        changes: { from, to: from + this.src.length, insert: newRel },
+      });
       return true;
     };
     // a src that no longer resolves is CLASSIFIED, not abandoned (the maintainer,
@@ -753,7 +598,11 @@ class ImgWidget extends WidgetType {
         const width = Math.round(img.getBoundingClientRect().width);
         const newAlt = caption ? `${caption}|${width}` : `|${width}`;
         view.dispatch({
-          changes: { from: imgFrom, to: lineTo, insert: `![${newAlt}](${this.src})` },
+          changes: {
+            from: imgFrom,
+            to: lineTo,
+            insert: `![${newAlt}](${this.src})`,
+          },
         });
       };
       window.addEventListener("mousemove", onMove);
@@ -823,7 +672,7 @@ function scanInline(
       const a = matchStart + s;
       const b = matchStart + e;
       if (b <= a) continue;
-      if (touched) {
+      if (touched && !rule.alwaysHideMarkers) {
         decos.push(Decoration.mark({ class: "rotli-syntax" }).range(a, b));
       } else {
         const d = Decoration.replace({});
@@ -887,13 +736,20 @@ function scanTaskProgress(doc: EditorView["state"]["doc"]): Map<number, TaskProg
     if (block.kind === "task") {
       // `[/]` counts as NOT done — a parent's "2/4" must mean four finished
       // things, not four started ones
-      nodes.push({ line: n, indent: block.indent ?? 0, done: block.state === "done" });
+      nodes.push({
+        line: n,
+        indent: block.indent ?? 0,
+        done: block.state === "done",
+      });
     }
   }
   return taskProgress(nodes);
 }
 
-function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decoration> } {
+function build(view: EditorView): {
+  deco: DecorationSet;
+  atomic: RangeSet<Decoration>;
+} {
   const decos: Range<Decoration>[] = [];
   const atomics: Range<Decoration>[] = [];
   const sel = view.state.selection.main;
@@ -971,7 +827,10 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
           break;
         case "bullet":
           decos.push(
-            Decoration.line({ class: "rotli-li", attributes: { style: listStyle(depth) } }).range(ls),
+            Decoration.line({
+              class: "rotli-li",
+              attributes: { style: listStyle(depth) },
+            }).range(ls),
           );
           hidePrefix(ls, prefixEnd, new BulletWidget(depth), decos, atomics);
           if (listItemImage(content, contentBase, line.to, lineTouched, sel, decos, atomics)) break;
@@ -979,7 +838,10 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
           break;
         case "numbered":
           decos.push(
-            Decoration.line({ class: "rotli-li", attributes: { style: listStyle(depth) } }).range(ls),
+            Decoration.line({
+              class: "rotli-li",
+              attributes: { style: listStyle(depth) },
+            }).range(ls),
           );
           hidePrefix(ls, prefixEnd, new NumberWidget(block.marker ?? "1."), decos, atomics);
           if (listItemImage(content, contentBase, line.to, lineTouched, sel, decos, atomics)) break;
@@ -991,16 +853,22 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
               class: block.state === "done" ? "rotli-task done" : "rotli-task",
               // a checkbox hangs in a wider column than a glyph; an ordered
               // task ("1. [ ]") hangs by its number PLUS the checkbox
-              attributes: { style: listStyle(depth, block.marker ? MARKER_EM + CHECK_EM : CHECK_EM) },
+              attributes: {
+                style: listStyle(depth, block.marker ? MARKER_EM + CHECK_EM : CHECK_EM),
+              },
             }).range(ls),
           );
-          hidePrefix(
-            ls,
-            prefixEnd,
-            new CheckboxWidget(block.state ?? "open", block.marker ?? null),
-            decos,
-            atomics,
-          );
+          if (sel.from < prefixEnd && sel.to > ls) {
+            revealablePrefix(ls, prefixEnd, true, decos, atomics);
+          } else {
+            hidePrefix(
+              ls,
+              prefixEnd,
+              new CheckboxWidget(block.state ?? "open", block.marker ?? null),
+              decos,
+              atomics,
+            );
+          }
           // only DONE strikes through: an in-progress task is still live work
           if (block.state === "done" && line.to > prefixEnd) {
             decos.push(Decoration.mark({ class: "rotli-done" }).range(prefixEnd, line.to));
@@ -1011,7 +879,10 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
             const p = progress.get(line.number);
             if (p) {
               decos.push(
-                Decoration.widget({ widget: new ProgressWidget(p.done, p.total), side: 1 }).range(line.to),
+                Decoration.widget({
+                  widget: new ProgressWidget(p.done, p.total),
+                  side: 1,
+                }).range(line.to),
               );
             }
           }
@@ -1020,45 +891,124 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
           break;
         case "result": {
           const state = block.resultState ?? "unanswered";
+          const answered = (block.resultSelectedIndex ?? -1) >= 0;
           const parts = resultTextParts(content);
           decos.push(
             Decoration.line({
               class: "rotli-result-line",
-              attributes: { style: listStyle(depth, block.marker ? MARKER_EM + RESULT_EM : RESULT_EM) },
-            }).range(ls),
-          );
-          hidePrefix(ls, prefixEnd, new ResultWidget(state, block.marker ?? null), decos, atomics);
-          if (state !== "unanswered" && parts.label.length > 0) {
-            decos.push(
-              Decoration.mark({ class: `rotli-result-text rotli-result-text--${state}` }).range(
-                prefixEnd,
-                prefixEnd + parts.label.length,
-              ),
-            );
-          }
-          if (state !== "unanswered" && parts.reason !== null) {
-            const reasonFrom = prefixEnd + parts.label.length;
-            if (line.to > reasonFrom) {
-              decos.push(Decoration.mark({ class: "rotli-result-reason" }).range(reasonFrom, line.to));
-            }
-          } else if (state !== "unanswered" && parts.label.trim().length > 0) {
-            decos.push(Decoration.widget({ widget: new ResultReasonWidget(), side: 1 }).range(line.to));
-          }
-          if (listItemImage(content, contentBase, line.to, lineTouched, sel, decos, atomics)) break;
-          scanInline(content, contentBase, sel, decos, atomics);
-          break;
-        }
-        case "choice":
-          decos.push(
-            Decoration.line({
-              class: block.choiceSelected ? "rotli-choice-line is-selected" : "rotli-choice-line",
-              attributes: { style: listStyle(depth, block.marker ? MARKER_EM + CHOICE_EM : CHOICE_EM) },
+              attributes: {
+                style: listStyle(depth, block.marker ? MARKER_EM + RESULT_EM : RESULT_EM),
+              },
             }).range(ls),
           );
           hidePrefix(
             ls,
             prefixEnd,
-            new ChoiceWidget(block.choiceSelected ?? false, block.marker ?? null),
+            new ResultWidget(
+              block.resultOptions ?? [
+                {
+                  label: "Yes",
+                  selected: state === "yes",
+                  color: "green",
+                  source: "",
+                },
+                {
+                  label: "No",
+                  selected: state === "no",
+                  color: "red",
+                  source: "",
+                },
+              ],
+              block.resultCompact ?? true,
+              block.marker ?? null,
+            ),
+            decos,
+            atomics,
+          );
+          if (answered && parts.label.length > 0) {
+            decos.push(
+              Decoration.mark({
+                class: `rotli-result-text${block.resultCompact ? ` rotli-result-text--${state}` : ""}`,
+              }).range(prefixEnd, prefixEnd + parts.label.length),
+            );
+          }
+          if (answered && parts.reason !== null) {
+            const reasonFrom = prefixEnd + parts.label.length;
+            if (line.to > reasonFrom) {
+              decos.push(Decoration.mark({ class: "rotli-result-reason" }).range(reasonFrom, line.to));
+            }
+          } else if (answered && parts.label.trim().length > 0) {
+            decos.push(
+              Decoration.widget({
+                widget: new ResultReasonWidget(),
+                side: 1,
+              }).range(line.to),
+            );
+          }
+          if (listItemImage(content, contentBase, line.to, lineTouched, sel, decos, atomics)) break;
+          scanInline(content, contentBase, sel, decos, atomics);
+          break;
+        }
+        case "choice": {
+          const prompt = block.choiceVariant === "prompt";
+          const multi = block.choiceVariant === "multi";
+          const siblingIsMulti = (number: number) => {
+            if (number < 1 || number > doc.lines) return false;
+            const sibling = parseBlock(doc.line(number).text);
+            return (
+              sibling.kind === "choice" &&
+              sibling.choiceVariant === "multi" &&
+              sibling.indent === block.indent
+            );
+          };
+          const siblingIsPrompt = (number: number) => {
+            if (number < 1 || number > doc.lines) return false;
+            const sibling = parseBlock(doc.line(number).text);
+            return (
+              sibling.kind === "choice" &&
+              sibling.choiceVariant === "prompt" &&
+              sibling.indent === block.indent
+            );
+          };
+          if (prompt) {
+            const nextIsMulti = siblingIsMulti(line.number + 1);
+            decos.push(
+              Decoration.line({
+                class: `rotli-choice-line rotli-choice-line--multi rotli-choice-prompt is-group-first${nextIsMulti ? "" : " is-group-last"}`,
+                attributes: {
+                  style: listStyle(depth, block.marker ? MARKER_EM : 0, GROUP_INSET_PX),
+                },
+              }).range(ls),
+            );
+            hidePrefix(ls, prefixEnd, null, decos, atomics);
+            scanInline(content, contentBase, sel, decos, atomics);
+            break;
+          }
+          const groupClass = multi
+            ? ` rotli-choice-line--multi${siblingIsMulti(line.number - 1) || siblingIsPrompt(line.number - 1) ? "" : " is-group-first"}${siblingIsMulti(line.number + 1) ? "" : " is-group-last"}`
+            : "";
+          decos.push(
+            Decoration.line({
+              class: `rotli-choice-line${groupClass}${block.choiceSelected ? " is-selected" : ""}`,
+              attributes: {
+                style: listStyle(
+                  depth,
+                  block.marker ? MARKER_EM + CHOICE_EM : CHOICE_EM,
+                  multi ? GROUP_INSET_PX : 0,
+                ),
+              },
+            }).range(ls),
+          );
+          hidePrefix(
+            ls,
+            prefixEnd,
+            block.choiceVariant === "radio" || block.choiceVariant === "multi"
+              ? new ChoiceControlWidget(
+                  block.choiceVariant,
+                  block.choiceSelected ?? false,
+                  block.marker ?? null,
+                )
+              : new ChoiceWidget(block.choiceSelected ?? false, block.marker ?? null),
             decos,
             atomics,
           );
@@ -1066,6 +1016,43 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
             decos.push(Decoration.mark({ class: "rotli-choice-text--selected" }).range(prefixEnd, line.to));
           }
           if (listItemImage(content, contentBase, line.to, lineTouched, sel, decos, atomics)) break;
+          scanInline(content, contentBase, sel, decos, atomics);
+          break;
+        }
+        case "toggle":
+          decos.push(
+            Decoration.line({
+              class: "rotli-toggle-line",
+              attributes: {
+                style: listStyle(depth, block.marker ? MARKER_EM + RESULT_EM : RESULT_EM),
+              },
+            }).range(ls),
+          );
+          hidePrefix(
+            ls,
+            prefixEnd,
+            new ToggleWidget(
+              block.toggleOptions ?? [
+                {
+                  label: "On",
+                  selected: block.toggleOn === true,
+                  color: "green",
+                  source: "",
+                },
+                {
+                  label: "Off",
+                  selected: block.toggleOn !== true,
+                  color: "red",
+                  source: "",
+                },
+              ],
+              block.toggleCompact ?? true,
+              block.toggleOn ?? false,
+              block.marker ?? null,
+            ),
+            decos,
+            atomics,
+          );
           scanInline(content, contentBase, sel, decos, atomics);
           break;
         case "quote":
@@ -1082,7 +1069,10 @@ function build(view: EditorView): { deco: DecorationSet; atomic: RangeSet<Decora
       pos = line.to + 1;
     }
   }
-  return { deco: Decoration.set(decos, true), atomic: RangeSet.of(atomics, true) };
+  return {
+    deco: Decoration.set(decos, true),
+    atomic: RangeSet.of(atomics, true),
+  };
 }
 
 // ─── ⌘-click opens a link (#14, audit 2026-07) ───────────────────────────────

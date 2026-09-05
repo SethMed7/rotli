@@ -284,7 +284,8 @@
   opacity: 0;
   transition: opacity 120ms var(--motion-ease);
 }
-.icobtn:hover .tip {
+.icobtn:hover .tip,
+.icobtn:focus-visible .tip {
   opacity: 1;
   transition-delay: 300ms;
 }

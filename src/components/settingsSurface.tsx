@@ -144,7 +144,7 @@ import {
   ShieldGlyph,
   SunGlyph,
 } from "./glyphs";
-
+import { PlaygroundImport } from "./playgroundImport";
 type SettingsPane =
   | "general"
   | "hotkeys"
@@ -861,6 +861,7 @@ function GeneralPane() {
         ones in its <code>2/4</code>.
       </p>
 
+      <PlaygroundImport disabled={memexConfig.data?.developmentReadOnly ?? import.meta.env.DEV} />
       <UpdatesSection />
 
       <h4 className="sethead">Demo mode</h4>
@@ -1549,7 +1550,6 @@ function LocationPane() {
   const [err, setErr] = useState<string | null>(null);
   const storageGrouping = useUiStore((s) => s.storageGrouping);
   const setStorageGrouping = useUiStore((s) => s.setStorageGrouping);
-
   const rootPath = real.data?.root ?? "No vault selected";
   const instances = cfg.data?.instances ?? [];
   const activeId = cfg.data?.activeId ?? null;

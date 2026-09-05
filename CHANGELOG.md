@@ -10,6 +10,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.90.0] - 2026-09-05
+
+### Added
+
+- Adjacent labeled boxes now render as source-backed exclusive result buttons:
+  `[True][False]`, or colored forms such as
+  `[True:green][Draw:#E3B341][False:red]`. Uncolored binary labels default to
+  green/red; accent, blue, green, yellow, purple, red, neutral, and strict three- or
+  six-digit hex colors are supported.
+  Selection writes a portable leading `x ` to the chosen box, keyboard focus
+  survives the rerender, and invalid or ambiguous source fails closed.
+- `[#]` now creates exclusive radio groups, `[##]` creates independent square
+  multi-select options, and `[True|False]` or compact `[|]` creates a portable
+  switch with explicit source state. The new controls support pointer and
+  keyboard activation, preserve focus, and remain literal inside backticks.
+- New Practice Vaults now include a versioned `wiki/Playground/` folder with
+  editable Markdown lessons for tasks, result colors, choices, toggles, raw
+  source, and backtick literals. It is self-contained, copyable, and removable.
+- Settings → General can import those lessons into an existing writable vault
+  as a deletable `Playground` named view. Re-importing reuses intact lesson
+  notes and never overwrites user edits.
+- Compact sidebar, tab, and editor-header actions now keep at least a 24px
+  pointer target, and icon labels appear for keyboard focus as well as hover.
+
+### Fixed
+
+- Labels beginning with `X ` remain literal; a lowercase literal `x ` prefix
+  can be escaped. Hash choices accept uppercase `X`, and copied choice prompts
+  no longer retain their hidden marker.
+- Labeled results now offer the same optional reason action as compact results.
+  Playground imports stay in Library instead of Captures, preserve existing
+  view-name casing, and reuse partially imported lessons. Practice Vault setup
+  stages the complete scaffold before publishing it, so failures leave no
+  half-created vault at the selected destination.
+- Updated compatible transitive fflate and fast-uri dependencies for archive
+  bounds and URI-parsing security fixes.
+- Typing a bare in-progress or completed task marker (`[/]` or `[x]`) and then
+  Space now adds the portable Markdown list prefix while preserving that state,
+  just as `[]` already did. Single-task completion now uses the active theme
+  accent instead of pass/fail green, and keyboard activation retains focus so
+  repeated two- or three-state cycling remains possible. The separate `[][]`
+  result control keeps its green pass and red fail semantics.
+- Enter after an in-progress task now starts an unchecked task instead of
+  leaking `[/]` down the list. Arrow-left can expose the raw state mark, and a
+  one-second hover on an empty task reveals an accessible In progress action.
+  Completed single checkboxes are solid accent fills without a check glyph.
+- Compact results cross out the rejected side after a choice, `[##]` rows read
+  as a grouped multi-choice panel, toggle colors accept `[:blue|:green]`, and
+  backticked control examples render as plain source text without a code chip.
+- Purple is now a token-backed named result/toggle color, including
+  `[:blue|:purple]`. Grouped `[##]` choices now use a compact right-aligned
+  measure, even panel gutters, calmer selected rows, aligned controls, and an
+  optional `[##?]` question row. Backticked examples render as ordinary text,
+  and the importable Playground is discoverable in General settings.
+
 ## [0.89.0] - 2026-09-03
 
 ## [0.88.0] - 2026-09-03
@@ -264,7 +319,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Quick capture never surfaces the app, and captures stay captures.** ⌥C
   from another app with Rotli open underneath raised the main window over the
   app you were in; the card now follows the Quick Note law (in Rotli means
-  main was visible *and* focused, and finishing never force-raises main).
+  main was visible _and_ focused, and finishing never force-raises main).
   Secure-at-birth captures were also filed under “Secure notes” beside curated
   secure notes; a capture that still carries the capture shelf now projects to
   the Captures board like any staged capture, with its protection unchanged.

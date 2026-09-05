@@ -5,7 +5,8 @@
 
 import { usePanesStore } from "../state/panes";
 import { CHOICE_MARK } from "./choiceState";
-import { RESULT_MARK } from "./resultState";
+import { parseChoiceControlLine, parseToggleLine } from "./controlState";
+import { parseResultLine, RESULT_MARK } from "./resultState";
 import { MARK } from "./taskState";
 
 export type InlineMark = "bold" | "italic" | "underline" | "strike" | "code" | "highlight" | "link";
@@ -169,7 +170,9 @@ const BLOCK_RULES: Record<BlockToggle, { add: string; test: RegExp }> = {
 };
 
 export function blockToggleActive(line: string, kind: BlockToggle): boolean {
-  return BLOCK_RULES[kind].test.test(line.replace(/^\s*/, ""));
+  const rest = line.replace(/^\s*/, "");
+  if (parseResultLine(rest) || parseChoiceControlLine(rest) || parseToggleLine(rest)) return false;
+  return BLOCK_RULES[kind].test.test(rest);
 }
 
 /** Toggle a block prefix AFTER any leading indent — a Tab-nested "  - child"
@@ -178,12 +181,15 @@ export function applyBlockToggle(line: string, kind: BlockToggle): PrefixEdit {
   const indent = /^\s*/.exec(line)?.[0] ?? "";
   const rest = line.slice(indent.length);
   const rule = BLOCK_RULES[kind];
-  const on = rule.test.exec(rest);
+  const result = parseResultLine(rest);
+  const choiceControl = parseChoiceControlLine(rest);
+  const toggle = parseToggleLine(rest);
+  const on = result || choiceControl || toggle ? null : rule.test.exec(rest);
   if (on) {
     const next = indent + rest.slice(on[0].length);
     return { line: next, delta: -on[0].length };
   }
-  const stripped = rest.replace(ANY_BLOCK_PREFIX, "");
+  const stripped = result?.text ?? choiceControl?.text ?? toggle?.text ?? rest.replace(ANY_BLOCK_PREFIX, "");
   const next = indent + rule.add + stripped;
   return { line: next, delta: next.length - line.length };
 }

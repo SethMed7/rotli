@@ -52,11 +52,13 @@ const text = (view: FakeView) => view.state.doc.toString();
 const head = (view: FakeView) => view.state.selection.main.head;
 
 describe("fenced code is grammar-free (#8)", () => {
-  test("Space after [] inside a fence types normally (never becomes a task)", () => {
-    const doc = "```js\n[]\n```";
-    const v = viewOf(doc, doc.indexOf("[]") + 2);
-    expect(press(v, "Space")).toBe(false);
-    expect(text(v)).toBe(doc);
+  test("Space after any task-state token inside a fence types normally", () => {
+    for (const token of ["[]", "[/]", "[x]"]) {
+      const doc = `\`\`\`js\n${token}\n\`\`\``;
+      const v = viewOf(doc, doc.indexOf(token) + token.length);
+      expect(press(v, "Space")).toBe(false);
+      expect(text(v)).toBe(doc);
+    }
   });
 
   test("Enter after a dash line inside a fence never continues a list", () => {
@@ -117,6 +119,27 @@ describe("numbered lists renumber on Enter (#9)", () => {
     expect(press(v, "Enter")).toBe(true);
     expect(text(v)).toBe("1. [x] done step\n2. [ ] \n3. [ ] next step");
   });
+
+  test("an in-progress task always continues as a fresh unchecked task", () => {
+    const plainDoc = "- [/] drafting";
+    const plain = viewOf(plainDoc, plainDoc.length);
+    expect(press(plain, "Enter")).toBe(true);
+    expect(text(plain)).toBe("- [/] drafting\n- [ ] ");
+
+    const orderedDoc = "4. [/] drafting";
+    const ordered = viewOf(orderedDoc, orderedDoc.length);
+    expect(press(ordered, "Enter")).toBe(true);
+    expect(text(ordered)).toBe("4. [/] drafting\n5. [ ] ");
+  });
+});
+
+describe("raw task-state editing", () => {
+  test("ArrowLeft at task text selects the state mark for direct replacement", () => {
+    const doc = "- [ ] Drafting";
+    const view = viewOf(doc, 6);
+    expect(press(view, "ArrowLeft")).toBe(true);
+    expect(view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to)).toBe(" ");
+  });
 });
 
 describe("the empty-item exit ramp needs the caret past the marker (#11)", () => {
@@ -136,6 +159,23 @@ describe("the empty-item exit ramp needs the caret past the marker (#11)", () =>
 });
 
 describe("the []+Space task shorthand (#14, #15)", () => {
+  test("preserves explicit in-progress and done states while adding the portable list marker", () => {
+    const cases = [
+      { source: "[/]", expected: "- [/] " },
+      { source: "- [/]", expected: "- [/] " },
+      { source: "[x]", expected: "- [x] " },
+      { source: "[X]", expected: "- [x] " },
+      { source: "- [x]", expected: "- [x] " },
+    ];
+
+    for (const { source, expected } of cases) {
+      const view = viewOf(source, source.length);
+      expect(press(view, "Space")).toBe(true);
+      expect(text(view)).toBe(expected);
+      expect(head(view)).toBe(expected.length);
+    }
+  });
+
   test("normalizes a pasted tab indent into spaces so the task is a real task", () => {
     const doc = "\t[]";
     const v = viewOf(doc, doc.length);
@@ -169,6 +209,17 @@ describe("the [][]+Space result shorthand", () => {
     const task = viewOf("[]", 2);
     expect(press(task, "Space")).toBe(true);
     expect(text(task)).toBe("- [ ] ");
+  });
+
+  test("adds portable list structure to labeled result controls", () => {
+    const result = viewOf("[True][False]", 13);
+    expect(press(result, "Space")).toBe(true);
+    expect(text(result)).toBe("- [True][False] ");
+    expect(head(result)).toBe(16);
+
+    const colored = viewOf("[Purple:purple][Blue:green]", 27);
+    expect(press(colored, "Space")).toBe(true);
+    expect(text(colored)).toBe("- [Purple:purple][Blue:green] ");
   });
 
   test("normalizes indent and upgrades an existing bullet", () => {
@@ -249,6 +300,40 @@ describe("the ()+Space multiple-choice shorthand", () => {
     const result = viewOf("- [ ][ ] API", 12);
     expect(press(result, "Tab")).toBe(true);
     expect(text(result)).toBe("  - [ ][ ] API");
+  });
+});
+
+describe("hash choice and toggle shorthands", () => {
+  test("creates radio and multi-select list rows", () => {
+    const radio = viewOf("[#]", 3);
+    expect(press(radio, "Space")).toBe(true);
+    expect(text(radio)).toBe("- [#] ");
+    const multi = viewOf("[##]", 4);
+    expect(press(multi, "Space")).toBe(true);
+    expect(text(multi)).toBe("- [##] ");
+
+    const prompt = viewOf("[##?]", 5);
+    expect(press(prompt, "Space")).toBe(true);
+    expect(text(prompt)).toBe("- [##?] ");
+  });
+
+  test("Enter after a multi-choice prompt starts its first answer", () => {
+    const source = "- [##?] Pick channels";
+    const prompt = viewOf(source, source.length);
+    expect(press(prompt, "Enter")).toBe(true);
+    expect(text(prompt)).toBe(`${source}\n- [##] `);
+  });
+
+  test("creates explicit-off compact and labeled toggles", () => {
+    const compact = viewOf("[|]", 3);
+    expect(press(compact, "Space")).toBe(true);
+    expect(text(compact)).toBe("- [|x] ");
+    const labeled = viewOf("[True|False]", 12);
+    expect(press(labeled, "Space")).toBe(true);
+    expect(text(labeled)).toBe("- [True|x False] ");
+    const colored = viewOf("[:blue|:purple]", 15);
+    expect(press(colored, "Space")).toBe(true);
+    expect(text(colored)).toBe("- [:blue|x :purple] ");
   });
 });
 

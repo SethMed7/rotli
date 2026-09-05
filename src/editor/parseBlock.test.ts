@@ -7,6 +7,8 @@ import { describe, expect, test } from "bun:test";
 
 import { parseBlock } from "./render";
 
+const CUSTOM_AMBER = `#${"E3B341"}`;
+
 describe("parseBlock — tab-tolerant list indents", () => {
   test("a tab-indented bullet is a bullet (tab = one nesting level)", () => {
     const b = parseBlock("\t- child");
@@ -124,6 +126,18 @@ describe("parseBlock — two-choice results", () => {
     expect(parseBlock("- [ ] todo").kind).toBe("task");
     expect(parseBlock("1. [x] done").kind).toBe("task");
   });
+
+  test("labeled result rows expose every option without swallowing the question", () => {
+    const block = parseBlock(`- [True:green][Draw:${CUSTOM_AMBER}][x False:red] Release?`);
+    expect(block.kind).toBe("result");
+    expect(block.prefixLen).toBe(`- [True:green][Draw:${CUSTOM_AMBER}][x False:red] `.length);
+    expect(block.text).toBe("Release?");
+    expect(block.resultOptions?.map(({ label, selected, color }) => ({ label, selected, color }))).toEqual([
+      { label: "True", selected: false, color: "green" },
+      { label: "Draw", selected: false, color: CUSTOM_AMBER },
+      { label: "False", selected: true, color: "red" },
+    ]);
+  });
 });
 
 describe("parseBlock — multiple-choice rows", () => {
@@ -145,10 +159,57 @@ describe("parseBlock — multiple-choice rows", () => {
     expect(block.marker).toBe("12.");
     expect(block.indent).toBe(2);
     expect(block.text).toBe("Blue");
+    expect(block.choiceVariant).toBe("legacy");
   });
 
   test("ordinary parenthesized list text remains an ordinary list", () => {
     expect(parseBlock("- (maybe) later").kind).toBe("bullet");
     expect(parseBlock("2. (yes) later").kind).toBe("numbered");
+  });
+});
+
+describe("parseBlock — hash choices and toggles", () => {
+  test("an optional multi-choice question remains distinct from its answers", () => {
+    expect(parseBlock("- [##?] Which channels should we use?")).toMatchObject({
+      kind: "choice",
+      choiceVariant: "prompt",
+      text: "Which channels should we use?",
+      prefixLen: 8,
+      indent: 0,
+    });
+  });
+
+  test("new one-of-many and many-of-many markers stay distinct", () => {
+    const radio = parseBlock("- [#x] Blue");
+    expect(radio).toMatchObject({
+      kind: "choice",
+      choiceVariant: "radio",
+      choiceSelected: true,
+      text: "Blue",
+    });
+    const multi = parseBlock("  3. [##] Green");
+    expect(multi).toMatchObject({
+      kind: "choice",
+      choiceVariant: "multi",
+      choiceSelected: false,
+      marker: "3.",
+      indent: 2,
+    });
+  });
+
+  test("compact and labeled switches expose their active state", () => {
+    expect(parseBlock("- [|x] Alerts")).toMatchObject({
+      kind: "toggle",
+      toggleOn: false,
+      toggleCompact: true,
+      text: "Alerts",
+    });
+    expect(parseBlock("2. [x True:green|False:red] Sync")).toMatchObject({
+      kind: "toggle",
+      toggleOn: true,
+      toggleCompact: false,
+      toggleLabels: ["True", "False"],
+      marker: "2.",
+    });
   });
 });

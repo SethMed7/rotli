@@ -513,8 +513,8 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 20px;
-  height: 18px;
+  width: var(--control-hit-min);
+  height: var(--control-hit-min);
   margin: -4px 0 -4px auto;
   border-radius: var(--r-control);
   color: var(--text-muted);
@@ -1204,8 +1204,8 @@
    <button> can't nest inside the row's <button>); they stopPropagation in JS so
    a click acts, never opening the note. */
 .snrow .snactbtn {
-  width: 18px;
-  height: 18px;
+  width: var(--control-hit-min);
+  height: var(--control-hit-min);
   border-radius: var(--r-inner);
   display: grid;
   place-items: center;
@@ -1451,7 +1451,8 @@
   background: var(--hov);
   color: var(--text);
 }
-.sidebtn:hover .tip {
+.sidebtn:hover .tip,
+.sidebtn:focus-visible .tip {
   opacity: 1;
   transition-delay: 300ms;
 }
@@ -2065,8 +2066,8 @@
    Pane focus still reads from the active tab merging into its editor. */
 .tab .x {
   margin-left: auto;
-  width: 15px;
-  height: 15px;
+  width: var(--control-hit-min);
+  height: var(--control-hit-min);
   border-radius: var(--r-inner);
   display: grid;
   place-items: center;
@@ -2105,7 +2106,8 @@
   background: var(--surface-2);
   color: var(--text);
 }
-.tabplus:hover .tip {
+.tabplus:hover .tip,
+.tabplus:focus-visible .tip {
   opacity: 1;
   transition-delay: 300ms;
 }

@@ -15,7 +15,36 @@ export const RESULT_MARK = "[ xX]";
 
 export type ResultState = "unanswered" | "no" | "yes";
 export type ResultChoice = Exclude<ResultState, "unanswered">;
+export type ResultColor =
+  | "accent"
+  | "blue"
+  | "green"
+  | "yellow"
+  | "purple"
+  | "red"
+  | "neutral"
+  | `#${string}`;
 export const RESULT_REASON_SEPARATOR = " — ";
+
+export interface ResultOption {
+  /** Human-readable button text. Compact results use Yes/No for accessibility. */
+  label: string;
+  selected: boolean;
+  /** Null means the current theme accent for labeled controls. */
+  color: ResultColor | null;
+  /** The exact portable option body without a leading `x ` selection marker. */
+  source: string;
+}
+
+export interface ParsedResultLine {
+  indent: string;
+  /** Source list marker including its trailing space (`- ` or `3. `). */
+  marker: string;
+  prefixLen: number;
+  text: string;
+  compact: boolean;
+  options: ResultOption[];
+}
 
 export interface ResultTextParts {
   label: string;
@@ -42,12 +71,103 @@ export function resultStateOf(yesMark: string, noMark: string): ResultState | nu
   return yes ? "yes" : "unanswered";
 }
 
+const RESULT_COLOR_NAMES = new Set<ResultColor>([
+  "accent",
+  "blue",
+  "green",
+  "yellow",
+  "purple",
+  "red",
+  "neutral",
+]);
+const RESULT_HEX_RE = /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i;
+
+export function resultOptionOf(body: string, fallbackLabel?: string): ResultOption | null {
+  const trimmed = body.trim();
+  const selectedMatch = /^x\s+(.+)$/.exec(trimmed);
+  const source = (selectedMatch?.[1] ?? trimmed).trim();
+  if (!source) return null;
+
+  let label = source;
+  let color: ResultColor | null = null;
+  const colon = source.lastIndexOf(":");
+  if (colon >= 0) {
+    const suffix = source.slice(colon + 1).trim();
+    const normalized = suffix.toLowerCase();
+    if (RESULT_HEX_RE.test(suffix)) color = suffix as ResultColor;
+    else if (RESULT_COLOR_NAMES.has(normalized as ResultColor)) color = normalized as ResultColor;
+    else return null;
+    label = source.slice(0, colon).trim();
+  }
+  if (!label) {
+    if (!fallbackLabel || color === null) return null;
+    label = fallbackLabel;
+  }
+  return { label: label.replace(/^\\(?=[xX]\s)/, ""), selected: selectedMatch !== null, color, source };
+}
+
+/** Parse the whole portable result prefix. Labeled options are adjacent boxes:
+ * `[True][False]` or labels with semantic/custom color suffixes. Invalid color
+ * syntax and multiple selections fail closed, leaving ordinary Markdown. */
+export function parseResultLine(line: string): ParsedResultLine | null {
+  const lead = /^(\s*)((?:-|\d+\.) )/.exec(line);
+  if (!lead) return null;
+  let at = lead[0].length;
+  const bodies: string[] = [];
+  while (line[at] === "[") {
+    const close = line.indexOf("]", at + 1);
+    if (close < 0) return null;
+    bodies.push(line.slice(at + 1, close));
+    at = close + 1;
+  }
+  if (bodies.length < 2 || line[at] !== " ") return null;
+
+  const compact = bodies.length === 2 && bodies.every((body) => /^[ xX]$/.test(body));
+  let options: ResultOption[];
+  if (compact) {
+    const state = resultStateOf(bodies[0] ?? " ", bodies[1] ?? " ");
+    if (state === null) return null;
+    options = [
+      { label: "Yes", selected: state === "yes", color: "green", source: "" },
+      { label: "No", selected: state === "no", color: "red", source: "" },
+    ];
+  } else {
+    const parsed = bodies.map((body) => resultOptionOf(body));
+    if (parsed.some((option) => option === null)) return null;
+    options = parsed as ResultOption[];
+    if (options.filter((option) => option.selected).length > 1) return null;
+    if (options.length === 2) {
+      options = options.map((option, index) => ({
+        ...option,
+        color: option.color ?? (index === 0 ? "green" : "red"),
+      }));
+    }
+  }
+
+  return {
+    indent: lead[1] ?? "",
+    marker: lead[2] ?? "- ",
+    prefixLen: at + 1,
+    text: line.slice(at + 1),
+    compact,
+    options,
+  };
+}
+
 /** Rewrite only a valid result row, preserving its indent, list marker, and text. */
-export function chooseResult(line: string, choice: ResultChoice): string | null {
-  const match = RESULT_LINE_RE.exec(line);
-  if (!match || resultStateOf(match[3] ?? " ", match[4] ?? " ") === null) return null;
-  const marks = choice === "yes" ? "[x][ ]" : "[ ][x]";
-  return `${match[1] ?? ""}${match[2] ?? "- "}${marks} ${line.slice(match[0].length)}`;
+export function chooseResult(line: string, choice: ResultChoice | number): string | null {
+  const parsed = parseResultLine(line);
+  if (!parsed) return null;
+  const index = typeof choice === "number" ? choice : choice === "yes" ? 0 : 1;
+  if (index < 0 || index >= parsed.options.length) return null;
+  const boxes = parsed.compact
+    ? index === 0
+      ? "[x][ ]"
+      : "[ ][x]"
+    : parsed.options
+        .map((option, optionIndex) => `[${optionIndex === index ? "x " : ""}${option.source}]`)
+        .join("");
+  return `${parsed.indent}${parsed.marker}${boxes} ${parsed.text}`;
 }
 
 /** Split an optional human explanation without adding metadata or a sidecar. */

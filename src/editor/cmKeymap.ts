@@ -7,7 +7,7 @@
 //             gets a soft 2-space tab at the caret, since indentation inside a
 //             fence is the user's code.
 //   ⇧Tab    — outdent up to 2 leading spaces.
-//   Space   — "[ ]"/"[]" becomes a task; "[][]" becomes a yes/no result;
+//   Space   — "[]"/"[ ]"/"[/]"/"[x]" becomes a task; "[][]" becomes a yes/no result;
 //             "()" becomes a one-of-many choice option.
 //   In a TABLE (the maintainer, 2026-07-01): Tab/⇧Tab hop to the next/previous cell
 //   (crossing rows), ↑/↓ hop rows in the same column, Enter moves to the same
@@ -19,9 +19,10 @@ import { EditorSelection, type Line, type TransactionSpec } from "@codemirror/st
 import type { Command, EditorView, KeyBinding } from "@codemirror/view";
 
 import { CHOICE_LINE_RE } from "./choiceState";
+import { parseChoiceControlLine, parseChoicePromptLine, parseToggleLine, setToggleOn } from "./controlState";
 import { lineInFence, scanFences } from "./fences";
 import { imageSourceSpan } from "./imageSelection";
-import { RESULT_LINE_RE, resultStateOf } from "./resultState";
+import { parseResultLine } from "./resultState";
 import {
   type CellRef,
   type TableBlock,
@@ -31,7 +32,7 @@ import {
   scanTables,
   tableToText,
 } from "./tables";
-import { MARK } from "./taskState";
+import { MARK, markOf, TASK_LINE_RE, taskStateOf } from "./taskState";
 
 /** Fenced code is grammar-free: no list continuation, no task shorthand, no
  * list indent — `[]` or `- item` inside a ``` fence is the user's code. */
@@ -44,15 +45,55 @@ function inFence(view: EditorView, line: Line): boolean {
  * ordered tasks count up AND reset), quotes. Returns the marker for the NEXT
  * line and whether the item is empty. */
 function listPrefixOf(line: string): { prefixLen: number; next: string; empty: boolean } | null {
-  const result = RESULT_LINE_RE.exec(line);
-  if (result && resultStateOf(result[3] ?? " ", result[4] ?? " ") !== null) {
-    const indent = result[1] ?? "";
-    const numbered = /^(\d+)\. $/.exec(result[2] ?? "");
+  const parsedResult = parseResultLine(line);
+  if (parsedResult) {
+    const numbered = /^(\d+)\. $/.exec(parsedResult.marker);
+    const marker = numbered ? `${Number(numbered[1]) + 1}. ` : "- ";
+    const controls = parsedResult.compact
+      ? "[ ][ ]"
+      : parsedResult.options.map((option) => `[${option.source}]`).join("");
+    return {
+      prefixLen: parsedResult.prefixLen,
+      next: `${parsedResult.indent}${marker}${controls} `,
+      empty: parsedResult.text.trim() === "",
+    };
+  }
+  const toggle = parseToggleLine(line);
+  if (toggle) {
+    const numbered = /^(\d+)\. $/.exec(toggle.marker);
+    const marker = numbered ? `${Number(numbered[1]) + 1}. ` : "- ";
+    const reset = setToggleOn(line, false);
+    if (reset) {
+      const control = reset.slice(
+        toggle.indentSource.length + toggle.marker.length,
+        reset.length - toggle.text.length,
+      );
+      return {
+        prefixLen: toggle.prefixLen,
+        next: `${toggle.indentSource}${marker}${control}`,
+        empty: toggle.text.trim() === "",
+      };
+    }
+  }
+  const choiceControl = parseChoiceControlLine(line);
+  if (choiceControl) {
+    const numbered = /^(\d+)\. $/.exec(choiceControl.marker);
+    const marker = numbered ? `${Number(numbered[1]) + 1}. ` : "- ";
+    const hashes = choiceControl.kind === "radio" ? "#" : "##";
+    return {
+      prefixLen: choiceControl.prefixLen,
+      next: `${choiceControl.indentSource}${marker}[${hashes}] `,
+      empty: choiceControl.text.trim() === "",
+    };
+  }
+  const choicePrompt = parseChoicePromptLine(line);
+  if (choicePrompt) {
+    const numbered = /^(\d+)\. $/.exec(choicePrompt.marker);
     const marker = numbered ? `${Number(numbered[1]) + 1}. ` : "- ";
     return {
-      prefixLen: result[0].length,
-      next: `${indent}${marker}[ ][ ] `,
-      empty: line.slice(result[0].length).trim() === "",
+      prefixLen: choicePrompt.prefixLen,
+      next: `${choicePrompt.indentSource}${marker}[##] `,
+      empty: choicePrompt.text.trim() === "",
     };
   }
   const choice = CHOICE_LINE_RE.exec(line);
@@ -74,7 +115,7 @@ function listPrefixOf(line: string): { prefixLen: number; next: string; empty: b
   const prefix = m[2] ?? "";
   const content = m[3] ?? "";
   const num = prefix.match(new RegExp(`^(\\d+)\\. (\\[${MARK}\\] )?$`));
-  const marker = num ? `${Number(num[1]) + 1}. ${num[2] ? "[ ] " : ""}` : prefix.replace(/\[[xX]\]/, "[ ]");
+  const marker = num ? `${Number(num[1]) + 1}. ${num[2] ? "[ ] " : ""}` : prefix.replace(/\[[/xX]\]/, "[ ]");
   return {
     prefixLen: indent.length + prefix.length,
     next: indent + marker,
@@ -130,7 +171,11 @@ const tabIndent: Command = (view) => {
     for (let n = startLine.number; n <= endLine.number; n++) {
       const l = state.doc.line(n);
       const indent = leadingIndent(l.text);
-      changes.push({ from: l.from, to: l.from + indent.length, insert: `  ${indent.replace(/\t/g, "  ")}` });
+      changes.push({
+        from: l.from,
+        to: l.from + indent.length,
+        insert: `  ${indent.replace(/\t/g, "  ")}`,
+      });
     }
     view.dispatch({ changes, userEvent: "input.indent" });
     return true;
@@ -149,7 +194,11 @@ const tabIndent: Command = (view) => {
   const indent = leadingIndent(startLine.text);
   const insert = `  ${indent.replace(/\t/g, "  ")}`;
   const spec: TransactionSpec = {
-    changes: { from: startLine.from, to: startLine.from + indent.length, insert },
+    changes: {
+      from: startLine.from,
+      to: startLine.from + indent.length,
+      insert,
+    },
     userEvent: "input.indent",
   };
   // the caret rides the shift — an insertion AT the caret (column 0, or an empty
@@ -208,16 +257,74 @@ const listControlOnSpace: Command = (view) => {
     });
     return true;
   }
-  // "[ ]"/"[]" at line start — optionally after an existing bullet ("- []"
-  // upgrades the bullet to a task). Pasted tab indents normalize to the two
-  // spaces the rest of the grammar speaks.
-  const m = /^(\s*)(?:- )?\[ ?\]$/.exec(before);
+  const labeledResult = /^(\s*)(?:- )?((?:\[[^\]\r\n]+\]){2,})$/.exec(before);
+  if (labeledResult) {
+    const indent = (labeledResult[1] ?? "").replace(/\t/g, "  ");
+    const controls = labeledResult[2] ?? "";
+    if (parseResultLine(`${indent}- ${controls} `)) {
+      const prefix = `${indent}- ${controls} `;
+      view.dispatch({
+        changes: { from: line.from, to: range.head, insert: prefix },
+        selection: EditorSelection.cursor(line.from + prefix.length),
+        userEvent: "input",
+      });
+      return true;
+    }
+  }
+  const hashChoice = /^(\s*)(?:- )?\[(##\?|##|#)\]$/.exec(before);
+  if (hashChoice) {
+    const prefix = `${(hashChoice[1] ?? "").replace(/\t/g, "  ")}- [${hashChoice[2]}] `;
+    view.dispatch({
+      changes: { from: line.from, to: range.head, insert: prefix },
+      selection: EditorSelection.cursor(line.from + prefix.length),
+      userEvent: "input",
+    });
+    return true;
+  }
+  const toggle = /^(\s*)(?:- )?(\[[^\]\r\n]*\|[^\]\r\n]*\])$/.exec(before);
+  if (toggle) {
+    const indent = (toggle[1] ?? "").replace(/\t/g, "  ");
+    const candidate = `${indent}- ${toggle[2]} `;
+    const prefix = setToggleOn(candidate, false);
+    if (prefix) {
+      view.dispatch({
+        changes: { from: line.from, to: range.head, insert: prefix },
+        selection: EditorSelection.cursor(line.from + prefix.length),
+        userEvent: "input",
+      });
+      return true;
+    }
+  }
+  // Any task-state token at line start — `[]`/`[ ]`, `[/]`, or `[x]` — may be
+  // typed without its list marker. Space upgrades it to portable task source;
+  // an optional existing bullet upgrades in place. Pasted tab indents normalize
+  // to the two spaces the rest of the grammar speaks.
+  const m = new RegExp(`^(\\s*)(?:- )?\\[(${MARK})?\\]$`).exec(before);
   if (!m) return false; // not a task shorthand → space types normally
-  const prefix = `${(m[1] ?? "").replace(/\t/g, "  ")}- [ ] `;
+  const mark = markOf(taskStateOf(m[2] ?? " "));
+  const prefix = `${(m[1] ?? "").replace(/\t/g, "  ")}- [${mark}] `;
   view.dispatch({
     changes: { from: line.from, to: range.head, insert: prefix },
     selection: EditorSelection.cursor(line.from + prefix.length),
     userEvent: "input",
+  });
+  return true;
+};
+
+/** Arrow into an atomic task marker to edit its raw state character. The
+ * blank mark is selected, so typing `/` is the direct open → in-progress path
+ * without making every ordinary click abandon live preview. */
+const taskMarkerArrowLeft: Command = (view) => {
+  const range = view.state.selection.main;
+  if (!range.empty) return false;
+  const line = view.state.doc.lineAt(range.head);
+  const task = TASK_LINE_RE.exec(line.text);
+  if (!task || range.head !== line.from + task[0].length) return false;
+  const markFrom = line.from + task[0].length - 3;
+  view.dispatch({
+    selection: EditorSelection.range(markFrom, markFrom + 1),
+    scrollIntoView: true,
+    userEvent: "select",
   });
   return true;
 };
@@ -371,7 +478,10 @@ const tableEnter: Command = (view) => {
   // last row → exit below the table (never split a row with a newline)
   const after = t.to >= view.state.doc.length ? null : view.state.doc.lineAt(t.to + 1);
   if (after) {
-    view.dispatch({ selection: EditorSelection.cursor(after.from), scrollIntoView: true });
+    view.dispatch({
+      selection: EditorSelection.cursor(after.from),
+      scrollIntoView: true,
+    });
   } else {
     view.dispatch({
       changes: { from: t.to, insert: "\n" },
@@ -391,6 +501,7 @@ export const rotliKeymap: KeyBinding[] = [
   { key: "ArrowDown", run: tableArrow(1) },
   { key: "ArrowUp", run: imageArrow("up") },
   { key: "ArrowDown", run: imageArrow("down") },
+  { key: "ArrowLeft", run: taskMarkerArrowLeft },
   { key: "ArrowLeft", run: imageArrow("left") },
   { key: "ArrowRight", run: imageArrow("right") },
   { key: "Enter", run: enterContinueList },
