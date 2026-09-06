@@ -10,6 +10,12 @@
 // and robots.txt derive from it. Both are read from the process environment
 // during the build, so Railway service variables are the only knobs.
 
+export const GITHUB_URL = 'https://github.com/SethMed7/rotli';
+export const RELEASES_URL = 'https://github.com/SethMed7/rotli-releases/releases/latest';
+export const LICENSE_URL = `${GITHUB_URL}/blob/main/LICENSE`;
+export const PRIVACY_URL = `${GITHUB_URL}/blob/main/PRIVACY.md`;
+export const ROADMAP_URL = `${GITHUB_URL}/blob/main/ROADMAP.md`;
+
 export type SiteMode = 'coming-soon' | 'dev' | 'full';
 
 const MODES: readonly SiteMode[] = ['coming-soon', 'dev', 'full'];

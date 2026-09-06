@@ -3,10 +3,10 @@ import Base from '../layouts/Base.astro';
 import mark from '../../../src/assets/characters/_logo.svg?raw';
 import staysLocal from '../../../src/assets/characters/filled/cocoa/stays_local.webp';
 import celebrating from '../../../src/assets/characters/filled/cocoa/celebrating.webp';
-import { site } from '../site';
+import SiteFooter from './SiteFooter.astro';
+import SiteHeader from './SiteHeader.astro';
+import { GITHUB_URL, PRIVACY_URL, RELEASES_URL, ROADMAP_URL, site } from '../site';
 
-const RELEASES_URL = 'https://github.com/SethMed7/rotli-releases/releases/latest';
-const GITHUB_URL = 'https://github.com/SethMed7/rotli';
 
 const themeFamilies = [
   { id: 'rotli', name: 'Rotli', environment: 'Warm Light', screenshot: '/rotli-app-warm-light.png' },
@@ -42,34 +42,15 @@ const surfaces = [
 ---
 
 <Base noindex={!site.indexable}>
-  <header class="site-header">
-    <a class="brand" href="/" aria-label="Rotli home">
-      <span class="brand-mark" set:html={mark} aria-hidden="true"></span>
-      <span class="wordmark">rotli</span>
-    </a>
-    <nav class="primary-nav" aria-label="Primary navigation">
-      <a href="#why-local">Why local</a>
-      <a href="#workspace">Workspace</a>
-      <a href="#personal">Personalize</a>
-      <a href="#beyond-the-app">More than an app</a>
-      <a href="/mcp/">MCP</a>
-    </nav>
-    <div class="header-actions">
-      <a class="github-link" href={GITHUB_URL} rel="noopener">GitHub</a>
-      <button class="mode-toggle" id="mode-toggle" type="button" aria-label="Use dark appearance">
-        <span class="mode-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path class="moon-path" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path>
-            <g class="sun-path">
-              <circle cx="12" cy="12" r="4"></circle>
-              <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
-            </g>
-          </svg>
-        </span>
-        <span class="mode-label">Dark</span>
-      </button>
-    </div>
-  </header>
+  <SiteHeader
+    nav={[
+      { href: '#why-local', label: 'Why local' },
+      { href: '#workspace', label: 'Workspace' },
+      { href: '#personal', label: 'Personalize' },
+      { href: '#beyond-the-app', label: 'More than an app' },
+      { href: '/mcp/', label: 'MCP' },
+    ]}
+  />
 
   <main id="content">
     <section class="hero-shell" aria-labelledby="hero-title">
@@ -311,46 +292,33 @@ const surfaces = [
         <h2 id="final-title">A durable place for the work you want to keep.</h2>
         <p>Warm enough to return to. Quiet enough to disappear. Local enough to remain yours.</p>
       </div>
-      {site.downloadsEnabled ? (
-        <a class="button final-button" href={RELEASES_URL} rel="noopener">Download the Mac beta</a>
-      ) : (
-        <span class="button final-button pending" aria-disabled="true">Mac beta coming soon</span>
-      )}
+      <div class="final-actions">
+        {site.downloadsEnabled ? (
+          <a class="button final-button" href={RELEASES_URL} rel="noopener">Download the Mac beta</a>
+        ) : (
+          <span class="button final-button pending" aria-disabled="true">Mac beta coming soon</span>
+        )}
+        <a class="button final-link" href={GITHUB_URL} rel="noopener">View on GitHub</a>
+      </div>
     </section>
   </main>
 
-  <footer class="site-footer">
-    <a class="footer-brand" href="/" aria-label="Rotli home"><span set:html={mark} aria-hidden="true"></span><b>rotli</b></a>
-    <p>Local-first, free, and open source.</p>
-    <nav aria-label="Footer navigation">
-      <a href={GITHUB_URL} rel="noopener">GitHub</a>
-      {site.downloadsEnabled && <a href={RELEASES_URL} rel="noopener">Releases</a>}
-      <a href="/mcp/">MCP guide</a>
-      <a href="https://github.com/SethMed7/rotli/blob/main/PRIVACY.md" rel="noopener">Privacy</a>
-      <a href="https://github.com/SethMed7/rotli/blob/main/ROADMAP.md" rel="noopener">Roadmap</a>
-    </nav>
-  </footer>
+  <SiteFooter
+    tagline="Local-first, free, and open source under the MIT license."
+    links={[
+      { href: GITHUB_URL, label: 'GitHub' },
+      ...(site.downloadsEnabled ? [{ href: RELEASES_URL, label: 'Releases' }] : []),
+      { href: '/mcp/', label: 'MCP guide' },
+      { href: PRIVACY_URL, label: 'Privacy' },
+      { href: ROADMAP_URL, label: 'Roadmap' },
+    ]}
+  />
 
   <script>
     const root = document.documentElement;
-    const modeButton = document.querySelector<HTMLButtonElement>('#mode-toggle');
-    const modeLabel = modeButton?.querySelector<HTMLElement>('.mode-label');
     const familyButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-theme-family]')];
     const themePreviewImage = document.querySelector<HTMLImageElement>('#theme-preview-image');
     const themePreviewCaption = document.querySelector<HTMLElement>('#theme-preview-caption');
-
-    const savePreference = (key: string, value: string) => {
-      try {
-        localStorage.setItem(key, value);
-      } catch (error) {}
-    };
-
-    const syncMode = () => {
-      const dark = root.dataset.mode === 'dark';
-      if (modeLabel) modeLabel.textContent = dark ? 'Light' : 'Dark';
-      modeButton?.setAttribute('aria-label', dark ? 'Use light appearance' : 'Use dark appearance');
-      modeButton?.setAttribute('data-mode', dark ? 'dark' : 'light');
-    };
 
     const syncFamily = () => {
       familyButtons.forEach((button) => {
@@ -370,29 +338,22 @@ const surfaces = [
       }
     };
 
-    modeButton?.addEventListener('click', () => {
-      root.dataset.mode = root.dataset.mode === 'dark' ? 'light' : 'dark';
-      savePreference('rotli-site-mode', root.dataset.mode);
-      syncMode();
-    });
-
     familyButtons.forEach((button) => {
       button.addEventListener('click', () => {
         root.dataset.family = button.dataset.themeFamily || 'rotli';
-        savePreference('rotli-site-family', root.dataset.family);
+        try {
+          localStorage.setItem('rotli-site-family', root.dataset.family);
+        } catch (error) {}
         syncFamily();
       });
     });
 
-    syncMode();
     syncFamily();
   </script>
 
   <style>
-    .site-header,
     main > section,
-    .proof-strip,
-    .site-footer {
+    .proof-strip {
       width: min(100% - 3rem, var(--page-max));
       margin-inline: auto;
     }
@@ -400,102 +361,6 @@ const surfaces = [
     main > .hero-shell {
       width: 100%;
       max-width: none;
-    }
-
-    .site-header {
-      min-height: 76px;
-      display: flex;
-      align-items: center;
-      gap: 2rem;
-      position: relative;
-      z-index: 20;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .brand,
-    .footer-brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.55rem;
-      color: var(--text);
-      text-decoration: none;
-    }
-
-    .brand-mark {
-      width: 30px;
-      color: var(--text);
-      line-height: 0;
-    }
-
-    .wordmark,
-    .footer-brand b {
-      font-family: var(--font-wordmark);
-      font-size: 1.55rem;
-      font-weight: 600;
-      letter-spacing: -0.015em;
-    }
-
-    .primary-nav {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: clamp(1.1rem, 2.5vw, 2.2rem);
-      margin-inline: auto;
-    }
-
-    .primary-nav a,
-    .github-link {
-      min-height: 44px;
-      display: inline-flex;
-      align-items: center;
-      color: var(--text-muted);
-      font-size: 0.9rem;
-      text-decoration: none;
-    }
-
-    .primary-nav a:hover,
-    .github-link:hover {
-      color: var(--text);
-    }
-
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.8rem;
-    }
-
-    .mode-toggle {
-      min-width: 82px;
-      min-height: 44px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.45rem;
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      background: var(--surface);
-      color: var(--text);
-      cursor: pointer;
-    }
-
-    .mode-toggle:hover {
-      background: var(--surface-2);
-      border-color: var(--border-strong);
-    }
-
-    .mode-icon,
-    .mode-icon svg {
-      width: 17px;
-      height: 17px;
-    }
-
-    .sun-path,
-    .mode-toggle[data-mode='dark'] .moon-path {
-      display: none;
-    }
-
-    .mode-toggle[data-mode='dark'] .sun-path {
-      display: block;
     }
 
     .hero-shell {
@@ -588,52 +453,6 @@ const surfaces = [
       flex-wrap: wrap;
       gap: 0.75rem;
       margin-top: 2rem;
-    }
-
-    .button {
-      min-height: 50px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0.72rem 1.25rem;
-      border-radius: 0.7rem;
-      font-weight: 600;
-      text-decoration: none;
-      transition: transform 120ms ease-out, background-color 140ms ease-out, border-color 140ms ease-out;
-    }
-
-    .button:active {
-      transform: translateY(1px);
-    }
-
-    .button.pending,
-    .button.pending:hover,
-    .button.pending:active {
-      transform: none;
-      cursor: default;
-      opacity: 0.82;
-    }
-
-    .button.primary {
-      background: var(--text);
-      color: var(--ground);
-      border: 1px solid var(--text);
-    }
-
-    .button.primary:hover {
-      background: var(--accent-text);
-      border-color: var(--accent-text);
-      color: var(--on-accent);
-    }
-
-    .button.secondary {
-      background: transparent;
-      color: var(--text);
-      border: 1px solid var(--border-strong);
-    }
-
-    .button.secondary:hover {
-      background: var(--surface);
     }
 
     .release-note {
@@ -1064,18 +883,41 @@ const surfaces = [
       border-radius: 0.4rem;
     }
 
-    .theme-pair-rotli i:first-child { background: var(--swatch-rotli-light); }
-    .theme-pair-rotli i:last-child { background: var(--swatch-rotli-dark); }
-    .theme-pair-paper i:first-child { background: var(--swatch-paper-light); }
-    .theme-pair-paper i:last-child { background: var(--swatch-paper-dark); }
-    .theme-pair-ocean i:first-child { background: var(--swatch-ocean-light); }
-    .theme-pair-ocean i:last-child { background: var(--swatch-ocean-dark); }
-    .theme-pair-grove i:first-child { background: var(--swatch-grove-light); }
-    .theme-pair-grove i:last-child { background: var(--swatch-grove-dark); }
-    .theme-pair-iris i:first-child { background: var(--swatch-iris-light); }
-    .theme-pair-iris i:last-child { background: var(--swatch-iris-dark); }
-    .theme-pair-midnight i:first-child { background: var(--swatch-midnight-light); }
-    .theme-pair-midnight i:last-child { background: var(--swatch-midnight-dark); }
+    .theme-pair-rotli i:first-child { background: var(--swatch-rotli-light);
+    }
+
+    .theme-pair-rotli i:last-child { background: var(--swatch-rotli-dark);
+    }
+
+    .theme-pair-paper i:first-child { background: var(--swatch-paper-light);
+    }
+
+    .theme-pair-paper i:last-child { background: var(--swatch-paper-dark);
+    }
+
+    .theme-pair-ocean i:first-child { background: var(--swatch-ocean-light);
+    }
+
+    .theme-pair-ocean i:last-child { background: var(--swatch-ocean-dark);
+    }
+
+    .theme-pair-grove i:first-child { background: var(--swatch-grove-light);
+    }
+
+    .theme-pair-grove i:last-child { background: var(--swatch-grove-dark);
+    }
+
+    .theme-pair-iris i:first-child { background: var(--swatch-iris-light);
+    }
+
+    .theme-pair-iris i:last-child { background: var(--swatch-iris-dark);
+    }
+
+    .theme-pair-midnight i:first-child { background: var(--swatch-midnight-light);
+    }
+
+    .theme-pair-midnight i:last-child { background: var(--swatch-midnight-dark);
+    }
 
     .theme-capture {
       margin: 0;
@@ -1270,6 +1112,25 @@ const surfaces = [
       color: var(--deep);
     }
 
+    .final-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 0.75rem;
+    }
+
+    .final-link {
+      border: 1px solid var(--deep);
+      background: transparent;
+      color: var(--deep);
+      white-space: nowrap;
+    }
+
+    .final-link:hover {
+      background: var(--deep);
+      color: var(--deep-text);
+    }
+
     .final-button {
       border: 1px solid var(--deep);
       background: var(--deep);
@@ -1282,55 +1143,7 @@ const surfaces = [
       color: var(--deep);
     }
 
-    .site-footer {
-      min-height: 8rem;
-      display: grid;
-      grid-template-columns: auto 1fr auto;
-      gap: 2rem;
-      align-items: center;
-      border-top: 1px solid var(--border);
-      color: var(--text-muted);
-      font-size: 0.86rem;
-    }
-
-    .footer-brand span {
-      width: 23px;
-    }
-
-    .footer-brand b {
-      font-size: 1.25rem;
-      color: var(--text);
-    }
-
-    .site-footer p {
-      margin: 0;
-    }
-
-    .site-footer nav {
-      display: flex;
-      gap: 1.25rem;
-    }
-
-    .site-footer nav a {
-      min-height: 44px;
-      display: inline-flex;
-      align-items: center;
-      text-decoration: none;
-    }
-
-    .site-footer nav a:hover {
-      color: var(--text);
-    }
-
     @media (max-width: 1080px) {
-      .primary-nav {
-        display: none;
-      }
-
-      .header-actions {
-        margin-left: auto;
-      }
-
       .hero {
         grid-template-columns: 1fr;
         min-height: 0;
@@ -1434,50 +1247,16 @@ const surfaces = [
         align-self: start;
       }
 
-      .final-button {
+      .final-actions {
         grid-column: 2;
-        justify-self: start;
-      }
-
-      .site-footer {
-        grid-template-columns: 1fr;
-        gap: 0.5rem;
-        padding-block: 2rem;
+        justify-content: flex-start;
       }
     }
 
     @media (max-width: 560px) {
-      .site-header,
       main > section,
-      .proof-strip,
-      .site-footer {
+      .proof-strip {
         width: min(100% - 1.5rem, var(--page-max));
-      }
-
-      .site-header {
-        gap: 0.75rem;
-      }
-
-      .github-link {
-        display: none;
-      }
-
-      .mode-toggle {
-        min-width: 44px;
-        width: 44px;
-        padding: 0;
-      }
-
-      .mode-label {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        white-space: nowrap;
-        border: 0;
       }
 
       .hero {
@@ -1595,11 +1374,6 @@ const surfaces = [
       .final-button {
         grid-column: 1;
         width: 100%;
-      }
-
-      .site-footer nav {
-        flex-wrap: wrap;
-        gap: 0 1.1rem;
       }
     }
   </style>

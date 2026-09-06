@@ -35,6 +35,12 @@
 	@captures path /rotli-app-*.png
 	header @captures Cache-Control "public, max-age=86400, stale-while-revalidate=86400"
 
+	# The dev site is never indexed; the build already emits noindex meta and a
+	# Disallow robots.txt, this is the HTTP-layer twin (SITE_MODE is a runtime
+	# variable on Railway as well as a build arg).
+	@dev expression `{env.SITE_MODE} == "dev"`
+	header @dev X-Robots-Tag "noindex, nofollow"
+
 	# Astro's directory format: /mcp/ -> /mcp/index.html. Caddy redirects a bare
 	# /mcp to /mcp/ on its own. Unknown paths fall through to the 404 page.
 	handle_errors {

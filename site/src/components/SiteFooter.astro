@@ -1,0 +1,28 @@
+---
+// The one site footer: brand, a short tagline, and optional links.
+import mark from '../../../src/assets/characters/_logo.svg?raw';
+
+interface FooterLink {
+  href: string;
+  label: string;
+}
+
+interface Props {
+  tagline: string;
+  links?: FooterLink[];
+}
+
+const { tagline, links = [] } = Astro.props;
+---
+
+<footer class="site-footer">
+  <a class="footer-brand" href="/" aria-label="Rotli home"><span set:html={mark} aria-hidden="true"></span><b>rotli</b></a>
+  <p>{tagline}</p>
+  {links.length > 0 && (
+    <nav aria-label="Footer navigation">
+      {links.map((link) => (
+        <a href={link.href} rel={link.href.startsWith('http') ? 'noopener' : undefined}>{link.label}</a>
+      ))}
+    </nav>
+  )}
+</footer>
