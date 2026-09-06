@@ -5,6 +5,8 @@ interface Props {
   canonicalPath?: string;
   image?: string;
   noindex?: boolean;
+  /** Pin the page to one environment and ignore saved preferences. */
+  lockAppearance?: { family: string; mode: 'light' | 'dark' };
 }
 
 const {
@@ -13,13 +15,14 @@ const {
   canonicalPath = Astro.url.pathname,
   image = '/social-card.png',
   noindex = false,
+  lockAppearance,
 } = Astro.props as Props;
 const siteUrl = Astro.site ?? Astro.url;
 const canonicalUrl = new URL(canonicalPath, siteUrl).href;
 const socialImageUrl = new URL(image, siteUrl).href;
 ---
 
-<html lang="en">
+<html lang="en" data-family={lockAppearance?.family} data-mode={lockAppearance?.mode}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -43,6 +46,7 @@ const socialImageUrl = new URL(image, siteUrl).href;
     <script is:inline>
       try {
         const root = document.documentElement;
+        if (root.dataset.family && root.dataset.mode) throw new Error('appearance is locked');
         const families = ['rotli', 'paper', 'ocean', 'grove', 'iris', 'midnight'];
         const savedFamily = localStorage.getItem('rotli-site-family');
         const savedMode = localStorage.getItem('rotli-site-mode');

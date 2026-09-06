@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The coming-soon page is pinned to the Rotli light environment with no
+  appearance toggle, and its layout is mobile-first: a compact quokka above
+  the copy on phones and tablets, the framed quokka beside the copy only on
+  desktop.
+
 - The marketing site shares one header and footer across the landing, MCP,
   and coming-soon pages, shows the GitHub mark in the header, says "open
   source under the MIT license" in the footer, and offers "View on GitHub"

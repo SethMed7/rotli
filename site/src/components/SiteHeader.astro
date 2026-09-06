@@ -13,9 +13,10 @@ interface NavLink {
 interface Props {
   nav?: NavLink[];
   github?: boolean;
+  toggle?: boolean;
 }
 
-const { nav = [], github = true } = Astro.props;
+const { nav = [], github = true, toggle = true } = Astro.props;
 ---
 
 <header class="site-header">
@@ -30,6 +31,7 @@ const { nav = [], github = true } = Astro.props;
       ))}
     </nav>
   )}
+  {(github || toggle) && (
   <div class="header-actions">
     {github && (
       <a class="github-link" href={GITHUB_URL} rel="noopener" aria-label="Rotli on GitHub">
@@ -39,6 +41,7 @@ const { nav = [], github = true } = Astro.props;
         <span>GitHub</span>
       </a>
     )}
+    {toggle && (
     <button class="mode-toggle" id="mode-toggle" type="button" aria-label="Use dark appearance">
       <span class="mode-icon" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -51,5 +54,7 @@ const { nav = [], github = true } = Astro.props;
       </span>
       <span class="mode-label">Dark</span>
     </button>
+    )}
   </div>
+  )}
 </header>

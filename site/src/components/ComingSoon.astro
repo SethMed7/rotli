@@ -1,7 +1,7 @@
 ---
 // The holding page for rotli.co before launch: what Rotli is, in one screen,
-// with no download and no account. Shares Base tokens so it reads correctly in
-// every theme family, light and dark.
+// with no download and no account. It is pinned to the Rotli light environment
+// (no toggle, no saved preference) so every visitor sees the same poster.
 import Base from '../layouts/Base.astro';
 import waving from '../../../src/assets/characters/waving.svg?raw';
 import SiteFooter from './SiteFooter.astro';
@@ -30,8 +30,9 @@ const promises = [
   title="Rotli — coming soon"
   description="Rotli is a warm, local-first Mac workspace for notes, editable files, boards, and AI conversations. One folder you own. Coming soon."
   canonicalPath="/"
+  lockAppearance={{ family: 'rotli', mode: 'light' }}
 >
-  <SiteHeader github={false} />
+  <SiteHeader github={false} toggle={false} />
 
   <main id="content" class="soon">
     <section class="soon-copy" aria-labelledby="soon-title">
@@ -64,18 +65,30 @@ const promises = [
   <SiteFooter tagline="A local-first workspace for your Mac. © 2026 Rotli" />
 
   <style>
+    /* Mobile first: one column, a compact quokka above the copy. */
     .soon {
-      width: min(100% - 3rem, var(--page-max));
+      width: min(100% - 2rem, var(--page-max));
       margin-inline: auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1.5rem;
+      padding-block: 2.5rem 3.5rem;
     }
 
-    .soon {
-      display: grid;
-      grid-template-columns: minmax(0, 1.15fr) minmax(16rem, 0.85fr);
-      gap: clamp(2.5rem, 6vw, 6rem);
-      align-items: center;
-      min-height: calc(100vh - 76px - 8rem);
-      padding-block: clamp(3.5rem, 8vw, 7rem);
+    .soon-art {
+      order: -1;
+      margin: 0;
+    }
+
+    .art-field {
+      width: 8.5rem;
+      color: var(--text);
+    }
+
+    .art-field :global(svg) {
+      display: block;
+      width: 100%;
+      height: auto;
     }
 
     .soon-copy {
@@ -83,7 +96,7 @@ const promises = [
     }
 
     .kicker {
-      margin: 0 0 1.1rem;
+      margin: 0 0 0.9rem;
       color: var(--accent-text);
       font-size: 0.88rem;
       font-weight: 600;
@@ -92,7 +105,7 @@ const promises = [
 
     h1 {
       margin: 0;
-      font-size: clamp(3rem, 6.2vw, 5.4rem);
+      font-size: clamp(2.6rem, 11vw, 5.4rem);
       line-height: 0.98;
       letter-spacing: -0.04em;
       font-weight: 600;
@@ -100,25 +113,25 @@ const promises = [
 
     .lede {
       max-width: 34rem;
-      margin: 1.5rem 0 0;
+      margin: 1.25rem 0 0;
       color: var(--text-muted);
-      font-size: clamp(1.08rem, 1.6vw, 1.25rem);
+      font-size: clamp(1.02rem, 1.6vw, 1.25rem);
       line-height: 1.55;
     }
 
     .promises {
       display: grid;
-      gap: 1rem;
-      margin: 2.25rem 0 0;
+      gap: 0.85rem;
+      margin: 2rem 0 0;
       padding: 0;
       list-style: none;
     }
 
     .promises li {
       display: grid;
-      grid-template-columns: 2.25rem minmax(0, 1fr);
-      gap: 0.5rem;
-      padding-top: 1rem;
+      grid-template-columns: 2rem minmax(0, 1fr);
+      gap: 0.4rem;
+      padding-top: 0.85rem;
       border-top: 1px solid var(--border);
     }
 
@@ -132,7 +145,7 @@ const promises = [
     .promises p {
       margin: 0;
       color: var(--text-muted);
-      font-size: 0.98rem;
+      font-size: 0.96rem;
     }
 
     .promises b {
@@ -142,63 +155,65 @@ const promises = [
 
     .status {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 0.6rem;
-      margin: 2.25rem 0 0;
+      margin: 2rem 0 0;
       color: var(--text-muted);
       font-size: 0.88rem;
+      line-height: 1.5;
     }
 
     .status-mark {
       flex: none;
       width: 0.6rem;
       height: 0.6rem;
+      margin-top: 0.4rem;
       border-radius: 999px;
       border: 1px solid var(--accent-text);
       background: var(--accent);
     }
 
-    .soon-art {
-      min-width: 0;
-      margin: 0;
-    }
-
-    .art-field {
-      aspect-ratio: 1;
-      max-width: 26rem;
-      margin-inline: auto;
-      padding: 12%;
-      border: 1px solid var(--border);
-      border-radius: 1rem;
-      background: var(--surface-2);
-      color: var(--text);
-    }
-
-    .art-field :global(svg) {
-      width: 100%;
-      height: 100%;
-    }
-
-    @media (max-width: 880px) {
+    /* Tablet: more air, larger quokka, still one column. */
+    @media (min-width: 640px) {
       .soon {
-        grid-template-columns: 1fr;
-        min-height: 0;
-        padding-block: 3rem;
-      }
-
-      .soon-art {
-        order: -1;
+        width: min(100% - 3rem, var(--page-max));
+        gap: 2rem;
+        padding-block: 3.5rem 4.5rem;
       }
 
       .art-field {
-        max-width: 16rem;
-        margin-inline: 0;
+        width: 11rem;
       }
     }
 
-    @media (max-width: 480px) {
+    /* Desktop: copy beside the quokka in its field, vertically centred. */
+    @media (min-width: 960px) {
       .soon {
-        width: min(100% - 2rem, var(--page-max));
+        grid-template-columns: minmax(0, 1.15fr) minmax(16rem, 0.85fr);
+        gap: clamp(2.5rem, 6vw, 6rem);
+        align-items: center;
+        min-height: calc(100vh - 76px - 8rem);
+        min-height: calc(100svh - 76px - 8rem);
+        padding-block: clamp(3.5rem, 8vw, 7rem);
+      }
+
+      .soon-art {
+        order: 0;
+      }
+
+      .art-field {
+        width: 100%;
+        max-width: 26rem;
+        aspect-ratio: 1;
+        margin-inline: auto;
+        padding: 12%;
+        border: 1px solid var(--border);
+        border-radius: 1rem;
+        background: var(--surface-2);
+      }
+
+      .art-field :global(svg) {
+        height: 100%;
       }
     }
   </style>
