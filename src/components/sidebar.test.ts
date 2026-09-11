@@ -22,7 +22,9 @@ test("Breve is a labelled segment of the front switcher, not a header icon", () 
   // the switcher carries the segment; e2e/breve-lens.spec.ts proves the
   // switcher and footer survive the trip into Breve and back
   expect(sidebarSource).toContain('breveActive={sidebarMode === "breve"}');
-  expect(sidebarSource).toContain('onBreve={() => dispatch("view.breve")}');
+  expect(sidebarSource).toContain(
+    'onBreve={LAUNCH_FEATURES.breve ? () => dispatch("view.breve") : undefined}',
+  );
 });
 
 test("System stays Library, Assets, Archive, and Trash for every active vault", () => {

@@ -16,9 +16,14 @@ use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
 use regex::Regex;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use tauri::Manager;
 use time::OffsetDateTime;
+
+#[path = "breve_files.rs"]
+mod breve_files;
+pub(crate) use breve_files::{read_json, write_json};
+use breve_files::{read_text, write_atomic};
 
 use crate::chat;
 use crate::corpus::CorpusState;
@@ -420,43 +425,6 @@ fn now_stamp() -> String {
         .unwrap_or_else(|_| now_date())
 }
 
-fn read_text(path: &Path) -> Option<String> {
-    let meta = fs::symlink_metadata(path).ok()?;
-    if meta.file_type().is_symlink() || !meta.is_file() || meta.len() > MAX_TEXT_BYTES {
-        return None;
-    }
-    fs::read_to_string(path).ok()
-}
-
-pub(crate) fn read_json<T: DeserializeOwned>(path: &Path) -> Option<T> {
-    serde_json::from_str(&read_text(path)?).ok()
-}
-
-fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
-    let dir = path
-        .parent()
-        .ok_or_else(|| format!("no parent for {}", path.display()))?;
-    fs::create_dir_all(dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
-    let mut tmp = tempfile::Builder::new()
-        .prefix(".rotli-breve-")
-        .tempfile_in(dir)
-        .map_err(|e| format!("temp file in {}: {e}", dir.display()))?;
-    tmp.write_all(bytes)
-        .map_err(|e| format!("write {}: {e}", path.display()))?;
-    tmp.as_file()
-        .sync_all()
-        .map_err(|e| format!("sync {}: {e}", path.display()))?;
-    tmp.persist(path)
-        .map_err(|e| format!("rename into {}: {e}", path.display()))?;
-    Ok(())
-}
-
-pub(crate) fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), String> {
-    let mut out =
-        serde_json::to_vec_pretty(value).map_err(|e| format!("encode {}: {e}", path.display()))?;
-    out.push(b'\n');
-    write_atomic(path, &out)
-}
 
 fn default_routines(
     enabled: bool,
@@ -1242,6 +1210,7 @@ pub async fn breve_delivery_settings(
     app: tauri::AppHandle,
     state: tauri::State<'_, CorpusState>,
 ) -> Result<BreveDeliverySettings, String> {
+    crate::feature_policy::require_breve()?;
     let root = active_root(&state)?;
     off_main(move || {
         if cfg!(debug_assertions) {
@@ -1260,6 +1229,7 @@ pub async fn breve_write_delivery_settings(
     state: tauri::State<'_, CorpusState>,
     settings: BreveDeliverySettings,
 ) -> Result<BreveDeliverySettings, String> {
+    crate::feature_policy::require_breve()?;
     // dev never resolves a write root (the dev branch inside returns before
     // touching one; a `tauri dev` session may have no vault registered)
     let root = if cfg!(debug_assertions) {
@@ -1338,6 +1308,7 @@ fn write_delivery_settings_at(
 
 #[tauri::command]
 pub fn breve_store_resend_key(value: String) -> Result<(), String> {
+    crate::feature_policy::require_breve()?;
     let value = value.trim();
     if value.is_empty() {
         return Err("the key is empty".into());
@@ -1351,6 +1322,7 @@ pub fn breve_store_resend_key(value: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn breve_remove_resend_key() -> Result<(), String> {
+    crate::feature_policy::require_breve()?;
     if cfg!(debug_assertions) {
         DEV_RESEND_CONFIGURED.store(false, Ordering::SeqCst);
         return Ok(());
@@ -1363,6 +1335,7 @@ pub fn breve_remove_resend_key() -> Result<(), String> {
 /// a worker; the settings validation stays exactly as it was.
 #[tauri::command]
 pub async fn breve_test_email(state: tauri::State<'_, CorpusState>) -> Result<String, String> {
+    crate::feature_policy::require_breve()?;
     if cfg!(debug_assertions) {
         return Ok("Test email simulated in Tauri dev mode".into());
     }
@@ -1413,6 +1386,7 @@ fn breve_test_email_blocking(root: &Path) -> Result<String, String> {
 /// stays exactly as it was.
 #[tauri::command]
 pub async fn breve_test_signal(state: tauri::State<'_, CorpusState>) -> Result<String, String> {
+    crate::feature_policy::require_breve()?;
     if cfg!(debug_assertions) {
         return Ok("Test Signal simulated in Tauri dev mode".into());
     }
@@ -1470,6 +1444,7 @@ pub async fn breve_snapshot(
     _app: tauri::AppHandle,
     state: tauri::State<'_, CorpusState>,
 ) -> Result<BreveSnapshot, String> {
+    crate::feature_policy::require_breve()?;
     let root = active_root(&state)?;
     off_main(move || {
         if cfg!(debug_assertions) {
@@ -1487,6 +1462,7 @@ pub async fn breve_write_config(
     state: tauri::State<'_, CorpusState>,
     config: BreveConfig,
 ) -> Result<BreveSnapshot, String> {
+    crate::feature_policy::require_breve()?;
     let config = local_only_config(config);
     validate_config(&config)?;
     let root = active_root(&state)?;
@@ -1577,6 +1553,7 @@ fn brief_skill_at(root: &Path, dev_custom: Option<String>) -> BreveBriefSkill {
 pub async fn breve_brief_skill(
     state: tauri::State<'_, CorpusState>,
 ) -> Result<BreveBriefSkill, String> {
+    crate::feature_policy::require_breve()?;
     let root = active_root(&state)?;
     off_main(move || {
         let dev = DEV_SKILL_CUSTOM.get_or_init(|| Mutex::new(None));
@@ -1594,6 +1571,7 @@ pub async fn breve_write_brief_skill(
     state: tauri::State<'_, CorpusState>,
     text: Option<String>,
 ) -> Result<BreveBriefSkill, String> {
+    crate::feature_policy::require_breve()?;
     if let Some(body) = &text {
         if body.trim().is_empty() {
             return Err(
@@ -1634,6 +1612,7 @@ pub async fn breve_write_watchlist(
     state: tauri::State<'_, CorpusState>,
     markdown: String,
 ) -> Result<BreveSnapshot, String> {
+    crate::feature_policy::require_breve()?;
     if markdown.len() as u64 > MAX_TEXT_BYTES || markdown.contains('\0') {
         return Err("Breve watchlist is too large or contains invalid bytes".into());
     }
@@ -1720,6 +1699,7 @@ pub async fn breve_backfill_watchlist(
     _app: tauri::AppHandle,
     state: tauri::State<'_, CorpusState>,
 ) -> Result<BreveBackfillResult, String> {
+    crate::feature_policy::require_breve()?;
     if cfg!(debug_assertions) {
         let root = active_root(&state)?;
         let notification = BreveNotification {
@@ -1948,6 +1928,7 @@ pub fn breve_import_legacy(
     _app: tauri::AppHandle,
     state: tauri::State<'_, CorpusState>,
 ) -> Result<BreveSnapshot, String> {
+    crate::feature_policy::require_breve()?;
     if cfg!(debug_assertions) {
         return Ok(dev_breve_snapshot(&active_root(&state)?));
     }
@@ -2069,6 +2050,7 @@ fn xml_escape(value: &str) -> String {
 /// One Rotli login item replaces seven Breve agents. It launches the menu-bar
 /// app after login; the app then owns the scheduler and Signal children.
 pub(crate) fn install_rotli_login_agent() -> Result<(), String> {
+    crate::feature_policy::require_breve()?;
     if cfg!(debug_assertions) {
         return Ok(());
     }
@@ -2124,6 +2106,7 @@ pub fn breve_takeover(
     app: tauri::AppHandle,
     state: tauri::State<'_, CorpusState>,
 ) -> Result<BreveSnapshot, String> {
+    crate::feature_policy::require_breve()?;
     if cfg!(debug_assertions) {
         return Ok(dev_breve_snapshot(&active_root(&state)?));
     }
@@ -2203,6 +2186,7 @@ pub fn breve_retire_legacy(
     app: tauri::AppHandle,
     state: tauri::State<'_, CorpusState>,
 ) -> Result<BreveSnapshot, String> {
+    crate::feature_policy::require_breve()?;
     if cfg!(debug_assertions) {
         return Ok(dev_breve_snapshot(&active_root(&state)?));
     }

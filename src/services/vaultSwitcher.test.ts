@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { CORPUS_INSTANCE_ID, type MemexInstance } from "../memex/config";
-import { vaultDisplayName, vaultRowLabel, vaultSwitcherItems } from "./vaultSwitcher";
+import { vaultDisplayName, vaultOverflowItems, vaultRowLabel, vaultSwitcherItems } from "./vaultSwitcher";
 
 const inst = (over: Partial<MemexInstance>): MemexInstance => ({
   id: "mx1",
@@ -46,5 +46,35 @@ describe("vaultSwitcherItems", () => {
 
   test("an empty instance list projects no fake rows", () => {
     expect(vaultSwitcherItems([])).toEqual([]);
+  });
+});
+
+describe("vaultOverflowItems", () => {
+  const on = { openLocationSettings: () => {}, remove: () => {} };
+  test("a connected vault removes behind a drill that names it and says the folder stays", () => {
+    const items = vaultOverflowItems(inst({ label: "Old notes" }), false, on);
+    expect(items[0]).toMatchObject({ kind: "action", label: expect.stringMatching(/^Location settings/) });
+    const drill = items.at(-1);
+    expect(drill).toMatchObject({
+      kind: "drill",
+      label: expect.stringMatching(/^Remove from Rotli/),
+      danger: true,
+    });
+    if (drill?.kind !== "drill") throw new Error("expected a drill");
+    expect(drill.items[0]).toMatchObject({ kind: "action", label: "Remove Old notes", danger: true });
+    expect(drill.items[1]).toMatchObject({
+      disabled: true,
+      label: expect.stringContaining("stay where they are"),
+    });
+  });
+
+  test("the active vault cannot be removed until another is active", () => {
+    const items = vaultOverflowItems(inst({ label: "current" }), true, on);
+    expect(items.at(-1)).toMatchObject({
+      kind: "action",
+      disabled: true,
+      label: expect.stringContaining("switch vaults first"),
+    });
+    expect(items.some((item) => item.kind === "drill")).toBe(false);
   });
 });

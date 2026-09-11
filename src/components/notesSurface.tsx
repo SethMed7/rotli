@@ -1,3 +1,4 @@
+import type { CSSProperties, KeyboardEvent, PointerEvent } from "react";
 // The Notes surface: ONE sidebar · the pane tree (the maintainer, 2026-06-13). The
 // two-rail era (folders + note list) is gone — a single unified compact-tree
 // sidebar replaces both. Collapse grammar (r3 frame B) survives intact: a
@@ -5,12 +6,12 @@
 // (no layout shift) and is ALSO a clickable restore strip running the unified
 // sidebar toggle. The sidebar is drag-resizable on its right edge; its width
 // persists via .rotli/settings.json.
-
-import type { CSSProperties, KeyboardEvent, PointerEvent } from "react";
 import { Suspense, lazy } from "react";
 
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { DEST } from "../services/destinations";
 import { useNotes } from "../services/hooks";
+import { leaves, usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { AllChatsSurface } from "./allChatsSurface";
 import { BoardSurface } from "./boardSurface";
@@ -82,6 +83,9 @@ export function NotesSurface() {
   const systemRoot = useUiStore((s) => s.systemRoot);
   const sidebarMode = useUiStore((s) => s.sidebarMode);
   const allNotes = useNotes().data;
+  const hasPaneContent = usePanesStore((s) =>
+    leaves(s.root).some((leaf) => leaf.tabs.some((tab) => tab.surfaceKind !== "note" || Boolean(tab.noteId))),
+  );
   const archived = useNotes(DEST.archive).data;
   const trashed = useNotes(DEST.trash).data;
 
@@ -104,7 +108,7 @@ export function NotesSurface() {
       )}
       {/* the content area: the note panes, or a grid view (Board / All notes)
           that renders HERE so the sidebar never moves (the maintainer, 2026-06-24) */}
-      {sidebarMode === "breve" ? (
+      {LAUNCH_FEATURES.breve && sidebarMode === "breve" ? (
         <Suspense fallback={null}>
           <BreveSurface />
         </Suspense>
@@ -122,7 +126,7 @@ export function NotesSurface() {
         <SystemSurface key={systemRoot} rootId={systemRoot} />
       ) : contentView === "recent" ? (
         <NoteListSurface title="Recent" glyph={<ClockGlyph size={15} />} />
-      ) : vaultIsEmpty ? (
+      ) : vaultIsEmpty && !hasPaneContent ? (
         <EmptyState />
       ) : (
         <PaneTree />

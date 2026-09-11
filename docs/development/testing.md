@@ -8,6 +8,12 @@ direction, runtime wiring, and owning documentation must agree.
 
 | Command | Purpose |
 |---|---|
+| `bun run security:protect` | Print the owner-only main/dev ruleset plan; explicit `--apply` checks the owner and applies/read-backs the two policies when GitHub supports private-repository protection |
+| `bun run security:secrets` | Redacted Gitleaks 8.30.1 scan of tracked/unignored working-tree files; separate from verify, fails on findings/errors; the external binary is intentionally listed in knip's tool allowlist |
+| `bun run security:working` | Scan proposed tracked/untracked worktree text with pinned Gitleaks without printing values; included in the required verify secrets lane alongside a latest-commit scan. Full history remains a separate publication gate |
+| `bun run security:bundle <candidate.app>` | Inspect actual release resources and binary strings for prohibited files, embedded home paths, and symlinks escaping the bundle; required before Apple uploads |
+| `bun run security:changes <base-sha> <head-sha>` | Check proposed Git commits with pinned Gitleaks and redacted diagnostics; CI blocks new findings. New-branch/manual scans cover reachable history, and may surface the separately unresolved historical fixtures |
+| `bun run security:history` | Redacted Gitleaks 8.30.1 scan of all local Git history refs; mandatory before source publication, never proof of image/prose privacy |
 | `bun run lint` | Concurrent fan-out of all four TypeScript scopes on both compiler implementations, plus formatting, oxlint, code-shape, brand, architecture, IPC, structure, and documentation guards |
 | `bun run lint:serial` | The exact same lint/check set in deterministic sequence. Use it on memory-constrained machines or when one-at-a-time logs are easier to diagnose; CI and the default gate retain the faster parallel path |
 | `bun run test:unit` | Frontend domain, application, adapter, and state tests under `src/`, run in Bun's isolated parallel workers |
@@ -26,7 +32,7 @@ direction, runtime wiring, and owning documentation must agree.
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` | Rust lint gate — warnings fail CI |
 | `bun run test:regression` | All Bun behavior tests plus Breve runtime and design-system checks |
 | `bun run check` | Required JavaScript/TypeScript gate: lint plus the regression suite |
-| `bun run verify` | **The local twin of CI.** Runs the Regression suite's lanes in its order — `check`, the production build, and the three `site/` steps; `check:e2e-types` plus Playwright; `cargo clippy -D warnings` plus `cargo test`. Takes lane names to narrow it (`bun run verify rust`). `bun run check` alone is *not* the CI gate: clippy, Playwright, and every `site/` step live outside it, which is how a change can pass locally and turn `main` red. Excludes only the advisory dependency audit and the signing/notarization steps `release.sh` owns |
+| `bun run verify` | **The local twin of CI.** Runs the Regression suite's lanes in its order — redacted proposed-source secret scan, `check`, the production build, and the three `site/` steps; `check:e2e-types` plus Playwright; `cargo clippy -D warnings` plus `cargo test`. Takes lane names to narrow it (`bun run verify rust`). `bun run check` alone is *not* the CI gate: clippy, Playwright, and every `site/` step live outside it, which is how a change can pass locally and turn `main` red. Excludes only the advisory dependency audit and the signing/notarization steps `release.sh` owns |
 | `cargo test --manifest-path src-tauri/Cargo.toml` | Rust host, filesystem, security, scheduler, and IPC behavior |
 | `NODE_OPTIONS=--max-old-space-size=4096 bun run build` | Production bundling, final TypeScript/runtime validation, and tested startup/lazy chunk budgets |
 
@@ -37,6 +43,10 @@ stays complete — every `package.json` script must appear in this document):
 |---|---|
 | `bun run deps` | Repository-owned Bun 1.4 dependency workflow over the app, site, and Breve lockfiles: `audit`, `audit-plan`, `dedupe-check`, `prune-plan`, `licenses`, `licenses-check`, and root-explicit `diff` are read-only. `licenses-check` fails on either a new Unknown-license package or a stale reviewed baseline entry. Reviewed maintenance uses `audit-fix`, `dedupe`, or `prune` with one explicit `--root` and `--apply`; audit repair never implies `--latest`. `ROTLI_BUN_DEPENDENCY_BIN` may point at a compatible alternate binary for isolated validation without changing the release toolchain |
 | `bun run dev` / `bun run preview` | Vite dev server against the seeded demo corpus / preview of the built bundle |
+| `bun run capture:launch` | Validate stable Home/Chat/Breve visibility, the Welcome folder in Main, and the task toggle plus Aa raw view in a fresh browser context; retain synthetic screenshots/video under ignored `_review/launch-captures/`. Requires a local stable preview; no native or network proof |
+| `bun run audit:grammar` | Grammar render audit against a local stable browser twin: seeds the Welcome folder, renders the lesson notes, types every documented control expansion into the welcome note, clicks the rendered controls, reads the source back through Aa → Raw markdown, and proves the stable Mermaid workspace offers View and Code only; report and screenshots under ignored `_review/grammar-audit/`. Synthetic data only; no native or network proof |
+| `bun run build:social-card` | Render the site's editable Open Graph SVG into a 1200×630 PNG with bundled fonts and external requests blocked |
+| `bun run capture:site` | Capture six theme previews and the Welcome folder's Tasks lesson in Main at 3× density from a running local browser twin; `site/README.md` owns media regeneration and visual review |
 | `bun run dev:app` | The native desktop development app, branded `rotli (dev)` with a fixed blue Rotli Dock icon (including an optically matched safe area for the unbundled `tauri dev` runtime); it uses an isolated `corpus.dev.json` vault selection, keeps the production fallback read-only, and supervises vault-triggered Tauri/Vite restarts from the terminal |
 | `bun run format` / `bun run format:check` | oxfmt write / verify with the explicit repository config over TypeScript in `src`, `e2e`, and `scripts`, plus `playwright.config.ts` — the same scope the pre-commit hook enforces, with import sorting on (`breve-runtime` keeps hand-aligned tables and stays outside). `format:check` rides the `lint` chain |
 | `bun run typecheck` | The TypeScript compiler over `src` and the Vite/build-policy scope (`tsc --noEmit` — `typescript@7`, the Go port) — the type-correctness source of truth and first step of `lint` (e2e and Breve retain their named lanes) |
@@ -93,7 +103,7 @@ CLI/MCP smoke: it creates and removes its own temporary memex and reports
 - **Regression (browser E2E):** Playwright specs under `e2e/` drive the SAME
   browser twin every other layer targets — `isTauri()` is false under `vite
   dev`, so the app renders against the seeded in-memory demo corpus
-  (`src/services/notes.ts`) with no Rust shell, onboarding gate, or real
+  (`src/services/notes.ts`) with no Rust shell or real
   filesystem/network/Keychain access. Reserved for interaction sequences a unit
   test can't exercise — real pointer-drag gestures (`src/lib/pointerDrag.ts`),
   multi-step gestures crossing components, and cross-surface wiring a mocked
@@ -260,3 +270,24 @@ result. See [`ci-runner.md`](ci-runner.md#how-releases-use-ci).
 
 CI does not prove native visual quality or real external delivery. Handoffs must
 state those remaining checks explicitly.
+
+## Launch onboarding coverage
+
+`e2e/launch-onboarding.spec.ts` uses the development-only `?onboarding` route
+to begin with an empty in-memory corpus. It clicks the actual setup and folder
+controls, creates a simulated empty folder, skips optional model setup, and
+checks that Main holds one Welcome folder with the welcome note and nine
+lessons and that the welcome note is the open tab. It proves the practice-vault
+option is gone, opens every note from the left menu, ticks a task and reads
+the state character through Aa → Raw markdown, proves Settings → Open welcome
+folder is idempotent, and asserts the checkbox/drag-handle overlap and the
+gutter geometry (every checkbox, marker, and control starts on the H1 edge,
+never in the margin) across twelve environments and a 760px window.
+`e2e/named-views.spec.ts` deletes a non-active view from Main's picker.
+Screenshots are test artifacts. `bun scripts/capture-site.mjs http://localhost:1430`
+creates the reviewed site media separately at 3× density; the Welcome-folder
+capture is `site/public/rotli-playground@3x.png` in Rotli Light. See `site/README.md` for the
+fixed site theme policy and the companion SVG export command.
+The route cannot activate in native or production builds. Browser folders and
+saved copies are fixtures and reset on reload. Native vault activation, actual
+file persistence, and permission failures still require a disposable Mac vault.

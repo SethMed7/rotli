@@ -13,7 +13,7 @@
 #
 # Usage:
 #   bun run verify              # every lane, in CI's order
-#   bun run verify quality      # one or more lanes: quality | e2e | rust
+#   bun run verify quality      # one or more lanes: secrets | quality | e2e | rust
 #
 # Not covered, deliberately:
 #   • the dependency-audit lane — advisory in CI, and `cargo install
@@ -25,7 +25,7 @@ set -euo pipefail
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"   # repo root
 
 LANES=("$@")
-[ ${#LANES[@]} -eq 0 ] && LANES=(quality e2e rust)
+[ ${#LANES[@]} -eq 0 ] && LANES=(secrets quality e2e rust)
 
 wants() {
   local lane="$1"
@@ -41,6 +41,18 @@ require() {
   local what="$1" fix="$2"
   [ -e "$what" ] || { echo "✗ missing $what"; echo "  run: $fix"; exit 1; }
 }
+
+if wants secrets; then
+  step "secrets — proposed working-tree additions (Gitleaks 8.30.1)"
+  bun run security:working
+  # A clean checkout has no diff; check the latest commit as well. CI supplies
+  # its exact PR/push base to the same script instead of guessing a range.
+  if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+    bun run security:changes "$(git rev-parse HEAD^)" "$(git rev-parse HEAD)"
+  else
+    bun run security:changes 0000000000000000000000000000000000000000 "$(git rev-parse HEAD)"
+  fi
+fi
 
 if wants quality; then
   # CI's first steps: a frozen install of every lockfile. Locally this is

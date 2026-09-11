@@ -174,7 +174,8 @@ second user-visible product or storage location.
   commands activate in paragraph or list-item content; list markers remain in
   place and multiline scaffolds indent their continuation lines inside the item.
 - A Markdown `mermaid` fence owns its diagram source. The rendered block opens a
-  View/Visual/Code workspace; `/Mermaid` inserts a valid starter flowchart. View
+  View/Code workspace (Visual editing is development-only via the centralized
+  launch feature policy); `/Mermaid` inserts a valid starter flowchart. View
   provides pan, zoom, and fit. Visual losslessly edits supported flowcharts as
   readable Mermaid shapes, labels, directions, connections, and portable node
   colors; unsupported diagram families and advanced syntax fail closed into
@@ -285,18 +286,27 @@ second user-visible product or storage location.
   read-only. Because Library is the `wiki/` projection, the welcome note never
   appears there. Scaffolding still restores Home/Notes navigation after carrying
   the outgoing vault's reusable appearance and editor preferences.
-- The explicit Practice Vault flow additionally writes a versioned
-  `wiki/Playground/` lesson folder and links it from the root welcome note. The
-  playground is ordinary Markdown, has no `.rotli/` dependency, and is safe to
-  copy as one folder into another vault or remove through normal file tools.
-- Settings → General may install those lessons into the active writable vault
-  and create a `Playground` named-view projection over their stable note ids.
-  Deleting the view removes only projection membership. A later import reuses
-  exact-title lessons in the Playground folder and never overwrites user edits.
-  New lessons carry no capture shelf metadata and remain in Library. Import is
-  retryable rather than transactional: a failed view write can leave ordinary
-  lesson files that the next import reuses. Practice Vault creation stages the
-  whole scaffold in a sibling temporary directory before publishing it.
+- Every new vault starts with a **Welcome** folder in Main: the root welcome
+  note first, then nine lessons. `src/assets/welcome.json` is the one catalog;
+  its first entry is the welcome note body the scaffold writes, and the rest
+  are ordinary Markdown notes in the vault (`wiki/Welcome/` in a memex layout,
+  `Welcome/` in a plain notes folder). They open from the left menu in the
+  ordinary editor, save like any note, and may be edited, removed from Main, or
+  trashed through the normal lifecycle. Nothing about them is session-only, and
+  there is no separate practice vault.
+- Seeding happens only when a vault is created (onboarding's empty folder and
+  the switcher's Connect on an empty folder, both through one activation path)
+  and on the explicit Settings → General → **Open welcome folder** action.
+  Opening an existing vault never writes. The native seed
+  (`corpus_seed_welcome`) returns `{ created, noteIds }` in catalog order; the
+  welcome note's id leads when the note still exists and is never recreated.
+  An intact lesson is matched by exact title inside the lesson folder and
+  reused, so user edits are never overwritten and a trashed lesson returns as
+  a fresh file on the next seed. New lessons carry no capture shelf metadata
+  and remain in Library. The frontend then files every id missing from Main
+  under one `Welcome` root folder in catalog order; a Main save failure is
+  reported and the next open retries the filing without creating files.
+  Seeding never writes a named view.
   Expensive chat, board, and conventional-file surfaces may remain mounted in a
   small recent-tab cache so ordinary tab switching does not rebuild them on the
   WebKit main thread. The cache is bounded, inactive surfaces are inert and

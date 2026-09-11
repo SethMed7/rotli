@@ -232,9 +232,8 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
             <p className="setup-eyebrow">Optional and changeable</p>
             <h1 id="model-setup-title">How should Rotli think?</h1>
             <p className="setup-lede">
-              Run a model entirely on this Mac, or use your own Claude, ChatGPT, Cursor, or Google accounts
-              through each company&rsquo;s official local client. Every connected lane stays off until you
-              turn it on.
+              Run a model entirely on this Mac, or use your own Claude, ChatGPT, or Cursor accounts through
+              each company&rsquo;s official local client. Every connected lane stays off until you turn it on.
             </p>
 
             <div className="setup-model-disclosures">

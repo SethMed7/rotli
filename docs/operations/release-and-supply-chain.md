@@ -41,6 +41,11 @@ authorized operation. Passing local checks does not authorize publication.
 
 The current script:
 
+- requires the owner's explicit `--authorize=<full-sha>` acknowledgement, an
+  authenticated @SethMed7 operator, exact promoted `origin/main`, and successful
+  hosted main/push CI **before** signing or any Apple upload; red CI cannot be
+  overridden;
+- forces `ROTLI_BUILD_CHANNEL=stable` for both frontend and native build;
 - requires the private `APPLE_SIGNING_IDENTITY` environment variable at release
   time; the public repository contains no certificate owner or Apple team id;
 - runs the JavaScript/TypeScript proof chain;
@@ -49,20 +54,31 @@ The current script:
 - clears stale DMG volumes and any `node_modules` under `breve-runtime/`, then
   refuses to notarize a built `.app` that still contains one;
 - builds a Developer ID-signed app with hardened runtime;
-- notarizes and staples the app;
+- notarizes and staples the app, validates its ticket, and requires Accepted
+  submission and log status without unresolved Apple issues;
 - regenerates and signs the updater archive from the stapled app;
-- creates, signs, notarizes, and staples the DMG;
+- creates, signs, notarizes, and staples the DMG; Gatekeeper assessment of
+  both app and DMG is blocking;
 - creates `latest.json`; and
 - records the exact source, CI run, repository-pinned toolchains, and artifact
   SHA-256 digests in `release-evidence.json`; and
-- publishes only when `--publish` is passed.
+- retains raw submission/log JSON privately under ignored
+  `_review/release-notary/<source-commit>/`, publishes only `{id,status}` per
+  artifact in hashed `notary-evidence.json`, and unsets updater key environment
+  variables after signing; and
+- publishes only when separately authorized and `--publish` is passed.
+
+The SHA flag records operator intent; a flag or GitHub login cannot prove the
+human requested a release. Agents still require an explicit target-specific
+owner instruction before running signing/notarization, and a separate publication
+instruction before `--publish`. Ordinary launch preparation does not authorize
+either. Unknown flags fail closed.
 
 Known hardening gaps before a 1.0 or paid production release:
 
-- add an SBOM, signed artifact/source provenance, retained notary submission
-  records, and an off-GitHub evidence archive;
+- add an SBOM, signed artifact/source provenance, and an off-GitHub evidence archive;
 - define beta/stable channels and a signed rollback procedure;
-- record and review the Apple notary log, not only the success status; and
+- exercise the revised notary/Gatekeeper flow on the exact owner-authorized candidate; and
 - move signing/updater key custody from single-maintainer knowledge to a
   documented recovery and rotation process.
 
@@ -70,6 +86,18 @@ This list is explicit so a green beta workflow is never misrepresented as full
 supply-chain assurance.
 
 ## Release evidence bundle
+
+Before an Apple upload, `security:bundle` examines the actual built `.app`,
+including ignored files copied into resources and binary strings. It refuses
+environment/credential files, embedded personal home paths, and links escaping
+the app. Bundled Breve resources must also appear in the clean source manifest,
+so an arbitrarily named ignored personal note is refused. A changed Tauri
+resource mapping requires updating this gate. Diagnostics show relative paths
+and reasons, never file contents.
+The release compiler flags remap the operator's home and checkout paths into
+generic build paths while preserving existing Cargo flags. This does not hide
+the Developer ID certificate's public signer identity. Synthetic boundary tests
+pass; the exact signed candidate still needs this inspection and native acceptance.
 
 `release.sh --publish` generates and uploads this machine-readable core
 manifest from the reviewed repository pins:
@@ -89,7 +117,7 @@ manifest from the reviewed repository pins:
   },
   "checks": {
     "ciRun": "immutable URL or identifier",
-    "result": "success or explicitly overridden conclusion"
+    "result": "success"
   },
   "artifacts": [
     {
@@ -104,8 +132,8 @@ manifest from the reviewed repository pins:
 The manifest contains no credential, local path, Keychain name beyond public
 configuration, or user data. The current script stores it with the GitHub
 release. A maintainer-controlled archive must be added so a delivery-repository
-outage cannot erase the provenance record. That archive, an SBOM, signed
-provenance, and retained notary identifiers remain promotion requirements
+outage cannot erase the provenance record. That archive, an SBOM, and signed
+provenance remain promotion requirements
 rather than fields that imply evidence the current script does not yet collect.
 
 ## Dependency policy
@@ -188,7 +216,14 @@ version-specific findings here.
 ## Key custody and recovery
 
 The repository contains public identifiers and updater verification material,
-never private signing keys or notarization credentials.
+never private signing keys or notarization credentials. Developer ID signatures
+contain the publisher identity and certificate chain: moving the signing identity
+out of source does **not** make a signed binary anonymous. Before distribution,
+the owner must accept the certificate's public identity or arrange an appropriate
+organization identity with Apple. Do not print that identity into public CI logs.
+Apple notarization uploads the app/archive to Apple; it must contain only reviewed
+build inputs, never user notes or machine-local state. See
+[Apple's custom notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow).
 
 For every release credential, maintain outside the repository:
 
@@ -221,10 +256,10 @@ revocation, replacement, and already-shipped client behavior are understood.
 
 Before calling the delivery process production-ready:
 
-- protect the release branch with required reviews and checks;
+- enforce both main/dev rulesets from [repository access](repository-access.md);
 - eliminate dirty-tree publication and silent tag failures;
 - extend the generated evidence with an SBOM, signed provenance, retained
-  notary records, and a maintainer-controlled archive;
+  reviewed notary records, and a maintainer-controlled archive;
 - complete a signing-key loss/rotation tabletop;
 - complete one updater rollback/superseding-release exercise; and
 - demonstrate install, update, and offline Gatekeeper behavior on a clean Mac.

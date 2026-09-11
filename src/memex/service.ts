@@ -11,7 +11,6 @@ import {
   corpusChooseFolder,
   corpusConnectBrain,
   corpusForgetBrain,
-  corpusCreatePracticeVault,
   corpusInitMemex,
   corpusListConfig,
   corpusSetActiveBrain,
@@ -79,10 +78,6 @@ export const connectBrain = (path?: string): Promise<boolean> => corpusConnectBr
  * the live corpus (the corpus IS a memex). */
 export const initMemexAsCorpus = (path: string, brainEnabled = true): Promise<string> =>
   corpusInitMemex(path, brainEnabled);
-
-/** Scaffold + switch to a scratch PRACTICE vault (2026-07-26); the outgoing
- * vault stays registered and untouched while the shell remains alive. */
-export const createPracticeVault = (): Promise<string> => corpusCreatePracticeVault();
 
 /** Remove a connected vault binding. Returns the refreshed config. */
 export async function forget(id: string): Promise<MemexConfig> {

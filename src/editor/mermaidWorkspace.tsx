@@ -10,6 +10,8 @@ import {
 } from "react";
 import { createRoot } from "react-dom/client";
 
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { MermaidModePicker, type WorkspaceMode } from "./mermaidModePicker";
 import { mermaidErrorMessage, renderMermaidElement } from "./mermaidRender";
 import {
   type MermaidPoint,
@@ -20,7 +22,8 @@ import {
 } from "./mermaidViewport";
 import { MermaidVisualEditor } from "./mermaidVisualEditor";
 
-type WorkspaceMode = "view" | "visual" | "code";
+const visualEditingEnabled = LAUNCH_FEATURES.mermaidVisualEditing;
+
 type RenderStatus = "loading" | "ready" | "empty" | "error";
 
 interface MermaidWorkspaceProps {
@@ -357,32 +360,7 @@ function MermaidWorkspace({
         onKeyDown={onPanelKeyDown}
       >
         <header className="rotli-mermaid-toolbar">
-          <div className="rotli-mermaid-mode" aria-label="Diagram mode">
-            <button
-              type="button"
-              className={mode === "view" ? "is-active" : ""}
-              aria-pressed={mode === "view"}
-              onClick={() => setMode("view")}
-            >
-              View
-            </button>
-            <button
-              type="button"
-              className={mode === "visual" ? "is-active" : ""}
-              aria-pressed={mode === "visual"}
-              onClick={() => setMode("visual")}
-            >
-              Visual
-            </button>
-            <button
-              type="button"
-              className={mode === "code" ? "is-active" : ""}
-              aria-pressed={mode === "code"}
-              onClick={() => setMode("code")}
-            >
-              Code
-            </button>
-          </div>
+          <MermaidModePicker mode={mode} onChange={setMode} visualEditingEnabled={visualEditingEnabled} />
 
           {mode === "view" && (
             <div className="rotli-mermaid-zoom" aria-label="Diagram zoom">
@@ -532,7 +510,7 @@ function MermaidWorkspace({
                 <div className="rotli-mermaid-hint">Drag to pan · Scroll to zoom · 0 to fit</div>
               )}
             </div>
-          ) : mode === "visual" ? (
+          ) : mode === "visual" && visualEditingEnabled ? (
             <MermaidVisualEditor
               source={draft}
               dirty={dirty}

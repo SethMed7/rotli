@@ -8,3 +8,22 @@ test-results
 playwright-report
 tmp
 _review
+# Only declared site inputs belong in an upload or image build context.
+**/.env
+**/.env.*
+**/secrets.*
+**/*.key
+**/*.pem
+**/*.p8
+**/*.p12
+**/*.cer
+**/*.mobileprovision
+**/*.provisionprofile
+**/*.keychain*
+**/.rotli
+**/.breve-secrets
+.carl
+.claude
+.codex
+.railway
+marketing

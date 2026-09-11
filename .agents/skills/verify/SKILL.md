@@ -13,9 +13,9 @@ never invent alternative commands.
 
 1. **Focused loop** while iterating: `bun test <file>` plus the relevant
    `check:*` script, and `bun run verify <lane>` to narrow —
-   `quality` (check + production build + `site/`), `e2e` (`check:e2e-types` +
+   `secrets` (redacted proposed-diff and commit scan), `quality` (check + production build + `site/`), `e2e` (`check:e2e-types` +
    Playwright), `rust` (`cargo clippy -D warnings` + `cargo test`).
-2. **Completion proof**: `bun run verify` — all three lanes, in CI's order. It
+2. **Completion proof**: `bun run verify` — all four lanes, in CI's order. It
    refuses to skip a lane it cannot run rather than reporting a false green.
 
 Report exact results in the handoff, including any lane you could not run and

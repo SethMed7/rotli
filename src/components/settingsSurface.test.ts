@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 
 const settingsSource = readFileSync(new URL("settingsSurface.tsx", import.meta.url), "utf8");
 const browserSource = readFileSync(new URL("browserSurface.tsx", import.meta.url), "utf8");
+// the relay pairing section lives in its own file (development builds only)
+const remoteAgentsSource = readFileSync(new URL("remoteAgentsSection.tsx", import.meta.url), "utf8");
 
 describe("private browser presentation", () => {
   test("gives browser preferences their own settings pane and explains the narrow private purpose", () => {
@@ -26,37 +28,37 @@ describe("private browser presentation", () => {
 
 describe("remote agent connection presentation", () => {
   test("requires an explicit connection for each app session", () => {
-    expect(settingsSource).toContain("Connect this session");
-    expect(settingsSource).toMatch(/starts disconnected after every launch/);
-    expect(settingsSource).toMatch(/Rotli must be\s+open and connected for every request/);
+    expect(remoteAgentsSource).toContain("Connect this session");
+    expect(remoteAgentsSource).toMatch(/starts disconnected after every launch/);
+    expect(remoteAgentsSource).toMatch(/Rotli must be\s+open and connected for every request/);
   });
 
   test("shows pairing details only after an explicit create or regenerate action", () => {
-    expect(settingsSource).toContain("Create pairing");
-    expect(settingsSource).toContain("Regenerate pairing");
-    expect(settingsSource).toContain("Paste into Grok Bot");
-    expect(settingsSource).toContain("authorizationHeader");
-    expect(settingsSource).toContain("cannot reveal this client token after you leave this screen");
-    expect(settingsSource).not.toMatch(/setRelayUrl\(event\.target\.value\);\s*setPairing\(null\)/);
+    expect(remoteAgentsSource).toContain("Create pairing");
+    expect(remoteAgentsSource).toContain("Regenerate pairing");
+    expect(remoteAgentsSource).toContain("Paste into Grok Bot");
+    expect(remoteAgentsSource).toContain("authorizationHeader");
+    expect(remoteAgentsSource).toContain("cannot reveal this client token after you leave this screen");
+    expect(remoteAgentsSource).not.toMatch(/setRelayUrl\(event\.target\.value\);\s*setPairing\(null\)/);
   });
 
   test("confirms token replacement and explains vault-switch disconnection", () => {
-    expect(settingsSource).toContain("Replace pairing");
-    expect(settingsSource).toMatch(/permanently invalidates the old client token/);
-    expect(settingsSource).toMatch(/Switching vaults disconnects/);
-    expect(settingsSource).toMatch(/pairing is bound to the relay URL/);
+    expect(remoteAgentsSource).toContain("Replace pairing");
+    expect(remoteAgentsSource).toMatch(/permanently invalidates the old client token/);
+    expect(remoteAgentsSource).toMatch(/Switching vaults disconnects/);
+    expect(remoteAgentsSource).toMatch(/pairing is bound to the relay URL/);
   });
 
   test("can explicitly disconnect and delete the pairing from Keychain", () => {
-    expect(settingsSource).toContain("Remove pairing");
-    expect(settingsSource).toContain("Confirm removal");
-    expect(settingsSource).toContain("remoteAgentUnpair");
-    expect(settingsSource).toMatch(/deletes both remote-agent tokens from Keychain/);
+    expect(remoteAgentsSource).toContain("Remove pairing");
+    expect(remoteAgentsSource).toContain("Confirm removal");
+    expect(remoteAgentsSource).toContain("remoteAgentUnpair");
+    expect(remoteAgentsSource).toMatch(/deletes both remote-agent tokens from Keychain/);
   });
 
   test("persists only the relay endpoint and distinguishes active connection states", () => {
-    expect(settingsSource).toContain("remoteAgentRelayUrl");
-    expect(settingsSource).toContain("current?.active");
-    expect(settingsSource).toContain('"Retrying"');
+    expect(remoteAgentsSource).toContain("remoteAgentRelayUrl");
+    expect(remoteAgentsSource).toContain("current?.active");
+    expect(remoteAgentsSource).toContain('"Retrying"');
   });
 });

@@ -1,43 +1,85 @@
 ---
 import Base from '../layouts/Base.astro';
 import mark from '../../../src/assets/characters/_logo.svg?raw';
-import staysLocal from '../../../src/assets/characters/filled/cocoa/stays_local.webp';
-import celebrating from '../../../src/assets/characters/filled/cocoa/celebrating.webp';
+import staysLocal from '../assets/characters/cocoa/stays_local.webp';
+import celebrating from '../assets/characters/cocoa/celebrating.webp';
 import SiteFooter from './SiteFooter.astro';
 import SiteHeader from './SiteHeader.astro';
+import PlaygroundStory from './PlaygroundStory.astro';
+import PromoFilm from './PromoFilm.astro';
 import { GITHUB_URL, PRIVACY_URL, RELEASES_URL, ROADMAP_URL, site } from '../site';
 
+// Secondary calls to action fall back to local anchors while the source
+// repository is private (site.sourcePublic is false by default).
+const secondaryAction = site.sourcePublic
+  ? { href: GITHUB_URL, label: 'Explore the source', external: true }
+  : site.promo.enabled
+    ? { href: '#film', label: 'Watch the film', external: false }
+    : { href: '#workspace', label: 'See the workspace', external: false };
 
-const themeFamilies = [
-  { id: 'rotli', name: 'Rotli', environment: 'Warm Light', screenshot: '/rotli-app-warm-light.png' },
-  { id: 'paper', name: 'Paper & Charcoal', environment: 'Paper', screenshot: '/rotli-app-paper.png' },
-  { id: 'ocean', name: 'Ocean', environment: 'Ocean Light', screenshot: '/rotli-app-ocean-light.png' },
-  { id: 'grove', name: 'Grove', environment: 'Grove Dark', screenshot: '/rotli-app-grove-dark.png' },
-  { id: 'iris', name: 'Iris', environment: 'Iris Light', screenshot: '/rotli-app-iris-light.png' },
-  { id: 'midnight', name: 'Midnight', environment: 'Midnight', screenshot: '/rotli-app-midnight.png' },
+const finalAction = site.sourcePublic
+  ? { href: GITHUB_URL, label: 'View on GitHub', external: true }
+  : site.promo.enabled
+    ? { href: '#film', label: 'Watch the film', external: false }
+    : { href: '#privacy', label: 'How privacy works', external: false };
+
+const footerLinks = [
+  ...(site.sourcePublic ? [{ href: GITHUB_URL, label: 'GitHub' }] : []),
+  ...(site.downloadsEnabled ? [{ href: RELEASES_URL, label: 'Releases' }] : []),
+  { href: '#workspace', label: 'Workspace' },
+  { href: '#playground', label: 'Playground' },
+  ...(site.showsExperiments ? [{ href: '/mcp/', label: 'MCP guide' }] : []),
+  { href: site.sourcePublic ? PRIVACY_URL : '#privacy', label: 'Privacy' },
+  ...(site.sourcePublic ? [{ href: ROADMAP_URL, label: 'Roadmap' }] : []),
 ];
 
+const footerTagline = site.sourcePublic
+  ? 'Local-first, free, and open source under the MIT license.'
+  : 'Local-first and free. One folder you own, no account required.';
+
+const themeFamilies = [
+  { id: 'rotli', name: 'Rotli', environment: 'Warm Light', screenshot: '/rotli-app-warm-light@3x.png' },
+  { id: 'paper', name: 'Paper & Charcoal', environment: 'Paper', screenshot: '/rotli-app-paper@3x.png' },
+  { id: 'ocean', name: 'Ocean', environment: 'Ocean Light', screenshot: '/rotli-app-ocean-light@3x.png' },
+  { id: 'grove', name: 'Grove', environment: 'Grove Dark', screenshot: '/rotli-app-grove-dark@3x.png' },
+  { id: 'iris', name: 'Iris', environment: 'Iris Light', screenshot: '/rotli-app-iris-light@3x.png' },
+  { id: 'midnight', name: 'Midnight', environment: 'Midnight', screenshot: '/rotli-app-midnight@3x.png' },
+];
+
+// The beta scope: what the launch site may promise. Anything beyond this list
+// appears only on the dev site, under the experiments label below.
 const surfaces = [
   {
     name: 'Markdown, first',
-    detail: 'Hybrid editing keeps syntax quiet until you need it. Wikilinks, tasks, embeds, Mermaid, and image generation remain readable files on disk.',
+    detail: 'Hybrid editing keeps syntax quiet until you need it. Headings, lists, tables, embeds, and Mermaid diagrams stay readable files on disk, with the source one switch away.',
     proof: 'Plain .md · live preview · source view',
   },
   {
-    name: 'Documents & sheets',
-    detail: 'DOCX, spreadsheets, and CSV open as conventional editable work surfaces. Rotli preserves their formats instead of flattening everything into notes.',
-    proof: 'Editable locally · ordinary file formats',
+    name: 'Tasks that stay text',
+    detail: 'Check a box and the note changes on disk. Tasks, choices, toggles, and results are portable Markdown notation, so they travel with the file into any other editor.',
+    proof: 'One notation · readable anywhere',
   },
   {
-    name: 'Boards & diagrams',
-    detail: 'Excalidraw boards live beside everything else. Mermaid keeps readable source while adding visual, code, pan, zoom, and fit modes.',
-    proof: 'Raw .excalidraw · Mermaid stays text',
+    name: 'Links and finding',
+    detail: 'Wikilinks connect notes to each other. ⌘K searches titles and text across the whole vault, and Main and named views arrange the same files without copying them.',
+    proof: 'Wikilinks · ⌘K · views, not copies',
   },
   {
     name: 'Chat with context',
-    detail: 'Use an on-device model or connect the model tools you already trust. Chat can work from the active vault, create real artifacts, and leave the conversation in place.',
-    proof: 'Local or connected · artifacts stay files',
+    detail: 'Optional. Use an on-device model or connect the model tools you already trust. Chat can work from the active vault, and each conversation is a Markdown transcript in your folder.',
+    proof: 'Local or connected · transcripts are files',
   },
+];
+
+// Features under development. Shown only when site.showsExperiments, always
+// labeled, never on the launch site. Keep this list honest about status.
+const experiments = [
+  { name: 'Local CLI + MCP', status: 'A bounded JSON CLI and local stdio MCP server; being refined before release.' },
+  { name: 'DOCX and spreadsheets', status: 'Editable surfaces under review for round-trip fidelity.' },
+  { name: 'Excalidraw boards', status: 'Boards beside notes; native save and reopen still being verified.' },
+  { name: 'Mermaid visual editing', status: 'A visual editor over the text source. View and Code stay in the beta.' },
+  { name: 'Breve routines', status: 'Scheduled briefs and watchlists written as vault Markdown.' },
+  { name: 'Remote agents', status: 'Cloud MCP clients through a stateless relay; no hosted relay is launched.' },
 ];
 ---
 
@@ -47,23 +89,25 @@ const surfaces = [
       { href: '#why-local', label: 'Why local' },
       { href: '#workspace', label: 'Workspace' },
       { href: '#personal', label: 'Personalize' },
-      { href: '#beyond-the-app', label: 'More than an app' },
-      { href: '/mcp/', label: 'MCP' },
+      ...(site.showsExperiments
+        ? [
+            { href: '#beyond-the-app', label: 'More than an app' },
+            { href: '/mcp/', label: 'MCP' },
+          ]
+        : []),
     ]}
   />
 
   <main id="content">
     <section class="hero-shell" aria-labelledby="hero-title">
-      <div class="hero-backdrop" aria-hidden="true">
-        <img src="/coastline.webp" alt="" width="941" height="1672" fetchpriority="high" />
-      </div>
+      <img class="hero-backdrop" src="/coastline.webp" alt="" width="941" height="1672" aria-hidden="true" />
       <div class="hero">
         <div class="hero-copy">
           <p class="hero-kicker">A local-first workspace for macOS</p>
           <h1 id="hero-title">Room to think.<br />Files you keep.</h1>
           <p class="hero-lede">
-            Rotli turns one folder on your Mac into a calm workspace for notes, editable files,
-            boards, and AI conversations—without turning your work into an export from a service.
+            Rotli turns one folder on your Mac into a calm workspace for notes, tasks, links,
+            and optional AI conversations—without turning your work into an export from a service.
           </p>
           <div class="hero-actions">
             {site.downloadsEnabled ? (
@@ -71,24 +115,28 @@ const surfaces = [
             ) : (
               <span class="button primary pending" aria-disabled="true">Mac beta coming soon</span>
             )}
-            <a class="button secondary" href={GITHUB_URL} rel="noopener">Explore the source</a>
+            <a class="button secondary" href={secondaryAction.href} rel={secondaryAction.external ? 'noopener' : undefined}>
+              {secondaryAction.label}
+            </a>
           </div>
-          <p class="release-note">Free · Apple silicon · signed beta · no account</p>
+          <p class="release-note">Free · Apple silicon · {site.downloadsEnabled ? 'Mac beta' : 'Beta in preparation'} · no account</p>
         </div>
 
         <figure class="product-figure">
           <div class="product-shot">
             <img
-              src="/rotli-app-ocean-light.png"
+              src="/rotli-app-paper@3x.png"
               width="1280"
               height="800"
-              alt="Rotli's browser demo workspace in the Ocean Light environment"
+              alt="Rotli's browser demo workspace in the Paper environment"
             />
           </div>
-          <figcaption><span>Real browser demo</span> Ocean Light · seeded local corpus</figcaption>
+          <figcaption><span>Real browser demo</span> Paper · seeded local corpus</figcaption>
         </figure>
       </div>
     </section>
+
+    <PromoFilm />
 
     <div class="proof-strip" aria-label="Rotli essentials">
       <span><b>⌥Space</b> summon from anywhere</span>
@@ -102,9 +150,9 @@ const surfaces = [
         <p class="section-label">Not a cloud account with an export button</p>
         <h2 id="folder-title">One folder. Every path out stays open.</h2>
         <p>
-          Your vault is an ordinary directory you choose. Markdown stays Markdown. Documents,
-          sheets, images, PDFs, and boards keep familiar formats. Rotli’s hidden metadata is
-          rebuildable structure—not a second content store.
+          Your vault is an ordinary directory you choose. Markdown stays Markdown, and chat
+          transcripts are Markdown too. Rotli’s hidden metadata is rebuildable structure—not a
+          second content store.
         </p>
         <ul class="plain-promises">
           <li>
@@ -127,11 +175,17 @@ const surfaces = [
           <li><span class="folder-icon">⌄</span><b>wiki/</b><small>your knowledge</small></li>
           <li class="nested"><span>◇</span>launch-notes.md<small>plain Markdown</small></li>
           <li class="nested"><span>◇</span>reading-list.md<small>plain Markdown</small></li>
-          <li><span class="folder-icon">⌄</span><b>storage/</b><small>editable work</small></li>
-          <li class="nested"><span>□</span>project-brief.docx<small>Word document</small></li>
-          <li class="nested"><span>▦</span>forecast.xlsx<small>spreadsheet</small></li>
-          <li class="nested"><span>✣</span>system-map.excalidraw<small>board</small></li>
+          <li class="nested"><span class="folder-icon">⌄</span><b>_inbox/</b><small>quick captures</small></li>
+          {site.showsExperiments && (
+            <>
+              <li><span class="folder-icon">⌄</span><b>storage/</b><small>experiments · dev preview</small></li>
+              <li class="nested"><span>□</span>project-brief.docx<small>Word document</small></li>
+              <li class="nested"><span>▦</span>forecast.xlsx<small>spreadsheet</small></li>
+              <li class="nested"><span>✣</span>system-map.excalidraw<small>board</small></li>
+            </>
+          )}
           <li><span class="folder-icon">⌄</span><b>chats/</b><small>portable transcripts</small></li>
+          <li class="nested"><span>◇</span>planning-with-claude.md<small>Markdown transcript</small></li>
           <li><span class="folder-icon">·</span><b>.rotli/</b><small>rebuildable projections</small></li>
         </ul>
         <p class="anatomy-note">Delete the app and the work still makes sense.</p>
@@ -143,8 +197,8 @@ const surfaces = [
         <p class="section-label">A workspace, not a preview catalog</p>
         <h2 id="workspace-title">Work on the file. Don’t stare at a thumbnail of it.</h2>
         <p>
-          Markdown is the knowledge surface. Conventional formats are useful bonus surfaces,
-          and Rotli only calls them supported when they can be edited or honestly converted.
+          Markdown is the knowledge surface, and the beta stays close to what it does well.
+          Rotli only calls a format supported when you can actually edit it here.
         </p>
       </div>
       <div class="surface-list">
@@ -156,6 +210,21 @@ const surfaces = [
           </article>
         ))}
       </div>
+      {site.showsExperiments && (
+        <aside class="experiments" aria-labelledby="experiments-title">
+          <p class="experiment-tag">Experiment · dev preview</p>
+          <h3 id="experiments-title">Also in development, outside the beta scope</h3>
+          <p>
+            These features are under review and are not promised for the Mac beta.
+            Breve and Mermaid visual editing are restricted to development builds.
+          </p>
+          <ul>
+            {experiments.map((experiment) => (
+              <li><b>{experiment.name}</b> {experiment.status}</li>
+            ))}
+          </ul>
+        </aside>
+      )}
       <div class="workflow-ribbon" aria-label="Rotli capture workflow">
         <span><b>Capture</b><small>⌥C from anywhere</small></span>
         <i aria-hidden="true">→</i>
@@ -167,23 +236,24 @@ const surfaces = [
       </div>
     </section>
 
-    <section class="privacy-story" aria-labelledby="privacy-title">
+    <PlaygroundStory />
+
+    <section class="privacy-story" id="privacy" aria-labelledby="privacy-title">
       <div class="privacy-visual">
         <img src={staysLocal.src} width="400" height="400" alt="The Rotli quokka holding a privacy shield" loading="lazy" />
-        <p>Remote models never receive secure notes. Locked notes are readable by you and editable by no AI.</p>
+        <p>Rotli excludes notes marked Secure from its remote model context. Locked notes remain readable, and AI edits are refused.</p>
       </div>
       <div class="privacy-copy">
         <p class="section-label">Intelligence with a boundary</p>
         <h2 id="privacy-title">AI is invited into your workspace. It does not own the house.</h2>
         <p>
-          Start with an on-device model, connect Claude Code, Codex, or Antigravity when you
-          choose, or use no model at all. Rotli keeps the file and privacy policy underneath
-          every route.
+          Start with an on-device model, connect Claude Code or Codex, or use Cursor for code chat.
+          You can also use no model at all. Connected providers are optional; their own data policies apply.
         </p>
         <dl class="boundary-list">
           <div><dt>On-device</dt><dd>Private by default and usable without a network.</dd></div>
           <div><dt>Connected</dt><dd>Your existing model tools, explicitly labeled as remote.</dd></div>
-          <div><dt>Secure</dt><dd>Detected secrets and protected notes fail closed before egress.</dd></div>
+          <div><dt>Secure</dt><dd>Protected notes are excluded from Rotli's remote context. This is an AI access policy, not disk encryption.</dd></div>
           <div><dt>Locked</dt><dd>Every model may read; no model may edit.</dd></div>
         </dl>
       </div>
@@ -244,12 +314,12 @@ const surfaces = [
             <h3>Your quokka, when you want one.</h3>
             <p>
               Choose body color, black or white linework, idle mood, pose, and independently
-              colored glasses, bucket hat, scarf, or goggles. Turn the companion off and it
+              colored glasses or a bucket hat. Turn the companion off and it
               stays in onboarding only.
             </p>
             <ul aria-label="Companion customization options">
               <li>7 body presets + custom hue</li>
-              <li>4 accessories + custom color</li>
+              <li>2 accessories + custom color</li>
               <li>semantic poses for empty states</li>
             </ul>
           </div>
@@ -257,34 +327,53 @@ const surfaces = [
       </div>
     </section>
 
+    {site.showsExperiments && (
     <section class="beyond-story" id="beyond-the-app" aria-labelledby="beyond-title">
       <div class="beyond-heading">
         <p class="section-label">The folder is useful beyond the window</p>
-        <h2 id="beyond-title">Rotli is also a routine engine and a workspace for your agents.</h2>
+        <h2 id="beyond-title">Your vault can work with the agents you already run.</h2>
       </div>
       <div class="beyond-lanes">
-        <article>
-          <div class="lane-title"><span>Breve</span><b>Quiet routines, owned by Rotli</b></div>
+        <article class="experiment-lane">
+          <div class="lane-title">
+            <span>CLI + MCP <i class="experiment-tag">Experiment · dev preview</i></span>
+            <b>Local agents, through Rotli’s own policy</b>
+          </div>
           <p>
-            Morning briefs, watchlists, reminders, delivery, and scheduler health live in one
-            managed runtime. Generated briefs are ordinary vault Markdown, not a hidden news database.
-          </p>
-          <p class="lane-proof">Vault-owned configuration · sandboxed model work · recoverable runtime updates</p>
-        </article>
-        <article>
-          <div class="lane-title"><span>CLI + MCP</span><b>Your vault can work with local and cloud agents</b></div>
-          <p>
-            The installed Rotli binary exposes a bounded JSON CLI and local stdio MCP server.
-            Opt-in Remote agents let Grok Bot reach your running Mac through a stateless HTTPS relay,
-            without moving the vault into the cloud.
+            The installed Rotli binary exposes a bounded JSON CLI and a local stdio MCP server, so
+            Claude Code, Codex, and Cursor can read and write notes through the same rules the app
+            uses. The stdio connection opens no network listener.
           </p>
           <p class="lane-proof">
-            <span>Stdio stays local · remote is session opt-in · one policy engine</span>
+            <span>Stdio stays local · one policy engine · being refined before release</span>
             <a href="/mcp/">Read the MCP guide <span aria-hidden="true">→</span></a>
           </p>
         </article>
+            <article class="experiment-lane">
+              <div class="lane-title">
+                <span>Breve <i class="experiment-tag">Experiment · dev preview</i></span>
+                <b>Quiet routines, owned by Rotli</b>
+              </div>
+              <p>
+                Morning briefs, watchlists, reminders, delivery, and scheduler health in one managed
+                runtime. Generated briefs are ordinary vault Markdown. Not part of the beta scope.
+              </p>
+              <p class="lane-proof">Vault-owned configuration · development builds only</p>
+            </article>
+            <article class="experiment-lane">
+              <div class="lane-title">
+                <span>Remote agents <i class="experiment-tag">Experiment · dev preview</i></span>
+                <b>Cloud MCP clients through a stateless relay</b>
+              </div>
+              <p>
+                Opt-in sessions let a cloud client reach your running Mac through a relay you operate,
+                without moving the vault into the cloud. No hosted relay is launched.
+              </p>
+              <p class="lane-proof">Session opt-in · same policy engine · outside beta scope</p>
+            </article>
       </div>
     </section>
+    )}
 
     <section class="final-cta" aria-labelledby="final-title">
       <span class="final-mark" set:html={mark} aria-hidden="true"></span>
@@ -298,34 +387,27 @@ const surfaces = [
         ) : (
           <span class="button final-button pending" aria-disabled="true">Mac beta coming soon</span>
         )}
-        <a class="button final-link" href={GITHUB_URL} rel="noopener">View on GitHub</a>
+        <a class="button final-link" href={finalAction.href} rel={finalAction.external ? 'noopener' : undefined}>
+          {finalAction.label}
+        </a>
       </div>
     </section>
   </main>
 
-  <SiteFooter
-    tagline="Local-first, free, and open source under the MIT license."
-    links={[
-      { href: GITHUB_URL, label: 'GitHub' },
-      ...(site.downloadsEnabled ? [{ href: RELEASES_URL, label: 'Releases' }] : []),
-      { href: '/mcp/', label: 'MCP guide' },
-      { href: PRIVACY_URL, label: 'Privacy' },
-      { href: ROADMAP_URL, label: 'Roadmap' },
-    ]}
-  />
+  <SiteFooter tagline={footerTagline} links={footerLinks} />
 
   <script>
-    const root = document.documentElement;
+    let previewFamily = "rotli";
     const familyButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-theme-family]')];
     const themePreviewImage = document.querySelector<HTMLImageElement>('#theme-preview-image');
     const themePreviewCaption = document.querySelector<HTMLElement>('#theme-preview-caption');
 
     const syncFamily = () => {
       familyButtons.forEach((button) => {
-        button.setAttribute('aria-pressed', String(button.dataset.themeFamily === root.dataset.family));
+        button.setAttribute('aria-pressed', String(button.dataset.themeFamily === previewFamily));
       });
 
-      const activeButton = familyButtons.find((button) => button.dataset.themeFamily === root.dataset.family);
+      const activeButton = familyButtons.find((button) => button.dataset.themeFamily === previewFamily);
       const screenshot = activeButton?.dataset.themeScreenshot;
       const environment = activeButton?.dataset.themeEnvironment;
       const familyName = activeButton?.dataset.themeName;
@@ -340,10 +422,7 @@ const surfaces = [
 
     familyButtons.forEach((button) => {
       button.addEventListener('click', () => {
-        root.dataset.family = button.dataset.themeFamily || 'rotli';
-        try {
-          localStorage.setItem('rotli-site-family', root.dataset.family);
-        } catch (error) {}
+        previewFamily = button.dataset.themeFamily || 'rotli';
         syncFamily();
       });
     });
@@ -371,37 +450,6 @@ const surfaces = [
       color: var(--hero-text);
     }
 
-    .hero-backdrop,
-    .hero-backdrop::before,
-    .hero-backdrop::after {
-      position: absolute;
-      inset: 0;
-    }
-
-    .hero-backdrop img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      object-position: 50% 34%;
-      filter: saturate(0.88) contrast(1.04);
-    }
-
-    .hero-backdrop::before {
-      content: '';
-      z-index: 1;
-      background: var(--hero-wash);
-    }
-
-    .hero-backdrop::after {
-      content: '';
-      z-index: 2;
-      background-image: url('/grain.png');
-      background-size: 96px 96px;
-      opacity: 0.32;
-      mix-blend-mode: soft-light;
-      pointer-events: none;
-    }
-
     .hero {
       position: relative;
       z-index: 3;
@@ -413,6 +461,17 @@ const surfaces = [
       align-items: center;
       min-height: calc(100vh - 76px);
       padding-block: clamp(5rem, 9vw, 8rem);
+    }
+
+    .hero-backdrop {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: 50% 34%;
+      opacity: 0.1;
+      pointer-events: none;
     }
 
     .hero-copy {
@@ -493,7 +552,6 @@ const surfaces = [
       border: 1px solid var(--hero-shot-border);
       border-radius: 0.85rem;
       background: var(--hero-shot);
-      box-shadow: 0 2rem 5rem var(--hero-shadow);
     }
 
     .product-shot img {
@@ -714,6 +772,66 @@ const surfaces = [
       text-align: right;
     }
 
+    /* Dev-site experiments: one label grammar, never shipped on the launch site. */
+    .experiment-tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 1.5rem;
+      padding: 0 0.55rem;
+      border: 1px solid var(--border-strong);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      font-style: normal;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    .experiments {
+      max-width: 52rem;
+      margin-top: 3rem;
+      padding: clamp(1.4rem, 3vw, 2rem);
+      border: 1px solid var(--border-strong);
+      border-radius: 0.85rem;
+      background: var(--surface-2);
+    }
+
+    .experiments > .experiment-tag {
+      margin: 0;
+    }
+
+    .experiments h3 {
+      margin: 0.9rem 0 0;
+      font-size: clamp(1.2rem, 1.8vw, 1.5rem);
+      letter-spacing: -0.02em;
+    }
+
+    .experiments > p:not(.experiment-tag) {
+      margin: 0.6rem 0 0;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .experiments ul {
+      display: grid;
+      gap: 0.6rem;
+      margin: 1.2rem 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .experiments li {
+      padding-top: 0.6rem;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.92rem;
+    }
+
+    .experiments li b {
+      color: var(--text);
+    }
+
     .workflow-ribbon {
       display: grid;
       grid-template-columns: repeat(7, auto);
@@ -745,8 +863,8 @@ const surfaces = [
       grid-template-columns: 0.8fr 1.2fr;
       overflow: hidden;
       border-radius: 0.9rem;
-      background: var(--deep);
-      color: var(--deep-text);
+      background: var(--surface);
+      color: var(--text);
     }
 
     .privacy-visual {
@@ -756,8 +874,8 @@ const surfaces = [
       align-items: center;
       justify-content: center;
       padding: clamp(2rem, 5vw, 4rem);
-      border-right: 1px solid var(--deep-border);
-      background: var(--deep-surface);
+      border-right: 1px solid var(--border);
+      background: var(--surface-2);
     }
 
     .privacy-visual img {
@@ -768,7 +886,7 @@ const surfaces = [
     .privacy-visual p {
       max-width: 24rem;
       margin: 1.5rem 0 0;
-      color: var(--deep-muted);
+      color: var(--text-muted);
       font-size: 0.9rem;
       text-align: center;
     }
@@ -779,16 +897,16 @@ const surfaces = [
     }
 
     .privacy-copy .section-label {
-      color: var(--accent);
+      color: var(--accent-text);
     }
 
     .privacy-copy > p:not(.section-label) {
-      color: var(--deep-muted);
+      color: var(--text-muted);
     }
 
     .boundary-list {
       margin: 2.4rem 0 0;
-      border-top: 1px solid var(--deep-border);
+      border-top: 1px solid var(--border);
     }
 
     .boundary-list > div {
@@ -796,17 +914,17 @@ const surfaces = [
       grid-template-columns: 7rem 1fr;
       gap: 1.2rem;
       padding-block: 0.95rem;
-      border-bottom: 1px solid var(--deep-border);
+      border-bottom: 1px solid var(--border);
     }
 
     .boundary-list dt {
-      color: var(--deep-text);
+      color: var(--text);
       font-weight: 600;
     }
 
     .boundary-list dd {
       margin: 0;
-      color: var(--deep-muted);
+      color: var(--text-muted);
     }
 
     .personal-story {
@@ -1041,9 +1159,17 @@ const surfaces = [
     }
 
     .lane-title span {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
       color: var(--accent-text);
       font-size: 0.8rem;
       font-weight: 600;
+    }
+
+    .experiment-lane > p:not(.lane-proof) {
+      color: var(--text-muted);
     }
 
     .lane-title b {
@@ -1194,7 +1320,7 @@ const surfaces = [
       .companion-art {
         min-height: 25rem;
         border-right: 0;
-        border-bottom: 1px solid var(--deep-border);
+        border-bottom: 1px solid var(--border);
       }
 
       .companion-art {
@@ -1262,10 +1388,6 @@ const surfaces = [
       .hero {
         width: min(100% - 1.5rem, var(--page-max));
         padding-top: 3.5rem;
-      }
-
-      .hero-backdrop img {
-        object-position: 55% 34%;
       }
 
       h1 {

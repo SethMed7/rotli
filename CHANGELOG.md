@@ -10,6 +10,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.91.0] - 2026-09-11
+
+### Launch preparation
+
+- The website focuses its public copy on notes and optional chat, hides private
+  source links, and labels broader features only on the dev site. A captioned
+  HyperFrames promo with synthetic Playground interaction, original music and
+  sound effects sits below the hero; playback is opt-in and has a failure state.
+- Stable builds hide Breve in navigation/actions, refuse its native commands,
+  and skip managed runtime/scheduler startup. Development builds retain it;
+  restored Breve preferences cannot reactivate it in a stable build.
+- MCP and agent integrations leave production until refined: stable builds hide
+  Settings → Connections → Remote agents and the Claude Code extension prompt,
+  refuse the relay commands, and refuse `rotli mcp` and `rotli agent …` from
+  the packaged binary. The plain JSON CLI keeps working. The website shows the
+  MCP guide and the agent lanes only on the dev site.
+- Signing/notarization now require owner authorization for the exact promoted
+  source and successful hosted CI before Apple uploads. Apple submission/log
+  evidence is retained privately; public notary evidence excludes identity/paths.
+- Repository and deployment-context privacy tripwires, redacted secret-scan
+  commands, and owner-only main/dev protection payloads are available. Actual
+  branch protection still requires an eligible private-repository GitHub plan.
+
+
+### Added
+
+- Every new vault starts with a **Welcome** folder in Main: the welcome note
+  plus nine guided lessons (tasks, results, choices, switches, tables, links,
+  views, files, AI) as ordinary Markdown notes in `wiki/Welcome/`. They open
+  from the left menu and edit like any note. Settings → General → **Open
+  welcome folder** restores any lesson you removed and opens the welcome note;
+  opening an existing vault never writes. This replaces the session-only
+  Playground tab (lesson dropdown, Raw Markdown and Save controls), the
+  named-view import, and the separate practice vault. New vaults therefore
+  start with sample content, reversing the earlier "no sample content on
+  ordinary vault creation" rule.
+- Vaults can be removed from the sidebar's vault switcher: each row's overflow
+  menu offers **Remove from Rotli…** behind a confirm step. Removal only
+  disconnects; the folder stays on disk, and the active vault must be switched
+  away first. Named views can be deleted from Main's view picker (**Delete a
+  view…**) without switching into them first.
+- A development-only browser onboarding review, fresh-vault E2E coverage, a
+  Welcome-folder site walkthrough, and reusable landscape/portrait Remotion films.
+
+### Fixed
+
+- Task checkboxes sat 24px left of the H1 and paragraph edge: the inline-block
+  checkbox wrapper inherited the task line's hanging `text-indent`. The wrapper
+  now resets it, and fresh-vault E2E asserts every checkbox, marker, and control
+  starts on the H1 edge in all twelve environments.
+- Site screenshots use fresh 3× lossless captures, and companion illustrations
+  are rendered from their canonical SVGs at 1536px for clear Retina display.
+- Hovering a task no longer places the block drag handle over its checkbox.
+- Empty vaults keep non-note workspace tabs visible, and vault activation finishes
+  before onboarding advances to model setup.
+
+### Removed
+
+- The onboarding "Try a practice vault" option and its scratch-vault command.
+  Every vault now starts with the Welcome folder instead.
+
+### Changed
+
+- Removed the decorative quokka above the coming-soon page's introduction.
+- The dev-site hero blends its coastline photograph softly into Paper. The
+  coming-soon page shows the Rotli Light Welcome lesson, introduces guided practice,
+  and keeps its compact mobile layout and GitHub development link.
+- Mermaid Visual editing is development-only while View and Code remain available
+  in production. Site/provider copy reflects current supported capabilities and
+  distinguishes beta preparation from release availability.
+
 ### Changed
 
 - The coming-soon page is pinned to the Rotli light environment with no
@@ -24,9 +95,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the site now reads every quokka from the app's canonical assets. Dev
   deployments add an `X-Robots-Tag: noindex` header.
 
-- The marketing site now opens in the Rotli light environment regardless of
-  the operating system appearance; the header toggle still switches to dark
-  and remembers the choice.
+- The marketing site stays in Rotli Light regardless of operating system or
+  saved appearance. The hero uses Paper, and theme showcase selections only
+  change the preview inside that section.
 
 ### Changed
 
@@ -51,12 +122,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   multi-select options, and `[True|False]` or compact `[|]` creates a portable
   switch with explicit source state. The new controls support pointer and
   keyboard activation, preserve focus, and remain literal inside backticks.
-- New Practice Vaults now include a versioned `wiki/Playground/` folder with
-  editable Markdown lessons for tasks, result colors, choices, toggles, raw
-  source, and backtick literals. It is self-contained, copyable, and removable.
-- Settings → General can import those lessons into an existing writable vault
-  as a deletable `Playground` named view. Re-importing reuses intact lesson
-  notes and never overwrites user edits.
 - Compact sidebar, tab, and editor-header actions now keep at least a 24px
   pointer target, and icon labels appear for keyboard focus as well as hover.
 
@@ -66,10 +131,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   can be escaped. Hash choices accept uppercase `X`, and copied choice prompts
   no longer retain their hidden marker.
 - Labeled results now offer the same optional reason action as compact results.
-  Playground imports stay in Library instead of Captures, preserve existing
-  view-name casing, and reuse partially imported lessons. Practice Vault setup
-  stages the complete scaffold before publishing it, so failures leave no
-  half-created vault at the selected destination.
+  Seeded Welcome lessons stay in Library instead of Captures.
 - Updated compatible transitive fflate and fast-uri dependencies for archive
   bounds and URI-parsing security fixes.
 - Typing a bare in-progress or completed task marker (`[/]` or `[x]`) and then
@@ -89,7 +151,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `[:blue|:purple]`. Grouped `[##]` choices now use a compact right-aligned
   measure, even panel gutters, calmer selected rows, aligned controls, and an
   optional `[##?]` question row. Backticked examples render as ordinary text,
-  and the importable Playground is discoverable in General settings.
+  and the Welcome folder is discoverable in General settings.
 
 ## [0.89.0] - 2026-09-03
 

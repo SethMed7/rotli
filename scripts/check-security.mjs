@@ -12,11 +12,14 @@
 // a tracked fixture and this script asserts reality matches it.
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
+
+import { repositoryPrivacyFindings } from "./repository-privacy.mjs";
 
 const root = process.cwd();
 const allow = JSON.parse(readFileSync(join(root, "scripts/fixtures/egress-allowlist.json"), "utf8"));
-const failures = [];
+const failures = repositoryPrivacyFindings(root, homedir());
 
 const read = (rel) => readFileSync(join(root, rel), "utf8");
 function listFiles(dir, re) {

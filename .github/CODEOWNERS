@@ -1,3 +1,11 @@
-# Default ownership while Rotli remains a single-maintainer private repository.
-# Move this to team ownership before relying on it as a protected-review control.
+# Only the owner can approve protected changes. GitHub must enforce required
+# code-owner review on BOTH main and dev; this file alone is not protection.
+# Add reviewers only on the owner's explicit instruction.
 * @SethMed7
+
+# Preserve owner control if general ownership is expanded later.
+/.github/ @SethMed7
+/scripts/release* @SethMed7
+/src-tauri/tauri*.json @SethMed7
+/src-tauri/entitlements.plist @SethMed7
+/docs/operations/release-and-supply-chain.md @SethMed7

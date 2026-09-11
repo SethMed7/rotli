@@ -34,7 +34,7 @@ export const NEW_ITEM_DEFINITIONS: readonly NewItemDefinition[] = [
   {
     kind: "mermaid",
     label: "Mermaid diagram",
-    description: "A note born with a flowchart fence and its visual workspace.",
+    description: "A note born with a flowchart fence and its diagram workspace.",
   },
 ];
 

@@ -1,0 +1,284 @@
+---
+// The launch film, placed directly below the hero. It renders only when the
+// real artifacts exist in public/media/ (site.promo.enabled), so a build never
+// ships an empty player over a black frame. Click-to-play with the browser's
+// native controls: no autoplay, no third-party player, no cookies, and no
+// network request for the video until the visitor presses play.
+import { site } from '../site';
+
+interface Props {
+  /** `landing` sits between the hero and the proof strip; `soon` follows the holding-page introduction. */
+  variant?: 'landing' | 'soon';
+}
+
+const { variant = 'landing' } = Astro.props;
+const { promo } = site;
+---
+
+{
+  promo.enabled && (
+    <section class:list={['film', `film-${variant}`]} id="film" aria-labelledby="film-title">
+      <div class="film-panel">
+        <div class="film-copy">
+          <p class="film-label">The film</p>
+          <h2 id="film-title">Rotli, in motion.</h2>
+          <p class="film-lede">
+            A place to write, think with a model, and make yourself at home.
+            See how it feels in 42 seconds.
+          </p>
+          <ul class="film-facts" aria-label="Playback details">
+            <li>Plays with sound</li>
+            <li>{promo.captions ? 'Captions available' : 'On-screen captions'}</li>
+            <li>Real Playground footage</li>
+          </ul>
+          <div class="film-start">
+            <button class="film-play" type="button" hidden aria-label="Play the Rotli film">
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+                <path d="M8 5.5v13l10.5-6.5z" />
+              </svg>
+              <span>Watch the film</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="film-frame">
+          <video
+            id="film-player"
+            controls
+            playsinline
+            preload="none"
+            poster={promo.poster}
+            width="1920"
+            height="1080"
+            aria-label="Rotli launch film"
+          >
+            <source src={promo.video} type="video/mp4" />
+            {promo.captions && (
+              <track kind="captions" src={promo.captions} srclang="en" label="English" />
+            )}
+            <p class="film-fallback">
+              Your browser cannot play this video here.{' '}
+              <a href={promo.video}>Download the film (MP4)</a>
+              {promo.captions && (
+                <>
+                  {' '}or <a href={promo.captions}>read the captions</a>
+                </>
+              )}
+              .
+            </p>
+          </video>
+        </div>
+        <p class="film-error" role="status" hidden>
+          Playback could not start. <a href={promo.video}>Open the film directly</a>
+          {promo.captions && <> or <a href={promo.captions}>read the captions</a></>}.
+        </p>
+      </div>
+    </section>
+  )
+}
+
+<script>
+  // Progressive: the video works with native controls alone. The large play
+  // control appears only when scripting runs and disappears once playback
+  // starts (from either control), so it never sits over a playing film.
+  const player = document.querySelector<HTMLVideoElement>('#film-player');
+  const play = document.querySelector<HTMLButtonElement>('.film-play');
+  const error = document.querySelector<HTMLElement>('.film-error');
+  const showError = () => { if (error) error.hidden = false; };
+  player?.addEventListener('error', showError);
+  player?.querySelector('source')?.addEventListener('error', showError);
+  if (player && play && typeof player.canPlayType === 'function' && player.canPlayType('video/mp4')) {
+    play.hidden = false;
+    play.addEventListener('click', () => {
+      play.hidden = true;
+      if (error) error.hidden = true;
+      player.focus();
+      void player.play().catch(() => {
+        // Playback refused (for example a blocked codec). Native controls remain.
+        play.hidden = false;
+        showError();
+      });
+    });
+    player.addEventListener('play', () => {
+      play.hidden = true;
+    });
+  }
+</script>
+
+<style>
+  .film {
+    width: min(100% - 3rem, var(--page-max));
+    margin-inline: auto;
+    padding-block: clamp(2.5rem, 5vw, 4.5rem);
+  }
+
+  .film-soon {
+    padding-block: 0 clamp(2.5rem, 5vw, 4.5rem);
+  }
+
+  .film-panel {
+    display: grid;
+    grid-template-columns: minmax(16rem, 0.72fr) minmax(0, 1.28fr);
+    gap: clamp(1.5rem, 3vw, 3rem);
+    align-items: center;
+    padding: clamp(1.25rem, 2.5vw, 2rem);
+    border: 1px solid var(--deep-border);
+    border-radius: 0.9rem;
+    background: var(--deep);
+    color: var(--deep-text);
+  }
+
+  .film-copy {
+    padding-inline: clamp(0.25rem, 1vw, 1rem);
+  }
+
+  .film-error {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--deep-text);
+  }
+
+  .film-error[hidden] { display: none; }
+
+  .film-label {
+    margin: 0 0 0.9rem;
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  h2 {
+    margin: 0;
+    font-size: clamp(2rem, 3.6vw, 3.4rem);
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+    font-weight: 600;
+  }
+
+  .film-lede {
+    max-width: 30rem;
+    margin: 1.1rem 0 0;
+    color: var(--deep-muted);
+    font-size: 1.02rem;
+  }
+
+  .film-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin: 1.4rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .film-facts li {
+    padding: 0.35rem 0.7rem;
+    border: 1px solid var(--deep-border);
+    border-radius: 999px;
+    color: var(--deep-muted);
+    font-size: 0.76rem;
+  }
+
+  .film-frame {
+    position: relative;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--deep-border);
+    border-radius: 0.7rem;
+    background: var(--deep-surface);
+  }
+
+  video {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    background: var(--deep-surface);
+    object-fit: contain;
+  }
+
+  .film-fallback {
+    margin: 0;
+    padding: 1.5rem;
+    color: var(--deep-text);
+  }
+
+  .film-fallback a {
+    color: var(--deep-text);
+  }
+
+  .film-play {
+    min-width: 7.5rem;
+    min-height: 3.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.7rem 1.3rem 0.7rem 1.05rem;
+    border: 1px solid var(--deep-text);
+    border-radius: 999px;
+    background: var(--deep-text);
+    color: var(--deep);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .film-start { min-height: 3.25rem; margin-top: 1.3rem; }
+
+  .film-play[hidden] {
+    display: none;
+  }
+
+  .film-play svg {
+    width: 1.3rem;
+    height: 1.3rem;
+  }
+
+  .film-play:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--deep);
+  }
+
+  .film-play:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  video:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  @media (max-width: 1080px) {
+    .film-panel {
+      grid-template-columns: 1fr;
+    }
+
+    .film-copy {
+      max-width: 44rem;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .film {
+      width: min(100% - 1.5rem, var(--page-max));
+    }
+
+    .film-panel {
+      padding: 1rem;
+      border-radius: 0.8rem;
+    }
+
+    .film-copy {
+      padding-inline: 0.25rem;
+    }
+
+    .film-play {
+      min-width: 0;
+      min-height: 3rem;
+      padding-inline: 1rem 1.1rem;
+    }
+  }
+</style>

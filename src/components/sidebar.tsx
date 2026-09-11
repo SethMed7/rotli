@@ -1,3 +1,4 @@
+import { type MouseEvent, useEffect, useRef, useState } from "react";
 // The sidebar SHELL. It owns the chrome that is true of every front — the vault
 // header row, the create/collapse toolbar, the inline error lane, the front
 // switcher, and the utility footer — then hands the body to whichever front is
@@ -11,19 +12,24 @@
 // whole body and scrolls on its own, so nothing has to be folded to make room
 // for anything else.
 
-import { type MouseEvent, useEffect, useRef, useState } from "react";
-
 import { dispatch } from "../keys/registry";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { useTransientPopover } from "../lib/popover";
 import { corpusInspectFolder, corpusRefreshVault } from "../lib/tauri";
+import { type MemexInstance } from "../memex/config";
 import { initMemexAsCorpus } from "../memex/service";
-import { useConnectBrain, useMemexConfig, useSwitchVault } from "../memex/useMemex";
+import { useConnectBrain, useForgetBrain, useMemexConfig, useSwitchVault } from "../memex/useMemex";
 import { openNewItemMenu } from "../newItems/menu";
 import { mainFolderIds } from "../services/mainTree";
-import { vaultDisplayName, vaultRowLabel, vaultSwitcherItems } from "../services/vaultSwitcher";
-import { reconnectActiveVault, refreshActiveVault } from "../state/activeVault";
+import {
+  vaultDisplayName,
+  vaultOverflowItems,
+  vaultRowLabel,
+  vaultSwitcherItems,
+} from "../services/vaultSwitcher";
+import { activateCreatedVault, reconnectActiveVault } from "../state/activeVault";
 import { useContextMenu } from "../state/contextMenu";
-import { useFocusedTab, usePanesStore } from "../state/panes";
+import { useFocusedTab } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { requestVaultFolder } from "../state/vaultFolderBrowser";
 import { BreveSidebar } from "./breve/breveSidebar";
@@ -81,6 +87,7 @@ export function Sidebar() {
   const memexCfg = useMemexConfig();
   const switchVaultMut = useSwitchVault();
   const connectBrainMut = useConnectBrain();
+  const forgetBrainMut = useForgetBrain();
   const vaultName = vaultDisplayName(memexCfg.data?.instances ?? []);
   const vaultItems = vaultSwitcherItems(memexCfg.data?.instances ?? []);
   const vaultTriggerRef = useRef<HTMLButtonElement>(null);
@@ -102,9 +109,8 @@ export function Sidebar() {
     if (!path) return;
     const report = await corpusInspectFolder(path);
     if (report.kind === "empty") {
-      const welcomeId = await initMemexAsCorpus(path);
-      await refreshActiveVault();
-      if (welcomeId) usePanesStore.getState().openNote(welcomeId);
+      await initMemexAsCorpus(path);
+      await activateCreatedVault();
       return;
     }
     if (report.kind !== "memex") {
@@ -137,7 +143,15 @@ export function Sidebar() {
     });
   };
 
-  const openVaultOverflow = (event: MouseEvent<HTMLButtonElement>) => {
+  // Per-row overflow: Location settings, and the same "Remove from Rotli"
+  // that lives in Settings → Location. Removal only disconnects — the folder
+  // and its files stay where they are — and the active vault refuses (Rust's
+  // forget_root rule), so switch first.
+  const openVaultOverflow = (
+    event: MouseEvent<HTMLButtonElement>,
+    instance: MemexInstance,
+    active: boolean,
+  ) => {
     event.stopPropagation();
     const trigger = event.currentTarget;
     const rect = trigger.getBoundingClientRect();
@@ -145,7 +159,10 @@ export function Sidebar() {
     openContextMenu(
       Math.max(8, rect.right - 202),
       rect.bottom + 4,
-      [{ kind: "action", label: "Location settings…", onClick: () => dispatch("app.settings") }],
+      vaultOverflowItems(instance, active, {
+        openLocationSettings: () => dispatch("app.settings"),
+        remove: () => void forgetBrainMut.mutateAsync(instance.id).catch(vaultErr("remove the vault")),
+      }),
       { returnFocus: () => vaultTriggerRef.current?.focus() },
     );
   };
@@ -259,7 +276,7 @@ export function Sidebar() {
                       role="menuitem"
                       aria-label={`More options for ${label}`}
                       title={`More options for ${label}`}
-                      onClick={openVaultOverflow}
+                      onClick={(event) => openVaultOverflow(event, instance, active)}
                     >
                       <MoreGlyph size={16} />
                     </button>
@@ -353,7 +370,7 @@ export function Sidebar() {
         onPick={pickSidebarView}
         chatCount={chats.chatList.length}
         breveActive={sidebarMode === "breve"}
-        onBreve={() => dispatch("view.breve")}
+        onBreve={LAUNCH_FEATURES.breve ? () => dispatch("view.breve") : undefined}
       />
 
       {/* a failed row-menu action (file-to-brain, board rename) says so HERE —

@@ -4,6 +4,7 @@
 // also carry `view_tag: <name>` (synchronized by Rust); boards and binary files
 // remain frontmatter-free and are represented only by these reference trees.
 
+import type { MenuSpec } from "../state/contextMenu";
 import {
   MAIN_ROOT,
   type MainNode,
@@ -137,6 +138,66 @@ export function renameNamedView(manifest: ViewsManifest, current: string, value:
     ...manifest,
     views: manifest.views.map((view) => (view.name === current ? { ...view, name } : view)),
   };
+}
+
+/** Main's view picker: the exclusive selector (Main + every named view), then
+ * New view, then "Delete a view…" as a drill listing every view so any of them
+ * can go without switching into it first (items stay in Main; the caller
+ * confirms). The shown view additionally gets Rename and its own Delete. */
+export function viewPickerItems(
+  manifest: ViewsManifest,
+  activeView: string | null,
+  writable: boolean,
+  on: {
+    show: (name: string | null) => void;
+    create: () => void;
+    rename: () => void;
+    remove: (name: string) => void;
+  },
+): MenuSpec[] {
+  const items: MenuSpec[] = [
+    {
+      kind: "action",
+      label: "Main — all items",
+      checked: activeView === null,
+      checkedMark: "highlight",
+      onClick: () => on.show(null),
+    },
+    ...manifest.views.map((view) => ({
+      kind: "action" as const,
+      label: view.name,
+      checked: activeView === view.name,
+      checkedMark: "highlight" as const,
+      onClick: () => on.show(view.name),
+    })),
+    { kind: "sep" },
+    { kind: "action", label: "New view…", disabled: !writable, onClick: on.create },
+    {
+      kind: "drill",
+      label: "Delete a view…",
+      danger: true,
+      disabled: !writable || manifest.views.length === 0,
+      items: manifest.views.map((view) => ({
+        kind: "action" as const,
+        label: view.name,
+        danger: true,
+        onClick: () => on.remove(view.name),
+      })),
+    },
+  ];
+  if (activeView) {
+    items.push(
+      { kind: "action", label: "Rename view…", disabled: !writable, onClick: on.rename },
+      {
+        kind: "action",
+        label: "Delete view…",
+        danger: true,
+        disabled: !writable,
+        onClick: () => on.remove(activeView),
+      },
+    );
+  }
+  return items;
 }
 
 export function deleteNamedView(manifest: ViewsManifest, name: string): ViewsManifest {

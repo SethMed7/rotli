@@ -52,6 +52,7 @@ import {
 } from "./lib/tauri";
 import { useNativeFileDrop } from "./editor/nativeFileDrop";
 import { onQuitFlushFailure } from "./lib/quitFlush";
+import { isOnboardingReview } from "./lib/reviewMode";
 import { fileQuickNoteInMain } from "./newItems/composition";
 import { createVaultCapture } from "./services/captureRouting";
 import { summonChat } from "./services/chatSummon";
@@ -59,6 +60,7 @@ import { DEST } from "./services/destinations";
 import { invalidateFolders, invalidateJournal, invalidateNotes } from "./services/hooks";
 import { adoptPendingAtOrganize } from "./services/librarianAutoAdopt";
 import { notesService } from "./services/notes";
+import { openSeededWelcome } from "./services/welcome";
 import { queryClient } from "./services/query";
 import { hydrateMain } from "./state/main";
 import { onboardingRequired } from "./state/onboarding";
@@ -149,6 +151,7 @@ function MainShell() {
   const onboardingVersion = useUiStore((s) => s.onboardingVersion);
   const setOnboardingVersion = useUiStore((s) => s.setOnboardingVersion);
   const onboardingPhase = useUiStore((s) => s.onboardingPhase);
+  const [vaultActivationPending, setVaultActivationPending] = useState(false);
   const setOnboardingPhase = useUiStore((s) => s.setOnboardingPhase);
   const vaultStatus = useVaultStore((s) => s.status);
   const mainAutoRemoveDays = useUiStore((s) => s.mainAutoRemoveDays);
@@ -156,14 +159,15 @@ function MainShell() {
   // first run (the real app only). The version gate ALSO re-onboards on every 0.x
   // update — bulletproof regardless of the `onboarded` flag's state on disk.
   const onboardingActive = onboardingRequired(
-    isTauri(),
+    isTauri() || isOnboardingReview(isTauri(), import.meta.env.DEV, window.location.search),
     onboarded,
     onboardingVersion,
     REQUIRED_ONBOARDING_VERSION,
   );
   const showOnboarding = onboardingActive && onboardingPhase === "preferences";
-  const showModelSetup = onboardingActive && onboardingPhase === "models";
+  const showModelSetup = onboardingActive && onboardingPhase === "models" && !vaultActivationPending;
   const showVaultActivation =
+    vaultActivationPending ||
     (onboardingActive && onboardingPhase === "vault") ||
     (isTauri() && vaultStatus === "unconfigured" && !onboardingActive);
 
@@ -421,14 +425,17 @@ function MainShell() {
                     void flushSettingsNow().catch(() => {});
                   },
                   onDone: () => {
+                    setVaultActivationPending(false);
                     setOnboardingPhase("models");
                     return flushSettingsNow();
                   },
                   onBeforeSwitch: () => {
+                    setVaultActivationPending(true);
                     setOnboardingPhase("models");
                     return flushSettingsNow();
                   },
                   onSwitchFailed: () => {
+                    setVaultActivationPending(false);
                     setOnboardingPhase("vault");
                     return flushSettingsNow();
                   },
@@ -451,6 +458,7 @@ function MainShell() {
             }}
             onDone={() => {
               setOnboarded(true);
+              openSeededWelcome();
               setOnboardingVersion(APP_VERSION);
               setOnboardingPhase("preferences");
               const ui = useUiStore.getState();

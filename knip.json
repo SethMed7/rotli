@@ -19,7 +19,9 @@
     "breve-runtime/**/*.ts!"
   ],
   "ignoreBinaries": [
-    "mktemp"
+    "mktemp",
+    "gitleaks",
+    "ffmpeg"
   ],
   "ignoreExportsUsedInFile": true
 }

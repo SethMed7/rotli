@@ -230,12 +230,21 @@ exception.
   note. A newly created vault opens
   Home with the sidebar expanded even when the outgoing vault was collapsed or
   showing Chat/Breve.
+- A completed new-vault onboarding opens an app-owned **Playground** tab in the
+  Home workspace. It is not a Main item or a vault note. Ten editable lessons
+  use session buffers; practice edits never enter search, Tasks, Library, disk,
+  or saved view/settings snapshots. Closing/reopening keeps drafts for this
+  session; restart or vault switch resets them. **Save lesson to vault** creates
+  an ordinary note and adds its reference to Main, only on explicit action.
+  Empty/read-only drafts cannot save; failed saves stay visible and retryable.
+  Browser preview clearly identifies its in-memory persistence.
 - The explicit Practice Vault adds `wiki/Playground/`: a versioned, removable
   set of ordinary Markdown lessons for tasks, result buttons, choices, toggles,
   custom colors, and literal backtick examples. The welcome note links into the
   folder. Because the lesson is one self-contained folder with no sidecar
   dependency, a user can copy it into another vault or delete it outright.
-- Settings → General offers **Import playground** for an existing writable
+- Settings → General offers **Open playground** without writing files, and
+  **Import playground** for an existing writable
   vault. It creates or reuses the same ordinary lesson notes and adds them to a
   deletable `Playground` named view. Deleting that projection never deletes the
   notes; importing again reuses unchanged lessons rather than overwriting them.
@@ -421,7 +430,9 @@ polish work.
 ## Diagram interaction
 
 - A rendered Mermaid fence is an entry point to one focused workspace with
-  View, Visual, and Code modes. View supports pointer pan,
+  View and Code modes in production. The experimental Visual editor is enabled
+  only by the development build policy in `src/lib/featurePolicy.ts`; neither
+  a query parameter nor a vault setting can enable it in production. View supports pointer pan,
   wheel/button/keyboard zoom, double-click or `0` to fit, and visible loading,
   empty, and parse-error states.
 - Mermaid text in the Markdown fence remains source of truth. Code changes are
@@ -445,6 +456,9 @@ polish work.
   active Main/view context, opens it, and starts its rename flow.
 
 ## Markdown editing
+
+- Block drag handles reserve the task-marker gutter. Hover never covers a task
+  checkbox; hide a handle if a narrow gutter has no safe room for it.
 
 - A bare task token followed by Space becomes a portable Markdown list task:
   `[]`/`[ ]` becomes `- [ ] `, `[/]` becomes `- [/] `, and `[x]` becomes

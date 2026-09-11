@@ -2,6 +2,9 @@
 
 Describe the user-visible result and the problem it solves.
 
+Target `dev` for ordinary changes; `main` is an owner-approved promotion.
+Only @SethMed7 currently approves either branch. Use synthetic fixtures and media.
+
 ## Architecture and data
 
 - [ ] Dependency direction still follows `ARCHITECTURE.md`.
@@ -18,9 +21,9 @@ Describe the user-visible result and the problem it solves.
 - [ ] Model behavior includes deterministic offline eval coverage when applicable
 - [ ] Cross-surface interaction includes E2E coverage when applicable
 - [ ] Syntax, naming, oxfmt, and TypeScript checks pass
-- [ ] `bun run check`
-- [ ] `cargo test --manifest-path src-tauri/Cargo.toml`
-- [ ] `NODE_OPTIONS=--max-old-space-size=4096 bun run build`
+- [ ] `bun run verify` (all lanes; list exact failures or unrun checks)
+- [ ] No credentials, private paths, notes, or local state in diff/attachments
+- [ ] Stable/dev feature behavior evaluated when changing launch scope
 - [ ] Current documentation and `CHANGELOG.md` updated when applicable
 - [ ] Dependency/release-sensitive changes record provenance, license, vulnerability, and rollback impact
 

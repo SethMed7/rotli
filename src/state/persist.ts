@@ -1,3 +1,4 @@
+import { type HybridPreset, PROVIDER_IDS, type ProviderId, providerDefaultModel } from "../ai/models";
 // Every preference survives relaunch. Vault-specific state stays in two
 // frontend-owned dot-files inside the corpus:
 //
@@ -16,8 +17,6 @@
 //
 // In a plain browser (vite dev) every entry point here is a no-op — the
 // in-memory demo corpus stays exactly as it was (the seam's whole point).
-
-import { type HybridPreset, PROVIDER_IDS, type ProviderId, providerDefaultModel } from "../ai/models";
 import { parseWebSearchProvider, type WebSearchProvider } from "../ai/searchProvider";
 import {
   QUOKKA_IDLE_POSES,
@@ -38,6 +37,7 @@ import { allActions } from "../keys/registry";
 // the quit-flush ack listener must exist from first paint — an idle ⌘Q acks
 // instantly instead of riding out the Rust-side hold (#4).
 import { createDebouncedTask } from "../lib/debouncedTask";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import {
   DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE,
   PRIVATE_BROWSER_SEARCH_ENGINES,
@@ -72,6 +72,7 @@ import {
   MIN_TEXT_SIZE,
   type Measure,
   type NoteStyle,
+  persistedNoteStyles,
   useNoteStyleStore,
 } from "./noteStyle";
 import { findLeaf, leaves, usePanesStore } from "./panes";
@@ -120,6 +121,7 @@ import {
 import { ACCENT_COLORS, DEFAULT_ACCENT_HUE, type AccentColor } from "./ui";
 import { useVaultStore } from "./vault";
 import { hydrateViews, useViewsStore } from "./views";
+import { durablePane, type PersistedViewstate } from "./viewstate";
 
 const SAVE_DEBOUNCE_MS = 500;
 
@@ -690,7 +692,7 @@ export function parseSettings(raw: string): PersistedSettings {
     sidebarCollapsed: asBool(data.sidebarCollapsed, false),
     sidebarWidth: clampSidebarWidth(typeof data.sidebarWidth === "number" ? data.sidebarWidth : 240),
     sidebarZoom: clampSidebarZoom(typeof data.sidebarZoom === "number" ? data.sidebarZoom : 1),
-    sidebarMode: data.sidebarMode === "breve" ? "breve" : "notes",
+    sidebarMode: LAUNCH_FEATURES.breve && data.sidebarMode === "breve" ? "breve" : "notes",
     // Home is the safe default front — a fresh (or unknown) value opens on notes
     sidebarView: data.sidebarView === "chat" ? "chat" : "home",
     breveView:
@@ -917,21 +919,10 @@ function applyShellSideEffects(s: PersistedSettings): void {
 
 // ─── viewstate.json ──────────────────────────────────────────────────────────
 
-interface PersistedViewstate {
-  v: 1;
-  root: PaneNode;
-  focusedPaneId: string;
-  selectedFolderId: string;
-  activeView: string | null;
-  mru: string[];
-  itemTouchedAt: Record<string, number>;
-  chatTouchedAt: Record<string, number>;
-}
-
 /** Revalidate ONE persisted tab against the live Tab union — every surfaceKind
  * must have a branch here, or its tabs silently vanish at relaunch (and a
  * single-tab leaf's split collapses with them — #34, audit 2026-07: file +
- * activity were missing). Exported for the per-kind round-trip tests. */
+ * activity were missing). Exported for round-trip tests. */
 export function validTab(v: unknown, alive: Set<string>): Tab | null {
   const o = record(v);
   if (typeof o.id !== "string" || !o.id) return null;
@@ -958,7 +949,6 @@ export function validTab(v: unknown, alive: Set<string>): Tab | null {
     if (typeof o.fileId !== "string" || !o.fileId) return null;
     return { id: o.id, surfaceKind: "file", fileId: o.fileId, ...preview };
   }
-  // activity: a singleton view with no binding — nothing to validate but shape.
   if (o.surfaceKind === "activity") {
     return { id: o.id, surfaceKind: "activity" };
   }
@@ -1413,7 +1403,7 @@ export interface AppearanceBroadcast {
 }
 
 export function appearanceBroadcast(): AppearanceBroadcast {
-  return { app: appSettingsSnapshot(), noteStyles: JSON.stringify(useNoteStyleStore.getState().styles) };
+  return { app: appSettingsSnapshot(), noteStyles: JSON.stringify(persistedNoteStyles()) };
 }
 
 export function applyAppearanceBroadcast(payload: AppearanceBroadcast): void {
@@ -1539,7 +1529,7 @@ function settingsSnapshot(): string {
     breveView: ui.breveView,
     expandedDests: ui.expandedDests,
     bindings: useBindingsStore.getState().overrides,
-    noteStyles: useNoteStyleStore.getState().styles,
+    noteStyles: persistedNoteStyles(),
     tableWidths: useTableWidthsStore.getState().widths,
     tableHeights: useTableWidthsStore.getState().heights,
   };
@@ -1551,7 +1541,7 @@ function viewstateSnapshot(): string {
   const panes = usePanesStore.getState();
   const snapshot: PersistedViewstate = {
     v: 1,
-    root: panes.root,
+    root: durablePane(panes.root),
     focusedPaneId: panes.focusedPaneId,
     selectedFolderId: useUiStore.getState().selectedFolderId,
     activeView: useUiStore.getState().activeView,

@@ -7,7 +7,9 @@ FROM oven/bun:1.4.0-alpine AS build
 
 ARG SITE_MODE=full
 ARG SITE_URL=https://rotli.co
-ENV SITE_MODE=$SITE_MODE SITE_URL=$SITE_URL CI=true
+# Fails closed: source-repository links appear only when this is exactly "true".
+ARG SOURCE_REPOSITORY_PUBLIC=false
+ENV SITE_MODE=$SITE_MODE SITE_URL=$SITE_URL SOURCE_REPOSITORY_PUBLIC=$SOURCE_REPOSITORY_PUBLIC CI=true
 
 WORKDIR /repo/site
 COPY site/package.json site/bun.lock site/bunfig.toml ./
@@ -17,7 +19,7 @@ COPY src/assets/characters /repo/src/assets/characters
 COPY site ./
 RUN bun run build
 
-FROM caddy:2.11.4-alpine
+FROM caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
 COPY site/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /repo/site/dist /srv
 EXPOSE 8080

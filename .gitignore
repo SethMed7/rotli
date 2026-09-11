@@ -17,6 +17,17 @@ scripts/.icon
 .env
 .env.*
 secrets.*
+**/.rotli/
+**/.breve-secrets
+*.pem
+*.mobileprovision
+*.provisionprofile
+*.keychain
+*.keychain-db
+
+# Capture sessions and local deployment overrides are never source assets.
+.railway/
+.hyperframes/
 
 # CARL ephemeral session state (runtime; the hook recreates it) — carl.json IS tracked
 .carl/sessions/

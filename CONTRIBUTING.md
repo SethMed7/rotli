@@ -70,6 +70,15 @@ replaces the current contracts. See
 Claude asks for one-time approval of the shared project server; Codex loads it
 only after the repository is trusted.
 
+## Pull requests and protected branches
+
+Changes branch from and target `dev`; promotion to `main` uses a separate PR.
+Only @SethMed7 currently approves either branch. The exact controls, owner-authored
+PR exception, private-repository plan blocker, and privacy-safe submission flow
+live in [repository access](docs/operations/repository-access.md). Neither bot
+approval nor a green check authorizes a release. Before attaching screenshots,
+logs, or fixtures, review them for personal data and use synthetic content.
+
 ## Making a change
 
 1. Inspect the current implementation and its tests.

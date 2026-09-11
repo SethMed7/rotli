@@ -9,6 +9,7 @@
     "dev": "astro dev",
     "check": "astro check",
     "build": "astro build",
+    "build:modes": "bun scripts/build-modes.mjs",
     "preview": "astro preview"
   },
   "dependencies": {

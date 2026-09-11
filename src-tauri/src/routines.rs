@@ -441,6 +441,7 @@ fn sync_runtime_at(
 }
 
 pub fn sync_runtime(app: &AppHandle, corpus_root: &Path) -> Result<PathBuf, String> {
+    crate::feature_policy::require_breve()?;
     let source = source_root(app)?;
     let home = corpus_root.join(MANAGED_DIR);
     let backup_dir = app
@@ -517,9 +518,8 @@ fn stop_child(child: &mut Child) {
 
 impl BreveSupervisor {
     pub fn start(&self, app: &AppHandle, root: PathBuf) -> Result<(), String> {
-        // `tauri dev` is a visual/interaction review surface. It must never
-        // sync code into the live managed runtime or launch a second scheduler.
-        if cfg!(debug_assertions) {
+        // Stable and debug previews never install or start a managed scheduler.
+        if !crate::feature_policy::breve_enabled() || cfg!(debug_assertions) {
             return Ok(());
         }
         if !root.join(MANAGED_MARKER).is_file() {

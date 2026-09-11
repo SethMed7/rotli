@@ -1,5 +1,6 @@
 import { corpusRefreshActiveVault, isTauri } from "../lib/tauri";
 import { queryClient } from "../services/query";
+import { openWelcome, resetWelcome } from "../services/welcome";
 import { resetMainForVaultSwitch } from "./main";
 import { useMruStore } from "./mru";
 import { resetPanesForVaultSwitch } from "./panes";
@@ -15,6 +16,7 @@ export function refreshActiveVault(): Promise<void> {
   if (refreshInFlight) return refreshInFlight;
   const refresh = (async () => {
     queryClient.clear();
+    resetWelcome();
     resetPanesForVaultSwitch();
     resetMainForVaultSwitch();
     resetViewsForVaultSwitch();
@@ -32,6 +34,20 @@ export function refreshActiveVault(): Promise<void> {
     },
   );
   return refresh;
+}
+
+/** The one path after a vault is CREATED (onboarding's empty folder, the
+ * switcher's Connect on an empty folder): rebind, then seed the Welcome folder
+ * in Main and land on the welcome note. The vault itself is already durable, so
+ * a seeding failure is logged and left to Settings → Open welcome folder rather
+ * than failing the creation. Opening an existing vault never comes through here. */
+export async function activateCreatedVault(): Promise<void> {
+  await refreshActiveVault();
+  try {
+    await openWelcome();
+  } catch (cause) {
+    console.warn("welcome folder seeding failed", cause);
+  }
 }
 
 /** Ask Rust to reopen/rescan the active folder, then rebuild every vault-scoped
