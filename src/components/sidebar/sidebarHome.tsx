@@ -60,8 +60,9 @@ import {
   transferTreeItemToView,
   viewFolderNameError,
   viewNameError,
+  viewPickerItems,
 } from "../../services/viewTree";
-import { type MenuSpec, useContextMenu } from "../../state/contextMenu";
+import { useContextMenu } from "../../state/contextMenu";
 import { useMainStore } from "../../state/main";
 import { sidebarItemId, useFocusedTab, usePanesStore } from "../../state/panes";
 import { QUICK_MAX, togglePinQuick } from "../../state/quick";
@@ -401,52 +402,18 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   const openViewMenu = (e: MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    const items: MenuSpec[] = [
-      {
-        kind: "action",
-        label: "Main — all items",
-        checked: activeView === null,
-        checkedMark: "highlight",
-        onClick: () => setActiveView(null),
+    const items = viewPickerItems(viewsManifest, activeView, viewsWritable, {
+      show: setActiveView,
+      create: () => {
+        setEditingView("create");
+        setViewInputError(null);
       },
-      ...viewsManifest.views.map((view) => ({
-        kind: "action" as const,
-        label: view.name,
-        checked: activeView === view.name,
-        checkedMark: "highlight" as const,
-        onClick: () => setActiveView(view.name),
-      })),
-      { kind: "sep" },
-      {
-        kind: "action",
-        label: "New view…",
-        disabled: !viewsWritable,
-        onClick: () => {
-          setEditingView("create");
-          setViewInputError(null);
-        },
+      rename: () => {
+        setEditingView("rename");
+        setViewInputError(null);
       },
-    ];
-    if (activeView) {
-      items.push(
-        {
-          kind: "action",
-          label: "Rename view…",
-          disabled: !viewsWritable,
-          onClick: () => {
-            setEditingView("rename");
-            setViewInputError(null);
-          },
-        },
-        {
-          kind: "action",
-          label: "Delete view…",
-          danger: true,
-          disabled: !viewsWritable,
-          onClick: () => setDeletingView(activeView),
-        },
-      );
-    }
+      remove: setDeletingView,
+    });
     const trigger = e.currentTarget;
     const rect = trigger.getBoundingClientRect();
     openContextMenu(rect.left, rect.bottom + 4, items, {
@@ -1214,7 +1181,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
                   onClick={() => {
                     setViewsManifest(deleteNamedView(viewsManifest, deletingView));
                     setDeletingView(null);
-                    setActiveView(null);
+                    if (activeView === deletingView) setActiveView(null);
                   }}
                 >
                   Delete

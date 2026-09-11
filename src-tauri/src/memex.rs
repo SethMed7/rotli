@@ -773,28 +773,6 @@ pub fn brain_view(path: &Path) -> Option<(String, MemexPerms)> {
 /// The corpus gate exposes this exact path and no other root document.
 pub const WELCOME_PRESET_FILE: &str = "Welcome to Rotli.md";
 
-const WELCOME_PRESET_BODY: &str = r#"# Welcome to Rotli
-
-This is a real Markdown note in your vault. Edit it, experiment here, or delete it when you no longer need it.
-
-## Things to try
-
-1. Change this sentence and press **⌘S**.
-2. Press **⌘N** to create a note.
-3. Press **⌘K** to search notes, files, chats, and actions.
-4. Type `/` on an empty line to explore Markdown blocks.
-5. Select some text and ask Rotli about it in Chat.
-6. Drop an image or file into **Assets**.
-
-## Your vault
-
-- Your files stay in the folder you chose and work in other apps.
-- **Library** is where Rotli organizes lasting notes.
-- **Assets**, **Archive**, and **Trash** are system views of this same vault.
-- This welcome note sits at the vault root, outside Library.
-
-Make it yours.
-"#;
 
 /// Scaffold a FRESH memex at `root` (empty/fresh only) — the v3.6 spine, one
 /// editable welcome note, and a new `mx_` memex.json stamped with `apps.rotli`.
@@ -827,7 +805,10 @@ pub fn scaffold_memex(root: &Path) -> Result<String, String> {
         &root.join("MAP.md"),
         "# MAP\n\nThe index of this Rotli vault.\n",
     )?;
-    atomic_write(&root.join(WELCOME_PRESET_FILE), WELCOME_PRESET_BODY)?;
+    atomic_write(
+        &root.join(WELCOME_PRESET_FILE),
+        crate::welcome_lessons::welcome_body(),
+    )?;
     // the memex is a TEXT tree; binaries live in the gitignored storage/ (referenced
     // by storage: links), and .rotli/ is rotli's rebuildable sidecar.
     atomic_write(&root.join(".gitignore"), "storage/\n.rotli/\n")?;

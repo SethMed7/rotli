@@ -75,7 +75,7 @@ export function SidebarSwitcher({
   /** Breve owns the sidebar body right now; Home and Chat read as unselected. */
   breveActive?: boolean;
   /** Present when the Breve segment is offered (the main window). */
-  onBreve?: () => void;
+  onBreve?: (() => void) | undefined;
 }) {
   return (
     // role="group" + aria-pressed, NOT a tablist: these segments switch the

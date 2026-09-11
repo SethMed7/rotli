@@ -16,6 +16,7 @@ import {
   transferTreeItemToView,
   viewChats,
   viewNameError,
+  viewPickerItems,
   viewTree,
 } from "./viewTree";
 
@@ -153,5 +154,40 @@ describe("chats in named views", () => {
     expect(viewChats(manifest, "Work")).toEqual(["new-slug"]);
     expect(migrateChatViewSlug(manifest, "not-assigned", "x")).toBe(manifest);
     expect(chatAssignedView(deleteNamedView(manifest, "Work"), "new-slug")).toBeNull();
+  });
+});
+
+describe("view picker menu", () => {
+  const on = { show: () => {}, create: () => {}, rename: () => {}, remove: () => {} };
+  const two = createNamedView(createNamedView(EMPTY_VIEWS, "Alpha"), "Beta");
+
+  test("every view is deletable through the drill without being shown first", () => {
+    const items = viewPickerItems(two, null, true, on);
+    const drill = items.find((item) => item.kind === "drill");
+    expect(drill).toMatchObject({
+      label: expect.stringMatching(/^Delete a view/),
+      danger: true,
+      disabled: false,
+    });
+    if (drill?.kind !== "drill") throw new Error("expected a drill");
+    expect(drill.items.map((item) => (item.kind === "action" ? item.label : ""))).toEqual(["Alpha", "Beta"]);
+    expect(items.some((item) => item.kind === "action" && item.label.startsWith("Rename"))).toBe(false);
+  });
+
+  test("the shown view adds rename and its own delete; no views or a read-only vault disable deletion", () => {
+    const shown = viewPickerItems(two, "Beta", true, on).map((item) =>
+      item.kind === "sep" ? "—" : item.label,
+    );
+    expect(shown.slice(-3).map((label) => label.replace(/…$/, ""))).toEqual([
+      "Delete a view",
+      "Rename view",
+      "Delete view",
+    ]);
+    expect(viewPickerItems(EMPTY_VIEWS, null, true, on).find((item) => item.kind === "drill")).toMatchObject({
+      disabled: true,
+    });
+    expect(viewPickerItems(two, null, false, on).find((item) => item.kind === "drill")).toMatchObject({
+      disabled: true,
+    });
   });
 });

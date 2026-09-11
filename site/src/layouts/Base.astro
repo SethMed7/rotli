@@ -5,24 +5,21 @@ interface Props {
   canonicalPath?: string;
   image?: string;
   noindex?: boolean;
-  /** Pin the page to one environment and ignore saved preferences. */
-  lockAppearance?: { family: string; mode: 'light' | 'dark' };
 }
 
 const {
   title = 'Rotli — room to think, files you keep',
-  description = 'A calm, local-first Mac workspace for notes, editable files, boards, and AI conversations. One folder you own, with no account required.',
+  description = 'A calm, local-first Mac workspace for notes, tasks, links, and optional AI conversations. One folder you own, with no account required.',
   canonicalPath = Astro.url.pathname,
   image = '/social-card.png',
   noindex = false,
-  lockAppearance,
 } = Astro.props as Props;
 const siteUrl = Astro.site ?? Astro.url;
 const canonicalUrl = new URL(canonicalPath, siteUrl).href;
 const socialImageUrl = new URL(image, siteUrl).href;
 ---
 
-<html lang="en" data-family={lockAppearance?.family} data-mode={lockAppearance?.mode}>
+<html lang="en" data-family="rotli" data-mode="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -43,19 +40,6 @@ const socialImageUrl = new URL(image, siteUrl).href;
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={socialImageUrl} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <script is:inline>
-      try {
-        const root = document.documentElement;
-        if (root.dataset.family && root.dataset.mode) throw new Error('appearance is locked');
-        const families = ['rotli', 'paper', 'ocean', 'grove', 'iris', 'midnight'];
-        const savedFamily = localStorage.getItem('rotli-site-family');
-        const savedMode = localStorage.getItem('rotli-site-mode');
-        root.dataset.family = families.includes(savedFamily) ? savedFamily : 'rotli';
-        // The site opens in the Rotli light environment; the toggle's saved
-        // choice wins, the operating system's appearance does not.
-        root.dataset.mode = savedMode === 'dark' ? 'dark' : 'light';
-      } catch (error) {}
-    </script>
     <style is:global>
       @font-face {
         font-family: 'General Sans';
@@ -118,269 +102,22 @@ const socialImageUrl = new URL(image, siteUrl).href;
         --swatch-iris-dark: #15121d;
         --swatch-midnight-light: #f0f2f5;
         --swatch-midnight-dark: #050607;
-        --hero-ground: #0b2f39;
-        --hero-text: #f5fbfc;
-        --hero-accent: #bfeaf0;
-        --hero-action: #6ee0e8;
-        --hero-action-text: #092a32;
-        --hero-shot: #0d2026;
-        --hero-wash: rgba(5, 29, 36, 0.58);
-        --hero-hover-wash: rgba(5, 29, 36, 0.5);
-        --hero-copy: rgba(238, 249, 251, 0.82);
-        --hero-muted: rgba(238, 249, 251, 0.7);
-        --hero-caption: rgba(238, 249, 251, 0.72);
-        --hero-border: rgba(245, 251, 252, 0.56);
-        --hero-shot-border: rgba(245, 251, 252, 0.42);
-        --hero-shadow: rgba(2, 20, 26, 0.3);
-      }
-
-      :root[data-family='rotli'][data-mode='dark'] {
-        --ground: #241d18;
-        --surface: #2e2620;
-        --surface-2: #392f28;
-        --tint: #3e332b;
-        --text: #f1e7da;
-        --text-muted: #b7a593;
-        --border: #493a30;
-        --border-strong: #665142;
-        --accent: #c97e62;
-        --accent-text: #dda087;
-        --on-accent: #241d18;
-        --deep: #171310;
-        --deep-surface: #211b17;
-        --deep-text: #f7ede1;
-        --deep-muted: #c7b7a6;
-        --deep-border: #3d3129;
-        --success: #a4b08d;
-        --selection: #573f34;
-        --quokka-field: #f1e7da;
-      }
-
-      :root[data-family='paper'][data-mode='light'] {
-        --ground: #fafaf9;
-        --surface: #ffffff;
-        --surface-2: #f2f2f0;
-        --tint: #e7e7e3;
-        --text: #161616;
-        --text-muted: #62625f;
-        --border: #ddddda;
-        --border-strong: #bdbdb8;
-        --accent: #30302e;
-        --accent-text: #161616;
-        --on-accent: #ffffff;
-        --deep: #161616;
-        --deep-surface: #22211f;
-        --deep-text: #efede8;
-        --deep-muted: #b8b4ac;
-        --deep-border: #3b3935;
-        --success: #555d50;
-        --selection: #e7e7e3;
-        --quokka-field: #f0f0ed;
-      }
-
-      :root[data-family='paper'][data-mode='dark'] {
-        --ground: #161616;
-        --surface: #1f1e1c;
-        --surface-2: #2a2825;
-        --tint: #33312d;
-        --text: #e9e7e2;
-        --text-muted: #aaa69e;
-        --border: #383631;
-        --border-strong: #54514a;
-        --accent: #e9e7e2;
-        --accent-text: #ffffff;
-        --on-accent: #161616;
-        --deep: #0d0d0d;
-        --deep-surface: #181716;
-        --deep-text: #f3f1ec;
-        --deep-muted: #b9b5ad;
-        --deep-border: #34322e;
-        --success: #b4bdad;
-        --selection: #33312d;
-        --quokka-field: #efede8;
-      }
-
-      :root[data-family='ocean'][data-mode='light'] {
-        --ground: #f2f6f9;
-        --surface: #ffffff;
-        --surface-2: #e8f0f5;
-        --tint: #dceaf2;
-        --text: #18272f;
-        --text-muted: #526873;
-        --border: #cadbe4;
-        --border-strong: #a8c2ce;
-        --accent: #2e6e91;
-        --accent-text: #285f7e;
-        --on-accent: #ffffff;
-        --deep: #0e171d;
-        --deep-surface: #152229;
-        --deep-text: #e7f0f4;
-        --deep-muted: #a9bdc6;
-        --deep-border: #2c424c;
-        --success: #507b66;
-        --selection: #dceaf2;
-        --quokka-field: #e2edf3;
-      }
-
-      :root[data-family='ocean'][data-mode='dark'] {
-        --ground: #0e171d;
-        --surface: #152229;
-        --surface-2: #1c2d35;
-        --tint: #213843;
-        --text: #e7f0f4;
-        --text-muted: #a1b6c0;
-        --border: #2a404a;
-        --border-strong: #41606e;
-        --accent: #70b2d7;
-        --accent-text: #9acde7;
-        --on-accent: #0e171d;
-        --deep: #081014;
-        --deep-surface: #101b20;
-        --deep-text: #eff7fa;
-        --deep-muted: #adc0c9;
-        --deep-border: #263a43;
-        --success: #8cc4a5;
-        --selection: #213843;
-        --quokka-field: #e4eef2;
-      }
-
-      :root[data-family='grove'][data-mode='light'] {
-        --ground: #f2f6f2;
-        --surface: #fcfefc;
-        --surface-2: #e9f0ea;
-        --tint: #dce8de;
-        --text: #1d2c23;
-        --text-muted: #5d6f64;
-        --border: #cfddd1;
-        --border-strong: #abc1b0;
-        --accent: #427a55;
-        --accent-text: #386c49;
-        --on-accent: #ffffff;
-        --deep: #101814;
-        --deep-surface: #17221b;
-        --deep-text: #e7efe9;
-        --deep-muted: #acbcb0;
-        --deep-border: #2d4033;
-        --success: #427a55;
-        --selection: #dce8de;
-        --quokka-field: #e6eee7;
-      }
-
-      :root[data-family='grove'][data-mode='dark'] {
-        --ground: #101814;
-        --surface: #17221b;
-        --surface-2: #1f2d24;
-        --tint: #26382c;
-        --text: #e7efe9;
-        --text-muted: #a4b5a8;
-        --border: #2c4032;
-        --border-strong: #46644f;
-        --accent: #82be96;
-        --accent-text: #a8d4b6;
-        --on-accent: #101814;
-        --deep: #09100c;
-        --deep-surface: #121b15;
-        --deep-text: #eef5f0;
-        --deep-muted: #afbeb2;
-        --deep-border: #293a2f;
-        --success: #82be96;
-        --selection: #26382c;
-        --quokka-field: #e5ede6;
-      }
-
-      :root[data-family='iris'][data-mode='light'] {
-        --ground: #f5f3f9;
-        --surface: #ffffff;
-        --surface-2: #ebe7f2;
-        --tint: #e3dcf0;
-        --text: #282334;
-        --text-muted: #696176;
-        --border: #dad3e4;
-        --border-strong: #bbb0cb;
-        --accent: #6b58a5;
-        --accent-text: #5e4c96;
-        --on-accent: #ffffff;
-        --deep: #15121d;
-        --deep-surface: #1d1927;
-        --deep-text: #eeeaf5;
-        --deep-muted: #b6acc4;
-        --deep-border: #393047;
-        --success: #557462;
-        --selection: #e3dcf0;
-        --quokka-field: #ebe6f3;
-      }
-
-      :root[data-family='iris'][data-mode='dark'] {
-        --ground: #15121d;
-        --surface: #1d1927;
-        --surface-2: #272132;
-        --tint: #30283f;
-        --text: #eeeaf5;
-        --text-muted: #b2a8c1;
-        --border: #372f45;
-        --border-strong: #55486a;
-        --accent: #ad9ae3;
-        --accent-text: #c8b9ef;
-        --on-accent: #15121d;
-        --deep: #0c0a11;
-        --deep-surface: #17131e;
-        --deep-text: #f4f0f8;
-        --deep-muted: #bbb0c8;
-        --deep-border: #322a3e;
-        --success: #8bb69a;
-        --selection: #30283f;
-        --quokka-field: #eae5f2;
-      }
-
-      :root[data-family='midnight'][data-mode='light'] {
-        --ground: #f4f5f7;
-        --surface: #ffffff;
-        --surface-2: #e9ebef;
-        --tint: #e0e3e8;
-        --text: #181b20;
-        --text-muted: #5e6570;
-        --border: #d3d7dd;
-        --border-strong: #adb4be;
-        --accent: #364152;
-        --accent-text: #2e3745;
-        --on-accent: #ffffff;
-        --deep: #050607;
-        --deep-surface: #0b0d0f;
-        --deep-text: #f1f3f5;
-        --deep-muted: #acb2ba;
-        --deep-border: #24292f;
-        --success: #4f7160;
-        --selection: #e0e3e8;
-        --quokka-field: #e8ebef;
-      }
-
-      :root[data-family='midnight'][data-mode='dark'] {
-        --ground: #050607;
-        --surface: #0b0d0f;
-        --surface-2: #121519;
-        --tint: #191d22;
-        --text: #f1f3f5;
-        --text-muted: #a4aab2;
-        --border: #252a30;
-        --border-strong: #3d454f;
-        --accent: #cfd5dc;
-        --accent-text: #ffffff;
-        --on-accent: #050607;
-        --deep: #000000;
-        --deep-surface: #08090a;
-        --deep-text: #f5f6f7;
-        --deep-muted: #adb2b8;
-        --deep-border: #20252b;
-        --success: #a4c5b2;
-        --selection: #191d22;
-        --quokka-field: #eceff2;
+        --hero-ground: #fafaf9;
+        --hero-text: #161616;
+        --hero-accent: #62625f;
+        --hero-action: #161616;
+        --hero-action-text: #ffffff;
+        --hero-shot: #ffffff;
+        --hero-hover-wash: #f2f2f0;
+        --hero-copy: #62625f;
+        --hero-muted: #62625f;
+        --hero-caption: #62625f;
+        --hero-border: #ddddda;
+        --hero-shot-border: #ddddda;
       }
 
       :root {
         color-scheme: light;
-      }
-      :root[data-mode='dark'] {
-        color-scheme: dark;
       }
       * {
         box-sizing: border-box;
@@ -527,35 +264,6 @@ const socialImageUrl = new URL(image, siteUrl).href;
         width: 18px;
         height: 18px;
       }
-      .mode-toggle {
-        min-width: 82px;
-        min-height: 44px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.45rem;
-        border: 1px solid var(--border);
-        border-radius: 999px;
-        background: var(--surface);
-        color: var(--text);
-        cursor: pointer;
-      }
-      .mode-toggle:hover {
-        background: var(--surface-2);
-        border-color: var(--border-strong);
-      }
-      .mode-icon,
-      .mode-icon svg {
-        width: 17px;
-        height: 17px;
-      }
-      .sun-path,
-      .mode-toggle[data-mode='dark'] .moon-path {
-        display: none;
-      }
-      .mode-toggle[data-mode='dark'] .sun-path {
-        display: block;
-      }
       .button {
         min-height: 50px;
         display: inline-flex;
@@ -657,8 +365,7 @@ const socialImageUrl = new URL(image, siteUrl).href;
           justify-content: center;
           padding-inline: 0;
         }
-        .github-link span,
-        .mode-label {
+        .github-link span {
           position: absolute;
           width: 1px;
           height: 1px;
@@ -668,11 +375,6 @@ const socialImageUrl = new URL(image, siteUrl).href;
           clip: rect(0, 0, 0, 0);
           white-space: nowrap;
           border: 0;
-        }
-        .mode-toggle {
-          min-width: 44px;
-          width: 44px;
-          padding: 0;
         }
       }
 
@@ -693,28 +395,5 @@ const socialImageUrl = new URL(image, siteUrl).href;
   <body>
     <a class="skip-link" href="#content">Skip to content</a>
     <slot />
-    <script>
-      // Appearance toggle for the shared site header (SiteHeader.astro).
-      const root = document.documentElement;
-      const modeButton = document.querySelector<HTMLButtonElement>('#mode-toggle');
-      const modeLabel = modeButton?.querySelector<HTMLElement>('.mode-label');
-
-      const syncMode = () => {
-        const dark = root.dataset.mode === 'dark';
-        if (modeLabel) modeLabel.textContent = dark ? 'Light' : 'Dark';
-        modeButton?.setAttribute('aria-label', dark ? 'Use light appearance' : 'Use dark appearance');
-        modeButton?.setAttribute('data-mode', dark ? 'dark' : 'light');
-      };
-
-      modeButton?.addEventListener('click', () => {
-        root.dataset.mode = root.dataset.mode === 'dark' ? 'light' : 'dark';
-        try {
-          localStorage.setItem('rotli-site-mode', root.dataset.mode);
-        } catch (error) {}
-        syncMode();
-      });
-
-      syncMode();
-    </script>
   </body>
 </html>

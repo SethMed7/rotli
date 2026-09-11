@@ -23,6 +23,7 @@ fix both in the same change.
 | Vault storage, Rotli's metadata layer, retrieval, and secure notes | [`architecture/memex-data-contract.md`](architecture/memex-data-contract.md) |
 | File editing and no-preview-only product law | [`architecture/memex-data-contract.md#editing-capabilities`](architecture/memex-data-contract.md#editing-capabilities) |
 | FileSurface capability matrix | [`architecture/file-surface-capability-audit-2026-07-11.md`](architecture/file-surface-capability-audit-2026-07-11.md) |
+| Launch plan, readiness matrix, and fresh-vault acceptance | [`architecture/launch-readiness-2026-09-07.md`](architecture/launch-readiness-2026-09-07.md) |
 | Current system-wide findings and priorities | [`architecture/system-audit-2026-09-01.md`](architecture/system-audit-2026-09-01.md) (supersedes [`system-audit-2026-07-29.md`](architecture/system-audit-2026-07-29.md)) |
 | Cross-window and host event registry | [`architecture/window-events.md`](architecture/window-events.md) |
 | Code quality, redundancy, and AI-readiness scorecard | [`architecture/code-quality-and-ai-readiness-2026-09-01.md`](architecture/code-quality-and-ai-readiness-2026-09-01.md) |
@@ -43,6 +44,7 @@ fix both in the same change.
 | Local-model output quality, speed, and heat — the measured plan | [`design/local-model-quality-and-performance.md`](design/local-model-quality-and-performance.md) |
 | Why rotli stays on Tauri, and how idle cost is kept honest | [`design/shell-runtime-decision.md`](design/shell-runtime-decision.md) |
 | Durable schemas, compatibility, migrations, and downgrade behavior | [`architecture/compatibility-and-migrations.md`](architecture/compatibility-and-migrations.md) |
+| Repository privacy, main/dev protection, reviewers, and PR flow | [`operations/repository-access.md`](operations/repository-access.md) |
 | Release integrity, provenance, SBOM, keys, and rollback | [`operations/release-and-supply-chain.md`](operations/release-and-supply-chain.md) |
 | Privacy-safe support, diagnostics, backup, and incident triage | [`operations/support-and-diagnostics.md`](operations/support-and-diagnostics.md) |
 | Cross-boundary architecture decision records | [`decisions/README.md`](decisions/README.md) |

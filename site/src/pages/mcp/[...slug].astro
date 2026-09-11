@@ -4,27 +4,44 @@ import SiteFooter from '../../components/SiteFooter.astro';
 import SiteHeader from '../../components/SiteHeader.astro';
 import { GITHUB_URL, PRIVACY_URL, site } from '../../site';
 
-// The guide exists only when the full site does; a coming-soon build emits no /mcp/.
+// MCP and agent integrations left production on 2026-09-11 until refined: the
+// guide exists only on the dev site, alongside the other experiments.
 export function getStaticPaths() {
-  return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
+  return site.showsExperiments ? [{ params: { slug: undefined } }] : [];
 }
+
+// Remote agents (relay, Grok Bot, self-hosting) are a development-build
+// experiment. The launch site documents the local stdio transport only; the
+// dev site adds the remote sections under an explicit experiment label.
+const remote = site.showsExperiments;
 
 const WORKSPACE_CONTRACT = `${GITHUB_URL}/blob/main/docs/architecture/agent-workspace.md`;
 const RELAY_CONTRACT = `${GITHUB_URL}/blob/main/docs/architecture/remote-agent-relay.md`;
+
+const title = remote
+  ? 'MCP for Rotli — local files, local policy, optional remote access'
+  : 'MCP for Rotli — local files, local policy';
+const description = remote
+  ? 'Connect Claude Code, Codex, Cursor, Grok Bot, and other MCP clients to the Rotli workspace on your Mac without turning the vault into cloud storage.'
+  : 'Connect Claude Code, Codex, Cursor, and other local MCP clients to the Rotli workspace on your Mac. Your files stay on your Mac and Rotli’s own policy applies.';
+
+const footerLinks = [
+  { href: '/', label: 'Product' },
+  ...(site.sourcePublic ? [{ href: GITHUB_URL, label: 'GitHub' }] : []),
+  { href: site.sourcePublic ? PRIVACY_URL : '/#privacy', label: 'Privacy' },
+];
+const footerTagline = site.sourcePublic
+  ? 'Your vault stays on your Mac. Open source under the MIT license.'
+  : 'Your vault stays on your Mac. Local-first and free.';
 ---
 
-<Base
-  title="MCP for Rotli — local files, local policy, optional remote access"
-  description="Connect Claude, Codex, Cursor, Grok Bot, and other MCP clients to the Rotli workspace on your Mac without turning the vault into cloud storage."
-  canonicalPath="/mcp/"
-  noindex={!site.indexable}
->
+<Base title={title} description={description} canonicalPath="/mcp/" noindex={!site.indexable}>
   <SiteHeader
     nav={[
       { href: '/', label: 'Product' },
       { href: '#connect', label: 'MCP', current: true },
       { href: '#policy', label: 'Safety' },
-      { href: '#self-host', label: 'Self-host' },
+      ...(remote ? [{ href: '#self-host', label: 'Self-host' }] : []),
     ]}
   />
 
@@ -34,35 +51,48 @@ const RELAY_CONTRACT = `${GITHUB_URL}/blob/main/docs/architecture/remote-agent-r
         <p class="eyebrow">Rotli workspace MCP</p>
         <h1 id="hero-title">Let agents help.<br />Keep the vault here.</h1>
         <p class="lede">
-          Claude, Codex, Cursor, Grok Bot, and other MCP clients can work through Rotli’s
-          existing note and board tools. Your Mac remains the writer and your files remain
-          the source of truth.
+          {remote
+            ? 'Claude Code, Codex, Cursor, Grok Bot, and other MCP clients can work through Rotli’s existing note tools. Your Mac remains the writer and your files remain the source of truth.'
+            : 'Claude Code, Codex, Cursor, and other local MCP clients can work through Rotli’s existing note tools. Your Mac remains the writer and your files remain the source of truth.'}
         </p>
         <a class="text-link" href="#connect">Choose a connection <span aria-hidden="true">↓</span></a>
       </div>
 
-      <div class="connection-diagram" aria-label="Remote MCP request flow">
-        <ol>
-          <li><span>01</span><b>Cloud agent</b><small>Grok Bot or another HTTPS MCP client</small></li>
-          <li><span>02</span><b>HTTPS relay</b><small>Opaque, in-flight frames only</small></li>
-          <li><span>03</span><b>Rotli on your Mac</b><small>Outbound, user-started session</small></li>
-          <li><span>04</span><b>Local vault</b><small>Existing CorpusStore policy</small></li>
-        </ol>
-      </div>
+      {remote ? (
+        <div class="connection-diagram" aria-label="Remote MCP request flow">
+          <ol>
+            <li><span>01</span><b>Cloud agent</b><small>Grok Bot or another HTTPS MCP client</small></li>
+            <li><span>02</span><b>HTTPS relay</b><small>Opaque, in-flight frames only</small></li>
+            <li><span>03</span><b>Rotli on your Mac</b><small>Outbound, user-started session</small></li>
+            <li><span>04</span><b>Local vault</b><small>Existing CorpusStore policy</small></li>
+          </ol>
+        </div>
+      ) : (
+        <div class="connection-diagram" aria-label="Local MCP request flow">
+          <ol>
+            <li><span>01</span><b>Your MCP client</b><small>Claude Code, Codex, Cursor, or another stdio client</small></li>
+            <li><span>02</span><b>Rotli binary over stdio</b><small>Started by the client; no network listener</small></li>
+            <li><span>03</span><b>Workspace policy</b><small>Secure notes hidden, Locked notes read-only</small></li>
+            <li><span>04</span><b>Local vault</b><small>Ordinary Markdown files on your Mac</small></li>
+          </ol>
+        </div>
+      )}
     </section>
 
-    <aside class="status-note" aria-label="Hosted relay status">
-      <strong>Before the hosted relay launches</strong>
-      <p>
-        Use local stdio or a relay you operate. The public Rotli relay domain will be added here
-        after it is deployed and verified; this guide does not point you at an unfinished service.
-      </p>
-    </aside>
+    {remote && (
+      <aside class="status-note" aria-label="Hosted relay status">
+        <strong>Before the hosted relay launches</strong>
+        <p>
+          Use local stdio or a relay you operate. The public Rotli relay domain will be added here
+          after it is deployed and verified; this guide does not point you at an unfinished service.
+        </p>
+      </aside>
+    )}
 
     <section class="routes" id="connect" aria-labelledby="routes-title">
       <div class="section-heading">
-        <p class="eyebrow">Two transports, one workspace service</p>
-        <h2 id="routes-title">Connect from the same Mac or from the cloud.</h2>
+        <p class="eyebrow">{remote ? 'Two transports, one workspace service' : 'One transport, one workspace service'}</p>
+        <h2 id="routes-title">{remote ? 'Connect from the same Mac or from the cloud.' : 'Connect from the same Mac.'}</h2>
       </div>
 
       <article class="route-row">
@@ -82,10 +112,11 @@ const RELAY_CONTRACT = `${GITHUB_URL}/blob/main/docs/architecture/remote-agent-r
         </div>
       </article>
 
+      {remote && (
       <article class="route-row">
         <div class="route-number">02</div>
         <div class="route-intro">
-          <p class="route-label">Cloud clients</p>
+          <p class="route-label">Cloud clients <i class="experiment-tag">Experiment · dev preview</i></p>
           <h3>Grok Bot over public HTTPS</h3>
           <p>Rotli connects outward to a stateless relay. No vault is mounted or stored there.</p>
         </div>
@@ -113,23 +144,29 @@ After connecting, call tools/list and report the available Rotli tools.</code></
           </p>
         </div>
       </article>
+      )}
     </section>
 
     <section class="capabilities" aria-labelledby="capabilities-title">
       <div class="section-heading compact">
         <p class="eyebrow">Discoverable at runtime</p>
         <h2 id="capabilities-title">The workspace tools already do the useful work.</h2>
-        <p>Clients receive the current schemas from <code>tools/list</code>; the relay owns none of them.</p>
+        <p>Clients receive the current schemas from <code>tools/list</code>{remote ? '; the relay owns none of them.' : '.'}</p>
       </div>
       <div class="capability-list">
-        <div><b>Find and understand</b><p>Status, metrics, list, search, structured query, note reads, Main, views, and compact board reads.</p></div>
-        <div><b>Create and edit</b><p>New notes, revision-safe note updates and patches, note moves, and Excalidraw board creation and actions.</p></div>
+        <div><b>Find and understand</b><p>Status, metrics, list, search, structured query, note reads, Main, and views.</p></div>
+        <div><b>Create and edit</b><p>New notes, revision-safe note updates and patches, and note moves.</p></div>
         <div><b>Organize and return</b><p>Main folders and placement, named-view organization, and links that open the result back in Rotli.</p></div>
+        {remote && (
+          <div><b>Boards <i class="experiment-tag">Experiment · dev preview</i></b><p>Compact Excalidraw board reads, board creation, and board actions.</p></div>
+        )}
       </div>
-      <p class="breve-note">
-        <b>Breve convention:</b> a remote <code>rotli_create_note</code> enters intake and Main, so existing
-        briefs can consume it. Routine-specific MCP tools are a later additive change, not a requirement.
-      </p>
+      {remote && (
+        <p class="breve-note">
+          <b>Breve convention <i class="experiment-tag">Experiment · dev preview</i>:</b> a remote <code>rotli_create_note</code> enters intake and Main, so existing
+          briefs can consume it. Routine-specific MCP tools are a later additive change, not a requirement.
+        </p>
+      )}
     </section>
 
     <section class="policy" id="policy" aria-labelledby="policy-title">
@@ -137,8 +174,9 @@ After connecting, call tools/list and report the available Rotli tools.</code></
         <p class="eyebrow">The boundary travels with the tool call</p>
         <h2 id="policy-title">Remote access does not create a second policy engine.</h2>
         <p>
-          Stdio, authenticated loopback HTTP, and the relay connector all enter the same Rotli
-          workspace service. The cloud transport cannot bypass the local corpus rules.
+          {remote
+            ? 'Stdio, authenticated loopback HTTP, and the relay connector all enter the same Rotli workspace service. The cloud transport cannot bypass the local corpus rules.'
+            : 'The stdio transport enters the same Rotli workspace service the app uses. An agent cannot bypass the local corpus rules by connecting a different way.'}
         </p>
       </div>
       <dl class="policy-list">
@@ -146,8 +184,12 @@ After connecting, call tools/list and report the available Rotli tools.</code></
         <div><dt>Locked notes</dt><dd>Readable under normal policy; every agent write is refused.</dd></div>
         <div><dt>Concurrent edits</dt><dd>Updates and patches require a revision from a fresh read.</dd></div>
         <div><dt>New notes</dt><dd>Land in <code>wiki/_inbox</code> (or legacy <code>Inbox</code>) and Main.</dd></div>
-        <div><dt>Offline Mac</dt><dd>No connection, no tool call, and no queued note body waiting in the relay.</dd></div>
-        <div><dt>Every launch</dt><dd>Remote agents start disconnected until you explicitly reconnect.</dd></div>
+        {remote && (
+          <>
+            <div><dt>Offline Mac</dt><dd>No connection, no tool call, and no queued note body waiting in the relay.</dd></div>
+            <div><dt>Every launch</dt><dd>Remote agents start disconnected until you explicitly reconnect.</dd></div>
+          </>
+        )}
       </dl>
     </section>
 
@@ -169,39 +211,41 @@ After connecting, call tools/list and report the available Rotli tools.</code></
       </div>
     </section>
 
-    <section class="self-host" id="self-host" aria-labelledby="self-host-title">
-      <div class="section-heading compact">
-        <p class="eyebrow">Relay deployment profile</p>
-        <h2 id="self-host-title">A dumb pipe, deliberately.</h2>
-        <p>
-          Deploy <code>services/rotli-mcp-relay</code> as one instance behind public TLS. Give it no
-          database and no volume, and use <code>/health</code> for the health check. Restarts intentionally
-          drop polls and in-flight requests.
-        </p>
-      </div>
-      <div class="deployment-facts" aria-label="Relay requirements">
-        <span>One replica</span>
-        <span>No durable storage</span>
-        <span>No frame logging</span>
-        <span>256 KB request cap</span>
-      </div>
-      <nav class="contract-links" aria-label="MCP contract documentation">
-        <a href={WORKSPACE_CONTRACT} rel="noopener">Workspace contract <span aria-hidden="true">↗</span></a>
-        <a href={RELAY_CONTRACT} rel="noopener">Relay contract <span aria-hidden="true">↗</span></a>
-        <a href={PRIVACY_URL} rel="noopener">Privacy inventory <span aria-hidden="true">↗</span></a>
-        <a href={`${GITHUB_URL}/tree/main/services/rotli-mcp-relay`} rel="noopener">Relay source <span aria-hidden="true">↗</span></a>
-      </nav>
-    </section>
+    {remote && (
+      <section class="self-host" id="self-host" aria-labelledby="self-host-title">
+        <div class="section-heading compact">
+          <p class="eyebrow">Relay deployment profile <i class="experiment-tag">Experiment · dev preview</i></p>
+          <h2 id="self-host-title">A dumb pipe, deliberately.</h2>
+          <p>
+            Deploy <code>services/rotli-mcp-relay</code> as one instance behind public TLS. Give it no
+            database and no volume, and use <code>/health</code> for the health check. Restarts intentionally
+            drop polls and in-flight requests.
+          </p>
+        </div>
+        <div class="deployment-facts" aria-label="Relay requirements">
+          <span>One replica</span>
+          <span>No durable storage</span>
+          <span>No frame logging</span>
+          <span>256 KB request cap</span>
+        </div>
+        {site.sourcePublic ? (
+          <nav class="contract-links" aria-label="MCP contract documentation">
+            <a href={WORKSPACE_CONTRACT} rel="noopener">Workspace contract <span aria-hidden="true">↗</span></a>
+            <a href={RELAY_CONTRACT} rel="noopener">Relay contract <span aria-hidden="true">↗</span></a>
+            <a href={PRIVACY_URL} rel="noopener">Privacy inventory <span aria-hidden="true">↗</span></a>
+            <a href={`${GITHUB_URL}/tree/main/services/rotli-mcp-relay`} rel="noopener">Relay source <span aria-hidden="true">↗</span></a>
+          </nav>
+        ) : (
+          <p class="contract-note">
+            The workspace and relay contracts and the relay source ship with the repository when it opens.
+            Until then, the policy list above is the public description of the boundary.
+          </p>
+        )}
+      </section>
+    )}
   </main>
 
-  <SiteFooter
-    tagline="Your vault stays on your Mac. Open source under the MIT license."
-    links={[
-      { href: '/', label: 'Product' },
-      { href: GITHUB_URL, label: 'GitHub' },
-      { href: PRIVACY_URL, label: 'Privacy' },
-    ]}
-  />
+  <SiteFooter tagline={footerTagline} links={footerLinks} />
 
   <style>
     main > section,
@@ -577,6 +621,32 @@ After connecting, call tools/list and report the available Rotli tools.</code></
 
     .contract-links a:hover {
       color: var(--text);
+    }
+
+    .contract-note {
+      max-width: var(--copy-max);
+      margin: 2rem 0 0;
+      color: var(--text-muted);
+      font-size: 0.92rem;
+    }
+
+    /* Dev-site experiments share the landing page's label grammar. */
+    .experiment-tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 1.5rem;
+      margin-left: 0.5rem;
+      padding: 0 0.55rem;
+      border: 1px solid var(--border-strong);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      font-style: normal;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      text-transform: none;
+      vertical-align: middle;
     }
 
     @media (max-width: 1080px) {

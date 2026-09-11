@@ -11,10 +11,11 @@ export interface Folder {
   parentId: string | null;
 }
 
-export interface PlaygroundImportResult {
-  imported: boolean;
-  viewName: string;
-  noteCount: number;
+/** Result of seeding the Welcome folder: whether any file was written and the
+ * note ids in catalog order (welcome note first; Main files them under one folder). */
+export interface WelcomeSeed {
+  created: boolean;
+  noteIds: string[];
 }
 
 export interface NoteSummary {

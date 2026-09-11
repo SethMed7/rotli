@@ -1,0 +1,72 @@
+[
+  {
+    "id": "welcome",
+    "title": "Welcome to Rotli",
+    "purpose": "Your vault, your first minute",
+    "filename": "Welcome to Rotli.md",
+    "body": "# Welcome to Rotli\n\nThis is a real Markdown note in your vault. Edit it, experiment here, or delete it when you no longer need it.\n\n## Things to try\n\n1. Change this sentence and press **⌘S**.\n2. Press **⌘N** to create a note.\n3. Press **⌘K** to search notes, files, chats, and actions.\n4. Type `/` on an empty line to explore Markdown blocks.\n5. Select some text and ask Rotli about it in Chat.\n6. Drop an image or file into **Assets**.\n\n## Guided lessons\n\nThe **Welcome** folder in Main holds nine short lessons: writing, tasks, choices, tables, links, views, files, AI, and a checklist. Each one is an ordinary note with room to make mistakes. Click a control, then choose **Aa → Raw markdown** to see the same text underneath, and **Beautified** to return.\n\nEdit the lessons, or delete the folder when you are done. Settings → General → Open welcome folder brings it back.\n\n- [ ] Try a lesson\n- [ ] Inspect its Markdown\n- [ ] Delete what you do not need\n\n## Your vault\n\n- Your files stay in the folder you chose and work in other apps.\n- **Library** is where Rotli organizes lasting notes.\n- **Assets**, **Archive**, and **Trash** are system views of this same vault.\n- This welcome note sits at the vault root, outside Library.\n\nMake it yours.\n"
+  },
+  {
+    "id": "writing",
+    "title": "Writing and formatting",
+    "purpose": "Make a note your own",
+    "body": "# Writing and formatting\n\nReplace this sentence with something you want to remember.\n\n## Make it readable\n\nThis is **bold**, this is *italic*, and this is `literal code`.\n\n> A useful note starts with one clear thought.\n\n- Capture the idea\n- Add the detail\n  - Keep related thoughts together\n\n1. Choose one next step\n2. Give it a little time\n\nTry typing `/` on a blank line. Choose a heading, list, table, or code block. Use Aa → Raw markdown to inspect the source, then Beautified to return to the rendered view.\n",
+    "filename": "05 Writing and formatting.md"
+  },
+  {
+    "id": "tasks",
+    "title": "Tasks and progress",
+    "purpose": "Click a control, inspect the source",
+    "body": "# Tasks and progress\n\nClick these controls. Choose Aa → Raw markdown to inspect the state characters.\n\n- [ ] Write the first draft\n- [/] Review the details\n- [x] Make room to think\n\nType `[]`, `[/]`, or `[x]` then Space on a fresh line. Enter continues with an unchecked task.\n\n## Results\n\n- [ ][ ] Did the check pass?\n- [True][False] Is the decision ready?\n- [True:green][Draw:yellow][False:red] What was the outcome?\n\nOnly ordinary tasks enter the vault's Tasks view. Results keep their own meaning. Try adding a reason to a result and undoing the change.\n",
+    "filename": "01 Tasks and progress.md"
+  },
+  {
+    "id": "choices",
+    "title": "Choices and toggles",
+    "purpose": "Express a decision without losing the text",
+    "body": "# Choices and toggles\n\nAdjacent circles make one choice. Squares are independent.\n\n- [#] Small\n- [#x] Medium\n- [#] Large\n\n- [##?] What belongs in the first release?\n- [##x] Writing\n- [##] Advanced workflows\n- [##x] Clear onboarding\n\n- [|x] Compact switch\n- [True:green|x False:red] Ready to share\n- [:blue|:green] A color-only switch\n\nSelect a different answer, then inspect the raw Markdown. Labels and selections remain plain text.\n",
+    "filename": "02 Choices and toggles.md"
+  },
+  {
+    "id": "tables",
+    "title": "Tables and code",
+    "purpose": "Edit useful structure directly",
+    "body": "# Tables and code\n\nClick a table cell and change its text. Drag a column boundary to resize it.\n\n| Step | Owner | State |\n| --- | --- | --- |\n| Draft | Me | Ready |\n| Review | Me | Next |\n| Share | Me | Later |\n\n## Code remains code\n\n```ts\nconst nextStep = \"Write one useful note\";\nconsole.log(nextStep);\n```\n\nInline examples stay literal: `[#]`, `[##]`, `[True|False]`, and `- [ ]` do not turn into controls here.\n\n```math\nE = mc^2\n```\n",
+    "filename": "03 Tables and code.md"
+  },
+  {
+    "id": "links",
+    "title": "Links and finding",
+    "purpose": "Connect saved notes",
+    "body": "# Links and finding\n\nCreate another note with the title **My first idea** using New → Markdown note. Then come back to this lesson and type a wikilink to that exact title.\n\nLiteral example: `[[My first idea]]`.\n\nClick the rendered link to open your note. Search for its title using the titlebar search field. Rename the note and check that the original title still resolves as an alias.\n\n- [ ] Create My first idea\n- [ ] Follow the link\n- [ ] Find the note with search\n- [ ] Rename and check the original link\n\nAn unresolved link should look unavailable. Rotli does not add pretend search results or vault notes.\n",
+    "filename": "09 Links and finding.md"
+  },
+  {
+    "id": "views",
+    "title": "Main and named views",
+    "purpose": "One file, more than one way to reach it",
+    "body": "# Main and named views\n\nFind this lesson in Main → Welcome and in All notes. They refer to the same file.\n\nUse Main's view picker to create a named view. Add this note to it. Edit the note, return to Main, and check that you see the same edit.\n\n- [ ] Create a named view\n- [ ] Add this note to it\n- [ ] Verify the edit from both places\n- [ ] Remove the view and confirm the note remains\n\nRemove a lesson from Main, then find it again in All notes. Move it to Trash, then restore it using the normal controls. Removing a reference and trashing a file are different actions.\n",
+    "filename": "10 Main and named views.md"
+  },
+  {
+    "id": "files",
+    "title": "Files and attachments",
+    "purpose": "Try conventional formats on saved work",
+    "body": "# Files and attachments\n\nThese steps create real files. Start with disposable examples.\n\n- [ ] New → Document: type a short paragraph, save, close, and reopen\n- [ ] New → Sheet: enter values and a formula, save, close, and reopen\n- [ ] New → Board: add a shape, save, close, and reopen\n- [ ] On this note, attach an image and resize it\n- [ ] On this note, attach a video and test playback\n- [ ] Open a PDF and review its explicit editing or conversion path\n\nFilesystem imports, native drops, and persistence must be tested in the Mac app. The browser twin cannot prove those behaviors. Complex imported documents should be checked against their source app after a save.\n",
+    "filename": "11 Files and attachments.md"
+  },
+  {
+    "id": "privacy",
+    "title": "AI and privacy",
+    "purpose": "Choose when intelligence participates",
+    "body": "# AI and privacy\n\nWriting works without a model. Chat and the Librarian are optional capabilities.\n\nUse only disposable sample text for these checks. Connect a provider only when you choose to.\n\n- [ ] Write and find a note while offline\n- [ ] Review the Librarian setting and its explanation\n- [ ] Create a secure test note and confirm remote AI cannot read it\n- [ ] Lock a test note and confirm AI cannot edit it\n- [ ] Inspect a saved chat as ordinary Markdown\n\nSecure is an AI access boundary, not encryption at rest. Locked notes remain readable. Browser tests cannot prove Keychain, a provider's live behavior, or scheduled delivery.\n",
+    "filename": "12 AI and privacy.md"
+  },
+  {
+    "id": "finish",
+    "title": "Your launch checklist",
+    "purpose": "Keep what helped, then make something real",
+    "body": "# Your launch checklist\n\nUse this as a personal acceptance check. Keep the note if you want a durable record.\n\n- [ ] I can create, edit, find, rename, trash, and restore a note\n- [ ] I understand that Main and named views refer to the same files\n- [ ] I can close and reopen tabs without losing work\n- [ ] I can use my theme in both light and dark mode\n- [ ] I can use the app in a narrow window and reach controls with Tab\n- [ ] I know the Welcome folder is mine to edit or delete\n- [ ] I tested native save and reopen in my disposable vault\n\nLeave the Welcome folder whenever you like. Your own work starts with New → Markdown note.\n",
+    "filename": "13 Your launch checklist.md"
+  }
+]

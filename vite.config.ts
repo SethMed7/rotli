@@ -34,97 +34,104 @@ const host = process.env.TAURI_DEV_HOST;
 const appVersion = JSON.parse(readFileSync("package.json", "utf8")).version as string;
 
 // https://vite.dev/config/
-export default defineConfig(() => ({
-  plugins: [
-    react(),
-    // ~6 MB of vendor per-locale lazy chunks (Univer hyphenation dictionaries,
-    // Excalidraw UI translations) collapse into one empty stub — see
-    // shouldStubLazyLocale in scripts/build-policy.ts (perf audit finding 17).
-    {
-      name: "rotli-prune-lazy-locales",
-      // Vendor lazy-loader tables reach Rollup through resolveDynamicImport
-      // (a core plugin resolves them there, so a plain resolveId never fires
-      // for these specifiers); the static-import hook stays as a backstop.
-      resolveDynamicImport(source: unknown, importer: string) {
-        return typeof source === "string" && shouldStubLazyLocale(source, importer)
-          ? LAZY_LOCALE_STUB_ID
-          : null;
-      },
-      resolveId(source: string, importer: string | undefined) {
-        return shouldStubLazyLocale(source, importer) ? LAZY_LOCALE_STUB_ID : null;
-      },
-      load(id: string) {
-        return id === LAZY_LOCALE_STUB_ID ? LAZY_LOCALE_STUB_SOURCE : null;
-      },
-    },
-  ],
-
-  // Excalidraw reads `process.env.IS_PREACT` at runtime; Vite strips `process`,
-  // so define the symbol (we use React, not Preact) to avoid a runtime
-  // "ReferenceError: process is not defined" the moment <Excalidraw/> mounts.
-  define: {
-    "process.env.IS_PREACT": JSON.stringify("false"),
-    __APP_VERSION__: JSON.stringify(appVersion),
-  },
-
-  // katex reaches the graph twice — our blockRender import and
-  // mermaid-to-excalidraw's own dependency — and without dedupe Rollup shipped
-  // two identical 260 KB chunks that BOTH loaded at runtime (perf audit
-  // 2026-07-30, #7). One resolved copy = one chunk.
-  resolve: {
-    dedupe: ["katex"],
-  },
-
-  build: {
-    // Optional editors (Univer, Excalidraw, Mermaid, exceljs) are intentionally
-    // lazy and much larger than the startup graph. Replace Vite's one-size-fits-
-    // all warning with hard, tested startup/lazy budgets.
-    chunkSizeWarningLimit: MAX_LAZY_CHUNK_KIB,
-    rolldownOptions: {
-      // onLog replaces the deprecated onwarn (Vite 8 / Rolldown); warnings are
-      // still the budget's failure signal, other levels pass to the default
-      onLog(level, warning, handler) {
-        if (level === "warn") {
-          const violation = buildWarningViolation(warning);
-          if (violation) throw new Error(`bundle warning regression: ${violation}`);
-        }
-        handler(level, warning);
-      },
-      plugins: [
-        {
-          name: "rotli-bundle-budget",
-          generateBundle(_options, bundle) {
-            const violations = bundleBudgetViolations(bundle);
-            if (violations.length) {
-              this.error(`bundle budget regression:\n${violations.map((line) => `  - ${line}`).join("\n")}`);
-            }
-          },
+export default defineConfig(({ command }) => {
+  const channel = process.env.ROTLI_BUILD_CHANNEL ?? (command === "serve" ? "dev" : "stable");
+  if (channel !== "dev" && channel !== "stable") throw new Error("Invalid ROTLI_BUILD_CHANNEL");
+  return {
+    plugins: [
+      react(),
+      // ~6 MB of vendor per-locale lazy chunks (Univer hyphenation dictionaries,
+      // Excalidraw UI translations) collapse into one empty stub — see
+      // shouldStubLazyLocale in scripts/build-policy.ts (perf audit finding 17).
+      {
+        name: "rotli-prune-lazy-locales",
+        // Vendor lazy-loader tables reach Rollup through resolveDynamicImport
+        // (a core plugin resolves them there, so a plain resolveId never fires
+        // for these specifiers); the static-import hook stays as a backstop.
+        resolveDynamicImport(source: unknown, importer: string) {
+          return typeof source === "string" && shouldStubLazyLocale(source, importer)
+            ? LAZY_LOCALE_STUB_ID
+            : null;
         },
-      ],
-    },
-  },
+        resolveId(source: string, importer: string | undefined) {
+          return shouldStubLazyLocale(source, importer) ? LAZY_LOCALE_STUB_ID : null;
+        },
+        load(id: string) {
+          return id === LAZY_LOCALE_STUB_ID ? LAZY_LOCALE_STUB_SOURCE : null;
+        },
+      },
+    ],
 
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent Vite from obscuring rust errors
-  clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
-  server: {
-    port: 1420,
-    strictPort: true,
-    host: host || false,
-    ...(host
-      ? {
-          hmr: {
-            protocol: "ws",
-            host,
-            port: 1421,
-          },
-        }
-      : {}),
-    watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+    // Excalidraw reads `process.env.IS_PREACT` at runtime; Vite strips `process`,
+    // so define the symbol (we use React, not Preact) to avoid a runtime
+    // "ReferenceError: process is not defined" the moment <Excalidraw/> mounts.
+    define: {
+      "process.env.IS_PREACT": JSON.stringify("false"),
+      __APP_VERSION__: JSON.stringify(appVersion),
+      __ROTLI_BUILD_CHANNEL__: JSON.stringify(channel),
     },
-  },
-}));
+
+    // katex reaches the graph twice — our blockRender import and
+    // mermaid-to-excalidraw's own dependency — and without dedupe Rollup shipped
+    // two identical 260 KB chunks that BOTH loaded at runtime (perf audit
+    // 2026-07-30, #7). One resolved copy = one chunk.
+    resolve: {
+      dedupe: ["katex"],
+    },
+
+    build: {
+      // Optional editors (Univer, Excalidraw, Mermaid, exceljs) are intentionally
+      // lazy and much larger than the startup graph. Replace Vite's one-size-fits-
+      // all warning with hard, tested startup/lazy budgets.
+      chunkSizeWarningLimit: MAX_LAZY_CHUNK_KIB,
+      rolldownOptions: {
+        // onLog replaces the deprecated onwarn (Vite 8 / Rolldown); warnings are
+        // still the budget's failure signal, other levels pass to the default
+        onLog(level, warning, handler) {
+          if (level === "warn") {
+            const violation = buildWarningViolation(warning);
+            if (violation) throw new Error(`bundle warning regression: ${violation}`);
+          }
+          handler(level, warning);
+        },
+        plugins: [
+          {
+            name: "rotli-bundle-budget",
+            generateBundle(_options, bundle) {
+              const violations = bundleBudgetViolations(bundle);
+              if (violations.length) {
+                this.error(
+                  `bundle budget regression:\n${violations.map((line) => `  - ${line}`).join("\n")}`,
+                );
+              }
+            },
+          },
+        ],
+      },
+    },
+
+    // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
+    //
+    // 1. prevent Vite from obscuring rust errors
+    clearScreen: false,
+    // 2. tauri expects a fixed port, fail if that port is not available
+    server: {
+      port: 1420,
+      strictPort: true,
+      host: host || false,
+      ...(host
+        ? {
+            hmr: {
+              protocol: "ws",
+              host,
+              port: 1421,
+            },
+          }
+        : {}),
+      watch: {
+        // 3. tell Vite to ignore watching `src-tauri`
+        ignored: ["**/src-tauri/**"],
+      },
+    },
+  };
+});

@@ -1,121 +1,113 @@
 ---
-// The holding page for rotli.co before launch: what Rotli is, in one screen,
-// with no download and no account. It is pinned to the Rotli light environment
-// (no toggle, no saved preference) so every visitor sees the same poster.
+// The rotli.co holding page stays in Rotli Light, with no download or account.
+// Keep the compact mobile introduction before the real product preview. The
+// launch film follows the introduction when its artifacts exist; a GitHub call
+// to action appears only once the source repository is public.
 import Base from '../layouts/Base.astro';
-import waving from '../../../src/assets/characters/waving.svg?raw';
+import PromoFilm from './PromoFilm.astro';
 import SiteFooter from './SiteFooter.astro';
 import SiteHeader from './SiteHeader.astro';
+import { GITHUB_URL, site } from '../site';
 
 const promises = [
-  {
-    title: 'One folder is the truth.',
-    detail:
-      'Markdown stays Markdown. Documents, sheets, images, and boards keep their ordinary formats. Delete the app and the work still makes sense.',
-  },
-  {
-    title: 'A workspace, not a viewer.',
-    detail:
-      'Write, plan, draw, and chat in one calm window. Summon it from anywhere, and keep working when the network is gone.',
-  },
-  {
-    title: 'AI with a boundary.',
-    detail:
-      'Start with an on-device model, connect the model tools you already trust, or use none. Secure notes never leave your Mac.',
-  },
+  { title: 'One ordinary folder.', detail: 'Your notes and files stay on your Mac, ready to open in other apps.' },
+  { title: 'A useful first minute.', detail: 'Nine welcome lessons help you try the real editor. They are your own notes: edit them, or delete the folder.' },
+  { title: 'AI when you want it.', detail: 'Use an on-device model, connect your own tools, or write without AI.' },
 ];
+
+const action = site.sourcePublic
+  ? { href: GITHUB_URL, label: 'Follow development on GitHub', glyph: '↗', external: true }
+  : site.promo.enabled
+    ? { href: '#film', label: 'Watch the film', glyph: '↓', external: false }
+    : null;
 ---
 
 <Base
   title="Rotli — coming soon"
-  description="Rotli is a warm, local-first Mac workspace for notes, editable files, boards, and AI conversations. One folder you own. Coming soon."
+  description="A local-first Mac workspace for notes, tasks, links, and ideas. Start with the Welcome folder. Keep your work in one ordinary folder. Mac beta coming soon."
   canonicalPath="/"
-  lockAppearance={{ family: 'rotli', mode: 'light' }}
 >
-  <SiteHeader github={false} toggle={false} />
+  <SiteHeader github={false} />
 
-  <main id="content" class="soon">
-    <section class="soon-copy" aria-labelledby="soon-title">
-      <p class="kicker">Coming soon for macOS</p>
-      <h1 id="soon-title">Room to think.<br />Files you keep.</h1>
-      <p class="lede">
-        Rotli is a warm, local-first workspace that turns one ordinary folder on your Mac into a
-        calm place for notes, editable files, boards, and AI conversations. No account. No cloud
-        copy you did not ask for.
-      </p>
-      <ul class="promises">
-        {promises.map((promise, index) => (
-          <li>
-            <span class="index" aria-hidden="true">0{index + 1}</span>
-            <p><b>{promise.title}</b> {promise.detail}</p>
-          </li>
-        ))}
-      </ul>
-      <p class="status">
-        <span class="status-mark" aria-hidden="true"></span>
-        Public beta on its way · Free · Apple silicon · no account required
-      </p>
-    </section>
+  <main id="content">
+    <div class="soon">
+      <section class="soon-copy" aria-labelledby="soon-title">
+        <p class="kicker">Coming soon for macOS</p>
+        <h1 id="soon-title">Room to think.<br />Files you keep.</h1>
+        <p class="lede">
+          A calm place for notes, tasks, links, and ideas.
+          Rotli brings them together in one folder you own, with no account required.
+        </p>
+        <p class="status">
+          <span class="status-mark" aria-hidden="true"></span>
+          Mac beta in preparation · Free · Apple silicon
+        </p>
+        {action && (
+          <a
+            class="button primary development-link"
+            href={action.href}
+            rel={action.external ? 'noopener' : undefined}
+          >
+            {action.label} <span aria-hidden="true">{action.glyph}</span>
+          </a>
+        )}
+        <ul class="promises">
+          {promises.map((promise) => (
+            <li><b>{promise.title}</b> {promise.detail}</li>
+          ))}
+        </ul>
+      </section>
 
-    <figure class="soon-art" aria-hidden="true">
-      <div class="art-field" set:html={waving}></div>
-    </figure>
+      <figure class="soon-preview">
+        <img
+          src="/rotli-playground@3x.png"
+          width="1440"
+          height="900"
+          alt="Rotli's Tasks and progress lesson from the Welcome folder in Main, in Rotli Light"
+          fetchpriority="high"
+        />
+        <figcaption>Actual browser preview · Practice stays in the app until you choose to save.</figcaption>
+      </figure>
+    </div>
+
+    <PromoFilm variant="soon" />
   </main>
 
   <SiteFooter tagline="A local-first workspace for your Mac. © 2026 Rotli" />
 
   <style>
-    /* Mobile first: one column, a compact quokka above the copy. */
     .soon {
       width: min(100% - 2rem, var(--page-max));
       margin-inline: auto;
       display: grid;
       grid-template-columns: minmax(0, 1fr);
-      gap: 1.5rem;
-      padding-block: 2.5rem 3.5rem;
+      gap: 2.5rem;
+      padding-block: 2rem 3.5rem;
     }
 
-    .soon-art {
-      order: -1;
-      margin: 0;
-    }
-
-    .art-field {
-      width: 8.5rem;
-      color: var(--text);
-    }
-
-    .art-field :global(svg) {
-      display: block;
-      width: 100%;
-      height: auto;
-    }
-
-    .soon-copy {
-      max-width: 38rem;
-    }
+    .soon-copy { max-width: 38rem; }
 
     .kicker {
       margin: 0 0 0.9rem;
       color: var(--accent-text);
       font-size: 0.88rem;
       font-weight: 600;
-      letter-spacing: 0.02em;
     }
 
     h1 {
       margin: 0;
-      font-size: clamp(2.6rem, 11vw, 5.4rem);
-      line-height: 0.98;
+      font-size: clamp(2.6rem, 8vw, 5rem);
+      line-height: 1;
       letter-spacing: -0.04em;
       font-weight: 600;
+      text-wrap: balance;
     }
 
     .lede {
       max-width: 34rem;
       margin: 1.25rem 0 0;
       color: var(--text-muted);
-      font-size: clamp(1.02rem, 1.6vw, 1.25rem);
+      font-size: clamp(1.02rem, 1.6vw, 1.2rem);
       line-height: 1.55;
     }
 
@@ -128,36 +120,19 @@ const promises = [
     }
 
     .promises li {
-      display: grid;
-      grid-template-columns: 2rem minmax(0, 1fr);
-      gap: 0.4rem;
       padding-top: 0.85rem;
       border-top: 1px solid var(--border);
-    }
-
-    .promises .index {
-      color: var(--accent-text);
-      font-size: 0.8rem;
-      font-weight: 600;
-      line-height: 1.9;
-    }
-
-    .promises p {
-      margin: 0;
       color: var(--text-muted);
       font-size: 0.96rem;
     }
 
-    .promises b {
-      color: var(--text);
-      font-weight: 600;
-    }
+    .promises b { color: var(--text); font-weight: 600; }
 
     .status {
       display: flex;
       align-items: flex-start;
       gap: 0.6rem;
-      margin: 2rem 0 0;
+      margin: 1.75rem 0 0;
       color: var(--text-muted);
       font-size: 0.88rem;
       line-height: 1.5;
@@ -168,52 +143,39 @@ const promises = [
       width: 0.6rem;
       height: 0.6rem;
       margin-top: 0.4rem;
-      border-radius: 999px;
+      border-radius: 50%;
       border: 1px solid var(--accent-text);
       background: var(--accent);
     }
 
-    /* Tablet: more air, larger quokka, still one column. */
-    @media (min-width: 640px) {
-      .soon {
-        width: min(100% - 3rem, var(--page-max));
-        gap: 2rem;
-        padding-block: 3.5rem 4.5rem;
-      }
+    .development-link { margin-top: 1.1rem; }
+    .soon-preview { min-width: 0; margin: 0; }
 
-      .art-field {
-        width: 11rem;
-      }
+    .soon-preview img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border: 1px solid var(--border);
+      border-radius: 0.85rem;
     }
 
-    /* Desktop: copy beside the quokka in its field, vertically centred. */
+    figcaption {
+      margin-top: 1rem;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+
+    @media (min-width: 640px) {
+      .soon { width: min(100% - 3rem, var(--page-max)); padding-block: 3rem 4rem; }
+    }
+
     @media (min-width: 960px) {
       .soon {
-        grid-template-columns: minmax(0, 1.15fr) minmax(16rem, 0.85fr);
-        gap: clamp(2.5rem, 6vw, 6rem);
+        grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+        gap: clamp(2.5rem, 5vw, 5rem);
         align-items: center;
-        min-height: calc(100vh - 76px - 8rem);
         min-height: calc(100svh - 76px - 8rem);
-        padding-block: clamp(3.5rem, 8vw, 7rem);
-      }
-
-      .soon-art {
-        order: 0;
-      }
-
-      .art-field {
-        width: 100%;
-        max-width: 26rem;
-        aspect-ratio: 1;
-        margin-inline: auto;
-        padding: 12%;
-        border: 1px solid var(--border);
-        border-radius: 1rem;
-        background: var(--surface-2);
-      }
-
-      .art-field :global(svg) {
-        height: 100%;
       }
     }
   </style>

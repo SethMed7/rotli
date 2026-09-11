@@ -127,3 +127,31 @@ test("the new-item chooser keeps a named view folder as its creation context", a
     page.locator('.main-tree[data-active-view="Main"] [data-main-id]', { hasText: "Northstar note" }),
   ).toBeVisible();
 });
+
+test("any named view can be deleted from Main's picker, and Main keeps its items", async ({ page }) => {
+  await gotoApp(page);
+  const mainRows = page.locator('.main-tree[data-active-view="Main"] [data-main-id]');
+  const before = await mainRows.count();
+  for (const name of ["Alpha", "Beta"]) {
+    await page.getByRole("button", { name: /Current view:/ }).click();
+    await page.getByRole("menu").getByRole("menuitem", { name: "New view…" }).click();
+    await page.getByRole("textbox", { name: "New view" }).fill(name);
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByRole("button", { name: new RegExp(`Current view: ${name}`) })).toBeVisible();
+  }
+  // back to Main, then delete Alpha without ever showing it
+  await page.getByRole("button", { name: /Current view: Beta/ }).click();
+  await page.getByRole("menu").getByRole("menuitemcheckbox", { name: "Main — all items" }).click();
+  await page.getByRole("button", { name: /Current view: Main/ }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "Delete a view…" }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "Alpha", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Delete Alpha? Items stay in Main.");
+  await page.getByRole("alert").getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByRole("button", { name: /Current view: Main/ })).toBeVisible();
+  await expect(mainRows).toHaveCount(before);
+  await page.getByRole("button", { name: /Current view: Main/ }).click();
+  const menu = page.getByRole("menu");
+  await expect(menu.getByRole("menuitemcheckbox", { name: "Beta" })).toBeVisible();
+  await expect(menu.getByRole("menuitemcheckbox", { name: "Alpha" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+});

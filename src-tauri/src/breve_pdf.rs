@@ -100,6 +100,7 @@ pub async fn breve_write_pdf_palette(
     state: tauri::State<'_, CorpusState>,
     palette: BrevePdfPalette,
 ) -> Result<(), String> {
+    crate::feature_policy::require_breve()?;
     let root = active_root(&state)?;
     off_main(move || {
         if cfg!(debug_assertions) {

@@ -8,10 +8,9 @@ import {
   type CorpusRefView,
   type VaultInspection,
 } from "../../lib/tauri";
-import { chooseFolder, createPracticeVault, initMemexAsCorpus } from "../../memex/service";
-import { refreshActiveVault } from "../../state/activeVault";
+import { chooseFolder, initMemexAsCorpus } from "../../memex/service";
+import { activateCreatedVault, refreshActiveVault } from "../../state/activeVault";
 import { ONBOARDING_STEP_NUMBER, ONBOARDING_TOTAL_STEPS } from "../../state/onboarding";
-import { usePanesStore } from "../../state/panes";
 import { flushSettingsNow } from "../../state/persist";
 import { useUiStore } from "../../state/ui";
 import { requestVaultFolder } from "../../state/vaultFolderBrowser";
@@ -20,14 +19,14 @@ import { SetupBack, SetupChoiceGroup, SetupPrimary } from "./setupControls";
 import { SetupSideFriends } from "./setupSideFriends";
 
 type Stage = "choose" | "create" | "scanning" | "review";
-type Intent = "create" | "open" | "practice" | "current";
+
+type Intent = "create" | "open" | "current";
 type ImportMode = "in-place" | "copy";
 
 export function vaultChoiceLabel(intent: Intent): string {
   if (intent === "create") return "Choose an empty folder";
   if (intent === "open") return "Choose an existing folder";
-  if (intent === "current") return "Use this vault";
-  return "Create a practice vault";
+  return "Use this vault";
 }
 
 export function VaultActivation({
@@ -84,14 +83,6 @@ export function VaultActivation({
         await onDone?.();
         return;
       }
-      if (intent === "practice") {
-        await onBeforeSwitch?.();
-        await flushSettingsNow();
-        const welcomeId = await createPracticeVault();
-        await refreshActiveVault();
-        if (welcomeId) usePanesStore.getState().openNote(welcomeId);
-        return;
-      }
       const path = await requestVaultFolder({
         title: intent === "create" ? "Create a Rotli vault" : "Open an existing folder",
         description:
@@ -134,9 +125,9 @@ export function VaultActivation({
         useUiStore.getState().setBrainEnabled(brainEnabled);
         await onBeforeSwitch?.();
         await flushSettingsNow();
-        const welcomeId = await initMemexAsCorpus(createPath, brainEnabled);
-        await refreshActiveVault();
-        if (welcomeId) usePanesStore.getState().openNote(welcomeId);
+        await initMemexAsCorpus(createPath, brainEnabled);
+        await activateCreatedVault();
+        await onDone?.();
         return;
       }
       if (stage === "review" && inspection) {
@@ -157,6 +148,7 @@ export function VaultActivation({
           await flushSettingsNow();
           if (await chooseFolder(inspection.path)) await refreshActiveVault();
         }
+        await onDone?.();
       }
     } catch (cause) {
       await restoreVaultStep();
@@ -241,11 +233,6 @@ export function VaultActivation({
                       title: "Open an existing folder",
                       description:
                         "Review an Obsidian, ZenNotes, or other Markdown tree before rotli writes anything.",
-                    },
-                    {
-                      value: "practice",
-                      title: "Try a practice vault",
-                      description: "Let rotli make a disposable local playground so you can explore first.",
                     },
                     ...(current
                       ? [

@@ -17,7 +17,6 @@
 import { create } from "zustand";
 
 import { clamp } from "../lib/clamp";
-import { seedPrivateBrowserTab } from "../lib/privateBrowser";
 import { initialNoteId, ulid } from "../services/notes";
 import type { LeafNode, PaneNode, SplitDir, Tab } from "../types";
 import { touchItemActivity, touchMru } from "./mru";
@@ -29,6 +28,15 @@ import {
   recordNav,
   retargetNavEntry,
 } from "./navHistory";
+import {
+  makeTab,
+  makeCanvasTab,
+  makeChatTab,
+  makeFileTab,
+  makeActivityTab,
+  makeNewItemTab,
+  makeBrowserTab,
+} from "./paneTabs";
 import { canOpenVaultInPanes, contentVaultId } from "./paneVaults";
 import { useUiStore } from "./ui";
 
@@ -43,41 +51,6 @@ export const MIN_PANE_HEIGHT = 220;
 /** Fallback width when the ui store hasn't seeded one yet — matches ui.ts's
  * sidebarWidth init (the maintainer, 2026-06-13: one sidebar, not two rails). */
 const SIDEBAR_WIDTH = 240;
-
-function makeTab(noteId: string): Tab {
-  return { id: ulid(), surfaceKind: "note", noteId };
-}
-
-function makeCanvasTab(boardId: string): Tab {
-  return { id: ulid(), surfaceKind: "canvas", boardId };
-}
-
-function makeChatTab(chatSlug: string | null, vaultId?: string): Tab {
-  return { id: ulid(), surfaceKind: "chat", chatSlug, ...(vaultId ? { vaultId } : {}) };
-}
-
-function makeFileTab(fileId: string): Tab {
-  return { id: ulid(), surfaceKind: "file", fileId };
-}
-
-function makeActivityTab(): Tab {
-  return { id: ulid(), surfaceKind: "activity" };
-}
-
-function makeNewItemTab(pendingLabel?: string, pendingNote = false): Tab {
-  return {
-    id: ulid(),
-    surfaceKind: "newItem",
-    ...(pendingLabel ? { pendingLabel } : {}),
-    ...(pendingNote ? { pendingNote: true } : {}),
-  };
-}
-
-function makeBrowserTab(url?: string): Tab {
-  const tab: Tab = { id: ulid(), surfaceKind: "browser" };
-  seedPrivateBrowserTab(tab.id, url);
-  return tab;
-}
 
 /** Vault isolation is a navigation guard: a blocked open leaves every existing
  * (possibly dirty) tab untouched. */
@@ -601,6 +574,21 @@ export const usePanesStore = create<PanesState>((set, get) => {
     return first;
   };
 
+  const openAppSurface = (surfaceKind: "activity") => {
+    useUiStore.getState().setContentView("panes");
+    const leaf = focusedLeaf();
+    set({
+      root: updateLeaf(get().root, leaf.id, (l) =>
+        placeTab(
+          l,
+          undefined,
+          (t) => t.surfaceKind === surfaceKind,
+          () => ({ id: ulid(), surfaceKind }),
+        ),
+      ),
+    });
+  };
+
   /** Carve a split. Returns whether it actually happened — a window too
    * narrow/short for another pane refuses, and callers with a fallback
    * (openToSide) must know, or the click dies silently. */
@@ -797,18 +785,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
       }
     },
 
-    openActivity: () => {
-      // like every other surface: reuse the pane's Activity tab or APPEND one —
-      // it used to swap the ACTIVE tab in place, eating the note you were on
-      // (the one violation of the never-replace law; P0 sweep 2026-07-28)
-      useUiStore.getState().setContentView("panes");
-      const leaf = focusedLeaf();
-      set({
-        root: updateLeaf(get().root, leaf.id, (l) =>
-          placeTab(l, undefined, (t) => t.surfaceKind === "activity", makeActivityTab),
-        ),
-      });
-    },
+    openActivity: () => openAppSurface("activity"),
 
     openNewItemTab: () => {
       // ALWAYS a fresh tab — the chooser is a blank slate, never a reuse

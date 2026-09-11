@@ -893,6 +893,10 @@
 .rotli-check-wrap {
   position: relative;
   display: inline-block;
+  /* the task line carries a negative text-indent for its hanging indent; an
+     inline-block inherits it and would push the box into the margin, left of the
+     H1 hash and paragraph edge */
+  text-indent: 0;
 }
 .rotli-check-doing-action {
   position: absolute;

@@ -1,7 +1,7 @@
 {
   "name": "rotli",
   "private": true,
-  "version": "0.90.0",
+  "version": "0.91.0",
   "packageManager": "bun@1.4.0",
   "overrides": {
     "@codemirror/lang-html": "6.4.12",
@@ -17,6 +17,7 @@
     "dev:app": "bun --no-orphans scripts/tauri-dev-supervisor.ts",
     "build": "bun scripts/build-character-fills.mjs && bun scripts/sync-excalidraw-fonts.mjs && bun run check:breve-runtime && tsc && vite build",
     "preview": "vite preview",
+    "capture:site": "bun scripts/capture-site.mjs",
     "tauri": "tauri",
     "build:mac": "bun scripts/build-tray-icon.mjs && bash scripts/predmg-clean.sh && bun run tauri build --bundles app",
     "release": "bash scripts/release.sh",
@@ -58,7 +59,16 @@
     "check:breve-runtime": "bun build breve-runtime/scripts/*.ts --target bun --outdir $(mktemp -d) && tsc --noEmit -p breve-runtime && bash -n breve-runtime/scripts/morning-brief.sh && bash -n breve-runtime/scripts/lunch-brief.sh && bash -n breve-runtime/scripts/night-brief.sh && bash -n breve-runtime/scripts/custom-brief.sh && bun run check:breve-contract",
     "check": "bun run lint && bun run test:regression",
     "format": "oxfmt -c .oxfmtrc.json \"src/**/*.{ts,tsx}\" \"e2e/**/*.ts\" \"scripts/**/*.{ts,mjs}\" \"services/**/*.ts\" playwright.config.ts vite.config.ts",
-    "format:check": "oxfmt -c .oxfmtrc.json --check \"src/**/*.{ts,tsx}\" \"e2e/**/*.ts\" \"scripts/**/*.{ts,mjs}\" \"services/**/*.ts\" playwright.config.ts vite.config.ts"
+    "format:check": "oxfmt -c .oxfmtrc.json --check \"src/**/*.{ts,tsx}\" \"e2e/**/*.ts\" \"scripts/**/*.{ts,mjs}\" \"services/**/*.ts\" playwright.config.ts vite.config.ts",
+    "security:protect": "bun scripts/repository-protection.mjs",
+    "security:secrets": "bun scripts/scan-repository-secrets.mjs",
+    "security:history": "bun scripts/scan-repository-secrets.mjs --history",
+    "capture:launch": "bun scripts/capture-launch.mjs",
+    "audit:grammar": "bun scripts/audit-grammar.mjs",
+    "security:changes": "bash scripts/scan-changed-secrets.sh",
+    "security:working": "bun scripts/scan-working-secrets.mjs",
+    "build:social-card": "bun scripts/build-social-card.mjs",
+    "security:bundle": "bun scripts/check-release-privacy.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",

@@ -1,5 +1,9 @@
 # Remote agent relay contract
 
+> Status 2026-09-11: development builds only. Stable builds hide Settings →
+> Connections → Remote agents and refuse every `remote_agent_*` command; the
+> vault-switch disconnect stays a no-op there. See the agent workspace contract.
+
 Rotli can expose `rotli-workspace` to a public HTTPS MCP client without moving
 the vault off the Mac. This capability is off at launch and requires the user
 to connect it explicitly from Settings → Connections for the current app

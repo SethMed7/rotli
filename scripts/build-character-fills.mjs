@@ -5,11 +5,12 @@ import sharp from "sharp";
 
 const root = join(import.meta.dir, "..");
 const sourceDir = join(root, "src/assets/characters");
-const outputRoot = join(sourceDir, "filled");
+const siteOnly = process.argv.includes("--site");
+const outputRoot = siteOnly ? join(root, "site/src/assets/characters") : join(sourceDir, "filled");
 const maskRoot = join(sourceDir, "masks");
 const conceptSourceRoot = join(sourceDir, "concepts/source");
 const conceptOutputRoot = join(sourceDir, "concepts/layers");
-const size = 512;
+const size = siteOnly ? 1536 : 512;
 const accessorySources = new Set(["glasses", "bucket-hat", "goggles"]);
 const accessoryBounds = {
   glasses: [160, 108, 350, 178],
@@ -24,10 +25,11 @@ const variants = [
 
 const sources = (await readdir(sourceDir))
   .filter((name) => name.endsWith(".svg") && !name.startsWith("_"))
+  .filter((name) => !siteOnly || ["stays_local.svg", "celebrating.svg"].includes(name))
   .sort();
 
 async function fillCharacter(sourceName, variant) {
-  const { data: lineArt, info } = await sharp(join(sourceDir, sourceName))
+  const { data: lineArt, info } = await sharp(join(sourceDir, sourceName), { density: siteOnly ? 216 : 72 })
     .resize(size, size, { fit: "contain" })
     .ensureAlpha()
     .raw()
@@ -90,7 +92,7 @@ async function fillCharacter(sourceName, variant) {
     .webp({ lossless: true, effort: 6 })
     .toFile(join(outputDir, `${basename(sourceName, ".svg")}.webp`));
 
-  if (variant.name === variants[0]?.name) {
+  if (!siteOnly && variant.name === variants[0]?.name) {
     const mask = Buffer.alloc(lineArt.length);
     for (let index = 0; index < width * height; index += 1) {
       const offset = index * channels;
@@ -312,12 +314,16 @@ async function buildConceptLayers(sourceName) {
 }
 
 for (const sourceName of sources) {
-  for (const variant of variants) await fillCharacter(sourceName, variant);
+  for (const variant of siteOnly ? variants.slice(0, 1) : variants) await fillCharacter(sourceName, variant);
 }
 
-const conceptSources = (await readdir(conceptSourceRoot)).filter((name) => name.endsWith(".png")).sort();
+const conceptSources = siteOnly
+  ? []
+  : (await readdir(conceptSourceRoot)).filter((name) => name.endsWith(".png")).sort();
 for (const sourceName of conceptSources) await buildConceptLayers(sourceName);
 
 console.log(
-  `Built ${sources.length * variants.length} canonical fills, ${sources.length} masks, and ${conceptSources.length * 6} concept layers.`,
+  siteOnly
+    ? `Built ${sources.length} site illustrations at ${size} × ${size} from canonical SVGs.`
+    : `Built ${sources.length * variants.length} canonical fills, ${sources.length} masks, and ${conceptSources.length * 6} concept layers.`,
 );

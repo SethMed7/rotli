@@ -312,7 +312,9 @@ const FS_MODE = isTauri();
 // Dev-only review affordance: ?empty skips note seeding so the r1 frame E
 // empty state ("Your island is ready") can be looked at. Folders still exist —
 // Inbox is the capture target either way.
-const SEED_EMPTY = import.meta.env.DEV && new URLSearchParams(window.location.search).has("empty");
+const SEED_EMPTY =
+  import.meta.env.DEV &&
+  ["empty", "onboarding"].some((key) => new URLSearchParams(window.location.search).has(key));
 
 const svc = new InMemoryNotesService();
 
@@ -378,7 +380,7 @@ Apple Notes feel, **markdown underneath**. Local files, one structure the AI can
 
 > The folder of files *is* the product. Every view, every backend, every AI is a reader.
 
-Later: breve plugs into the same corpus and the Wiki answers from it. Nothing changes shape.`,
+Start with a note. Add context when a conversation would help. Your files stay yours.`,
       { createdAt: todayAt(9, 42), updatedAt: todayAt(9, 42) },
     );
     firstNoteId = welcome.id;

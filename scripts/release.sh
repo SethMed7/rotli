@@ -15,8 +15,8 @@
 # updater key from a path OUTSIDE the repo.
 #
 # Usage:
-#   bash scripts/release.sh            # build + sign + notarize + validate (NO publish)
-#   bash scripts/release.sh --publish  # the above, then gh release to rotli-releases + tag
+#   bash scripts/release.sh --authorize=<full-sha>  # owner-approved sign/notarize, no publication
+#   bash scripts/release.sh --authorize=<full-sha> --publish  # separately approved publication
 #   bash scripts/release.sh --check-ci-only  # verify HEAD's hosted CI evidence, then exit
 #   bash scripts/release.sh --check-ci-only=<full-sha>  # diagnose another commit without releasing it
 set -euo pipefail
@@ -41,10 +41,12 @@ ENTITLEMENTS="src-tauri/entitlements.plist"
 PUBLISH=0
 LAUNCH=0   # --launch unlocks a major≥1 version (the public 1.0 launch); see the guard below
 REQUIRE_CI=1  # CI evidence is mandatory; --require-ci remains as an explicit/backward-compatible spelling
+AUTHORIZED_COMMIT=""
 CHECK_CI_ONLY=0
 CI_CHECK_COMMIT="$SOURCE_COMMIT"
 for arg in "$@"; do
   case "$arg" in
+    --authorize=*)  AUTHORIZED_COMMIT="${arg#*=}" ;;
     --publish)       PUBLISH=1 ;;
     --launch)        LAUNCH=1 ;;
     --require-ci)    REQUIRE_CI=1 ;;
@@ -53,6 +55,7 @@ for arg in "$@"; do
       CHECK_CI_ONLY=1
       CI_CHECK_COMMIT="${arg#*=}"
       ;;
+    *) echo "✗ unknown release argument"; exit 1 ;;
   esac
 done
 
@@ -66,14 +69,14 @@ verify_ci_conclusion() {
   # commit-scoped instead of "the newest 40 main runs" (which missed a run that
   # had just completed, 2026-09-03). gh's index can lag a fresh run by seconds;
   # a bounded retry covers that, and superseded (cancelled) runs never count.
-  git fetch -q origin main 2>/dev/null || true
+  git fetch -q origin main || { echo "✗ cannot refresh origin/main"; return 1; }
   if ! git merge-base --is-ancestor "$source_commit" origin/main 2>/dev/null; then
     echo "✗ $source_commit is not on origin/main — release from the promoted commit"
     return 1
   fi
   local attempt
   for attempt in 1 2 3 4 5; do
-    ci_runs="$(gh run list --workflow "Regression suite" --commit "$source_commit" \
+    ci_runs="$(gh run list --workflow "Regression suite" --branch main --event push --commit "$source_commit" \
       --json headSha,status,conclusion,url --limit 20 2>/dev/null || echo '[]')"
     ci_conclusion="$(printf '%s' "$ci_runs" \
       | jq -r 'map(select(.conclusion != "cancelled")) | first | if . == null then "none" elif .status != "completed" then "pending" else (.conclusion // "unknown") end' \
@@ -94,16 +97,8 @@ verify_ci_conclusion() {
       [ "$REQUIRE_CI" -eq 1 ] && { echo "  CI evidence is required before release publication"; return 1; }
       ;;
     *)
-      # The only emergency escape is explicit and loud. It can override a
-      # completed red conclusion, but never missing or still-pending evidence.
-      if [ "${ROTLI_RELEASE_ALLOW_RED:-0}" = "1" ]; then
-        [ -n "$CI_RUN_URL" ] || { echo "✗ completed Regression run has no immutable URL"; return 1; }
-        echo "  ⚠ Regression concluded '$ci_conclusion' for $source_commit — OVERRIDDEN by ROTLI_RELEASE_ALLOW_RED=1"
-      else
-        echo "✗ Regression suite for $source_commit concluded '$ci_conclusion' — refusing to publish a red commit"
-        echo "  Emergency override: ROTLI_RELEASE_ALLOW_RED=1"
-        return 1
-      fi ;;
+      echo "✗ Regression suite concluded '$ci_conclusion' — refusing signing, notarization, and publication"
+      return 1 ;;
   esac
 }
 
@@ -115,6 +110,36 @@ if [ "$CHECK_CI_ONLY" -eq 1 ]; then
   verify_ci_conclusion "$CI_CHECK_COMMIT"
   exit 0
 fi
+
+# The explicit SHA acknowledges owner authorization for this exact source.
+# It is an operator guard, not a substitute for the human's release instruction.
+if [ "$AUTHORIZED_COMMIT" != "$SOURCE_COMMIT" ]; then
+  echo "✗ signing/notarization requires owner authorization: --authorize=$SOURCE_COMMIT"
+  exit 1
+fi
+if [ "$(gh api user --jq .login)" != "SethMed7" ]; then
+  echo "✗ only the repository owner may operate signing/notarization"
+  exit 1
+fi
+verify_ci_conclusion "$SOURCE_COMMIT"
+[ "$(git rev-parse origin/main)" = "$SOURCE_COMMIT" ] || {
+  echo "✗ signing requires the exact promoted origin/main commit"
+  exit 1
+}
+# Public artifacts never inherit a developer's experimental build override.
+export ROTLI_BUILD_CHANNEL=stable
+umask 077
+# Preserve Cargo's flag semantics while remapping developer paths in compiler
+# metadata. Encoded flags keep paths containing spaces as single arguments.
+ROTLI_NATIVE_BUILD_FLAGS=()
+if [ -n "${CARGO_ENCODED_RUSTFLAGS:-}" ]; then
+  IFS=$'\x1f' read -r -d '' -a ROTLI_NATIVE_BUILD_FLAGS < <(printf '%s\0' "$CARGO_ENCODED_RUSTFLAGS")
+else
+  read -r -d '' -a ROTLI_NATIVE_BUILD_FLAGS < <(printf '%s\0' "${RUSTFLAGS:-}")
+fi
+ROTLI_NATIVE_BUILD_FLAGS+=("--remap-path-prefix=$HOME=/build/user" "--remap-path-prefix=$PWD=/build/rotli")
+printf -v CARGO_ENCODED_RUSTFLAGS '%s\037' "${ROTLI_NATIVE_BUILD_FLAGS[@]}"
+export CARGO_ENCODED_RUSTFLAGS="${CARGO_ENCODED_RUSTFLAGS%$'\x1f'}"
 
 if [ -z "$DEVID" ]; then
   echo "✗ APPLE_SIGNING_IDENTITY is required for a signed release"
@@ -179,8 +204,27 @@ DMG="$DIST/rotli_${VER}_aarch64.dmg"
 DL_URL="https://github.com/${RELEASES_REPO}/releases/download/v${VER}/rotli.app.tar.gz"
 
 echo "▸ rotli $VER  (publish=$PUBLISH · signing identity configured · notary profile configured)"
-[ -f "$UPDATER_KEY" ] || { echo "✗ updater key not found at $UPDATER_KEY"; exit 1; }
+[ -f "$UPDATER_KEY" ] || { echo "✗ configured updater key is unavailable"; exit 1; }
 mkdir -p "$DIST"
+NOTARY_RECORDS="_review/release-notary/$SOURCE_COMMIT"
+mkdir -p "$NOTARY_RECORDS"
+
+notarize() {
+  local artifact="$1" label="$2" record="$NOTARY_RECORDS/$2-submission.json"
+  xcrun notarytool submit "$artifact" --keychain-profile "$NOTARY_PROFILE" --wait --output-format json > "$record"
+  local submission_id
+  submission_id="$(jq -er '.id | select(type == "string" and length > 0)' "$record")"
+  xcrun notarytool log "$submission_id" --keychain-profile "$NOTARY_PROFILE" "$NOTARY_RECORDS/$label-log.json"
+  jq -e '.status == "Accepted"' "$record" >/dev/null || {
+    echo "✗ Apple did not accept $label; inspect the private notary record"
+    return 1
+  }
+  jq -e '.status == "Accepted" and ((.issues // []) | length == 0)' "$NOTARY_RECORDS/$label-log.json" >/dev/null || {
+    echo "✗ Apple reported issues for $label; review the private notary log before proceeding"
+    return 1
+  }
+}
+
 
 # ── 0. gate ──────────────────────────────────────────────────────────────────
 echo "▸ check"
@@ -196,6 +240,7 @@ CI=true bun run tauri build --bundles app \
   --config '{"bundle":{"createUpdaterArtifacts":true}}'
 
 [ -d "$APP" ] || { echo "✗ no .app at $APP"; exit 1; }
+bun run security:bundle "$APP"
 
 # ── 1a. the bundle must not absorb local development junk ────────────────────
 # tauri.conf.json copies `../breve-runtime/` wholesale into Resources. That
@@ -233,8 +278,9 @@ codesign --verify --strict --verbose=2 "$APP"
 echo "▸ notarize the .app (notarytool --wait; a few minutes)"
 ZIP="$DIST/rotli-app.zip"
 ditto -c -k --keepParent "$APP" "$ZIP"
-xcrun notarytool submit "$ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
+notarize "$ZIP" app
 xcrun stapler staple "$APP"
+xcrun stapler validate "$APP"
 rm -f "$ZIP"
 
 # the updater feed must ship the FINAL stapled app (so an auto-updated install
@@ -264,8 +310,13 @@ rm -rf "$STAGE"
 # ── 4. sign + notarize + staple the DMG ──────────────────────────────────────
 echo "▸ sign + notarize the dmg"
 codesign --force --timestamp -s "$DEVID" "$DMG"
-xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
+notarize "$DMG" dmg
 xcrun stapler staple "$DMG"
+
+# Retain raw Apple logs privately; publish only submission IDs and statuses.
+jq -n --slurpfile app "$NOTARY_RECORDS/app-submission.json" --slurpfile dmg "$NOTARY_RECORDS/dmg-submission.json" \
+  '{app: ($app[0] | {id, status}), dmg: ($dmg[0] | {id, status})}' > "$DIST/notary-evidence.json"
+unset TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD
 
 # ── 5. the updater feed manifest ─────────────────────────────────────────────
 echo "▸ latest.json"
@@ -281,7 +332,8 @@ bun scripts/make-latest-json.mjs \
 # ── 6. Gatekeeper proof ──────────────────────────────────────────────────────
 echo "▸ gatekeeper check"
 xcrun stapler validate "$DMG"
-spctl -a -vvv -t install "$DMG" 2>&1 || true   # informational; stapler validate is the gate
+spctl --assess --type execute "$APP"
+spctl --assess --type open --context context:primary-signature "$DMG"
 
 echo "✓ built + notarized:"
 ls -lh "$DMG" "$DIST/rotli.app.tar.gz" "$DIST/latest.json"
@@ -318,6 +370,7 @@ if [ "$PUBLISH" -eq 1 ]; then
     --artifact "$DIST/rotli.app.tar.gz" \
     --artifact "$DIST/rotli.app.tar.gz.sig" \
     --artifact "$DIST/latest.json" \
+    --artifact "$DIST/notary-evidence.json" \
     > "$DIST/release-evidence.json"
 
   git tag "v$VER" "$SOURCE_COMMIT"
@@ -326,7 +379,7 @@ if [ "$PUBLISH" -eq 1 ]; then
   echo "▸ publish → $RELEASES_REPO (tag v$VER)"
   gh release create "v$VER" \
     "$DMG" "$DIST/rotli.app.tar.gz" "$DIST/rotli.app.tar.gz.sig" "$DIST/latest.json" \
-    "$DIST/release-evidence.json" \
+    "$DIST/release-evidence.json" "$DIST/notary-evidence.json" \
     --repo "$RELEASES_REPO" \
     --title "rotli $VER" \
     --notes "$NOTES"

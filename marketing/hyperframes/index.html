@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>rotli — launch promo (HyperFrames composition)</title>
+    <script src="vendor/gsap.min.js"></script>
+    <style>
+      /* Brand tokens from src/brand/tokens/colors.json (light + dark surfaces). */
+      :root {
+        --ground: #f8f2e9;
+        --surface: #ffffff;
+        --text: #3a3028;
+        --text-muted: #6e6155;
+        --accent: #c97e62;
+        --accent-text: #8f4e37;
+        --border-strong: #cdb8a1;
+        --dark-ground: #241d18;
+        --dark-text: #f1e7da;
+        --dark-muted: #b7a593;
+      }
+      /* The compiler inlines both faces as data URIs at render time; no preload hints needed. */
+      @font-face {
+        font-family: 'General Sans';
+        src: url('assets/fonts/GeneralSans-Variable.woff2') format('woff2');
+        font-weight: 300 700;
+        font-display: block;
+      }
+      @font-face {
+        font-family: 'Baloo 2';
+        src: url('assets/fonts/Baloo2-600.ttf') format('truetype');
+        font-weight: 600;
+        font-display: block;
+      }
+      html, body { margin: 0; background: var(--ground); }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--ground);
+        color: var(--text);
+        font-family: 'General Sans', system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .clip { position: absolute; inset: 0; }
+      .wordmark { font-family: 'Baloo 2', 'General Sans', sans-serif; font-weight: 600; letter-spacing: -0.015em; }
+
+      /* Act 1 — typographic opening */
+      #op-mark { position: absolute; left: 240px; top: 70px; display: flex; align-items: center; gap: 12px; }
+      #op-mark img { width: 44px; height: 44px; display: block; }
+      #op-mark span { font-size: 40px; line-height: 44px; color: var(--text); }
+      .op-line {
+        position: absolute; left: 240px; margin: 0;
+        font-weight: 600; letter-spacing: -0.04em; color: var(--text); white-space: nowrap;
+      }
+      #op-1 { top: 296px; font-size: 128px; line-height: 136px; }
+      #op-2 { top: 440px; font-size: 128px; line-height: 136px; }
+      #op-3 { top: 592px; font-size: 172px; line-height: 180px; }
+
+      /* Act 2 — product frame: real proportions, flat border, one fixed position for every shot */
+      .shot {
+        position: absolute; left: 240px; top: 56px; width: 1440px; height: 900px;
+        overflow: hidden; border: 1px solid var(--border-strong); border-radius: 10px;
+        background: var(--surface); box-sizing: border-box;
+      }
+      .pan { position: absolute; left: 0; top: 0; width: 1440px; height: 900px; transform-origin: 0 0; will-change: transform; }
+      .pan img, .pan video { display: block; width: 1440px; height: 900px; }
+      .pan .clip { inset: 0; }
+      .theme-label {
+        position: absolute; left: 240px; top: 14px; margin: 0;
+        font-size: 26px; line-height: 32px; font-weight: 600; color: var(--accent-text);
+      }
+
+      /* Captions: fixed linen band under the frame, cocoa type, one line each */
+      .caption.clip {
+        inset: auto; left: 240px; top: 964px; width: 1440px; margin: 0;
+        text-align: center; font-size: 44px; line-height: 52px; font-weight: 500; color: var(--text);
+      }
+
+      /* Act 3 — end card on the brand's dark environment tokens */
+      #end { background: var(--dark-ground); color: var(--dark-text); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+      #end-identity { display: flex; align-items: center; gap: 18px; }
+      #end-identity img { width: 84px; height: 84px; display: block; }
+      #end-identity span { font-size: 96px; line-height: 100px; color: var(--dark-text); }
+      #end-tagline { margin: 40px 0 0; font-size: 76px; line-height: 84px; font-weight: 600; letter-spacing: -0.03em; color: var(--dark-text); }
+      #end-status { margin: 44px 0 0; font-size: 30px; line-height: 36px; font-weight: 500; color: var(--dark-muted); }
+      #end-url { margin: 22px 0 0; font-size: 54px; line-height: 60px; font-weight: 600; color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="rotli-promo" data-start="0" data-duration="41.8" data-width="1920" data-height="1080" data-fps="30">
+
+      <!-- ===== Act 1: 0.0–4.5 typographic opening ===== -->
+      <section id="opening" class="clip" data-start="0" data-duration="4.5" data-track-index="6">
+        <div id="op-mark"><img src="assets/characters/logo-cocoa.svg" alt="" /><span class="wordmark">rotli</span></div>
+        <!-- data-cue-* feed the VTT/SRT export only; the lines accumulate on screen. -->
+        <p id="op-1" class="op-line" data-cue="One folder." data-cue-start="0.2" data-cue-duration="1.2">One folder.</p>
+        <p id="op-2" class="op-line" data-cue="One folder. Plain files." data-cue-start="1.4" data-cue-duration="1.2">Plain files.</p>
+        <p id="op-3" class="op-line" data-cue="One folder. Plain files. Room to think." data-cue-start="2.6" data-cue-duration="1.8">Room to think.</p>
+      </section>
+
+      <!-- ===== Act 2: product ===== -->
+      <!-- 4.5–12.4 the demo note: full workspace, then one reframe into the writing. -->
+      <section id="shot-note" class="clip" data-start="4.5" data-duration="7.9" data-track-index="2">
+        <div class="shot"><div id="pan-note" class="pan" data-layout-allow-overflow><img src="assets/captures/app-warm-light.png" alt="rotli demo note in the Rotli Warm Light environment" /></div></div>
+      </section>
+
+      <!-- 12.4–31.2 one continuous take in the Playground. prepare.mjs derives play-take.mp4 from
+           the approved recording: the real task tick, Raw Markdown, toggle back, save, and Chat
+           presses in order, with each editorial hold baked in as a frozen frame of the recording
+           itself. One <video> because the renderer injects frames only for the first video inside
+           a pan (later ones rendered blank). The wrapper is deliberately untimed (a nested video's
+           own data-start is resolved without a timed wrapper's offset); the timeline owns its
+           opacity from 12.4 to 31.2. Events: tick 15.63, Raw 17.77, back 20.93, save 22.27, Chat 25.97. -->
+      <section id="shot-play" class="clip">
+        <div class="shot"><div id="pan-play" class="pan" data-layout-allow-overflow>
+          <video id="play-take" src="assets/captures/play-take.mp4" data-start="12.4" data-duration="18.8" data-media-start="0" data-track-index="2" muted playsinline></video>
+        </div></div>
+      </section>
+
+      <!-- 31.2–37.8 six theme families, clean cuts, identical framing, family names outside the frame. -->
+      <section id="theme-rotli" class="clip" data-start="31.2" data-duration="1.1" data-track-index="2">
+        <div class="shot"><div class="pan" data-layout-allow-overflow><img src="assets/captures/app-warm-light.png" alt="Rotli Warm Light" /></div></div>
+      </section>
+      <p id="lab-rotli" class="theme-label clip" data-start="31.2" data-duration="1.1" data-track-index="3">Rotli</p>
+      <section id="theme-paper" class="clip" data-start="32.3" data-duration="1.1" data-track-index="2">
+        <div class="shot"><div class="pan" data-layout-allow-overflow><img src="assets/captures/app-paper.png" alt="Paper & Charcoal" /></div></div>
+      </section>
+      <p id="lab-paper" class="theme-label clip" data-start="32.3" data-duration="1.1" data-track-index="3">Paper &amp; Charcoal</p>
+      <section id="theme-ocean" class="clip" data-start="33.4" data-duration="1.1" data-track-index="2">
+        <div class="shot"><div class="pan" data-layout-allow-overflow><img src="assets/captures/app-ocean-light.png" alt="Ocean Light" /></div></div>
+      </section>
+      <p id="lab-ocean" class="theme-label clip" data-start="33.4" data-duration="1.1" data-track-index="3">Ocean</p>
+      <section id="theme-grove" class="clip" data-start="34.5" data-duration="1.1" data-track-index="2">
+        <div class="shot"><div class="pan" data-layout-allow-overflow><img src="assets/captures/app-grove-dark.png" alt="Grove Dark" /></div></div>
+      </section>
+      <p id="lab-grove" class="theme-label clip" data-start="34.5" data-duration="1.1" data-track-index="3">Grove</p>
+      <section id="theme-iris" class="clip" data-start="35.6" data-duration="1.1" data-track-index="2">
+        <div class="shot"><div class="pan" data-layout-allow-overflow><img src="assets/captures/app-iris-light.png" alt="Iris Light" /></div></div>
+      </section>
+      <p id="lab-iris" class="theme-label clip" data-start="35.6" data-duration="1.1" data-track-index="3">Iris</p>
+      <section id="theme-midnight" class="clip" data-start="36.7" data-duration="1.1" data-track-index="2">
+        <div class="shot"><div class="pan" data-layout-allow-overflow><img src="assets/captures/app-midnight.png" alt="Midnight" /></div></div>
+      </section>
+      <p id="lab-midnight" class="theme-label clip" data-start="36.7" data-duration="0.9" data-track-index="3">Midnight</p>
+
+      <!-- Captions (single source for the VTT/SRT export). One short line each, never overlapping. -->
+      <p id="cap-1" class="caption clip" data-start="4.8" data-duration="3.5" data-track-index="4">Plain Markdown files. In a folder you choose.</p>
+      <p id="cap-2" class="caption clip" data-start="8.9" data-duration="3.3" data-track-index="4">Headings, tasks, links. Plain text underneath.</p>
+      <p id="cap-3" class="caption clip" data-start="12.7" data-duration="1.6" data-track-index="4">Ten lessons to try in the Playground.</p>
+      <p id="cap-4" class="caption clip" data-start="15.2" data-duration="2.4" data-track-index="4">Tick a task. It stays in your note.</p>
+      <p id="cap-5" class="caption clip" data-start="18" data-duration="2.9" data-track-index="4">Raw Markdown is one click away.</p>
+      <p id="cap-6" class="caption clip" data-start="22.4" data-duration="2.7" data-track-index="4">Save your own copy to your vault.</p>
+      <p id="cap-7" class="caption clip" data-start="26.2" data-duration="2.4" data-track-index="4">Chat is optional. On-device or a connected tool.</p>
+      <p id="cap-8" class="caption clip" data-start="28.7" data-duration="2.3" data-track-index="4">Connected chat can send the context you select.</p>
+      <p id="cap-9" class="caption clip" data-start="31.5" data-duration="6.1" data-track-index="4">Six theme families. Each tuned for light and dark.</p>
+
+      <!-- ===== Act 3: 37.8–41.8 end card ===== -->
+      <section id="end" class="clip" data-start="37.8" data-duration="4" data-track-index="5" data-cue="rotli — Room to think. Files you keep. Mac beta in preparation. rotli.co">
+        <div id="end-identity"><img src="assets/characters/logo-linen.svg" alt="" /><span class="wordmark">rotli</span></div>
+        <p id="end-tagline">Room to think. Files you keep.</p>
+        <p id="end-status">Mac beta in preparation</p>
+        <p id="end-url">rotli.co</p>
+      </section>
+
+      <!-- ===== Audio: original synthesized bed and effects (audio/synth.py) =====
+           Airs start 0.2 s before a hard cut so the swell peaks on it. Every click sits on a
+           recorded, visible state change, placed on the first frame where the change is visible
+           in the delivered render (measured by frame differencing). -->
+      <audio id="bed" src="assets/audio/bed.wav" data-start="0" data-duration="41.8" data-track-index="0" data-volume="1"></audio>
+      <audio id="air-1" src="assets/audio/sfx-air.wav" data-start="4.3" data-duration="0.45" data-track-index="1" data-volume="0.75"></audio>
+      <audio id="air-2" src="assets/audio/sfx-air-low.wav" data-start="12.2" data-duration="0.45" data-track-index="1" data-volume="0.7"></audio>
+      <audio id="tick-task" src="assets/audio/sfx-tick.wav" data-start="15.63" data-duration="0.14" data-track-index="1" data-volume="0.8"></audio>
+      <audio id="press-raw" src="assets/audio/sfx-press.wav" data-start="17.82" data-duration="0.16" data-track-index="1" data-volume="0.85"></audio>
+      <audio id="press-back" src="assets/audio/sfx-press.wav" data-start="20.93" data-duration="0.16" data-track-index="1" data-volume="0.6"></audio>
+      <audio id="press-save" src="assets/audio/sfx-press.wav" data-start="22.30" data-duration="0.16" data-track-index="1" data-volume="0.85"></audio>
+      <audio id="press-chat" src="assets/audio/sfx-press.wav" data-start="26.08" data-duration="0.16" data-track-index="1" data-volume="0.85"></audio>
+      <audio id="air-3" src="assets/audio/sfx-air.wav" data-start="31.0" data-duration="0.45" data-track-index="1" data-volume="0.75"></audio>
+      <audio id="air-4" src="assets/audio/sfx-air-low.wav" data-start="37.6" data-duration="0.45" data-track-index="1" data-volume="0.75"></audio>
+    </div>
+
+    <script>
+      // One paused, finite timeline registered under the composition id. HyperFrames
+      // seeks it; nothing here reads a clock or random source. Clip visibility is
+      // owned by the runtime through data-start/data-duration; tweens only shape
+      // entrances, reframes, and exits inside those windows.
+      const tl = gsap.timeline({ paused: true });
+      const reveal = (target, at, duration = 0.45, y = 14) =>
+        tl.fromTo(target, { opacity: 0, y }, { opacity: 1, y: 0, duration, ease: 'power2.out', immediateRender: false }, at);
+      const fadeIn = (target, at, duration = 0.4) =>
+        tl.fromTo(target, { opacity: 0 }, { opacity: 1, duration, ease: 'power1.out', immediateRender: false }, at);
+      const fadeOut = (target, at, duration = 0.3) => tl.to(target, { opacity: 0, duration, ease: 'power1.inOut' }, at);
+      const reframe = (target, at, vars) => tl.to(target, { ...vars, duration: 0.7, ease: 'power2.inOut' }, at);
+
+      // Act 1 — three phrases build; small wordmark in the corner; the ladder exits as the app arrives.
+      gsap.set(['#op-mark', '#op-1', '#op-2', '#op-3'], { opacity: 0 });
+      fadeIn('#op-mark', 0.4, 0.5);
+      reveal('#op-1', 0.2);
+      reveal('#op-2', 1.4);
+      reveal('#op-3', 2.6, 0.5);
+      fadeOut('#opening', 4.15, 0.35);
+
+      // Act 2 — the workspace simply appears in the frame every later shot shares.
+      gsap.set(['#shot-note', '#shot-play', '#theme-rotli', '#end'], { opacity: 0 });
+      fadeIn('#shot-note', 4.5, 0.3);
+      // Note detail (scale 1.7; window x 395–1242, y 150–679 logical): heading, paragraph,
+      // task list, quote, and the closing line, with the toolbar and chrome out of frame.
+      reframe('#pan-note', 8.5, { scale: 1.7, x: -671.5, y: -255 });
+
+      // Playground: arrive on the full lesson, then move in as the recording starts.
+      fadeIn('#shot-play', 12.4, 0.25);
+      // Task detail (scale 1.7; window x 236–1083, y 80–609): the sidebar edge as a landmark,
+      // the lesson header with its real Raw Markdown / Save controls, the task rows, and the
+      // first two Results rows. The reframe settles at 15.1; the recorded tick lands at 15.63.
+      reframe('#pan-play', 14.4, { scale: 1.7, x: -401.2, y: -136 });
+      // Pull back and left to bring the sidebar in before the recorded Chat press at 25.97
+      // (scale 1.45; window x 0–993, y 40–661): tab strip, Home/Chat switcher, Chat panel,
+      // and the saved lesson's header stay in one stable composition through both captions.
+      reframe('#pan-play', 24.6, { scale: 1.45, x: 0, y: -58 });
+      fadeOut('#shot-play', 31.0, 0.2);
+      fadeIn('#theme-rotli', 31.2, 0.2);
+
+      // Captions: quick in, quick out, never overlapping one another.
+      for (const caption of document.querySelectorAll('.caption')) {
+        const start = Number(caption.dataset.start);
+        const end = start + Number(caption.dataset.duration);
+        gsap.set(caption, { opacity: 0 });
+        fadeIn(caption, start, 0.25);
+        fadeOut(caption, end - 0.2, 0.2);
+      }
+
+      // Act 3 — the whole end card readable at once.
+      fadeIn('#end', 37.8, 0.5);
+
+      window.__timelines = window.__timelines || {};
+      window.__timelines['rotli-promo'] = tl;
+    </script>
+  </body>
+</html>

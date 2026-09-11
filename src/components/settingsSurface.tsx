@@ -49,6 +49,7 @@ import {
   rebind,
   setDispatchSuspended,
 } from "../keys/registry";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { PRIVATE_BROWSER_SEARCH_ENGINE_PRESENTATIONS } from "../lib/privateBrowser";
 import {
   type ChatModelInfo,
@@ -71,12 +72,6 @@ import {
   organizerSetBrain,
   organizerSetTrust,
   openUrl,
-  remoteAgentPair,
-  type RemoteAgentPairing,
-  remoteAgentStart,
-  remoteAgentStatus,
-  remoteAgentStop,
-  remoteAgentUnpair,
   revealCorpus,
   SECRET_BRAVE_SEARCH_API_KEY,
   secretDelete,
@@ -144,7 +139,8 @@ import {
   ShieldGlyph,
   SunGlyph,
 } from "./glyphs";
-import { PlaygroundImport } from "./playgroundImport";
+import { RemoteAgentsSection } from "./remoteAgentsSection";
+import { WelcomeSettings } from "./welcomeSettings";
 type SettingsPane =
   | "general"
   | "hotkeys"
@@ -861,7 +857,7 @@ function GeneralPane() {
         ones in its <code>2/4</code>.
       </p>
 
-      <PlaygroundImport disabled={memexConfig.data?.developmentReadOnly ?? import.meta.env.DEV} />
+      <WelcomeSettings disabled={memexConfig.data?.developmentReadOnly ?? import.meta.env.DEV} />
       <UpdatesSection />
 
       <h4 className="sethead">Demo mode</h4>
@@ -3172,275 +3168,50 @@ function ConnectionsPane() {
 
       <WebResearchSection />
 
-      <RemoteAgentsSection />
+      {LAUNCH_FEATURES.agents && <RemoteAgentsSection />}
 
       {/* Use rotli for your docs — a prompt you paste into Claude Code so a
           project's docs live in rotli, not the repo (the maintainer, 2026-07-07). */}
-      <section className="aisection">
-        <h4 className="set-subhead">Extensions</h4>
-        <p className="setnote">
-          Extend rotli&rsquo;s corpus workflows without giving another service ownership of your notes.
-        </p>
-        <div className="claudecmd">
-          <div className="claudecmd-intro">
-            <h4>Use rotli for your docs</h4>
-            <p className="plugdesc">
-              Paste this into Claude Code in any project and your planning + docs land in rotli instead of the
-              repo — everything but the README.
-            </p>
-          </div>
-          <div className="claudecmd-shell">
-            <div className="claudecmd-toolbar">
-              <span>Claude Code instruction</span>
-              <button
-                type="button"
-                className={`claudecmd-copy ${copyState}`}
-                onClick={() => void copy()}
-                aria-label={
-                  copyState === "copied" ? "Copied Claude Code instruction" : "Copy Claude Code instruction"
-                }
-              >
-                {copyState === "copied" ? <CheckGlyph size={13} /> : <CopyGlyph size={13} />}
-                <span>
-                  {copyState === "copied" ? "Copied" : copyState === "failed" ? "Try again" : "Copy"}
-                </span>
-              </button>
-            </div>
-            <pre className="claudecmd-block">{CLAUDE_DOCS_COMMAND}</pre>
-          </div>
-          <span className={`claudecmd-status ${copyState === "failed" ? "failed" : ""}`} aria-live="polite">
-            {copyState === "failed" ? "Rotli couldn’t access the clipboard. Try copying again." : ""}
-          </span>
-        </div>
-      </section>
-    </>
-  );
-}
-
-function RemoteAgentsSection() {
-  const native = isTauri();
-  const relayUrl = useUiStore((state) => state.remoteAgentRelayUrl);
-  const setRelayUrl = useUiStore((state) => state.setRemoteAgentRelayUrl);
-  const [pairing, setPairing] = useState<RemoteAgentPairing | null>(null);
-  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
-  const [confirmUnpair, setConfirmUnpair] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState<{ text: string; err: boolean } | null>(null);
-  const status = useQuery({
-    queryKey: ["remote-agent-status"],
-    queryFn: remoteAgentStatus,
-    enabled: native,
-    refetchInterval: 2000,
-  });
-  const refresh = () => void queryClient.invalidateQueries({ queryKey: ["remote-agent-status"] });
-  const run = (action: () => Promise<unknown>, success: string) => {
-    setBusy(true);
-    setNote(null);
-    action()
-      .then(() => {
-        setNote({ text: success, err: false });
-        refresh();
-      })
-      .catch((error) => setNote({ text: error instanceof Error ? error.message : String(error), err: true }))
-      .finally(() => setBusy(false));
-  };
-  const copyPairing = async () => {
-    if (!pairing || !navigator.clipboard) return;
-    try {
-      await navigator.clipboard.writeText(
-        `MCP URL: ${pairing.mcpUrl}\nAuthorization: ${pairing.authorizationHeader}`,
-      );
-      setNote({ text: "MCP URL and bearer header copied.", err: false });
-    } catch {
-      setNote({ text: "Rotli couldn’t access the clipboard.", err: true });
-    }
-  };
-  const current = status.data;
-  const statusLabel = !native
-    ? "Unavailable"
-    : status.isPending
-      ? "Checking…"
-      : current?.connected
-        ? "Connected"
-        : current?.active
-          ? current.lastError
-            ? "Retrying"
-            : "Connecting…"
-          : current?.paired
-            ? "Ready"
-            : "Off";
-  const feedback = current?.lastError ? { text: current.lastError, err: true } : note;
-  const createPairing = () => {
-    setBusy(true);
-    setNote(null);
-    remoteAgentPair(relayUrl)
-      .then((next) => {
-        setPairing(next);
-        setRelayUrl(next.mcpUrl);
-        setConfirmRegenerate(false);
-        setConfirmUnpair(false);
-        setNote({
-          text: "New pairing created. Copy it now—Rotli cannot reveal this client token after you leave this screen.",
-          err: false,
-        });
-        refresh();
-      })
-      .catch((error) => setNote({ text: error instanceof Error ? error.message : String(error), err: true }))
-      .finally(() => setBusy(false));
-  };
-
-  return (
-    <section className="aisection remote-agents" aria-labelledby="remote-agents-title">
-      <div className="remote-agents-head">
-        <div>
-          <h4 className="set-subhead" id="remote-agents-title">
-            Remote agents
-          </h4>
+      {LAUNCH_FEATURES.agents && (
+        <section className="aisection">
+          <h4 className="set-subhead">Extensions</h4>
           <p className="setnote">
-            Let a cloud MCP client reach this Mac through your relay. Notes stay in the vault; Rotli must be
-            open and connected for every request.
+            Extend rotli&rsquo;s corpus workflows without giving another service ownership of your notes.
           </p>
-        </div>
-        <span className={`ailane-chip ${current?.connected ? "ok" : current?.active ? "busy" : ""}`}>
-          {statusLabel}
-        </span>
-      </div>
-
-      <label className="remote-agents-field">
-        <span>Relay MCP URL</span>
-        <input
-          type="url"
-          value={relayUrl}
-          disabled={!native || busy}
-          maxLength={2048}
-          placeholder="https://your-relay.example/mcp"
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          onChange={(event) => {
-            setRelayUrl(event.target.value);
-            setConfirmRegenerate(false);
-            setConfirmUnpair(false);
-          }}
-          onKeyDown={(event) => event.stopPropagation()}
-        />
-      </label>
-
-      <div className="remote-agents-actions">
-        <button
-          type="button"
-          className="ghostbtn"
-          disabled={!native || busy || !relayUrl.trim()}
-          onClick={() => {
-            if (current?.paired && !confirmRegenerate) {
-              setConfirmRegenerate(true);
-              setConfirmUnpair(false);
-              setNote({
-                text: "Replacing the pairing disconnects this session and permanently invalidates the old client token.",
-                err: false,
-              });
-              return;
-            }
-            createPairing();
-          }}
-        >
-          {confirmRegenerate ? "Replace pairing" : current?.paired ? "Regenerate pairing" : "Create pairing"}
-        </button>
-        {confirmRegenerate && (
-          <button
-            type="button"
-            className="ghostbtn quiet"
-            disabled={busy}
-            onClick={() => {
-              setConfirmRegenerate(false);
-              setNote(null);
-            }}
-          >
-            Cancel
-          </button>
-        )}
-        {current?.paired && (
-          <button
-            type="button"
-            className={`ghostbtn${confirmUnpair ? " danger" : " quiet"}`}
-            disabled={!native || busy}
-            onClick={() => {
-              if (!confirmUnpair) {
-                setConfirmUnpair(true);
-                setConfirmRegenerate(false);
-                setNote({
-                  text: "Removing the pairing disconnects this session and deletes both remote-agent tokens from Keychain.",
-                  err: false,
-                });
-                return;
-              }
-              setBusy(true);
-              setNote(null);
-              remoteAgentUnpair()
-                .then(() => {
-                  setPairing(null);
-                  setConfirmUnpair(false);
-                  setNote({
-                    text: "Pairing removed from Keychain. This Mac is no longer available remotely.",
-                    err: false,
-                  });
-                  refresh();
-                })
-                .catch((error) =>
-                  setNote({ text: error instanceof Error ? error.message : String(error), err: true }),
-                )
-                .finally(() => setBusy(false));
-            }}
-          >
-            {confirmUnpair ? "Confirm removal" : "Remove pairing"}
-          </button>
-        )}
-        {current?.active ? (
-          <button
-            type="button"
-            className="ghostbtn quiet"
-            disabled={busy}
-            onClick={() => run(remoteAgentStop, "Remote agents disconnected for this app session.")}
-          >
-            Disconnect
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="ghostbtn primary"
-            disabled={!native || busy || !current?.paired || !relayUrl.trim()}
-            onClick={() => run(() => remoteAgentStart(relayUrl), "Connecting this app session to the relay…")}
-          >
-            Connect this session
-          </button>
-        )}
-      </div>
-
-      {pairing && (
-        <div className="remote-agents-pairing">
-          <div>
-            <strong>Paste into Grok Bot</strong>
-            <span>{pairing.mcpUrl}</span>
-            <span>{pairing.authorizationHeader}</span>
+          <div className="claudecmd">
+            <div className="claudecmd-intro">
+              <h4>Use rotli for your docs</h4>
+              <p className="plugdesc">
+                Paste this into Claude Code in any project and your planning + docs land in rotli instead of
+                the repo — everything but the README.
+              </p>
+            </div>
+            <div className="claudecmd-shell">
+              <div className="claudecmd-toolbar">
+                <span>Claude Code instruction</span>
+                <button
+                  type="button"
+                  className={`claudecmd-copy ${copyState}`}
+                  onClick={() => void copy()}
+                  aria-label={
+                    copyState === "copied" ? "Copied Claude Code instruction" : "Copy Claude Code instruction"
+                  }
+                >
+                  {copyState === "copied" ? <CheckGlyph size={13} /> : <CopyGlyph size={13} />}
+                  <span>
+                    {copyState === "copied" ? "Copied" : copyState === "failed" ? "Try again" : "Copy"}
+                  </span>
+                </button>
+              </div>
+              <pre className="claudecmd-block">{CLAUDE_DOCS_COMMAND}</pre>
+            </div>
+            <span className={`claudecmd-status ${copyState === "failed" ? "failed" : ""}`} aria-live="polite">
+              {copyState === "failed" ? "Rotli couldn’t access the clipboard. Try copying again." : ""}
+            </span>
           </div>
-          <button type="button" className="ghostbtn" onClick={() => void copyPairing()}>
-            <CopyGlyph size={13} /> Copy setup
-          </button>
-        </div>
+        </section>
       )}
-      <p className="setnote remote-agents-boundary">
-        Remote access starts disconnected after every launch. The bearer token lives in macOS Keychain; each
-        pairing is bound to the relay URL used to create it, and changing relays requires a new pairing.
-        Regenerating invalidates the old pairing on this Mac. Secure notes stay hidden, locked notes stay
-        read-only, and stale revisions are refused. Switching vaults disconnects the current remote session.
-      </p>
-      {!native && <p className="setnote">Pairing is available only in the native Mac app.</p>}
-      {feedback && (
-        <p className={feedback.err ? "setnote err" : "setnote"} aria-live="polite">
-          {feedback.text}
-        </p>
-      )}
-    </section>
+    </>
   );
 }
 

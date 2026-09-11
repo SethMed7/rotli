@@ -335,3 +335,11 @@ Record the date and the delta at the top of this section.
   chat.rs destination clamp + Bearer-locality fix, corpus file-lane traversal
   guards, prompt-injection framing, the Breve loopback-only gate, and CI audit
   lanes.
+
+## Repository publication review
+
+[Repository access](../operations/repository-access.md) owns the main/dev rules,
+owner-only approval flow, source/history scan results, and deployment-context
+privacy boundary. `check:security` now includes the repository file/home-path
+tripwires. Gitleaks source/history scans remain separate, redacted release
+preparation checks; unresolved findings are not waived by `bun run verify`.

@@ -1,3 +1,4 @@
+import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 // The editing surface (Phase 1d): a CodeMirror 6 view wired to rotli. CM edits
 // the note's markdown TEXT directly — the .md stays the source of truth — and
 // livePreview.ts renders it WYSIWYG. This wrapper:
@@ -10,8 +11,6 @@
 //     font/size/measure, and the spell-check toggle.
 // One view per (noteId, pane); EditorSurface keys it by noteId so it remounts on
 // a note switch (fresh caret/scroll, no bleed).
-
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { Compartment, EditorSelection, EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap, placeholder } from "@codemirror/view";
 import { type CSSProperties, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -26,6 +25,7 @@ import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import { addBlockBelow, blockHandles, deleteBlock, moveBlock } from "./blockHandles";
 import { blockRender } from "./blockRender";
+import type { SlashState, PickerState, ImageGenState } from "./cmEditorState";
 import { rotliKeymap } from "./cmKeymap";
 import { codeHighlight } from "./codeHighlight";
 import {
@@ -63,35 +63,6 @@ import { SlashPicker } from "./slashPicker";
 import { tableRender } from "./tableRender";
 import { buildTitleCounts, wikilinkLabel } from "./wikilink";
 import { setWikilinkNotes } from "./wikilinkIndex";
-
-interface SlashState {
-  open: boolean;
-  query: string;
-  index: number;
-  left: number;
-  top: number;
-  /** Opens upward when the caret row is too close to the window's bottom edge. */
-  up: boolean;
-}
-
-interface PickerState {
-  mode: SlashPickerMode;
-  index: number;
-  left: number;
-  top: number;
-  up: boolean;
-  insertAt: number;
-  continuation: string;
-}
-
-/** The /image-gen popover's anchor (engine + prompt → PNG in storage/images). */
-interface ImageGenState {
-  left: number;
-  top: number;
-  up: boolean;
-  insertAt: number;
-  continuation: string;
-}
 
 /** The floating format bar (bottom-center, ~42px tall, sitting 16px up) covers
  * the scroller's bottom strip. CM keeps the caret at least this many px above

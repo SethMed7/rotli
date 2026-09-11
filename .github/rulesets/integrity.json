@@ -1,0 +1,67 @@
+{
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "include": [
+        "refs/heads/main",
+        "refs/heads/dev"
+      ],
+      "exclude": []
+    }
+  },
+  "name": "Main and dev integrity",
+  "bypass_actors": [],
+  "rules": [
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    },
+    {
+      "type": "required_linear_history"
+    },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "dismiss_stale_reviews_on_push": false,
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_approving_review_count": 0,
+        "required_review_thread_resolution": true,
+        "allowed_merge_methods": [
+          "squash"
+        ]
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "required_status_checks": [
+          {
+            "context": "Quality and production builds",
+            "integration_id": 15368
+          },
+          {
+            "context": "Browser E2E (Playwright)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Rust (Linux cargo check)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Rust (clippy + tests)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Repository secret scan",
+            "integration_id": 15368
+          }
+        ]
+      }
+    }
+  ]
+}

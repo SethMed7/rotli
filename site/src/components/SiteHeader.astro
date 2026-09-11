@@ -1,8 +1,10 @@
 ---
-// The one site header: brand, optional page navigation, GitHub, appearance
-// toggle. Chrome styles and the toggle script live in Base.astro.
+// The one site header: brand, optional page navigation, and GitHub.
+// Site appearance is fixed to Rotli Light in Base.astro. The GitHub link
+// exists only while the source repository is public (site.sourcePublic); a
+// page may additionally opt out with github={false}.
 import mark from '../../../src/assets/characters/_logo.svg?raw';
-import { GITHUB_URL } from '../site';
+import { GITHUB_URL, site } from '../site';
 
 interface NavLink {
   href: string;
@@ -13,10 +15,10 @@ interface NavLink {
 interface Props {
   nav?: NavLink[];
   github?: boolean;
-  toggle?: boolean;
 }
 
-const { nav = [], github = true, toggle = true } = Astro.props;
+const { nav = [], github: githubRequested = true } = Astro.props;
+const github = githubRequested && site.sourcePublic;
 ---
 
 <header class="site-header">
@@ -31,7 +33,6 @@ const { nav = [], github = true, toggle = true } = Astro.props;
       ))}
     </nav>
   )}
-  {(github || toggle) && (
   <div class="header-actions">
     {github && (
       <a class="github-link" href={GITHUB_URL} rel="noopener" aria-label="Rotli on GitHub">
@@ -41,20 +42,5 @@ const { nav = [], github = true, toggle = true } = Astro.props;
         <span>GitHub</span>
       </a>
     )}
-    {toggle && (
-    <button class="mode-toggle" id="mode-toggle" type="button" aria-label="Use dark appearance">
-      <span class="mode-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path class="moon-path" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path>
-          <g class="sun-path">
-            <circle cx="12" cy="12" r="4"></circle>
-            <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
-          </g>
-        </svg>
-      </span>
-      <span class="mode-label">Dark</span>
-    </button>
-    )}
   </div>
-  )}
 </header>

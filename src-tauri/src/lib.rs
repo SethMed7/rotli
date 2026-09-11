@@ -2,8 +2,7 @@
 #![cfg_attr(not(target_os = "macos"), allow(dead_code))]
 // rotli — the shell. The window is a visitor, not a resident: it lives in the
 // menu bar (no dock icon, no Cmd-Tab), is summoned by a global shortcut, and
-// hides on blur or Esc. Summon shows LIVING windows — never recreates them —
-// so they appear in well under 80ms.
+// hides on blur or Esc. Summon reveals existing windows without recreating them.
 //
 // THE SUMMON LAW (revised by the maintainer, 2026-06-12): ⌥Space toggles the MAIN
 // window — "Option+Space is the way we open the app." The quick-capture card
@@ -22,11 +21,12 @@ mod compute;
 mod containment;
 mod corpus;
 mod document_conversion;
+mod feature_policy;
 mod fsutil;
 mod keychain;
 mod localmodel;
 mod memex;
-mod memex_query; mod native_drag; mod practice_playground;
+mod memex_query; mod native_drag; mod remote_agent_url; mod welcome_lessons;
 mod organizer;
 #[cfg(test)]
 mod parity_tests;
@@ -42,6 +42,7 @@ mod vault_location;
 mod web;
 mod web_search;
 mod workspace;
+mod workspace_help;
 
 use std::sync::{atomic::{AtomicUsize, Ordering}, Condvar, Mutex};
 use std::time::{Duration, Instant};
@@ -1855,7 +1856,7 @@ fn activate_vault_path_live(
         let breve_supervisor = app.state::<routines::BreveSupervisor>();
         breve_supervisor.stop();
         let active = state.default_root_path()?;
-        if active.join(routines::MANAGED_MARKER).is_file() {
+        if feature_policy::breve_enabled() && active.join(routines::MANAGED_MARKER).is_file() {
             if let Err(error) = breve::install_rotli_login_agent() {
                 eprintln!("rotli: Breve login item unavailable after vault switch ({error})");
             }
@@ -1980,44 +1981,6 @@ fn write_new_vault_settings(
     );
     let json = serde_json::to_string_pretty(&value).map_err(|e| e.to_string())? + "\n";
     fsutil::atomic_write(&path, &json, ".rotli-vault-settings-")
-}
-
-/// Create a PRACTICE vault (vault platform, 2026-07-26): scaffold a fresh
-/// scratch vault at an obvious home, carry the current settings along, and
-/// switch into the practice vault in place. The shared corpus switch policy keeps the
-/// outgoing vault registered as a linked library. The current vault's
-/// FILES are never touched — this is a switch plus a courtesy registration.
-/// ASYNC command (vault-lane pass, 2026-07-31): scaffold + registry writes ran
-/// on the main thread — worker now.
-#[tauri::command]
-async fn corpus_create_practice_vault(app: AppHandle) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || corpus_create_practice_vault_blocking(app))
-        .await
-        .map_err(|e| format!("vault worker failed ({e})"))?
-}
-
-fn corpus_create_practice_vault_blocking(app: AppHandle) -> Result<String, String> {
-    let _lane = vault_lane();
-    use tauri::Manager;
-    let current = corpus::is_configured(&app).then(|| corpus::resolve_corpus(&app));
-    let home = app.path().home_dir().map_err(|e| e.to_string())?;
-    let mut root = home.join("rotli Practice Vault");
-    let mut n = 1;
-    while root.exists() {
-        n += 1;
-        root = home.join(format!("rotli Practice Vault {n}"));
-    }
-    flush_webviews_before_shutdown(&app)?;
-    practice_playground::scaffold_practice_vault(&root)?;
-    if let Some(current) = &current {
-        corpus::carry_settings(current, &root)?;
-    }
-    write_new_vault_settings(&root, None)?;
-    activate_vault_path_live(&app, root, false)?;
-    app.state::<corpus::CorpusState>()
-        .route(corpus::DEFAULT_ROOT_ID, |store| {
-            store.wire_id_of(memex::WELCOME_PRESET_FILE)
-        })
 }
 
 fn mount_connected_brain(
@@ -2433,7 +2396,7 @@ pub fn run() {
             corpus_choose_folder,
             corpus_switch_vault,
             corpus_init_memex,
-            corpus_create_practice_vault, practice_playground::corpus_import_playground,
+            welcome_lessons::corpus_seed_welcome,
             corpus_connect_brain,
             corpus_forget_brain,
             corpus_set_active_brain,
@@ -2721,7 +2684,7 @@ pub fn run() {
             }
             app.manage(corpus::CorpusState(Mutex::new(registry)));
             if let Ok(root) = app.state::<corpus::CorpusState>().default_root_path() {
-                if root.join(routines::MANAGED_MARKER).is_file() {
+                if feature_policy::breve_enabled() && root.join(routines::MANAGED_MARKER).is_file() {
                     if let Err(e) = breve::install_rotli_login_agent() {
                         eprintln!("rotli: Breve login item unavailable ({e})");
                     }

@@ -1,0 +1,29 @@
+<section class="playground-story" id="playground" aria-labelledby="playground-title">
+  <div class="intro">
+    <p class="eyebrow">Your first useful minute</p>
+    <h2 id="playground-title">Try it. Change it.<br />Keep what helps.</h2>
+    <p>Start a vault and Main holds a Welcome folder: the welcome note and nine guided
+      lessons. Try tasks, choices, tables, and plain Markdown in the real editor. Every
+      lesson is an ordinary note in your own files: edit it, or delete the folder when you
+      are done.</p>
+    <p class="detail">Removed a lesson? Settings brings the folder back whenever you like.</p>
+  </div>
+  <figure>
+    <img src="/rotli-playground@3x.png" width="1440" height="900" loading="lazy"
+      alt="Rotli's Tasks and progress lesson open from the Welcome folder in Main, in the Rotli Light browser preview" />
+    <figcaption>Actual browser preview · Rotli Light · Tasks and progress lesson</figcaption>
+  </figure>
+</section>
+
+<style>
+  .playground-story { width: min(100% - 3rem, var(--page-max)); margin: 0 auto; padding-block: clamp(4rem, 8vw, 7rem); border-top: 1px solid var(--border); }
+  .intro { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 4rem; align-items: start; margin-bottom: 2.5rem; }
+  .eyebrow { grid-column: 1 / -1; color: var(--accent-text); font-weight: 600; font-size: .85rem; margin: 0; }
+  h2 { grid-row: span 2; margin: 0; font-size: clamp(2.1rem, 4vw, 3.6rem); line-height: 1.08; letter-spacing: -.035em; font-weight: 600; }
+  p { margin: 0; color: var(--text-muted); line-height: 1.6; font-size: 1.05rem; }
+  .detail { font-size: .9rem; }
+  figure { margin: 0; }
+  img { width: 100%; height: auto; display: block; border: 1px solid var(--border); border-radius: .7rem; }
+  figcaption { margin-top: .8rem; color: var(--text-muted); font-size: .8rem; }
+  @media (max-width: 700px) { .intro { grid-template-columns: 1fr; gap: 1.2rem; } h2 { grid-row: auto; } }
+</style>

@@ -12,6 +12,8 @@
 import type { EditorState } from "@codemirror/state";
 import { EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 
+import { CHECK_EM } from "./listGeometry";
+
 /** A block = [firstLineNumber, lastLineNumber] (1-based), the maximal run of
  * non-blank lines around `lineNo`. Returns null on a blank line. */
 export interface BlockRange {
@@ -289,10 +291,18 @@ class HandleView {
     }
     const edRect = this.view.dom.getBoundingClientRect();
     const contentRect = this.view.contentDOM.getBoundingClientRect();
-    const padL = Number.parseFloat(getComputedStyle(this.view.contentDOM).paddingLeft) || 0;
+    const contentStyle = getComputedStyle(this.view.contentDOM);
+    const padL = Number.parseFloat(contentStyle.paddingLeft) || 0;
     const w = this.el.offsetWidth || 46;
     const h = this.el.offsetHeight || 22;
-    const left = Math.max(2, contentRect.left + padL - w - HANDLE_GAP - edRect.left);
+    // Task controls hang to the left of the prose measure. Reserve their
+    // existing geometry before placing the handle, including after hover.
+    const markerGutter = CHECK_EM * (Number.parseFloat(contentStyle.fontSize) || 15);
+    const left = contentRect.left + padL - markerGutter - w - HANDLE_GAP - edRect.left;
+    if (left < 2) {
+      this.hideNow();
+      return;
+    }
     const top = coords.top + (coords.bottom - coords.top - h) / 2 - edRect.top;
     this.el.style.left = `${left}px`;
     this.el.style.top = `${top}px`;

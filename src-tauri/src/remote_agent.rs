@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tauri::Manager;
 
+pub(crate) use crate::remote_agent_url::relay_base;
 use crate::keychain::REMOTE_AGENT_TOKEN_ACCOUNT;
 
 const PAIRING_VERSION: u8 = 2;
@@ -142,27 +143,6 @@ fn require_pairing_relay(pairing: &StoredPairing, base: &str) -> Result<(), Stri
     }
 }
 
-fn relay_base(value: &str) -> Result<String, String> {
-    let value = value.trim().trim_end_matches('/');
-    let base = value.strip_suffix("/mcp").unwrap_or(value);
-    let parsed = tauri::Url::parse(base).map_err(|_| "enter a valid relay HTTPS URL")?;
-    let local_dev = parsed.scheme() == "http"
-        && parsed
-            .host_str()
-            .is_some_and(|host| matches!(host, "127.0.0.1" | "localhost" | "::1"));
-    if parsed.scheme() != "https" && !local_dev {
-        return Err(
-            "the relay must use HTTPS (HTTP is allowed only on loopback for development)".into(),
-        );
-    }
-    if parsed.query().is_some() || parsed.fragment().is_some() {
-        return Err("the relay URL must not contain a query or fragment".into());
-    }
-    if !parsed.username().is_empty() || parsed.password().is_some() {
-        return Err("the relay URL must not contain credentials".into());
-    }
-    Ok(base.to_string())
-}
 
 fn require_main_webview(window: &tauri::WebviewWindow) -> Result<(), String> {
     if window.label() == "main" {
@@ -176,6 +156,7 @@ fn require_main_webview(window: &tauri::WebviewWindow) -> Result<(), String> {
 pub(crate) fn remote_agent_status(
     state: tauri::State<'_, RemoteAgentState>,
 ) -> Result<RemoteAgentStatus, String> {
+    crate::feature_policy::require_agents()?;
     let pairing = load_pairing();
     let mut status = state
         .status
@@ -195,6 +176,7 @@ pub(crate) fn remote_agent_pair(
     relay_url: String,
     state: tauri::State<'_, RemoteAgentState>,
 ) -> Result<RemoteAgentPairing, String> {
+    crate::feature_policy::require_agents()?;
     require_main_webview(&window)?;
     let base = relay_base(&relay_url)?;
     state.stop_connector()?;
@@ -219,6 +201,7 @@ pub(crate) fn remote_agent_start(
     relay_url: String,
     state: tauri::State<'_, RemoteAgentState>,
 ) -> Result<RemoteAgentStatus, String> {
+    crate::feature_policy::require_agents()?;
     require_main_webview(&window)?;
     let base = relay_base(&relay_url)?;
     let pairing = load_pairing().ok_or("pair this Mac before connecting")?;
@@ -270,6 +253,7 @@ pub(crate) fn remote_agent_start(
 pub(crate) fn remote_agent_stop(
     state: tauri::State<'_, RemoteAgentState>,
 ) -> Result<RemoteAgentStatus, String> {
+    crate::feature_policy::require_agents()?;
     state.stop_connector()?;
     remote_agent_status(state)
 }
@@ -279,6 +263,7 @@ pub(crate) fn remote_agent_unpair(
     window: tauri::WebviewWindow,
     state: tauri::State<'_, RemoteAgentState>,
 ) -> Result<RemoteAgentStatus, String> {
+    crate::feature_policy::require_agents()?;
     require_main_webview(&window)?;
     remove_pairing(&state)?;
     remote_agent_status(state)

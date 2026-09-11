@@ -1,7 +1,6 @@
+import { Channel, convertFileSrc, invoke } from "@tauri-apps/api/core";
 // Tauri seam — every Tauri API call in the frontend goes through here, guarded
 // by isTauri(), so the whole UI renders in a plain browser (vite dev, no shell).
-
-import { Channel, convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
@@ -14,7 +13,13 @@ import type {
   BreveBackfillResult,
   BreveDeliverySettings,
 } from "../routines/breveTypes";
-import type { PlaygroundImportResult, SearchHit } from "../types";
+import type { SearchHit, WelcomeSeed } from "../types";
+import {
+  type VaultBrowserView,
+  browserEmptyFolders,
+  browserVaultHome,
+  browserVaultPreview,
+} from "./vaultBrowserPreview";
 
 export function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window;
@@ -1566,14 +1571,15 @@ export interface VaultInspection {
  * until the review screen is confirmed. */
 export function corpusInspectFolder(path: string): Promise<VaultInspection> {
   if (!isTauri()) {
+    const empty = browserEmptyFolders.has(path);
     return Promise.resolve({
       path,
       label: path.split("/").pop() ?? "Notes",
-      kind: "markdown",
-      source: "Markdown folder",
-      markdownFiles: 24,
-      otherFiles: 3,
-      folders: 7,
+      kind: empty ? "empty" : "markdown",
+      source: "Browser preview folder",
+      markdownFiles: empty ? 0 : 24,
+      otherFiles: empty ? 0 : 3,
+      folders: empty ? 0 : 7,
       warnings: [],
     });
   }
@@ -1587,53 +1593,30 @@ export async function corpusImportVaultCopy(source: string, destination: string)
   await invoke("corpus_import_vault_copy", { source, destination });
 }
 
-export interface VaultBrowserEntry {
-  name: string;
-}
-
-export interface VaultBrowserView {
-  absolutePath: string;
-  displayPath: string;
-  homePath: string;
-  directories: VaultBrowserEntry[];
-  canGoBack: boolean;
-  canSelect: boolean;
-  selectDisabledReason: string | null;
-}
-
-let browserVaultView: VaultBrowserView = {
-  absolutePath: "/Users/example",
-  displayPath: "~",
-  homePath: "/Users/example",
-  directories: ["Applications", "Desktop", "Documents", "Downloads", "Library"].map((name) => ({ name })),
-  canGoBack: false,
-  canSelect: false,
-  selectDisabledReason:
-    "Choose or create a folder inside Home. Home itself includes private app and credential data.",
-};
+export type { VaultBrowserView } from "./vaultBrowserPreview";
 
 /** Open Rotli's directory-only, Home-contained vault navigator. Rust owns the
  * session and returns no filenames or file contents. */
 export function vaultBrowserStart(requireEmpty: boolean): Promise<VaultBrowserView> {
   if (!isTauri()) {
-    browserVaultView = { ...browserVaultView, canSelect: false };
-    return Promise.resolve(browserVaultView);
+    browserVaultPreview.view = { ...browserVaultHome, canSelect: false };
+    return Promise.resolve(browserVaultPreview.view);
   }
   return invoke<VaultBrowserView>("vault_browser_start", { requireEmpty });
 }
 
 export function vaultBrowserOpenChild(name: string): Promise<VaultBrowserView> {
   if (!isTauri()) {
-    browserVaultView = {
-      absolutePath: `${browserVaultView.absolutePath}/${name}`,
-      displayPath: `${browserVaultView.displayPath}/${name}`,
-      homePath: browserVaultView.homePath,
+    browserVaultPreview.view = {
+      absolutePath: `${browserVaultPreview.view.absolutePath}/${name}`,
+      displayPath: `${browserVaultPreview.view.displayPath}/${name}`,
+      homePath: browserVaultPreview.view.homePath,
       directories: [],
       canGoBack: true,
       canSelect: true,
       selectDisabledReason: null,
     };
-    return Promise.resolve(browserVaultView);
+    return Promise.resolve(browserVaultPreview.view);
   }
   return invoke<VaultBrowserView>("vault_browser_open_child", { name });
 }
@@ -1644,22 +1627,25 @@ export function vaultBrowserGoBack(): Promise<VaultBrowserView> {
 }
 
 export function vaultBrowserRefresh(): Promise<VaultBrowserView> {
-  if (!isTauri()) return Promise.resolve(browserVaultView);
+  if (!isTauri()) return Promise.resolve(browserVaultPreview.view);
   return invoke<VaultBrowserView>("vault_browser_refresh");
 }
 
 export function vaultBrowserCreateFolder(name: string): Promise<VaultBrowserView> {
-  if (!isTauri()) return vaultBrowserOpenChild(name);
+  if (!isTauri()) {
+    browserEmptyFolders.add(`${browserVaultPreview.view.absolutePath}/${name}`);
+    return vaultBrowserOpenChild(name);
+  }
   return invoke<VaultBrowserView>("vault_browser_create_folder", { name });
 }
 
 export function vaultBrowserSelect(): Promise<string> {
-  if (!isTauri()) return Promise.resolve(browserVaultView.absolutePath);
+  if (!isTauri()) return Promise.resolve(browserVaultPreview.view.absolutePath);
   return invoke<string>("vault_browser_select");
 }
 
 export function vaultBrowserSelectChild(name: string): Promise<string> {
-  if (!isTauri()) return Promise.resolve(`${browserVaultView.absolutePath}/${name}`);
+  if (!isTauri()) return Promise.resolve(`${browserVaultPreview.view.absolutePath}/${name}`);
   return invoke<string>("vault_browser_select_child", { name });
 }
 
@@ -1715,13 +1701,8 @@ export async function corpusInitMemex(path: string, brainEnabled = true): Promis
   return invoke<string>("corpus_init_memex", { path, brainEnabled });
 }
 
-export async function corpusCreatePracticeVault(): Promise<string> {
-  if (!isTauri()) return "";
-  return invoke<string>("corpus_create_practice_vault");
-}
-
-export const corpusImportPlayground = (): Promise<PlaygroundImportResult> =>
-  corpusInvoke("corpus_import_playground");
+/** Seed the Welcome folder's notes as ordinary files (idempotent); ids in catalog order. */
+export const corpusSeedWelcome = (): Promise<WelcomeSeed> => corpusInvoke("corpus_seed_welcome");
 
 /** Connect a memex as a linked vault and mount it in the current process. False
  * when the picker is cancelled. */

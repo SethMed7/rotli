@@ -172,7 +172,7 @@ describe("parseSettings — Breve sidebar lens", () => {
     expect(s.breveView).toBe("dashboard");
   });
 
-  test("keeps every valid Breve view", () => {
+  test("preserves Breve view choices without restoring a disabled public lens", () => {
     for (const view of [
       "dashboard",
       "briefs",
@@ -182,7 +182,7 @@ describe("parseSettings — Breve sidebar lens", () => {
       "settings",
     ] as const) {
       const s = parseSettings(JSON.stringify({ sidebarMode: "breve", breveView: view }));
-      expect(s.sidebarMode).toBe("breve");
+      expect(s.sidebarMode).toBe("notes");
       expect(s.breveView).toBe(view);
     }
   });

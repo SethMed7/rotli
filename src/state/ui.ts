@@ -1,6 +1,5 @@
-// UI state only (the Zustand law). Data lives behind src/services/.
-
 import { create } from "zustand";
+// UI state only (the Zustand law). Data lives behind src/services/.
 
 import { DEFAULT_PROVIDER_MODELS, type HybridPreset, type ProviderId } from "../ai/models";
 import { DEFAULT_WEB_SEARCH_PROVIDER, type WebSearchProvider } from "../ai/searchProvider";
@@ -14,6 +13,7 @@ import {
   normalizeQuokkaAccessoryHue,
   normalizeQuokkaCustomHue,
 } from "../brand/quokka";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import {
   DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE,
   type PrivateBrowserSearchEngine,
@@ -266,9 +266,8 @@ export type ContentView =
  * like one kind of telemetry. */
 export type DashboardSection = "rotli" | "models";
 
-/** The sidebar's high-level lens. Breve is an operational view over the same
- * corpus, not a separate window or a tab, so switching lenses must leave the
- * current notes contentView and pane tree untouched. */
+/** The Breve lens preserves the notes contentView and pane tree;
+ * stable builds refuse to activate it. */
 export type SidebarMode = "notes" | "breve";
 /** Breve stays a vault-bound operational lens. Dashboard is the news-hub
  * landing, Notifications is the sanitized routine activity projection, and
@@ -830,6 +829,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   setSidebarZoom: (z) => set({ sidebarZoom: clampSidebarZoom(z) }),
   sidebarMode: "notes",
   setSidebarMode: (mode) => {
+    if (mode === "breve" && !LAUNCH_FEATURES.breve) return;
     const current = get();
     if (
       current.sidebarMode === "breve" &&

@@ -1,0 +1,23 @@
+{
+  "name": "rotli-launch-films",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.0",
+  "scripts": {
+    "prepare": "bun prepare.mjs",
+    "check": "tsc --noEmit",
+    "studio": "remotion studio src/index.tsx",
+    "render": "bun run prepare && remotion render src/index.tsx LaunchLandscape out/rotli-launch-landscape.mp4 --concurrency=4 && remotion render src/index.tsx LaunchPortrait out/rotli-launch-portrait.mp4 --concurrency=4"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.522",
+    "remotion": "4.0.522",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.18",
+    "bun-types": "1.4.0",
+    "typescript": "6.0.3"
+  }
+}

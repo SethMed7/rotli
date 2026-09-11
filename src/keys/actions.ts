@@ -1,14 +1,13 @@
-// Every user-invocable action registers here so ⌘K and Settings → Hotkeys can
-// list and rebind all of it. One dispatcher per webview, no ad-hoc keydown
-// listeners anywhere else. Both webviews register the full set — the
-// dispatcher only fires the actions for its own surface, and the Settings
-// list shows everything.
-
 import {
   closeFocusedPaneWithDraftCleanup,
   closeFocusedTabWithDraftCleanup,
 } from "../documents/draftComposition";
+// Every user-invocable action registers here so ⌘K and Settings → Hotkeys can
+// list and rebind all of it. One dispatcher per webview, no ad-hoc keydown
+// listeners elsewhere. The dispatcher routes by surface; Settings lists
+// only capabilities enabled in this build.
 import { type BlockToggle, type HeadingLevel, type InlineMark, activeEditor } from "../editor/commands";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import {
   corpusFrontmatter,
   corpusSetPinned,
@@ -261,22 +260,23 @@ export function registerDefaultActions(): void {
       ui.setFocusMode(!ui.focusMode);
     },
   });
-  registerAction({
-    id: "view.breve",
-    title: "Open or close Breve",
-    defaultChord: "Meta+Shift+B", // Breve had no chord at all (audit 2026-09-02 §1.3)
-    run: () => {
-      const ui = useUiStore.getState();
-      ui.setSettingsOpen(false);
-      ui.setFocusMode(false);
-      if (ui.sidebarMode === "breve") {
-        ui.setSidebarMode("notes");
-        if (useUiStore.getState().sidebarMode === "notes") ui.setContentView("panes");
-      } else {
-        ui.setSidebarMode("breve");
-      }
-    },
-  });
+  if (LAUNCH_FEATURES.breve)
+    registerAction({
+      id: "view.breve",
+      title: "Open or close Breve",
+      defaultChord: "Meta+Shift+B", // Breve had no chord at all (audit 2026-09-02 §1.3)
+      run: () => {
+        const ui = useUiStore.getState();
+        ui.setSettingsOpen(false);
+        ui.setFocusMode(false);
+        if (ui.sidebarMode === "breve") {
+          ui.setSidebarMode("notes");
+          if (useUiStore.getState().sidebarMode === "notes") ui.setContentView("panes");
+        } else {
+          ui.setSidebarMode("breve");
+        }
+      },
+    });
   // Block handles — the Milkdown-style ⠿ drag/add/remove gutter (also an Aa toggle).
   registerAction({
     id: "editor.toggleBlocks",

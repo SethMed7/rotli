@@ -1,5 +1,12 @@
 # Agent workspace contract
 
+> Status 2026-09-11: the MCP server (`rotli mcp`, stdio and loopback HTTP), the
+> `rotli agent …` commands, and the remote relay are **development builds
+> only** until refined. Stable builds refuse them with
+> "MCP and agent integrations are available only in development builds" and
+> hide their Settings surface. The plain JSON CLI (`rotli notes …`,
+> `rotli views …`, `rotli main …`, and the rest) is not gated.
+
 Rotli exposes one headless workspace application service through the packaged
 CLI, local stdio MCP, authenticated loopback HTTP, and the opt-in remote relay
 connector. Claude, Codex, scripts, and humans therefore exercise the same corpus policy instead of

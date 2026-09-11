@@ -53,3 +53,7 @@ export const useNoteStyleStore = create<NoteStyleState>((set) => ({
 export function useNoteStyle(noteId: string): NoteStyle {
   return useNoteStyleStore((s) => s.styles[noteId]) ?? DEFAULT_NOTE_STYLE;
 }
+
+export function persistedNoteStyles(): Record<string, NoteStyle> {
+  return useNoteStyleStore.getState().styles;
+}
