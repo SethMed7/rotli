@@ -29,6 +29,7 @@ async function onboard(page: Page) {
   await expect(page.getByRole("heading", { name: "Create Launch Practice?" })).toBeVisible();
   await page.getByRole("button", { name: /^Create vault/ }).click();
   await page.getByRole("button", { name: "Skip model setup" }).click();
+  await page.getByRole("button", { name: "Skip tour" }).click();
   await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
   const folder = welcomeFolder(page);
   await expect(folder).toBeVisible();
@@ -53,6 +54,93 @@ async function gutterOffsets(page: Page) {
       return { h1: h1 ? range.getBoundingClientRect().left - edge : null, rows };
     });
 }
+
+test("first-time setup opens in Rotli Light with a quokka wearing nothing", async ({ page }) => {
+  await page.goto("/?onboarding");
+  await expect(page.getByRole("heading", { name: "Make Rotli feel like yours." })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  const companion = page.locator(".setup-companion .quokka");
+  await expect(companion).toBeVisible();
+  await expect(companion.locator(".quokka-accessory-layer")).toHaveCount(0);
+  await page.getByRole("button", { name: "Get started" }).click();
+  await expect(page.getByRole("heading", { name: "Choose a theme." })).toBeVisible();
+  await expect(
+    page.getByRole("radiogroup", { name: "Theme" }).getByRole("radio", { name: /Rotli/ }),
+  ).toHaveAttribute("aria-checked", "true");
+  await expect(
+    page
+      .getByRole("radiogroup", { name: "Appearance mode" })
+      .getByRole("radio", { name: "Light", exact: true }),
+  ).toHaveAttribute("aria-checked", "true");
+  await expect(page.locator(".setup-quokka-preview .quokka-accessory-layer")).toHaveCount(0);
+
+  // a choice made in setup survives the round trip through the vault step
+  await page
+    .getByRole("radiogroup", { name: "Theme" })
+    .getByRole("radio", { name: /Midnight/ })
+    .click();
+  await page
+    .getByRole("radiogroup", { name: "Appearance mode" })
+    .getByRole("radio", { name: "Dark" })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "midnight-dark");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Choose where notes live" }).click();
+  await expect(page.getByRole("button", { name: "Choose an empty folder" })).toBeVisible();
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(page.getByRole("button", { name: "Choose where notes live" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "midnight-dark");
+});
+
+test("the guided tour follows setup, spotlights real controls, skips missing ones, and reopens from Settings", async ({
+  page,
+}) => {
+  await page.goto("/?onboarding");
+  await page.getByRole("button", { name: "Skip app setup" }).click();
+  await page.getByRole("button", { name: "Choose an empty folder" }).click();
+  await page.getByRole("button", { name: "New folder", exact: true }).click();
+  await page.getByLabel("New folder name").fill("Tour Practice");
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await page.getByRole("button", { name: "Use empty folder", exact: true }).click();
+  await page.getByRole("button", { name: /^Create vault/ }).click();
+  await page.getByRole("button", { name: "Skip model setup" }).click();
+  const tour = page.getByRole("region", { name: "Guided tour" });
+  await expect(tour).toBeVisible();
+  await expect(tour).toHaveAttribute("data-step", "new");
+  await expect(tour).toContainText("1 of");
+  const ringOver = async (name: RegExp | string) => {
+    const ring = (await tour.locator(".tour-ring").boundingBox())!;
+    const target = (await page.getByRole("button", { name }).first().boundingBox())!;
+    expect(ring.x).toBeLessThanOrEqual(target.x);
+    expect(ring.y).toBeLessThanOrEqual(target.y);
+    expect(ring.x + ring.width).toBeGreaterThanOrEqual(target.x + target.width);
+    expect(ring.y + ring.height).toBeGreaterThanOrEqual(target.y + target.height);
+  };
+  await ringOver(/^New note in /);
+  await tour.getByRole("button", { name: "Next" }).click();
+  await expect(tour).toHaveAttribute("data-step", "views");
+  await ringOver(/^Current view: /);
+  await tour.getByRole("button", { name: "Back" }).click();
+  await expect(tour).toHaveAttribute("data-step", "new");
+  await page.keyboard.press("Escape");
+  await expect(tour).toBeHidden();
+  // the app underneath was live the whole time
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await page.getByRole("button", { name: "Settings" }).first().click();
+  await page.getByRole("button", { name: "Show me around" }).click();
+  await expect(tour).toBeVisible();
+  await expect(tour).toHaveAttribute("data-step", "new");
+  for (let index = 0; index < 6; index++) {
+    const done = tour.getByRole("button", { name: "Done" });
+    if (await done.isVisible()) {
+      await done.click();
+      break;
+    }
+    await tour.getByRole("button", { name: "Next" }).click();
+  }
+  await expect(tour).toBeHidden();
+});
 
 test("fresh onboarding seeds a Welcome folder in Main and opens the welcome note", async ({ page }) => {
   await onboard(page);
@@ -94,6 +182,10 @@ test("fresh onboarding seeds a Welcome folder in Main and opens the welcome note
 test("every Welcome note opens from Main as an ordinary note and the practice-vault option is gone", async ({
   page,
 }) => {
+  // ten note opens re-render the Main tree each time; the hosted runner needs
+  // the slow budget, and the taller viewport keeps every row inside the sidebar
+  test.slow();
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/?onboarding");
   await page.getByRole("button", { name: "Skip app setup" }).click();
   await expect(page.getByRole("radio", { name: /practice vault/i })).toHaveCount(0);
@@ -102,6 +194,7 @@ test("every Welcome note opens from Main as an ordinary note and the practice-va
   const rows = lessonRows(page);
   for (let index = 0; index < 10; index++) {
     const title = (await rows.nth(index).textContent())!.trim();
+    await rows.nth(index).scrollIntoViewIfNeeded();
     await rows.nth(index).click();
     await expect(page.getByRole("tab", { selected: true })).toContainText(title);
     await expect(page.locator(".cm-content").last()).toContainText(title);
@@ -112,6 +205,9 @@ test("every Welcome note opens from Main as an ordinary note and the practice-va
 test("checkboxes and list markers align with the H1 in every environment and a narrow window", async ({
   page,
 }, testInfo) => {
+  // twelve environment switches with a geometry probe and two screenshots
+  // each outgrow the default budget on the hosted runner
+  test.slow();
   await page.setViewportSize({ width: 1440, height: 900 });
   await onboard(page);
   await lessonRows(page).nth(2).click();

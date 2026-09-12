@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { WELCOME_LESSON_COUNT, openWelcome, welcomeUsesMemory } from "../services/welcome";
+import { startTour } from "../state/tour";
 
 /** A read-only native vault cannot take the notes; the browser twin always
  * can, because its seed lives in memory and says so. */
@@ -43,6 +44,13 @@ export function WelcomeSettings({ disabled = false }: { disabled?: boolean }) {
       </p>
       <button type="button" className="ghostbtn" disabled={busy || unavailable} onClick={() => void run()}>
         {busy ? "Opening…" : "Open welcome folder"}
+      </button>
+      <p className="lead">
+        The guided tour points at the real controls: New, Main and its view picker, search, Aa, Chat, and
+        Settings. It runs once after setup and any time from here or ⌘K.
+      </p>
+      <button type="button" className="ghostbtn" onClick={startTour}>
+        Show me around
       </button>
       {note && <p className="setnote">{note}</p>}
       {error && (

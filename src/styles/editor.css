@@ -1009,7 +1009,7 @@
   min-width: 2.2em;
   height: 1.65em;
   padding: 0 0.55em;
-  border-color: color-mix(in srgb, var(--result-color) 55%, var(--border));
+  border-color: color-mix(in srgb, var(--result-edge, var(--result-color)) 55%, var(--border));
   border-radius: var(--r-control);
   color: color-mix(in srgb, var(--result-color) 75%, var(--text));
   font-size: 0.78em;
@@ -1017,11 +1017,11 @@
   white-space: nowrap;
 }
 .rotli-result-choice.is-labeled:hover {
-  border-color: var(--result-color);
+  border-color: var(--result-edge, var(--result-color));
   color: color-mix(in srgb, var(--result-color) 85%, var(--text));
 }
 .rotli-result-choice.is-labeled.is-selected {
-  border-color: var(--result-color);
+  border-color: var(--result-edge, var(--result-color));
   background: var(--result-color);
   color: var(--result-selected-ink);
 }
@@ -1122,9 +1122,10 @@
 }
 .rotli-cm-host .cm-line.rotli-choice-line--multi {
   box-sizing: border-box;
-  width: min(100%, 30rem);
-  margin-inline-start: auto;
-  margin-inline-end: 0;
+  /* never the whole measure, so Left / Center / Right always reads */
+  width: min(30rem, 80%);
+  margin-inline-start: 0;
+  margin-inline-end: auto;
   background: var(--surface-2);
   border-inline: 1px solid var(--border);
   padding-block: 4px;
@@ -1134,12 +1135,10 @@
   border-top: 1px solid var(--border);
 }
 .rotli-cm-host .cm-line.rotli-choice-line--multi.is-group-first {
-  margin-block-start: 8px;
   border-top: 1px solid var(--border);
   border-radius: var(--r-control) var(--r-control) 0 0;
 }
 .rotli-cm-host .cm-line.rotli-choice-line--multi.is-group-last {
-  margin-block-end: 8px;
   border-bottom: 1px solid var(--border);
   border-radius: 0 0 var(--r-control) var(--r-control);
 }
@@ -1153,10 +1152,59 @@
   color: var(--text);
   font-weight: 600;
 }
+.rotli-cm-host .cm-line.rotli-choice-line--multi.is-align-center {
+  margin-inline: auto;
+}
+.rotli-cm-host .cm-line.rotli-choice-line--multi.is-align-right {
+  margin-inline-start: auto;
+  margin-inline-end: 0;
+}
+/* the breathing room above and below a panel is a measured block widget, not
+   a line margin: CodeMirror sizes lines by their border box, so a margin
+   would leave its height map short and vertical motion one line off */
+.rotli-choice-gap {
+  height: 8px;
+}
 .rotli-cm-host .cm-line.rotli-choice-prompt {
   padding-block: 8px;
   color: var(--text);
   font-weight: 600;
+}
+/* panel placement lives in the prompt marker; the control appears on hover,
+   when the caret sits on the prompt, or when a button holds focus */
+.rotli-choice-align {
+  display: inline-flex;
+  gap: 2px;
+  margin-inline-start: 0.6em;
+  vertical-align: middle;
+  opacity: 0;
+  transition: opacity var(--motion-enter) var(--motion-ease);
+}
+.rotli-choice-prompt:hover .rotli-choice-align,
+.rotli-choice-align.is-touched,
+.rotli-choice-align:focus-within {
+  opacity: 1;
+}
+.rotli-choice-align-option {
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+  background: var(--surface);
+  color: var(--text-muted);
+  padding: 0.1em 0.45em;
+  font: inherit;
+  font-size: 0.72em;
+  font-weight: 500;
+  line-height: 1.3;
+  cursor: pointer;
+}
+.rotli-choice-align-option:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.rotli-choice-align-option.is-selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
 }
 
 .rotli-toggle {
@@ -1433,9 +1481,16 @@
    real monospaced file text above the body — a block widget inside .cm-content,
    so it lives in the writing column and scrolls/pushes the note like text — */
 .rotli-fm {
-  padding: 0 0 12px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 12px;
+  padding: 0;
+}
+/* the rule and the gap below it live inside the widget's box (a margin would
+   hide from CodeMirror's height map) */
+.rotli-fm::after {
+  content: "";
+  display: block;
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-bottom: 12px;
 }
 .rotli-fm-path {
   display: grid;
@@ -1798,9 +1853,10 @@
    the inner .rotli-tbl-scroll. — */
 .rotli-md-tablewrap {
   position: relative;
-  margin: 4px 0 10px;
-  /* room for the col chips above + the +col strip at the right */
-  padding: 10px 14px 0 0;
+  /* room for the col chips above + the +col strip at the right; the table's
+     own breathing room is padding, never margin (CodeMirror measures the
+     border box, so a margin would leave its height map short) */
+  padding: 14px 14px 10px 0;
 }
 .rotli-md-tablewrap.rotli-md-tablepart {
   /* a split twin (rows above/below the revealed line) hugs its neighbour */
@@ -1889,6 +1945,14 @@
 .rotli-md-table td:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
+}
+/* ⇧-click / ⌘-click cell ranges: a tinted wash, never a checkmark */
+.rotli-md-table th.is-selected,
+.rotli-md-table tbody tr td.is-selected,
+.rotli-md-table tbody tr:nth-child(even) td.is-selected {
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
 }
 .rotli-md-cell-input {
   display: block;
@@ -2141,4 +2205,96 @@
 .rotli-progress.all {
   background: color-mix(in srgb, var(--success) 18%, transparent);
   color: var(--success);
+}
+
+/* ─── the `:color` picker inside a result or toggle bracket ─── a CodeMirror
+   tooltip (no React), rainbow order, 1–9 and 0 pick, typing filters */
+.rotli-colorpick {
+  min-width: 176px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 5px;
+  z-index: 7;
+}
+.rotli-colorpick-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  background: none;
+  border-radius: var(--r-control);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9em;
+  text-align: left;
+  cursor: pointer;
+}
+.rotli-colorpick-row:hover,
+.rotli-colorpick-row.is-active {
+  background: var(--hov);
+}
+.rotli-colorpick-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--colorpick-color);
+  border: 1px solid var(--colorpick-edge);
+  flex: none;
+}
+.rotli-colorpick-name {
+  flex: 1;
+  text-transform: capitalize;
+}
+.rotli-colorpick-key {
+  color: var(--text-muted);
+  font-size: 0.8em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── the `[[` picker: matching notes while a wikilink target is typed ─── */
+.rotli-linkpick {
+  min-width: 220px;
+  max-width: min(420px, calc(100vw - 24px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 5px;
+  z-index: 7;
+}
+.rotli-linkpick-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  background: none;
+  border-radius: var(--r-control);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9em;
+  text-align: left;
+  cursor: pointer;
+}
+.rotli-linkpick-row:hover,
+.rotli-linkpick-row.is-active {
+  background: var(--hov);
+}
+.rotli-linkpick-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rotli-linkpick-hint {
+  color: var(--text-muted);
+  font-size: 0.8em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 45%;
 }

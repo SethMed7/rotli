@@ -79,6 +79,66 @@ test("dragging a column boundary resizes the column; double-click resets", async
   expect(Math.abs(restored.width - before.width)).toBeLessThan(12);
 });
 
+test("Enter after a typed pipe row starts a table, and Shift+Enter breaks a line inside a cell", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.type("| Step | Owner |");
+  await page.keyboard.press("Enter");
+  const table = page.locator(".rotli-md-table");
+  await expect(table).toBeVisible();
+  await expect(table.locator("th")).toHaveCount(2);
+  await expect(table.locator("tbody tr")).toHaveCount(1);
+  await table.locator("td").first().click();
+  const cell = table.getByRole("textbox", { name: "Edit Step row 1" });
+  await expect(cell).toBeVisible();
+  await cell.fill("Draft");
+  await cell.press("Shift+Enter");
+  await cell.pressSequentially("second line");
+  await cell.press("Tab");
+  await expect(table.locator("td").first().locator("br")).toHaveCount(1);
+  await expect(table.locator("td").first()).toContainText("second line");
+  await page.locator(".ed-date").click();
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  await expect(editor).toContainText("| Draft<br>second line |");
+  await expect(editor).toContainText(/\| -+ \| -+ \|/);
+});
+
+test("⇧-click selects a block of cells, Ctrl-click toggles one, and Delete clears them together", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText(TABLE_NOTE);
+  const table = page.locator(".rotli-md-table");
+  await expect(table).toBeVisible();
+  await table.getByRole("cell", { name: "Inkling" }).click({ modifiers: ["Control"] });
+  await table.getByRole("cell", { name: "Open" }).click({ modifiers: ["Shift"] });
+  await expect(table.locator(".is-selected")).toHaveCount(4);
+  await expect(table.locator(".rotli-md-cell-input")).toHaveCount(0);
+  await table.getByRole("cell", { name: "GLM-5.2" }).click({ modifiers: ["Control"] });
+  await expect(table.locator(".is-selected")).toHaveCount(3);
+  await page.keyboard.press("Delete");
+  await expect(table).not.toContainText("Inkling");
+  await expect(table).not.toContainText("Apache 2.0");
+  await expect(table).not.toContainText("Open");
+  await expect(table).toContainText("GLM-5.2");
+  await expect(table.locator("tbody tr")).toHaveCount(2);
+  // a plain click still edits, and drops the selection
+  await table.getByRole("cell", { name: "GLM-5.2" }).click();
+  await expect(table.getByRole("textbox", { name: "Edit Model row 2" })).toBeVisible();
+  await expect(table.locator(".is-selected")).toHaveCount(0);
+});
+
 test("editing a wrapped table cell preserves the table's shape", async ({ page }) => {
   await gotoApp(page);
   await page.keyboard.press("Meta+T");
@@ -118,6 +178,34 @@ test("an exact note-title wikilink opens on an ordinary click", async ({ page })
 
   await page.locator(".rotli-wikilink", { hasText: "Pricing decision" }).click();
   await expect(page.locator(".cm-content")).toContainText("Free local forever.");
+});
+
+test("typing [[ lists matching notes; Enter or a click completes and closes the link", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.type("See [[pric");
+  const list = page.getByRole("listbox", { name: "Link a note" });
+  await expect(list).toBeVisible();
+  await expect(list.getByRole("option").first()).toContainText("Pricing decision");
+  await page.keyboard.press("Enter");
+  await expect(list).toBeHidden();
+  await page.keyboard.type(" and ");
+  await page.keyboard.type("[[");
+  await expect(list).toBeVisible();
+  await list.getByRole("option").filter({ hasText: "Pricing decision" }).click();
+  await expect(list).toBeHidden();
+  await page.locator(".ed-date").click();
+  const links = page.locator(".rotli-wikilink");
+  await expect(links).toHaveCount(2);
+  await expect(links.first()).not.toHaveClass(/missing/);
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  await expect(editor).toContainText("See [[Pricing decision]] and [[Pricing decision]]");
 });
 
 test("a ts code fence renders IDE-grade token colors", async ({ page }) => {
@@ -441,7 +529,7 @@ test("hash choices and switches stay interactive while inline code stays literal
   await expect(page.locator(".rotli-toggle")).toHaveCount(3);
   await expect(page.locator(".rotli-choice-line--multi.is-group-first")).toHaveCount(1);
   await expect(page.locator(".rotli-choice-line--multi.is-group-last")).toHaveCount(1);
-  await expect(page.locator(".rotli-choice-prompt")).toHaveText("Which channels should we use?");
+  await expect(page.locator(".rotli-choice-prompt")).toContainText("Which channels should we use?");
   const multiPanel = page.locator(".rotli-choice-line--multi:not(.rotli-choice-prompt)").first();
   const multiGeometry = await multiPanel.evaluate((line) => {
     const panel = line.getBoundingClientRect();
@@ -459,7 +547,8 @@ test("hash choices and switches stay interactive while inline code stays literal
     };
   });
   expect(multiGeometry.width).toBeLessThanOrEqual(481);
-  expect(Math.abs(multiGeometry.rightGap - multiGeometry.editorPaddingEnd)).toBeLessThanOrEqual(1);
+  // the bare prompt sits at the left edge and never fills the measure
+  expect(multiGeometry.rightGap - multiGeometry.editorPaddingEnd).toBeGreaterThan(40);
   expect(multiGeometry.controlInset).toBeGreaterThanOrEqual(11);
   expect(multiGeometry.paddingBlockStart).toBe("4px");
   expect(multiGeometry.paddingInlineEnd).toBe("12px");
@@ -470,6 +559,44 @@ test("hash choices and switches stay interactive while inline code stays literal
     return control.top + control.height / 2 - (text.top + text.height / 2);
   });
   expect(Math.abs(centerOffset)).toBeLessThanOrEqual(1);
+
+  const prompt = page.locator(".rotli-choice-prompt");
+  const panelGaps = () =>
+    multiPanel.evaluate((line) => {
+      const panel = line.getBoundingClientRect();
+      const editorNode = line.closest(".cm-content")!;
+      const editor = editorNode.getBoundingClientRect();
+      const style = getComputedStyle(editorNode);
+      return {
+        left: panel.left - editor.left - Number.parseFloat(style.paddingInlineStart),
+        right: editor.right - panel.right - Number.parseFloat(style.paddingInlineEnd),
+      };
+    });
+  await expect(page.getByRole("radio", { name: "Align panel left" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.locator(".rotli-choice-line--multi.is-align-left")).toHaveCount(3);
+  const leftGaps = await panelGaps();
+  expect(Math.abs(leftGaps.left)).toBeLessThanOrEqual(1);
+  await prompt.hover();
+  await page.getByRole("radio", { name: "Align panel right" }).click();
+  await expect(page.getByRole("radio", { name: "Align panel right" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  await expect(page.locator(".rotli-choice-line--multi.is-align-right")).toHaveCount(3);
+  const rightGaps = await panelGaps();
+  expect(Math.abs(rightGaps.right)).toBeLessThanOrEqual(1);
+  expect(rightGaps.left).toBeGreaterThan(40);
+  const alignCenter = page.getByRole("radio", { name: "Align panel center" });
+  await alignCenter.focus();
+  await page.keyboard.press("Space");
+  await expect(page.getByRole("radio", { name: "Align panel center" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  await expect(page.getByRole("radio", { name: "Align panel center" })).toBeFocused();
+  const centerGaps = await panelGaps();
+  expect(Math.abs(centerGaps.left - centerGaps.right)).toBeLessThanOrEqual(2);
+  await expect(page.locator(".rotli-choice-line--multi.is-align-center")).toHaveCount(3);
   const purpleToggle = page.locator(".rotli-toggle").last();
   const purpleColors = await purpleToggle.evaluate((toggle) => {
     const probe = document.createElement("span");
@@ -505,13 +632,55 @@ test("hash choices and switches stay interactive while inline code stays literal
     .getByRole("button", { name: "Raw markdown" })
     .click();
   await expect(editor).toContainText("- [#x] Blue");
-  await expect(editor).toContainText("- [##?] Which channels should we use?");
+  await expect(editor).toContainText("- [##?:center] Which channels should we use?");
   await expect(editor).toContainText("- [##x] Email");
   await expect(editor).toContainText("- [##x] SMS");
   await expect(editor).toContainText("- [x|] Feature flag");
   await expect(editor).toContainText("- [x True:green|False:red] Sync");
   await expect(editor).toContainText("- [:blue|:purple] Color only");
   await expect(editor).toContainText("`[#]` and `[|]` stay literal");
+});
+
+test("typing : inside a result bracket opens the color list; numbers, letters and Enter choose", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.type("- [Wait:");
+  const list = page.getByRole("listbox", { name: "Label color" });
+  await expect(list).toBeVisible();
+  await expect(list.getByRole("option")).toHaveCount(13);
+  await expect(list.getByRole("option").first()).toHaveText(/Red/i);
+  await page.keyboard.press("3");
+  await expect(list).toBeHidden();
+  await page.keyboard.type("][No:pi");
+  await expect(list.getByRole("option")).toHaveCount(1);
+  await expect(list.getByRole("option").first()).toHaveText(/pink/i);
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("] Ship");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter"); // the empty continuation row exits the list
+  await page.keyboard.type("- [Go:");
+  await expect(list).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(list).toBeHidden();
+  await page.keyboard.type("cyan|x Stop:black] Route");
+  await page.locator(".ed-date").click();
+  const yellow = page.getByRole("button", { name: "Wait", exact: true });
+  const pink = page.getByRole("button", { name: "No", exact: true });
+  await expect(yellow).toBeVisible();
+  await pink.click();
+  await expect(pink).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("switch", { name: "Go or Stop" })).toHaveAttribute("aria-checked", "false");
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  await expect(editor).toContainText("- [Wait:yellow][x No:pink] Ship");
+  await expect(editor).toContainText("- [Go:cyan|x Stop:black] Route");
 });
 
 test("() creates a tab-navigable Markdown multiple-choice group", async ({ page }) => {

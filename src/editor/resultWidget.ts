@@ -10,42 +10,8 @@ import {
   setChoiceControlSelected,
   setToggleOn,
 } from "./controlState";
-import {
-  chooseResult,
-  RESULT_REASON_SEPARATOR,
-  type ResultChoice,
-  type ResultColor,
-  type ResultOption,
-} from "./resultState";
-
-function colorValue(color: ResultColor | null): string {
-  if (color === null || color === "accent") return "var(--accent)";
-  if (color === "blue") return "var(--accent-swatch-blue)";
-  if (color === "green") return "var(--success)";
-  if (color === "yellow") return "var(--accent-swatch-amber)";
-  if (color === "purple") return "var(--accent-swatch-violet)";
-  if (color === "red") return "var(--failure)";
-  if (color === "neutral") return "var(--text-muted)";
-  return color;
-}
-
-function selectedInk(color: ResultColor | null): string {
-  if (color === null || color === "accent") return "var(--on-accent)";
-  if (color === "blue") return "var(--on-accent)";
-  if (color === "green") return "var(--check-ink)";
-  if (color === "yellow") return "var(--rotli-cocoa)";
-  if (color === "purple") return "var(--on-accent)";
-  if (color === "red") return "var(--on-accent)";
-  if (color === "neutral") return "var(--surface)";
-  const value = color.slice(1);
-  const full = value.length === 3 ? value.replace(/(.)/g, "$1$1") : value;
-  const channels = [0, 2, 4].map((at) => Number.parseInt(full.slice(at, at + 2), 16) / 255);
-  const linear = channels.map((channel) =>
-    channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
-  );
-  const luminance = 0.2126 * (linear[0] ?? 0) + 0.7152 * (linear[1] ?? 0) + 0.0722 * (linear[2] ?? 0);
-  return luminance > 0.42 ? "var(--rotli-cocoa)" : "var(--rotli-linen)";
-}
+import { colorEdge, colorValue, selectedInk } from "./resultColors";
+import { chooseResult, RESULT_REASON_SEPARATOR, type ResultChoice, type ResultOption } from "./resultState";
 
 export class ResultWidget extends WidgetType {
   constructor(
@@ -109,6 +75,7 @@ export class ResultWidget extends WidgetType {
       btn.textContent = this.compact ? (index === 0 ? "✓" : "×") : option.label;
       btn.dataset.resultIndex = String(index);
       btn.style.setProperty("--result-color", colorValue(option.color));
+      btn.style.setProperty("--result-edge", colorEdge(option.color));
       btn.style.setProperty("--result-selected-ink", selectedInk(option.color));
       const label = this.compact ? (index === 0 ? "Yes or passed" : "No or failed") : option.label;
       btn.setAttribute("aria-label", label);

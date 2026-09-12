@@ -1092,6 +1092,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
             <button
               type="button"
               className="fsec-view"
+              data-tour="views"
               aria-label={`Current view: ${activeView ?? "Main"}. Change view`}
               aria-haspopup="menu"
               title="Change view"
@@ -1105,6 +1106,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
             <button
               type="button"
               className="fsec-add"
+              data-tour="new"
               aria-label={`New note in ${activeView ?? "Main"}`}
               title={`New note in ${activeView ?? "Main"}`}
               onClick={() => dispatch("notes.new")}

@@ -111,6 +111,7 @@ try {
     ["[Yes:#E3B341][No:purple] ", "Hex and purple", "- [Yes:#E3B341][No:purple] Hex and purple"],
     ["[#] ", "Single choice", "- [#] Single choice"],
     ["[##?] ", "Multi prompt", "- [##?] Multi prompt"],
+    ["[##?:left] ", "Placed prompt", "- [##?:left] Placed prompt"],
     ["[##] ", "Multi option", "- [##] Multi option"],
     ["[|] ", "Compact switch", "- [|x] Compact switch"],
     ["[True|False] ", "Labeled switch", "- [True|x False] Labeled switch"],

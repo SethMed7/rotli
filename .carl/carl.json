@@ -454,7 +454,7 @@
       "rules": [
         {
           "id": 0,
-          "text": "Rotli ships six theme families — Rotli (warm), Paper & Charcoal (mono), Ocean, Grove, Iris, and Midnight — each with an intentionally tuned light and dark environment (twelve data-theme values; check:design-system asserts every label). Paper and Charcoal are the calm defaults. All surfaces use shared semantic color, type, spacing, focus, and state roles.",
+          "text": "Rotli ships six theme families — Rotli (warm), Paper & Charcoal (mono), Ocean, Grove, Iris, and Midnight — each with an intentionally tuned light and dark environment (twelve data-theme values; check:design-system asserts every label). Rotli Light is the default and the environment every first run opens in; Paper and Charcoal are the calm mono pair. All surfaces use shared semantic color, type, spacing, focus, and state roles.",
           "added": "2026-07-11",
           "last_reviewed": "2026-09-01",
           "source": "DESIGN.md"

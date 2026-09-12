@@ -5,7 +5,10 @@ import { resultOptionOf, type ResultOption } from "./resultState";
 
 export type ChoiceControlKind = "radio" | "multi";
 
-const CONTROL_LITERAL = /^(?:\[(?:[ /xX]|#{1,2}[xX]?|##\?)?\]|\[[^\r\n]*(?:\]\[|\|)[^\r\n]*\])$/;
+export type ChoicePromptAlign = "left" | "center" | "right";
+
+const CONTROL_LITERAL =
+  /^(?:\[(?:[ /xX]|#{1,2}[xX]?|##\?(?::(?:left|center|right))?)?\]|\[[^\r\n]*(?:\]\[|\|)[^\r\n]*\])$/;
 
 export function isControlLiteral(value: string): boolean {
   return CONTROL_LITERAL.test(value);
@@ -25,6 +28,8 @@ export interface ChoicePromptLine {
   indent: number;
   indentSource: string;
   marker: string;
+  /** Panel alignment; the bare `[##?]` marker means left. */
+  align: ChoicePromptAlign;
   prefixLen: number;
   text: string;
 }
@@ -34,17 +39,48 @@ export interface ControlEdit {
   line: string;
 }
 
-/** An optional heading for the immediately following `[##]` answer rows. */
+/** An optional heading for the immediately following `[##]` answer rows. A
+ * `:center` / `:right` suffix on the marker places the whole panel; the bare
+ * marker sits at the left edge. */
 export function parseChoicePromptLine(line: string): ChoicePromptLine | null {
-  const match = /^(\s*)((?:-|\d+\.) )\[##\?\] (.*)$/.exec(line);
+  const match = /^(\s*)((?:-|\d+\.) )\[##\?(?::(left|center|right))?\] (.*)$/.exec(line);
   if (!match) return null;
   return {
     indent: (match[1] ?? "").replace(/\t/g, "  ").length,
     indentSource: match[1] ?? "",
     marker: match[2] ?? "- ",
-    prefixLen: match[0].length - (match[3] ?? "").length,
-    text: match[3] ?? "",
+    align: (match[3] as ChoicePromptAlign | undefined) ?? "left",
+    prefixLen: match[0].length - (match[4] ?? "").length,
+    text: match[4] ?? "",
   };
+}
+
+/** Rewrite a prompt row's alignment; the default (left) drops the suffix. */
+export function setChoicePromptAlign(line: string, align: ChoicePromptAlign): string | null {
+  const parsed = parseChoicePromptLine(line);
+  if (!parsed) return null;
+  const suffix = align === "left" ? "" : `:${align}`;
+  return `${parsed.indentSource}${parsed.marker}[##?${suffix}] ${parsed.text}`;
+}
+
+/** Alignment of the panel an answer row belongs to: walk up adjacent same-indent
+ * `[##]` rows to the prompt; a promptless group keeps the default. */
+export function choiceGroupAlign(
+  lineAt: (index: number) => string | undefined,
+  targetIndex: number,
+): ChoicePromptAlign {
+  const target = parseChoiceControlLine(lineAt(targetIndex) ?? "");
+  if (!target || target.kind !== "multi") return "left";
+  let index = targetIndex;
+  while (index > 0) {
+    const previous = lineAt(index - 1) ?? "";
+    const prompt = parseChoicePromptLine(previous);
+    if (prompt) return prompt.indent === target.indent ? prompt.align : "left";
+    const option = parseChoiceControlLine(previous);
+    if (option?.kind !== "multi" || option.indent !== target.indent) return "left";
+    index--;
+  }
+  return "left";
 }
 
 export function parseChoiceControlLine(line: string): ChoiceControlLine | null {

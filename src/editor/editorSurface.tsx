@@ -410,6 +410,7 @@ export function EditorSurface({
             type="button"
             ref={aaChipRef}
             className={aaOpen ? "aachip on" : "aachip"}
+            data-tour="typography"
             aria-haspopup="dialog"
             aria-expanded={aaOpen}
             onClick={() => setAaOpen(!aaOpen)}

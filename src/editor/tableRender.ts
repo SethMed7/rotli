@@ -17,6 +17,7 @@ import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemir
 
 import { MIN_TABLE_COL_PX, MIN_TABLE_ROW_PX, tableWidthKey, useTableWidthsStore } from "../state/tableWidths";
 import { noteIdFacet } from "./livePreview";
+import { cellEditValue, cellSourceValue, inlineCell, plainCellLabel } from "./tableCell";
 import { GRIP_H, GRIP_V, applyOp, openTableMenu } from "./tableMenu";
 import {
   type Align,
@@ -30,32 +31,11 @@ import {
   setCellText,
   tableToText,
 } from "./tables";
-
-/** Escape HTML, then apply a minimal inline render (bold · italic · code) so cell
- * text reads beautified without opening an HTML-injection hole. */
-function inlineCell(raw: string): string {
-  let s = raw.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  s = s.replace(/`([^`]+)`/g, '<code class="md-code">$1</code>');
-  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-  s = s.replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>");
-  s = s.replace(/__([^_]+)__/g, "<strong>$1</strong>");
-  // [text](url) → just the text, styled (a notes app, not a browser)
-  s = s.replace(/\[([^\]]+)\]\([^)]+\)/g, '<span class="md-link">$1</span>');
-  return s;
-}
+import { attachCellSelection } from "./tableSelection";
 
 /** Reveal the whole table raw: the `</>` escape hatch. Cleared automatically
  * when the caret leaves the table (see the field's update). */
 export const setTableRaw = StateEffect.define<number>();
-
-function plainCellLabel(raw: string, col: number): string {
-  const label = raw
-    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/[*_`~=]/g, "")
-    .trim();
-  return label || `column ${col + 1}`;
-}
 
 /** Renders a table (or a headerless run of rows — the split-reveal twins).
  *  - `rowBase`      absolute data-row index of rows[0] (chip menus need it)
@@ -465,6 +445,8 @@ class TableWidget extends WidgetType {
       };
     };
 
+    const selection = attachCellSelection(table, view, tableAtWidget);
+
     const focusRebuiltCell = (tableFrom: number, target: CellTarget) => {
       requestAnimationFrame(() => {
         for (const candidate of view.dom.querySelectorAll<HTMLElement>(".rotli-md-tablewrap")) {
@@ -498,7 +480,7 @@ class TableWidget extends WidgetType {
       const input = document.createElement("textarea");
       input.rows = 1;
       input.className = "rotli-md-cell-input";
-      input.value = original;
+      input.value = cellEditValue(original);
       const header = this.header?.[col] ?? "";
       input.setAttribute(
         "aria-label",
@@ -524,7 +506,7 @@ class TableWidget extends WidgetType {
         finished = true;
         active = null;
         releaseGeometry();
-        const value = commit ? input.value.replace(/\r?\n/g, " ") : original;
+        const value = commit ? cellSourceValue(input.value) : original;
         const current = tableAtWidget();
         if (!current) return;
         let next = commit ? setCellText(current, row, col, value) : current;
@@ -555,6 +537,7 @@ class TableWidget extends WidgetType {
           return;
         }
         if (event.key !== "Tab" && event.key !== "Enter") return;
+        if (event.key === "Enter" && event.shiftKey) return; // a line break inside the cell (`<br>` in source)
         event.preventDefault();
         event.stopPropagation();
         const current = tableAtWidget();
@@ -595,6 +578,7 @@ class TableWidget extends WidgetType {
       }
       const cell = (e.target as HTMLElement).closest?.("td,th");
       if (!(cell instanceof HTMLTableCellElement)) return;
+      if (selection.onMouseDown(e, cell)) return;
       e.preventDefault();
       startCellEdit(cell);
     });

@@ -593,6 +593,13 @@
   --accent-swatch-violet: #6a5ab2;
   --accent-swatch-rose: #ad5470;
   --accent-swatch-amber: #9a6f1e;
+  /* the wider label palette (`[Label:orange]` …): tuned per scheme like the
+     accent swatches; black and white draw their own edge in the widgets */
+  --accent-swatch-orange: #b8621f;
+  --accent-swatch-cyan: #1f7f8f;
+  --accent-swatch-brown: #6f4a2c;
+  --accent-swatch-black: #1c1a17;
+  --accent-swatch-white: #fbf8f2;
 }
 :root[data-theme="dark"],
 :root[data-theme="charcoal"],
@@ -602,4 +609,9 @@
   --accent-swatch-violet: #b3a6ee;
   --accent-swatch-rose: #e3a0b3;
   --accent-swatch-amber: #dfb15f;
+  --accent-swatch-orange: #e79a5c;
+  --accent-swatch-cyan: #7ccfdc;
+  --accent-swatch-brown: #b98a66;
+  --accent-swatch-black: #0f0e0d;
+  --accent-swatch-white: #f4f1ea;
 }

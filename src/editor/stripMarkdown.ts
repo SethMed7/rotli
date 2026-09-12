@@ -20,6 +20,7 @@ export function stripMarkdown(text: string): string {
         .replace(/==([^=]+)==/g, "$1")
         .replace(/~~([^~]+)~~/g, "$1")
         .replace(/<\/?u>/g, "")
+        .replace(/<br\s*\/?>/gi, " ")
         .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
         .replace(/\*([^*\s](?:[^*]*[^*\s])?)\*/g, "$1");
     } while (s !== prev);

@@ -278,6 +278,32 @@ for (const file of definitionSources.filter((f) => f.endsWith(".css") || f.endsW
   }
 }
 
+// CodeMirror sizes every line and block widget by its border box, so a
+// vertical margin on one leaves the height map short and lands ↑/↓ and clicks
+// below it one line off. Spacing on these roots is padding or a measured
+// spacer element, never margin.
+const measuredRoots = [".cm-line", ".rotli-md-tablewrap", ".rotli-fm", ".rotli-choice-gap"];
+const verticalMargin = /(?:^|[\s;])margin(?:-top|-bottom|-block(?:-start|-end)?)?\s*:\s*([^;]+)/g;
+const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// the root itself (with state classes / pseudo-classes), never a descendant,
+// a suffixed class, or a pseudo-element — those sit inside the measured box
+const rootSelector = (root) =>
+  new RegExp(`(?:^|[\\s>+~])${escape(root)}(?:\\.[\\w-]+|:[\\w-]+(?:\\([^)]*\\))?|\\[[^\\]]*\\])*$`);
+for (const block of blocks(read("src/styles/editor.css"))) {
+  if (!block.selectors.some((selector) => measuredRoots.some((root) => rootSelector(root).test(selector))))
+    continue;
+  for (const m of block.body.matchAll(verticalMargin)) {
+    const [, value] = m;
+    const parts = value.trim().split(/\s+/);
+    const vertical =
+      m[0].includes("margin-") || parts.length === 1 ? parts : [parts[0], parts[2] ?? parts[0]];
+    if (vertical.every((part) => part === "0" || part === "auto")) continue;
+    violations.push(
+      `src/styles/editor.css: ${block.selectors.join(", ")} sets a vertical margin (${m[0].trim()}) on an editor line or block widget — use padding or a measured spacer`,
+    );
+  }
+}
+
 if (violations.length) {
   console.error(`design-system regression failed:\n${violations.map((line) => `  - ${line}`).join("\n")}`);
   process.exit(1);

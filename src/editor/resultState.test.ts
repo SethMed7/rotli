@@ -96,7 +96,7 @@ describe("two-choice result grammar", () => {
   test("labeled results fail closed when selection or color syntax is ambiguous", () => {
     expect(parseResultLine("- [x True][x False] Pick one")).toBeNull();
     expect(parseResultLine("- [True:#12][False:red] Pick one")).toBeNull();
-    expect(parseResultLine("- [True:orange][False:red] Pick one")).toBeNull();
+    expect(parseResultLine("- [True:teal][False:red] Pick one")).toBeNull();
     expect(parseResultLine("- [Only one] not a result")).toBeNull();
   });
 

@@ -32,6 +32,8 @@ fn markdown_to_print_text(title: &str, markdown: &str) -> String {
             for marker in ["**", "__", "~~", "`"] {
                 line = line.replace(marker, "");
             }
+            // a table cell's `<br>` line break prints as a space
+            line = line.replace("<br>", " ").replace("<br/>", " ");
         }
         if first_content && !line.trim().is_empty() {
             first_content = false;

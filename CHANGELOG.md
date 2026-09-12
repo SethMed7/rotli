@@ -10,6 +10,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.92.0] - 2026-09-12
+
+The Welcome kit release: every lesson teaches the typed syntax, a guided tour
+points at the real controls, and the editor gains pickers for colors and
+wikilinks, typed tables, and placeable choice panels.
+
+### Added
+
+- A guided tour after first-run setup points at the real controls: New,
+  Main and its view picker, search, Aa, Chat, and Settings. It is an overlay
+  the app stays live under; Skip, Done, or Escape end it, and Settings →
+  General → Show me around (also in ⌘K) runs it again. The welcome note and
+  the views lesson point at it.
+- Multi-choice panels can sit left, center, or right. The `[##?]` prompt row
+  shows a Left/Center/Right control on hover or when the caret is on it; the
+  choice is written into the marker as `[##?:center]` or `[##?:right]`, and
+  the bare marker means left. The panel is never wider than 80% of the
+  writing measure, so the placement always shows.
+- Label colors: typing `:` inside a result or toggle bracket opens a color
+  list in rainbow order (red, orange, yellow, green, cyan, blue, purple, pink,
+  brown, black, white, neutral, accent); arrows or letters narrow it, Enter,
+  Tab, a click, or the keys 1–9 and 0 choose. Six names are new (orange,
+  cyan, pink, brown, black, white), each tuned per light and dark scheme.
+- Wikilinks: typing `[[` opens a list of matching notes (titles first, then
+  aliases); Enter, Tab, or a click completes the link and closes it with
+  `]]`. The links lesson points at it.
+- Tables: Enter at the end of a typed `| a | b |` row writes the delimiter
+  row and a first empty row, so a table starts without knowing about dashes.
+  Shift+Enter inside a cell adds a line break (`<br>` in source). ⇧-click
+  selects a block of cells and ⌘-click (Ctrl on Linux) adds or removes one;
+  Delete clears the selection in one edit and copy writes it as
+  tab-separated text.
+
+### Changed
+
+- First-time setup always opens in Rotli Light with the quokka wearing no
+  accessory, including when a version update runs setup again on a
+  personalized install; the appearance step is where the choice is made.
+  Skip, Settings → Reset & re-onboard, and a fresh install now share that one
+  default instead of resetting to Paper and follow-macOS, and the Rotli family
+  leads the theme picker in setup and Settings → Appearance.
+- The Welcome folder's lessons now show how to type each control as
+  backticked source (`[][]`, `[True][False]`, color suffixes and hex, `[#]`,
+  `[##?]` + `[##]`, `[|]`, `[True|False]`, `[:blue|:green]`, a typed table
+  row, `[[`) instead of only rendering the finished controls. Existing vaults
+  keep their edited lessons; Settings → General → Open welcome folder reseeds
+  only missing ones.
+- A bare `[##?]` prompt written under 0.91.0 now renders its panel at the
+  left instead of the right; add `[##?:right]` to keep the old placement.
+
+### Fixed
+
+- Pressing ↑ or clicking just below a multi-choice panel or a table landed one
+  line off, because their vertical spacing was a margin the editor's height
+  map could not see. Spacing is now measured (a block spacer for panels,
+  padding for tables), and a guard keeps vertical margins off editor lines and
+  block widgets.
+- The development app is named "Rotli (Dev)" and paints its blue Dock icon
+  from the Rust shell at launch, so a `bun run dev:app` instance is never
+  mistaken for the installed app even before the webview loads.
+- The ten-note Welcome walk in the launch E2E suite declares a slow budget so
+  the hosted runner no longer times it out.
+
 ## [0.91.0] - 2026-09-11
 
 ### Launch preparation

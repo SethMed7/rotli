@@ -25,9 +25,11 @@ import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import { addBlockBelow, blockHandles, deleteBlock, moveBlock } from "./blockHandles";
 import { blockRender } from "./blockRender";
+import { choicePanelGaps } from "./choicePanelGapsField";
 import type { SlashState, PickerState, ImageGenState } from "./cmEditorState";
 import { rotliKeymap } from "./cmKeymap";
 import { codeHighlight } from "./codeHighlight";
+import { colorPicker } from "./colorPicker";
 import {
   type EditorHandle,
   applyBlockToggle,
@@ -63,6 +65,7 @@ import { SlashPicker } from "./slashPicker";
 import { tableRender } from "./tableRender";
 import { buildTitleCounts, wikilinkLabel } from "./wikilink";
 import { setWikilinkNotes } from "./wikilinkIndex";
+import { wikilinkPicker } from "./wikilinkPicker";
 
 /** The floating format bar (bottom-center, ~42px tall, sitting 16px up) covers
  * the scroller's bottom strip. CM keeps the caret at least this many px above
@@ -586,7 +589,17 @@ function CmEditorImpl({
         // corpus root; table widgets key persisted column widths by the id
         noteIdFacet.of(noteId),
         viewModeComp.of(
-          rawEditorRef.current ? rawMarkdown : [livePreview, blockRender, tableRender, codeHighlight],
+          rawEditorRef.current
+            ? rawMarkdown
+            : [
+                livePreview,
+                choicePanelGaps,
+                colorPicker,
+                wikilinkPicker,
+                blockRender,
+                tableRender,
+                codeHighlight,
+              ],
         ),
         blockComp.of(blockHandlesRef.current ? blockHandles(openBlockMenu) : []),
         fmComp.of(fmExt(fmRawRef.current, fmGenRef.current, fmErrRef.current)),
@@ -688,7 +701,17 @@ function CmEditorImpl({
     rawEditorRef.current = rawEditor;
     viewRef.current?.dispatch({
       effects: viewModeComp.reconfigure(
-        rawEditor ? rawMarkdown : [livePreview, blockRender, tableRender, codeHighlight],
+        rawEditor
+          ? rawMarkdown
+          : [
+              livePreview,
+              choicePanelGaps,
+              colorPicker,
+              wikilinkPicker,
+              blockRender,
+              tableRender,
+              codeHighlight,
+            ],
       ),
     });
   }, [rawEditor, viewModeComp]);

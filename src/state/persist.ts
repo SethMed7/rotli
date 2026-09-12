@@ -64,6 +64,7 @@ import { inboxFolderId, notesService } from "../services/notes";
 import { isRetentionEligible, parseRetentionDays } from "../services/retentionPolicy";
 import type { PaneNode, Tab } from "../types";
 import { DEFAULT_VOICE, VOICES } from "../voice/speech";
+import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
 import { hydrateMain, useMainStore } from "./main";
 import { MRU_CAP, touchItemActivity, touchMru, useMruStore } from "./mru";
 import {
@@ -118,7 +119,7 @@ import {
   type SyntaxPalette,
   useUiStore,
 } from "./ui";
-import { ACCENT_COLORS, DEFAULT_ACCENT_HUE, type AccentColor } from "./ui";
+import { ACCENT_COLORS, type AccentColor } from "./ui";
 import { useVaultStore } from "./vault";
 import { hydrateViews, useViewsStore } from "./views";
 import { durablePane, type PersistedViewstate } from "./viewstate";
@@ -1365,22 +1366,18 @@ export async function hydratePersistedState(): Promise<void> {
       // a missing/corrupt vault sidecar means defaults + app preferences
     }
   } else if (!appSettingsPresent) {
-    // The first-ever paint uses the calm pair and follows macOS. Existing
-    // installations are untouched because either their app sidecar or their
-    // configured vault supplies the prior choice.
+    // The first-ever paint is Rotli Light. Existing installations are
+    // untouched because either their app sidecar or their configured vault
+    // supplies the prior choice.
     useUiStore.setState({
-      theme: "system",
-      themeFamily: "mono",
-      syntaxPalette: "rotli",
-      accentColor: "default",
-      accentHue: DEFAULT_ACCENT_HUE,
+      ...DEFAULT_APPEARANCE,
       stayOpen: false,
       showInDock: false,
     });
     shellSettings = {
       ...shellSettings,
-      theme: "system",
-      themeFamily: "mono",
+      theme: DEFAULT_APPEARANCE.theme,
+      themeFamily: DEFAULT_APPEARANCE.themeFamily,
     };
   }
   if (isMainSurface()) {

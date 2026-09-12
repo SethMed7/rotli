@@ -17,14 +17,9 @@ import { chordFromEvent, formatChord, toAccelerator } from "../../keys/chords";
 import { setSetupHandle } from "../../keys/handles";
 import { allActions, conflictFor, getAction, rebind, setDispatchSuspended } from "../../keys/registry";
 import { setGlobalShortcut } from "../../lib/tauri";
-import { ONBOARDING_STEP_NUMBER, ONBOARDING_TOTAL_STEPS } from "../../state/onboarding";
-import {
-  DEFAULT_ACCENT_HUE,
-  THEME_FAMILY_PRESENTATIONS,
-  type ThemeFamily,
-  type ThemeSetting,
-  useUiStore,
-} from "../../state/ui";
+import { DEFAULT_APPEARANCE } from "../../state/appearanceDefaults";
+import { ONBOARDING_STEP_NUMBER, ONBOARDING_TOTAL_STEPS, startingAppearance } from "../../state/onboarding";
+import { THEME_FAMILY_PRESENTATIONS, type ThemeFamily, type ThemeSetting, useUiStore } from "../../state/ui";
 import { Character } from "../character";
 
 /** Compact accessory palette for first-run; Settings owns the full hue dial.
@@ -177,6 +172,13 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
     setSetupHandle({ continue: advance, ...(index > 0 ? { back: () => move(-1) } : {}) });
     return () => setSetupHandle(null);
   });
+  // First run always opens in Rotli Light with the bare quokka, even when a
+  // version bump re-onboards a personalized install; the appearance step is
+  // where the person chooses again. Coming back from the vault step resumes at
+  // shortcuts and must keep what was just chosen.
+  useEffect(() => {
+    if (initialStep === "welcome") useUiStore.setState(startingAppearance());
+  }, [initialStep]);
 
   const pickFamily = (nextFamily: ThemeFamily) => {
     useUiStore.getState().setThemeFamily(nextFamily);
@@ -196,11 +198,7 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
       void setGlobalShortcut(action.id, action.defaultChord ? toAccelerator(action.defaultChord) : null);
     }
     useUiStore.setState({
-      theme: "system",
-      themeFamily: "mono",
-      syntaxPalette: "rotli",
-      accentColor: "default",
-      accentHue: DEFAULT_ACCENT_HUE,
+      ...DEFAULT_APPEARANCE,
       quokkaCompanionEnabled: false,
       quokkaStyle: "cocoa",
       quokkaCustomHue: DEFAULT_QUOKKA_CUSTOM_HUE,
@@ -248,6 +246,7 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
                       : "listening"
               }
               size={152}
+              accessorized={false}
               alwaysVisible
             />
             <p>

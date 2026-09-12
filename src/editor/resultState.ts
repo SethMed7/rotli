@@ -15,15 +15,9 @@ export const RESULT_MARK = "[ xX]";
 
 export type ResultState = "unanswered" | "no" | "yes";
 export type ResultChoice = Exclude<ResultState, "unanswered">;
-export type ResultColor =
-  | "accent"
-  | "blue"
-  | "green"
-  | "yellow"
-  | "purple"
-  | "red"
-  | "neutral"
-  | `#${string}`;
+import { isResultColorName, RESULT_HEX_RE, type ResultColor } from "./resultColors";
+
+export type { ResultColor } from "./resultColors";
 export const RESULT_REASON_SEPARATOR = " — ";
 
 export interface ResultOption {
@@ -71,17 +65,6 @@ export function resultStateOf(yesMark: string, noMark: string): ResultState | nu
   return yes ? "yes" : "unanswered";
 }
 
-const RESULT_COLOR_NAMES = new Set<ResultColor>([
-  "accent",
-  "blue",
-  "green",
-  "yellow",
-  "purple",
-  "red",
-  "neutral",
-]);
-const RESULT_HEX_RE = /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i;
-
 export function resultOptionOf(body: string, fallbackLabel?: string): ResultOption | null {
   const trimmed = body.trim();
   const selectedMatch = /^x\s+(.+)$/.exec(trimmed);
@@ -95,7 +78,7 @@ export function resultOptionOf(body: string, fallbackLabel?: string): ResultOpti
     const suffix = source.slice(colon + 1).trim();
     const normalized = suffix.toLowerCase();
     if (RESULT_HEX_RE.test(suffix)) color = suffix as ResultColor;
-    else if (RESULT_COLOR_NAMES.has(normalized as ResultColor)) color = normalized as ResultColor;
+    else if (isResultColorName(normalized)) color = normalized;
     else return null;
     label = source.slice(0, colon).trim();
   }

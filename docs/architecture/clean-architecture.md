@@ -75,9 +75,10 @@ and a stale exemption fails the check. The vendor seams: `exceljs`, `@excalidraw
 (`src/sheets/codec` + `src/sheets/engine`, `src/boards/engine` — plus
 `src/app.tsx`, allowed solely for Excalidraw's theme CSS import,
 `src/documents/engine` + `src/brand/univerTheme.ts`, `src/documents/codec` +
-`src/documents/create.ts`). Chat and onboarding presentation are cohesive
-clusters under `src/components/chat/` and `src/components/onboarding/`; new
-feature-specific helpers may not accumulate at `src/components/` root. `src/lib`
+`src/documents/create.ts`). Chat, onboarding, and the guided tour are cohesive
+presentation clusters under `src/components/chat/`, `src/components/onboarding/`,
+and `src/components/tour/`; new feature-specific helpers may not accumulate at
+`src/components/` root. `src/lib`
 is inward by default, with its store/service/Tauri-aware shell and gesture
 adapters named individually in the ownership registry. `bun run check:code-shape` rejects production
 module cycles and imports of test code. Architecture changes should extend these

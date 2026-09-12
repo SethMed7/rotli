@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  choiceGroupAlign,
   isControlLiteral,
   parseChoiceControlLine,
   parseChoicePromptLine,
+  setChoicePromptAlign,
   parseToggleLine,
   selectChoiceControlGroup,
   setChoiceControlSelected,
@@ -32,10 +34,48 @@ describe("hash choice controls", () => {
       indent: 0,
       indentSource: "",
       marker: "- ",
+      align: "left",
       prefixLen: 8,
       text: "Which channels should we use?",
     });
     expect(parseChoiceControlLine("- [##?] Which channels should we use?")).toBeNull();
+  });
+
+  test("a prompt marker carries the panel placement and rewrites it in source", () => {
+    expect(parseChoicePromptLine("- [##?] Plain")?.align).toBe("left");
+    expect(parseChoicePromptLine("- [##?:right] Edge")?.align).toBe("right");
+    expect(parseChoicePromptLine("  1. [##?:center] Centered")).toMatchObject({
+      indent: 2,
+      marker: "1. ",
+      align: "center",
+      prefixLen: 18,
+      text: "Centered",
+    });
+    expect(parseChoicePromptLine("- [##?:top] Unknown")).toBeNull();
+    expect(setChoicePromptAlign("- [##?] Q", "right")).toBe("- [##?:right] Q");
+    expect(setChoicePromptAlign("- [##?:right] Q", "left")).toBe("- [##?] Q");
+    expect(setChoicePromptAlign("- [##] Q", "left")).toBeNull();
+    expect(["[##?:left]", "[##?:center]", "[##?:right]"].every(isControlLiteral)).toBe(true);
+    expect(isControlLiteral("[##?:top]")).toBe(false);
+  });
+
+  test("answer rows inherit placement from the prompt of their own group", () => {
+    const lines = [
+      "- [##?:center] Q",
+      "- [##] A",
+      "- [##x] B",
+      "  - [##] Nested keeps the default",
+      "",
+      "- [##] Promptless",
+      "- [#] Radio",
+    ];
+    const at = (index: number) => lines[index];
+    expect(choiceGroupAlign(at, 1)).toBe("center");
+    expect(choiceGroupAlign(at, 2)).toBe("center");
+    expect(choiceGroupAlign(at, 3)).toBe("left");
+    expect(choiceGroupAlign(at, 5)).toBe("left");
+    expect(choiceGroupAlign(at, 6)).toBe("left");
+    expect(choiceGroupAlign(at, 0)).toBe("left");
   });
 
   test("reads exclusive circles and independent square choices", () => {

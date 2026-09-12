@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "rotli (dev)",
+  "productName": "Rotli (Dev)",
   "bundle": {
     "icon": [
       "icons-dev/32x32.png",

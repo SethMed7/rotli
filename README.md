@@ -74,9 +74,13 @@ file still enters the same intake/Library workflow when the Librarian is on.
 More fronts are planned — an email **Inbox**, mobile and tablet apps, and a
 handwriting-first notebook experience. See [ROADMAP.md](ROADMAP.md).
 
+## The first minute
+
+Every new vault starts with a **Welcome** folder in Main: the welcome note and nine short lessons (writing, tasks, choices, tables, links, views, files, AI, and a checklist). Each is an ordinary note that shows the typed syntax in backticks next to the rendered control, so you can click a checkbox, then choose **Aa → Raw markdown** to see the same text underneath. After setup, a skippable **guided tour** points at New, Main's view picker, search, Aa, Chat, and Settings; **Settings → General → Show me around** runs it again, and **Open welcome folder** brings back any lesson you deleted.
+
 ## What's built
 
-- **The editor** — hybrid markdown: the line under your caret shows raw syntax, everything else renders. `- ` starts a list, `[]` then Space makes a checkbox, `[][]` makes a left-check/right-red-X result with an optional reason, and `()` makes adjacent one-of-many options. A quiet format bar floats below. Mermaid diagrams open into a View/Visual/Code workspace: flowcharts can be built from shapes, arrows, labels, direction, and colors without leaving Mermaid, while an optional conversion creates a separate Excalidraw board copy. Typography (`Aa`) and decision styling are render layers — never written into your files.
+- **The editor** — hybrid markdown: the line under your caret shows raw syntax, everything else renders. `- ` starts a list and `[]` then Space makes a checkbox. `[][]` makes a check/X result, `[True][False]` names the answers, and `:green` after a label colors it (typing the `:` opens a color list). `[#]` rows make one-of-many choices, `[##?]` plus `[##]` rows make a multi-choice panel you can place left, center, or right, and `[|]` makes a switch. Type `| Step | Owner |` and press Enter to start a table; Shift+Enter breaks a line inside a cell, and ⇧-click or ⌘-click selects cells to clear or copy. `[[` opens a picker of your notes and closes the link for you. A quiet format bar floats below. Mermaid diagrams open into a View/Visual/Code workspace: flowcharts can be built from shapes, arrows, labels, direction, and colors without leaving Mermaid, while an optional conversion creates a separate Excalidraw board copy. Typography (`Aa`) and decision styling are render layers — never written into your files.
 - **Panes & tabs** — split with `⌘D` / `⌘⇧D`, tabs with `⌘T`; every tab stays visible and closeable. Everything drag-resizable, everything remembered.
 - **One active vault** — connect other vaults as switch targets, while the sidebar, panes, search, System counts, Librarian, and AI context remain scoped to the vault currently open.
 - **`⌘K`** — every note and action in one palette, recents first.
@@ -102,10 +106,10 @@ and keep the conventional behavior of their own formats.
 ## Personal work environments
 
 The titlebar sun cycles through paired light and dark environments in six
-families: **Rotli · Paper & Charcoal · Ocean · Grove · Iris · Midnight**. Paper
-and Charcoal remain the calm defaults, while the additional families let the
-workspace feel more personal without changing its readable hierarchy or
-keyboard behavior.
+families: **Rotli · Paper & Charcoal · Ocean · Grove · Iris · Midnight**. Rotli
+Light is where every first run starts; the other families let the workspace
+feel more personal without changing its readable hierarchy or keyboard
+behavior.
 
 <div align="center">
 <img src="docs/media/rotli-warm-dark.png" alt="rotli in Warm Dark" width="405">
@@ -138,7 +142,7 @@ bun install --frozen-lockfile
 bun run dev:app     # supervised native rotli (dev), including live vault switching
 bun run dev         # frontend only, in a plain browser (in-memory demo vault)
 bun run check       # TypeScript, tests, runtime, architecture, design, and docs
-cargo test --manifest-path src-tauri/Cargo.toml
+bun run verify      # CI's local twin: check + builds + Playwright + clippy + cargo test
 ```
 
 ## Use your workspace from Claude, Codex, or the shell
@@ -182,7 +186,8 @@ data boundary, [`SECURITY.md`](SECURITY.md) for responsible reporting, and
 
 |  |  |
 |---|---|
-| ✅ | Shell · panes & tabs · hybrid editor · `⌘K` · four work environments |
+| ✅ | Shell · panes & tabs · hybrid editor · `⌘K` · six environment families, each light and dark |
+| ✅ | **The Welcome kit** — a Welcome folder of editable lessons plus a guided tour that points at the real controls |
 | ✅ | **Your vault stays ordinary files** — Rotli adds atomic writes, watching, metadata, and persistence without taking ownership |
 | ✅ | **Search** — full-text across your notes (titles + bodies), instant |
 | ✅ | **Chat** — on-device by default, or your own connected models; your notes are its knowledge base |

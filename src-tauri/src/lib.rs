@@ -2197,6 +2197,14 @@ fn development_app_icon_is_embedded_for_the_default_variant() {
     assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
 }
 
+/// Debug builds paint the blue development icon the moment the app launches,
+/// before any webview asks for it, so a `tauri dev` instance is never mistaken
+/// for the installed app in the Dock.
+#[cfg(all(target_os = "macos", debug_assertions))]
+fn apply_dev_dock_icon(app: &AppHandle) {
+    set_app_icon(app.clone(), "default".into());
+}
+
 /// Swap the macOS Dock/app icon at runtime (Settings → Appearance → App icon).
 /// Debug builds always use the blue development icon because `tauri dev` has no
 /// app bundle to fall back to. Release builds keep the configured icon variant.
@@ -2560,6 +2568,8 @@ pub fn run() {
             // The visitor law: never in the dock, never in Cmd-Tab.
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            #[cfg(all(target_os = "macos", debug_assertions))]
+            apply_dev_dock_icon(app.handle());
 
             // Resolve Finder moves and renames before any root is registered or
             // watched. A bookmark is accepted only when the live memex.json id

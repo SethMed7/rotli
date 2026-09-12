@@ -78,6 +78,7 @@ export function SidebarFooter() {
         type="button"
         className="sb-footbtn"
         title="Settings"
+        data-tour="settings"
         data-hotkey="app.settings"
         onClick={() => dispatch("app.settings")}
       >

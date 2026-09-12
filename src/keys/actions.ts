@@ -36,6 +36,8 @@ import { navigate } from "../state/navHistory";
 import { DEFAULT_NOTE_STYLE, useNoteStyleStore } from "../state/noteStyle";
 import { activeTabOf, findLeaf, leaves, openNavTarget, usePanesStore } from "../state/panes";
 import { cycleQuick, removeQuickNote } from "../state/quick";
+import { toggleSettings } from "../state/settingsToggle";
+import { startTour } from "../state/tour";
 import { SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
 import { EDITOR_ACTION } from "./editorActionIds";
 import { captureHandle, quickHandle, setupHandle } from "./handles";
@@ -297,26 +299,12 @@ export function registerDefaultActions(): void {
       ui.setFileMetadata(ui.fileMetadata === "show" ? "hide" : "show");
     },
   });
+  registerAction({ id: "app.tour", title: "Show me around", defaultChord: null, run: startTour });
   registerAction({
     id: "app.settings",
     title: "Settings",
     defaultChord: "Meta+Comma",
-    run: () => {
-      const ui = useUiStore.getState();
-      if (
-        !ui.settingsOpen &&
-        ui.sidebarMode === "breve" &&
-        ui.breveDirty &&
-        typeof window !== "undefined" &&
-        !window.confirm("Discard your unsaved Breve changes and open Settings?")
-      )
-        return;
-      if (!ui.settingsOpen && ui.sidebarMode === "breve") ui.setBreveDirty(false);
-      ui.setPaletteOpen(false);
-      ui.setFocusMode(false);
-      ui.setContentView("panes");
-      ui.setSettingsOpen(!ui.settingsOpen);
-    },
+    run: () => toggleSettings(),
   });
 
   // The Board — quick captures collected as cards (the maintainer, 2026-06-19). A view in

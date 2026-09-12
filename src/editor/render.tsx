@@ -11,6 +11,7 @@ import { CHOICE_RE, ORDERED_CHOICE_RE } from "./choiceState";
 import { isControlLiteral } from "./controlState";
 import {
   type ChoiceControlKind,
+  type ChoicePromptAlign,
   parseChoiceControlLine,
   parseChoicePromptLine,
   parseToggleLine,
@@ -52,6 +53,8 @@ export interface Block {
   choiceSelected?: boolean;
   /** Legacy `( )`, new `[#]` radio, or `[##]` multi-select square. */
   choiceVariant?: "legacy" | ChoiceControlKind | "prompt";
+  /** Panel placement carried by a `[##?]` prompt row. */
+  choiceAlign?: ChoicePromptAlign;
   toggleOn?: boolean;
   toggleCompact?: boolean;
   toggleOptions?: ResultOption[];
@@ -125,6 +128,7 @@ export function parseBlock(line: string): Block {
       prefixLen: choicePrompt.prefixLen,
       text: choicePrompt.text,
       choiceVariant: "prompt",
+      choiceAlign: choicePrompt.align,
       ...(choicePrompt.marker === "- " ? {} : { marker: choicePrompt.marker.trim() }),
       indent,
     };

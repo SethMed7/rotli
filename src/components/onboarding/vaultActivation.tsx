@@ -197,6 +197,7 @@ export function VaultActivation({
             <Character
               name={stage === "scanning" ? "searching" : stage === "review" ? "knowledge" : "notes"}
               size={152}
+              accessorized={false}
               alwaysVisible
             />
             <p>
