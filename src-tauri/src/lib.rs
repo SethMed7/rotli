@@ -28,10 +28,12 @@ mod localmodel;
 mod memex;
 mod memex_query; mod native_drag; mod remote_agent_url; mod welcome_lessons;
 mod organizer;
+mod organizer_knobs;
 #[cfg(test)]
 mod parity_tests;
 mod private_browser;
 mod provider;
+mod provider_lane;
 mod remote_agent;
 mod routines;
 mod search_index; mod search_match;

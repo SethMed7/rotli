@@ -1292,19 +1292,30 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+/* a resolved wikilink reads as a LINK at a glance (the maintainer, 2026-09-12: the
+   dotted rule "doesn't look clickable"): a solid accent underline, and the row's
+   tint on hover so the pointer target is obvious */
 .rotli-wikilink {
   color: var(--accent-text);
   text-decoration: underline;
-  text-decoration-style: dotted;
-  text-underline-offset: 2px;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  border-radius: var(--r-inner);
   cursor: pointer;
+}
+.rotli-wikilink:hover {
+  background: var(--tint);
 }
 /* a wikilink that resolves to NO note — visibly inert so a dead click never
    reads as broken navigation (the maintainer, 2026-07-28); dashed + muted, no pointer */
 .rotli-wikilink-missing {
   color: var(--text-muted);
   text-decoration-style: dashed;
+  text-decoration-thickness: 1px;
   cursor: text;
+}
+.rotli-wikilink-missing:hover {
+  background: transparent;
 }
 /* fenced-code TOKEN COLORS (the maintainer, 2026-07-30) — IDE-grade, riding the accent
    swatch tokens so every theme (and scheme) adapts with zero new raw colors */

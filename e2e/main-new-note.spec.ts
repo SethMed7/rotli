@@ -102,3 +102,52 @@ test("browsing reuses one preview tab; re-click keeps; typing keeps", async ({ p
   await page.keyboard.type("x");
   await expect(page.locator(".tab.preview")).toHaveCount(0);
 });
+
+test("New lands beside the open note, and at the Main root when nothing is open", async ({ page }) => {
+  await gotoApp(page);
+
+  // stock Main: one note inside a folder
+  await page.locator(".sb-notes-tree .frow", { hasText: "All notes" }).first().click();
+  const mainRoot = page.locator('[data-main-id="main:"]');
+  await pointerDrag(
+    page,
+    page.locator(".recent-row", { hasText: "Groceries" }).first(),
+    await centerOf(mainRoot),
+  );
+  await page.getByRole("button", { name: "New folder in Main" }).click();
+  await page.getByRole("textbox", { name: "New folder in Main" }).fill("Bundle");
+  await page.getByRole("textbox", { name: "New folder in Main" }).press("Enter");
+  const folder = page.locator('.main-tree [data-main-folder="1"]', { hasText: "Bundle" });
+  await pointerDrag(page, page.locator(".main-row", { hasText: "Groceries" }), await centerOf(folder));
+  const groceries = page.locator(".main-row", { hasText: "Groceries" });
+  const nested = await groceries.evaluate((el) => (el as HTMLElement).style.paddingLeft);
+
+  // the note inside the folder is open → New lands beside it
+  await groceries.click();
+  await page.getByRole("button", { name: /^New note in / }).click();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Untitled");
+  await page.locator(".cm-content").last().click();
+  await page.keyboard.type("# Beside it");
+  const beside = page.locator(".main-row", { hasText: "Beside it" });
+  await expect(beside).toBeVisible();
+  expect(await beside.evaluate((el) => (el as HTMLElement).style.paddingLeft)).toBe(nested);
+
+  // close every tab → nothing open → New lands at the root, even though the
+  // folder was the last place clicked
+  const openTabs = page.getByRole("tab");
+  while ((await openTabs.count()) > 0) {
+    const tab = openTabs.first();
+    await tab.hover(); // the × on an inactive tab is hover-revealed
+    await tab.getByRole("button", { name: "Close tab — ⌘W" }).click({ force: true });
+  }
+  await expect(openTabs).toHaveCount(0);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Untitled");
+  await page.locator(".cm-content").last().click();
+  await page.keyboard.type("# At the root");
+  const root = page.locator(".main-row", { hasText: "At the root" });
+  await expect(root).toBeVisible();
+  const rootPad = await root.evaluate((el) => (el as HTMLElement).style.paddingLeft);
+  expect(rootPad).not.toBe(nested);
+  expect(Number.parseInt(rootPad, 10)).toBeLessThan(Number.parseInt(nested, 10));
+});

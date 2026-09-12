@@ -39,6 +39,9 @@
       ],
       "src-tauri/src/private_browser.rs": [
         "private_url"
+      ],
+      "src-tauri/src/provider_lane.rs": [
+        "complete_blocking"
       ]
     }
   },

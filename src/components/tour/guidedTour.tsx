@@ -48,6 +48,17 @@ export function GuidedTour() {
     };
   }, [requested, setStep]);
 
+  // the spotlit control wears data-tour-active so the stylesheet can lift it
+  // (tint + accent outline) above the scrim; a DOM attribute, not React state
+  useEffect(() => {
+    if (requested === null) return;
+    const index = nextAvailableStep(requested, 1, available);
+    const anchor = index >= 0 ? TOUR_STEPS[index]?.anchor : undefined;
+    const node = anchor ? document.querySelector<HTMLElement>(anchor) : null;
+    node?.setAttribute("data-tour-active", "");
+    return () => node?.removeAttribute("data-tour-active");
+  }, [requested, layout]);
+
   if (requested === null) return null;
   // a step whose control is not on screen is skipped, in either direction
   const step = nextAvailableStep(requested, 1, available);

@@ -12,8 +12,9 @@ export interface ColorPickSpan {
 }
 
 /** The caret sits right after `:` (plus letters) inside a control bracket:
- * a `[` with no `]` since, opened at a list marker, right after another box
- * (`][`), or on the far side of a toggle's `|`. Backticked spans are opaque. */
+ * a `[` with no `]` since, opened at a list marker or at the start of a line
+ * (the first box is typed before Space expands the row), right after another
+ * box (`][`), or on the far side of a toggle's `|`. Backticked spans are opaque. */
 export function colorPickAt(line: string, caret: number): ColorPickSpan | null {
   const before = line.slice(0, caret);
   const match = /:([a-zA-Z]*)$/.exec(before);
@@ -24,7 +25,7 @@ export function colorPickAt(line: string, caret: number): ColorPickSpan | null {
   const inner = before.slice(opener + 1, colon);
   if (inner.includes("[")) return null;
   const lead = before.slice(0, opener);
-  const control = /(?:^\s*(?:-|\d+\.) |\])$/.test(lead) || inner.includes("|");
+  const control = /(?:^\s*(?:-|\d+\.) |\])$|^\s*$/.test(lead) || inner.includes("|");
   if (!control) return null;
   if ((before.match(/`/g) ?? []).length % 2 === 1) return null;
   return { from: colon + 1, to: caret, query: match[1] ?? "" };

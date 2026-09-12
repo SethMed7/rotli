@@ -59,3 +59,32 @@ test("⌘-click gathers Main rows and one drag moves them all into a folder", as
   await expect(page.locator(".main-tree", { hasText: "Quokka world" })).toBeVisible();
   void inFolder;
 });
+
+test("dropping a note just below a folder row takes it back out to the folder's level", async ({ page }) => {
+  await gotoApp(page);
+
+  await page.locator(".sb-notes-tree .frow", { hasText: "All notes" }).first().click();
+  const mainRoot = page.locator('[data-main-id="main:"]');
+  await pointerDrag(
+    page,
+    page.locator(".recent-row", { hasText: "Groceries" }).first(),
+    await centerOf(mainRoot),
+  );
+  await page.getByRole("button", { name: "New folder in Main" }).click();
+  await page.getByRole("textbox", { name: "New folder in Main" }).fill("Bundle");
+  await page.getByRole("textbox", { name: "New folder in Main" }).press("Enter");
+  const folder = page.locator('.main-tree [data-main-folder="1"]', { hasText: "Bundle" });
+  const groceries = page.locator(".main-row", { hasText: "Groceries" });
+  const rootPad = await groceries.evaluate((el) => (el as HTMLElement).style.paddingLeft);
+
+  await pointerDrag(page, groceries, await centerOf(folder));
+  const nestedPad = await groceries.evaluate((el) => (el as HTMLElement).style.paddingLeft);
+  expect(nestedPad).not.toBe(rootPad);
+
+  // the lower quarter of the folder row = "after the folder" (a sibling), not into it
+  const box = await folder.boundingBox();
+  if (!box) throw new Error("folder row has no box");
+  await pointerDrag(page, groceries, { x: box.x + box.width / 2, y: box.y + box.height * 0.85 });
+  expect(await groceries.evaluate((el) => (el as HTMLElement).style.paddingLeft)).toBe(rootPad);
+  await expect(folder).toBeVisible();
+});

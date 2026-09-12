@@ -8,7 +8,7 @@
 
 import { expect, test } from "@playwright/test";
 
-import { edgePoint, gotoApp, pointerDrag } from "./support";
+import { centerOf, edgePoint, gotoApp, pointerDrag } from "./support";
 
 test("dragging a tab past the last tab lands it at the very end, not before it", async ({ page }) => {
   await gotoApp(page);
@@ -35,4 +35,42 @@ test("dragging a tab past the last tab lands it at the very end, not before it",
   await pointerDrag(page, welcome, dropPoint);
 
   await expect(tabs).toHaveText([/Pricing decision/, /Groceries/, /rotli — notes first/]);
+});
+
+test("a Main note dragged onto a pane opens there; onto a pane edge it carves a split", async ({ page }) => {
+  await gotoApp(page);
+
+  await page.locator(".sb-notes-tree .frow", { hasText: "All notes" }).first().click();
+  const mainRoot = page.locator('[data-main-id="main:"]');
+  for (const title of ["Groceries", "Pricing decision"]) {
+    await pointerDrag(
+      page,
+      page.locator(".recent-row", { hasText: title }).first(),
+      await centerOf(mainRoot),
+    );
+  }
+  // back to the panes so a pane body is on screen
+  await page.locator(".main-row", { hasText: "Groceries" }).click();
+  const panes = page.locator("section:has(> [data-pane-body])");
+  await expect(panes).toHaveCount(1);
+  const tabs = page.getByRole("tab");
+  const before = await tabs.count();
+
+  // center of the pane → a new tab in it
+  await pointerDrag(
+    page,
+    page.locator(".main-row", { hasText: "Pricing decision" }),
+    await centerOf(panes.first().locator("[data-pane-body]")),
+  );
+  await expect(tabs).toHaveCount(before + 1);
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Pricing decision");
+
+  // right edge → a second pane holding the note
+  await pointerDrag(
+    page,
+    page.locator(".main-row", { hasText: "Groceries" }),
+    await edgePoint(panes.first().locator("[data-pane-body]"), "right"),
+  );
+  await expect(panes).toHaveCount(2);
+  await expect(panes.nth(1).getByRole("tab", { selected: true })).toContainText("Groceries");
 });

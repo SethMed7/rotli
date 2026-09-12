@@ -22,6 +22,7 @@ import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
 import { useViewsStore } from "../state/views";
 import { newItemDefinition, type NewItemKind } from "./model";
+import { newItemParent } from "./placement";
 import { createNewItem, type CreatedItem, type NewItemCreator, type NewItemPresenter } from "./workflow";
 
 function focusedItemId(): string | null {
@@ -35,20 +36,12 @@ function focusedItemId(): string | null {
   return null;
 }
 
-function selectedMainFolder(): string | null {
-  const selected = useUiStore.getState().selectedFolderId;
-  return selected.startsWith(MAIN_ROOT) && selected !== MAIN_ROOT ? selected : null;
-}
-
 function mainParent(): string {
   const activeView = useUiStore.getState().activeView;
   const tree = activeView
     ? viewTree(useViewsStore.getState().manifest, activeView)
     : useMainStore.getState().manifest.tree;
-  const selected = selectedMainFolder();
-  if (selected && mainFolderIds(tree).includes(selected)) return selected;
-  const current = focusedItemId();
-  return (current && mainParentOfNote(tree, current)) || MAIN_ROOT;
+  return newItemParent(tree, focusedItemId());
 }
 
 interface FilingContext {

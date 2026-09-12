@@ -683,6 +683,43 @@ test("typing : inside a result bracket opens the color list; numbers, letters an
   await expect(editor).toContainText("- [Go:cyan|x Stop:black] Route");
 });
 
+test("the first box at a line start opens the color list; unlabeled rows rotate colors and a color-only pair reads Yes/No", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  // the first box is typed BEFORE Space expands the row — no list marker yet
+  await page.keyboard.type("[Low:gre");
+  const list = page.getByRole("listbox", { name: "Label color" });
+  await expect(list).toBeVisible();
+  await expect(list.getByRole("option").first()).toHaveText(/green/i);
+  await page.keyboard.press("Escape");
+  await page.keyboard.type("en][Mid][High][Top]");
+  await page.keyboard.press("Space");
+  await page.keyboard.type("Priority");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("[:purple][:accent]");
+  await page.keyboard.press("Space");
+  await page.keyboard.type("Go");
+  await page.locator(".ed-date").click();
+  const colorOf = (name: string) =>
+    page
+      .getByRole("button", { name, exact: true })
+      .evaluate((el) => (el as HTMLElement).style.getPropertyValue("--result-color"));
+  const colors = await Promise.all(["Low", "Mid", "High", "Top"].map(colorOf));
+  expect(new Set(colors).size).toBe(4);
+  expect(colors[0]).toContain("success");
+  const yes = page.getByRole("button", { name: "Yes", exact: true });
+  await expect(yes).toBeVisible();
+  await expect(page.getByRole("button", { name: "No", exact: true })).toBeVisible();
+  expect(await yes.evaluate((el) => (el as HTMLElement).style.getPropertyValue("--result-color"))).toContain(
+    "violet",
+  );
+});
+
 test("() creates a tab-navigable Markdown multiple-choice group", async ({ page }) => {
   await gotoApp(page);
   await page.keyboard.press("Meta+T");

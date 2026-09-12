@@ -75,7 +75,9 @@ test("a Mermaid diagram item is born with the starter fence", async ({ page }) =
   await expect(page.locator(".rotli-render-mermaid-trigger")).toBeVisible();
 });
 
-test("an item chosen after selecting a Main folder is filed in that folder", async ({ page }) => {
+test("an item chosen with a Main folder merely selected lands beside the open note, not in the folder", async ({
+  page,
+}) => {
   await gotoApp(page);
 
   await page.getByRole("button", { name: "New folder in Main" }).click();
@@ -96,7 +98,10 @@ test("an item chosen after selecting a Main folder is filed in that folder", asy
   await expect(folderContents.locator(".main-row", { hasText: "Untitled" })).toHaveCount(0);
   await page.locator(".pane.focused .cm-content").click();
   await page.keyboard.type("# Filed sketch");
-  await expect(folderContents.locator(".main-row", { hasText: "Filed sketch" })).toHaveCount(1);
+  // the welcome note was open at the Main root, so the new item lands there —
+  // clicking a folder row no longer redirects creation (newItems/placement.ts)
+  await expect(page.locator(".main-tree .main-row", { hasText: "Filed sketch" })).toHaveCount(1);
+  await expect(folderContents.locator(".main-row", { hasText: "Filed sketch" })).toHaveCount(0);
 });
 
 test("an Excalidraw board asks for its name before creation", async ({ page }) => {

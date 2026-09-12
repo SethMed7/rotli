@@ -10,6 +10,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.93.0] - 2026-09-12
+
+The second review round on the Welcome kit: the Librarian may file through a
+connected client you chose, setup knows your Mac before the Models step, the
+editor's color list and result colors behave, and Main's new-note and drag
+rules follow what is open.
+
+### Added
+
+- The Librarian can file through a connected client you chose: Settings →
+  Librarian and the first-run Models step offer On this Mac plus every
+  signed-in Claude, ChatGPT, or Gemini client (Cursor never files notes).
+  Two consents gate it — the choice and the lane's switch in Connections —
+  and Rust checks both every cycle, so a chosen-but-off lane files on this
+  Mac and says so. The call rides the same seam as chat (provider policy,
+  secret scan, model allowlists); secure and locked notes are skipped before
+  any prompt exists. When Gemini is signed in on this Mac, the Models step
+  proposes it as the Librarian; the lane still waits for you to turn it on.
+- First-run setup probes local models and signed-in clients from its first
+  screen, so the Models step opens already knowing what this Mac has instead
+  of "Checking…". Gemini is named in that step's heading and copy.
+- A note dragged from Main onto a pane opens there: the pane center or its
+  tab strip adds a tab, and an edge carves a split holding the note, with the
+  same dropzones a dragged tab shows. Folders and gathered selections still
+  move only within Main.
+- A color-only result pair such as `[:purple][:accent]` now renders as Yes
+  and No in those colors, the way `[:blue|:green]` already reads as a switch.
+
+### Changed
+
+- The guided tour's spotlight is unmistakable: a thicker accent ring with a
+  breathing halo, and the highlighted control itself lifts with a tint and
+  accent outline.
+- New (the header button, ⌘T, and the chooser) files the note beside the note
+  that is open, and at the Main root when nothing is open. The last folder
+  clicked in the sidebar no longer decides, so a note created on an empty
+  window no longer lands inside the Welcome folder. Inside a named view the
+  same rule applies: the view stays the context, and a merely selected view
+  folder no longer nests the new item.
+- A result row with three or more answers gives every uncolored answer its
+  own color from a fixed rotation (blue, purple, orange, cyan, pink, yellow,
+  brown, green, red), skipping colors chosen by hand and repeating only when
+  the rotation runs out. Rows that used to show every answer in the accent
+  color now show distinct colors; the source text is unchanged.
+- A resolved wikilink reads as a link: a solid accent underline instead of a
+  dotted one, and the row tint on hover. Unresolved links stay dashed and
+  muted.
+
+### Fixed
+
+- The color list did not open for the first box typed at the start of a line
+  (`[True:gre` before Space expands the row); it opened only after a list
+  marker or a second box. It now opens for the first box too.
+
 ## [0.92.0] - 2026-09-12
 
 The Welcome kit release: every lesson teaches the typed syntax, a guided tour

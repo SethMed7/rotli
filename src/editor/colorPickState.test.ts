@@ -10,6 +10,13 @@ test("a colon inside a result or toggle bracket opens the picker with the typed 
   expect(colorPickAt("1. [Yes:", 8)).toMatchObject({ query: "" });
 });
 
+test("the first box typed at the start of a line opens the picker before Space expands the row", () => {
+  expect(colorPickAt("[True:gre", 9)).toEqual({ from: 6, to: 9, query: "gre" });
+  expect(colorPickAt("  [Yes:", 7)).toMatchObject({ from: 7, query: "" });
+  expect(colorPickAt("[:", 2)).toMatchObject({ query: "" });
+  expect(colorPickAt("Some [note:", 11)).toBeNull();
+});
+
 test("prose, links, closed brackets, hex values, and code stay quiet", () => {
   expect(colorPickAt("see [note:", 10)).toBeNull();
   expect(colorPickAt("- [True:green] done at 10:", 26)).toBeNull();

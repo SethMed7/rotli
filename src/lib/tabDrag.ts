@@ -11,7 +11,7 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 
 import type { DropPos } from "../services/mainTree";
-import { type DropZone, leaves, usePanesStore } from "../state/panes";
+import { type DropPreview, type DropZone, leaves, usePanesStore } from "../state/panes";
 import { createDragGhost } from "./dragGhost";
 import { commitMainAdd, mainDropAt } from "./mainAddDrag";
 import { createPointerDragSession } from "./pointerDrag";
@@ -27,6 +27,21 @@ function zoneAt(rect: DOMRect, x: number, y: number): DropZone {
   if (fy < EDGE_BAND) return "up";
   if (fy > 1 - EDGE_BAND) return "down";
   return "center";
+}
+
+/** The pane target under a point: a strip (with its insertion index) or a
+ * pane body's 5-zone split-or-move; null off the panes. Shared with the
+ * sidebar's note drag (lib/paneDropDrag) so both paint the same previews. */
+export function panePreviewAt(x: number, y: number): DropPreview {
+  const el = document.elementFromPoint(x, y);
+  const strip = el?.closest<HTMLElement>("[data-tabscroll]");
+  if (strip?.dataset.paneId)
+    return { kind: "strip", paneId: strip.dataset.paneId, index: stripIndex(strip, x) };
+  const body = el?.closest<HTMLElement>("[data-pane-body]");
+  if (body?.dataset.leafId) {
+    return { kind: "zone", leafId: body.dataset.leafId, zone: zoneAt(body.getBoundingClientRect(), x, y) };
+  }
+  return null;
 }
 
 /** Pointer x vs each tab's midpoint within a strip → the insertion index. */
@@ -61,19 +76,9 @@ export function startTabDrag(
     // reset the Main-drop candidate each move; the branches below re-set it
     clearMainHover();
     mainDrop = null;
-    const el = document.elementFromPoint(x, y);
-    const strip = el?.closest<HTMLElement>("[data-tabscroll]");
-    if (strip?.dataset.paneId) {
-      store().setDropPreview({ kind: "strip", paneId: strip.dataset.paneId, index: stripIndex(strip, x) });
-      return;
-    }
-    const body = el?.closest<HTMLElement>("[data-pane-body]");
-    if (body?.dataset.leafId) {
-      store().setDropPreview({
-        kind: "zone",
-        leafId: body.dataset.leafId,
-        zone: zoneAt(body.getBoundingClientRect(), x, y),
-      });
+    const pane = panePreviewAt(x, y);
+    if (pane) {
+      store().setDropPreview(pane);
       return;
     }
     // over the sidebar's Main tree → highlight the row, arm a Main add

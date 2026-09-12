@@ -254,10 +254,10 @@ describe("parseSettings — creation and Brain model", () => {
     expect(parseSettings('{"tabLayout":"compress"}').tabLayout).toBe("scroll");
   });
 
-  test("legacy remote organizer settings fail closed to local", () => {
-    expect(parseSettings('{"organizerModel":"gemini35"}').organizerModel).toBe("local");
-    expect(parseSettings('{"organizerModel":"claude"}').organizerModel).toBe("local");
-    expect(parseSettings('{"organizerModel":"future"}').organizerModel).toBe("local");
+  test("the Librarian lane keeps the connected clients and fails closed on everything else", () => {
+    const lane = (id: string) => parseSettings(`{"organizerModel":"${id}"}`).organizerModel;
+    expect(["claude", "antigravity"].map(lane)).toEqual(["claude", "antigravity"]);
+    expect(["gemini35", "cursor", "future"].map(lane)).toEqual(["local", "local", "local"]);
   });
 
   test("quick-note and quick-capture vault choices are independent and optional", () => {

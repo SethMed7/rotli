@@ -33,10 +33,16 @@ use ulid::Ulid;
 
 use crate::chat::{self, WireMsg};
 use crate::corpus::{self, CorpusState};
+use crate::organizer_knobs::{connected_lane, parse_knobs, Knobs, DEFAULT_QUIET};
 
 /// The daemon's model timeout — deliberately far below chat's 120s so a stuck
 /// server never camps a background thread (doc §2: "shorter timeout than chat").
 const MODEL_TIMEOUT: Duration = Duration::from_secs(45);
+/// A connected client thinks longer than the on-device model; the child
+/// registry's watchdog is the backstop.
+const CONNECTED_TIMEOUT: Duration = Duration::from_secs(120);
+/// The request id every organizer completion registers under.
+const ORGANIZER_REQUEST_ID: &str = "organizer";
 /// Daemon replies are one small JSON object (classify: an area + confidence;
 /// enrich: a summary line + short tag/link arrays) — cap generation accordingly.
 const GEN_MAX_TOKENS: u32 = 512;
@@ -55,13 +61,6 @@ const GATE_RECHECK: Duration = Duration::from_secs(60);
 /// Model-offline backoff band (doc §4.8: queue, never block; resume cleanly).
 const BACKOFF_MIN: Duration = Duration::from_secs(30);
 const BACKOFF_MAX: Duration = Duration::from_secs(15 * 60);
-/// Knob defaults — knob-not-constant per §6.4; the settings.json keys
-/// (`organizerThreshold` / `organizerQuietSecs`) override per cycle.
-const DEFAULT_THRESHOLD: f64 = 0.8;
-/// Default quiet window: organize a note only after it's sat UNTOUCHED this long
-/// (the maintainer, 2026-07-03: "watch the file, wait 5 minutes, then organize"). The
-/// `organizerQuietSecs` knob overrides it per cycle.
-const DEFAULT_QUIET: Duration = Duration::from_secs(300);
 /// How much note body rides in a classify/enrich prompt (chars — the model only
 /// needs the gist, and `_inbox` captures are usually short anyway).
 const BODY_BUDGET: usize = 4000;
@@ -1149,65 +1148,6 @@ pub(crate) fn plan_wait(
     }
 }
 
-// ─── knobs (settings.json — frontend-owned, Rust READS only) ─────────────────
-
-/// Which model the organizer runs. Legacy remote values parse to Local so an
-/// old or hand-edited settings file cannot reactivate provider execution.
-#[derive(Clone, Copy, PartialEq, Debug)]
-enum OrgModel {
-    Local,
-}
-
-impl OrgModel {
-    fn parse(s: &str) -> Self {
-        let _ = s;
-        OrgModel::Local
-    }
-}
-
-struct Knobs {
-    /// The vault's Brain master switch (decision 2026-07-26, vault-vs-brain):
-    /// false = a RAW vault — no cycles, no sweeps, no model calls, ever.
-    /// Missing from settings ⇒ true (existing vaults keep today's behavior
-    /// byte-for-byte; the field is additive and no migration writes it).
-    brain_enabled: bool,
-    trust: Option<Trust>,
-    threshold: f64,
-    quiet: Duration,
-    model: OrgModel,
-}
-
-fn parse_knobs(settings_json: &str) -> Knobs {
-    let v: serde_json::Value =
-        serde_json::from_str(settings_json).unwrap_or(serde_json::Value::Null);
-    Knobs {
-        brain_enabled: v
-            .get("brainEnabled")
-            .and_then(serde_json::Value::as_bool)
-            .unwrap_or(true),
-        trust: v
-            .get("organizerTrust")
-            .and_then(|t| t.as_str())
-            .map(Trust::parse),
-        threshold: v
-            .get("organizerThreshold")
-            .and_then(serde_json::Value::as_f64)
-            .filter(|t| (0.0..=1.0).contains(t))
-            .unwrap_or(DEFAULT_THRESHOLD),
-        quiet: v
-            .get("organizerQuietSecs")
-            .and_then(serde_json::Value::as_f64)
-            .filter(|q| q.is_finite() && *q >= 0.0)
-            .map(Duration::from_secs_f64)
-            .unwrap_or(DEFAULT_QUIET),
-        model: v
-            .get("organizerModel")
-            .and_then(|m| m.as_str())
-            .map(OrgModel::parse)
-            .unwrap_or(OrgModel::Local),
-    }
-}
-
 /// Re-read the knobs each cycle. Trust is adopted from settings.json only when
 /// the FILE'S value changed since the last read (startup seed + external edits)
 /// — never as a blind overwrite. `organizer_set_trust` flips the in-memory rung
@@ -2169,6 +2109,9 @@ fn app_backgrounded(app: &tauri::AppHandle) -> bool {
 /// a live vault switch can retarget the one worker without restarting Rotli.
 pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: String) {
     handle.0.running.store(true, Ordering::SeqCst);
+    // a connected lane runs through the same child registry as chat, so the
+    // watchdog can kill a hung client
+    let children = Arc::clone(&app.state::<crate::provider::ProviderState>().children);
     // install the live-progress sink — run_cycle narrates through it and the
     // Activity surface listens ("rotli:organizer-progress"); titles only
     {
@@ -2371,23 +2314,41 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                 // the gates passed — the nudge's cycle is really starting (#29)
                 inner.run_now.store(false, Ordering::SeqCst);
             }
-            // The organizer is structurally on-device. Parse the knob each
-            // cycle only to apply the legacy migration at the native boundary.
-            let _org_model = {
+            // The lane is re-read every cycle: on this Mac, or the connected
+            // client the user chose in Settings → Librarian AND turned on in
+            // Connections (organizer_knobs::connected_lane). Secure and locked
+            // notes were already skipped before any prompt is built, so a
+            // connected lane only ever sees what a chat lane could.
+            let lane = {
                 let s = corpus_state
                     .route(&root_id, |s| s.dot_read("settings"))
                     .unwrap_or_else(|_| "{}".into());
-                parse_knobs(&s).model
+                connected_lane(&s)
             };
-            let transport = |prompt: &str| {
-                let msgs = [WireMsg {
-                    role: "user".to_string(),
-                    content: prompt.to_string(),
-                    images: Vec::new(),
-                }];
-                chat::complete_local(&msgs, true, 0.0, GEN_MAX_TOKENS, MODEL_TIMEOUT)
+            let transport = |prompt: &str| match &lane {
+                Some(lane) => crate::provider_lane::complete_blocking(
+                    &children,
+                    ORGANIZER_REQUEST_ID,
+                    &lane.provider,
+                    &lane.model,
+                    prompt,
+                    CONNECTED_TIMEOUT,
+                    None,
+                    None,
+                    None,
+                ),
+                None => {
+                    let msgs = [WireMsg {
+                        role: "user".to_string(),
+                        content: prompt.to_string(),
+                        images: Vec::new(),
+                    }];
+                    chat::complete_local(&msgs, true, 0.0, GEN_MAX_TOKENS, MODEL_TIMEOUT)
+                }
             };
-            *inner.model_label.lock().unwrap() = chat::DEFAULT_MODEL.to_string();
+            *inner.model_label.lock().unwrap() = lane
+                .as_ref()
+                .map_or_else(|| chat::DEFAULT_MODEL.to_string(), |l| format!("{}:{}", l.provider, l.model));
             // a Stop belongs to the cycle it interrupted, never to the next
             // one — cleared BEFORE busy goes up, so no press can slip into the
             // gap and be silently eaten while the UI shows busy (review F5)
@@ -3539,46 +3500,6 @@ mod tests {
             Trust::parse_strict("garbage").is_none(),
             "the command rejects junk"
         );
-        // knob parsing: bad values fall back, never explode
-        let k = parse_knobs("{\"organizerTrust\":\"organize\",\"organizerThreshold\":0.6,\"organizerQuietSecs\":10}");
-        assert_eq!(k.trust, Some(Trust::Organize));
-        assert_eq!(k.threshold, 0.6);
-        assert_eq!(k.quiet, Duration::from_secs(10));
-        let k = parse_knobs("{\"organizerThreshold\":7}");
-        assert_eq!(
-            k.threshold, DEFAULT_THRESHOLD,
-            "out-of-band threshold → default"
-        );
-        assert_eq!(k.trust, None);
-        let k = parse_knobs("not json");
-        assert_eq!(k.threshold, DEFAULT_THRESHOLD);
-        assert_eq!(k.quiet, DEFAULT_QUIET);
-        assert_eq!(
-            k.model,
-            OrgModel::Local,
-            "absent/garbage organizerModel → on-device"
-        );
-        // Legacy remote values fail closed to the on-device lane.
-        assert_eq!(
-            parse_knobs("{\"organizerModel\":\"claude\"}").model,
-            OrgModel::Local
-        );
-        assert_eq!(
-            parse_knobs("{\"organizerModel\":\"Claude\"}").model,
-            OrgModel::Local
-        );
-        assert_eq!(
-            parse_knobs("{\"organizerModel\":\"gemini35\"}").model,
-            OrgModel::Local
-        );
-        assert_eq!(
-            parse_knobs("{\"organizerModel\":\"local\"}").model,
-            OrgModel::Local
-        );
-        assert_eq!(
-            parse_knobs("{\"organizerModel\":\"gpt\"}").model,
-            OrgModel::Local
-        );
     }
 
     // ── the cycle ──
@@ -4212,6 +4133,31 @@ mod tests {
     /// THE vault-vs-brain acceptance test (decision 2026-07-26): a raw vault
     /// never reaches a model and never changes a file — and toggling the Brain
     /// off → on (Suggest) → off leaves every user file byte-identical.
+    /// A raw vault stays raw even when a connected Librarian lane is chosen
+    /// AND switched on: the brain-off exit sits before any prompt is built, so
+    /// the lane never sees a note (the class the 2026-08-01 audit found —
+    /// a background lane reaching a client on looser terms than chat).
+    #[test]
+    fn raw_vault_never_reaches_a_connected_lane() {
+        let (_dir, root, state, handle) = seed_brain();
+        write_settings(
+            &state,
+            "{\"brainEnabled\":false,\"organizerTrust\":\"organize\",\"organizerQuietSecs\":0,\"organizerModel\":\"claude\",\"aiProviders\":{\"claude\":true}}",
+        );
+        let plain = stage_capture(&state, "# Alazan 84\n\nland deal notes\n");
+        let calls = AtomicUsize::new(0);
+        let counting = |p: &str| {
+            calls.fetch_add(1, Ordering::SeqCst);
+            dual_transport(p)
+        };
+        handle.enqueue(&root, &[root.join(&plain)]);
+        let report =
+            run_cycle(&state, "default", &root, &handle.0, &no_gates(), &counting).unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), 0, "raw vault: the lane never fires");
+        assert_eq!((report.proposals, report.applied), (0, 0));
+        assert!(journal_rows(&state).is_empty());
+    }
+
     #[test]
     fn raw_vault_never_models_and_toggling_never_changes_files() {
         let (_dir, root, state, handle) = seed_brain();

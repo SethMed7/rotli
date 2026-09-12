@@ -24,7 +24,9 @@ import {
 import { dispatch } from "../../keys/registry";
 import { createDragGhost } from "../../lib/dragGhost";
 import { noteDiskFolder, projectNoteToBrain } from "../../lib/noteLocation";
+import { commitPaneDrop } from "../../lib/paneDropDrag";
 import { createPointerDragSession } from "../../lib/pointerDrag";
+import { panePreviewAt } from "../../lib/tabDrag";
 import { useNow } from "../../lib/useNow";
 import { DEST, isRootMarker } from "../../services/destinations";
 import {
@@ -64,7 +66,7 @@ import {
 } from "../../services/viewTree";
 import { useContextMenu } from "../../state/contextMenu";
 import { useMainStore } from "../../state/main";
-import { sidebarItemId, useFocusedTab, usePanesStore } from "../../state/panes";
+import { type DropPreview, sidebarItemId, useFocusedTab, usePanesStore } from "../../state/panes";
 import { QUICK_MAX, togglePinQuick } from "../../state/quick";
 import { ALL_NOTES, SEC_SYSTEM, TASKS, useUiStore } from "../../state/ui";
 import { useViewsStore } from "../../state/views";
@@ -445,6 +447,10 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     const dragIds = mainSel.has(id) && mainSel.size > 1 ? [...mainSel] : [id];
     const dragLabel = dragIds.length > 1 ? `${dragIds.length} items` : label;
     let drop: { id: string; pos: DropPos } | null = null;
+    // one NOTE may also land on the panes (lib/paneDropDrag); folders and
+    // gathered selections only move within Main
+    const paneable = dragIds.length === 1 && !id.startsWith(MAIN_ROOT);
+    let paneDrop: DropPreview = null;
     didMainDragRef.current = false;
     createPointerDragSession(e, {
       ghost: (x, y) => createDragGhost(dragLabel, x, y),
@@ -452,12 +458,15 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
       onStart: () => {
         didMainDragRef.current = true;
         setMainDragId(id);
+        if (paneable) usePanesStore.getState().setDraggingTab({ paneId: null, tabId: null });
       },
       onMove: (x, y) => {
         const hit = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest(
           "[data-main-id]",
         ) as HTMLElement | null;
         const tid = hit?.dataset.mainId;
+        paneDrop = !hit && paneable ? panePreviewAt(x, y) : null;
+        usePanesStore.getState().setDropPreview(paneDrop);
         if (!hit || !tid || dragIds.includes(tid)) {
           drop = null;
           setMainDrop(null);
@@ -473,6 +482,10 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
         setMainDrop(drop);
       },
       onDrop: () => {
+        if (paneDrop) {
+          commitPaneDrop(id, paneDrop);
+          return;
+        }
         const d = drop;
         if (!d) return;
         let tree = activeTree;
@@ -483,6 +496,9 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
       onEnd: () => {
         setMainDragId(null);
         setMainDrop(null);
+        const panes = usePanesStore.getState();
+        panes.setDraggingTab(null);
+        panes.setDropPreview(null);
       },
     });
   };
