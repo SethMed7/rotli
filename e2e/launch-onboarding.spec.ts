@@ -94,6 +94,10 @@ test("fresh onboarding seeds a Welcome folder in Main and opens the welcome note
 test("every Welcome note opens from Main as an ordinary note and the practice-vault option is gone", async ({
   page,
 }) => {
+  // ten note opens re-render the Main tree each time; the hosted runner needs
+  // the slow budget, and the taller viewport keeps every row inside the sidebar
+  test.slow();
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/?onboarding");
   await page.getByRole("button", { name: "Skip app setup" }).click();
   await expect(page.getByRole("radio", { name: /practice vault/i })).toHaveCount(0);
@@ -102,6 +106,7 @@ test("every Welcome note opens from Main as an ordinary note and the practice-va
   const rows = lessonRows(page);
   for (let index = 0; index < 10; index++) {
     const title = (await rows.nth(index).textContent())!.trim();
+    await rows.nth(index).scrollIntoViewIfNeeded();
     await rows.nth(index).click();
     await expect(page.getByRole("tab", { selected: true })).toContainText(title);
     await expect(page.locator(".cm-content").last()).toContainText(title);
@@ -112,6 +117,9 @@ test("every Welcome note opens from Main as an ordinary note and the practice-va
 test("checkboxes and list markers align with the H1 in every environment and a narrow window", async ({
   page,
 }, testInfo) => {
+  // twelve environment switches with a geometry probe and two screenshots
+  // each outgrow the default budget on the hosted runner
+  test.slow();
   await page.setViewportSize({ width: 1440, height: 900 });
   await onboard(page);
   await lessonRows(page).nth(2).click();
