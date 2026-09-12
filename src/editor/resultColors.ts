@@ -69,3 +69,28 @@ export function selectedInk(color: ResultColor | null): string {
 export function colorEdge(color: ResultColor | null): string {
   return color === "white" || color === "black" ? "var(--border)" : colorValue(color);
 }
+
+/** The order uncolored options take when a row has three or more: away from
+ * red and green first, since those two carry pass/fail meaning in this same
+ * grammar. Neutral, black, white, and accent are never handed out. */
+const ROTATION: readonly ResultColorName[] = [
+  "blue",
+  "purple",
+  "orange",
+  "cyan",
+  "pink",
+  "yellow",
+  "brown",
+  "green",
+  "red",
+];
+
+/** Fill the null slots so every option in a row reads differently: colors
+ * chosen by hand are skipped, and the list only repeats once it runs out. */
+export function rotateColors(colors: readonly (ResultColor | null)[]): ResultColor[] {
+  const taken = new Set(colors.filter((color) => color !== null));
+  const free = ROTATION.filter((name) => !taken.has(name));
+  const pool = free.length > 0 ? free : ROTATION;
+  let next = 0;
+  return colors.map((color) => color ?? pool[next++ % pool.length] ?? "accent");
+}

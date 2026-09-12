@@ -87,6 +87,34 @@ describe("two-choice result grammar", () => {
     ]);
   });
 
+  test("a color-only pair reads as Yes and No in those colors", () => {
+    expect(parseResultLine("- [:purple][:accent] Decision")?.options).toMatchObject([
+      { label: "Yes", color: "purple", source: ":purple" },
+      { label: "No", color: "accent", source: ":accent" },
+    ]);
+    expect(chooseResult("- [:purple][:accent] Decision", 0)).toBe("- [x :purple][:accent] Decision");
+    expect(parseResultLine("- [:purple][:accent][:red] Decision")).toBeNull();
+  });
+
+  test("three or more options without colors each get a different color, skipping any chosen by hand", () => {
+    expect(parseResultLine("- [Low][Mid][High] Priority")?.options.map((option) => option.color)).toEqual([
+      "blue",
+      "purple",
+      "orange",
+    ]);
+    expect(
+      parseResultLine("- [Low:blue][Mid][High][Top] Priority")?.options.map((option) => option.color),
+    ).toEqual(["blue", "purple", "orange", "cyan"]);
+    const many = parseResultLine(`- ${"[a]".repeat(12)} Wide`)?.options.map((option) => option.color) ?? [];
+    expect(new Set(many.slice(0, 9)).size).toBe(9);
+    expect(many[9]).toBe(many[0]);
+    expect(parseResultLine("- [Low][Mid][High] Priority")?.options.map((option) => option.source)).toEqual([
+      "Low",
+      "Mid",
+      "High",
+    ]);
+  });
+
   test("choosing a labeled option preserves labels and colors and clears its siblings", () => {
     expect(chooseResult(`- [x True:green][Draw:${CUSTOM_AMBER}][False:red] Ship it`, 1)).toBe(
       `- [True:green][x Draw:${CUSTOM_AMBER}][False:red] Ship it`,

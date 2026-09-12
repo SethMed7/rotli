@@ -113,7 +113,12 @@ imports.
   click, or the keys 1–9 and 0 choose, Escape dismisses it.
   `#RGB` and `#RRGGBB` values are also accepted, for example
   `[Draw:#E3B341]`. An uncolored two-option result defaults to green then red;
-  other uncolored labeled options use the active theme accent.
+  a row of three or more options gives every uncolored option its own color
+  from a fixed rotation (blue, purple, orange, cyan, pink, yellow, brown,
+  green, red), skipping colors already chosen by hand and repeating only when
+  the rotation runs out. A color-only pair such as `[:purple][:accent]` reads
+  as Yes and No in those colors, like the compact form; three or more
+  color-only boxes fail closed.
   Unknown names, malformed hex values, and multiple selected boxes fail closed
   as ordinary Markdown. Color is presentation only; the label and pressed
   state keep the choice understandable without color.

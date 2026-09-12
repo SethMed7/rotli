@@ -10,6 +10,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A color-only result pair such as `[:purple][:accent]` now renders as Yes
+  and No in those colors, the way `[:blue|:green]` already reads as a switch.
+
+### Changed
+
+- A result row with three or more answers gives every uncolored answer its
+  own color from a fixed rotation (blue, purple, orange, cyan, pink, yellow,
+  brown, green, red), skipping colors chosen by hand and repeating only when
+  the rotation runs out. Rows that used to show every answer in the accent
+  color now show distinct colors; the source text is unchanged.
+- A resolved wikilink reads as a link: a solid accent underline instead of a
+  dotted one, and the row tint on hover. Unresolved links stay dashed and
+  muted.
+
+### Fixed
+
+- The color list did not open for the first box typed at the start of a line
+  (`[True:gre` before Space expands the row); it opened only after a list
+  marker or a second box. It now opens for the first box too.
+
 ## [0.92.0] - 2026-09-12
 
 The Welcome kit release: every lesson teaches the typed syntax, a guided tour

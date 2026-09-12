@@ -15,7 +15,7 @@ export const RESULT_MARK = "[ xX]";
 
 export type ResultState = "unanswered" | "no" | "yes";
 export type ResultChoice = Exclude<ResultState, "unanswered">;
-import { isResultColorName, RESULT_HEX_RE, type ResultColor } from "./resultColors";
+import { isResultColorName, RESULT_HEX_RE, type ResultColor, rotateColors } from "./resultColors";
 
 export type { ResultColor } from "./resultColors";
 export const RESULT_REASON_SEPARATOR = " — ";
@@ -90,8 +90,10 @@ export function resultOptionOf(body: string, fallbackLabel?: string): ResultOpti
 }
 
 /** Parse the whole portable result prefix. Labeled options are adjacent boxes:
- * `[True][False]` or labels with semantic/custom color suffixes. Invalid color
- * syntax and multiple selections fail closed, leaving ordinary Markdown. */
+ * `[True][False]` or labels with semantic/custom color suffixes. A color-only
+ * pair (`[:purple][:accent]`) reads as Yes/No, like the compact form; a row of
+ * three or more gives every uncolored option its own rotation color. Invalid
+ * color syntax and multiple selections fail closed, leaving ordinary Markdown. */
 export function parseResultLine(line: string): ParsedResultLine | null {
   const lead = /^(\s*)((?:-|\d+\.) )/.exec(line);
   if (!lead) return null;
@@ -115,15 +117,21 @@ export function parseResultLine(line: string): ParsedResultLine | null {
       { label: "No", selected: state === "no", color: "red", source: "" },
     ];
   } else {
-    const parsed = bodies.map((body) => resultOptionOf(body));
+    const pair = bodies.length === 2;
+    const parsed = bodies.map((body, index) =>
+      resultOptionOf(body, pair ? (index === 0 ? "Yes" : "No") : undefined),
+    );
     if (parsed.some((option) => option === null)) return null;
     options = parsed as ResultOption[];
     if (options.filter((option) => option.selected).length > 1) return null;
-    if (options.length === 2) {
+    if (pair) {
       options = options.map((option, index) => ({
         ...option,
         color: option.color ?? (index === 0 ? "green" : "red"),
       }));
+    } else {
+      const colors = rotateColors(options.map((option) => option.color));
+      options = options.map((option, index) => ({ ...option, color: colors[index] ?? option.color }));
     }
   }
 
