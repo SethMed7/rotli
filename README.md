@@ -80,7 +80,7 @@ Every new vault starts with a **Welcome** folder in Main: the welcome note and n
 
 ## What's built
 
-- **The editor** — hybrid markdown: the line under your caret shows raw syntax, everything else renders. `- ` starts a list and `[]` then Space makes a checkbox. `[][]` makes a check/X result, `[True][False]` names the answers, and `:green` after a label colors it (typing the `:` opens a color list). `[#]` rows make one-of-many choices, `[##?]` plus `[##]` rows make a multi-choice panel you can place left, center, or right, and `[|]` makes a switch. Type `| Step | Owner |` and press Enter to start a table; Shift+Enter breaks a line inside a cell, and ⇧-click or ⌘-click selects cells to clear or copy. `[[` opens a picker of your notes and closes the link for you. A quiet format bar floats below. Mermaid diagrams open into a View/Visual/Code workspace: flowcharts can be built from shapes, arrows, labels, direction, and colors without leaving Mermaid, while an optional conversion creates a separate Excalidraw board copy. Typography (`Aa`) and decision styling are render layers — never written into your files.
+- **The editor** — hybrid markdown: the line under your caret shows raw syntax, everything else renders. `- ` starts a list and `[]` then Space makes a checkbox. `[][]` makes a check/X result, `[True][False]` names the answers, and `:green` after a label colors it (typing the `:` opens a color list). `[#]` rows make one-of-many choices, `[##?]` plus `[##]` rows make a multi-choice panel you can place left, center, or right, and `[|]` makes a switch. Type `| Step | Owner |` and press Enter to start a table; Shift+Enter breaks a line inside a cell, and ⇧-click or ⌘-click selects cells to clear or copy. `[[` opens a picker of your notes and closes the link for you. A quiet format bar floats below. Mermaid diagrams render in place with View and Code modes, and an optional conversion creates a separate Excalidraw board copy (the Visual flowchart builder is development-only for now). Typography (`Aa`) and decision styling are render layers — never written into your files.
 - **Panes & tabs** — split with `⌘D` / `⌘⇧D`, tabs with `⌘T`; every tab stays visible and closeable. Everything drag-resizable, everything remembered.
 - **One active vault** — connect other vaults as switch targets, while the sidebar, panes, search, System counts, Librarian, and AI context remain scoped to the vault currently open.
 - **`⌘K`** — every note and action in one palette, recents first.
@@ -126,8 +126,8 @@ behavior.
 
 - **Plain Markdown files** on your Mac — open them in any editor, back them up, keep them forever.
 - **Secrets are auto-detected** and never sent to a remote model or out to the web.
-- **Works fully offline** — no account; connected models, web research, updates,
-  and Remote agents use the network only when you explicitly choose them.
+- **Works fully offline** — no account; connected models, web research, and
+  updates use the network only when you explicitly choose them.
 
 You work how you want in **Main**; the Librarian organizes the **Library** underneath — location and metadata only, never the words inside your notes — and a raw vault opts out of AI entirely.
 
@@ -145,12 +145,12 @@ bun run check       # TypeScript, tests, runtime, architecture, design, and docs
 bun run verify      # CI's local twin: check + builds + Playwright + clippy + cargo test
 ```
 
-## Use your workspace from Claude, Codex, or the shell
+## Use your workspace from the shell
 
-The installed Rotli executable is also a JSON CLI and a local stdio MCP server.
-Both use the same corpus policy as the app: new notes enter intake and appear in
-Main, secure notes stay unavailable to remote agents, locked notes refuse agent
-edits, and updates require a fresh revision.
+The installed Rotli executable is also a JSON CLI that follows the same corpus
+policy as the app: new notes enter intake and appear in Main, secure notes stay
+unavailable to remote agents, locked notes refuse agent edits, and updates
+require a fresh revision.
 
 ```sh
 /Applications/rotli.app/Contents/MacOS/rotli notes list
@@ -158,21 +158,14 @@ edits, and updates require a fresh revision.
 /Applications/rotli.app/Contents/MacOS/rotli notes query 'area:projects tags:payments updated:>=2026-07-01'
 /Applications/rotli.app/Contents/MacOS/rotli notes create --title "Launch plan" --body "First draft"
 /Applications/rotli.app/Contents/MacOS/rotli rename "Launch plan" "Launch plan v2"
-/Applications/rotli.app/Contents/MacOS/rotli agent doctor
-/Applications/rotli.app/Contents/MacOS/rotli agent self-test
-/Applications/rotli.app/Contents/MacOS/rotli agent config
 ```
 
-The doctor is read-only, the self-test uses a disposable vault, and the final
-command prints copy-ready Claude Code and Codex MCP configuration for that exact
-installed binary. Note results identify themselves as Markdown and include
-document metrics; Rotli keeps YAML frontmatter outside the agent-editable body.
-The server uses stdio by default and loads tools on demand; its optional HTTP
-adapter is bearer-authenticated and loopback-only. Cloud clients such as Grok
-Bot can reach the same tools only when the user explicitly connects the running
-app to a stateless HTTPS relay for that session. Rotli never opens a public Mac
-port or silently changes global agent settings. See the public [MCP guide](https://rotli.co/mcp/)
-and the [`agent workspace contract`](docs/architecture/agent-workspace.md).
+Note results identify themselves as Markdown and include document metrics;
+Rotli keeps YAML frontmatter outside the agent-editable body. The stdio MCP
+server, the `rotli agent …` commands, and Remote agents are development builds
+only until they are refined; the stable app refuses them. See the
+[`agent workspace contract`](docs/architecture/agent-workspace.md) for the
+full contract.
 
 Contributing or working with an AI coding tool? Start with
 [`CONTRIBUTING.md`](CONTRIBUTING.md), [`AGENTS.md`](AGENTS.md), and the
