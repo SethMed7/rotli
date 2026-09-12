@@ -25,6 +25,7 @@ import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import { addBlockBelow, blockHandles, deleteBlock, moveBlock } from "./blockHandles";
 import { blockRender } from "./blockRender";
+import { choicePanelGaps } from "./choicePanelGapsField";
 import type { SlashState, PickerState, ImageGenState } from "./cmEditorState";
 import { rotliKeymap } from "./cmKeymap";
 import { codeHighlight } from "./codeHighlight";
@@ -586,7 +587,9 @@ function CmEditorImpl({
         // corpus root; table widgets key persisted column widths by the id
         noteIdFacet.of(noteId),
         viewModeComp.of(
-          rawEditorRef.current ? rawMarkdown : [livePreview, blockRender, tableRender, codeHighlight],
+          rawEditorRef.current
+            ? rawMarkdown
+            : [livePreview, choicePanelGaps, blockRender, tableRender, codeHighlight],
         ),
         blockComp.of(blockHandlesRef.current ? blockHandles(openBlockMenu) : []),
         fmComp.of(fmExt(fmRawRef.current, fmGenRef.current, fmErrRef.current)),
@@ -688,7 +691,7 @@ function CmEditorImpl({
     rawEditorRef.current = rawEditor;
     viewRef.current?.dispatch({
       effects: viewModeComp.reconfigure(
-        rawEditor ? rawMarkdown : [livePreview, blockRender, tableRender, codeHighlight],
+        rawEditor ? rawMarkdown : [livePreview, choicePanelGaps, blockRender, tableRender, codeHighlight],
       ),
     });
   }, [rawEditor, viewModeComp]);

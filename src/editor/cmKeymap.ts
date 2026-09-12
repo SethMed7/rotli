@@ -271,7 +271,7 @@ const listControlOnSpace: Command = (view) => {
       return true;
     }
   }
-  const hashChoice = /^(\s*)(?:- )?\[(##\?|##|#)\]$/.exec(before);
+  const hashChoice = /^(\s*)(?:- )?\[(##\?(?::(?:left|center|right))?|##|#)\]$/.exec(before);
   if (hashChoice) {
     const prefix = `${(hashChoice[1] ?? "").replace(/\t/g, "  ")}- [${hashChoice[2]}] `;
     view.dispatch({

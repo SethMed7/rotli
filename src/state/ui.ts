@@ -22,6 +22,7 @@ import { DEFAULT_NEW_ITEM_KIND, type NewItemKind } from "../newItems/model";
 import { inboxFolderId } from "../services/notes";
 import type { NoteSummary } from "../types";
 import { DEFAULT_VOICE } from "../voice/speech";
+import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
 import type { Measure } from "./noteStyle";
 import { systemPrefersDark } from "./systemScheme";
 
@@ -40,7 +41,6 @@ export type SyntaxPalette = "rotli" | "mono";
  * both schemes. Chosen in onboarding, changeable in Settings → Appearance. */
 export const ACCENT_COLORS = ["default", "blue", "green", "violet", "rose", "amber", "custom"] as const;
 export type AccentColor = (typeof ACCENT_COLORS)[number];
-export const DEFAULT_ACCENT_HUE = 210;
 
 /** Quiet long-chat landmarks. Every treatment opens the same accessible prompt
  * overview; this preference changes only the small trail beside the thread. */
@@ -77,18 +77,18 @@ export const THEME_FAMILY_PRESENTATIONS: readonly {
   darkLabel: string;
 }[] = [
   {
-    family: "mono",
-    label: "Paper & Charcoal",
-    description: "Paper in Light, Charcoal in Dark.",
-    lightLabel: "Paper",
-    darkLabel: "Charcoal",
-  },
-  {
     family: "warm",
     label: "Rotli",
     description: "Clay and cream by day, cocoa at night.",
     lightLabel: "Warm Light",
     darkLabel: "Warm Dark",
+  },
+  {
+    family: "mono",
+    label: "Paper & Charcoal",
+    description: "Paper in Light, Charcoal in Dark.",
+    lightLabel: "Paper",
+    darkLabel: "Charcoal",
   },
   {
     family: "ocean",
@@ -747,7 +747,7 @@ interface UiState {
 }
 
 export const useUiStore = create<UiState>((set, get) => ({
-  theme: "light",
+  theme: DEFAULT_APPEARANCE.theme,
   setTheme: (theme) => set({ theme }),
   // The titlebar sun walks the same ordered environment catalog shown in Appearance;
   // a "system" setting resolves to its current mode before stepping on.
@@ -759,7 +759,7 @@ export const useUiStore = create<UiState>((set, get) => ({
       return next ? { themeFamily: next.family, theme: next.mode } : s;
     }),
 
-  themeFamily: "warm",
+  themeFamily: DEFAULT_APPEARANCE.themeFamily,
   setThemeFamily: (family) => set({ themeFamily: family }),
 
   syntaxPalette: "rotli",

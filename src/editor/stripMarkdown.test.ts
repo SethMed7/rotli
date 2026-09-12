@@ -32,6 +32,7 @@ describe("stripMarkdown (beautified copy)", () => {
   test("plain text is untouched", () => {
     expect(stripMarkdown("just words")).toBe("just words");
     expect(stripMarkdown("- [##?] Question\n- [##X] Answer")).toBe("Question\nAnswer");
+    expect(stripMarkdown("- [##?:center] Question")).toBe("Question");
     expect(stripMarkdown("`[##?]` literal")).toBe("[##?] literal");
   });
 });

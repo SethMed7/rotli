@@ -1122,9 +1122,10 @@
 }
 .rotli-cm-host .cm-line.rotli-choice-line--multi {
   box-sizing: border-box;
-  width: min(100%, 30rem);
-  margin-inline-start: auto;
-  margin-inline-end: 0;
+  /* never the whole measure, so Left / Center / Right always reads */
+  width: min(30rem, 80%);
+  margin-inline-start: 0;
+  margin-inline-end: auto;
   background: var(--surface-2);
   border-inline: 1px solid var(--border);
   padding-block: 4px;
@@ -1134,12 +1135,10 @@
   border-top: 1px solid var(--border);
 }
 .rotli-cm-host .cm-line.rotli-choice-line--multi.is-group-first {
-  margin-block-start: 8px;
   border-top: 1px solid var(--border);
   border-radius: var(--r-control) var(--r-control) 0 0;
 }
 .rotli-cm-host .cm-line.rotli-choice-line--multi.is-group-last {
-  margin-block-end: 8px;
   border-bottom: 1px solid var(--border);
   border-radius: 0 0 var(--r-control) var(--r-control);
 }
@@ -1153,10 +1152,59 @@
   color: var(--text);
   font-weight: 600;
 }
+.rotli-cm-host .cm-line.rotli-choice-line--multi.is-align-center {
+  margin-inline: auto;
+}
+.rotli-cm-host .cm-line.rotli-choice-line--multi.is-align-right {
+  margin-inline-start: auto;
+  margin-inline-end: 0;
+}
+/* the breathing room above and below a panel is a measured block widget, not
+   a line margin: CodeMirror sizes lines by their border box, so a margin
+   would leave its height map short and vertical motion one line off */
+.rotli-choice-gap {
+  height: 8px;
+}
 .rotli-cm-host .cm-line.rotli-choice-prompt {
   padding-block: 8px;
   color: var(--text);
   font-weight: 600;
+}
+/* panel placement lives in the prompt marker; the control appears on hover,
+   when the caret sits on the prompt, or when a button holds focus */
+.rotli-choice-align {
+  display: inline-flex;
+  gap: 2px;
+  margin-inline-start: 0.6em;
+  vertical-align: middle;
+  opacity: 0;
+  transition: opacity var(--motion-enter) var(--motion-ease);
+}
+.rotli-choice-prompt:hover .rotli-choice-align,
+.rotli-choice-align.is-touched,
+.rotli-choice-align:focus-within {
+  opacity: 1;
+}
+.rotli-choice-align-option {
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+  background: var(--surface);
+  color: var(--text-muted);
+  padding: 0.1em 0.45em;
+  font: inherit;
+  font-size: 0.72em;
+  font-weight: 500;
+  line-height: 1.3;
+  cursor: pointer;
+}
+.rotli-choice-align-option:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.rotli-choice-align-option.is-selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
 }
 
 .rotli-toggle {
@@ -1433,9 +1481,16 @@
    real monospaced file text above the body — a block widget inside .cm-content,
    so it lives in the writing column and scrolls/pushes the note like text — */
 .rotli-fm {
-  padding: 0 0 12px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 12px;
+  padding: 0;
+}
+/* the rule and the gap below it live inside the widget's box (a margin would
+   hide from CodeMirror's height map) */
+.rotli-fm::after {
+  content: "";
+  display: block;
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-bottom: 12px;
 }
 .rotli-fm-path {
   display: grid;
@@ -1798,9 +1853,10 @@
    the inner .rotli-tbl-scroll. — */
 .rotli-md-tablewrap {
   position: relative;
-  margin: 4px 0 10px;
-  /* room for the col chips above + the +col strip at the right */
-  padding: 10px 14px 0 0;
+  /* room for the col chips above + the +col strip at the right; the table's
+     own breathing room is padding, never margin (CodeMirror measures the
+     border box, so a margin would leave its height map short) */
+  padding: 14px 14px 10px 0;
 }
 .rotli-md-tablewrap.rotli-md-tablepart {
   /* a split twin (rows above/below the revealed line) hugs its neighbour */

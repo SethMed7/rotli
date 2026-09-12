@@ -54,6 +54,44 @@ async function gutterOffsets(page: Page) {
     });
 }
 
+test("first-time setup opens in Rotli Light with a quokka wearing nothing", async ({ page }) => {
+  await page.goto("/?onboarding");
+  await expect(page.getByRole("heading", { name: "Make Rotli feel like yours." })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  const companion = page.locator(".setup-companion .quokka");
+  await expect(companion).toBeVisible();
+  await expect(companion.locator(".quokka-accessory-layer")).toHaveCount(0);
+  await page.getByRole("button", { name: "Get started" }).click();
+  await expect(page.getByRole("heading", { name: "Choose a theme." })).toBeVisible();
+  await expect(
+    page.getByRole("radiogroup", { name: "Theme" }).getByRole("radio", { name: /Rotli/ }),
+  ).toHaveAttribute("aria-checked", "true");
+  await expect(
+    page
+      .getByRole("radiogroup", { name: "Appearance mode" })
+      .getByRole("radio", { name: "Light", exact: true }),
+  ).toHaveAttribute("aria-checked", "true");
+  await expect(page.locator(".setup-quokka-preview .quokka-accessory-layer")).toHaveCount(0);
+
+  // a choice made in setup survives the round trip through the vault step
+  await page
+    .getByRole("radiogroup", { name: "Theme" })
+    .getByRole("radio", { name: /Midnight/ })
+    .click();
+  await page
+    .getByRole("radiogroup", { name: "Appearance mode" })
+    .getByRole("radio", { name: "Dark" })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "midnight-dark");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Choose where notes live" }).click();
+  await expect(page.getByRole("button", { name: "Choose an empty folder" })).toBeVisible();
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(page.getByRole("button", { name: "Choose where notes live" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "midnight-dark");
+});
+
 test("fresh onboarding seeds a Welcome folder in Main and opens the welcome note", async ({ page }) => {
   await onboard(page);
   const rows = lessonRows(page);

@@ -20,9 +20,10 @@ import {
 
 describe("theme presentation", () => {
   test("organizes every environment as a complete light and dark family", () => {
+    // the default family leads the picker so key 1 is the first-run choice
     expect(THEME_FAMILY_PRESENTATIONS.map((theme) => theme.label)).toEqual([
-      "Paper & Charcoal",
       "Rotli",
+      "Paper & Charcoal",
       "Ocean",
       "Grove",
       "Iris",

@@ -17,7 +17,9 @@ import { fileURLToPath } from "node:url";
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const SRC = join(ROOT, "src");
 const SKIP = join(SRC, "brand");
-const SKIP_FILES = new Set([join(SRC, "styles", "themes.css")]);
+// welcome.json is lesson prose that teaches the `[Label:#hex]` control suffix;
+// it never styles the app, so its example hex is content, not a raw color.
+const SKIP_FILES = new Set([join(SRC, "styles", "themes.css"), join(SRC, "assets", "welcome.json")]);
 const SKIP_FUNCTIONAL_FILES = new Set([...SKIP_FILES, join(SRC, "styles", "base.css")]);
 const TEXT_EXTS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".css", ".html", ".svg", ".json", ".md"]);
 const HEX = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b/g;

@@ -173,9 +173,14 @@ describe("parseBlock — hash choices and toggles", () => {
     expect(parseBlock("- [##?] Which channels should we use?")).toMatchObject({
       kind: "choice",
       choiceVariant: "prompt",
+      choiceAlign: "left",
       text: "Which channels should we use?",
       prefixLen: 8,
       indent: 0,
+    });
+    expect(parseBlock("- [##?:right] Placed")).toMatchObject({
+      choiceVariant: "prompt",
+      choiceAlign: "right",
     });
   });
 

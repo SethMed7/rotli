@@ -6,12 +6,14 @@
 // because clearing the in-memory overrides alone wouldn't un-register a custom
 // global chord or flip the Dock back.
 
+import type { QuokkaAccessory } from "../brand/quokka";
 import { useBindingsStore } from "../keys/bindings";
 import { toAccelerator } from "../keys/chords";
 import { allActions } from "../keys/registry";
 import { DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE } from "../lib/privateBrowser";
 import { setDockVisible, setGlobalShortcut, setHideOnBlur } from "../lib/tauri";
-import { DEFAULT_ACCENT_HUE, useUiStore } from "./ui";
+import { DEFAULT_APPEARANCE } from "./appearanceDefaults";
+import { useUiStore } from "./ui";
 
 export const ONBOARDING_STEP_NUMBER = {
   welcome: 1,
@@ -23,6 +25,12 @@ export const ONBOARDING_STEP_NUMBER = {
 } as const;
 
 export const ONBOARDING_TOTAL_STEPS = Object.keys(ONBOARDING_STEP_NUMBER).length;
+
+/** What every first run starts from: Rotli Light and a quokka wearing nothing,
+ * even when a version bump re-onboards a personalized install. */
+export function startingAppearance(): typeof DEFAULT_APPEARANCE & { quokkaAccessory: QuokkaAccessory } {
+  return { ...DEFAULT_APPEARANCE, quokkaAccessory: "none" };
+}
 
 function compareVersions(a: string, b: string): number {
   const left = a.split(".").map((part) => Number.parseInt(part, 10) || 0);
@@ -61,11 +69,7 @@ export async function resetAndReonboard(): Promise<void> {
 
   // theme + the General flags + the gate → defaults, in one store write
   useUiStore.setState({
-    theme: "system",
-    themeFamily: "mono",
-    syntaxPalette: "rotli",
-    accentColor: "default",
-    accentHue: DEFAULT_ACCENT_HUE,
+    ...DEFAULT_APPEARANCE,
     stayOpen: false,
     showInDock: false,
     privateBrowserSearchEngine: DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE,

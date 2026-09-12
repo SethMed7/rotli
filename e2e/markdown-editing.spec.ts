@@ -441,7 +441,7 @@ test("hash choices and switches stay interactive while inline code stays literal
   await expect(page.locator(".rotli-toggle")).toHaveCount(3);
   await expect(page.locator(".rotli-choice-line--multi.is-group-first")).toHaveCount(1);
   await expect(page.locator(".rotli-choice-line--multi.is-group-last")).toHaveCount(1);
-  await expect(page.locator(".rotli-choice-prompt")).toHaveText("Which channels should we use?");
+  await expect(page.locator(".rotli-choice-prompt")).toContainText("Which channels should we use?");
   const multiPanel = page.locator(".rotli-choice-line--multi:not(.rotli-choice-prompt)").first();
   const multiGeometry = await multiPanel.evaluate((line) => {
     const panel = line.getBoundingClientRect();
@@ -459,7 +459,8 @@ test("hash choices and switches stay interactive while inline code stays literal
     };
   });
   expect(multiGeometry.width).toBeLessThanOrEqual(481);
-  expect(Math.abs(multiGeometry.rightGap - multiGeometry.editorPaddingEnd)).toBeLessThanOrEqual(1);
+  // the bare prompt sits at the left edge and never fills the measure
+  expect(multiGeometry.rightGap - multiGeometry.editorPaddingEnd).toBeGreaterThan(40);
   expect(multiGeometry.controlInset).toBeGreaterThanOrEqual(11);
   expect(multiGeometry.paddingBlockStart).toBe("4px");
   expect(multiGeometry.paddingInlineEnd).toBe("12px");
@@ -470,6 +471,44 @@ test("hash choices and switches stay interactive while inline code stays literal
     return control.top + control.height / 2 - (text.top + text.height / 2);
   });
   expect(Math.abs(centerOffset)).toBeLessThanOrEqual(1);
+
+  const prompt = page.locator(".rotli-choice-prompt");
+  const panelGaps = () =>
+    multiPanel.evaluate((line) => {
+      const panel = line.getBoundingClientRect();
+      const editorNode = line.closest(".cm-content")!;
+      const editor = editorNode.getBoundingClientRect();
+      const style = getComputedStyle(editorNode);
+      return {
+        left: panel.left - editor.left - Number.parseFloat(style.paddingInlineStart),
+        right: editor.right - panel.right - Number.parseFloat(style.paddingInlineEnd),
+      };
+    });
+  await expect(page.getByRole("radio", { name: "Align panel left" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.locator(".rotli-choice-line--multi.is-align-left")).toHaveCount(3);
+  const leftGaps = await panelGaps();
+  expect(Math.abs(leftGaps.left)).toBeLessThanOrEqual(1);
+  await prompt.hover();
+  await page.getByRole("radio", { name: "Align panel right" }).click();
+  await expect(page.getByRole("radio", { name: "Align panel right" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  await expect(page.locator(".rotli-choice-line--multi.is-align-right")).toHaveCount(3);
+  const rightGaps = await panelGaps();
+  expect(Math.abs(rightGaps.right)).toBeLessThanOrEqual(1);
+  expect(rightGaps.left).toBeGreaterThan(40);
+  const alignCenter = page.getByRole("radio", { name: "Align panel center" });
+  await alignCenter.focus();
+  await page.keyboard.press("Space");
+  await expect(page.getByRole("radio", { name: "Align panel center" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  await expect(page.getByRole("radio", { name: "Align panel center" })).toBeFocused();
+  const centerGaps = await panelGaps();
+  expect(Math.abs(centerGaps.left - centerGaps.right)).toBeLessThanOrEqual(2);
+  await expect(page.locator(".rotli-choice-line--multi.is-align-center")).toHaveCount(3);
   const purpleToggle = page.locator(".rotli-toggle").last();
   const purpleColors = await purpleToggle.evaluate((toggle) => {
     const probe = document.createElement("span");
@@ -505,7 +544,7 @@ test("hash choices and switches stay interactive while inline code stays literal
     .getByRole("button", { name: "Raw markdown" })
     .click();
   await expect(editor).toContainText("- [#x] Blue");
-  await expect(editor).toContainText("- [##?] Which channels should we use?");
+  await expect(editor).toContainText("- [##?:center] Which channels should we use?");
   await expect(editor).toContainText("- [##x] Email");
   await expect(editor).toContainText("- [##x] SMS");
   await expect(editor).toContainText("- [x|] Feature flag");

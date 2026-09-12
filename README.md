@@ -102,10 +102,10 @@ and keep the conventional behavior of their own formats.
 ## Personal work environments
 
 The titlebar sun cycles through paired light and dark environments in six
-families: **Rotli · Paper & Charcoal · Ocean · Grove · Iris · Midnight**. Paper
-and Charcoal remain the calm defaults, while the additional families let the
-workspace feel more personal without changing its readable hierarchy or
-keyboard behavior.
+families: **Rotli · Paper & Charcoal · Ocean · Grove · Iris · Midnight**. Rotli
+Light is where every first run starts; the other families let the workspace
+feel more personal without changing its readable hierarchy or keyboard
+behavior.
 
 <div align="center">
 <img src="docs/media/rotli-warm-dark.png" alt="rotli in Warm Dark" width="405">

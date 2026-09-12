@@ -133,9 +133,13 @@ imports.
   square control writes `[##x]` when selected, and any number of adjacent
   options may remain selected. An optional `- [##?] Question` row immediately
   before the answers becomes the panel prompt; typing `[##?]` and then Space
-  creates that source. Adjacent rows render as one compact, evenly inset,
-  right-aligned option panel rather than stretching across the whole writing
-  measure.
+  creates that source. Adjacent rows render as one compact, evenly inset
+  option panel (never wider than 30rem or 80% of the measure) rather than
+  stretching across the whole writing measure. The panel sits at the left
+  edge unless the prompt marker carries a placement suffix: `[##?:center]` or
+  `[##?:right]` (`[##?:left]` is accepted and means the same as the bare
+  marker). The prompt row's Left/Center/Right control rewrites that suffix in
+  source; a group without a prompt row keeps the default.
 - `[True|False]` followed by Space becomes the explicit-off switch
   `- [True|x False] `; `[|]` becomes the compact green/red switch `- [|x] `.
   Switching on writes `[x True|False]` or `[x|]`. Toggle labels accept the same

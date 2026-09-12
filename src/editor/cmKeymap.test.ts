@@ -315,6 +315,16 @@ describe("hash choice and toggle shorthands", () => {
     const prompt = viewOf("[##?]", 5);
     expect(press(prompt, "Space")).toBe(true);
     expect(text(prompt)).toBe("- [##?] ");
+    const placed = viewOf("[##?:right]", 11);
+    expect(press(placed, "Space")).toBe(true);
+    expect(text(placed)).toBe("- [##?:right] ");
+  });
+
+  test("Enter after a placed prompt starts its first answer without the suffix", () => {
+    const source = "- [##?:center] Pick channels";
+    const prompt = viewOf(source, source.length);
+    expect(press(prompt, "Enter")).toBe(true);
+    expect(text(prompt)).toBe(`${source}\n- [##] `);
   });
 
   test("Enter after a multi-choice prompt starts its first answer", () => {

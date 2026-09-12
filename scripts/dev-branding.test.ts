@@ -20,7 +20,7 @@ test("the native dev command uses an unmistakable identity without changing prod
   };
 
   expect(pkg.scripts?.["dev:app"]).toBe("bun --no-orphans scripts/tauri-dev-supervisor.ts");
-  expect(development.productName).toBe("rotli (dev)");
+  expect(development.productName).toBe("Rotli (Dev)");
   expect(development.bundle?.icon).toContain("icons-dev/icon.icns");
   expect(production.productName).toBe("rotli");
   expect(production.bundle?.icon).not.toContain("icons-dev/icon.icns");

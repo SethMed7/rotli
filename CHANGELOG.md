@@ -10,6 +10,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Multi-choice panels can sit left, center, or right. The `[##?]` prompt row
+  shows a Left/Center/Right control on hover or when the caret is on it; the
+  choice is written into the marker as `[##?:center]` or `[##?:right]`, and
+  the bare marker means left. The panel is never wider than 80% of the
+  writing measure, so the placement always shows.
+
+### Fixed
+
+- The development app is named "Rotli (Dev)" and paints its blue Dock icon
+  from the Rust shell at launch, so a `bun run dev:app` instance is never
+  mistaken for the installed app even before the webview loads.
+- Pressing ↑ or clicking just below a multi-choice panel or a table landed one
+  line off, because their vertical spacing was a margin the editor's height
+  map could not see. Spacing is now measured (a block spacer for panels,
+  padding for tables), and a guard keeps vertical margins off editor lines and
+  block widgets.
+
+### Changed
+
+- First-time setup always opens in Rotli Light with the quokka wearing no
+  accessory, including when a version update runs setup again on a
+  personalized install; the appearance step is where the choice is made.
+  Skip, Settings → Reset & re-onboard, and a fresh install now share that one
+  default instead of resetting to Paper and follow-macOS, and the Rotli family
+  leads the theme picker in setup and Settings → Appearance.
+- The Welcome folder's task and choice lessons now show how to type each
+  control as backticked source (`[][]`, `[True][False]`, color suffixes and hex,
+  `[#]`, `[##?]` + `[##]`, `[|]`, `[True|False]`, `[:blue|:green]`) instead of
+  only rendering the finished controls. Existing vaults keep their edited
+  lessons; Settings → General → Open welcome folder reseeds only missing ones.
+
 ## [0.91.0] - 2026-09-11
 
 ### Launch preparation

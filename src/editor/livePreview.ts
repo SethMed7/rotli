@@ -30,8 +30,9 @@ import { VIDEO_EXTS, extOf } from "../lib/fileKind";
 import { openUrl, resolveImageSrc, rootIdOf } from "../lib/tauri";
 import { locateLostImage } from "../services/imageRepair";
 import { usePanesStore } from "../state/panes";
+import { ChoiceAlignWidget } from "./choiceAlignWidget";
 import { selectChoiceGroup } from "./choiceState";
-import { isControlLiteral } from "./controlState";
+import { choiceGroupAlign, isControlLiteral } from "./controlState";
 import { scanFences } from "./fences";
 import { imageSourceSpan, selectionCoversImage } from "./imageSelection";
 import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
@@ -952,40 +953,45 @@ function build(view: EditorView): {
         case "choice": {
           const prompt = block.choiceVariant === "prompt";
           const multi = block.choiceVariant === "multi";
-          const siblingIsMulti = (number: number) => {
-            if (number < 1 || number > doc.lines) return false;
+          const siblingVariant = (number: number) => {
+            if (number < 1 || number > doc.lines) return null;
             const sibling = parseBlock(doc.line(number).text);
-            return (
-              sibling.kind === "choice" &&
-              sibling.choiceVariant === "multi" &&
-              sibling.indent === block.indent
-            );
+            return sibling.kind === "choice" && sibling.indent === block.indent
+              ? sibling.choiceVariant
+              : null;
           };
-          const siblingIsPrompt = (number: number) => {
-            if (number < 1 || number > doc.lines) return false;
-            const sibling = parseBlock(doc.line(number).text);
-            return (
-              sibling.kind === "choice" &&
-              sibling.choiceVariant === "prompt" &&
-              sibling.indent === block.indent
-            );
-          };
+          const siblingIsMulti = (number: number) => siblingVariant(number) === "multi";
+          const siblingIsPrompt = (number: number) => siblingVariant(number) === "prompt";
           if (prompt) {
             const nextIsMulti = siblingIsMulti(line.number + 1);
+            const align = block.choiceAlign ?? "left";
             decos.push(
               Decoration.line({
-                class: `rotli-choice-line rotli-choice-line--multi rotli-choice-prompt is-group-first${nextIsMulti ? "" : " is-group-last"}`,
+                class: `rotli-choice-line rotli-choice-line--multi rotli-choice-prompt is-group-first${nextIsMulti ? "" : " is-group-last"} is-align-${align}`,
                 attributes: {
                   style: listStyle(depth, block.marker ? MARKER_EM : 0, GROUP_INSET_PX),
                 },
               }).range(ls),
             );
             hidePrefix(ls, prefixEnd, null, decos, atomics);
+            decos.push(
+              Decoration.widget({ widget: new ChoiceAlignWidget(align, lineTouched), side: 1 }).range(
+                line.to,
+              ),
+            );
             scanInline(content, contentBase, sel, decos, atomics);
             break;
           }
+          const groupAlign = multi
+            ? choiceGroupAlign(
+                (index) => (index >= 0 && index < doc.lines ? doc.line(index + 1).text : undefined),
+                line.number - 1,
+              )
+            : "left";
+          const groupFirst = multi && !siblingIsMulti(line.number - 1) && !siblingIsPrompt(line.number - 1);
+          const groupLast = multi && !siblingIsMulti(line.number + 1);
           const groupClass = multi
-            ? ` rotli-choice-line--multi${siblingIsMulti(line.number - 1) || siblingIsPrompt(line.number - 1) ? "" : " is-group-first"}${siblingIsMulti(line.number + 1) ? "" : " is-group-last"}`
+            ? ` rotli-choice-line--multi${groupFirst ? " is-group-first" : ""}${groupLast ? " is-group-last" : ""} is-align-${groupAlign}`
             : "";
           decos.push(
             Decoration.line({
