@@ -12,6 +12,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { LIBRARIAN_LABELS } from "../ai/librarianLane";
 import { daysSinceMidnight, relativeLabel } from "../lib/dateLabels";
 import { useTransientPopover } from "../lib/popover";
 import {
@@ -47,9 +48,7 @@ const TRUST_WORDS: Record<string, string> = {
   tidy: "Tidy — new captures file themselves",
   organize: "Organize — working by itself in the background",
 };
-const MODEL_WORDS: Record<string, string> = {
-  local: "On this Mac",
-};
+const MODEL_WORDS: Record<string, string> = LIBRARIAN_LABELS;
 
 /** History longer than this earns the quiet "clear old logs" nudge (§4.8:
  * show, never nag — one line, two buttons, no badge). */

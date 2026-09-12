@@ -854,6 +854,27 @@
   padding: 0 0 10px;
 }
 
+/* the Librarian choice: a short block under the model disclosures */
+.setup-librarian {
+  display: grid;
+  gap: 6px;
+  padding: 14px 0 4px;
+  border-top: 1px solid var(--border);
+}
+.setup-librarian strong {
+  font-size: 12px;
+}
+.setup-librarian small {
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+.setup-librarian-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 0;
+}
+
 .setup-list-scroll-label {
   display: block;
   padding: 2px 0 7px;

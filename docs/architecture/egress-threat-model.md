@@ -105,7 +105,10 @@ the same provider&rsquo;s allowlist. The tag stays in the durable transcript for
 auditability, is stripped from the provider prompt, and the answer is stamped
 with the provider and model. A tag never changes the chat&rsquo;s primary model.
 
-Breve, the organizer, and scheduled/background jobs are local-only. Provider-
+Breve and scheduled/background jobs are local-only. The organizer is local by
+default; the user may point it at a connected client (Claude, Codex, or
+Antigravity — never Cursor) in Settings → Librarian, and that lane must also be
+turned on in Connections or the organizer stays local (route 5). Provider-
 backed image generation is disabled. Unsupported provider ids and retired
 settings are discarded or rejected; they cannot become process arguments.
 
@@ -164,7 +167,7 @@ way a compromised loop would.
 | 2 | `chat_messages` → remote HTTP / Gemini | **RETIRED** | `endpoint_permitted` now accepts only registered on-device loopback destinations; the remote HTTP compatibility transport was removed |
 | 3 | `cli_complete` → `claude` / `codex` / `cursor` | **GAP → FIXED** | native policy permits only the three official local clients before spec/binary lookup, then `blocked_for_remote`, binary/model allowlists, and inert argv/protocol fields apply; Cursor additionally uses ACP Ask mode in an empty scratch workspace and denies permissions; AGY/Gemini are refused |
 | 4 | `generate_image` → any provider | **RETIRED** | the stable IPC command returns a native unavailable error before root/path resolution, credential lookup, or process spawn |
-| 5 | Organizer → remote provider | **RETIRED** | the organizer has only the local MLX transport; legacy Claude/Gemini settings normalize to local and no remote organizer function exists |
+| 5 | Organizer → connected client | **OPT-IN** (2026-09-12, [ADR](../decisions/2026-09-12-librarian-connected-lane.md)) | `organizer_knobs::connected_lane` yields a lane only when `organizerModel` names claude/codex/antigravity AND `aiProviders[lane]` is true; the call rides `provider_lane::complete_blocking`, the same seam as route 3 (policy, `blocked_for_remote`, binary and model allowlists, child registry). Secure and locked notes are skipped before any prompt exists; legacy ids and Cursor parse to local |
 | 6 | Organizer → local MLX | SAFE | `complete_local` is loopback by construction |
 
 ### Web lanes

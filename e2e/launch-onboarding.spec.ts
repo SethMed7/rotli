@@ -28,6 +28,11 @@ async function onboard(page: Page) {
   await page.getByRole("button", { name: "Use empty folder", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Create Launch Practice?" })).toBeVisible();
   await page.getByRole("button", { name: /^Create vault/ }).click();
+  // the Librarian choice is on the Models step; with no signed-in client in
+  // the twin it offers only this Mac, already pressed
+  await expect(
+    page.getByRole("group", { name: "Librarian model" }).getByRole("button", { name: "On this Mac" }),
+  ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Skip model setup" }).click();
   await page.getByRole("button", { name: "Skip tour" }).click();
   await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");

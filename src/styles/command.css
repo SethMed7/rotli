@@ -3147,9 +3147,32 @@
 }
 .tour-ring {
   position: fixed;
-  border: 2px solid var(--accent);
+  border: 3px solid var(--accent);
   border-radius: var(--r-control);
   box-sizing: border-box;
+  /* a soft accent halo (an outline, keeping the flat material) that breathes
+     so the eye lands on the control the card is talking about */
+  outline: 4px solid color-mix(in srgb, var(--accent) 32%, transparent);
+  outline-offset: 2px;
+  animation: tour-pulse 1.6s ease-in-out infinite;
+}
+@keyframes tour-pulse {
+  0%,
+  100% {
+    outline-offset: 2px;
+    outline-color: color-mix(in srgb, var(--accent) 32%, transparent);
+  }
+  50% {
+    outline-offset: 7px;
+    outline-color: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+}
+/* the control itself lifts while spotlit: tinted and outlined in the accent,
+   so the highlighted button is unmistakable even on a busy sidebar */
+[data-tour-active] {
+  background: var(--tint) !important;
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 .tour-card {
   position: fixed;

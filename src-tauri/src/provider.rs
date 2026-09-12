@@ -37,7 +37,7 @@ pub(crate) const CONNECTED_PROVIDER_POLICY_MESSAGE: &str =
 pub(crate) const CLOUD_IMAGE_POLICY_MESSAGE: &str =
     "Provider-backed image generation is unavailable; no provider account was used.";
 
-fn connected_provider_execution_allowed(provider: &str) -> Result<(), String> {
+pub(crate) fn connected_provider_execution_allowed(provider: &str) -> Result<(), String> {
     match provider {
         "claude" | "codex" | "cursor" | "antigravity" => Ok(()),
         other => Err(format!("unknown provider \"{other}\"")),
@@ -76,7 +76,7 @@ pub(crate) struct CliSpec {
     pub(crate) id: &'static str,
     /// Absolute candidate paths; "~/" expands to $HOME. First hit wins.
     pub(crate) bins: &'static [&'static str],
-    models: &'static [&'static str],
+    pub(crate) models: &'static [&'static str],
 }
 
 // `bins` lists are byte-identical to breve-runtime/scripts/cli-paths.ts (F10) —
@@ -133,7 +133,7 @@ pub(crate) const CLIS: &[CliSpec] = &[
     },
 ];
 
-fn spec(provider: &str) -> Result<&'static CliSpec, String> {
+pub(crate) fn spec(provider: &str) -> Result<&'static CliSpec, String> {
     CLIS.iter()
         .find(|s| s.id == provider)
         .ok_or_else(|| format!("unknown provider \"{provider}\""))
@@ -148,7 +148,7 @@ fn expand_home(path: &str) -> Option<PathBuf> {
     }
 }
 
-fn resolve_bin(s: &CliSpec) -> Option<PathBuf> {
+pub(crate) fn resolve_bin(s: &CliSpec) -> Option<PathBuf> {
     s.bins
         .iter()
         .filter_map(|p| expand_home(p))
@@ -157,7 +157,7 @@ fn resolve_bin(s: &CliSpec) -> Option<PathBuf> {
 
 /// Where the prompt rides.
 #[derive(Debug, PartialEq)]
-enum PromptVia {
+pub(crate) enum PromptVia {
     Stdin,
     Acp,
 }
@@ -184,7 +184,7 @@ fn build_args(
 /// The webview may request quality/cost controls, but the trusted native side
 /// owns the allowlists and translates them into provider-native argv. Unknown
 /// values fail closed before any process is started.
-fn build_args_tuned(
+pub(crate) fn build_args_tuned(
     provider: &str,
     model: &str,
     _prompt: &str,
@@ -367,7 +367,7 @@ fn codex_scratch_dir() -> Result<String, String> {
 /// Attached images, written to disk for a lane whose CLI takes image FILES.
 /// Held as a value so the temp dir is removed when the turn ends, whatever
 /// happens — an attachment must not linger in /tmp after the answer.
-struct ImageFiles {
+pub(crate) struct ImageFiles {
     dir: std::path::PathBuf,
     paths: Vec<String>,
 }
@@ -440,7 +440,7 @@ fn image_preamble(paths: &[String]) -> String {
 /// `claude -p --output-format json` → one JSON document with `result` (+
 /// `is_error`). Some paths prepend plain-text warnings, so fall back to
 /// scanning lines from the end for the envelope.
-fn parse_claude_json(stdout: &str) -> Result<String, String> {
+pub(crate) fn parse_claude_json(stdout: &str) -> Result<String, String> {
     let envelope = |v: &serde_json::Value| -> Option<Result<String, String>> {
         let result = v.get("result")?.as_str()?.trim().to_string();
         if v.get("is_error").and_then(|b| b.as_bool()) == Some(true) {
@@ -473,7 +473,7 @@ fn parse_claude_json(stdout: &str) -> Result<String, String> {
 
 /// `codex exec --json` → JSONL; the reply is the LAST completed `agent_message`
 /// item. `turn.failed` / `error` events surface as errors.
-fn parse_codex_jsonl(stdout: &str) -> Result<String, String> {
+pub(crate) fn parse_codex_jsonl(stdout: &str) -> Result<String, String> {
     let mut last: Option<String> = None;
     for line in stdout.lines() {
         let Ok(v) = serde_json::from_str::<serde_json::Value>(line.trim()) else {
@@ -536,7 +536,7 @@ pub(crate) fn with_stderr_tail(message: &str, stderr: &str, open: &str, close: &
 /// Spawn + register + read to EOF + reap. The watchdog thread kills the child
 /// at the deadline (matching token only — a finished step's watchdog must not
 /// shoot a successor reusing the request id); `cli_cancel` kills it early.
-fn run_registered(
+pub(crate) fn run_registered(
     children: &Arc<Mutex<HashMap<String, Running>>>,
     request_id: &str,
     mut cmd: Command,
@@ -642,17 +642,15 @@ pub async fn cli_complete(
     images: Option<Vec<String>>,
 ) -> Result<String, String> {
     connected_provider_execution_allowed(&provider)?;
-    // the CLI lane is remote by definition — same egress law as chat.rs
+    // the CLI lane is remote by definition — same egress law as chat.rs. The
+    // lane seam checks again so a caller that bypasses this command (the
+    // organizer) is bound the same way; here it also refuses before any image
+    // is staged to disk.
     if crate::secret::blocked_for_remote(&prompt) {
-        return Err(
-            "This conversation carries secret-shaped content and can't be sent to a connected model — switch to a local model to continue."
-                .into(),
-        );
+        return Err(crate::provider_lane::SECRET_MESSAGE.into());
     }
     let timeout =
         Duration::from_millis(timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).min(MAX_TIMEOUT_MS));
-    let bin = resolve_bin(spec(&provider)?)
-        .ok_or_else(|| format!("{provider} isn't installed (checked its usual homes)"))?;
     // staged for the whole turn; the temp dir is removed when this drops
     let staged = write_image_files(images.as_deref().unwrap_or(&[]))?;
     // the path-reading lanes need the files NAMED in the prompt; codex gets
@@ -663,47 +661,23 @@ pub async fn cli_complete(
         }
         _ => prompt,
     };
-    let (args, via) = build_args_tuned(
-        &provider,
-        &model,
-        &prompt,
-        timeout.as_secs(),
-        reasoning_effort.as_deref(),
-        service_tier.as_deref(),
-        staged.as_ref(),
-    )?;
-
     let children = Arc::clone(&state.children);
     tauri::async_runtime::spawn_blocking(move || {
         // `staged` must live until the child has READ the files — moving it in
         // here (rather than letting it drop at the end of the outer fn) is what
         // keeps the temp dir alive for the whole run.
-        let _staged = staged;
-        if matches!(via, PromptVia::Acp) {
-            let lane = acp::AcpLane::for_provider(&provider)
-                .ok_or_else(|| format!("{provider} has no ACP lane"))?;
-            let (env, env_remove) = if lane == acp::AcpLane::Antigravity {
-                (antigravity::runtime_env(&bin)?, antigravity::env_remove_keys())
-            } else {
-                (Vec::new(), Vec::new())
-            };
-            let turn = acp::AcpTurn { lane, bin: &bin, args: &args, env, env_remove, model: &model };
-            return acp::run_acp_registered(&children, &request_id, turn, &prompt, timeout);
-        }
-        let mut cmd = Command::new(&bin);
-        cmd.args(&args);
-        let payload = matches!(via, PromptVia::Stdin).then_some(prompt.as_str());
-        let (stdout, stderr, ok) = run_registered(&children, &request_id, cmd, payload, timeout)?;
-        let parsed = match provider.as_str() {
-            "claude" => parse_claude_json(&stdout),
-            "codex" => parse_codex_jsonl(&stdout),
-            _ => Err(CONNECTED_PROVIDER_POLICY_MESSAGE.into()),
-        };
-        match parsed {
-            Ok(text) => Ok(text),
-            Err(e) if !ok => Err(with_stderr_tail(&e, &stderr, " — ", "")),
-            Err(e) => Err(e),
-        }
+        let staged = staged;
+        crate::provider_lane::complete_blocking(
+            &children,
+            &request_id,
+            &provider,
+            &model,
+            &prompt,
+            timeout,
+            reasoning_effort.as_deref(),
+            service_tier.as_deref(),
+            staged.as_ref(),
+        )
     })
     .await
     .map_err(|e| format!("provider task failed: {e}"))?

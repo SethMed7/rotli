@@ -42,7 +42,7 @@ your vault/                 ← one folder, openable in any editor
   .rotli/                   ← the app's own state; delete it and lose nothing but a rebuild
 ```
 
-You just capture. The **Librarian** — a small **on-device** helper — files each note into the **Library**'s areas like *People*, *Projects*, and *Research*. You never have to think about where a note goes, yet it's always exactly where you'd look for it. Prefer no AI at all? Choose a **raw vault** and the Librarian never runs — just your files, organized by you.
+You just capture. The **Librarian** — **on-device** by default, or a Claude, ChatGPT, or Gemini client you signed in and chose — files each note into the **Library**'s areas like *People*, *Projects*, and *Research*. You never have to think about where a note goes, yet it's always exactly where you'd look for it. Prefer no AI at all? Choose a **raw vault** and the Librarian never runs — just your files, organized by you.
 
 Already have an Obsidian, ZenNotes, or ordinary Markdown folder? First run can
 inspect it without writing, then either open it in place or import a copy. Its
@@ -184,7 +184,7 @@ data boundary, [`SECURITY.md`](SECURITY.md) for responsible reporting, and
 | ✅ | **Your vault stays ordinary files** — Rotli adds atomic writes, watching, metadata, and persistence without taking ownership |
 | ✅ | **Search** — full-text across your notes (titles + bodies), instant |
 | ✅ | **Chat** — on-device by default, or your own connected models; your notes are its knowledge base |
-| ✅ | **The Librarian** — an on-device organizer files captures into the Library with an activity record and guarded undo — or choose a raw vault with no AI at all |
+| ✅ | **The Librarian** — an organizer (on-device by default, or a connected client you choose) files captures into the Library with an activity record and guarded undo — or choose a raw vault with no AI at all |
 | ⏳ | **[The roadmap](ROADMAP.md)** — email Inbox · mobile & tablet · handwriting-to-text notebook |
 
 ---

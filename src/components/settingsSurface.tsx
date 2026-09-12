@@ -10,6 +10,7 @@ import { type CSSProperties, type KeyboardEvent, useEffect, useMemo, useRef, use
 
 import { makeTauriHost } from "../ai/host";
 import { suggestPresets } from "../ai/hybrid";
+import { LIBRARIAN_LABELS, librarianCaption, librarianOptions } from "../ai/librarianLane";
 import {
   CLI_CATALOG,
   type HybridPreset,
@@ -110,6 +111,7 @@ import { reconnectActiveVault } from "../state/activeVault";
 import { resetAndReonboard } from "../state/onboarding";
 import { usePanesStore } from "../state/panes";
 import { setQuickFolderSynced, setQuickVaultSynced } from "../state/quick";
+import { startSetupDetection, useSetupDetection } from "../state/setupDetection";
 import {
   ACCENT_COLORS,
   CHAT_NAVIGATOR_STYLES,
@@ -1803,6 +1805,10 @@ function BrainPane() {
   const setTrust = useUiStore((s) => s.setOrganizerTrust);
   const model = useUiStore((s) => s.organizerModel);
   const setModel = useUiStore((s) => s.setOrganizerModel);
+  const providers = useUiStore((s) => s.aiProviders);
+  const detections = useSetupDetection((s) => s.detections);
+  // the picker offers signed-in clients, so make sure the probes have run
+  useEffect(() => startSetupDetection(), []);
   const quiet = useUiStore((s) => s.organizerQuietSecs);
   const setQuiet = useUiStore((s) => s.setOrganizerQuietSecs);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
@@ -1881,10 +1887,12 @@ function BrainPane() {
             <b>Main</b>.
           </p>
           <span className="mplabel">Organizing model</span>
-          <Seg value={model} options={[["local", "On this Mac"]]} onPick={(m) => setModel(m)} />
-          <p className="setnote">
-            A local model on this Mac organizes — note content never enters a cloud-model provider.
-          </p>
+          <Seg
+            value={model}
+            options={librarianOptions(detections, model).map((lane) => [lane, LIBRARIAN_LABELS[lane]])}
+            onPick={(m) => setModel(m)}
+          />
+          <p className="setnote">{librarianCaption(model, model === "local" || providers[model])}</p>
           <span className="mplabel">Wait before organizing</span>
           <Seg
             value={String(quiet)}

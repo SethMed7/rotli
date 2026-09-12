@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  LIBRARIAN_LABELS,
+  librarianCaption,
+  librarianOptions,
+  suggestedLibrarian,
+} from "../../ai/librarianLane";
+import {
   CLI_CATALOG,
   PROVIDER_LABELS,
   type ProviderId,
@@ -11,8 +17,6 @@ import { setSetupHandle } from "../../keys/handles";
 import {
   type ChatModelInfo,
   type CliDetect,
-  chatModels,
-  cliDetect,
   localModelInstall,
   localModelInstallCancel,
   localModelInstallProgress,
@@ -20,6 +24,12 @@ import {
   localModelUninstall,
 } from "../../lib/tauri";
 import { ONBOARDING_STEP_NUMBER, ONBOARDING_TOTAL_STEPS } from "../../state/onboarding";
+import {
+  providerReady,
+  refreshLocalModels,
+  startSetupDetection,
+  useSetupDetection,
+} from "../../state/setupDetection";
 import { useUiStore } from "../../state/ui";
 import { Character } from "../character";
 import { ChevronRight } from "../glyphs";
@@ -73,8 +83,12 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
   const setAiProvider = useUiStore((state) => state.setAiProvider);
   const providerDefaults = useUiStore((state) => state.providerDefaults);
   const setProviderDefault = useUiStore((state) => state.setProviderDefault);
-  const [local, setLocal] = useState<ChatModelInfo[]>([]);
-  const [detections, setDetections] = useState<Partial<Record<ProviderId, CliDetect>>>({});
+  const organizerModel = useUiStore((state) => state.organizerModel);
+  const setOrganizerModel = useUiStore((state) => state.setOrganizerModel);
+  // detection began on the first setup screen (state/setupDetection); by now
+  // the answers are usually in, so this step opens knowing what is here
+  const local = useSetupDetection((state) => state.local);
+  const detections = useSetupDetection((state) => state.detections);
   const [expanded, setExpanded] = useState<ProviderId | null>(null);
   const [installing, setInstalling] = useState<{
     requestId: string;
@@ -89,24 +103,22 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
   const [showScrollCue, setShowScrollCue] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
 
-  const refreshLocal = () =>
-    void chatModels()
-      .then(setLocal)
-      .catch(() => setLocal([]));
+  const refreshLocal = () => void refreshLocalModels();
 
+  // a direct open of this step (Settings → run setup again) still starts it
+  useEffect(() => startSetupDetection(), []);
+
+  // Gemini is proposed as the Librarian once (per mount) when it is signed in
+  // and nothing was chosen; the lane itself stays off until the user turns it
+  // on above, so the proposal costs nothing until that second consent
+  const proposedRef = useRef(false);
   useEffect(() => {
-    refreshLocal();
-    for (const provider of CONNECTED_PROVIDERS) {
-      void cliDetect(provider)
-        .then((detection) => setDetections((current) => ({ ...current, [provider]: detection })))
-        .catch(() =>
-          setDetections((current) => ({
-            ...current,
-            [provider]: { installed: false, authenticated: false, version: null },
-          })),
-        );
-    }
-  }, []);
+    if (proposedRef.current) return;
+    const proposal = suggestedLibrarian(detections, organizerModel);
+    if (proposal === organizerModel) return;
+    proposedRef.current = true;
+    setOrganizerModel(proposal);
+  }, [detections, organizerModel, setOrganizerModel]);
 
   useEffect(() => {
     setSetupHandle({ continue: onDone, back: onBack });
@@ -125,10 +137,7 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
 
   const installedIds = useMemo(() => new Set(local.map((model) => model.id)), [local]);
   const installable = installableCatalog(installedIds);
-  const readyProviders = CONNECTED_PROVIDERS.filter((provider) => {
-    const detection = detections[provider];
-    return !!detection?.installed && detection.authenticated;
-  }).length;
+  const readyProviders = CONNECTED_PROVIDERS.filter((provider) => providerReady(detections[provider])).length;
   const installPct =
     installing && installing.approxMb > 0
       ? Math.min(99, Math.round((installedBytes / (installing.approxMb * 1_000_000)) * 100))
@@ -232,8 +241,9 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
             <p className="setup-eyebrow">Optional and changeable</p>
             <h1 id="model-setup-title">How should Rotli think?</h1>
             <p className="setup-lede">
-              Run a model entirely on this Mac, or use your own Claude, ChatGPT, or Cursor accounts through
-              each company&rsquo;s official local client. Every connected lane stays off until you turn it on.
+              Run a model entirely on this Mac, or use your own Claude, ChatGPT, Cursor, or Gemini accounts
+              through each company&rsquo;s official local client. Rotli already looked at what this Mac has;
+              every connected lane stays off until you turn it on.
             </p>
 
             <div className="setup-model-disclosures">
@@ -393,7 +403,7 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
                   onClick={() => toggleSection("subscription")}
                 >
                   <span>
-                    <strong id="connected-model-title">Connect Claude, ChatGPT, or Cursor</strong>
+                    <strong id="connected-model-title">Connect Claude, ChatGPT, Cursor, or Gemini</strong>
                     <small>Use official command-line clients already signed in on this Mac.</small>
                   </span>
                   <span className="setup-model-summary-meta">
@@ -406,7 +416,7 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
                     <div className="setup-provider-list">
                       {CONNECTED_PROVIDERS.map((provider) => {
                         const detection = detections[provider];
-                        const ready = !!detection?.installed && detection.authenticated;
+                        const ready = providerReady(detection);
                         const enabled = providers[provider];
                         return (
                           <div className="setup-provider" key={provider}>
@@ -475,6 +485,31 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
                 )}
               </section>
             </div>
+
+            <section className="setup-librarian" aria-labelledby="librarian-title">
+              <strong id="librarian-title">Who files your notes?</strong>
+              <small>The Librarian tidies the Library on its own schedule. Choose where it thinks.</small>
+              <div className="setup-librarian-options" role="group" aria-label="Librarian model">
+                {librarianOptions(detections, organizerModel).map((lane) => (
+                  <button
+                    key={lane}
+                    type="button"
+                    className={organizerModel === lane ? "setup-model-action selected" : "setup-model-action"}
+                    aria-pressed={organizerModel === lane}
+                    onClick={() => {
+                      setOrganizerModel(lane);
+                      // picking a client IS the consent to use it
+                      if (lane !== "local") setAiProvider(lane, true);
+                    }}
+                  >
+                    {LIBRARIAN_LABELS[lane]}
+                  </button>
+                ))}
+              </div>
+              <p className="setup-provider-help">
+                {librarianCaption(organizerModel, organizerModel === "local" || providers[organizerModel])}
+              </p>
+            </section>
 
             {note && (
               <p className={note.error ? "setup-error" : "setup-model-note"} role="status">

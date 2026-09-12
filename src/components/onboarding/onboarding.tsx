@@ -19,6 +19,7 @@ import { allActions, conflictFor, getAction, rebind, setDispatchSuspended } from
 import { setGlobalShortcut } from "../../lib/tauri";
 import { DEFAULT_APPEARANCE } from "../../state/appearanceDefaults";
 import { ONBOARDING_STEP_NUMBER, ONBOARDING_TOTAL_STEPS, startingAppearance } from "../../state/onboarding";
+import { startSetupDetection } from "../../state/setupDetection";
 import { THEME_FAMILY_PRESENTATIONS, type ThemeFamily, type ThemeSetting, useUiStore } from "../../state/ui";
 import { Character } from "../character";
 
@@ -178,6 +179,9 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
   // shortcuts and must keep what was just chosen.
   useEffect(() => {
     if (initialStep === "welcome") useUiStore.setState(startingAppearance());
+    // the Models step is six screens away: probe local models and signed-in
+    // clients now so it opens already knowing what this Mac has
+    startSetupDetection();
   }, [initialStep]);
 
   const pickFamily = (nextFamily: ThemeFamily) => {

@@ -12,6 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The Librarian can file through a connected client you chose: Settings →
+  Librarian and the first-run Models step offer On this Mac plus every
+  signed-in Claude, ChatGPT, or Gemini client (Cursor never files notes).
+  Two consents gate it — the choice and the lane's switch in Connections —
+  and Rust checks both every cycle, so a chosen-but-off lane files on this
+  Mac and says so. The call rides the same seam as chat (provider policy,
+  secret scan, model allowlists); secure and locked notes are skipped before
+  any prompt exists. When Gemini is signed in on this Mac, the Models step
+  proposes it as the Librarian; the lane still waits for you to turn it on.
+- First-run setup probes local models and signed-in clients from its first
+  screen, so the Models step opens already knowing what this Mac has instead
+  of "Checking…". Gemini is named in that step's heading and copy.
 - A note dragged from Main onto a pane opens there: the pane center or its
   tab strip adds a tab, and an edge carves a split holding the note, with the
   same dropzones a dragged tab shows. Folders and gathered selections still
@@ -21,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The guided tour's spotlight is unmistakable: a thicker accent ring with a
+  breathing halo, and the highlighted control itself lifts with a tint and
+  accent outline.
 - New (the header button, ⌘T, and the chooser) files the note beside the note
   that is open, and at the Main root when nothing is open. The last folder
   clicked in the sidebar no longer decides, so a note created on an empty
