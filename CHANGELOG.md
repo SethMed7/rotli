@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.93.0] - 2026-09-12
+
+The second review round on the Welcome kit: the Librarian may file through a
+connected client you chose, setup knows your Mac before the Models step, the
+editor's color list and result colors behave, and Main's new-note and drag
+rules follow what is open.
+
 ### Added
 
 - The Librarian can file through a connected client you chose: Settings →
