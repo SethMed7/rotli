@@ -411,8 +411,10 @@ function neighborIn(root: PaneNode, fromId: string, dir: FocusDir): string | nul
  * dragend/drop. Panes read it to arm their split-detach dropzones (the maintainer,
  * 2026-06-13). */
 export interface DraggingTab {
-  paneId: string;
-  tabId: string;
+  /** Null for a note dragged in from the sidebar (lib/paneDropDrag): the pane
+   * dropzones arm, no strip tab reads as the one in flight. */
+  paneId: string | null;
+  tabId: string | null;
 }
 
 /** A closed tab the session can bring back (⌘⇧T) — where it lived and at which

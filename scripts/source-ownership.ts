@@ -83,6 +83,7 @@ export const COMPONENT_ROOT_FILE_OWNERS = {
 export const LIB_EFFECTFUL_FILE_OWNERS = {
   "clipboard.ts": "host pasteboard adapter (HTML copies with inlined image bytes)",
   "mainAddDrag.ts": "cross-surface Main drag workflow",
+  "paneDropDrag.ts": "sidebar note → pane drop workflow",
   "nativeDrag.ts": "native Finder drag hover relay adapter",
   "popover.ts": "shared transient-popover hook backed by UI state",
   "quitFlush.ts": "native quit lifecycle adapter",

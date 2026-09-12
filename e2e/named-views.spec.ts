@@ -92,7 +92,9 @@ test("Chat names the inherited Notes view and can leave it for all chats", async
   await expect(page.getByRole("button", { name: /Current view: Main/ })).toBeVisible();
 });
 
-test("the new-item chooser keeps a named view folder as its creation context", async ({ page }) => {
+test("the new-item chooser keeps the named VIEW as its creation context, at the view root when no note is open there", async ({
+  page,
+}) => {
   await gotoApp(page);
 
   const viewSwitcher = page.getByRole("button", { name: /Current view: Main/ });
@@ -120,7 +122,12 @@ test("the new-item chooser keeps a named view folder as its creation context", a
   await expect(folder.locator("..").locator(".main-row", { hasText: "Untitled" })).toHaveCount(0);
   await page.locator(".pane.focused .cm-content").click();
   await page.keyboard.type("# Northstar note");
-  await expect(folder.locator("..").locator(".main-row", { hasText: "Northstar note" })).toHaveCount(1);
+  // the view stays the context (membership), but a folder that is merely
+  // selected no longer nests the item: it lands at the view's root
+  await expect(
+    page.locator('.main-tree[data-active-view="Northstar"] .main-row', { hasText: "Northstar note" }),
+  ).toHaveCount(1);
+  await expect(folder.locator("..").locator(".main-row", { hasText: "Northstar note" })).toHaveCount(0);
   await page.getByRole("button", { name: /Current view: Northstar/ }).click();
   await page.getByRole("menu").getByRole("menuitemcheckbox", { name: "Main — all items" }).click();
   await expect(

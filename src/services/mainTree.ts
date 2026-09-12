@@ -268,7 +268,7 @@ export function addNoteToMain(tree: MainNode[], noteId: string): MainNode[] {
 /** Add a note INTO the Main folder with rendered id `parentId` ("main:<path>"),
  * or the Main root when `parentId` is MAIN_ROOT / the folder can't be found.
  * A no-op if the note already lives anywhere in Main. Every new note lands in
- * Main, inside the folder the user is working in (the maintainer #15/#16, 2026-07-03). */
+ * Main, beside the note that is open or at the root (newItems/placement.ts). */
 export function addNoteToMainAt(tree: MainNode[], noteId: string, parentId: string): MainNode[] {
   if (containsNote(tree, noteId)) return tree;
   const ref: MainNode = { note: noteId };

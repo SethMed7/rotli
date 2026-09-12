@@ -12,11 +12,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A note dragged from Main onto a pane opens there: the pane center or its
+  tab strip adds a tab, and an edge carves a split holding the note, with the
+  same dropzones a dragged tab shows. Folders and gathered selections still
+  move only within Main.
 - A color-only result pair such as `[:purple][:accent]` now renders as Yes
   and No in those colors, the way `[:blue|:green]` already reads as a switch.
 
 ### Changed
 
+- New (the header button, ⌘T, and the chooser) files the note beside the note
+  that is open, and at the Main root when nothing is open. The last folder
+  clicked in the sidebar no longer decides, so a note created on an empty
+  window no longer lands inside the Welcome folder. Inside a named view the
+  same rule applies: the view stays the context, and a merely selected view
+  folder no longer nests the new item.
 - A result row with three or more answers gives every uncolored answer its
   own color from a fixed rotation (blue, purple, orange, cyan, pink, yellow,
   brown, green, red), skipping colors chosen by hand and repeating only when
