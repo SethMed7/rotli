@@ -18,6 +18,7 @@ import { Suspense, lazy } from "react";
 
 import { CaptureCard } from "./components/captureCard";
 import { ContextMenu } from "./components/contextMenu";
+import { GuidedTour } from "./components/tour/guidedTour";
 import { HotkeyBadges } from "./components/hotkeyBadges";
 import { NotesSurface } from "./components/notesSurface";
 import { PreviewModal } from "./components/previewModal";
@@ -74,6 +75,7 @@ import { flushSettingsNow, runAutoRetentionMaintenance } from "./state/persist";
 import { applyQuickState } from "./state/quick";
 import { useAppearanceSync } from "./state/appearanceSync";
 import { applyAccent, applySyntaxPalette, applyTheme } from "./state/theme";
+import { startTour } from "./state/tour";
 import { useUiStore } from "./state/ui";
 import { useVaultStore } from "./state/vault";
 import { hydrateViews } from "./state/views";
@@ -459,6 +461,7 @@ function MainShell() {
             onDone={() => {
               setOnboarded(true);
               openSeededWelcome();
+              startTour();
               setOnboardingVersion(APP_VERSION);
               setOnboardingPhase("preferences");
               const ui = useUiStore.getState();
@@ -489,6 +492,7 @@ function MainShell() {
         )}
       </main>
       <PreviewModal />
+      <GuidedTour />
       {whichKey &&
         (hotkeyPeek === "badges" ? <HotkeyBadges /> : <WhichKey onClose={() => setWhichKey(false)} />)}
       <ContextMenu />

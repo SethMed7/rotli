@@ -89,6 +89,7 @@ export function SidebarSwitcher({
             key={id}
             type="button"
             aria-pressed={active}
+            data-tour={id === "chat" ? "chat" : undefined}
             title={hint}
             data-hotkey={action}
             className={active ? "sb-switch-seg sel" : "sb-switch-seg"}

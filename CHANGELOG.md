@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   padding for tables), and a guard keeps vertical margins off editor lines and
   block widgets.
 
+- A guided tour after first-run setup points at the real controls: New,
+  Main and its view picker, search, Aa, Chat, and Settings. It is an overlay
+  the app stays live under; Skip, Done, or Escape end it, and Settings →
+  General → Show me around (also in ⌘K) runs it again. The welcome note and
+  the views lesson point at it.
 - Wikilinks: typing `[[` opens a list of matching notes (titles first, then
   aliases); Enter, Tab, or a click completes the link and closes it with
   `]]`. The links lesson points at it.

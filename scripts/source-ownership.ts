@@ -37,6 +37,7 @@ export const COMPONENT_DIRECTORY_OWNERS = {
   chat: "Chat pane presentation feature",
   onboarding: "first-run, vault activation, and model setup presentation",
   sidebar: "sidebar presentation feature",
+  tour: "guided tour overlay that spotlights the real controls after setup",
 } as const;
 
 /** Root components are limited to pane/dialog entry points plus this explicit

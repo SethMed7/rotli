@@ -138,6 +138,7 @@ export function Titlebar() {
               <button
                 type="button"
                 className="tb-search"
+                data-tour="search"
                 aria-label={breveActive ? "Search Rotli and actions — ⌘K" : "Search notes and actions — ⌘K"}
                 onMouseDown={(event) => event.stopPropagation()}
                 onDoubleClick={(event) => event.stopPropagation()}
