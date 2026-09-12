@@ -1009,7 +1009,7 @@
   min-width: 2.2em;
   height: 1.65em;
   padding: 0 0.55em;
-  border-color: color-mix(in srgb, var(--result-color) 55%, var(--border));
+  border-color: color-mix(in srgb, var(--result-edge, var(--result-color)) 55%, var(--border));
   border-radius: var(--r-control);
   color: color-mix(in srgb, var(--result-color) 75%, var(--text));
   font-size: 0.78em;
@@ -1017,11 +1017,11 @@
   white-space: nowrap;
 }
 .rotli-result-choice.is-labeled:hover {
-  border-color: var(--result-color);
+  border-color: var(--result-edge, var(--result-color));
   color: color-mix(in srgb, var(--result-color) 85%, var(--text));
 }
 .rotli-result-choice.is-labeled.is-selected {
-  border-color: var(--result-color);
+  border-color: var(--result-edge, var(--result-color));
   background: var(--result-color);
   color: var(--result-selected-ink);
 }
@@ -2205,4 +2205,96 @@
 .rotli-progress.all {
   background: color-mix(in srgb, var(--success) 18%, transparent);
   color: var(--success);
+}
+
+/* ─── the `:color` picker inside a result or toggle bracket ─── a CodeMirror
+   tooltip (no React), rainbow order, 1–9 and 0 pick, typing filters */
+.rotli-colorpick {
+  min-width: 176px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 5px;
+  z-index: 7;
+}
+.rotli-colorpick-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  background: none;
+  border-radius: var(--r-control);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9em;
+  text-align: left;
+  cursor: pointer;
+}
+.rotli-colorpick-row:hover,
+.rotli-colorpick-row.is-active {
+  background: var(--hov);
+}
+.rotli-colorpick-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--colorpick-color);
+  border: 1px solid var(--colorpick-edge);
+  flex: none;
+}
+.rotli-colorpick-name {
+  flex: 1;
+  text-transform: capitalize;
+}
+.rotli-colorpick-key {
+  color: var(--text-muted);
+  font-size: 0.8em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── the `[[` picker: matching notes while a wikilink target is typed ─── */
+.rotli-linkpick {
+  min-width: 220px;
+  max-width: min(420px, calc(100vw - 24px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 5px;
+  z-index: 7;
+}
+.rotli-linkpick-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  background: none;
+  border-radius: var(--r-control);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9em;
+  text-align: left;
+  cursor: pointer;
+}
+.rotli-linkpick-row:hover,
+.rotli-linkpick-row.is-active {
+  background: var(--hov);
+}
+.rotli-linkpick-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rotli-linkpick-hint {
+  color: var(--text-muted);
+  font-size: 0.8em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 45%;
 }

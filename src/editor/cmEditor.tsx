@@ -29,6 +29,7 @@ import { choicePanelGaps } from "./choicePanelGapsField";
 import type { SlashState, PickerState, ImageGenState } from "./cmEditorState";
 import { rotliKeymap } from "./cmKeymap";
 import { codeHighlight } from "./codeHighlight";
+import { colorPicker } from "./colorPicker";
 import {
   type EditorHandle,
   applyBlockToggle,
@@ -64,6 +65,7 @@ import { SlashPicker } from "./slashPicker";
 import { tableRender } from "./tableRender";
 import { buildTitleCounts, wikilinkLabel } from "./wikilink";
 import { setWikilinkNotes } from "./wikilinkIndex";
+import { wikilinkPicker } from "./wikilinkPicker";
 
 /** The floating format bar (bottom-center, ~42px tall, sitting 16px up) covers
  * the scroller's bottom strip. CM keeps the caret at least this many px above
@@ -589,7 +591,15 @@ function CmEditorImpl({
         viewModeComp.of(
           rawEditorRef.current
             ? rawMarkdown
-            : [livePreview, choicePanelGaps, blockRender, tableRender, codeHighlight],
+            : [
+                livePreview,
+                choicePanelGaps,
+                colorPicker,
+                wikilinkPicker,
+                blockRender,
+                tableRender,
+                codeHighlight,
+              ],
         ),
         blockComp.of(blockHandlesRef.current ? blockHandles(openBlockMenu) : []),
         fmComp.of(fmExt(fmRawRef.current, fmGenRef.current, fmErrRef.current)),
@@ -691,7 +701,17 @@ function CmEditorImpl({
     rawEditorRef.current = rawEditor;
     viewRef.current?.dispatch({
       effects: viewModeComp.reconfigure(
-        rawEditor ? rawMarkdown : [livePreview, choicePanelGaps, blockRender, tableRender, codeHighlight],
+        rawEditor
+          ? rawMarkdown
+          : [
+              livePreview,
+              choicePanelGaps,
+              colorPicker,
+              wikilinkPicker,
+              blockRender,
+              tableRender,
+              codeHighlight,
+            ],
       ),
     });
   }, [rawEditor, viewModeComp]);

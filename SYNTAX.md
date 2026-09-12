@@ -106,7 +106,11 @@ imports.
   `x axis` and preserves the escape when choosing either result or toggle side.
 - A labeled result can add a color after its label: `[True:green]`,
   `[Draw:yellow]`, `[False:red]`, `[Later:accent]`, `[Info:blue]`,
-  `[Maybe:purple]`, or `[Skip:neutral]`.
+  `[Maybe:purple]`, or `[Skip:neutral]`. The full name list, in the picker's
+  rainbow order, is red, orange, yellow, green, cyan, blue, purple, pink,
+  brown, black, white, neutral, accent. Typing `:` inside a result or toggle
+  bracket opens that picker: arrows or typed letters narrow it, Enter, Tab, a
+  click, or the keys 1–9 and 0 choose, Escape dismisses it.
   `#RGB` and `#RRGGBB` values are also accepted, for example
   `[Draw:#E3B341]`. An uncolored two-option result defaults to green then red;
   other uncolored labeled options use the active theme accent.
@@ -145,6 +149,11 @@ imports.
   Switching on writes `[x True|False]` or `[x|]`. Toggle labels accept the same
   semantic and strict hex color suffixes as labeled results. Color-only sides
   use fallback labels, so `[:blue|:green]` renders as an On/Off switch.
+- Wikilinks are `[[title]]`, `[[id]]`, `[[target|shown]]`, or `[[target#heading]]`.
+  Typing `[[` opens a picker of matching notes (title prefixes first, then
+  aliases and substrings; an empty query offers the newest notes); Enter, Tab,
+  or a click writes the closed link, using the id only when titles collide.
+  Escape dismisses it and the text stays a plain, still-typed link.
 - Tables are GFM: a header row, a delimiter row of dashes (any count, with
   optional alignment colons), then body rows. Enter at the end of a typed
   `| a | b |` row that is not yet a table writes the delimiter row and an

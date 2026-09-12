@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   padding for tables), and a guard keeps vertical margins off editor lines and
   block widgets.
 
+- Wikilinks: typing `[[` opens a list of matching notes (titles first, then
+  aliases); Enter, Tab, or a click completes the link and closes it with
+  `]]`. The links lesson points at it.
+- Label colors: typing `:` inside a result or toggle bracket opens a color
+  list in rainbow order (red, orange, yellow, green, cyan, blue, purple, pink,
+  brown, black, white, neutral, accent); arrows or letters narrow it, Enter,
+  Tab, a click, or the keys 1–9 and 0 choose. Six names are new (orange,
+  cyan, pink, brown, black, white), each tuned per light and dark scheme.
 - Tables: Enter at the end of a typed `| a | b |` row writes the delimiter
   row and a first empty row, so a table starts without knowing about dashes.
   Shift+Enter inside a cell adds a line break (`<br>` in source). ⇧-click

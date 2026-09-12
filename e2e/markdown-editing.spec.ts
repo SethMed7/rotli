@@ -180,6 +180,34 @@ test("an exact note-title wikilink opens on an ordinary click", async ({ page })
   await expect(page.locator(".cm-content")).toContainText("Free local forever.");
 });
 
+test("typing [[ lists matching notes; Enter or a click completes and closes the link", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.type("See [[pric");
+  const list = page.getByRole("listbox", { name: "Link a note" });
+  await expect(list).toBeVisible();
+  await expect(list.getByRole("option").first()).toContainText("Pricing decision");
+  await page.keyboard.press("Enter");
+  await expect(list).toBeHidden();
+  await page.keyboard.type(" and ");
+  await page.keyboard.type("[[");
+  await expect(list).toBeVisible();
+  await list.getByRole("option").filter({ hasText: "Pricing decision" }).click();
+  await expect(list).toBeHidden();
+  await page.locator(".ed-date").click();
+  const links = page.locator(".rotli-wikilink");
+  await expect(links).toHaveCount(2);
+  await expect(links.first()).not.toHaveClass(/missing/);
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  await expect(editor).toContainText("See [[Pricing decision]] and [[Pricing decision]]");
+});
+
 test("a ts code fence renders IDE-grade token colors", async ({ page }) => {
   await gotoApp(page);
   await page.keyboard.press("Meta+T");
@@ -611,6 +639,48 @@ test("hash choices and switches stay interactive while inline code stays literal
   await expect(editor).toContainText("- [x True:green|False:red] Sync");
   await expect(editor).toContainText("- [:blue|:purple] Color only");
   await expect(editor).toContainText("`[#]` and `[|]` stay literal");
+});
+
+test("typing : inside a result bracket opens the color list; numbers, letters and Enter choose", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.type("- [Wait:");
+  const list = page.getByRole("listbox", { name: "Label color" });
+  await expect(list).toBeVisible();
+  await expect(list.getByRole("option")).toHaveCount(13);
+  await expect(list.getByRole("option").first()).toHaveText(/Red/i);
+  await page.keyboard.press("3");
+  await expect(list).toBeHidden();
+  await page.keyboard.type("][No:pi");
+  await expect(list.getByRole("option")).toHaveCount(1);
+  await expect(list.getByRole("option").first()).toHaveText(/pink/i);
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("] Ship");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter"); // the empty continuation row exits the list
+  await page.keyboard.type("- [Go:");
+  await expect(list).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(list).toBeHidden();
+  await page.keyboard.type("cyan|x Stop:black] Route");
+  await page.locator(".ed-date").click();
+  const yellow = page.getByRole("button", { name: "Wait", exact: true });
+  const pink = page.getByRole("button", { name: "No", exact: true });
+  await expect(yellow).toBeVisible();
+  await pink.click();
+  await expect(pink).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("switch", { name: "Go or Stop" })).toHaveAttribute("aria-checked", "false");
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  await expect(editor).toContainText("- [Wait:yellow][x No:pink] Ship");
+  await expect(editor).toContainText("- [Go:cyan|x Stop:black] Route");
 });
 
 test("() creates a tab-navigable Markdown multiple-choice group", async ({ page }) => {
