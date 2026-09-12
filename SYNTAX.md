@@ -145,6 +145,12 @@ imports.
   Switching on writes `[x True|False]` or `[x|]`. Toggle labels accept the same
   semantic and strict hex color suffixes as labeled results. Color-only sides
   use fallback labels, so `[:blue|:green]` renders as an On/Off switch.
+- Tables are GFM: a header row, a delimiter row of dashes (any count, with
+  optional alignment colons), then body rows. Enter at the end of a typed
+  `| a | b |` row that is not yet a table writes the delimiter row and an
+  empty first body row, so the delimiter never has to be typed. A line break
+  inside a cell is written as `<br>` (Shift+Enter in the cell editor); plain
+  readers flatten it to a space.
 - Inline code is opaque to the control grammar. Backticked content renders as
   ordinary literal text with no code-chip background; only the backticks are
   hidden in beautified mode. Fenced code blocks retain their code styling.

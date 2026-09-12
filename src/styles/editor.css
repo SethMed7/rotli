@@ -1946,6 +1946,14 @@
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
+/* ⇧-click / ⌘-click cell ranges: a tinted wash, never a checkmark */
+.rotli-md-table th.is-selected,
+.rotli-md-table tbody tr td.is-selected,
+.rotli-md-table tbody tr:nth-child(even) td.is-selected {
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
 .rotli-md-cell-input {
   display: block;
   width: calc(100% + 18px);

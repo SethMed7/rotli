@@ -30,6 +30,7 @@ import {
   cellSpansOf,
   nextCell,
   scanTables,
+  splitRow,
   tableToText,
 } from "./tables";
 import { MARK, markOf, TASK_LINE_RE, taskStateOf } from "./taskState";
@@ -466,6 +467,37 @@ function imageArrow(direction: "up" | "down" | "left" | "right"): Command {
   };
 }
 
+/** Enter at the end of a typed `| a | b |` row that is not yet a table writes
+ * the delimiter row and an empty first body row, and lands in its first cell.
+ * The delimiter is what makes it a table; nobody should have to know that. */
+const tableStartOnEnter: Command = (view) => {
+  const range = view.state.selection.main;
+  if (!range.empty) return false;
+  const line = view.state.doc.lineAt(range.head);
+  if (range.head !== line.to || inFence(view, line)) return false;
+  if (!/^\s*\|.*\|\s*$/.test(line.text)) return false;
+  const cells = splitRow(line.text);
+  if (cells.length < 2 || cells.every((cell) => cell === "")) return false;
+  if (line.number > 1 && view.state.doc.line(line.number - 1).text.includes("|")) return false;
+  if (
+    line.number < view.state.doc.lines &&
+    /^\s*\|?\s*:?-+/.test(view.state.doc.line(line.number + 1).text)
+  ) {
+    return false;
+  }
+  const indent = /^\s*/.exec(line.text)?.[0] ?? "";
+  const delimiter = `${indent}| ${cells.map(() => "---").join(" | ")} |`;
+  const body = `${indent}| ${cells.map(() => " ").join(" | ")} |`;
+  const insert = `\n${delimiter}\n${body}`;
+  view.dispatch({
+    changes: { from: line.to, insert },
+    selection: EditorSelection.cursor(line.to + 1 + delimiter.length + 1 + indent.length + 2),
+    scrollIntoView: true,
+    userEvent: "input",
+  });
+  return true;
+};
+
 const tableEnter: Command = (view) => {
   const ctx = tableCtxAt(view);
   if (!ctx) return false;
@@ -496,6 +528,7 @@ const tableEnter: Command = (view) => {
 export const rotliKeymap: KeyBinding[] = [
   // table nav first — inside a table these own the keys, elsewhere they pass
   { key: "Enter", run: tableEnter },
+  { key: "Enter", run: tableStartOnEnter },
   { key: "Tab", run: tableTab, shift: tableShiftTab },
   { key: "ArrowUp", run: tableArrow(-1) },
   { key: "ArrowDown", run: tableArrow(1) },

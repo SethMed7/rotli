@@ -320,6 +320,28 @@ describe("hash choice and toggle shorthands", () => {
     expect(text(placed)).toBe("- [##?:right] ");
   });
 
+  test("Enter at the end of a typed pipe row writes the delimiter and a first empty row", () => {
+    const source = "| Step | Owner |";
+    const view = viewOf(source, source.length);
+    expect(press(view, "Enter")).toBe(true);
+    expect(text(view)).toBe("| Step | Owner |\n| --- | --- |\n|   |   |");
+    expect(view.state.selection.main.head).toBe("| Step | Owner |\n| --- | --- |\n| ".length);
+    // a toggle row carries a pipe but is not a table; a lone cell is not either
+    const toggle = viewOf("- [True|False] Ready", 20);
+    press(toggle, "Enter");
+    expect(text(toggle)).toBe("- [True|False] Ready\n- [True|x False] ");
+    const lone = viewOf("| only |", 8);
+    expect(press(lone, "Enter")).toBe(false);
+    // an existing delimiter below means the table is already started
+    const started = viewOf("| a | b |\n| --- | --- |", 9);
+    press(started, "Enter");
+    expect(
+      text(started)
+        .split("\n")
+        .filter((row) => /^\| -+ \| -+ \|$/.test(row)),
+    ).toHaveLength(1);
+  });
+
   test("Enter after a placed prompt starts its first answer without the suffix", () => {
     const source = "- [##?:center] Pick channels";
     const prompt = viewOf(source, source.length);

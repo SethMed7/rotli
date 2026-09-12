@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   padding for tables), and a guard keeps vertical margins off editor lines and
   block widgets.
 
+- Tables: Enter at the end of a typed `| a | b |` row writes the delimiter
+  row and a first empty row, so a table starts without knowing about dashes.
+  Shift+Enter inside a cell adds a line break (`<br>` in source). ⇧-click
+  selects a block of cells and ⌘-click (Ctrl on Linux) adds or removes one;
+  Delete clears the selection in one edit and copy writes it as
+  tab-separated text.
+
 ### Changed
 
 - First-time setup always opens in Rotli Light with the quokka wearing no

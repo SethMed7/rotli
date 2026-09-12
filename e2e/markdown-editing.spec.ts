@@ -79,6 +79,66 @@ test("dragging a column boundary resizes the column; double-click resets", async
   expect(Math.abs(restored.width - before.width)).toBeLessThan(12);
 });
 
+test("Enter after a typed pipe row starts a table, and Shift+Enter breaks a line inside a cell", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.type("| Step | Owner |");
+  await page.keyboard.press("Enter");
+  const table = page.locator(".rotli-md-table");
+  await expect(table).toBeVisible();
+  await expect(table.locator("th")).toHaveCount(2);
+  await expect(table.locator("tbody tr")).toHaveCount(1);
+  await table.locator("td").first().click();
+  const cell = table.getByRole("textbox", { name: "Edit Step row 1" });
+  await expect(cell).toBeVisible();
+  await cell.fill("Draft");
+  await cell.press("Shift+Enter");
+  await cell.pressSequentially("second line");
+  await cell.press("Tab");
+  await expect(table.locator("td").first().locator("br")).toHaveCount(1);
+  await expect(table.locator("td").first()).toContainText("second line");
+  await page.locator(".ed-date").click();
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  await expect(editor).toContainText("| Draft<br>second line |");
+  await expect(editor).toContainText(/\| -+ \| -+ \|/);
+});
+
+test("⇧-click selects a block of cells, Ctrl-click toggles one, and Delete clears them together", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText(TABLE_NOTE);
+  const table = page.locator(".rotli-md-table");
+  await expect(table).toBeVisible();
+  await table.getByRole("cell", { name: "Inkling" }).click({ modifiers: ["Control"] });
+  await table.getByRole("cell", { name: "Open" }).click({ modifiers: ["Shift"] });
+  await expect(table.locator(".is-selected")).toHaveCount(4);
+  await expect(table.locator(".rotli-md-cell-input")).toHaveCount(0);
+  await table.getByRole("cell", { name: "GLM-5.2" }).click({ modifiers: ["Control"] });
+  await expect(table.locator(".is-selected")).toHaveCount(3);
+  await page.keyboard.press("Delete");
+  await expect(table).not.toContainText("Inkling");
+  await expect(table).not.toContainText("Apache 2.0");
+  await expect(table).not.toContainText("Open");
+  await expect(table).toContainText("GLM-5.2");
+  await expect(table.locator("tbody tr")).toHaveCount(2);
+  // a plain click still edits, and drops the selection
+  await table.getByRole("cell", { name: "GLM-5.2" }).click();
+  await expect(table.getByRole("textbox", { name: "Edit Model row 2" })).toBeVisible();
+  await expect(table.locator(".is-selected")).toHaveCount(0);
+});
+
 test("editing a wrapped table cell preserves the table's shape", async ({ page }) => {
   await gotoApp(page);
   await page.keyboard.press("Meta+T");

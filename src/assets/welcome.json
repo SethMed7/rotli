@@ -31,7 +31,7 @@
     "id": "tables",
     "title": "Tables and code",
     "purpose": "Edit useful structure directly",
-    "body": "# Tables and code\n\nClick a table cell and change its text. Drag a column boundary to resize it.\n\n| Step | Owner | State |\n| --- | --- | --- |\n| Draft | Me | Ready |\n| Review | Me | Next |\n| Share | Me | Later |\n\n## Code remains code\n\n```ts\nconst nextStep = \"Write one useful note\";\nconsole.log(nextStep);\n```\n\nInline examples stay literal: `[#]`, `[##]`, `[True|False]`, and `- [ ]` do not turn into controls here.\n\n```math\nE = mc^2\n```\n",
+    "body": "# Tables and code\n\nClick a table cell and change its text. Drag a column boundary to resize it.\n\n- To start a table, type `| Step | Owner |` on a fresh line and press Enter. Rotli adds the divider row and a first empty row; you never have to type the dashes yourself.\n- Press Shift+Enter inside a cell for a line break. The source keeps one row per line by writing `<br>` where the break is.\n- Shift-click a second cell to select a block of cells, or ⌘-click cells one by one. Delete clears them together, and ⌘C copies them as tab-separated text.\n\n| Step | Owner | State |\n| --- | --- | --- |\n| Draft | Me | Ready |\n| Review | Me | Next |\n| Share | Me | Later |\n\n## Code remains code\n\n```ts\nconst nextStep = \"Write one useful note\";\nconsole.log(nextStep);\n```\n\nInline examples stay literal: `[#]`, `[##]`, `[True|False]`, and `- [ ]` do not turn into controls here.\n\n```math\nE = mc^2\n```\n",
     "filename": "03 Tables and code.md"
   },
   {
