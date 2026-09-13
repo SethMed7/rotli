@@ -1,4 +1,3 @@
-import { type HybridPreset, PROVIDER_IDS, type ProviderId, providerDefaultModel } from "../ai/models";
 // Every preference survives relaunch. Vault-specific state stays in two
 // frontend-owned dot-files inside the corpus:
 //
@@ -17,6 +16,8 @@ import { type HybridPreset, PROVIDER_IDS, type ProviderId, providerDefaultModel 
 //
 // In a plain browser (vite dev) every entry point here is a no-op — the
 // in-memory demo corpus stays exactly as it was (the seam's whole point).
+import { librarianModelId } from "../ai/librarianLane";
+import { type HybridPreset, PROVIDER_IDS, type ProviderId, providerDefaultModel } from "../ai/models";
 import { parseWebSearchProvider, type WebSearchProvider } from "../ai/searchProvider";
 import {
   QUOKKA_IDLE_POSES,
@@ -329,6 +330,7 @@ interface PersistedSettings {
   organizerTrust: OrganizerTrust;
   /** Which model the organizer runs. Remote choices remain opt-in. */
   organizerModel: OrganizerModel;
+  organizerModelId: string | null;
   /** Idle delay (seconds) before the organizer scans a just-touched note. The
    * Rust daemon's `organizerQuietSecs` knob; default 300 (5 min). */
   organizerQuietSecs: number;
@@ -666,6 +668,10 @@ export function parseSettings(raw: string): PersistedSettings {
     organizerTrust: asEnum(data.organizerTrust, ORGANIZER_TRUSTS, "organize"),
     // default LOCAL (on-device) so organizing never leaves the Mac unless chosen
     organizerModel: asEnum(data.organizerModel, ORGANIZER_MODELS, "local"),
+    organizerModelId: librarianModelId(
+      asEnum(data.organizerModel, ORGANIZER_MODELS, "local"),
+      data.organizerModelId,
+    ),
     // idle delay before organizing; default 5 min, non-negative finite only
     organizerQuietSecs:
       typeof data.organizerQuietSecs === "number" &&
@@ -797,7 +803,8 @@ function applySettings(s: PersistedSettings): void {
     brainEnabled: s.brainEnabled,
     secureLocalAi: s.secureLocalAi,
     organizerTrust: s.organizerTrust,
-    organizerModel: "local",
+    organizerModel: s.organizerModel,
+    organizerModelId: s.organizerModelId,
     organizerQuietSecs: s.organizerQuietSecs,
     librarianIntroSeen: s.librarianIntroSeen,
     onboarded: s.onboarded,
@@ -1506,7 +1513,8 @@ function settingsSnapshot(): string {
     brainEnabled: ui.brainEnabled,
     secureLocalAi: ui.secureLocalAi,
     organizerTrust: ui.organizerTrust,
-    organizerModel: "local",
+    organizerModel: ui.organizerModel,
+    organizerModelId: ui.organizerModelId,
     organizerQuietSecs: ui.organizerQuietSecs,
     librarianIntroSeen: ui.librarianIntroSeen,
     onboarded: ui.onboarded,

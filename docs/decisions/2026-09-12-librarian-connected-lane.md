@@ -47,3 +47,12 @@ provider on a schedule with no per-note click.
   journal's `filed_by` records `provider:model`.
 - The connected lane cannot be stopped mid-turn by the Librarian's Stop
   button; the child registry's watchdog (120 s) is the backstop.
+
+## Notes
+
+- 2026-09-12 (later): the Librarian gets its own model choice
+  (`organizerModelId`) on the chosen lane; it outranks the lane's chat
+  default when it names an allowlisted model, on both sides. The same change
+  fixed 0.93.0 writing `organizerModel: "local"` to settings.json regardless
+  of the choice, which had kept the daemon on this Mac and reverted the
+  Settings control on relaunch.

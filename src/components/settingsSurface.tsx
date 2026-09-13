@@ -10,7 +10,7 @@ import { type CSSProperties, type KeyboardEvent, useEffect, useMemo, useRef, use
 
 import { makeTauriHost } from "../ai/host";
 import { suggestPresets } from "../ai/hybrid";
-import { LIBRARIAN_LABELS, librarianCaption, librarianOptions } from "../ai/librarianLane";
+import { LIBRARIAN_LABELS, librarianCaption, librarianModelFor, librarianOptions } from "../ai/librarianLane";
 import {
   CLI_CATALOG,
   type HybridPreset,
@@ -1806,6 +1806,9 @@ function BrainPane() {
   const model = useUiStore((s) => s.organizerModel);
   const setModel = useUiStore((s) => s.setOrganizerModel);
   const providers = useUiStore((s) => s.aiProviders);
+  const providerDefaults = useUiStore((s) => s.providerDefaults);
+  const modelId = useUiStore((s) => s.organizerModelId);
+  const setModelId = useUiStore((s) => s.setOrganizerModelId);
   const detections = useSetupDetection((s) => s.detections);
   // the picker offers signed-in clients, so make sure the probes have run
   useEffect(() => startSetupDetection(), []);
@@ -1893,6 +1896,22 @@ function BrainPane() {
             onPick={(m) => setModel(m)}
           />
           <p className="setnote">{librarianCaption(model, model === "local" || providers[model])}</p>
+          {model !== "local" && (
+            <label className="setselect-row">
+              <span>Model</span>
+              <select
+                aria-label="Librarian model"
+                value={librarianModelFor(model, modelId, providerDefaults)}
+                onChange={(event) => setModelId(event.currentTarget.value)}
+              >
+                {CLI_CATALOG[model].map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <span className="mplabel">Wait before organizing</span>
           <Seg
             value={String(quiet)}

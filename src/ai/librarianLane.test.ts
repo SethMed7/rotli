@@ -4,6 +4,8 @@ import {
   isLibrarianLane,
   LIBRARIAN_LANES,
   librarianCaption,
+  librarianModelFor,
+  librarianModelId,
   librarianOptions,
   suggestedLibrarian,
 } from "./librarianLane";
@@ -36,4 +38,14 @@ test("the caption says whether notes leave the Mac", () => {
   expect(librarianCaption("local", false)).toMatch(/never enters/);
   expect(librarianCaption("antigravity", true)).toMatch(/^Gemini files your notes/);
   expect(librarianCaption("antigravity", false)).toMatch(/turned off in Connections/);
+});
+
+test("a Librarian model id sticks only inside its lane's catalog, else the chat default answers", () => {
+  expect(librarianModelId("local", "opus")).toBeNull();
+  expect(librarianModelId("claude", "opus")).toBe("opus");
+  expect(librarianModelId("claude", "gemini-3.8-flash-high")).toBeNull();
+  expect(librarianModelId("claude", 7)).toBeNull();
+  expect(librarianModelFor("claude", "opus", { claude: "sonnet" })).toBe("opus");
+  expect(librarianModelFor("claude", "nope", { claude: "sonnet" })).toBe("sonnet");
+  expect(librarianModelFor("antigravity", null, {})).toBe("gemini-3.8-flash-high");
 });
