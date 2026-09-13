@@ -12,7 +12,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { LIBRARIAN_LABELS } from "../ai/librarianLane";
+import { filedStamp, LIBRARIAN_LABELS } from "../ai/librarianLane";
 import { daysSinceMidnight, relativeLabel } from "../lib/dateLabels";
 import { useTransientPopover } from "../lib/popover";
 import {
@@ -803,7 +803,7 @@ export function ActivitySurface() {
                                 >
                                   {describeAction(a, true)}
                                 </button>
-                                <span className="act-time">{when(a.ts)}</span>
+                                <span className="act-time">{filedStamp(when(a.ts), a.model)}</span>
                                 {/* raw vault: Approve would hit the Rust refusal — only
                                     Dismiss (journal-only) remains actionable */}
                                 {brainOn && (
@@ -875,7 +875,7 @@ export function ActivitySurface() {
                         >
                           {describeAction(a, false)}
                         </button>
-                        <span className="act-time">{when(a.ts)}</span>
+                        <span className="act-time">{filedStamp(when(a.ts), a.model)}</span>
                         {undone ? (
                           <span className="act-undone">undone</span>
                         ) : (

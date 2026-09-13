@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.95.0] - 2026-09-13
+
+Three fixes from a computer-use test of the installed 0.94.0.
+
+### Fixed
+
+- Clicking the blank space below a note that ends with a wikilink no longer
+  opens that link; only a click on the line itself does.
+- Escape in the color or `[[` list closed the list AND fell through to the
+  app's Esc ladder, which could hide the whole window. A key the editor has
+  already consumed no longer reaches the app chords.
+- Librarian Activity rows now name the lane and model that filed the note
+  ("Claude · Claude Opus"), not only the day and time.
+
+
 ## [0.94.0] - 2026-09-12
 
 The Librarian lane actually works: the choice persists and reaches the

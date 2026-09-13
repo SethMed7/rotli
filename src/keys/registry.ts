@@ -138,6 +138,9 @@ export function attachDispatcher(surface: Surface): () => void {
   if (detach) return detach;
   const onKeyDown = (event: KeyboardEvent) => {
     if (suspended) return;
+    // a key the editor already consumed (a picker's Escape, a keymap binding)
+    // is not a chord press: Esc must unwind the picker, not hide the window
+    if (event.defaultPrevented) return;
     if (event.repeat) return; // auto-repeat is not a fresh press — never re-fire a command
     const pressed = chordFromEvent(event);
     if (!pressed) return;
