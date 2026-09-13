@@ -76,3 +76,20 @@ export function librarianCaption(choice: LibrarianChoice, laneOn: boolean): stri
     ? `${label} files your notes through its official local client on the Librarian's own schedule. Secure and locked notes never leave this Mac.`
     : `${label} is chosen but turned off in Connections, so the Librarian files on this Mac until you turn it on.`;
 }
+
+/** A journal row's `filed_by` for people: "claude:opus" → "Claude · Claude Opus";
+ * a bare local model id is shown as recorded. */
+export function describeFiledBy(model: string): string {
+  const colon = model.indexOf(":");
+  if (colon < 0) return model;
+  const lane = model.slice(0, colon);
+  const id = model.slice(colon + 1);
+  if (!isLibrarianLane(lane)) return model;
+  const label = CLI_CATALOG[lane].find((entry) => entry.id === id)?.label ?? id;
+  return `${LIBRARIAN_LABELS[lane]} · ${label}`;
+}
+
+/** The stamp on an Activity row: the time, plus who filed it when known. */
+export function filedStamp(when: string, model?: string): string {
+  return model ? `${when} · ${describeFiledBy(model)}` : when;
+}

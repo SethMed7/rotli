@@ -180,6 +180,50 @@ test("an exact note-title wikilink opens on an ordinary click", async ({ page })
   await expect(page.locator(".cm-content")).toContainText("Free local forever.");
 });
 
+test("blank space below a note that ends with a wikilink does not open the link", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText("# Link test\n\n[[Pricing decision]]");
+  await page.locator(".ed-date").click();
+  const box = await editor.boundingBox();
+  if (!box) throw new Error("no editor box");
+  // well below the last line, inside the editor's padding
+  await page.mouse.click(box.x + box.width * 0.7, box.y + box.height - 8);
+  await expect(page.locator(".cm-content")).toContainText("Link test");
+  await expect(page.locator(".cm-content")).not.toContainText("Free local forever.");
+  await page.locator(".rotli-wikilink", { hasText: "Pricing decision" }).click();
+  await expect(page.locator(".cm-content")).toContainText("Free local forever.");
+});
+
+test("Escape in the color list closes the list only; the app's Esc ladder does not fire", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.type("Focus first");
+  await page.keyboard.press("Enter");
+  // focus mode is the first observable rung of the Esc ladder in the twin
+  await page.getByRole("button", { name: /Search notes and actions/ }).click();
+  await page.getByPlaceholder("Search notes, files, chats, actions…").fill("Focus mode");
+  await page.locator(".prow", { hasText: "Focus mode" }).click();
+  const focused = page.locator('[data-focus="true"]');
+  await expect(focused.first()).toBeAttached();
+  await editor.click();
+  await page.keyboard.press("End");
+  await page.keyboard.type("- [Wait:");
+  const list = page.getByRole("listbox", { name: "Label color" });
+  await expect(list).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(list).toBeHidden();
+  await expect(focused.first()).toBeAttached(); // still in focus mode
+  await page.keyboard.press("Escape");
+  await expect(focused).toHaveCount(0); // the ladder runs only on a free Esc
+});
+
 test("typing [[ lists matching notes; Enter or a click completes and closes the link", async ({ page }) => {
   await gotoApp(page);
   await page.getByRole("button", { name: /^New note in / }).click();

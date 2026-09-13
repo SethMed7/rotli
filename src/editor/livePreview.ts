@@ -1144,6 +1144,9 @@ function tryOpenBareUrlAt(lineText: string, lineFrom: number, pos: number): bool
 
 export const linkOpener = EditorView.domEventHandlers({
   click(e, view) {
+    // only a click ON a line counts: the blank space below the last line maps
+    // to the document end, which would open a link that merely ends the note
+    if (!(e.target instanceof Element) || !e.target.closest(".cm-line")) return false;
     const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
     if (pos == null) return false;
     const line = view.state.doc.lineAt(pos);

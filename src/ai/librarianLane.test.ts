@@ -3,6 +3,7 @@ import { expect, test } from "bun:test";
 import {
   isLibrarianLane,
   LIBRARIAN_LANES,
+  describeFiledBy,
   librarianCaption,
   librarianModelFor,
   librarianModelId,
@@ -48,4 +49,11 @@ test("a Librarian model id sticks only inside its lane's catalog, else the chat 
   expect(librarianModelFor("claude", "opus", { claude: "sonnet" })).toBe("opus");
   expect(librarianModelFor("claude", "nope", { claude: "sonnet" })).toBe("sonnet");
   expect(librarianModelFor("antigravity", null, {})).toBe("gemini-3.8-flash-high");
+});
+
+test("a filed_by value names the lane and model for people", () => {
+  expect(describeFiledBy("claude:opus")).toBe("Claude · Claude Opus");
+  expect(describeFiledBy("antigravity:gemini-3.8-flash-high")).toBe("Gemini · Gemini 3.8 Flash (High)");
+  expect(describeFiledBy("claude:unknown-id")).toBe("Claude · unknown-id");
+  expect(describeFiledBy("gemma-3-12b-it-qat-4bit")).toBe("gemma-3-12b-it-qat-4bit");
 });
