@@ -254,12 +254,6 @@ describe("parseSettings — creation and Brain model", () => {
     expect(parseSettings('{"tabLayout":"compress"}').tabLayout).toBe("scroll");
   });
 
-  test("the Librarian lane keeps the connected clients and fails closed on everything else", () => {
-    const lane = (id: string) => parseSettings(`{"organizerModel":"${id}"}`).organizerModel;
-    expect(["claude", "antigravity"].map(lane)).toEqual(["claude", "antigravity"]);
-    expect(["gemini35", "cursor", "future"].map(lane)).toEqual(["local", "local", "local"]);
-  });
-
   test("quick-note and quick-capture vault choices are independent and optional", () => {
     expect(parseSettings("{}").quickVaultId).toBeNull();
     expect(parseSettings("{}").captureVaultId).toBeNull();

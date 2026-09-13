@@ -89,8 +89,9 @@ pub(crate) fn parse_knobs(settings_json: &str) -> Knobs {
 #[derive(Clone, PartialEq, Debug)]
 pub(crate) struct ConnectedLane {
     pub(crate) provider: String,
-    /// The user's per-provider default (`providerDefaults`) when it names an
-    /// allowlisted model, else the lane's first allowlisted model.
+    /// The Librarian's own `organizerModelId` when it names an allowlisted
+    /// model, else the lane's chat default (`providerDefaults`), else the
+    /// lane's first allowlisted model — the order src/ai/librarianLane.ts uses.
     pub(crate) model: String,
 }
 
@@ -112,11 +113,17 @@ pub(crate) fn connected_lane(settings_json: &str) -> Option<ConnectedLane> {
     if !enabled {
         return None;
     }
+    let allowed = |m: &&str| crate::provider_lane::model_allowed(&provider, m);
     let chosen = v
-        .get("providerDefaults")
-        .and_then(|d| d.get(&provider))
+        .get("organizerModelId")
         .and_then(|m| m.as_str())
-        .filter(|m| crate::provider_lane::model_allowed(&provider, m))
+        .filter(allowed)
+        .or_else(|| {
+            v.get("providerDefaults")
+                .and_then(|d| d.get(&provider))
+                .and_then(|m| m.as_str())
+                .filter(allowed)
+        })
         .map(str::to_string);
     let model = chosen.or_else(|| crate::provider_lane::default_model(&provider).map(str::to_string))?;
     Some(ConnectedLane { provider, model })
@@ -201,6 +208,18 @@ mod tests {
         ))
         .expect("lane");
         assert_eq!(own.model, last);
+        // the Librarian's own id outranks the chat default; junk falls through
+        let first = crate::provider_lane::default_model("claude").unwrap();
+        let own = connected_lane(&format!(
+            "{{\"organizerModel\":\"claude\",\"aiProviders\":{{\"claude\":true}},\"organizerModelId\":\"{first}\",\"providerDefaults\":{{\"claude\":\"{last}\"}}}}"
+        ))
+        .expect("lane");
+        assert_eq!(own.model, first);
+        let junk = connected_lane(&format!(
+            "{{\"organizerModel\":\"claude\",\"aiProviders\":{{\"claude\":true}},\"organizerModelId\":\"nope\",\"providerDefaults\":{{\"claude\":\"{last}\"}}}}"
+        ))
+        .expect("lane");
+        assert_eq!(junk.model, last);
         // Cursor and the legacy ids never file notes
         assert_eq!(
             connected_lane("{\"organizerModel\":\"cursor\",\"aiProviders\":{\"cursor\":true}}"),

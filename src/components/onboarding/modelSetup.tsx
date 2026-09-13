@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   LIBRARIAN_LABELS,
   librarianCaption,
+  librarianModelFor,
   librarianOptions,
   suggestedLibrarian,
 } from "../../ai/librarianLane";
@@ -55,7 +56,7 @@ const SETUP_HELP: Record<ConnectedProvider, string> = {
   cursor:
     "Install Cursor Agent from cursor.com/cli, then run `agent login` yourself in Terminal. Rotli uses Cursor's official ACP custom-client protocol in read-only Ask mode.",
   antigravity:
-    "Google's official Antigravity ACP agent. Install it and sign in with Google from Settings → AI Models after setup; it stays off until you turn it on there.",
+    "Google's official Antigravity ACP agent, which Rotli downloads and signs in from Settings → AI Models → Antigravity after setup. The `agy` command line and the Antigravity IDE are separate products with their own logins; Rotli does not use them. The lane stays off until you turn it on.",
 };
 
 function localSize(mb: number): string {
@@ -85,6 +86,8 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
   const setProviderDefault = useUiStore((state) => state.setProviderDefault);
   const organizerModel = useUiStore((state) => state.organizerModel);
   const setOrganizerModel = useUiStore((state) => state.setOrganizerModel);
+  const organizerModelId = useUiStore((state) => state.organizerModelId);
+  const setOrganizerModelId = useUiStore((state) => state.setOrganizerModelId);
   // detection began on the first setup screen (state/setupDetection); by now
   // the answers are usually in, so this step opens knowing what is here
   const local = useSetupDetection((state) => state.local);
@@ -506,6 +509,25 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
                   </button>
                 ))}
               </div>
+              {organizerModel !== "local" && (
+                <label className="setup-provider-default">
+                  <span>
+                    Model
+                    <small>What the Librarian asks</small>
+                  </span>
+                  <select
+                    aria-label="Librarian model"
+                    value={librarianModelFor(organizerModel, organizerModelId, providerDefaults)}
+                    onChange={(event) => setOrganizerModelId(event.currentTarget.value)}
+                  >
+                    {CLI_CATALOG[organizerModel].map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <p className="setup-provider-help">
                 {librarianCaption(organizerModel, organizerModel === "local" || providers[organizerModel])}
               </p>

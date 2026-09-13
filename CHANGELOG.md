@@ -10,6 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.94.0] - 2026-09-12
+
+The Librarian lane actually works: the choice persists and reaches the
+daemon, the Librarian picks its model, and the Antigravity setup says what it
+is.
+
+### Added
+
+- The Librarian chooses a model, not only a lane: Settings → Librarian and
+  the first-run Models step show the lane's model list once a connected
+  client is chosen. Unset, the lane's chat default applies.
+
+### Changed
+
+- The Antigravity setup copy says what the lane actually is: Google's ACP
+  agent that Rotli downloads and signs in from Settings → AI Models →
+  Antigravity, separate from the `agy` command line and the Antigravity IDE.
+
+### Fixed
+
+- 0.93.0 wrote `organizerModel: "local"` to settings regardless of the
+  Librarian choice, so the daemon never used a connected lane and the
+  Settings control reverted to On this Mac on relaunch. The choice now
+  persists and reaches the daemon.
+
+
 ## [0.93.0] - 2026-09-12
 
 The second review round on the Welcome kit: the Librarian may file through a

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 // UI state only (the Zustand law). Data lives behind src/services/.
 
-import { LIBRARIAN_LANES, type LibrarianChoice } from "../ai/librarianLane";
+import type { OrganizerModel } from "../ai/librarianLane";
 import { DEFAULT_PROVIDER_MODELS, type HybridPreset, type ProviderId } from "../ai/models";
 import { DEFAULT_WEB_SEARCH_PROVIDER, type WebSearchProvider } from "../ai/searchProvider";
 import {
@@ -130,12 +130,7 @@ export type AppIcon = "default" | "warm" | "paper" | "charcoal" | "clay";
 
 export const ORGANIZER_TRUSTS: readonly OrganizerTrust[] = ["off", "suggest", "tidy", "organize"];
 
-/** Where the Librarian files notes: this Mac or a connected client from
- * ai/librarianLane (Cursor never). Junk and legacy ids coerce to `local`
- * (asEnum); Rust also requires the lane to be on in Connections. */
-export type OrganizerModel = LibrarianChoice;
-
-export const ORGANIZER_MODELS: readonly OrganizerModel[] = ["local", ...LIBRARIAN_LANES];
+export { ORGANIZER_MODELS, type OrganizerModel } from "../ai/librarianLane";
 
 /** How holding ⌘ reveals the keyboard map (the maintainer, 2026-08-04: "I'd prefer little
  * boxes around the UI so I can visually see and instantly toggle exactly where
@@ -712,6 +707,9 @@ interface UiState {
    * the Rust daemon re-reads settings.json each cycle, so no push command. */
   organizerModel: OrganizerModel;
   setOrganizerModel: (m: OrganizerModel) => void;
+  /** The Librarian's own model on a connected lane; null = the lane's chat default. */
+  organizerModelId: string | null;
+  setOrganizerModelId: (id: string | null) => void;
   /** Idle delay (seconds) before the organizer scans a just-touched note. */
   organizerQuietSecs: number;
   setOrganizerQuietSecs: (n: number) => void;
@@ -1072,7 +1070,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   organizerTrust: "organize",
   setOrganizerTrust: (t) => set({ organizerTrust: t }),
   organizerModel: "local",
-  setOrganizerModel: (m) => set({ organizerModel: m }),
+  setOrganizerModel: (m) => set({ organizerModel: m, organizerModelId: null }),
+  organizerModelId: null,
+  setOrganizerModelId: (id) => set({ organizerModelId: id }),
   organizerQuietSecs: 300,
   setOrganizerQuietSecs: (n) => set({ organizerQuietSecs: n }),
   librarianIntroSeen: false,

@@ -75,6 +75,12 @@ export function AntigravitySetup({ onChange }: { onChange: () => void }) {
         ) : (
           <span className="ailane-chip ok">runtime {s.version ?? s.latestVersion}</span>
         )}
+        {!s.installed && !install.isPending && (
+          <span className="ailane-desc">
+            This is Google&rsquo;s ACP agent (about 315 MB), separate from the <code>agy</code> command line
+            and the Antigravity IDE and their logins; Rotli uses only this runtime.
+          </span>
+        )}
         {s.installed && !s.signedIn && !signIn.isPending && (
           <button type="button" className="ghostbtn primary" disabled={busy} onClick={() => signIn.mutate()}>
             Sign in with Google
