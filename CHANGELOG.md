@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.94.0] - 2026-09-12
+
+The Librarian lane actually works: the choice persists and reaches the
+daemon, the Librarian picks its model, and the Antigravity setup says what it
+is.
+
 ### Added
 
 - The Librarian chooses a model, not only a lane: Settings → Librarian and
