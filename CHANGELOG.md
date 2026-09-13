@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.95.0] - 2026-09-13
+
+Three fixes from a computer-use test of the installed 0.94.0.
+
 ### Fixed
 
 - Clicking the blank space below a note that ends with a wikilink no longer
