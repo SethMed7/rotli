@@ -23,6 +23,11 @@ export type LaunchFeatures = ReturnType<typeof launchFeatures>;
 /** The one caption for a capability a surface names but this build withholds. */
 export const COMING_SOON_CAPTION = "Coming soon — not in this release yet";
 
+// Vite replaces this identifier at build time (vite.config.ts `define`). The
+// module-local declaration keeps non-Vite typecheck lanes (scripts that import
+// the AI loop) compiling without src/vite-env.d.ts.
+declare const __ROTLI_BUILD_CHANNEL__: "stable" | "dev" | undefined;
+
 /** Only the build chooses the channel; settings and URLs cannot override it. */
 export const LAUNCH_FEATURES = launchFeatures(
   typeof __ROTLI_BUILD_CHANNEL__ !== "undefined" && __ROTLI_BUILD_CHANNEL__ === "dev",

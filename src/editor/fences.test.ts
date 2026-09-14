@@ -6,7 +6,7 @@ import { describe, expect, test } from "bun:test";
 
 import { Text } from "@codemirror/state";
 
-import { TARGET_LANGS, innerCode, lineInFence, scanFences } from "./fences";
+import { TARGET_LANGS, innerCode, lineInFence, scanFences, withheldEmbedMessage } from "./fences";
 
 function doc(...lines: string[]): Text {
   return Text.of(lines);
@@ -115,4 +115,13 @@ describe("scanFences", () => {
     expect(lineInFence(d.line(4).from, fences)).toBe(true);
     expect(lineInFence(d.line(5).from, fences)).toBe(false);
   });
+});
+
+test("a sheet fence is withheld only where the build lacks sheets; other embeds never are", () => {
+  expect(withheldEmbedMessage("sheet", { sheets: false })).toBe(
+    "Spreadsheets aren’t available in this build yet.",
+  );
+  expect(withheldEmbedMessage("sheet", { sheets: true })).toBeNull();
+  expect(withheldEmbedMessage("board", { sheets: false })).toBeNull();
+  expect(withheldEmbedMessage("mermaid", { sheets: false })).toBeNull();
 });

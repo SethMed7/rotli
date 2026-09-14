@@ -42,7 +42,7 @@ import {
   isTauri,
 } from "../lib/tauri";
 import { deriveSheetFacts, describeShape, formatStamp, sizeLine } from "../sheets/facts";
-import { SHEET_BIN, SHEET_EDITABLE, SHEET_EDIT_MAX_BYTES, SHEET_TEXT } from "../sheets/kinds";
+import * as sheetKinds from "../sheets/kinds";
 import { type SheetTable, parseWorkbook } from "../sheets/view";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 
@@ -86,7 +86,7 @@ export function kindOf(name: string): FileKind {
   if (VIDEO.has(ext)) return "video";
   if (IMAGE.has(ext)) return "image";
   if (ext === "pdf") return "pdf";
-  if (SHEET_TEXT.has(ext) || SHEET_BIN.has(ext)) return "sheet";
+  if (sheetKinds.SHEET_TEXT.has(ext) || sheetKinds.SHEET_BIN.has(ext)) return "sheet";
   if (DOCUMENT_EXTS.has(ext)) return "document";
   if (HTML.has(ext)) return "html";
   if (TEXT.has(ext) || name.toLowerCase().endsWith(".audio.txt")) return "text";
@@ -188,8 +188,8 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
   const [pathCopied, setPathCopied] = useState(false);
   const detailsRef = useRef<HTMLDivElement | null>(null);
 
-  const sheetEditable =
-    kind === "sheet" && SHEET_EDITABLE.has(ext) && !!stat?.writable && stat.len <= SHEET_EDIT_MAX_BYTES;
+  const sheetEditable = kind === "sheet" && sheetKinds.sheetEditableFile(ext, stat);
+  const withheld = kind === "sheet" && sheetKinds.workbookWithheld(ext);
   const documentEditable =
     kind === "document" && DOCX_EDITABLE.has(ext) && !!stat?.writable && stat.len <= DOCUMENT_EDIT_MAX_BYTES;
 
@@ -245,7 +245,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
             .catch(fail);
         })
         .catch(fail);
-    } else if (kind === "sheet") {
+    } else if (kind === "sheet" && !sheetKinds.workbookWithheld(ext)) {
       // probe first: an editable sheet mounts the editor (which loads its own
       // data); everything else falls back to the read-only table
       corpusFileStat(fileId)
@@ -254,7 +254,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           if (cancelled) return;
           setStat(s);
           setProbed(true);
-          const editable = SHEET_EDITABLE.has(ext) && !!s?.writable && s.len <= SHEET_EDIT_MAX_BYTES;
+          const editable = sheetKinds.sheetEditableFile(ext, s);
           if (editable) return;
           // past the read cap the bytes arrive truncated — an xlsx dies with a
           // cryptic zip-parse error, a csv shows a silent cut. Refuse up front.
@@ -262,7 +262,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
             setTooLarge(true);
             return;
           }
-          const load = SHEET_BIN.has(ext)
+          const load = sheetKinds.SHEET_BIN.has(ext)
             ? corpusFileBytes(fileId).then((b64) => parseWorkbook({ base64: b64 }))
             : corpusFileText(fileId, READ_MAX_BYTES).then((csv) =>
                 parseWorkbook({ csv, delimiter: ext === "tsv" ? "\t" : "," }),
@@ -391,7 +391,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
         setDetailsErr("too large to inspect here");
         return;
       }
-      const load = SHEET_BIN.has(ext)
+      const load = sheetKinds.SHEET_BIN.has(ext)
         ? corpusFileBytes(fileId).then((b64) => parseWorkbook({ base64: b64 }))
         : corpusFileText(fileId, READ_MAX_BYTES).then((csv) =>
             parseWorkbook({ csv, delimiter: ext === "tsv" ? "\t" : "," }),
@@ -459,7 +459,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
   const loadingHtml =
     kind === "html" && !err && !tooLarge && (text === null || (htmlMode === "preview" && !url));
   const loadingSheet =
-    kind === "sheet" && !err && !tooLarge && (!probed || (!sheetEditable && tables === null));
+    kind === "sheet" && !withheld && !err && !tooLarge && (!probed || (!sheetEditable && tables === null));
   const loadingDocument = kind === "document" && DOCX_EDITABLE.has(ext) && !err && !tooLarge && !probed;
   const sheet = tables?.[activeSheet];
 
@@ -500,25 +500,8 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
         {/* EVERY read-only sheet says WHY editing is off, not just the read-only
             root — .ods/.xls/oversize/failed-probe were silent (#53, audit 2026-07) */}
         {kind === "sheet" && probed && !sheetEditable && !tooLarge && (
-          <span
-            className="file-readonly"
-            title={
-              stat === null
-                ? "rotli couldn't verify this file, so it opened as a view-only table"
-                : !stat.writable
-                  ? "This root is read-only — rotli never writes it"
-                  : !SHEET_EDITABLE.has(ext)
-                    ? `Editing supports .xlsx and .csv — .${ext} opens as a view-only table (use Open externally to edit)`
-                    : "Too large to edit safely in rotli — use Open externally to edit"
-            }
-          >
-            {stat === null
-              ? "view only"
-              : !stat.writable
-                ? "read-only"
-                : !SHEET_EDITABLE.has(ext)
-                  ? `view only · .${ext}`
-                  : "view only · too large"}
+          <span className="file-readonly" title={sheetKinds.sheetReadOnlyReason(stat, ext).title}>
+            {sheetKinds.sheetReadOnlyReason(stat, ext).label}
           </span>
         )}
         {kind === "sheet" && sheetEditable && <div ref={sheetChromeRef} className="file-sheet-chrome" />}
@@ -772,6 +755,15 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           <pre className="file-text">{text || "(empty file)"}</pre>
         )}
 
+        {withheld && (
+          <div className="file-document-fallback">
+            <h2>.{ext} is unsupported in this build</h2>
+            <p>
+              Spreadsheets aren’t available in this build yet. Open the original externally, or save a CSV
+              copy to edit it in Rotli.
+            </p>
+          </div>
+        )}
         {!err && kind === "sheet" && probed && sheetEditable && (
           <Suspense fallback={<p className="file-loading">Loading…</p>}>
             <SheetEditor

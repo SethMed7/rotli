@@ -22,6 +22,8 @@ export interface PromptCtx {
   documentTool?: boolean;
   /** Offer the established sheet/PDF work-file lane (desktop app). */
   artifactTool?: boolean;
+  /** Include workbooks in that lane (the sheets launch capability). */
+  sheetArtifacts?: boolean;
   /** Offer the draw_board tool (desktop app; local mermaid→board conversion). */
   boardTool?: boolean;
   /** The user's name (Settings → General / onboarding) — omit when unset. */
@@ -160,7 +162,7 @@ export const gemmaAdapter: Adapter = {
       ? `\n- {"thought":"…","tool":"create_document","args":{"title":"…","body":"…structured markdown-like content…"}} → create a conventional editable Word document (.docx), file it through Rotli, and show it beside this chat. Its body may use headings, paragraphs, lists, and one table; do not put Markdown image embeds in it.`
       : "";
     const artifactTool = ctx.artifactTool
-      ? `\n- {"thought":"…","tool":"create_artifact","args":{"kind":"sheet|pdf","title":"…","content":"…"}} → create a user-owned work file. Use valid CSV (including a header row) for a sheet. PDF always creates an editable Markdown source beside the exported copy. Use create_document, not this tool, for Word files.`
+      ? `\n- {"thought":"…","tool":"create_artifact","args":{"kind":"${ctx.sheetArtifacts ? "sheet|pdf" : "pdf"}","title":"…","content":"…"}} → create a user-owned work file.${ctx.sheetArtifacts ? " Use valid CSV (including a header row) for a sheet." : ""} PDF always creates an editable Markdown source beside the exported copy. Use create_document, not this tool, for Word files.`
       : "";
     const boardTool = ctx.boardTool
       ? `\n- {"thought":"…","tool":"draw_board","args":{"title":"…","mermaid":"flowchart TD\\n  A[Start] --> B[Done]"}} → turn a Mermaid flowchart into an editable visual board saved with the user's boards and shown on screen. Use it when the user asks for a board, canvas, or visual diagram they can edit. Keep to a simple flowchart: named nodes, arrows, short labels, one direction (TD or LR).`
@@ -286,7 +288,7 @@ export const frontierAdapter: Adapter = {
       ? `\n- {"thought":"…","tool":"create_document","args":{"title":"…","body":"…structured markdown-like content…"}} — create a conventional editable Word document (.docx), file it through Rotli, and show it beside this chat; headings, paragraphs, lists, and one table are supported, but do not put Markdown image embeds in it`
       : "";
     const artifactTool = ctx.artifactTool
-      ? `\n- {"thought":"…","tool":"create_artifact","args":{"kind":"sheet|pdf","title":"…","content":"…"}} — create an editable sheet or a PDF with an editable Markdown source; use create_document for Word files`
+      ? `\n- {"thought":"…","tool":"create_artifact","args":{"kind":"${ctx.sheetArtifacts ? "sheet|pdf" : "pdf"}","title":"…","content":"…"}} — create ${ctx.sheetArtifacts ? "an editable sheet or " : ""}a PDF with an editable Markdown source; use create_document for Word files`
       : "";
     const boardTool = ctx.boardTool
       ? `\n- {"thought":"…","tool":"draw_board","args":{"title":"…","mermaid":"flowchart TD\\n  A --> B"}} — turn a Mermaid flowchart into an editable visual board (use when the user asks for a board/canvas/editable diagram; keep it a simple flowchart)`

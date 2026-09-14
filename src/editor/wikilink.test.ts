@@ -94,7 +94,12 @@ describe("filterSlashItems", () => {
   test("matches keywords (wiki, excalidraw, xlsx, docx)", () => {
     expect(filterSlashItems("wiki").some((i) => i.label === "Link note")).toBe(true);
     expect(filterSlashItems("excalidraw").some((i) => i.label === "Board")).toBe(true);
-    expect(filterSlashItems("xlsx").some((i) => i.label === "Sheet")).toBe(true);
+    expect(filterSlashItems("xlsx", { sheets: true }).some((i) => i.label === "Sheet")).toBe(true);
+    // a build without sheets offers no spreadsheet embed at all
+    expect(filterSlashItems("sheet", { sheets: false }).some((i) => i.label === "Sheet")).toBe(false);
+    expect(filterSlashItems("", { sheets: false }).length).toBe(
+      filterSlashItems("", { sheets: true }).length - 1,
+    );
     expect(filterSlashItems("docx").some((i) => i.label === "Document")).toBe(true);
   });
 
