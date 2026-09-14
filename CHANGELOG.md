@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 0.95.1 (unreleased)
+
+### Changed
+
+- Links: `www.` hosts and email addresses link on their own (bare domains such
+  as `example.com` stay prose), `[](url)` shows its url, a scheme-less address
+  opens as `https://`, and a link that can't open says so instead of a silent
+  dead click.
+
 ## [0.95.0] - 2026-09-13
 
 Three fixes from a computer-use test of the installed 0.94.0.

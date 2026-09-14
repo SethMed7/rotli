@@ -48,3 +48,10 @@ describe("markdown-strip.json fixture (Breve parity)", () => {
     });
   }
 });
+
+describe("stripMarkdown — links", () => {
+  test("an empty-text link copies as its url; an image is not a link", () => {
+    expect(stripMarkdown("see [](sethmedina.com)")).toBe("see sethmedina.com");
+    expect(stripMarkdown("![](storage:a.png)")).toBe("![](storage:a.png)");
+  });
+});

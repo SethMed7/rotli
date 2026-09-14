@@ -3,6 +3,7 @@
 // view (breveWatchlist.tsx) renders this; the markdown contract stays owned by
 // src/routines/watchlist.ts.
 
+import { normalizedWebsite } from "../../lib/webUrl";
 import {
   legacyWatchUrl,
   parseWatchlist,
@@ -19,20 +20,6 @@ export type EditableWatchSection = Omit<WatchSection, "items"> & {
 
 export function editId(): string {
   return crypto.randomUUID();
-}
-
-/** Accepts a bare domain or an http/https URL; returns the canonical URL. */
-export function normalizedWebsite(value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const candidate = /^[a-z][a-z\d+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-  try {
-    const parsed = new URL(candidate);
-    if ((parsed.protocol !== "https:" && parsed.protocol !== "http:") || !parsed.hostname) return null;
-    return parsed.toString();
-  } catch {
-    return null;
-  }
 }
 
 /** Compact display form of a topic's website: the bare hostname. */

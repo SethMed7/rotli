@@ -3,6 +3,8 @@
 
 import type { Text } from "@codemirror/state";
 
+import { MD_LINK_SOURCE } from "./inlineLinks";
+
 export interface RawMarkdownToken {
   from: number;
   to: number;
@@ -108,7 +110,7 @@ export function classifyRawMarkdown(doc: Text): RawMarkdownClassification {
       const from = match.index + (match[1] ?? "").length;
       token(line.from, from, match.index + match[0].length, "rotli-raw-blue");
     });
-    matches(text, /\[([^\]]+)\]\(([^)]*)\)/g, (match) => {
+    matches(text, new RegExp(MD_LINK_SOURCE, "g"), (match) => {
       const labelFrom = match.index + 1;
       const labelTo = labelFrom + (match[1] ?? "").length;
       token(line.from, match.index, labelFrom, "rotli-raw-accent");

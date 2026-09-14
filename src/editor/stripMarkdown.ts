@@ -6,8 +6,11 @@
 
 import { CHOICE_MARK } from "./choiceState";
 import { parseChoiceControlLine, parseChoicePromptLine, parseToggleLine } from "./controlState";
+import { linkLabel, MD_LINK_SOURCE } from "./inlineLinks";
 import { parseResultLine, RESULT_MARK } from "./resultState";
 import { MARK } from "./taskState";
+
+const MD_LINK_G = new RegExp(MD_LINK_SOURCE, "g");
 
 export function stripMarkdown(text: string): string {
   const inline = (s: string): string => {
@@ -21,7 +24,7 @@ export function stripMarkdown(text: string): string {
         .replace(/~~([^~]+)~~/g, "$1")
         .replace(/<\/?u>/g, "")
         .replace(/<br\s*\/?>/gi, " ")
-        .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+        .replace(MD_LINK_G, (_m, label: string, url: string) => linkLabel(label, url))
         .replace(/\*([^*\s](?:[^*]*[^*\s])?)\*/g, "$1");
     } while (s !== prev);
     return s;

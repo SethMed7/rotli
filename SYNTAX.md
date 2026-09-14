@@ -159,6 +159,14 @@ imports.
   aliases and substrings; an empty query offers the newest notes); Enter, Tab,
   or a click writes the closed link, using the id only when titles collide.
   Escape dismisses it and the text stays a plain, still-typed link.
+- Web links are `[text](https://example.com)` or a bare autolink. Autolinks follow GFM's
+  scope: `http://` and `https://` URLs, `www.` hosts, and plain email
+  addresses. A bare domain such as `example.com` stays prose, so `node.js`,
+  `file.md`, and `etc.` never light up. `[](https://example.com)` shows the address as its
+  text; an image embed (`!` before the brackets) is always an image, never a link. A scheme-less address opens
+  as `https://`, and an email opens as `mailto:`. A link that names no web
+  address (a relative path, a `#heading`) shows **Couldn't open this link**
+  when it is ⌘-clicked.
 - Tables are GFM: a header row, a delimiter row of dashes (any count, with
   optional alignment colons), then body rows. Enter at the end of a typed
   `| a | b |` row that is not yet a table writes the delimiter row and an

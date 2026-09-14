@@ -12,6 +12,8 @@
 //
 // Pure: no audio, no DOM, no model.
 
+import { linkLabel, MD_LINK_SOURCE } from "../editor/inlineLinks";
+
 /** A sentence ready to synthesize. */
 export interface Speakable {
   text: string;
@@ -25,6 +27,8 @@ const SENTENCE_END = /[.!?…]["')\]]*\s/;
 /** Abbreviations whose trailing dot must NOT end a sentence. */
 const ABBREV = /(?:^|\s)(?:mr|mrs|ms|dr|prof|sr|jr|st|vs|etc|e\.g|i\.e|approx|fig|no)\.$/i;
 
+const MD_LINK_G = new RegExp(MD_LINK_SOURCE, "g");
+
 /** Strip the Markdown that would be read aloud as gibberish, leaving prose. */
 export function speakableText(line: string): string {
   return line
@@ -32,7 +36,7 @@ export function speakableText(line: string): string {
     .replace(/^\s*>\s?/, "") // quote marker
     .replace(/^\s*(?:[-*+]|\d+\.)\s+(?:(?:\[[ xX]\]){2}\s+|\[[ xX/]\]\s+|\([ xX]\)\s+)?/, "") // list/task/result/choice
     .replace(/!\[[^\]]*\]\([^)]*\)/g, "") // images say nothing aloud
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1") // links: speak the label, not the URL
+    .replace(MD_LINK_G, (_m, label: string, url: string) => linkLabel(label, url)) // links: speak the label, not the URL
     .replace(/`([^`]+)`/g, "$1") // inline code: speak the token
     .replace(/(\*\*|__|\*|_|~~|==)/g, "") // emphasis marks
     .replace(/\s+/g, " ")

@@ -218,3 +218,14 @@ describe("parseBlock — hash choices and toggles", () => {
     });
   });
 });
+
+describe("parseBlock — links", () => {
+  test("an empty-text link is ordinary paragraph text for the inline layer", () => {
+    expect(parseBlock("[](sethmedina.com)")).toEqual({
+      kind: "para",
+      prefixLen: 0,
+      text: "[](sethmedina.com)",
+    });
+    expect(parseBlock("- [](x.com)")).toMatchObject({ kind: "bullet", text: "[](x.com)" });
+  });
+});

@@ -21,6 +21,7 @@ describe("speakableText — prose, not markup", () => {
 
   test("a link is read as its label — never the URL", () => {
     expect(speakableText("see [the docs](https://example.com/a/b) now")).toBe("see the docs now");
+    expect(speakableText("see [](example.com) now")).toBe("see example.com now");
   });
 
   test("an image says nothing at all", () => {

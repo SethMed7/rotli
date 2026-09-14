@@ -197,6 +197,17 @@ test("blank space below a note that ends with a wikilink does not open the link"
   await expect(page.locator(".cm-content")).toContainText("Free local forever.");
 });
 
+test("www. hosts, emails, and [](url) render as links; bare domains stay prose", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText("Visit www.example.com or mail a@b.co, see [](sethmedina.com), not node.js");
+  await page.locator(".ed-date").click();
+  const links = editor.locator(".rotli-link");
+  await expect(links).toHaveText(["www.example.com", "a@b.co", "sethmedina.com"]);
+});
+
 test("Escape in the color list closes the list only; the app's Esc ladder does not fire", async ({
   page,
 }) => {

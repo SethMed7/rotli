@@ -299,6 +299,11 @@
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
 }
+/* a link whose address opens nothing says so instead of a silent dead click */
+.md-link[data-open-failed] {
+  color: var(--danger);
+  text-decoration-style: dashed;
+}
 
 /* — the raw active line: transparent textarea over the tinted twin.
      Metrics on both MUST stay identical or the caret drifts. — */
@@ -1291,6 +1296,15 @@
   color: var(--accent-text);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+/* the editor's "Couldn't open this link" note, beside the ⌘-click */
+.rotli-link-failed {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  color: var(--danger);
+  font-size: 0.85em;
+  padding: 3px 8px;
 }
 /* a resolved wikilink reads as a LINK at a glance (the maintainer, 2026-09-12: the
    dotted rule "doesn't look clickable"): a solid accent underline, and the row's
