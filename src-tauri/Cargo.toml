@@ -35,6 +35,7 @@ pdf-extract = "0.12"                                            # offline embedd
 notify = "8"                                                     # fs watcher (external edits → UI refresh)
 ulid = "1"                                                       # note identity (time-sortable, matches the TS ulid)
 time = { version = "0.3", features = ["formatting", "parsing"] } # frontmatter created/updated (RFC 3339)
+sha2 = "0.10"                                                    # Welcome re-seed: recognize shipped lesson bodies (already transitive)
 tempfile = "3"                                                   # atomic writes: tmp in the same dir + rename
 trash = "5"                                                     # delete = OS trash, never a hard rm
 uuid = { version = "1", features = ["v4"] }                     # mx_<uuid> ids for a rotli-initiated memex
