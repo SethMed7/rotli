@@ -96,6 +96,28 @@ try {
   recording = false;
   await frameLoop;
   const frameEnd = (Date.now() - started) / 1000;
+  // Off camera: stable withholds sheets and Mermaid diagram tabs. The chooser
+  // still names both, disabled and without a digit, and a ```sheet fence in a
+  // note renders the unavailable block instead of mounting an editor.
+  await page.getByRole("button", { name: /Search notes and actions/ }).click();
+  await page.getByPlaceholder("Search notes, files, chats, actions…").fill("choose type");
+  await page.locator(".prow", { hasText: "New tab (choose type)" }).click();
+  const chooser = page.locator(".ni-surface");
+  for (const label of ["Sheet", "Mermaid diagram"]) {
+    const card = chooser.getByRole("button", {
+      name: `New ${label} — Coming soon — not in this release yet`,
+    });
+    await expect(card).toHaveAttribute("aria-disabled", "true");
+    await expect(card.locator(".ni-key")).toHaveCount(0);
+  }
+  await page.keyboard.press("5");
+  await expect(chooser).toBeVisible();
+  await chooser.getByRole("button", { name: "New Markdown note (press 3)" }).click();
+  await page.locator(".pane.focused .cm-content").click();
+  await page.keyboard.insertText("# Fence check\n\n```sheet\nforecast.xlsx\n```\n\nAfter the fence");
+  await expect(page.locator(".rotli-render-withheld")).toHaveText(
+    "Spreadsheets aren’t available in this build yet.",
+  );
   const concat =
     frames
       .map((frame, index) => {
@@ -156,7 +178,7 @@ try {
     ) + "\n",
   );
   console.log(
-    "Stable launch capture passed: Home/Chat, no Breve, no agent integrations, Welcome folder in Main, real task toggle and Aa raw view; synthetic in-memory data only.",
+    "Stable launch capture passed: Home/Chat, no Breve, no agent integrations, Welcome folder in Main, real task toggle and Aa raw view, coming-soon Sheet/Mermaid cards, withheld sheet fence; synthetic in-memory data only.",
   );
 } finally {
   recording = false;

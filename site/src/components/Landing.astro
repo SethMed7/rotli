@@ -75,7 +75,10 @@ const surfaces = [
 // labeled, never on the launch site. Keep this list honest about status.
 const experiments = [
   { name: 'Local CLI + MCP', status: 'A bounded JSON CLI and local stdio MCP server; being refined before release.' },
-  { name: 'DOCX and spreadsheets', status: 'Editable surfaces under review for round-trip fidelity.' },
+  { name: 'DOCX documents', status: 'An editable surface under review for round-trip fidelity.' },
+  { name: 'Spreadsheets', status: 'Coming soon. XLSX workbooks are in development builds only; CSV editing is in the beta.' },
+  { name: 'Mermaid diagram tabs', status: 'Coming soon. A ```mermaid fence in any note already renders.' },
+  { name: 'Read aloud', status: 'Coming soon. On-device voice for chat replies.' },
   { name: 'Excalidraw boards', status: 'Boards beside notes; native save and reopen still being verified.' },
   { name: 'Mermaid visual editing', status: 'A visual editor over the text source. View and Code stay in the beta.' },
   { name: 'Breve routines', status: 'Scheduled briefs and watchlists written as vault Markdown.' },
@@ -180,7 +183,7 @@ const experiments = [
             <>
               <li><span class="folder-icon">⌄</span><b>storage/</b><small>experiments · dev preview</small></li>
               <li class="nested"><span>□</span>project-brief.docx<small>Word document</small></li>
-              <li class="nested"><span>▦</span>forecast.xlsx<small>spreadsheet</small></li>
+              <li class="nested"><span>▦</span>forecast.xlsx<small>spreadsheet · coming soon</small></li>
               <li class="nested"><span>✣</span>system-map.excalidraw<small>board</small></li>
             </>
           )}
@@ -216,7 +219,8 @@ const experiments = [
           <h3 id="experiments-title">Also in development, outside the beta scope</h3>
           <p>
             These features are under review and are not promised for the Mac beta.
-            Breve and Mermaid visual editing are restricted to development builds.
+            Breve, spreadsheets, Mermaid diagram tabs and visual editing, read-aloud, and agent integrations are
+            restricted to development builds.
           </p>
           <ul>
             {experiments.map((experiment) => (

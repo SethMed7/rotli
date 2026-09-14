@@ -14,7 +14,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     id: "new",
     anchor: '[data-tour="new"]',
     title: "New notes start here",
-    body: "This makes a Markdown note in Main. The titlebar's + also offers documents, sheets, and boards.",
+    body: "This makes a Markdown note in Main. The titlebar's + also offers documents and boards.",
   },
   {
     id: "views",

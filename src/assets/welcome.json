@@ -52,7 +52,7 @@
     "id": "files",
     "title": "Files and attachments",
     "purpose": "Try conventional formats on saved work",
-    "body": "# Files and attachments\n\nThese steps create real files. Start with disposable examples.\n\n- [ ] New → Document: type a short paragraph, save, close, and reopen\n- [ ] New → Sheet: enter values and a formula, save, close, and reopen\n- [ ] New → Board: add a shape, save, close, and reopen\n- [ ] On this note, attach an image and resize it\n- [ ] On this note, attach a video and test playback\n- [ ] Open a PDF and review its explicit editing or conversion path\n\nFilesystem imports, native drops, and persistence must be tested in the Mac app. The browser twin cannot prove those behaviors. Complex imported documents should be checked against their source app after a save.\n",
+    "body": "# Files and attachments\n\nThese steps create real files. Start with disposable examples.\n\n- [ ] New → Document: type a short paragraph, save, close, and reopen\n- [ ] New → Board: add a shape, save, close, and reopen\n- [ ] On this note, attach an image and resize it\n- [ ] On this note, attach a video and test playback\n- [ ] Open a PDF and review its explicit editing or conversion path\n\nFilesystem imports, native drops, and persistence must be tested in the Mac app. The browser twin cannot prove those behaviors. Complex imported documents should be checked against their source app after a save.\n",
     "filename": "11 Files and attachments.md"
   },
   {
