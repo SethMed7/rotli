@@ -10,6 +10,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 0.95.1 (unreleased)
+
+### Changed
+
+- Spreadsheets (XLSX), the Mermaid diagram tab, and read-aloud are not in
+  public builds yet. The New-tab chooser shows Sheet and Mermaid diagram as
+  "Coming soon"; `/Sheet`, `sheet` fences, opening an .xlsx, and chat-created
+  sheets say they are unavailable. CSV editing and Mermaid fences in notes
+  still work.
+- Settings → Connections has shorter web-research copy and lists the Grokbot
+  plug-in and MCP as coming soon; Settings → AI Models shows Voice as coming
+  soon.
+
+### Added
+
+- Settings → About Rotli, with the installed version and a link to
+  sethmedina.com.
+
+### Fixed
+
+- Welcome lessons you never edited now pick up copy fixes the next time you
+  open the Welcome folder; lessons you changed are left alone.
+
 ## [0.95.0] - 2026-09-13
 
 Three fixes from a computer-use test of the installed 0.94.0.

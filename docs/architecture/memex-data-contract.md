@@ -302,7 +302,14 @@ second user-visible product or storage location.
   welcome note's id leads when the note still exists and is never recreated.
   An intact lesson is matched by exact title inside the lesson folder and
   reused, so user edits are never overwritten and a trashed lesson returns as
-  a fresh file on the next seed. New lessons carry no capture shelf metadata
+  a fresh file on the next seed. A reused lesson (or the welcome note) whose
+  body, after CRLF→LF and trailing-whitespace normalization, hashes to a body
+  Rotli once shipped is refreshed to the current copy through the ordinary
+  atomic save; any other body is the user's and is left alone. The shipped set
+  is `src/assets/welcome-history.json`, appended by
+  `scripts/welcome-history.mjs` whenever `welcome.json` changes (a tooling test
+  and a Rust test fail until it is). Existing vaults pick up copy changes on the
+  next seed (Open welcome folder), not on launch. New lessons carry no capture shelf metadata
   and remain in Library. The frontend then files every id missing from Main
   under one `Welcome` root folder in catalog order; a Main save failure is
   reported and the next open retries the filing without creating files.

@@ -432,7 +432,10 @@ polish work.
 - A rendered Mermaid fence is an entry point to one focused workspace with
   View and Code modes in production. The experimental Visual editor is enabled
   only by the development build policy in `src/lib/featurePolicy.ts`; neither
-  a query parameter nor a vault setting can enable it in production. View supports pointer pan,
+  a query parameter nor a vault setting can enable it in production. Stable
+  builds also withhold the Mermaid diagram item kind: the New-tab chooser shows
+  its card disabled with "Coming soon — not in this release yet" (the one
+  sanctioned coming-soon treatment; other surfaces omit withheld capabilities). View supports pointer pan,
   wheel/button/keyboard zoom, double-click or `0` to fit, and visible loading,
   empty, and parse-error states.
 - Mermaid text in the Markdown fence remains source of truth. Code changes are
