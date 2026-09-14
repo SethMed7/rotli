@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
 import type { EditableDocument } from "../documents/model";
-import { artifactFileName, editableDocumentText, markdownToDocumentDraft } from "./artifacts";
+import {
+  artifactFileName,
+  editableDocumentText,
+  markdownToDocumentDraft,
+  offeredArtifactKinds,
+} from "./artifacts";
 
 describe("chat artifact policy", () => {
   test("names generated files predictably without accepting path syntax", () => {
@@ -75,4 +80,9 @@ describe("chat artifact policy", () => {
       ],
     });
   });
+});
+
+test("chat offers workbooks only where the build has sheets", () => {
+  expect(offeredArtifactKinds({ sheets: false })).toEqual(["document", "pdf"]);
+  expect(offeredArtifactKinds({ sheets: true })).toEqual(["document", "sheet", "pdf"]);
 });

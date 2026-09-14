@@ -891,7 +891,7 @@ describe("runAgent", () => {
     const created: string[] = [];
     const { host } = fakeHost(
       [
-        '{"tool":"create_artifact","args":{"kind":"sheet","title":"Runway","content":"Month,Cash\\nJan,100"}}',
+        '{"tool":"create_artifact","args":{"kind":"pdf","title":"Runway","content":"Month,Cash\\nJan,100"}}',
         '{"final":"the sheet is ready"}',
       ],
       {
@@ -908,7 +908,7 @@ describe("runAgent", () => {
       artifactTool: true,
     });
     expect(final).toBe("the sheet is ready");
-    expect(created).toEqual(["sheet", "Runway", "Month,Cash\nJan,100"]);
+    expect(created).toEqual(["pdf", "Runway", "Month,Cash\nJan,100"]);
   });
 
   test("the egress guard blocks a secret-shaped image prompt", async () => {
@@ -1246,7 +1246,7 @@ describe("create_artifact tool", () => {
       await runTool(withArtifact, "create_artifact", { kind: "html", title: "No", content: "x" }, budget),
     ).toContain("supported kind");
     expect(
-      await runTool(withArtifact, "create_artifact", { kind: "sheet", title: "No rows" }, budget),
+      await runTool(withArtifact, "create_artifact", { kind: "pdf", title: "No rows" }, budget),
     ).toContain("needs");
     expect(calls).toBe(0);
   });

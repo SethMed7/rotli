@@ -246,6 +246,11 @@ describe("parseSettings — creation and Brain model", () => {
     expect(parseSettings("{}").newTabDefault).toBe("markdown");
     expect(parseSettings('{"newTabDefault":"document"}').newTabDefault).toBe("document");
     expect(parseSettings('{"newTabDefault":"database"}').newTabDefault).toBe("markdown");
+    // tests run as the stable channel: withheld kinds and voice never load as on
+    expect(parseSettings('{"newTabDefault":"sheet","readAloud":true}')).toMatchObject({
+      newTabDefault: "markdown",
+      readAloud: false,
+    });
   });
 
   test("tab layout defaults to scroll and only accepts the two visible modes", () => {

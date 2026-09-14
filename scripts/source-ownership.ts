@@ -36,6 +36,7 @@ export const COMPONENT_DIRECTORY_OWNERS = {
   breve: "Breve presentation feature",
   chat: "Chat pane presentation feature",
   onboarding: "first-run, vault activation, and model setup presentation",
+  settings: "Settings pane sections and controls composed by settingsSurface (voice, connections, about)",
   sidebar: "sidebar presentation feature",
   tour: "guided tour overlay that spotlights the real controls after setup",
 } as const;

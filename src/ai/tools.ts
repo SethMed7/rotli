@@ -4,7 +4,7 @@
 // scan beats any index.
 
 import type { CorpusNoteMeta } from "../lib/tauri";
-import { isChatArtifactKind } from "./artifacts";
+import { isChatArtifactKind, offeredArtifactKinds } from "./artifacts";
 export { buildIndex } from "../memex/modelMap";
 import type { Budget } from "./budget";
 import { markdownImageSource } from "./imageLinks";
@@ -504,8 +504,9 @@ export async function runTool(
       const kind = argText(args.kind).trim().toLowerCase();
       const title = argText(args.title).trim();
       const content = argText(args.content ?? args.body ?? args.csv).trim();
-      if (!isChatArtifactKind(kind)) {
-        return 'error: create_artifact needs a supported kind: "document", "sheet", or "pdf".';
+      const offered = offeredArtifactKinds();
+      if (!isChatArtifactKind(kind) || !offered.includes(kind)) {
+        return `error: create_artifact needs a supported kind: ${offered.map((k) => `"${k}"`).join(", ")}.`;
       }
       if (title === "" || content === "") {
         return 'error: create_artifact needs a non-empty "title" and "content".';

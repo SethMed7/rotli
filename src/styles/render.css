@@ -70,6 +70,12 @@
   overflow: hidden;
   border-radius: var(--r-inner);
 }
+/* A fence whose editor this build withholds: plain muted copy in the block. */
+.rotli-render-withheld {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
 .rotli-render-embed {
   isolation: isolate;
 }

@@ -126,7 +126,7 @@ export const site = {
   /**
    * Capabilities under review may be described on the dev site under an
    * experiment label. This is a marketing policy, not an app feature gate;
-   * the app separately restricts Breve and Mermaid visual editing to dev.
+   * the app separately restricts its experiments to dev (src/lib/featurePolicy.ts).
    */
   showsExperiments: mode === 'dev',
   /** Links to the source repository and its documents are rendered. */

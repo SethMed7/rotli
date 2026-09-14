@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 
 import { MAIN_ROOT, mainNoteIds } from "../services/mainTree";
 import { useMainStore } from "../state/main";
-import { fileQuickNoteInMain } from "./composition";
+import { createManagedItem, fileQuickNoteInMain, refuseWithheldKind } from "./composition";
 
 afterEach(() => useMainStore.setState({ manifest: { version: 1, tree: [] } }));
 
@@ -25,4 +25,12 @@ test("filing the same quick note twice does not duplicate its reference", () => 
     .getState()
     .manifest.tree.filter((node) => "note" in node && node.note === "01QUICKNOTE0000000000000001");
   expect(ids).toHaveLength(1);
+});
+
+test("a withheld kind is refused before any file is created; available kinds pass", async () => {
+  // bun test compiles as the stable channel
+  expect(() => refuseWithheldKind("sheet")).toThrow("Sheet isn’t available in this build yet");
+  expect(() => refuseWithheldKind("mermaid")).toThrow("Mermaid diagram isn’t available in this build yet");
+  expect(() => refuseWithheldKind("markdown")).not.toThrow();
+  await expect(createManagedItem("sheet")).rejects.toThrow("isn’t available");
 });

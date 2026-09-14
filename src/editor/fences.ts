@@ -87,3 +87,11 @@ export function innerCode(doc: Text, from: number, to: number): string {
   if (closeLine.from <= openLine.to + 1) return ""; // no inner lines
   return doc.sliceString(openLine.to + 1, closeLine.from - 1);
 }
+
+/** The copy a withheld embed fence shows instead of mounting its editor. The
+ * fence text stays in the note untouched; the caret still reveals it. */
+export const SHEET_EMBED_WITHHELD = "Spreadsheets aren’t available in this build yet.";
+
+export function withheldEmbedMessage(lang: string, features: { sheets: boolean }): string | null {
+  return lang === "sheet" && !features.sheets ? SHEET_EMBED_WITHHELD : null;
+}

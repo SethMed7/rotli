@@ -24,7 +24,7 @@ import {
   createManagedItemInTabOptimistically,
   requestManagedBoardCreation,
 } from "../newItems/composition";
-import type { NewItemKind } from "../newItems/model";
+import { type NewItemKind, isNewItemAvailable } from "../newItems/model";
 import { openChatForNote } from "../noteChat/composition";
 import { summonChat } from "../services/chatSummon";
 import { invalidateNotes, lifecycleError } from "../services/hooks";
@@ -356,6 +356,7 @@ export function registerDefaultActions(): void {
     ["items.newSheet", "New sheet", "sheet"],
     ["items.newMermaid", "New Mermaid diagram", "mermaid"],
   ] as const) {
+    if (!isNewItemAvailable(kind, LAUNCH_FEATURES)) continue;
     registerAction({
       id,
       title,

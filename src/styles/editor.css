@@ -1659,6 +1659,13 @@
 .aaseg:hover {
   background: var(--hov);
 }
+.aaseg:disabled {
+  cursor: default;
+  color: var(--text-muted);
+}
+.aaseg:disabled:hover {
+  background: none;
+}
 .aaseg.sel {
   background: var(--selected-bg);
   border-color: color-mix(in srgb, var(--seg-accent) 40%, transparent);

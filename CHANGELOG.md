@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   goes through the same import as a drop. Before, a note ignored the paste and
   a chat pasted the file name as text.
 
+- Settings → About Rotli, with the installed version and a link to
+  sethmedina.com.
+
 ### Changed
 
 - Inline code shows as a quiet monospace chip again, so backticked examples
@@ -33,6 +36,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   typing the closer steps over it, and `[[` still opens the note picker.
 - Lettered lists: `a. ` and `A. ` items count a→b→c, continue on Enter, and
   strip cleanly in plain copy and read-aloud.
+
+- Spreadsheets (XLSX), the Mermaid diagram tab, and read-aloud are not in
+  public builds yet. The New-tab chooser shows Sheet and Mermaid diagram as
+  "Coming soon"; `/Sheet`, `sheet` fences, opening an .xlsx, and chat-created
+  sheets say they are unavailable. CSV editing and Mermaid fences in notes
+  still work.
+- Settings → Connections has shorter web-research copy and lists the Grokbot
+  plug-in and MCP as coming soon; Settings → AI Models shows Voice as coming
+  soon.
 
 ### Fixed
 
@@ -73,6 +85,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The chat model picker is compact (340px, single-line rows, a narrower
   provider rail), has a visible border, and opens beside the model chip when
   the window has room.
+
+- Welcome lessons you never edited now pick up copy fixes the next time you
+  open the Welcome folder; lessons you changed are left alone.
 
 ## [0.95.0] - 2026-09-13
 

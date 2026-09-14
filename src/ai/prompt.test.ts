@@ -400,7 +400,9 @@ describe("editable artifact generation", () => {
       expect(adapter.renderPrompt({ ...base })).not.toContain('"tool":"create_artifact"');
       const enabled = adapter.renderPrompt({ ...base, artifactTool: true, documentTool: true });
       expect(enabled).toContain('"tool":"create_artifact"');
-      expect(enabled).toContain("sheet|pdf");
+      expect(enabled.includes('"kind":"pdf"')).toBe(true);
+      const withSheets = adapter.renderPrompt({ ...base, artifactTool: true, sheetArtifacts: true });
+      expect(withSheets.includes('"kind":"sheet|pdf"')).toBe(true);
       expect(enabled).toMatch(/editable Markdown source/i);
       expect(enabled).toContain('"tool":"create_document"');
       expect(enabled).toMatch(/Use create_document|use create_document/i);
