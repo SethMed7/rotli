@@ -542,7 +542,7 @@ test("hash choices and switches stay interactive while inline code stays literal
   const editor = page.locator(".cm-content").last();
   await editor.click();
   await page.keyboard.insertText(
-    "- [#] Red\n- [#] Blue\n\n- [##?] Which channels should we use?\n- [##] Email\n- [##] SMS\n\n- [|x] Feature flag\n- [True:green|x False:red] Sync\n- [:blue|:purple] Color only\n\n`[#]` and `[|]` stay literal\n\n`[#] raw data` and `plain example` stay visually plain too",
+    "- [#] Red\n- [#] Blue\n\n- [##?] Which channels should we use?\n- [##] Email\n- [##] SMS\n\n- [|x] Feature flag\n- [True:green|x False:red] Sync\n- [:blue|:purple] Color only\n\n`[#]` and `[|]` stay literal\n\n`[#] raw data` and `plain example` read as code",
   );
   await page.locator(".ed-date").click();
 
@@ -659,16 +659,17 @@ test("hash choices and switches stay interactive while inline code stays literal
   await expect(literal).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   await expect(literal).toHaveCSS("padding-left", "0px");
   await expect(page.locator(".rotli-code", { hasText: "[|]" })).toBeVisible();
-  const plainLiteral = page.locator(".rotli-code", { hasText: "plain example" });
-  await expect(plainLiteral).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-  await expect(plainLiteral).toHaveCSS("padding-left", "0px");
+  // ordinary inline code is a quiet mono chip; only control literals stay plain
+  const codeChip = page.locator(".rotli-code", { hasText: "plain example" });
+  await expect(codeChip).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(codeChip).toHaveCSS("padding-left", "4px");
   expect(
-    await plainLiteral.evaluate(
+    await codeChip.evaluate(
       (node) => getComputedStyle(node).fontFamily === getComputedStyle(node.parentElement!).fontFamily,
     ),
-  ).toBe(true);
-  const plainLiteralLine = plainLiteral.locator("xpath=ancestor::*[contains(@class, 'cm-line')][1]");
-  await expect(plainLiteralLine).toHaveText("[#] raw data and plain example stay visually plain too");
+  ).toBe(false);
+  const codeChipLine = codeChip.locator("xpath=ancestor::*[contains(@class, 'cm-line')][1]");
+  await expect(codeChipLine).toHaveText("[#] raw data and plain example read as code");
 
   await page.getByRole("button", { name: "Aa" }).click();
   await page

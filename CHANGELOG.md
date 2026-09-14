@@ -10,6 +10,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 0.95.1 (unreleased)
+
+### Fixed
+
+- ⌘I, ⌘U, ⌘[ and ⌘] work in Markdown notes again. In 0.95.0 the editor's
+  built-in shortcuts swallowed them, and ⌘U could even undo your last bold.
+- The format bar's B button no longer lights up for an unclosed `**`.
+- ⌘W, ⌘1-9, ⌃Tab, ⌘⇧T and ⌘D pressed while Library, Assets, Archive or Trash
+  is showing now bring your tabs back into view instead of acting unseen.
+- New folder in the vault picker opens a folder that already exists instead
+  of showing "File exists (os error 17)".
+- The Welcome note teaches autosave (there is no ⌘S for notes) and ⌘T for a
+  new note; the empty-pane and empty-list hints say ⌘T too.
+- Setup's Librarian model menu and the provider default menus use the same
+  select style as Settings.
+- The chat model picker and reasoning menu have a visible border and the
+  floating-surface corner radius.
+
+### Changed
+
+- Inline code shows as a quiet monospace chip again, so backticked examples
+  in the lessons read as code.
+- ⌘E toggles inline code and ⌘⇧X strikethrough by default; format bar
+  tooltips show your current bindings.
+
 ## [0.95.0] - 2026-09-13
 
 Three fixes from a computer-use test of the installed 0.94.0.
