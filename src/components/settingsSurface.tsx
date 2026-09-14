@@ -102,7 +102,7 @@ import {
   useSetMemexPerms,
   useSwitchVault,
 } from "../memex/useMemex";
-import { NEW_ITEM_DEFINITIONS } from "../newItems/model";
+import { availableNewItems } from "../newItems/model";
 import { isChatsPath, isHidden, isVault, isWikiPath } from "../services/destinations";
 import { useFolders } from "../services/hooks";
 import { queryClient } from "../services/query";
@@ -725,7 +725,7 @@ function GeneralPane() {
           value={newTabDefault}
           onChange={(event) => setNewTabDefault(event.target.value as typeof newTabDefault)}
         >
-          {NEW_ITEM_DEFINITIONS.map((item) => (
+          {availableNewItems(LAUNCH_FEATURES).map((item) => (
             <option key={item.kind} value={item.kind}>
               {item.label}
             </option>
@@ -733,8 +733,8 @@ function GeneralPane() {
         </select>
       </label>
       <p className="setnote">
-        Markdown notes support slash commands and embeds. Documents stay conventional documents; sheets and
-        boards use their own focused editors.
+        Markdown notes support slash commands and embeds. Documents stay conventional documents; boards use
+        their own focused editor.
       </p>
 
       <h4 className="sethead">Tab bar</h4>

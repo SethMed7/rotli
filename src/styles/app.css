@@ -783,3 +783,21 @@ body[data-surface="capture"] {
   color: var(--text-muted);
   line-height: 1.4;
 }
+/* A card the build withholds: named, readable, visibly not clickable. */
+.ni-card-soon {
+  cursor: default;
+  border-style: dashed;
+}
+.ni-card-soon:hover {
+  background: none;
+  border-color: var(--border);
+}
+.ni-card-soon .ni-label,
+.ni-card-soon .ni-desc {
+  color: var(--text-muted);
+}
+.ni-soon {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
