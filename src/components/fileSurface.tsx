@@ -287,7 +287,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
       // conversion family gets an explicit copy-to-DOCX action; every other
       // legacy format is labeled unsupported and stays untouched.
       setProbed(true);
-    } else {
+    } else if (kind !== "sheet") {
       // audio / video / image / pdf / other → an asset:// URL for the tag
       fileAssetUrl(fileId)
         .then((u) => !cancelled && (u ? setUrl(u) : setErr("couldn't resolve the file")))
