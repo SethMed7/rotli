@@ -18,6 +18,7 @@ import { Suspense, lazy } from "react";
 
 import { CaptureCard } from "./components/captureCard";
 import { ContextMenu } from "./components/contextMenu";
+import { FileNotice } from "./components/fileNotice";
 import { GuidedTour } from "./components/tour/guidedTour";
 import { HotkeyBadges } from "./components/hotkeyBadges";
 import { NotesSurface } from "./components/notesSurface";
@@ -493,6 +494,7 @@ function MainShell() {
       </main>
       <PreviewModal />
       <GuidedTour />
+      <FileNotice />
       {whichKey &&
         (hotkeyPeek === "badges" ? <HotkeyBadges /> : <WhichKey onClose={() => setWhichKey(false)} />)}
       <ContextMenu />

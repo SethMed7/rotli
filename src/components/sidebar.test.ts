@@ -65,36 +65,10 @@ test("file drops wait for Rust to issue native import grants", () => {
   expect(tauriSource).toContain('listen<AuthorizedNativeDrop>("rotli:native-drop-authorized"');
 });
 
-test("editor drops resolve nested hits and import into the note's own root", () => {
-  const editorDrop = dropSource.slice(
-    dropSource.indexOf("const target = editorAt(hits)"),
-    dropSource.indexOf("await invalidateNotes();", dropSource.indexOf("const target = editorAt(hits)")),
-  );
-  expect(dropSource).toContain("nativeDropPoints(px, py, window.devicePixelRatio || 1)");
-  expect(editorDrop).toContain("editorAt(hits)");
-  expect(editorDrop).toContain("rootIdOf(view.state.facet(noteIdFacet))");
-  expect(editorDrop).toContain("corpusImportFile(rootId, path)");
-  expect(editorDrop).not.toContain('corpusImportFile("default"');
-});
-
+// the chat/editor partition and the element-stack routing are behaviour-tested
+// in src/editor/dropRouting.test.ts
 test("byte-backed webview image drops keep the guarded asset fallback", () => {
   expect(dropSource).toContain('window.addEventListener("drop", onDrop, true)');
   expect(dropSource).toContain("importImageFilesAtDrop(view, files");
   expect(dropSource).toContain("corpusCreateImageAsset(rootId, name, base64)");
-});
-
-test("chat drops partition with the chat's own image predicate; editor drops accept embeds", () => {
-  const chatDrop = dropSource.slice(
-    dropSource.indexOf("if (chatAttach) {"),
-    dropSource.indexOf("const target = editorAt(hits)"),
-  );
-  // an .svg routed to chat by the editor's wider predicate was refused there
-  // AND never imported — the router must ask the chat what it accepts
-  expect(chatDrop).toContain("paths.filter(isChatImagePath)");
-  expect(chatDrop).not.toContain("paths.filter(isImagePath)");
-  const editorDrop = dropSource.slice(
-    dropSource.indexOf("const target = editorAt(hits)"),
-    dropSource.indexOf("await invalidateNotes();", dropSource.indexOf("const target = editorAt(hits)")),
-  );
-  expect(editorDrop).toContain("paths.filter(isEmbeddablePath)");
 });

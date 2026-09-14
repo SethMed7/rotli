@@ -42,6 +42,17 @@ function compareVersions(a: string, b: string): number {
   return 0;
 }
 
+/** The window flags "Skip app setup" writes. Only a true first run (never
+ * onboarded, no recorded onboarding version) takes the visitor defaults; a
+ * 0.x version bump re-onboards an install whose Stay open / Dock choice must
+ * survive — resetting it made the window hide on the next Finder click. */
+export function windowBehaviorOnSkip(
+  onboarded: boolean,
+  onboardingVersion: string,
+): { stayOpen?: false; showInDock?: false } {
+  return !onboarded && onboardingVersion === "" ? { stayOpen: false, showInDock: false } : {};
+}
+
 export function onboardingRequired(
   native: boolean,
   onboarded: boolean,

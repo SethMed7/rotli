@@ -268,7 +268,13 @@ second user-visible product or storage location.
   portable root-relative `storage:` source. `/attatch` (also searchable as
   `/attach`) opens a native multi-image picker whose returned paths receive the
   same single-use grants before import. A failed copy is surfaced and never
-  reported as an inserted image.
+  reported as an inserted image. The drop router walks every element under the
+  point past non-modal overlays and stops at a modal; a drop with no chat or
+  note under it still copies into Assets and says so, and a drop Rust grants
+  nothing for (folders) emits `rotli:native-drop-refused`. A Finder copy
+  pasted (⌘V) into a note or chat takes the same path: Rust reads the
+  pasteboard's file references and grants them at most once per pasteboard
+  change, so the webview cannot re-import a copied file without a new copy.
 - A requested PDF is an exported copy of a separate editable Markdown source,
   both attached to the originating assistant turn. Rust keeps both in the same
   registered root and refuses secure, secret-shaped, locked, read-only, or
