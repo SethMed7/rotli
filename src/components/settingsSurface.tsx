@@ -1900,6 +1900,7 @@ function BrainPane() {
             <label className="setselect-row">
               <span>Model</span>
               <select
+                className="setselect"
                 aria-label="Librarian model"
                 value={librarianModelFor(model, modelId, providerDefaults)}
                 onChange={(event) => setModelId(event.currentTarget.value)}

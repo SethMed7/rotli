@@ -140,11 +140,11 @@ describe("round-trips", () => {
 
 describe("withChordHint", () => {
   test("appends the current chord in the mac hint voice", () => {
-    expect(withChordHint("Italic", "Meta+I")).toBe("Italic — ⌘I");
-    expect(withChordHint("Strikethrough", "Meta+Shift+X")).toBe("Strikethrough — ⌘⇧X");
+    expect(withChordHint("Heading", "Meta+J")).toBe("Heading — ⌘J");
+    expect(withChordHint("Reveal", "Alt+Shift+Meta+Period")).toBe("Reveal — ⌥⌘⇧.");
   });
 
   test("an unbound action shows its bare label, never a stale chord", () => {
-    expect(withChordHint("Link", null)).toBe("Link");
+    expect(withChordHint("Quote", null)).toBe("Quote");
   });
 });

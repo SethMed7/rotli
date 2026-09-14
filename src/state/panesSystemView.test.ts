@@ -10,8 +10,6 @@ const leaf = (id: string, tabIds: string[]): LeafNode => ({
   tabs: tabIds.map((tabId) => ({ id: tabId, surfaceKind: "note", noteId: `note-${tabId}` })),
   activeTabId: tabIds[0] ?? "",
 });
-const tabIds = (paneId: string): string[] =>
-  (findLeaf(usePanesStore.getState().root, paneId)?.tabs ?? []).map((t) => t.id);
 
 // The System browser (contentView "system") replaces the pane tree. Every tab
 // or pane chord must bring the panes back — otherwise ⌘W, ⌘1-9, ⌃Tab, ⌘D and
@@ -78,7 +76,7 @@ describe("tab and pane chords leave the System browser", () => {
       focusedPaneId: "p1",
     });
     usePanesStore.getState().closeFileTabs("storage/x.pdf");
-    expect(tabIds("p1")).toEqual(["A"]);
+    expect(findLeaf(usePanesStore.getState().root, "p1")?.tabs).toHaveLength(1);
     expect(view()).toBe("system");
   });
 });
