@@ -52,8 +52,8 @@ function PaneEmptyState() {
       <Character name="base" size={120} className="be-quokka" accessorized />
       <p className="be-title">All clear</p>
       <p className="be-sub">
-        <button type="button" className="pane-empty-act" onClick={() => dispatch("notes.new")}>
-          <kbd>⌘N</kbd> new note
+        <button type="button" className="pane-empty-act" onClick={() => dispatch("tabs.new")}>
+          <kbd>⌘T</kbd> new tab
         </button>
         <button type="button" className="pane-empty-act" onClick={() => dispatch("palette.toggle")}>
           <kbd>⌘K</kbd> search

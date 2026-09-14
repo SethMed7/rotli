@@ -112,6 +112,9 @@ mod tests {
         assert_eq!(lessons().len(), 9);
         assert!(welcome_body().starts_with("# Welcome to Rotli\n"));
         assert!(welcome_body().contains("## Guided lessons"));
+        assert!(!welcome_body().contains("⌘S"));
+        assert!(welcome_body()
+            .contains("2. Press **⌘T** to create a note, or **⌘N** to choose what a new tab becomes."));
         let controls = &lessons()[2].body;
         assert!(controls.contains("- [#x] Medium"));
         assert!(controls.contains("- [##?] What belongs in the first release?"));
