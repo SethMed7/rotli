@@ -1,8 +1,10 @@
-// The one Markdown link grammar: `[text](url)` links and bare autolinks (GFM
-// scope — `http(s)://…`, `www.…` hosts, and plain email addresses). Bare
-// domains such as `example.com` deliberately stay prose: `node.js`,
-// `file.md`, and `etc.` would light up otherwise. The live editor, the static
-// renderer, the raw-source highlighter, the plain-text copy, and read-aloud
+// The one Markdown link grammar: `[text](url)` links and bare autolinks —
+// `http(s)://…` URLs, `www.…` hosts, plain email addresses, and bare domains
+// such as `sethmedina.com` or `github.com/SethMed7/rotli`. A bare domain links
+// only when its last label is on BARE_DOMAIN_TLDS, so `node.js`, `file.md`,
+// `install.sh`, `v0.95.1`, and `etc.` stay prose: the allowlist leaves out
+// every TLD that doubles as a common file extension. The live editor, the
+// static renderer, the link click target, the plain-text copy, and read-aloud
 // all build their regexes from these sources. Pure — no CodeMirror, no DOM.
 
 import { normalizedWebsite } from "../lib/webUrl";
@@ -22,8 +24,57 @@ const WWW_HOST = String.raw`(?<![\w.@/-])www\.[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*(
 const EMAIL_BODY = String.raw`[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}(?![A-Za-z0-9_-])`;
 const EMAIL = String.raw`(?<![\w.%+\-@/:])${EMAIL_BODY}`;
 
+/** The top-level domains a bare `name.tld` may end on — the single policy.
+ * Lowercase only. Deliberately absent because they are everyday file
+ * extensions: md, js, ts, txt, py, rs, sh, so, cc, app, json, and friends. */
+export const BARE_DOMAIN_TLDS = [
+  "com",
+  "org",
+  "net",
+  "edu",
+  "gov",
+  "io",
+  "co",
+  "dev",
+  "ai",
+  "me",
+  "xyz",
+  "info",
+  "biz",
+  "us",
+  "uk",
+  "ca",
+  "de",
+  "fr",
+  "eu",
+  "au",
+  "nz",
+  "jp",
+  "gg",
+  "tv",
+  "fm",
+  "ly",
+  "to",
+  "tech",
+  "site",
+  "online",
+  "blog",
+  "page",
+  "cloud",
+  "shop",
+  "store",
+  "news",
+  "link",
+] as const;
+
+// Not glued to a word, path, email, or dotted run on the left; the TLD must end
+// the host (`foo.com.zz` and `sethmedina.company` stay prose), so a closing
+// sentence period is never part of the link. Emails match first in the
+// alternation, so `foo@bar.com` stays one email.
+const BARE_DOMAIN = String.raw`(?<![\w.@/:~-])[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.(?:${BARE_DOMAIN_TLDS.join("|")})(?![\w-]|\.\w)(?:[/?#](?:${URL_TAIL})?)?`;
+
 /** A bare link typed as plain text. Group-free: the whole match is the link. */
-export const AUTOLINK_SOURCE = `(?:${HTTP_URL}|${WWW_HOST}|${EMAIL})`;
+export const AUTOLINK_SOURCE = `(?:${HTTP_URL}|${WWW_HOST}|${EMAIL}|${BARE_DOMAIN})`;
 
 const EMAIL_ONLY = new RegExp(`^${EMAIL_BODY}$`);
 const HAS_SCHEME = /^[a-z][a-z\d+.-]*:/i;

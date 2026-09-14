@@ -15,8 +15,9 @@ describe("webLinkAt", () => {
     expect(webLinkAt("www.x.com", 0)).toBe("www.x.com");
   });
 
-  test("prose, bare domains, and the gap between links open nothing", () => {
-    expect(webLinkAt("node.js and sethmedina.com", 14)).toBeNull();
+  test("a bare domain opens itself; file names and the gap between links open nothing", () => {
+    expect(webLinkAt("node.js and sethmedina.com", 14)).toBe("sethmedina.com");
+    expect(webLinkAt("node.js and sethmedina.com", 2)).toBeNull();
     expect(webLinkAt("[a](x.com) gap [b](y.com)", 12)).toBeNull();
   });
 });

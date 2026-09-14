@@ -10,6 +10,7 @@ describe("stripMarkdown (beautified copy)", () => {
   test("drops inline bold/italic/code/highlight/strike/underline markers", () => {
     expect(stripMarkdown("a **bold** and *italic* and `code`")).toBe("a bold and italic and code");
     expect(stripMarkdown("==hi== ~~no~~ <u>u</u>")).toBe("hi no u");
+    expect(stripMarkdown("an _italic_ and snake_case_name")).toBe("an italic and snake_case_name");
   });
   test("links become their text", () => {
     expect(stripMarkdown("see [the docs](https://x.com)")).toBe("see the docs");

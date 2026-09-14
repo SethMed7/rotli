@@ -180,10 +180,16 @@ imports.
   code. `[[` becomes `[[]]` and still opens the note picker; choosing a note
   replaces through the closing `]]`. Arriving at an already-closed link with
   the caret does not open the picker.
-- Web links are `[text](https://example.com)` or a bare autolink. Autolinks follow GFM's
-  scope: `http://` and `https://` URLs, `www.` hosts, and plain email
-  addresses. A bare domain such as `example.com` stays prose, so `node.js`,
-  `file.md`, and `etc.` never light up. `[](https://example.com)` shows the address as its
+- Web links are `[text](https://example.com)` or a bare autolink: `http://`
+  and `https://` URLs, `www.` hosts, plain email addresses, and bare domains
+  such as `sethmedina.com` or `github.com/SethMed7/rotli` with an optional
+  path, query, or fragment. A bare domain links only when it ends on a common
+  web TLD from the allowlist in `src/editor/inlineLinks.ts` (lowercase `com`,
+  `org`, `io`, `co`, `dev`, `ai`, and similar); TLDs that double as file
+  extensions are left out, so `node.js`, `file.md`, `install.sh`,
+  `Rotli.app`, `v0.95.1`, and `etc.` stay prose. A domain glued to a word,
+  path, or `@` on its left stays prose, and a closing sentence period is never
+  part of the link. `[](https://example.com)` shows the address as its
   text; an image embed (`!` before the brackets) is always an image, never a link. A scheme-less address opens
   as `https://`, and an email opens as `mailto:`. A link that names no web
   address (a relative path, a `#heading`) shows **Couldn't open this link**
@@ -194,6 +200,12 @@ imports.
   empty first body row, so the delimiter never has to be typed. A line break
   inside a cell is written as `<br>` (Shift+Enter in the cell editor); plain
   readers flatten it to a space.
+- Italic is `*text*` or `_text_`; ⌘I writes `*text*`. An underscore only
+  opens when no letter, digit, or `_` touches it on the left and only closes
+  when none touches it on the right, and the text inside cannot start or end
+  with a space, so `snake_case_name`, `file_name.md`, and `__init__` stay
+  prose, and a bare link keeps its underscores. `__text__` is not bold; use
+  `**text**`.
 - Inline code is opaque to the control grammar. Backticked content renders as
   ordinary literal text with no code-chip background; only the backticks are
   hidden in beautified mode. Fenced code blocks retain their code styling.

@@ -16,6 +16,7 @@ import {
   parseChoicePromptLine,
   parseToggleLine,
 } from "./controlState";
+import { underscoreEm } from "./inlineEmphasis";
 import { AUTOLINK_SOURCE, LINK_OPEN_FAILED, linkHref, linkLabel, MD_LINK_SOURCE } from "./inlineLinks";
 import { ORDERED_MARKER_SOURCE } from "./listMarkers";
 import { type ResultOption, type ResultState, parseResultLine, resultTextParts } from "./resultState";
@@ -290,7 +291,11 @@ const INLINE_RULES: InlineRule[] = [
     re: /\*([^*\s](?:[^*]*[^*\s])?)\*/,
     render: (m, key) => <em key={key}>{renderInline(m[1] ?? "")}</em>,
   },
-  // a BARE url, www. host, or email is a link too (mirrors livePreview's
+  {
+    re: underscoreEm(),
+    render: (m, key) => <em key={key}>{renderInline(m[1] ?? "")}</em>,
+  },
+  // a BARE url, www. host, email, or domain is a link too (mirrors livePreview's
   // autolink rule) — the md-link rule sits earlier so `[t](url)` keeps winning
   {
     re: new RegExp(AUTOLINK_SOURCE),

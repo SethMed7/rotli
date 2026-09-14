@@ -6,12 +6,14 @@
 
 import { CHOICE_MARK } from "./choiceState";
 import { parseChoiceControlLine, parseChoicePromptLine, parseToggleLine } from "./controlState";
+import { underscoreEm } from "./inlineEmphasis";
 import { linkLabel, MD_LINK_SOURCE } from "./inlineLinks";
 import { ORDERED_MARKER_SOURCE } from "./listMarkers";
 import { parseResultLine, RESULT_MARK } from "./resultState";
 import { MARK } from "./taskState";
 
 const MD_LINK_G = new RegExp(MD_LINK_SOURCE, "g");
+const UNDERSCORE_EM_G = underscoreEm("g");
 const ORDERED_PREFIX = new RegExp(String.raw`^(\s*)${ORDERED_MARKER_SOURCE}\s+`);
 
 export function stripMarkdown(text: string): string {
@@ -27,7 +29,8 @@ export function stripMarkdown(text: string): string {
         .replace(/<\/?u>/g, "")
         .replace(/<br\s*\/?>/gi, " ")
         .replace(MD_LINK_G, (_m, label: string, url: string) => linkLabel(label, url))
-        .replace(/\*([^*\s](?:[^*]*[^*\s])?)\*/g, "$1");
+        .replace(/\*([^*\s](?:[^*]*[^*\s])?)\*/g, "$1")
+        .replace(UNDERSCORE_EM_G, "$1");
     } while (s !== prev);
     return s;
   };

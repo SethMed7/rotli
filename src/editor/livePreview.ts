@@ -35,6 +35,7 @@ import { choiceGroupAlign, isControlLiteral } from "./controlState";
 import { scanFences } from "./fences";
 import { imageSourceSpan, selectionCoversImage } from "./imageSelection";
 import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
+import { underscoreEm } from "./inlineEmphasis";
 import { AUTOLINK_SOURCE, MD_LINK_SOURCE } from "./inlineLinks";
 import { CHECK_EM, CHOICE_EM, GROUP_INSET_PX, listStyle, MARKER_EM, RESULT_EM } from "./listGeometry";
 import { parseBlock } from "./render";
@@ -158,7 +159,8 @@ const INLINE: InlineRule[] = [
     },
   },
   { re: /\*([^*\s](?:[^*]*[^*\s])?)\*/, cls: "rotli-em", parts: fixed(1, 1), nest: true },
-  // a BARE url, www. host, or email typed as plain text is a link too — no
+  { re: underscoreEm(), cls: "rotli-em", parts: fixed(1, 1), nest: true },
+  // a BARE url, www. host, email, or domain typed as plain text is a link too — no
   // markers to hide. Sits after the md-link rule: `[t](url)` starts earlier.
   {
     re: new RegExp(AUTOLINK_SOURCE),

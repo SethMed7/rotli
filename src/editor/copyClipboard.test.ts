@@ -53,6 +53,9 @@ describe("clipboardHtml", () => {
   test("the inline grammar matches Breve's fixture", () => {
     for (const c of fixture.cases) expect(inlineHtml(c.input)).toBe(c.html);
   });
+  test("_x_ copies as <em>; intraword underscores stay text", () => {
+    expect(inlineHtml("an _italic_ and snake_case_name")).toBe("an <em>italic</em> and snake_case_name");
+  });
   test("html is escaped", () => {
     expect(clipboardHtml("a <b> & c")).toBe("<p>a &lt;b&gt; &amp; c</p>");
   });

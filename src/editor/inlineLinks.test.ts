@@ -1,5 +1,5 @@
-// The one link grammar: GFM-scope autolinks (http(s), www., email — never a
-// bare domain), `[text](url)` with optional text, and the href normalizer that
+// The one link grammar: autolinks (http(s), www., email, and bare domains on
+// an allowlisted TLD), `[text](url)` with optional text, and the href normalizer that
 // turns what was typed into what opens.
 
 import { describe, expect, test } from "bun:test";
@@ -18,14 +18,48 @@ describe("autolinks", () => {
     expect(autolinks("mail first.last+tag@mail.b.co.")).toEqual(["first.last+tag@mail.b.co"]);
   });
 
-  test("bare domains, file names, and abbreviations are prose", () => {
-    for (const prose of ["node.js", "file.md", "etc.", "e.g. this", "sethmedina.com", "v1.2.3", "@handle"]) {
+  test("bare domains on a known TLD link, with an optional path; a closing period stays prose", () => {
+    expect(autolinks("sethmedina.com")).toEqual(["sethmedina.com"]);
+    expect(autolinks("try rotli.co today")).toEqual(["rotli.co"]);
+    expect(autolinks("github.com/SethMed7/rotli")).toEqual(["github.com/SethMed7/rotli"]);
+    expect(autolinks("docs.example.io/path?x=1")).toEqual(["docs.example.io/path?x=1"]);
+    expect(autolinks("see sethmedina.com.")).toEqual(["sethmedina.com"]);
+    expect(autolinks("(bbc.co.uk), then")).toEqual(["bbc.co.uk"]);
+    expect(autolinks("github.com/a_b_c")).toEqual(["github.com/a_b_c"]);
+  });
+
+  test("file names, versions, numbers, and abbreviations are prose", () => {
+    for (const prose of [
+      "node.js",
+      "file.md",
+      "notes.txt",
+      "index.ts",
+      "install.sh",
+      "libfoo.so",
+      "Rotli.app",
+      "etc.",
+      "e.g. this",
+      "v0.95.1",
+      "3.14",
+      "a.b",
+      "v1.2.3",
+      "@handle",
+      "@rotli.co",
+      "~/site.com",
+      "foo.com.zz",
+      "sethmedina.company",
+    ]) {
       expect(autolinks(prose)).toEqual([]);
     }
   });
 
-  test("www. and emails need a word boundary on the left", () => {
-    expect(autolinks("foo.www.x.com")).toEqual([]);
+  test("an email stays one email, never an email plus a bare domain", () => {
+    expect(autolinks("foo@bar.com")).toEqual(["foo@bar.com"]);
+  });
+
+  test("www. hosts, domains, and emails need a word boundary on the left (never a partial host)", () => {
+    expect(autolinks("foo.www.x.com")).toEqual(["foo.www.x.com"]);
+    expect(autolinks("foo_www.x.com")).toEqual([]);
     expect(autolinks("x@www.y.com")).toEqual(["x@www.y.com"]);
     expect(autolinks("https://user@host.com")).toEqual(["https://user@host.com"]);
   });

@@ -197,15 +197,31 @@ test("blank space below a note that ends with a wikilink does not open the link"
   await expect(page.locator(".cm-content")).toContainText("Free local forever.");
 });
 
-test("www. hosts, emails, and [](url) render as links; bare domains stay prose", async ({ page }) => {
+test("www. hosts, emails, bare domains, and [](url) render as links; file names stay prose", async ({
+  page,
+}) => {
   await gotoApp(page);
   await page.getByRole("button", { name: /^New note in / }).click();
   const editor = page.locator(".cm-content").last();
   await editor.click();
-  await page.keyboard.insertText("Visit www.example.com or mail a@b.co, see [](sethmedina.com), not node.js");
+  await page.keyboard.insertText(
+    "Visit www.example.com or mail a@b.co, see [](sethmedina.com), try rotli.co. Not node.js",
+  );
   await page.locator(".ed-date").click();
   const links = editor.locator(".rotli-link");
-  await expect(links).toHaveText(["www.example.com", "a@b.co", "sethmedina.com"]);
+  await expect(links).toHaveText(["www.example.com", "a@b.co", "sethmedina.com", "rotli.co"]);
+});
+
+test("_x_ renders italic while snake_case and __init__ stay prose", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText("an _underscored_ word, snake_case_name, __init__, github.com/a_b_c");
+  await page.locator(".ed-date").click();
+  await expect(editor.locator(".rotli-em")).toHaveText(["underscored"]);
+  await expect(editor.locator(".rotli-autolink")).toHaveText(["github.com/a_b_c"]);
+  await expect(editor).toContainText("snake_case_name, __init__,");
 });
 
 test("the [[ picker stays open with a no-match row, and Escape closes only the picker", async ({ page }) => {

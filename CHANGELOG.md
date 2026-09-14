@@ -28,10 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ⌘E toggles inline code and ⌘⇧X strikethrough by default; format bar
   tooltips show your current bindings.
 
-- Links: `www.` hosts and email addresses link on their own (bare domains such
-  as `example.com` stay prose), `[](url)` shows its url, a scheme-less address
+- Links: `www.` hosts, email addresses, and bare domains such as
+  `sethmedina.com` link on their own (file names such as `node.js` and
+  `file.md` stay prose), `[](url)` shows its url, a scheme-less address
   opens as `https://`, and a link that can't open says so instead of a silent
   dead click.
+- `_text_` is italic, like `*text*`; underscores inside words (`snake_case`,
+  `__init__`) stay as typed.
 - Brackets, parentheses, backticks, and `**` `==` `~~` pair while you type;
   typing the closer steps over it, and `[[` still opens the note picker.
 - Lettered lists: `a. ` and `A. ` items count a→b→c, continue on Enter, and
