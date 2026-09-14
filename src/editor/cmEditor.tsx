@@ -23,6 +23,7 @@ import { invalidateNotes, useNotes, useSearchableNotes } from "../services/hooks
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
+import { autoPair } from "./autoPairInput";
 import { addBlockBelow, blockHandles, deleteBlock, moveBlock } from "./blockHandles";
 import { blockRender } from "./blockRender";
 import { choicePanelGaps } from "./choicePanelGapsField";
@@ -582,6 +583,7 @@ function CmEditorImpl({
         // URL. Both read source text in raw and beautified modes, so this sits
         // outside the view-mode compartment.
         linkOpener,
+        autoPair,
         // heading folding (2026-08-04): sits OUTSIDE the view-mode compartment
         // so an outline survives toggling raw ⇄ beautified — the fold is a
         // property of the document you're reading, not of one rendering of it.

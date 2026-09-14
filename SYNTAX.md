@@ -159,6 +159,17 @@ imports.
   aliases and substrings; an empty query offers the newest notes); Enter, Tab,
   or a click writes the closed link, using the id only when titles collide.
   Escape dismisses it and the text stays a plain, still-typed link.
+- Typing an opener pairs it: `[` writes `[]`, `(` writes `()`, a backtick
+  writes two, and the second character of `**`, `==`, or `~~` writes the
+  closing pair, with the caret between. Typing the closer by hand steps over
+  the waiting one, so a line typed in full comes out exactly as typed. A
+  closer appears only when nothing is glued to the caret's right; a delimiter
+  pair glued to a word (`2**3`) does not pair; a third delimiter in an empty
+  pair collapses to `***`, `===`, or `~~~`; three backticks stay three. `_`
+  and a single `*` never pair. Nothing pairs inside a backtick span or fenced
+  code. `[[` becomes `[[]]` and still opens the note picker; choosing a note
+  replaces through the closing `]]`. Arriving at an already-closed link with
+  the caret does not open the picker.
 - Web links are `[text](https://example.com)` or a bare autolink. Autolinks follow GFM's
   scope: `http://` and `https://` URLs, `www.` hosts, and plain email
   addresses. A bare domain such as `example.com` stays prose, so `node.js`,

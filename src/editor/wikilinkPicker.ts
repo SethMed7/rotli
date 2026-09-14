@@ -20,6 +20,7 @@ export const wikilinkPicker = createCaretPicker<NoteSummary>({
       to: line.from + span.to,
       anchor: line.from + span.open,
       query: span.query,
+      ...(span.closed ? { typedOnly: true } : {}),
       choices: wikilinkChoices(wikilinkNotes(), span.query),
     };
   },

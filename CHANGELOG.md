@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as `example.com` stay prose), `[](url)` shows its url, a scheme-less address
   opens as `https://`, and a link that can't open says so instead of a silent
   dead click.
+- Brackets, parentheses, backticks, and `**` `==` `~~` pair while you type;
+  typing the closer steps over it, and `[[` still opens the note picker.
 
 ## [0.95.0] - 2026-09-13
 

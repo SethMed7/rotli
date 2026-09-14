@@ -17,6 +17,9 @@ export interface CaretPick<T> {
   query: string;
   choices: T[];
   index: number;
+  /** Offer this pick only when typing produced it (or it is already open) —
+   * the caret merely arriving at the spot keeps the picker closed. */
+  typedOnly?: boolean;
 }
 
 export interface CaretPickerSpec<T> {
@@ -50,13 +53,17 @@ export function createCaretPicker<T>(spec: CaretPickerSpec<T>) {
   };
 
   const field = StateField.define<FieldValue>({
-    create: (state) => ({ pick: detect(state, null), dismissed: null }),
+    create: (state) => {
+      const pick = detect(state, null);
+      return { pick: pick?.typedOnly ? null : pick, dismissed: null };
+    },
     update(value, tr) {
       let dismissed = value.dismissed;
       for (const effect of tr.effects) if (effect.is(dismissAt)) dismissed = effect.value;
       if (!tr.docChanged && !tr.selection && tr.effects.length === 0) return value;
       if (tr.docChanged) dismissed = null;
       let pick = detect(tr.state, dismissed);
+      if (pick?.typedOnly && !tr.docChanged && !value.pick) pick = null;
       if (pick && value.pick && value.pick.query === pick.query) {
         pick = { ...pick, index: Math.min(value.pick.index, pick.choices.length - 1) };
       }

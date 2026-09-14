@@ -263,6 +263,23 @@ test("typing [[ lists matching notes; Enter or a click completes and closes the 
   await expect(editor).toContainText("See [[Pricing decision]] and [[Pricing decision]]");
 });
 
+test("typed brackets, backticks, and bold pair and step over their closers", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.type("A [");
+  await expect(editor).toHaveText("A []");
+  await page.keyboard.type("link](x.com) and **");
+  await page.keyboard.type("bold** and `code`");
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  await expect(editor).toHaveText("A [link](x.com) and **bold** and `code`");
+});
+
 test("a ts code fence renders IDE-grade token colors", async ({ page }) => {
   await gotoApp(page);
   await page.keyboard.press("Meta+T");
