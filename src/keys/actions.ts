@@ -597,8 +597,8 @@ export function registerDefaultActions(): void {
     [EDITOR_ACTION.bold, "Bold", "bold", "Meta+B"],
     [EDITOR_ACTION.italic, "Italic", "italic", "Meta+I"],
     [EDITOR_ACTION.underline, "Underline", "underline", "Meta+U"],
-    [EDITOR_ACTION.strike, "Strikethrough", "strike", null],
-    [EDITOR_ACTION.code, "Inline code", "code", null],
+    [EDITOR_ACTION.strike, "Strikethrough", "strike", "Meta+Shift+X"],
+    [EDITOR_ACTION.code, "Inline code", "code", "Meta+E"],
     [EDITOR_ACTION.highlight, "Highlight", "highlight", "Meta+Shift+H"],
     [EDITOR_ACTION.link, "Link", "link", null],
   ];

@@ -1,4 +1,4 @@
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { history } from "@codemirror/commands";
 // The editing surface (Phase 1d): a CodeMirror 6 view wired to rotli. CM edits
 // the note's markdown TEXT directly — the .md stays the source of truth — and
 // livePreview.ts renders it WYSIWYG. This wrapper:
@@ -63,6 +63,7 @@ import {
 } from "./slashMenu";
 import { SlashPicker } from "./slashPicker";
 import { tableRender } from "./tableRender";
+import { vendorKeymap } from "./vendorKeymap";
 import { buildTitleCounts, wikilinkLabel } from "./wikilink";
 import { setWikilinkNotes } from "./wikilinkIndex";
 import { wikilinkPicker } from "./wikilinkPicker";
@@ -569,7 +570,7 @@ function CmEditorImpl({
           }),
         ),
         Prec.high(keymap.of(rotliKeymap)),
-        keymap.of([...defaultKeymap, ...historyKeymap]),
+        keymap.of(vendorKeymap()), // stock CM minus registry chords (⌘I/⌘U/⌘[/⌘]/⌘⏎)
         EditorView.lineWrapping,
         // never let the caret slide behind the floating format bar: CM treats
         // the bottom strip as invisible when scrolling the caret into view, so

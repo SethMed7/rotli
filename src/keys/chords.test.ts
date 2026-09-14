@@ -5,7 +5,14 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { chordFromEvent, formatChord, keyFromCode, normalizeChord, toAccelerator } from "./chords";
+import {
+  chordFromEvent,
+  formatChord,
+  keyFromCode,
+  normalizeChord,
+  toAccelerator,
+  withChordHint,
+} from "./chords";
 
 // A minimal KeyboardEvent stand-in — chordFromEvent only reads .code and the
 // four modifier booleans, never any DOM behaviour.
@@ -128,5 +135,16 @@ describe("round-trips", () => {
     const chord = chordFromEvent(evt("KeyF", { altKey: true, metaKey: true }));
     expect(chord).toBe("Alt+Meta+F");
     expect(formatChord(chord!)).toBe("⌥⌘F");
+  });
+});
+
+describe("withChordHint", () => {
+  test("appends the current chord in the mac hint voice", () => {
+    expect(withChordHint("Italic", "Meta+I")).toBe("Italic — ⌘I");
+    expect(withChordHint("Strikethrough", "Meta+Shift+X")).toBe("Strikethrough — ⌘⇧X");
+  });
+
+  test("an unbound action shows its bare label, never a stale chord", () => {
+    expect(withChordHint("Link", null)).toBe("Link");
   });
 });
