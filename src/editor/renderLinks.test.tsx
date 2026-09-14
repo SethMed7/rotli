@@ -16,6 +16,12 @@ test("[](url) renders the url as the link text with a normalized href", () => {
   );
 });
 
+test("an empty-text link to a full address is one anchor, never a nested autolink", () => {
+  for (const address of ["https://x.com", "www.x.com", "a@b.co"]) {
+    expect(html(`[](${address})`).split("<a ").length - 1).toBe(1);
+  }
+});
+
 test("www. hosts and emails autolink; bare domains stay prose", () => {
   expect(html("www.x.com")).toBe(
     '<a class="md-link" href="https://www.x.com/" title="www.x.com">www.x.com</a>',

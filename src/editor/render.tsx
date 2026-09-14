@@ -274,7 +274,9 @@ const INLINE_RULES: InlineRule[] = [
   },
   {
     re: new RegExp(MD_LINK_SOURCE),
-    render: (m, key) => webAnchor(renderInline(linkLabel(m[1] ?? "", m[2] ?? "")), m[2] ?? "", key),
+    // an empty-text link shows its address as plain text — rendering it inline
+    // would autolink it again inside this anchor
+    render: (m, key) => webAnchor(m[1] ? renderInline(m[1]) : linkLabel("", m[2] ?? ""), m[2] ?? "", key),
   },
   {
     re: /\*([^*\s](?:[^*]*[^*\s])?)\*/,
