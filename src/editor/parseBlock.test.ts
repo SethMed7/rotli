@@ -229,3 +229,30 @@ describe("parseBlock — links", () => {
     expect(parseBlock("- [](x.com)")).toMatchObject({ kind: "bullet", text: "[](x.com)" });
   });
 });
+
+describe("parseBlock — lettered lists", () => {
+  test("a single letter and a dot then a space is a numbered item that keeps its letter", () => {
+    expect(parseBlock("a. first")).toEqual({
+      kind: "numbered",
+      prefixLen: 3,
+      text: "first",
+      marker: "a.",
+      indent: 0,
+    });
+    expect(parseBlock("  B. nested")).toMatchObject({
+      kind: "numbered",
+      marker: "B.",
+      indent: 2,
+      text: "nested",
+    });
+  });
+
+  test("abbreviations, a missing space, two letters, and a lettered task are not lettered tasks", () => {
+    expect(parseBlock("a.b").kind).toBe("para");
+    expect(parseBlock("a.").kind).toBe("para");
+    expect(parseBlock("e.g. this").kind).toBe("para");
+    expect(parseBlock("ab. no").kind).toBe("para");
+    // v1 letters are plain numbered items only: the box stays literal text
+    expect(parseBlock("a. [ ] x")).toMatchObject({ kind: "numbered", marker: "a.", text: "[ ] x" });
+  });
+});

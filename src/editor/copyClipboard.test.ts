@@ -24,6 +24,10 @@ describe("clipboardText", () => {
 });
 
 describe("clipboardHtml", () => {
+  test("a lettered list exports as an ordered list in letters", () => {
+    expect(clipboardHtml("a. one\nb. two")).toBe('<ol type="a">\n<li>one</li>\n<li>two</li>\n</ol>');
+  });
+
   test("ordered and unordered lists nest by indent and keep a custom start", () => {
     expect(clipboardHtml("1. a\n2. b\n  1. b1\n  2. b2\n3. c")).toBe(
       "<ol>\n<li>a</li>\n<li>b\n<ol>\n<li>b1</li>\n<li>b2</li>\n</ol></li>\n<li>c</li>\n</ol>",

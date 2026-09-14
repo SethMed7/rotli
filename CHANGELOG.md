@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dead click.
 - Brackets, parentheses, backticks, and `**` `==` `~~` pair while you type;
   typing the closer steps over it, and `[[` still opens the note picker.
+- Lettered lists: `a. ` and `A. ` items count a→b→c, continue on Enter, and
+  strip cleanly in plain copy and read-aloud.
 
 ## [0.95.0] - 2026-09-13
 

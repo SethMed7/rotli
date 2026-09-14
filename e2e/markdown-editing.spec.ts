@@ -836,6 +836,24 @@ test("() creates a tab-navigable Markdown multiple-choice group", async ({ page 
   await expect(rawLines.nth(2)).toHaveText("- (x) Green");
 });
 
+test("a lettered list continues on Enter and renders its letters", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.type("a. first");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("second");
+  await page.locator(".ed-date").click();
+  await expect(editor).toContainText("b.");
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  await expect(editor).toHaveText("a. firstb. second");
+});
+
 test("slash commands work inside a numbered list item", async ({ page }) => {
   await gotoApp(page);
   await page.keyboard.press("Meta+T");

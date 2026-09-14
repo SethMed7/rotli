@@ -120,8 +120,12 @@ function listPrefixOf(line: string): { prefixLen: number; next: string; empty: b
   const content = m[3] ?? "";
   const ordered = parseOrderedMarker(prefix);
   const task = new RegExp(`\\[${MARK}\\] $`).test(prefix);
+  const following = ordered ? nextOrderedMarker(ordered.marker) : null;
+  // past `z.` a lettered list has no next marker: Enter starts a plain line
   const marker = ordered
-    ? `${nextOrderedMarker(ordered.marker) ?? ""} ${task ? "[ ] " : ""}`
+    ? following
+      ? `${following} ${task ? "[ ] " : ""}`
+      : ""
     : prefix.replace(/\[[/xX]\]/, "[ ]");
   return {
     prefixLen: indent.length + prefix.length,

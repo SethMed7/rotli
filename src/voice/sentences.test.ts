@@ -17,6 +17,8 @@ describe("speakableText — prose, not markup", () => {
     expect(speakableText("2. [x][ ] a passed check")).toBe("a passed check");
     expect(speakableText("- (x) selected option")).toBe("selected option");
     expect(speakableText("3. third")).toBe("third");
+    expect(speakableText("b. lettered")).toBe("lettered");
+    expect(speakableText("e.g. an example")).toBe("e.g. an example");
   });
 
   test("a link is read as its label — never the URL", () => {

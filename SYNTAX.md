@@ -159,6 +159,16 @@ imports.
   aliases and substrings; an empty query offers the newest notes); Enter, Tab,
   or a click writes the closed link, using the id only when titles collide.
   Escape dismisses it and the text stays a plain, still-typed link.
+- Ordered lists count with numbers (`1. `) or a single ASCII letter
+  (`a. `, `A. `). Rotli keeps each run consecutive in its own style: `a. a.
+  d.` reads `a. b. c.`, a nested run starts at `1.` or `a.`, and a run never
+  mixes styles (a `3.` after `b.` starts a new run). Enter continues `a.` with
+  `b.`; after `z.` it starts a plain line, and letters past `z.` are left as
+  written. Only the plain item is lettered: tasks, results, and choices keep
+  numbers, so `a. [ ] x` is a lettered item whose text is `[ ] x`. There are no
+  roman numerals, and `ab.`, `a.b`, `e.g.`, and a letter without a following
+  space stay prose. Any line that starts with one letter, a dot, and a space is
+  a list item, including `I. Introduction` or `A. Smith`.
 - Typing an opener pairs it: `[` writes `[]`, `(` writes `()`, a backtick
   writes two, and the second character of `**`, `==`, or `~~` writes the
   closing pair, with the caret between. Typing the closer by hand steps over

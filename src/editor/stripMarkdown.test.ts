@@ -55,3 +55,10 @@ describe("stripMarkdown — links", () => {
     expect(stripMarkdown("![](storage:a.png)")).toBe("![](storage:a.png)");
   });
 });
+
+describe("stripMarkdown — lettered lists", () => {
+  test("plain copy drops a lettered marker; abbreviations stay", () => {
+    expect(stripMarkdown("a. first\n  B. nested")).toBe("first\n  nested");
+    expect(stripMarkdown("e.g. this")).toBe("e.g. this");
+  });
+});
