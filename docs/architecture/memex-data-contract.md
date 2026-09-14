@@ -29,7 +29,12 @@ second user-visible product or storage location.
   `.rotli/settings.json` stores only `webSearchProvider` (`duckduckgo` by
   default, or `brave`); it never stores an API key. The per-chat globe remains
   the consent bit for whether that chat may use the network and is not a
-  provider selector. Brave credentials live under Rotli's allowlisted macOS
+  provider selector. It stays offered for every lane: frontier CLIs run
+  tool-less inside Rotli, so the globe is their only web path, and a chat never
+  turns it on by itself. With it off, a frontier lane still answers general
+  questions from the model's own knowledge and mentions the globe only when an
+  answer depends on live data; the on-device lane says it can't confirm
+  outside-world facts. Brave credentials live under Rotli's allowlisted macOS
   Keychain account, while search execution and provider failure policy remain
   application/adapter concerns outside the vault contract.
 - **Breve stays inside the active vault.** Its portable routine configuration
