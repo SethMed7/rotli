@@ -6,7 +6,15 @@
 // the chord is taken).
 
 import { useQuery } from "@tanstack/react-query";
-import { type CSSProperties, type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { makeTauriHost } from "../ai/host";
 import { suggestPresets } from "../ai/hybrid";
@@ -138,6 +146,7 @@ import {
   ShieldGlyph,
   SunGlyph,
 } from "./glyphs";
+import { AboutPane } from "./settings/aboutPane";
 import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { Seg } from "./settings/seg";
 import { VoiceSettings } from "./settings/voiceSettings";
@@ -151,9 +160,10 @@ type SettingsPane =
   | "security"
   | "models"
   | "location"
-  | "connections";
+  | "connections"
+  | "about";
 
-const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = [
+const NAV: { id: SettingsPane; label: string; glyph: (props: { size?: number }) => ReactNode }[] = [
   { id: "general", label: "General", glyph: LaptopGlyph },
   { id: "hotkeys", label: "Keybindings", glyph: KeyboardGlyph },
   { id: "appearance", label: "Appearance", glyph: SunGlyph },
@@ -171,6 +181,7 @@ const NAV: { id: SettingsPane; label: string; glyph: typeof KeyboardGlyph }[] = 
   // ones. See LocationPane below.
   { id: "location", label: "Location", glyph: DatabaseGlyph },
   { id: "connections", label: "Connections", glyph: ExternalLinkGlyph },
+  { id: "about", label: "About Rotli", glyph: QuokkaMark },
 ];
 
 /** A settings pane heading with its quokka character accent (the maintainer, 2026-06-26) —
@@ -418,17 +429,10 @@ type CheckState =
   | { kind: "installing"; pct: number }
   | { kind: "error"; message: string };
 
-function UpdatesSection() {
-  const updateAvailable = useUiStore((s) => s.updateAvailable);
-  const updateVersion = useUiStore((s) => s.updateVersion);
-  const setUpdateAvailable = useUiStore((s) => s.setUpdateAvailable);
-  const setUpdateVersion = useUiStore((s) => s.setUpdateVersion);
-  const [version, setVersion] = useState("0.1.0");
-  // Preserve the result of an explicit check while Settings is reopened.
-  const [state, setState] = useState<CheckState>(
-    updateAvailable ? { kind: "available", version: updateVersion } : { kind: "idle" },
-  );
-
+/** The installed bundle version (null outside the Mac app) — the one source
+ * for Updates and About. */
+function useAppVersion(): string | null {
+  const [version, setVersion] = useState<string | null>(null);
   useEffect(() => {
     if (!isTauri()) return;
     let alive = true;
@@ -441,6 +445,19 @@ function UpdatesSection() {
       alive = false;
     };
   }, []);
+  return version;
+}
+
+function UpdatesSection() {
+  const updateAvailable = useUiStore((s) => s.updateAvailable);
+  const updateVersion = useUiStore((s) => s.updateVersion);
+  const setUpdateAvailable = useUiStore((s) => s.setUpdateAvailable);
+  const setUpdateVersion = useUiStore((s) => s.setUpdateVersion);
+  const version = useAppVersion() ?? "0.1.0";
+  // Preserve the result of an explicit check while Settings is reopened.
+  const [state, setState] = useState<CheckState>(
+    updateAvailable ? { kind: "available", version: updateVersion } : { kind: "idle" },
+  );
 
   const check = () => {
     setState({ kind: "checking" });
@@ -3059,6 +3076,16 @@ function ConnectionsPane() {
   );
 }
 
+function AboutRotliPane() {
+  const version = useAppVersion();
+  return (
+    <>
+      <PaneHead title="About Rotli" char="waving" />
+      <AboutPane version={version} onOpenWebsite={(url) => void openUrl(url)} />
+    </>
+  );
+}
+
 export function SettingsSurface() {
   const [pane, setPane] = useState<SettingsPane>("general");
   // a surface elsewhere asked for a SPECIFIC pane (the Librarian's gear →
@@ -3109,6 +3136,7 @@ export function SettingsSurface() {
           {pane === "models" && <ModelsPane />}
           {pane === "location" && <LocationPane />}
           {pane === "connections" && <ConnectionsPane />}
+          {pane === "about" && <AboutRotliPane />}
         </div>
       </div>
     </div>

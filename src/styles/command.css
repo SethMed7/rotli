@@ -3256,3 +3256,12 @@
 .websearch-option.is-soon .websearch-optionname {
   color: var(--text-muted);
 }
+
+/* Settings → About Rotli: the external website link, a ghost button in shape. */
+.about-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  text-decoration: none;
+}

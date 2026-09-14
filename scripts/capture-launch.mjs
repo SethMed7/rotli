@@ -59,6 +59,19 @@ try {
   await expect(page.getByRole("heading", { name: "Remote agents" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Extensions" })).toHaveCount(0);
   await expect(page.getByLabel("Relay MCP URL")).toHaveCount(0);
+  for (const row of ["Grokbot plug-in", "MCP"])
+    await expect(page.locator(".websearch-option.is-soon", { hasText: row })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+  // Read-aloud is withheld too: Voice names itself as coming soon, controls inert.
+  await page.getByRole("button", { name: "AI Models", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Read replies aloud", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "About Rotli", exact: true }).click();
+  await expect(page.getByRole("link", { name: "Website — sethmedina.com" })).toHaveAttribute(
+    "href",
+    "https://sethmedina.com",
+  );
   await page.getByRole("button", { name: "General", exact: true }).click();
   // The Welcome folder is preseeded in Main; its notes open from the left menu.
   await page.getByRole("button", { name: "Open welcome folder", exact: true }).click();
