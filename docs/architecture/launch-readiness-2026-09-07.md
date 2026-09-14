@@ -334,7 +334,7 @@ compiled stable build. Off in stable: Breve, Mermaid Visual, agent integrations,
 XLSX workbooks (`sheets`; CSV editing stays), the Mermaid-diagram item kind
 (`mermaidDiagrams`; a Mermaid fence still renders), and read-aloud (`voice`).
 The New-tab chooser keeps the Sheet and Mermaid diagram cards disabled with a
-"Coming soon" caption, Settings shows Voice and the Grokbot/MCP connections the
+"Coming soon" caption, Settings shows Voice and the Grok Bot/MCP connections the
 same way, and every other surface omits the withheld capability. A dev Git branch
 is not itself a runtime security boundary: use the explicit channel for packaged
 dev builds, with the existing separate development app identity/configuration.

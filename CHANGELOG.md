@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Coming soon"; `/Sheet`, `sheet` fences, opening an .xlsx, and chat-created
   sheets say they are unavailable. CSV editing and Mermaid fences in notes
   still work.
-- Settings → Connections has shorter web-research copy and lists the Grokbot
+- Settings → Connections has shorter web-research copy and lists the Grok Bot
   plug-in and MCP as coming soon; Settings → AI Models shows Voice as coming
   soon.
 

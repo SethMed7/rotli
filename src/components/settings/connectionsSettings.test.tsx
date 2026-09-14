@@ -5,10 +5,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { COMING_SOON_CAPTION } from "../../lib/featurePolicy";
 import { COMING_SOON_CONNECTIONS, ConnectionsSettings } from "./connectionsSettings";
 
-test("a stable build lists Grokbot and MCP as inert coming-soon rows beside web research", () => {
+test("a stable build lists Grok Bot and MCP as inert coming-soon rows beside web research", () => {
   const markup = renderToStaticMarkup(<ConnectionsSettings agents={false} braveKeyRow={null} />);
   expect(COMING_SOON_CONNECTIONS.map((row) => [row.label, row.detail])).toEqual([
-    ["Grokbot plug-in", "Connect Rotli to Grokbot"],
+    ["Grok Bot plug-in", "Connect Rotli to Grok Bot"],
     ["MCP", "Let outside agents read and write this vault over MCP"],
   ]);
   const rows = markup.match(/<li class="websearch-option is-soon"[^>]*>/g) ?? [];

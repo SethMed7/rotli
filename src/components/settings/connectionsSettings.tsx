@@ -30,7 +30,7 @@ vault — NOT this repo. The README is the ONLY doc that stays in the repo.
 
 /** Named connections a stable build withholds, in the provider list grammar. */
 export const COMING_SOON_CONNECTIONS = [
-  { id: "grokbot", label: "Grokbot plug-in", detail: "Connect Rotli to Grokbot" },
+  { id: "grokbot", label: "Grok Bot plug-in", detail: "Connect Rotli to Grok Bot" },
   { id: "mcp", label: "MCP", detail: "Let outside agents read and write this vault over MCP" },
 ] as const;
 

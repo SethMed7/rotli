@@ -59,7 +59,7 @@ try {
   await expect(page.getByRole("heading", { name: "Remote agents" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Extensions" })).toHaveCount(0);
   await expect(page.getByLabel("Relay MCP URL")).toHaveCount(0);
-  for (const row of ["Grokbot plug-in", "MCP"])
+  for (const row of ["Grok Bot plug-in", "MCP"])
     await expect(page.locator(".websearch-option.is-soon", { hasText: row })).toHaveAttribute(
       "aria-disabled",
       "true",
