@@ -28,7 +28,6 @@ import {
   providerDefaultModel,
   scanVerdict,
 } from "../ai/models";
-import { WEB_SEARCH_PROVIDERS, webSearchProviderInfo } from "../ai/searchProvider";
 import { verifyLane } from "../ai/verify";
 import {
   QUOKKA_ACCESSORY_PRESENTATIONS,
@@ -125,14 +124,12 @@ import {
   useUiStore,
 } from "../state/ui";
 import { requestVaultFolder } from "../state/vaultFolderBrowser";
-import { VOICES } from "../voice/speech";
 import { AntigravitySetup } from "./antigravitySetup";
 import { Character, type CharacterName, QuokkaMark } from "./character";
 import {
   BrowserGlyph,
   CheckGlyph,
   CloudGlyph,
-  CopyGlyph,
   DatabaseGlyph,
   ExternalLinkGlyph,
   KeyboardGlyph,
@@ -141,7 +138,9 @@ import {
   ShieldGlyph,
   SunGlyph,
 } from "./glyphs";
-import { RemoteAgentsSection } from "./remoteAgentsSection";
+import { ConnectionsSettings } from "./settings/connectionsSettings";
+import { Seg } from "./settings/seg";
+import { VoiceSettings } from "./settings/voiceSettings";
 import { WelcomeSettings } from "./welcomeSettings";
 type SettingsPane =
   | "general"
@@ -230,33 +229,6 @@ function Toggle({
       </span>
       <SwitchKnob />
     </button>
-  );
-}
-
-/** A small segmented picker (reuses the .aaseg pills). */
-function Seg<T extends string>({
-  value,
-  options,
-  onPick,
-}: {
-  value: T;
-  options: [T, string][];
-  onPick: (v: T) => void;
-}) {
-  return (
-    <div className="segrow">
-      {options.map(([v, label]) => (
-        <button
-          type="button"
-          key={v}
-          className={value === v ? "aaseg sel" : "aaseg"}
-          aria-pressed={value === v}
-          onClick={() => onPick(v)}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
   );
 }
 
@@ -2541,56 +2513,6 @@ function BraveKeyRow() {
   );
 }
 
-function WebResearchSection() {
-  const provider = useUiStore((state) => state.webSearchProvider);
-  const setProvider = useUiStore((state) => state.setWebSearchProvider);
-  const selected = webSearchProviderInfo(provider);
-
-  return (
-    <section className="aisection">
-      <h4 className="set-subhead">Web research</h4>
-      <p className="setnote">
-        The globe still controls internet access for each chat. This setting chooses where every globe-enabled
-        search in this vault goes; switching providers changes that network destination.
-      </p>
-      <fieldset className="websearch-options">
-        <legend className="websearch-legend">Search provider</legend>
-        {WEB_SEARCH_PROVIDERS.map((option) => (
-          <label
-            className={option.id === provider ? "websearch-option selected" : "websearch-option"}
-            key={option.id}
-          >
-            <input
-              type="radio"
-              name="web-search-provider"
-              value={option.id}
-              checked={option.id === provider}
-              onChange={() => setProvider(option.id)}
-            />
-            <span className="websearch-optioncopy">
-              <span className="websearch-optionname">{option.label}</span>
-              <span className="websearch-optiondetail">{option.detail}</span>
-            </span>
-          </label>
-        ))}
-      </fieldset>
-      {selected.needsKey && <BraveKeyRow />}
-      <p className="setnote websearch-privacy">
-        Search queries go directly from this Mac to <b>{selected.label}</b>. Rotli also reads selected public
-        result pages directly so the model can answer from evidence. The provider and sites receive ordinary
-        network request information; their own privacy and retention terms apply. Rotli never ships a shared
-        search key and never changes providers after a failure.
-      </p>
-      {!selected.needsKey && (
-        <p className="setnote websearch-availability">
-          DuckDuckGo needs no account or setup, but its unofficial HTML result pages can change or become
-          temporarily unavailable. Rotli reports that failure instead of pretending there were no results.
-        </p>
-      )}
-    </section>
-  );
-}
-
 /** One preset's editor — plain controlled fields over a draft copy. */
 function PresetEditor({
   draft,
@@ -2990,51 +2912,16 @@ function ModelsPane() {
         />
       </section>
 
-      <section className="aisection">
-        <h4 className="set-subhead">Voice</h4>
-        <p className="setnote">
-          Read replies aloud with a speaker button on each answer. The voice runs on this Mac and is prepared
-          the first time you use it — nothing is downloaded until then, and nothing is sent anywhere.
-        </p>
-        <Seg
-          value={readAloud ? "on" : "off"}
-          options={[
-            ["off", "Off"],
-            ["on", "Read replies aloud"],
-          ]}
-          onPick={(v) => setReadAloud(v === "on")}
-        />
-        {readAloud && (
-          <>
-            <p className="setnote">Voice:</p>
-            <Seg
-              value={readAloudVoice}
-              options={VOICES.map((v) => [v.id, v.label] as [string, string])}
-              onPick={setReadAloudVoice}
-            />
-          </>
-        )}
-      </section>
+      <VoiceSettings
+        available={LAUNCH_FEATURES.voice}
+        readAloud={readAloud}
+        voice={readAloudVoice}
+        onReadAloud={setReadAloud}
+        onVoice={setReadAloudVoice}
+      />
     </>
   );
 }
-
-/** The prompt you paste into Claude Code so a project's docs live in your Rotli
- * vault instead of the repo — planning + documentation you organize in rotli,
- * the README the only thing that stays in the repo. Copy-first; you refine the
- * wording to taste (the maintainer, 2026-07-07). */
-const CLAUDE_DOCS_COMMAND = `When you create or update documentation for this project, keep it in my Rotli
-vault — NOT this repo. The README is the ONLY doc that stays in the repo.
-
-• Before writing a new doc, ask me: "rotli or repo?" (the README always → repo).
-• When a doc goes to rotli, write the Markdown file into my rotli notes folder
-  under wiki/_inbox/<slug>.md with frontmatter:
-      ---
-      owner: rotli
-      shelf: [<Project>]     # this project's name, e.g. Rotli
-      ---
-  rotli files it, and I keep it under my <Project> folder in Main.
-• Do not create or leave project docs in this repo's docs/ folder.`;
 
 /** The secure-note explainer (decision 2026-07-22, feature C) — plain language
  * distilled from the memex data contract's fail-closed list, plus the ONE knob
@@ -3164,80 +3051,10 @@ function BrowserPane() {
 }
 
 function ConnectionsPane() {
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
-  const copyReset = useRef<number | null>(null);
-
-  useEffect(
-    () => () => {
-      if (copyReset.current !== null) window.clearTimeout(copyReset.current);
-    },
-    [],
-  );
-
-  const copy = async () => {
-    if (copyReset.current !== null) window.clearTimeout(copyReset.current);
-    try {
-      if (!navigator.clipboard) throw new Error("Clipboard access is unavailable");
-      await navigator.clipboard.writeText(CLAUDE_DOCS_COMMAND);
-      setCopyState("copied");
-      copyReset.current = window.setTimeout(() => setCopyState("idle"), 1800);
-    } catch {
-      setCopyState("failed");
-    }
-  };
   return (
     <>
       <PaneHead title="Connections" char="chat" />
-      <p className="lead">
-        Choose the outside services rotli can contact. Connections stay explicit, use your own accounts when
-        required, and never change destinations after a failure.
-      </p>
-
-      <WebResearchSection />
-
-      {LAUNCH_FEATURES.agents && <RemoteAgentsSection />}
-
-      {/* Use rotli for your docs — a prompt you paste into Claude Code so a
-          project's docs live in rotli, not the repo (the maintainer, 2026-07-07). */}
-      {LAUNCH_FEATURES.agents && (
-        <section className="aisection">
-          <h4 className="set-subhead">Extensions</h4>
-          <p className="setnote">
-            Extend rotli&rsquo;s corpus workflows without giving another service ownership of your notes.
-          </p>
-          <div className="claudecmd">
-            <div className="claudecmd-intro">
-              <h4>Use rotli for your docs</h4>
-              <p className="plugdesc">
-                Paste this into Claude Code in any project and your planning + docs land in rotli instead of
-                the repo — everything but the README.
-              </p>
-            </div>
-            <div className="claudecmd-shell">
-              <div className="claudecmd-toolbar">
-                <span>Claude Code instruction</span>
-                <button
-                  type="button"
-                  className={`claudecmd-copy ${copyState}`}
-                  onClick={() => void copy()}
-                  aria-label={
-                    copyState === "copied" ? "Copied Claude Code instruction" : "Copy Claude Code instruction"
-                  }
-                >
-                  {copyState === "copied" ? <CheckGlyph size={13} /> : <CopyGlyph size={13} />}
-                  <span>
-                    {copyState === "copied" ? "Copied" : copyState === "failed" ? "Try again" : "Copy"}
-                  </span>
-                </button>
-              </div>
-              <pre className="claudecmd-block">{CLAUDE_DOCS_COMMAND}</pre>
-            </div>
-            <span className={`claudecmd-status ${copyState === "failed" ? "failed" : ""}`} aria-live="polite">
-              {copyState === "failed" ? "Rotli couldn’t access the clipboard. Try copying again." : ""}
-            </span>
-          </div>
-        </section>
-      )}
+      <ConnectionsSettings agents={LAUNCH_FEATURES.agents} braveKeyRow={<BraveKeyRow />} />
     </>
   );
 }

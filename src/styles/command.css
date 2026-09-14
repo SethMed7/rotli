@@ -714,6 +714,13 @@
   line-height: 1.6;
   max-width: 560px;
 }
+/* The one caption for a capability this build names but withholds. */
+.set-soon {
+  margin: 4px 0 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
 .setnote code {
   font-family: ui-monospace, Menlo, monospace;
   font-size: 11px;
@@ -3232,4 +3239,20 @@
   .tour-card {
     width: min(300px, calc(100vw - 24px));
   }
+}
+
+/* Settings → Connections: withheld integrations in the provider list grammar,
+   visibly inert (no radio, no hover, muted copy). */
+.connections-soon {
+  list-style: none;
+}
+.websearch-option.is-soon {
+  grid-template-columns: minmax(0, 1fr);
+  cursor: default;
+}
+.websearch-option.is-soon:hover {
+  background: none;
+}
+.websearch-option.is-soon .websearch-optionname {
+  color: var(--text-muted);
 }

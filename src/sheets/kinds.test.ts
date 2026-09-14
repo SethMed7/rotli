@@ -26,8 +26,8 @@ test("an editable sheet file also needs a writable root and the byte gate", () =
 });
 
 test("every read-only sheet names its reason", () => {
-  expect(sheetReadOnlyReason(null, "csv").label).toBe("view only");
+  expect(sheetReadOnlyReason(null, "csv").title.includes("couldn't verify")).toBe(true);
   expect(sheetReadOnlyReason({ writable: false }, "csv").label).toBe("read-only");
   expect(sheetReadOnlyReason({ writable: true }, "tsv").label).toBe("view only · .tsv");
-  expect(sheetReadOnlyReason({ writable: true }, "csv").label).toBe("view only · too large");
+  expect(sheetReadOnlyReason({ writable: true }, "csv").title.startsWith("Too large")).toBe(true);
 });

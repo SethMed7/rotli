@@ -18,8 +18,6 @@ export function launchFeatures(development: boolean) {
   } as const;
 }
 
-export type LaunchFeatures = ReturnType<typeof launchFeatures>;
-
 /** The one caption for a capability a surface names but this build withholds. */
 export const COMING_SOON_CAPTION = "Coming soon — not in this release yet";
 
