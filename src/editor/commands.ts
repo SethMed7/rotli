@@ -99,7 +99,7 @@ function toggleLink(line: string, selStart: number, selEnd: number): LineEdit {
   return { line: next, selStart: caret, selEnd: caret };
 }
 
-/** Caret-context active state: is `pos` inside a marked span on this line? */
+/** Caret-context active state: is `pos` inside a CLOSED marked span on this line? */
 export function isMarkActive(line: string, pos: number, mark: InlineMark): boolean {
   if (mark === "link") return false;
   const { open, close } = MARKS[mark];
@@ -112,9 +112,11 @@ export function isMarkActive(line: string, pos: number, mark: InlineMark): boole
       count++;
       i = scan.indexOf(open, i + open.length);
     }
-    return count % 2 === 1;
+    // an odd opener count is only a span once its closer exists — a lone
+    // `**Testing` renders plain, so the bar must not light B for it
+    return count % 2 === 1 && scan.indexOf(close, pos) !== -1;
   }
-  return countBefore(scan, open, pos) > countBefore(scan, close, pos);
+  return countBefore(scan, open, pos) > countBefore(scan, close, pos) && scan.indexOf(close, pos) !== -1;
 }
 
 function countBefore(text: string, token: string, pos: number): number {

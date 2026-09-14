@@ -513,8 +513,11 @@ polish work.
   supplies color-only sides with accessible On/Off fallback labels.
 - Backtick-delimited inline code wins before every control grammar. Its content
   stays literal and selectable while beautified mode hides only the backticks
-  and presents the content as ordinary text without an inline-code chip.
-  Fenced code blocks remain visually distinct code surfaces.
+  and presents the content as a quiet chip: `--font-mono` at 0.92em on
+  `--tint` with `--r-inner` corners, so a backticked example reads as typed
+  syntax rather than broken rendering. A backticked control literal (`[#]`,
+  `[|]`) stays plain text. Fenced code blocks remain visually distinct code
+  surfaces.
 - A Markdown pane reveals one compact scroll-to-top control after meaningful
   downward scrolling. It floats at the pane's bottom-right, remains a labeled
   keyboard-focusable button, and uses reduced-motion-safe spatial feedback.

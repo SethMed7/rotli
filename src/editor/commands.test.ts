@@ -7,7 +7,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { applyBlockToggle, applyBlockToggleAll, blockToggleActive } from "./commands";
+import { applyBlockToggle, applyBlockToggleAll, blockToggleActive, isMarkActive } from "./commands";
 
 describe("applyBlockToggle on indented lines", () => {
   test("toggling bullet OFF on a nested item removes the marker, keeps the indent", () => {
@@ -91,5 +91,30 @@ describe("applyBlockToggleAll (multi-line selection policy)", () => {
 
   test("blank lines never receive a marker", () => {
     expect(applyBlockToggleAll(["alpha", "", "beta"], "bullet")).toEqual(["- alpha", null, "- beta"]);
+  });
+});
+
+describe("isMarkActive needs a closed pair (the format bar's B must not light on a lone opener)", () => {
+  test("an unclosed bold opener is not bold", () => {
+    expect(isMarkActive("**Testing", 5, "bold")).toBe(false);
+  });
+
+  test("a caret inside a closed bold span is bold", () => {
+    expect(isMarkActive("**Testing**", 5, "bold")).toBe(true);
+    expect(isMarkActive("a **b** c", 4, "bold")).toBe(true);
+  });
+
+  test("past a closed span with a trailing lone opener is not bold", () => {
+    expect(isMarkActive("**a** then **b", 13, "bold")).toBe(false);
+  });
+
+  test("an unclosed <u> is not underlined; a closed one is", () => {
+    expect(isMarkActive("<u>open", 5, "underline")).toBe(false);
+    expect(isMarkActive("<u>open</u>", 5, "underline")).toBe(true);
+  });
+
+  test("italic ignores the bold pairs and still needs its closer", () => {
+    expect(isMarkActive("*lean", 3, "italic")).toBe(false);
+    expect(isMarkActive("*lean*", 3, "italic")).toBe(true);
   });
 });

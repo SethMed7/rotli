@@ -121,3 +121,9 @@ export function toAccelerator(chord: string): string {
     )
     .join("+");
 }
+
+/** "Italic" + "Meta+I" → "Italic — ⌘I"; an unbound action keeps its bare label,
+ * so a control's tooltip always tells the truth after a rebind. */
+export function withChordHint(label: string, chord: string | null): string {
+  return chord ? `${label} — ${formatChord(chord)}` : label;
+}

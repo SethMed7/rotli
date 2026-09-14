@@ -226,6 +226,32 @@ pub(crate) fn vault_browser_refresh(
     with_session(&state, |session| session_view(&app, session))
 }
 
+/// Create `name` under `parent`, or, when a folder of that name is already
+/// there, hand back that folder: the picker's job is to land somewhere, so an
+/// existing folder is the destination, not an error. Returns the canonical path.
+fn create_or_enter_dir(parent: &Path, name: &str) -> Result<PathBuf, String> {
+    let child = parent.join(name);
+    match fs::create_dir(&child) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            if !child.is_dir() {
+                return Err(format!(
+                    "A file named \"{name}\" is already here. Choose another folder name."
+                ));
+            }
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
+            return Err("Rotli can't create a folder here. Choose a folder you can write to.".into());
+        }
+        Err(_) => {
+            return Err(format!(
+                "Rotli couldn't create \"{name}\". Try another name or location."
+            ));
+        }
+    }
+    fs::canonicalize(&child).map_err(|_| format!("Rotli couldn't open \"{name}\"."))
+}
+
 #[tauri::command]
 pub(crate) fn vault_browser_create_folder(
     app: tauri::AppHandle,
@@ -234,10 +260,7 @@ pub(crate) fn vault_browser_create_folder(
 ) -> Result<VaultBrowserView, String> {
     safe_child_name(name.trim())?;
     with_session(&state, |session| {
-        let child = session.current.join(name.trim());
-        fs::create_dir(&child).map_err(|error| format!("Create folder: {error}"))?;
-        let child =
-            fs::canonicalize(&child).map_err(|error| format!("Open new folder: {error}"))?;
+        let child = create_or_enter_dir(&session.current, name.trim())?;
         if !child.starts_with(&session.home) || child == session.home {
             return Err("That folder is outside this Home browser session.".into());
         }
@@ -322,7 +345,7 @@ pub(crate) fn vault_browser_reveal(
 
 #[cfg(test)]
 mod tests {
-    use super::{display_path, list_directories_at, safe_child_name};
+    use super::{create_or_enter_dir, display_path, list_directories_at, safe_child_name};
     use std::fs;
     use std::path::Path;
 
@@ -353,6 +376,28 @@ mod tests {
             .map(|entry| entry.name)
             .collect();
         assert_eq!(names, ["alpha", "Bravo"]);
+    }
+
+    #[test]
+    fn new_folder_creates_a_fresh_folder_and_enters_an_existing_one() {
+        let temp = tempfile::tempdir().unwrap();
+        let fresh = create_or_enter_dir(temp.path(), "Notes").unwrap();
+        assert!(fresh.is_dir());
+        fs::write(fresh.join("keep.md"), "kept").unwrap();
+
+        // a folder that already exists is where the person wanted to go
+        let again = create_or_enter_dir(temp.path(), "Notes").unwrap();
+        assert_eq!(again, fresh);
+        assert_eq!(fs::read_to_string(again.join("keep.md")).unwrap(), "kept");
+    }
+
+    #[test]
+    fn new_folder_refuses_a_file_of_the_same_name_in_product_voice() {
+        let temp = tempfile::tempdir().unwrap();
+        fs::write(temp.path().join("Notes"), "a file").unwrap();
+        let error = create_or_enter_dir(temp.path(), "Notes").unwrap_err();
+        assert!(error.contains("A file named \"Notes\" is already here"), "{error}");
+        assert!(!error.contains("os error"), "{error}");
     }
 
     #[test]

@@ -458,6 +458,7 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
                                   <small>Used by @{provider}</small>
                                 </span>
                                 <select
+                                  className="setselect"
                                   value={providerDefaultModel(provider, providerDefaults)}
                                   aria-label={`Default model for ${PROVIDER_LABELS[provider]}`}
                                   onChange={(event) =>
@@ -510,12 +511,10 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
                 ))}
               </div>
               {organizerModel !== "local" && (
-                <label className="setup-provider-default">
-                  <span>
-                    Model
-                    <small>What the Librarian asks</small>
-                  </span>
+                <label className="setselect-row">
+                  <span>Model</span>
                   <select
+                    className="setselect"
                     aria-label="Librarian model"
                     value={librarianModelFor(organizerModel, organizerModelId, providerDefaults)}
                     onChange={(event) => setOrganizerModelId(event.currentTarget.value)}

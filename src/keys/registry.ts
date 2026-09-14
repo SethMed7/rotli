@@ -101,6 +101,7 @@ export function applyRebind(actionId: string, chord: string | null): void {
 }
 
 let detach: (() => void) | null = null;
+let attachedSurface: Surface = "main";
 
 let suspended = false;
 
@@ -133,9 +134,26 @@ function isCanvasTarget(target: EventTarget | null): boolean {
   );
 }
 
+/** The action this webview's dispatcher would fire for `pressed` (a normalized
+ * chord) right now, or null. The one ownership rule: the dispatcher uses it, and
+ * the editor's vendor keymap asks it before running a CodeMirror command on the
+ * same chord (src/editor/vendorKeymap.ts). */
+export function claimingAction(pressed: string): KeyAction | null {
+  if (suspended) return null;
+  for (const action of actions.values()) {
+    if (action.global) continue; // OS-side, handled in Rust
+    if (!action.shared && action.surface !== attachedSurface) continue;
+    if (action.enabled && !action.enabled()) continue;
+    const chord = currentChord(action.id);
+    if (chord && normalizeChord(chord) === pressed) return action;
+  }
+  return null;
+}
+
 /** Attach the one dispatcher for this webview's surface. Idempotent. */
 export function attachDispatcher(surface: Surface): () => void {
   if (detach) return detach;
+  attachedSurface = surface;
   const onKeyDown = (event: KeyboardEvent) => {
     if (suspended) return;
     // a key the editor already consumed (a picker's Escape, a keymap binding)
@@ -153,16 +171,10 @@ export function attachDispatcher(surface: Surface): () => void {
     }
     // over an Excalidraw canvas the clash chords belong to the canvas
     if (CANVAS_OWNED_CHORDS.has(pressed) && isCanvasTarget(event.target)) return;
-    for (const action of actions.values()) {
-      if (action.global) continue; // OS-side, handled in Rust
-      if (!action.shared && action.surface !== surface) continue;
-      if (action.enabled && !action.enabled()) continue;
-      const chord = currentChord(action.id);
-      if (chord && normalizeChord(chord) === pressed) {
-        event.preventDefault();
-        action.run();
-        return;
-      }
+    const action = claimingAction(pressed);
+    if (action) {
+      event.preventDefault();
+      action.run();
     }
   };
   window.addEventListener("keydown", onKeyDown);

@@ -386,8 +386,8 @@
   overflow: hidden;
   overscroll-behavior: contain;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-control);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-card);
 }
 .chat-modelpop-notice {
   grid-column: 1 / -1;
@@ -646,8 +646,8 @@
   width: 184px;
   overflow-y: auto;
   padding: 5px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-control);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-card);
   background: var(--surface);
   color: var(--text);
 }
@@ -2406,9 +2406,7 @@ body:has(.document-editor) .univer-popup :where(button, input):disabled {
 .univer-list-none.univer-text-sm > li > button[style*="font-family"]:hover {
   background: var(--document-workspace) !important;
 }
-.univer-list-none.univer-text-sm
-  > li
-  > button[style*="font-family"]:focus-visible {
+.univer-list-none.univer-text-sm > li > button[style*="font-family"]:focus-visible {
   outline: 2px solid var(--document-ink);
   outline-offset: -2px;
 }
@@ -2417,9 +2415,7 @@ body:has(.document-editor) [role="dialog"][class*="univer-"] {
   color: var(--document-ink) !important;
   font-family: Arial, sans-serif !important;
 }
-body:has(.document-editor)
-  [role="dialog"][class*="univer-"]
-  :where(h1, h2, h3, label, input) {
+body:has(.document-editor) [role="dialog"][class*="univer-"] :where(h1, h2, h3, label, input) {
   color: var(--document-ink) !important;
 }
 body:has(.document-editor) [role="dialog"][class*="univer-"] input {
