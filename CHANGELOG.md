@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 0.95.1 (unreleased)
+
+### Fixed
+
+- Claude, Codex, and Gemini chats answer general questions from what the model
+  knows instead of refusing because the web is off. They search your notes for
+  questions about you, your work, or an attached note, and mention the globe
+  once when an answer depends on live data.
+- The chat model picker is compact (340px, single-line rows, a narrower
+  provider rail), has a visible border, and opens beside the model chip when
+  the window has room.
+
 ## [0.95.0] - 2026-09-13
 
 Three fixes from a computer-use test of the installed 0.94.0.
