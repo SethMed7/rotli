@@ -605,6 +605,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
     const active = activeTabOf(leaf);
     const dup = tab ?? (active ? duplicateTab(active) : null);
     if (!dup) return false;
+    useUiStore.getState().setContentView("panes"); // a split from the System browser must be seen
     const newLeaf = makeLeaf(dup);
     set({ root: splitLeaf(get().root, leaf.id, dir, newLeaf), focusedPaneId: newLeaf.id });
     return true;
@@ -929,6 +930,9 @@ export const usePanesStore = create<PanesState>((set, get) => {
     closeTabById: (paneId, tabId, opts) => {
       const leaf = findLeaf(get().root, paneId);
       if (!leaf) return;
+      // a user close (⌘W) shows the panes; a force-close (record:false, e.g. a
+      // trashed asset) must not yank the System browser away
+      if (opts?.record !== false) useUiStore.getState().setContentView("panes");
       const closing = leaf.tabs.find((t) => t.id === tabId);
       const closingIndex = leaf.tabs.findIndex((t) => t.id === tabId);
       const record = () => {
@@ -979,6 +983,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
       const stack = get().closedTabs;
       const last = stack[stack.length - 1];
       if (!last) return; // quiet no-op — nothing to bring back
+      useUiStore.getState().setContentView("panes");
       set({ closedTabs: stack.slice(0, -1) });
       // the source pane if it still exists, else wherever focus lives now
       const target = findLeaf(get().root, last.paneId)?.id ?? focusedLeaf().id;
@@ -1029,6 +1034,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
     activateTab: (paneId, tabId) => {
       const target = findLeaf(get().root, paneId)?.tabs.find((t) => t.id === tabId);
       if (target) {
+        useUiStore.getState().setContentView("panes");
         const noteId = tabNoteId(target);
         if (noteId) touchMru(noteId);
         else if (target.surfaceKind === "canvas") touchItemActivity(target.boardId);
@@ -1072,6 +1078,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
       if (!remaining) return; // never close the last pane
       const fallback = leaves(remaining)[0];
       if (!fallback) return;
+      useUiStore.getState().setContentView("panes");
       const focus = neighbor && findLeaf(remaining, neighbor) ? neighbor : fallback.id;
       // the working set survives (slice 4, 2026-07-28): ⌘⌥W used to silently
       // discard every tab in the pane — they MERGE into the neighbor instead,
