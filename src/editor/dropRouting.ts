@@ -54,6 +54,20 @@ export function firstTarget<E extends Closest, T>(
 
 export type DropSurface = "chat" | "editor" | "none";
 
+/** A file paste the host granted nothing for. If the pasteboard no longer holds
+ * file references, the focus-time check was stale (Rotli itself copied text
+ * since, e.g. "Copy path"). The note gets the text back, and a chat asks for a
+ * retry, which now pastes normally. Otherwise the grant for this copy is spent:
+ * copy again in Finder. */
+export function emptyPasteOutcome(
+  stillHasFiles: boolean,
+  surface: "chat" | "editor",
+  text: string,
+): "insert-text" | "paste-again" | "copy-again" {
+  if (stillHasFiles) return "copy-again";
+  return surface === "editor" && text ? "insert-text" : "paste-again";
+}
+
 /** What a DOM paste event exposes, read synchronously. */
 export interface PastePayload {
   types: readonly string[];

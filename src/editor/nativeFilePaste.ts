@@ -19,12 +19,12 @@ import {
 } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
 import { showFileNotice } from "../state/fileNotice";
-import { classifyPaste, type PasteFiles } from "./dropRouting";
+import { classifyPaste, emptyPasteOutcome, type PasteFiles } from "./dropRouting";
 import { importImageFilesAtPosition, isImagePath } from "./externalImageDrop";
 import { deliverFiles, type FileTarget } from "./fileDelivery";
 import { noteIdFacet } from "./livePreview";
 
-const UNREADABLE_PASTE = "Couldn’t paste the copied file — copy it again in Finder, then paste";
+const COPY_AGAIN = "Couldn’t paste the copied file — copy it again in Finder, then paste";
 
 type PasteTarget = Exclude<FileTarget, { kind: "none" }>;
 
@@ -37,17 +37,41 @@ function pasteTarget(element: Element): PasteTarget | null {
   return view ? { kind: "editor", view, at: view.state.selection.main.head } : null;
 }
 
-async function pasteFiles(route: PasteFiles, target: PasteTarget, bytes: readonly File[]): Promise<void> {
+/** What the paste event carried, read while the event was live. */
+interface Pasted {
+  bytes: readonly File[];
+  text: string;
+}
+
+/** Take a file paste; resolves whether the pasteboard still holds file refs. */
+async function pasteFiles(route: PasteFiles, target: PasteTarget, pasted: Pasted): Promise<boolean> {
   const paths = route.paths ? await clipboardFilePaths() : [];
-  if (paths.length > 0) return deliverFiles(paths, target);
-  if (route.bytes && target.kind === "editor" && bytes.length > 0) {
+  if (paths.length > 0) {
+    await deliverFiles(paths, target);
+    return true;
+  }
+  if (route.bytes && target.kind === "editor" && pasted.bytes.length > 0) {
     const rootId = rootIdOf(target.view.state.facet(noteIdFacet));
-    await importImageFilesAtPosition(target.view, bytes, target.at, (name, base64) =>
+    await importImageFilesAtPosition(target.view, pasted.bytes, target.at, (name, base64) =>
       corpusCreateImageAsset(rootId, name, base64),
     );
-    return invalidateNotes();
+    await invalidateNotes();
+    return route.paths;
   }
-  showFileNotice(UNREADABLE_PASTE);
+  const stillHasFiles = await clipboardHasFiles().catch(() => false);
+  const outcome = emptyPasteOutcome(stillHasFiles, target.kind, pasted.text);
+  if (outcome === "insert-text" && target.kind === "editor") {
+    const { view, at } = target;
+    view.dispatch({
+      changes: { from: at, insert: pasted.text },
+      selection: { anchor: at + pasted.text.length },
+    });
+  } else if (outcome === "paste-again") {
+    showFileNotice("The clipboard changed — paste again");
+  } else {
+    showFileNotice(COPY_AGAIN);
+  }
+  return stillHasFiles;
 }
 
 export function useNativeFilePaste(): void {
@@ -83,13 +107,21 @@ export function useNativeFilePaste(): void {
       if (!route) return;
       event.preventDefault();
       event.stopPropagation();
-      // File objects are only readable during the event
-      const bytes = [...data.files].filter((file) => isImagePath(file.name));
-      void pasteFiles(route, target, bytes).catch((error: unknown) => {
-        showFileNotice(
-          `Couldn’t paste the copied file — ${error instanceof Error ? error.message : String(error)}`,
-        );
-      });
+      // File objects and clipboard text are only readable during the event
+      const pasted = {
+        bytes: [...data.files].filter((file) => isImagePath(file.name)),
+        text: data.getData("text/plain"),
+      };
+      void pasteFiles(route, target, pasted)
+        .then((hasFiles) => {
+          // a stale focus-time signal must not catch the next paste as well
+          pasteboardHasFiles = hasFiles;
+        })
+        .catch((error: unknown) => {
+          showFileNotice(
+            `Couldn’t paste the copied file — ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
     };
     refresh();
     window.addEventListener("focus", refresh);

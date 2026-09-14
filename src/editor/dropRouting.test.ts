@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  emptyPasteOutcome,
   classifyPaste,
   type DropCandidate,
   firstTarget,
@@ -141,5 +142,14 @@ describe("a paste of copied files", () => {
     const screenshot = { types: ["Files", "image/png"], fileCount: 1, uriList: "" };
     expect(classifyPaste(screenshot, "editor", false)).toEqual({ paths: false, bytes: true });
     expect(classifyPaste(screenshot, "chat", false)).toBeNull();
+  });
+
+  test("a stale 'has files' signal never eats the text the person copied inside Rotli", () => {
+    // Finder copy → focus Rotli → "Copy path" → ⌘V: nothing granted, no files left
+    expect(emptyPasteOutcome(false, "editor", "/Users/a/notes/plan.md")).toBe("insert-text");
+    expect(emptyPasteOutcome(false, "chat", "/Users/a/notes/plan.md")).toBe("paste-again");
+    expect(emptyPasteOutcome(false, "editor", "")).toBe("paste-again");
+    // the files are still there but this copy's one grant is spent
+    expect(emptyPasteOutcome(true, "editor", "shot.png")).toBe("copy-again");
   });
 });
