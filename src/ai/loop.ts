@@ -8,6 +8,7 @@
 // answer — a tool step's JSON scaffolding never reaches the user. Persistence is the
 // caller's job — only the final answer is written to the chat file.
 
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { artifactClarification } from "./artifactIntent";
 import { budgetFor } from "./budget";
 import { containsPrivateDataOverlap, looksSecret } from "./guard";
@@ -155,6 +156,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
       ...(input.imageTool ? { imageTool: true } : {}),
       ...(input.documentTool ? { documentTool: true } : {}),
       ...(input.artifactTool ? { artifactTool: true } : {}),
+      ...(input.artifactTool && LAUNCH_FEATURES.sheets ? { sheetArtifacts: true } : {}),
       ...(input.boardTool ? { boardTool: true } : {}),
       ...(input.userName ? { userName: input.userName } : {}),
     });

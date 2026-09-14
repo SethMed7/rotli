@@ -27,15 +27,15 @@ import {
 
 import { type DragGhost, createImageDragGhost } from "../lib/dragGhost";
 import { VIDEO_EXTS, extOf } from "../lib/fileKind";
-import { openUrl, resolveImageSrc, rootIdOf } from "../lib/tauri";
+import { resolveImageSrc, rootIdOf } from "../lib/tauri";
 import { locateLostImage } from "../services/imageRepair";
-import { usePanesStore } from "../state/panes";
 import { ChoiceAlignWidget } from "./choiceAlignWidget";
 import { selectChoiceGroup } from "./choiceState";
 import { choiceGroupAlign, isControlLiteral } from "./controlState";
 import { scanFences } from "./fences";
 import { imageSourceSpan, selectionCoversImage } from "./imageSelection";
 import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
+import { AUTOLINK_SOURCE, MD_LINK_SOURCE } from "./inlineLinks";
 import { CHECK_EM, CHOICE_EM, GROUP_INSET_PX, listStyle, MARKER_EM, RESULT_EM } from "./listGeometry";
 import { parseBlock } from "./render";
 import { resultTextParts } from "./resultState";
@@ -43,7 +43,6 @@ import { ChoiceControlWidget, ResultReasonWidget, ResultWidget, ToggleWidget } f
 import { lineInTable, scanTables } from "./tables";
 import { type TaskNode, type TaskProgress, taskProgress } from "./taskTree";
 import { CheckboxWidget } from "./taskWidget";
-import { editorLinkOpensOnClick, WIKILINK_RE } from "./wikilink";
 import { resolveWikilinkTarget } from "./wikilinkIndex";
 
 interface Sel {
@@ -65,6 +64,8 @@ interface InlineRule {
   /** Keep delimiters invisible even at the caret. Used for literal backticks;
    * Raw Markdown is the explicit delimiter-editing surface. */
   alwaysHideMarkers?: boolean;
+  /** Scan the content for further marks (bold around underline, …). */
+  nest?: boolean;
   /** Marker + content ranges RELATIVE to the match start. */
   parts: (m: RegExpExecArray) => {
     markers: [number, number][];
@@ -120,43 +121,50 @@ const INLINE: InlineRule[] = [
       };
     },
   },
+  { re: /\*\*\*([^*]+)\*\*\*/, cls: "rotli-strong rotli-em", parts: fixed(3, 3), nest: true },
   {
     re: /\*\*((?:[^*]|\*(?!\*))+)\*\*/,
     cls: "rotli-strong",
     parts: fixed(2, 2),
+    nest: true,
   },
-  { re: /==([^=]+)==/, cls: "rotli-hl", parts: fixed(2, 2) },
-  { re: /~~([^~]+)~~/, cls: "rotli-strike", parts: fixed(2, 2) },
-  { re: /<u>(.*?)<\/u>/, cls: "rotli-u", parts: fixed(3, 4) },
+  { re: /==([^=]+)==/, cls: "rotli-hl", parts: fixed(2, 2), nest: true },
+  { re: /~~([^~]+)~~/, cls: "rotli-strike", parts: fixed(2, 2), nest: true },
+  { re: /<u>(.*?)<\/u>/, cls: "rotli-u", parts: fixed(3, 4), nest: true },
   {
-    re: /\[([^\]]+)\]\(([^)]*)\)/,
+    re: new RegExp(MD_LINK_SOURCE),
     cls: "rotli-link",
     attrs: { title: "⌘-click to open" },
-    // [text](url): hide "[" and "](url)", style the text
+    // [text](url): hide "[" and "](url)", style the text. `[](url)` has no
+    // text to show, so it hides "[](" and ")" and shows the url instead.
     parts: (m) => {
       const L = m[0].length;
       const textLen = (m[1] ?? "").length;
+      if (textLen === 0)
+        return {
+          markers: [
+            [0, 3],
+            [L - 1, L],
+          ],
+          content: [3, L - 1],
+        };
       return {
         markers: [
           [0, 1],
           [1 + textLen, L],
-        ] as [number, number][],
-        content: [1, 1 + textLen] as [number, number],
+        ],
+        content: [1, 1 + textLen],
       };
     },
   },
-  { re: /\*([^*\s](?:[^*]*[^*\s])?)\*/, cls: "rotli-em", parts: fixed(1, 1) },
-  // a BARE url typed as plain text is a link too (the maintainer, 2026-07-28: "we should
-  // notice links") — no markers to hide, trailing punctuation stays prose.
-  // Sits after the md-link rule: `[t](url)` starts earlier so it wins the scan.
+  { re: /\*([^*\s](?:[^*]*[^*\s])?)\*/, cls: "rotli-em", parts: fixed(1, 1), nest: true },
+  // a BARE url, www. host, or email typed as plain text is a link too — no
+  // markers to hide. Sits after the md-link rule: `[t](url)` starts earlier.
   {
-    re: /https?:\/\/[^\s<>()[\]]*[^\s<>()[\].,;:!?'"]/,
+    re: new RegExp(AUTOLINK_SOURCE),
     cls: "rotli-link rotli-autolink",
     attrs: { title: "⌘-click to open" },
-    parts: (m) => ({
-      markers: [],
-      content: [0, m[0].length] as [number, number],
-    }),
+    parts: (m) => ({ markers: [], content: [0, m[0].length] }),
   },
 ];
 
@@ -667,6 +675,7 @@ function scanInline(
       const cls = rule.clsFor?.(m) ?? rule.cls;
       const attrs = rule.attrsFor?.(m) ?? rule.attrs;
       decos.push(Decoration.mark(attrs ? { class: cls, attributes: attrs } : { class: cls }).range(cs, ce));
+      if (rule.nest) scanInline(m[0].slice(cr[0], cr[1]), cs, sel, decos, atomics);
     }
     const touched = sel.from <= spanEnd && sel.to >= spanStart;
     for (const [s, e] of markers) {
@@ -1080,89 +1089,6 @@ function build(view: EditorView): {
     atomic: RangeSet.of(atomics, true),
   };
 }
-
-// ─── ⌘-click opens a link (#14, audit 2026-07) ───────────────────────────────
-// Plain click stays the edit path (caret in, markers reveal); holding ⌘ routes
-// the link's url through the scheme-allowlisted Rust opener instead. Works in
-// beautified AND raw mode — the match runs on the underlying markdown text, not
-// the decoration, so it doesn't care whether the markers are hidden.
-
-const MD_LINK = /\[([^\]]+)\]\(([^)]*)\)/g;
-
-function tryOpenWikilinkAt(lineText: string, lineFrom: number, pos: number): boolean {
-  WIKILINK_RE.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = WIKILINK_RE.exec(lineText)) !== null) {
-    const from = lineFrom + m.index;
-    const to = from + m[0].length;
-    if (pos >= from && pos <= to) {
-      const id = resolveWikilinkTarget(m[1] ?? "");
-      if (id) {
-        usePanesStore.getState().openNote(id);
-        return true;
-      }
-      return false;
-    }
-    if (from > pos) break;
-  }
-  return false;
-}
-
-function tryOpenMarkdownLinkAt(lineText: string, lineFrom: number, pos: number): boolean {
-  MD_LINK.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = MD_LINK.exec(lineText)) !== null) {
-    const from = lineFrom + m.index;
-    const to = from + m[0].length;
-    if (pos >= from && pos <= to) {
-      const url = (m[2] ?? "").trim();
-      if (url) void openUrl(url).catch(() => {});
-      return true;
-    }
-    if (from > pos) break;
-  }
-  return false;
-}
-
-// mirrors the autolink INLINE rule — a bare url ⌘-clicks open like an md link
-const BARE_URL = /https?:\/\/[^\s<>()[\]]*[^\s<>()[\].,;:!?'"]/g;
-
-function tryOpenBareUrlAt(lineText: string, lineFrom: number, pos: number): boolean {
-  BARE_URL.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = BARE_URL.exec(lineText)) !== null) {
-    const from = lineFrom + m.index;
-    const to = from + m[0].length;
-    if (pos >= from && pos <= to) {
-      void openUrl(m[0]).catch(() => {});
-      return true;
-    }
-    if (from > pos) break;
-  }
-  return false;
-}
-
-export const linkOpener = EditorView.domEventHandlers({
-  click(e, view) {
-    // only a click ON a line counts: the blank space below the last line maps
-    // to the document end, which would open a link that merely ends the note
-    if (!(e.target instanceof Element) || !e.target.closest(".cm-line")) return false;
-    const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
-    if (pos == null) return false;
-    const line = view.state.doc.lineAt(pos);
-    // Note links are workspace navigation, so they behave like visible links.
-    // Ordinary web URLs keep the deliberate ⌘-click editor gesture.
-    if (
-      (editorLinkOpensOnClick("note", e.button, e.metaKey) && tryOpenWikilinkAt(line.text, line.from, pos)) ||
-      (editorLinkOpensOnClick("web", e.button, e.metaKey) &&
-        (tryOpenMarkdownLinkAt(line.text, line.from, pos) || tryOpenBareUrlAt(line.text, line.from, pos)))
-    ) {
-      e.preventDefault();
-      return true;
-    }
-    return false;
-  },
-});
 
 export const livePreview = ViewPlugin.fromClass(
   class {

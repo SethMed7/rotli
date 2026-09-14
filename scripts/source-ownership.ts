@@ -36,6 +36,7 @@ export const COMPONENT_DIRECTORY_OWNERS = {
   breve: "Breve presentation feature",
   chat: "Chat pane presentation feature",
   onboarding: "first-run, vault activation, and model setup presentation",
+  settings: "Settings pane sections and controls composed by settingsSurface (voice, connections, about)",
   sidebar: "sidebar presentation feature",
   tour: "guided tour overlay that spotlights the real controls after setup",
 } as const;
@@ -51,6 +52,7 @@ export const COMPONENT_ROOT_FILE_OWNERS = {
   "contextMenu.tsx": "shared context-menu primitive",
   "documentEditor.tsx": "FileSurface document presentation adapter",
   "emptyState.tsx": "shared empty-state primitive",
+  "fileNotice.tsx": "application-shell transient notice for Finder drops and pastes that landed out of sight",
   "glyphs.tsx": "shared first-party glyph registry",
   "hotkeyBadges.tsx": "shared shortcut badge overlay",
   "icon.tsx": "shared semantic icon primitive",

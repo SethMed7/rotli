@@ -99,9 +99,10 @@ until that workflow exists—never ship a passive “preview only” dead end.
 
 Markdown is the foundation Rotli is built around and remains the primary
 knowledge surface. Slash commands, wikilinks, typed embed fences, frontmatter,
-and note-native workflows belong to Markdown only. DOCX documents, spreadsheets,
+and note-native workflows belong to Markdown only. DOCX documents, CSV tables,
 and Excalidraw boards are useful bonus work surfaces—not parallel note systems—
-and keep the conventional behavior of their own formats.
+and keep the conventional behavior of their own formats. XLSX spreadsheets,
+Mermaid diagram tabs, and read-aloud are coming soon; they are not in this release.
 
 ## Personal work environments
 

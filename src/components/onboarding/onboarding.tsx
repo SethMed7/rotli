@@ -18,7 +18,12 @@ import { setSetupHandle } from "../../keys/handles";
 import { allActions, conflictFor, getAction, rebind, setDispatchSuspended } from "../../keys/registry";
 import { setGlobalShortcut } from "../../lib/tauri";
 import { DEFAULT_APPEARANCE } from "../../state/appearanceDefaults";
-import { ONBOARDING_STEP_NUMBER, ONBOARDING_TOTAL_STEPS, startingAppearance } from "../../state/onboarding";
+import {
+  ONBOARDING_STEP_NUMBER,
+  ONBOARDING_TOTAL_STEPS,
+  startingAppearance,
+  windowBehaviorOnSkip,
+} from "../../state/onboarding";
 import { startSetupDetection } from "../../state/setupDetection";
 import { THEME_FAMILY_PRESENTATIONS, type ThemeFamily, type ThemeSetting, useUiStore } from "../../state/ui";
 import { Character } from "../character";
@@ -196,6 +201,7 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
     useUiStore.getState().setStayOpen(value === "resident");
   };
   const skip = () => {
+    const ui = useUiStore.getState();
     useBindingsStore.setState({ overrides: {} });
     for (const action of allActions()) {
       if (!action.global) continue;
@@ -210,8 +216,7 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
       quokkaAccessoryHue: DEFAULT_QUOKKA_ACCESSORY_HUE,
       quokkaLineColor: "auto",
       quokkaIdlePose: "base",
-      stayOpen: false,
-      showInDock: false,
+      ...windowBehaviorOnSkip(ui.onboarded, ui.onboardingVersion),
     });
     onDone();
   };

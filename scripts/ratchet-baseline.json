@@ -8,7 +8,7 @@
     "src/components/systemSurface.tsx": 1189,
     "src/components/sidebar/sidebarHome.tsx": 1301,
     "src/components/fileSurface.tsx": 854,
-    "src/components/chat/chatSurface.tsx": 3211,
+    "src/components/chat/chatSurface.tsx": 2864,
     "src/components/breve/breveSurface.tsx": 2335,
     "src/components/settingsSurface.tsx": 3502,
     "src/components/activitySurface.tsx": 984,

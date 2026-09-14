@@ -6,6 +6,7 @@
 import { usePanesStore } from "../state/panes";
 import { CHOICE_MARK } from "./choiceState";
 import { parseChoiceControlLine, parseToggleLine } from "./controlState";
+import { ORDERED_MARKER_SOURCE } from "./listMarkers";
 import { parseResultLine, RESULT_MARK } from "./resultState";
 import { MARK } from "./taskState";
 
@@ -59,25 +60,87 @@ export interface LineEdit {
   selEnd: number;
 }
 
+/** Consecutive `*` touching `at`, walking left (dir -1) or right (dir 1). */
+function starRun(line: string, at: number, dir: -1 | 1): number {
+  let n = 0;
+  for (let i = dir < 0 ? at - 1 : at; i >= 0 && i < line.length && line[i] === "*"; i += dir) n++;
+  return n;
+}
+
+/** Whether `open`/`close` sit right around [a, b). Stars are counted as runs so
+ * italic inside bold (`***x***`) reads as both marks, and `**x**` is not italic. */
+function markAround(line: string, a: number, b: number, mark: Exclude<InlineMark, "link">): boolean {
+  const { open, close } = MARKS[mark];
+  if (mark === "italic" || mark === "bold") {
+    const left = starRun(line, a, -1);
+    const right = starRun(line, b, 1);
+    return mark === "italic" ? left % 2 === 1 && right % 2 === 1 : left >= 2 && right >= 2;
+  }
+  return (
+    a >= open.length && line.slice(a - open.length, a) === open && line.slice(b, b + close.length) === close
+  );
+}
+
+/** Walk outward over other marks' delimiters until `mark` wraps [a, b), so one
+ * mark comes off a stack like `***<u>x</u>***` without disturbing the rest. */
+function enclosingLayer(
+  line: string,
+  a: number,
+  b: number,
+  mark: Exclude<InlineMark, "link">,
+): { a: number; b: number } | null {
+  for (;;) {
+    if (markAround(line, a, b, mark)) return { a, b };
+    const other = (Object.keys(MARKS) as Exclude<InlineMark, "link">[]).find(
+      (m) => m !== mark && m !== "bold" && m !== "italic" && markAround(line, a, b, m),
+    );
+    const stars = Math.min(starRun(line, a, -1), starRun(line, b, 1));
+    if (other) {
+      a -= MARKS[other].open.length;
+      b += MARKS[other].close.length;
+    } else if (mark !== "bold" && mark !== "italic" && stars > 0) {
+      a -= stars;
+      b += stars;
+    } else {
+      return null;
+    }
+  }
+}
+
 export function toggleInlineMark(line: string, selStart: number, selEnd: number, mark: InlineMark): LineEdit {
   if (mark === "link") return toggleLink(line, selStart, selEnd);
   const { open, close } = MARKS[mark];
   const sel = line.slice(selStart, selEnd);
-  // unwrap: marks sit immediately around the selection
-  if (
-    selStart >= open.length &&
-    line.slice(selStart - open.length, selStart) === open &&
-    line.slice(selEnd, selEnd + close.length) === close
-  ) {
+  // inline code is opaque: any other mark wraps OUTSIDE its backticks
+  const inCode =
+    mark !== "code" &&
+    line[selStart - 1] === "`" &&
+    line[selEnd] === "`" &&
+    !sel.includes("`") &&
+    selEnd > selStart;
+  const a = inCode ? selStart - 1 : selStart;
+  const b = inCode ? selEnd + 1 : selEnd;
+  // unwrap: the mark sits around the selection, possibly outside other marks
+  const layer = enclosingLayer(line, a, b, mark);
+  if (layer) {
     return {
-      line: line.slice(0, selStart - open.length) + sel + line.slice(selEnd + close.length),
+      line:
+        line.slice(0, layer.a - open.length) +
+        line.slice(layer.a, layer.b) +
+        line.slice(layer.b + close.length),
       selStart: selStart - open.length,
       selEnd: selEnd - open.length,
     };
   }
   // unwrap: the selection includes the marks
-  if (sel.length >= open.length + close.length && sel.startsWith(open) && sel.endsWith(close)) {
-    const inner = sel.slice(open.length, sel.length - close.length);
+  const inner = sel.slice(open.length, sel.length - close.length);
+  if (
+    !inCode &&
+    sel.length >= open.length + close.length &&
+    sel.startsWith(open) &&
+    sel.endsWith(close) &&
+    markAround(sel, open.length, sel.length - close.length, mark)
+  ) {
     return {
       line: line.slice(0, selStart) + inner + line.slice(selEnd),
       selStart,
@@ -86,7 +149,7 @@ export function toggleInlineMark(line: string, selStart: number, selEnd: number,
   }
   // wrap (empty selection leaves the caret inside the new pair)
   return {
-    line: line.slice(0, selStart) + open + sel + close + line.slice(selEnd),
+    line: line.slice(0, a) + open + line.slice(a, b) + close + line.slice(b),
     selStart: selStart + open.length,
     selEnd: selEnd + open.length,
   };
@@ -99,7 +162,7 @@ function toggleLink(line: string, selStart: number, selEnd: number): LineEdit {
   return { line: next, selStart: caret, selEnd: caret };
 }
 
-/** Caret-context active state: is `pos` inside a marked span on this line? */
+/** Caret-context active state: is `pos` inside a CLOSED marked span on this line? */
 export function isMarkActive(line: string, pos: number, mark: InlineMark): boolean {
   if (mark === "link") return false;
   const { open, close } = MARKS[mark];
@@ -112,9 +175,11 @@ export function isMarkActive(line: string, pos: number, mark: InlineMark): boole
       count++;
       i = scan.indexOf(open, i + open.length);
     }
-    return count % 2 === 1;
+    // an odd opener count is only a span once its closer exists — a lone
+    // `**Testing` renders plain, so the bar must not light B for it
+    return count % 2 === 1 && scan.indexOf(close, pos) !== -1;
   }
-  return countBefore(scan, open, pos) > countBefore(scan, close, pos);
+  return countBefore(scan, open, pos) > countBefore(scan, close, pos) && scan.indexOf(close, pos) !== -1;
 }
 
 function countBefore(text: string, token: string, pos: number): number {
@@ -156,7 +221,7 @@ export function applyHeading(line: string, level: HeadingLevel): PrefixEdit {
 const RESULT_PAIR = `\\[${RESULT_MARK}\\]\\[${RESULT_MARK}\\] `;
 const CHOICE_PREFIX = `\\(${CHOICE_MARK}\\) `;
 const ANY_BLOCK_PREFIX = new RegExp(
-  `^(\\d+\\. ${RESULT_PAIR}|- ${RESULT_PAIR}|\\d+\\. ${CHOICE_PREFIX}|- ${CHOICE_PREFIX}|\\d+\\. \\[${MARK}\\] |- \\[${MARK}\\] |- |\\d+\\. |> )`,
+  `^(\\d+\\. ${RESULT_PAIR}|- ${RESULT_PAIR}|\\d+\\. ${CHOICE_PREFIX}|- ${CHOICE_PREFIX}|\\d+\\. \\[${MARK}\\] |- \\[${MARK}\\] |- |${ORDERED_MARKER_SOURCE} |> )`,
 );
 
 const BLOCK_RULES: Record<BlockToggle, { add: string; test: RegExp }> = {
@@ -164,7 +229,7 @@ const BLOCK_RULES: Record<BlockToggle, { add: string; test: RegExp }> = {
   bullet: { add: "- ", test: new RegExp(`^- (?!${RESULT_PAIR}|${CHOICE_PREFIX}|\\[${MARK}\\] )`) },
   numbered: {
     add: "1. ",
-    test: new RegExp(`^\\d+\\. (?!${RESULT_PAIR}|${CHOICE_PREFIX}|\\[${MARK}\\] )`),
+    test: new RegExp(`^${ORDERED_MARKER_SOURCE} (?!${RESULT_PAIR}|${CHOICE_PREFIX}|\\[${MARK}\\] )`),
   },
   checklist: { add: "- [ ] ", test: new RegExp(`^- \\[${MARK}\\] `) },
 };

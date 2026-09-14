@@ -14,6 +14,7 @@
 import type { ReactNode } from "react";
 
 import { DOCUMENT_SEARCH_KEYWORDS } from "../documents/kinds";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import type { BlockToggle } from "./commands";
 import { bulletGlyph, checklistGlyph, codeGlyph, numberedGlyph, quoteGlyph } from "./formatGlyphs";
 import { parseBlock } from "./render";
@@ -350,13 +351,18 @@ export function slashPlacement(
   return spaceBelow < needed && spaceAbove > spaceBelow ? "up" : "down";
 }
 
-/** Filter by label or optional keywords (case-insensitive). */
-export function filterSlashItems(query: string): SlashItem[] {
+/** Filter by label or optional keywords (case-insensitive). The spreadsheet
+ * embed is withheld from builds without the sheets capability. */
+export function filterSlashItems(
+  query: string,
+  features: { sheets: boolean } = LAUNCH_FEATURES,
+): SlashItem[] {
   const q = query.trim().toLowerCase();
-  if (q === "") return SLASH_ITEMS;
-  return SLASH_ITEMS.filter(
-    (it) => it.label.toLowerCase().includes(q) || it.keywords?.some((k) => k.includes(q)),
-  );
+  const items = features.sheets
+    ? SLASH_ITEMS
+    : SLASH_ITEMS.filter((it) => !(it.op.kind === "picker" && it.op.mode === "embedSheet"));
+  if (q === "") return items;
+  return items.filter((it) => it.label.toLowerCase().includes(q) || it.keywords?.some((k) => k.includes(q)));
 }
 
 export interface SlashLineTarget {

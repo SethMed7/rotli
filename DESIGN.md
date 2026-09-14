@@ -116,7 +116,9 @@ exception.
   twins disable both filesystem-only actions instead of pretending they ran.
 - Note-to-note wikilinks open with an ordinary click; web links — markdown
   links and bare-URL autolinks alike — keep the deliberate ⌘-click gesture
-  inside the editor. A wikilink that resolves to no note renders visibly inert (dimmed,
+  inside the editor. A web link that cannot open shows a small **Couldn't open
+  this link** note at the click (cleared by the next edit or caret move); static
+  readers mark the link itself. A wikilink that resolves to no note renders visibly inert (dimmed,
   dashed underline, honest tooltip) — a dead link must never look like a live
   one. The editor header may
   expose the existing session back/forward trail beside the date, using compact
@@ -432,7 +434,10 @@ polish work.
 - A rendered Mermaid fence is an entry point to one focused workspace with
   View and Code modes in production. The experimental Visual editor is enabled
   only by the development build policy in `src/lib/featurePolicy.ts`; neither
-  a query parameter nor a vault setting can enable it in production. View supports pointer pan,
+  a query parameter nor a vault setting can enable it in production. Stable
+  builds also withhold the Mermaid diagram item kind: the New-tab chooser shows
+  its card disabled with "Coming soon — not in this release yet" (the one
+  sanctioned coming-soon treatment; other surfaces omit withheld capabilities). View supports pointer pan,
   wheel/button/keyboard zoom, double-click or `0` to fit, and visible loading,
   empty, and parse-error states.
 - Mermaid text in the Markdown fence remains source of truth. Code changes are
@@ -513,8 +518,11 @@ polish work.
   supplies color-only sides with accessible On/Off fallback labels.
 - Backtick-delimited inline code wins before every control grammar. Its content
   stays literal and selectable while beautified mode hides only the backticks
-  and presents the content as ordinary text without an inline-code chip.
-  Fenced code blocks remain visually distinct code surfaces.
+  and presents the content as a quiet chip: `--font-mono` at 0.92em on
+  `--tint` with `--r-inner` corners, so a backticked example reads as typed
+  syntax rather than broken rendering. A backticked control literal (`[#]`,
+  `[|]`) stays plain text. Fenced code blocks remain visually distinct code
+  surfaces.
 - A Markdown pane reveals one compact scroll-to-top control after meaningful
   downward scrolling. It floats at the pane's bottom-right, remains a labeled
   keyboard-focusable button, and uses reduced-motion-safe spatial feedback.

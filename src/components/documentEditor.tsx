@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 
 import { editManagedDocument } from "../documents/composition";
 import { markDocumentDraftChanged } from "../documents/draftComposition";
+import { documentFormatHandle } from "../documents/engine/format";
 import type { DocumentEngineHandle } from "../documents/engine/univer";
 import type { EditableDocument } from "../documents/model";
 import {
@@ -16,6 +17,7 @@ import {
   unregisterLiveDocument,
   type ReadyDocumentSession,
 } from "../documents/session";
+import { registerEditor, unregisterEditor } from "../editor/commands";
 import { corpusFileStat } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
@@ -114,7 +116,12 @@ export default function DocumentEditor({
         const structureSubscription = handle.onStructureChange(() => {
           if (!disposed) setEngineRevision((revision) => revision + 1);
         });
+        // editor.* format actions resolve through the focused pane's handle;
+        // an embed has no pane and keeps Univer's in-canvas shortcuts only
+        const formatHandle = documentFormatHandle((id) => handle.runCommand(id));
+        if (paneId) registerEditor(paneId, formatHandle);
         disposeEngine = () => {
+          if (paneId) unregisterEditor(paneId, formatHandle);
           if (subscription && typeof subscription === "object") subscription.dispose?.();
           structureSubscription.dispose();
           handle.dispose();
@@ -169,7 +176,7 @@ export default function DocumentEditor({
       handleRef.current = null;
       sessionRef.current = null;
     };
-  }, [engineRevision, fileId]);
+  }, [engineRevision, fileId, paneId]);
 
   useEffect(() => {
     const session = sessionRef.current;

@@ -20,9 +20,11 @@ export const wikilinkPicker = createCaretPicker<NoteSummary>({
       to: line.from + span.to,
       anchor: line.from + span.open,
       query: span.query,
+      ...(span.closed ? { typedOnly: true } : {}),
       choices: wikilinkChoices(wikilinkNotes(), span.query),
     };
   },
+  empty: (query) => (query.trim() ? `No note named “${query.trim()}”` : "No notes to link yet"),
   insert: (note) => `[[${wikilinkLabel(note, buildTitleCounts(wikilinkNotes()))}]]`,
   row(node, note) {
     const title = document.createElement("span");

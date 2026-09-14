@@ -197,6 +197,50 @@ test("blank space below a note that ends with a wikilink does not open the link"
   await expect(page.locator(".cm-content")).toContainText("Free local forever.");
 });
 
+test("www. hosts, emails, and [](url) render as links; bare domains stay prose", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText("Visit www.example.com or mail a@b.co, see [](sethmedina.com), not node.js");
+  await page.locator(".ed-date").click();
+  const links = editor.locator(".rotli-link");
+  await expect(links).toHaveText(["www.example.com", "a@b.co", "sethmedina.com"]);
+});
+
+test("the [[ picker stays open with a no-match row, and Escape closes only the picker", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.type("[[Zzqx");
+  const picker = page.locator(".rotli-linkpick");
+  await expect(picker).toBeVisible();
+  await expect(picker).toContainText("No note named “Zzqx”");
+  await page.keyboard.press("Escape");
+  await expect(picker).toBeHidden();
+  await expect(editor).toBeVisible();
+});
+
+test("stacked marks render together: bold-italic around underline, strike around code", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText("***<u>hello world</u>*** and ~~`code`~~");
+  await page.locator(".ed-date").click();
+  const underlined = editor.locator(
+    ".rotli-strong.rotli-em .rotli-u, .rotli-u .rotli-strong.rotli-em, .rotli-strong.rotli-em.rotli-u",
+  );
+  await expect(editor.locator(".rotli-u", { hasText: "hello world" })).toBeVisible();
+  await expect(editor.locator(".rotli-strong.rotli-em").first()).toContainText("hello world");
+  await expect(underlined.first()).toBeVisible();
+  await expect(editor.locator(".rotli-strike .rotli-code, .rotli-code .rotli-strike").first()).toContainText(
+    "code",
+  );
+  await expect(editor).not.toContainText("<u>");
+});
+
 test("Escape in the color list closes the list only; the app's Esc ladder does not fire", async ({
   page,
 }) => {
@@ -250,6 +294,23 @@ test("typing [[ lists matching notes; Enter or a click completes and closes the 
     .getByRole("button", { name: "Raw markdown" })
     .click();
   await expect(editor).toContainText("See [[Pricing decision]] and [[Pricing decision]]");
+});
+
+test("typed brackets, backticks, and bold pair and step over their closers", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.type("A [");
+  await expect(editor).toHaveText("A []");
+  await page.keyboard.type("link](x.com) and **");
+  await page.keyboard.type("bold** and `code`");
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  await expect(editor).toHaveText("A [link](x.com) and **bold** and `code`");
 });
 
 test("a ts code fence renders IDE-grade token colors", async ({ page }) => {
@@ -542,7 +603,7 @@ test("hash choices and switches stay interactive while inline code stays literal
   const editor = page.locator(".cm-content").last();
   await editor.click();
   await page.keyboard.insertText(
-    "- [#] Red\n- [#] Blue\n\n- [##?] Which channels should we use?\n- [##] Email\n- [##] SMS\n\n- [|x] Feature flag\n- [True:green|x False:red] Sync\n- [:blue|:purple] Color only\n\n`[#]` and `[|]` stay literal\n\n`[#] raw data` and `plain example` stay visually plain too",
+    "- [#] Red\n- [#] Blue\n\n- [##?] Which channels should we use?\n- [##] Email\n- [##] SMS\n\n- [|x] Feature flag\n- [True:green|x False:red] Sync\n- [:blue|:purple] Color only\n\n`[#]` and `[|]` stay literal\n\n`[#] raw data` and `plain example` read as code",
   );
   await page.locator(".ed-date").click();
 
@@ -659,16 +720,17 @@ test("hash choices and switches stay interactive while inline code stays literal
   await expect(literal).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   await expect(literal).toHaveCSS("padding-left", "0px");
   await expect(page.locator(".rotli-code", { hasText: "[|]" })).toBeVisible();
-  const plainLiteral = page.locator(".rotli-code", { hasText: "plain example" });
-  await expect(plainLiteral).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-  await expect(plainLiteral).toHaveCSS("padding-left", "0px");
+  // ordinary inline code is a quiet mono chip; only control literals stay plain
+  const codeChip = page.locator(".rotli-code", { hasText: "plain example" });
+  await expect(codeChip).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(codeChip).toHaveCSS("padding-left", "4px");
   expect(
-    await plainLiteral.evaluate(
+    await codeChip.evaluate(
       (node) => getComputedStyle(node).fontFamily === getComputedStyle(node.parentElement!).fontFamily,
     ),
-  ).toBe(true);
-  const plainLiteralLine = plainLiteral.locator("xpath=ancestor::*[contains(@class, 'cm-line')][1]");
-  await expect(plainLiteralLine).toHaveText("[#] raw data and plain example stay visually plain too");
+  ).toBe(false);
+  const codeChipLine = codeChip.locator("xpath=ancestor::*[contains(@class, 'cm-line')][1]");
+  await expect(codeChipLine).toHaveText("[#] raw data and plain example read as code");
 
   await page.getByRole("button", { name: "Aa" }).click();
   await page
@@ -806,6 +868,24 @@ test("() creates a tab-navigable Markdown multiple-choice group", async ({ page 
   await expect(rawLines.nth(0)).toHaveText("- ( ) Red");
   await expect(rawLines.nth(1)).toHaveText("- ( ) Blue");
   await expect(rawLines.nth(2)).toHaveText("- (x) Green");
+});
+
+test("a lettered list continues on Enter and renders its letters", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.type("a. first");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("second");
+  await page.locator(".ed-date").click();
+  await expect(editor).toContainText("b.");
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  await expect(editor).toHaveText("a. firstb. second");
 });
 
 test("slash commands work inside a numbered list item", async ({ page }) => {

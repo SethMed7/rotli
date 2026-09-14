@@ -6,7 +6,9 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { statusFor } from "./tools";
+import { budgetFor } from "./budget";
+import { runTool, statusFor } from "./tools";
+import type { Host } from "./types";
 
 describe("statusFor — enriched, safe live labels", () => {
   test("bare tool (no args) keeps the generic label", () => {
@@ -54,4 +56,22 @@ describe("statusFor — enriched, safe live labels", () => {
       "searching your notes…",
     );
   });
+});
+
+test("a build without sheets refuses a workbook artifact before the host runs", async () => {
+  // bun test compiles as the stable channel
+  let calls = 0;
+  const host = { createArtifact: async () => `created ${++calls}` } as unknown as Host;
+  const budget = budgetFor({ id: "gemma-3-12b-it-qat-4bit" });
+  const refused = await runTool(
+    host,
+    "create_artifact",
+    { kind: "sheet", title: "T", content: "a,b" },
+    budget,
+  );
+  expect(refused).toBe('error: create_artifact needs a supported kind: "document", "pdf".');
+  expect(await runTool(host, "create_artifact", { kind: "pdf", title: "T", content: "# T" }, budget)).toBe(
+    "created 1",
+  );
+  expect(calls).toBe(1);
 });

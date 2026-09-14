@@ -123,6 +123,11 @@ test("the guided tour follows setup, spotlights real controls, skips missing one
     expect(ring.y + ring.height).toBeGreaterThanOrEqual(target.y + target.height);
   };
   await ringOver(/^New note in /);
+  // one scrim, and the dimmed app still takes real clicks (the old panels
+  // intercepted them — and native Finder drops with them)
+  await expect(tour.locator(".tour-scrim")).toHaveCount(1);
+  await page.getByRole("tab", { selected: true }).click();
+  await expect(tour).toHaveAttribute("data-step", "new");
   await tour.getByRole("button", { name: "Next" }).click();
   await expect(tour).toHaveAttribute("data-step", "views");
   await ringOver(/^Current view: /);

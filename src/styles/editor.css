@@ -275,11 +275,12 @@
 
 /* — inline marks — */
 .md-code {
-  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 0.92em;
   color: inherit;
-  background: none;
-  border-radius: 0;
-  padding: 0;
+  background: var(--tint);
+  border-radius: var(--r-inner);
+  padding: 1px 4px;
 }
 .md-code.control-literal {
   padding: 0;
@@ -298,6 +299,11 @@
   color: var(--accent-text);
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
+}
+/* a link whose address opens nothing says so instead of a silent dead click */
+.md-link[data-open-failed] {
+  color: var(--danger);
+  text-decoration-style: dashed;
 }
 
 /* — the raw active line: transparent textarea over the tinted twin.
@@ -435,7 +441,7 @@
   bottom: calc(100% + 8px);
   left: 0;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--r-card);
   padding: 5px;
   z-index: 7;
@@ -1268,12 +1274,15 @@
 .rotli-u {
   text-decoration: underline;
 }
+/* inline code: a quiet mono chip so a backticked example reads as typed
+   syntax, not as broken rendering; control literals below stay plain */
 .rotli-code {
-  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 0.92em;
   color: inherit;
-  background: none;
-  border-radius: 0;
-  padding: 0;
+  background: var(--tint);
+  border-radius: var(--r-inner);
+  padding: 1px 4px;
 }
 .rotli-control-literal {
   padding: 0;
@@ -1291,6 +1300,15 @@
   color: var(--accent-text);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+/* the editor's "Couldn't open this link" note, beside the ⌘-click */
+.rotli-link-failed {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  color: var(--danger);
+  font-size: 0.85em;
+  padding: 3px 8px;
 }
 /* a resolved wikilink reads as a LINK at a glance (the maintainer, 2026-09-12: the
    dotted rule "doesn't look clickable"): a solid accent underline, and the row's
@@ -1640,6 +1658,13 @@
 }
 .aaseg:hover {
   background: var(--hov);
+}
+.aaseg:disabled {
+  cursor: default;
+  color: var(--text-muted);
+}
+.aaseg:disabled:hover {
+  background: none;
 }
 .aaseg.sel {
   background: var(--selected-bg);
@@ -2300,6 +2325,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.rotli-linkpick-empty {
+  padding: 5px 8px;
+  color: var(--text-muted);
+  font-size: 0.9em;
 }
 .rotli-linkpick-hint {
   color: var(--text-muted);

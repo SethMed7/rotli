@@ -8,6 +8,18 @@ describe("DOCX Univer adapter policy", () => {
     expect(isDocumentContentMutation({ id: "doc.operation.set-zoom", type: 1 })).toBe(false);
   });
 
+  test("a format chosen at a collapsed caret is pending style, not a content mutation", () => {
+    // Univer arms the caret's style cache and still dispatches a no-op
+    // rich-text mutation. Treating it as content re-laid the canvas, which
+    // refreshed the selection and cleared the pending style before typing.
+    const caretOnly = { id: "doc.mutation.rich-text-editing", type: 2 };
+    expect(isDocumentContentMutation({ ...caretOnly, params: { actions: null } })).toBe(false);
+    expect(isDocumentContentMutation({ ...caretOnly, params: { actions: [] } })).toBe(false);
+    expect(
+      isDocumentContentMutation({ ...caretOnly, params: { actions: ["body", { et: "text-x", e: [] }] } }),
+    ).toBe(true);
+  });
+
   test("captures a stable insertion range before a table dialog takes focus", () => {
     expect(
       documentInsertionRange("doc-1", {

@@ -1028,7 +1028,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   hotkeyPeek: "badges",
   setHotkeyPeek: (v) => set({ hotkeyPeek: v }),
   readAloud: false,
-  setReadAloud: (on) => set({ readAloud: on }),
+  setReadAloud: (on) => set({ readAloud: LAUNCH_FEATURES.voice && on }),
   readAloudVoice: DEFAULT_VOICE,
   setReadAloudVoice: (id) => set({ readAloudVoice: id }),
   taskCycle: "two",

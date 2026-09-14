@@ -7,6 +7,7 @@ import {
   pendingNoteDocumentId,
 } from "../editor/model";
 import { MERMAID_STARTER } from "../editor/slashActions";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { corpusCreateBoard, corpusCreateManagedFile } from "../lib/tauri";
 /** Composition root for item creation. Product rules stay in model/workflow. */
 import { invalidateMemex } from "../memex/useMemex";
@@ -21,7 +22,7 @@ import { useMainStore } from "../state/main";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
 import { useViewsStore } from "../state/views";
-import { newItemDefinition, type NewItemKind } from "./model";
+import { isNewItemAvailable, newItemDefinition, type NewItemKind } from "./model";
 import { newItemParent } from "./placement";
 import { createNewItem, type CreatedItem, type NewItemCreator, type NewItemPresenter } from "./workflow";
 
@@ -178,6 +179,7 @@ export async function createManagedItem(
   kind: NewItemKind,
   options: { newTab?: boolean; open?: boolean; boardName?: string; pendingTabId?: string } = {},
 ): Promise<CreatedItem> {
+  refuseWithheldKind(kind);
   const boardName = options.boardName?.trim() ?? "";
   if (kind === "board" && !boardName) throw new Error("a board needs a name");
   const baseItemCreator: NewItemCreator =
@@ -323,6 +325,13 @@ export async function createManagedItem(
   return item;
 }
 
+/** Every creation entry point funnels through here, so a kind the build
+ * withholds cannot be created by a stale binding, palette, or tool call. */
+export function refuseWithheldKind(kind: NewItemKind): void {
+  if (!isNewItemAvailable(kind, LAUNCH_FEATURES))
+    throw new Error(`${newItemDefinition(kind).label} isn’t available in this build yet`);
+}
+
 /** ⌘T's optimistic composition: append/activate a real tab synchronously, then
  * start the durable creator. Resolution retargets that exact tab; refresh and
  * Main/view filing remain background work. */
@@ -382,6 +391,7 @@ export function createPopulatedManagedItem(
   kind: "document" | "sheet",
   createFile: () => Promise<string>,
 ): Promise<CreatedItem> {
+  refuseWithheldKind(kind);
   return createNewItem(
     {
       creator: { create: async () => ({ id: await createFile(), kind }) },

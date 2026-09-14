@@ -12,6 +12,7 @@
 // (MIRROR-NOT-IMPORT across the app/runtime boundary).
 
 import { imageSourceSpan } from "./imageSelection";
+import { type OrderedStyle, parseOrderedMarker } from "./listMarkers";
 import { type Block, parseBlock } from "./render";
 import { stripMarkdown } from "./stripMarkdown";
 
@@ -108,7 +109,13 @@ export function clipboardHtml(markdown: string, images: ImageDataUrls = new Map(
     if (quote) out.push("</blockquote>");
     quote = false;
   };
-  const listItem = (tag: "ol" | "ul", indent: number, inner: string, start?: number) => {
+  const listItem = (
+    tag: "ol" | "ul",
+    indent: number,
+    inner: string,
+    start?: number,
+    style?: OrderedStyle,
+  ) => {
     closeQuote();
     closeLists(indent + 1); // a shallower item ends every deeper list first
     const top = stack[stack.length - 1];
@@ -118,7 +125,8 @@ export function clipboardHtml(markdown: string, images: ImageDataUrls = new Map(
       // a deeper item nests inside the open item; a different kind or a
       // shallower level opens a fresh list
       if (!(top && top.indent < indent)) closeLists(indent);
-      out.push(`<${tag}${start && start > 1 ? ` start="${start}"` : ""}>`);
+      const type = style === "lower" ? ' type="a"' : style === "upper" ? ' type="A"' : "";
+      out.push(`<${tag}${type}${start && start > 1 ? ` start="${start}"` : ""}>`);
       stack.push({ tag, indent, open: false });
     }
     out.push(`<li>${inner}`);
@@ -166,9 +174,11 @@ export function clipboardHtml(markdown: string, images: ImageDataUrls = new Map(
         closeQuote();
         out.push(`<${block.kind}>${inlineHtml(block.text)}</${block.kind}>`);
         break;
-      case "numbered":
-        listItem("ol", indent, body, Number(block.marker?.replace(".", "") ?? 1));
+      case "numbered": {
+        const ordered = parseOrderedMarker(block.marker ?? "1.");
+        listItem("ol", indent, body, ordered?.value ?? 1, ordered?.style);
         break;
+      }
       case "bullet":
         listItem("ul", indent, body);
         break;

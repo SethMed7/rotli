@@ -28,7 +28,7 @@ import { createRoutedNote } from "../services/createNote";
 import { DEST, isSink } from "../services/destinations";
 import { invalidateNotes, useArchiveNote, useRestoreNote, useTrashNote } from "../services/hooks";
 import { useMainGcIds } from "../services/hooks";
-import { activeItemSinkLane } from "../services/itemLifecycle";
+import { activeItemSinkLane, fileLifecycleRows, readFileLifecycle } from "../services/itemLifecycle";
 import { isEmptyNote } from "../services/mainDismiss";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
 import { markNoteDraftChanged } from "../services/noteDrafts";
@@ -211,7 +211,8 @@ export function useNoteMenu() {
         // menu shows the right toggle label + check (the maintainer #23, 2026-07-03: these
         // moved out of the metadata popover into this menu).
         const fm = isNote ? await corpusFrontmatter(note.id).catch(() => null) : null;
-        const fileStat = sinkLane === "file" ? await corpusFileStat(note.id).catch(() => null) : null;
+        const fileLifecycle =
+          sinkLane === "file" ? await readFileLifecycle(() => corpusFileStat(note.id)) : null;
         const secureAtHome =
           isNote && (isSecureBrainFolder(noteDiskFolder(note)) || isSecureNotesFolder(noteDiskFolder(note)));
 
@@ -515,8 +516,10 @@ export function useNoteMenu() {
             danger: true,
             onClick: () => opts?.trashSelection?.(selectedItems),
           });
-        } else if (sinkLane === "file") {
-          const movable = fileStat?.lifecycleMutable === true;
+        } else if (sinkLane === "file" && fileLifecycle) {
+          const rows = fileLifecycleRows(fileLifecycle);
+          const movable = rows.movable;
+          if (rows.error) useUiStore.getState().setRowActionError(rows.error);
           const moveFile = (sink: "Archive" | "Trash") => {
             if (!movable) return;
             useUiStore.getState().setRowActionError(null);
@@ -539,13 +542,13 @@ export function useNoteMenu() {
           };
           items.push({
             kind: "action" as const,
-            label: movable ? "Move file to Archive" : "Read-only — can’t move file",
+            label: rows.archiveLabel,
             disabled: !movable,
             onClick: () => moveFile("Archive"),
           });
           items.push({
             kind: "action" as const,
-            label: movable ? "Move file to Trash" : "Read-only — can’t move file",
+            label: rows.trashLabel,
             danger: movable,
             disabled: !movable,
             onClick: () => moveFile("Trash"),

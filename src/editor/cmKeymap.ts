@@ -22,6 +22,7 @@ import { CHOICE_LINE_RE } from "./choiceState";
 import { parseChoiceControlLine, parseChoicePromptLine, parseToggleLine, setToggleOn } from "./controlState";
 import { lineInFence, scanFences } from "./fences";
 import { imageSourceSpan } from "./imageSelection";
+import { nextOrderedMarker, ORDERED_MARKER_SOURCE, parseOrderedMarker } from "./listMarkers";
 import { parseResultLine } from "./resultState";
 import {
   type CellRef,
@@ -109,14 +110,23 @@ function listPrefixOf(line: string): { prefixLen: number; next: string; empty: b
     };
   }
   const m = line.match(
-    new RegExp(`^([ \\t]*)((?:\\d+\\. \\[${MARK}\\] |- \\[${MARK}\\] |- |\\d+\\. |> ))(.*)$`),
+    new RegExp(
+      `^([ \\t]*)((?:\\d+\\. \\[${MARK}\\] |- \\[${MARK}\\] |- |${ORDERED_MARKER_SOURCE} |> ))(.*)$`,
+    ),
   );
   if (!m) return null;
   const indent = m[1] ?? "";
   const prefix = m[2] ?? "";
   const content = m[3] ?? "";
-  const num = prefix.match(new RegExp(`^(\\d+)\\. (\\[${MARK}\\] )?$`));
-  const marker = num ? `${Number(num[1]) + 1}. ${num[2] ? "[ ] " : ""}` : prefix.replace(/\[[/xX]\]/, "[ ]");
+  const ordered = parseOrderedMarker(prefix);
+  const task = new RegExp(`\\[${MARK}\\] $`).test(prefix);
+  const following = ordered ? nextOrderedMarker(ordered.marker) : null;
+  // past `z.` a lettered list has no next marker: Enter starts a plain line
+  const marker = ordered
+    ? following
+      ? `${following} ${task ? "[ ] " : ""}`
+      : ""
+    : prefix.replace(/\[[/xX]\]/, "[ ]");
   return {
     prefixLen: indent.length + prefix.length,
     next: indent + marker,
