@@ -118,3 +118,16 @@ describe("isMarkActive needs a closed pair (the format bar's B must not light on
     expect(isMarkActive("*lean*", 3, "italic")).toBe(true);
   });
 });
+
+describe("the numbered toggle and lettered items", () => {
+  test("a lettered item reads as numbered and toggles off to its text", () => {
+    expect(blockToggleActive("b. item", "numbered")).toBe(true);
+    expect(applyBlockToggle("  a. child", "numbered").line).toBe("  child");
+  });
+  test("switching a lettered item to a bullet replaces its marker", () => {
+    expect(applyBlockToggle("a. item", "bullet").line).toBe("- item");
+  });
+  test("an abbreviation is not a list item", () => {
+    expect(blockToggleActive("e.g. item", "numbered")).toBe(false);
+  });
+});

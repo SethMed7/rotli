@@ -7,10 +7,12 @@
 // undo step, caret mapped through). A run is the consecutive same-indent
 // ordered items; deeper items ride along, anything shallower or non-list ends
 // it. A top-level run keeps its first number (a list may start at 5); a nested
-// run always starts at 1.
+// run always starts at 1. Lettered runs (`a.`, `B.`) count the same way, never
+// join a run of another style, and stop renumbering past `z.`.
 
 import { EditorState, type Text, Transaction, type TransactionSpec } from "@codemirror/state";
 
+import { formatOrdinal, type OrderedStyle, parseOrderedMarker } from "./listMarkers";
 import { parseBlock } from "./render";
 
 export interface NumberChange {
@@ -23,7 +25,9 @@ interface OrderedLine {
   indent: number;
   numberFrom: number;
   numberTo: number;
+  ordinal: string;
   value: number;
+  style: OrderedStyle;
 }
 
 const ORDERED_KINDS = new Set(["numbered", "task", "result", "choice"]);
@@ -33,13 +37,15 @@ function orderedLineOf(text: string, lineFrom: number): OrderedLine | null {
   const block = parseBlock(text);
   if (!ORDERED_KINDS.has(block.kind) || !block.marker) return null;
   const indentChars = /^[ \t]*/.exec(text)?.[0] ?? "";
-  const digits = /^\d+/.exec(text.slice(indentChars.length));
-  if (!digits) return null;
+  const ordered = parseOrderedMarker(text.slice(indentChars.length));
+  if (!ordered) return null;
   return {
     indent: block.indent ?? 0,
     numberFrom: lineFrom + indentChars.length,
-    numberTo: lineFrom + indentChars.length + digits[0].length,
-    value: Number(digits[0]),
+    numberTo: lineFrom + indentChars.length + ordered.ordinal.length,
+    ordinal: ordered.ordinal,
+    value: ordered.value,
+    style: ordered.style,
   };
 }
 
@@ -62,10 +68,11 @@ export function renumberRunAt(doc: Text, lineNumber: number): NumberChange[] {
   for (let n = lineNumber - 1; n >= 1; n--) {
     const l = doc.line(n);
     const item = orderedLineOf(l.text, l.from);
-    if (item && item.indent === here.indent) {
+    if (item && item.indent === here.indent && item.style === here.style) {
       first = n;
       continue;
     }
+    if (item && item.indent === here.indent) break;
     if (item && item.indent < here.indent) break;
     if (!item && !ridesAlong(l.text, here.indent)) break;
   }
@@ -75,9 +82,11 @@ export function renumberRunAt(doc: Text, lineNumber: number): NumberChange[] {
   for (let n = first; n <= doc.lines; n++) {
     const l = doc.line(n);
     const item = orderedLineOf(l.text, l.from);
+    if (item && item.indent === here.indent && item.style !== here.style) break;
     if (item && item.indent === here.indent) {
-      if (item.value !== value)
-        changes.push({ from: item.numberFrom, to: item.numberTo, insert: String(value) });
+      const ordinal = formatOrdinal(item.ordinal, value);
+      if (ordinal !== null && item.ordinal !== ordinal)
+        changes.push({ from: item.numberFrom, to: item.numberTo, insert: ordinal });
       value++;
       continue;
     }
@@ -107,7 +116,7 @@ export function renumberLines(doc: Text, fromLine: number, toLine: number): Numb
     for (let m = n; m <= hi; m++) {
       const t = doc.line(m);
       const it = orderedLineOf(t.text, t.from);
-      if (it && it.indent < key) break;
+      if (it && (it.indent < key || (it.indent === key && it.style !== item.style))) break;
       if (!it && !ridesAlong(t.text, key)) break;
       if (it && it.indent === key) seen.add(key * 1_000_000 + m);
     }

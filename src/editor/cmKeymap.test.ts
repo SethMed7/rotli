@@ -489,3 +489,33 @@ describe("Tab outside a table", () => {
     expect(text(v)).toBe("| a | b |\n|---|---|\n| 1 | 2 |\n\n  - item");
   });
 });
+
+describe("lettered lists continue on Enter", () => {
+  test("Enter after a. starts b. and renumbers the letters below", () => {
+    const doc = "a. alpha\nb. beta";
+    const v = viewOf(doc, doc.indexOf("alpha") + 5);
+    expect(press(v, "Enter")).toBe(true);
+    expect(text(v)).toBe("a. alpha\nb. \nc. beta");
+  });
+
+  test("Enter on an empty lettered item clears it", () => {
+    const doc = "a. alpha\nb. ";
+    const v = viewOf(doc, doc.length);
+    expect(press(v, "Enter")).toBe(true);
+    expect(text(v)).toBe("a. alpha\n");
+  });
+
+  test("Enter after z. starts a plain line: the letters have run out", () => {
+    const doc = "y. before\nz. last";
+    const v = viewOf(doc, doc.length);
+    expect(press(v, "Enter")).toBe(true);
+    expect(text(v)).toBe("y. before\nz. last\n");
+  });
+
+  test("an abbreviation or a lettered line inside a fence never continues", () => {
+    const prose = "e.g. this";
+    expect(press(viewOf(prose, prose.length), "Enter")).toBe(false);
+    const fenced = "```\na. item\n```";
+    expect(press(viewOf(fenced, fenced.indexOf("item") + 4), "Enter")).toBe(false);
+  });
+});

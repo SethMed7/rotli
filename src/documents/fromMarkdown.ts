@@ -1,3 +1,4 @@
+import { ORDERED_MARKER_SOURCE } from "../editor/listMarkers";
 import type {
   DocumentContent,
   DocumentDraft,
@@ -5,6 +6,8 @@ import type {
   DocumentParagraph,
   DocumentTable,
 } from "./model";
+
+const NUMBERED_ITEM = new RegExp(String.raw`^(?:${ORDERED_MARKER_SOURCE}|\d+\))\s+(.+)$`);
 
 function inlineText(source: string): string {
   return source
@@ -118,7 +121,7 @@ export function documentDraftFromMarkdown(title: string, body: string): Document
     }
 
     const bullet = !inFence ? trimmed.match(/^[-*+]\s+(.+)$/) : null;
-    const numbered = !inFence ? trimmed.match(/^\d+[.)]\s+(.+)$/) : null;
+    const numbered = !inFence ? trimmed.match(NUMBERED_ITEM) : null;
     if (bullet || numbered) {
       flushProse();
       const text = inlineText((bullet?.[1] ?? numbered?.[1] ?? "").trim());

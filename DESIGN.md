@@ -116,7 +116,9 @@ exception.
   twins disable both filesystem-only actions instead of pretending they ran.
 - Note-to-note wikilinks open with an ordinary click; web links — markdown
   links and bare-URL autolinks alike — keep the deliberate ⌘-click gesture
-  inside the editor. A wikilink that resolves to no note renders visibly inert (dimmed,
+  inside the editor. A web link that cannot open shows a small **Couldn't open
+  this link** note at the click (cleared by the next edit or caret move); static
+  readers mark the link itself. A wikilink that resolves to no note renders visibly inert (dimmed,
   dashed underline, honest tooltip) — a dead link must never look like a live
   one. The editor header may
   expose the existing session back/forward trail beside the date, using compact

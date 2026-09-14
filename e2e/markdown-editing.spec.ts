@@ -197,6 +197,17 @@ test("blank space below a note that ends with a wikilink does not open the link"
   await expect(page.locator(".cm-content")).toContainText("Free local forever.");
 });
 
+test("www. hosts, emails, and [](url) render as links; bare domains stay prose", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText("Visit www.example.com or mail a@b.co, see [](sethmedina.com), not node.js");
+  await page.locator(".ed-date").click();
+  const links = editor.locator(".rotli-link");
+  await expect(links).toHaveText(["www.example.com", "a@b.co", "sethmedina.com"]);
+});
+
 test("Escape in the color list closes the list only; the app's Esc ladder does not fire", async ({
   page,
 }) => {
@@ -250,6 +261,23 @@ test("typing [[ lists matching notes; Enter or a click completes and closes the 
     .getByRole("button", { name: "Raw markdown" })
     .click();
   await expect(editor).toContainText("See [[Pricing decision]] and [[Pricing decision]]");
+});
+
+test("typed brackets, backticks, and bold pair and step over their closers", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.type("A [");
+  await expect(editor).toHaveText("A []");
+  await page.keyboard.type("link](x.com) and **");
+  await page.keyboard.type("bold** and `code`");
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  await expect(editor).toHaveText("A [link](x.com) and **bold** and `code`");
 });
 
 test("a ts code fence renders IDE-grade token colors", async ({ page }) => {
@@ -807,6 +835,24 @@ test("() creates a tab-navigable Markdown multiple-choice group", async ({ page 
   await expect(rawLines.nth(0)).toHaveText("- ( ) Red");
   await expect(rawLines.nth(1)).toHaveText("- ( ) Blue");
   await expect(rawLines.nth(2)).toHaveText("- (x) Green");
+});
+
+test("a lettered list continues on Enter and renders its letters", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.type("a. first");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("second");
+  await page.locator(".ed-date").click();
+  await expect(editor).toContainText("b.");
+  await page.getByRole("button", { name: "Aa" }).click();
+  await page
+    .getByRole("dialog", { name: "Typography" })
+    .getByRole("button", { name: "Raw markdown" })
+    .click();
+  await expect(editor).toHaveText("a. firstb. second");
 });
 
 test("slash commands work inside a numbered list item", async ({ page }) => {

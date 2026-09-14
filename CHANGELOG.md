@@ -25,6 +25,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ⌘E toggles inline code and ⌘⇧X strikethrough by default; format bar
   tooltips show your current bindings.
 
+- Links: `www.` hosts and email addresses link on their own (bare domains such
+  as `example.com` stay prose), `[](url)` shows its url, a scheme-less address
+  opens as `https://`, and a link that can't open says so instead of a silent
+  dead click.
+- Brackets, parentheses, backticks, and `**` `==` `~~` pair while you type;
+  typing the closer steps over it, and `[[` still opens the note picker.
+- Lettered lists: `a. ` and `A. ` items count a→b→c, continue on Enter, and
+  strip cleanly in plain copy and read-aloud.
+
 ### Fixed
 
 - ⌘I, ⌘U, ⌘[, ⌘] and ⌘⌥ arrow pane focus work in Markdown notes again. In

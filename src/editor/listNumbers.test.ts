@@ -97,3 +97,23 @@ describe("listNumbering (transaction filter)", () => {
     );
   });
 });
+
+describe("lettered runs", () => {
+  test("letters renumber a→b→c in their own case, keeping a later start", () => {
+    expect(renumber("a. x\na. y\nd. z")).toBe("a. x\nb. y\nc. z");
+    expect(renumber("C. x\nC. y")).toBe("C. x\nD. y");
+  });
+  test("runs never mix styles: a number after a letter starts its own run", () => {
+    expect(renumber("a. x\nb. y\n3. z\n3. w")).toBe("a. x\nb. y\n3. z\n4. w");
+    expect(renumber("1. x\n1. y\na. z\nc. w")).toBe("1. x\n2. y\na. z\nb. w");
+    expect(renumber("a. x\nA. y\nA. z")).toBe("a. x\nA. y\nB. z");
+  });
+  test("a nested lettered run starts at a", () => {
+    expect(renumber("1. top\n  c. one\n  c. two\n2. next")).toBe("1. top\n  a. one\n  b. two\n2. next");
+  });
+  test("renumbering stops past z", () => {
+    const letters = "abcdefghijklmnopqrstuvwxyz".split("");
+    const doc = [...letters.map((l) => `${l}. item`), "a. extra"].join("\n");
+    expect(renumber(doc)).toBe(doc);
+  });
+});

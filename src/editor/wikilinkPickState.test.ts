@@ -24,9 +24,18 @@ test("an open [[ before the caret is a pick span; closed links and code are not"
   expect(wikilinkPickAt("see [[Pri", 9)).toEqual({ open: 4, to: 9, query: "Pri" });
   expect(wikilinkPickAt("[[", 2)).toEqual({ open: 0, to: 2, query: "" });
   expect(wikilinkPickAt("see [[Pricing]] and", 19)).toBeNull();
-  expect(wikilinkPickAt("see [[Pri]]", 9)).toBeNull();
+  expect(wikilinkPickAt("see [[Pri] x", 9)).toBeNull();
   expect(wikilinkPickAt("`[[Pri", 6)).toBeNull();
   expect(wikilinkPickAt("plain text", 5)).toBeNull();
+});
+
+test("an auto-closed ]] after the caret belongs to the pick, offered only while typing", () => {
+  expect(wikilinkPickAt("see [[Pri]]", 9)).toEqual({ open: 4, to: 11, query: "Pri", closed: true });
+  expect(wikilinkPickAt("[[]]", 2)).toEqual({ open: 0, to: 4, query: "", closed: true });
+  // picking replaces [open, to): the closer is consumed, never doubled
+  const span = wikilinkPickAt("see [[Pri]] now", 9)!;
+  const line = "see [[Pri]] now";
+  expect(line.slice(0, span.open) + "[[Pricing]]" + line.slice(span.to)).toBe("see [[Pricing]] now");
 });
 
 test("choices rank title prefixes, then aliases, then substrings, newest first, notes only", () => {
