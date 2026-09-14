@@ -253,6 +253,14 @@ const INLINE_RULES: InlineRule[] = [
     ),
   },
   {
+    re: /\*\*\*([^*]+)\*\*\*/,
+    render: (m, key) => (
+      <strong key={key}>
+        <em>{renderInline(m[1] ?? "")}</em>
+      </strong>
+    ),
+  },
+  {
     re: /\*\*((?:[^*]|\*(?!\*))+)\*\*/,
     render: (m, key) => <strong key={key}>{renderInline(m[1] ?? "")}</strong>,
   },

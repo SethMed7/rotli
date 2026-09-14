@@ -64,6 +64,8 @@ interface InlineRule {
   /** Keep delimiters invisible even at the caret. Used for literal backticks;
    * Raw Markdown is the explicit delimiter-editing surface. */
   alwaysHideMarkers?: boolean;
+  /** Scan the content for further marks (bold around underline, …). */
+  nest?: boolean;
   /** Marker + content ranges RELATIVE to the match start. */
   parts: (m: RegExpExecArray) => {
     markers: [number, number][];
@@ -119,14 +121,16 @@ const INLINE: InlineRule[] = [
       };
     },
   },
+  { re: /\*\*\*([^*]+)\*\*\*/, cls: "rotli-strong rotli-em", parts: fixed(3, 3), nest: true },
   {
     re: /\*\*((?:[^*]|\*(?!\*))+)\*\*/,
     cls: "rotli-strong",
     parts: fixed(2, 2),
+    nest: true,
   },
-  { re: /==([^=]+)==/, cls: "rotli-hl", parts: fixed(2, 2) },
-  { re: /~~([^~]+)~~/, cls: "rotli-strike", parts: fixed(2, 2) },
-  { re: /<u>(.*?)<\/u>/, cls: "rotli-u", parts: fixed(3, 4) },
+  { re: /==([^=]+)==/, cls: "rotli-hl", parts: fixed(2, 2), nest: true },
+  { re: /~~([^~]+)~~/, cls: "rotli-strike", parts: fixed(2, 2), nest: true },
+  { re: /<u>(.*?)<\/u>/, cls: "rotli-u", parts: fixed(3, 4), nest: true },
   {
     re: new RegExp(MD_LINK_SOURCE),
     cls: "rotli-link",
@@ -153,7 +157,7 @@ const INLINE: InlineRule[] = [
       };
     },
   },
-  { re: /\*([^*\s](?:[^*]*[^*\s])?)\*/, cls: "rotli-em", parts: fixed(1, 1) },
+  { re: /\*([^*\s](?:[^*]*[^*\s])?)\*/, cls: "rotli-em", parts: fixed(1, 1), nest: true },
   // a BARE url, www. host, or email typed as plain text is a link too — no
   // markers to hide. Sits after the md-link rule: `[t](url)` starts earlier.
   {
@@ -671,6 +675,7 @@ function scanInline(
       const cls = rule.clsFor?.(m) ?? rule.cls;
       const attrs = rule.attrsFor?.(m) ?? rule.attrs;
       decos.push(Decoration.mark(attrs ? { class: cls, attributes: attrs } : { class: cls }).range(cs, ce));
+      if (rule.nest) scanInline(m[0].slice(cr[0], cr[1]), cs, sel, decos, atomics);
     }
     const touched = sel.from <= spanEnd && sel.to >= spanStart;
     for (const [s, e] of markers) {

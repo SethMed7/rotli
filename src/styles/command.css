@@ -2049,18 +2049,30 @@
   flex: 0 0 76px;
   text-align: end;
 }
+/* The native macOS popup ignores the app's chrome, so the select draws its own:
+   no platform appearance, a token-coloured chevron from two gradient halves. */
 .setselect {
+  -webkit-appearance: none;
+  appearance: none;
   font: inherit;
   font-size: 13px;
   color: var(--text);
-  background: var(--surface);
+  background-color: var(--surface);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 9px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
   border: 1px solid var(--border);
   border-radius: var(--r-control);
-  padding: 6px 10px;
+  padding: 6px 28px 6px 10px;
   cursor: pointer;
 }
 .setselect:hover {
-  background: var(--hov);
+  background-color: var(--hov);
 }
 
 /* ——— private browser preferences — one familiar provider choice plus the

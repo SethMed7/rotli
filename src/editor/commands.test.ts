@@ -7,7 +7,13 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { applyBlockToggle, applyBlockToggleAll, blockToggleActive, isMarkActive } from "./commands";
+import {
+  applyBlockToggle,
+  applyBlockToggleAll,
+  blockToggleActive,
+  isMarkActive,
+  toggleInlineMark,
+} from "./commands";
 
 describe("applyBlockToggle on indented lines", () => {
   test("toggling bullet OFF on a nested item removes the marker, keeps the indent", () => {
@@ -129,5 +135,36 @@ describe("the numbered toggle and lettered items", () => {
   });
   test("an abbreviation is not a list item", () => {
     expect(blockToggleActive("e.g. item", "numbered")).toBe(false);
+  });
+});
+
+describe("stacked marks (⌘B then ⌘I then ⌘U keep every mark)", () => {
+  const apply = (line: string, sel: [number, number], mark: Parameters<typeof toggleInlineMark>[3]) => {
+    const r = toggleInlineMark(line, sel[0], sel[1], mark);
+    return { line: r.line, sel: [r.selStart, r.selEnd] as [number, number] };
+  };
+
+  test("italic on a bold selection adds a star instead of stripping the bold", () => {
+    const bold = apply("hello world", [0, 11], "bold");
+    expect(bold.line).toBe("**hello world**");
+    const both = apply(bold.line, bold.sel, "italic");
+    expect(both.line).toBe("***hello world***");
+    const all = apply(both.line, both.sel, "underline");
+    expect(all.line).toBe("***<u>hello world</u>***");
+  });
+
+  test("bold-italic unwraps one mark at a time", () => {
+    expect(apply("***x***", [3, 4], "italic").line).toBe("**x**");
+    expect(apply("***x***", [3, 4], "bold").line).toBe("*x*");
+    expect(apply("*x*", [1, 2], "bold").line).toBe("***x***");
+  });
+
+  test("a mark on inline code wraps outside the backticks and toggles back", () => {
+    const code = apply("code", [0, 4], "code");
+    expect(code.line).toBe("`code`");
+    const struck = apply(code.line, code.sel, "strike");
+    expect(struck.line).toBe("~~`code`~~");
+    expect(struck.line.slice(struck.sel[0], struck.sel[1])).toBe("code");
+    expect(apply(struck.line, struck.sel, "strike").line).toBe("`code`");
   });
 });

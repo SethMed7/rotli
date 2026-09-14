@@ -60,25 +60,57 @@ export interface LineEdit {
   selEnd: number;
 }
 
+/** Consecutive `*` touching `at`, walking left (dir -1) or right (dir 1). */
+function starRun(line: string, at: number, dir: -1 | 1): number {
+  let n = 0;
+  for (let i = dir < 0 ? at - 1 : at; i >= 0 && i < line.length && line[i] === "*"; i += dir) n++;
+  return n;
+}
+
+/** Whether `open`/`close` sit right around [a, b). Stars are counted as runs so
+ * italic inside bold (`***x***`) reads as both marks, and `**x**` is not italic. */
+function markAround(line: string, a: number, b: number, mark: Exclude<InlineMark, "link">): boolean {
+  const { open, close } = MARKS[mark];
+  if (mark === "italic" || mark === "bold") {
+    const left = starRun(line, a, -1);
+    const right = starRun(line, b, 1);
+    return mark === "italic" ? left % 2 === 1 && right % 2 === 1 : left >= 2 && right >= 2;
+  }
+  return (
+    a >= open.length && line.slice(a - open.length, a) === open && line.slice(b, b + close.length) === close
+  );
+}
+
 export function toggleInlineMark(line: string, selStart: number, selEnd: number, mark: InlineMark): LineEdit {
   if (mark === "link") return toggleLink(line, selStart, selEnd);
   const { open, close } = MARKS[mark];
   const sel = line.slice(selStart, selEnd);
+  // inline code is opaque: any other mark wraps OUTSIDE its backticks
+  const inCode =
+    mark !== "code" &&
+    line[selStart - 1] === "`" &&
+    line[selEnd] === "`" &&
+    !sel.includes("`") &&
+    selEnd > selStart;
+  const a = inCode ? selStart - 1 : selStart;
+  const b = inCode ? selEnd + 1 : selEnd;
   // unwrap: marks sit immediately around the selection
-  if (
-    selStart >= open.length &&
-    line.slice(selStart - open.length, selStart) === open &&
-    line.slice(selEnd, selEnd + close.length) === close
-  ) {
+  if (markAround(line, a, b, mark)) {
     return {
-      line: line.slice(0, selStart - open.length) + sel + line.slice(selEnd + close.length),
+      line: line.slice(0, a - open.length) + line.slice(a, b) + line.slice(b + close.length),
       selStart: selStart - open.length,
       selEnd: selEnd - open.length,
     };
   }
   // unwrap: the selection includes the marks
-  if (sel.length >= open.length + close.length && sel.startsWith(open) && sel.endsWith(close)) {
-    const inner = sel.slice(open.length, sel.length - close.length);
+  const inner = sel.slice(open.length, sel.length - close.length);
+  if (
+    !inCode &&
+    sel.length >= open.length + close.length &&
+    sel.startsWith(open) &&
+    sel.endsWith(close) &&
+    markAround(sel, open.length, sel.length - close.length, mark)
+  ) {
     return {
       line: line.slice(0, selStart) + inner + line.slice(selEnd),
       selStart,
@@ -87,7 +119,7 @@ export function toggleInlineMark(line: string, selStart: number, selEnd: number,
   }
   // wrap (empty selection leaves the caret inside the new pair)
   return {
-    line: line.slice(0, selStart) + open + sel + close + line.slice(selEnd),
+    line: line.slice(0, a) + open + line.slice(a, b) + close + line.slice(b),
     selStart: selStart + open.length,
     selEnd: selEnd + open.length,
   };

@@ -33,3 +33,7 @@ test("www. hosts and emails autolink; bare domains stay prose", () => {
 test("a link to no web address keeps its text and a # href", () => {
   expect(html("[notes](notes/file.md)")).toBe('<a class="md-link" href="#" title="notes/file.md">notes</a>');
 });
+
+test("bold-italic renders both marks and still nests an underline", () => {
+  expect(html("***<u>x</u>***")).toBe("<strong><em><u>x</u></em></strong>");
+});

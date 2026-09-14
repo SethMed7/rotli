@@ -208,6 +208,39 @@ test("www. hosts, emails, and [](url) render as links; bare domains stay prose",
   await expect(links).toHaveText(["www.example.com", "a@b.co", "sethmedina.com"]);
 });
 
+test("the [[ picker stays open with a no-match row, and Escape closes only the picker", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.type("[[Zzqx");
+  const picker = page.locator(".rotli-linkpick");
+  await expect(picker).toBeVisible();
+  await expect(picker).toContainText("No note named “Zzqx”");
+  await page.keyboard.press("Escape");
+  await expect(picker).toBeHidden();
+  await expect(editor).toBeVisible();
+});
+
+test("stacked marks render together: bold-italic around underline, strike around code", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText("***<u>hello world</u>*** and ~~`code`~~");
+  await page.locator(".ed-date").click();
+  const underlined = editor.locator(
+    ".rotli-strong.rotli-em .rotli-u, .rotli-u .rotli-strong.rotli-em, .rotli-strong.rotli-em.rotli-u",
+  );
+  await expect(editor.locator(".rotli-u", { hasText: "hello world" })).toBeVisible();
+  await expect(editor.locator(".rotli-strong.rotli-em").first()).toContainText("hello world");
+  await expect(underlined.first()).toBeVisible();
+  await expect(editor.locator(".rotli-strike .rotli-code, .rotli-code .rotli-strike").first()).toContainText(
+    "code",
+  );
+  await expect(editor).not.toContainText("<u>");
+});
+
 test("Escape in the color list closes the list only; the app's Esc ladder does not fire", async ({
   page,
 }) => {

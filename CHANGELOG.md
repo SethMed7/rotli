@@ -48,6 +48,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Formatting stacks: ⌘B then ⌘I makes bold italic instead of swapping bold
+  for italic, underline or highlight inside bold or italic renders instead of
+  showing raw `<u>` tags, and strikethrough on inline code wraps outside the
+  backticks.
+- The `[[` note picker stays open with "No note named …" when nothing matches,
+  so Escape closes the picker instead of hiding the window.
+- Settings and setup selects draw the app's own rounded control instead of
+  the native macOS popup.
 - ⌘I, ⌘U, ⌘[, ⌘] and ⌘⌥ arrow pane focus work in Markdown notes again. In
   0.95.0 the editor's built-in shortcuts swallowed them, and ⌘U could even undo
   your last bold.
