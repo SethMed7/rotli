@@ -48,7 +48,7 @@ tauri-plugin-clipboard-manager = "2"
 # macOS-only: swap the Dock/app icon at runtime (Settings → Appearance → App icon)
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
-objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSImage", "NSResponder"] }
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSImage", "NSPasteboard", "NSPasteboardItem", "NSResponder"] }
 objc2-foundation = { version = "0.3", features = ["NSArray", "NSData", "NSError", "NSString", "NSURL"] }
 
 # Size diet (2026-07-31): the release binary embeds the whole frontend dist, and

@@ -10,6 +10,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 0.95.1 (unreleased)
+
+### Added
+
+- Copy an image or file in Finder and paste it (⌘V) into a note or a chat: it
+  goes through the same import as a drop. Before, a note ignored the paste and
+  a chat pasted the file name as text.
+
+### Fixed
+
+- The guided tour dims the app with one scrim and one accent outline around
+  the control. It no longer shows seams, a pulsing halo, or a doubled focus
+  ring, and selected controls keep their look. The dimmed app no longer
+  blocks clicks or Finder drops while the tour is open.
+- A Finder drop is no longer taken by an overlay above the note or chat. A
+  drop that only reaches Assets now says "Saved to Assets", and a drop of
+  folders says nothing was imported. Before, both did nothing you could see.
+- Skipping app setup after an update no longer turns Stay open and Show in
+  Dock back off. That reset made the window hide as soon as you clicked
+  Finder.
+
 ## [0.95.0] - 2026-09-13
 
 Three fixes from a computer-use test of the installed 0.94.0.

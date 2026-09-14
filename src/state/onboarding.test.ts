@@ -7,6 +7,7 @@ import {
   onboardingRequired,
   resetAndReonboard,
   startingAppearance,
+  windowBehaviorOnSkip,
 } from "./onboarding";
 import { useUiStore } from "./ui";
 
@@ -47,4 +48,15 @@ test("first run starts in Rotli Light with a bare quokka, whatever the install h
     accentColor: "default",
     quokkaAccessory: "none",
   });
+});
+
+test("skipping setup resets window behavior only on a true first run, never on an upgrade", () => {
+  // a fresh install: nothing persisted yet, so skip lands on the visitor defaults
+  expect(windowBehaviorOnSkip(false, "")).toEqual({ stayOpen: false, showInDock: false });
+  // a 0.x version bump re-onboards an onboarded install: Stay open survives
+  expect(windowBehaviorOnSkip(true, "0.94.0")).toEqual({});
+  // an install from before the version gate (onboarded, no recorded version)
+  expect(windowBehaviorOnSkip(true, "")).toEqual({});
+  // Reset & re-onboard already put the flags back itself; skip leaves them be
+  expect(windowBehaviorOnSkip(false, "0.94.0")).toEqual({});
 });

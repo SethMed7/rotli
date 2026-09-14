@@ -56,16 +56,32 @@ export interface Rect {
 }
 
 export interface Placement {
-  /** The four scrim panels around the spotlight, in window coordinates. */
-  scrims: Rect[];
-  ring: Rect;
+  /** The spotlight cutout in window coordinates: the anchor plus a 2px breath. */
+  hole: Rect;
+  /** The one scrim's `clip-path`: the whole viewport with `hole` cut out. */
+  clipPath: string;
   card: { left: number; top: number };
   /** Which side of the anchor the card sits on. */
   side: "below" | "above" | "right";
 }
 
-const PAD = 6;
+const PAD = 2;
 const GAP = 12;
+
+/** One full-viewport polygon with `hole` cut out. The outer ring runs
+ * clockwise and the inner ring counter-clockwise, so the cutout holds under
+ * nonzero (the CSS default) and evenodd filling alike. */
+export function spotlightClipPath(hole: Rect, viewport: { width: number; height: number }): string {
+  const left = Math.max(0, hole.left);
+  const top = Math.max(0, hole.top);
+  const right = Math.min(viewport.width, hole.left + hole.width);
+  const bottom = Math.min(viewport.height, hole.top + hole.height);
+  const at = (x: number, y: number) => `${x}px ${y}px`;
+  const { width, height } = viewport;
+  const outer = [at(0, 0), at(width, 0), at(width, height), at(0, height), at(0, 0)];
+  const inner = [at(left, top), at(left, bottom), at(right, bottom), at(right, top), at(left, top)];
+  return `polygon(${[...outer, ...inner].join(", ")})`;
+}
 
 /** Spotlight `anchor` inside a `viewport`, and place a `card` next to it:
  * below when it fits, else above, else to the right; never off-screen. */
@@ -74,43 +90,27 @@ export function placeStep(
   viewport: { width: number; height: number },
   card: { width: number; height: number },
 ): Placement {
-  const ring = {
+  const hole = {
     left: anchor.left - PAD,
     top: anchor.top - PAD,
     width: anchor.width + PAD * 2,
     height: anchor.height + PAD * 2,
   };
-  const scrims: Rect[] = [
-    { left: 0, top: 0, width: viewport.width, height: Math.max(0, ring.top) },
-    {
-      left: 0,
-      top: ring.top + ring.height,
-      width: viewport.width,
-      height: Math.max(0, viewport.height - ring.top - ring.height),
-    },
-    { left: 0, top: ring.top, width: Math.max(0, ring.left), height: ring.height },
-    {
-      left: ring.left + ring.width,
-      top: ring.top,
-      width: Math.max(0, viewport.width - ring.left - ring.width),
-      height: ring.height,
-    },
-  ];
   const clampLeft = (left: number) =>
     Math.min(Math.max(GAP, left), Math.max(GAP, viewport.width - card.width - GAP));
   let side: Placement["side"] = "below";
-  let top = ring.top + ring.height + GAP;
-  let left = clampLeft(ring.left);
+  let top = hole.top + hole.height + GAP;
+  let left = clampLeft(hole.left);
   if (top + card.height > viewport.height - GAP) {
     side = "above";
-    top = ring.top - GAP - card.height;
+    top = hole.top - GAP - card.height;
   }
   if (top < GAP) {
     side = "right";
-    top = Math.min(Math.max(GAP, ring.top), Math.max(GAP, viewport.height - card.height - GAP));
-    left = clampLeft(ring.left + ring.width + GAP);
+    top = Math.min(Math.max(GAP, hole.top), Math.max(GAP, viewport.height - card.height - GAP));
+    left = clampLeft(hole.left + hole.width + GAP);
   }
-  return { scrims, ring, card: { left, top }, side };
+  return { hole, clipPath: spotlightClipPath(hole, viewport), card: { left, top }, side };
 }
 
 /** The next step at or after `from` whose anchor exists; -1 when none. */

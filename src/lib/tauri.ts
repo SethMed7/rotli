@@ -1879,6 +1879,21 @@ export function onNativeDropAuthorized(cb: (drop: AuthorizedNativeDrop) => void)
   return () => void unlisten.then((fn) => fn());
 }
 
+/** A Finder drop none of whose items could be granted (folders, gone files). */
+export function onNativeDropRefused(cb: (count: number) => void): () => void {
+  if (!isTauri()) return () => {};
+  const unlisten = listen<{ count: number }>("rotli:native-drop-refused", (event) => cb(event.payload.count));
+  return () => void unlisten.then((fn) => fn());
+}
+
+/** Whether the pasteboard holds Finder file references (types only). */
+export const clipboardHasFiles = (): Promise<boolean> =>
+  isTauri() ? invoke<boolean>("clipboard_has_files") : Promise.resolve(false);
+
+/** Copied Finder files with fresh one-shot import grants, once per copy. */
+export const clipboardFilePaths = (): Promise<string[]> =>
+  isTauri() ? invoke<string[]>("clipboard_file_paths") : Promise.resolve([]);
+
 // ——— the memex seam (Stage 1) — typed wrappers over the Rust memex commands
 //     (src-tauri/src/memex.rs). rotli connects to / initiates a memex instance
 //     (the shared identity/personality/wiki/history/chats/inbox.md spine; for the maintainer, ~/memex-vault)

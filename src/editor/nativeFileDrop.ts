@@ -7,7 +7,7 @@
 // the drop point, the editor the drag last hovered, and the focused pane's
 // editor at its caret — a coordinate that misses every editor no longer
 // sends an image silently to storage. A CHAT under the pointer claims images
-// first. Everything else lands in storage/.
+// first. Everything else lands in storage/ and says so (dropRouting.ts).
 //
 // Some WebKit/Tauri combinations surface an ordinary DataTransfer instead of
 // the native path event; an editor-local fallback keeps image drops working.
@@ -15,52 +15,48 @@
 import { EditorView } from "@codemirror/view";
 import { useEffect } from "react";
 
-import { chatDropAt, isChatImagePath } from "../components/chat/chatDrop";
+import { chatDropAt } from "../components/chat/chatDrop";
 import { onNativeDrag } from "../lib/nativeDrag";
 import {
   corpusCreateImageAsset,
-  corpusImportFile,
   isTauri,
   onNativeDropAuthorized,
+  onNativeDropRefused,
   rootIdOf,
 } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
-import { useUiStore } from "../state/ui";
+import { showFileNotice } from "../state/fileNotice";
+import { type DropCandidate, firstTarget } from "./dropRouting";
 import {
   type DropPoint,
   dropEditorHost,
   importImageFilesAtDrop,
-  importImagesAtDrop,
-  isEmbeddablePath,
   isImagePath,
   nativeDropPoints,
 } from "./externalImageDrop";
+import { deliverFiles } from "./fileDelivery";
 import { noteIdFacet } from "./livePreview";
+import { useNativeFilePaste } from "./nativeFilePaste";
 
-interface Hit {
-  point: DropPoint;
-  element: HTMLElement | null;
-}
-
-/** Every candidate CSS point for a native position, with what sits there. */
-function hitsFor(px: number, py: number): Hit[] {
+/** Every candidate CSS point for a native position, with the WHOLE element
+ * stack there — an overlay on top must not hide the chat or note beneath. */
+function candidatesFor(px: number, py: number): DropCandidate<Element>[] {
   return nativeDropPoints(px, py, window.devicePixelRatio || 1).map((point) => ({
     point,
-    element: document.elementFromPoint(point.x, point.y) as HTMLElement | null,
+    stack: document.elementsFromPoint(point.x, point.y),
   }));
 }
 
-function editorAt(hits: Hit[]): { view: EditorView; point: DropPoint } | null {
-  for (const { point, element } of hits) {
+function editorAt(candidates: DropCandidate<Element>[]): { view: EditorView; point: DropPoint } | null {
+  const hit = firstTarget(candidates, (element) => {
     const host = dropEditorHost(element);
-    const view = host ? EditorView.findFromDOM(host) : null;
-    if (view) return { view, point };
-  }
-  return null;
+    return host ? EditorView.findFromDOM(host) : null;
+  });
+  return hit ? { view: hit.target, point: hit.point } : null;
 }
 
 /** The focused pane's editor, at its caret — the last-resort target. */
-export function focusedEditor(): EditorView | null {
+function focusedEditor(): EditorView | null {
   const host =
     document.querySelector<HTMLElement>(".pane.focused .cm-editor") ??
     document.querySelector<HTMLElement>(".editor .cm-editor");
@@ -111,26 +107,15 @@ export function useNativeFileDrop(): void {
     const dropLine = new DropLine();
 
     const handleDrop = async (paths: string[], px: number, py: number) => {
-      const hits = hitsFor(px, py);
-      const chatAttach = hits.map(({ element }) => (element ? chatDropAt(element) : null)).find(Boolean);
-      if (chatAttach) {
-        const dropped = paths.filter(isChatImagePath);
-        const rest = paths.filter((path) => !isChatImagePath(path));
-        if (dropped.length > 0) chatAttach(dropped);
-        if (rest.length > 0) await Promise.all(rest.map((p) => corpusImportFile("default", p)));
-        await invalidateNotes();
-        return;
-      }
-      const target = editorAt(hits) ?? (hovered?.view.dom.isConnected ? hovered : null) ?? caretTarget();
-      const view = target?.view ?? null;
-      const rootId = view ? rootIdOf(view.state.facet(noteIdFacet)) : "default";
-      const images = view ? paths.filter(isEmbeddablePath) : [];
-      const toStorage = view ? paths.filter((path) => !isEmbeddablePath(path)) : paths;
-      if (toStorage.length) await Promise.all(toStorage.map((p) => corpusImportFile(rootId, p)));
-      if (view && target && images.length) {
-        await importImagesAtDrop(view, images, target.point, (path) => corpusImportFile(rootId, path));
-      }
-      await invalidateNotes();
+      const candidates = candidatesFor(px, py);
+      const chat = firstTarget(candidates, chatDropAt);
+      if (chat) return deliverFiles(paths, { kind: "chat", attach: chat.target });
+      const target =
+        editorAt(candidates) ?? (hovered?.view.dom.isConnected ? hovered : null) ?? caretTarget();
+      if (!target) return deliverFiles(paths, { kind: "none" });
+      const { view, point } = target;
+      const at = view.posAtCoords(point) ?? view.state.selection.main.head;
+      return deliverFiles(paths, { kind: "editor", view, at });
     };
 
     const unlistenDrag = onNativeDrag((drag) => {
@@ -139,7 +124,7 @@ export function useNativeFileDrop(): void {
         dropLine.hide();
         return;
       }
-      const target = editorAt(hitsFor(drag.x, drag.y));
+      const target = editorAt(candidatesFor(drag.x, drag.y));
       if (target) {
         hovered = target;
         dropLine.show(target.view, target.point);
@@ -153,19 +138,27 @@ export function useNativeFileDrop(): void {
       void handleDrop(event.paths, event.position.x, event.position.y)
         .catch((error: unknown) => {
           const detail = error instanceof Error ? error.message : String(error);
-          useUiStore.getState().setRowActionError(`Couldn’t import dropped files — ${detail}`);
+          showFileNotice(`Couldn’t import dropped files — ${detail}`);
         })
         .finally(() => {
           hovered = null;
         });
+    });
+    // Rust granted none of the dropped items (folders, files gone mid-drag)
+    const unlistenRefused = onNativeDropRefused(() => {
+      dropLine.hide();
+      showFileNotice("Nothing imported — Rotli imports files, not folders");
     });
     return () => {
       stopped = true;
       dropLine.hide();
       unlistenDrag();
       unlistenDrop();
+      unlistenRefused();
     };
   }, []);
+
+  useNativeFilePaste();
 
   useEffect(() => {
     const onDragOver = (event: DragEvent) => {
@@ -190,7 +183,7 @@ export function useNativeFileDrop(): void {
         .then(invalidateNotes)
         .catch((error: unknown) => {
           const detail = error instanceof Error ? error.message : String(error);
-          useUiStore.getState().setRowActionError(`Couldn’t import dropped images — ${detail}`);
+          showFileNotice(`Couldn’t import dropped images — ${detail}`);
         });
     };
     window.addEventListener("dragover", onDragOver, true);

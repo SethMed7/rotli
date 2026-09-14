@@ -51,6 +51,7 @@ export const COMPONENT_ROOT_FILE_OWNERS = {
   "contextMenu.tsx": "shared context-menu primitive",
   "documentEditor.tsx": "FileSurface document presentation adapter",
   "emptyState.tsx": "shared empty-state primitive",
+  "fileNotice.tsx": "application-shell transient notice for Finder drops and pastes that landed out of sight",
   "glyphs.tsx": "shared first-party glyph registry",
   "hotkeyBadges.tsx": "shared shortcut badge overlay",
   "icon.tsx": "shared semantic icon primitive",

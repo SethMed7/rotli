@@ -3132,8 +3132,10 @@
   color: var(--text);
 }
 
-/* ─── the guided tour: four flat scrims around a spotlight ring, a card beside
-   it. An overlay the app stays live under — only the card takes clicks. ─── */
+/* ─── the guided tour: ONE flat scrim with the spotlight cut out of it (a
+   clip-path polygon, no seams where panels meet), one accent stroke around
+   the hole, a card beside it. An overlay the app stays live under — only the
+   card takes clicks, so native Finder drops still reach the app. ─── */
 .tour {
   position: fixed;
   inset: 0;
@@ -3142,37 +3144,24 @@
 }
 .tour-scrim {
   position: fixed;
+  inset: 0;
   background: var(--scrim);
-  pointer-events: auto;
+  pointer-events: none;
 }
+/* the single stroke: drawn OUTSIDE the hole (an outline on a content-box
+   frame) so it never covers the control's own edge; no halo, no pulse */
 .tour-ring {
   position: fixed;
-  border: 3px solid var(--accent);
+  box-sizing: content-box;
   border-radius: var(--r-control);
-  box-sizing: border-box;
-  /* a soft accent halo (an outline, keeping the flat material) that breathes
-     so the eye lands on the control the card is talking about */
-  outline: 4px solid color-mix(in srgb, var(--accent) 32%, transparent);
-  outline-offset: 2px;
-  animation: tour-pulse 1.6s ease-in-out infinite;
-}
-@keyframes tour-pulse {
-  0%,
-  100% {
-    outline-offset: 2px;
-    outline-color: color-mix(in srgb, var(--accent) 32%, transparent);
-  }
-  50% {
-    outline-offset: 7px;
-    outline-color: color-mix(in srgb, var(--accent) 14%, transparent);
-  }
-}
-/* the control itself lifts while spotlit: tinted and outlined in the accent,
-   so the highlighted button is unmistakable even on a busy sidebar */
-[data-tour-active] {
-  background: var(--tint) !important;
   outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline-offset: 0;
+  pointer-events: none;
+}
+/* the spotlit control keeps its own look — a selected segment or chip stays
+   selected — and drops its focus ring so the tour draws exactly one stroke */
+[data-tour-active]:focus-visible {
+  outline: none;
 }
 .tour-card {
   position: fixed;
@@ -3232,4 +3221,49 @@
   .tour-card {
     width: min(300px, calc(100vw - 24px));
   }
+}
+
+/* ─── the file notice: one transient line when a Finder drop or paste went to
+   Assets with nothing inserted, or could not be read. Bottom-centre, flat
+   floating surface, never over the tour card's clicks. ─── */
+.file-notice {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 18;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(460px, calc(100vw - 24px));
+  box-sizing: border-box;
+  padding: 8px 8px 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-card);
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.45;
+  animation: pop-in var(--motion-enter) var(--motion-ease);
+}
+.file-notice-text {
+  flex: 1;
+  min-width: 0;
+}
+.file-notice-x {
+  border: 0;
+  background: none;
+  padding: 2px 6px;
+  border-radius: var(--r-control);
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.file-notice-x:hover {
+  color: var(--text);
+}
+.file-notice-x:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
