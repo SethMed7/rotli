@@ -13,6 +13,7 @@
 // Pure: no audio, no DOM, no model.
 
 import { linkLabel, MD_LINK_SOURCE } from "../editor/inlineLinks";
+import { ORDERED_MARKER_SOURCE } from "../editor/listMarkers";
 
 /** A sentence ready to synthesize. */
 export interface Speakable {
@@ -28,13 +29,16 @@ const SENTENCE_END = /[.!?…]["')\]]*\s/;
 const ABBREV = /(?:^|\s)(?:mr|mrs|ms|dr|prof|sr|jr|st|vs|etc|e\.g|i\.e|approx|fig|no)\.$/i;
 
 const MD_LINK_G = new RegExp(MD_LINK_SOURCE, "g");
+const LIST_PREFIX = new RegExp(
+  String.raw`^\s*(?:[-*+]|${ORDERED_MARKER_SOURCE})\s+(?:(?:\[[ xX]\]){2}\s+|\[[ xX/]\]\s+|\([ xX]\)\s+)?`,
+);
 
 /** Strip the Markdown that would be read aloud as gibberish, leaving prose. */
 export function speakableText(line: string): string {
   return line
     .replace(/^#{1,6}\s+/, "") // heading marks — the words still matter
     .replace(/^\s*>\s?/, "") // quote marker
-    .replace(/^\s*(?:[-*+]|\d+\.)\s+(?:(?:\[[ xX]\]){2}\s+|\[[ xX/]\]\s+|\([ xX]\)\s+)?/, "") // list/task/result/choice
+    .replace(LIST_PREFIX, "") // list/task/result/choice
     .replace(/!\[[^\]]*\]\([^)]*\)/g, "") // images say nothing aloud
     .replace(MD_LINK_G, (_m, label: string, url: string) => linkLabel(label, url)) // links: speak the label, not the URL
     .replace(/`([^`]+)`/g, "$1") // inline code: speak the token

@@ -17,6 +17,7 @@ import {
   parseToggleLine,
 } from "./controlState";
 import { AUTOLINK_SOURCE, LINK_OPEN_FAILED, linkHref, linkLabel, MD_LINK_SOURCE } from "./inlineLinks";
+import { ORDERED_MARKER_SOURCE } from "./listMarkers";
 import { type ResultOption, type ResultState, parseResultLine, resultTextParts } from "./resultState";
 import { ORDERED_TASK_RE, TASK_RE, type TaskState, taskStateOf } from "./taskState";
 
@@ -67,7 +68,7 @@ export interface Block {
   indent?: number;
 }
 
-const NUMBERED_RE = /^(\d+)\. /;
+const NUMBERED_RE = new RegExp(`^(${ORDERED_MARKER_SOURCE}) `);
 // H1–H6 (widened 2026-08-04 for heading folding). `#### x` used to fall through
 // as a plain paragraph — standard Markdown says it's a heading, and folding
 // needs the level to know where a section ends.
@@ -189,12 +190,12 @@ export function parseBlock(line: string): Block {
       indent,
     };
   const n = NUMBERED_RE.exec(body);
-  if (n)
+  if (n?.[1])
     return {
       kind: "numbered",
       prefixLen: indentChars.length + n[0].length,
       text: body.slice(n[0].length),
-      marker: `${n[1]}.`,
+      marker: n[1],
       indent,
     };
   // quotes de-indent like the other list kinds so a Tab-nested quote ("  > x")

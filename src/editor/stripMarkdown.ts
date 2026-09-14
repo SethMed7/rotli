@@ -7,10 +7,12 @@
 import { CHOICE_MARK } from "./choiceState";
 import { parseChoiceControlLine, parseChoicePromptLine, parseToggleLine } from "./controlState";
 import { linkLabel, MD_LINK_SOURCE } from "./inlineLinks";
+import { ORDERED_MARKER_SOURCE } from "./listMarkers";
 import { parseResultLine, RESULT_MARK } from "./resultState";
 import { MARK } from "./taskState";
 
 const MD_LINK_G = new RegExp(MD_LINK_SOURCE, "g");
+const ORDERED_PREFIX = new RegExp(String.raw`^(\s*)${ORDERED_MARKER_SOURCE}\s+`);
 
 export function stripMarkdown(text: string): string {
   const inline = (s: string): string => {
@@ -54,7 +56,7 @@ export function stripMarkdown(text: string): string {
           .replace(new RegExp(`^(\\s*)(?:-|\\d+\\.) \\(${CHOICE_MARK}\\)\\s+`), "$1")
           .replace(new RegExp(`^(\\s*)- \\[${MARK}\\]\\s+`), "$1")
           .replace(/^(\s*)[-*+]\s+/, "$1")
-          .replace(/^(\s*)\d+\.\s+/, "$1")
+          .replace(ORDERED_PREFIX, "$1")
           .replace(/^(\s*)>\s+/, "$1"),
       );
     })

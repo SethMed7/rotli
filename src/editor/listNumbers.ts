@@ -11,6 +11,7 @@
 
 import { EditorState, type Text, Transaction, type TransactionSpec } from "@codemirror/state";
 
+import { formatOrdinal, parseOrderedMarker } from "./listMarkers";
 import { parseBlock } from "./render";
 
 export interface NumberChange {
@@ -23,6 +24,7 @@ interface OrderedLine {
   indent: number;
   numberFrom: number;
   numberTo: number;
+  ordinal: string;
   value: number;
 }
 
@@ -33,13 +35,14 @@ function orderedLineOf(text: string, lineFrom: number): OrderedLine | null {
   const block = parseBlock(text);
   if (!ORDERED_KINDS.has(block.kind) || !block.marker) return null;
   const indentChars = /^[ \t]*/.exec(text)?.[0] ?? "";
-  const digits = /^\d+/.exec(text.slice(indentChars.length));
-  if (!digits) return null;
+  const ordered = parseOrderedMarker(text.slice(indentChars.length));
+  if (!ordered) return null;
   return {
     indent: block.indent ?? 0,
     numberFrom: lineFrom + indentChars.length,
-    numberTo: lineFrom + indentChars.length + digits[0].length,
-    value: Number(digits[0]),
+    numberTo: lineFrom + indentChars.length + ordered.ordinal.length,
+    ordinal: ordered.ordinal,
+    value: ordered.value,
   };
 }
 
@@ -76,8 +79,9 @@ export function renumberRunAt(doc: Text, lineNumber: number): NumberChange[] {
     const l = doc.line(n);
     const item = orderedLineOf(l.text, l.from);
     if (item && item.indent === here.indent) {
-      if (item.value !== value)
-        changes.push({ from: item.numberFrom, to: item.numberTo, insert: String(value) });
+      const ordinal = formatOrdinal(item.ordinal, value);
+      if (ordinal !== null && item.ordinal !== ordinal)
+        changes.push({ from: item.numberFrom, to: item.numberTo, insert: ordinal });
       value++;
       continue;
     }

@@ -6,6 +6,7 @@
 import { usePanesStore } from "../state/panes";
 import { CHOICE_MARK } from "./choiceState";
 import { parseChoiceControlLine, parseToggleLine } from "./controlState";
+import { ORDERED_MARKER_SOURCE } from "./listMarkers";
 import { parseResultLine, RESULT_MARK } from "./resultState";
 import { MARK } from "./taskState";
 
@@ -156,7 +157,7 @@ export function applyHeading(line: string, level: HeadingLevel): PrefixEdit {
 const RESULT_PAIR = `\\[${RESULT_MARK}\\]\\[${RESULT_MARK}\\] `;
 const CHOICE_PREFIX = `\\(${CHOICE_MARK}\\) `;
 const ANY_BLOCK_PREFIX = new RegExp(
-  `^(\\d+\\. ${RESULT_PAIR}|- ${RESULT_PAIR}|\\d+\\. ${CHOICE_PREFIX}|- ${CHOICE_PREFIX}|\\d+\\. \\[${MARK}\\] |- \\[${MARK}\\] |- |\\d+\\. |> )`,
+  `^(\\d+\\. ${RESULT_PAIR}|- ${RESULT_PAIR}|\\d+\\. ${CHOICE_PREFIX}|- ${CHOICE_PREFIX}|\\d+\\. \\[${MARK}\\] |- \\[${MARK}\\] |- |${ORDERED_MARKER_SOURCE} |> )`,
 );
 
 const BLOCK_RULES: Record<BlockToggle, { add: string; test: RegExp }> = {
@@ -164,7 +165,7 @@ const BLOCK_RULES: Record<BlockToggle, { add: string; test: RegExp }> = {
   bullet: { add: "- ", test: new RegExp(`^- (?!${RESULT_PAIR}|${CHOICE_PREFIX}|\\[${MARK}\\] )`) },
   numbered: {
     add: "1. ",
-    test: new RegExp(`^\\d+\\. (?!${RESULT_PAIR}|${CHOICE_PREFIX}|\\[${MARK}\\] )`),
+    test: new RegExp(`^${ORDERED_MARKER_SOURCE} (?!${RESULT_PAIR}|${CHOICE_PREFIX}|\\[${MARK}\\] )`),
   },
   checklist: { add: "- [ ] ", test: new RegExp(`^- \\[${MARK}\\] `) },
 };
