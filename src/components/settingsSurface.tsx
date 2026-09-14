@@ -2320,6 +2320,7 @@ function LaneCard({ id }: { id: ProviderId }) {
             <small>Used by @{id} when no model is specified.</small>
           </span>
           <select
+            className="setselect"
             value={defaultModel}
             aria-label={`Default model for ${PROVIDER_LABELS[id]}`}
             onChange={(event) => setProviderDefault(id, event.currentTarget.value)}
@@ -2567,6 +2568,7 @@ function PresetEditor({
       <label className="preset-field">
         <span>Organizer (routes each message)</span>
         <select
+          className="setselect"
           value={p.organizer}
           onChange={(e) => setP((prev) => ({ ...prev, organizer: e.target.value }))}
         >
@@ -2583,7 +2585,11 @@ function PresetEditor({
             onChange={(e) => setRoute(i, { when: e.target.value })}
             onKeyDown={(e) => e.stopPropagation()}
           />
-          <select value={r.model} onChange={(e) => setRoute(i, { model: e.target.value })}>
+          <select
+            className="setselect"
+            value={r.model}
+            onChange={(e) => setRoute(i, { model: e.target.value })}
+          >
             {modelOpts}
           </select>
           <button
@@ -2612,6 +2618,7 @@ function PresetEditor({
         <label className="preset-field preset-fallback">
           <span>Fallback</span>
           <select
+            className="setselect"
             value={p.fallback ?? ""}
             onChange={(e) =>
               setP((prev) => {

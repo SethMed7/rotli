@@ -168,3 +168,22 @@ describe("stacked marks (⌘B then ⌘I then ⌘U keep every mark)", () => {
     expect(apply(struck.line, struck.sel, "strike").line).toBe("`code`");
   });
 });
+
+describe("toggling one mark out of a stack reaches past the other marks' delimiters", () => {
+  test("italic comes off bold-italic-underline without touching the underline", () => {
+    const line = "***<u>hello world</u>***";
+    const r = toggleInlineMark(line, 6, 17, "italic");
+    expect(r.line).toBe("**<u>hello world</u>**");
+    expect(r.line.slice(r.selStart, r.selEnd)).toBe("hello world");
+  });
+  test("bold comes off through an underline and a highlight", () => {
+    const line = "**==<u>x</u>==**";
+    const r = toggleInlineMark(line, 7, 8, "bold");
+    expect(r.line).toBe("==<u>x</u>==");
+    expect(r.line.slice(r.selStart, r.selEnd)).toBe("x");
+  });
+  test("strike comes off code it wraps, and a fresh mark still wraps innermost", () => {
+    expect(toggleInlineMark("~~`code`~~", 3, 7, "strike").line).toBe("`code`");
+    expect(toggleInlineMark("**<u>x</u>**", 5, 6, "highlight").line).toBe("**<u>==x==</u>**");
+  });
+});

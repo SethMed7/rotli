@@ -81,6 +81,32 @@ function markAround(line: string, a: number, b: number, mark: Exclude<InlineMark
   );
 }
 
+/** Walk outward over other marks' delimiters until `mark` wraps [a, b), so one
+ * mark comes off a stack like `***<u>x</u>***` without disturbing the rest. */
+function enclosingLayer(
+  line: string,
+  a: number,
+  b: number,
+  mark: Exclude<InlineMark, "link">,
+): { a: number; b: number } | null {
+  for (;;) {
+    if (markAround(line, a, b, mark)) return { a, b };
+    const other = (Object.keys(MARKS) as Exclude<InlineMark, "link">[]).find(
+      (m) => m !== mark && m !== "bold" && m !== "italic" && markAround(line, a, b, m),
+    );
+    const stars = Math.min(starRun(line, a, -1), starRun(line, b, 1));
+    if (other) {
+      a -= MARKS[other].open.length;
+      b += MARKS[other].close.length;
+    } else if (mark !== "bold" && mark !== "italic" && stars > 0) {
+      a -= stars;
+      b += stars;
+    } else {
+      return null;
+    }
+  }
+}
+
 export function toggleInlineMark(line: string, selStart: number, selEnd: number, mark: InlineMark): LineEdit {
   if (mark === "link") return toggleLink(line, selStart, selEnd);
   const { open, close } = MARKS[mark];
@@ -94,10 +120,14 @@ export function toggleInlineMark(line: string, selStart: number, selEnd: number,
     selEnd > selStart;
   const a = inCode ? selStart - 1 : selStart;
   const b = inCode ? selEnd + 1 : selEnd;
-  // unwrap: marks sit immediately around the selection
-  if (markAround(line, a, b, mark)) {
+  // unwrap: the mark sits around the selection, possibly outside other marks
+  const layer = enclosingLayer(line, a, b, mark);
+  if (layer) {
     return {
-      line: line.slice(0, a - open.length) + line.slice(a, b) + line.slice(b + close.length),
+      line:
+        line.slice(0, layer.a - open.length) +
+        line.slice(layer.a, layer.b) +
+        line.slice(layer.b + close.length),
       selStart: selStart - open.length,
       selEnd: selEnd - open.length,
     };

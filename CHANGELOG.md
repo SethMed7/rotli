@@ -54,8 +54,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   backticks.
 - The `[[` note picker stays open with "No note named …" when nothing matches,
   so Escape closes the picker instead of hiding the window.
-- Settings and setup selects draw the app's own rounded control instead of
-  the native macOS popup.
+- Settings and setup selects, including AI Models' default-model and preset
+  menus, draw the app's own rounded control instead of the native macOS popup.
+- Turning one mark off a stack (⌘I on bold-italic-underlined text) removes only
+  that mark instead of inserting stray stars.
 - ⌘I, ⌘U, ⌘[, ⌘] and ⌘⌥ arrow pane focus work in Markdown notes again. In
   0.95.0 the editor's built-in shortcuts swallowed them, and ⌘U could even undo
   your last bold.
