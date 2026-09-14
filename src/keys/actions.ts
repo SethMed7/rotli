@@ -475,11 +475,13 @@ export function registerDefaultActions(): void {
     id: "system.trashSelection",
     title: "Move selection to Trash",
     defaultChord: "Meta+Backspace",
-    run: () => {
+    // enabled, not a run-time guard: outside a System selection ⌘⌫ must stay
+    // the editor's delete-to-line-start instead of being claimed and dropped
+    enabled: () => {
       const ui = useUiStore.getState();
-      if (ui.contentView !== "system" || ui.systemSelection.length === 0) return;
-      void trashSystemSelection();
+      return ui.contentView === "system" && ui.systemSelection.length > 0;
     },
+    run: () => void trashSystemSelection(),
   });
   for (let n = 1; n <= 8; n++) {
     registerAction({

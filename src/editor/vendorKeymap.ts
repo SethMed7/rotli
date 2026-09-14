@@ -1,92 +1,91 @@
-// The vendor (CodeMirror) keymaps minus every chord the key registry owns.
-// CM binds ⌘I / ⌘U / ⌘[ / ⌘] / ⌘⏎ with preventDefault, and the registry
-// dispatcher treats a consumed keydown as "not a chord press" — so an
-// unfiltered vendor set silently eats editor.italic, editor.underline,
-// nav.back, nav.forward and setup.continue. Policy lives here once: the
-// registry's chords win; whatever CM binds on a free chord stays.
+// The vendor (CodeMirror) keymaps, taught to yield to the key registry.
+// CM binds ⌘I / ⌘U / ⌘[ / ⌘] / ⌘⌥↑↓ with preventDefault, and the registry
+// dispatcher treats a consumed keydown as "not a chord press" — so the stock
+// keymaps silently ate editor.italic, editor.underline, nav.back, nav.forward
+// and the pane-focus chords (0.95.0). Removing those bindings outright would be
+// wrong too: ⌘⌫ belongs to the System browser's trash only while a System
+// selection exists, and ⌘⏎ to the capture window, so a note must keep CM's
+// delete-to-line-start and insert-blank-line. Ownership is therefore decided
+// at press time by the registry's own claim rule: when a registry action
+// claims the chord it runs (and the keydown is consumed once); otherwise the
+// CodeMirror command runs as before.
 
 import { defaultKeymap, historyKeymap } from "@codemirror/commands";
-import type { KeyBinding } from "@codemirror/view";
+import type { Command, KeyBinding } from "@codemirror/view";
 
-import { allActions, currentChord } from "../keys/registry";
+import { claimingAction } from "../keys/registry";
 
 export const VENDOR_KEYMAP: readonly KeyBinding[] = [...defaultKeymap, ...historyKeymap];
 
-/** Registry key tokens (KeyboardEvent.code names) → CodeMirror key names. */
-const CM_KEY_NAME: Record<string, string> = {
-  BracketLeft: "[",
-  BracketRight: "]",
-  Backslash: "\\",
-  Slash: "/",
-  Comma: ",",
-  Period: ".",
-  Semicolon: ";",
-  Quote: "'",
-  Backquote: "`",
-  Minus: "-",
-  Equal: "=",
-  Esc: "Escape",
+/** Something that may take over a chord right now; returns true when it did. */
+export type ChordClaim = (chord: string) => boolean;
+
+/** CodeMirror key names → registry key tokens (KeyboardEvent.code names). */
+const REGISTRY_KEY: Record<string, string> = {
+  "[": "BracketLeft",
+  "]": "BracketRight",
+  "\\": "Backslash",
+  "/": "Slash",
+  ",": "Comma",
+  ".": "Period",
+  ";": "Semicolon",
+  "'": "Quote",
+  "`": "Backquote",
+  "-": "Minus",
+  "=": "Equal",
+  Escape: "Esc",
 };
 
-function canonical(mods: string[], key: string): string {
-  const named = mods.map((m) =>
-    m === "Mod" || m === "Cmd" || m === "Meta" ? "Meta" : m === "Control" ? "Ctrl" : m,
-  );
-  return [...new Set(named)]
-    .sort()
-    .concat(key.length === 1 ? key.toLowerCase() : key)
-    .join("-");
-}
+const MOD_ORDER = ["Ctrl", "Alt", "Shift", "Meta"];
+const MOD_NAME: Record<string, string> = {
+  Mod: "Meta",
+  Cmd: "Meta",
+  Meta: "Meta",
+  Ctrl: "Ctrl",
+  Control: "Ctrl",
+  Alt: "Alt",
+  Shift: "Shift",
+};
 
-/** "Meta+BracketLeft" → the canonical form a CM key spec compares against. */
-function fromRegistryChord(chord: string): string {
-  const parts = chord.split("+");
-  const key = parts.pop() ?? "";
-  return canonical(parts, CM_KEY_NAME[key] ?? key);
-}
-
-/** "Shift-Mod-u" (or a spec whose key is "-" itself) → canonical form; Mod = ⌘ on mac. */
-function fromCmSpec(spec: string): string {
+/** "Shift-Mod-u" → "Shift+Meta+U" (mac: Mod = ⌘); null for a modifier-less
+ * spec — bare keys (Escape, Enter, arrows) stay CodeMirror-first. */
+export function registryChordOf(spec: string, addShift = false): string | null {
   const key = spec.endsWith("-") ? "-" : spec.slice(spec.lastIndexOf("-") + 1);
-  const mods = spec.slice(0, spec.length - key.length - 1);
-  return canonical(mods ? mods.split("-") : [], key);
+  const modText = spec.slice(0, Math.max(0, spec.length - key.length - 1));
+  const mods = new Set((modText ? modText.split("-") : []).map((m) => MOD_NAME[m] ?? m));
+  if (addShift) mods.add("Shift");
+  if (!mods.has("Meta") && !mods.has("Ctrl") && !mods.has("Alt")) return null;
+  const token = REGISTRY_KEY[key] ?? (key.length === 1 ? key.toUpperCase() : key);
+  return [...MOD_ORDER.filter((m) => mods.has(m)), token].join("+");
 }
 
-function specOf(binding: KeyBinding): string | undefined {
-  return binding.mac ?? binding.key;
+function yielding(chord: string | null, command: Command, claim: ChordClaim): Command {
+  if (!chord) return command;
+  return (view) => claim(chord) || command(view);
 }
 
-/** Does this keymap bind `spec` (CM syntax, e.g. "Mod-i")? Test seam. */
-export function bindsKey(bindings: readonly KeyBinding[], spec: string): boolean {
-  const wanted = fromCmSpec(spec);
-  return bindings.some((b) => {
-    const s = specOf(b);
-    return s !== undefined && fromCmSpec(s) === wanted;
+/** Every binding with a modifier chord asks `claim` first, for both its plain
+ * and Shift variants. Pure given `claim` — the unit-test seam. */
+export function yieldToRegistry(bindings: readonly KeyBinding[], claim: ChordClaim): KeyBinding[] {
+  return bindings.map((binding) => {
+    const spec = binding.mac ?? binding.key;
+    if (!spec) return binding;
+    const next: KeyBinding = { ...binding };
+    if (binding.run) next.run = yielding(registryChordOf(spec), binding.run, claim);
+    if (binding.shift) next.shift = yielding(registryChordOf(spec, true), binding.shift, claim);
+    return next;
   });
 }
 
-/** The vendor bindings with every registry-owned chord removed. */
-export function filterVendorKeymap(
-  bindings: readonly KeyBinding[],
-  ownedChords: Iterable<string | null>,
-): KeyBinding[] {
-  const owned = new Set<string>();
-  for (const chord of ownedChords) if (chord) owned.add(fromRegistryChord(chord));
-  return bindings.filter((b) => {
-    const s = specOf(b);
-    return s === undefined || !owned.has(fromCmSpec(s));
-  });
-}
+/** The registry's claim: run the action this webview's dispatcher would fire. */
+export const registryClaim: ChordClaim = (chord) => {
+  const action = claimingAction(chord);
+  if (!action) return false;
+  action.run();
+  return true;
+};
 
-/** Every chord the registry currently owns in this webview (OS-global ones
- * never reach CM, so they are irrelevant here). */
-export function registryOwnedChords(): (string | null)[] {
-  return allActions()
-    .filter((a) => !a.global)
-    .map((a) => currentChord(a.id));
-}
-
-/** The vendor keymap the editor installs: stock CM minus the registry's chords. */
+/** The vendor keymap the editor installs. */
 export function vendorKeymap(): KeyBinding[] {
-  return filterVendorKeymap(VENDOR_KEYMAP, registryOwnedChords());
+  return yieldToRegistry(VENDOR_KEYMAP, registryClaim);
 }

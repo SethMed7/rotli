@@ -14,8 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- ⌘I, ⌘U, ⌘[ and ⌘] work in Markdown notes again. In 0.95.0 the editor's
-  built-in shortcuts swallowed them, and ⌘U could even undo your last bold.
+- ⌘I, ⌘U, ⌘[, ⌘] and ⌘⌥ arrow pane focus work in Markdown notes again. In
+  0.95.0 the editor's built-in shortcuts swallowed them, and ⌘U could even undo
+  your last bold.
 - The format bar's B button no longer lights up for an unclosed `**`.
 - ⌘W, ⌘1-9, ⌃Tab, ⌘⇧T and ⌘D pressed while Library, Assets, Archive or Trash
   is showing now bring your tabs back into view instead of acting unseen.

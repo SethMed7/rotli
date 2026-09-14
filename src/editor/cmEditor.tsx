@@ -570,7 +570,7 @@ function CmEditorImpl({
           }),
         ),
         Prec.high(keymap.of(rotliKeymap)),
-        keymap.of(vendorKeymap()), // stock CM minus registry chords (⌘I/⌘U/⌘[/⌘]/⌘⏎)
+        keymap.of(vendorKeymap()), // stock CM, yielding to registry-claimed chords (⌘I/⌘U/⌘[/⌘])
         EditorView.lineWrapping,
         // never let the caret slide behind the floating format bar: CM treats
         // the bottom strip as invisible when scrolling the caret into view, so
