@@ -52,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Dock back off. That reset made the window hide as soon as you clicked
   Finder.
 
+- DOCX: bold, text color, or highlight chosen with no selection now applies to
+  the text you type next, and highlight plus subscript/superscript survive save.
+- DOCX: ⌘B/⌘I/⌘U and the other format shortcuts reach a document pane.
+- A file whose details can't be read now says so instead of "Read-only".
+
 ## [0.95.0] - 2026-09-13
 
 Three fixes from a computer-use test of the installed 0.94.0.

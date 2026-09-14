@@ -1020,6 +1020,8 @@ export interface FileStat {
   writable: boolean;
   /** Whether this storage asset may move into the memex Archive or Trash. */
   lifecycleMutable: boolean;
+  /** Why the file cannot move ("read-only vault", "outside Rotli storage", …); null when it can. */
+  lifecycleReason: string | null;
   /** Filesystem birth/modify stamps (ms since epoch) — derived display facts
    * for the file-details panel; null when the filesystem can't report one. */
   createdMs: number | null;

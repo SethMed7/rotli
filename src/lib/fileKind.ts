@@ -56,3 +56,10 @@ const IMAGE_MIME: Record<string, string> = {
 export function imageMimeOf(ext: string): string {
   return IMAGE_MIME[ext] ?? "application/octet-stream";
 }
+
+/** The file-details fact for a Rotli-managed file: documents, sheets, and
+ * assets live in the vault's storage/ folder, which the vault's .gitignore
+ * excludes by contract. Null for any file outside storage/. */
+export function managedFileNote(id: string): string | null {
+  return /^storage\//i.test(id) ? "Stored in storage/ inside your vault — not tracked by git." : null;
+}
