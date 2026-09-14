@@ -27,7 +27,7 @@ import {
   DOCUMENT_OPEN_WITH_APPS,
 } from "../documents/kinds";
 import { clamp } from "../lib/clamp";
-import { IMAGE_EXTS, VIDEO_EXTS, extOf, fileName } from "../lib/fileKind";
+import { IMAGE_EXTS, VIDEO_EXTS, extOf, fileName, managedFileNote } from "../lib/fileKind";
 import {
   type FileStat,
   corpusFileBytes,
@@ -46,8 +46,7 @@ import { SHEET_BIN, SHEET_EDITABLE, SHEET_EDIT_MAX_BYTES, SHEET_TEXT } from "../
 import { type SheetTable, parseWorkbook } from "../sheets/view";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 
-// Univer + exceljs are heavy — code-split so they load only when an editable
-// sheet mounts (same reasoning as the CanvasSurface split).
+// Univer + exceljs are heavy — code-split like CanvasSurface, loaded only when an editor mounts.
 const SheetEditor = lazy(() => import("../sheets/sheetEditor"));
 const DocumentEditor = lazy(() => import("./documentEditor"));
 
@@ -591,6 +590,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
                     ))}
                   </ul>
                 )}
+                {managedFileNote(fileId) && <p className="fdp-note">{managedFileNote(fileId)}</p>}
                 {detailsErr && <p className="fdp-note">⚠ {detailsErr}</p>}
                 {absPath && (
                   <button type="button" className="file-open-ext fdp-copy" onClick={copyPath}>

@@ -11,10 +11,11 @@ import type {
   DocumentRun,
   DocumentTable,
   DocumentTableCell,
-  DocumentTextStyle,
   EditableDocument,
 } from "../model";
 import type { DocumentEditorCodec } from "../ports";
+import { RUN_STYLE_TAGS, parseRunStyle, runStyleXml } from "./runStyle";
+import { decodeXml, encodeXml, val } from "./xml";
 
 type LayoutNode =
   | { kind: "paragraph"; xml: string; original: DocumentParagraph }
@@ -36,60 +37,13 @@ export interface DocxSource {
   layout: LayoutNode[];
 }
 
-function decodeXml(value: string): string {
-  return value
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(Number.parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, decimal: string) => String.fromCodePoint(Number.parseInt(decimal, 10)))
-    .replaceAll("&quot;", '"')
-    .replaceAll("&apos;", "'")
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&amp;", "&");
-}
-
-function encodeXml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
-}
-
-function val(xml: string, tag: string): string | undefined {
-  return new RegExp(`<w:${tag}\\b[^>]*\\bw:val=["']([^"']*)["'][^>]*\\/?>`, "i").exec(xml)?.[1];
-}
-
-function enabled(xml: string, tag: string): boolean {
-  const match = new RegExp(`<w:${tag}\\b([^>]*)\\/?>`, "i").exec(xml);
-  if (!match) return false;
-  return !/\bw:val=["'](?:0|false|off|none)["']/i.test(match[1] ?? "");
-}
-
-function parseStyle(runXml: string): DocumentTextStyle | undefined {
-  const props = /<w:rPr\b[^>]*>([\s\S]*?)<\/w:rPr>/i.exec(runXml)?.[1] ?? "";
-  const font = /<w:rFonts\b[^>]*\bw:(?:ascii|hAnsi)=["']([^"']+)["']/i.exec(props)?.[1];
-  const halfPoints = Number.parseFloat(val(props, "sz") ?? "");
-  const color = val(props, "color");
-  const style: DocumentTextStyle = {
-    ...(enabled(props, "b") ? { bold: true } : {}),
-    ...(enabled(props, "i") ? { italic: true } : {}),
-    ...(enabled(props, "u") ? { underline: true } : {}),
-    ...(enabled(props, "strike") ? { strike: true } : {}),
-    ...(font ? { fontFamily: decodeXml(font) } : {}),
-    ...(Number.isFinite(halfPoints) && halfPoints > 0 ? { fontSize: halfPoints / 2 } : {}),
-    ...(color && /^[0-9a-f]{6}$/i.test(color) ? { color: `#${color}` } : {}),
-  };
-  return Object.keys(style).length ? style : undefined;
-}
-
 function parseRun(runXml: string): DocumentRun {
   let text = "";
   const tokens = /<w:t\b[^>]*>([\s\S]*?)<\/w:t>|<w:tab\b[^>]*\/?\s*>|<w:br\b[^>]*\/?\s*>/gi;
   for (const match of runXml.matchAll(tokens)) {
     text += match[1] !== undefined ? decodeXml(match[1]) : match[0].startsWith("<w:tab") ? "\t" : "\n";
   }
-  const style = parseStyle(runXml);
+  const style = parseRunStyle(runXml);
   return { text, ...(style ? { style } : {}) };
 }
 
@@ -326,32 +280,9 @@ function stripOwnedProperties(xml: string, tags: readonly string[]): string {
 
 function runXml(run: DocumentRun, originalXml?: string): string {
   const style = run.style;
-  const owned = style
-    ? [
-        style.fontFamily
-          ? `<w:rFonts w:ascii="${encodeXml(style.fontFamily)}" w:hAnsi="${encodeXml(style.fontFamily)}"/>`
-          : "",
-        style.bold ? "<w:b/>" : "",
-        style.italic ? "<w:i/>" : "",
-        style.underline ? '<w:u w:val="single"/>' : "",
-        style.strike ? "<w:strike/>" : "",
-        style.color ? `<w:color w:val="${style.color.replace(/^#/, "").toUpperCase()}"/>` : "",
-        style.fontSize
-          ? `<w:sz w:val="${Math.round(style.fontSize * 2)}"/><w:szCs w:val="${Math.round(style.fontSize * 2)}"/>`
-          : "",
-      ].join("")
-    : "";
+  const owned = runStyleXml(style);
   const originalProps = /<w:rPr\b[^>]*>([\s\S]*?)<\/w:rPr>/i.exec(originalXml ?? "")?.[1] ?? "";
-  const retained = stripOwnedProperties(originalProps, [
-    "rFonts",
-    "b",
-    "i",
-    "u",
-    "strike",
-    "color",
-    "sz",
-    "szCs",
-  ]);
+  const retained = stripOwnedProperties(originalProps, RUN_STYLE_TAGS);
   const props = `${retained}${owned}`;
   const pieces = run.text.split(/(\t|\n)/).map((piece) => {
     if (piece === "\t") return "<w:tab/>";

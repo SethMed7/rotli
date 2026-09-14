@@ -4,11 +4,9 @@
 import {
   DocumentFlavor,
   DrawingTypeEnum,
-  HorizontalAlign,
   ICommandService,
   ImageSourceType,
   LocaleType,
-  NamedStyleType,
   createUniver,
   merge,
   type IDocumentData,
@@ -17,7 +15,6 @@ import {
   type ITable,
   type ITableCell,
   type ITextRun,
-  type ITextStyle,
 } from "@univerjs/presets";
 import { UniverDocsDrawingPreset } from "@univerjs/preset-docs-drawing";
 import {
@@ -38,18 +35,24 @@ import UniverPresetDocsCoreEnUS from "@univerjs/preset-docs-core/locales/en-US";
 import "@univerjs/preset-docs-core/lib/index.css";
 import { DOCUMENT_CANVAS_COLORS, documentUniverTheme } from "../../brand/univerTheme";
 import { documentFitZoom } from "../layout";
+import { keepCaretStyleThroughNoopMutations } from "./caretStyle";
 import { documentInsertionRange, documentTableRanges, isDocumentContentMutation } from "./policy";
 import { documentImageDrawing } from "./imageDrawing";
+import {
+  fromHorizontalAlign,
+  fromNamedStyle,
+  fromTextStyle,
+  horizontalAlign,
+  namedStyle,
+  textStyle,
+} from "./textStyle";
 import { GENERATED_DOCX_THEME } from "../theme";
 import type {
-  DocumentAlignment,
   DocumentContent,
   DocumentImage,
-  DocumentNamedStyle,
   DocumentParagraph,
   DocumentTable,
   DocumentTableCell,
-  DocumentTextStyle,
   EditableDocument,
 } from "../model";
 
@@ -77,70 +80,9 @@ export interface DocumentEngineHandle {
   save(): EditableDocument;
   onDirty(callback: () => void): { dispose?: () => void } | void;
   onStructureChange(callback: () => void): { dispose(): void };
+  /** Run a Univer command by id against this document (format intents). */
+  runCommand(id: string): void;
   dispose(): void;
-}
-
-function namedStyle(value?: DocumentNamedStyle): NamedStyleType | undefined {
-  if (value === "title") return NamedStyleType.TITLE;
-  if (value === "subtitle") return NamedStyleType.SUBTITLE;
-  if (value === "heading1") return NamedStyleType.HEADING_1;
-  if (value === "heading2") return NamedStyleType.HEADING_2;
-  if (value === "heading3") return NamedStyleType.HEADING_3;
-  if (value === "normal") return NamedStyleType.NORMAL_TEXT;
-  return undefined;
-}
-
-function fromNamedStyle(value?: NamedStyleType): DocumentNamedStyle | undefined {
-  if (value === NamedStyleType.TITLE) return "title";
-  if (value === NamedStyleType.SUBTITLE) return "subtitle";
-  if (value === NamedStyleType.HEADING_1) return "heading1";
-  if (value === NamedStyleType.HEADING_2) return "heading2";
-  if (value === NamedStyleType.HEADING_3) return "heading3";
-  if (value === NamedStyleType.NORMAL_TEXT) return "normal";
-  return undefined;
-}
-
-function horizontalAlign(value?: DocumentAlignment): HorizontalAlign | undefined {
-  if (value === "left") return HorizontalAlign.LEFT;
-  if (value === "center") return HorizontalAlign.CENTER;
-  if (value === "right") return HorizontalAlign.RIGHT;
-  if (value === "justify") return HorizontalAlign.JUSTIFIED;
-  return undefined;
-}
-
-function fromHorizontalAlign(value?: HorizontalAlign): DocumentAlignment | undefined {
-  if (value === HorizontalAlign.LEFT) return "left";
-  if (value === HorizontalAlign.CENTER) return "center";
-  if (value === HorizontalAlign.RIGHT) return "right";
-  if (value === HorizontalAlign.JUSTIFIED || value === HorizontalAlign.BOTH) return "justify";
-  return undefined;
-}
-
-function textStyle(style?: DocumentTextStyle): ITextStyle | undefined {
-  if (!style) return undefined;
-  return {
-    ...(style.fontFamily ? { ff: style.fontFamily } : {}),
-    ...(style.fontSize ? { fs: style.fontSize } : {}),
-    ...(style.bold ? { bl: 1 } : {}),
-    ...(style.italic ? { it: 1 } : {}),
-    ...(style.underline ? { ul: { s: 1 } } : {}),
-    ...(style.strike ? { st: { s: 1 } } : {}),
-    ...(style.color ? { cl: { rgb: style.color } } : {}),
-  };
-}
-
-function fromTextStyle(style?: ITextStyle): DocumentTextStyle | undefined {
-  if (!style) return undefined;
-  const next: DocumentTextStyle = {
-    ...(style.ff ? { fontFamily: style.ff } : {}),
-    ...(style.fs ? { fontSize: style.fs } : {}),
-    ...(style.bl ? { bold: true } : {}),
-    ...(style.it ? { italic: true } : {}),
-    ...(style.ul?.s ? { underline: true } : {}),
-    ...(style.st?.s ? { strike: true } : {}),
-    ...(style.cl?.rgb ? { color: style.cl.rgb } : {}),
-  };
-  return Object.keys(next).length ? next : undefined;
 }
 
 export function documentToSnapshot(document: EditableDocument): IDocumentData {
@@ -575,6 +517,7 @@ export function mountDocumentEditor(host: HTMLElement, model: EditableDocument):
     if (!documentInsertionRange(model.id, selectionManager.getActiveTextRange())) return;
     lastInsertionRange = currentInsertionRange();
   };
+  const caretStyle = keepCaretStyleThroughNoopMutations(commandService, selectionManager);
   const rememberSelection = selectionManager.textSelection$.subscribe(() => {
     captureInsertionRange();
   });
@@ -790,6 +733,7 @@ export function mountDocumentEditor(host: HTMLElement, model: EditableDocument):
       api.onCommandExecuted?.((command) => {
         if (isDocumentContentMutation(command)) callback();
       }),
+    runCommand: (id) => void commandService.executeCommand(id),
     onStructureChange: (callback) => {
       structureChangeCallbacks.add(callback);
       return { dispose: () => structureChangeCallbacks.delete(callback) };
@@ -807,6 +751,7 @@ export function mountDocumentEditor(host: HTMLElement, model: EditableDocument):
       skeletonReadySubscription?.unsubscribe();
       host.ownerDocument.removeEventListener("pointerdown", captureInsertionRange, true);
       rememberSelection.unsubscribe();
+      caretStyle.dispose();
       rememberTableInsertion.dispose();
       recoverDroppedTable.dispose();
       keepCanvasConventional.dispose();

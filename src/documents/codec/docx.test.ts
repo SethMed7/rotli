@@ -5,6 +5,11 @@ import JSZip from "jszip";
 import { createDocxBase64 } from "../create";
 import { decodeDocx, encodeDocx } from "./docx";
 
+// Document fixture colors (OOXML hex without the leading #), not UI colors.
+const ORANGE = "F6B26B";
+const RED = "FF0000";
+const YELLOW = "FFFF00";
+
 describe("DOCX editor codec", () => {
   const RED_PIXEL_PNG =
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nCEAAAAASUVORK5CYII=";
@@ -58,6 +63,56 @@ describe("DOCX editor codec", () => {
         ? reopenedTable.table.rows[1]?.cells[1]?.paragraphs[0]?.runs[0]?.text
         : undefined,
     ).toBe("Edited table");
+  });
+
+  test("round-trips background shading and sub/superscript runs", async () => {
+    const base64 = await createDocxBase64({ title: "", blocks: [{ kind: "paragraph", text: "Body" }] });
+    const decoded = await decodeDocx(base64, "storage/rotli/marks.docx");
+    const runs = [
+      { text: "shaded", style: { background: `#${ORANGE}` } },
+      { text: "2", style: { verticalAlign: "subscript" as const } },
+      { text: "th", style: { verticalAlign: "superscript" as const, color: `#${RED}` } },
+    ];
+    decoded.document.content = [{ kind: "paragraph", paragraph: { runs } }];
+    const encoded = await encodeDocx(decoded.source, decoded.document);
+    const saved = await JSZip.loadAsync(encoded, { base64: true });
+    const savedXml = (await saved.file("word/document.xml")?.async("string")) ?? "";
+    expect(savedXml).toContain(`<w:shd w:val="clear" w:color="auto" w:fill="${ORANGE}"/>`);
+    expect(savedXml).toContain('<w:vertAlign w:val="subscript"/>');
+
+    const reopened = await decodeDocx(encoded, "storage/rotli/marks.docx");
+    const paragraph = reopened.document.content[0];
+    expect(paragraph?.kind === "paragraph" ? paragraph.paragraph.runs : undefined).toEqual([
+      { text: "shaded", style: { background: `#${ORANGE}` } },
+      { text: "2", style: { verticalAlign: "subscript" } },
+      { text: "th", style: { color: `#${RED}`, verticalAlign: "superscript" } },
+    ]);
+  });
+
+  test("reads Word highlight colors and drops them when the run loses its background", async () => {
+    const base64 = await createDocxBase64({ title: "", blocks: [{ kind: "paragraph", text: "Marked" }] });
+    const zip = await JSZip.loadAsync(base64, { base64: true });
+    const xml = (await zip.file("word/document.xml")?.async("string")) ?? "";
+    zip.file(
+      "word/document.xml",
+      xml.replace(
+        '<w:r><w:t xml:space="preserve">Marked</w:t></w:r>',
+        '<w:r><w:rPr><w:highlight w:val="yellow"/></w:rPr><w:t xml:space="preserve">Marked</w:t></w:r>',
+      ),
+    );
+    const decoded = await decodeDocx(await zip.generateAsync({ type: "base64" }), "storage/rotli/hl.docx");
+    const index = decoded.document.content.findIndex(
+      (content) => content.kind === "paragraph" && content.paragraph.runs[0]?.text === "Marked",
+    );
+    const marked = decoded.document.content[index];
+    if (!marked || marked.kind !== "paragraph") throw new Error("expected highlighted paragraph");
+    expect(marked.paragraph.runs[0]?.style).toEqual({ background: `#${YELLOW}` });
+
+    marked.paragraph.runs = [{ text: "Marked" }];
+    const saved = await JSZip.loadAsync(await encodeDocx(decoded.source, decoded.document), { base64: true });
+    const savedXml = (await saved.file("word/document.xml")?.async("string")) ?? "";
+    expect(savedXml).toContain("Marked");
+    expect(savedXml).not.toContain("w:highlight");
   });
 
   test("decodes Word tables as native editable document content", async () => {

@@ -104,6 +104,7 @@ describe("size and stamp formatting refuse to fabricate", () => {
       revision: "r1",
       writable: true,
       lifecycleMutable: false,
+      lifecycleReason: "read-only vault",
       createdMs: null,
       modifiedMs: null,
     };
