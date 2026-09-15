@@ -1,0 +1,12 @@
+# Gitleaks configuration: the default rule set plus one reviewed allowance.
+# The only allowance is jwt.io's published sample token, a public test input
+# for the secret detector (src-tauri/src/corpus.rs). Real credentials are never
+# allowlisted; rotate and rewrite instead (docs/operations/repository-access.md).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "jwt.io public sample token used as a detector test input"
+regexes = [
+  '''eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\.''',
+]

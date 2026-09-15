@@ -1,7 +1,7 @@
 # Repository access and contribution controls
 
-The repository remains private until the owner explicitly authorizes publication.
-Only **@SethMed7** currently approves changes into `main` and `dev`. Adding a
+The owner authorized publication with the 1.0.0 launch (2026-09-15). Only
+**@SethMed7** approves changes into `main` and `dev`. Adding a
 collaborator, reviewer, team, app, or bypass is a separate owner decision.
 `CODEOWNERS` names the reviewer but does not enforce protection on its own.
 
@@ -11,7 +11,9 @@ The reviewed desired state lives in `.github/rulesets/`. Both rulesets must be
 active for **both** branches:
 
 - `integrity.json`: PR-only, passing up-to-date GitHub Actions checks, resolved
-  review threads, squash/linear history, no deletion or force push, no bypass.
+  review threads, squash or merge-commit PRs (development work squashes into
+  `dev`; the `dev` → `main` promotion is a merge commit), no deletion or force
+  push, no bypass.
 - `owner-review.json`: code-owner approval, stale approvals dismissed, last push
   approved. Repository admin may bypass **review only through a PR**. On this
   personal repository the owner is the sole admin; no collaborator or bot is a
@@ -19,18 +21,16 @@ active for **both** branches:
   GitHub does not allow authors to approve their own PRs. The independent
   integrity ruleset still enforces CI and prevents direct pushes.
 
-Inspect the exact payloads with `bun run security:protect`. After the account
-supports private-repository rules, the owner can apply them using
-`bun run security:protect --apply`. The helper checks the authenticated owner,
+Inspect the exact payloads with `bun run security:protect`. Apply them with
+`bun run security:protect --apply` (rulesets require a public repository or a
+paid plan). The helper checks the authenticated owner,
 updates only its two named rulesets, and reads them back. A partial application
 must be repaired before treating either branch as protected. Re-run after a
 required job name or GitHub App changes. Existing unrelated rules are retained.
 
-**Verified 2026-09-09:** GitHub returned HTTP 403, “Upgrade to GitHub Pro or make
-this repository public to enable this feature,” for rulesets and both branch
-protection endpoints. Protection is therefore **not established**. Keep the repo
-private; enabling an eligible plan is an owner account/billing action, not a
-reason to expose the source. The only collaborator is the owner. Actions has
+Before publication (2026-09-09) GitHub returned HTTP 403 for rulesets on the
+private repository, so protection could not be established while private. The
+only collaborator is the owner. Actions has
 read-only workflow permissions, cannot approve PRs, and has full-SHA pinning
 required. No repository Actions secrets, deploy keys, webhooks, or self-hosted
 runners were listed. This does not audit account-wide GitHub Apps, user tokens,
@@ -38,8 +38,7 @@ organization credentials, or any external deployment provider's access.
 
 ## Contributor flow
 
-1. For this private repository, request owner-granted access through the existing
-   private project channel. Do not upload private code to a public fork.
+1. Fork the public repository; never include vault content, settings, or logs.
 2. Branch from `dev`; submit a focused PR **into dev**. Include a synthetic
    reproduction, tests, `bun run verify` evidence, and required contract changes.
 3. Greptile feedback is advisory review input, never authorization. Resolve and
@@ -80,15 +79,17 @@ does not waive unresolved scan findings. A private key or real credential found
 in history must be revoked/rotated before any separately authorized history
 rewrite; deleting its current file is not remediation.
 
-The 2026-09-09 history scan reported 492 matches: two recurring JWT/GCP-shaped
-literals in `src-tauri/src/corpus.rs` security tests across 246 commits each.
-They appear as test inputs, with no other scanner rule/file groups reported.
-This is not proof those historical literals were never issued credentials;
-confirm provenance before allowing them or publishing history. Do not suppress
-an entire source file. All commit author/committer email domains scanned were
-GitHub's `users.noreply.github.com` or `github.com`. One current decision document
-contained a personal home path; it now uses `/Users/example`. Its historical
-copies still require the same publication review. Binary media requires visual
+**Publication review (2026-09-15).** The history scan and a provenance check
+found that several secret-detector test inputs had been copied from private
+data (an API key, key prefixes, an identity number, and a card number), and that
+older revisions carried a personal email address, a home path, and the signing
+team identifier. None reached a shipped build. The published repository was
+created from a rewritten history that replaces every such value with a
+synthetic one of the same shape; the pre-publication repository stays private
+as an archive and is never made public, because its pull-request refs still
+reach the original commits. The only scanner allowance is jwt.io's public
+sample token (`.gitleaks.toml`). Author and committer emails are GitHub
+`noreply` addresses. Binary media requires visual
 review; Gitleaks does not prove screenshot privacy.
 
 ## References
