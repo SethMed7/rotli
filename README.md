@@ -12,7 +12,7 @@
 A calm, local-first workspace for your Mac. One folder is your vault, the
 Librarian keeps it organized, and every note stays a plain file you own.
 
-[**Download for Mac**](https://github.com/SethMed7/rotli-releases/releases/latest) &nbsp;·&nbsp;
+[**Download for Mac**](https://github.com/SethMed7/rotli-releases/releases/latest/download/Rotli.dmg) &nbsp;·&nbsp;
 [rotli.co](https://rotli.co) &nbsp;·&nbsp; macOS on Apple Silicon · signed and notarized
 
 <br>

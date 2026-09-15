@@ -58,7 +58,9 @@ The current script:
   submission and log status without unresolved Apple issues;
 - regenerates and signs the updater archive from the stapled app;
 - creates, signs, notarizes, and staples the DMG; Gatekeeper assessment of
-  both app and DMG is blocking;
+  both app and DMG is blocking. The release also carries the same bytes as
+  `Rotli.dmg`, so `releases/latest/download/Rotli.dmg` (the site's and README's
+  Download link) always downloads the newest build directly;
 - creates `latest.json`; and
 - records the exact source, CI run, repository-pinned toolchains, and artifact
   SHA-256 digests in `release-evidence.json`; and

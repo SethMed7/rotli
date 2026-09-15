@@ -201,6 +201,9 @@ SIG="$APP.tar.gz.sig"
 # release's artifacts into the app itself. Size-diet fix, 2026-07-31.
 DIST="dist-release"
 DMG="$DIST/rotli_${VER}_aarch64.dmg"
+# The same notarized bytes under a stable name: the site's Download button links
+# to releases/latest/download/Rotli.dmg, which then always serves the newest build.
+STABLE_DMG="$DIST/Rotli.dmg"
 DL_URL="https://github.com/${RELEASES_REPO}/releases/download/v${VER}/rotli.app.tar.gz"
 
 echo "▸ rotli $VER  (publish=$PUBLISH · signing identity configured · notary profile configured)"
@@ -356,6 +359,8 @@ if [ "$PUBLISH" -eq 1 ]; then
   # complete Regression suite on main; missing, pending, and red evidence block.
   verify_ci_conclusion "$SOURCE_COMMIT"
 
+  cp "$DMG" "$STABLE_DMG"
+
   echo "▸ release evidence"
   BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   MACOS_BUILD="macOS $(sw_vers -productVersion) ($(sw_vers -buildVersion)) $(uname -m)"
@@ -367,6 +372,7 @@ if [ "$PUBLISH" -eq 1 ]; then
     --ci-run "$CI_RUN_URL" \
     --ci-result "$CI_RUN_RESULT" \
     --artifact "$DMG" \
+    --artifact "$STABLE_DMG" \
     --artifact "$DIST/rotli.app.tar.gz" \
     --artifact "$DIST/rotli.app.tar.gz.sig" \
     --artifact "$DIST/latest.json" \
@@ -378,7 +384,7 @@ if [ "$PUBLISH" -eq 1 ]; then
 
   echo "▸ publish → $RELEASES_REPO (tag v$VER)"
   gh release create "v$VER" \
-    "$DMG" "$DIST/rotli.app.tar.gz" "$DIST/rotli.app.tar.gz.sig" "$DIST/latest.json" \
+    "$DMG" "$STABLE_DMG" "$DIST/rotli.app.tar.gz" "$DIST/rotli.app.tar.gz.sig" "$DIST/latest.json" \
     "$DIST/release-evidence.json" "$DIST/notary-evidence.json" \
     --repo "$RELEASES_REPO" \
     --title "rotli $VER" \
