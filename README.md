@@ -2,191 +2,198 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/media/quokka-waving.inv.svg">
-  <img src="docs/media/quokka-waving.svg" alt="the rotli quokka, waving hello" width="150">
+  <img src="docs/media/quokka-waving.svg" alt="The Rotli quokka, waving hello" width="140">
 </picture>
 
-# rotli
+# Rotli
 
-**A warm, local-first notes app that lives in your Mac's menu bar.**
+### Room to think. Files you keep.
 
-*`⌥Space` and it's there. Dismiss it and it's gone. Your notes stay plain files on your Mac — yours to keep, forever.*
+A calm, local-first workspace for your Mac. One folder is your vault, the
+Librarian keeps it organized, and every note stays a plain file you own.
 
-**[⬇&nbsp; Download for Mac](https://github.com/SethMed7/rotli-releases/releases/latest)** &nbsp;·&nbsp; macOS · Apple Silicon · always the newest signed build
+[**Download for Mac**](https://github.com/SethMed7/rotli-releases/releases/latest/download/Rotli.dmg) &nbsp;·&nbsp;
+[rotli.co](https://rotli.co) &nbsp;·&nbsp; macOS on Apple Silicon · signed and notarized
 
 <br>
 
-<img src="docs/media/rotli-warm-light.png" alt="rotli in Warm Light — the Welcome note open in Main" width="860">
+<img src="docs/media/rotli-warm-light.webp" alt="Rotli in Rotli Light: the Welcome note open in Main, with Home, Main, and System in the sidebar" width="900">
 
 </div>
 
 ---
 
-## Meet rotli
+## Meet Rotli
 
-Most apps want your attention. rotli wants to get out of your way.
+Most apps want your attention. Rotli stays out of the way.
 
-It lives in your menu bar — **no dock icon, no ⌘Tab entry, no badges, no pings.** Summon it with `⌥Space`, jot what's in your head, and dismiss it; it's gone until you need it again. The only thing here with a pulse is your work.
+Press `⌥Space` and it is there; press it again and it is gone. Write what is on
+your mind, then get back to your day. There are no badges, no streaks, and no
+pings.
 
-And everything you write is **yours**: plain markdown in one folder *you* choose. Open it in any editor, back it up however you like, keep it when rotli is long forgotten. rotli is a warm window onto your files — never their owner.
+Everything you write is **yours**: plain Markdown in one folder you choose.
+Open it in any editor, back it up however you like, and keep it long after you
+stop using Rotli. Rotli is a window onto your files, never their owner.
 
-## One folder is your whole vault
-
-Your notes live in a **vault** — one local folder that quietly holds everything:
+## One folder is your vault
 
 ```
-your vault/                 ← one folder, openable in any editor
-  a-note.md                 ← plain markdown + a little frontmatter (id · created · updated …)
-  wiki/                     ← the Library — People · Projects · Research …
-  chats/                    ← your AI conversations
-  storage/                  ← files, images, PDFs, boards — referenced from notes
-  .rotli/                   ← the app's own state; delete it and lose nothing but a rebuild
+your vault/                 one folder, openable in any editor
+  wiki/                     the Library: People · Projects · Research …
+  wiki/_secure/             secure notes, kept away from remote AI
+  chats/                    your conversations
+  storage/                  documents, boards, images, and files
+  .rotli/                   Rotli's own state; delete it and lose only a rebuild
 ```
 
-You just capture. The **Librarian** — **on-device** by default, or a Claude, ChatGPT, or Gemini client you signed in and chose — files each note into the **Library**'s areas like *People*, *Projects*, and *Research*. You never have to think about where a note goes, yet it's always exactly where you'd look for it. Prefer no AI at all? Choose a **raw vault** and the Librarian never runs — just your files, organized by you.
+You capture. The **Librarian** files each note into an area of the Library,
+adds a summary and tags, and records what it did with a guarded undo. It uses
+an on-device model by default, or a Claude, ChatGPT, or Gemini client you have
+already signed in to. It changes a note's location and metadata only, never the
+words you wrote. Prefer no AI at all? Choose a **raw vault**, and the Librarian
+never runs.
 
-Already have an Obsidian, ZenNotes, or ordinary Markdown folder? First run can
-inspect it without writing, then either open it in place or import a copy. Its
-nested folders become the initial Main reference tree; the files remain one
-tree on disk, never duplicated into a Rotli database.
+Already have an Obsidian, ZenNotes, or plain Markdown folder? First run can
+inspect it without writing anything, then open it in place or import a copy.
 
-## Main and the Library — one file, two ways in
+## Work in a view, however you like
 
-This is the idea rotli is built around, so it's worth thirty seconds:
+- **Main** is your own shelf: the notes you reach for, arranged by hand. The
+  Library underneath stays tidy, and a note in Main is the same file on disk,
+  not a copy.
+- **Named views** give a project or client its own focused Main. New notes
+  follow the view you are in.
+- **Remove from Main** takes a note out of view; the file stays in your vault.
+- **Delete** moves it to **Trash** inside the vault. Nothing leaves your disk
+  until you choose **Empty Trash**.
+- **Files**, at the foot of the sidebar, browses the vault folder the way
+  Finder does, so there is nothing new to learn.
 
-- **Main** is *your* shelf — the notes you reach for, arranged by hand, in whatever order makes sense to you.
-- **The Library** is where those same notes actually live on disk, filed into tidy areas by the Librarian.
+## Secure notes stay secure
 
-They aren't copies. They're the **same file**, reached two ways. Rearrange Main all you like; the Library keeps everything findable. Let the Librarian refile things; your Main arrangement never moves. Your order, and a tidy library, at the same time — and the Librarian only ever touches a note's *location and metadata*, **never the words inside it**. Rotli records its actions for review and offers guarded undo when the note still matches the recorded change.
+Mark a note **secure** and Rotli moves it to `wiki/_secure/` and keeps it away
+from remote models and web lookups; the Librarian leaves it alone. Rotli also
+recognizes common secret shapes (API keys, private keys, card and identity
+numbers) and treats them the same way. Remote models never see secure content;
+on-device models can, unless you turn that off.
 
-Main can also open additional named **views** for focused slices such as a
-project, client, or open-source work. Main keeps every referenced item; a named
-view adds its own virtual folders and one `view_tag` to Markdown metadata. New
-items and folders follow the view you are currently in, while the underlying
-file still enters the same intake/Library workflow when the Librarian is on.
+## What's inside
 
-## Two fronts, one window
+- **The editor.** Hybrid Markdown shows raw syntax only on the line you are
+  editing. Lists, checkboxes, choices, switches, tables, wikilinks (`[[`), and
+  Mermaid diagrams render in place. Choose **Aa → Raw markdown** to see the
+  text underneath.
+- **Chat that knows your notes.** On-device by default, or through an
+  official Claude Code, Codex, or Cursor client already installed on your
+  Mac. Rotli never shows a provider login or reads provider credentials.
+  Flip the globe for a web lookup.
+- **Documents and boards.** Word documents (`.docx`) and Excalidraw boards open
+  and save in their own formats, alongside your notes.
+- **Quick capture** with `⌥C` from anywhere; the thought lands in Captures and
+  gets filed later.
+- **`⌘K`** finds every note, file, chat, and action. `⌘T` starts a note and
+  `⌘N` chooses what a new tab becomes.
+- **Panes and tabs** split with `⌘D` and `⌘⇧D`; every hotkey can be rebound.
+- **The Welcome folder** holds nine short lessons, plus a guided tour of the
+  real controls. **Settings → General → Show me around** runs it again.
 
-| Front | What it is |
-|---|---|
-| **Notes** | The note system — a hybrid-markdown editor that hides syntax until your caret lands on it, plus Excalidraw **boards**, all saved as plain files. |
-| **Chat** | Your AI conversations. On-device by default, or through an already-authenticated official Claude Code, Codex, or Cursor client on your Mac. Cursor is a software/code-chat lane. Your notes are its knowledge base — it reads them to answer. |
+Spreadsheets, Mermaid diagram tabs, and read-aloud are coming soon and are not
+in this release.
 
-More fronts are planned — an email **Inbox**, mobile and tablet apps, and a
-handwriting-first notebook experience. See [ROADMAP.md](ROADMAP.md).
+## Six environments, light and dark
 
-## The first minute
-
-Every new vault starts with a **Welcome** folder in Main: the welcome note and nine short lessons (writing, tasks, choices, tables, links, views, files, AI, and a checklist). Each is an ordinary note that shows the typed syntax in backticks next to the rendered control, so you can click a checkbox, then choose **Aa → Raw markdown** to see the same text underneath. After setup, a skippable **guided tour** points at New, Main's view picker, search, Aa, Chat, and Settings; **Settings → General → Show me around** runs it again, and **Open welcome folder** brings back any lesson you deleted.
-
-## What's built
-
-- **The editor** — hybrid markdown: the line under your caret shows raw syntax, everything else renders. `- ` starts a list and `[]` then Space makes a checkbox. `[][]` makes a check/X result, `[True][False]` names the answers, and `:green` after a label colors it (typing the `:` opens a color list). `[#]` rows make one-of-many choices, `[##?]` plus `[##]` rows make a multi-choice panel you can place left, center, or right, and `[|]` makes a switch. Type `| Step | Owner |` and press Enter to start a table; Shift+Enter breaks a line inside a cell, and ⇧-click or ⌘-click selects cells to clear or copy. `[[` opens a picker of your notes and closes the link for you. A quiet format bar floats below. Mermaid diagrams render in place with View and Code modes, and an optional conversion creates a separate Excalidraw board copy (the Visual flowchart builder is development-only for now). Typography (`Aa`) and decision styling are render layers — never written into your files.
-- **Panes & tabs** — split with `⌘D` / `⌘⇧D`, tabs with `⌘T`; every tab stays visible and closeable. Everything drag-resizable, everything remembered.
-- **One active vault** — connect other vaults as switch targets, while the sidebar, panes, search, System counts, Librarian, and AI context remain scoped to the vault currently open.
-- **`⌘K`** — every note and action in one palette, recents first.
-- **Quick capture (`⌥C`)** — from anywhere on your Mac: one breath, type, `⏎` — the thought lands in Captures and the AI files it later.
-- **Chat that knows your notes** — on-device by default; optionally use an already-authenticated official Claude Code, Codex, or Cursor client installed on your Mac. Cursor uses its documented ACP custom-client protocol in read-only Ask mode for software work, with Grok 4.6 as the initial default. Each provider has a user-editable default, and `@claude`, `@codex`, or `@cursor` requests an attributed opinion without changing the chat&rsquo;s primary model (`:model-id` is optional). Rotli never presents a provider login or reads provider credentials. Attach images on supported lanes or flip the globe for a web lookup. DuckDuckGo works without setup, or choose Brave Search API with your own Keychain-stored key in **Settings → Connections → Web research**.
-- **Autosave** — a quiet olive dot. No spinners, ever.
-- **Every hotkey rebindable** — one searchable registry in Settings.
-
-## A workspace, not a preview catalog
-
-Images and video are the only file types Rotli may treat as view-only media.
-Every other format shown as supported must be something you can work on and
-save in Rotli. When a format cannot yet be edited faithfully, Rotli should offer
-an explicit local conversion or import workflow and call the format unsupported
-until that workflow exists—never ship a passive “preview only” dead end.
-
-Markdown is the foundation Rotli is built around and remains the primary
-knowledge surface. Slash commands, wikilinks, typed embed fences, frontmatter,
-and note-native workflows belong to Markdown only. DOCX documents, CSV tables,
-and Excalidraw boards are useful bonus work surfaces—not parallel note systems—
-and keep the conventional behavior of their own formats. XLSX spreadsheets,
-Mermaid diagram tabs, and read-aloud are coming soon; they are not in this release.
-
-## Personal work environments
-
-The titlebar sun cycles through paired light and dark environments in six
-families: **Rotli · Paper & Charcoal · Ocean · Grove · Iris · Midnight**. Rotli
-Light is where every first run starts; the other families let the workspace
-feel more personal without changing its readable hierarchy or keyboard
-behavior.
+The titlebar sun switches between paired light and dark environments in six
+families: **Rotli · Paper & Charcoal · Ocean · Grove · Iris · Midnight**. Every
+first run starts in Rotli Light; below is one environment from each family.
 
 <div align="center">
-<img src="docs/media/rotli-warm-dark.png" alt="rotli in Warm Dark" width="405">
-&nbsp;
-<img src="docs/media/rotli-charcoal.png" alt="rotli in Charcoal" width="405">
+<table>
+  <tr>
+    <td><img src="docs/media/rotli-warm-dark.webp" alt="Rotli Dark" width="290"></td>
+    <td><img src="docs/media/charcoal.webp" alt="Charcoal" width="290"></td>
+    <td><img src="docs/media/ocean-light.webp" alt="Ocean Light" width="290"></td>
+  </tr>
+  <tr>
+    <td align="center">Rotli Dark</td>
+    <td align="center">Charcoal</td>
+    <td align="center">Ocean Light</td>
+  </tr>
+  <tr>
+    <td><img src="docs/media/grove-dark.webp" alt="Grove Dark" width="290"></td>
+    <td><img src="docs/media/iris-light.webp" alt="Iris Light" width="290"></td>
+    <td><img src="docs/media/midnight.webp" alt="Midnight" width="290"></td>
+  </tr>
+  <tr>
+    <td align="center">Grove Dark</td>
+    <td align="center">Iris Light</td>
+    <td align="center">Midnight</td>
+  </tr>
+</table>
 </div>
 
 ## Your data stays yours
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/media/quokka-shield.inv.svg">
-  <img src="docs/media/quokka-shield.svg" alt="the rotli quokka holding a lock shield" width="96" align="right">
+  <img src="docs/media/quokka-shield.svg" alt="The Rotli quokka holding a lock shield" width="96" align="right">
 </picture>
 
-- **Plain Markdown files** on your Mac — open them in any editor, back them up, keep them forever.
-- **Secrets are auto-detected** and never sent to a remote model or out to the web.
-- **Works fully offline** — no account; connected models, web research, and
-  updates use the network only when you explicitly choose them.
+- **Plain Markdown files** on your Mac, readable by any editor, forever.
+- **No account.** Rotli works fully offline. Connected models, web research, and
+  updates use the network only when you choose them.
+- **Secure notes and secret-shaped text** never reach a remote model or the web.
+- **The Librarian** changes location and metadata only, and a raw vault turns
+  AI off entirely.
 
-You work how you want in **Main**; the Librarian organizes the **Library** underneath — location and metadata only, never the words inside your notes — and a raw vault opts out of AI entirely.
-
-*Your vault is just plain files in a documented layout — rotli is the layer that manages and understands it. The format lives with rotli, not behind it.*
+See [`PRIVACY.md`](PRIVACY.md) for the full data boundary.
 
 <br clear="all">
 
-## Run it
-
-```sh
-bun install --frozen-lockfile
-bun run dev:app     # supervised native rotli (dev), including live vault switching
-bun run dev         # frontend only, in a plain browser (in-memory demo vault)
-bun run check       # TypeScript, tests, runtime, architecture, design, and docs
-bun run verify      # CI's local twin: check + builds + Playwright + clippy + cargo test
-```
-
 ## Use your workspace from the shell
 
-The installed Rotli executable is also a JSON CLI that follows the same corpus
-policy as the app: new notes enter intake and appear in Main, secure notes stay
-unavailable to remote agents, locked notes refuse agent edits, and updates
-require a fresh revision.
+The installed app is also a JSON CLI that follows the same rules as the app:
+new notes enter intake and appear in Main, secure notes stay unavailable to
+agents, locked notes refuse edits, and every update needs a fresh revision.
 
 ```sh
 /Applications/rotli.app/Contents/MacOS/rotli notes list
 /Applications/rotli.app/Contents/MacOS/rotli notes search "launch plan"
-/Applications/rotli.app/Contents/MacOS/rotli notes query 'area:projects tags:payments updated:>=2026-07-01'
+/Applications/rotli.app/Contents/MacOS/rotli notes query 'area:projects updated:>=2026-07-01'
 /Applications/rotli.app/Contents/MacOS/rotli notes create --title "Launch plan" --body "First draft"
-/Applications/rotli.app/Contents/MacOS/rotli rename "Launch plan" "Launch plan v2"
 ```
 
-Note results identify themselves as Markdown and include document metrics;
-Rotli keeps YAML frontmatter outside the agent-editable body. The stdio MCP
-server, the `rotli agent …` commands, and Remote agents are development builds
-only until they are refined; the stable app refuses them. See the
-[`agent workspace contract`](docs/architecture/agent-workspace.md) for the
-full contract.
+The MCP server, `rotli agent …` commands, and remote agents are development
+builds only for now. The [agent workspace contract](docs/architecture/agent-workspace.md)
+has the details.
 
-Contributing or working with an AI coding tool? Start with
+## Build it
+
+```sh
+bun install --frozen-lockfile
+bun run dev:app     # the native app in development, with live vault switching
+bun run dev         # the frontend alone, in a browser with an in-memory demo vault
+bun run verify      # CI's local twin: checks, builds, Playwright, clippy, cargo test
+```
+
+Contributing, or working with an AI coding tool? Start with
 [`CONTRIBUTING.md`](CONTRIBUTING.md), [`AGENTS.md`](AGENTS.md), and the
-[`documentation map`](docs/README.md). See [`PRIVACY.md`](PRIVACY.md) for the
-data boundary, [`SECURITY.md`](SECURITY.md) for responsible reporting, and
-[`LICENSE`](LICENSE) for the MIT terms.
+[documentation map](docs/README.md). Repository skills for every agent live in
+[`.agents/skills/`](.agents/skills). Report security issues through
+[`SECURITY.md`](SECURITY.md). Rotli is released under the [MIT license](LICENSE).
 
-**Stack** — Tauri v2 · React 18 · Vite (rolldown) · TypeScript strict · Bun · Zustand + TanStack Query · plain CSS driven entirely by the in-repo brand kit (`src/brand/`, v1.0.0 — the single source of truth for colors, type, and logo, enforced by `bun run check:hex`). Local-first is the architecture, not a feature: nothing needs an account, offline is the default, and every network connection is an explicit user choice.
+**Stack:** Tauri 2 · React · Vite · TypeScript (strict) · Bun · Rust · plain CSS
+from the in-repo brand kit (`src/brand/`).
 
 ## Where it's going
 
 |  |  |
 |---|---|
-| ✅ | Shell · panes & tabs · hybrid editor · `⌘K` · six environment families, each light and dark |
-| ✅ | **The Welcome kit** — a Welcome folder of editable lessons plus a guided tour that points at the real controls |
-| ✅ | **Your vault stays ordinary files** — Rotli adds atomic writes, watching, metadata, and persistence without taking ownership |
-| ✅ | **Search** — full-text across your notes (titles + bodies), instant |
-| ✅ | **Chat** — on-device by default, or your own connected models; your notes are its knowledge base |
-| ✅ | **The Librarian** — an organizer (on-device by default, or a connected client you choose) files captures into the Library with an activity record and guarded undo — or choose a raw vault with no AI at all |
-| ⏳ | **[The roadmap](ROADMAP.md)** — email Inbox · mobile & tablet · handwriting-to-text notebook |
+| ✅ | **1.0**: the editor, panes and tabs, `⌘K`, six environment families |
+| ✅ | **The Librarian** files your notes, with an activity record and guarded undo |
+| ✅ | **Chat** on-device or through your own connected clients, grounded in your notes |
+| ✅ | **Secure notes** kept away from remote AI and the web |
+| ✅ | **Documents and boards** saved in their own formats |
+| ⏳ | Spreadsheets · email Inbox · mobile and tablet · handwriting ([roadmap](ROADMAP.md)) |
 
 ---
 
@@ -194,9 +201,9 @@ data boundary, [`SECURITY.md`](SECURITY.md) for responsible reporting, and
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/media/quokka-celebrating.inv.svg">
-  <img src="docs/media/quokka-celebrating.svg" alt="the rotli quokka, celebrating" width="140">
+  <img src="docs/media/quokka-celebrating.svg" alt="The Rotli quokka, celebrating" width="120">
 </picture>
 
-**Warm, quiet, instant. Free and local, forever.**
+**Calm, local, and yours.**
 
 </div>

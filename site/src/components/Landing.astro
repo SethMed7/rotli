@@ -6,7 +6,7 @@ import showcaseManifest from '../assets/characters/showcase/showcase.json';
 import SiteFooter from './SiteFooter.astro';
 import SiteHeader from './SiteHeader.astro';
 import PlaygroundStory from './PlaygroundStory.astro';
-import { GITHUB_URL, PRIVACY_URL, RELEASES_URL, ROADMAP_URL, site } from '../site';
+import { DOWNLOAD_URL, GITHUB_URL, PRIVACY_URL, RELEASES_URL, ROADMAP_URL, site } from '../site';
 
 // Hero leads with the full promo (falls back to the teaser if the full cut
 // is missing). The same clip is never stacked twice below.
@@ -186,7 +186,7 @@ const experiments = [
           </p>
           <div class="hero-actions">
             {site.downloadsEnabled ? (
-              <a class="button primary" href={RELEASES_URL} rel="noopener">Download for Mac</a>
+              <a class="button primary" href={DOWNLOAD_URL} rel="noopener">Download for Mac</a>
             ) : (
               <span class="button primary pending" aria-disabled="true">Mac alpha coming soon</span>
             )}
@@ -583,7 +583,7 @@ const experiments = [
       </div>
       <div class="final-actions">
         {site.downloadsEnabled ? (
-          <a class="button final-button" href={RELEASES_URL} rel="noopener">Download the Mac alpha</a>
+          <a class="button final-button" href={DOWNLOAD_URL} rel="noopener">Download the Mac alpha</a>
         ) : (
           <span class="button final-button pending" aria-disabled="true">Mac alpha coming soon</span>
         )}

@@ -26,6 +26,9 @@ import { fileURLToPath } from 'node:url';
 
 export const GITHUB_URL = 'https://github.com/SethMed7/rotli';
 export const RELEASES_URL = 'https://github.com/SethMed7/rotli-releases/releases/latest';
+// The newest notarized DMG, downloaded directly. scripts/release.sh publishes a
+// stable-named copy (Rotli.dmg) on every release, so this never needs editing.
+export const DOWNLOAD_URL = `${RELEASES_URL}/download/Rotli.dmg`;
 export const LICENSE_URL = `${GITHUB_URL}/blob/main/LICENSE`;
 export const PRIVACY_URL = `${GITHUB_URL}/blob/main/PRIVACY.md`;
 export const ROADMAP_URL = `${GITHUB_URL}/blob/main/ROADMAP.md`;
