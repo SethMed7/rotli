@@ -10,6 +10,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Marketing landing: plain Paper hero ground (no coastline backdrop). The hero
+  plays the full promo muted on load with a sound toggle, slightly larger in
+  the layout and bled to the right edge. Theme studio shows a Light | Dark
+  grid of small orbs colored from each environment's ground and accent; they
+  auto-cycle all twelve environments and any orb jumps to it. Theme captures
+  are cropped free of the window bezel. Privacy is an open wider layout
+  without a surrounding card. The Workspace section is now "What's in the
+  alpha" (the capture ribbon is gone). The site calls the release an alpha,
+  not a beta, and the whole page sits on the Rotli Warm Light ground: the
+  hero no longer switches to a Paper-white band and the one white card is
+  gone. A new Organize section leads with Librarian + views: turn the
+  Librarian on, work from Main or a named view, and keep the vault organized
+  underneath. The companion block is a coverflow carousel: the current quokka
+  in the middle with the previous and next ones blurred at the sides, cycling
+  through real, selectable combinations (body presets and a custom hue, the
+  plain line drawing, glasses or a bucket hat in default or custom color,
+  black or white line work, real poses) rendered from the app's own placement
+  rules by `scripts/build-companion-showcase.ts`. Dots or the side figures
+  pick one; it pauses on hover and never auto-advances under reduced motion.
+  The hero no longer flashes a playback error when a muted autoplay attempt is
+  merely interrupted. The small eyebrow labels above each heading are gone;
+  every section sits on the same page grid (the privacy block no longer
+  spills past the gutter); sections rise in gently as they scroll into view
+  (off under reduced motion and without scripting).
+
 ## [0.95.1] - 2026-09-14
 
 The 0.95.0 review round: hotkeys, links, lists, documents, the tour, drops, and

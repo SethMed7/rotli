@@ -1,0 +1,62 @@
+[
+  {
+    "slug": "cocoa-celebrating",
+    "label": "Cocoa · Cheerful",
+    "alt": "A cocoa quokka celebrating with arms raised",
+    "preset": "Cocoa"
+  },
+  {
+    "slug": "fern-glasses-waving",
+    "label": "Fern · Glasses · waving",
+    "alt": "A fern-green quokka wearing glasses and waving",
+    "preset": "Fern"
+  },
+  {
+    "slug": "ocean-bucket-hat-content",
+    "label": "Ocean · Bucket hat · Content",
+    "alt": "An ocean-blue quokka in an amber bucket hat",
+    "preset": "Ocean"
+  },
+  {
+    "slug": "iris-glasses-thoughtful",
+    "label": "Iris · Glasses · Thoughtful",
+    "alt": "An iris-purple quokka in glasses, thinking",
+    "preset": "Iris"
+  },
+  {
+    "slug": "berry-bucket-hat-peaceful",
+    "label": "Berry · Blue bucket hat · Peaceful",
+    "alt": "A berry-pink quokka resting in a blue bucket hat",
+    "preset": "Berry"
+  },
+  {
+    "slug": "amber-attentive",
+    "label": "Amber · Attentive",
+    "alt": "An amber quokka listening attentively",
+    "preset": "Amber"
+  },
+  {
+    "slug": "line-content",
+    "label": "Line · the original drawing",
+    "alt": "The original quokka line drawing without a fill",
+    "preset": "Line"
+  },
+  {
+    "slug": "custom-teal-white-line-searching",
+    "label": "Custom teal · White line · searching",
+    "alt": "A teal quokka with white line work holding a magnifying glass",
+    "preset": "Custom"
+  },
+  {
+    "slug": "cocoa-glasses-walking",
+    "label": "Cocoa · Glasses · walking",
+    "alt": "A cocoa quokka in glasses walking in profile",
+    "preset": "Cocoa"
+  },
+  {
+    "slug": "fern-bucket-hat-inbox",
+    "label": "Fern · Bucket hat · sorting the inbox",
+    "alt": "A fern-green quokka in a bucket hat holding an inbox tray",
+    "preset": "Fern"
+  }
+]

@@ -46,7 +46,7 @@ bun run preview  # serve the built dist/ locally
   | `full`        | launch (default for local dev)| landing + 404            | yes       | yes     |
 
   An unknown value fails the build. Flipping production to launch is a variable
-  change (`SITE_MODE=full`), not a code change. `dev` additionally sets
+  change (`SITE_MODE=full`), not a code change — see "Going live" below. `dev` additionally sets
   `site.showsExperiments`, the switch that renders descriptions of features
   under review. App enforcement is separate: Breve and Mermaid visual editing
   are disabled in stable builds; conventional file adapters remain available
@@ -64,13 +64,21 @@ bun run preview  # serve the built dist/ locally
   version bump can merge before its signed asset is published.
 - Site tokens in `src/layouts/Base.astro` keep every page in Rotli Light,
   regardless of OS appearance or previously saved site preferences. Only the
-  hero uses Paper. The theme showcase changes its own screenshot and caption;
-  it never recolors the site. Keep tokens aligned with `src/brand/`.
+  hero uses Paper tokens on a plain solid ground (no photographic backdrop).
+  The theme showcase changes its own screenshot and caption; it never recolors
+  the site. Keep tokens aligned with `src/brand/`.
 - Fonts (General Sans body, Baloo 2 wordmark) are copied into
   `public/fonts/` from `src/brand/fonts/`.
-- The compact mark comes from `src/assets/characters/`. Site companion art in
-  `src/assets/characters/cocoa/` is generated at 1536 × 1536 from those canonical
-  SVGs with the existing fill pipeline; app-sized 512px exports stay unchanged.
+- The compact mark comes from `src/assets/characters/`. The privacy quokka in
+  `src/assets/characters/cocoa/` is generated at 1536 × 1536 from the canonical
+  SVGs with the existing fill pipeline (`bun scripts/build-character-fills.mjs
+  --site`); app-sized 512px exports stay unchanged.
+- The companion carousel reads `src/assets/characters/showcase/` (renders +
+  `showcase.json`), produced by `bun scripts/build-companion-showcase.ts`. That
+  script composites body preset, accessory, line color, and pose with the same
+  placement rules as `src/components/character.tsx`, so every slide is a
+  combination a person can pick in Settings → Companion. Edit `COMBOS` there
+  and re-run; never hand-draw a variant the app cannot produce.
 - `src/components/SiteHeader.astro` and `SiteFooter.astro` are the only header
   and footer; their shared styles live in
   `src/layouts/Base.astro`. Pages own only their sections.
@@ -78,9 +86,9 @@ bun run preview  # serve the built dist/ locally
   (1280 × 800 logical viewport at 3× density), never a live vault. The Playground
   uses a 4320 × 2700 capture in Rotli Light. The `@3x.png` filenames replace the
   old 1× URLs so cached blurry images cannot persist. Do not upscale screenshots.
-- The Paper hero blends the original user-provided coastline at 10% opacity.
-  This decorative image appears only in the landing hero; product captures
-  remain fully opaque and sharp. The old grain overlay is not loaded.
+- The hero uses a plain Paper ground with no photographic backdrop. Product
+  captures remain fully opaque and sharp. The old coastline blend and grain
+  overlay are not loaded.
 - The coming-soon page keeps the same Rotli Light foundation and shows the real
   Playground capture. The introduction begins with the coming-soon label. Its
   one call to action is "Follow development on GitHub" when the source is
@@ -129,6 +137,23 @@ TXT ownership token (the CLI omits it; read it from the dashboard or the API's
 `Application not found` even though the CNAME routes. Cloudflare's proxy may
 stay on with the SSL/TLS mode set to **Full** (not Full strict).
 
+### Going live (turning off the holding page)
+
+The holding page is only the production `SITE_MODE=coming-soon` variable. To
+launch:
+
+1. Confirm the newest release on `RELEASES_URL` (the `rotli-releases` latest
+   page) is the alpha you want people to download; the button links there.
+2. In Railway → `rotli-site` → production service, set `SITE_MODE=full`
+   (leave `SITE_URL=https://rotli.co`). Redeploy so the Docker build picks up
+   the new build arg.
+3. Check `https://rotli.co/` renders the landing (hero film, Download for
+   Mac), `/robots.txt` allows indexing, and `/sitemap-index.xml` exists.
+4. Roll back by setting `SITE_MODE=coming-soon` again and redeploying.
+
+Both modes are built by `bun run verify` (quality lane) so the flip never
+depends on an unbuilt configuration.
+
 Deploy from a checkout when needed (`railway up` uploads the repository root):
 
 ```sh
@@ -149,31 +174,45 @@ bun run build:modes                            # full, dev, coming-soon → dist
 docker build -f site/Dockerfile --build-arg SITE_MODE=dev -t rotli-site:dev ..  # from site/
 ```
 
-## Launch film
+## Launch films
 
-`src/components/PromoFilm.astro` places the film directly below the landing
-hero (before the proof strip) and after the holding page's introduction. It is
-click-to-play with the browser's native controls: `preload="none"`,
-`playsinline`, a poster, a captions track, and fallback text. There is no
-autoplay, no third-party player, and no cookie. The section renders only when
-the real artifacts exist at build time, so a build never ships an empty player
-over a black frame; the hero and final calls to action switch to "Watch the
-film" in the same build. The site references exactly these paths:
+Two media slots share `public/media/`:
 
-| Artifact | Path | Required |
+| Slot | Role | When it renders |
 | --- | --- | --- |
-| H.264 MP4, 1920 × 1080 | `public/media/rotli-promo.mp4` | yes |
-| Poster JPEG | `public/media/rotli-promo-poster.jpg` | yes |
-| WebVTT captions | `public/media/rotli-promo.vtt` | yes |
+| Full film | Landing hero (right column); holding page `#film` | `rotli-promo.mp4` + poster + captions exist |
+| Teaser | Landing hero fallback only | Full cut missing, and `rotli-teaser.mp4` + poster exist |
 
-All three files must be nonempty. Copy the reviewed exports from the film project into `public/media/` and
-rebuild. The captions track is not switched on by default because the film
-carries its own on-screen captions; viewers enable it from the native
-controls. `Caddyfile` serves `/media/*` same-origin (`media-src 'self'`), with a
-day-long cache and explicit `video/mp4` and `text/vtt` content types, because
-the Caddy image has no MIME table for those extensions and `nosniff` would
-otherwise make browsers refuse the captions track. Do not commit zero-byte
-placeholders; the section must stay absent until the real film is ready.
+The landing hero prefers the full promo and autoplays it muted with a sound
+toggle. The same clip is not stacked again below the hero. `PromoFilm.astro`
+still owns the click-to-play film block on the holding page.
+
+Players on the holding page are click-to-play with native controls:
+`preload="none"`, `playsinline`, a poster, optional captions, and fallback text.
+The hero clip autoplays muted with an explicit sound toggle (no third-party
+player, no cookie). Reduced-motion visitors keep the poster until they start
+playback. A slot renders only when its required artifacts exist at build time.
+
+Theme studio previews twelve environments from `public/themes/` (six families ×
+light/dark). Fresh captures live beside the family + Light/Dark controls; the
+Organize section tells the Librarian story: work in a view while filing stays
+underneath.
+
+| Artifact | Path | Teaser | Full |
+| --- | --- | --- | --- |
+| H.264 MP4, 1920 × 1080 | `public/media/rotli-teaser.mp4` / `rotli-promo.mp4` | required | required |
+| Poster JPEG | `…-poster.jpg` | required | required |
+| WebVTT captions | `….vtt` | optional | required |
+
+All required files must be nonempty. Copy reviewed exports from the film
+project into `public/media/` and rebuild. The captions track is not switched
+on by default because films may carry on-screen captions; viewers enable it
+from the native controls. `Caddyfile` serves `/media/*` same-origin
+(`media-src 'self'`), with a day-long cache and explicit `video/mp4` and
+`text/vtt` content types, because the Caddy image has no MIME table for those
+extensions and `nosniff` would otherwise make browsers refuse the captions
+track. Do not commit zero-byte placeholders; a slot must stay absent until its
+real files are ready.
 
 ## Playground and launch assets
 
