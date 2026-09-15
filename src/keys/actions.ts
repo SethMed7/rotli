@@ -22,9 +22,9 @@ import {
 import {
   createManagedItem,
   createManagedItemInTabOptimistically,
-  requestManagedBoardCreation,
+  requestNamedItemCreation,
 } from "../newItems/composition";
-import { type NewItemKind, isNewItemAvailable } from "../newItems/model";
+import { type NewItemKind, isNameFirstKind, isNewItemAvailable } from "../newItems/model";
 import { openChatForNote } from "../noteChat/composition";
 import { summonChat } from "../services/chatSummon";
 import { invalidateNotes, lifecycleError } from "../services/hooks";
@@ -64,8 +64,8 @@ function focusedTabNow() {
 }
 
 function runCreate(kind: NewItemKind, newTab: boolean): void {
-  if (kind === "board") {
-    requestManagedBoardCreation({ newTab });
+  if (isNameFirstKind(kind)) {
+    requestNamedItemCreation(kind, { newTab });
     return;
   }
   void createManagedItem(kind, { newTab }).catch((error) =>
@@ -86,8 +86,8 @@ export function newItemInTab(): void {
     return;
   }
   const kind = useUiStore.getState().newTabDefault;
-  if (kind === "board") {
-    requestManagedBoardCreation({ newTab: true });
+  if (isNameFirstKind(kind)) {
+    requestNamedItemCreation(kind, { newTab: true });
     return;
   }
   createManagedItemInTabOptimistically(kind);

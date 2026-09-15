@@ -117,6 +117,8 @@ export const SERVICE_FILE_OWNERS = {
   "hooks.ts": "notes query adapter",
   "imageRepair.ts": "file storage",
   "itemLifecycle.ts": "vault lifecycle",
+  "itemRename.ts": "vault lifecycle",
+  "itemRenameComposition.ts": "vault lifecycle",
   "librarianAutoAdopt.ts": "librarian",
   "mainDismiss.ts": "Main projection",
   "mainTree.ts": "Main projection",

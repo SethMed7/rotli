@@ -12,6 +12,7 @@ import {
   corpusListConfig,
   corpusMove,
   corpusRead,
+  corpusRenameManagedFile,
   corpusSearch,
   corpusWrite,
 } from "../lib/tauri";
@@ -203,5 +204,9 @@ export class FsNotesService implements NotesService {
           ? origin
           : DEST.inbox;
     return this.moveNote(id, target);
+  }
+
+  async renameFile(id: string, name: string): Promise<string> {
+    return corpusRenameManagedFile(id, name);
   }
 }

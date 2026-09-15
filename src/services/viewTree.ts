@@ -11,6 +11,7 @@ import {
   addNoteToMainAt,
   gcManifest,
   removeFromMain,
+  renameNoteRef,
   uniqueRootFolderName,
 } from "./mainTree";
 
@@ -137,6 +138,14 @@ export function renameNamedView(manifest: ViewsManifest, current: string, value:
   return {
     ...manifest,
     views: manifest.views.map((view) => (view.name === current ? { ...view, name } : view)),
+  };
+}
+
+/** A path-id item was renamed: every view that references it follows, in place. */
+export function renameViewItemRef(manifest: ViewsManifest, oldId: string, newId: string): ViewsManifest {
+  return {
+    ...manifest,
+    views: manifest.views.map((view) => ({ ...view, tree: renameNoteRef(view.tree, oldId, newId) })),
   };
 }
 

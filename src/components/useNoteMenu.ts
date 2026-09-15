@@ -8,6 +8,7 @@
 import { useCallback } from "react";
 
 import { discardBlankNote } from "../documents/draftComposition";
+import { fileNameStem } from "../lib/fileKind";
 import { noteDiskFolder } from "../lib/noteLocation";
 import {
   corpusFileStat,
@@ -29,6 +30,7 @@ import { DEST, isSink } from "../services/destinations";
 import { invalidateNotes, useArchiveNote, useRestoreNote, useTrashNote } from "../services/hooks";
 import { useMainGcIds } from "../services/hooks";
 import { activeItemSinkLane, fileLifecycleRows, readFileLifecycle } from "../services/itemLifecycle";
+import { renameLane } from "../services/itemRename";
 import { isEmptyNote } from "../services/mainDismiss";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
 import { markNoteDraftChanged } from "../services/noteDrafts";
@@ -486,15 +488,18 @@ export function useNoteMenu() {
             });
           }
         }
-        if (sinkLane === "note") {
+        const renameVia = renameLane(note);
+        if (renameVia) {
           items.push({ kind: "sep" as const });
           items.push({
             kind: "action" as const,
             label: "Rename…",
             onClick: () =>
-              isBoard
+              renameVia === "board"
                 ? useUiStore.getState().setRenamingBoardId(note.id)
-                : setRenameTarget({ id: note.id, current: note.title }),
+                : renameVia === "file"
+                  ? setRenameTarget({ id: note.id, current: fileNameStem(note.id), lane: "file" })
+                  : setRenameTarget({ id: note.id, current: note.title }),
           });
         }
         items.push({ kind: "sep" as const });

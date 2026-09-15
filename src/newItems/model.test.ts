@@ -6,6 +6,7 @@ import {
   NEW_ITEM_KINDS,
   availableNewItems,
   availableNewTabDefault,
+  isNameFirstKind,
   isNewItemAvailable,
   isNewItemKind,
   newItemChoices,
@@ -17,6 +18,10 @@ describe("new item registry", () => {
     expect(DEFAULT_NEW_ITEM_KIND).toBe("markdown");
     expect(NEW_ITEM_DEFINITIONS.map((item) => item.kind)).toEqual([...NEW_ITEM_KINDS]);
     expect(new Set(NEW_ITEM_DEFINITIONS.map((item) => item.label)).size).toBe(NEW_ITEM_KINDS.length);
+  });
+
+  test("boards and documents are named before their file exists", () => {
+    expect(NEW_ITEM_KINDS.filter(isNameFirstKind)).toEqual(["document", "board"]);
   });
 
   test("persisted values validate and unknown kinds resolve safely", () => {

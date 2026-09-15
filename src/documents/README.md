@@ -61,6 +61,10 @@ original before the first Rotli save. Background is written as run shading
 colors; a Word `w:highlight` decodes to its hex and is replaced by shading on
 save. Baseline is `<w:vertAlign w:val="subscript|superscript"/>`.
 
+A person names a document before it is created and can rename it from its
+row or tab menu; the naming rules live in the
+[memex data contract](../../docs/architecture/memex-data-contract.md).
+
 Managed documents live in `storage/` inside the vault, which the vault's
 `.gitignore` excludes, so they are never tracked by git even when notes are. Markdown-only features such as slash
 commands and embed fences are never mounted in documents.

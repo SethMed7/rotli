@@ -5,6 +5,7 @@
 // Components never call either directly — they consume the TanStack Query
 // hooks in ./hooks.ts.
 
+import { extOf, fileName, userFileName } from "../lib/fileKind";
 import { isTauri } from "../lib/tauri";
 import { noteSlugify } from "../memex/contract";
 import type { Folder, Note, NoteSummary, SearchHit } from "../types";
@@ -257,6 +258,43 @@ export class InMemoryNotesService implements NotesService {
     const target =
       origin === undefined ? DEST.inbox : origin === "" || this.folders.has(origin) ? origin : DEST.inbox;
     return this.moveNote(id, target);
+  }
+
+  /** The browser twin of corpus_rename_managed_file: same filename rule, same
+   * refusal of a taken name. */
+  async renameFile(id: string, name: string): Promise<string> {
+    const file = this.notes.get(id);
+    if (!file || file.kind !== "file") throw new Error(`file not found: ${id}`);
+    const next = userFileName(name, extOf(fileName(id)));
+    const folder = id.includes("/") ? id.slice(0, id.lastIndexOf("/") + 1) : "";
+    const newId = `${folder}${next}`;
+    if (newId === id) return id;
+    if (newId.toLowerCase() !== id.toLowerCase() && this.notes.has(newId))
+      throw new Error(`a file named “${next}” already exists here`);
+    this.notes.delete(id);
+    this.notes.set(newId, { ...file, id: newId, title: next, revision: this.nextRevision() });
+    return newId;
+  }
+
+  /** A surfaced binary row (id = its path, title = its filename) — lets browser
+   * specs exercise file menus without a filesystem. */
+  seedFile(id: string, folderId: string = DEST.storage): Note {
+    const now = Date.now();
+    const file: Note = {
+      id,
+      title: fileName(id),
+      snippet: "",
+      bodyEmpty: false,
+      folderId,
+      createdAt: now,
+      updatedAt: now,
+      pinned: false,
+      kind: "file",
+      body: "",
+      revision: this.nextRevision(),
+    };
+    this.notes.set(id, file);
+    return file;
   }
 
   /** Synchronous seeding (Stage 1 sample corpus — the r1/r2 gate frames). */

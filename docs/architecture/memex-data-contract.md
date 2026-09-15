@@ -80,7 +80,14 @@ second user-visible product or storage location.
   older `<slug>-<id6>.md` note moves it to the readable form. Merely opening or
   listing a vault never rewrites user files.
 - **Documents and sheets** created by Rotli live in the managed binary lane:
-  `storage/rotli/` in a Rotli vault or `Storage/` in the legacy layout.
+  `storage/rotli/` in a Rotli vault or `Storage/` in the legacy layout. A
+  document's filename is its name: ordinary user creation collects the name
+  first (like a board) and writes `<name>.docx`; only a nameless embed target
+  falls back to `untitled-<timestamp>.docx`. Rename… on a document or sheet row
+  or tab renames the file in its folder, keeps the extension, refuses a name
+  another file already holds, saves any unsaved edits first, and retargets open
+  tabs plus Main and named-view references (`corpus_rename_managed_file`,
+  `services/itemRename.ts` owns which items are renamable).
 - **Boards** are raw `.excalidraw` files. The corpus adapter chooses the writable
   Excalidraw lane for a Rotli vault and a selected writable folder for legacy storage.
   Ordinary user creation collects a nonblank name before writing anything, then

@@ -10,6 +10,7 @@ import type {
 import {
   createDocument,
   createNamedDocument,
+  createUserNamedDocument,
   documentFileName,
   editDocument,
   namedDocumentFileName,
@@ -58,6 +59,21 @@ describe("document application workflows", () => {
       42,
     );
     expect(writes).toEqual(["tanstack-architecture-guide-42.docx"]);
+  });
+
+  test("a document a person names is created under exactly that name", async () => {
+    const writes: string[] = [];
+    const encoder: DocumentEncoder = { extension: "docx", encode: async () => "encoded" };
+    const repository: DocumentRepository = {
+      create: async (name) => {
+        writes.push(name);
+        return `storage/rotli/${name}`;
+      },
+    };
+    const id = await createUserNamedDocument({ encoder, repository }, "  Quarterly plan / Q3 ");
+    expect(id).toBe("storage/rotli/Quarterly plan - Q3.docx");
+    await expect(createUserNamedDocument({ encoder, repository }, "   ")).rejects.toThrow("needs a name");
+    expect(writes).toEqual(["Quarterly plan - Q3.docx"]);
   });
 
   test("editing refuses oversized files before reading or decoding bytes", async () => {

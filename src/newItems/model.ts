@@ -9,6 +9,15 @@ export interface NewItemDefinition {
   description: string;
 }
 
+/** Kinds whose filename IS their name, so the name is collected before the
+ * file exists — cancelling leaves nothing behind. */
+const NAME_FIRST_KINDS = ["board", "document"] as const;
+export type NameFirstKind = (typeof NAME_FIRST_KINDS)[number];
+
+export function isNameFirstKind(kind: NewItemKind): kind is NameFirstKind {
+  return (NAME_FIRST_KINDS as readonly NewItemKind[]).includes(kind);
+}
+
 /** A kind the build withholds stays visible in the chooser as "coming soon";
  * every other entry point (menus, actions, Settings, persisted defaults) treats
  * it as absent. */

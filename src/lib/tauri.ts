@@ -473,11 +473,13 @@ export function corpusCreateBoard(folderId: string, name: string, body?: string)
   );
 }
 
-/** Rename a board (.excalidraw) within its folder. `name` is a free stem (no
- * extension). Returns the board's NEW meta — its `id` is the new relpath, so the
- * caller retargets any open canvas tab to it. */
+/** Rename a board / a .docx or .xlsx in its folder, keeping the extension. The NEW id
+ * is the new relpath (retarget open tabs); a document rename refuses a taken name. */
 export function corpusRenameBoard(id: string, name: string): Promise<CorpusNoteMeta> {
   return corpusInvoke("corpus_rename_board", { id, name });
+}
+export function corpusRenameManagedFile(id: string, name: string): Promise<string> {
+  return corpusInvoke("corpus_rename_managed_file", { id, name });
 }
 
 /** One chat-capable model the memex-ai store can serve (read from

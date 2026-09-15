@@ -1,13 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 
 import { createManagedItem } from "../newItems/composition";
+import type { NameFirstKind } from "../newItems/model";
 import { useUiStore } from "../state/ui";
+import { NameFieldDialog } from "./nameFieldDialog";
 
-/** Name-first entry for ordinary board creation. The request exists before the
- * file does, so cancelling this dialog cannot leave an untitled board behind. */
+const COPY: Record<NameFirstKind, { title: string; field: string; create: string; noun: string }> = {
+  board: { title: "Name Excalidraw board", field: "Board name", create: "Create board", noun: "board" },
+  document: { title: "Name document", field: "Document name", create: "Create document", noun: "document" },
+};
+
+/** Name-first entry for ordinary board and document creation. The request
+ * exists before the file does, so cancelling this dialog cannot leave an
+ * untitled board or document behind. */
 export function BoardNameDialog() {
-  const request = useUiStore((state) => state.boardCreationRequest);
-  const setRequest = useUiStore((state) => state.setBoardCreationRequest);
+  const request = useUiStore((state) => state.nameFirstRequest);
+  const setRequest = useUiStore((state) => state.setNameFirstRequest);
   const [value, setValue] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
@@ -23,6 +31,7 @@ export function BoardNameDialog() {
 
   if (!request) return null;
   const name = value.trim();
+  const copy = COPY[request.kind];
 
   const cancel = () => {
     if (!creating) setRequest(null);
@@ -32,68 +41,30 @@ export function BoardNameDialog() {
     setCreating(true);
     setError("");
     try {
-      await createManagedItem("board", { boardName: name, newTab: request.newTab });
+      await createManagedItem(request.kind, { name, newTab: request.newTab });
       setRequest(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      const reason = cause instanceof Error ? cause.message : String(cause);
+      setError(`Couldn’t create the ${copy.noun} — ${reason}`);
       setCreating(false);
       queueMicrotask(() => inputRef.current?.focus());
     }
   };
 
   return (
-    <div className="rename-overlay" onMouseDown={cancel}>
-      <div
-        className="rename-card"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="board-name-title"
-        aria-describedby={error ? "board-name-error" : undefined}
-        aria-busy={creating}
-        onMouseDown={(event) => event.stopPropagation()}
-        onKeyDown={(event) => {
-          if (event.key !== "Escape") return;
-          event.preventDefault();
-          event.stopPropagation();
-          cancel();
-        }}
-      >
-        <label id="board-name-title" className="rename-label" htmlFor="board-name-input">
-          Name Excalidraw board
-        </label>
-        <input
-          id="board-name-input"
-          ref={inputRef}
-          className="rename-input"
-          aria-label="Board name"
-          value={value}
-          disabled={creating}
-          autoComplete="off"
-          onChange={(event) => setValue(event.target.value)}
-          onKeyDown={(event) => {
-            event.stopPropagation();
-            if (event.key === "Enter") void create();
-          }}
-        />
-        {error && (
-          <p id="board-name-error" role="alert" className="rename-error">
-            Couldn’t create the board — {error}
-          </p>
-        )}
-        <div className="rename-actions">
-          <button type="button" className="rename-btn" disabled={creating} onClick={cancel}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="rename-btn primary"
-            disabled={!name || creating}
-            onClick={() => void create()}
-          >
-            {creating ? "Creating…" : "Create board"}
-          </button>
-        </div>
-      </div>
-    </div>
+    <NameFieldDialog
+      id="board-name"
+      title={copy.title}
+      fieldLabel={copy.field}
+      inputRef={inputRef}
+      value={value}
+      onChange={setValue}
+      onSubmit={() => void create()}
+      onCancel={cancel}
+      busy={creating}
+      error={error}
+      submitLabel={creating ? "Creating…" : copy.create}
+      submitDisabled={!name}
+    />
   );
 }

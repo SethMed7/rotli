@@ -12,8 +12,8 @@ import { useEffect, useRef } from "react";
 
 import { dispatch } from "../keys/registry";
 import { COMING_SOON_CAPTION, LAUNCH_FEATURES } from "../lib/featurePolicy";
-import { createManagedItem, requestManagedBoardCreation } from "../newItems/composition";
-import { type NewItemFeatures, type NewItemKind, newItemChoices } from "../newItems/model";
+import { createManagedItem, requestNamedItemCreation } from "../newItems/composition";
+import { type NewItemFeatures, type NewItemKind, isNameFirstKind, newItemChoices } from "../newItems/model";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { BoardGlyph, BrowserGlyph, ChatGlyph, DocumentGlyph, FileGlyph, NewFileGlyph } from "./glyphs";
@@ -58,8 +58,8 @@ export function NewItemSurface({ paneId, tabId }: { paneId: string; tabId: strin
 
   const pickKind = (kind: NewItemKind) => {
     close();
-    if (kind === "board") {
-      requestManagedBoardCreation({ newTab: true });
+    if (isNameFirstKind(kind)) {
+      requestNamedItemCreation(kind, { newTab: true });
       return;
     }
     void createManagedItem(kind, { newTab: true }).catch((err: unknown) =>

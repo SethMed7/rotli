@@ -8630,6 +8630,10 @@ pub fn corpus_views_write(
     })
 }
 
+/// Document/sheet rename — a child module so it reuses the store's own gates.
+#[path = "corpus_file_rename.rs"]
+pub mod file_rename;
+
 // ─── tests ───────────────────────────────────────────────────────────────────
 
 /// The prompt-injection evals — a fully cooperating, fully compromised caller

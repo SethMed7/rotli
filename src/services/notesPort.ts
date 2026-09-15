@@ -27,4 +27,7 @@ export interface NotesService {
   archiveNote(id: string): Promise<Note>;
   trashNote(id: string): Promise<Note>;
   restoreNote(id: string): Promise<Note>;
+  /** Rename a document/sheet file in place (extension kept); resolves its new id.
+   * Refuses a name another file already holds. */
+  renameFile(id: string, name: string): Promise<string>;
 }
