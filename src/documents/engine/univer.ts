@@ -7,6 +7,8 @@ import {
   ICommandService,
   ImageSourceType,
   LocaleType,
+  RedoCommand,
+  UndoCommand,
   createUniver,
   merge,
   type IDocumentData,
@@ -20,14 +22,18 @@ import { UniverDocsDrawingPreset } from "@univerjs/preset-docs-drawing";
 import {
   DOCS_VIEW_KEY,
   CreateDocTableCommand,
+  DocAutoFormatService,
   DocBackground,
   DocContentInsertService,
   DocCreateTableOperation,
+  DocSelectAllCommand,
   DocSelectionManagerService,
   DocSkeletonManagerService,
   IRenderManagerService,
+  InsertCommand,
   ReplaceSnapshotCommand,
   SetDocZoomRatioOperation,
+  TabCommand,
   UniverDocsCorePreset,
   VIEWPORT_KEY,
 } from "@univerjs/preset-docs-core";
@@ -36,7 +42,13 @@ import "@univerjs/preset-docs-core/lib/index.css";
 import { DOCUMENT_CANVAS_COLORS, documentUniverTheme } from "../../brand/univerTheme";
 import { documentFitZoom } from "../layout";
 import { keepCaretStyleThroughNoopMutations } from "./caretStyle";
-import { documentInsertionRange, documentTableRanges, isDocumentContentMutation } from "./policy";
+import { installDocumentKeys } from "./keys";
+import {
+  documentInsertionRange,
+  documentStructureSignature,
+  documentTableRanges,
+  isDocumentContentMutation,
+} from "./policy";
 import { documentImageDrawing } from "./imageDrawing";
 import {
   fromHorizontalAlign,
@@ -518,6 +530,23 @@ export function mountDocumentEditor(host: HTMLElement, model: EditableDocument):
     lastInsertionRange = currentInsertionRange();
   };
   const caretStyle = keepCaretStyleThroughNoopMutations(commandService, selectionManager);
+  const documentKeys = installDocumentKeys(
+    {
+      commands: commandService,
+      autoFormat: injector.get(DocAutoFormatService),
+      selection: selectionManager,
+      body: () => editor.getSnapshot().body,
+      ids: {
+        tab: TabCommand.id,
+        insertText: InsertCommand.id,
+        selectAll: DocSelectAllCommand.id,
+        undo: UndoCommand.id,
+        redo: RedoCommand.id,
+      },
+    },
+    host,
+    model.id,
+  );
   const rememberSelection = selectionManager.textSelection$.subscribe(() => {
     captureInsertionRange();
   });
@@ -625,11 +654,17 @@ export function mountDocumentEditor(host: HTMLElement, model: EditableDocument):
   });
 
   let mutationFrame = 0;
+  let structure = documentStructureSignature(editor.getSnapshot());
   const keepCanvasConventional = commandService.onCommandExecuted((command) => {
     if (!isDocumentContentMutation(command)) return;
     queueMicrotask(() => {
       if (disposed) return;
       styleCanvas();
+      // Only a structural edit (table, inline block, drawing) needs the page
+      // re-measured; resizing on every keystroke repainted the page each time.
+      const next = documentStructureSignature(editor.getSnapshot());
+      if (next === structure) return;
+      structure = next;
       const engine = renderManager.getRenderById(model.id)?.engine;
       engine?.resizeBySize(Math.max(1, host.clientWidth - 1), Math.max(1, host.clientHeight - 1));
       cancelAnimationFrame(mutationFrame);
@@ -752,6 +787,7 @@ export function mountDocumentEditor(host: HTMLElement, model: EditableDocument):
       host.ownerDocument.removeEventListener("pointerdown", captureInsertionRange, true);
       rememberSelection.unsubscribe();
       caretStyle.dispose();
+      documentKeys.dispose();
       rememberTableInsertion.dispose();
       recoverDroppedTable.dispose();
       keepCanvasConventional.dispose();

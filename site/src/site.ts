@@ -31,16 +31,26 @@ export const PRIVACY_URL = `${GITHUB_URL}/blob/main/PRIVACY.md`;
 export const ROADMAP_URL = `${GITHUB_URL}/blob/main/ROADMAP.md`;
 
 /**
- * The launch film. The marketing film pipeline produces these three artifacts
- * and a maintainer copies them into `public/media/` once they are reviewed.
- * These are the only file references the site uses; keep them in sync with the
- * film project's export names.
+ * Launch films. The marketing pipeline exports these into `public/media/` once
+ * reviewed. The landing hero prefers the full promo; the teaser is a fallback
+ * when the full cut is missing. PromoFilm still powers the holding page.
  */
+export const TEASER_VIDEO_PATH = '/media/rotli-teaser.mp4';
+export const TEASER_POSTER_PATH = '/media/rotli-teaser-poster.jpg';
+export const TEASER_CAPTIONS_PATH = '/media/rotli-teaser.vtt';
+
 export const PROMO_VIDEO_PATH = '/media/rotli-promo.mp4';
 export const PROMO_POSTER_PATH = '/media/rotli-promo-poster.jpg';
 export const PROMO_CAPTIONS_PATH = '/media/rotli-promo.vtt';
 
 export type SiteMode = 'coming-soon' | 'dev' | 'full';
+
+export type FilmArtifacts = {
+  enabled: boolean;
+  video: string;
+  poster: string;
+  captions: string | null;
+};
 
 const MODES: readonly SiteMode[] = ['coming-soon', 'dev', 'full'];
 const DEFAULT_URL = 'https://rotli.co';
@@ -77,38 +87,69 @@ function findPublicDir(): string | null {
   ];
   const found = candidates.find((dir) => existsSync(join(dir, 'favicon.svg'))) ?? null;
   if (found === null) {
-    console.warn('[site] Could not locate public/; the film section is omitted.');
+    console.warn('[site] Could not locate public/; film sections are omitted.');
   }
   return found;
 }
 
+function publicFileExists(publicDir: string | null, path: string): boolean {
+  if (publicDir === null) return false;
+  const file = join(publicDir, path.replace(/^\//, ''));
+  return existsSync(file) && statSync(file).isFile() && statSync(file).size > 0;
+}
+
 /**
- * The film is included only when its real artifacts exist in `public/media/`
- * at build time. Until then the pages omit the section entirely rather than
- * rendering an empty player over a black frame. All three artifacts must be
- * nonempty files; placeholder files never enable the player.
+ * A film slot is included only when its real artifacts exist in `public/media/`
+ * at build time. Until then the pages omit the player rather than rendering an
+ * empty frame. The full film requires video, poster, and captions. The teaser
+ * requires video and poster; captions are optional for short clips that carry
+ * on-screen text.
  */
-function readPromo() {
+function readFilm(options: {
+  label: string;
+  videoPath: string;
+  posterPath: string;
+  captionsPath: string;
+  captionsRequired: boolean;
+}): FilmArtifacts {
   const publicDir = findPublicDir();
-  const exists = (path: string) => {
-    if (publicDir === null) return false;
-    const file = join(publicDir, path);
-    return existsSync(file) && statSync(file).isFile() && statSync(file).size > 0;
-  };
-  const video = exists(PROMO_VIDEO_PATH);
-  const poster = exists(PROMO_POSTER_PATH);
-  const captions = exists(PROMO_CAPTIONS_PATH);
-  const enabled = video && poster && captions;
+  const video = publicFileExists(publicDir, options.videoPath);
+  const poster = publicFileExists(publicDir, options.posterPath);
+  const captions = publicFileExists(publicDir, options.captionsPath);
+  const enabled = video && poster && (options.captionsRequired ? captions : true);
   if (!enabled && (video || poster || captions)) {
     console.warn(
-      `[site] Film artifacts are incomplete (video: ${video}, poster: ${poster}, captions: ${captions}); the film section is omitted.`,
+      `[site] ${options.label} artifacts are incomplete (video: ${video}, poster: ${poster}, captions: ${captions}); that player is omitted.`,
     );
   }
   return {
     enabled,
-    video: PROMO_VIDEO_PATH,
-    poster: PROMO_POSTER_PATH,
-    captions: captions ? PROMO_CAPTIONS_PATH : null,
+    video: options.videoPath,
+    poster: options.posterPath,
+    captions: captions ? options.captionsPath : null,
+  };
+}
+
+function readPromo() {
+  const teaser = readFilm({
+    label: 'Teaser',
+    videoPath: TEASER_VIDEO_PATH,
+    posterPath: TEASER_POSTER_PATH,
+    captionsPath: TEASER_CAPTIONS_PATH,
+    captionsRequired: false,
+  });
+  const full = readFilm({
+    label: 'Full film',
+    videoPath: PROMO_VIDEO_PATH,
+    posterPath: PROMO_POSTER_PATH,
+    captionsPath: PROMO_CAPTIONS_PATH,
+    captionsRequired: true,
+  });
+  return {
+    teaser,
+    full,
+    /** True when the full film section can render (`#film` anchors). */
+    enabled: full.enabled,
   } as const;
 }
 
@@ -131,6 +172,6 @@ export const site = {
   showsExperiments: mode === 'dev',
   /** Links to the source repository and its documents are rendered. */
   sourcePublic: readSourcePublic(),
-  /** The launch film, when its artifacts are present. */
+  /** Teaser (hero) and full launch film, when their artifacts are present. */
   promo: readPromo(),
 } as const;

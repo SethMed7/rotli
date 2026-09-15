@@ -292,4 +292,26 @@ describe("DOCX editor codec", () => {
       (await secondSave.file("word/_rels/document.xml.rels")?.async("string")) ?? "";
     expect(secondRelationships.match(/rIdRotliImage/g)).toHaveLength(1);
   });
+
+  test("control characters typed into a run never make document.xml invalid XML", async () => {
+    // A native Ctrl+A in the editor's input typed U+0001 into the page; Word and
+    // strict XML parsers reject the whole file when it is written verbatim.
+    const base64 = await createDocxBase64({ title: "", blocks: [{ kind: "paragraph", text: "Body" }] });
+    const decoded = await decodeDocx(base64, "storage/rotli/control.docx");
+    decoded.document.content[0] = {
+      kind: "paragraph",
+      paragraph: { runs: [{ text: "Keep\u0001 this\tand\u000bthat\uFFFF." }] },
+    };
+    const encoded = await encodeDocx(decoded.source, decoded.document);
+    const saved = await (
+      await JSZip.loadAsync(encoded, { base64: true })
+    )
+      .file("word/document.xml")
+      ?.async("string");
+
+    expect(saved).toBeDefined();
+    for (const control of ["\u0001", "\u000b", "\uffff"]) expect(saved).not.toContain(control);
+    expect(saved).toContain("Keep this");
+    expect(saved).toContain("<w:tab/>");
+  });
 });

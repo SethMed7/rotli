@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
-import { documentInsertionRange, documentTableRanges, isDocumentContentMutation } from "./policy";
+import {
+  documentInsertionRange,
+  documentStructureSignature,
+  documentTableRanges,
+  isDocumentContentMutation,
+  isSelectAllChord,
+} from "./policy";
 
 describe("DOCX Univer adapter policy", () => {
   test("marks content mutations dirty but ignores zoom operations", () => {
@@ -40,5 +46,23 @@ describe("DOCX Univer adapter policy", () => {
     expect(documentTableRanges("before\r\x1a\x1b\x1c\r\n\x1d\x0e\x0fafter\r\n", [], ["table-1"])).toEqual([
       { startIndex: 7, endIndex: 15, tableId: "table-1" },
     ]);
+  });
+
+  test("typing keeps the structure signature; tables, blocks, and drawings change it", () => {
+    const typed = { body: { tables: [], customBlocks: [] }, tableSource: {}, drawingsOrder: [] };
+    const base = documentStructureSignature(typed);
+    expect(documentStructureSignature({ ...typed })).toBe(base);
+    expect(documentStructureSignature({ ...typed, tableSource: { t: {} } })).not.toBe(base);
+    expect(documentStructureSignature({ body: { customBlocks: [{}] } })).not.toBe(base);
+    expect(documentStructureSignature({ drawingsOrder: ["image"] })).not.toBe(base);
+  });
+
+  test("Select All is ⌘A on a Mac and Ctrl+A elsewhere, never with Shift or Option", () => {
+    const chord = { code: "KeyA", metaKey: false, ctrlKey: false, shiftKey: false, altKey: false };
+    expect(isSelectAllChord({ ...chord, metaKey: true }, true)).toBe(true);
+    expect(isSelectAllChord({ ...chord, ctrlKey: true }, true)).toBe(false);
+    expect(isSelectAllChord({ ...chord, ctrlKey: true }, false)).toBe(true);
+    expect(isSelectAllChord({ ...chord, metaKey: true, shiftKey: true }, true)).toBe(false);
+    expect(isSelectAllChord({ ...chord, code: "KeyS", metaKey: true }, true)).toBe(false);
   });
 });

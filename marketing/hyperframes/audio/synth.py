@@ -52,13 +52,13 @@ TARGETS = {
 
 # Film cuts the music answers (seconds). Keep in step with index.html.
 CUTS = {
-    "opening": [(0.2, 62, 0.72), (1.4, 66, 0.74), (2.6, 69, 0.86)],  # one accent per headline, D–F#–A
-    "app": 4.5,            # the workspace arrives: calm = open fifth · energetic = the drop
-    "playground": 12.4,    # calm: two-note answer · energetic: montage starts (lead motif enters)
-    "pulse_end": 37.5,     # calm: sparse pulse ends here
-    "themes": [(31.2, 69), (33.4, 66), (35.6, 74)],  # calm: motif notes on theme cuts
-    "riser": 36.3,         # energetic: two-bar riser starts
-    "resolve": 38.1,       # end card: calm = resolved chord · energetic = the hit, then decay
+    "opening": [(0.2, 62, 0.72), (1.1, 66, 0.74), (2.0, 69, 0.86)],  # one accent per headline, D–F#–A
+    "app": 3.6,            # the product arrives: calm = open fifth · energetic = the drop
+    "playground": 25.43,    # calm: two-note answer · energetic: the writing montage (lead motif enters)
+    "pulse_end": 71.73,     # calm: sparse pulse ends here
+    "themes": [(20.63, 69), (29.97, 66), (38.57, 74)],  # calm: motif notes on beat changes
+    "riser": 72.03,         # energetic: riser into the ending
+    "resolve": 73.63,       # "Built for you. And for your AI.": calm = resolved chord · energetic = the hit
 }
 BPM = 104.0
 

@@ -27,25 +27,15 @@ export const ONBOARDING_STEP_NUMBER = {
 export const ONBOARDING_TOTAL_STEPS = Object.keys(ONBOARDING_STEP_NUMBER).length;
 
 /** What every first run starts from: Rotli Light and a quokka wearing nothing,
- * even when a version bump re-onboards a personalized install. */
+ * even when a personalized install is re-onboarded from Settings. */
 export function startingAppearance(): typeof DEFAULT_APPEARANCE & { quokkaAccessory: QuokkaAccessory } {
   return { ...DEFAULT_APPEARANCE, quokkaAccessory: "none" };
 }
 
-function compareVersions(a: string, b: string): number {
-  const left = a.split(".").map((part) => Number.parseInt(part, 10) || 0);
-  const right = b.split(".").map((part) => Number.parseInt(part, 10) || 0);
-  for (let index = 0; index < Math.max(left.length, right.length); index++) {
-    const difference = (left[index] ?? 0) - (right[index] ?? 0);
-    if (difference !== 0) return difference;
-  }
-  return 0;
-}
-
 /** The window flags "Skip app setup" writes. Only a true first run (never
- * onboarded, no recorded onboarding version) takes the visitor defaults; a
- * 0.x version bump re-onboards an install whose Stay open / Dock choice must
- * survive — resetting it made the window hide on the next Finder click. */
+ * onboarded, no recorded onboarding version) takes the visitor defaults; an
+ * install re-onboarded from Settings keeps its Stay open / Dock choice —
+ * resetting it made the window hide on the next Finder click. */
 export function windowBehaviorOnSkip(
   onboarded: boolean,
   onboardingVersion: string,
@@ -53,13 +43,11 @@ export function windowBehaviorOnSkip(
   return !onboarded && onboardingVersion === "" ? { stayOpen: false, showInDock: false } : {};
 }
 
-export function onboardingRequired(
-  native: boolean,
-  onboarded: boolean,
-  onboardingVersion: string,
-  requiredVersion: string,
-): boolean {
-  return native && (!onboarded || compareVersions(onboardingVersion, requiredVersion) < 0);
+/** Setup runs only on a true first run (or after Settings → Reset & re-onboard).
+ * An app update never re-onboards: the 0.x version gate that did is retired
+ * with 1.0.0. `onboardingVersion` still records where setup was completed. */
+export function onboardingRequired(native: boolean, onboarded: boolean): boolean {
+  return native && !onboarded;
 }
 
 export async function resetAndReonboard(): Promise<void> {

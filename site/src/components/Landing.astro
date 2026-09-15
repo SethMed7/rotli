@@ -2,26 +2,29 @@
 import Base from '../layouts/Base.astro';
 import mark from '../../../src/assets/characters/_logo.svg?raw';
 import staysLocal from '../assets/characters/cocoa/stays_local.webp';
-import celebrating from '../assets/characters/cocoa/celebrating.webp';
+import showcaseManifest from '../assets/characters/showcase/showcase.json';
 import SiteFooter from './SiteFooter.astro';
 import SiteHeader from './SiteHeader.astro';
 import PlaygroundStory from './PlaygroundStory.astro';
-import PromoFilm from './PromoFilm.astro';
 import { GITHUB_URL, PRIVACY_URL, RELEASES_URL, ROADMAP_URL, site } from '../site';
+
+// Hero leads with the full promo (falls back to the teaser if the full cut
+// is missing). The same clip is never stacked twice below.
+const heroFilm = site.promo.full.enabled
+  ? { ...site.promo.full, kind: 'full' as const }
+  : site.promo.teaser.enabled
+    ? { ...site.promo.teaser, kind: 'teaser' as const }
+    : null;
 
 // Secondary calls to action fall back to local anchors while the source
 // repository is private (site.sourcePublic is false by default).
 const secondaryAction = site.sourcePublic
   ? { href: GITHUB_URL, label: 'Explore the source', external: true }
-  : site.promo.enabled
-    ? { href: '#film', label: 'Watch the film', external: false }
-    : { href: '#workspace', label: 'See the workspace', external: false };
+  : { href: '#organize', label: 'How organization works', external: false };
 
 const finalAction = site.sourcePublic
   ? { href: GITHUB_URL, label: 'View on GitHub', external: true }
-  : site.promo.enabled
-    ? { href: '#film', label: 'Watch the film', external: false }
-    : { href: '#privacy', label: 'How privacy works', external: false };
+  : { href: '#organize', label: 'How organization works', external: false };
 
 const footerLinks = [
   ...(site.sourcePublic ? [{ href: GITHUB_URL, label: 'GitHub' }] : []),
@@ -37,16 +40,86 @@ const footerTagline = site.sourcePublic
   ? 'Local-first, free, and open source under the MIT license.'
   : 'Local-first and free. One folder you own, no account required.';
 
+// Orb colors read the site swatch layer (Base.astro), which mirrors the app's
+// per-environment ground and accent tokens.
 const themeFamilies = [
-  { id: 'rotli', name: 'Rotli', environment: 'Warm Light', screenshot: '/rotli-app-warm-light@3x.png' },
-  { id: 'paper', name: 'Paper & Charcoal', environment: 'Paper', screenshot: '/rotli-app-paper@3x.png' },
-  { id: 'ocean', name: 'Ocean', environment: 'Ocean Light', screenshot: '/rotli-app-ocean-light@3x.png' },
-  { id: 'grove', name: 'Grove', environment: 'Grove Dark', screenshot: '/rotli-app-grove-dark@3x.png' },
-  { id: 'iris', name: 'Iris', environment: 'Iris Light', screenshot: '/rotli-app-iris-light@3x.png' },
-  { id: 'midnight', name: 'Midnight', environment: 'Midnight', screenshot: '/rotli-app-midnight@3x.png' },
+  {
+    id: 'rotli',
+    name: 'Rotli',
+    light: { environment: 'Warm Light', screenshot: '/themes/rotli-warm-light@2x.webp' },
+    dark: { environment: 'Warm Dark', screenshot: '/themes/rotli-warm-dark@2x.webp' },
+  },
+  {
+    id: 'paper',
+    name: 'Paper & Charcoal',
+    light: { environment: 'Paper', screenshot: '/themes/paper@2x.webp' },
+    dark: { environment: 'Charcoal', screenshot: '/themes/charcoal@2x.webp' },
+  },
+  {
+    id: 'ocean',
+    name: 'Ocean',
+    light: { environment: 'Ocean Light', screenshot: '/themes/ocean-light@2x.webp' },
+    dark: { environment: 'Ocean Dark', screenshot: '/themes/ocean-dark@2x.webp' },
+  },
+  {
+    id: 'grove',
+    name: 'Grove',
+    light: { environment: 'Grove Light', screenshot: '/themes/grove-light@2x.webp' },
+    dark: { environment: 'Grove Dark', screenshot: '/themes/grove-dark@2x.webp' },
+  },
+  {
+    id: 'iris',
+    name: 'Iris',
+    light: { environment: 'Iris Light', screenshot: '/themes/iris-light@2x.webp' },
+    dark: { environment: 'Iris Dark', screenshot: '/themes/iris-dark@2x.webp' },
+  },
+  {
+    id: 'midnight',
+    name: 'Midnight',
+    light: { environment: 'Midnight Light', screenshot: '/themes/midnight-light@2x.webp' },
+    dark: { environment: 'Midnight', screenshot: '/themes/midnight@2x.webp' },
+  },
 ];
 
-// The beta scope: what the launch site may promise. Anything beyond this list
+const themeTour = themeFamilies.flatMap((family) => ([
+  {
+    id: `${family.id}:light`,
+    familyId: family.id,
+    familyName: family.name,
+    mode: 'light' as const,
+    environment: family.light.environment,
+    screenshot: family.light.screenshot,
+  },
+  {
+    id: `${family.id}:dark`,
+    familyId: family.id,
+    familyName: family.name,
+    mode: 'dark' as const,
+    environment: family.dark.environment,
+    screenshot: family.dark.screenshot,
+  },
+]));
+
+const orbStyle = (familyId: string, mode: 'light' | 'dark') =>
+  `--orb-ground: var(--swatch-${familyId}-${mode}); --orb-accent: var(--swatch-${familyId}-${mode}-accent);`;
+
+// Companion carousel: real, selectable combinations (body preset or line
+// drawing × accessory × line color × pose) rendered by
+// scripts/build-companion-showcase.ts with the app's own placement rules.
+const showcaseImages = import.meta.glob<{ default: ImageMetadata }>(
+  '../assets/characters/showcase/*.webp',
+  { eager: true },
+);
+const companions = showcaseManifest.map((entry) => {
+  const image = showcaseImages[`../assets/characters/showcase/${entry.slug}.webp`];
+  if (!image) throw new Error(`Missing companion render for ${entry.slug}; run bun scripts/build-companion-showcase.ts`);
+  return { ...entry, src: image.default };
+});
+
+const defaultTheme = themeFamilies[0];
+const defaultThemeShot = defaultTheme.light;
+
+// The alpha scope: what the launch site may promise. Anything beyond this list
 // appears only on the dev site, under the experiments label below.
 const surfaces = [
   {
@@ -61,7 +134,7 @@ const surfaces = [
   },
   {
     name: 'Links and finding',
-    detail: 'Wikilinks connect notes to each other. ⌘K searches titles and text across the whole vault, and Main and named views arrange the same files without copying them.',
+    detail: 'Wikilinks connect notes to each other. ⌘K searches titles and text across the whole vault. With the Librarian on, Main and named views keep the same files arranged without copying them.',
     proof: 'Wikilinks · ⌘K · views, not copies',
   },
   {
@@ -76,11 +149,11 @@ const surfaces = [
 const experiments = [
   { name: 'Local CLI + MCP', status: 'A bounded JSON CLI and local stdio MCP server; being refined before release.' },
   { name: 'DOCX documents', status: 'An editable surface under review for round-trip fidelity.' },
-  { name: 'Spreadsheets', status: 'Coming soon. XLSX workbooks are in development builds only; CSV editing is in the beta.' },
+  { name: 'Spreadsheets', status: 'Coming soon. XLSX workbooks are in development builds only; CSV editing is in the alpha.' },
   { name: 'Mermaid diagram tabs', status: 'Coming soon. A Mermaid fence in any note already renders.' },
   { name: 'Read aloud', status: 'Coming soon. On-device voice for chat replies.' },
   { name: 'Excalidraw boards', status: 'Boards beside notes; native save and reopen still being verified.' },
-  { name: 'Mermaid visual editing', status: 'A visual editor over the text source. View and Code stay in the beta.' },
+  { name: 'Mermaid visual editing', status: 'A visual editor over the text source. View and Code stay in the alpha.' },
   { name: 'Breve routines', status: 'Scheduled briefs and watchlists written as vault Markdown.' },
   { name: 'Remote agents', status: 'Cloud MCP clients through a stateless relay; no hosted relay is launched.' },
 ];
@@ -90,8 +163,9 @@ const experiments = [
   <SiteHeader
     nav={[
       { href: '#why-local', label: 'Why local' },
+      { href: '#organize', label: 'Organize' },
       { href: '#workspace', label: 'Workspace' },
-      { href: '#personal', label: 'Personalize' },
+      { href: '#personal', label: 'Themes' },
       ...(site.showsExperiments
         ? [
             { href: '#beyond-the-app', label: 'More than an app' },
@@ -103,10 +177,8 @@ const experiments = [
 
   <main id="content">
     <section class="hero-shell" aria-labelledby="hero-title">
-      <img class="hero-backdrop" src="/coastline.webp" alt="" width="941" height="1672" aria-hidden="true" />
       <div class="hero">
         <div class="hero-copy">
-          <p class="hero-kicker">A local-first workspace for macOS</p>
           <h1 id="hero-title">Room to think.<br />Files you keep.</h1>
           <p class="hero-lede">
             Rotli turns one folder on your Mac into a calm workspace for notes, tasks, links,
@@ -116,41 +188,87 @@ const experiments = [
             {site.downloadsEnabled ? (
               <a class="button primary" href={RELEASES_URL} rel="noopener">Download for Mac</a>
             ) : (
-              <span class="button primary pending" aria-disabled="true">Mac beta coming soon</span>
+              <span class="button primary pending" aria-disabled="true">Mac alpha coming soon</span>
             )}
             <a class="button secondary" href={secondaryAction.href} rel={secondaryAction.external ? 'noopener' : undefined}>
               {secondaryAction.label}
             </a>
           </div>
-          <p class="release-note">Free · Apple silicon · {site.downloadsEnabled ? 'Mac beta' : 'Beta in preparation'} · no account</p>
+          <p class="release-note">Free · Apple silicon · {site.downloadsEnabled ? 'Mac alpha' : 'Alpha in preparation'} · no account</p>
         </div>
 
-        <figure class="product-figure">
-          <div class="product-shot">
-            <img
-              src="/rotli-app-paper@3x.png"
-              width="1280"
-              height="800"
-              alt="Rotli's browser demo workspace in the Paper environment"
-            />
-          </div>
-          <figcaption><span>Real browser demo</span> Paper · seeded local corpus</figcaption>
-        </figure>
+        {heroFilm ? (
+          <figure class="hero-film" id="hero-film">
+            <div class="hero-film-frame">
+              <video
+                id="hero-player"
+                autoplay
+                muted
+                loop
+                playsinline
+                preload="metadata"
+                poster={heroFilm.poster}
+                width="1920"
+                height="1080"
+                aria-label={heroFilm.kind === 'teaser' ? 'Rotli teaser' : 'Rotli launch film'}
+              >
+                <source src={heroFilm.video} type="video/mp4" />
+                {heroFilm.captions && (
+                  <track kind="captions" src={heroFilm.captions} srclang="en" label="English" />
+                )}
+                <p class="hero-film-fallback">
+                  Your browser cannot play this video here.{' '}
+                  <a href={heroFilm.video}>Download the clip (MP4)</a>.
+                </p>
+              </video>
+              <div class="hero-film-controls">
+                <button class="hero-sound" type="button" aria-pressed="false" aria-label="Turn sound on">
+                  <svg class="icon-muted" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M11 5 6 9H3v6h3l5 4V5z" />
+                    <path d="m16 9 5 5M21 9l-5 5" />
+                  </svg>
+                  <svg class="icon-sound is-hidden" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M11 5 6 9H3v6h3l5 4V5z" />
+                    <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+                    <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+                  </svg>
+                  <span class="sound-label">Sound off</span>
+                </button>
+              </div>
+            </div>
+            <figcaption>
+              <span>{heroFilm.kind === 'teaser' ? 'Teaser' : 'In motion'}</span>
+              Plays muted · turn sound on when you want it
+            </figcaption>
+            <p class="hero-film-error" role="status" hidden>
+              Playback could not start. <a href={heroFilm.video}>Open the clip directly</a>.
+            </p>
+          </figure>
+        ) : (
+          <figure class="product-figure">
+            <div class="product-shot">
+              <img
+                src="/themes/paper@2x.webp"
+                width="2376"
+                height="1485"
+                alt="Rotli's browser demo workspace in the Paper environment"
+              />
+            </div>
+            <figcaption><span>Real browser demo</span> Paper · seeded local corpus</figcaption>
+          </figure>
+        )}
       </div>
     </section>
 
-    <PromoFilm />
-
-    <div class="proof-strip" aria-label="Rotli essentials">
+    <div class="proof-strip" aria-label="Rotli essentials" data-reveal>
       <span><b>⌥Space</b> summon from anywhere</span>
       <span><b>One folder</b> is the durable truth</span>
       <span><b>Offline</b> remains useful without AI</span>
       <span><b>Local-first</b> is the architecture</span>
     </div>
 
-    <section class="folder-story" id="why-local" aria-labelledby="folder-title">
+    <section class="folder-story" id="why-local" aria-labelledby="folder-title" data-reveal>
       <div class="section-copy">
-        <p class="section-label">Not a cloud account with an export button</p>
         <h2 id="folder-title">One folder. Every path out stays open.</h2>
         <p>
           Your vault is an ordinary directory you choose. Markdown stays Markdown, and chat
@@ -195,30 +313,71 @@ const experiments = [
       </div>
     </section>
 
-    <section class="workspace-story" id="workspace" aria-labelledby="workspace-title">
-      <div class="workspace-intro">
-        <p class="section-label">A workspace, not a preview catalog</p>
-        <h2 id="workspace-title">Work on the file. Don’t stare at a thumbnail of it.</h2>
+    <section class="organize-story" id="organize" aria-labelledby="organize-title" data-reveal>
+      <div class="organize-copy">
+        <h2 id="organize-title">Turn on the Librarian.<br />Work in a view.</h2>
         <p>
-          Markdown is the knowledge surface, and the beta stays close to what it does well.
-          Rotli only calls a format supported when you can actually edit it here.
+          That is the whole idea. With the Librarian on, you stay in Main or a named view while
+          Rotli keeps Library and areas filed underneath. Views arrange the same files—they are
+          not a second vault, and they are not a copy.
+        </p>
+        <ul class="organize-points">
+          <li>
+            <b>You work in a view</b>
+            <span>Main and named views are the calm surface for today. Switch views when the job changes; leave the files where they live.</span>
+          </li>
+          <li>
+            <b>The Librarian organizes underneath</b>
+            <span>New notes stage for filing. Areas and summaries stay rebuildable metadata over ordinary Markdown.</span>
+          </li>
+          <li>
+            <b>Organization without lock-in</b>
+            <span>Turn the Librarian off and the folder remains a complete workspace. The files never depended on the projection.</span>
+          </li>
+        </ul>
+      </div>
+      <figure class="organize-figure">
+        <div class="organize-shot">
+          <img
+            src="/themes/rotli-warm-light@2x.webp"
+            width="2376"
+            height="1485"
+            alt="Rotli Home with Main, Welcome lessons, and Library in the sidebar"
+            loading="lazy"
+          />
+        </div>
+        <figcaption>
+          <span>Main · the view you work in</span>
+          Library stays organized underneath · lessons are ordinary notes
+        </figcaption>
+      </figure>
+    </section>
+
+    <section class="workspace-story" id="workspace" aria-labelledby="workspace-title" data-reveal>
+      <div class="workspace-intro">
+        <h2 id="workspace-title">Notes, tasks, links, and chat. All ordinary files.</h2>
+        <p>
+          Everything you edit in Rotli is a plain file in your folder. Nothing here is a
+          preview of something you would need another app to change.
         </p>
       </div>
       <div class="surface-list">
         {surfaces.map((surface) => (
           <article class="surface-row">
             <h3>{surface.name}</h3>
-            <p>{surface.detail}</p>
-            <span>{surface.proof}</span>
+            <div>
+              <p>{surface.detail}</p>
+              <span>{surface.proof}</span>
+            </div>
           </article>
         ))}
       </div>
       {site.showsExperiments && (
         <aside class="experiments" aria-labelledby="experiments-title">
           <p class="experiment-tag">Experiment · dev preview</p>
-          <h3 id="experiments-title">Also in development, outside the beta scope</h3>
+          <h3 id="experiments-title">Also in development, outside the alpha scope</h3>
           <p>
-            These features are under review and are not promised for the Mac beta.
+            These features are under review and are not promised for the Mac alpha.
             Breve, spreadsheets, Mermaid diagram tabs and visual editing, read-aloud, and agent integrations are
             restricted to development builds.
           </p>
@@ -229,26 +388,16 @@ const experiments = [
           </ul>
         </aside>
       )}
-      <div class="workflow-ribbon" aria-label="Rotli capture workflow">
-        <span><b>Capture</b><small>⌥C from anywhere</small></span>
-        <i aria-hidden="true">→</i>
-        <span><b>Arrange</b><small>Main and named views</small></span>
-        <i aria-hidden="true">→</i>
-        <span><b>Find</b><small>⌘K across the vault</small></span>
-        <i aria-hidden="true">→</i>
-        <span><b>Use</b><small>write, plan, chat, build</small></span>
-      </div>
     </section>
 
     <PlaygroundStory />
 
-    <section class="privacy-story" id="privacy" aria-labelledby="privacy-title">
+    <section class="privacy-story" id="privacy" aria-labelledby="privacy-title" data-reveal>
       <div class="privacy-visual">
-        <img src={staysLocal.src} width="400" height="400" alt="The Rotli quokka holding a privacy shield" loading="lazy" />
+        <img src={staysLocal.src} width="280" height="280" alt="The Rotli quokka holding a privacy shield" loading="lazy" />
         <p>Rotli excludes notes marked Secure from its remote model context. Locked notes remain readable, and AI edits are refused.</p>
       </div>
       <div class="privacy-copy">
-        <p class="section-label">Intelligence with a boundary</p>
         <h2 id="privacy-title">AI is invited into your workspace. It does not own the house.</h2>
         <p>
           Start with an on-device model, connect Claude Code or Codex, or use Cursor for code chat.
@@ -264,77 +413,124 @@ const experiments = [
     </section>
 
     <section class="personal-story" id="personal" aria-labelledby="personal-title">
-      <div class="personal-heading">
+      <div class="personal-heading" data-reveal>
         <div>
-          <p class="section-label">A workspace that can feel like yours</p>
-          <h2 id="personal-title">Six families. Twelve tuned environments. One calm grammar.</h2>
+          <h2 id="personal-title">Same workspace. The light that fits you.</h2>
         </div>
         <p>
-          Light, Dark, and System are separate from the family you choose. Every environment
-          keeps content readable; accent hue and an optional companion add personality without
-          taking over the work.
+          Six families, each with a light and dark environment. Click a family or let them
+          cycle—the calm grammar around your notes stays the same.
         </p>
       </div>
 
-      <div class="theme-studio">
-        <div class="theme-choices" role="group" aria-label="Preview a Rotli theme family">
-          {themeFamilies.map((family, index) => (
-            <button
-              class="theme-choice"
-              type="button"
-              data-theme-family={family.id}
-              data-theme-name={family.name}
-              data-theme-screenshot={family.screenshot}
-              data-theme-environment={family.environment}
-              aria-pressed={index === 0 ? 'true' : 'false'}
-            >
-              <span class={`theme-pair theme-pair-${family.id}`} aria-hidden="true"><i></i><i></i></span>
-              <span>{family.name}</span>
-            </button>
-          ))}
-        </div>
+      <div class="theme-studio" data-reveal>
         <figure class="theme-capture">
-          <div class="theme-capture-frame">
-            <img
-              id="theme-preview-image"
-              src={themeFamilies[0].screenshot}
-              width="1280"
-              height="800"
-              alt={`Rotli's browser demo workspace in the ${themeFamilies[0].environment} environment`}
-              loading="lazy"
-            />
-          </div>
+          <img
+            id="theme-preview-image"
+            src={defaultThemeShot.screenshot}
+            width="2376"
+            height="1485"
+            alt={`Rotli workspace in the ${defaultThemeShot.environment} environment`}
+            loading="lazy"
+          />
+          <script is:inline id="theme-tour-data" type="application/json" set:html={JSON.stringify(themeTour)} />
           <figcaption>
-            <span>Captured from Rotli’s browser demo</span>
-            <b id="theme-preview-caption">{themeFamilies[0].name} · {themeFamilies[0].environment}</b>
+            <span id="theme-preview-family">{defaultTheme.name}</span>
+            <b id="theme-preview-caption">{defaultThemeShot.environment}</b>
           </figcaption>
         </figure>
-        <div class="companion-preview">
-          <div class="companion-art">
-            <img src={celebrating.src} width="400" height="400" alt="A filled cocoa Rotli quokka celebrating" loading="lazy" />
+
+        <aside class="theme-picker" aria-label="Theme environments">
+          <div class="theme-grid" role="group" aria-label="Preview a Rotli environment">
+            <span class="theme-grid-head">Light</span>
+            <span class="theme-grid-head">Dark</span>
+            {themeFamilies.map((family, index) => (
+              <>
+                <button
+                  class="theme-orb-button"
+                  type="button"
+                  data-theme-stop={`${family.id}:light`}
+                  aria-pressed={index === 0 ? 'true' : 'false'}
+                  aria-label={family.light.environment}
+                  title={family.light.environment}
+                >
+                  <span class="theme-orb" style={orbStyle(family.id, 'light')} aria-hidden="true"></span>
+                </button>
+                <button
+                  class="theme-orb-button"
+                  type="button"
+                  data-theme-stop={`${family.id}:dark`}
+                  aria-pressed="false"
+                  aria-label={family.dark.environment}
+                  title={family.dark.environment}
+                >
+                  <span class="theme-orb" style={orbStyle(family.id, 'dark')} aria-hidden="true"></span>
+                </button>
+                <span class="theme-row-label">{family.id === 'paper' ? 'Paper' : family.name}</span>
+              </>
+            ))}
           </div>
-          <div class="companion-copy">
-            <span>Optional companion</span>
-            <h3>Your quokka, when you want one.</h3>
-            <p>
-              Choose body color, black or white linework, idle mood, pose, and independently
-              colored glasses or a bucket hat. Turn the companion off and it
-              stays in onboarding only.
-            </p>
-            <ul aria-label="Companion customization options">
-              <li>7 body presets + custom hue</li>
-              <li>2 accessories + custom color</li>
-              <li>semantic poses for empty states</li>
-            </ul>
+        </aside>
+      </div>
+
+      <div class="companion-preview" data-reveal>
+        <div class="companion-art" id="companion-art">
+          <div class="companion-stage" aria-live="polite">
+            {companions.map((companion, index) => (
+              <button
+                class:list={[
+                  'companion-slide',
+                  { 'is-active': index === 0, 'is-next': index === 1, 'is-prev': index === companions.length - 1 },
+                ]}
+                type="button"
+                data-companion-index={index}
+                aria-label={`Show ${companion.label}`}
+                tabindex="-1"
+              >
+                <img
+                  src={companion.src.src}
+                  width="400"
+                  height="400"
+                  alt={companion.alt}
+                  loading="lazy"
+                  decoding="async"
+                />
+              </button>
+            ))}
           </div>
+          <div class="companion-dots" role="group" aria-label="Choose a quokka pose">
+            {companions.map((companion, index) => (
+              <button
+                class="companion-dot"
+                type="button"
+                data-companion-index={index}
+                aria-pressed={index === 0 ? 'true' : 'false'}
+                aria-label={companion.label}
+                title={companion.label}
+              ></button>
+            ))}
+          </div>
+          <p class="companion-caption" id="companion-caption">{companions[0].label}</p>
+        </div>
+        <div class="companion-copy">
+          <h3>Your quokka, when you want one.</h3>
+          <p>
+            Choose body color, black or white linework, idle mood, pose, and independently
+            colored glasses or a bucket hat. Turn the companion off and it
+            stays in onboarding only.
+          </p>
+          <ul aria-label="Companion customization options">
+            <li>7 body presets + custom hue</li>
+            <li>2 accessories + custom color</li>
+            <li>semantic poses for empty states</li>
+          </ul>
         </div>
       </div>
     </section>
 
     {site.showsExperiments && (
-    <section class="beyond-story" id="beyond-the-app" aria-labelledby="beyond-title">
+    <section class="beyond-story" id="beyond-the-app" aria-labelledby="beyond-title" data-reveal>
       <div class="beyond-heading">
-        <p class="section-label">The folder is useful beyond the window</p>
         <h2 id="beyond-title">Your vault can work with the agents you already run.</h2>
       </div>
       <div class="beyond-lanes">
@@ -360,7 +556,7 @@ const experiments = [
               </div>
               <p>
                 Morning briefs, watchlists, reminders, delivery, and scheduler health in one managed
-                runtime. Generated briefs are ordinary vault Markdown. Not part of the beta scope.
+                runtime. Generated briefs are ordinary vault Markdown. Not part of the alpha scope.
               </p>
               <p class="lane-proof">Vault-owned configuration · development builds only</p>
             </article>
@@ -373,13 +569,13 @@ const experiments = [
                 Opt-in sessions let a cloud client reach your running Mac through a relay you operate,
                 without moving the vault into the cloud. No hosted relay is launched.
               </p>
-              <p class="lane-proof">Session opt-in · same policy engine · outside beta scope</p>
+              <p class="lane-proof">Session opt-in · same policy engine · outside alpha scope</p>
             </article>
       </div>
     </section>
     )}
 
-    <section class="final-cta" aria-labelledby="final-title">
+    <section class="final-cta" aria-labelledby="final-title" data-reveal>
       <span class="final-mark" set:html={mark} aria-hidden="true"></span>
       <div>
         <h2 id="final-title">A durable place for the work you want to keep.</h2>
@@ -387,9 +583,9 @@ const experiments = [
       </div>
       <div class="final-actions">
         {site.downloadsEnabled ? (
-          <a class="button final-button" href={RELEASES_URL} rel="noopener">Download the Mac beta</a>
+          <a class="button final-button" href={RELEASES_URL} rel="noopener">Download the Mac alpha</a>
         ) : (
-          <span class="button final-button pending" aria-disabled="true">Mac beta coming soon</span>
+          <span class="button final-button pending" aria-disabled="true">Mac alpha coming soon</span>
         )}
         <a class="button final-link" href={finalAction.href} rel={finalAction.external ? 'noopener' : undefined}>
           {finalAction.label}
@@ -401,37 +597,169 @@ const experiments = [
   <SiteFooter tagline={footerTagline} links={footerLinks} />
 
   <script>
-    let previewFamily = "rotli";
-    const familyButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-theme-family]')];
+    type ThemeStop = {
+      id: string;
+      familyId: string;
+      familyName: string;
+      mode: 'light' | 'dark';
+      environment: string;
+      screenshot: string;
+    };
+
     const themePreviewImage = document.querySelector<HTMLImageElement>('#theme-preview-image');
     const themePreviewCaption = document.querySelector<HTMLElement>('#theme-preview-caption');
-
-    const syncFamily = () => {
-      familyButtons.forEach((button) => {
-        button.setAttribute('aria-pressed', String(button.dataset.themeFamily === previewFamily));
-      });
-
-      const activeButton = familyButtons.find((button) => button.dataset.themeFamily === previewFamily);
-      const screenshot = activeButton?.dataset.themeScreenshot;
-      const environment = activeButton?.dataset.themeEnvironment;
-      const familyName = activeButton?.dataset.themeName;
-      if (themePreviewImage && screenshot && environment) {
-        themePreviewImage.src = screenshot;
-        themePreviewImage.alt = `Rotli's browser demo workspace in the ${environment} environment`;
+    const themePreviewFamily = document.querySelector<HTMLElement>('#theme-preview-family');
+    const stopButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-theme-stop]')];
+    const tour: ThemeStop[] = (() => {
+      const node = document.querySelector('#theme-tour-data');
+      try {
+        return JSON.parse(node?.textContent || '[]') as ThemeStop[];
+      } catch {
+        return [];
       }
-      if (themePreviewCaption && familyName && environment) {
-        themePreviewCaption.textContent = `${familyName} · ${environment}`;
+    })();
+
+    let tourIndex = 0;
+    let timer: number | null = null;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const INTERVAL_MS = 3800;
+
+    const showStop = (index: number) => {
+      if (!tour.length) return;
+      tourIndex = ((index % tour.length) + tour.length) % tour.length;
+      const stop = tour[tourIndex];
+      if (themePreviewImage) {
+        themePreviewImage.src = stop.screenshot;
+        themePreviewImage.alt = `Rotli workspace in the ${stop.environment} environment`;
+      }
+      if (themePreviewFamily) themePreviewFamily.textContent = stop.familyName;
+      if (themePreviewCaption) themePreviewCaption.textContent = stop.environment;
+      stopButtons.forEach((button) => {
+        button.setAttribute('aria-pressed', String(button.dataset.themeStop === stop.id));
+      });
+    };
+
+    const stopTour = () => {
+      if (timer !== null) {
+        window.clearInterval(timer);
+        timer = null;
       }
     };
 
-    familyButtons.forEach((button) => {
+    const startTour = () => {
+      stopTour();
+      if (reduceMotion || tour.length < 2) return;
+      timer = window.setInterval(() => showStop(tourIndex + 1), INTERVAL_MS);
+    };
+
+    stopButtons.forEach((button) => {
       button.addEventListener('click', () => {
-        previewFamily = button.dataset.themeFamily || 'rotli';
-        syncFamily();
+        const next = tour.findIndex((stop) => stop.id === button.dataset.themeStop);
+        if (next >= 0) showStop(next);
+        startTour();
       });
     });
 
-    syncFamily();
+    showStop(0);
+    startTour();
+
+    // Companion carousel: crossfades through poses, pauses while the visitor
+    // hovers or focuses it, and never auto-advances under reduced motion.
+    const companionArt = document.querySelector<HTMLElement>('#companion-art');
+    const companionSlides = [...document.querySelectorAll<HTMLButtonElement>('.companion-slide')];
+    const companionDots = [...document.querySelectorAll<HTMLButtonElement>('.companion-dot')];
+    const companionCaption = document.querySelector<HTMLElement>('#companion-caption');
+    let companionIndex = 0;
+    let companionTimer: number | null = null;
+    let companionPaused = false;
+    const COMPANION_MS = 3000;
+
+    const showCompanion = (index: number) => {
+      const count = companionSlides.length;
+      if (!count) return;
+      companionIndex = ((index % count) + count) % count;
+      const prev = (companionIndex - 1 + count) % count;
+      const next = (companionIndex + 1) % count;
+      companionSlides.forEach((slide, i) => {
+        slide.classList.toggle('is-active', i === companionIndex);
+        slide.classList.toggle('is-prev', i === prev && count > 1);
+        slide.classList.toggle('is-next', i === next && count > 2);
+      });
+      companionDots.forEach((dot, i) => dot.setAttribute('aria-pressed', String(i === companionIndex)));
+      const label = companionDots[companionIndex]?.getAttribute('aria-label');
+      if (companionCaption && label) companionCaption.textContent = label;
+    };
+
+    companionSlides.forEach((slide) => {
+      slide.addEventListener('click', () => {
+        const target = Number(slide.dataset.companionIndex);
+        if (Number.isFinite(target) && target !== companionIndex) {
+          showCompanion(target);
+          startCompanion();
+        }
+      });
+    });
+
+    const stopCompanion = () => {
+      if (companionTimer !== null) {
+        window.clearInterval(companionTimer);
+        companionTimer = null;
+      }
+    };
+
+    const startCompanion = () => {
+      stopCompanion();
+      if (reduceMotion || companionPaused || companionSlides.length < 2) return;
+      companionTimer = window.setInterval(() => showCompanion(companionIndex + 1), COMPANION_MS);
+    };
+
+    companionDots.forEach((dot, i) => {
+      dot.addEventListener('click', () => {
+        showCompanion(i);
+        startCompanion();
+      });
+    });
+
+    companionArt?.addEventListener('mouseenter', () => { companionPaused = true; stopCompanion(); });
+    companionArt?.addEventListener('mouseleave', () => { companionPaused = false; startCompanion(); });
+    companionArt?.addEventListener('focusin', () => { companionPaused = true; stopCompanion(); });
+    companionArt?.addEventListener('focusout', (event) => {
+      if (companionArt.contains(event.relatedTarget as Node | null)) return;
+      companionPaused = false;
+      startCompanion();
+    });
+
+    showCompanion(0);
+    startCompanion();
+
+    // Scroll reveal. Anything already on screen shows at once; the rest rises
+    // in as it enters. Reduced motion shows everything immediately.
+    const revealTargets = [...document.querySelectorAll<HTMLElement>('[data-reveal]')];
+    if (reduceMotion || !('IntersectionObserver' in window)) {
+      revealTargets.forEach((target) => target.classList.add('is-visible'));
+    } else {
+      const revealer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add('is-visible');
+            revealer.unobserve(entry.target);
+          });
+        },
+        { rootMargin: '0px 0px -10% 0px', threshold: 0.08 },
+      );
+      revealTargets.forEach((target) => revealer.observe(target));
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        stopTour();
+        stopCompanion();
+      } else {
+        startTour();
+        startCompanion();
+      }
+    });
   </script>
 
   <style>
@@ -457,42 +785,22 @@ const experiments = [
     .hero {
       position: relative;
       z-index: 3;
-      width: min(100% - 3rem, var(--page-max));
-      margin-inline: auto;
+      width: 100%;
+      max-width: none;
+      margin-inline: 0;
       display: grid;
-      grid-template-columns: minmax(20rem, 0.76fr) minmax(36rem, 1.24fr);
-      gap: clamp(2.5rem, 5vw, 5rem);
+      grid-template-columns: minmax(18rem, 32rem) minmax(0, 1fr);
+      gap: clamp(1.5rem, 3vw, 3.5rem);
       align-items: center;
       min-height: calc(100vh - 76px);
-      padding-block: clamp(5rem, 9vw, 8rem);
-    }
-
-    .hero-backdrop {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      object-position: 50% 34%;
-      opacity: 0.1;
-      pointer-events: none;
+      padding-block: clamp(3.5rem, 6vw, 5.5rem);
+      padding-left: max(1.5rem, calc((100% - var(--page-max)) / 2));
+      padding-right: 0;
     }
 
     .hero-copy {
       max-width: 34rem;
-    }
-
-    .hero-kicker,
-    .section-label {
-      margin: 0 0 1.1rem;
-      color: var(--accent-text);
-      font-size: 0.88rem;
-      font-weight: 600;
-      letter-spacing: 0.02em;
-    }
-
-    .hero-kicker {
-      color: var(--hero-accent);
+      padding-right: 0.5rem;
     }
 
     h1 {
@@ -564,7 +872,8 @@ const experiments = [
       height: auto;
     }
 
-    .product-figure figcaption {
+    .product-figure figcaption,
+    .hero-film figcaption {
       display: flex;
       justify-content: space-between;
       gap: 1rem;
@@ -573,9 +882,119 @@ const experiments = [
       font-size: 0.78rem;
     }
 
-    .product-figure figcaption span {
+    .hero-film figcaption {
+      padding-right: max(1.5rem, calc((100% - var(--page-max)) / 2));
+    }
+
+    .product-figure figcaption span,
+    .hero-film figcaption span {
       color: var(--hero-text);
       font-weight: 600;
+    }
+
+    .hero-film {
+      min-width: 0;
+      margin: 0;
+      align-self: stretch;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .hero-film-frame {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--hero-shot-border);
+      border-right: 0;
+      border-radius: 0.95rem 0 0 0.95rem;
+      background: var(--hero-shot);
+    }
+
+    .hero-film-frame video {
+      display: block;
+      width: 100%;
+      height: auto;
+      min-height: min(52vh, 34rem);
+      aspect-ratio: 16 / 9;
+      background: var(--hero-shot);
+      object-fit: cover;
+      object-position: left center;
+    }
+
+    .hero-film-frame video:focus-visible {
+      outline: 2px solid var(--hero-accent);
+      outline-offset: -2px;
+    }
+
+    .hero-film-fallback {
+      margin: 0;
+      padding: 1.5rem;
+      color: var(--hero-copy);
+    }
+
+    .hero-film-fallback a {
+      color: var(--hero-text);
+    }
+
+    .hero-film-controls {
+      position: absolute;
+      right: 0.9rem;
+      bottom: 0.9rem;
+      z-index: 2;
+    }
+
+    .hero-sound {
+      min-height: 2.6rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.45rem 0.85rem 0.45rem 0.7rem;
+      border: 1px solid var(--hero-border);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--hero-ground) 88%, transparent);
+      color: var(--hero-text);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .hero-sound svg {
+      width: 1.15rem;
+      height: 1.15rem;
+    }
+
+    .hero-sound svg.is-hidden {
+      display: none;
+    }
+
+    .hero-sound:hover {
+      border-color: var(--hero-text);
+      background: var(--hero-ground);
+    }
+
+    .hero-sound:focus-visible {
+      outline: 2px solid var(--hero-accent);
+      outline-offset: 3px;
+    }
+
+    .hero-sound[aria-pressed='true'] {
+      border-color: var(--hero-text);
+      background: var(--hero-text);
+      color: var(--hero-action-text);
+    }
+
+    .hero-film-error {
+      margin: 0.7rem 0 0;
+      color: var(--hero-copy);
+      font-size: 0.86rem;
+    }
+
+    .hero-film-error[hidden] {
+      display: none;
+    }
+
+    .hero-film-error a {
+      color: var(--hero-text);
     }
 
     .proof-strip {
@@ -614,6 +1033,85 @@ const experiments = [
       padding-block: clamp(7rem, 12vw, 11rem);
     }
 
+    .organize-story {
+      display: grid;
+      grid-template-columns: minmax(18rem, 0.92fr) minmax(0, 1.08fr);
+      gap: clamp(2.5rem, 6vw, 5rem);
+      align-items: center;
+      padding-block: clamp(6rem, 10vw, 9rem);
+      border-top: 1px solid var(--border);
+    }
+
+    .organize-copy h2 {
+      margin: 0;
+      font-size: clamp(2.35rem, 4.5vw, 4.2rem);
+      line-height: 1.04;
+      letter-spacing: -0.035em;
+      font-weight: 600;
+    }
+
+    .organize-copy > p {
+      margin: 1.4rem 0 0;
+      color: var(--text-muted);
+      font-size: 1.08rem;
+      line-height: 1.6;
+      max-width: 36rem;
+    }
+
+    .organize-points {
+      list-style: none;
+      margin: 2rem 0 0;
+      padding: 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .organize-points li {
+      display: grid;
+      gap: 0.35rem;
+      padding-block: 1.05rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .organize-points b {
+      font-size: 1.02rem;
+    }
+
+    .organize-points span {
+      color: var(--text-muted);
+      font-size: 0.98rem;
+      line-height: 1.55;
+    }
+
+    .organize-figure {
+      margin: 0;
+    }
+
+    .organize-shot {
+      overflow: hidden;
+      border-radius: 0.65rem;
+      background: transparent;
+    }
+
+    .organize-shot img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .organize-figure figcaption {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-top: 0.85rem;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+    }
+
+    .organize-figure figcaption span {
+      color: var(--text);
+      font-weight: 600;
+    }
+
     .section-copy h2,
     .workspace-intro h2,
     .privacy-copy h2,
@@ -627,9 +1125,10 @@ const experiments = [
       font-weight: 600;
     }
 
-    .section-copy > p:not(.section-label),
-    .workspace-intro > p:not(.section-label),
-    .privacy-copy > p:not(.section-label) {
+    .section-copy > p,
+    .workspace-intro > p,
+    .privacy-copy > p,
+    .personal-heading > p {
       margin: 1.5rem 0 0;
       color: var(--text-muted);
       font-size: 1.08rem;
@@ -747,10 +1246,10 @@ const experiments = [
 
     .surface-row {
       display: grid;
-      grid-template-columns: 0.7fr 1.3fr 0.7fr;
+      grid-template-columns: minmax(12rem, 0.6fr) minmax(0, 1.4fr);
       gap: clamp(1.5rem, 4vw, 4rem);
       align-items: start;
-      padding-block: 2rem;
+      padding-block: 1.75rem;
       border-bottom: 1px solid var(--border);
     }
 
@@ -760,7 +1259,7 @@ const experiments = [
     }
 
     .surface-row h3 {
-      font-size: clamp(1.25rem, 2vw, 1.65rem);
+      font-size: clamp(1.2rem, 1.9vw, 1.55rem);
       letter-spacing: -0.02em;
     }
 
@@ -769,11 +1268,12 @@ const experiments = [
       color: var(--text-muted);
     }
 
-    .surface-row > span {
+    .surface-row span {
+      display: block;
+      margin-top: 0.55rem;
       color: var(--accent-text);
       font-size: 0.78rem;
       font-weight: 600;
-      text-align: right;
     }
 
     /* Dev-site experiments: one label grammar, never shipped on the launch site. */
@@ -836,80 +1336,45 @@ const experiments = [
       color: var(--text);
     }
 
-    .workflow-ribbon {
-      display: grid;
-      grid-template-columns: repeat(7, auto);
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      margin-top: 4.5rem;
-      padding: 1.3rem 1.5rem;
-      border: 1px solid var(--border-strong);
-      border-radius: 0.75rem;
-      background: var(--surface);
-    }
-
-    .workflow-ribbon span {
-      display: grid;
-      gap: 0.15rem;
-    }
-
-    .workflow-ribbon small,
-    .workflow-ribbon i {
-      color: var(--text-muted);
-      font-size: 0.75rem;
-      font-style: normal;
-    }
-
     .privacy-story {
-      width: min(100% - 1.5rem, calc(var(--page-max) + 4rem)) !important;
       display: grid;
-      grid-template-columns: 0.8fr 1.2fr;
-      overflow: hidden;
-      border-radius: 0.9rem;
-      background: var(--surface);
+      grid-template-columns: minmax(16rem, 0.9fr) minmax(0, 1.1fr);
+      gap: clamp(3rem, 8vw, 8rem);
+      align-items: center;
+      padding-block: clamp(6rem, 10vw, 9rem);
+      border-top: 1px solid var(--border);
       color: var(--text);
     }
 
     .privacy-visual {
-      min-height: 42rem;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: clamp(2rem, 5vw, 4rem);
-      border-right: 1px solid var(--border);
-      background: var(--surface-2);
+      display: grid;
+      justify-items: start;
+      gap: 1.25rem;
     }
 
     .privacy-visual img {
-      width: min(100%, 19rem);
+      width: min(100%, 15rem);
       height: auto;
     }
 
     .privacy-visual p {
-      max-width: 24rem;
-      margin: 1.5rem 0 0;
+      max-width: 22rem;
+      margin: 0;
       color: var(--text-muted);
-      font-size: 0.9rem;
-      text-align: center;
+      font-size: 0.92rem;
+      line-height: 1.55;
     }
 
     .privacy-copy {
       align-self: center;
-      padding: clamp(3rem, 7vw, 7rem);
     }
 
-    .privacy-copy .section-label {
-      color: var(--accent-text);
-    }
-
-    .privacy-copy > p:not(.section-label) {
-      color: var(--text-muted);
+    .privacy-copy > p {
+      max-width: 36rem;
     }
 
     .boundary-list {
-      margin: 2.4rem 0 0;
+      margin: 1.8rem 0 0;
       border-top: 1px solid var(--border);
     }
 
@@ -917,7 +1382,7 @@ const experiments = [
       display: grid;
       grid-template-columns: 7rem 1fr;
       gap: 1.2rem;
-      padding-block: 0.95rem;
+      padding-block: 0.85rem;
       border-bottom: 1px solid var(--border);
     }
 
@@ -942,123 +1407,92 @@ const experiments = [
       align-items: end;
     }
 
-    .personal-heading > p {
-      margin: 0 0 0.4rem;
-      color: var(--text-muted);
-    }
-
     .theme-studio {
-      margin-top: 4rem;
-      border: 1px solid var(--border-strong);
-      border-radius: 0.85rem;
-      overflow: hidden;
-      background: var(--surface);
-    }
-
-    .theme-choices {
+      margin-top: 3.5rem;
       display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      border-bottom: 1px solid var(--border);
+      grid-template-columns: minmax(0, 1.7fr) auto;
+      gap: clamp(2rem, 5vw, 4rem);
+      align-items: center;
     }
 
-    .theme-choice {
-      min-height: 82px;
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      justify-content: center;
-      gap: 0.55rem;
-      padding: 0.8rem;
-      border: 0;
-      border-right: 1px solid var(--border);
-      background: transparent;
+    .theme-picker {
+      display: block;
+    }
+
+    .theme-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 2.4rem);
+      column-gap: 0.9rem;
+      row-gap: 0.3rem;
+      justify-items: center;
+      align-items: center;
+    }
+
+    .theme-grid-head {
+      margin-bottom: 0.35rem;
       color: var(--text-muted);
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .theme-orb-button {
+      display: grid;
+      place-items: center;
+      width: 2.4rem;
+      height: 2.4rem;
+      padding: 0;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
       cursor: pointer;
-      text-align: left;
     }
 
-    .theme-choice:last-child {
-      border-right: 0;
+    .theme-orb-button:focus-visible {
+      outline: 2px solid var(--accent-text);
+      outline-offset: 2px;
     }
 
-    .theme-choice:hover {
-      background: var(--surface-2);
-      color: var(--text);
+    .theme-orb-button[aria-pressed='true'] .theme-orb {
+      outline: 2px solid var(--accent-text);
+      outline-offset: 3px;
     }
 
-    .theme-choice[aria-pressed='true'] {
-      background: var(--tint);
-      color: var(--text);
+    .theme-orb {
+      width: 2rem;
+      height: 2rem;
+      border-radius: 999px;
+      border: 1px solid color-mix(in srgb, var(--border-strong) 60%, transparent);
+      background:
+        radial-gradient(circle at 32% 28%, color-mix(in srgb, white 45%, var(--orb-ground)) 0%, transparent 46%),
+        radial-gradient(circle at 70% 74%, var(--orb-accent) 0%, color-mix(in srgb, var(--orb-accent) 55%, transparent) 30%, transparent 62%),
+        var(--orb-ground);
+      box-shadow: inset 0 -6px 10px color-mix(in srgb, var(--deep) 14%, transparent);
     }
 
-    .theme-choice > span:last-child {
+    .theme-row-label {
+      grid-column: 1 / -1;
+      margin-bottom: 0.7rem;
+      color: var(--text-muted);
       font-size: 0.72rem;
       font-weight: 600;
     }
 
-    .theme-pair {
-      height: 28px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      overflow: hidden;
-      border: 1px solid var(--border-strong);
-      border-radius: 0.4rem;
-    }
-
-    .theme-pair-rotli i:first-child { background: var(--swatch-rotli-light);
-    }
-
-    .theme-pair-rotli i:last-child { background: var(--swatch-rotli-dark);
-    }
-
-    .theme-pair-paper i:first-child { background: var(--swatch-paper-light);
-    }
-
-    .theme-pair-paper i:last-child { background: var(--swatch-paper-dark);
-    }
-
-    .theme-pair-ocean i:first-child { background: var(--swatch-ocean-light);
-    }
-
-    .theme-pair-ocean i:last-child { background: var(--swatch-ocean-dark);
-    }
-
-    .theme-pair-grove i:first-child { background: var(--swatch-grove-light);
-    }
-
-    .theme-pair-grove i:last-child { background: var(--swatch-grove-dark);
-    }
-
-    .theme-pair-iris i:first-child { background: var(--swatch-iris-light);
-    }
-
-    .theme-pair-iris i:last-child { background: var(--swatch-iris-dark);
-    }
-
-    .theme-pair-midnight i:first-child { background: var(--swatch-midnight-light);
-    }
-
-    .theme-pair-midnight i:last-child { background: var(--swatch-midnight-dark);
+    .theme-row-label:last-child {
+      margin-bottom: 0;
     }
 
     .theme-capture {
       margin: 0;
-      padding: clamp(1rem, 2vw, 1.5rem);
-      border-bottom: 1px solid var(--border);
-      background: var(--surface-2);
+      min-width: 0;
     }
 
-    .theme-capture-frame {
-      overflow: hidden;
-      border: 1px solid var(--border-strong);
-      border-radius: 0.72rem;
-      background: var(--deep);
-    }
-
-    .theme-capture-frame img {
+    .theme-capture img {
       display: block;
       width: 100%;
       height: auto;
+      border-radius: 0.55rem;
     }
 
     .theme-capture figcaption {
@@ -1066,48 +1500,148 @@ const experiments = [
       align-items: baseline;
       justify-content: space-between;
       gap: 1rem;
-      padding: 0.9rem 0.15rem 0.1rem;
+      padding: 0.85rem 0.1rem 0;
       color: var(--text-muted);
-      font-size: 0.78rem;
+      font-size: 0.82rem;
+    }
+
+    .theme-capture figcaption span {
+      font-weight: 600;
+      color: var(--text);
     }
 
     .theme-capture figcaption b {
-      color: var(--text);
-      font-weight: 600;
+      color: var(--text-muted);
+      font-weight: 500;
     }
 
     .companion-preview {
+      margin-top: clamp(3.5rem, 7vw, 5.5rem);
       display: grid;
-      grid-template-columns: minmax(18rem, 0.75fr) minmax(0, 1.25fr);
+      grid-template-columns: minmax(20rem, 1fr) minmax(0, 1fr);
+      gap: clamp(2rem, 5vw, 4rem);
+      align-items: center;
+      padding-top: clamp(2.5rem, 5vw, 3.5rem);
+      border-top: 1px solid var(--border);
     }
 
     .companion-art {
-      min-height: 30rem;
       display: grid;
-      place-items: center;
-      padding: 2rem;
-      border-right: 1px solid var(--border);
-      background: var(--quokka-field);
+      justify-items: center;
+      gap: 0.9rem;
+      padding: 0;
+      background: transparent;
     }
 
-    .companion-art img {
-      width: min(100%, 16rem);
-      height: auto;
+    .companion-stage {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 5 / 3;
+      overflow: hidden;
+    }
+
+    .companion-slide {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      width: 58%;
+      height: 100%;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      opacity: 0;
+      transform: translateX(-50%) scale(0.5);
+      filter: blur(6px);
+      transition: opacity 520ms ease, transform 520ms cubic-bezier(0.2, 0.7, 0.2, 1), filter 520ms ease;
+      pointer-events: none;
+    }
+
+    .companion-slide img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .companion-slide.is-active {
+      z-index: 2;
+      opacity: 1;
+      transform: translateX(-50%) scale(1);
+      filter: none;
+    }
+
+    .companion-slide.is-prev,
+    .companion-slide.is-next {
+      z-index: 1;
+      opacity: 0.55;
+      filter: blur(2.5px);
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
+    .companion-slide.is-prev {
+      transform: translateX(-100%) scale(0.62);
+    }
+
+    .companion-slide.is-next {
+      transform: translateX(0%) scale(0.62);
+    }
+
+    .companion-slide.is-prev:hover,
+    .companion-slide.is-next:hover {
+      opacity: 0.8;
+      filter: blur(1px);
+    }
+
+    .companion-dots {
+      display: flex;
+      gap: 0.45rem;
+    }
+
+    .companion-dot {
+      width: 0.55rem;
+      height: 0.55rem;
+      padding: 0;
+      border: 0;
+      border-radius: 999px;
+      background: var(--border-strong);
+      cursor: pointer;
+      transition: background-color 180ms ease, transform 180ms ease;
+    }
+
+    .companion-dot:hover {
+      background: var(--text-muted);
+    }
+
+    .companion-dot[aria-pressed='true'] {
+      background: var(--accent-text);
+      transform: scale(1.25);
+    }
+
+    .companion-dot:focus-visible {
+      outline: 2px solid var(--accent-text);
+      outline-offset: 3px;
+    }
+
+    .companion-caption {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .companion-slide {
+        transition: none;
+      }
     }
 
     .companion-copy {
       align-self: center;
-      padding: clamp(2rem, 6vw, 5rem);
-    }
-
-    .companion-copy > span {
-      color: var(--accent-text);
-      font-size: 0.82rem;
-      font-weight: 600;
+      padding: 0;
     }
 
     .companion-copy h3 {
-      margin: 0.65rem 0 0;
+      margin: 0;
       font-size: clamp(1.8rem, 3vw, 3rem);
       line-height: 1.08;
       letter-spacing: -0.03em;
@@ -1277,26 +1811,53 @@ const experiments = [
       .hero {
         grid-template-columns: 1fr;
         min-height: 0;
+        gap: 2rem;
+        padding-right: 0;
       }
 
       .hero-copy {
         max-width: 48rem;
+        padding-right: max(1.5rem, calc((100% - var(--page-max)) / 2));
       }
 
       .product-figure {
-        width: min(100%, 54rem);
+        width: min(100% - 1.5rem, 54rem);
+        margin-right: 1.5rem;
       }
 
-      .theme-choices {
-        grid-template-columns: repeat(3, 1fr);
+      .hero-film {
+        width: 100%;
       }
 
-      .theme-choice:nth-child(3) {
-        border-right: 0;
+      .hero-film-frame {
+        border-radius: 0.95rem 0 0 0.95rem;
       }
 
-      .theme-choice:nth-child(-n + 3) {
-        border-bottom: 1px solid var(--border);
+      .hero-film-frame video {
+        min-height: min(42vh, 22rem);
+      }
+
+      .theme-studio {
+        grid-template-columns: 1fr;
+        gap: 1.75rem;
+      }
+
+      .theme-picker {
+        order: -1;
+        width: 100%;
+      }
+
+      .theme-grid {
+        grid-template-columns: repeat(12, 2.4rem);
+        grid-auto-flow: column;
+        grid-template-rows: auto auto;
+        column-gap: 0.5rem;
+        justify-content: start;
+      }
+
+      .theme-grid-head,
+      .theme-row-label {
+        display: none;
       }
     }
 
@@ -1314,49 +1875,19 @@ const experiments = [
       }
 
       .folder-story,
+      .organize-story,
       .personal-heading,
       .privacy-story,
       .companion-preview {
         grid-template-columns: 1fr;
       }
 
-      .privacy-visual,
       .companion-art {
-        min-height: 25rem;
-        border-right: 0;
-        border-bottom: 1px solid var(--border);
-      }
-
-      .companion-art {
-        border-bottom-color: var(--border);
+        justify-self: start;
       }
 
       .surface-row {
         grid-template-columns: 0.8fr 1.2fr;
-      }
-
-      .surface-row > span {
-        grid-column: 2;
-        text-align: left;
-      }
-
-      .workflow-ribbon {
-        grid-template-columns: 1fr;
-        justify-content: stretch;
-      }
-
-      .workflow-ribbon i {
-        display: none;
-      }
-
-      .workflow-ribbon span {
-        grid-template-columns: 8rem 1fr;
-        padding-block: 0.4rem;
-        border-bottom: 1px solid var(--border);
-      }
-
-      .workflow-ribbon span:last-child {
-        border-bottom: 0;
       }
 
       .beyond-lanes article {
@@ -1390,8 +1921,22 @@ const experiments = [
       }
 
       .hero {
-        width: min(100% - 1.5rem, var(--page-max));
+        width: 100%;
         padding-top: 3.5rem;
+        padding-left: 1.5rem;
+      }
+
+      .hero-copy {
+        padding-right: 1.5rem;
+      }
+
+      .hero-film figcaption,
+      .product-figure figcaption {
+        padding-right: 1.5rem;
+      }
+
+      .hero-film-frame video {
+        min-height: 14rem;
       }
 
       h1 {
@@ -1434,58 +1979,26 @@ const experiments = [
         gap: 0.8rem;
       }
 
-      .surface-row > span {
-        grid-column: 1;
-      }
-
-      .privacy-story {
-        width: calc(100% - 0.75rem) !important;
-      }
-
-      .privacy-copy {
-        padding: 2.4rem 1.5rem;
-      }
-
       .boundary-list > div {
         grid-template-columns: 1fr;
         gap: 0.25rem;
       }
 
-      .theme-choices {
-        grid-template-columns: 1fr 1fr;
-      }
-
-      .theme-capture {
-        padding: 0.7rem;
+      .theme-grid {
+        grid-template-columns: repeat(6, 2.4rem);
+        grid-template-rows: auto auto auto auto;
       }
 
       .theme-capture figcaption,
-      .product-figure figcaption {
+      .product-figure figcaption,
+      .hero-film figcaption {
         align-items: flex-start;
         flex-direction: column;
         gap: 0.2rem;
       }
 
-      .theme-choice,
-      .theme-choice:nth-child(3) {
-        border-right: 1px solid var(--border);
-        border-bottom: 1px solid var(--border);
-      }
-
-      .theme-choice:nth-child(even) {
-        border-right: 0;
-      }
-
-      .theme-choice:nth-last-child(-n + 2) {
-        border-bottom: 0;
-      }
-
-      .companion-art {
-        min-height: 21rem;
-      }
-
       .companion-copy {
-        padding: 2rem 1.3rem;
+        padding: 0;
       }
 
       .final-cta {
@@ -1503,4 +2016,48 @@ const experiments = [
       }
     }
   </style>
+
+  <script>
+    // Hero film: muted autoplay with an explicit sound toggle. Reduced motion
+    // keeps the poster until the visitor starts playback themselves.
+    const player = document.querySelector<HTMLVideoElement>('#hero-player');
+    const sound = document.querySelector<HTMLButtonElement>('.hero-sound');
+    const error = document.querySelector<HTMLElement>('.hero-film-error');
+    const mutedIcon = sound?.querySelector<SVGElement>('.icon-muted');
+    const soundIcon = sound?.querySelector<SVGElement>('.icon-sound');
+    const soundLabel = sound?.querySelector<HTMLElement>('.sound-label');
+    const showError = () => { if (error) error.hidden = false; };
+    const syncSoundUi = () => {
+      if (!player || !sound) return;
+      const on = !player.muted;
+      sound.setAttribute('aria-pressed', String(on));
+      sound.setAttribute('aria-label', on ? 'Turn sound off' : 'Turn sound on');
+      if (mutedIcon) mutedIcon.classList.toggle('is-hidden', on);
+      if (soundIcon) soundIcon.classList.toggle('is-hidden', !on);
+      if (soundLabel) soundLabel.textContent = on ? 'Sound on' : 'Sound off';
+    };
+    player?.addEventListener('error', showError);
+    player?.querySelector('source')?.addEventListener('error', showError);
+    player?.addEventListener('playing', () => { if (error) error.hidden = true; });
+    if (player && typeof player.canPlayType === 'function' && player.canPlayType('video/mp4')) {
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      player.muted = true;
+      if (reduceMotion) {
+        player.removeAttribute('autoplay');
+        player.pause();
+      } else {
+        // A refused or interrupted autoplay is not a broken file: keep the
+        // poster and stay quiet. Real media errors surface through `error`.
+        void player.play().catch(() => {});
+      }
+      sound?.addEventListener('click', () => {
+        player.muted = !player.muted;
+        if (!player.muted && player.paused) {
+          void player.play().catch(showError);
+        }
+        syncSoundUi();
+      });
+      syncSoundUi();
+    }
+  </script>
 </Base>

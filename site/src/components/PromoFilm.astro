@@ -1,9 +1,9 @@
 ---
-// The launch film, placed directly below the hero. It renders only when the
-// real artifacts exist in public/media/ (site.promo.enabled), so a build never
-// ships an empty player over a black frame. Click-to-play with the browser's
-// native controls: no autoplay, no third-party player, no cookies, and no
-// network request for the video until the visitor presses play.
+// The full launch film on the holding page. The landing hero owns the promo
+// cut directly, so this section is not stacked under the landing hero.
+// Renders only when public/media/ has real files, so a build never ships an
+// empty player. Click-to-play with native controls: no autoplay, no
+// third-party player, no cookies, and no network request until play.
 import { site } from '../site';
 
 interface Props {
@@ -12,15 +12,14 @@ interface Props {
 }
 
 const { variant = 'landing' } = Astro.props;
-const { promo } = site;
+const film = site.promo.full;
 ---
 
 {
-  promo.enabled && (
+  film.enabled && (
     <section class:list={['film', `film-${variant}`]} id="film" aria-labelledby="film-title">
       <div class="film-panel">
         <div class="film-copy">
-          <p class="film-label">The film</p>
           <h2 id="film-title">Rotli, in motion.</h2>
           <p class="film-lede">
             A place to write, think with a model, and make yourself at home.
@@ -28,7 +27,7 @@ const { promo } = site;
           </p>
           <ul class="film-facts" aria-label="Playback details">
             <li>Plays with sound</li>
-            <li>{promo.captions ? 'Captions available' : 'On-screen captions'}</li>
+            <li>{film.captions ? 'Captions available' : 'On-screen captions'}</li>
             <li>Real Playground footage</li>
           </ul>
           <div class="film-start">
@@ -47,21 +46,21 @@ const { promo } = site;
             controls
             playsinline
             preload="none"
-            poster={promo.poster}
+            poster={film.poster}
             width="1920"
             height="1080"
             aria-label="Rotli launch film"
           >
-            <source src={promo.video} type="video/mp4" />
-            {promo.captions && (
-              <track kind="captions" src={promo.captions} srclang="en" label="English" />
+            <source src={film.video} type="video/mp4" />
+            {film.captions && (
+              <track kind="captions" src={film.captions} srclang="en" label="English" />
             )}
             <p class="film-fallback">
               Your browser cannot play this video here.{' '}
-              <a href={promo.video}>Download the film (MP4)</a>
-              {promo.captions && (
+              <a href={film.video}>Download the film (MP4)</a>
+              {film.captions && (
                 <>
-                  {' '}or <a href={promo.captions}>read the captions</a>
+                  {' '}or <a href={film.captions}>read the captions</a>
                 </>
               )}
               .
@@ -69,8 +68,8 @@ const { promo } = site;
           </video>
         </div>
         <p class="film-error" role="status" hidden>
-          Playback could not start. <a href={promo.video}>Open the film directly</a>
-          {promo.captions && <> or <a href={promo.captions}>read the captions</a></>}.
+          Playback could not start. <a href={film.video}>Open the film directly</a>
+          {film.captions && <> or <a href={film.captions}>read the captions</a></>}.
         </p>
       </div>
     </section>
@@ -139,14 +138,6 @@ const { promo } = site;
   }
 
   .film-error[hidden] { display: none; }
-
-  .film-label {
-    margin: 0 0 0.9rem;
-    color: var(--accent);
-    font-size: 0.85rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-  }
 
   h2 {
     margin: 0;

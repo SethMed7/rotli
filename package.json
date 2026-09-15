@@ -1,7 +1,7 @@
 {
   "name": "rotli",
   "private": true,
-  "version": "0.95.1",
+  "version": "1.0.0",
   "packageManager": "bun@1.4.0",
   "overrides": {
     "@codemirror/lang-html": "6.4.12",
@@ -68,6 +68,7 @@
     "security:changes": "bash scripts/scan-changed-secrets.sh",
     "security:working": "bun scripts/scan-working-secrets.mjs",
     "build:social-card": "bun scripts/build-social-card.mjs",
+    "build:companion-showcase": "bun scripts/build-companion-showcase.ts",
     "security:bundle": "bun scripts/check-release-privacy.mjs"
   },
   "dependencies": {

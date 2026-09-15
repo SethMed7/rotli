@@ -23,9 +23,13 @@ const variants = [
   { name: "green", fill: [111, 166, 139] },
 ];
 
+// Plain fills the marketing site uses directly. The companion carousel is
+// rendered separately by build-companion-showcase.ts with accessories.
+const sitePoses = ["stays_local.svg", "celebrating.svg"];
+
 const sources = (await readdir(sourceDir))
   .filter((name) => name.endsWith(".svg") && !name.startsWith("_"))
-  .filter((name) => !siteOnly || ["stays_local.svg", "celebrating.svg"].includes(name))
+  .filter((name) => !siteOnly || sitePoses.includes(name))
   .sort();
 
 async function fillCharacter(sourceName, variant) {

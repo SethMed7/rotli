@@ -40,6 +40,7 @@ const socialImageUrl = new URL(image, siteUrl).href;
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={socialImageUrl} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script is:inline>document.documentElement.classList.add('js');</script>
     <style is:global>
       @font-face {
         font-family: 'General Sans';
@@ -72,7 +73,7 @@ const socialImageUrl = new URL(image, siteUrl).href;
         --page-max: 76rem;
         --copy-max: 68ch;
         --ground: #f8f2e9;
-        --surface: #ffffff;
+        --surface: #fbf6ee;
         --surface-2: #f1e7d8;
         --tint: #f2d6c2;
         --text: #3a3028;
@@ -91,29 +92,42 @@ const socialImageUrl = new URL(image, siteUrl).href;
         --selection: #f2d6c2;
         --quokka-field: #f3e8da;
         --swatch-rotli-light: #f8f2e9;
+        --swatch-rotli-light-accent: #c97e62;
         --swatch-rotli-dark: #241d18;
+        --swatch-rotli-dark-accent: #c97e62;
         --swatch-paper-light: #fafaf9;
+        --swatch-paper-light-accent: #161616;
         --swatch-paper-dark: #161616;
+        --swatch-paper-dark-accent: #e9e7e2;
         --swatch-ocean-light: #dfebf3;
+        --swatch-ocean-light-accent: #2e6e91;
         --swatch-ocean-dark: #0e171d;
+        --swatch-ocean-dark-accent: #70b2d7;
         --swatch-grove-light: #e3eee4;
+        --swatch-grove-light-accent: #427a55;
         --swatch-grove-dark: #101814;
+        --swatch-grove-dark-accent: #82be96;
         --swatch-iris-light: #e9e4f2;
+        --swatch-iris-light-accent: #6b58a5;
         --swatch-iris-dark: #15121d;
+        --swatch-iris-dark-accent: #ad9ae3;
         --swatch-midnight-light: #f0f2f5;
+        --swatch-midnight-light-accent: #364152;
         --swatch-midnight-dark: #050607;
-        --hero-ground: #fafaf9;
-        --hero-text: #161616;
-        --hero-accent: #62625f;
-        --hero-action: #161616;
-        --hero-action-text: #ffffff;
-        --hero-shot: #ffffff;
-        --hero-hover-wash: #f2f2f0;
-        --hero-copy: #62625f;
-        --hero-muted: #62625f;
-        --hero-caption: #62625f;
-        --hero-border: #ddddda;
-        --hero-shot-border: #ddddda;
+        --swatch-midnight-dark-accent: #cfd5dc;
+        /* The hero shares the Rotli Warm Light palette; one ground, no white band. */
+        --hero-ground: var(--ground);
+        --hero-text: var(--text);
+        --hero-accent: var(--accent-text);
+        --hero-action: var(--accent-text);
+        --hero-action-text: var(--on-accent);
+        --hero-shot: var(--surface-2);
+        --hero-hover-wash: var(--surface-2);
+        --hero-copy: var(--text-muted);
+        --hero-muted: var(--text-muted);
+        --hero-caption: var(--text-muted);
+        --hero-border: var(--border-strong);
+        --hero-shot-border: var(--border);
       }
 
       :root {
@@ -169,6 +183,24 @@ const socialImageUrl = new URL(image, siteUrl).href;
       ::selection {
         background: var(--selection);
         color: var(--text);
+      }
+      /* Scroll reveal: blocks below the fold rise in as they enter the viewport.
+         Only when scripting is on (the `js` class), never under reduced motion. */
+      .js [data-reveal] {
+        opacity: 0;
+        transform: translateY(18px);
+        transition: opacity 640ms cubic-bezier(0.2, 0.7, 0.2, 1), transform 640ms cubic-bezier(0.2, 0.7, 0.2, 1);
+      }
+      .js [data-reveal].is-visible {
+        opacity: 1;
+        transform: none;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .js [data-reveal] {
+          opacity: 1;
+          transform: none;
+          transition: none;
+        }
       }
       .skip-link {
         position: fixed;
