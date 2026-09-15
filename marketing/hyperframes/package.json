@@ -6,17 +6,18 @@
   "scripts": {
     "ci": "bun install --frozen-lockfile --ignore-scripts --linker=isolated",
     "prepare:assets": "bun prepare.mjs",
-    "audio": "python3 audio/synth.py --bed calm",
+    "audio": "python3 audio/synth.py --bed energetic",
     "audio:energetic": "python3 audio/synth.py --bed energetic --preview",
     "captions": "bun scripts/export-captions.mjs",
     "stems": "bun scripts/build-stems.mjs",
     "lint": "bun scripts/hyperframes-local.mjs lint .",
-    "check": "bun scripts/hyperframes-local.mjs check . --snapshots --at 0.4,1.8,3.6,5.0,8.7,11.0,12.7,15.0,15.9,18.2,20.2,21.6,22.8,25.0,26.5,30.0,32.0,36.0,40.0 --timeout 15000",
-    "snapshot": "bun scripts/hyperframes-local.mjs snapshot . --at 0.4,1.8,3.6,5.0,8.7,11.0,12.7,15.0,15.9,18.2,20.2,21.6,22.8,25.0,26.5,30.0,32.0,36.0,40.0 --no-end --output snapshots/review --timeout 15000",
+    "check": "bun scripts/hyperframes-local.mjs check . --snapshots --at 0.5,2.4,4.6,7.0,9.0,12.0,15.0,17.5,20.5,23.0,25.5,28.0,30.5,33.0,36.0,39.0,42.0,44.5,47.0,50.0,53.5,56.0,59.0,62.0,65.5,68.5,71.5,74.5,77.5 --timeout 15000",
+    "snapshot": "bun scripts/hyperframes-local.mjs snapshot . --at 0.5,2.4,4.6,7.0,9.0,12.0,15.0,17.5,20.5,23.0,25.5,28.0,30.5,33.0,36.0,39.0,42.0,44.5,47.0,50.0,53.5,56.0,59.0,62.0,65.5,68.5,71.5,74.5,77.5 --no-end --output snapshots/review --timeout 15000",
     "render": "bun scripts/hyperframes-local.mjs render . --output renders/rotli-launch-promo.mp4 --quality high --workers 4 --video-frame-format png",
-    "poster": "bun scripts/hyperframes-local.mjs snapshot . --at 40 --no-end --output renders/poster --timeout 15000 && cp renders/poster/frame-00-at-40s.png renders/rotli-launch-promo-poster.png",
+    "poster": "bun scripts/hyperframes-local.mjs snapshot . --at 78 --no-end --output renders/poster --timeout 15000 && cp renders/poster/frame-00-at-78s.png renders/rotli-launch-promo-poster.png",
     "verify": "bun scripts/verify-render.mjs",
-    "build": "bun run prepare:assets && bun run audio && bun run captions && bun run stems && bun run lint && bun run render && bun run poster && bun run verify"
+    "sync": "bun scripts/sync-timings.mjs",
+    "build": "bun run prepare:assets && bun run sync && bun run audio && bun run captions && bun run stems && bun run lint && bun run render && bun run poster && bun run verify"
   },
   "dependencies": {
     "gsap": "3.15.0",

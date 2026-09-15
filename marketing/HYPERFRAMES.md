@@ -1,91 +1,55 @@
-# Rotli launch film — creative and audit record
+# Rotli launch films — creative and audit record
 
-The current homepage film is the 41.8-second HyperFrames composition in
-`hyperframes/index.html`. Claude Code Fable 5.1 directed both cuts and consulted
-GPT-6 Astra through Codex CLI twice: on the storyboard
-(`hyperframes/review/gpt6-astra-review.md`) and on the final cut
-(`hyperframes/review/gpt6-astra-final-review.md`, brief in `review/final-brief.md`).
-GPT collected the synthetic Playground footage and inspected the real controls
-through computer use. Existing Remotion work is preserved.
-
-The film contains **captions, original music, and sound effects only. No voiceover**.
+The homepage carries two films cut from a recorded shoot of the native Mac app
+(2026-09-15, a fresh synthetic `Notebook` vault): a **79-second full promo**
+(`hyperframes/index.html`, HyperFrames) and a **15-second silent teaser** for
+the hero (built in `hyperframes/prepare.mjs`). Claude Code (Opus 5) made every
+creative decision. GPT-6 Astra (Codex CLI) drove the app through computer use
+for the takes, logged each take with timed selects and crops, and flagged
+privacy hazards; the director chose and reframed the edit. Records live in the
+ignored `_review/promo-v5/`. Backgrounds are plain color only. No voiceover.
 
 ## Delivered files
 
 | Website artifact | Generated source |
 |---|---|
-| `site/public/media/rotli-promo.mp4` | `hyperframes/renders/rotli-launch-promo.mp4` |
-| `site/public/media/rotli-promo-poster.jpg` | `hyperframes/renders/rotli-launch-promo-poster.png`, converted to JPEG |
-| `site/public/media/rotli-promo.vtt` | `hyperframes/renders/rotli-launch-promo.vtt` (SRT twin beside it) |
+| `site/public/media/rotli-promo.mp4` | `hyperframes/renders/rotli-launch-promo.mp4`, re-encoded (CRF 22, AAC 128 kbps) |
+| `site/public/media/rotli-promo-poster.jpg` | `hyperframes/renders/rotli-launch-promo-poster.png` (the end card) |
+| `site/public/media/rotli-promo.vtt` | `hyperframes/renders/rotli-launch-promo.vtt` |
+| `site/public/media/rotli-teaser.mp4` | `hyperframes/renders/rotli-teaser.mp4` |
+| `site/public/media/rotli-teaser-poster.jpg` | `hyperframes/renders/rotli-teaser-poster.jpg` |
 
-The export is 1920×1080, 30 fps, H.264 High/yuv420p, AAC 48 kHz stereo,
-41.800 seconds (1254 frames), 7.09 MB. Captions are burned into the picture;
-the VTT/SRT track carries the same 13 cues. The end card is the poster.
-Music-only and effects-only stems are in the ignored `hyperframes/renders/stems/`.
+## Story (full promo)
 
-## Edit
+Cold open “One folder. / Your vault. / Room to think.”, then one beat per idea,
+each a kicker and headline beside the recorded app:
 
-| Time | Picture and message |
-|---|---|
-| 0–4.5 | Words first: “One folder.” (0.2) / “Plain files.” (1.4) / “Room to think.” (2.6) accumulate; small wordmark in the corner |
-| 4.5–8.5 | The workspace fades into the frame every later shot shares: full synthetic note in Rotli Warm Light. *Plain Markdown files. In a folder you choose.* |
-| 8.5–12.4 | One 0.7 s reframe into the writing (heading, paragraph, task list, quote). *Headings, tasks, links. Plain text underneath.* |
-| 12.4–14.4 | Hard cut to the full Playground lesson. *Ten lessons to try in the Playground.* |
-| 14.4–19.5 | Recording, reframed onto the lesson header, task rows, and first results: the real tick at 15.63 and Raw Markdown at 17.77. *Tick a task. It stays in your note.* / *Raw Markdown is one click away.* |
-| 19.5–23.3 | Raw Markdown hold, the real toggle back at 20.93, a short restored hold, the real save at 22.27 (“Lesson saved”, “Your copy is in Main”). *Save your own copy to your vault.* |
-| 23.3–31.2 | Saved-state hold, a 0.7 s pull-back to bring the sidebar in, the real Chat press at 25.97, and the Chat front. *Chat is optional. On-device or a connected tool.* / *Connected chat can send the context you select.* |
-| 31.2–37.8 | Six aligned theme captures, clean cuts, 1.1 s each, family names above the frame. *Six theme families. Each tuned for light and dark.* |
-| 37.8–41.8 | Rotli, “Room to think. Files you keep.”, “Mac beta in preparation”, rotli.co |
+1. Your vault — Everything lives in one folder of plain files.
+2. The Librarian — AI keeps it organized for you. / It files notes. It never rewrites them. (Run now → “Filed … → Projects / Research”.)
+3. Your views — Work in views, arranged however you want. / Same files underneath. Nothing moves.
+4. Write — Plain Markdown that renders as you type.
+5. Secure notes — Mark a note secure. / Cloud AI never sees it. Not even the title. (The note moves to Library › Secure notes.)
+6. Chat — Chat with the AI you already pay for. / It answers from your notes. (Claude Code model picker; a real reply grounded in the Q4 note.)
+7. Files — Browse your vault like you browse Finder.
+8. Your views — Remove a note from a view. / It stays in your vault.
+9. Trash — Delete moves it to Trash. / Rotli never erases a file.
 
-General Sans, the Baloo wordmark, the canonical compact quokka mark, and Rotli
-color tokens carry the film. Captions occupy a fixed linen band with 44 px
-type, one line each. The music is a sparse plucked motif in D major with a
-light pad and a resolved chord decaying to the last frame; quiet airs mark the
-four hard cuts, a light tick sits on the recorded checkbox, and soft presses sit
-on the four recorded button presses. Nothing plays on theme cuts or reframes.
-`audio/synth.py` synthesizes all audio locally with seeded NumPy and FFmpeg.
-No downloaded music, samples, paid audio service, or narration.
+Ending: “Built for you. And for your AI.”, then rotli / Room to think. Files you
+keep. / Mac beta in preparation / rotli.co. Music: `audio/synth.py --bed energetic`.
 
-### What changed in the second cut
+## Footage and honesty boundary
 
-The first cut (44 s) was a sequence of stills with fades: a static task shot, a
-static Chat screenshot, and only two of the five recorded interactions. The
-second cut makes the middle one continuous take of the real recording (tick →
-Raw Markdown → back → save → Chat) with two purposeful camera moves, cuts the
-opening from 5 to 4.5 s, replaces the rise-in entrance with a plain fade,
-removes the margin quokka from the Chat beat, keeps the Chat beat to about five
-seconds after the press, labels themes by family only, and shortens every
-caption to one glance. Astra's final-cut notes that were adopted: the save
-separation, the caption rewrites (except the Raw Markdown line, which keeps the
-control's real name), the shorter Chat beat, the family-only labels, and the
-plain entrance. Not adopted: the 0.2/1.2/2.4 opening (too fast for the third
-line) and moving the tick before the reframe settles.
-
-## Capture and privacy boundary
-
-Inputs are the source-controlled demo/Playground, the seven synthetic site
-captures, and canonical brand assets. No native app window, live vault,
-personal notes, browser profile, or model conversation was captured.
-
-`bun run capture:launch` uses a fresh browser context against a local stable
-preview, rejects a native bridge, asserts Home/Chat with no Breve, and blocks
-requests outside that origin. It captures actual task/source/save controls,
-lossless 2880×1800 frames with real timestamps, and a high-quality 30fps MP4.
-Only that MP4 feeds the film. Its visible events, measured by frame
-differencing, are at source 2.43 (tick), 4.57 (Raw Markdown), 6.43 (back),
-6.97 (save), and 9.17 (Chat), static afterwards; `shots.json` agrees within a
-frame. `prepare.mjs` cuts the recording at those times into one derived take
-and bakes each editorial hold in as a frozen frame of the recording itself, so
-every hold is a pixel-exact continuation (maximum local frame difference at the
-seven seams in the delivered MP4: 8–22 on a 0–255 scale, i.e. codec noise; a
-real UI change measures 98–187). Recheck the event times
-after any fresh capture.
-
-The Chat shot shows navigation, not a model response. The save shows the
-Playground's own control and status line in the browser twin, whose saved
-copies live in memory; browser capture does not prove native filesystem,
-titlebar, Keychain, scheduler, or updater behavior. The caption describes the
-product feature, not the footage.
+`edl.json` names every recording (`sources`), range, crop, speed, and hold;
+`scripts/sync-timings.mjs` writes the kickers, headlines, shot push-ins, and
+music cues from it. The takes are full-display recordings; every crop sits
+below the macOS menu bar. Captions were checked against the code: secure notes
+are skipped by the Librarian (not filed by title), and Empty Trash hands files to
+the macOS Trash, so “never erases a file” holds. Excluded from the edit: a macOS
+Apple Music permission dialog and a Messages code popup (rejected takes), a
+chat reply that misread an unselected choice row as a status (the row was
+removed from the demo note and the chat re-recorded), the Library › Secure notes
+folder showing Empty, a chat save-conflict warning (cropped out), and the
+Librarian leaving one note unfiled.
 
 ## Toolchain and safeguards
 
@@ -118,36 +82,13 @@ through the wrapper.
 
 ## Verification
 
-- `lint`: 0 errors, 3 advisory warnings (duplicate static media discovery for
-  the Warm Light capture used twice, dense tracks 2/3). `check`: runtime,
-  layout (19 samples), and motion clean; 7/7 text contrast checks pass WCAG AA.
-- Frames of the delivered MP4 were inspected before and after each recorded
-  event, at each seam, and at the opening, both reframes, the Playground
-  arrival, the saved state, three themes, the fade into the end card, and the
-  end card. Visible-change frames in the MP4 by frame differencing: tick 15.60,
-  Raw Markdown 17.87, save 22.33, Chat 26.13; the toggle back between 20.85 and
-  21.05 by inspection. The effects sit at 15.63, 17.82, 20.93, 22.30, and 26.08,
-  so each press leads its visible change by at most two frames.
-- `verify`: 1920×1080, 30/1, h264 High yuv420p, 41.800 s / 1254 frames, AAC
-  48 kHz stereo, −18.9 LUFS integrated, 5.8 LU range, −3.0 dBTP. PASS.
-  Frame-luminance scan of the take: 564 frames, 0 blank.
-- `audio-levels`: presses lift the mix over the music stem by 2.0–5.0 dB and
-  the tick by 1.6 dB; the last 0.5 s sits at −62.6 dB RMS, so the bed decays
-  rather than stops. The airs at 4.3 and 31.0 coincide with accent notes in the
-  bed and lift it only 0.2–0.3 dB, so those two transitions are effectively
-  carried by the music alone. No listening review is claimed; a human mix pass
-  remains useful.
-- Website: `scripts/verify-site-player.mjs` against a local static preview
-  (fresh browser context, only the preview origin reachable) proved the poster
-  (`image/jpeg`, 66,577 bytes), MP4 (`video/mp4`, 7,085,055 bytes), and VTT
-  (`text/vtt`, 973 bytes) are served, the real “Watch the film” control starts
-  playback (1920×1080, 41.80 s), and the caption track loads 13 cues. Run
-  against the full build and the coming-soon build (production's mode).
-- Repository `bun run verify` (CI's local twin) passed: secrets, quality, e2e,
-  and rust lanes.
+- `lint`: 0 errors, 1 advisory warning (dense caption track).
+- `verify`: 1920×1080, 30/1, h264 High yuv420p, 79.133 s / 2374 frames, AAC
+  48 kHz stereo, −15.6 LUFS integrated, −4.8 dBTP. PASS.
+- Blank-frame guard over the product frame: 2206 frames, 0 blank.
+- Snapshots at 29 beat times and a 1 fps sheet of the whole product section
+  reviewed by eye: no dialogs, notifications, or personal data in frame.
+- Site: `SITE_MODE=full` build wires the teaser into the hero and the full film
+  with captions into its own section.
 
-Limitation: burned-in captions are 44 px at 1080p, comfortable on a laptop
-embed but small on a phone; the VTT track is the phone-size accessibility path.
-
-The film and site are staged locally. No commit, push, deployment, signing,
-notarization, installed-app change, or native vault mutation was performed.
+No listening review is claimed. No commit, push, or deployment was made for the films.

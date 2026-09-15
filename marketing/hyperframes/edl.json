@@ -1,0 +1,685 @@
+{
+ "_about": "Edit decision list for the fifth cut (full promo) and the hero teaser. sources = native recordings outside Git (_review/), each with the rectangle crops may use (display below the menu bar). Segment times are seconds in that recording; crop = [x, y, w, h] source px; speed = playback rate; hold = seconds the last frame is held; mask = only the crop survives on plain linen (for frames with private surroundings). beats drive scripts/sync-timings.mjs (kickers, headlines, music). Selects follow GPT-6 Astra's shot log (_review/promo-v5/astra/v5-shot-log.md); the director chose the edit. The 2026-09-15 shoot used a fresh synthetic Notebook vault.",
+ "sources": {
+  "R1": {
+   "file": "_review/promo-v5/rec/R1.mov",
+   "window": [
+    0,
+    66,
+    3024,
+    1832
+   ]
+  },
+  "R2": {
+   "file": "_review/promo-v5/rec/R2.mov",
+   "window": [
+    0,
+    66,
+    3024,
+    1832
+   ]
+  },
+  "R3": {
+   "file": "_review/promo-v5/rec/R3.mov",
+   "window": [
+    0,
+    66,
+    3024,
+    1832
+   ]
+  },
+  "R4": {
+   "file": "_review/promo-v5/rec/R4.mov",
+   "window": [
+    0,
+    66,
+    3024,
+    1832
+   ]
+  },
+  "R5d": {
+   "file": "_review/promo-v5/rec/R5d.mov",
+   "window": [
+    0,
+    66,
+    3024,
+    1832
+   ]
+  },
+  "R6": {
+   "file": "_review/promo-v5/rec/R6.mov",
+   "window": [
+    0,
+    66,
+    3024,
+    1832
+   ]
+  },
+  "R7": {
+   "file": "_review/promo-v5/rec/R7.mov",
+   "window": [
+    0,
+    66,
+    3024,
+    1832
+   ]
+  },
+  "R8": {
+   "file": "_review/promo-v5/rec/R8.mov",
+   "window": [
+    0,
+    66,
+    3024,
+    1832
+   ]
+  }
+ },
+ "intro": 3.6,
+ "music": {
+  "montage": "heading"
+ },
+ "beats": [
+  {
+   "beat": "vault",
+   "kicker": "Your vault",
+   "captions": [
+    {
+     "text": "Everything lives in one folder of plain files."
+    }
+   ]
+  },
+  {
+   "beat": "librarian",
+   "kicker": "The Librarian",
+   "captions": [
+    {
+     "text": "AI keeps it organized for you."
+    },
+    {
+     "from": "projects-filed",
+     "text": "It files notes. It never rewrites them."
+    }
+   ]
+  },
+  {
+   "beat": "views",
+   "kicker": "Your views",
+   "captions": [
+    {
+     "text": "Work in views, arranged however you want."
+    },
+    {
+     "from": "switch-main",
+     "text": "Same files underneath. Nothing moves."
+    }
+   ]
+  },
+  {
+   "beat": "write",
+   "kicker": "Write",
+   "captions": [
+    {
+     "text": "Plain Markdown that renders as you type."
+    }
+   ]
+  },
+  {
+   "beat": "secure",
+   "kicker": "Secure notes",
+   "captions": [
+    {
+     "text": "Mark a note secure."
+    },
+    {
+     "from": "secure-location",
+     "text": "Cloud AI never sees it. Not even the title."
+    }
+   ]
+  },
+  {
+   "beat": "chat",
+   "kicker": "Chat",
+   "captions": [
+    {
+     "text": "Chat with the AI you already pay for."
+    },
+    {
+     "from": "reply",
+     "text": "It answers from your notes."
+    }
+   ]
+  },
+  {
+   "beat": "files",
+   "kicker": "Files",
+   "captions": [
+    {
+     "text": "Browse your vault like you browse Finder."
+    }
+   ]
+  },
+  {
+   "beat": "remove",
+   "kicker": "Your views",
+   "captions": [
+    {
+     "text": "Remove a note from a view."
+    },
+    {
+     "from": "still-there",
+     "text": "It stays in your vault."
+    }
+   ]
+  },
+  {
+   "beat": "trash",
+   "kicker": "Trash",
+   "captions": [
+    {
+     "text": "Delete moves it to Trash."
+    },
+    {
+     "from": "in-trash",
+     "text": "Rotli never erases a file."
+    }
+   ]
+  }
+ ],
+ "full": [
+  {
+   "id": "vault-notes",
+   "beat": "vault",
+   "source": "R1",
+   "in": 2.5,
+   "out": 5.0,
+   "speed": 1,
+   "crop": [
+    0,
+    170,
+    2000,
+    1250
+   ],
+   "hold": 1.0
+  },
+  {
+   "id": "run-now",
+   "beat": "librarian",
+   "source": "R1",
+   "in": 24.7,
+   "out": 26.7,
+   "speed": 1,
+   "crop": [
+    600,
+    220,
+    1600,
+    1000
+   ]
+  },
+  {
+   "id": "filed-rows",
+   "beat": "librarian",
+   "source": "R1",
+   "in": 215.4,
+   "out": 218.4,
+   "speed": 1,
+   "crop": [
+    620,
+    470,
+    1840,
+    1150
+   ],
+   "hold": 0.3
+  },
+  {
+   "id": "projects-filed",
+   "beat": "librarian",
+   "source": "R1",
+   "in": 259.5,
+   "out": 262.0,
+   "speed": 1,
+   "crop": [
+    600,
+    180,
+    1840,
+    1150
+   ],
+   "hold": 0.4
+  },
+  {
+   "id": "new-view",
+   "beat": "views",
+   "source": "R2",
+   "in": 36.4,
+   "out": 38.3,
+   "speed": 1,
+   "crop": [
+    0,
+    560,
+    1280,
+    800
+   ]
+  },
+  {
+   "id": "move-to-view",
+   "beat": "views",
+   "source": "R2",
+   "in": 72.1,
+   "out": 74.2,
+   "speed": 1.25,
+   "crop": [
+    0,
+    540,
+    1904,
+    1190
+   ]
+  },
+  {
+   "id": "reorder",
+   "beat": "views",
+   "source": "R2",
+   "in": 129.3,
+   "out": 132.0,
+   "speed": 1.25,
+   "crop": [
+    0,
+    560,
+    1280,
+    800
+   ]
+  },
+  {
+   "id": "switch-main",
+   "beat": "views",
+   "source": "R2",
+   "in": 149.6,
+   "out": 151.7,
+   "speed": 1,
+   "crop": [
+    0,
+    560,
+    1280,
+    800
+   ]
+  },
+  {
+   "id": "switch-q4",
+   "beat": "views",
+   "source": "R2",
+   "in": 174.4,
+   "out": 176.7,
+   "speed": 1,
+   "crop": [
+    0,
+    560,
+    1280,
+    800
+   ]
+  },
+  {
+   "id": "heading",
+   "beat": "write",
+   "source": "R3",
+   "in": 19.1,
+   "out": 20.8,
+   "speed": 1.25,
+   "crop": [
+    960,
+    310,
+    1600,
+    1000
+   ]
+  },
+  {
+   "id": "task-done",
+   "beat": "write",
+   "source": "R3",
+   "in": 31.1,
+   "out": 33.0,
+   "speed": 1.25,
+   "crop": [
+    960,
+    310,
+    1600,
+    1000
+   ]
+  },
+  {
+   "id": "task-progress",
+   "beat": "write",
+   "source": "R3",
+   "in": 59.6,
+   "out": 61.5,
+   "speed": 1.25,
+   "crop": [
+    960,
+    310,
+    1600,
+    1000
+   ]
+  },
+  {
+   "id": "colored-labels",
+   "beat": "write",
+   "source": "R3",
+   "in": 73.6,
+   "out": 75.0,
+   "speed": 1,
+   "crop": [
+    960,
+    310,
+    1600,
+    1000
+   ]
+  },
+  {
+   "id": "table-create",
+   "beat": "write",
+   "source": "R3",
+   "in": 89.2,
+   "out": 91.0,
+   "speed": 1.25,
+   "crop": [
+    960,
+    310,
+    1600,
+    1000
+   ]
+  },
+  {
+   "id": "final-writing",
+   "beat": "write",
+   "source": "R3",
+   "in": 150.5,
+   "out": 153.5,
+   "speed": 1,
+   "crop": [
+    960,
+    310,
+    1600,
+    1000
+   ]
+  },
+  {
+   "id": "secure-menu",
+   "beat": "secure",
+   "source": "R4",
+   "in": 72.4,
+   "out": 74.6,
+   "speed": 1,
+   "crop": [
+    640,
+    880,
+    1600,
+    1000
+   ],
+   "hold": 0.4
+  },
+  {
+   "id": "secure-location",
+   "beat": "secure",
+   "source": "R4",
+   "in": 102.3,
+   "out": 105.1,
+   "speed": 1,
+   "crop": [
+    1000,
+    160,
+    1760,
+    1100
+   ],
+   "hold": 0.4
+  },
+  {
+   "id": "model-picker",
+   "beat": "chat",
+   "source": "R5d",
+   "in": 17.0,
+   "out": 21.0,
+   "speed": 1.25,
+   "crop": [
+    780,
+    300,
+    1920,
+    1200
+   ]
+  },
+  {
+   "id": "ask",
+   "beat": "chat",
+   "source": "R5d",
+   "in": 56.6,
+   "out": 66.3,
+   "speed": 2.5,
+   "crop": [
+    780,
+    300,
+    1920,
+    1200
+   ]
+  },
+  {
+   "id": "reply",
+   "beat": "chat",
+   "source": "R5d",
+   "in": 130.62,
+   "out": 134.5,
+   "speed": 1,
+   "crop": [
+    700,
+    100,
+    1600,
+    1000
+   ],
+   "hold": 0.8
+  },
+  {
+   "id": "list-view",
+   "beat": "files",
+   "source": "R6",
+   "in": 8.3,
+   "out": 10.3,
+   "speed": 1,
+   "crop": [
+    600,
+    180,
+    1840,
+    1150
+   ]
+  },
+  {
+   "id": "columns",
+   "beat": "files",
+   "source": "R6",
+   "in": 32.6,
+   "out": 35.1,
+   "speed": 1,
+   "crop": [
+    600,
+    180,
+    1840,
+    1150
+   ],
+   "hold": 0.3
+  },
+  {
+   "id": "in-view",
+   "beat": "remove",
+   "source": "R7",
+   "in": 27.4,
+   "out": 29.4,
+   "speed": 1,
+   "crop": [
+    0,
+    560,
+    1280,
+    800
+   ]
+  },
+  {
+   "id": "remove-menu",
+   "beat": "remove",
+   "source": "R7",
+   "in": 40.5,
+   "out": 42.3,
+   "speed": 1,
+   "crop": [
+    0,
+    780,
+    1300,
+    812
+   ]
+  },
+  {
+   "id": "removed",
+   "beat": "remove",
+   "source": "R7",
+   "in": 53.3,
+   "out": 55.7,
+   "speed": 1,
+   "crop": [
+    0,
+    780,
+    1300,
+    812
+   ]
+  },
+  {
+   "id": "still-there",
+   "beat": "remove",
+   "source": "R7",
+   "in": 99.2,
+   "out": 102.3,
+   "speed": 1,
+   "crop": [
+    0,
+    160,
+    1920,
+    1200
+   ],
+   "hold": 0.3
+  },
+  {
+   "id": "trash-menu",
+   "beat": "trash",
+   "source": "R8",
+   "in": 9.5,
+   "out": 11.3,
+   "speed": 1,
+   "crop": [
+    560,
+    300,
+    2144,
+    1340
+   ]
+  },
+  {
+   "id": "trash-command",
+   "beat": "trash",
+   "source": "R8",
+   "in": 21.5,
+   "out": 22.3,
+   "speed": 1,
+   "crop": [
+    560,
+    300,
+    2144,
+    1340
+   ]
+  },
+  {
+   "id": "in-trash",
+   "beat": "trash",
+   "source": "R8",
+   "in": 54.2,
+   "out": 57.0,
+   "speed": 1,
+   "crop": [
+    600,
+    180,
+    1840,
+    1150
+   ],
+   "hold": 0.6
+  }
+ ],
+ "teaser": [
+  {
+   "id": "t-writing",
+   "source": "R3",
+   "in": 150.5,
+   "out": 153.5,
+   "speed": 1,
+   "crop": [
+    960,
+    310,
+    1600,
+    1000
+   ]
+  },
+  {
+   "id": "t-filed",
+   "source": "R1",
+   "in": 259.5,
+   "out": 262.0,
+   "speed": 1,
+   "crop": [
+    600,
+    180,
+    1840,
+    1150
+   ]
+  },
+  {
+   "id": "t-views",
+   "source": "R2",
+   "in": 174.4,
+   "out": 176.7,
+   "speed": 1,
+   "crop": [
+    0,
+    560,
+    1280,
+    800
+   ]
+  },
+  {
+   "id": "t-secure",
+   "source": "R4",
+   "in": 102.3,
+   "out": 105.1,
+   "speed": 1,
+   "crop": [
+    1040,
+    200,
+    1968,
+    1230
+   ]
+  },
+  {
+   "id": "t-reply",
+   "source": "R5d",
+   "in": 130.62,
+   "out": 134.0,
+   "speed": 1,
+   "crop": [
+    700,
+    100,
+    1600,
+    1000
+   ]
+  },
+  {
+   "id": "t-trash",
+   "source": "R8",
+   "in": 54.2,
+   "out": 57.0,
+   "speed": 1,
+   "crop": [
+    600,
+    180,
+    1840,
+    1150
+   ]
+  }
+ ]
+}

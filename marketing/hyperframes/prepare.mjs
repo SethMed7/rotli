@@ -1,98 +1,151 @@
-// Copies canonical brand inputs into the ignored assets/ tree so the
-// composition never reaches outside marketing/hyperframes at render time.
-// Approved inputs only: brand fonts, the synthetic site captures, the canonical
-// character drawings, and the pinned GSAP runtime from node_modules.
+// Builds every generated input for the promo from approved sources only: brand
+// fonts, the canonical compact mark, pinned GSAP, and the native screen
+// recordings named in edl.json `sources` (kept outside Git under _review/ —
+// they can contain private frames, so only the ranges in edl.json are read).
+//
+// The HyperFrames renderer injects frames only for the first <video> in a
+// composition's pan (later ones render blank), so the whole product section is
+// ONE derived take: each EDL segment is cut, retimed, reframed to one 16:10
+// frame, and concatenated here. Privacy-masked segments keep only their crop,
+// set on the film's plain linen, so no framing slip in the composition can
+// reveal the rest of those frames.
+//
+// Outputs: assets/takes/full.mp4 + full.json (segment offsets for index.html),
+// renders/rotli-teaser.{mp4,webm} + poster (the silent hero loop, cross-faded
+// here because it has no text or audio to compose).
 import { spawnSync } from 'node:child_process';
-import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 const root = new URL('.', import.meta.url).pathname;
 const repo = join(root, '..', '..');
 
 const copies = [
-  // fonts (Fontshare free license for General Sans; Baloo 2 is OFL — see HYPERFRAMES.md)
   ['src/brand/fonts/GeneralSans-Variable.woff2', 'assets/fonts/GeneralSans-Variable.woff2'],
   ['src/brand/fonts/Baloo2-600.ttf', 'assets/fonts/Baloo2-600.ttf'],
-  // synthetic app captures (1280x800 logical at 3x; Playground 1440x900 at 3x)
-  ['site/public/rotli-app-warm-light@3x.png', 'assets/captures/app-warm-light.png'],
-  ['site/public/rotli-app-paper@3x.png', 'assets/captures/app-paper.png'],
-  ['site/public/rotli-app-ocean-light@3x.png', 'assets/captures/app-ocean-light.png'],
-  ['site/public/rotli-app-grove-dark@3x.png', 'assets/captures/app-grove-dark.png'],
-  ['site/public/rotli-app-iris-light@3x.png', 'assets/captures/app-iris-light.png'],
-  ['site/public/rotli-app-midnight@3x.png', 'assets/captures/app-midnight.png'],
-  ['site/public/rotli-playground@3x.png', 'assets/captures/playground.png'],
-  // synthetic interaction recording handed over by the parent
-  // (`bun run capture:launch` at the repository root regenerates them; the
-  // _review/ folder is ignored by Git, so a fresh checkout must run that first)
-  ['_review/launch-captures/playground-interactions.mp4', 'assets/captures/playground-interactions.mp4'],
-  // canonical characters
   ['src/assets/characters/_logo.svg', 'assets/characters/logo.svg'],
-  // pinned animation runtime, served locally (no CDN fetch during render)
   ['marketing/hyperframes/node_modules/gsap/dist/gsap.min.js', 'vendor/gsap.min.js'],
 ];
-
 for (const [from, to] of copies) {
   const source = join(repo, from);
-  const target = join(root, to);
-  await stat(source).catch(() => {
-    throw new Error(`Missing approved input ${from}${from.startsWith('_review/') ? ' — run `bun run capture:launch` at the repository root first' : ''}`);
-  });
-  await mkdir(dirname(target), { recursive: true });
-  await copyFile(source, target);
+  await stat(source).catch(() => { throw new Error(`Missing approved input ${from}`); });
+  await mkdir(dirname(join(root, to)), { recursive: true });
+  await copyFile(source, join(root, to));
   console.log(`${to}  <-  ${from}`);
 }
 
-// Recolored copies of the compact mark. Geometry is untouched; only the single
-// fill attribute changes so the mark can sit in cocoa on linen and linen on the
-// dark end card without inlining the path into the composition.
+// Recolored copies of the compact mark (one fill attribute swapped).
 const markSource = await readFile(join(repo, 'src/assets/characters/_logo.svg'), 'utf8');
 if ((markSource.match(/fill="[^"]*"/g) ?? []).length !== 1) throw new Error('Expected exactly one fill on the compact mark.');
 for (const [name, color] of [['logo-cocoa.svg', '#3A3028'], ['logo-linen.svg', '#F1E7DA']]) {
   await writeFile(join(root, 'assets/characters', name), markSource.replace(/fill="[^"]*"/, `fill="${color}"`));
-  console.log(`assets/characters/${name}  <-  _logo.svg recolored ${color}`);
 }
 
-// The HyperFrames renderer injected frames only for the first <video> inside the
-// Playground pan; every later <video> (own file, dense keyframes, own data-start)
-// rendered blank for its whole slot while `snapshot` showed it correctly. So the
-// Playground beat is ONE derived take driving ONE <video>: ffmpeg cuts the approved
-// recording at the source times the film needs and bakes each editorial hold in as
-// a frozen frame of the recording itself (exact pixels, so the holds are invisible
-// continuations). Source event times (frame-differenced): tick 2.43, Raw 4.57,
-// back 6.43, save 6.97, Chat 9.17, static afterwards. The film shows the take from
-// 12.4 s, so film time = 12.4 + take offset.
-const recording = join(root, 'assets/captures/playground-interactions.mp4');
-const take = [
-  // [kind, sourceSeconds, lengthSeconds]           take offset  → film time / event
-  ['freeze', 1.2, 2.0],  // full lesson, before any interaction   0.0–2.0     12.4–14.4
-  ['play', 1.2, 5.1],    // tick at +1.23, Raw Markdown at +3.37   2.0–7.1     tick 15.63, Raw 17.77
-  ['freeze', 5.5, 1.3],  // Raw Markdown hold                      7.1–8.4
-  ['play', 6.3, 0.4],    // toggle back at +0.13                   8.4–8.8     back 20.93
-  ['freeze', 6.8, 0.8],  // restored rendered view                 8.8–9.6
-  ['play', 6.7, 1.3],    // Save lesson to vault at +0.27          9.6–10.9    save 22.27
-  ['freeze', 7.6, 2.1],  // Lesson saved / Your copy is in Main    10.9–13.0
-  ['play', 8.6, 2.4],    // Chat at +0.57, then static             13.0–15.4   Chat 25.97
-  ['freeze', 10.0, 3.4], // Chat front hold                        15.4–18.8
-];
-const inputs = [];
-const chains = [];
-let freezeIndex = 0;
-for (const [i, [kind, at, seconds]] of take.entries()) {
-  if (kind === 'freeze') {
-    const png = join(root, 'assets/captures', `play-freeze-${++freezeIndex}.png`);
-    const r = spawnSync('ffmpeg', ['-y', '-v', 'error', '-ss', String(at), '-i', recording, '-frames:v', '1', png], { stdio: 'inherit' });
-    if (r.status !== 0) throw new Error(`ffmpeg freeze frame failed at ${at}s`);
-    inputs.push('-loop', '1', '-t', String(seconds), '-i', png);
-    chains.push(`[${inputs.filter((a) => a === '-i').length}:v]fps=30,format=yuv420p,setsar=1[s${i}]`);
-  } else {
-    chains.push(`[0:v]trim=start=${at}:end=${(at + seconds).toFixed(3)},setpts=PTS-STARTPTS,fps=30,format=yuv420p,setsar=1[s${i}]`);
-  }
+const ASPECT = 1.6;
+const OUT_W = 1920;
+const OUT_H = 1200;
+const LINEN = '0xf8f2e9';
+const edl = JSON.parse(await readFile(join(root, 'edl.json'), 'utf8'));
+
+// Each recording the EDL reads: a repo-relative path (outside Git, under _review/)
+// and the rectangle inside it that crops may use (the app window, or the display
+// below the menu bar). A segment names its recording with `source`.
+const sources = {};
+for (const [name, { file, window }] of Object.entries(edl.sources)) {
+  const path = join(repo, file);
+  await stat(path).catch(() => { throw new Error(`Missing recording ${file} (source "${name}")`); });
+  sources[name] = { path, window };
 }
-const total = take.reduce((sum, [, , seconds]) => sum + seconds, 0);
-const target = join(root, 'assets/captures/play-take.mp4');
-const concat = `${chains.join(';')};${take.map((_, i) => `[s${i}]`).join('')}concat=n=${take.length}:v=1:a=0[out]`;
-const built = spawnSync('ffmpeg', ['-y', '-v', 'error', '-i', recording, ...inputs, '-filter_complex', concat, '-map', '[out]',
-  '-r', '30', '-c:v', 'libx264', '-preset', 'fast', '-crf', '12', '-g', '15', '-keyint_min', '15', '-sc_threshold', '0',
-  '-pix_fmt', 'yuv420p', '-an', '-movflags', '+faststart', '-map_metadata', '-1', target], { stdio: 'inherit' });
-if (built.status !== 0) throw new Error('ffmpeg take build failed');
-console.log(`assets/captures/play-take.mp4  <-  playground-interactions.mp4 (${take.length} segments, ${total.toFixed(1)}s, ${freezeIndex} frozen frames)`);
+
+/** Grow a crop to the film's 16:10 frame around its center, kept inside the window. */
+function frameFor([x, y, w, h], WINDOW) {
+  let fw = w;
+  let fh = h;
+  if (w / h > ASPECT) fh = w / ASPECT; else fw = h * ASPECT;
+  fw = Math.min(fw, WINDOW[2]);
+  fh = Math.min(fh, WINDOW[3]);
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const fx = clamp(x + w / 2 - fw / 2, WINDOW[0], WINDOW[0] + WINDOW[2] - fw);
+  const fy = clamp(y + h / 2 - fh / 2, WINDOW[1], WINDOW[1] + WINDOW[3] - fh);
+  return [fx, fy, fw, fh].map((v) => Math.round(v / 2) * 2);
+}
+
+function ffmpeg(args) {
+  const r = spawnSync('ffmpeg', ['-y', '-v', 'error', ...args], { stdio: 'inherit' });
+  if (r.status !== 0) throw new Error(`ffmpeg failed: ${args.join(' ')}`);
+}
+
+const encode = ['-r', '30', '-c:v', 'libx264', '-preset', 'medium', '-crf', '14', '-g', '15', '-keyint_min', '15',
+  '-sc_threshold', '0', '-pix_fmt', 'yuv420p', '-an', '-map_metadata', '-1'];
+
+/** One segment → a 1920×1200, 30 fps clip of (out − in) / speed (+ hold) seconds. */
+async function buildSegment(seg, dir) {
+  if (!seg.crop) throw new Error(`${seg.id}: no crop — every segment needs framing`);
+  const source = sources[seg.source];
+  if (!source) throw new Error(`${seg.id}: unknown source "${seg.source}"`);
+  const [cx, cy, cw, ch] = seg.crop;
+  const hold = seg.hold ? `,tpad=stop_mode=clone:stop_duration=${seg.hold}` : '';
+  const retime = `setpts=(PTS-STARTPTS)/${seg.speed},fps=30${hold}`;
+  let filter;
+  if (seg.mask) {
+    // Only the crop survives, scaled to the frame width and centered on plain linen.
+    const sw = Math.round(OUT_W * 0.86 / 2) * 2;
+    const sh = Math.round((sw * ch) / cw / 2) * 2;
+    filter = `color=c=${LINEN}:s=${OUT_W}x${OUT_H}:r=30[bg];` +
+      `[0:v]crop=${cw}:${ch}:${cx}:${cy},scale=${sw}:${sh}:flags=lanczos,${retime}[fg];` +
+      `[bg][fg]overlay=x=${(OUT_W - sw) / 2}:y=${(OUT_H - sh) / 2}:shortest=1,format=yuv420p,setsar=1[v]`;
+  } else {
+    const [fx, fy, fw, fh] = frameFor(seg.crop, source.window);
+    filter = `[0:v]crop=${fw}:${fh}:${fx}:${fy},scale=${OUT_W}:${OUT_H}:flags=lanczos,${retime},format=yuv420p,setsar=1[v]`;
+  }
+  const length = (seg.out - seg.in) / seg.speed + (seg.hold ?? 0);
+  const file = join(dir, `${seg.id}.mp4`);
+  ffmpeg(['-ss', String(seg.in), '-t', (seg.out - seg.in).toFixed(3), '-i', source.path,
+    '-filter_complex', filter, '-map', '[v]', '-t', length.toFixed(3), ...encode, file]);
+  return { file, length: Math.round(length * 30) / 30 };
+}
+
+const takes = join(root, 'assets/takes');
+await rm(takes, { recursive: true, force: true });
+await mkdir(takes, { recursive: true });
+
+// ---- Full cut: concatenated take + the offsets index.html places captions against.
+const full = [];
+let offset = 0;
+for (const seg of edl.full) {
+  const { file, length } = await buildSegment(seg, takes);
+  full.push({ id: seg.id, beat: seg.beat, at: Number(offset.toFixed(3)), length, file });
+  offset += length;
+}
+await writeFile(join(takes, 'full.txt'), full.map((s) => `file '${s.file}'`).join('\n'));
+ffmpeg(['-f', 'concat', '-safe', '0', '-i', join(takes, 'full.txt'), ...encode, '-movflags', '+faststart', join(takes, 'full.mp4')]);
+await writeFile(join(takes, 'full.json'), JSON.stringify({ seconds: Number(offset.toFixed(3)), segments: full.map(({ file, ...s }) => s) }, null, 2));
+console.log(`assets/takes/full.mp4  (${full.length} segments, ${offset.toFixed(2)} s)`);
+for (const s of full) console.log(`  ${s.at.toFixed(2).padStart(6)}  ${s.length.toFixed(2)}  ${s.beat.padEnd(9)} ${s.id}`);
+
+// ---- Teaser: silent hero loop with short cross-fades, last shot fading back into the first.
+const XFADE = 0.3;
+const teaser = [];
+for (const seg of edl.teaser) teaser.push(await buildSegment(seg, takes));
+// The first shot is read twice: once to open, once (as the last input) for the loop seam.
+const inputs = [...teaser, teaser[0]].flatMap((t) => ['-i', t.file]);
+const chains = [];
+let label = '[0:v]';
+let at = teaser[0].length;
+for (let i = 1; i < teaser.length; i++) {
+  const out = `[x${i}]`;
+  chains.push(`${label}[${i}:v]xfade=transition=fade:duration=${XFADE}:offset=${(at - XFADE).toFixed(3)}${out}`);
+  label = out;
+  at += teaser[i].length - XFADE;
+}
+// Loop seam: the tail fades into the first shot's opening frames and the film starts
+// XFADE in, so the last frame flows straight into the first and the hero loop never jumps.
+chains.push(`[${teaser.length}:v]trim=end=${XFADE},setpts=PTS-STARTPTS[head];` +
+  `${label}[head]xfade=transition=fade:duration=${XFADE}:offset=${(at - XFADE).toFixed(3)},trim=start=${XFADE},setpts=PTS-STARTPTS[loop]`);
+await mkdir(join(root, 'renders'), { recursive: true });
+const teaserMp4 = join(root, 'renders/rotli-teaser.mp4');
+ffmpeg([...inputs, '-filter_complex', chains.join(';'), '-map', '[loop]', '-r', '30', '-c:v', 'libx264', '-preset', 'slow',
+  '-crf', '20', '-pix_fmt', 'yuv420p', '-an', '-movflags', '+faststart', '-map_metadata', '-1', teaserMp4]);
+ffmpeg(['-i', teaserMp4, '-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '36', '-row-mt', '1', '-an', join(root, 'renders/rotli-teaser.webm')]);
+ffmpeg(['-ss', '0.5', '-i', teaserMp4, '-frames:v', '1', '-q:v', '3', join(root, 'renders/rotli-teaser-poster.jpg')]);
+console.log(`renders/rotli-teaser.{mp4,webm}  (${teaser.length} shots, ${(at - XFADE).toFixed(2)} s loop)`);

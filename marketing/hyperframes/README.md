@@ -1,8 +1,10 @@
 # rotli launch promo — HyperFrames source
 
-A 41.8-second, 1920×1080, 30 fps H.264 promo for the rotli homepage, authored as
+A 58-second, 1920×1080, 30 fps H.264 promo for the rotli homepage, authored as
 one HyperFrames HTML composition (`index.html`) with a GSAP timeline, brand
-fonts, the synthetic app captures, and original synthesized music and effects.
+fonts, one take cut from the 2026-09-15 native screen recording (`edl.json`),
+and original synthesized music — plus a 10.5-second silent hero teaser that
+`prepare.mjs` cuts from the same recording.
 [`../HYPERFRAMES.md`](../HYPERFRAMES.md) is the creative and audit record.
 
 ## Reproduce
@@ -16,15 +18,13 @@ bun run ci               # frozen, script-free, isolated install (hyperframes 0.
 bun run build            # assets → audio → captions → stems → lint → render → poster → verify
 ```
 
-A fresh checkout first needs the synthetic recording. From the repository root,
-build the stable browser twin with `bun run build`, serve it with
-`bun run preview --host 127.0.0.1 --port 1431 --strictPort` in a separate terminal,
-then run `bun run capture:launch`. FFmpeg is required. This produces a 2880×1800
-MP4 from lossless timestamped frames, checkpoint screenshots, and `shots.json`
-under ignored `_review/launch-captures/`. After a fresh capture, re-measure the
-event times (frame differencing; the source times are listed in `prepare.mjs`)
-and retime the `take` table there, the `<audio>` cues in `index.html`, and
-`CUTS` in `audio/synth.py`.
+A fresh checkout first needs the source recording: link the 2026-09-15 native
+screen recording to `_review/promo-v4/source.mov` at the repository root (it is
+private and never committed). FFmpeg is required. `edl.json` lists every range
+the build reads, with its crop, speed, optional final-frame hold, and privacy
+mask; `prepare.mjs` writes the segment offsets to `assets/takes/full.json`.
+After changing the EDL, retime the kickers, headlines, and `shots` table in
+`index.html` and `CUTS` in `audio/synth.py` from that file.
 
 All HyperFrames commands below run through `scripts/hyperframes-local.mjs`.
 It removes inherited model credentials, forces frame descriptions off, and
@@ -32,13 +32,13 @@ disables telemetry, update checks, and auto-install. Do not bypass that wrapper.
 
 | Script | What it does | Output |
 |---|---|---|
-| `prepare:assets` | copies brand fonts, six theme captures, the canonical compact mark, pinned GSAP, and the recording; then derives `play-take.mp4` (the Playground beat with its holds baked in as frozen recording frames) | `assets/`, `vendor/` |
-| `audio` | synthesizes the second cut's calm bed and effects with numpy, calibrated to −19 LUFS / −4.5 dBTP with ffmpeg's meter (the effects bring the mix to −3 dBTP) | `assets/audio/*.wav` |
-| `audio:energetic` | the third cut's 104 BPM bed (−15.5 LUFS, drop / montage / riser / hit on the CUTS table) plus a listenable preview; not yet wired to a composition | `assets/audio/bed.wav`, `renders/preview/bed-energetic.m4a` |
+| `prepare:assets` | copies brand fonts, the canonical compact mark, and pinned GSAP; cuts the EDL's full-promo take and builds the silent teaser | `assets/`, `vendor/`, `renders/rotli-teaser.*` |
+| `audio` | synthesizes the 104 BPM energetic bed and effects with numpy, calibrated to −15.5 LUFS with ffmpeg's meter (`--bed calm` still builds the second cut's bed) | `assets/audio/*.wav` |
+| `audio:energetic` | the same bed plus a listenable preview | `assets/audio/bed.wav`, `renders/preview/bed-energetic.m4a` |
 | `captions` | derives WebVTT and SRT from the caption clips in `index.html` | `renders/*.vtt`, `renders/*.srt` |
 | `stems` | mixes music-only and effects-only stems from the same timings | `renders/stems/*.wav` |
 | `lint` / `check` | HyperFrames static and browser gates (layout, motion, WCAG contrast) | `snapshots/` |
-| `snapshot` | nineteen review frames, one per beat or seam, with vision description disabled | `snapshots/review/` |
+| `snapshot` | twenty-six review frames, one per beat or seam, with vision description disabled | `snapshots/review/` |
 | `render` | the film (`--video-frame-format png` for the UI recording) | `renders/rotli-launch-promo.mp4` |
 | `poster` | the end card as a still | `renders/rotli-launch-promo-poster.png` |
 | `verify` | ffprobe + EBU R128 evidence against the composition's declared length, fails on mismatch | `renders/verification.md` |
@@ -47,7 +47,8 @@ disables telemetry, update checks, and auto-install. Do not bypass that wrapper.
 
 Everything under `assets/`, `vendor/`, `renders/`, `snapshots/`, and
 `node_modules/` is generated and ignored. The parent copies delivery media
-(`renders/rotli-launch-promo.mp4`, `-poster.png` as JPEG, `.vtt`, `.srt`) to the
+(`renders/rotli-launch-promo.mp4` re-encoded at CRF 22, `-poster.png` as JPEG, `.vtt`, and
+`renders/rotli-teaser.mp4` with its poster) to the
 site when it is time to publish; nothing here deploys or commits.
 
 ## Layout of the source
@@ -57,7 +58,7 @@ site when it is time to publish; nothing here deploys or commits.
   root `data-duration` is the single source for the film length (the audio
   synth, stems, and verification read it).
 - `prepare.mjs` — the only place that reaches outside this directory, and the
-  owner of the derived take's cut list.
+  owner of the take build; `edl.json` is the cut list.
 - `audio/synth.py` — deterministic (seeded) synthesis and loudness calibration.
 - `scripts/` — the credential-filtering wrapper, captions, stems, verification.
 - `review/` — the storyboard brief and final-cut brief sent to GPT-6 Astra via
@@ -68,5 +69,5 @@ a timed `<video>` must not sit inside a timed wrapper, and only the first
 `<video>` inside the pan container receives injected frames on render (later
 ones came out blank while `snapshot` showed them). Hence one derived take.
 
-Keep every beat honest: only real synthetic captures, no invented UI, no
-downloads, and the status line stays "Mac beta in preparation".
+Keep every beat honest: only real recorded UI, never an unmasked private range,
+no invented UI, no downloads, and the status line stays "Mac beta in preparation".
