@@ -96,6 +96,13 @@ impl CorpusStore {
         self.suppress.mark(&abs);
         self.suppress.mark(&new_abs);
         fs::rename(&abs, &new_abs).map_err(|e| format!("rename {rel}: {e}"))?;
+        // the one-time first-save backup (`write_file_bytes`) travels with its
+        // file; best-effort, and never over a backup the new name already has
+        let old_bak = Path::new(&format!("{}.bak", abs.display())).to_path_buf();
+        let new_bak = Path::new(&format!("{}.bak", new_abs.display())).to_path_buf();
+        if old_bak.is_file() && (case_only || fs::symlink_metadata(&new_bak).is_err()) {
+            let _ = fs::rename(&old_bak, &new_bak);
+        }
         Ok(new_rel)
     }
 }
@@ -160,6 +167,23 @@ mod tests {
             store.rename_managed_file(&sheet, "Budget").unwrap(),
             "storage/rotli/Budget.xlsx"
         );
+    }
+
+    #[test]
+    fn the_first_save_backup_follows_the_renamed_document() {
+        let (_dir, mut store) = memex_store();
+        let doc = store.create_managed_file("plan.docx", b"v1").unwrap();
+        store.write_file_bytes(&doc, b"v2", true).unwrap();
+        assert!(store.root().join(format!("{doc}.bak")).is_file());
+        let renamed = store.rename_managed_file(&doc, "Roadmap").unwrap();
+        assert!(!store.root().join(format!("{doc}.bak")).exists(), "no orphan backup");
+        assert_eq!(fs::read(store.root().join(format!("{renamed}.bak"))).unwrap(), b"v1");
+        // a backup already holding the new name is never replaced
+        let other = store.create_managed_file("draft.docx", b"d1").unwrap();
+        store.write_file_bytes(&other, b"d2", true).unwrap();
+        fs::write(store.root().join("storage/rotli/Final.docx.bak"), b"keep").unwrap();
+        let final_doc = store.rename_managed_file(&other, "Final").unwrap();
+        assert_eq!(fs::read(store.root().join(format!("{final_doc}.bak"))).unwrap(), b"keep");
     }
 
     #[test]

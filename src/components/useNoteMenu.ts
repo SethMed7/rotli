@@ -495,11 +495,9 @@ export function useNoteMenu() {
             kind: "action" as const,
             label: "Rename…",
             onClick: () =>
-              renameVia === "board"
-                ? useUiStore.getState().setRenamingBoardId(note.id)
-                : renameVia === "file"
-                  ? setRenameTarget({ id: note.id, current: fileNameStem(note.id), lane: "file" })
-                  : setRenameTarget({ id: note.id, current: note.title }),
+              renameVia === "title"
+                ? setRenameTarget({ id: note.id, current: note.title })
+                : setRenameTarget({ id: note.id, current: fileNameStem(note.id), lane: renameVia }),
           });
         }
         items.push({ kind: "sep" as const });

@@ -1,12 +1,13 @@
 // Rename dialog — a small centered modal opened from the right-click menu's
 // "Rename…". Seeds with the item's current name; Enter saves, Esc / click-away
-// cancels. A note renames via useRenameNote (rewrites its H1); a document or
-// sheet renames its file (extension kept) and stays open to say why a name was
-// refused.
+// cancels. A note renames via useRenameNote (rewrites its H1); a board,
+// document, or sheet renames its file (extension kept) and stays open to say
+// why a name was refused.
 
 import { useEffect, useRef, useState } from "react";
 
 import { extOf } from "../lib/fileKind";
+import { renameBoardItem } from "../services/boardRename";
 import { useRenameNote } from "../services/hooks";
 import { renameManagedFile } from "../services/itemRenameComposition";
 import { useUiStore } from "../state/ui";
@@ -31,8 +32,16 @@ export function RenameDialog() {
   }, [target]);
 
   if (!target) return null;
-  const file = target.lane === "file";
-  const noun = !file ? "note" : extOf(target.id) === "xlsx" ? "sheet" : "document";
+  const lane = target.lane ?? "title";
+  const file = lane !== "title";
+  const noun =
+    lane === "title"
+      ? "note"
+      : lane === "board"
+        ? "board"
+        : extOf(target.id) === "xlsx"
+          ? "sheet"
+          : "document";
   const close = () => {
     if (!draft.busy) setTarget(null);
   };
@@ -47,7 +56,8 @@ export function RenameDialog() {
     if (draft.busy) return;
     setDraft({ ...draft, error: "", busy: true });
     try {
-      await renameManagedFile(target.id, t);
+      if (lane === "board") await renameBoardItem(target.id, t);
+      else await renameManagedFile(target.id, t);
       setTarget(null);
     } catch (cause) {
       const reason = cause instanceof Error ? cause.message : String(cause);
@@ -60,7 +70,7 @@ export function RenameDialog() {
     <NameFieldDialog
       id="rename"
       title={`Rename ${noun}`}
-      fieldLabel={file ? `${noun === "sheet" ? "Sheet" : "Document"} name` : undefined}
+      fieldLabel={file ? `${noun[0]!.toUpperCase()}${noun.slice(1)} name` : undefined}
       inputRef={inputRef}
       value={draft.value}
       onChange={(value) => setDraft({ ...draft, value, error: "" })}

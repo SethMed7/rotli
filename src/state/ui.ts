@@ -556,8 +556,8 @@ interface UiState {
 
   /** The note (or, with `lane: "file"`, document/sheet file) being renamed in the
    * rename dialog, or null. `current` seeds the input (the maintainer, 2026-07-01). */
-  renameTarget: { id: string; current: string; lane?: "title" | "file" } | null;
-  setRenameTarget: (t: { id: string; current: string; lane?: "title" | "file" } | null) => void;
+  renameTarget: { id: string; current: string; lane?: "title" | "file" | "board" } | null;
+  setRenameTarget: (t: { id: string; current: string; lane?: "title" | "file" | "board" } | null) => void;
 
   /** A failed row-menu action (file-to-brain, board rename …) surfaced as an
    * inline note in the sidebar — the menu that launched the action is gone by

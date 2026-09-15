@@ -98,3 +98,42 @@ test("a document renames from its Main row and its tab, keeping .docx", async ({
   await expect(page.locator(".main-tree .main-row", { hasText: "Plan v2.docx" })).toBeVisible();
   await expect(page.getByRole("tab", { name: /Plan v2\.docx/ })).toBeVisible();
 });
+
+test("a board whose tab is closed renames from its Main row", async ({ page }) => {
+  await gotoApp(page);
+  // a board row in Main with no open tab — the inline rename input only ever
+  // lived on the tab strip, so the row's Rename… used to do nothing
+  await page.evaluate(async () => {
+    const mounted = (path: string) => {
+      const url = performance
+        .getEntriesByType("resource")
+        .map((entry) => entry.name)
+        .find((name) => new URL(name).pathname === path);
+      if (!url) throw new Error(`${path} is not mounted`);
+      return import(/* @vite-ignore */ url);
+    };
+    const [{ notesService }, { invalidateNotes }, { useMainStore }, { addNoteToMain }] = await Promise.all([
+      mounted("/src/services/notes.ts"),
+      mounted("/src/services/hooks.ts"),
+      mounted("/src/state/main.ts"),
+      mounted("/src/services/mainTree.ts"),
+    ]);
+    const id = "storage/excalidraw/Rename Board.excalidraw";
+    const board = notesService.seedFile(id);
+    board.kind = "board";
+    board.title = "Rename Board";
+    await invalidateNotes();
+    const main = useMainStore.getState();
+    main.setTree(addNoteToMain(main.manifest.tree, id));
+  });
+
+  const row = page.locator(".main-tree .main-row", { hasText: "Rename Board" });
+  await expect(row).toBeVisible();
+  await expect(page.getByRole("tab", { name: /Rename Board/ })).toHaveCount(0);
+  await row.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Rename…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Rename board" });
+  const input = dialog.getByRole("textbox", { name: "Board name" });
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue("Rename Board");
+});

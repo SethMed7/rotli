@@ -54,7 +54,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documents can be named and renamed. A new Document asks for its name first,
   like a board, instead of arriving as `untitled-<number>.docx`; Rename… on a
   document's row or tab renames the file, keeps `.docx`, follows it in Main,
-  views, and open tabs, and says so when the name is already taken.
+  views, and open tabs, and says so when the name is already taken. The
+  document's first-save `.bak` backup moves with it.
+- Rename… on a board's sidebar row works when the board isn't open in a tab;
+  it opens the rename dialog instead of silently closing the menu.
 - Formatting stacks: ⌘B then ⌘I makes bold italic instead of swapping bold
   for italic, underline or highlight inside bold or italic renders instead of
   showing raw `<u>` tags, and strikethrough on inline code wraps outside the
