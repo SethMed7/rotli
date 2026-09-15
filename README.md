@@ -104,28 +104,28 @@ in this release.
 
 The titlebar sun switches between paired light and dark environments in six
 families: **Rotli · Paper & Charcoal · Ocean · Grove · Iris · Midnight**. Every
-first run starts in Rotli Light.
+first run starts in Rotli Light; below is one environment from each family.
 
 <div align="center">
 <table>
   <tr>
     <td><img src="docs/media/rotli-warm-dark.webp" alt="Rotli Dark" width="290"></td>
-    <td><img src="docs/media/paper.webp" alt="Paper" width="290"></td>
     <td><img src="docs/media/charcoal.webp" alt="Charcoal" width="290"></td>
+    <td><img src="docs/media/ocean-light.webp" alt="Ocean Light" width="290"></td>
   </tr>
   <tr>
     <td align="center">Rotli Dark</td>
-    <td align="center">Paper</td>
     <td align="center">Charcoal</td>
+    <td align="center">Ocean Light</td>
   </tr>
   <tr>
-    <td><img src="docs/media/ocean-light.webp" alt="Ocean Light" width="290"></td>
     <td><img src="docs/media/grove-dark.webp" alt="Grove Dark" width="290"></td>
+    <td><img src="docs/media/iris-light.webp" alt="Iris Light" width="290"></td>
     <td><img src="docs/media/midnight.webp" alt="Midnight" width="290"></td>
   </tr>
   <tr>
-    <td align="center">Ocean Light</td>
     <td align="center">Grove Dark</td>
+    <td align="center">Iris Light</td>
     <td align="center">Midnight</td>
   </tr>
 </table>
