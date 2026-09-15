@@ -10,7 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## 0.95.1 (unreleased)
+## [0.95.1] - 2026-09-14
+
+The 0.95.0 review round: hotkeys, links, lists, documents, the tour, drops, and
+launch gates for features that are coming soon.
 
 ### Added
 
