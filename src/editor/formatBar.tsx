@@ -6,8 +6,10 @@
 
 import { type MouseEvent, type ReactNode, useRef, useState } from "react";
 
+import { useBindingsStore } from "../keys/bindings";
+import { withChordHint } from "../keys/chords";
 import { EDITOR_ACTION } from "../keys/editorActionIds";
-import { dispatch } from "../keys/registry";
+import { currentChord, dispatch } from "../keys/registry";
 import { useTransientPopover } from "../lib/popover";
 import {
   type BlockToggle,
@@ -96,6 +98,10 @@ export function FormatBar({ ctx, narrow }: { ctx: FormatContext; narrow: boolean
   useTransientPopover([hMenuRef, hBtnRef], hOpen, () => setHOpen(false));
   useTransientPopover([moreMenuRef, moreBtnRef], moreOpen, () => setMoreOpen(false));
 
+  // subscribe to rebinds so the tooltips below re-read currentChord
+  useBindingsStore((state) => state.overrides);
+  const hint = (label: string, actionId: string): string => withChordHint(label, currentChord(actionId));
+
   const level = ctx.line === null ? 0 : headingLevelOf(ctx.line);
   const markOn = (mark: InlineMark): boolean =>
     ctx.line !== null && isMarkActive(ctx.line, ctx.selStart, mark);
@@ -109,10 +115,10 @@ export function FormatBar({ ctx, narrow }: { ctx: FormatContext; narrow: boolean
 
   const structureGroup = (
     <>
-      <Fb label="Code" on={markOn("code")} onClick={run(EDITOR_ACTION.code)}>
+      <Fb label={hint("Code", EDITOR_ACTION.code)} on={markOn("code")} onClick={run(EDITOR_ACTION.code)}>
         {codeGlyph}
       </Fb>
-      <Fb label="Link" on={markOn("link")} onClick={run(EDITOR_ACTION.link)}>
+      <Fb label={hint("Link", EDITOR_ACTION.link)} on={markOn("link")} onClick={run(EDITOR_ACTION.link)}>
         {linkGlyph}
       </Fb>
       <Fb label="Quote" on={blockOn("quote")} onClick={run(EDITOR_ACTION.quote)}>
@@ -159,16 +165,28 @@ export function FormatBar({ ctx, narrow }: { ctx: FormatContext; narrow: boolean
         )}
       </div>
       <div className="fdiv" />
-      <Fb label="Bold — ⌘B" on={markOn("bold")} onClick={run(EDITOR_ACTION.bold)}>
+      <Fb label={hint("Bold", EDITOR_ACTION.bold)} on={markOn("bold")} onClick={run(EDITOR_ACTION.bold)}>
         <strong>B</strong>
       </Fb>
-      <Fb label="Italic — ⌘I" on={markOn("italic")} onClick={run(EDITOR_ACTION.italic)}>
+      <Fb
+        label={hint("Italic", EDITOR_ACTION.italic)}
+        on={markOn("italic")}
+        onClick={run(EDITOR_ACTION.italic)}
+      >
         <em>I</em>
       </Fb>
-      <Fb label="Underline — ⌘U" on={markOn("underline")} onClick={run(EDITOR_ACTION.underline)}>
+      <Fb
+        label={hint("Underline", EDITOR_ACTION.underline)}
+        on={markOn("underline")}
+        onClick={run(EDITOR_ACTION.underline)}
+      >
         <u>U</u>
       </Fb>
-      <Fb label="Strikethrough" on={markOn("strike")} onClick={run(EDITOR_ACTION.strike)}>
+      <Fb
+        label={hint("Strikethrough", EDITOR_ACTION.strike)}
+        on={markOn("strike")}
+        onClick={run(EDITOR_ACTION.strike)}
+      >
         <s>S</s>
       </Fb>
       {narrow ? (

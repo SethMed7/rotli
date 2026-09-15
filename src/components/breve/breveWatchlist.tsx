@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { breveBackfillWatchlist, breveWriteWatchlist, openUrl, type BreveSnapshot } from "../../lib/tauri";
+import { normalizedWebsite } from "../../lib/webUrl";
 import type { WatchItem } from "../../routines/watchlist";
 import { ChevronRight, ExternalLinkGlyph, PlusGlyph, SearchGlyph, XGlyph } from "../glyphs";
 import { PageHead, SaveNote, useBreveDraftGuard, type SaveState } from "./breveShared";
@@ -15,7 +16,6 @@ import {
   editId,
   editableWatchlist,
   itemIssue,
-  normalizedWebsite,
   sectionIssue,
   watchlistDocument,
   watchlistHasIssues,

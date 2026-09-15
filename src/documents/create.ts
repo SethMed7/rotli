@@ -1,5 +1,6 @@
 import JSZip from "jszip";
 
+import { encodeXml as xml } from "./codec/xml";
 import { DOCUMENT_CREATE_EXTENSION } from "./kinds";
 import {
   blankDocumentDraft,
@@ -14,15 +15,6 @@ import type { DocumentEncoder } from "./ports";
 import { GENERATED_DOCX_THEME } from "./theme";
 
 export type DocxTemplate = DocumentDraft;
-
-function xml(text: string): string {
-  return text
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
-}
 
 function run(run: DocumentRun, forceBold = false): string {
   const style = run.style;

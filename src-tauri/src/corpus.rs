@@ -1520,6 +1520,9 @@ pub struct FileStat {
     /// memex Archive or Trash. Separate from `writable`: unsupported formats
     /// still need a recoverable lifecycle action.
     pub lifecycle_mutable: bool,
+    /// Why `lifecycle_mutable` is false ("read-only vault", "not a file",
+    /// "outside Rotli storage"); None when the file may move.
+    pub lifecycle_reason: Option<String>,
     /// Filesystem birth/modify stamps (ms since epoch) — DERIVED display facts
     /// for the file-details panel, never copied into frontmatter. None when the
     /// filesystem can't report one.
@@ -3021,37 +3024,39 @@ impl CorpusStore {
                 .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
                 .map(|d| d.as_millis() as i64)
         };
+        let lifecycle_block = self.storage_file_lifecycle_block(rel);
         Ok(FileStat {
             len: meta.len(),
             revision: crate::fsutil::file_revision(&abs)?,
             // an existing storage/ office file is editable in place
             // even though the contract's writable() refuses the storage lane at large
             writable: self.writable(rel).is_ok() || self.storage_office_editable(rel),
-            lifecycle_mutable: self.storage_file_lifecycle_mutable(rel),
+            lifecycle_mutable: lifecycle_block.is_none(),
+            lifecycle_reason: lifecycle_block.map(str::to_owned),
             created_ms: stamp_ms(meta.created()),
             modified_ms: stamp_ms(meta.modified()),
         })
     }
 
-    /// A surfaced storage asset can enter Rotli's in-memex Archive/Trash when
-    /// the root accepts mutations. Markdown and boards keep their own lifecycle.
-    fn storage_file_lifecycle_mutable(&self, rel: &str) -> bool {
-        if self.mutation_allowed().is_err() || !self.guard_rel(rel).is_ok_and(|path| path.is_file())
-        {
-            return false;
+    /// Why a surfaced storage asset cannot enter Rotli's in-memex Archive/Trash
+    /// (None = it can). Markdown and boards keep their own lifecycle.
+    fn storage_file_lifecycle_block(&self, rel: &str) -> Option<&'static str> {
+        if self.mutation_allowed().is_err() {
+            return Some("read-only vault");
+        }
+        if !self.guard_rel(rel).is_ok_and(|path| path.is_file()) {
+            return Some("not a file");
         }
         let in_storage = match self.layout {
             Layout::Memex => rel.starts_with("storage/"),
             Layout::LegacyRotli => rel.starts_with("Storage/"),
         };
-        if !in_storage {
-            return false;
-        }
         let ext = Path::new(rel)
             .extension()
             .and_then(|value| value.to_str())
             .map(str::to_ascii_lowercase);
-        !matches!(ext.as_deref(), Some("md" | "markdown" | "excalidraw"))
+        let own_lifecycle = matches!(ext.as_deref(), Some("md" | "markdown" | "excalidraw"));
+        (!in_storage || own_lifecycle).then_some("outside Rotli storage")
     }
 
     /// Move an existing storage asset into Archive/Trash while preserving its
@@ -3062,10 +3067,8 @@ impl CorpusStore {
         if sink != "Archive" && sink != "Trash" {
             return Err(format!("not a file lifecycle destination: {sink}"));
         }
-        if !self.storage_file_lifecycle_mutable(rel) {
-            return Err(format!(
-                "this file is read-only or outside Rotli storage: {rel}"
-            ));
+        if let Some(reason) = self.storage_file_lifecycle_block(rel) {
+            return Err(format!("this file can't move ({reason}): {rel}"));
         }
         let abs = self.abs(rel);
         let name = Path::new(rel)
@@ -8627,6 +8630,10 @@ pub fn corpus_views_write(
     })
 }
 
+/// Document/sheet rename — a child module so it reuses the store's own gates.
+#[path = "corpus_file_rename.rs"]
+pub mod file_rename;
+
 // ─── tests ───────────────────────────────────────────────────────────────────
 
 /// The prompt-injection evals — a fully cooperating, fully compromised caller
@@ -9280,6 +9287,25 @@ mod tests {
             .is_err());
         assert!(root.join("wiki/projects/reference.pdf").is_file());
         assert!(store.move_file_to_sink(&doc, "Somewhere").is_err());
+    }
+
+    #[test]
+    fn file_stat_names_why_a_file_cannot_enter_archive_or_trash() {
+        let dir = TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        seed_memex(&root);
+        let mut store = CorpusStore::open(root.clone()).unwrap();
+        let doc = store.create_managed_file("reasons.docx", b"docx").unwrap();
+        assert_eq!(store.file_stat(&doc).unwrap().lifecycle_reason, None);
+        fs::create_dir_all(root.join("wiki/projects")).unwrap();
+        fs::write(root.join("wiki/projects/reference.pdf"), b"keep").unwrap();
+        let outside = store.file_stat("wiki/projects/reference.pdf").unwrap();
+        assert!(!outside.lifecycle_mutable);
+        assert_eq!(outside.lifecycle_reason.as_deref(), Some("outside Rotli storage"));
+        store.set_perms_read_only(true);
+        let locked = store.file_stat(&doc).unwrap();
+        assert!(!locked.lifecycle_mutable);
+        assert_eq!(locked.lifecycle_reason.as_deref(), Some("read-only vault"));
     }
 
     /// Fresh corpus (first run happens: Inbox + welcome note exist).

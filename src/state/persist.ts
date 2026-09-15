@@ -59,7 +59,7 @@ import {
 } from "../lib/tauri";
 import { activeInstance } from "../memex/config";
 import { archiveChat, listChats, loadConfig } from "../memex/service";
-import { DEFAULT_NEW_ITEM_KIND, NEW_ITEM_KINDS, type NewItemKind } from "../newItems/model";
+import { type NewItemKind, newTabDefaultFrom } from "../newItems/model";
 import { mainFolderIds, mainNoteIds, removeFromMain } from "../services/mainTree";
 import { inboxFolderId, notesService } from "../services/notes";
 import { isRetentionEligible, parseRetentionDays } from "../services/retentionPolicy";
@@ -548,7 +548,7 @@ export function parseSettings(raw: string): PersistedSettings {
     chatNavigatorStyle: asEnum(data.chatNavigatorStyle, CHAT_NAVIGATOR_STYLES, "paws"),
     stayOpen: asBool(data.stayOpen, false),
     showInDock: asBool(data.showInDock, false),
-    newTabDefault: asEnum(data.newTabDefault, NEW_ITEM_KINDS, DEFAULT_NEW_ITEM_KIND),
+    newTabDefault: newTabDefaultFrom(data.newTabDefault, LAUNCH_FEATURES),
     tabLayout: asEnum(data.tabLayout, TAB_LAYOUTS, "scroll"),
     privateBrowserSearchEngine: asEnum(
       data.privateBrowserSearchEngine,
@@ -624,7 +624,7 @@ export function parseSettings(raw: string): PersistedSettings {
       : "badges",
     // OFF unless explicitly stored — a voice model must never be fetched
     // because a config file was unreadable
-    readAloud: data.readAloud === true,
+    readAloud: LAUNCH_FEATURES.voice && data.readAloud === true,
     readAloudVoice: VOICES.some((v) => v.id === data.readAloudVoice)
       ? (data.readAloudVoice as string)
       : DEFAULT_VOICE,

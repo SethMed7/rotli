@@ -11,8 +11,9 @@
 import { useEffect, useRef } from "react";
 
 import { dispatch } from "../keys/registry";
-import { createManagedItem, requestManagedBoardCreation } from "../newItems/composition";
-import { NEW_ITEM_DEFINITIONS, type NewItemKind } from "../newItems/model";
+import { COMING_SOON_CAPTION, LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { createManagedItem, requestNamedItemCreation } from "../newItems/composition";
+import { type NewItemFeatures, type NewItemKind, isNameFirstKind, newItemChoices } from "../newItems/model";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { BoardGlyph, BrowserGlyph, ChatGlyph, DocumentGlyph, FileGlyph, NewFileGlyph } from "./glyphs";
@@ -30,6 +31,19 @@ interface ChooserEntry {
   description: string;
   glyph: React.ReactNode;
   run: () => void;
+  /** Named but withheld by this build: shown disabled, no digit, never runs. */
+  comingSoon?: boolean;
+}
+
+/** Item cards keep their slot numbers in every build (Chat 1, Browser 2, then
+ * the kinds from 3), so a withheld card leaves its digit dead instead of
+ * shifting Board's number between channels. */
+export function newItemCards(features: NewItemFeatures) {
+  return newItemChoices(features).map((item, index) => ({
+    ...item,
+    digit: String(index + 3),
+    comingSoon: item.availability === "comingSoon",
+  }));
 }
 
 export function NewItemSurface({ paneId, tabId }: { paneId: string; tabId: string }) {
@@ -44,8 +58,8 @@ export function NewItemSurface({ paneId, tabId }: { paneId: string; tabId: strin
 
   const pickKind = (kind: NewItemKind) => {
     close();
-    if (kind === "board") {
-      requestManagedBoardCreation({ newTab: true });
+    if (isNameFirstKind(kind)) {
+      requestNamedItemCreation(kind, { newTab: true });
       return;
     }
     void createManagedItem(kind, { newTab: true }).catch((err: unknown) =>
@@ -76,12 +90,13 @@ export function NewItemSurface({ paneId, tabId }: { paneId: string; tabId: strin
         usePanesStore.getState().openBrowser();
       },
     },
-    ...NEW_ITEM_DEFINITIONS.map((def, index) => ({
-      digit: String(index + 3),
-      label: def.label,
-      description: def.description,
-      glyph: kindGlyph(def.kind),
-      run: () => pickKind(def.kind),
+    ...newItemCards(LAUNCH_FEATURES).map((card) => ({
+      digit: card.digit,
+      label: card.label,
+      description: card.description,
+      glyph: kindGlyph(card.kind),
+      run: () => pickKind(card.kind),
+      comingSoon: card.comingSoon,
     })),
   ];
 
@@ -93,7 +108,7 @@ export function NewItemSurface({ paneId, tabId }: { paneId: string; tabId: strin
       onKeyDown={(event) => {
         // bare digits only — ⌘1..9 (tab switch) and other chords pass through
         if (event.metaKey || event.ctrlKey || event.altKey) return;
-        const entry = entries.find((candidate) => candidate.digit === event.key);
+        const entry = entries.find((candidate) => candidate.digit === event.key && !candidate.comingSoon);
         if (!entry) return;
         event.preventDefault();
         event.stopPropagation();
@@ -106,17 +121,31 @@ export function NewItemSurface({ paneId, tabId }: { paneId: string; tabId: strin
         <ul className="ni-grid">
           {entries.map((entry) => (
             <li key={entry.digit}>
-              <button
-                type="button"
-                className="ni-card"
-                onClick={entry.run}
-                aria-label={`New ${entry.label} (press ${entry.digit})`}
-              >
-                <kbd className="ni-key">{entry.digit}</kbd>
-                {entry.glyph}
-                <span className="ni-label">{entry.label}</span>
-                <span className="ni-desc">{entry.description}</span>
-              </button>
+              {entry.comingSoon ? (
+                <button
+                  type="button"
+                  className="ni-card ni-card-soon"
+                  aria-disabled="true"
+                  aria-label={`New ${entry.label} — ${COMING_SOON_CAPTION}`}
+                >
+                  {entry.glyph}
+                  <span className="ni-label">{entry.label}</span>
+                  <span className="ni-desc">{entry.description}</span>
+                  <span className="ni-soon">{COMING_SOON_CAPTION}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="ni-card"
+                  onClick={entry.run}
+                  aria-label={`New ${entry.label} (press ${entry.digit})`}
+                >
+                  <kbd className="ni-key">{entry.digit}</kbd>
+                  {entry.glyph}
+                  <span className="ni-label">{entry.label}</span>
+                  <span className="ni-desc">{entry.description}</span>
+                </button>
+              )}
             </li>
           ))}
         </ul>

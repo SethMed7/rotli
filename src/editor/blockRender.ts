@@ -21,13 +21,14 @@ import { type EditorState, type Range, StateEffect, StateField } from "@codemirr
 import { Decoration, type DecorationSet, EditorView, ViewPlugin, WidgetType } from "@codemirror/view";
 
 import { createEditableBoardFromMermaid } from "../boards/composition";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { isTauri } from "../lib/tauri";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { isDarkDataTheme } from "../state/theme";
 import { useUiStore } from "../state/ui";
 import { installEmbedControls } from "./embedControls";
 import { mountBoardEmbed, mountDocumentEmbed, mountSheetEmbed } from "./embedHosts";
-import { type FenceBlock, type LangKey, innerCode, scanFences } from "./fences";
+import { type FenceBlock, type LangKey, innerCode, scanFences, withheldEmbedMessage } from "./fences";
 import { type InlineMermaidCamera, createInlineMermaidCamera } from "./mermaidInlineCamera";
 import { mermaidErrorMessage, renderMermaidElement } from "./mermaidRender";
 import { mountMermaidWorkspace } from "./mermaidWorkspace";
@@ -256,6 +257,29 @@ function cacheSet(key: string, el: HTMLElement): void {
     const oldest = CACHE.keys().next().value;
     if (oldest === undefined) break;
     CACHE.delete(oldest);
+  }
+}
+
+// ——— withheld embeds: a static note where this build has no editor ————————
+
+class WithheldEmbedWidget extends WidgetType {
+  constructor(
+    readonly lang: string,
+    readonly message: string,
+  ) {
+    super();
+  }
+
+  eq(o: WithheldEmbedWidget): boolean {
+    return o.lang === this.lang && o.message === this.message;
+  }
+
+  toDOM(): HTMLElement {
+    const box = document.createElement("div");
+    box.className = "rotli-render-block rotli-render-withheld";
+    box.dataset.lang = this.lang;
+    box.textContent = this.message;
+    return box;
   }
 }
 
@@ -718,6 +742,12 @@ function buildFrom(state: EditorState, fences: FenceBlock[]): BlockState {
     const touched = sel.from <= block.to && sel.to >= block.from;
     if (touched) continue; // raw source shows (livePreview skips these lines too)
 
+    const withheld = withheldEmbedMessage(block.lang, LAUNCH_FEATURES);
+    if (withheld) {
+      const widget = new WithheldEmbedWidget(block.lang, withheld);
+      decos.push(Decoration.replace({ widget, block: true }).range(block.from, block.to));
+      continue;
+    }
     const code = innerCode(state.doc, block.from, block.to);
     if (block.lang === "board" || block.lang === "sheet" || block.lang === "document") {
       const fileId = code.trim();

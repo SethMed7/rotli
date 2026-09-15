@@ -34,7 +34,7 @@ import {
 } from "../documents/draftComposition";
 import { newItemInTab } from "../keys/actions";
 import { tabHotkeyAction } from "../keys/tabHotkeys";
-import { fileName } from "../lib/fileKind";
+import { fileName, fileNameStem } from "../lib/fileKind";
 import {
   privateBrowserTabTitle,
   privateBrowserTitleSnapshot,
@@ -47,6 +47,7 @@ import { newItemDefinition } from "../newItems/model";
 import { useBoardRename } from "../services/boardRename";
 import { useChatRename } from "../services/chatRename";
 import { useNoteIndex } from "../services/hooks";
+import { renameLane } from "../services/itemRename";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useMainStore } from "../state/main";
@@ -213,6 +214,15 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
         label: "Rename…",
         onClick: () =>
           useUiStore.getState().setRenameTarget({ id: tab.noteId, current: titles.get(tab.noteId) ?? "" }),
+      });
+      items.push({ kind: "sep" });
+    } else if (tab.surfaceKind === "file" && renameLane({ id: tab.fileId, kind: "file" }) === "file") {
+      const fileId = tab.fileId;
+      items.push({
+        kind: "action",
+        label: "Rename…",
+        onClick: () =>
+          useUiStore.getState().setRenameTarget({ id: fileId, current: fileNameStem(fileId), lane: "file" }),
       });
       items.push({ kind: "sep" });
     } else if (tab.surfaceKind === "chat" && tab.chatSlug) {

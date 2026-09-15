@@ -22,9 +22,9 @@ import {
 import {
   createManagedItem,
   createManagedItemInTabOptimistically,
-  requestManagedBoardCreation,
+  requestNamedItemCreation,
 } from "../newItems/composition";
-import type { NewItemKind } from "../newItems/model";
+import { type NewItemKind, isNameFirstKind, isNewItemAvailable } from "../newItems/model";
 import { openChatForNote } from "../noteChat/composition";
 import { summonChat } from "../services/chatSummon";
 import { invalidateNotes, lifecycleError } from "../services/hooks";
@@ -64,8 +64,8 @@ function focusedTabNow() {
 }
 
 function runCreate(kind: NewItemKind, newTab: boolean): void {
-  if (kind === "board") {
-    requestManagedBoardCreation({ newTab });
+  if (isNameFirstKind(kind)) {
+    requestNamedItemCreation(kind, { newTab });
     return;
   }
   void createManagedItem(kind, { newTab }).catch((error) =>
@@ -86,8 +86,8 @@ export function newItemInTab(): void {
     return;
   }
   const kind = useUiStore.getState().newTabDefault;
-  if (kind === "board") {
-    requestManagedBoardCreation({ newTab: true });
+  if (isNameFirstKind(kind)) {
+    requestNamedItemCreation(kind, { newTab: true });
     return;
   }
   createManagedItemInTabOptimistically(kind);
@@ -356,6 +356,7 @@ export function registerDefaultActions(): void {
     ["items.newSheet", "New sheet", "sheet"],
     ["items.newMermaid", "New Mermaid diagram", "mermaid"],
   ] as const) {
+    if (!isNewItemAvailable(kind, LAUNCH_FEATURES)) continue;
     registerAction({
       id,
       title,
@@ -475,11 +476,13 @@ export function registerDefaultActions(): void {
     id: "system.trashSelection",
     title: "Move selection to Trash",
     defaultChord: "Meta+Backspace",
-    run: () => {
+    // enabled, not a run-time guard: outside a System selection ⌘⌫ must stay
+    // the editor's delete-to-line-start instead of being claimed and dropped
+    enabled: () => {
       const ui = useUiStore.getState();
-      if (ui.contentView !== "system" || ui.systemSelection.length === 0) return;
-      void trashSystemSelection();
+      return ui.contentView === "system" && ui.systemSelection.length > 0;
     },
+    run: () => void trashSystemSelection(),
   });
   for (let n = 1; n <= 8; n++) {
     registerAction({
@@ -597,8 +600,8 @@ export function registerDefaultActions(): void {
     [EDITOR_ACTION.bold, "Bold", "bold", "Meta+B"],
     [EDITOR_ACTION.italic, "Italic", "italic", "Meta+I"],
     [EDITOR_ACTION.underline, "Underline", "underline", "Meta+U"],
-    [EDITOR_ACTION.strike, "Strikethrough", "strike", null],
-    [EDITOR_ACTION.code, "Inline code", "code", null],
+    [EDITOR_ACTION.strike, "Strikethrough", "strike", "Meta+Shift+X"],
+    [EDITOR_ACTION.code, "Inline code", "code", "Meta+E"],
     [EDITOR_ACTION.highlight, "Highlight", "highlight", "Meta+Shift+H"],
     [EDITOR_ACTION.link, "Link", "link", null],
   ];

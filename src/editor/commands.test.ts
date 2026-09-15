@@ -7,7 +7,13 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { applyBlockToggle, applyBlockToggleAll, blockToggleActive } from "./commands";
+import {
+  applyBlockToggle,
+  applyBlockToggleAll,
+  blockToggleActive,
+  isMarkActive,
+  toggleInlineMark,
+} from "./commands";
 
 describe("applyBlockToggle on indented lines", () => {
   test("toggling bullet OFF on a nested item removes the marker, keeps the indent", () => {
@@ -91,5 +97,93 @@ describe("applyBlockToggleAll (multi-line selection policy)", () => {
 
   test("blank lines never receive a marker", () => {
     expect(applyBlockToggleAll(["alpha", "", "beta"], "bullet")).toEqual(["- alpha", null, "- beta"]);
+  });
+});
+
+describe("isMarkActive needs a closed pair (the format bar's B must not light on a lone opener)", () => {
+  test("an unclosed bold opener is not bold", () => {
+    expect(isMarkActive("**Testing", 5, "bold")).toBe(false);
+  });
+
+  test("a caret inside a closed bold span is bold", () => {
+    expect(isMarkActive("**Testing**", 5, "bold")).toBe(true);
+    expect(isMarkActive("a **b** c", 4, "bold")).toBe(true);
+  });
+
+  test("past a closed span with a trailing lone opener is not bold", () => {
+    expect(isMarkActive("**a** then **b", 13, "bold")).toBe(false);
+  });
+
+  test("an unclosed <u> is not underlined; a closed one is", () => {
+    expect(isMarkActive("<u>open", 5, "underline")).toBe(false);
+    expect(isMarkActive("<u>open</u>", 5, "underline")).toBe(true);
+  });
+
+  test("italic ignores the bold pairs and still needs its closer", () => {
+    expect(isMarkActive("*lean", 3, "italic")).toBe(false);
+    expect(isMarkActive("*lean*", 3, "italic")).toBe(true);
+  });
+});
+
+describe("the numbered toggle and lettered items", () => {
+  test("a lettered item reads as numbered and toggles off to its text", () => {
+    expect(blockToggleActive("b. item", "numbered")).toBe(true);
+    expect(applyBlockToggle("  a. child", "numbered").line).toBe("  child");
+  });
+  test("switching a lettered item to a bullet replaces its marker", () => {
+    expect(applyBlockToggle("a. item", "bullet").line).toBe("- item");
+  });
+  test("an abbreviation is not a list item", () => {
+    expect(blockToggleActive("e.g. item", "numbered")).toBe(false);
+  });
+});
+
+describe("stacked marks (⌘B then ⌘I then ⌘U keep every mark)", () => {
+  const apply = (line: string, sel: [number, number], mark: Parameters<typeof toggleInlineMark>[3]) => {
+    const r = toggleInlineMark(line, sel[0], sel[1], mark);
+    return { line: r.line, sel: [r.selStart, r.selEnd] as [number, number] };
+  };
+
+  test("italic on a bold selection adds a star instead of stripping the bold", () => {
+    const bold = apply("hello world", [0, 11], "bold");
+    expect(bold.line).toBe("**hello world**");
+    const both = apply(bold.line, bold.sel, "italic");
+    expect(both.line).toBe("***hello world***");
+    const all = apply(both.line, both.sel, "underline");
+    expect(all.line).toBe("***<u>hello world</u>***");
+  });
+
+  test("bold-italic unwraps one mark at a time", () => {
+    expect(apply("***x***", [3, 4], "italic").line).toBe("**x**");
+    expect(apply("***x***", [3, 4], "bold").line).toBe("*x*");
+    expect(apply("*x*", [1, 2], "bold").line).toBe("***x***");
+  });
+
+  test("a mark on inline code wraps outside the backticks and toggles back", () => {
+    const code = apply("code", [0, 4], "code");
+    expect(code.line).toBe("`code`");
+    const struck = apply(code.line, code.sel, "strike");
+    expect(struck.line).toBe("~~`code`~~");
+    expect(struck.line.slice(struck.sel[0], struck.sel[1])).toBe("code");
+    expect(apply(struck.line, struck.sel, "strike").line).toBe("`code`");
+  });
+});
+
+describe("toggling one mark out of a stack reaches past the other marks' delimiters", () => {
+  test("italic comes off bold-italic-underline without touching the underline", () => {
+    const line = "***<u>hello world</u>***";
+    const r = toggleInlineMark(line, 6, 17, "italic");
+    expect(r.line).toBe("**<u>hello world</u>**");
+    expect(r.line.slice(r.selStart, r.selEnd)).toBe("hello world");
+  });
+  test("bold comes off through an underline and a highlight", () => {
+    const line = "**==<u>x</u>==**";
+    const r = toggleInlineMark(line, 7, 8, "bold");
+    expect(r.line).toBe("==<u>x</u>==");
+    expect(r.line.slice(r.selStart, r.selEnd)).toBe("x");
+  });
+  test("strike comes off code it wraps, and a fresh mark still wraps innermost", () => {
+    expect(toggleInlineMark("~~`code`~~", 3, 7, "strike").line).toBe("`code`");
+    expect(toggleInlineMark("**<u>x</u>**", 5, 6, "highlight").line).toBe("**<u>==x==</u>**");
   });
 });

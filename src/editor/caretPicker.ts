@@ -17,6 +17,9 @@ export interface CaretPick<T> {
   query: string;
   choices: T[];
   index: number;
+  /** Offer this pick only when typing produced it (or it is already open) —
+   * the caret merely arriving at the spot keeps the picker closed. */
+  typedOnly?: boolean;
 }
 
 export interface CaretPickerSpec<T> {
@@ -31,6 +34,9 @@ export interface CaretPickerSpec<T> {
   row(node: HTMLButtonElement, choice: T, index: number): void;
   /** When true, 1–9 and 0 pick by position. */
   numberKeys?: boolean;
+  /** A message for a query with no choices. Without it the picker closes on
+   * zero matches; with it the picker stays open so Escape still belongs to it. */
+  empty?: (query: string) => string;
 }
 
 export function createCaretPicker<T>(spec: CaretPickerSpec<T>) {
@@ -46,22 +52,26 @@ export function createCaretPicker<T>(spec: CaretPickerSpec<T>) {
     const range = state.selection.main;
     if (!range.empty || range.head === dismissed) return null;
     const pick = spec.detect(state);
-    return pick && pick.choices.length > 0 ? { ...pick, index: 0 } : null;
+    return pick && (pick.choices.length > 0 || spec.empty) ? { ...pick, index: 0 } : null;
   };
 
   const field = StateField.define<FieldValue>({
-    create: (state) => ({ pick: detect(state, null), dismissed: null }),
+    create: (state) => {
+      const pick = detect(state, null);
+      return { pick: pick?.typedOnly ? null : pick, dismissed: null };
+    },
     update(value, tr) {
       let dismissed = value.dismissed;
       for (const effect of tr.effects) if (effect.is(dismissAt)) dismissed = effect.value;
       if (!tr.docChanged && !tr.selection && tr.effects.length === 0) return value;
       if (tr.docChanged) dismissed = null;
       let pick = detect(tr.state, dismissed);
+      if (pick?.typedOnly && !tr.docChanged && !value.pick) pick = null;
       if (pick && value.pick && value.pick.query === pick.query) {
-        pick = { ...pick, index: Math.min(value.pick.index, pick.choices.length - 1) };
+        pick = { ...pick, index: Math.max(0, Math.min(value.pick.index, pick.choices.length - 1)) };
       }
       for (const effect of tr.effects) {
-        if (effect.is(moveIndex) && pick) {
+        if (effect.is(moveIndex) && pick && pick.choices.length > 0) {
           pick = { ...pick, index: (pick.index + effect.value + pick.choices.length) % pick.choices.length };
         }
       }
@@ -99,6 +109,14 @@ export function createCaretPicker<T>(spec: CaretPickerSpec<T>) {
       dom.setAttribute("aria-label", spec.label);
       const render = () => {
         const current = view.state.field(field).pick ?? pick;
+        if (current.choices.length === 0 && spec.empty) {
+          const note = document.createElement("div");
+          note.className = `${spec.className}-empty`;
+          note.setAttribute("role", "status");
+          note.textContent = spec.empty(current.query);
+          dom.replaceChildren(note);
+          return;
+        }
         dom.replaceChildren(
           ...current.choices.map((choice, index) => {
             const row = document.createElement("button");

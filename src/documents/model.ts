@@ -43,6 +43,9 @@ export interface DocumentTextStyle {
   fontFamily?: string;
   fontSize?: number;
   color?: string;
+  /** Run shading behind the text as `#RRGGBB` (DOCX `w:shd w:fill`). */
+  background?: string;
+  verticalAlign?: "subscript" | "superscript";
 }
 
 export interface DocumentRun {

@@ -7,6 +7,7 @@ import {
   pendingNoteDocumentId,
 } from "../editor/model";
 import { MERMAID_STARTER } from "../editor/slashActions";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { corpusCreateBoard, corpusCreateManagedFile } from "../lib/tauri";
 /** Composition root for item creation. Product rules stay in model/workflow. */
 import { invalidateMemex } from "../memex/useMemex";
@@ -21,7 +22,7 @@ import { useMainStore } from "../state/main";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { ALL_NOTES, RECENT, useUiStore } from "../state/ui";
 import { useViewsStore } from "../state/views";
-import { newItemDefinition, type NewItemKind } from "./model";
+import { isNewItemAvailable, newItemDefinition, type NameFirstKind, type NewItemKind } from "./model";
 import { newItemParent } from "./placement";
 import { createNewItem, type CreatedItem, type NewItemCreator, type NewItemPresenter } from "./workflow";
 
@@ -176,19 +177,27 @@ const presenter: NewItemPresenter = {
 
 export async function createManagedItem(
   kind: NewItemKind,
-  options: { newTab?: boolean; open?: boolean; boardName?: string; pendingTabId?: string } = {},
+  options: { newTab?: boolean; open?: boolean; name?: string; pendingTabId?: string } = {},
 ): Promise<CreatedItem> {
-  const boardName = options.boardName?.trim() ?? "";
-  if (kind === "board" && !boardName) throw new Error("a board needs a name");
+  refuseWithheldKind(kind);
+  const name = options.name?.trim() ?? "";
+  if (kind === "board" && !name) throw new Error("a board needs a name");
   const baseItemCreator: NewItemCreator =
     kind === "board"
       ? {
           async create() {
-            const board = await corpusCreateBoard(resolvedPhysicalFolder(), boardName);
+            const board = await corpusCreateBoard(resolvedPhysicalFolder(), name);
             return { id: board.id, kind: "board" };
           },
         }
-      : creator;
+      : kind === "document" && name
+        ? {
+            async create() {
+              const { createManagedDocument } = await import("../documents/composition");
+              return { id: await createManagedDocument(Date.now(), name), kind: "document" };
+            },
+          }
+        : creator;
   const filingContext = currentFilingContext();
   let pendingNotePrepared = false;
   let abandonedBlankMarkdown = false;
@@ -311,7 +320,9 @@ export async function createManagedItem(
       // populated starter body makes Rust's blank-discard backstop refuse it.
       if ((item.kind === "markdown" || item.kind === "mermaid") && !pendingNotePrepared)
         trackOpenedNote(item);
-      else if (item.kind === "document") trackNewDocumentDraft(item.id);
+      // a document the person named is kept, like a board; only an untitled
+      // one is a discardable draft
+      else if (item.kind === "document" && !name) trackNewDocumentDraft(item.id);
     },
   };
   const item = await createNewItem(
@@ -323,10 +334,17 @@ export async function createManagedItem(
   return item;
 }
 
+/** Every creation entry point funnels through here, so a kind the build
+ * withholds cannot be created by a stale binding, palette, or tool call. */
+export function refuseWithheldKind(kind: NewItemKind): void {
+  if (!isNewItemAvailable(kind, LAUNCH_FEATURES))
+    throw new Error(`${newItemDefinition(kind).label} isn’t available in this build yet`);
+}
+
 /** ⌘T's optimistic composition: append/activate a real tab synchronously, then
  * start the durable creator. Resolution retargets that exact tab; refresh and
  * Main/view filing remain background work. */
-export function createManagedItemInTabOptimistically(kind: Exclude<NewItemKind, "board">): void {
+export function createManagedItemInTabOptimistically(kind: Exclude<NewItemKind, NameFirstKind>): void {
   const panes = usePanesStore.getState();
   const pendingNote = kind === "markdown" || kind === "mermaid";
   const pending = panes.openPendingItemTab(
@@ -382,6 +400,7 @@ export function createPopulatedManagedItem(
   kind: "document" | "sheet",
   createFile: () => Promise<string>,
 ): Promise<CreatedItem> {
+  refuseWithheldKind(kind);
   return createNewItem(
     {
       creator: { create: async () => ({ id: await createFile(), kind }) },
@@ -402,8 +421,8 @@ export async function registerPopulatedManagedItem(item: CreatedItem): Promise<C
 
 /** Open the shared name-first lane used by chooser cards, menus, and hotkeys.
  * The file creator remains unavailable until the dialog supplies a name. */
-export function requestManagedBoardCreation(options: { newTab?: boolean } = {}): void {
-  useUiStore.getState().setBoardCreationRequest({ newTab: options.newTab ?? false });
+export function requestNamedItemCreation(kind: NameFirstKind, options: { newTab?: boolean } = {}): void {
+  useUiStore.getState().setNameFirstRequest({ kind, newTab: options.newTab ?? false });
 }
 
 /** Create a populated board atomically while preserving the same Main/view

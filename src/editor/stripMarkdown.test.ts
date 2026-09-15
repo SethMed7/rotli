@@ -10,6 +10,7 @@ describe("stripMarkdown (beautified copy)", () => {
   test("drops inline bold/italic/code/highlight/strike/underline markers", () => {
     expect(stripMarkdown("a **bold** and *italic* and `code`")).toBe("a bold and italic and code");
     expect(stripMarkdown("==hi== ~~no~~ <u>u</u>")).toBe("hi no u");
+    expect(stripMarkdown("an _italic_ and snake_case_name")).toBe("an italic and snake_case_name");
   });
   test("links become their text", () => {
     expect(stripMarkdown("see [the docs](https://x.com)")).toBe("see the docs");
@@ -47,4 +48,18 @@ describe("markdown-strip.json fixture (Breve parity)", () => {
       expect(stripMarkdown(c.input)).toBe(c.text);
     });
   }
+});
+
+describe("stripMarkdown — links", () => {
+  test("an empty-text link copies as its url; an image is not a link", () => {
+    expect(stripMarkdown("see [](sethmedina.com)")).toBe("see sethmedina.com");
+    expect(stripMarkdown("![](storage:a.png)")).toBe("![](storage:a.png)");
+  });
+});
+
+describe("stripMarkdown — lettered lists", () => {
+  test("plain copy drops a lettered marker; abbreviations stay", () => {
+    expect(stripMarkdown("a. first\n  B. nested")).toBe("first\n  nested");
+    expect(stripMarkdown("e.g. this")).toBe("e.g. this");
+  });
 });

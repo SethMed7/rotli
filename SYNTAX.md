@@ -159,12 +159,53 @@ imports.
   aliases and substrings; an empty query offers the newest notes); Enter, Tab,
   or a click writes the closed link, using the id only when titles collide.
   Escape dismisses it and the text stays a plain, still-typed link.
+- Ordered lists count with numbers (`1. `) or a single ASCII letter
+  (`a. `, `A. `). Rotli keeps each run consecutive in its own style: `a. a.
+  d.` reads `a. b. c.`, a nested run starts at `1.` or `a.`, and a run never
+  mixes styles (a `3.` after `b.` starts a new run). Enter continues `a.` with
+  `b.`; after `z.` it starts a plain line, and letters past `z.` are left as
+  written. Only the plain item is lettered: tasks, results, and choices keep
+  numbers, so `a. [ ] x` is a lettered item whose text is `[ ] x`. There are no
+  roman numerals, and `ab.`, `a.b`, `e.g.`, and a letter without a following
+  space stay prose. Any line that starts with one letter, a dot, and a space is
+  a list item, including `I. Introduction` or `A. Smith`.
+- Typing an opener pairs it: `[` writes `[]`, `(` writes `()`, a backtick
+  writes two, and the second character of `**`, `==`, or `~~` writes the
+  closing pair, with the caret between. Typing the closer by hand steps over
+  the waiting one, so a line typed in full comes out exactly as typed. A
+  closer appears only when nothing is glued to the caret's right; a delimiter
+  pair glued to a word (`2**3`) does not pair; a third delimiter in an empty
+  pair collapses to `***`, `===`, or `~~~`; three backticks stay three. `_`
+  and a single `*` never pair. Nothing pairs inside a backtick span or fenced
+  code. `[[` becomes `[[]]` and still opens the note picker; choosing a note
+  replaces through the closing `]]`. Arriving at an already-closed link with
+  the caret does not open the picker.
+- Web links are `[text](https://example.com)` or a bare autolink: `http://`
+  and `https://` URLs, `www.` hosts, plain email addresses, and bare domains
+  such as `sethmedina.com` or `github.com/SethMed7/rotli` with an optional
+  path, query, or fragment. A bare domain links only when it ends on a common
+  web TLD from the allowlist in `src/editor/inlineLinks.ts` (lowercase `com`,
+  `org`, `io`, `co`, `dev`, `ai`, and similar); TLDs that double as file
+  extensions are left out, so `node.js`, `file.md`, `install.sh`,
+  `Rotli.app`, `v0.95.1`, and `etc.` stay prose. A domain glued to a word,
+  path, or `@` on its left stays prose, and a closing sentence period is never
+  part of the link. `[](https://example.com)` shows the address as its
+  text; an image embed (`!` before the brackets) is always an image, never a link. A scheme-less address opens
+  as `https://`, and an email opens as `mailto:`. A link that names no web
+  address (a relative path, a `#heading`) shows **Couldn't open this link**
+  when it is ⌘-clicked.
 - Tables are GFM: a header row, a delimiter row of dashes (any count, with
   optional alignment colons), then body rows. Enter at the end of a typed
   `| a | b |` row that is not yet a table writes the delimiter row and an
   empty first body row, so the delimiter never has to be typed. A line break
   inside a cell is written as `<br>` (Shift+Enter in the cell editor); plain
   readers flatten it to a space.
+- Italic is `*text*` or `_text_`; ⌘I writes `*text*`. An underscore only
+  opens when no letter, digit, or `_` touches it on the left and only closes
+  when none touches it on the right, and the text inside cannot start or end
+  with a space, so `snake_case_name`, `file_name.md`, and `__init__` stay
+  prose, and a bare link keeps its underscores. `__text__` is not bold; use
+  `**text**`.
 - Inline code is opaque to the control grammar. Backticked content renders as
   ordinary literal text with no code-chip background; only the backticks are
   hidden in beautified mode. Fenced code blocks retain their code styling.

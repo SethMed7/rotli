@@ -26,7 +26,7 @@ mod fsutil;
 mod keychain;
 mod localmodel;
 mod memex;
-mod memex_query; mod native_drag; mod remote_agent_url; mod welcome_lessons;
+mod memex_query; mod native_drag; mod pasteboard; mod remote_agent_url; mod welcome_lessons;
 mod organizer;
 mod organizer_knobs;
 #[cfg(test)]
@@ -2359,6 +2359,7 @@ pub fn run() {
         .manage(QuickReturn(Mutex::new(false)))
         .manage(QuitFlush { status: Mutex::new(QuitFlushStatus::default()), cv: Condvar::new() })
         .manage(corpus::ImportAuthorizations::default())
+        .manage(pasteboard::PasteboardGrants::default())
         .manage(memex::FolderAuthorizations::default())
         .manage(vault_browser::VaultBrowserState::default())
         .manage(provider::ProviderState::default())
@@ -2440,6 +2441,8 @@ pub fn run() {
             corpus::corpus_open_file_with,
             corpus::corpus_import_file,
             corpus_pick_images,
+            pasteboard::clipboard_has_files,
+            pasteboard::clipboard_file_paths,
             corpus::corpus_create_image_asset,
             corpus::corpus_abs,
             clipboard_assets::corpus_image_data_url,
@@ -2476,6 +2479,7 @@ pub fn run() {
             corpus::corpus_discard_blank,
             corpus::corpus_move,
             corpus::corpus_rename_board,
+            corpus::file_rename::corpus_rename_managed_file,
             breve::breve_snapshot,
             breve::breve_import_legacy,
             breve::breve_write_config,

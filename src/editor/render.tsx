@@ -16,6 +16,9 @@ import {
   parseChoicePromptLine,
   parseToggleLine,
 } from "./controlState";
+import { underscoreEm } from "./inlineEmphasis";
+import { AUTOLINK_SOURCE, LINK_OPEN_FAILED, linkHref, linkLabel, MD_LINK_SOURCE } from "./inlineLinks";
+import { ORDERED_MARKER_SOURCE } from "./listMarkers";
 import { type ResultOption, type ResultState, parseResultLine, resultTextParts } from "./resultState";
 import { ORDERED_TASK_RE, TASK_RE, type TaskState, taskStateOf } from "./taskState";
 
@@ -66,7 +69,7 @@ export interface Block {
   indent?: number;
 }
 
-const NUMBERED_RE = /^(\d+)\. /;
+const NUMBERED_RE = new RegExp(`^(${ORDERED_MARKER_SOURCE}) `);
 // H1–H6 (widened 2026-08-04 for heading folding). `#### x` used to fall through
 // as a plain paragraph — standard Markdown says it's a heading, and folding
 // needs the level to know where a section ends.
@@ -188,12 +191,12 @@ export function parseBlock(line: string): Block {
       indent,
     };
   const n = NUMBERED_RE.exec(body);
-  if (n)
+  if (n?.[1])
     return {
       kind: "numbered",
       prefixLen: indentChars.length + n[0].length,
       text: body.slice(n[0].length),
-      marker: `${n[1]}.`,
+      marker: n[1],
       indent,
     };
   // quotes de-indent like the other list kinds so a Tab-nested quote ("  > x")
@@ -212,12 +215,32 @@ interface InlineRule {
 
 /** Rendered links OPEN now (#14, audit 2026-07): clicking routes the href
  * through the scheme-allowlisted Rust opener — the webview itself never
- * navigates (that part of the Stage-1 rule stands). */
+ * navigates (that part of the Stage-1 rule stands). A link that can't open
+ * marks itself failed instead of doing nothing. */
 function openLink(event: MouseEvent<HTMLAnchorElement>): void {
   event.preventDefault();
-  const href = event.currentTarget.getAttribute("href") ?? "";
-  // a non-openable scheme simply doesn't open — the allowlist lives in Rust
-  if (href && href !== "#") void openUrl(href).catch(() => {});
+  const anchor = event.currentTarget;
+  const fail = () => {
+    anchor.dataset.openFailed = "true";
+    anchor.title = LINK_OPEN_FAILED;
+  };
+  const href = anchor.getAttribute("href") ?? "";
+  if (!href || href === "#") return fail();
+  void openUrl(href).catch(fail);
+}
+
+function webAnchor(label: ReactNode, address: string, key: number): ReactNode {
+  return (
+    <a
+      className="md-link"
+      href={linkHref(address) ?? "#"}
+      title={address || undefined}
+      key={key}
+      onClick={openLink}
+    >
+      {label}
+    </a>
+  );
 }
 
 /** Order matters: code is opaque, ** wins over *. */
@@ -228,6 +251,14 @@ const INLINE_RULES: InlineRule[] = [
       <code className={isControlLiteral(m[1] ?? "") ? "md-code control-literal" : "md-code"} key={key}>
         {m[1]}
       </code>
+    ),
+  },
+  {
+    re: /\*\*\*([^*]+)\*\*\*/,
+    render: (m, key) => (
+      <strong key={key}>
+        <em>{renderInline(m[1] ?? "")}</em>
+      </strong>
     ),
   },
   {
@@ -251,26 +282,24 @@ const INLINE_RULES: InlineRule[] = [
     render: (m, key) => <u key={key}>{renderInline(m[1] ?? "")}</u>,
   },
   {
-    re: /\[([^\]]+)\]\(([^)]*)\)/,
-    render: (m, key) => (
-      <a className="md-link" href={m[2] || "#"} title={m[2] || undefined} key={key} onClick={openLink}>
-        {renderInline(m[1] ?? "")}
-      </a>
-    ),
+    re: new RegExp(MD_LINK_SOURCE),
+    // an empty-text link shows its address as plain text — rendering it inline
+    // would autolink it again inside this anchor
+    render: (m, key) => webAnchor(m[1] ? renderInline(m[1]) : linkLabel("", m[2] ?? ""), m[2] ?? "", key),
   },
   {
     re: /\*([^*\s](?:[^*]*[^*\s])?)\*/,
     render: (m, key) => <em key={key}>{renderInline(m[1] ?? "")}</em>,
   },
-  // a BARE url is a link too (mirrors livePreview's autolink rule) — the
-  // md-link rule sits earlier so `[t](url)` keeps winning the scan
   {
-    re: /https?:\/\/[^\s<>()[\]]*[^\s<>()[\].,;:!?'"]/,
-    render: (m, key) => (
-      <a className="md-link" href={m[0]} title={m[0]} key={key} onClick={openLink}>
-        {m[0]}
-      </a>
-    ),
+    re: underscoreEm(),
+    render: (m, key) => <em key={key}>{renderInline(m[1] ?? "")}</em>,
+  },
+  // a BARE url, www. host, email, or domain is a link too (mirrors livePreview's
+  // autolink rule) — the md-link rule sits earlier so `[t](url)` keeps winning
+  {
+    re: new RegExp(AUTOLINK_SOURCE),
+    render: (m, key) => webAnchor(m[0], m[0], key),
   },
 ];
 

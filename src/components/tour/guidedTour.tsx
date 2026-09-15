@@ -48,8 +48,8 @@ export function GuidedTour() {
     };
   }, [requested, setStep]);
 
-  // the spotlit control wears data-tour-active so the stylesheet can lift it
-  // (tint + accent outline) above the scrim; a DOM attribute, not React state
+  // the spotlit control wears data-tour-active so the stylesheet can mute its
+  // own focus ring under the tour's single stroke; a DOM attribute, not state
   useEffect(() => {
     if (requested === null) return;
     const index = nextAvailableStep(requested, 1, available);
@@ -73,10 +73,8 @@ export function GuidedTour() {
   const position = TOUR_STEPS.slice(0, step + 1).filter(available).length;
   return (
     <div className="tour" role="region" aria-label="Guided tour" data-step={current.id}>
-      {placement.scrims.map((scrim, index) => (
-        <div key={index} className="tour-scrim" style={scrim} />
-      ))}
-      <div className="tour-ring" style={placement.ring} aria-hidden="true" />
+      <div className="tour-scrim" style={{ clipPath: placement.clipPath }} aria-hidden="true" />
+      <div className="tour-ring" style={placement.hole} aria-hidden="true" />
       <section className={`tour-card is-${placement.side}`} style={placement.card} aria-live="polite">
         <p className="tour-count">
           {position} of {total}

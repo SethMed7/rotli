@@ -159,32 +159,66 @@ describe("read-before-answer scaffolding (the 2026-07-29 people-list failure)", 
 // differently by globe state (search the web ON, say it can't confirm OFF).
 // It must never auto-enable the web (the globe stays the user's control).
 describe("freshness / recency reasoning", () => {
-  test("both adapters teach freshness reasoning in both globe states", () => {
+  test("both adapters teach freshness reasoning with the globe on", () => {
     for (const adapter of [gemmaAdapter, frontierAdapter]) {
       const on = adapter.renderPrompt({ ...base, web: true });
-      const off = adapter.renderPrompt({ ...base, web: false });
-      // framed around whether it's an outside-WORLD question, in both states
+      // framed around whether it's an outside-WORLD question
       expect(on).toContain("WORLD");
-      expect(off).toContain("WORLD");
       // it's framed as a judgement ("decide"/"judge whether"), not a literal
       // trigger word list the model matches on
       expect(on).toMatch(/decide|judge whether/i);
       expect(on.toLowerCase()).toMatch(/cutoff|stale|current than your training/);
+      // ON: cite supplied source IDs; do not answer stale from memory.
+      expect(on).toContain("[S1]");
     }
   });
 
-  test("globe ON steers to the web for current facts; globe OFF steers to an honest can't-confirm", () => {
-    for (const adapter of [gemmaAdapter, frontierAdapter]) {
-      const on = adapter.renderPrompt({ ...base, web: true });
-      const off = adapter.renderPrompt({ ...base, web: false });
-      // ON: cite supplied source IDs; do not answer stale from memory.
-      expect(on).toContain("[S1]");
-      // OFF: never present a stale fact as current, and invite the globe —
-      // and it must acknowledge the web is off rather than direct a search
-      expect(off.toLowerCase()).toMatch(/can'?t (confirm|verify)|out of date|stale/);
-      expect(off.toLowerCase()).toContain("globe");
-      expect(off.toLowerCase()).toContain("web is off for this chat");
+  test("local, globe OFF: world questions get an honest can't-confirm and a globe invitation", () => {
+    const off = gemmaAdapter.renderPrompt({ ...base, web: false });
+    expect(off).toContain("WORLD");
+    expect(off).toMatch(/decide/i);
+    expect(off.toLowerCase()).toMatch(/can'?t (confirm|verify)|cannot answer it reliably/);
+    expect(off.toLowerCase()).toContain("globe");
+    expect(off.toLowerCase()).toContain("web is off for this chat");
+  });
+
+  // A frontier lane knows as much as the same model anywhere else. Asked "what
+  // do you know about <a model release>" with the globe off, Gemini refused
+  // because the frontier prompt shared the local lane's can't-verify rule and
+  // framed the notes as the place every answer starts.
+  test("frontier, globe OFF: general knowledge is answered, never refused for a missing web", () => {
+    const off = frontierAdapter.renderPrompt({ ...base, web: false });
+    const lower = off.toLowerCase();
+    expect(lower).toContain("web is off for this chat");
+    expect(lower).toContain("your own knowledge");
+    expect(lower).toContain("never refuse a general question");
+    expect(lower).not.toContain("needs up-to-date information you can't verify");
+    expect(lower).not.toContain("search it before answering from memory");
+    // live data: state what the model knows, qualified, and point at the globe exactly once
+    expect(lower).toContain("as of your training");
+    expect(lower.match(/globe/g)).toHaveLength(1);
+    // the globe stays the user's control — the model is never told web tools exist
+    expect(off).not.toContain('"tool":"web_search"');
+    expect(off).not.toContain('"tool":"web_fetch"');
+  });
+
+  test("frontier: notes are searched for the user's own questions, not every question", () => {
+    for (const web of [false, true]) {
+      const lower = frontierAdapter.renderPrompt({ ...base, web }).toLowerCase();
+      expect(lower).toContain("search the notes only when the question concerns the user");
+      expect(lower).toContain("an attached note");
     }
+  });
+
+  test("frontier force-final draws on general knowledge, not only the findings", () => {
+    const final = frontierAdapter
+      .renderForceFinal({ history: [], userText: "hi", scratch: [] })
+      .toLowerCase();
+    expect(final).not.toContain("base it on the conversation and findings below");
+    expect(final).toContain("your own general knowledge");
+  });
+
+  test("globe ON gives both lanes their web tools", () => {
     // Local models get one bounded composite tool. Frontier adapters retain
     // low-level primitives for their stronger native tool-planning behavior.
     expect(gemmaAdapter.renderPrompt({ ...base, web: true })).toContain("research_web");
@@ -366,7 +400,9 @@ describe("editable artifact generation", () => {
       expect(adapter.renderPrompt({ ...base })).not.toContain('"tool":"create_artifact"');
       const enabled = adapter.renderPrompt({ ...base, artifactTool: true, documentTool: true });
       expect(enabled).toContain('"tool":"create_artifact"');
-      expect(enabled).toContain("sheet|pdf");
+      expect(enabled.includes('"kind":"pdf"')).toBe(true);
+      const withSheets = adapter.renderPrompt({ ...base, artifactTool: true, sheetArtifacts: true });
+      expect(withSheets.includes('"kind":"sheet|pdf"')).toBe(true);
       expect(enabled).toMatch(/editable Markdown source/i);
       expect(enabled).toContain('"tool":"create_document"');
       expect(enabled).toMatch(/Use create_document|use create_document/i);

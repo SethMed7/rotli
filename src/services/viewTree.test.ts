@@ -12,6 +12,7 @@ import {
   parseViewsManifest,
   projectionMenuAction,
   renameNamedView,
+  renameViewItemRef,
   setNamedViewTree,
   transferTreeItemToView,
   viewChats,
@@ -189,5 +190,20 @@ describe("view picker menu", () => {
     expect(viewPickerItems(two, null, false, on).find((item) => item.kind === "drill")).toMatchObject({
       disabled: true,
     });
+  });
+});
+
+describe("renamed path items", () => {
+  test("every view reference follows a renamed document in place", () => {
+    let manifest = createNamedView(createNamedView(EMPTY_VIEWS, "Work"), "Home");
+    manifest = assignItemToView(manifest, "storage/rotli/untitled-1.docx", "Work", "main:Plans");
+    const renamed = renameViewItemRef(manifest, "storage/rotli/untitled-1.docx", "storage/rotli/Plan.docx");
+    expect(assignedView(renamed, "storage/rotli/Plan.docx")).toBe("Work");
+    expect(assignedView(renamed, "storage/rotli/untitled-1.docx")).toBeNull();
+    expect(viewTree(renamed, "Work")).toEqual(
+      viewTree(manifest, "Work").map((node) =>
+        JSON.parse(JSON.stringify(node).replace("untitled-1.docx", "Plan.docx")),
+      ),
+    );
   });
 });

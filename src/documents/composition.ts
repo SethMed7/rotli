@@ -19,7 +19,7 @@ import { documentDraftFromMarkdown } from "./fromMarkdown";
 import { DOCUMENT_EDIT_MAX_BYTES } from "./kinds";
 import { blankDocumentDraft, type DocumentDraft, type DocumentImage } from "./model";
 import type { DocumentFileReader, DocumentFileWriter, DocumentRepository } from "./ports";
-import { createDocument, createNamedDocument, editDocument } from "./workflow";
+import { createDocument, createNamedDocument, createUserNamedDocument, editDocument } from "./workflow";
 
 const repository: DocumentRepository = {
   create: corpusCreateManagedFile,
@@ -34,9 +34,11 @@ const writer: DocumentFileWriter = {
   writeBase64: corpusWriteFileBytes,
 };
 
-export async function createManagedDocument(now = Date.now()): Promise<string> {
+export async function createManagedDocument(now = Date.now(), name?: string): Promise<string> {
   const { docxEncoder } = await import("./create");
-  return createDocument({ encoder: docxEncoder, repository }, blankDocumentDraft(), now);
+  return name
+    ? createUserNamedDocument({ encoder: docxEncoder, repository }, name)
+    : createDocument({ encoder: docxEncoder, repository }, blankDocumentDraft(), now);
 }
 
 export async function createManagedDocumentFromDraft(

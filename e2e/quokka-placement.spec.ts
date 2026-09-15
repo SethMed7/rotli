@@ -12,6 +12,7 @@ const settingsPanes = [
   "AI Models",
   "Location",
   "Connections",
+  "About Rotli",
 ] as const;
 
 test("every Settings pane keeps its small Rotli accent crisp and theme-safe", async ({ page }) => {

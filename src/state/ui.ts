@@ -19,7 +19,7 @@ import {
   DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE,
   type PrivateBrowserSearchEngine,
 } from "../lib/privateBrowser";
-import { DEFAULT_NEW_ITEM_KIND, type NewItemKind } from "../newItems/model";
+import { DEFAULT_NEW_ITEM_KIND, type NameFirstKind, type NewItemKind } from "../newItems/model";
 import { inboxFolderId } from "../services/notes";
 import type { NoteSummary } from "../types";
 import { DEFAULT_VOICE } from "../voice/speech";
@@ -547,17 +547,17 @@ interface UiState {
    * below, before any file exists. */
   renamingBoardId: string | null;
   setRenamingBoardId: (id: string | null) => void;
-  /** An ordinary user-invoked board creation waiting for its required name.
-   * The request carries presentation intent only; no file exists yet. */
-  boardCreationRequest: { newTab: boolean } | null;
-  setBoardCreationRequest: (request: { newTab: boolean } | null) => void;
+  /** An ordinary user-invoked board/document creation waiting for its required
+   * name. The request carries presentation intent only; no file exists yet. */
+  nameFirstRequest: { kind: NameFirstKind; newTab: boolean } | null;
+  setNameFirstRequest: (request: { kind: NameFirstKind; newTab: boolean } | null) => void;
   renamingChatSlug: string | null;
   setRenamingChatSlug: (slug: string | null) => void;
 
-  /** The note whose title is being edited in the rename dialog (opened from the
-   * right-click menu), or null. `current` seeds the input (the maintainer, 2026-07-01). */
-  renameTarget: { id: string; current: string } | null;
-  setRenameTarget: (t: { id: string; current: string } | null) => void;
+  /** The note (or, with `lane: "file"`, document/sheet file) being renamed in the
+   * rename dialog, or null. `current` seeds the input (the maintainer, 2026-07-01). */
+  renameTarget: { id: string; current: string; lane?: "title" | "file" | "board" } | null;
+  setRenameTarget: (t: { id: string; current: string; lane?: "title" | "file" | "board" } | null) => void;
 
   /** A failed row-menu action (file-to-brain, board rename …) surfaced as an
    * inline note in the sidebar — the menu that launched the action is gone by
@@ -955,8 +955,8 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   renamingBoardId: null,
   setRenamingBoardId: (id) => set({ renamingBoardId: id }),
-  boardCreationRequest: null,
-  setBoardCreationRequest: (request) => set({ boardCreationRequest: request }),
+  nameFirstRequest: null,
+  setNameFirstRequest: (request) => set({ nameFirstRequest: request }),
   renamingChatSlug: null,
   setRenamingChatSlug: (slug) => set({ renamingChatSlug: slug }),
   rowActionError: null,
@@ -1028,7 +1028,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   hotkeyPeek: "badges",
   setHotkeyPeek: (v) => set({ hotkeyPeek: v }),
   readAloud: false,
-  setReadAloud: (on) => set({ readAloud: on }),
+  setReadAloud: (on) => set({ readAloud: LAUNCH_FEATURES.voice && on }),
   readAloudVoice: DEFAULT_VOICE,
   setReadAloudVoice: (id) => set({ readAloudVoice: id }),
   taskCycle: "two",

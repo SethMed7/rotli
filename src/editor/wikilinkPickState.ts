@@ -5,21 +5,29 @@ import type { NoteSummary } from "../types";
 export interface WikilinkPickSpan {
   /** Column of the opening `[[`. */
   open: number;
-  /** Column of the caret; the typed target is `[open + 2, to)`. */
+  /** End column of the pick: the caret, or past an auto-closed `]]`. The typed
+   * target is `[open + 2, caret)`. */
   to: number;
   query: string;
+  /** True when the link is already closed by a `]]` right after the caret —
+   * the picker offers it only while typing, never when the caret just arrives. */
+  closed?: boolean;
 }
 
 /** The caret sits after `[[` plus some text with no `]` since; backticked
- * spans are opaque, and a link that is already closed stays closed. */
+ * spans are opaque. A `]]` right after the caret (auto-pairing writes it)
+ * belongs to the pick, so choosing replaces through it; any other `]` there
+ * means the link is not being typed. */
 export function wikilinkPickAt(line: string, caret: number): WikilinkPickSpan | null {
   const before = line.slice(0, caret);
   const match = /\[\[([^[\]]*)$/.exec(before);
   if (!match) return null;
   if ((before.match(/`/g) ?? []).length % 2 === 1) return null;
-  if (line.slice(caret).startsWith("]")) return null;
   const open = caret - match[0].length;
-  return { open, to: caret, query: match[1] ?? "" };
+  const query = match[1] ?? "";
+  if (line.startsWith("]]", caret)) return { open, to: caret + 2, query, closed: true };
+  if (line.slice(caret).startsWith("]")) return null;
+  return { open, to: caret, query };
 }
 
 const key = (value: string) => value.trim().toLowerCase();

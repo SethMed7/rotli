@@ -17,10 +17,26 @@ Local documents follow Rotli's [clean architecture protocol](../../docs/architec
   the clean document model. It patches `word/document.xml`, preserves unrelated
   package parts, and retains unsupported objects inside edited paragraphs and
   table cells.
-- `engine/univer.ts` is the only document module that imports Univer. Replacing
-  the editor does not change storage, the OOXML codec, or application use cases.
-  Its narrow policy helper owns mutation classification and the insertion-range
-  bridge needed when a portaled table dialog takes focus.
+- `engine/` is the only document folder that imports Univer; `engine/univer.ts`
+  mounts it. Replacing the editor does not change storage, the OOXML codec, or
+  application use cases. `engine/policy.ts` owns mutation classification (a
+  no-op mutation, such as a format armed at a collapsed caret, is not content:
+  it neither dirties the file nor re-lays the canvas, which would clear that
+  pending style) and the insertion-range bridge needed when a portaled table
+  dialog takes focus. `engine/caretStyle.ts` keeps that pending style alive:
+  Univer answers every rich-text mutation, including the no-op one that arms
+  a caret format, by refreshing the selection, which clears its style cache,
+  so the adapter skips the refresh for no-op mutations only.
+  `engine/textStyle.ts` maps run styles both ways.
+- `engine/format.ts` maps Rotli's editor format intents (bold, italic,
+  underline, strike, H1–H3, bullet and numbered lists) to Univer commands;
+  `documentEditor.tsx` registers it as the pane's editor handle so the key
+  registry never swallows a format chord in a document pane. Inside the canvas
+  Univer's built-in ⌘B/⌘I/⌘U also apply and win first (like the board canvas's
+  owned chords), so a rebind moves only the registry side. Code, highlight,
+  link, quote, and checklist are Markdown-only and do nothing in a document.
+- `codec/runStyle.ts` owns the run properties Rotli edits; `codec/xml.ts` holds
+  the shared WordprocessingML string helpers.
 - `composition.ts` is the only module that joins concrete adapters to Tauri.
 - Chat-authored Word documents reuse that composition and the ordinary managed
   item filing workflow. Model-authored Markdown-like headings, paragraphs,
@@ -37,10 +53,20 @@ Local documents follow Rotli's [clean architecture protocol](../../docs/architec
 
 DOCX support is create + local structured editing. The portable subset currently
 supports paragraphs, heading/title styles, alignment, lists, fonts, sizes, color,
-common inline emphasis, embedded raster images, and native Word tables with editable cell content and
+background shading, subscript/superscript, common inline emphasis, embedded raster images, and native Word tables with editable cell content and
 row/column structure through Univer. Unsupported Word objects remain preserved
 in their OOXML locations but are not editable; a one-time `.bak` protects the
-original before the first Rotli save. Markdown-only features such as slash
+original before the first Rotli save. Background is written as run shading
+(`<w:shd w:val="clear" w:fill="RRGGBB"/>`) because the editor offers arbitrary
+colors; a Word `w:highlight` decodes to its hex and is replaced by shading on
+save. Baseline is `<w:vertAlign w:val="subscript|superscript"/>`.
+
+A person names a document before it is created and can rename it from its
+row or tab menu; the naming rules live in the
+[memex data contract](../../docs/architecture/memex-data-contract.md).
+
+Managed documents live in `storage/` inside the vault, which the vault's
+`.gitignore` excludes, so they are never tracked by git even when notes are. Markdown-only features such as slash
 commands and embed fences are never mounted in documents.
 
 The editor presents conventional document defaults independent of the app

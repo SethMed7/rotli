@@ -122,7 +122,7 @@ export function NoteListSurface({
           <p className="be-title">{notes.length === 0 ? "No notes yet" : "No matches"}</p>
           <p className="be-sub">
             {notes.length === 0
-              ? "Press ⌘N, or your Quick capture shortcut (⌥C), to start one."
+              ? "Press ⌘T, or your Quick capture shortcut (⌥C), to start one."
               : "Try a different search."}
           </p>
         </div>

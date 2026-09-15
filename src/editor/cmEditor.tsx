@@ -1,4 +1,4 @@
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { history } from "@codemirror/commands";
 // The editing surface (Phase 1d): a CodeMirror 6 view wired to rotli. CM edits
 // the note's markdown TEXT directly — the .md stays the source of truth — and
 // livePreview.ts renders it WYSIWYG. This wrapper:
@@ -23,6 +23,7 @@ import { invalidateNotes, useNotes, useSearchableNotes } from "../services/hooks
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
+import { autoPair } from "./autoPairInput";
 import { addBlockBelow, blockHandles, deleteBlock, moveBlock } from "./blockHandles";
 import { blockRender } from "./blockRender";
 import { choicePanelGaps } from "./choicePanelGapsField";
@@ -46,8 +47,9 @@ import { fmBlock } from "./fmBlock";
 import { focusDim } from "./focusMode";
 import { headingFolding, toggleHeadingFold } from "./headingFold";
 import { ImageGenPopover } from "./imageGenPopover";
+import { linkOpener } from "./linkOpener";
 import { listNumbering } from "./listNumbers";
-import { linkOpener, livePreview, noteIdFacet } from "./livePreview";
+import { livePreview, noteIdFacet } from "./livePreview";
 import { ensureDocument, getDocumentText, onDocumentChange, setDocumentText } from "./model";
 import { rawMarkdown } from "./rawMarkdown";
 import { pickerFence, slashInsertion } from "./slashActions";
@@ -63,6 +65,7 @@ import {
 } from "./slashMenu";
 import { SlashPicker } from "./slashPicker";
 import { tableRender } from "./tableRender";
+import { vendorKeymap } from "./vendorKeymap";
 import { buildTitleCounts, wikilinkLabel } from "./wikilink";
 import { setWikilinkNotes } from "./wikilinkIndex";
 import { wikilinkPicker } from "./wikilinkPicker";
@@ -569,7 +572,7 @@ function CmEditorImpl({
           }),
         ),
         Prec.high(keymap.of(rotliKeymap)),
-        keymap.of([...defaultKeymap, ...historyKeymap]),
+        keymap.of(vendorKeymap()), // stock CM, yielding to registry-claimed chords (⌘I/⌘U/⌘[/⌘])
         EditorView.lineWrapping,
         // never let the caret slide behind the floating format bar: CM treats
         // the bottom strip as invisible when scrolling the caret into view, so
@@ -581,6 +584,7 @@ function CmEditorImpl({
         // URL. Both read source text in raw and beautified modes, so this sits
         // outside the view-mode compartment.
         linkOpener,
+        autoPair,
         // heading folding (2026-08-04): sits OUTSIDE the view-mode compartment
         // so an outline survives toggling raw ⇄ beautified — the fold is a
         // property of the document you're reading, not of one rendering of it.

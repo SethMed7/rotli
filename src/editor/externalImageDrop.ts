@@ -158,6 +158,16 @@ export function importImageFilesAtDrop(
   createAsset: (name: string, base64: string) => Promise<string>,
 ): Promise<void> {
   const at = view.posAtCoords(point) ?? view.state.selection.main.head;
+  return importImageFilesAtPosition(view, files, at, createAsset);
+}
+
+/** The byte-backed lane at an exact position (a pasted screenshot at the caret). */
+export function importImageFilesAtPosition(
+  view: ImageDropEditor,
+  files: readonly File[],
+  at: number,
+  createAsset: (name: string, base64: string) => Promise<string>,
+): Promise<void> {
   return importImagesAtPosition(view, files, at, async (file) => {
     const dataUrl = await readAsDataUrl(file);
     const base64 = dataUrl.split(",", 2)[1];

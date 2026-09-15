@@ -12,6 +12,14 @@ use crate::corpus::ImportAuthorizations;
 pub(crate) const DRAG_EVENT: &str = "rotli:native-drag";
 /// The webview event a granted drop rides on.
 pub(crate) const DROP_EVENT: &str = "rotli:native-drop-authorized";
+/// The webview event a drop rides on when no dropped item could be granted.
+pub(crate) const DROP_REFUSED_EVENT: &str = "rotli:native-drop-refused";
+
+#[derive(Clone, serde::Serialize)]
+struct RefusedNativeDrop {
+    /// How many items the OS delivered (all refused).
+    count: usize,
+}
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -58,8 +66,14 @@ pub(crate) fn handle(window: &Window, event: &DragDropEvent) {
         }
         DragDropEvent::Drop { paths, position } => {
             let _ = window.emit(DRAG_EVENT, NativeDrag { phase: "leave", x: 0.0, y: 0.0, count: 0 });
+            let offered = paths.len();
             let paths = window.app_handle().state::<ImportAuthorizations>().authorize_native_drop(paths);
-            if !paths.is_empty() {
+            if paths.is_empty() {
+                // folders, vanished files, a poisoned grant lock: say so instead
+                // of dropping the gesture on the floor
+                eprintln!("rotli: native drop granted none of {offered} dropped item(s)");
+                let _ = window.emit(DROP_REFUSED_EVENT, RefusedNativeDrop { count: offered });
+            } else {
                 let _ = window.emit(
                     DROP_EVENT,
                     AuthorizedNativeDrop { paths, position: DropPosition { x: position.x, y: position.y } },

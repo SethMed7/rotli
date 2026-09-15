@@ -125,8 +125,9 @@ opens the welcome note as a note tab. The session-only Playground tab, its
 lesson dropdown, the named-view import, and the practice-vault option are
 gone. Settings → General → **Open welcome folder** re-seeds missing lessons
 and reopens the welcome note; opening an existing vault never writes. Intact
-lessons are reused by title without overwriting user edits; they are not
-silently upgraded.
+lessons are reused by title without overwriting user edits. Since 0.95.1 an
+untouched lesson (body matches a shipped version) is refreshed to the current
+copy on the next seed; edited lessons still are not.
 
 | Lesson | Exercise | Proof in this pass |
 |---|---|---|
@@ -329,7 +330,12 @@ default and builds `stable` by default; explicit `ROTLI_BUILD_CHANNEL=dev` permi
 an experimental preview build. Rust's build script consumes the same variable,
 defaulting debug to dev and optimized release to stable. The release script forces
 stable. Neither persisted settings nor URLs or runtime environment can promote a
-compiled stable build. Mermaid Visual and Breve are off in stable. A dev Git branch
+compiled stable build. Off in stable: Breve, Mermaid Visual, agent integrations,
+XLSX workbooks (`sheets`; CSV editing stays), the Mermaid-diagram item kind
+(`mermaidDiagrams`; a Mermaid fence still renders), and read-aloud (`voice`).
+The New-tab chooser keeps the Sheet and Mermaid diagram cards disabled with a
+"Coming soon" caption, Settings shows Voice and the Grok Bot/MCP connections the
+same way, and every other surface omits the withheld capability. A dev Git branch
 is not itself a runtime security boundary: use the explicit channel for packaged
 dev builds, with the existing separate development app identity/configuration.
 

@@ -12,21 +12,26 @@ import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { invalidateNotes } from "./hooks";
 
+/** Rename a board file and carry its open tab and Main slot to the new id.
+ * Rejects with the reason (read-only vault…) and changes nothing when it does. */
+export async function renameBoardItem(boardId: string, raw: string): Promise<void> {
+  const name = raw.trim();
+  if (!name) return;
+  const meta = await corpusRenameBoard(boardId, name);
+  usePanesStore.getState().retargetBoard(boardId, meta.id);
+  renameMainRef(boardId, meta.id); // the Main slot follows the new path id (#33)
+  await invalidateNotes();
+}
+
 export function useBoardRename() {
   const renamingBoardId = useUiStore((s) => s.renamingBoardId);
   const setRenamingBoardId = useUiStore((s) => s.setRenamingBoardId);
-  const retargetBoard = usePanesStore((s) => s.retargetBoard);
 
   const commit = useCallback(
     async (boardId: string, raw: string) => {
       setRenamingBoardId(null);
-      const name = raw.trim();
-      if (!name) return;
       try {
-        const meta = await corpusRenameBoard(boardId, name);
-        retargetBoard(boardId, meta.id);
-        renameMainRef(boardId, meta.id); // the Main slot follows the new path id (#33)
-        await invalidateNotes();
+        await renameBoardItem(boardId, raw);
       } catch (err) {
         // the row just snaps back — SAY why (read-only vault, name collision…);
         // the sidebar's inline error lane already exists for exactly this
@@ -37,7 +42,7 @@ export function useBoardRename() {
           );
       }
     },
-    [setRenamingBoardId, retargetBoard],
+    [setRenamingBoardId],
   );
 
   return {

@@ -1,11 +1,12 @@
 import type { MouseEvent as ReactMouseEvent } from "react";
 
 import { dispatch } from "../keys/registry";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
-import { NEW_ITEM_DEFINITIONS } from "./model";
+import { availableNewItems } from "./model";
 
 export function newItemMenuItems(): MenuSpec[] {
-  return NEW_ITEM_DEFINITIONS.map((item) => ({
+  return availableNewItems(LAUNCH_FEATURES).map((item) => ({
     kind: "action" as const,
     label: item.label,
     onClick: () =>

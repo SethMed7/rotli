@@ -10,6 +10,108 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.95.1] - 2026-09-14
+
+The 0.95.0 review round: hotkeys, links, lists, documents, the tour, drops, and
+launch gates for features that are coming soon.
+
+### Added
+
+- Copy an image or file in Finder and paste it (⌘V) into a note or a chat: it
+  goes through the same import as a drop. Before, a note ignored the paste and
+  a chat pasted the file name as text.
+
+- Settings → About Rotli, with the installed version and a link to
+  sethmedina.com.
+
+### Changed
+
+- Inline code shows as a quiet monospace chip again, so backticked examples
+  in the lessons read as code.
+- ⌘E toggles inline code and ⌘⇧X strikethrough by default; format bar
+  tooltips show your current bindings.
+
+- Links: `www.` hosts, email addresses, and bare domains such as
+  `sethmedina.com` link on their own (file names such as `node.js` and
+  `file.md` stay prose), `[](url)` shows its url, a scheme-less address
+  opens as `https://`, and a link that can't open says so instead of a silent
+  dead click.
+- `_text_` is italic, like `*text*`; underscores inside words (`snake_case`,
+  `__init__`) stay as typed.
+- Brackets, parentheses, backticks, and `**` `==` `~~` pair while you type;
+  typing the closer steps over it, and `[[` still opens the note picker.
+- Lettered lists: `a. ` and `A. ` items count a→b→c, continue on Enter, and
+  strip cleanly in plain copy and read-aloud.
+
+- Spreadsheets (XLSX), the Mermaid diagram tab, and read-aloud are not in
+  public builds yet. The New-tab chooser shows Sheet and Mermaid diagram as
+  "Coming soon"; `/Sheet`, `sheet` fences, opening an .xlsx, and chat-created
+  sheets say they are unavailable. CSV editing and Mermaid fences in notes
+  still work.
+- Settings → Connections has shorter web-research copy and lists the Grok Bot
+  plug-in and MCP as coming soon; Settings → AI Models shows Voice as coming
+  soon.
+
+### Fixed
+
+- Documents can be named and renamed. A new Document asks for its name first,
+  like a board, instead of arriving as `untitled-<number>.docx`; Rename… on a
+  document's row or tab renames the file, keeps `.docx`, follows it in Main,
+  views, and open tabs, and says so when the name is already taken. The
+  document's first-save `.bak` backup moves with it.
+- Rename… on a board's sidebar row works when the board isn't open in a tab;
+  it opens the rename dialog instead of silently closing the menu.
+- Formatting stacks: ⌘B then ⌘I makes bold italic instead of swapping bold
+  for italic, underline or highlight inside bold or italic renders instead of
+  showing raw `<u>` tags, and strikethrough on inline code wraps outside the
+  backticks.
+- The `[[` note picker stays open with "No note named …" when nothing matches,
+  so Escape closes the picker instead of hiding the window.
+- Settings and setup selects, including AI Models' default-model and preset
+  menus, draw the app's own rounded control instead of the native macOS popup.
+- Turning one mark off a stack (⌘I on bold-italic-underlined text) removes only
+  that mark instead of inserting stray stars.
+- ⌘I, ⌘U, ⌘[, ⌘] and ⌘⌥ arrow pane focus work in Markdown notes again. In
+  0.95.0 the editor's built-in shortcuts swallowed them, and ⌘U could even undo
+  your last bold.
+- The format bar's B button no longer lights up for an unclosed `**`.
+- ⌘W, ⌘1-9, ⌃Tab, ⌘⇧T and ⌘D pressed while Library, Assets, Archive or Trash
+  is showing now bring your tabs back into view instead of acting unseen.
+- New folder in the vault picker opens a folder that already exists instead
+  of showing "File exists (os error 17)".
+- The Welcome note teaches autosave (there is no ⌘S for notes) and ⌘T for a
+  new note; the empty-pane and empty-list hints say ⌘T too.
+- Setup's Librarian model menu and the provider default menus use the same
+  select style as Settings.
+- The chat model picker and reasoning menu have a visible border and the
+  floating-surface corner radius.
+- The guided tour dims the app with one scrim and one accent outline around
+  the control. It no longer shows seams, a pulsing halo, or a doubled focus
+  ring, and selected controls keep their look. The dimmed app no longer
+  blocks clicks or Finder drops while the tour is open.
+- A Finder drop is no longer taken by an overlay above the note or chat. A
+  drop that only reaches Assets now says "Saved to Assets", and a drop of
+  folders says nothing was imported. Before, both did nothing you could see.
+- Skipping app setup after an update no longer turns Stay open and Show in
+  Dock back off. That reset made the window hide as soon as you clicked
+  Finder.
+
+- DOCX: bold, text color, or highlight chosen with no selection now applies to
+  the text you type next, and highlight plus subscript/superscript survive save.
+- DOCX: ⌘B/⌘I/⌘U and the other format shortcuts reach a document pane.
+- A file whose details can't be read now says so instead of "Read-only".
+
+- Claude, Codex, and Gemini chats answer general questions from what the model
+  knows instead of refusing because the web is off. They search your notes for
+  questions about you, your work, or an attached note, and mention the globe
+  once when an answer depends on live data.
+- The chat model picker is compact (340px, single-line rows, a narrower
+  provider rail), has a visible border, and opens beside the model chip when
+  the window has room.
+
+- Welcome lessons you never edited now pick up copy fixes the next time you
+  open the Welcome folder; lessons you changed are left alone.
+
 ## [0.95.0] - 2026-09-13
 
 Three fixes from a computer-use test of the installed 0.94.0.

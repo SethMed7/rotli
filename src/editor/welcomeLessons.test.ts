@@ -14,3 +14,13 @@ test("the catalog is the root welcome note plus nine uniquely titled lessons tha
     expect(entry.body).not.toMatch(/Playground|Save lesson|Raw Markdown|app-owned/);
   }
 });
+
+test("the welcome note teaches autosave and the real new-note chords", () => {
+  // ⌘S does nothing for a note (it saves as you type) and ⌘N opens the
+  // new-tab chooser — ⌘T is the chord that creates a note
+  expect(WELCOME_NOTE.body).not.toContain("⌘S");
+  expect(WELCOME_NOTE.body).toContain("1. Change this sentence. Rotli saves as you type");
+  expect(WELCOME_NOTE.body).toContain(
+    "2. Press **⌘T** to create a note, or **⌘N** to choose what a new tab becomes.",
+  );
+});

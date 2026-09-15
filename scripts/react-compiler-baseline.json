@@ -23,9 +23,12 @@
   "src/components/canvasSurface.tsx": {
     "EffectSetState": 1
   },
-  "src/components/chat/chatSurface.tsx": {
-    "EffectSetState": 7,
+  "src/components/chat/chatModelPicker.tsx": {
+    "EffectSetState": 1,
     "Refs": 2
+  },
+  "src/components/chat/chatSurface.tsx": {
+    "EffectSetState": 3
   },
   "src/components/contextMenu.tsx": {
     "EffectSetState": 1

@@ -1,3 +1,4 @@
+import { userFileName } from "../lib/fileKind";
 import { blankDocumentDraft, type DocumentDraft, type EditableDocument } from "./model";
 import type {
   DocumentEditorCodec,
@@ -54,6 +55,18 @@ export async function createNamedDocument(
     namedDocumentFileName(title, dependencies.encoder.extension, now),
     base64,
   );
+}
+
+/** Create a blank document under the name a person typed — the filename IS its
+ * name (no timestamp). A blank name is refused before anything is encoded. */
+export async function createUserNamedDocument(
+  dependencies: CreateDocumentDependencies,
+  name: string,
+  draft: DocumentDraft = blankDocumentDraft(),
+): Promise<string> {
+  const fileName = userFileName(name, dependencies.encoder.extension.toLowerCase());
+  const base64 = await dependencies.encoder.encode(draft);
+  return dependencies.repository.create(fileName, base64);
 }
 
 export interface EditDocumentDependencies<Source> {

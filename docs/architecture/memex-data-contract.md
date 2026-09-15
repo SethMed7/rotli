@@ -29,7 +29,12 @@ second user-visible product or storage location.
   `.rotli/settings.json` stores only `webSearchProvider` (`duckduckgo` by
   default, or `brave`); it never stores an API key. The per-chat globe remains
   the consent bit for whether that chat may use the network and is not a
-  provider selector. Brave credentials live under Rotli's allowlisted macOS
+  provider selector. It stays offered for every lane: frontier CLIs run
+  tool-less inside Rotli, so the globe is their only web path, and a chat never
+  turns it on by itself. With it off, a frontier lane still answers general
+  questions from the model's own knowledge and mentions the globe only when an
+  answer depends on live data; the on-device lane says it can't confirm
+  outside-world facts. Brave credentials live under Rotli's allowlisted macOS
   Keychain account, while search execution and provider failure policy remain
   application/adapter concerns outside the vault contract.
 - **Breve stays inside the active vault.** Its portable routine configuration
@@ -75,7 +80,14 @@ second user-visible product or storage location.
   older `<slug>-<id6>.md` note moves it to the readable form. Merely opening or
   listing a vault never rewrites user files.
 - **Documents and sheets** created by Rotli live in the managed binary lane:
-  `storage/rotli/` in a Rotli vault or `Storage/` in the legacy layout.
+  `storage/rotli/` in a Rotli vault or `Storage/` in the legacy layout. A
+  document's filename is its name: ordinary user creation collects the name
+  first (like a board) and writes `<name>.docx`; only a nameless embed target
+  falls back to `untitled-<timestamp>.docx`. Rename… on a document or sheet row
+  or tab renames the file in its folder, keeps the extension, refuses a name
+  another file already holds, saves any unsaved edits first, and retargets open
+  tabs plus Main and named-view references (`corpus_rename_managed_file`,
+  `services/itemRename.ts` owns which items are renamable).
 - **Boards** are raw `.excalidraw` files. The corpus adapter chooses the writable
   Excalidraw lane for a Rotli vault and a selected writable folder for legacy storage.
   Ordinary user creation collects a nonblank name before writing anything, then
@@ -268,7 +280,13 @@ second user-visible product or storage location.
   portable root-relative `storage:` source. `/attatch` (also searchable as
   `/attach`) opens a native multi-image picker whose returned paths receive the
   same single-use grants before import. A failed copy is surfaced and never
-  reported as an inserted image.
+  reported as an inserted image. The drop router walks every element under the
+  point past non-modal overlays and stops at a modal; a drop with no chat or
+  note under it still copies into Assets and says so, and a drop Rust grants
+  nothing for (folders) emits `rotli:native-drop-refused`. A Finder copy
+  pasted (⌘V) into a note or chat takes the same path: Rust reads the
+  pasteboard's file references and grants them at most once per pasteboard
+  change, so the webview cannot re-import a copied file without a new copy.
 - A requested PDF is an exported copy of a separate editable Markdown source,
   both attached to the originating assistant turn. Rust keeps both in the same
   registered root and refuses secure, secret-shaped, locked, read-only, or
@@ -302,7 +320,14 @@ second user-visible product or storage location.
   welcome note's id leads when the note still exists and is never recreated.
   An intact lesson is matched by exact title inside the lesson folder and
   reused, so user edits are never overwritten and a trashed lesson returns as
-  a fresh file on the next seed. New lessons carry no capture shelf metadata
+  a fresh file on the next seed. A reused lesson (or the welcome note) whose
+  body, after CRLF→LF and trailing-whitespace normalization, hashes to a body
+  Rotli once shipped is refreshed to the current copy through the ordinary
+  atomic save; any other body is the user's and is left alone. The shipped set
+  is `src/assets/welcome-history.json`, appended by
+  `scripts/welcome-history.mjs` whenever `welcome.json` changes (a tooling test
+  and a Rust test fail until it is). Existing vaults pick up copy changes on the
+  next seed (Open welcome folder), not on launch. New lessons carry no capture shelf metadata
   and remain in Library. The frontend then files every id missing from Main
   under one `Welcome` root folder in catalog order; a Main save failure is
   reported and the next open retries the filing without creating files.

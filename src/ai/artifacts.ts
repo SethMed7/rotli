@@ -1,10 +1,17 @@
 import type { DocumentBlock, DocumentDraft, EditableDocument } from "../documents/model";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 
 export const CHAT_ARTIFACT_KINDS = ["document", "sheet", "pdf"] as const;
 export type ChatArtifactKind = (typeof CHAT_ARTIFACT_KINDS)[number];
 
 export function isChatArtifactKind(value: string): value is ChatArtifactKind {
   return (CHAT_ARTIFACT_KINDS as readonly string[]).includes(value);
+}
+
+/** The kinds this build lets chat create: workbooks follow the sheets launch
+ * capability, so stable builds offer documents and PDFs only. */
+export function offeredArtifactKinds(features: { sheets: boolean } = LAUNCH_FEATURES): ChatArtifactKind[] {
+  return CHAT_ARTIFACT_KINDS.filter((kind) => kind !== "sheet" || features.sheets);
 }
 
 /** Model titles are display copy, never paths. Keep one conservative filename

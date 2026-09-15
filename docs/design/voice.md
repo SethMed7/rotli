@@ -1,6 +1,8 @@
 # Voice — dictation and talking with the AI
 
-Status: **designed, not built** (2026-08-04). Research verified against the
+Status: read-aloud (tier 0) is built and ships in **development builds only**
+(feature policy `voice`, 2026-09-14); stable Settings shows it as coming soon.
+Dictation and talk-back below remain **designed, not built** (2026-08-04). Research verified against the
 installed models and the CLIs on this machine; nothing here is speculative about
 what rotli already owns.
 

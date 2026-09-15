@@ -9,6 +9,60 @@ export interface NewItemDefinition {
   description: string;
 }
 
+/** Kinds whose filename IS their name, so the name is collected before the
+ * file exists — cancelling leaves nothing behind. */
+const NAME_FIRST_KINDS = ["board", "document"] as const;
+export type NameFirstKind = (typeof NAME_FIRST_KINDS)[number];
+
+export function isNameFirstKind(kind: NewItemKind): kind is NameFirstKind {
+  return (NAME_FIRST_KINDS as readonly NewItemKind[]).includes(kind);
+}
+
+/** A kind the build withholds stays visible in the chooser as "coming soon";
+ * every other entry point (menus, actions, Settings, persisted defaults) treats
+ * it as absent. */
+export type NewItemAvailability = "available" | "comingSoon";
+
+export interface NewItemFeatures {
+  sheets: boolean;
+  mermaidDiagrams: boolean;
+}
+
+export function newItemAvailability(kind: NewItemKind, features: NewItemFeatures): NewItemAvailability {
+  if (kind === "sheet" && !features.sheets) return "comingSoon";
+  if (kind === "mermaid" && !features.mermaidDiagrams) return "comingSoon";
+  return "available";
+}
+
+export function isNewItemAvailable(kind: NewItemKind, features: NewItemFeatures): boolean {
+  return newItemAvailability(kind, features) === "available";
+}
+
+/** Definitions with their availability, in chooser order. */
+export function newItemChoices(
+  features: NewItemFeatures,
+): (NewItemDefinition & { availability: NewItemAvailability })[] {
+  return NEW_ITEM_DEFINITIONS.map((item) => ({
+    ...item,
+    availability: newItemAvailability(item.kind, features),
+  }));
+}
+
+/** Only the kinds this build can create — menus, Settings, and actions. */
+export function availableNewItems(features: NewItemFeatures): NewItemDefinition[] {
+  return NEW_ITEM_DEFINITIONS.filter((item) => isNewItemAvailable(item.kind, features));
+}
+
+/** Parse a persisted ⌘T default: unknown or withheld kinds read as Markdown. */
+export function newTabDefaultFrom(value: unknown, features: NewItemFeatures): NewItemKind {
+  return isNewItemKind(value) ? availableNewTabDefault(value, features) : DEFAULT_NEW_ITEM_KIND;
+}
+
+/** A persisted default that names a withheld kind falls back to Markdown. */
+export function availableNewTabDefault(kind: NewItemKind, features: NewItemFeatures): NewItemKind {
+  return isNewItemAvailable(kind, features) ? kind : DEFAULT_NEW_ITEM_KIND;
+}
+
 /** One product vocabulary for menus, Settings, the palette, and tests. */
 export const NEW_ITEM_DEFINITIONS: readonly NewItemDefinition[] = [
   {

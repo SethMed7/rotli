@@ -7,6 +7,7 @@ interface TextRangeLike {
 interface CommandLike {
   id: string;
   type?: number;
+  params?: unknown;
 }
 
 interface TableRangeLike {
@@ -29,8 +30,18 @@ export function documentInsertionRange(unitId: string, range: TextRangeLike | nu
   };
 }
 
+/** A mutation is content only when it changes the document. Univer arms a
+ * collapsed caret's pending style (toolbar Bold, text color, highlight) and
+ * still dispatches a rich-text mutation whose `actions` is null. Treating that
+ * as content marked the file dirty and re-laid the canvas, and the relayout's
+ * selection refresh cleared the pending style before the next keystroke. A
+ * mutation without an `actions` key keeps the conservative content default. */
 export function isDocumentContentMutation(command: CommandLike): boolean {
-  return command.type === UNIVER_MUTATION_COMMAND_TYPE;
+  if (command.type !== UNIVER_MUTATION_COMMAND_TYPE) return false;
+  const params = command.params;
+  if (!params || typeof params !== "object" || !("actions" in params)) return true;
+  const actions = (params as { actions?: unknown }).actions;
+  return Array.isArray(actions) ? actions.length > 0 : actions != null;
 }
 
 /** Univer's create-table mutation can emit the control stream and tableSource

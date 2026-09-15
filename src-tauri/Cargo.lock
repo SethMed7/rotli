@@ -3429,7 +3429,7 @@ dependencies = [
 
 [[package]]
 name = "rotli"
-version = "0.95.0"
+version = "0.95.1"
 dependencies = [
  "base64 0.22.1",
  "notify",
@@ -3442,6 +3442,7 @@ dependencies = [
  "security-framework",
  "serde",
  "serde_json",
+ "sha2",
  "tantivy",
  "tauri",
  "tauri-build",
