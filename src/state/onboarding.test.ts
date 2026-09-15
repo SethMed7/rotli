@@ -17,13 +17,14 @@ test("first run has one canonical six-step progress map", () => {
 });
 
 test("native development receives onboarding while the browser twin does not", () => {
-  expect(onboardingRequired(true, false, "", "0.80.0")).toBe(true);
-  expect(onboardingRequired(false, false, "", "0.80.0")).toBe(false);
+  expect(onboardingRequired(true, false)).toBe(true);
+  expect(onboardingRequired(false, false)).toBe(false);
 });
 
-test("completed current onboarding stays out of the way", () => {
-  expect(onboardingRequired(true, true, "0.80.0", "0.80.0")).toBe(false);
-  expect(onboardingRequired(true, true, "0.79.0", "0.80.0")).toBe(true);
+test("a completed onboarding never runs again, whatever version the app updates to", () => {
+  // Updates used to re-onboard on every 0.x version change; only a fresh
+  // install (or Settings → Reset & re-onboard) runs setup now.
+  expect(onboardingRequired(true, true)).toBe(false);
 });
 
 test("Reset & re-onboard lands on Rotli Light, the one appearance default", async () => {
@@ -53,7 +54,7 @@ test("first run starts in Rotli Light with a bare quokka, whatever the install h
 test("skipping setup resets window behavior only on a true first run, never on an upgrade", () => {
   // a fresh install: nothing persisted yet, so skip lands on the visitor defaults
   expect(windowBehaviorOnSkip(false, "")).toEqual({ stayOpen: false, showInDock: false });
-  // a 0.x version bump re-onboards an onboarded install: Stay open survives
+  // an onboarded install (Reset & re-onboard aside) keeps Stay open
   expect(windowBehaviorOnSkip(true, "0.94.0")).toEqual({});
   // an install from before the version gate (onboarded, no recorded version)
   expect(windowBehaviorOnSkip(true, "")).toEqual({});

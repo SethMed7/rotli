@@ -137,12 +137,6 @@ function surfaceFromUrl(): Surface {
 declare const __APP_VERSION__: string;
 const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.0.0";
 
-// The onboardingVersion gate. While 0.x (beta), re-onboard on EVERY version change
-// (the flow keeps evolving). Post-1.0, freeze the bar at 1.0.0 so updates never
-// re-onboard — only a fresh install (no prior onboardingVersion) does.
-const REQUIRED_ONBOARDING_VERSION =
-  (Number.parseInt(APP_VERSION.split(".")[0] ?? "0", 10) || 0) >= 1 ? "1.0.0" : APP_VERSION;
-
 function MainShell() {
   const [resumeAtShortcuts, setResumeAtShortcuts] = useState(false);
   const settingsOpen = useUiStore((s) => s.settingsOpen);
@@ -151,7 +145,6 @@ function MainShell() {
   const focusMode = useUiStore((s) => s.focusMode);
   const onboarded = useUiStore((s) => s.onboarded);
   const setOnboarded = useUiStore((s) => s.setOnboarded);
-  const onboardingVersion = useUiStore((s) => s.onboardingVersion);
   const setOnboardingVersion = useUiStore((s) => s.setOnboardingVersion);
   const onboardingPhase = useUiStore((s) => s.onboardingPhase);
   const [vaultActivationPending, setVaultActivationPending] = useState(false);
@@ -159,13 +152,10 @@ function MainShell() {
   const vaultStatus = useVaultStore((s) => s.status);
   const mainAutoRemoveDays = useUiStore((s) => s.mainAutoRemoveDays);
   const chatAutoArchiveDays = useUiStore((s) => s.chatAutoArchiveDays);
-  // first run (the real app only). The version gate ALSO re-onboards on every 0.x
-  // update — bulletproof regardless of the `onboarded` flag's state on disk.
+  // first run only (the real app); an app update never re-onboards
   const onboardingActive = onboardingRequired(
     isTauri() || isOnboardingReview(isTauri(), import.meta.env.DEV, window.location.search),
     onboarded,
-    onboardingVersion,
-    REQUIRED_ONBOARDING_VERSION,
   );
   const showOnboarding = onboardingActive && onboardingPhase === "preferences";
   const showModelSetup = onboardingActive && onboardingPhase === "models" && !vaultActivationPending;

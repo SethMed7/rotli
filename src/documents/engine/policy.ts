@@ -72,3 +72,35 @@ export function documentTableRanges(
   }
   return ranges;
 }
+
+interface StructureLike {
+  body?: { tables?: readonly unknown[]; customBlocks?: readonly unknown[] } | null;
+  tableSource?: Record<string, unknown> | null;
+  drawingsOrder?: readonly unknown[] | null;
+}
+
+/** The parts of a snapshot whose change needs the canvas re-measured: tables,
+ * inline blocks, and drawings. Ordinary typing leaves it unchanged, so it never
+ * pays the one-pixel resize (which repainted the page on every keystroke). */
+export function documentStructureSignature(snapshot: StructureLike): string {
+  return [
+    snapshot.body?.tables?.length ?? 0,
+    Object.keys(snapshot.tableSource ?? {}).length,
+    snapshot.body?.customBlocks?.length ?? 0,
+    snapshot.drawingsOrder?.length ?? 0,
+  ].join(":");
+}
+
+interface ChordLike {
+  code: string;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+}
+
+/** ⌘A on a Mac, Ctrl+A elsewhere — the platform's plain Select All chord. */
+export function isSelectAllChord(event: ChordLike, isMac: boolean): boolean {
+  if (event.code !== "KeyA" || event.shiftKey || event.altKey) return false;
+  return isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+}

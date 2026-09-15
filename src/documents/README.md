@@ -27,7 +27,22 @@ Local documents follow Rotli's [clean architecture protocol](../../docs/architec
   Univer answers every rich-text mutation, including the no-op one that arms
   a caret format, by refreshing the selection, which clears its style cache,
   so the adapter skips the refresh for no-op mutations only.
-  `engine/textStyle.ts` maps run styles both ways.
+  `engine/textStyle.ts` maps run styles both ways. After a content mutation
+  the adapter re-applies the paper colors, but re-measures the canvas only
+  when the structure signature (tables, inline blocks, drawings) changes;
+  a per-keystroke resize repainted the page on every character.
+- `engine/keys.ts` closes Univer's keyboard gaps. Tab in an ordinary paragraph
+  inserts a tab through a lowest-priority auto-format (list nesting and table
+  cells still win). The macOS Edit menu owns ⌘A, ⌘Z, and ⇧⌘Z before the web
+  view sees a keydown; WebKit delivers its `selectAll:`, `undo:`, and `redo:`
+  as `selectstart` and `beforeinput` (`historyUndo`/`historyRedo`) on the
+  page's hidden input, which the adapter answers with Univer's select-all,
+  undo, and redo while focus is in that input. Univer's select-all takes one
+  paragraph first and then one range per paragraph (typing replaced only the
+  active range), so a text-only document is selected as a single range; a
+  document with tables keeps Univer's table-aware ranges. Toolbar fields keep
+  their own shortcuts. `codec/xml.ts` drops XML 1.0 forbidden characters on
+  save, so a stray control character cannot make the file unreadable.
 - `engine/format.ts` maps Rotli's editor format intents (bold, italic,
   underline, strike, H1–H3, bullet and numbered lists) to Univer commands;
   `documentEditor.tsx` registers it as the pane's editor handle so the key
