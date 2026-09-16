@@ -190,9 +190,22 @@ by this build's policy, make a network request. Three ways to change that:
 | **Bridge to the Mac app** | The Mac app's existing token-gated loopback server exposes chat and the connected CLIs; the page uses it when Rotli for Mac is running. | "Nothing leaves this machine." | ~1 week, after the local-model shape |
 | **Hosted Rotli (login)** | The owner's proposal: a per-user cloud workspace with the CLIs installed, the vault synced to it, and a login. Everything works from any browser with no install. | **The files DO leave the machine**, to Rotli's servers — a different product from the local-first Rotli, with accounts, billing, key custody, a threat model rewrite, and sync. | A product tier, not a feature: weeks, plus operations |
 
-Recommendation: the first two keep the promise the site makes and reuse
-what exists; the third is a real business decision to take separately,
-not a web-version item. None of the three is started.
+**The owner's clarification (2026-09-16 PM): a terminal in the web app
+where the user logs into Claude Code, Cursor, or ChatGPT themselves; the
+files stay in the user's folder.** A browser cannot run a shell, so the
+terminal's process has to live somewhere, and that choice is the whole
+decision:
+
+| Where the CLI runs | Files | The login | Install | Fit |
+|---|---|---|---|---|
+| **On the user's machine, through a small local helper** (the existing `rotli` CLI grown a pty bridge on `127.0.0.1`, token-gated like `rotli mcp --http`; xterm.js in the page) | Stay in the user's folder; the CLI reads them directly | The user's own, in the terminal, as today | One small binary — the same one the parked cross-platform track needs for Windows and Linux | **Recommended.** Keeps the promise, reuses the loopback server, and gives non-Mac users chat before the native app is ported |
+| On Rotli's servers, fed per turn from the browser | Stay local; only what a chat turn sends leaves (which goes to the model provider anyway) | The user's own, but the CLI's login token lives on Rotli's server | None | Custody of every user's provider login, plus a relay that sees each frame — the same class of risk as the remote-agent relay, multiplied by a terminal |
+
+Recommendation: the local-helper shape. It is roughly two weeks (pty over
+WebSocket in the Rust CLI, xterm.js behind an adapter, the loopback
+`connect-src` for `/app/`, a "Connect Rotli on this computer" step with
+the token), and it reuses the workspace service that exists. The hosted
+shape is a separate business decision. Nothing is started.
 
 ### Phase W2 — installable, and a bridge to the Mac
 
