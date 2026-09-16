@@ -48,10 +48,10 @@ import { onQuitFlush } from "../lib/quitFlush";
 import {
   appSettingsRead,
   appSettingsWrite,
-  corpusStatus,
   corpusSettingsRead,
   corpusSettingsWrite,
-  isTauri,
+  corpusStatus,
+  hasDurableCorpus,
   organizerSetTrust,
   setDockVisible,
   setGlobalShortcut,
@@ -66,6 +66,7 @@ import { isRetentionEligible, parseRetentionDays } from "../services/retentionPo
 import type { PaneNode, Tab } from "../types";
 import { DEFAULT_VOICE, VOICES } from "../voice/speech";
 import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
+import { helperLinked } from "./helperLink";
 import { hydrateMain, useMainStore } from "./main";
 import { MRU_CAP, touchItemActivity, touchMru, useMruStore } from "./mru";
 import {
@@ -701,7 +702,9 @@ export function parseSettings(raw: string): PersistedSettings {
     sidebarZoom: clampSidebarZoom(typeof data.sidebarZoom === "number" ? data.sidebarZoom : 1),
     sidebarMode: LAUNCH_FEATURES.breve && data.sidebarMode === "breve" ? "breve" : "notes",
     // Home is the safe default front — a fresh (or unknown) value opens on notes
-    sidebarView: data.sidebarView === "chat" ? "chat" : "home",
+    // the Chat front stays when something can chat: the desktop, or Rotli Web
+    // paired with Rotli Helper (hydrated before this runs)
+    sidebarView: data.sidebarView === "chat" && (LAUNCH_FEATURES.chat || helperLinked()) ? "chat" : "home",
     breveView:
       data.breveView === "dashboard" ||
       data.breveView === "briefs" ||
@@ -1154,7 +1157,7 @@ export function runAutoRetentionMaintenance(now = Date.now()): Promise<void> {
 }
 
 async function performAutoRetentionMaintenance(now: number): Promise<void> {
-  if (!mainMapsReady || !isTauri()) return;
+  if (!mainMapsReady || !hasDurableCorpus()) return;
   const ui = useUiStore.getState();
   if (ui.mainAutoRemoveDays === null && ui.chatAutoArchiveDays === null) return;
 
@@ -1323,7 +1326,7 @@ function prePaint(): void {
 /** Load everything durable from `.rotli/` into the stores. Never throws, never
  * blocks on bad data — a deleted or corrupted dot-file just means defaults. */
 export async function hydratePersistedState(): Promise<void> {
-  if (!isTauri()) return; // the browser keeps the in-memory demo, untouched
+  if (!hasDurableCorpus()) return; // the browser twin keeps the in-memory demo, untouched
   let configured = true;
   try {
     configured = await corpusStatus();
@@ -1560,7 +1563,7 @@ function viewstateSnapshot(): string {
 /** Durably write the current settings snapshot RIGHT NOW (awaitable) — used
  * before a deliberate relaunch so flags like `onboarded` survive the restart. */
 export async function flushSettingsNow(): Promise<void> {
-  if (!isTauri()) return;
+  if (!hasDurableCorpus()) return;
   const writes: Array<Promise<void>> = [appSettingsWrite(appSettingsSnapshot())];
   if (useVaultStore.getState().status === "configured") {
     writes.push(corpusSettingsWrite("settings", settingsSnapshot()));
@@ -1610,7 +1613,7 @@ export function createPersistDrain(
  * window hides (visibilitychange) or unloads (pagehide). Call once, after
  * hydration, in the main window — no-op anywhere else. */
 export function attachPersistence(): () => void {
-  if (!isTauri() || !isMainSurface()) return () => {};
+  if (!hasDurableCorpus() || !isMainSurface()) return () => {};
 
   const configured = useVaultStore.getState().status === "configured";
 

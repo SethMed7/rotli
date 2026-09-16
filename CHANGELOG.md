@@ -12,6 +12,132 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Rotli Web (first phase).** The app now builds for the browser
+  (`bun run build:web`) and the site serves it from `rotli.co/app/` when the
+  `WEB_APP_ENABLED` knob is on. No account: the vault lives in the browser's
+  own storage on that device, and the page's Content-Security-Policy is
+  `connect-src 'none'`, so the browser refuses every outbound request. Notes,
+  folders, Main and named views, settings, and the open tabs persist across
+  reloads; a first visit seeds and opens the Welcome folder. Chat and every
+  model lane, the Librarian, Breve, agents, sheets, Word files, and Finder
+  drops stay in the Mac app; the web build withholds them by platform.
+  Chat stays visible, disabled, and says on hover that it is in the Mac app
+  (a click opens the download); Settings → General says where the notes
+  live. Its top bar is a toolbar,
+  not window chrome: the brand sits where the Mac app keeps its traffic
+  lights and links back to the site, and there is no window drag or private
+  browser. In Chrome, Edge, or Arc, **Open a folder on this computer**
+  (sidebar → Connect vault, or Settings → General) makes a real folder the
+  vault: every note is a file there, the same files the Mac app reads, and
+  the browser remembers only the folder. Firefox, Zen, Safari, and Brave
+  (until its folder flag is on) cannot write to a folder; there **Import a
+  folder** keeps a copy in the browser and **Export vault (.zip)** gives it
+  back. Boards are the next phase
+  (`docs/design/web-version-and-shell-batch-2026-09-16.md`).
+- **Rotli Helper: chat on the web.** A small program you run on your own
+  computer (`rotli-helper`, Mac, Windows, and Linux; not the Mac app) lets
+  Rotli Web chat through the AI tools installed there — Claude Code, Codex,
+  Cursor — with your notes as context. Start it, paste the pairing code it
+  prints into Chat → Connect, and Chat is a real front: the tools' guides
+  then know what is installed, and a message goes to the tool you pick and
+  its reply comes back. The helper listens only on your own computer, only
+  for pages from rotli.co, and only for a paired page; images are not sent
+  through it in this release, and a note in a secure folder or carrying a
+  secret never reaches a model. One line in a terminal installs and starts
+  it: `curl -fsSL https://rotli.co/helper/install.sh | sh` on Mac and Linux,
+  `irm https://rotli.co/helper/install.ps1 | iex` on Windows; the dialog
+  shows the line for your computer, with a copy button, and once paired it
+  checks which AI tools are already installed and signed in and says
+  Connected. Safari cannot reach the helper; every other desktop browser can
+  (some ask once for local network access). Web chats are saved in the
+  browser vault.
+- **Guided setup for the connected models.** A lane that is not ready walks
+  you through it instead of hiding a hint: Settings → AI Models shows the
+  steps open (install with the tool's own command for your OS, copy button
+  beside it; sign in, in your terminal; come back — **Check again** asks
+  right now), and steps Rotli can already see done are ticked. The chat's
+  empty state shows the same steps when no model can answer, with a door to
+  Settings. On Rotli Web, Chat and the note's chat chip stay visible and a
+  click opens **Chat on the web**: install Rotli Helper (a small program
+  for Mac, Windows, and Linux, not the Mac app; marked plainly as not
+  released yet), connect the page to it, and set up the AI tool now.
+
+### Fixed
+
+- Chat: leave a chat while it is thinking and come back, and the thread now
+  shows the working row again and the reply when it lands. Before, the
+  remounted chat showed only your message until the tab was closed and
+  reopened, even after the sidebar said Done: the run settled and saved into
+  the earlier mount's closure and the new one never heard. The run signals
+  the sidebar already reads now carry a "reply saved" count that a mounted
+  chat follows, and the composer holds while a run it did not start is in
+  flight.
+- **Delete folder** in the Main tree's folder menu: an empty folder goes
+  away at once; a full one moves its items to Trash (recoverable) and then
+  goes away. Notes are never deleted with a folder. (Real Library
+  directories still cannot be deleted from Rotli; that needs a Rust command
+  that routes to the OS Trash and is tracked separately.)
+- The note header's actions are plain glyphs now, not cards: no surface
+  behind the chat, Aa, and outline buttons, hover brings the ink up, and the
+  active one is the accent colour.
+- Ordered-list markers of two or more digits no longer overflow their
+  column: the marker column and the line's hanging indent widen together, so
+  wrapped text sits under the text, never under the number.
+- All notes says which named view a note belongs to (a muted tag before the
+  date). The list itself stays global, as designed.
+- Copying a selection across a chat copies the messages' source Markdown, so
+  a paste into another chat or a note renders as the thread did. The browser
+  default serialised the rendered bubbles and the formatting was lost.
+- Dropping a file a surface cannot take (a PDF on a note or a chat) now says
+  it went to Assets instead of vanishing silently, and a chat whose model
+  cannot see images keeps dropped images in Assets and says so instead of
+  discarding them.
+- Multi-select, the same way everywhere: **⇧-click** selects the range from
+  the last click in Captures and in the Main tree (the System browser already
+  did this; all three now share one rule). Captures has a **Select all**
+  button in its header, and ⌘A selects every card while Captures is open.
+- Restore puts a note back where it was. Moving a note to Trash or Archive
+  removed it from Main, so a restored note came back with no Main home and
+  showed up in Captures instead of its folder. The Main slot now stays (the
+  tree hides a note while it sits in a sink), so Restore returns it to the
+  folder it left, and a note opened from Trash or Archive offers **Restore**
+  in its header.
+- Library, Assets, Archive, and Trash have a **Back to notes** control at
+  their root, the same one Captures has. The header's chevron was up-one-
+  folder only and vanished at the root, which is where Trash is browsed.
+- Captures → **Make a note** (and Merge N into a note) works in a memex vault
+  again. It wrote straight into the literal Inbox folder, which is not a
+  writable surface there, so the create was refused and the button did
+  visibly nothing. The merged note now goes through the same router as every
+  other new note (memex staging when writable, else Inbox), and a refusal is
+  reported in the sidebar instead of swallowed.
+- rotli.co theme studio: the twelve environment orbs rendered as blank paper
+  circles in production because their colours rode inline `style` attributes,
+  which the site's Content-Security-Policy (`style-src 'self'`) blocks. Local
+  `astro dev`/`preview` send no CSP, so the bug was invisible before deploy.
+  The colours are now CSS rules keyed by `data-orb`, and the site build fails
+  on any inline style so the class of bug cannot ship again. `site/README.md`
+  documents the Docker prod twin for validating a build under the real headers.
+
+### Changed
+
+- Link previews: rotli.co's social card now carries the waving quokka, the
+  Baloo 2 wordmark, and the site address; the page publishes explicit Open
+  Graph image dimensions and type, `og:locale`, a theme colour, a 32×32 PNG
+  favicon, and a 180×180 Apple touch icon so iMessage, Slack, and LinkedIn
+  render the card and icon on the first fetch. `bun run build:social-card`
+  also renders a 1280×640 `social-card-github.png` for the repository's
+  social preview.
+
+### Cross-platform groundwork (parked)
+
+- Cross-platform groundwork: `security-framework` moved under the macOS-only
+  dependency table (the Keychain module already carried a non-macOS stub, but
+  the crate was still requested on Linux and would have failed at link time),
+  and a manual-only `Cross-platform build probe` workflow builds unsigned
+  bundles on macOS, Windows, and Linux runners so the compiler enumerates the
+  remaining portability gaps. It never runs on push. The feasibility document
+  gained a 2026-09-16 re-count of the seams.
 - The public site footer now includes a Featured on Launch Llama Tools badge.
 
 ## [1.0.0] - 2026-09-15

@@ -37,7 +37,16 @@ import { imageSourceSpan, selectionCoversImage } from "./imageSelection";
 import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
 import { underscoreEm } from "./inlineEmphasis";
 import { AUTOLINK_SOURCE, MD_LINK_SOURCE } from "./inlineLinks";
-import { CHECK_EM, CHOICE_EM, GROUP_INSET_PX, listStyle, MARKER_EM, RESULT_EM } from "./listGeometry";
+import {
+  CHECK_EM,
+  CHOICE_EM,
+  GROUP_INSET_PX,
+  isWideMarker,
+  listStyle,
+  MARKER_EM,
+  numberMarkerEm,
+  RESULT_EM,
+} from "./listGeometry";
 import { parseBlock } from "./render";
 import { resultTextParts } from "./resultState";
 import { ChoiceControlWidget, ResultReasonWidget, ResultWidget, ToggleWidget } from "./resultWidget";
@@ -266,7 +275,7 @@ class NumberWidget extends WidgetType {
   }
   toDOM() {
     const s = document.createElement("span");
-    s.className = "rotli-marker num";
+    s.className = isWideMarker(this.marker) ? "rotli-marker num wide" : "rotli-marker num";
     s.textContent = this.marker;
     s.setAttribute("aria-hidden", "true");
     return s;
@@ -852,7 +861,7 @@ function build(view: EditorView): {
           decos.push(
             Decoration.line({
               class: "rotli-li",
-              attributes: { style: listStyle(depth) },
+              attributes: { style: listStyle(depth, numberMarkerEm(block.marker ?? "1.")) },
             }).range(ls),
           );
           hidePrefix(ls, prefixEnd, new NumberWidget(block.marker ?? "1."), decos, atomics);

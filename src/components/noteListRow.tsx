@@ -18,6 +18,7 @@ function NoteListRowImpl({
   note,
   snippetNode,
   selected,
+  viewName,
   onOpen,
   onContextMenu,
 }: {
@@ -27,6 +28,9 @@ function NoteListRowImpl({
   snippetNode?: ReactNode | undefined;
   /** The revealed row ("Show in Library" landed here) — the one active state. */
   selected?: boolean | undefined;
+  /** The named view this note is assigned to, if any — All notes stays global
+   * (a named view never filters it), so the row says which view owns it. */
+  viewName?: string | null | undefined;
   onOpen: (note: NoteSummary, newTab: boolean) => void;
   onContextMenu?: (e: MouseEvent, note: NoteSummary) => void;
 }) {
@@ -61,6 +65,11 @@ function NoteListRowImpl({
           note.snippet && <span className="rr-snippet">{note.snippet}</span>
         )}
         {note.pinned && <PinGlyph size={13} className="rr-pin" filled />}
+        {viewName && (
+          <span className="rr-view" title={`In the ${viewName} view`}>
+            {viewName}
+          </span>
+        )}
         <span className="rr-date">{longDateLabel(note.updatedAt)}</span>
       </button>
     </li>

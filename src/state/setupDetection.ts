@@ -42,6 +42,14 @@ function record(provider: ProviderId, detection: CliDetect): void {
   useSetupDetection.setState((state) => ({ detections: { ...state.detections, [provider]: detection } }));
 }
 
+/** Ask again about one client — the setup walkthrough's "Check again". */
+export function recheckProvider(provider: ProviderId): Promise<void> {
+  return Promise.resolve()
+    .then(() => cliDetect(provider))
+    .then((detection) => record(provider, detection))
+    .catch(() => record(provider, NOT_INSTALLED));
+}
+
 /** Kick off every probe once. Safe to call from any screen; later calls no-op. */
 export function startSetupDetection(): void {
   if (useSetupDetection.getState().started) return;

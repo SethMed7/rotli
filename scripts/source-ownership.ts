@@ -38,6 +38,7 @@ export const COMPONENT_DIRECTORY_OWNERS = {
   onboarding: "first-run, vault activation, and model setup presentation",
   settings: "Settings pane sections and controls composed by settingsSurface (voice, connections, about)",
   sidebar: "sidebar presentation feature",
+  system: "System browser (Library, Assets, Archive, Trash) rows composed by systemSurface",
   tour: "guided tour overlay that spotlights the real controls after setup",
 } as const;
 
@@ -45,6 +46,11 @@ export const COMPONENT_DIRECTORY_OWNERS = {
  * list of shared primitives, overlays, and application-shell composition.
  * Feature-specific helpers belong in a named COMPONENT_DIRECTORY_OWNERS home. */
 export const COMPONENT_ROOT_FILE_OWNERS = {
+  "backToNotes.tsx": "shared back-to-panes control for full-content views",
+  "webVaultConnectDialog.tsx": "Rotli Web: the connect-a-folder explanation before the browser's own picker",
+  "webDialogFrame.tsx":
+    "Rotli Web: the shared frame of its explanatory dialogs (overlay, card, Escape, actions)",
+  "webChatSetupDialog.tsx": "Rotli Web: the chat-on-the-web walkthrough (helper, connect, sign in to a tool)",
   "captureCard.tsx": "application-shell quick-capture entry",
   "captureReveal.ts": "capture presentation state shared by shell surfaces",
   "character.tsx": "shared character renderer",
@@ -84,6 +90,8 @@ export const COMPONENT_ROOT_FILE_OWNERS = {
  * turning lib into a general dumping ground. */
 export const LIB_EFFECTFUL_FILE_OWNERS = {
   "clipboard.ts": "host pasteboard adapter (HTML copies with inlined image bytes)",
+  "folderVaultStore.ts": "Rotli Web folder mode: .rotli/ files behind the vault-store port",
+  "fsaVaultDir.ts": "Rotli Web folder mode: File System Access API behind the vault-dir port",
   "mainAddDrag.ts": "cross-surface Main drag workflow",
   "paneDropDrag.ts": "sidebar note → pane drop workflow",
   "nativeDrag.ts": "native Finder drag hover relay adapter",
@@ -103,16 +111,26 @@ export const SERVICE_FILE_OWNERS = {
   "brainJournal.ts": "librarian",
   "brainJournalComposition.ts": "librarian",
   "brainJournalStore.ts": "librarian",
+  "captureMerge.ts": "capture",
   "captureRouting.ts": "capture",
   "chatFolders.ts": "chat",
+  "chatImages.ts": "chat",
   "chatRename.ts": "chat",
   "chatSummon.ts": "chat",
+  "connectorSetup.ts": "chat",
+  "helperLink.ts": "chat",
+  "webAiCorpus.ts": "chat",
+  "webChats.ts": "chat",
   "createNote.ts": "notes",
+  "demoCorpus.ts": "notes",
+  "inMemoryNotes.ts": "notes",
   "derive.ts": "notes",
   "destinations.ts": "vault projection",
   "externalCorpusChange.ts": "vault lifecycle",
   "folderTrash.ts": "vault lifecycle",
   "fsNotes.ts": "notes adapter",
+  "folderNotes.ts": "notes",
+  "vaultDir.ts": "notes",
   "antigravity.ts": "connected-provider lane management (Antigravity runtime + sign-in)",
   "hooks.ts": "notes query adapter",
   "imageRepair.ts": "file storage",
@@ -127,6 +145,9 @@ export const SERVICE_FILE_OWNERS = {
   "notes.ts": "notes adapter",
   "remoteAgent.ts": "remote-agent relay adapter seam (development builds only)",
   "welcome.ts": "Welcome folder seeding and Main filing composition",
+  "webNotes.ts": "notes",
+  "importedVault.ts": "notes",
+  "webVaultFolder.ts": "notes",
   "notesPort.ts": "notes application port",
   "query.ts": "notes retrieval",
   "retentionPolicy.ts": "vault lifecycle",

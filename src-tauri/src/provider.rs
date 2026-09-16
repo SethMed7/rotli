@@ -641,46 +641,72 @@ pub async fn cli_complete(
     // lanes with a NATIVE image flag carry them — see `image_args`.
     images: Option<Vec<String>>,
 ) -> Result<String, String> {
-    connected_provider_execution_allowed(&provider)?;
-    // the CLI lane is remote by definition — same egress law as chat.rs. The
-    // lane seam checks again so a caller that bypasses this command (the
-    // organizer) is bound the same way; here it also refuses before any image
-    // is staged to disk.
+    // defence in depth: refuse before a task is even scheduled (and
+    // `complete_connected` asks again, for every caller that is not this one)
     if crate::secret::blocked_for_remote(&prompt) {
         return Err(crate::provider_lane::SECRET_MESSAGE.into());
     }
-    let timeout =
-        Duration::from_millis(timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).min(MAX_TIMEOUT_MS));
-    // staged for the whole turn; the temp dir is removed when this drops
-    let staged = write_image_files(images.as_deref().unwrap_or(&[]))?;
-    // the path-reading lanes need the files NAMED in the prompt; codex gets
-    // them as argv instead, so its prompt is untouched
-    let prompt = match &staged {
-        Some(s) if reads_images_from_path(&provider) => {
-            format!("{}\n{prompt}", image_preamble(&s.paths))
-        }
-        _ => prompt,
-    };
     let children = Arc::clone(&state.children);
     tauri::async_runtime::spawn_blocking(move || {
-        // `staged` must live until the child has READ the files — moving it in
-        // here (rather than letting it drop at the end of the outer fn) is what
-        // keeps the temp dir alive for the whole run.
-        let staged = staged;
-        crate::provider_lane::complete_blocking(
+        complete_connected(
             &children,
             &request_id,
             &provider,
             &model,
             &prompt,
-            timeout,
+            timeout_ms,
             reasoning_effort.as_deref(),
             service_tier.as_deref(),
-            staged.as_ref(),
+            images.as_deref().unwrap_or(&[]),
         )
     })
     .await
     .map_err(|e| format!("provider task failed: {e}"))?
+}
+
+/// One connected-client completion with every gate a chat turn gets, as a plain
+/// blocking function — so the `rotli-helper` bridge (helper.rs) and the IPC
+/// command above share one sequence: provider policy, the secret-egress
+/// refusal, the timeout clamp, image staging, then the lane.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn complete_connected(
+    children: &Arc<Mutex<HashMap<String, Running>>>,
+    request_id: &str,
+    provider: &str,
+    model: &str,
+    prompt: &str,
+    timeout_ms: Option<u64>,
+    reasoning_effort: Option<&str>,
+    service_tier: Option<&str>,
+    images: &[String],
+) -> Result<String, String> {
+    connected_provider_execution_allowed(provider)?;
+    // the CLI lane is remote by definition — same egress law as chat.rs; the
+    // lane seam checks again, and here it refuses before an image hits disk
+    if crate::secret::blocked_for_remote(prompt) {
+        return Err(crate::provider_lane::SECRET_MESSAGE.into());
+    }
+    let millis = timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).min(MAX_TIMEOUT_MS);
+    let timeout = Duration::from_millis(millis);
+    // a local that outlives the run below — what keeps the temp dir alive until
+    // the child has READ the files, and removes it on the way out regardless
+    let staged = write_image_files(images)?;
+    // path-reading lanes need the files NAMED in the prompt; codex gets argv
+    let prompt = match &staged {
+        Some(s) if reads_images_from_path(provider) => format!("{}\n{prompt}", image_preamble(&s.paths)),
+        _ => prompt.to_string(),
+    };
+    crate::provider_lane::complete_blocking(
+        children,
+        request_id,
+        provider,
+        model,
+        &prompt,
+        timeout,
+        reasoning_effort,
+        service_tier,
+        staged.as_ref(),
+    )
 }
 
 /// Kill a live completion (the composer's stop). Unknown ids are a no-op.
@@ -763,7 +789,7 @@ pub async fn cli_detect(provider: String) -> Result<CliDetect, String> {
         .map_err(|e| format!("detect task failed: {e}"))?
 }
 
-fn detect(provider: &str) -> Result<CliDetect, String> {
+pub(crate) fn detect(provider: &str) -> Result<CliDetect, String> {
     if provider == "antigravity" {
         // no CLI to probe: installed = the managed runtime is present,
         // authenticated = the agent's own credential file exists

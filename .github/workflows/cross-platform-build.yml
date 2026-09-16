@@ -1,0 +1,125 @@
+# Cross-platform build probe — manual only, never a gate.
+#
+# Builds an unsigned Rotli bundle on GitHub's macOS, Windows, and Linux runners
+# so the compiler and bundler enumerate every real portability gap. It is
+# EXPECTED to fail on Windows and Linux until the cross-platform punch-list in
+# docs/design/cross-platform-feasibility.md is worked; that is why it runs only
+# from the Actions tab (workflow_dispatch) and never on push or pull_request —
+# wiring it to push would put a permanently red lane on every commit.
+#
+# What it proves: compile + link + bundle per OS. What it does not prove: window
+# chrome, tray, Keychain, scheduler, or WebKitGTK rendering quality (the Linux
+# go/no-go in the feasibility addendum needs a human in a VM with the artifact).
+#
+# No signing: the probe never sees the Apple Developer ID or the updater key,
+# and `bundle.createUpdaterArtifacts` stays off, so Tauri does not ask for
+# TAURI_SIGNING_PRIVATE_KEY. Artifacts are unsigned smoke builds only.
+name: Cross-platform build probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: Comma-separated subset of macos,windows,linux (empty = all)
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-platform-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    name: Select platforms
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+    steps:
+      - id: select
+        env:
+          REQUESTED: ${{ github.event.inputs.platforms }}
+        run: |
+          all='[
+            {"name":"macos","os":"macos-15","bundles":"app"},
+            {"name":"windows","os":"windows-2022","bundles":"nsis"},
+            {"name":"linux","os":"ubuntu-24.04","bundles":"deb appimage"}
+          ]'
+          if [ -z "$REQUESTED" ]; then
+            selected="$(echo "$all" | jq -c .)"
+          else
+            want=",$(echo "$REQUESTED" | tr -d ' ' | tr '[:upper:]' '[:lower:]'),"
+            selected="$(echo "$all" | jq -c --arg want "$want" '[.[] | select(.name as $n | $want | contains("," + $n + ","))]')"
+          fi
+          echo "matrix={\"include\":$selected}" >> "$GITHUB_OUTPUT"
+          echo "Building: $selected"
+
+  build:
+    name: Build (${{ matrix.name }})
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    # Red on one OS must not hide the others: every platform reports on its own.
+    continue-on-error: ${{ matrix.name != 'macos' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Tauri's Linux build inputs
+        if: matrix.name == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      # Rustup reads rust-toolchain.toml from the checkout and installs its exact
+      # channel and components before the cache or Cargo runs.
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2.8.2
+        with:
+          workspaces: src-tauri -> target
+          key: probe-${{ matrix.name }}
+
+      - run: bun ci
+
+      # The frontend is OS-agnostic; build it once here so a Vite failure reads
+      # as a frontend failure, not a Tauri one. beforeBuildCommand rebuilds it
+      # again inside `tauri build`, which is cheap and keeps the config untouched.
+      - run: bun run build
+
+      - name: Tauri build (unsigned, ${{ matrix.bundles }})
+        env:
+          CI: 'true'
+        run: bun run tauri build --bundles ${{ matrix.bundles }}
+
+      - name: Locate bundles
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          find src-tauri/target/release/bundle -maxdepth 3 -type f \
+            \( -name '*.dmg' -o -name '*.exe' -o -name '*.msi' -o -name '*.deb' -o -name '*.AppImage' \) -print \
+            -o -type d -name '*.app' -print 2>/dev/null || true
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() }}
+        with:
+          name: rotli-unsigned-${{ matrix.name }}
+          path: |
+            src-tauri/target/release/bundle/**/*.dmg
+            src-tauri/target/release/bundle/**/*.exe
+            src-tauri/target/release/bundle/**/*.msi
+            src-tauri/target/release/bundle/**/*.deb
+            src-tauri/target/release/bundle/**/*.AppImage
+            src-tauri/target/release/bundle/macos/*.app/**
+          if-no-files-found: ignore
+          retention-days: 7

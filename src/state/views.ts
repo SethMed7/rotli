@@ -3,7 +3,7 @@
 
 import { create } from "zustand";
 
-import { corpusViewsRead, corpusViewsWrite, isTauri } from "../lib/tauri";
+import { corpusViewsRead, corpusViewsWrite, hasDurableCorpus } from "../lib/tauri";
 import { createRevisionedTrackedWrite } from "../lib/trackedWrite";
 import {
   EMPTY_VIEWS,
@@ -37,8 +37,9 @@ export const useViewsStore = create<ViewsState>((set, get) => ({
   dirty: false,
   setManifest: (manifest) => {
     if (!get().writable) return;
-    set({ manifest, saveState: isTauri() ? "saving" : "saved", error: null, dirty: isTauri() });
-    if (!isTauri()) return;
+    const durable = hasDurableCorpus();
+    set({ manifest, saveState: durable ? "saving" : "saved", error: null, dirty: durable });
+    if (!durable) return;
     viewsWriter.write(serializeViewsManifest(manifest), (ok, error) => {
       if (ok) set({ saveState: "saved", dirty: false });
       else

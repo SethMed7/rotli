@@ -13,6 +13,7 @@ import { type MouseEvent, useEffect, useRef, useState } from "react";
 // for anything else.
 
 import { dispatch } from "../keys/registry";
+import { isWebVault } from "../lib/browserVault";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { useTransientPopover } from "../lib/popover";
 import { corpusInspectFolder, corpusRefreshVault } from "../lib/tauri";
@@ -32,6 +33,7 @@ import { useContextMenu } from "../state/contextMenu";
 import { useFocusedTab } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { requestVaultFolder } from "../state/vaultFolderBrowser";
+import { useWebVaultConnect } from "../state/webVaultConnect";
 import { BreveSidebar } from "./breve/breveSidebar";
 import { ChevronRight, MoreGlyph, NewFileGlyph, NewFolderGlyph, RefreshGlyph, VaultGlyph } from "./glyphs";
 import { SidebarChat } from "./sidebar/sidebarChat";
@@ -100,6 +102,11 @@ export function Sidebar() {
     setRowActionError(`Couldn’t ${verb} — ${err instanceof Error ? err.message : String(err)}`);
 
   const connectVault = async () => {
+    if (isWebVault()) {
+      // Rotli Web: say what is about to happen, then the browser's own picker
+      useWebVaultConnect.getState().show();
+      return;
+    }
     const path = await requestVaultFolder({
       title: "Connect vault",
       description: "Choose an existing Rotli vault, or choose an empty folder to create one.",

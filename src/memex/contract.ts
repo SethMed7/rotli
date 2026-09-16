@@ -436,9 +436,9 @@ export function ensureChatBacklink(noteBody: string, slug: string): string {
 // changes. No `title:` field — the title lives in the body's first heading (titleOf),
 // exactly like a curated wiki note.
 
-/** Ulid-style id (Crockford base32: time-sortable prefix + random tail). Mirrors
- *  services/notes.ts `ulid` — kept local so the memex codec stays self-contained
- *  (the boundary law: this file never imports the rest of the app). */
+/** Ulid-style id (Crockford base32: time-sortable prefix + random tail). The
+ *  one implementation: services/inMemoryNotes.ts imports it from here (the
+ *  boundary law runs one way — this file never imports the rest of the app). */
 const B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 export function ulid(now: number = Date.now()): string {
   let time = "";

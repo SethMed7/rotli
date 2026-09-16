@@ -5,347 +5,33 @@
 // Components never call either directly — they consume the TanStack Query
 // hooks in ./hooks.ts.
 
-import { extOf, fileName, userFileName } from "../lib/fileKind";
+import { isWebVault } from "../lib/browserVault";
 import { isTauri } from "../lib/tauri";
-import { noteSlugify } from "../memex/contract";
-import type { Folder, Note, NoteSummary, SearchHit } from "../types";
-import { DEST, isChats, isHidden, isRootMarker, isSink, isTrash, isVault } from "./destinations";
-
-/** The browser world's memex roots: the seeded corpus is a PLAIN local root
- * (Inbox/Storage/…), and the one memex is the seeded Vault brain — so only
- * "vault:chats/…" counts as Chat-front transcripts here, exactly like fs mode
- * with a plain corpus + a connected brain. */
-const MEMEX_MARKERS: ReadonlySet<string> = new Set([DEST.vault]);
-import type { NoteCreationPolicy } from "../security/secureNotes";
-import { snippetOf, summaryOrder, titleOf } from "./derive";
+import { registerWebAiCorpus, registerWebMemexBridge } from "../lib/webAiSeam";
+import { seedDemoCorpus, seedReservedRoots } from "./demoCorpus";
 import { FsNotesService } from "./fsNotes";
+import { hydrateHelperLink } from "./helperLink";
+import { InMemoryNotesService } from "./inMemoryNotes";
 import type { NotesService } from "./notesPort";
-import { searchMatch, sortHits } from "./search";
+import { createWebAiCorpus } from "./webAiCorpus";
+import { chatStoreFor, webMemexBridge } from "./webChats";
+import {
+  activeWebNotesService,
+  hydrateWebNotes,
+  webNotesService,
+  webVaultWasRestored,
+  activeWebVaultDir,
+} from "./webNotes";
 
-/** Ulid-style id: time-sortable prefix + random tail (Crockford base32). */
-const B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-export function ulid(now = Date.now()): string {
-  let time = "";
-  let t = now;
-  for (let i = 0; i < 10; i++) {
-    time = (B32[t % 32] ?? "0") + time;
-    t = Math.floor(t / 32);
-  }
-  let rand = "";
-  for (let i = 0; i < 16; i++) rand += B32[Math.floor(Math.random() * 32)] ?? "0";
-  return time + rand;
-}
-
-export class InMemoryNotesService implements NotesService {
-  private folders = new Map<string, Folder>();
-  private notes = new Map<string, Note>();
-  private revisionCounter = 0;
-
-  private nextRevision(): string {
-    this.revisionCounter += 1;
-    return `memory:${this.revisionCounter}`;
-  }
-  /** Where an archived/trashed note came from, so Phase 2 restore is
-   * reviewable in the browser surface — fs mode carries this on disk instead.
-   * Side Map keeps Note's shape identical to the FS service (the maintainer, 2026-06-13). */
-  readonly origins = new Map<string, string>();
-
-  async listFolders(): Promise<Folder[]> {
-    return [...this.folders.values()];
-  }
-
-  async createFolder(name: string, parentId: string | null = null): Promise<Folder> {
-    // a RESERVED parent (id === its path, seedReserved) gets a path-style
-    // child id, mirroring fs mode where folderId === the relative path — the
-    // System browser's folder seeding depends on that grammar
-    const parent = parentId ? this.folders.get(parentId) : null;
-    if (parentId && !parent) throw new Error(`no folder ${parentId}`);
-    const pathStyle = parent && (parent.id.includes("/") || parent.id === parent.name);
-    const folder: Folder = pathStyle
-      ? { id: `${parentId}/${name}`, name, parentId }
-      : { id: ulid(), name, parentId };
-    this.folders.set(folder.id, folder);
-    return folder;
-  }
-
-  async updateFolder(id: string, name: string): Promise<Folder> {
-    const existing = this.folders.get(id);
-    if (!existing) throw new Error(`unknown folder: ${id}`);
-    const updated = { ...existing, name };
-    this.folders.set(id, updated);
-    return updated;
-  }
-
-  async deleteFolder(id: string): Promise<void> {
-    this.folders.delete(id);
-  }
-
-  private descendants(folderId: string): Set<string> {
-    const ids = new Set([folderId]);
-    let grew = true;
-    while (grew) {
-      grew = false;
-      for (const f of this.folders.values()) {
-        if (f.parentId && ids.has(f.parentId) && !ids.has(f.id)) {
-          ids.add(f.id);
-          grew = true;
-        }
-      }
-    }
-    return ids;
-  }
-
-  async listNotes(folderId?: string): Promise<NoteSummary[]> {
-    const all = [...this.notes.values()];
-    // Same three-case rule as FsNotesService (destinations.ts is the truth):
-    // All Notes hides the hidden roots; a hidden root shows only its subtree;
-    // any normal folder shows its subtree minus hidden (defensive).
-    // A non-default ROOT MARKER ("vault:") scopes to the whole external root by
-    // id prefix (its folders aren't in the descendants() parent-graph). Handle it
-    // before the parent-graph cases so the browser mirror matches fs mode.
-    if (folderId && isRootMarker(folderId)) {
-      return all
-        .filter((n) => n.folderId.startsWith(folderId))
-        .map(({ body: _body, ...summary }) => summary)
-        .sort(summaryOrder);
-    }
-    const within = folderId ? this.descendants(folderId) : null; // once, not per note
-    let scoped: Note[];
-    // All Notes also excludes the external Vault (browsed only via its own row)
-    // AND chats/ transcripts — the Chat front owns those (the fs twin agrees).
-    if (!within)
-      scoped = all.filter(
-        (n) => !isHidden(n.folderId) && !isVault(n.folderId) && !isChats(n.folderId, MEMEX_MARKERS),
-      );
-    else if (folderId && isHidden(folderId)) scoped = all.filter((n) => within.has(n.folderId));
-    else scoped = all.filter((n) => within.has(n.folderId) && !isHidden(n.folderId));
-    return scoped.map(({ body: _body, ...summary }) => summary).sort(summaryOrder);
-  }
-
-  /** The WHOLE corpus, unfiltered — the browser twin of the fs adapter's
-   * single-fetch source for the note universe. Order is irrelevant (the universe
-   * filters into per-folder views); no sort. */
-  async listAll(): Promise<NoteSummary[]> {
-    return [...this.notes.values()].map(({ body: _body, ...summary }) => summary);
-  }
-
-  /** The browser twin of Rust corpus_search: same scope (never Trash, never
-   * chats/ — Archive/staged/Vault stay findable), same pure grammar
-   * (search.ts searchMatch/sortHits), same cap. In-memory notes are all
-   * kind:"note", so no board/binary filter is needed here. */
-  async searchNotes(query: string, limit = 50): Promise<SearchHit[]> {
-    if (!query.trim()) return [];
-    const hits: SearchHit[] = [];
-    for (const n of this.notes.values()) {
-      if (isTrash(n.folderId) || isChats(n.folderId, MEMEX_MARKERS)) continue;
-      const m = searchMatch(query, n.title, n.body, n.snippet);
-      if (!m) continue;
-      hits.push({
-        id: n.id,
-        title: n.title,
-        snippet: m.snippet,
-        folderId: n.folderId,
-        kind: n.kind ?? "note",
-        rank: m.rank,
-        matchStart: m.matchStart,
-        matchLen: m.matchLen,
-        spans: m.spans,
-        updatedAt: n.updatedAt,
-      });
-    }
-    return sortHits(hits).slice(0, limit);
-  }
-
-  async getNote(id: string): Promise<Note | null> {
-    return this.notes.get(id) ?? null;
-  }
-
-  async createNote(folderId: string, body: string, _policy?: NoteCreationPolicy): Promise<Note> {
-    // mirror fs mode's safety ceiling: rotli never creates a note inside the
-    // external Vault (the memex is read-mostly; corpus_create's writable() gate
-    // refuses it in the shell). Keeps the browser preview honest.
-    if (isVault(folderId)) throw new Error("the Vault is read-only — notes can't be created there");
-    const now = Date.now();
-    const note: Note = {
-      id: ulid(now),
-      title: titleOf(body),
-      snippet: snippetOf(body),
-      bodyEmpty: !body.trim(),
-      aliases: [noteSlugify(titleOf(body))],
-      folderId,
-      createdAt: now,
-      updatedAt: now,
-      pinned: false,
-      body,
-      revision: this.nextRevision(),
-    };
-    this.notes.set(note.id, note);
-    return note;
-  }
-
-  async updateNote(id: string, body: string, expectedRevision: string, expectedBody?: string): Promise<Note> {
-    const existing = this.notes.get(id);
-    if (!existing) throw new Error(`unknown note: ${id}`);
-    if (!expectedRevision || (expectedRevision !== existing.revision && expectedBody !== existing.body)) {
-      throw new Error(
-        `revision conflict: expected ${expectedRevision || "(missing)"}, found ${existing.revision}; the note changed after it was opened`,
-      );
-    }
-    const title = titleOf(body);
-    const aliases = [...(existing.aliases ?? [])];
-    if (existing.title !== title) {
-      for (const alias of [existing.title, noteSlugify(existing.title), noteSlugify(title)]) {
-        if (alias && !aliases.some((value) => value.toLocaleLowerCase() === alias.toLocaleLowerCase())) {
-          aliases.push(alias);
-        }
-      }
-    }
-    const updated: Note = {
-      ...existing,
-      body,
-      title,
-      aliases,
-      snippet: snippetOf(body),
-      bodyEmpty: !body.trim(),
-      updatedAt: Date.now(),
-      revision: this.nextRevision(),
-    };
-    this.notes.set(id, updated);
-    return updated;
-  }
-
-  async deleteNote(id: string): Promise<void> {
-    this.notes.delete(id);
-  }
-
-  // ——— lifecycle: move keeps the note's id; only its folderId changes. The
-  // origin Map mirrors fs mode's on-disk breadcrumb so restore is reviewable in
-  // the browser surface, while the Note's shape stays identical to fs mode —
-  // origin is NEVER a field on Note (the maintainer, 2026-06-13). ———
-
-  async moveNote(id: string, targetFolder: string): Promise<Note> {
-    const existing = this.notes.get(id);
-    if (!existing) throw new Error(`unknown note: ${id}`);
-    // mirror Rust's cross-root refusal: a note can't move into the external
-    // Vault (or out of it, but that path can't arise in browser mode).
-    if (isVault(targetFolder)) throw new Error("moving a note into the Vault isn't supported");
-    const from = existing.folderId;
-    // The SAME origin rule Rust bakes in (isSink mirrors Rust is_hidden_root —
-    // Archive/Trash only, NOT Board): entering a sink from a non-sink folder
-    // records where it came from; leaving a sink when an origin exists clears
-    // it; otherwise the breadcrumb is left untouched.
-    if (isSink(targetFolder) && !isSink(from)) this.origins.set(id, from);
-    else if (!isSink(targetFolder) && this.origins.has(id)) this.origins.delete(id);
-    const updated: Note = { ...existing, folderId: targetFolder };
-    this.notes.set(id, updated);
-    return updated;
-  }
-
-  async archiveNote(id: string): Promise<Note> {
-    return this.moveNote(id, DEST.archive);
-  }
-
-  async trashNote(id: string): Promise<Note> {
-    return this.moveNote(id, DEST.trash);
-  }
-
-  async restoreNote(id: string): Promise<Note> {
-    // Mirror fs mode's three-valued origin (corpus.rs:162-167): no breadcrumb →
-    // Inbox; "" → the corpus ROOT (a distinct value, NOT a miss); a folder id →
-    // there if it still exists, else Inbox. "" is falsy and no folder has id "",
-    // so the root case must be matched explicitly.
-    const origin = this.origins.get(id);
-    const target =
-      origin === undefined ? DEST.inbox : origin === "" || this.folders.has(origin) ? origin : DEST.inbox;
-    return this.moveNote(id, target);
-  }
-
-  /** The browser twin of corpus_rename_managed_file: same filename rule, same
-   * refusal of a taken name. */
-  async renameFile(id: string, name: string): Promise<string> {
-    const file = this.notes.get(id);
-    if (!file || file.kind !== "file") throw new Error(`file not found: ${id}`);
-    const next = userFileName(name, extOf(fileName(id)));
-    const folder = id.includes("/") ? id.slice(0, id.lastIndexOf("/") + 1) : "";
-    const newId = `${folder}${next}`;
-    if (newId === id) return id;
-    if (newId.toLowerCase() !== id.toLowerCase() && this.notes.has(newId))
-      throw new Error(`a file named “${next}” already exists here`);
-    this.notes.delete(id);
-    this.notes.set(newId, { ...file, id: newId, title: next, revision: this.nextRevision() });
-    return newId;
-  }
-
-  /** A surfaced binary row (id = its path, title = its filename) — lets browser
-   * specs exercise file menus without a filesystem. */
-  seedFile(id: string, folderId: string = DEST.storage): Note {
-    const now = Date.now();
-    const file: Note = {
-      id,
-      title: fileName(id),
-      snippet: "",
-      bodyEmpty: false,
-      folderId,
-      createdAt: now,
-      updatedAt: now,
-      pinned: false,
-      kind: "file",
-      body: "",
-      revision: this.nextRevision(),
-    };
-    this.notes.set(id, file);
-    return file;
-  }
-
-  /** Synchronous seeding (Stage 1 sample corpus — the r1/r2 gate frames). */
-  seedFolder(name: string, parentId: string | null = null): Folder {
-    const folder: Folder = { id: ulid(), name, parentId };
-    this.folders.set(folder.id, folder);
-    return folder;
-  }
-
-  /** A reserved/destination folder whose id IS its name (or its path under a
-   * reserved root, e.g. "Storage/Work", or a prefixed external-root path like
-   * "vault:wiki") — matching fs mode where folderId === the relative path (bare
-   * for the default root, "<rootid>:rel" for a non-default one). This is what
-   * makes DEST.inbox === folder.id true in BOTH modes; the freshest-note and
-   * destination lookups depend on it. */
-  seedReserved(id: string, name: string, parentId: string | null = null): Folder {
-    const folder: Folder = { id, name, parentId };
-    this.folders.set(folder.id, folder);
-    return folder;
-  }
-
-  seedNote(
-    folderId: string,
-    body: string,
-    opts: { id?: string; pinned?: boolean; createdAt: number; updatedAt: number; origin?: string },
-  ): Note {
-    const note: Note = {
-      id: opts.id ?? ulid(opts.createdAt),
-      title: titleOf(body),
-      snippet: snippetOf(body),
-      bodyEmpty: !body.trim(),
-      aliases: [noteSlugify(titleOf(body))],
-      folderId,
-      createdAt: opts.createdAt,
-      updatedAt: opts.updatedAt,
-      pinned: opts.pinned ?? false,
-      body,
-      revision: this.nextRevision(),
-    };
-    this.notes.set(note.id, note);
-    if (opts.origin) this.origins.set(note.id, opts.origin);
-    return note;
-  }
-}
-
-// ——— the seeded corpus (titles/snippets from the approved gate frames) ———
-// Browser/dev surface ONLY: inside the Tauri shell the demo corpus never even
-// exists in memory — the disk corpus (with its one welcome note) is the truth.
+export { InMemoryNotesService, ulid } from "./inMemoryNotes";
 
 /** ONE switch point — decided once, at startup. */
 const FS_MODE = isTauri();
+/** Rotli Web: the in-memory service, persisted to the browser vault. The
+ * demo corpus below never seeds here — a fresh web vault starts like a fresh
+ * Mac vault (reserved roots + the Welcome folder), and a returning visit
+ * restores the snapshot before the first render (hydrateWebNotes). */
+const WEB_MODE = !FS_MODE && isWebVault();
 
 // Dev-only review affordance: ?empty skips note seeding so the r1 frame E
 // empty state ("Your island is ready") can be looked at. Folders still exist —
@@ -360,196 +46,18 @@ const svc = new InMemoryNotesService();
 let inboxId = "Inbox";
 let firstNoteId = "";
 
-if (!FS_MODE) {
-  const DAY = 24 * 60 * 60 * 1000;
-  const now = Date.now();
-  const todayAt = (h: number, m: number) => {
-    const d = new Date(now);
-    d.setHours(h, m, 0, 0);
-    return Math.min(d.getTime(), now);
-  };
-
-  // Reserved LOCAL roots: id === name (mirrors fs mode where folderId is the
-  // path), so DEST.inbox === folder.id holds in the browser too.
-  const inbox = svc.seedReserved(DEST.inbox, DEST.inbox);
-  inboxId = inbox.id;
-  svc.seedReserved(DEST.secure, DEST.secure);
-  svc.seedReserved(DEST.storage, DEST.storage);
-  svc.seedReserved(DEST.board, DEST.board);
-  svc.seedReserved(DEST.archive, DEST.archive);
-  svc.seedReserved(DEST.trash, DEST.trash);
-
-  // The external Vault root (mirrors fs mode's memex auto-bind to ~/memex-vault): a
-  // non-default root whose surfaced folders carry the "vault:" prefix. Only
-  // wiki/ (browse-only) + chats/ surface — identity/personality/history/etc never do. The Vault
-  // row itself is the marker DEST.vault ("vault:"); these are its top-level
-  // folders (parentId === null, exactly as Rust aggregates them).
-  svc.seedReserved("vault:wiki", "wiki", null);
-  svc.seedReserved("vault:chats", "chats", null);
-  // A nested wiki subfolder so the tree + descendant scoping render like fs mode.
-  const vaultProjects = svc.seedReserved("vault:wiki/projects", "projects", "vault:wiki");
-
-  // The corpus's OWN Library (wiki/) — mirrors fs mode, where the Librarian
-  // files notes into areas. One filed note (below) + one EMPTY area, so the
-  // System browser's Finder truths hold in the browser fixture too: empty
-  // folders render, and "Show in Library" lands on the exact folder.
-  svc.seedReserved("wiki", "wiki", null);
-  const wikiProjects = svc.seedReserved("wiki/Projects", "Projects", "wiki");
-  svc.seedReserved("wiki/People", "People", "wiki");
-
-  // A couple of LOCAL user folders under Storage — path-style ids so the tree
-  // renders and descendant scoping behaves exactly like fs mode.
-  const storageWork = svc.seedReserved(`${DEST.storage}/Work`, "Work", DEST.storage);
-  const storageNorthstar = svc.seedReserved(`${DEST.storage}/Northstar`, "Northstar", DEST.storage);
-
-  if (!SEED_EMPTY) {
-    // —— Inbox: the welcome note + a quick capture ——
-    const welcome = svc.seedNote(
-      inbox.id,
-      `# rotli — notes first
-
-Apple Notes feel, **markdown underneath**. Local files, one structure the AI can read. The app is a *visitor* — summon it, write, dismiss it.
-
-### What ships first
-
-- [x] Folders, list, editor — the three panes
-- [ ] Quick capture from anywhere (\`⌥Space\`)
-- [ ] Plain \`.md\` files on disk — the corpus
-
-> The folder of files *is* the product. Every view, every backend, every AI is a reader.
-
-Start with a note. Add context when a conversation would help. Your files stay yours.`,
-      { createdAt: todayAt(9, 42), updatedAt: todayAt(9, 42) },
-    );
-    firstNoteId = welcome.id;
-
-    svc.seedNote(inbox.id, `# Call the bank about the wire limit before Friday`, {
-      createdAt: now - 2 * DAY,
-      updatedAt: now - 2 * DAY,
-    });
-
-    // —— Storage: a pinned decision + nested Work/Northstar notes ——
-    svc.seedNote(
-      DEST.storage,
-      `# Pricing decision
-
-Free local forever. Paid = sync + managed AI. Never gate local features behind the subscription — the corpus is the user's, full stop.
-
-Launch sync at $4, anchor on Obsidian, revisit at 10k users.`,
-      { pinned: true, createdAt: todayAt(8, 5), updatedAt: todayAt(9, 10) },
-    );
-
-    svc.seedNote(
-      storageWork.id,
-      `# Q3 platform review — prep
-
-Three things must land before Thursday: the settlement mapping, the gateway export enum, and a clear pricing answer we can defend in front of the partners.
-
-The demo flows from capture → recall: open with the island story, close with the cited answer.
-
-Maria owns the reconciliation walkthrough; I take pricing.`,
-      { createdAt: now - DAY, updatedAt: now - DAY },
-    );
-
-    svc.seedNote(
-      storageNorthstar.id,
-      `# Q3 priorities — Northstar
-
-Ship the gateway migration, land the issuing portal rebuild, and get the partner reporting story straight before the platform review.`,
-      { createdAt: todayAt(7, 30), updatedAt: todayAt(7, 30) },
-    );
-
-    // —— Vault (external memex, browse-only): wiki/ notes that rotli reads but
-    // never writes. These mirror what surfaces from ~/memex-vault — note-creation is
-    // redirected to the local Inbox, never into here. ——
-    svc.seedNote(
-      "vault:wiki",
-      `# memex-vault — the knowledge base
-
-The durable, human-readable memory. rotli browses it read-only: wiki/ surfaces here, identity/, personality/ and history/ never do.`,
-      { createdAt: now - 3 * DAY, updatedAt: now - 3 * DAY },
-    );
-
-    svc.seedNote(
-      vaultProjects.id,
-      `# rotli — project note
-
-The warm, local-first menu-bar notes app. Lives in its own repo; the Vault is where its long-form thinking is kept.`,
-      { createdAt: now - 5 * DAY, updatedAt: now - 5 * DAY },
-    );
-
-    // —— a plain local "Brain" folder: the Brain→Vault rename leaves the
-    // pre-existing local folder untouched (Invariant 4) — it's just a folder now.
-    const localBrain = svc.seedFolder("Brain");
-
-    // —— Storage: long-lived reference ——
-    svc.seedNote(
-      DEST.storage,
-      `# Quokka world — where it lives
-
-Onboarding, empty states, about. Never in the editor, never in notifications — the world appears at low-frequency moments only.`,
-      { createdAt: now - DAY, updatedAt: now - DAY },
-    );
-
-    svc.seedNote(
-      DEST.storage,
-      `# Groceries
-
-Olive oil, sourdough, oat milk, blueberries, the good butter.`,
-      { createdAt: now - 4 * DAY, updatedAt: now - 4 * DAY },
-    );
-
-    // —— ONE Archive note + ONE Trash note (origin = where restore returns it).
-    // These are hidden from All Notes; only their own view shows them. ——
-    svc.seedNote(
-      DEST.archive,
-      `# 1-on-1 — Sarah
-
-Ship review Friday. She'll own the gateway migration writeup. Follow up on the Lithic question and the Q3 growth path conversation.`,
-      {
-        createdAt: now - 30 * DAY,
-        updatedAt: now - 7 * DAY,
-        origin: `${DEST.storage}/Work`,
-      },
-    );
-
-    svc.seedNote(
-      DEST.trash,
-      `# Old draft — pricing tiers v0
-
-Scrap this. The three-tier idea died; we went free-local + one paid sync line. Kept only so Phase 2 restore has something to put back.`,
-      {
-        createdAt: now - 14 * DAY,
-        updatedAt: now - 5 * DAY,
-        origin: localBrain.id,
-      },
-    );
-
-    // —— Library: a note the Librarian filed into an area (wiki/Projects) ——
-    svc.seedNote(
-      wikiProjects.id,
-      `# Launch checklist
-
-Filed under **Projects** by the Librarian — same file, reachable from Main and the Library alike.`,
-      { createdAt: now - 2 * DAY, updatedAt: now - DAY },
-    );
-
-    // —— Board: loose quick-captures, the staging area. Cards, not notes — you
-    // multi-select and merge them into one joint note (the maintainer, 2026-06-19). ——
-    svc.seedNote(DEST.board, "Ask Maria about the settlement mapping deadline", {
-      createdAt: now - 40 * 60 * 1000,
-      updatedAt: now - 40 * 60 * 1000,
-    });
-    svc.seedNote(DEST.board, "Idea: warm empty-state for the Board — the quokka again?", {
-      createdAt: now - 25 * 60 * 1000,
-      updatedAt: now - 25 * 60 * 1000,
-    });
-    svc.seedNote(DEST.board, "Gateway export enum — confirm the Lithic mapping before Thursday", {
-      createdAt: now - 8 * 60 * 1000,
-      updatedAt: now - 8 * 60 * 1000,
-    });
-  }
+if (!FS_MODE && !WEB_MODE) {
+  const seeded = seedDemoCorpus(svc, SEED_EMPTY);
+  inboxId = seeded.inboxId;
+  firstNoteId = seeded.firstNoteId;
+} else if (WEB_MODE) {
+  // A fresh web vault starts like a fresh Mac vault: the reserved roots and
+  // nothing else. A returning visit restores its snapshot before the first
+  // render (hydrateWebNotes in ./webNotes.ts).
+  inboxId = seedReservedRoots(svc);
 }
+
+export { webVaultWasRestored };
 
 /** Where captures and ⌘N land when no folder is selected — "Inbox" on disk
  * (fs mode), the seeded folder's id in the browser. */
@@ -560,4 +68,25 @@ export const inboxFolderId = inboxId;
  * pristine first tab once the corpus answers). */
 export const initialNoteId = firstNoteId;
 
-export const notesService: NotesService = FS_MODE ? new FsNotesService() : svc;
+// A `let`, not a `const`: Rotli Web retargets it at boot when the browser
+// still trusts a remembered folder (hydrateWebVault, before the first render).
+// Consumers read the live binding at call time, never a captured copy.
+export let notesService: NotesService = FS_MODE
+  ? new FsNotesService()
+  : WEB_MODE
+    ? webNotesService(svc)
+    : svc;
+
+/** Rotli Web only: choose folder mode or browser storage before the first
+ * render (main.tsx awaits it). Resolves what hydrateWebNotes resolves. */
+export async function hydrateWebVault(): Promise<boolean> {
+  const restored = await hydrateWebNotes();
+  if (WEB_MODE) {
+    notesService = activeWebNotesService(notesService);
+    // the model's view of this vault, and the helper that runs the model
+    registerWebAiCorpus(createWebAiCorpus(() => notesService));
+    registerWebMemexBridge(webMemexBridge(chatStoreFor(activeWebVaultDir())));
+    await hydrateHelperLink();
+  }
+  return restored;
+}

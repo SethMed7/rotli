@@ -27,6 +27,17 @@ workflow. Those operations remain local responsibilities of
 [`scripts/release.sh`](../../scripts/release.sh), and no CI job receives Apple or
 updater signing credentials.
 
+## Cross-platform build probe (manual)
+
+[`.github/workflows/cross-platform-build.yml`](../../.github/workflows/cross-platform-build.yml)
+is a second, `workflow_dispatch`-only workflow. It runs an unsigned
+`tauri build` on `macos-15`, `windows-2022`, and `ubuntu-24.04` (bundles chosen
+on the CLI, so `tauri.conf.json` stays macOS-shaped) and uploads whatever
+bundled. It is expected to fail on Windows and Linux until the punch-list in
+[`cross-platform-feasibility.md`](../design/cross-platform-feasibility.md) is
+worked, which is why it never runs on push or pull request and is not part of
+the release gate. It receives no signing credentials.
+
 ## Reproducibility and permissions
 
 - Use exact hosted image labels (`ubuntu-24.04` and `macos-15`), not `*-latest`.

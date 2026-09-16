@@ -12,7 +12,9 @@ import { type ReactNode, useCallback, useMemo, useState } from "react";
 
 import { useNoteSearch, useSearchableNotes } from "../services/hooks";
 import { isBodyHit } from "../services/search";
+import { assignedView } from "../services/viewTree";
 import { usePanesStore } from "../state/panes";
+import { useViewsStore } from "../state/views";
 import type { NoteSummary, SearchHit } from "../types";
 import { Character } from "./character";
 import { SearchGlyph } from "./glyphs";
@@ -40,6 +42,8 @@ export function NoteListSurface({
   searchPlaceholder?: string;
 }) {
   const { notes } = useSearchableNotes();
+  // All notes is global by design; a row names the named view that owns it
+  const viewsManifest = useViewsStore((state) => state.manifest);
   const openSummary = usePanesStore((s) => s.openSummary);
   const openMenu = useNoteMenu();
   const [query, setQuery] = useState("");
@@ -133,6 +137,7 @@ export function NoteListSurface({
               <NoteListRow
                 key={r.note.id}
                 note={r.note}
+                viewName={assignedView(viewsManifest, r.note.id)}
                 snippetNode={
                   r.hit ? (
                     <MatchText

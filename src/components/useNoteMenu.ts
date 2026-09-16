@@ -16,7 +16,6 @@ import {
   corpusMoveFileToSink,
   corpusNoteAbsolutePath,
   corpusRevealFile,
-  corpusRestoreFile,
   corpusSetLocalAiAccess,
   corpusSetLocked,
   corpusSetPinned,
@@ -29,7 +28,12 @@ import { createRoutedNote } from "../services/createNote";
 import { DEST, isSink } from "../services/destinations";
 import { invalidateNotes, useArchiveNote, useRestoreNote, useTrashNote } from "../services/hooks";
 import { useMainGcIds } from "../services/hooks";
-import { activeItemSinkLane, fileLifecycleRows, readFileLifecycle } from "../services/itemLifecycle";
+import {
+  activeItemSinkLane,
+  fileLifecycleRows,
+  readFileLifecycle,
+  restoreSinkItem,
+} from "../services/itemLifecycle";
 import { renameLane } from "../services/itemRename";
 import { isEmptyNote } from "../services/mainDismiss";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
@@ -144,33 +148,22 @@ export function useNoteMenu() {
         // must get the full menu, not a dead "Restore" that no-ops (the maintainer,
         // 2026-07-06: "Restore does nothing but I can see it in All notes").
         if (isSink(note.folderId)) {
-          const restoreItem: MenuSpec = restoresByPath
-            ? {
-                kind: "action" as const,
-                label: "Restore to original folder",
-                onClick: () => {
-                  useUiStore.getState().setRowActionError(null);
-                  void corpusRestoreFile(note.id)
-                    .then(async () => {
-                      usePanesStore.getState().closeFileTabs(note.id);
-                      await invalidateNotes();
-                    })
-                    .catch((err) =>
-                      useUiStore
-                        .getState()
-                        .setRowActionError(
-                          `Couldn’t restore “${note.title || "this file"}” — ${
-                            err instanceof Error ? err.message : String(err)
-                          }`,
-                        ),
-                    );
-                },
-              }
-            : {
-                kind: "action" as const,
-                label: "Restore",
-                onClick: () => restore.mutate(note.id),
-              };
+          const restoreItem: MenuSpec = {
+            kind: "action" as const,
+            label: restoresByPath ? "Restore to original folder" : "Restore",
+            onClick: () => {
+              useUiStore.getState().setRowActionError(null);
+              void restoreSinkItem(note, restore.mutateAsync).catch((err) =>
+                useUiStore
+                  .getState()
+                  .setRowActionError(
+                    `Couldn’t restore “${note.title || "this file"}” — ${
+                      err instanceof Error ? err.message : String(err)
+                    }`,
+                  ),
+              );
+            },
+          };
           open(
             x,
             y,
@@ -506,8 +499,9 @@ export function useNoteMenu() {
             kind: "action" as const,
             label: "Archive",
             onClick: () => {
-              // a note leaving for a sink also leaves Main (the maintainer #5, 2026-07-08)
-              if (inMain) setTree(removeFromMain(manifest.tree, note.id), liveIds);
+              // the Main slot stays (2026-09-16): the projection hides a
+              // sink-resident note, so Archive still empties it from view —
+              // and Restore brings it back to the folder it sat in
               archive.mutate(note.id);
             },
           });
@@ -528,7 +522,6 @@ export function useNoteMenu() {
             useUiStore.getState().setRowActionError(null);
             void corpusMoveFileToSink(note.id, sink)
               .then(async () => {
-                if (inMain) setTree(removeFromMain(manifest.tree, note.id), liveIds);
                 if (starred) togglePinQuick(note.id);
                 usePanesStore.getState().closeFileTabs(note.id);
                 await invalidateNotes();
@@ -562,7 +555,6 @@ export function useNoteMenu() {
             label: "Move to Trash",
             danger: true,
             onClick: () => {
-              if (inMain) setTree(removeFromMain(manifest.tree, note.id), liveIds);
               trash.mutate(note.id);
             },
           });

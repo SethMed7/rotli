@@ -1,9 +1,10 @@
+import { WELCOME_CATALOG, WELCOME_LESSONS } from "../editor/welcomeLessons";
 // The Welcome folder: a preseeded folder in Main holding the root welcome note
 // and nine lessons as ordinary notes ("a preseeded folder, that's it — it uses
 // the left menu and is in main view"). Seeding happens only when a vault is
 // created and on the explicit Settings action; opening an existing vault never
 // writes.
-import { WELCOME_CATALOG, WELCOME_LESSONS } from "../editor/welcomeLessons";
+import { isWebVault } from "../lib/browserVault";
 import { corpusSeedWelcome, isTauri } from "../lib/tauri";
 import { useMainStore } from "../state/main";
 import { usePanesStore } from "../state/panes";
@@ -120,7 +121,7 @@ export function resetWelcome(): void {
 }
 
 export function welcomeUsesMemory(): boolean {
-  return !isTauri();
+  return !isTauri() && !isWebVault();
 }
 
 /** Lesson count for copy that must stay in step with the catalog. */

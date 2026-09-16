@@ -99,6 +99,9 @@ if wants e2e; then
     echo "  ⚠ something already listens on :1420 — Playwright will reuse it (reuseExistingServer); stop it to prove THIS tree"
   fi
   bun run test:e2e
+
+  step "e2e — Rotli Web (build:web + vite preview under /app/)"
+  bun run test:e2e:web
 fi
 
 if wants rust; then

@@ -114,24 +114,34 @@ export interface DropPlan {
 
 export const UNROUTED_MEDIA_NOTICE = "Saved to Assets — drop onto a note or chat to insert";
 
+/** What a surface says when part of a drop went to Assets instead of into it
+ * (2026-09-16: a PDF dropped on a note or chat used to vanish silently). */
+function storedNotice(store: readonly string[], accepts: string): string | null {
+  if (store.length === 0) return null;
+  const count = store.length === 1 ? "1 file" : `${store.length} files`;
+  return `Saved ${count} to Assets — ${accepts}`;
+}
+
 /** Partition external files for the surface that received them. A chat asks
  * the chat what it accepts (an .svg routed by the editor's wider rule was
  * refused there and never stored); a note embeds; nothing else is silent. */
 export function planDrop(paths: readonly string[], surface: DropSurface): DropPlan {
   if (surface === "chat") {
+    const store = paths.filter((path) => !isChatImagePath(path));
     return {
       attach: paths.filter(isChatImagePath),
       embed: [],
-      store: paths.filter((path) => !isChatImagePath(path)),
-      notice: null,
+      store,
+      notice: storedNotice(store, "a chat attaches images"),
     };
   }
   if (surface === "editor") {
+    const store = paths.filter((path) => !isEmbeddablePath(path));
     return {
       attach: [],
       embed: paths.filter(isEmbeddablePath),
-      store: paths.filter((path) => !isEmbeddablePath(path)),
-      notice: null,
+      store,
+      notice: storedNotice(store, "a note embeds images and video"),
     };
   }
   const media = paths.some(isEmbeddablePath);

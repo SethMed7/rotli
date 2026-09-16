@@ -27,6 +27,7 @@ import {
 import { ONBOARDING_STEP_NUMBER, ONBOARDING_TOTAL_STEPS } from "../../state/onboarding";
 import {
   providerReady,
+  recheckProvider,
   refreshLocalModels,
   startSetupDetection,
   useSetupDetection,
@@ -34,6 +35,7 @@ import {
 import { useUiStore } from "../../state/ui";
 import { Character } from "../character";
 import { ChevronRight } from "../glyphs";
+import { ConnectorGuide } from "../settings/connectorGuide";
 import { chatMark } from "../sidebar/chatMark";
 import { ModelLogo } from "../sidebar/modelLogo";
 import { SetupBack, SetupPrimary } from "./setupControls";
@@ -45,19 +47,12 @@ const CONNECTED_PROVIDERS = [
   "cursor",
   "antigravity",
 ] as const satisfies readonly ProviderId[];
-type ConnectedProvider = (typeof CONNECTED_PROVIDERS)[number];
 type ModelSection = "local" | "install" | "subscription";
 
-const SETUP_HELP: Record<ConnectedProvider, string> = {
-  claude:
-    "Install Claude Code, then run `claude auth login` yourself in Terminal. Rotli only detects and invokes that official local client.",
-  codex:
-    "Install Codex with `brew install codex`, then run `codex login` and sign in with your ChatGPT account.",
-  cursor:
-    "Install Cursor Agent from cursor.com/cli, then run `agent login` yourself in Terminal. Rotli uses Cursor's official ACP custom-client protocol in read-only Ask mode.",
-  antigravity:
-    "Google's official Antigravity ACP agent, which Rotli downloads and signs in from Settings → AI Models → Antigravity after setup. The `agy` command line and the Antigravity IDE are separate products with their own logins; Rotli does not use them. The lane stays off until you turn it on.",
-};
+/** Antigravity's install and sign-in live in Settings, not a terminal, so its
+ * help stays a sentence; the terminal lanes render the shared walkthrough. */
+const ANTIGRAVITY_HELP =
+  "Google's official Antigravity ACP agent, which Rotli downloads and signs in from Settings → AI Models → Antigravity after setup. The `agy` command line and the Antigravity IDE are separate products with their own logins; Rotli does not use them. The lane stays off until you turn it on.";
 
 function localSize(mb: number): string {
   return mb >= 1000 ? `${(mb / 1000).toFixed(1)} GB` : `${Math.round(mb)} MB`;
@@ -473,9 +468,18 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
                                 </select>
                               </label>
                             )}
-                            {expanded === provider && (
-                              <p className="setup-provider-help">{SETUP_HELP[provider]}</p>
-                            )}
+                            {expanded === provider &&
+                              (provider === "antigravity" ? (
+                                <p className="setup-provider-help">{ANTIGRAVITY_HELP}</p>
+                              ) : (
+                                <div className="setup-provider-help">
+                                  <ConnectorGuide
+                                    lane={provider}
+                                    detection={detection}
+                                    onRecheck={() => void recheckProvider(provider)}
+                                  />
+                                </div>
+                              ))}
                           </div>
                         );
                       })}

@@ -14,6 +14,7 @@ import {
   listFolderContents,
   rerootDiskPath,
   sortFolderListing,
+  filterSystemFolders,
 } from "./systemBrowser";
 
 const note = (over: Partial<NoteSummary>): NoteSummary => ({
@@ -212,5 +213,47 @@ describe("hidden lanes", () => {
   test("without the hidden set the same lanes DO surface (other roots unaffected)", () => {
     const l = listFolderContents(items, "wiki", ["wiki/_templates", "wiki/Projects"]);
     expect(l.folders.map((f) => f.path).sort()).toEqual(["wiki/Projects", "wiki/_inbox", "wiki/_templates"]);
+  });
+
+  test("the Library search lists folders whose name matches, with their counts", () => {
+    const notes = [
+      {
+        id: "a",
+        title: "Agent portal",
+        snippet: "",
+        folderId: "wiki",
+        diskFolderId: "wiki/engineering",
+        createdAt: 1,
+        updatedAt: 5,
+        pinned: false,
+      },
+      {
+        id: "b",
+        title: "Creed",
+        snippet: "",
+        folderId: "wiki",
+        diskFolderId: "wiki/engineering/beliefs",
+        createdAt: 1,
+        updatedAt: 9,
+        pinned: false,
+      },
+      {
+        id: "c",
+        title: "Grace",
+        snippet: "",
+        folderId: "wiki",
+        diskFolderId: "wiki/theology",
+        createdAt: 1,
+        updatedAt: 2,
+        pinned: false,
+      },
+    ] as NoteSummary[];
+    const hits = filterSystemFolders(notes, "engineer", ["wiki/engineering/empty-sub"]);
+    expect(hits.map((f) => [f.path, f.itemCount, f.updatedAt])).toEqual([["wiki/engineering", 2, 9]]);
+    expect(filterSystemFolders(notes, "").length).toBe(0);
+    expect(filterSystemFolders(notes, "sub", ["wiki/engineering/empty-sub"]).map((f) => f.path)).toEqual([
+      "wiki/engineering/empty-sub",
+    ]);
+    expect(filterSystemFolders(notes, "theo", [], undefined, new Set(["wiki/theology"]))).toEqual([]);
   });
 });

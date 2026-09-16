@@ -23,7 +23,12 @@ mod corpus;
 mod document_conversion;
 mod feature_policy;
 mod fsutil;
+/// The `rotli-helper` loopback bridge (a second binary, not the app).
+pub mod helper;
+mod helper_args;
+mod helper_token;
 mod keychain;
+mod loopback_http;
 mod localmodel;
 mod memex;
 mod memex_query; mod native_drag; mod pasteboard; mod remote_agent_url; mod welcome_lessons;

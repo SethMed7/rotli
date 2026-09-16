@@ -2479,3 +2479,14 @@
 .tab.preview > span:not(.tglyph) {
   font-style: italic;
 }
+
+/* Rotli Web: a front whose feature lives in the Mac app stays in the
+   switcher, quieter, and reads as a link to the download on hover */
+.sb-switch-seg.desktop-only {
+  opacity: 0.55;
+  text-decoration: none;
+  cursor: default;
+}
+.sb-switch-seg.desktop-only:hover {
+  opacity: 0.8;
+}

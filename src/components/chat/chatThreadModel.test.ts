@@ -18,3 +18,12 @@ describe("long chat thread window", () => {
     expect(recentChatThread(["one", "two"])).toEqual({ messages: ["one", "two"], hiddenCount: 0 });
   });
 });
+
+test("a copied selection yields the source Markdown of the touched turns, oldest first, deduplicated", async () => {
+  const { chatSelectionMarkdown } = await import("./chatThreadModel");
+  const sources = ["# Plan\n\n- one", "**bold** reply", "  ", "last"];
+  expect(chatSelectionMarkdown(sources, [3, 1, 1, 0])).toBe("# Plan\n\n- one\n\n**bold** reply\n\nlast");
+  expect(chatSelectionMarkdown(sources, [2])).toBe("");
+  expect(chatSelectionMarkdown(sources, [])).toBe("");
+  expect(chatSelectionMarkdown(sources, [9])).toBe("");
+});
