@@ -454,3 +454,82 @@ concluded `failure` with **0 steps executed** in every job. Until that clears,
 neither the Linux `cargo build` probe nor any other CI-based portability
 evidence can run. This is the practical first blocker on the whole
 cross-platform track, ahead of any code change.
+
+---
+
+# Addendum — re-verified 2026-09-16 at 1.0.0
+
+Status: **AUDIT**. Re-count at `7f0ae539` (1.0.0, the public repository).
+The body and the 0.77.0 addendum still hold; the seam count grew again and
+the blocking context changed.
+
+## What changed since 0.77.0
+
+| Measure | 0.77.0 | 1.0.0 | Δ |
+|---|---|---|---|
+| `target_os = "macos"` occurrences | 37 / 8 files | **73 / 12 files** | +97% |
+| `Command::new("…")` literal binaries | 11 distinct | **≥ 14 distinct** (literal strings only; 15 more calls take the binary from a variable and are not counted) | — |
+| Linux `cargo check` in CI | none | **`rust-linux-check` lane, green** | new |
+
+Per file: `lib.rs` 22 · `vault_location.rs` 10 · `corpus.rs` 8 ·
+`document_conversion.rs` 7 · `organizer.rs` 6 · `pasteboard.rs` 5 ·
+`workspace.rs` 3 · `keychain.rs` 3 · `antigravity.rs` 3 · `web.rs` 2 ·
+`vault_browser.rs` 2 · `memex.rs` 2. Three files are new to the inventory:
+`vault_location.rs` (security-scoped bookmarks through `NSURL` in
+`objc2-foundation`, so a remembered vault survives a move; off-Mac the plain
+path is the fallback), `pasteboard.rs` (`NSPasteboard` copy with HTML +
+images; needs the `arboard` crate or Tauri's clipboard plugin off-Mac), and
+`antigravity.rs` (`installed()` is `cfg!(all(macos, aarch64))` at line 102 and
+URLs open through `/usr/bin/open`; the lane is Apple-Silicon-only by design
+until Google ships the agent elsewhere).
+
+New subprocess binaries since the last count: `/usr/sbin/cupsfilter` and
+`/usr/bin/ditto` (PDF/print export), `/usr/bin/shasum`, `/bin/sh`, `/bin/bash`
+(Breve shell scripts). `cupsfilter` has no Linux/Windows analog; PDF export
+off-Mac needs a different route (a headless-Chromium print-to-PDF step is the
+obvious candidate).
+
+**`launchctl` is confirmed limited to three call sites, none on the daemon
+path:** `localmodel.rs:547-550` (reload the MLX model server), `chat.rs:725`
+(kickstart the llama.cpp server), and `breve.rs:2033` (unload legacy
+standalone-Breve LaunchAgents during migration). `breve-runtime/scripts/
+morning-brief.sh` and `lunch-brief.sh` still say "fired by launchd" in their
+headers; in Rotli they are invoked by the supervised `rotli-scheduler.ts`, so
+the comment is stale, not the architecture. Their hard-coded Homebrew `PATH`
+prefix is harmless off-Mac but `find_bun` (`memex.rs:348`) still probes only
+`~/.bun/bin/bun`, `/opt/homebrew/bin/bun`, and `/usr/local/bin/bun` — Windows
+needs `%USERPROFILE%\.bun\bin\bun.exe`.
+
+## Corrections to circulating advice
+
+- **`security-framework` was an unconditional dependency** (`Cargo.toml`
+  `[dependencies]`), even though `keychain.rs` already carries a
+  `#[cfg(not(target_os = "macos"))]` stub. Linux `cargo check` passed only
+  because check never links. Moved under the macOS target table on
+  2026-09-16. The keyring-crate swap proposed in the body is **still the plan
+  for Windows/Linux**, but it must be gated to `not(macos)`: replacing
+  `security-framework` on the Mac side would change the Keychain item
+  attributes and orphan every existing user's stored keys.
+- **"Breve runs from launchd" is outdated** (see above). Nothing on the
+  scheduler path needs Task Scheduler or systemd.
+- **Local AI off-Mac is a choice, not a correction.** Two viable shapes:
+  a user-installed **Ollama** (the body's recommendation: zero bundling, the
+  `/api/generate` wire already works, model management is Ollama's) or a
+  bundled **llama-server sidecar** per target triple via Tauri `externalBin`
+  (zero user setup, but per-OS binaries, a much larger download, a GGUF twin
+  of every catalog entry, and Rotli owning process supervision). Circulating
+  advice cites a CUDA backend for MLX; unverified here, and even if accurate it
+  would cover only NVIDIA machines, so it is not a substitute for either shape.
+  Decide this before Phase 1; nothing in Phase 0 depends on it.
+
+## Blocking context (2026-09-16)
+
+Hosted CI is **unblocked**: the eight most recent `Regression suite` runs
+(all 2026-09-15, GitHub-hosted runners) concluded `success`. The manual `Cross-platform build probe`
+workflow (`.github/workflows/cross-platform-build.yml`) now exists for the
+body's "recommended first step": it builds unsigned bundles on `macos-15`,
+`windows-2022`, and `ubuntu-24.04` from the Actions tab, expects red on the
+non-Mac legs, and uploads whatever bundled. The Linux artifact it produces is
+the input to the 0.77.0 addendum's WebKitGTK go/no-go, which remains the first
+decision on this track and still needs a human in a VM.
+

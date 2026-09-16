@@ -30,6 +30,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   also renders a 1280×640 `social-card-github.png` for the repository's
   social preview.
 
+### Cross-platform groundwork (parked)
+
+- Cross-platform groundwork: `security-framework` moved under the macOS-only
+  dependency table (the Keychain module already carried a non-macOS stub, but
+  the crate was still requested on Linux and would have failed at link time),
+  and a manual-only `Cross-platform build probe` workflow builds unsigned
+  bundles on macOS, Windows, and Linux runners so the compiler enumerates the
+  remaining portability gaps. It never runs on push. The feasibility document
+  gained a 2026-09-16 re-count of the seams.
+
 ## [1.0.0] - 2026-09-15
 
 Rotli 1.0.
