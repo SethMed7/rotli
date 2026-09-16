@@ -15,16 +15,20 @@ export function CopyCommand({ command }: { command: string }) {
   const { copyState: state, copy } = useCopyState();
   return (
     <span className="guide-cmd">
+      <span className="guide-cmd-bar">
+        <span className="guide-cmd-label">Run in Terminal</span>
+        <button
+          type="button"
+          className={`claudecmd-copy ${state}`}
+          aria-label={state === "copied" ? `Copied ${command}` : `Copy: ${command}`}
+          title="Copy this command"
+          onClick={() => void copy(command)}
+        >
+          {state === "copied" ? <CheckGlyph size={13} /> : <CopyGlyph size={13} />}
+          <span>{state === "copied" ? "Copied" : "Copy"}</span>
+        </button>
+      </span>
       <code>{command}</code>
-      <button
-        type="button"
-        className={`claudecmd-copy ${state}`}
-        aria-label={state === "copied" ? `Copied ${command}` : `Copy: ${command}`}
-        title="Copy this command"
-        onClick={() => void copy(command)}
-      >
-        {state === "copied" ? <CheckGlyph size={13} /> : <CopyGlyph size={13} />}
-      </button>
     </span>
   );
 }

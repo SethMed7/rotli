@@ -4,11 +4,11 @@
 // signed in. This dialog walks those steps in order, pairs the helper, and
 // says what is true about each step right now.
 
-import { useQuery } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { PROVIDER_LABELS, type ProviderId } from "../ai/models";
-import { connectorDetectionQuery } from "../services/connectorSetup";
+import { type CliDetect, connectorDetectionQuery } from "../services/connectorSetup";
 import { pairHelper, unpairHelper } from "../services/helperLink";
 import { useChatSetupGuide } from "../state/chatSetupGuide";
 import { useHelperLink } from "../state/helperLink";
@@ -133,60 +133,119 @@ export function WebChatSetupDialog() {
             reach the helper; use Chrome, Edge, Brave, Arc, Firefox, or Zen.
           </span>
         </GuideStep>
-        <GuideStep n={3} done={false} title="Install and sign in to an AI tool">
-          <div className="guide-lanes" role="group" aria-label="AI tool">
-            {LANES.map((id) => (
-              <button
-                key={id}
-                type="button"
-                aria-pressed={lane === id}
-                className={lane === id ? "ghostbtn guide-lane on" : "ghostbtn guide-lane"}
-                onClick={() => setLane(id)}
-              >
-                {PROVIDER_LABELS[id]}
-              </button>
-            ))}
-          </div>
-          <LaneGuide lane={lane} linked={linked} />
-        </GuideStep>
+        {linked ? (
+          <LaneScan lane={lane} setLane={setLane} />
+        ) : (
+          <GuideStep n={3} done={false} title="Install and sign in to an AI tool">
+            <span className="guide-step-detail">
+              Pair first and Rotli checks what is already installed on this computer. Until then, the steps:
+            </span>
+            <LaneButtons lane={lane} setLane={setLane} />
+            <ConnectorGuide lane={lane} detection={undefined} />
+          </GuideStep>
+        )}
       </GuideSteps>
     </WebDialogFrame>
   );
 }
 
-/** Paired, the guide can ask the helper what is installed; unpaired it cannot. */
-function LaneGuide({ lane, linked }: { lane: ProviderId; linked: boolean }) {
-  if (!linked) return <ConnectorGuide lane={lane} detection={undefined} />;
-  return <LinkedLaneGuide lane={lane} />;
+function laneStatus(d: CliDetect | undefined, pending: boolean): { label: string; ready: boolean } {
+  if (!d) return { label: pending ? "Checking…" : "Not checked", ready: false };
+  if (!d.installed) return { label: "Not installed", ready: false };
+  if (!d.authenticated) return { label: "Sign in needed", ready: false };
+  return { label: "Connected", ready: true };
 }
 
-function LinkedLaneGuide({ lane }: { lane: ProviderId }) {
-  const detection = useQuery(connectorDetectionQuery(lane));
-  const enabled = useUiStore((s) => s.aiProviders[lane]);
-  const setAiProvider = useUiStore((s) => s.setAiProvider);
-  const ready = !!detection.data?.installed && !!detection.data?.authenticated;
+function LaneButtons({
+  lane,
+  setLane,
+  badges,
+}: {
+  lane: ProviderId;
+  setLane: (id: ProviderId) => void;
+  badges?: Partial<Record<ProviderId, { label: string; ready: boolean }>> | undefined;
+}) {
   return (
-    <>
-      <ConnectorGuide
-        lane={lane}
-        detection={detection.data}
-        onRecheck={() => void detection.refetch()}
-        checking={detection.isFetching}
-      />
-      {ready && (
+    <div className="guide-lanes" role="group" aria-label="AI tool">
+      {LANES.map((id) => {
+        const badge = badges?.[id];
+        return (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={lane === id}
+            className={lane === id ? "ghostbtn guide-lane on" : "ghostbtn guide-lane"}
+            onClick={() => setLane(id)}
+          >
+            {PROVIDER_LABELS[id]}
+            {badge && (
+              <span className={badge.ready ? "guide-lane-badge ok" : "guide-lane-badge"}>{badge.label}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Paired: scan every tool on this computer; a ready one reads Connected and
+ * needs no install steps, only the switch that puts it in the chat. */
+function LaneScan({ lane, setLane }: { lane: ProviderId; setLane: (id: ProviderId) => void }) {
+  const checks = useQueries({ queries: LANES.map((id) => connectorDetectionQuery(id)) });
+  const aiProviders = useUiStore((s) => s.aiProviders);
+  const setAiProvider = useUiStore((s) => s.setAiProvider);
+  const badges: Partial<Record<ProviderId, { label: string; ready: boolean }>> = {};
+  LANES.forEach((id, index) => {
+    badges[id] = laneStatus(checks[index]?.data, checks[index]?.isFetching ?? false);
+  });
+  const index = LANES.indexOf(lane);
+  const check = checks[index];
+  const detection = check?.data;
+  const status = badges[lane] ?? { label: "Not checked", ready: false };
+  const enabled = aiProviders[lane];
+  const version = detection?.version?.match(/\d+(?:\.\d+)+/)?.[0];
+  const anyOn = LANES.some((id) => badges[id]?.ready && aiProviders[id]);
+  const recheck = () => void check?.refetch();
+  return (
+    <GuideStep n={3} done={anyOn} title={anyOn ? "An AI tool is connected" : "Connect an AI tool"}>
+      <LaneButtons lane={lane} setLane={setLane} badges={badges} />
+      {status.ready ? (
         <span className="guide-actions">
           <span className="guide-step-detail" role="status">
-            {enabled
-              ? `${PROVIDER_LABELS[lane]} is on — pick it in the chat's model menu.`
-              : `${PROVIDER_LABELS[lane]} is ready on this computer.`}
+            Connected — {PROVIDER_LABELS[lane]}
+            {version ? ` v${version}` : ""} is installed and signed in on this computer.
+            {enabled ? " It is on: pick it in the chat's model menu." : ""}
           </span>
-          {!enabled && (
+          {enabled ? (
+            <button
+              type="button"
+              className="ghostbtn guide-check"
+              onClick={recheck}
+              disabled={check?.isFetching}
+            >
+              {check?.isFetching ? "Checking…" : "Check again"}
+            </button>
+          ) : (
             <button type="button" className="ghostbtn guide-check" onClick={() => setAiProvider(lane, true)}>
               Use {PROVIDER_LABELS[lane]} in chat
             </button>
           )}
         </span>
+      ) : (
+        <>
+          <span className="guide-step-detail" role="status">
+            {detection
+              ? `${PROVIDER_LABELS[lane]}: ${status.label.toLowerCase()} on this computer. The steps:`
+              : "Checking this computer…"}
+          </span>
+          <ConnectorGuide
+            lane={lane}
+            detection={detection}
+            onRecheck={recheck}
+            checking={check?.isFetching ?? false}
+          />
+        </>
       )}
-    </>
+    </GuideStep>
   );
 }

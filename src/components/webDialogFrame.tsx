@@ -48,10 +48,21 @@ export function WebDialogFrame({
           onClose();
         }}
       >
-        <h2 id={`${id}-title`} className="rename-label">
-          {title}
-        </h2>
-        {children}
+        <div className="web-dialog-head">
+          <h2 id={`${id}-title`} className="rename-label">
+            {title}
+          </h2>
+          <button
+            type="button"
+            className="web-dialog-dismiss"
+            aria-label="Dismiss"
+            title="Dismiss"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+        <div className="web-dialog-body">{children}</div>
         <div className="rename-actions">{actions}</div>
       </div>
     </div>

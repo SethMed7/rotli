@@ -87,12 +87,14 @@ test("pairing with the helper turns Chat on; a message goes through it and the r
   await dialog.getByLabel("Paste the pairing code the helper printed:").fill(`${PORT}:${TOKEN}`);
   await dialog.getByRole("button", { name: "Pair" }).click();
   await expect(dialog.getByRole("status").filter({ hasText: "Paired with" })).toContainText(`port ${PORT}`);
-  // paired, the lane guide asks the helper what is installed → every step ticked
-  await expect(dialog.getByRole("button", { name: "Check again" })).toBeVisible();
-  await expect(dialog.locator(".guide-step.done .guide-step-title", { hasText: "Sign in" })).toBeVisible();
+  // paired, step 3 scans the tools: a ready one reads Connected, no install steps
+  await expect(dialog.getByRole("button", { name: /^Claude Code\s*Connected$/ })).toBeVisible();
+  await expect(dialog.getByRole("status").filter({ hasText: /^Connected — Claude Code/ })).toBeVisible();
+  await expect(dialog.getByText("Install it")).toHaveCount(0);
   // a ready lane is switched on from here, no trip to Settings
   await dialog.getByRole("button", { name: "Use Claude Code in chat" }).click();
-  await expect(dialog.getByText(/Claude Code is on/)).toBeVisible();
+  await expect(dialog.getByText(/It is on: pick it/)).toBeVisible();
+  await expect(dialog.getByText("An AI tool is connected")).toBeVisible();
   await dialog.getByRole("button", { name: "Done" }).click();
 
   // the Chat front is a real front now
