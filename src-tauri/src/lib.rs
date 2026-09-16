@@ -25,6 +25,7 @@ mod feature_policy;
 mod fsutil;
 /// The `rotli-helper` loopback bridge (a second binary, not the app).
 pub mod helper;
+mod helper_token;
 mod keychain;
 mod loopback_http;
 mod localmodel;

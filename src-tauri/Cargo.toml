@@ -56,6 +56,12 @@ tauri-plugin-clipboard-manager = "2"
 
 # macOS-only crates: the Keychain and the AppKit bindings behind the runtime
 # Dock/app icon swap (Settings → Appearance → App icon).
+# rotli-helper refuses to reuse a pairing-token file owned by another account;
+# getuid is the one thing std has no portable reader for. Already in the tree
+# transitively — this only names the edge.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [target.'cfg(target_os = "macos")'.dependencies]
 # Keychain-backed user secrets — never argv/ps/config. keychain.rs carries the
 # not(macos) stub, so the crate itself must not be asked for on Linux/Windows.

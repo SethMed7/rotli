@@ -9,13 +9,19 @@
 
 use std::io::{BufRead, Read, Write};
 use std::net::TcpStream;
+use std::time::{Duration, Instant};
 
 use serde_json::Value;
 
 /// A request head is bounded before a body is read at all: a client must not be
-/// able to stream headers forever, nor hide a megabyte in one of them.
+/// able to stream headers forever, nor hide a megabyte in one of them, nor hold
+/// a connection slot by dribbling.
 const MAX_HEADER_LINES: usize = 64;
 const MAX_HEADER_LINE_BYTES: u64 = 8 * 1024;
+/// ABSOLUTE, measured from the first read. A socket read timeout restarts on
+/// every byte that arrives, so one byte every nine seconds satisfies it forever;
+/// only a deadline that does not move bounds a slowloris.
+const HEAD_DEADLINE: Duration = Duration::from_secs(10);
 
 pub(crate) struct HttpHead {
     pub(crate) method: String,
@@ -35,26 +41,31 @@ impl HttpHead {
     }
 }
 
-/// Read the request line and headers, bounded in both count and width.
+/// Read the request line and headers, bounded in count, width, and time. The
+/// caller answers 400 on any refusal.
 pub(crate) fn read_http_head(reader: &mut impl BufRead) -> Result<HttpHead, String> {
+    let deadline = Instant::now() + HEAD_DEADLINE;
     let first = read_bounded_line(reader)?;
     let mut parts = first.split_whitespace();
     let method = parts.next().unwrap_or_default().to_string();
     let path = parts.next().unwrap_or_default().to_string();
     let mut headers = Vec::new();
-    loop {
+    // EVERY line counts against the cap. Counting only the well-formed ones let
+    // an endless flood of junk lines run unbounded past it.
+    for _ in 0..MAX_HEADER_LINES {
+        if Instant::now() >= deadline {
+            return Err("the request head took longer than 10s".into());
+        }
         let line = read_bounded_line(reader)?;
         if line == "\r\n" || line == "\n" || line.is_empty() {
-            break;
+            return Ok(HttpHead { method, path, headers });
         }
-        if headers.len() >= MAX_HEADER_LINES {
-            return Err(format!("more than {MAX_HEADER_LINES} request headers"));
-        }
-        if let Some((name, value)) = line.split_once(':') {
-            headers.push((name.trim().to_ascii_lowercase(), value.trim().to_string()));
-        }
+        let Some((name, value)) = line.split_once(':') else {
+            return Err("a request head line is not a header".into());
+        };
+        headers.push((name.trim().to_ascii_lowercase(), value.trim().to_string()));
     }
-    Ok(HttpHead { method, path, headers })
+    Err(format!("more than {MAX_HEADER_LINES} request head lines"))
 }
 
 fn read_bounded_line(reader: &mut impl BufRead) -> Result<String, String> {
@@ -78,6 +89,12 @@ pub(crate) fn unauthorized() -> Value {
 
 pub(crate) fn not_found() -> Value {
     serde_json::json!({"error": "not found"})
+}
+
+/// A head that never became a request. Answered rather than dropped, so a
+/// client learns it was refused instead of seeing a reset connection.
+pub(crate) fn malformed_head() -> Value {
+    serde_json::json!({"error": "malformed request head"})
 }
 
 /// Does this request carry the expected bearer? The header name and the
@@ -182,7 +199,27 @@ pub(crate) fn write_http_response_with_headers(
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
+
     use super::*;
+
+    #[test]
+    fn a_head_is_bounded_in_lines_and_refuses_a_line_that_is_not_a_header() {
+        let good = "GET /health HTTP/1.1\r\nHost: localhost:1\r\n\r\n";
+        let head = read_http_head(&mut Cursor::new(good.as_bytes())).unwrap();
+        assert_eq!((head.method.as_str(), head.path.as_str()), ("GET", "/health"));
+        assert_eq!(head.header("host"), Some("localhost:1"));
+        let refusal = |raw: String| {
+            read_http_head(&mut Cursor::new(raw.into_bytes())).err().unwrap_or_default()
+        };
+        let junk = refusal(format!("GET / HTTP/1.1\r\n{}\r\n", "nonsense\r\n".repeat(500)));
+        assert!(junk.contains("not a header"), "{junk}");
+        // a flood of WELL-FORMED headers still stops at the cap
+        let many = refusal(format!("GET / HTTP/1.1\r\n{}\r\n", "X-Pad: 1\r\n".repeat(500)));
+        assert!(many.contains("more than 64"), "{many}");
+        let wide = refusal(format!("GET / HTTP/1.1\r\nX-Pad: {}\r\n\r\n", "y".repeat(9000)));
+        assert!(wide.contains("8 KB"), "{wide}");
+    }
 
     /// The compare is length- AND content-sensitive: a one-character change and
     /// a valid PREFIX plus extra must both fail, or a token is guessable.

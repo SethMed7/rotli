@@ -54,18 +54,18 @@
 //! a string for `cli_complete`, an object for `cli_detect`, `null` for
 //! `cli_cancel`, `[]` for `chat_models`.
 
-use std::collections::HashMap;
-use std::io::{BufReader, Write};
+use std::collections::{HashMap, HashSet};
+use std::io::BufReader;
 use std::net::{SocketAddr, TcpListener, TcpStream};
-use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use serde_json::{json, Value};
 
+use crate::helper_token::{load_or_create_token, token_dir};
 use crate::loopback_http::{
-    bearer_authorized, not_found, read_http_body, read_http_head, unauthorized,
+    bearer_authorized, malformed_head, not_found, read_http_body, read_http_head, unauthorized,
     write_http_response_with_headers, HttpHead,
 };
 use crate::provider::Running;
@@ -85,7 +85,6 @@ const DEFAULT_ORIGINS: &[&str] = &[
     "http://127.0.0.1:1437",
 ];
 const USAGE: &str = "rotli-helper [--port N] [--origin URL]... [--print-code] [--reset-token]";
-
 struct Options {
     port: u16,
     origins: Vec<String>,
@@ -100,9 +99,30 @@ struct Helper {
     /// request id → the live child, shared across connections so a cancel that
     /// arrives on a SECOND connection can kill a run in flight on the first.
     children: Arc<Mutex<HashMap<String, Running>>>,
+    /// Request ids with a run in flight. Reserved BEFORE the spawn and released
+    /// on every exit path, so two concurrent turns cannot share an id.
+    in_flight: Mutex<HashSet<String>>,
 }
 
-/// What the request's `Origin` header means. `Absent` = a non-browser caller.
+/// A request id held for one run. Taking it is atomic with the duplicate test
+/// (one `HashSet::insert`, one lock) and `Drop` gives it back on every path.
+struct Reservation<'a> {
+    ids: &'a Mutex<HashSet<String>>,
+    id: String,
+}
+
+impl Drop for Reservation<'_> {
+    fn drop(&mut self) {
+        self.ids.lock().unwrap().remove(&self.id);
+    }
+}
+
+fn reserve<'a>(ids: &'a Mutex<HashSet<String>>, id: &str) -> Option<Reservation<'a>> {
+    let taken = ids.lock().unwrap().insert(id.to_string());
+    taken.then(|| Reservation { ids, id: id.to_string() })
+}
+
+/// What `Origin` means here. `Absent` = a non-browser caller.
 enum OriginVerdict {
     Absent,
     Allowed(String),
@@ -128,7 +148,9 @@ pub fn run(args: &[String]) -> Result<(), String> {
     println!("If your browser asks to allow local network access, allow it.");
     let port = options.port;
     let children = Arc::new(Mutex::new(HashMap::new()));
-    serve(listener, Arc::new(Helper { port, origins: options.origins, token, children }))
+    let origins = options.origins;
+    let in_flight = Mutex::new(HashSet::new());
+    serve(listener, Arc::new(Helper { port, origins, token, children, in_flight }))
 }
 
 fn parse_args(args: &[String]) -> Result<Options, String> {
@@ -171,61 +193,6 @@ fn normalize_origin(raw: &str) -> String {
     raw.trim().trim_end_matches('/').to_ascii_lowercase()
 }
 
-// ── the token ─────────────────────────────────────────────────────────────────
-
-fn token_dir() -> Result<PathBuf, String> {
-    let home = std::env::var_os("HOME")
-        .or_else(|| std::env::var_os("USERPROFILE"))
-        .ok_or_else(|| "couldn't find your home directory".to_string())?;
-    Ok(PathBuf::from(home).join(".rotli-helper"))
-}
-
-/// Two v4 UUIDs without hyphens: 64 characters from the OS CSPRNG.
-fn new_token() -> String {
-    format!("{}{}", uuid::Uuid::new_v4().simple(), uuid::Uuid::new_v4().simple())
-}
-
-fn load_or_create_token(dir: &Path, reset: bool) -> Result<String, String> {
-    let path = dir.join("token");
-    if !reset {
-        if let Ok(existing) = std::fs::read_to_string(&path) {
-            let existing = existing.trim().to_string();
-            // a truncated or hand-edited file is replaced, never trusted short
-            if existing.len() >= 32 {
-                return Ok(existing);
-            }
-        }
-    }
-    std::fs::create_dir_all(dir)
-        .map_err(|error| format!("couldn't create {}: {error}", dir.display()))?;
-    set_private(dir, 0o700);
-    let token = new_token();
-    let mut options = std::fs::OpenOptions::new();
-    options.write(true).create(true).truncate(true);
-    // created private — never world-readable for even an instant
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt as _;
-        options.mode(0o600);
-    }
-    let mut file = options
-        .open(&path)
-        .map_err(|error| format!("couldn't write {}: {error}", path.display()))?;
-    file.write_all(token.as_bytes()).map_err(|error| error.to_string())?;
-    // an existing file keeps its old mode through O_CREAT, so say it again
-    set_private(&path, 0o600);
-    Ok(token)
-}
-
-#[cfg(unix)]
-fn set_private(path: &Path, mode: u32) {
-    use std::os::unix::fs::PermissionsExt as _;
-    let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode));
-}
-
-#[cfg(not(unix))]
-fn set_private(_path: &Path, _mode: u32) {}
-
 // ── the service ───────────────────────────────────────────────────────────────
 
 fn serve(listener: TcpListener, helper: Arc<Helper>) -> Result<(), String> {
@@ -254,7 +221,11 @@ fn serve(listener: TcpListener, helper: Arc<Helper>) -> Result<(), String> {
 fn handle(mut stream: TcpStream, helper: &Helper) -> Result<(), String> {
     stream.set_read_timeout(Some(HEAD_READ_TIMEOUT)).map_err(|error| error.to_string())?;
     let mut reader = BufReader::new(stream.try_clone().map_err(|error| error.to_string())?);
-    let head = read_http_head(&mut reader)?;
+    let head = match read_http_head(&mut reader) {
+        Ok(head) => head,
+        // no Origin was parsed, so no CORS headers can be trusted onto this one
+        Err(_) => return respond(&mut stream, &[], 400, malformed_head()),
+    };
     let origin = match helper.origin_verdict(&head) {
         OriginVerdict::Denied => {
             let refusal = json!({"error":"this origin is not paired with Rotli Helper"});
@@ -284,9 +255,9 @@ fn handle(mut stream: TcpStream, helper: &Helper) -> Result<(), String> {
 
 fn cors_headers(origin: Option<&str>) -> Vec<(&'static str, String)> {
     let Some(origin) = origin else { return Vec::new() };
+    // the matching origin, echoed — never `*`, which would pair the helper with
+    // every site the user visits
     vec![
-        // the matching origin, echoed — never `*`, which would pair the helper
-        // with every site the user visits
         ("Access-Control-Allow-Origin", origin.to_string()),
         ("Vary", "Origin".to_string()),
         ("Access-Control-Allow-Headers", "authorization, content-type".to_string()),
@@ -393,9 +364,9 @@ impl Helper {
         if arguments.get("images").and_then(Value::as_array).is_some_and(|i| !i.is_empty()) {
             return Err((400, "Images are not sent through Rotli Helper in this release.".into()));
         }
-        if self.children.lock().unwrap().contains_key(&request_id) {
+        let Some(_held) = reserve(&self.in_flight, &request_id) else {
             return Err((409, format!("a run is already in flight for \"{request_id}\"")));
-        }
+        };
         let effort = arguments.get("reasoningEffort").and_then(Value::as_str);
         let tier = arguments.get("serviceTier").and_then(Value::as_str);
         let timeout = arguments.get("timeoutMs").and_then(Value::as_u64);
@@ -408,21 +379,24 @@ impl Helper {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Read as _;
+    use std::io::{Read as _, Write as _};
 
     use super::*;
+    use crate::helper_token::new_token;
 
     /// A real helper on an ephemeral loopback port. No CLI is ever spawned:
     /// every test below stops at a gate or at an unknown provider.
-    fn helper() -> (u16, String) {
+    fn helper() -> (u16, String, Arc<Helper>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
         let token = new_token();
         let origins = DEFAULT_ORIGINS.iter().map(|o| (*o).to_string()).collect();
         let children = Arc::new(Mutex::new(HashMap::new()));
-        let service = Helper { port, origins, token: token.clone(), children };
-        std::thread::spawn(move || drop(serve(listener, Arc::new(service))));
-        (port, token)
+        let in_flight = Mutex::new(HashSet::new());
+        let service = Arc::new(Helper { port, origins, token: token.clone(), children, in_flight });
+        let serving = Arc::clone(&service);
+        std::thread::spawn(move || drop(serve(listener, serving)));
+        (port, token, service)
     }
 
     fn raw_request(port: u16, request: &str) -> String {
@@ -446,7 +420,7 @@ mod tests {
 
     #[test]
     fn health_answers_without_a_token() {
-        let (port, _) = helper();
+        let (port, _, _) = helper();
         let answer = raw_request(port, &format!("GET /health HTTP/1.1\r\nHost: localhost:{port}\r\n\r\n"));
         assert!(answer.starts_with("HTTP/1.1 200 OK"), "{answer}");
         assert!(answer.contains("\"name\":\"rotli-helper\""), "{answer}");
@@ -455,7 +429,7 @@ mod tests {
 
     #[test]
     fn rpc_refuses_a_missing_or_wrong_token() {
-        let (port, _) = helper();
+        let (port, _, _) = helper();
         let anonymous = rpc(port, "", "{\"cmd\":\"chat_models\",\"args\":{}}");
         assert!(anonymous.starts_with("HTTP/1.1 401"), "{anonymous}");
         let wrong = rpc(port, "Authorization: Bearer not-the-token\r\n", "{\"cmd\":\"chat_models\"}");
@@ -464,7 +438,7 @@ mod tests {
 
     #[test]
     fn a_preflight_from_an_allowlisted_origin_needs_no_token() {
-        let (port, _) = helper();
+        let (port, _, _) = helper();
         let answer = raw_request(
             port,
             &format!("OPTIONS /rpc HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nOrigin: http://localhost:1437\r\nAccess-Control-Request-Method: POST\r\n\r\n"),
@@ -485,7 +459,7 @@ mod tests {
 
     #[test]
     fn an_unlisted_origin_is_refused_everywhere() {
-        let (port, token) = helper();
+        let (port, token, _) = helper();
         for request in [
             format!("GET /health HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nOrigin: https://evil.example\r\n\r\n"),
             format!("OPTIONS /rpc HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nOrigin: null\r\n\r\n"),
@@ -499,14 +473,14 @@ mod tests {
 
     #[test]
     fn a_rebound_host_header_is_refused() {
-        let (port, _) = helper();
+        let (port, _, _) = helper();
         let answer = raw_request(port, "GET /health HTTP/1.1\r\nHost: attacker.example\r\n\r\n");
         assert!(answer.starts_with("HTTP/1.1 400"), "{answer}");
     }
 
     #[test]
     fn an_unknown_command_is_a_404_and_an_unknown_route_too() {
-        let (port, token) = helper();
+        let (port, token, _) = helper();
         let authorization = format!("Authorization: Bearer {token}\r\n");
         let unknown = rpc(port, &authorization, "{\"cmd\":\"corpus_read\",\"args\":{}}");
         assert!(unknown.starts_with("HTTP/1.1 404"), "{unknown}");
@@ -517,7 +491,7 @@ mod tests {
 
     #[test]
     fn detect_reports_an_unknown_provider_as_an_error() {
-        let (port, token) = helper();
+        let (port, token, _) = helper();
         let answer = rpc(
             port,
             &format!("Authorization: Bearer {token}\r\n"),
@@ -529,7 +503,7 @@ mod tests {
 
     #[test]
     fn a_completion_with_images_is_refused_before_anything_is_staged() {
-        let (port, token) = helper();
+        let (port, token, _) = helper();
         let answer = rpc(
             port,
             &format!("Authorization: Bearer {token}\r\n"),
@@ -541,7 +515,7 @@ mod tests {
 
     #[test]
     fn an_oversized_body_is_refused_on_the_header() {
-        let (port, token) = helper();
+        let (port, token, _) = helper();
         // 26 MB > the 24 MiB cap, and no body follows: the length alone ends it
         let answer = raw_request(
             port,
@@ -552,7 +526,7 @@ mod tests {
 
     #[test]
     fn a_missing_length_or_wrong_media_type_is_refused() {
-        let (port, token) = helper();
+        let (port, token, _) = helper();
         let no_length = raw_request(
             port,
             &format!("POST /rpc HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAuthorization: Bearer {token}\r\nContent-Type: application/json\r\n\r\n"),
@@ -565,22 +539,41 @@ mod tests {
         assert!(wrong_media.starts_with("HTTP/1.1 415"), "{wrong_media}");
     }
 
+    /// The reservation, not the children map, makes an id exclusive: the old
+    /// check-then-act let two turns pass, and the second child then replaced
+    /// the first in `children`, leaving it unkillable by watchdog or cancel.
     #[test]
-    fn the_token_file_is_private_and_a_restart_reuses_it() {
-        let home = tempfile::tempdir().unwrap();
-        let dir = home.path().join(".rotli-helper");
-        let first = load_or_create_token(&dir, false).unwrap();
-        assert!(first.len() >= 32, "a pairing token must be at least 32 characters");
-        let second = load_or_create_token(&dir, false).unwrap();
-        assert_eq!(first, second, "a restart must keep the pairing");
-        let third = load_or_create_token(&dir, true).unwrap();
-        assert_ne!(first, third, "--reset-token must issue a new one");
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt as _;
-            let mode = std::fs::metadata(dir.join("token")).unwrap().permissions().mode();
-            assert_eq!(mode & 0o777, 0o600, "the token file must be owner-only");
-        }
+    fn a_second_run_under_one_request_id_is_refused_while_the_first_holds_it() {
+        let (port, token, service) = helper();
+        let held = reserve(&service.in_flight, "busy").expect("the first run takes the id");
+        assert!(reserve(&service.in_flight, "busy").is_none(), "nobody else may take it");
+        let answer = rpc(
+            port,
+            &format!("Authorization: Bearer {token}\r\n"),
+            "{\"cmd\":\"cli_complete\",\"args\":{\"requestId\":\"busy\",\"provider\":\"claude\",\"model\":\"sonnet\",\"prompt\":\"hi\"}}",
+        );
+        assert!(answer.starts_with("HTTP/1.1 409"), "{answer}");
+        assert!(answer.contains("already in flight"), "{answer}");
+        assert!(service.in_flight.lock().unwrap().contains("busy"), "the first run keeps it");
+        drop(held);
+        assert!(service.in_flight.lock().unwrap().is_empty(), "Drop gives the id back");
+        assert!(reserve(&service.in_flight, "busy").is_some(), "and the id is takeable again");
+    }
+
+    #[test]
+    fn a_junk_head_line_is_answered_400_and_a_flood_stops_at_the_first() {
+        let (port, _, _) = helper();
+        // nothing follows the junk line, so the server consumes the whole
+        // request and closes cleanly — the body is readable
+        let one = raw_request(port, &format!("GET /health HTTP/1.1\r\nHost: localhost:{port}\r\nnope\r\n"));
+        assert!(one.starts_with("HTTP/1.1 400"), "{one}");
+        assert!(one.contains("malformed request head"), "{one}");
+        // A flood is REFUSED at the first junk line rather than absorbed. Only
+        // the status is asserted: bytes the helper deliberately never read are
+        // still in flight, so the close can reset and drop the body.
+        let flood = "nonsense-with-no-colon\r\n".repeat(500);
+        let many = raw_request(port, &format!("GET /health HTTP/1.1\r\nHost: localhost:{port}\r\n{flood}"));
+        assert!(many.starts_with("HTTP/1.1 400"), "{many}");
     }
 
     #[test]
