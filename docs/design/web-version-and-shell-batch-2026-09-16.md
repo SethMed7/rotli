@@ -143,8 +143,14 @@ Decisions, per the review before building:
    not mirrored into frontmatter until the Mac app next writes it. Stated
    here rather than half-implemented.
 5. **What the browser keeps:** the folder's directory handle, nothing else.
-   Permission is per visit: "Reconnect" is one click. Chromium only; Safari
-   and Firefox keep the browser-storage vault and say so.
+   Permission is per visit: "Reconnect" is one click.
+6. **Every browser gets a folder, two ways.** Chrome, Edge, and Arc open it
+   live (read and write). Firefox, Zen, Safari, and Brave with its folder
+   flag off can only read a picked folder once, so there "Import a folder"
+   copies its text files into browser storage and runs the SAME folder
+   service over an in-memory filesystem mirrored back on every change;
+   "Export vault (.zip)" hands the files back. Brave users are told which
+   flag turns the live mode on. The copy says plainly that it is a copy.
 
 Seams: `services/vaultDir.ts` (port + in-memory fake), `lib/frontmatter.ts`
 (codec), `services/folderNotes.ts` (the NotesService), `lib/fsaVaultDir.ts`
@@ -238,6 +244,8 @@ pull requests later. The table is filled from the code map below.
 | 15 | Copying a chat loses Markdown | `chatSurface.tsx:1461-1467` (per-message copy is already raw); no copy handler on the thread | Selecting across rendered messages and pressing ⌘C serialises the DOM, so assistant Markdown is already consumed. | A `copy` listener on the thread maps the selection to `[data-chat-message-index]` rows and writes their source Markdown; a "Copy chat" action for the whole thread. | `chatMessagePresentation.test.ts`, `e2e/chat-workspace.spec.ts` |
 
 | 16 | Chat: leave mid-run, come back — no "working" sign, and when the run finishes the reply never appears | `src/components/chat/chatSurface.tsx` (in-flight row, message list source); the `chatRuns` store (the sidebar's Working/Done badge reads it); the transcript persistence path | Reported 2026-09-16 with two screenshots: send a message, open another tab, return. The sidebar row says Working, the thread shows no in-progress row; when the sidebar flips to Done the thread still shows only the user's message; closing and reopening the chat tab shows the reply. The run completes in the store, so the surface's pending row and its appended reply both live in component state that a remount discards, and the remounted surface reads a transcript that the finishing run has not written yet or does not invalidate. | Derive both the in-flight row and the finished reply from the `chatRuns` store (the same truth the sidebar reads): a remounted surface shows the working row, streams into it, and on completion the reply is in the list without a reload. Confirm the transcript write and the query invalidation on completion. **Highest priority of the batch: a finished answer is lost from view.** | `chatSurface.test.ts`, `e2e/chat-workspace.spec.ts` (send, navigate away, complete, return) |
+
+| 17 | Library, Archive, Trash: boards and documents in their real folders, kind glyphs, image previews (app AND web) | `src/components/systemSurface.tsx`, `src/services/systemBrowser.ts` (listings), `ItemTile`/`FolderListRow` | Reported 2026-09-16 with a screenshot: the Library lists only Notes under a project folder; boards and documents that belong there are hard to find (they list under Assets/storage lanes), rows carry a plain note glyph, and trashed images show no preview. | List every item kind in the folder that owns it (a board or document beside its notes, at least as a linked row when the file lives in the managed storage lane); use the same kind glyphs as the sidebar (`glyphForNote`) in List and Columns; image tiles in Trash and Archive get the Icons-view thumbnail. Same listing rule for the web build's folder mode. | `systemBrowser.test.ts`, `e2e/system-gallery.spec.ts`, `e2e/system-browser-reveal.spec.ts` |
 
 Cross-cutting: one range-select helper (8, 9); one back control (4, 11);
 `createRoutedNote` is the single creation router and `merge()` is its only

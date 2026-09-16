@@ -8,8 +8,8 @@
 // click ("Reconnect"). Safari and Firefox have no picker; they keep the
 // browser-storage vault and say so.
 
-const DB_NAME = "rotli-web";
-const STORE = "vault";
+import { VAULT_STORE, openDatabase, requestToPromise } from "../lib/browserVault";
+
 const HANDLE_KEY = "vault-handle";
 
 export type FolderVaultStatus =
@@ -18,33 +18,42 @@ export type FolderVaultStatus =
   | { kind: "granted"; name: string; handle: FileSystemDirectoryHandle }
   | { kind: "prompt"; name: string; handle: FileSystemDirectoryHandle };
 
-function open(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
-    request.onupgradeneeded = () => {
-      if (!request.result.objectStoreNames.contains(STORE)) request.result.createObjectStore(STORE);
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("IndexedDB open failed"));
-  });
-}
-
-function done<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("IndexedDB request failed"));
-  });
-}
-
 export function folderPickerSupported(): boolean {
   return typeof window !== "undefined" && typeof window.showDirectoryPicker === "function";
+}
+
+export type FolderSupport =
+  /** The File System Access API: a live folder, read and write. */
+  | { kind: "live" }
+  /** Brave ships the API switched off; one flag turns it on. */
+  | { kind: "brave-off" }
+  /** Firefox, Zen, Safari: a folder can be read once and copied in; Export gives it back. */
+  | { kind: "import-only"; browser: string };
+
+/** What this browser can do with a folder. Brave hides behind a Chromium
+ * user agent, so it is asked directly. */
+export async function browserFolderSupport(): Promise<FolderSupport> {
+  if (folderPickerSupported()) return { kind: "live" };
+  const brave = (navigator as Navigator & { brave?: { isBrave?: () => Promise<boolean> } }).brave;
+  if (brave?.isBrave && (await brave.isBrave().catch(() => false))) return { kind: "brave-off" };
+  const ua = navigator.userAgent;
+  const browser = /Zen\//.test(ua)
+    ? "Zen"
+    : /Firefox\//.test(ua)
+      ? "Firefox"
+      : /Safari\//.test(ua) && !/Chrom/.test(ua)
+        ? "Safari"
+        : "this browser";
+  return { kind: "import-only", browser };
 }
 
 export async function loadVaultHandle(): Promise<FileSystemDirectoryHandle | null> {
   if (typeof indexedDB === "undefined") return null;
   try {
-    const db = await open();
-    const value = await done(db.transaction(STORE, "readonly").objectStore(STORE).get(HANDLE_KEY));
+    const db = await openDatabase();
+    const value = await requestToPromise(
+      db.transaction(VAULT_STORE, "readonly").objectStore(VAULT_STORE).get(HANDLE_KEY),
+    );
     return value && typeof value === "object" && "kind" in value
       ? (value as FileSystemDirectoryHandle)
       : null;
@@ -54,10 +63,10 @@ export async function loadVaultHandle(): Promise<FileSystemDirectoryHandle | nul
 }
 
 async function saveVaultHandle(handle: FileSystemDirectoryHandle | null): Promise<void> {
-  const db = await open();
-  const store = db.transaction(STORE, "readwrite").objectStore(STORE);
-  if (handle) await done(store.put(handle, HANDLE_KEY));
-  else await done(store.delete(HANDLE_KEY));
+  const db = await openDatabase();
+  const store = db.transaction(VAULT_STORE, "readwrite").objectStore(VAULT_STORE);
+  if (handle) await requestToPromise(store.put(handle, HANDLE_KEY));
+  else await requestToPromise(store.delete(HANDLE_KEY));
 }
 
 /** Where the web build stands at boot: no picker, no folder, a folder the

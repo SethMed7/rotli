@@ -137,6 +137,7 @@ export const SERVICE_FILE_OWNERS = {
   "remoteAgent.ts": "remote-agent relay adapter seam (development builds only)",
   "welcome.ts": "Welcome folder seeding and Main filing composition",
   "webNotes.ts": "notes",
+  "importedVault.ts": "notes",
   "webVaultFolder.ts": "notes",
   "notesPort.ts": "notes application port",
   "query.ts": "notes retrieval",

@@ -258,7 +258,7 @@ const vendorSeams = [
   },
   {
     vendor: "jszip",
-    allowed: ["src/documents/codec/", "src/documents/create.ts", "src/sheets/codec/"],
+    allowed: ["src/documents/codec/", "src/documents/create.ts", "src/sheets/codec/", "src/lib/vaultZip.ts"],
   },
 ];
 function walkVendors(dir) {

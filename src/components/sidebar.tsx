@@ -21,6 +21,7 @@ import { type MemexInstance } from "../memex/config";
 import { initMemexAsCorpus } from "../memex/service";
 import { useConnectBrain, useForgetBrain, useMemexConfig, useSwitchVault } from "../memex/useMemex";
 import { openNewItemMenu } from "../newItems/menu";
+import { importFolderAndReload } from "../services/importedVault";
 import { mainFolderIds } from "../services/mainTree";
 import {
   vaultDisplayName,
@@ -103,13 +104,13 @@ export function Sidebar() {
 
   const connectVault = async () => {
     if (isWebVault()) {
-      // Rotli Web: the browser's own folder picker; the page reloads from it
-      if (!folderPickerSupported()) {
-        throw new Error(
-          "This browser can’t open folders — Chrome, Edge, or Arc can. Notes stay in this browser’s storage.",
-        );
+      // Rotli Web: the browser's own folder picker (live folder where the
+      // API exists; a one-time import elsewhere); the page reloads from it
+      if (folderPickerSupported()) {
+        await connectFolderVault();
+        return;
       }
-      await connectFolderVault();
+      await importFolderAndReload();
       return;
     }
     const path = await requestVaultFolder({

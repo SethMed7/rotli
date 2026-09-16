@@ -20,8 +20,16 @@ import { FsaVaultDir } from "../lib/fsaVaultDir";
 import { showFileNotice } from "../state/fileNotice";
 import { DEST } from "./destinations";
 import { FolderNotesService } from "./folderNotes";
+import {
+  IMPORTED_VAULT_KEY,
+  PersistedVaultDir,
+  downloadVaultZip,
+  isImportedVaultSnapshot,
+  seedVaultDir,
+} from "./importedVault";
 import { type InMemoryNotesService, isNotesSnapshot } from "./inMemoryNotes";
 import type { NotesService } from "./notesPort";
+import type { VaultDir } from "./vaultDir";
 import { folderVaultStatus } from "./webVaultFolder";
 
 /** The NotesService methods that change state. Every other method is a read. */
@@ -197,6 +205,8 @@ let instance: WebNotesPersistence | null = null;
 /** Set at boot when the browser still trusts a remembered folder. */
 let folderService: FolderNotesService | null = null;
 let folderName: string | null = null;
+let folderDir: VaultDir | null = null;
+let mode: "browser" | "folder" | "imported" = "browser";
 
 /** The one web notes service: the in-memory service wrapped so every
  * mutation schedules a vault write. Called once from ./notes.ts. */
@@ -220,11 +230,46 @@ export async function hydrateWebNotes(): Promise<boolean> {
     configureBrowserVault(new FolderVaultStore(dir));
     folderService = new FolderNotesService(dir);
     folderName = status.name;
+    folderDir = dir;
+    mode = "folder";
     return true; // a real vault is never seeded over
   }
   if (status.kind === "prompt") {
     showFileNotice(
       `Your vault folder “${status.name}” needs permission again — Settings → General → Reconnect`,
+    );
+  }
+  // an imported copy (browsers without the live API): the same filesystem
+  // in memory, mirrored back into browser storage on every change
+  const idb = browserVault();
+  const raw = await idb.read(IMPORTED_VAULT_KEY).catch(() => undefined);
+  if (raw !== undefined) {
+    let parsed: unknown = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = null;
+    }
+    if (isImportedVaultSnapshot(parsed)) {
+      const dir = new PersistedVaultDir(await seedVaultDir(parsed), parsed.name, (snapshot) =>
+        idb.write(IMPORTED_VAULT_KEY, snapshot),
+      );
+      if (typeof window !== "undefined") {
+        const flush = () => void dir.flush().catch(() => {});
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) flush();
+        });
+        window.addEventListener("pagehide", flush);
+      }
+      configureBrowserVault(new FolderVaultStore(dir));
+      folderService = new FolderNotesService(dir);
+      folderName = parsed.name;
+      folderDir = dir;
+      mode = "imported";
+      return true;
+    }
+    showFileNotice(
+      "The imported vault stored in this browser can’t be read by this version of Rotli; it was left alone.",
     );
   }
   return (await instance.hydrate()) === "restored";
@@ -239,6 +284,17 @@ export function activeWebNotesService(fallback: NotesService): NotesService {
 /** The connected folder's name, or null when notes live in the browser. */
 export function connectedFolderName(): string | null {
   return folderName;
+}
+
+/** Where this web session's notes live. */
+export function webVaultMode(): "browser" | "folder" | "imported" {
+  return mode;
+}
+
+/** Download the connected or imported vault's text files as a zip. */
+export async function exportWebVault(): Promise<void> {
+  if (!folderDir) throw new Error("Nothing to export yet — open or import a folder first.");
+  await downloadVaultZip(folderDir, folderName ?? "rotli-vault");
 }
 
 /** True after hydrateWebNotes found a stored vault (or a connected folder);

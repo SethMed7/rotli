@@ -1,27 +1,39 @@
 import { useEffect, useState } from "react";
 
 import { isWebVault } from "../../lib/browserVault";
-import { connectedFolderName } from "../../services/webNotes";
+import { forgetImportedVault, importFolderAndReload } from "../../services/importedVault";
+import { connectedFolderName, exportWebVault, webVaultMode } from "../../services/webNotes";
 import {
+  type FolderSupport,
   type FolderVaultStatus,
+  browserFolderSupport,
   connectFolderVault,
   disconnectFolderVault,
   folderVaultStatus,
   reconnectFolderVault,
 } from "../../services/webVaultFolder";
 
+async function forgetImport(): Promise<void> {
+  await forgetImportedVault();
+  window.location.reload();
+}
+
 /** Settings → General in Rotli Web only: where the notes live, what that
- * means, and the way to a real folder on this computer (Chromium browsers).
+ * means, and the way to a real folder on this computer — live where the
+ * browser can (Chrome, Edge, Arc), a one-time import plus Export elsewhere.
  * Renders nothing in the desktop shell and in the browser twin. */
 export function WebVaultSettings() {
   const web = isWebVault();
   const [status, setStatus] = useState<FolderVaultStatus | null>(null);
+  const [support, setSupport] = useState<FolderSupport | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     if (!web) return;
     void folderVaultStatus().then(setStatus);
+    void browserFolderSupport().then(setSupport);
   }, [web]);
   if (!web) return null;
+  const mode = webVaultMode();
   const folder = connectedFolderName();
   const run = (action: () => Promise<unknown>) => () => {
     setError(null);
@@ -31,35 +43,63 @@ export function WebVaultSettings() {
     <>
       <h4 className="sethead">Rotli Web</h4>
       <p className="lead">
-        {folder ? (
+        {mode === "folder" && (
           <>
             Your vault is the folder <strong>{folder}</strong> on this computer: every note is a file there,
             and the browser remembers only the folder. The same folder opens in Rotli for Mac.
           </>
-        ) : (
+        )}
+        {mode === "imported" && (
+          <>
+            Your vault is a copy of the folder <strong>{folder}</strong>, kept in this browser. This browser
+            can read a folder you pick but cannot write to it, so changes stay here until you export them.
+          </>
+        )}
+        {mode === "browser" && (
           <>Your vault lives in this browser, on this device. Clearing this site&rsquo;s data removes it.</>
         )}{" "}
         Nothing is sent anywhere: the page&rsquo;s security policy forbids every outbound request.
       </p>
-      {status?.kind === "unsupported" && (
+      {support?.kind === "brave-off" && (
         <p className="setnote">
-          This browser can&rsquo;t open folders. Chrome, Edge, or Arc can; here, notes stay in browser
-          storage.
+          Brave ships the folder API switched off. Turn on <code>brave://flags/#file-system-access-api</code>,
+          relaunch, and a real folder can be the vault. Until then, a folder can be imported as a copy.
         </p>
       )}
-      {status?.kind === "none" && (
+      {support?.kind === "import-only" && (
+        <p className="setnote">
+          {support.browser} can read a folder you pick but cannot write to it. Chrome, Edge, or Arc open a
+          folder live; here, Import keeps a copy and Export gives it back as a zip.
+        </p>
+      )}
+      {support?.kind === "live" && status?.kind === "none" && (
         <button type="button" className="ghostbtn" onClick={run(connectFolderVault)}>
           Open a folder on this computer…
         </button>
       )}
-      {status?.kind === "prompt" && (
+      {support?.kind === "live" && status?.kind === "prompt" && (
         <button type="button" className="ghostbtn" onClick={run(reconnectFolderVault)}>
           Reconnect &ldquo;{status.name}&rdquo;
+        </button>
+      )}
+      {support && support.kind !== "live" && (
+        <button type="button" className="ghostbtn" onClick={run(importFolderAndReload)}>
+          {mode === "imported" ? "Import a folder again…" : "Import a folder…"}
+        </button>
+      )}
+      {mode !== "browser" && (
+        <button type="button" className="ghostbtn" onClick={run(exportWebVault)}>
+          Export vault (.zip)
         </button>
       )}
       {(status?.kind === "granted" || status?.kind === "prompt") && (
         <button type="button" className="ghostbtn" onClick={run(disconnectFolderVault)}>
           Use browser storage instead
+        </button>
+      )}
+      {mode === "imported" && (
+        <button type="button" className="ghostbtn" onClick={run(forgetImport)}>
+          Forget the imported copy
         </button>
       )}
       {error && (

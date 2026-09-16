@@ -27,8 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   browser. In Chrome, Edge, or Arc, **Open a folder on this computer**
   (sidebar → Connect vault, or Settings → General) makes a real folder the
   vault: every note is a file there, the same files the Mac app reads, and
-  the browser remembers only the folder. Boards and export are the next
-  phase
+  the browser remembers only the folder. Firefox, Zen, Safari, and Brave
+  (until its folder flag is on) cannot write to a folder; there **Import a
+  folder** keeps a copy in the browser and **Export vault (.zip)** gives it
+  back. Boards are the next phase
   (`docs/design/web-version-and-shell-batch-2026-09-16.md`).
 
 ### Fixed
