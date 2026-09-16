@@ -1,3 +1,5 @@
+// The pure parts of scripts/dev-helper-server.ts (the Vite dev-only plugin
+// vite.config.ts mounts for the web platform).
 import { describe, expect, test } from "bun:test";
 
 import { localAssetName, localBinaryCandidates, localizedInstaller } from "./dev-helper-server";
