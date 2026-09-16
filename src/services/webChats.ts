@@ -153,6 +153,8 @@ export interface ChatStore {
 const CHATS_DIR = "chats";
 const CHAT_FOLDERS_FILE = ".rotli/chat-folders.json";
 const CHAT_HEAD_LINES = 41;
+/** A file time below this (2001-09-09) is a logical clock, not a date. */
+const EPOCH_MS_FLOOR = 1_000_000_000_000;
 
 function safeSlug(slug: string): string {
   if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) throw new Error(`"${slug}" is not a chat slug`);
@@ -189,9 +191,12 @@ export class FolderChatStore implements ChatStore {
             this.dir.stat(path),
           ]);
           const head = text.split("\n").slice(0, CHAT_HEAD_LINES).join("\n");
-          // an imported copy keeps no file times; the contract's `updated:`
-          // day (bumped on every append) is the next best recency
-          const modified = stat?.lastModified || Date.parse(frontmatterField(head, "updated")) || 0;
+          // an imported copy keeps no real file times (its port stamps a
+          // logical clock); the contract's `updated:` day, bumped on every
+          // append, is the recency then
+          const fileTime = stat?.lastModified ?? 0;
+          const modified =
+            fileTime > EPOCH_MS_FLOOR ? fileTime : Date.parse(frontmatterField(head, "updated")) || fileTime;
           return summarize(slug, head, modified);
         }),
     );

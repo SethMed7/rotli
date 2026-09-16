@@ -86,9 +86,8 @@ describe("web chat store", () => {
       ["from-the-app", "From the app", "plan", true, "chats/from-the-app.md"],
       ["no-times", "Imported", "", false, "chats/no-times.md"],
     ]);
-    // a real file time wins; without one the `updated:` day stands in
-    expect(listed[0]!.modifiedMs).toBeGreaterThan(0);
-    expect(listed[1]!.modifiedMs).toBeGreaterThan(0);
+    // the in-memory port stamps a logical clock, not a date: the `updated:` day stands in
+    expect(listed[1]!.modifiedMs).toBe(Date.parse("2026-09-10"));
     const born = composeNewChat(
       { title: "Web", source: "rotli", slug: "web" },
       [{ speaker: "you", text: "hi" }],
