@@ -12,15 +12,18 @@ import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, use
 import { relativeLabel } from "../lib/dateLabels";
 import { createDragGhost } from "../lib/dragGhost";
 import { createPointerDragSession } from "../lib/pointerDrag";
+import { rangeBetween } from "../lib/rangeSelect";
 import { createMergedCaptureNote, joinCaptureBodies } from "../services/captureMerge";
 import { DEST } from "../services/destinations";
 import { invalidateNotes, useNotes } from "../services/hooks";
 import { mainNoteIds } from "../services/mainTree";
 import { archiveNoteWithImages, trashNoteWithImages } from "../services/noteLifecycle";
 import { notesService } from "../services/notes";
+import { useCaptureSelection } from "../state/captureSelection";
 import { useMainStore } from "../state/main";
 import { useFocusedNoteId, usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
+import { BackToNotes } from "./backToNotes";
 import { pendingRevealKey } from "./captureReveal";
 import { Character } from "./character";
 import { ArchiveGlyph, CheckGlyph, TrashGlyph, glyphForNote } from "./glyphs";
@@ -189,13 +192,35 @@ export function BoardSurface() {
     });
   };
 
-  const toggle = (id: string) =>
+  // click toggles a card (they read as checkboxes); ⇧-click ranges from the
+  // last card clicked, in the visible order — the same rule as the System
+  // browser and the Main tree (lib/rangeSelect)
+  const anchorRef = useRef<string | null>(null);
+  const select = (id: string, e: { shiftKey: boolean }) => {
+    const range =
+      e.shiftKey && anchorRef.current ? rangeBetween(ordered, (c) => c.id, anchorRef.current, id) : null;
+    if (range) {
+      setSelected((prev) => new Set([...prev, ...range.map((c) => c.id)]));
+      return;
+    }
+    anchorRef.current = id;
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+  };
+  const selectAll = () => setSelected(new Set(ordered.map((c) => c.id)));
+  // ⌘A asks through the capture-selection store; only a NEW request selects
+  // (a reorder re-runs the effect but must not re-select everything)
+  const selectAllNonce = useCaptureSelection((s) => s.selectAllNonce);
+  const seenSelectAllRef = useRef(0);
+  useEffect(() => {
+    if (selectAllNonce === seenSelectAllRef.current) return;
+    seenSelectAllRef.current = selectAllNonce;
+    setSelected(new Set(ordered.map((c) => c.id)));
+  }, [selectAllNonce, ordered]);
 
   // open a card by kind — a stray board in the Board root opens its canvas, not
   // a dead note tab. open* returns the content area to the panes on its own.
@@ -266,21 +291,19 @@ export function BoardSurface() {
   return (
     <div className="board">
       <header className="board-head">
-        <button type="button" className="board-back" onClick={back}>
-          <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
-            <path
-              d="M15 18l-6-6 6-6"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <span>Back to notes</span>
-        </button>
+        <BackToNotes onClick={back} />
         <h2 className="board-title">Captures</h2>
         <span className="board-count">{captures.length}</span>
+        {captures.length > 0 && (
+          <button
+            type="button"
+            className="board-btn ghost board-select-all"
+            disabled={busy || selected.size === ordered.length}
+            onClick={selectAll}
+          >
+            Select all
+          </button>
+        )}
       </header>
 
       {captures.length === 0 ? (
@@ -315,12 +338,12 @@ export function BoardSurface() {
                   className={cls.join(" ")}
                   aria-pressed={sel}
                   onPointerDown={(e) => startCardDrag(e, c.id, c.title || "Empty capture")}
-                  onClick={() => {
+                  onClick={(e) => {
                     if (didDragRef.current) {
                       didDragRef.current = false;
                       return;
                     }
-                    toggle(c.id);
+                    select(c.id, e);
                   }}
                   onDoubleClick={() => openOne(c)}
                   onContextMenu={(e) => openMenu(e, c)}

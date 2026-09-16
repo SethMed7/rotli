@@ -23,6 +23,7 @@ import { longDateLabel } from "../lib/dateLabels";
 import { IMAGE_EXTS, extOf } from "../lib/fileKind";
 import { startMainAddDrag } from "../lib/mainAddDrag";
 import { noteDiskFolder, projectNoteToBrain } from "../lib/noteLocation";
+import { rangeBetween } from "../lib/rangeSelect";
 import { fileAssetUrl } from "../lib/tauri";
 import { DEST } from "../services/destinations";
 import { invalidateFolders, useFolders, useNoteIndex, useNotes, useSearchableNotes } from "../services/hooks";
@@ -46,6 +47,7 @@ import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
+import { BackToNotes } from "./backToNotes";
 import { Character } from "./character";
 import {
   ChevronRight,
@@ -420,12 +422,9 @@ export function SystemSurface({ rootId }: { rootId: string }) {
     } else if (e.shiftKey && folderAnchorRef.current) {
       // ⇧ is single-band like selectItem's mirror rule: only ⌘ mixes bands
       setSelection([]);
-      const order = listing.folders.map((f) => f.path);
-      const a = order.indexOf(folderAnchorRef.current);
-      const b = order.indexOf(path);
-      if (a >= 0 && b >= 0) {
-        setFolderSel(order.slice(Math.min(a, b), Math.max(a, b) + 1));
-      } else {
+      const range = rangeBetween(listing.folders, (f) => f.path, folderAnchorRef.current, path);
+      if (range) setFolderSel(range.map((f) => f.path));
+      else {
         setFolderSel([path]);
         folderAnchorRef.current = path;
       }
@@ -445,12 +444,9 @@ export function SystemSurface({ rootId }: { rootId: string }) {
       anchorRef.current = n.id;
     } else if (e.shiftKey && anchorRef.current) {
       // ⇧-click ranges from the anchor within the visible order
-      const span = order ?? visibleItems;
-      const a = span.findIndex((v) => v.id === anchorRef.current);
-      const b = span.findIndex((v) => v.id === n.id);
-      if (a >= 0 && b >= 0) {
-        setSelection(span.slice(Math.min(a, b), Math.max(a, b) + 1));
-      } else {
+      const range = rangeBetween(order ?? visibleItems, (v) => v.id, anchorRef.current, n.id);
+      if (range) setSelection(range);
+      else {
         setSelection([n]);
         anchorRef.current = n.id;
       }
@@ -672,19 +668,19 @@ export function SystemSurface({ rootId }: { rootId: string }) {
       }}
     >
       <header className="board-head">
-        {!atRoot && (
+        {atRoot ? (
+          <BackToNotes onClick={() => useUiStore.getState().setContentView("panes")} />
+        ) : (
           <button
             type="button"
             className="fdr-up"
             aria-label="Back"
-            title="Back"
             onClick={() => enter(crumbs[crumbs.length - 2]?.path ?? root.prefix)}
           >
             <ChevronRight size={11} className="fdr-up-chev" />
           </button>
         )}
-        {/* the full trail lives in the BOTTOM path bar now (Finder's home for
-            it — the maintainer, 2026-07-28); the header keeps just where-am-I */}
+        {/* the trail lives in the BOTTOM path bar (Finder's home, the maintainer 2026-07-28); the header keeps where-am-I */}
         <h2 className="board-title">{crumbs[crumbs.length - 1]?.label ?? root.title}</h2>
         <span className="board-count">{items.length}</span>
         {isLibrary && (

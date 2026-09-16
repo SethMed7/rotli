@@ -39,6 +39,7 @@ import { cycleQuick, removeQuickNote } from "../state/quick";
 import { toggleSettings } from "../state/settingsToggle";
 import { startTour } from "../state/tour";
 import { SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
+import { registerCaptureActions } from "./captureActions";
 import { EDITOR_ACTION } from "./editorActionIds";
 import { captureHandle, quickHandle, setupHandle } from "./handles";
 import { registerAction } from "./registry";
@@ -251,6 +252,7 @@ export function registerDefaultActions(): void {
       ui.setPaletteOpen(!ui.paletteOpen);
     },
   });
+  registerCaptureActions();
   registerAction({
     id: "view.focus",
     title: "Focus mode",

@@ -70,6 +70,29 @@ describe("buildMainTree", () => {
     expect(r.folders.map((f) => f.id)).toEqual(["main:A", "main:A/B"]);
     expect(r.folders[1]?.parentId).toBe("main:A");
   });
+  test("a note in a sink keeps its Main slot: hidden while trashed, back in place once restored", () => {
+    // 2026-09-16: trashing used to strip the reference, so Restore landed the
+    // note with no Main home (which is exactly the Captures projection)
+    const slot: MainNode[] = [{ folder: "Today", children: [{ note: "t" }, { note: "u" }] }];
+    const trashed = new Map([
+      ["t", note("t", "Trash")],
+      ["u", note("u")],
+    ]);
+    expect(buildMainTree(slot, trashed).notes.map((n) => n.id)).toEqual(["u"]);
+    const archived = new Map([
+      ["t", note("t", "Archive")],
+      ["u", note("u")],
+    ]);
+    expect(buildMainTree(slot, archived).notes.map((n) => n.id)).toEqual(["u"]);
+    const restored = new Map([
+      ["t", note("t")],
+      ["u", note("u")],
+    ]);
+    expect(buildMainTree(slot, restored).notes.map((n) => [n.id, n.folderId])).toEqual([
+      ["t", "main:Today"],
+      ["u", "main:Today"],
+    ]);
+  });
   test("a STAGED note (hidden Board root) projects like any other — given the full index", () => {
     const index = new Map([["staged", note("staged", "Board")]]);
     const r = buildMainTree([{ note: "staged" }], index);

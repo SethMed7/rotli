@@ -45,6 +45,7 @@ export const COMPONENT_DIRECTORY_OWNERS = {
  * list of shared primitives, overlays, and application-shell composition.
  * Feature-specific helpers belong in a named COMPONENT_DIRECTORY_OWNERS home. */
 export const COMPONENT_ROOT_FILE_OWNERS = {
+  "backToNotes.tsx": "shared back-to-panes control for full-content views",
   "captureCard.tsx": "application-shell quick-capture entry",
   "captureReveal.ts": "capture presentation state shared by shell surfaces",
   "character.tsx": "shared character renderer",

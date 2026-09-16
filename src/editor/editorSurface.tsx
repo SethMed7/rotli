@@ -15,7 +15,9 @@ import { brainLocationLabel, noteDiskFolder, noteLocationLabel } from "../lib/no
 import { corpusNoteAbsolutePath, corpusRawFrontmatter, corpusWriteFrontmatterRaw } from "../lib/tauri";
 import { useNow } from "../lib/useNow";
 import { listChatsForNote, openChatForNote, openNoteChat } from "../noteChat/composition";
-import { invalidateNotes, useNote, useNoteIndex } from "../services/hooks";
+import { isSink } from "../services/destinations";
+import { invalidateNotes, useNote, useNoteIndex, useRestoreNote } from "../services/hooks";
+import { restoreSinkItem } from "../services/itemLifecycle";
 import { mainHasNote } from "../services/mainTree";
 import { markNoteDraftChanged } from "../services/noteDrafts";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
@@ -145,6 +147,11 @@ export function EditorSurface({
   const saveError = useDocumentSaveError(noteId);
 
   const [aaOpen, setAaOpen] = useState(false);
+  // Restore for a sink-resident note (declared up here: hooks before the
+  // early return below). Files and boards go back by path, notes through
+  // the lifecycle mutation — the split useNoteMenu makes (restoreSinkItem).
+  const restoreNote = useRestoreNote();
+  const [restoring, setRestoring] = useState(false);
   const [chatBusy, setChatBusy] = useState(false);
   const [narrow, setNarrow] = useState(false);
   const [headerCompact, setHeaderCompact] = useState(false);
@@ -348,6 +355,22 @@ export function EditorSurface({
   const measureWidth = focusMode ? FOCUS_MEASURE : MEASURE_MAX_WIDTH[style.measure];
   const brainFolder = noteDiskFolder(note);
   const brainLocation = brainLocationLabel(brainFolder);
+
+  const inSink = isSink(note.folderId);
+  const restoreFromSink = async () => {
+    setRestoring(true);
+    try {
+      await restoreSinkItem(note, restoreNote.mutateAsync);
+    } catch (error) {
+      useUiStore
+        .getState()
+        .setRowActionError(
+          `Couldn’t restore “${note.title || "this note"}” — ${error instanceof Error ? error.message : String(error)}`,
+        );
+    } finally {
+      setRestoring(false);
+    }
+  };
   const shelfLocation = brainLocationLabel(note.folderId);
 
   return (
@@ -391,6 +414,20 @@ export function EditorSurface({
               {noteLocationLabel(brainFolder, shownInMain)}
             </button>
           </div>
+          {inSink && (
+            // a note opened from Trash or Archive (2026-09-16): the one way
+            // back is right here, the same branch the row menu dispatches
+            <button
+              type="button"
+              className="aachip"
+              disabled={pending || restoring}
+              aria-label="Restore this note"
+              title={`Restore — back to ${brainLocation === "Trash" || brainLocation === "Archive" ? "where it was" : brainLocation}`}
+              onClick={() => void restoreFromSink()}
+            >
+              Restore
+            </button>
+          )}
           {LAUNCH_FEATURES.chat && (
             <button
               type="button"

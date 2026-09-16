@@ -35,6 +35,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the sidebar already reads now carry a "reply saved" count that a mounted
   chat follows, and the composer holds while a run it did not start is in
   flight.
+- Multi-select, the same way everywhere: **⇧-click** selects the range from
+  the last click in Captures and in the Main tree (the System browser already
+  did this; all three now share one rule). Captures has a **Select all**
+  button in its header, and ⌘A selects every card while Captures is open.
+- Restore puts a note back where it was. Moving a note to Trash or Archive
+  removed it from Main, so a restored note came back with no Main home and
+  showed up in Captures instead of its folder. The Main slot now stays (the
+  tree hides a note while it sits in a sink), so Restore returns it to the
+  folder it left, and a note opened from Trash or Archive offers **Restore**
+  in its header.
+- Library, Assets, Archive, and Trash have a **Back to notes** control at
+  their root, the same one Captures has. The header's chevron was up-one-
+  folder only and vanished at the root, which is where Trash is browsed.
 - Captures → **Make a note** (and Merge N into a note) works in a memex vault
   again. It wrote straight into the literal Inbox folder, which is not a
   writable surface there, so the create was refused and the button did
