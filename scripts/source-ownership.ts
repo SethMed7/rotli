@@ -47,6 +47,9 @@ export const COMPONENT_DIRECTORY_OWNERS = {
 export const COMPONENT_ROOT_FILE_OWNERS = {
   "backToNotes.tsx": "shared back-to-panes control for full-content views",
   "webVaultConnectDialog.tsx": "Rotli Web: the connect-a-folder explanation before the browser's own picker",
+  "webDialogFrame.tsx":
+    "Rotli Web: the shared frame of its explanatory dialogs (overlay, card, Escape, actions)",
+  "webChatSetupDialog.tsx": "Rotli Web: the chat-on-the-web walkthrough (helper, connect, sign in to a tool)",
   "captureCard.tsx": "application-shell quick-capture entry",
   "captureReveal.ts": "capture presentation state shared by shell surfaces",
   "character.tsx": "shared character renderer",
@@ -113,6 +116,7 @@ export const SERVICE_FILE_OWNERS = {
   "chatImages.ts": "chat",
   "chatRename.ts": "chat",
   "chatSummon.ts": "chat",
+  "connectorSetup.ts": "chat",
   "createNote.ts": "notes",
   "demoCorpus.ts": "notes",
   "inMemoryNotes.ts": "notes",

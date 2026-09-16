@@ -1143,14 +1143,103 @@
 .ailane-help {
   margin-top: 10px;
 }
-.ailane-helptoggle {
-  border: none;
-  background: none;
-  padding: 0;
-  font: inherit;
+/* The connector walkthrough: numbered steps, done ones ticked, a copyable
+   command on each, "Check again" at the end. Shared by Settings lane cards,
+   the chat's empty state, and Rotli Web's chat setup. */
+.guide-steps {
+  list-style: none;
+  padding-left: 0;
+}
+.guide-step {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 6px 0;
+}
+.guide-step + .guide-step {
+  border-top: 1px solid var(--border);
+}
+.guide-step-n {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+}
+.guide-step.done .guide-step-n {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+.guide-step.done .guide-step-title {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+.guide-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.guide-step-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.guide-step-detail {
   font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.guide-cmd {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+.guide-cmd code {
+  white-space: pre-wrap;
+  word-break: break-all;
+  padding: 3px 8px;
+  font-size: 12px;
+}
+.guide-check {
+  align-self: flex-start;
+  margin-top: 2px;
+  text-decoration: none;
+}
+.guide-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+.guide-aside {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.guide-lanes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 6px;
+}
+.guide-lane.on {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
   color: var(--accent-text);
-  cursor: pointer;
+}
+.web-chat-setup {
+  max-width: 40rem;
+  max-height: min(86vh, 720px);
+  overflow-y: auto;
 }
 .ailane-steps {
   margin: 8px 0 0;

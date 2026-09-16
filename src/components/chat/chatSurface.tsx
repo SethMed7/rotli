@@ -146,6 +146,7 @@ import {
   reasoningChoices,
   serviceTierChoices,
 } from "./chatReasoningModel";
+import { ChatSetupGuide } from "./chatSetupGuide";
 import { CHAT_MESSAGE_WINDOW, recentChatThread } from "./chatThreadModel";
 import {
   CHAT_TITLE_MAX_LENGTH,
@@ -2536,6 +2537,9 @@ export function ChatSurface({
                     </div>
                     {!pristineChat && (
                       <p className="chat-sub">This saved chat is ready for its first message.</p>
+                    )}
+                    {catalogSettled && !picked && (
+                      <ChatSetupGuide onOpenSettings={() => setSettingsOpen(true)} />
                     )}
                   </div>
                 ) : (

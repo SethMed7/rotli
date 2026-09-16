@@ -34,6 +34,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   folder** keeps a copy in the browser and **Export vault (.zip)** gives it
   back. Boards are the next phase
   (`docs/design/web-version-and-shell-batch-2026-09-16.md`).
+- **Guided setup for the connected models.** A lane that is not ready walks
+  you through it instead of hiding a hint: Settings → AI Models shows the
+  steps open (install with the tool's own command for your OS, copy button
+  beside it; sign in, in your terminal; come back — **Check again** asks
+  right now), and steps Rotli can already see done are ticked. The chat's
+  empty state shows the same steps when no model can answer, with a door to
+  Settings. On Rotli Web, Chat and the note's chat chip stay visible and a
+  click opens **Chat on the web**: install Rotli Helper (a small program
+  for Mac, Windows, and Linux, not the Mac app; marked plainly as not
+  released yet), connect the page to it, and set up the AI tool now.
 
 ### Fixed
 

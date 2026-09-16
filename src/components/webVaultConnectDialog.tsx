@@ -9,6 +9,7 @@ import { useState } from "react";
 import { importFolderAndReload } from "../services/importedVault";
 import { type FolderSupport, browserFolderSupportSync, connectFolderVault } from "../services/webVaultFolder";
 import { useWebVaultConnect } from "../state/webVaultConnect";
+import { WebDialogFrame } from "./webDialogFrame";
 
 /** The dialog's explanation for this browser. Pure; exported for tests. */
 export function connectDialogCopy(support: FolderSupport): {
@@ -73,43 +74,32 @@ export function WebVaultConnectDialog() {
       });
   };
   return (
-    <div className="rename-overlay" onMouseDown={busy ? undefined : close}>
-      <div
-        className="rename-card web-connect-card"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="web-connect-title"
-        aria-busy={busy}
-        onMouseDown={(event) => event.stopPropagation()}
-        onKeyDown={(event) => {
-          if (event.key !== "Escape") return;
-          event.preventDefault();
-          event.stopPropagation();
-          close();
-        }}
-      >
-        <h2 id="web-connect-title" className="rename-label">
-          {copy.title}
-        </h2>
-        {copy.lines.map((line) => (
-          <p key={line} className="web-connect-line">
-            {line}
-          </p>
-        ))}
-        {error && (
-          <p role="alert" className="rename-error">
-            {error}
-          </p>
-        )}
-        <div className="rename-actions">
+    <WebDialogFrame
+      id="web-connect"
+      title={copy.title}
+      busy={busy}
+      onClose={close}
+      actions={
+        <>
           <button type="button" className="rename-btn" disabled={busy} onClick={close}>
             Cancel
           </button>
           <button type="button" className="rename-btn primary" disabled={busy} onClick={choose}>
             {busy ? "Waiting for the browser…" : copy.action}
           </button>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      {copy.lines.map((line) => (
+        <p key={line} className="web-connect-line">
+          {line}
+        </p>
+      ))}
+      {error && (
+        <p role="alert" className="rename-error">
+          {error}
+        </p>
+      )}
+    </WebDialogFrame>
   );
 }

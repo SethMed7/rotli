@@ -63,7 +63,7 @@ test("a note created in a fresh folder is there after a reload", async ({ page }
   await expect(page.locator('.main-tree [data-main-folder="1"]', { hasText: "Kept" })).toBeVisible();
 });
 
-test("the web build shows chat disabled, pointing at the Mac app, and says where the notes live", async ({
+test("the web build keeps Chat visible; clicking it walks through the helper and the tool sign-in", async ({
   page,
 }) => {
   await page.goto(APP);
@@ -71,13 +71,34 @@ test("the web build shows chat disabled, pointing at the Mac app, and says where
   await expect(page.getByRole("button", { name: "Home", exact: true })).toBeVisible();
   const chatFront = page.locator(".sb-switch-seg.desktop-only");
   await expect(chatFront).toBeVisible();
-  await expect(chatFront).toHaveAttribute("aria-disabled", "true");
-  await expect(chatFront).toHaveAttribute("href", "/");
-  await expect(chatFront).toHaveAttribute("title", /available in the Mac app/i);
+  await expect(chatFront).toHaveAttribute("title", /click to see how/i);
+  await chatFront.click();
+  const dialog = page.getByRole("dialog", { name: "Chat on the web" });
+  await expect(dialog).toBeVisible();
+  // step 1 leads with the helper on every OS and is honest that it is not
+  // shipped; the Mac app is an aside, never the only door
+  await expect(dialog.getByText("Install Rotli Helper")).toBeVisible();
+  await expect(dialog.getByText(/not released yet/)).toBeVisible();
+  await expect(dialog.getByRole("button", { name: /Get Rotli Helper/ })).toBeDisabled();
+  await expect(dialog.getByRole("link", { name: /Prefer the Mac app/ })).toHaveAttribute("href", "/");
+  // step 3 the user can do now: the real install + sign-in commands, copyable
+  await expect(dialog.getByText("npm install -g @anthropic-ai/claude-code")).toBeVisible();
+  await expect(dialog.getByText("claude auth login")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: /^Copy: claude auth login/ })).toBeVisible();
+  await dialog.getByRole("tab", { name: "Codex" }).click();
+  await expect(dialog.getByText("codex login")).toBeVisible();
+  // the web cannot look at the user's machine: no Check again
+  await expect(dialog.getByRole("button", { name: "Check again" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+
+  // the note's chat chip opens the same walkthrough
   const chip = page.getByRole("button", { name: "Chats on this note" });
   await expect(chip).toBeVisible();
-  await expect(chip).toBeDisabled();
-  await expect(chip).toHaveAttribute("title", /available in the Mac app/);
+  await expect(chip).toHaveAttribute("title", /click to see how/);
+  await chip.click();
+  await expect(page.getByRole("dialog", { name: "Chat on the web" })).toBeVisible();
+  await page.getByRole("dialog", { name: "Chat on the web" }).getByRole("button", { name: "Close" }).click();
 
   await page
     .getByRole("button", { name: /Settings/ })

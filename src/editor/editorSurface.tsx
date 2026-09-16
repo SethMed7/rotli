@@ -20,6 +20,7 @@ import { invalidateNotes, useNote, useNoteIndex, useRestoreNote } from "../servi
 import { restoreSinkItem } from "../services/itemLifecycle";
 import { mainHasNote } from "../services/mainTree";
 import { markNoteDraftChanged } from "../services/noteDrafts";
+import { useChatSetupGuide } from "../state/chatSetupGuide";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useMainStore } from "../state/main";
 import { backId, forwardId, useNavHistory } from "../state/navHistory";
@@ -433,15 +434,17 @@ export function EditorSurface({
               type="button"
               ref={chatChipRef}
               className="aachip"
-              disabled={chatBusy || pending || !LAUNCH_FEATURES.chat}
+              disabled={chatBusy || pending}
               aria-label="Chats on this note"
               aria-haspopup="menu"
               title={
                 LAUNCH_FEATURES.chat
                   ? "Chats on this note — ⌥-click continues the latest"
-                  : "Chats on this note — available in the Mac app"
+                  : "Chats on this note — not set up on the web yet, click to see how"
               }
-              onClick={(event) => openChatChip(event.altKey)}
+              onClick={(event) =>
+                LAUNCH_FEATURES.chat ? openChatChip(event.altKey) : useChatSetupGuide.getState().show()
+              }
               onContextMenu={(event) => {
                 event.preventDefault();
                 openChatChip(false);

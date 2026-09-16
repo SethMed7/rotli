@@ -136,12 +136,13 @@
 }
 /* header actions are plain glyphs, not cards (the maintainer, 2026-09-16): no
    surface behind them; hover brings the ink up, "on" is the accent — the same
-   grammar as the location chip beside them. Hit area stays ≥ 24px. */
+   grammar as the location chip beside them. Hit area stays ≥ 28px tall
+   (e2e/tab-strip-layout.spec.ts) — flat, not smaller. */
 .aachip {
   display: flex;
   align-items: center;
   gap: 5px;
-  min-height: 24px;
+  min-height: 28px;
   padding: 3px 5px;
   border: none;
   border-radius: var(--r-control);

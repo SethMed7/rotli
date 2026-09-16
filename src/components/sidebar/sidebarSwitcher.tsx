@@ -15,6 +15,7 @@
 // this it was an unlabeled coffee icon in the header row with no shortcut.
 
 import { LAUNCH_FEATURES } from "../../lib/featurePolicy";
+import { useChatSetupGuide } from "../../state/chatSetupGuide";
 import type { ContentView, DashboardSection, SidebarView } from "../../state/ui";
 import { ChatGlyph, CoffeeGlyph, HomeGlyph } from "../glyphs";
 
@@ -86,22 +87,21 @@ export function SidebarSwitcher({
       {SIDEBAR_FRONTS.map(({ id, label, Glyph, hint, action }) => {
         const active = !breveActive && value === id;
         if (id === "chat" && !LAUNCH_FEATURES.chat) {
-          // Rotli Web: chat lives with the models on the Mac. The front stays
-          // visible so the product reads whole, says so on hover, and one
-          // click opens the site (the download) in a new tab.
+          // Rotli Web: chat needs the tools on the user's computer. The front
+          // stays visible so the product reads whole, says so on hover, and
+          // one click opens the walkthrough that gets it there.
           return (
-            <a
+            <button
               key={id}
+              type="button"
               className="sb-switch-seg desktop-only"
-              aria-disabled="true"
-              title="Chat is available in the Mac app — click to get Rotli for Mac"
-              href="/"
-              target="_blank"
-              rel="noopener"
+              aria-pressed={false}
+              title="Chat isn't set up on the web yet — click to see how"
+              onClick={() => useChatSetupGuide.getState().show()}
             >
               <Glyph size={14} />
               <span className="sb-switch-label">{label}</span>
-            </a>
+            </button>
           );
         }
         return (

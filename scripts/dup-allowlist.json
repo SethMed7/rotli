@@ -1,5 +1,5 @@
 {
-  "comment": "Suppresses known-good duplication from check-duplication.mjs. Two matcher forms: `fingerprint` (exact cluster — churns on edit, which deliberately resurfaces the cluster for re-triage) or `files` (every site of the cluster must live in the listed files — for permanent do-not-fix decisions that must survive edits). Optional `signal` narrows a files matcher.",
+  "comment": "Suppresses known-good duplication from check-duplication.mjs. Two matcher forms: `fingerprint` (exact cluster \u2014 churns on edit, which deliberately resurfaces the cluster for re-triage) or `files` (every site of the cluster must live in the listed files \u2014 for permanent do-not-fix decisions that must survive edits). Optional `signal` narrows a files matcher.",
   "entries": [
     {
       "id": "organizer-vs-breve-retry",
@@ -14,11 +14,8 @@
     {
       "id": "egress-policy-mirror",
       "signal": "literal",
-      "files": [
-        "breve-runtime/scripts/safe-fetch.ts",
-        "src-tauri/src/web.rs"
-      ],
-      "reason": "Batch 0 independent_security_enforcement: the egress policy is deliberately implemented on both sides of the process boundary and held in parity by scripts/fixtures/egress-fixtures.json — shared literals (private ranges, redirect caps) are the fixture working as designed."
+      "files": ["breve-runtime/scripts/safe-fetch.ts", "src-tauri/src/web.rs"],
+      "reason": "Batch 0 independent_security_enforcement: the egress policy is deliberately implemented on both sides of the process boundary and held in parity by scripts/fixtures/egress-fixtures.json \u2014 shared literals (private ranges, redirect caps) are the fixture working as designed."
     },
     {
       "id": "endpoint-locality-parity",
@@ -33,55 +30,42 @@
     {
       "id": "render-document-cli-contract",
       "signal": "literal",
-      "files": [
-        "breve-runtime/scripts/render-document.ts",
-        "src-tauri/src/document_conversion.rs"
-      ],
-      "reason": "TS↔Rust process contract: the themed PDF renderer's argv (--in/--out/--title) is spelled by the script that parses it and by the Rust caller that spawns it; the shared literals are the contract, not copied logic (2026-09-02)."
+      "files": ["breve-runtime/scripts/render-document.ts", "src-tauri/src/document_conversion.rs"],
+      "reason": "TS\u2194Rust process contract: the themed PDF renderer's argv (--in/--out/--title) is spelled by the script that parses it and by the Rust caller that spawns it; the shared literals are the contract, not copied logic (2026-09-02)."
     },
     {
       "id": "antigravity-manage-contract",
       "signal": "literal",
-      "files": [
-        "src-tauri/src/antigravity.rs",
-        "src/lib/tauri.ts"
-      ],
-      "reason": "TS↔Rust IPC contract: the five Antigravity action words are spelled once by the command that dispatches them and once by the wrapper that sends them (2026-09-03)."
+      "files": ["src-tauri/src/antigravity.rs", "src/lib/tauri.ts"],
+      "reason": "TS\u2194Rust IPC contract: the five Antigravity action words are spelled once by the command that dispatches them and once by the wrapper that sends them (2026-09-03)."
     },
     {
       "id": "antigravity-settings-card-vocabulary",
       "signal": "literal",
-      "files": [
-        "src/components/antigravitySetup.tsx",
-        "src/components/settingsSurface.tsx"
-      ],
+      "files": ["src/components/antigravitySetup.tsx", "src/components/settingsSurface.tsx"],
       "reason": "The Antigravity setup card deliberately speaks the AI Models settings vocabulary (.ailane-* rows, .ghostbtn variants, chip states) so it reads as one surface; the shared literals are class names, not copied logic (2026-09-03)."
     },
     {
       "id": "search-grammar-lockstep-vectors",
-      "files": [
-        "src-tauri/src/search_match.rs",
-        "src/services/search.test.ts"
-      ],
+      "files": ["src-tauri/src/search_match.rs", "src/services/search.test.ts"],
       "signal": "literal",
-      "reason": "MIRROR-NOT-IMPORT: the Rust search grammar tests and the TS twin's vectors share their literals ON PURPOSE (Groceries/sourdough/Launch checklist…) — the same inputs asserted on both sides of the app/shell boundary are the lockstep proof, not a copy to extract (docs/design/tantivy-search.md)."
+      "reason": "MIRROR-NOT-IMPORT: the Rust search grammar tests and the TS twin's vectors share their literals ON PURPOSE (Groceries/sourdough/Launch checklist\u2026) \u2014 the same inputs asserted on both sides of the app/shell boundary are the lockstep proof, not a copy to extract (docs/design/tantivy-search.md)."
     },
     {
       "id": "web-connect-dialog-shares-rename-card",
       "signal": "literal",
       "files": [
         "src/components/nameFieldDialog.tsx",
-        "src/components/webVaultConnectDialog.tsx"
+        "src/components/webDialogFrame.tsx",
+        "src/components/webVaultConnectDialog.tsx",
+        "src/components/webChatSetupDialog.tsx"
       ],
-      "reason": "Both dialogs are instances of the one small modal grammar (.rename-overlay/.rename-card/.rename-btn, Cancel + primary action) from the design system; the shared literals are its class names and labels, not copied logic (2026-09-16)."
+      "reason": "All are instances of the one small modal grammar (.rename-overlay/.rename-card/.rename-btn, Cancel + primary action) from the design system \u2014 the web dialogs share WebDialogFrame; the remaining shared literals are its class names and labels, not copied logic (2026-09-16)."
     },
     {
       "id": "web-connect-dialog-shares-rename-card-escape",
       "signal": "shingle",
-      "files": [
-        "src/components/nameFieldDialog.tsx",
-        "src/components/webVaultConnectDialog.tsx"
-      ],
+      "files": ["src/components/nameFieldDialog.tsx", "src/components/webDialogFrame.tsx"],
       "reason": "The same Escape-closes-the-card keydown handler the shared dialog grammar prescribes (see web-connect-dialog-shares-rename-card)."
     }
   ]

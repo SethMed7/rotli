@@ -239,7 +239,30 @@ Phases, each its own branch after this one merges:
    mode stays as the zero-install fallback.
 
 Estimate: phases 1–3 about three weeks; phase 4 two to three more. The
-hosted shape is off the table for now. Nothing is started.
+hosted shape is off the table for now. Nothing of the helper is started.
+
+**Guided setup (landed 2026-09-16 PM, this branch).** The owner: "when not
+set up, clicking chat should walk me through the steps; same for the
+connectors — give the install command, say to run it in a terminal, then
+to log in." One data module, `src/ai/connectorGuides.ts`, holds each
+lane's ordered steps (install → sign in → come back) with the tool's own
+official commands per OS, and `stepDone` ticks the steps detection already
+proves. One component, `ConnectorGuide`, renders them: numbered, a copy
+button on every command, done steps struck through, **Check again** where
+Rotli can look (the desktop only; the web never asks the machine). Three
+doors show it:
+
+- Settings → AI Models: a lane that is not ready shows the steps open,
+  instead of the folded "How to set this up" hint.
+- The chat's empty state, when no model can answer, shows the steps for
+  each enabled lane plus a door to Settings, instead of a dead send button.
+- Rotli Web: the Chat front and the note's chat chip stay visible; a click
+  opens **Chat on the web**, which leads with **Install Rotli Helper**
+  (honestly marked not released, on every OS — the owner: the Mac app is
+  an aside, never the only door), then **Connect this page to the helper**,
+  then the lane tabs with the real install and sign-in commands the user
+  can run today. When the helper ships, step 1's button turns live and the
+  page's `connect-src` opens to loopback (phase 2 above).
 
 ### Phase W2 — installable, and a bridge to the Mac
 
@@ -291,6 +314,8 @@ pull requests later. The table is filled from the code map below.
 | 14 Flat header actions | Done: no surface behind the chips | `e2e/shell-batch-2026-09-16.spec.ts` |
 | 15 Copy chat as Markdown | Done: a selection across turns copies their source; needs a native check (the twin has no replies) | `chatThreadModel.test.ts` |
 | 16 Chat remount | Done: working row and reply follow the run store; needs the native check (send, switch tabs, wait for Done, switch back) | `chatRuns.test.ts` |
+| 17 Library/Trash render every kind | Not started (see the table below) | — |
+| 18 "Show in Library" on a board (reported 2026-09-16 PM) | **Likely cause read from the code, not reproduced (the browser twin seeds no board); decision needed.** In a memex vault every board is stored under `storage/excalidraw/` (a 2026-07-07 decision: the writable board lane inside the gitignored asset store), and the Library projects `storage/` as **Assets**. So the reveal has two faults: (a) `expandToFocusedItem` (`sidebarHome.tsx`) matches `fid.startsWith("Storage")` against the disk folder `storage/excalidraw` — a case mismatch, so the click does nothing at all; (b) even fixed, it would land in Assets, which the owner says is wrong: Assets is for images added to notes or generated, and files that sit in the left menu belong in the Library. Fixing (a) is a one-line reveal fix; honouring (b) means boards (and documents) get a Library home — either a Library lane that lists the managed-storage boards beside their folder's notes (item 17's "linked row" rule, no file moves) or a vault-layout change that stores new boards under `wiki/…` (STRUCTURE.md contract, `storage/` is gitignored so boards are not versioned today). The owner picks; the listing rule is the smaller change and keeps every existing vault intact. | `sidebarHome` reveal test; `systemBrowser.test.ts` |
 
 | # | Item | Owner (file:line at 1.0.0) | What the code does today | Change | Proof |
 |---|---|---|---|---|---|

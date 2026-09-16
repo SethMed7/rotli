@@ -3275,6 +3275,27 @@ body:has(.document-editor) [role="dialog"][class*="univer-"] input:disabled {
     animation: none;
   }
 }
+.chat-setup {
+  width: min(100%, 700px);
+  margin: 12px auto 0;
+  padding: 0 24px;
+  text-align: left;
+}
+.chat-setup-lane {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+}
+.chat-setup-lane summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+.chat-setup .chat-welcome-actions {
+  margin-top: 12px;
+  padding: 0;
+}
 .chat-welcome-actions {
   display: grid;
   width: min(100%, 700px);

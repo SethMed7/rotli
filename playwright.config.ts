@@ -8,7 +8,10 @@
 
 import { defineConfig, devices } from "@playwright/test";
 
-const PORT = 1420;
+// ROTLI_E2E_PORT lets a second checkout (a git worktree) run the lane beside
+// a dev server already on 1420 — Playwright would otherwise reuse that
+// server and prove the OTHER checkout's code.
+const PORT = Number(process.env.ROTLI_E2E_PORT) || 1420;
 const baseURL = `http://localhost:${PORT}`;
 
 export default defineConfig({
@@ -40,7 +43,7 @@ export default defineConfig({
   // layer targets. `strictPort` in vite.config.ts fails fast if 1420 is busy
   // rather than silently drifting to another port Playwright wouldn't find.
   webServer: {
-    command: "bun run dev",
+    command: `bun run dev -- --port ${PORT} --strictPort`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
