@@ -49,7 +49,6 @@ import {
   mainParentOfNote,
   mainRowSort,
   moveInTree,
-  removeFromMain,
   renameFolderInMain,
   uniqueRootFolderName,
 } from "../../services/mainTree";
@@ -60,7 +59,6 @@ import {
   deleteNamedView,
   renameNamedView,
   setNamedViewTree,
-  transferTreeItemToView,
   viewFolderNameError,
   viewNameError,
   viewPickerItems,
@@ -89,6 +87,7 @@ import {
 import { InlineRenameInput } from "../inlineRenameInput";
 import { useNoteMenu } from "../useNoteMenu";
 import { homeDashboardSnapshot } from "./homeDashboardModel";
+import { mainFolderMenuItems } from "./mainFolderMenu";
 import { noteDisplayTitle } from "./noteDisplayTitle";
 import { SidebarSystem, type SystemDestRow } from "./sidebarSystem";
 import { useActiveTree } from "./useActiveTree";
@@ -282,71 +281,23 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     openContextMenu(
       x,
       y,
-      [
-        {
-          kind: "action" as const,
-          label: "Rename folder…",
-          onClick: () => setRenamingMainId(f.id),
+      mainFolderMenuItems({
+        folder: f,
+        folderItems,
+        folderScopeComplete,
+        views: viewsManifest,
+        activeView,
+        mainTree: mainManifest.tree,
+        activeTree,
+        liveIds,
+        rename: () => setRenamingMainId(f.id),
+        setViews: setViewsManifest,
+        setActiveTree,
+        trashItems: (items, onSuccess) => {
+          setRowActionError(null);
+          trashItems.mutate(items, { onSuccess });
         },
-        ...(viewsManifest.views.length > 0
-          ? [
-              {
-                kind: "drill" as const,
-                label: "Move to view",
-                items: [
-                  {
-                    kind: "action" as const,
-                    label: "Main only",
-                    checked: activeView === null,
-                    checkedMark: "highlight" as const,
-                    onClick: () =>
-                      setViewsManifest(
-                        transferTreeItemToView(mainManifest.tree, viewsManifest, activeView, f.id, null),
-                      ),
-                  },
-                  ...viewsManifest.views.map((view) => ({
-                    kind: "action" as const,
-                    label: view.name,
-                    checked: activeView === view.name,
-                    checkedMark: "highlight" as const,
-                    onClick: () =>
-                      setViewsManifest(
-                        transferTreeItemToView(mainManifest.tree, viewsManifest, activeView, f.id, view.name),
-                      ),
-                  })),
-                ],
-              },
-            ]
-          : []),
-        { kind: "sep" as const },
-        {
-          kind: "action" as const,
-          label: `Remove from ${activeView ?? "Main"}`,
-          onClick: () => setActiveTree(removeFromMain(activeTree, f.id), liveIds),
-        },
-        { kind: "sep" as const },
-        {
-          kind: "drill" as const,
-          label: folderScopeComplete
-            ? "Move folder contents to Trash…"
-            : "Unavailable items — can’t trash folder",
-          danger: true,
-          disabled: folderItems.length === 0 || !folderScopeComplete,
-          items: [
-            {
-              kind: "action" as const,
-              label: `Move ${folderItems.length} ${folderItems.length === 1 ? "item" : "items"} to Trash`,
-              danger: true,
-              onClick: () => {
-                setRowActionError(null);
-                trashItems.mutate(folderItems, {
-                  onSuccess: () => setActiveTree(removeFromMain(activeTree, f.id), liveIds),
-                });
-              },
-            },
-          ],
-        },
-      ],
+      }),
       opts,
     );
   };

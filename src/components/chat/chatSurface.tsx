@@ -98,6 +98,7 @@ import {
   loadChatFolders,
   saveChatFolders,
 } from "../../services/chatFolders";
+import { stashRefusedChatDrop } from "../../services/chatImages";
 import { invalidateNotes, useNoteIndex } from "../../services/hooks";
 import { artifactMainFolderName, fileNoteInNamedRootFolder } from "../../services/mainTree";
 import { assignChatToView } from "../../services/viewTree";
@@ -132,7 +133,9 @@ import {
   WordGlyph,
   XGlyph,
 } from "../glyphs";
+import { ChatAttachedImages } from "./chatAttachedImages";
 import { ChatClarificationBar } from "./chatClarificationBar";
+import { copyChatSelection } from "./chatCopy";
 import { CHAT_PANE_ATTR, registerChatDrop } from "./chatDrop";
 import { ModelPicker } from "./chatModelPicker";
 import { ChatPromptNavigator } from "./chatPromptNavigator";
@@ -990,60 +993,6 @@ function renderMessage(text: string): ReactNode {
         return renderStructuredLines(block.lines, key);
     }
   });
-}
-
-function ChatAttachedImages({ images }: { images: readonly string[] }) {
-  const [preview, setPreview] = useState<string | null>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
-  useTransientPopover([dialogRef], preview !== null, () => setPreview(null));
-  const resolved = useQueries({
-    queries: images.map((source) => ({
-      queryKey: ["chat-attached-image", source],
-      queryFn: () =>
-        /^(?:https?:|data:|blob:|asset:)/i.test(source) ? Promise.resolve(source) : fileAssetUrl(source),
-      staleTime: Infinity,
-    })),
-  });
-  return (
-    <>
-      <div
-        className="cmsg-images"
-        aria-label={`${images.length} attached ${images.length === 1 ? "image" : "images"}`}
-      >
-        {images.map((source, index) => {
-          const url = resolved[index]?.data;
-          return url ? (
-            <button
-              type="button"
-              key={`${index}-${source.slice(-16)}`}
-              className="cmsg-image"
-              aria-label={`Preview attached image ${index + 1}`}
-              onClick={() => setPreview(url)}
-            >
-              <img src={url} alt={`Attached image ${index + 1}`} />
-            </button>
-          ) : null;
-        })}
-      </div>
-      {preview &&
-        createPortal(
-          <div className="cmsg-image-scrim" role="presentation">
-            <div
-              ref={dialogRef}
-              className="cmsg-image-dialog"
-              role="dialog"
-              aria-label="Attached image preview"
-            >
-              <button type="button" aria-label="Close image preview" onClick={() => setPreview(null)}>
-                <XGlyph size={16} />
-              </button>
-              <img src={preview} alt="Attached image preview" />
-            </div>
-          </div>,
-          document.body,
-        )}
-    </>
-  );
 }
 
 // memo: renderMessage re-parses a whole message's markdown on every render, and
@@ -2272,12 +2221,16 @@ export function ChatSurface({
     () =>
       registerChatDrop(paneId, (paths) => {
         if (!canVision) {
+          // the model cannot see, but the files are the user's: keep them in
+          // Assets and say so (2026-09-16: they were discarded with only a hint)
           setVisionHint(true);
+          if (active)
+            void stashRefusedChatDrop(active.id === CORPUS_INSTANCE_ID ? "default" : active.id, paths);
           return;
         }
         attachPaths(paths);
       }),
-    [paneId, attachPaths, canVision],
+    [paneId, attachPaths, canVision, active],
   );
 
   // this chat's generated assets: everything under storage/chats/<slug>/ in the
@@ -2549,7 +2502,7 @@ export function ChatSurface({
               onJump={jumpToPrompt}
             />
             <div className="chat-scroll" ref={scrollRef}>
-              <div className="chat-thread">
+              <div className="chat-thread" onCopy={(event) => copyChatSelection(event, messages)}>
                 {hiddenMessageCount > 0 && (
                   <p className="chat-thread-window" role="status">
                     Showing the latest {CHAT_MESSAGE_WINDOW} messages. {hiddenMessageCount.toLocaleString()}{" "}

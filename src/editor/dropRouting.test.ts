@@ -91,8 +91,12 @@ describe("the drop plan", () => {
       attach: ["/a/shot.png"],
       embed: [],
       store: ["/a/logo.svg", "/a/report.pdf"],
-      notice: null,
+      notice: "Saved 2 files to Assets — a chat attaches images",
     });
+  });
+
+  test("a chat that takes every dropped image says nothing extra", () => {
+    expect(planDrop(["/a/shot.png"], "chat").notice).toBeNull();
   });
 
   test("a note embeds images and video and stores everything else", () => {
@@ -100,8 +104,9 @@ describe("the drop plan", () => {
       attach: [],
       embed: ["/a/logo.svg", "/a/clip.mp4"],
       store: ["/a/report.pdf"],
-      notice: null,
+      notice: "Saved 1 file to Assets — a note embeds images and video",
     });
+    expect(planDrop(["/a/logo.svg"], "editor").notice).toBeNull();
   });
 
   test("files with no chat or note under them are stored AND say so", () => {

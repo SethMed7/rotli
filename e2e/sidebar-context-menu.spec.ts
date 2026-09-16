@@ -24,9 +24,7 @@ test("sidebar folder menus align labels and keep explicit Trash reachable", asyn
 
   const menu = page.getByRole("menu");
   await expect(menu.getByRole("menuitem", { name: /Remove from Main/ })).toBeVisible();
-  const trashDrill = menu.getByRole("menuitem", {
-    name: "Move folder contents to Trash…",
-  });
+  const trashDrill = menu.getByRole("menuitem", { name: "Delete folder…" });
   await expect(trashDrill).toBeVisible();
   await expect(menu.locator(".ctxmenu-check")).toHaveCount(0);
 

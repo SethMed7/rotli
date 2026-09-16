@@ -107,6 +107,7 @@ export const SERVICE_FILE_OWNERS = {
   "captureMerge.ts": "capture",
   "captureRouting.ts": "capture",
   "chatFolders.ts": "chat",
+  "chatImages.ts": "chat",
   "chatRename.ts": "chat",
   "chatSummon.ts": "chat",
   "createNote.ts": "notes",

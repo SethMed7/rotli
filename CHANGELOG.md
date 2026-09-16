@@ -35,6 +35,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the sidebar already reads now carry a "reply saved" count that a mounted
   chat follows, and the composer holds while a run it did not start is in
   flight.
+- **Delete folder** in the Main tree's folder menu: an empty folder goes
+  away at once; a full one moves its items to Trash (recoverable) and then
+  goes away. Notes are never deleted with a folder. (Real Library
+  directories still cannot be deleted from Rotli; that needs a Rust command
+  that routes to the OS Trash and is tracked separately.)
+- The note header's actions are plain glyphs now, not cards: no surface
+  behind the chat, Aa, and outline buttons, hover brings the ink up, and the
+  active one is the accent colour.
+- Wrapped list lines align: a space that landed on the wrap boundary used to
+  start the continuation line one character to the right, and ordered
+  markers of two or more digits overflowed their column. The editor now
+  hangs that space at the line end and widens the marker column for wide
+  numbers so wrapped text sits under the text, never under the number.
+- All notes says which named view a note belongs to (a muted tag before the
+  date). The list itself stays global, as designed.
+- Copying a selection across a chat copies the messages' source Markdown, so
+  a paste into another chat or a note renders as the thread did. The browser
+  default serialised the rendered bubbles and the formatting was lost.
+- Dropping a file a surface cannot take (a PDF on a note or a chat) now says
+  it went to Assets instead of vanishing silently, and a chat whose model
+  cannot see images keeps dropped images in Assets and says so instead of
+  discarding them.
 - Multi-select, the same way everywhere: **⇧-click** selects the range from
   the last click in Captures and in the Main tree (the System browser already
   did this; all three now share one rule). Captures has a **Select all**

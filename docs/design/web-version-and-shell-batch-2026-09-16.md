@@ -148,10 +148,28 @@ point above (W0 items 6 to 8).
 
 ## 3. Shell bugs and enhancements
 
-Fifteen items from the owner's list. Each lands as its own commit with a
-failing reproduction first, its tests, and a `CHANGELOG.md` line, so the
-branch can be split into pull requests later. The table is filled from the
-code map below.
+Sixteen items from the owner's list. Each landed with its tests and a
+`CHANGELOG.md` line, in commit clusters so the branch can be split into
+pull requests later. The table is filled from the code map below.
+
+### Status (2026-09-16, end of session)
+
+| Item | State | Proof |
+|---|---|---|
+| 1 Delete folder | Done for Main-tree (virtual) folders; real Library directories still need a Rust command routed to the OS Trash | `mainFolderMenu.test.ts`, `e2e/shell-batch-2026-09-16.spec.ts` |
+| 2 Drop image into a note | Partial: a non-embeddable file dropped on a note now says it went to Assets; the native lane is unchanged and needs the native acceptance step | `dropRouting.test.ts`; native |
+| 3 Drop image into a chat | Partial: a model that cannot see keeps the images in Assets and says so; non-image files say where they went; the DataTransfer fallback for chats is still missing | `dropRouting.test.ts`; native |
+| 4, 11 Back button | Done: Back to notes at every System root, one shared control | `e2e/system-back-and-restore.spec.ts` |
+| 5 Restore to origin | Done: the Main slot survives Trash/Archive; Restore returns the note to its folder | `mainTree.test.ts`, `e2e/system-back-and-restore.spec.ts` |
+| 6 Captures Make a note | Done: routed creation, visible refusal | `captureMerge.test.ts` |
+| 7 Select all | Done: header button and ⌘A while Captures is open | `e2e/range-select.spec.ts` |
+| 8, 9 ⇧-click ranges | Done on Captures, Main tree, and System folders through one helper | `rangeSelect.test.ts`, `e2e/range-select.spec.ts` |
+| 10 Restore inside a trashed note | Done: header Restore chip through the shared helper | `e2e/system-back-and-restore.spec.ts` |
+| 12 All notes and views | Validated global; rows now carry a muted view tag | `e2e/shell-batch-2026-09-16.spec.ts` |
+| 13 Wrapped list alignment | Done: `pre-wrap` on the editor content, wide column for two-digit markers | `listGeometry.test.ts`, `e2e/shell-batch-2026-09-16.spec.ts` |
+| 14 Flat header actions | Done: no surface behind the chips | `e2e/shell-batch-2026-09-16.spec.ts` |
+| 15 Copy chat as Markdown | Done: a selection across turns copies their source; needs a native check (the twin has no replies) | `chatThreadModel.test.ts` |
+| 16 Chat remount | Done: working row and reply follow the run store; needs the native check (send, switch tabs, wait for Done, switch back) | `chatRuns.test.ts` |
 
 | # | Item | Owner (file:line at 1.0.0) | What the code does today | Change | Proof |
 |---|---|---|---|---|---|

@@ -872,6 +872,17 @@ span.fdr-col {
   margin-left: auto;
   color: var(--accent-text);
 }
+/* the named view a row belongs to (All notes is global; this says where) */
+.rr-view {
+  flex: none;
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.rr-view + .rr-date {
+  margin-left: 8px;
+}
 .rr-pin + .rr-date {
   margin-left: 8px;
 }
