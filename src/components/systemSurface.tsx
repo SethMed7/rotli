@@ -41,6 +41,7 @@ import {
   listFolderContents,
   rerootDiskPath,
   sortFolderListing,
+  filterSystemFolders,
 } from "../services/systemBrowser";
 import { emptyTrash, trashSystemSelection } from "../services/systemTrash";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
@@ -61,6 +62,7 @@ import {
   glyphForNote,
 } from "./glyphs";
 import { NoteListRow } from "./noteListRow";
+import { FolderListRow, SearchFolderHits } from "./system/folderListRow";
 import { useNoteMenu } from "./useNoteMenu";
 
 /** Root id → the browser's title + the prefix its folder labels strip. */
@@ -243,6 +245,10 @@ export function SystemSurface({ rootId }: { rootId: string }) {
   const hiddenLanes = useMemo<ReadonlySet<string>>(
     () => (isLibrary ? LIBRARY_HIDDEN_LANES : new Set()),
     [isLibrary],
+  );
+  const folderHits = useMemo(
+    () => filterSystemFolders(items, query, folderSeed, pathOf, hiddenLanes),
+    [items, query, folderSeed, pathOf, hiddenLanes],
   );
   const listing = useMemo(
     () =>
@@ -791,7 +797,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
       )}
 
       {searching ? (
-        hits.length === 0 ? (
+        hits.length === 0 && folderHits.length === 0 ? (
           <div className="list-empty">
             <p className="be-title">No matches</p>
             <p className="be-sub">Try a different search.</p>
@@ -799,6 +805,13 @@ export function SystemSurface({ rootId }: { rootId: string }) {
         ) : (
           <div className="board-scroll" {...scrollProps}>
             {marqueeNode}
+            <SearchFolderHits
+              folders={folderHits}
+              onOpen={(path) => {
+                setQuery("");
+                setCwd(path);
+              }}
+            />
             <ul className="recent-list">
               {hits.map((n) => (
                 <NoteListRow
@@ -1130,55 +1143,5 @@ function GalleryView({
         )}
       </div>
     </div>
-  );
-}
-
-function FolderListRow({
-  entry,
-  depth,
-  open,
-  selected,
-  onToggle,
-  onSelect,
-  onEnter,
-}: {
-  entry: FolderEntry;
-  depth: number;
-  open: boolean;
-  selected: boolean;
-  onToggle: () => void;
-  onSelect: (e: { metaKey: boolean; shiftKey: boolean }) => void;
-  onEnter: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      data-folder-path={entry.path}
-      className={selected ? "fdr-row folder sel" : "fdr-row folder"}
-      style={{ paddingLeft: 12 + depth * 18 }}
-      title="Open folder"
-      onClick={onSelect}
-      onDoubleClick={onEnter}
-    >
-      <span className="fdr-name">
-        {/* the disclosure triangle — pointer affordance; the row itself stays
-            the accessible control (double-click enters, single selects) */}
-        <span
-          className={`fchev${open ? " open" : ""}`}
-          aria-hidden="true"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle();
-          }}
-          onDoubleClick={(e) => e.stopPropagation()}
-        >
-          <ChevronRight size={10} />
-        </span>
-        <FolderGlyph size={14} className="fdr-row-icon folder" />
-        {entry.name}
-      </span>
-      <span className="fdr-date">{entry.updatedAt === null ? "—" : longDateLabel(entry.updatedAt)}</span>
-      <span className="fdr-kind">Folder</span>
-    </button>
   );
 }

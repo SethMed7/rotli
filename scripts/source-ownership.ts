@@ -38,6 +38,7 @@ export const COMPONENT_DIRECTORY_OWNERS = {
   onboarding: "first-run, vault activation, and model setup presentation",
   settings: "Settings pane sections and controls composed by settingsSurface (voice, connections, about)",
   sidebar: "sidebar presentation feature",
+  system: "System browser (Library, Assets, Archive, Trash) rows composed by systemSurface",
   tour: "guided tour overlay that spotlights the real controls after setup",
 } as const;
 

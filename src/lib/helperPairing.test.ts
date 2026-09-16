@@ -22,6 +22,7 @@ describe("helper pairing", () => {
   test("the helper is only ever addressed on loopback and only for the AI commands", () => {
     expect(helperBaseUrl(43111)).toBe("http://127.0.0.1:43111");
     expect(HELPER_COMMANDS.has("cli_complete")).toBe(true);
+    expect(HELPER_COMMANDS.has("model_usage")).toBe(true);
     expect(HELPER_COMMANDS.has("corpus_read")).toBe(false);
   });
 });

@@ -54,6 +54,7 @@
 //! a string for `cli_complete`, an object for `cli_detect`, `null` for
 //! `cli_cancel`, `[]` for `chat_models`.
 
+use crate::helper_args::{normalize_origin, parse_args};
 use std::collections::{HashMap, HashSet};
 use std::io::BufReader;
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -70,7 +71,6 @@ use crate::loopback_http::{
 };
 use crate::provider::Running;
 
-const DEFAULT_PORT: u16 = 43111;
 /// The MCP adapter's 256 KB is a tool-call budget; a chat turn needs headroom.
 const HELPER_MAX_REQUEST_BYTES: usize = 24 * 1024 * 1024;
 /// A completion holds its connection for up to ten minutes. Cancel and health
@@ -78,19 +78,6 @@ const HELPER_MAX_REQUEST_BYTES: usize = 24 * 1024 * 1024;
 /// cannot take every thread and starve the cancel that would end the flood.
 const MAX_CONNECTIONS: usize = 16;
 const HEAD_READ_TIMEOUT: Duration = Duration::from_secs(10);
-const DEFAULT_ORIGINS: &[&str] = &[
-    "https://rotli.co",
-    "https://dev.rotli.co",
-    "http://localhost:1437",
-    "http://127.0.0.1:1437",
-];
-const USAGE: &str = "rotli-helper [--port N] [--origin URL]... [--print-code] [--reset-token]";
-struct Options {
-    port: u16,
-    origins: Vec<String>,
-    print_code: bool,
-    reset_token: bool,
-}
 
 struct Helper {
     port: u16,
@@ -151,46 +138,6 @@ pub fn run(args: &[String]) -> Result<(), String> {
     let origins = options.origins;
     let in_flight = Mutex::new(HashSet::new());
     serve(listener, Arc::new(Helper { port, origins, token, children, in_flight }))
-}
-
-fn parse_args(args: &[String]) -> Result<Options, String> {
-    let mut options = Options {
-        port: DEFAULT_PORT,
-        origins: DEFAULT_ORIGINS.iter().map(|origin| (*origin).to_string()).collect(),
-        print_code: false,
-        reset_token: false,
-    };
-    let mut index = 0;
-    while index < args.len() {
-        let value = |at: usize, what: &str| {
-            args.get(at + 1).cloned().ok_or(format!("{what} needs a value\n{USAGE}"))
-        };
-        match args[index].as_str() {
-            "--port" => {
-                options.port = value(index, "--port")?
-                    .parse()
-                    .map_err(|_| format!("--port must be a TCP port number\n{USAGE}"))?;
-                index += 1;
-            }
-            "--origin" => {
-                options.origins.push(normalize_origin(&value(index, "--origin")?));
-                index += 1;
-            }
-            "--print-code" => options.print_code = true,
-            "--reset-token" => options.reset_token = true,
-            // asking for help is not an error
-            "--help" | "-h" => { println!("{USAGE}"); std::process::exit(0) }
-            other => return Err(format!("unknown option \"{other}\"\n{USAGE}")),
-        }
-        index += 1;
-    }
-    Ok(options)
-}
-
-/// Origins compare exactly, so both sides are normalized the way a browser
-/// writes one: lowercase, no trailing slash, no path.
-fn normalize_origin(raw: &str) -> String {
-    raw.trim().trim_end_matches('/').to_ascii_lowercase()
 }
 
 // ── the service ───────────────────────────────────────────────────────────────
@@ -350,6 +297,18 @@ impl Helper {
             // on-device models are the app's lane, not the helper's; the page
             // asks so it can render an empty local section rather than guess
             "chat_models" => Ok(json!([])),
+            // the sidebar's usage panel: this computer's CLI transcripts,
+            // aggregated — counts and models only, never content or paths
+            "model_usage" => {
+                let range = text_argument(arguments, "range")?;
+                let refresh = arguments
+                    .get("refresh")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                let summary =
+                    crate::usage::model_usage_blocking(&range, refresh).map_err(|e| (400, e))?;
+                serde_json::to_value(summary).map_err(|e| (500, e.to_string()))
+            }
             _ => Err((404, "unknown command".into())),
         }
     }
@@ -382,6 +341,7 @@ mod tests {
     use std::io::{Read as _, Write as _};
 
     use super::*;
+    use crate::helper_args::DEFAULT_ORIGINS;
     use crate::helper_token::new_token;
 
     /// A real helper on an ephemeral loopback port. No CLI is ever spawned:
@@ -576,15 +536,4 @@ mod tests {
         assert!(many.starts_with("HTTP/1.1 400"), "{many}");
     }
 
-    #[test]
-    fn arguments_parse_into_the_documented_options() {
-        let typed = ["--port", "43999", "--origin", "https://Example.test/", "--print-code"];
-        let parsed = parse_args(&typed.map(String::from)).unwrap();
-        assert_eq!(parsed.port, 43999);
-        assert!(parsed.print_code);
-        assert!(parsed.origins.contains(&"https://example.test".to_string()));
-        assert!(parsed.origins.contains(&"https://rotli.co".to_string()));
-        assert!(parse_args(&["--nope".into()]).is_err());
-        assert!(parse_args(&["--port".into()]).is_err());
-    }
 }

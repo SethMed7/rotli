@@ -49,40 +49,21 @@ export type {
   ModelUsageTotal,
 } from "./modelUsageTypes";
 import type { ModelUsageRange, ModelUsageSummary } from "./modelUsageTypes";
+import { emptyModelUsage } from "./modelUsageTypes";
 
 /** Aggregate provider-owned local session histories. Rust chooses the only
  * directories that can be scanned and returns counts only—never transcript
  * text, paths, prompts, responses, or session identifiers. */
 export function modelUsage(range: ModelUsageRange, refresh = false): Promise<ModelUsageSummary> {
   if (!isTauri()) {
-    return Promise.resolve({
-      range,
-      readAtMs: Date.now(),
-      sinceMs: Date.now(),
-      untilMs: Date.now(),
-      bucketMs: range === "24h" ? 60 * 60 * 1_000 : 24 * 60 * 60 * 1_000,
-      totalSessions: 0,
-      buckets: [],
-      models: [],
-      sources: [
-        {
-          provider: "claude",
-          status: "missing",
-          scannedFiles: 0,
-          skippedFiles: 0,
-          malformedRecords: 0,
-          message: "The browser twin does not inspect this computer.",
-        },
-        {
-          provider: "codex",
-          status: "missing",
-          scannedFiles: 0,
-          skippedFiles: 0,
-          malformedRecords: 0,
-          message: "The browser twin does not inspect this computer.",
-        },
-      ],
-    });
+    // Rotli Web paired with Rotli Helper: the helper reads this computer's CLI
+    // transcripts the way the app does; unpaired (or refused), the empty summary
+    if (currentWebAiBridge()) {
+      return aiInvoke<ModelUsageSummary>("model_usage", { range, refresh }).catch(() =>
+        emptyModelUsage(range),
+      );
+    }
+    return Promise.resolve(emptyModelUsage(range));
   }
   return invoke<ModelUsageSummary>("model_usage", { range, refresh });
 }

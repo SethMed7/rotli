@@ -50,3 +50,35 @@ export interface ModelUsageSummary {
   models: ModelUsageTotal[];
   sources: ModelUsageSource[];
 }
+
+/** The summary a shell that cannot inspect this computer answers with. */
+export function emptyModelUsage(range: ModelUsageRange): ModelUsageSummary {
+  return {
+    range,
+    readAtMs: Date.now(),
+    sinceMs: Date.now(),
+    untilMs: Date.now(),
+    bucketMs: range === "24h" ? 60 * 60 * 1_000 : 24 * 60 * 60 * 1_000,
+    totalSessions: 0,
+    buckets: [],
+    models: [],
+    sources: [
+      {
+        provider: "claude",
+        status: "missing",
+        scannedFiles: 0,
+        skippedFiles: 0,
+        malformedRecords: 0,
+        message: "The browser twin does not inspect this computer.",
+      },
+      {
+        provider: "codex",
+        status: "missing",
+        scannedFiles: 0,
+        skippedFiles: 0,
+        malformedRecords: 0,
+        message: "The browser twin does not inspect this computer.",
+      },
+    ],
+  };
+}

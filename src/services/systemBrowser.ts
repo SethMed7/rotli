@@ -63,6 +63,57 @@ export function filterSystemItems(items: NoteSummary[], query: string): NoteSumm
 
 const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: "base" });
 
+/** Every folder under the root, from the notes' on-disk paths (each ancestor)
+ * plus the seeded real directories, minus the hidden lanes. */
+function allFolders(
+  items: NoteSummary[],
+  seedFolders: readonly string[],
+  pathOf: (n: NoteSummary) => string,
+  hidden: ReadonlySet<string>,
+): string[] {
+  const out = new Set<string>();
+  const add = (path: string) => {
+    const parts = path.split("/").filter(Boolean);
+    for (let depth = 1; depth <= parts.length; depth += 1) {
+      const folder = parts.slice(0, depth).join("/");
+      if (!hidden.has(folder)) out.add(folder);
+    }
+  };
+  for (const n of items) add(pathOf(n));
+  for (const seed of seedFolders) add(seed);
+  return [...out];
+}
+
+/** The Library's search, for folders: every folder anywhere under the root
+ * whose own name contains the query (the owner, 2026-09-16: "engineering"
+ * never came up for "Engineering" — only its notes did). */
+export function filterSystemFolders(
+  items: NoteSummary[],
+  query: string,
+  seedFolders: readonly string[] = [],
+  pathOf: (n: NoteSummary) => string = noteDiskFolder,
+  hidden: ReadonlySet<string> = new Set(),
+): FolderEntry[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  return allFolders(items, seedFolders, pathOf, hidden)
+    .map((path) => ({ path, name: folderSegmentLabel(path.slice(path.lastIndexOf("/") + 1)) }))
+    .filter(({ name }) => name.toLowerCase().includes(q))
+    .sort((a, b) => byName(a.name, b.name))
+    .map(({ path, name }) => {
+      const inside = items.filter((n) => {
+        const p = pathOf(n);
+        return p === path || p.startsWith(`${path}/`);
+      });
+      return {
+        path,
+        name,
+        itemCount: inside.length,
+        updatedAt: inside.length ? Math.max(...inside.map((n) => n.updatedAt)) : null,
+      };
+    });
+}
+
 /** Map a note's ON-DISK folder path into the browser root's namespace. In a
  * memex the projection renames lifecycle lanes (disk `storage/…` surfaces as
  * destination "Storage") while `diskFolderId` keeps the on-disk lowercase —

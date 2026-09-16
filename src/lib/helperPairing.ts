@@ -16,6 +16,7 @@ export const HELPER_COMMANDS: ReadonlySet<string> = new Set([
   "cli_complete",
   "cli_cancel",
   "chat_models",
+  "model_usage",
 ]);
 
 /** `43111:token` as the helper prints it, or a `http://127.0.0.1:43111/#token`
