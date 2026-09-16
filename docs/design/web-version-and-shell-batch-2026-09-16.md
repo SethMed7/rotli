@@ -201,11 +201,45 @@ decision:
 | **On the user's machine, through a small local helper** (the existing `rotli` CLI grown a pty bridge on `127.0.0.1`, token-gated like `rotli mcp --http`; xterm.js in the page) | Stay in the user's folder; the CLI reads them directly | The user's own, in the terminal, as today | One small binary — the same one the parked cross-platform track needs for Windows and Linux | **Recommended.** Keeps the promise, reuses the loopback server, and gives non-Mac users chat before the native app is ported |
 | On Rotli's servers, fed per turn from the browser | Stay local; only what a chat turn sends leaves (which goes to the model provider anyway) | The user's own, but the CLI's login token lives on Rotli's server | None | Custody of every user's provider login, plus a relay that sees each frame — the same class of risk as the remote-agent relay, multiplied by a terminal |
 
-Recommendation: the local-helper shape. It is roughly two weeks (pty over
-WebSocket in the Rust CLI, xterm.js behind an adapter, the loopback
-`connect-src` for `/app/`, a "Connect Rotli on this computer" step with
-the token), and it reuses the workspace service that exists. The hosted
-shape is a separate business decision. Nothing is started.
+**Decision (owner, 2026-09-16 PM): the local helper — and it must not be
+the Mac app.** The point of Rotli Web is Windows and Linux without a
+native app. So the helper is a **standalone headless binary** for the
+three OSes, not the Tauri executable in disguise.
+
+What that means in the code: today `rotli`'s CLI mode is the app binary
+running `run_headless_if_requested` (`src-tauri/src/main.rs:6`) before the
+GUI. A "Rotli Helper" is a second Cargo bin target over the same library
+with the GUI behind a feature flag, so it links no Tauri/WebKit and builds
+on `ubuntu`, `windows`, and `macos` runners — the crate already compiles
+and passes its tests on Linux. It carries the workspace service that
+exists (`rotli mcp --http`, token-gated loopback) plus a pty bridge over a
+WebSocket on `127.0.0.1`, and the CLI bridge (`provider.rs`: Claude Code,
+Codex, Cursor detection and `cli_complete`).
+
+Phases, each its own branch after this one merges:
+
+1. **Helper binary + install.** Feature-gated headless bin; CI builds it per
+   OS through the cross-platform probe; distribution as a one-line install
+   (`curl … | sh`, a Windows `.ps1`) or an npm wrapper — the people who run
+   Claude Code and Codex already have Node. No app install anywhere.
+2. **Terminal in the web app.** xterm.js behind an adapter, a "Connect
+   Rotli Helper" step (the helper prints a token and a `rotli://`-free
+   loopback URL), `/app/`'s `connect-src` opened to loopback only. The
+   terminal's working directory is the connected vault folder, so
+   `claude`, `codex`, and `cursor` see the user's files directly and the
+   user logs in as they do today. Files never leave the machine; the
+   helper writes nothing but its token.
+3. **Rotli's chat UI through the helper.** The same `cli_complete` bridge
+   the Mac app uses, over loopback, so chat on the web is the real chat,
+   not a raw terminal only. The secure-note rules apply through the Rust
+   side as on the Mac.
+4. **The real corpus over loopback (optional).** With the helper running,
+   the web page can use the Rust corpus for the connected folder — search,
+   the Librarian, boards — the same code the Mac runs. The TypeScript folder
+   mode stays as the zero-install fallback.
+
+Estimate: phases 1–3 about three weeks; phase 4 two to three more. The
+hosted shape is off the table for now. Nothing is started.
 
 ### Phase W2 — installable, and a bridge to the Mac
 
