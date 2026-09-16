@@ -11,7 +11,7 @@ import type { CliDetect } from "../../services/connectorSetup";
 import { CheckGlyph, CopyGlyph } from "../glyphs";
 import { useCopyState } from "./useCopyState";
 
-function CopyCommand({ command }: { command: string }) {
+export function CopyCommand({ command }: { command: string }) {
   const { copyState: state, copy } = useCopyState();
   return (
     <span className="guide-cmd">

@@ -13,11 +13,12 @@ import { pairHelper, unpairHelper } from "../services/helperLink";
 import { useChatSetupGuide } from "../state/chatSetupGuide";
 import { useHelperLink } from "../state/helperLink";
 import { useUiStore } from "../state/ui";
-import { ConnectorGuide, GuideStep, GuideSteps } from "./settings/connectorGuide";
+import { ConnectorGuide, CopyCommand, GuideStep, GuideSteps } from "./settings/connectorGuide";
 import { WebDialogFrame } from "./webDialogFrame";
 
 const LANES: readonly ProviderId[] = ["claude", "codex", "cursor"];
-const HELPER_RUN = "rotli-helper";
+const HELPER_BUILD = "cargo build --release --bin rotli-helper";
+const HELPER_RUN = "./src-tauri/target/release/rotli-helper";
 
 function PairHelper() {
   const link = useHelperLink((s) => s.link);
@@ -113,15 +114,16 @@ export function WebChatSetupDialog() {
         <GuideStep n={1} done={linked} title="Run Rotli Helper">
           <span className="guide-step-detail">
             A small program for Mac, Windows, and Linux — not the Mac app — that runs your AI tools where your
-            files are and listens only on your own computer. Start it in a terminal and leave it running:
+            files are and listens only on your own computer. Downloads are not published yet, so build it once
+            from the Rotli source folder, in a terminal:
           </span>
-          <span className="guide-cmd">
-            <code>{HELPER_RUN}</code>
-          </span>
+          <CopyCommand command={HELPER_BUILD} />
           <span className="guide-step-detail">
-            Downloads are not published yet: build it from the Rotli source with
-            <code> cargo build --release --bin rotli-helper</code>. The Mac app has chat built in if you would
-            rather.
+            Then start it, and leave that terminal open while you chat:
+          </span>
+          <CopyCommand command={HELPER_RUN} />
+          <span className="guide-step-detail">
+            It prints a pairing code. Ctrl+C stops it. The Mac app has chat built in if you would rather.
           </span>
         </GuideStep>
         <GuideStep n={2} done={linked} title="Pair this page with the helper">

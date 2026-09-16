@@ -78,7 +78,7 @@ test("the web build keeps Chat visible; clicking it walks through the helper and
   // step 1 leads with the helper on every OS, honest that it is built from
   // source today; step 2 is the live pairing form
   await expect(dialog.getByText("Run Rotli Helper")).toBeVisible();
-  await expect(dialog.getByText(/build it from the Rotli source/)).toBeVisible();
+  await expect(dialog.getByText("./src-tauri/target/release/rotli-helper")).toBeVisible();
   await expect(dialog.getByLabel("Paste the pairing code the helper printed:")).toBeVisible();
   // step 3 the user can do now: the real install + sign-in commands, copyable
   await expect(dialog.getByText("npm install -g @anthropic-ai/claude-code")).toBeVisible();
