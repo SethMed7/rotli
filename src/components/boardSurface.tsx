@@ -12,6 +12,7 @@ import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, use
 import { relativeLabel } from "../lib/dateLabels";
 import { createDragGhost } from "../lib/dragGhost";
 import { createPointerDragSession } from "../lib/pointerDrag";
+import { createMergedCaptureNote, joinCaptureBodies } from "../services/captureMerge";
 import { DEST } from "../services/destinations";
 import { invalidateNotes, useNotes } from "../services/hooks";
 import { mainNoteIds } from "../services/mainTree";
@@ -202,8 +203,10 @@ export function BoardSurface() {
 
   const back = () => setContentView("panes");
 
-  /** Merge the selected cards into ONE note in Inbox (bodies joined oldest-first
-   * with a blank line), then archive the originals — they're consumed, not lost. */
+  /** Merge the selected cards into ONE note (bodies joined oldest-first with a
+   * blank line) created where a new note from here belongs, then archive the
+   * originals — they're consumed, not lost. A refused create says so in the
+   * sidebar's error lane instead of failing silently. */
   const merge = async () => {
     if (chosen.length === 0 || busy) return;
     setBusy(true);
@@ -212,18 +215,20 @@ export function BoardSurface() {
       // in the order the thoughts arrived
       const ordered = [...chosen].reverse();
       const docs = await Promise.all(ordered.map((c) => notesService.getNote(c.id)));
-      const body = docs
-        .map((d) => d?.body.trim() ?? "")
-        .filter((b) => b.length > 0)
-        .join("\n\n");
-      const note = await notesService.createNote(DEST.inbox, body);
+      const noteId = await createMergedCaptureNote(joinCaptureBodies(docs.map((d) => d?.body)));
       // consume the originals together — independent archives, so one failure
       // must not strand the rest (audit 2026-07-30, #16 batch half)
       const results = await Promise.allSettled(ordered.map((c) => archiveNoteWithImages(c.id)));
       reportLifecycleFailures(results, ordered.length, "merged capture", "archived");
       await invalidateNotes();
       setSelected(new Set());
-      openNote(note.id); // returns the content area to the panes
+      openNote(noteId); // returns the content area to the panes
+    } catch (error) {
+      useUiStore
+        .getState()
+        .setRowActionError(
+          `Couldn’t make a note from the selection — ${error instanceof Error ? error.message : String(error)}`,
+        );
     } finally {
       setBusy(false);
     }

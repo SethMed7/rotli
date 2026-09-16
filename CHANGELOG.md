@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the sidebar already reads now carry a "reply saved" count that a mounted
   chat follows, and the composer holds while a run it did not start is in
   flight.
+- Captures → **Make a note** (and Merge N into a note) works in a memex vault
+  again. It wrote straight into the literal Inbox folder, which is not a
+  writable surface there, so the create was refused and the button did
+  visibly nothing. The merged note now goes through the same router as every
+  other new note (memex staging when writable, else Inbox), and a refusal is
+  reported in the sidebar instead of swallowed.
 - rotli.co theme studio: the twelve environment orbs rendered as blank paper
   circles in production because their colours rode inline `style` attributes,
   which the site's Content-Security-Policy (`style-src 'self'`) blocks. Local

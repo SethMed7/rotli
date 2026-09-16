@@ -103,6 +103,7 @@ export const SERVICE_FILE_OWNERS = {
   "brainJournal.ts": "librarian",
   "brainJournalComposition.ts": "librarian",
   "brainJournalStore.ts": "librarian",
+  "captureMerge.ts": "capture",
   "captureRouting.ts": "capture",
   "chatFolders.ts": "chat",
   "chatRename.ts": "chat",
