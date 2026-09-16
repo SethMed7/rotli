@@ -171,7 +171,7 @@ export class InMemoryNotesService implements NotesService {
     return this.notes.get(id) ?? null;
   }
 
-  async createNote(folderId: string, body: string, _policy?: NoteCreationPolicy): Promise<Note> {
+  async createNote(folderId: string, body: string, policy?: NoteCreationPolicy): Promise<Note> {
     // mirror fs mode's safety ceiling: rotli never creates a note inside the
     // external Vault (the memex is read-mostly; corpus_create's writable() gate
     // refuses it in the shell). Keeps the browser preview honest.
@@ -187,6 +187,7 @@ export class InMemoryNotesService implements NotesService {
       createdAt: now,
       updatedAt: now,
       pinned: false,
+      ...(policy?.secure ? { secure: true } : {}),
       body,
       revision: this.nextRevision(),
     };

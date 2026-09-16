@@ -12,6 +12,10 @@ import type { WebMemexBridge } from "../lib/webAiSeam";
 const INDEX_KEY = "chat-index";
 const FOLDERS_KEY = "chat-folders";
 const chatKey = (slug: string) => `chat:${slug}`;
+/** Removed chats keep their transcript here, the way Rust moves a chat file to
+ * the vault's Trash or Archive instead of deleting it. */
+const removedKey = (bin: "trash" | "archive", slug: string) => `chat-${bin}:${slug}`;
+const INDEX_RETRIES = 4;
 
 function frontmatterField(contents: string, name: string): string {
   const block = contents.startsWith("---\n") ? contents.slice(4, contents.indexOf("\n---", 4)) : "";
@@ -38,25 +42,39 @@ interface IndexEntry {
   modifiedMs: number;
 }
 
+function parseIndex(raw: string | undefined): IndexEntry[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as IndexEntry[]).filter((e) => typeof e?.slug === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 /** The chat store over one vault; the bridge below routes the memex commands to it. */
 export class WebChatStore {
   constructor(private readonly vault: BrowserVault) {}
 
   private async index(): Promise<IndexEntry[]> {
-    const raw = await this.vault.read(INDEX_KEY);
-    if (!raw) return [];
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      return Array.isArray(parsed) ? (parsed as IndexEntry[]).filter((e) => typeof e?.slug === "string") : [];
-    } catch {
-      return [];
-    }
+    return parseIndex(await this.vault.read(INDEX_KEY));
   }
 
+  /** Revision-gated read-modify-write: two tabs saving different chats at
+   * once both land, the loser retrying on the winner's index. */
   private async touch(slug: string, remove = false): Promise<void> {
-    const rest = (await this.index()).filter((e) => e.slug !== slug);
-    const next = remove ? rest : [{ slug, modifiedMs: Date.now() }, ...rest];
-    await this.vault.write(INDEX_KEY, JSON.stringify(next));
+    for (let attempt = 0; attempt < INDEX_RETRIES; attempt += 1) {
+      const stored = await this.vault.readVersioned(INDEX_KEY);
+      const rest = parseIndex(stored.contents).filter((e) => e.slug !== slug);
+      const next = remove ? rest : [{ slug, modifiedMs: Date.now() }, ...rest];
+      try {
+        await this.vault.writeVersioned(INDEX_KEY, JSON.stringify(next), stored.revision);
+        return;
+      } catch (reason) {
+        if (!(reason instanceof RevisionConflict)) throw reason;
+      }
+    }
+    throw new Error("the chat list kept changing in another tab — try again");
   }
 
   async list(): Promise<MemexChatSummary[]> {
@@ -78,12 +96,15 @@ export class WebChatStore {
 
   /** Rust's contract: a new chat presents no revision and refuses to overwrite. */
   async write(slug: string, contents: string, expectedRevision: string | null): Promise<string> {
-    if (expectedRevision === null) {
+    let expected = expectedRevision;
+    if (expected === null) {
       const existing = await this.vault.readVersioned(chatKey(slug));
       if (existing.contents) throw new Error(`a chat named "${slug}" already exists`);
+      // a removed chat's key is gone (see remove), so a fresh slug starts at "0"
+      expected = existing.revision;
     }
     try {
-      await this.vault.writeVersioned(chatKey(slug), contents, expectedRevision ?? "0");
+      await this.vault.writeVersioned(chatKey(slug), contents, expected);
     } catch (reason) {
       if (reason instanceof RevisionConflict)
         throw new Error("This chat changed in another tab — reopen it.");
@@ -93,9 +114,20 @@ export class WebChatStore {
     return `chats/${slug}.md`;
   }
 
-  async remove(slug: string): Promise<void> {
-    await this.vault.write(chatKey(slug), "");
+  /** Trash or archive: the transcript moves to a recoverable key, the live
+   * key and its revision go away (so the slug can be born again), and the
+   * chat leaves the list. */
+  async remove(slug: string, bin: "trash" | "archive" = "trash"): Promise<void> {
+    const live = await this.vault.read(chatKey(slug));
+    if (live) await this.vault.write(removedKey(bin, slug), live);
+    await this.vault.store.delete(chatKey(slug));
+    await this.vault.store.delete(`${chatKey(slug)}#rev`);
     await this.touch(slug, true);
+  }
+
+  /** A removed transcript, for a future Trash/Archive front on the web. */
+  recoverable(slug: string, bin: "trash" | "archive"): Promise<string | undefined> {
+    return this.vault.read(removedKey(bin, slug));
   }
 
   folders(): Promise<{ contents: string; revision: string }> {
@@ -125,7 +157,9 @@ export function webMemexBridge(store: WebChatStore): WebMemexBridge {
           a.expectedRevision === null ? null : text(a.expectedRevision, "0"),
         );
       case "memex_delete_chat":
-        return store.remove(slug);
+        return store.remove(slug, "trash");
+      case "memex_archive_chat":
+        return store.remove(slug, "archive");
       case "memex_chat_folders":
         return store.folders();
       case "memex_write_chat_folders":

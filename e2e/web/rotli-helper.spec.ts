@@ -86,7 +86,7 @@ test("pairing with the helper turns Chat on; a message goes through it and the r
 
   await dialog.getByLabel("Paste the pairing code the helper printed:").fill(`${PORT}:${TOKEN}`);
   await dialog.getByRole("button", { name: "Pair" }).click();
-  await expect(dialog.getByRole("status")).toContainText(`Paired with Rotli Helper on port ${PORT}`);
+  await expect(dialog.getByRole("status").filter({ hasText: "Paired with" })).toContainText(`port ${PORT}`);
   // paired, the lane guide asks the helper what is installed → every step ticked
   await expect(dialog.getByRole("button", { name: "Check again" })).toBeVisible();
   await expect(dialog.locator(".guide-step.done .guide-step-title", { hasText: "Sign in" })).toBeVisible();
@@ -122,7 +122,7 @@ test("unpairing takes Chat back to the walkthrough", async ({ page }) => {
   const dialog = page.getByRole("dialog", { name: "Chat on the web" });
   await dialog.getByLabel("Paste the pairing code the helper printed:").fill(`${PORT}:${TOKEN}`);
   await dialog.getByRole("button", { name: "Pair" }).click();
-  await expect(dialog.getByRole("status")).toContainText("Paired");
+  await expect(dialog.getByRole("status").filter({ hasText: "Paired with" })).toBeVisible();
   await dialog.getByRole("button", { name: "Unpair" }).click();
   await expect(dialog.getByRole("button", { name: "Pair" })).toBeVisible();
   await dialog.getByRole("button", { name: "Close" }).click();

@@ -10,7 +10,7 @@ async function corpusWith(bodies: Record<string, string>) {
     const note = await svc.createNote(folder, body);
     ids[folder] = note.id;
   }
-  return { corpus: createWebAiCorpus(() => svc), ids };
+  return { corpus: createWebAiCorpus(() => svc), ids, svc };
 }
 
 describe("web AI corpus", () => {
@@ -33,6 +33,13 @@ describe("web AI corpus", () => {
     expect((await corpus.frontmatter(work))?.secure).toBe(true);
     expect((await corpus.frontmatter(inbox))?.secure).toBe(false);
     expect(await corpus.frontmatter("nope")).toBeNull();
+  });
+
+  test("a note flagged secure by hand, in an open folder, is withheld too", async () => {
+    const { corpus, svc } = await corpusWith({ Inbox: "# Open\n\nnothing secret" });
+    const flagged = await svc.createNote("Inbox", "# Diary\n\nplain words", { secure: true });
+    expect((await corpus.list()).map((n) => n.id)).not.toContain(flagged.id);
+    await expect(corpus.read(flagged.id)).rejects.toThrow(/secure/);
   });
 
   test("search answers only with readable notes", async () => {

@@ -3,8 +3,9 @@
 // corpus_read_ai, corpus_readable_ids) with the secure-note law enforced
 // there; on the web the same law is enforced here, over the notes service,
 // and fails closed: a note is withheld from every model when it lives in a
-// secure folder OR its body trips the secret detector. The web has no
-// on-device models, so there is no local-class exception to enforce.
+// secure folder, OR its frontmatter says `secure: true`, OR its body trips
+// the secret detector. The web has no on-device models, so there is no
+// local-class exception to enforce.
 
 import { looksSecret } from "../ai/guard";
 import type { CorpusNoteMeta, FrontmatterView, WebAiCorpus } from "../lib/tauri";
@@ -39,7 +40,7 @@ export function createWebAiCorpus(notes: () => NotesService): WebAiCorpus {
     const note = await notes().getNote(id);
     if (!note) return true; // unknowable = withheld
     if (note.kind && note.kind !== "note") return false;
-    return secureByLocation(note) || looksSecret(note.body);
+    return note.secure === true || secureByLocation(note) || looksSecret(note.body);
   };
   const readableOnly = async <T extends { id: string }>(items: T[]): Promise<T[]> => {
     const verdicts = await Promise.all(items.map((item) => secure(item.id)));

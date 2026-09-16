@@ -2,13 +2,22 @@
 // browser vault (this device only); once paired, the AI commands the Mac app
 // sends to Rust ride the helper instead, through the same IPC seam.
 
-import { browserVault } from "../lib/browserVault";
+import { IndexedDbVaultStore, MemoryVaultStore, type VaultStore } from "../lib/browserVault";
 import { helperHealth, helperRpc } from "../lib/helperClient";
 import { HELPER_COMMANDS, type HelperLink, parsePairingCode } from "../lib/helperPairing";
 import { registerWebAiBridge } from "../lib/webAiSeam";
 import { useHelperLink } from "../state/helperLink";
 
 const LINK_KEY = "helper-link";
+
+// The pairing is a DEVICE credential, never vault data: in folder or imported
+// mode the browser vault maps keys to .rotli/ files that travel with an export,
+// so the link lives in this browser's own database whatever the vault mode.
+let deviceStore: VaultStore | null = null;
+function device(): VaultStore {
+  deviceStore ??= typeof indexedDB === "undefined" ? new MemoryVaultStore() : new IndexedDbVaultStore();
+  return deviceStore;
+}
 
 function bridgeFor(link: HelperLink) {
   return (cmd: string, args: Record<string, unknown> | undefined): Promise<unknown> => {
@@ -34,7 +43,7 @@ function adopt(link: HelperLink | null): void {
 export async function hydrateHelperLink(): Promise<void> {
   let link: HelperLink | null = null;
   try {
-    const raw = await browserVault().read(LINK_KEY);
+    const raw = await device().get(LINK_KEY);
     link = raw ? parsePairingCode(raw) : null;
   } catch {
     link = null;
@@ -73,7 +82,7 @@ export async function pairHelper(code: string): Promise<void> {
   if (!health.ok || health.name !== "rotli-helper") throw new Error(`Port ${link.port} is not Rotli Helper.`);
   // the token is proven by one authenticated call before it is kept
   await helperRpc(link, "chat_models", {});
-  await browserVault().write(LINK_KEY, `${link.port}:${link.token}`);
+  await device().set(LINK_KEY, `${link.port}:${link.token}`);
   adopt(link);
   useHelperLink.getState().setReachable(true);
 }
@@ -81,7 +90,7 @@ export async function pairHelper(code: string): Promise<void> {
 /** Forget the pairing on this device. The helper keeps its token. */
 export async function unpairHelper(): Promise<void> {
   try {
-    await browserVault().write(LINK_KEY, "");
+    await device().delete(LINK_KEY);
   } catch {
     /* forgetting can only fail to persist; the session forgets regardless */
   }

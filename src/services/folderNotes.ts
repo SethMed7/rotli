@@ -14,6 +14,7 @@ import {
   parseNoteDocument,
   shelfOf,
   withShelf,
+  isSecureFrontmatter,
 } from "../lib/frontmatter";
 import { composeNote, noteSlugify, noteStem, today, ulid } from "../memex/contract";
 import type { NoteCreationPolicy } from "../security/secureNotes";
@@ -190,6 +191,7 @@ export class FolderNotesService implements NotesService {
       updatedAt,
       pinned: frontmatter?.pinned ?? false,
       kind: "note",
+      secure: frontmatter ? isSecureFrontmatter(frontmatter) : false,
       body,
       revision: `${stat.lastModified}:${stat.size}`,
     };
