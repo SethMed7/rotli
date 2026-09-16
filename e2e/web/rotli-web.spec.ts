@@ -85,7 +85,7 @@ test("the web build keeps Chat visible; clicking it walks through the helper and
   await expect(dialog.getByText("npm install -g @anthropic-ai/claude-code")).toBeVisible();
   await expect(dialog.getByText("claude auth login")).toBeVisible();
   await expect(dialog.getByRole("button", { name: /^Copy: claude auth login/ })).toBeVisible();
-  await dialog.getByRole("tab", { name: "Codex" }).click();
+  await dialog.getByRole("button", { name: "Codex", exact: true }).click();
   await expect(dialog.getByText("codex login")).toBeVisible();
   // the web cannot look at the user's machine: no Check again
   await expect(dialog.getByRole("button", { name: "Check again" })).toHaveCount(0);

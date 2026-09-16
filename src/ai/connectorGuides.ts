@@ -32,15 +32,15 @@ const INSTALL: Record<
   claude: {
     mac: {
       command: "npm install -g @anthropic-ai/claude-code",
-      detail: "Needs Node.js. The installer at claude.com/claude-code works too.",
+      detail: "Needs Node.js 22 or newer. The installer at claude.com/claude-code works too.",
     },
     linux: {
       command: "npm install -g @anthropic-ai/claude-code",
-      detail: "Needs Node.js. The installer at claude.com/claude-code works too.",
+      detail: "Needs Node.js 22 or newer. The installer at claude.com/claude-code works too.",
     },
     windows: {
       command: "npm install -g @anthropic-ai/claude-code",
-      detail: "Needs Node.js. Run it in PowerShell or Windows Terminal.",
+      detail: "Needs Node.js 22 or newer. Run it in PowerShell or Windows Terminal.",
     },
   },
   codex: {
@@ -57,13 +57,18 @@ const INSTALL: Record<
   cursor: {
     mac: {
       command: "curl https://cursor.com/install -fsS | bash",
-      detail: "The official installer places `agent` in ~/.local/bin.",
+      detail:
+        "The official installer places `agent` in ~/.local/bin. Open a new terminal afterwards so it is on your PATH.",
     },
     linux: {
       command: "curl https://cursor.com/install -fsS | bash",
-      detail: "The official installer places `agent` in ~/.local/bin.",
+      detail:
+        "The official installer places `agent` in ~/.local/bin. Open a new terminal afterwards so it is on your PATH.",
     },
-    windows: { detail: "Install Cursor CLI from cursor.com/cli, then open a new terminal." },
+    windows: {
+      command: "irm 'https://cursor.com/install?win32=true' | iex",
+      detail: "Run it in PowerShell, then open a new terminal so `agent` is on your PATH.",
+    },
   },
 };
 

@@ -74,13 +74,12 @@ export function WebChatSetupDialog() {
           </span>
           <span className="guide-step-body">
             <span className="guide-step-title">Install and sign in to an AI tool — you can do this now</span>
-            <div className="guide-lanes" role="tablist" aria-label="AI tool">
+            <div className="guide-lanes" role="group" aria-label="AI tool">
               {LANES.map((id) => (
                 <button
                   key={id}
                   type="button"
-                  role="tab"
-                  aria-selected={lane === id}
+                  aria-pressed={lane === id}
                   className={lane === id ? "ghostbtn guide-lane on" : "ghostbtn guide-lane"}
                   onClick={() => setLane(id)}
                 >

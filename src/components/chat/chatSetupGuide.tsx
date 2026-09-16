@@ -12,13 +12,35 @@ import { ConnectorGuide } from "../settings/connectorGuide";
 
 const LANES: readonly ProviderId[] = ["claude", "codex", "cursor"];
 
-export function ChatSetupGuide({ onOpenSettings }: { onOpenSettings: () => void }) {
+export function ChatSetupGuide({
+  secureOnly = false,
+  onOpenSettings,
+}: {
+  /** A secure chat never sees a connected model, so the tools' guide would mislead. */
+  secureOnly?: boolean;
+  onOpenSettings: () => void;
+}) {
   const aiProviders = useUiStore((s) => s.aiProviders);
   const enabledLanes = LANES.filter((id) => aiProviders[id]);
   const lanes = enabledLanes.length > 0 ? enabledLanes : ["claude" as ProviderId];
   const checks = useQueries({
     queries: lanes.map((id) => connectorDetectionQuery(id)),
   });
+  if (secureOnly) {
+    return (
+      <section className="chat-setup" aria-label="Set up a model">
+        <p className="chat-sub">
+          This chat touches a secure note, so only an on-device model may answer, and none is installed yet.
+          Install one under Settings → AI Models → Local; the connected tools stay out of secure chats.
+        </p>
+        <div className="chat-welcome-actions">
+          <button type="button" className="ghostbtn" onClick={onOpenSettings}>
+            Open AI Models settings
+          </button>
+        </div>
+      </section>
+    );
+  }
   return (
     <section className="chat-setup" aria-label="Set up a model">
       <p className="chat-sub">

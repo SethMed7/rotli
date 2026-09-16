@@ -19,7 +19,7 @@ describe("connector guides", () => {
     expect(connectorGuide("claude", "linux")[0]?.command).toBe("npm install -g @anthropic-ai/claude-code");
     expect(connectorGuide("codex", "mac")[0]?.command).toBe("brew install codex");
     expect(connectorGuide("codex", "windows")[0]?.command).toBe("npm install -g @openai/codex");
-    expect(connectorGuide("cursor", "windows")[0]?.command).toBeUndefined();
+    expect(connectorGuide("cursor", "windows")[0]?.command).toMatch(/^irm /);
     expect(connectorGuide("antigravity", "mac")).toEqual([]);
   });
 

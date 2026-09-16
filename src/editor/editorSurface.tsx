@@ -447,7 +447,8 @@ export function EditorSurface({
               }
               onContextMenu={(event) => {
                 event.preventDefault();
-                openChatChip(false);
+                if (LAUNCH_FEATURES.chat) openChatChip(false);
+                else useChatSetupGuide.getState().show();
               }}
             >
               <ChatGlyph size={15} />

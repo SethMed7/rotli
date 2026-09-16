@@ -2539,7 +2539,7 @@ export function ChatSurface({
                       <p className="chat-sub">This saved chat is ready for its first message.</p>
                     )}
                     {catalogSettled && !picked && (
-                      <ChatSetupGuide onOpenSettings={() => setSettingsOpen(true)} />
+                      <ChatSetupGuide secureOnly={secureChat} onOpenSettings={() => setSettingsOpen(true)} />
                     )}
                   </div>
                 ) : (
