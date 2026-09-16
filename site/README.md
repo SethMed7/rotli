@@ -102,11 +102,45 @@ bun run preview  # serve the built dist/ locally
   integrations left production until refined. The remote route (Grok Bot, the
   relay, self-hosting) sits inside that same dev-only guide. Do not publish a hosted relay URL there until that
   deployment has been verified.
-- `public/social-card.svg` is the editable source for the rendered Open Graph
-  image; run `bun run build:social-card` from the repository root to
-  render it with the bundled fonts and no external requests. The result is
-  `public/social-card.png`; keep its copy and palette aligned with the
-  current hero before rendering a new PNG.
+- `public/social-card.svg` is the editable source for the link preview; run
+  `bun run build:social-card` from the repository root to render it with the
+  bundled fonts, the inlined waving quokka, and no external requests. The
+  results are `public/social-card.png` (1200×630, what iMessage, Slack,
+  LinkedIn, X, and Discord show for a rotli.co link) and
+  `public/social-card-github.png` (1280×640, the 2:1 image GitHub wants for
+  the repository's Settings → Social preview, which has no API and is uploaded
+  by hand). Keep the copy and palette aligned with the current hero before
+  rendering. `layouts/Base.astro` publishes the card with explicit
+  `og:image:width/height/type` so scrapers render it on the first fetch, and
+  ships PNG icons (`favicon-32.png`, `apple-touch-icon.png`, both exported from
+  `src-tauri/icons/icon.png`) for the previews that cannot use the SVG favicon.
+  LinkedIn and Facebook cache scrapes; re-scrape with their post inspectors
+  after a deploy.
+
+## Validate a build under production headers (the prod twin)
+
+`astro dev` and `astro preview` send no security headers, so a page can look
+right locally and break on rotli.co, where Caddy serves every response under
+`style-src 'self'` (inline `style` attributes and `<style>` blocks are dropped
+silently). Two guards and one rehearsal cover this:
+
+- The Astro build fails if any generated page carries an inline style
+  (`astro.config.mjs`, `rotli-csp-inline-style-guard`), and stylesheets are
+  never inlined (`build.inlineStylesheets: 'never'`). This runs in `bun run
+  verify quality`, in CI, and inside the Railway image build.
+- To rehearse the exact production image, headers included, build and run the
+  site's own Dockerfile from the repository root (no version bump, no deploy):
+
+```sh
+cd ..   # repository root: the Dockerfile's build context
+docker build -f site/Dockerfile --build-arg SITE_MODE=full -t rotli-site-twin .
+docker run --rm -p 8080:8080 rotli-site-twin
+# open http://localhost:8080 — same Caddyfile, same CSP, same cache headers
+```
+
+The dev deployment (`dev.rotli.co`, built from the `dev` branch in `dev` mode)
+is the hosted rehearsal for everything else: it is not indexed and offers no
+download, so landing there first costs nothing.
 
 ## Railway deployment
 

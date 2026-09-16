@@ -10,6 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- rotli.co theme studio: the twelve environment orbs rendered as blank paper
+  circles in production because their colours rode inline `style` attributes,
+  which the site's Content-Security-Policy (`style-src 'self'`) blocks. Local
+  `astro dev`/`preview` send no CSP, so the bug was invisible before deploy.
+  The colours are now CSS rules keyed by `data-orb`, and the site build fails
+  on any inline style so the class of bug cannot ship again. `site/README.md`
+  documents the Docker prod twin for validating a build under the real headers.
+
+### Changed
+
+- Link previews: rotli.co's social card now carries the waving quokka, the
+  Baloo 2 wordmark, and the site address; the page publishes explicit Open
+  Graph image dimensions and type, `og:locale`, a theme colour, a 32×32 PNG
+  favicon, and a 180×180 Apple touch icon so iMessage, Slack, and LinkedIn
+  render the card and icon on the first fetch. `bun run build:social-card`
+  also renders a 1280×640 `social-card-github.png` for the repository's
+  social preview.
+
 ## [1.0.0] - 2026-09-15
 
 Rotli 1.0.

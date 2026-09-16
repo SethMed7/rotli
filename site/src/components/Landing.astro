@@ -100,8 +100,9 @@ const themeTour = themeFamilies.flatMap((family) => ([
   },
 ]));
 
-const orbStyle = (familyId: string, mode: 'light' | 'dark') =>
-  `--orb-ground: var(--swatch-${familyId}-${mode}); --orb-accent: var(--swatch-${familyId}-${mode}-accent);`;
+// Orb colours are CSS rules keyed by data-orb, never inline style attributes:
+// production's Content-Security-Policy is `style-src 'self'`, which blocks
+// every inline style (astro.config.mjs fails the build if one appears).
 
 // Companion carousel: real, selectable combinations (body preset or line
 // drawing × accessory × line color × pose) rendered by
@@ -454,7 +455,7 @@ const experiments = [
                   aria-label={family.light.environment}
                   title={family.light.environment}
                 >
-                  <span class="theme-orb" style={orbStyle(family.id, 'light')} aria-hidden="true"></span>
+                  <span class="theme-orb" data-orb={`${family.id}-light`} aria-hidden="true"></span>
                 </button>
                 <button
                   class="theme-orb-button"
@@ -464,7 +465,7 @@ const experiments = [
                   aria-label={family.dark.environment}
                   title={family.dark.environment}
                 >
-                  <span class="theme-orb" style={orbStyle(family.id, 'dark')} aria-hidden="true"></span>
+                  <span class="theme-orb" data-orb={`${family.id}-dark`} aria-hidden="true"></span>
                 </button>
                 <span class="theme-row-label">{family.id === 'paper' ? 'Paper' : family.name}</span>
               </>
@@ -1469,6 +1470,67 @@ const experiments = [
         radial-gradient(circle at 70% 74%, var(--orb-accent) 0%, color-mix(in srgb, var(--orb-accent) 55%, transparent) 30%, transparent 62%),
         var(--orb-ground);
       box-shadow: inset 0 -6px 10px color-mix(in srgb, var(--deep) 14%, transparent);
+    }
+
+    /* One rule per environment; the swatch tokens live in Base.astro. */
+    .theme-orb[data-orb='rotli-light'] {
+      --orb-ground: var(--swatch-rotli-light);
+      --orb-accent: var(--swatch-rotli-light-accent);
+    }
+
+    .theme-orb[data-orb='rotli-dark'] {
+      --orb-ground: var(--swatch-rotli-dark);
+      --orb-accent: var(--swatch-rotli-dark-accent);
+    }
+
+    .theme-orb[data-orb='paper-light'] {
+      --orb-ground: var(--swatch-paper-light);
+      --orb-accent: var(--swatch-paper-light-accent);
+    }
+
+    .theme-orb[data-orb='paper-dark'] {
+      --orb-ground: var(--swatch-paper-dark);
+      --orb-accent: var(--swatch-paper-dark-accent);
+    }
+
+    .theme-orb[data-orb='ocean-light'] {
+      --orb-ground: var(--swatch-ocean-light);
+      --orb-accent: var(--swatch-ocean-light-accent);
+    }
+
+    .theme-orb[data-orb='ocean-dark'] {
+      --orb-ground: var(--swatch-ocean-dark);
+      --orb-accent: var(--swatch-ocean-dark-accent);
+    }
+
+    .theme-orb[data-orb='grove-light'] {
+      --orb-ground: var(--swatch-grove-light);
+      --orb-accent: var(--swatch-grove-light-accent);
+    }
+
+    .theme-orb[data-orb='grove-dark'] {
+      --orb-ground: var(--swatch-grove-dark);
+      --orb-accent: var(--swatch-grove-dark-accent);
+    }
+
+    .theme-orb[data-orb='iris-light'] {
+      --orb-ground: var(--swatch-iris-light);
+      --orb-accent: var(--swatch-iris-light-accent);
+    }
+
+    .theme-orb[data-orb='iris-dark'] {
+      --orb-ground: var(--swatch-iris-dark);
+      --orb-accent: var(--swatch-iris-dark-accent);
+    }
+
+    .theme-orb[data-orb='midnight-light'] {
+      --orb-ground: var(--swatch-midnight-light);
+      --orb-accent: var(--swatch-midnight-light-accent);
+    }
+
+    .theme-orb[data-orb='midnight-dark'] {
+      --orb-ground: var(--swatch-midnight-dark);
+      --orb-accent: var(--swatch-midnight-dark-accent);
     }
 
     .theme-row-label {
