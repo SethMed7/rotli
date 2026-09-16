@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The public site footer now includes a Featured on Launch Llama Tools badge.
+
 ## [1.0.0] - 2026-09-15
 
 Rotli 1.0.
