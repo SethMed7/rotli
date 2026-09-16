@@ -66,6 +66,7 @@ import { isRetentionEligible, parseRetentionDays } from "../services/retentionPo
 import type { PaneNode, Tab } from "../types";
 import { DEFAULT_VOICE, VOICES } from "../voice/speech";
 import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
+import { helperLinked } from "./helperLink";
 import { hydrateMain, useMainStore } from "./main";
 import { MRU_CAP, touchItemActivity, touchMru, useMruStore } from "./mru";
 import {
@@ -701,7 +702,9 @@ export function parseSettings(raw: string): PersistedSettings {
     sidebarZoom: clampSidebarZoom(typeof data.sidebarZoom === "number" ? data.sidebarZoom : 1),
     sidebarMode: LAUNCH_FEATURES.breve && data.sidebarMode === "breve" ? "breve" : "notes",
     // Home is the safe default front — a fresh (or unknown) value opens on notes
-    sidebarView: data.sidebarView === "chat" && LAUNCH_FEATURES.chat ? "chat" : "home",
+    // the Chat front stays when something can chat: the desktop, or Rotli Web
+    // paired with Rotli Helper (hydrated before this runs)
+    sidebarView: data.sidebarView === "chat" && (LAUNCH_FEATURES.chat || helperLinked()) ? "chat" : "home",
     breveView:
       data.breveView === "dashboard" ||
       data.breveView === "briefs" ||

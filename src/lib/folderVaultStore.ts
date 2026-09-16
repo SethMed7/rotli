@@ -55,7 +55,13 @@ export class FolderVaultStore implements VaultStore {
   }
 
   /** The file's current stamp must equal what the writer read; then write.
-   * `nextRevision` is ignored: the next stamp is whatever the file gets. */
+   * `nextRevision` is ignored: the next stamp is whatever the file gets.
+   *
+   * Best effort, not a lock: the stamp read and the write are two steps, so
+   * two tabs writing the same file in the same instant can both pass and the
+   * last one wins. The Mac app holds a file lock in Rust for the same files;
+   * the browser has no equivalent, and the window is milliseconds on a file a
+   * person edits in one tab. The next writer's stale stamp is refused. */
   async compareAndSwap(
     key: string,
     value: string,

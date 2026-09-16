@@ -100,7 +100,21 @@ export const useChatRuns = create<ChatRunsState>((set, get) => ({
       persisted[newKey] = (persisted[newKey] ?? 0) + (persisted[oldKey] ?? 0);
       delete persisted[oldKey];
     }
-    set({ runs, persisted });
+    // the timing maps move with the key too: replyPending() reads them, and a
+    // hold left on the old unsaved key would release the composer early
+    const moveStamp = (map: Record<string, number>): Record<string, number> => {
+      if (!(oldKey in map)) return map;
+      const next = { ...map };
+      next[newKey] = Math.max(next[newKey] ?? 0, next[oldKey] ?? 0);
+      delete next[oldKey];
+      return next;
+    };
+    set({
+      runs,
+      persisted,
+      settledAt: moveStamp(get().settledAt),
+      persistedAt: moveStamp(get().persistedAt),
+    });
   },
   clearUnread: (key) => {
     if (get().runs[key] !== "unread") return;

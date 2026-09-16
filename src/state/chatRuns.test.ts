@@ -31,6 +31,18 @@ describe("chat run signals", () => {
     expect(useChatRuns.getState().persisted).toEqual({ "corpus:new": 1 });
   });
 
+  test("retargeting keeps the reply hold: a settled unsaved run still holds the composer under the slug key", () => {
+    const s = useChatRuns.getState();
+    s.markRunning("unsaved:t2");
+    s.settleRun("unsaved:t2", true);
+    s.retargetRun("unsaved:t2", "corpus:born");
+    const now = Date.now();
+    expect(replyPending(useChatRuns.getState(), "corpus:born", now)).toBe(true);
+    expect(replyPending(useChatRuns.getState(), "unsaved:t2", now)).toBe(false);
+    useChatRuns.getState().markPersisted("corpus:born");
+    expect(replyPending(useChatRuns.getState(), "corpus:born", now)).toBe(false);
+  });
+
   test("running → settled-watched stays done; settled-unwatched flips to unread", () => {
     const s = useChatRuns.getState();
     s.markRunning("corpus:a");

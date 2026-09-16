@@ -35,16 +35,23 @@ try {
   } catch {
     throw "rotli-helper: no download at $url - this version may not be published for your computer yet."
   }
+  $sumsPath = Join-Path $tmp "SHA256SUMS"
+  $haveSums = $true
   try {
-    Invoke-WebRequest -Uri $sumsUrl -OutFile (Join-Path $tmp "SHA256SUMS") -UseBasicParsing
-    $line = Get-Content (Join-Path $tmp "SHA256SUMS") | Where-Object { $_ -match " $([regex]::Escape($asset))$" } | Select-Object -First 1
-    if ($line) {
-      $expected = ($line -split "\s+")[0].ToLowerInvariant()
-      $actual = (Get-FileHash -Algorithm SHA256 (Join-Path $tmp $asset)).Hash.ToLowerInvariant()
-      if ($expected -ne $actual) { throw "rotli-helper: the download did not match the published checksum - not installing." }
-    }
-  } catch [System.Net.WebException] {
-    # no checksum file published for this version: install unverified, as curl-only Macs do
+    Invoke-WebRequest -Uri $sumsUrl -OutFile $sumsPath -UseBasicParsing
+  } catch {
+    $haveSums = $false
+  }
+  if ($haveSums) {
+    # a release that ships checksums must verify: no matching line is a refusal
+    $line = Get-Content $sumsPath | Where-Object { $_ -match " $([regex]::Escape($asset))$" } | Select-Object -First 1
+    if (-not $line) { throw "rotli-helper: the release's checksum file has no entry for $asset - not installing." }
+    $expected = ($line -split "\s+")[0].ToLowerInvariant()
+    $actual = (Get-FileHash -Algorithm SHA256 (Join-Path $tmp $asset)).Hash.ToLowerInvariant()
+    if ($expected -ne $actual) { throw "rotli-helper: the download did not match the published checksum - not installing." }
+    Write-Host "Checksum verified."
+  } else {
+    Write-Host "This release publishes no checksum file; installing unverified."
   }
   New-Item -ItemType Directory -Path $destDir -Force | Out-Null
   Move-Item -Force (Join-Path $tmp $asset) $dest

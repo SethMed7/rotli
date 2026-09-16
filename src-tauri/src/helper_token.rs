@@ -86,6 +86,10 @@ fn ensure_owner_only(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Windows: the token sits under the user's profile (`%USERPROFILE%`), whose
+/// default ACL already denies other standard accounts; there is no mode bit
+/// to check, so this is a documented residual: an administrator, or a profile
+/// with a loosened ACL, can read it. `--reset-token` mints a fresh one.
 #[cfg(not(unix))]
 fn ensure_owner_only(_path: &Path) -> Result<(), String> {
     Ok(())
