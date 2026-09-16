@@ -75,12 +75,20 @@ describe("web chat store", () => {
       "---\nid: x\ntitle: From the app\nsource: rotli\nattachedTo: [[plan]]\npinned: true\n---\n\n## Messages\n",
     );
     await dir.writeText("chats/README.md", "not a chat");
+    await dir.writeText(
+      "chats/no-times.md",
+      "---\nid: y\ntitle: Imported\nsource: rotli\nattachedTo:\ncreated: 2026-09-01\nupdated: 2026-09-10\n---\n",
+    );
     const store = new FolderChatStore(dir);
     const bridge = webMemexBridge(store);
     const listed = await store.list();
     expect(listed.map((c) => [c.slug, c.title, c.attachedTo, c.pinned, c.path])).toEqual([
       ["from-the-app", "From the app", "plan", true, "chats/from-the-app.md"],
+      ["no-times", "Imported", "", false, "chats/no-times.md"],
     ]);
+    // a real file time wins; without one the `updated:` day stands in
+    expect(listed[0]!.modifiedMs).toBeGreaterThan(0);
+    expect(listed[1]!.modifiedMs).toBeGreaterThan(0);
     const born = composeNewChat(
       { title: "Web", source: "rotli", slug: "web" },
       [{ speaker: "you", text: "hi" }],

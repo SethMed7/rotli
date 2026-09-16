@@ -9,7 +9,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { type MemexChatSummary, isTauri } from "../../lib/tauri";
+import { type MemexChatSummary, hasDurableCorpus } from "../../lib/tauri";
 import { type MemexInstance, activeInstance } from "../../memex/config";
 import { useInstanceChats, useMemexConfig } from "../../memex/useMemex";
 import {
@@ -57,7 +57,9 @@ export function useChatFolders(): SidebarChatData {
   );
   const foldersQuery = useQuery({
     queryKey: [...CHAT_FOLDERS_KEY, activeMemex?.root ?? ""],
-    enabled: !!activeMemex && isTauri(),
+    // the vault answers on the desktop and in Rotli Web alike; only the
+    // in-memory twin has no chat folders
+    enabled: !!activeMemex && hasDurableCorpus(),
     queryFn: () => loadChatFolders(activeMemex!),
   });
   const manifest = foldersQuery.data?.manifest ?? EMPTY_CHAT_FOLDERS;

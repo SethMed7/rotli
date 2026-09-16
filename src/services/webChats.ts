@@ -189,7 +189,10 @@ export class FolderChatStore implements ChatStore {
             this.dir.stat(path),
           ]);
           const head = text.split("\n").slice(0, CHAT_HEAD_LINES).join("\n");
-          return summarize(slug, head, stat?.lastModified ?? 0);
+          // an imported copy keeps no file times; the contract's `updated:`
+          // day (bumped on every append) is the next best recency
+          const modified = stat?.lastModified || Date.parse(frontmatterField(head, "updated")) || 0;
+          return summarize(slug, head, modified);
         }),
     );
     return rows;
