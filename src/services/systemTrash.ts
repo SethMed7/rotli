@@ -3,6 +3,7 @@
 // reusing the folder-trash ports so notes and files ride their own lanes;
 // errors land in the sidebar's inline lane, partial progress stays honest.
 
+import { isWebVault } from "../lib/browserVault";
 import { corpusFileStat, corpusMoveFileToSink, corpusPurge } from "../lib/tauri";
 import { useUiStore } from "../state/ui";
 import { DEST } from "./destinations";
@@ -10,6 +11,7 @@ import { trashVirtualFolderItems } from "./folderTrash";
 import { invalidateNotes } from "./hooks";
 import { trashNoteWithImages } from "./noteLifecycle";
 import { notesService } from "./notes";
+import { purgeWebTrash } from "./webNotes";
 
 export async function trashSystemSelection(): Promise<void> {
   const ui = useUiStore.getState();
@@ -40,6 +42,14 @@ export async function trashSystemSelection(): Promise<void> {
 export async function emptyTrash(): Promise<{ purged: number; failed: number }> {
   const ui = useUiStore.getState();
   ui.setRowActionError(null);
+  if (isWebVault()) {
+    // the browser vault has no Rust purge: the persisted service deletes
+    // what sits in Trash and writes the vault (review 2026-09-16 — this was
+    // a successful no-op)
+    const purged = await purgeWebTrash();
+    await invalidateNotes();
+    return { purged, failed: 0 };
+  }
   const items = await notesService.listNotes(DEST.trash);
   let purged = 0;
   const failures: string[] = [];

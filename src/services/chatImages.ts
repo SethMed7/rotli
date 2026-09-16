@@ -17,7 +17,17 @@ export function attachedImageUrl(source: string): Promise<string> {
  * files are the user's: keep them in Assets and say so (2026-09-16 — they
  * were discarded with only the vision hint). */
 export async function stashRefusedChatDrop(rootId: string, paths: readonly string[]): Promise<void> {
-  await Promise.allSettled(paths.map((path) => corpusImportFile(rootId, path)));
+  const results = await Promise.allSettled(paths.map((path) => corpusImportFile(rootId, path)));
   await invalidateNotes();
-  showFileNotice("Saved to Assets — this model can't see images, so nothing was attached");
+  showFileNotice(refusedDropNotice(results.map((r) => r.status === "fulfilled")));
+}
+
+/** What to say after a refused drop, from which imports actually landed. */
+export function refusedDropNotice(imported: readonly boolean[]): string {
+  const saved = imported.filter(Boolean).length;
+  const failed = imported.length - saved;
+  if (saved === 0) return "Nothing was saved — this model can't see images, and the import failed";
+  const files = saved === 1 ? "1 file" : `${saved} files`;
+  const tail = failed > 0 ? ` (${failed} couldn't be imported)` : "";
+  return `Saved ${files} to Assets — this model can't see images, so nothing was attached${tail}`;
 }

@@ -20,6 +20,17 @@ export interface VaultStore {
   get(key: string): Promise<string | undefined>;
   set(key: string, value: string): Promise<void>;
   delete(key: string): Promise<void>;
+  /** Write `value` under `key` and `nextRevision` under `revisionKey` only if
+   * `revisionKey` currently holds `expectedRevision` (a missing key reads as
+   * "0") — all in ONE transaction, so two writers cannot both pass the check.
+   * Resolves false when the check failed and nothing was written. */
+  compareAndSwap(
+    key: string,
+    value: string,
+    revisionKey: string,
+    expectedRevision: string,
+    nextRevision: string,
+  ): Promise<boolean>;
 }
 
 const DB_NAME = "rotli-web";
@@ -69,6 +80,34 @@ export class IndexedDbVaultStore implements VaultStore {
     const db = await this.open();
     await requestToPromise(db.transaction(STORE, "readwrite").objectStore(STORE).delete(key));
   }
+
+  compareAndSwap(
+    key: string,
+    value: string,
+    revisionKey: string,
+    expectedRevision: string,
+    nextRevision: string,
+  ): Promise<boolean> {
+    return this.open().then(
+      (db) =>
+        new Promise<boolean>((resolve, reject) => {
+          const tx = db.transaction(STORE, "readwrite");
+          const store = tx.objectStore(STORE);
+          let swapped = false;
+          const read = store.get(revisionKey);
+          read.onsuccess = () => {
+            const current = typeof read.result === "string" ? read.result : "0";
+            if (current !== expectedRevision) return; // the transaction commits nothing
+            store.put(value, key);
+            store.put(nextRevision, revisionKey);
+            swapped = true;
+          };
+          tx.oncomplete = () => resolve(swapped);
+          tx.onerror = () => reject(tx.error ?? new Error("IndexedDB transaction failed"));
+          tx.onabort = () => reject(tx.error ?? new Error("IndexedDB transaction aborted"));
+        }),
+    );
+  }
 }
 
 /** For tests and for a browser without IndexedDB (private windows in some
@@ -83,6 +122,18 @@ export class MemoryVaultStore implements VaultStore {
   }
   async delete(key: string): Promise<void> {
     this.values.delete(key);
+  }
+  async compareAndSwap(
+    key: string,
+    value: string,
+    revisionKey: string,
+    expectedRevision: string,
+    nextRevision: string,
+  ): Promise<boolean> {
+    if ((this.values.get(revisionKey) ?? "0") !== expectedRevision) return false;
+    this.values.set(key, value);
+    this.values.set(revisionKey, nextRevision);
+    return true;
   }
 }
 
@@ -118,18 +169,30 @@ export class BrowserVault {
     return { contents, revision };
   }
 
-  /** Refuses a stale write; a first write must present revision "0". */
+  /** Refuses a stale write; a first write must present revision "0". The
+   * check and the write are one transaction (two tabs cannot both win). */
   async writeVersioned(key: string, contents: string, expectedRevision: string): Promise<string> {
-    const current = (await this.store.get(`${key}#rev`)) ?? "0";
-    if (expectedRevision !== current) {
-      throw new Error(
-        `revision conflict on ${key}: expected ${expectedRevision || "(missing)"}, found ${current}`,
-      );
+    const next = String(Number(expectedRevision || "0") + 1);
+    const swapped = await this.store.compareAndSwap(key, contents, `${key}#rev`, expectedRevision, next);
+    if (!swapped) {
+      const current = (await this.store.get(`${key}#rev`)) ?? "0";
+      throw new RevisionConflict(key, expectedRevision, current);
     }
-    const next = String(Number(current) + 1);
-    await this.store.set(key, contents);
-    await this.store.set(`${key}#rev`, next);
     return next;
+  }
+}
+
+/** A write that presented a revision the store no longer holds: another tab
+ * (or an earlier write in this one) moved it. Callers decide whether to
+ * reload or to stop writing. */
+export class RevisionConflict extends Error {
+  constructor(
+    readonly key: string,
+    readonly expected: string,
+    readonly found: string,
+  ) {
+    super(`revision conflict on ${key}: expected ${expected || "(missing)"}, found ${found}`);
+    this.name = "RevisionConflict";
   }
 }
 

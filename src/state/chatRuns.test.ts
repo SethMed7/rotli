@@ -4,11 +4,11 @@
 
 import { beforeEach, describe, expect, test } from "bun:test";
 
-import { useChatRuns } from "./chatRuns";
+import { REPLY_HOLD_GRACE_MS, replyPending, useChatRuns } from "./chatRuns";
 
 describe("chat run signals", () => {
   beforeEach(() => {
-    useChatRuns.setState({ runs: {}, persisted: {} });
+    useChatRuns.setState({ runs: {}, persisted: {}, settledAt: {}, persistedAt: {} });
   });
 
   test("a persisted reply bumps its key's count and the owner learns the count it caused", () => {
@@ -74,5 +74,18 @@ describe("chat run signals", () => {
     const before = useChatRuns.getState().runs;
     useChatRuns.getState().settleRun("corpus:ghost", true);
     expect(useChatRuns.getState().runs).toBe(before);
+  });
+
+  test("a settled run holds until its reply persists, and releases on its own after the grace", () => {
+    const s = useChatRuns.getState();
+    expect(replyPending(useChatRuns.getState(), "corpus:a", Date.now())).toBe(false);
+    s.markRunning("corpus:a");
+    expect(replyPending(useChatRuns.getState(), "corpus:a", Date.now())).toBe(false); // still running
+    s.settleRun("corpus:a", false);
+    const settled = useChatRuns.getState().settledAt["corpus:a"]!;
+    expect(replyPending(useChatRuns.getState(), "corpus:a", settled + 10)).toBe(true);
+    expect(replyPending(useChatRuns.getState(), "corpus:a", settled + REPLY_HOLD_GRACE_MS + 1)).toBe(false);
+    s.markPersisted("corpus:a");
+    expect(replyPending(useChatRuns.getState(), "corpus:a", settled + 10)).toBe(false);
   });
 });

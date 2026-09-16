@@ -103,7 +103,7 @@ import { invalidateNotes, useNoteIndex } from "../../services/hooks";
 import { artifactMainFolderName, fileNoteInNamedRootFolder } from "../../services/mainTree";
 import { assignChatToView } from "../../services/viewTree";
 import { type ChatImageAttachment, chatDraftFor, useChatDrafts } from "../../state/chatDrafts";
-import { useChatRuns } from "../../state/chatRuns";
+import { replyPending, useChatRuns } from "../../state/chatRuns";
 import { useMainStore } from "../../state/main";
 import { touchChatActivity } from "../../state/mru";
 import { type Measure } from "../../state/noteStyle";
@@ -1304,7 +1304,13 @@ export function ChatSurface({
   const [busy, setBusy] = useState(false);
   /** A predecessor mount's turn is in flight: show it, and hold the composer. */
   const foreignRun = runState === "running" && !busy;
-  const working = busy || foreignRun;
+  /** Once a run settles, the composer stays held until its reply has been
+   * persisted and reread (a send in that gap would read a thread without the
+   * answer — review 2026-09-16). Derived from the store: a failed run never
+   * persists, so the store's grace tick releases the hold on its own. */
+  // (any store change, the grace tick included, re-runs this selector)
+  const foreignPending = useChatRuns((s) => !busy && replyPending(s, chatKeyId, Date.now()));
+  const working = busy || foreignRun || foreignPending;
   /** The persisted count this mount's own send produced, so its own landing
    * does not trigger a reread; a foreign landing does. */
   const ownPersistRef = useRef(0);

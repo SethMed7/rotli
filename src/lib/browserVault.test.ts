@@ -41,4 +41,18 @@ describe("browser vault", () => {
     await vault.writeVersioned("main", "m", "0");
     expect(await vault.readVersioned("views")).toEqual({ contents: "", revision: "0" });
   });
+
+  test("two writers racing from the same revision: exactly one wins, in one transaction", async () => {
+    const vault = new BrowserVault(new MemoryVaultStore());
+    const results = await Promise.allSettled([
+      vault.writeVersioned("main", "from tab A", "0"),
+      vault.writeVersioned("main", "from tab B", "0"),
+    ]);
+    const won = results.filter((r) => r.status === "fulfilled");
+    const lost = results.filter((r) => r.status === "rejected");
+    expect(won.length).toBe(1);
+    expect(lost.length).toBe(1);
+    expect(String((lost[0] as PromiseRejectedResult).reason)).toMatch(/revision conflict/);
+    expect((await vault.readVersioned("main")).revision).toBe("1");
+  });
 });
