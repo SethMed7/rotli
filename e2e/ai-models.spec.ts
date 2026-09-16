@@ -56,8 +56,10 @@ test("a lane that isn't ready shows the walkthrough with copyable commands inste
   await expect(claude.getByText("npm install -g @anthropic-ai/claude-code")).toBeVisible();
   await expect(claude.getByText("Sign in, in your terminal")).toBeVisible();
   await expect(claude.getByRole("button", { name: /^Copy: claude auth login/ })).toBeVisible();
+  // the install line is the tool's own for THIS OS (brew on a Mac, npm on
+  // the Linux CI runner); the sign-in line is the same everywhere
   const codex = page.locator(".ailane", { hasText: "Codex" }).first();
-  await expect(codex.getByText("brew install codex")).toBeVisible();
+  await expect(codex.getByText(/^(brew install codex|npm install -g @openai\/codex)$/)).toBeVisible();
   await expect(codex.getByText("codex login")).toBeVisible();
   // nothing in the walkthrough overflows the window
   expect(await claude.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
