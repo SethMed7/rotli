@@ -1,8 +1,10 @@
 import { type ChatModelInfo, corpusFrontmatter, corpusWriteAi, isTauri } from "../lib/tauri";
 import { CORPUS_INSTANCE_ID, type MemexInstance } from "../memex/config";
+import { noteSlugify } from "../memex/contract";
 import { listChats, setChatAttachedTo, writeNote } from "../memex/service";
 import { invalidateMemex } from "../memex/useMemex";
-import { isChatsPath } from "../services/destinations";
+import { titleOf } from "../services/derive";
+import { DEST, isChatsPath } from "../services/destinations";
 import { invalidateNotes } from "../services/hooks";
 import { notesService } from "../services/notes";
 import { attachedNoteId, type MemoryTurn } from "./model";
@@ -72,6 +74,12 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
       return note ? { id, stem, body: note.body, revision: note.revision } : null;
     },
     async create(body: string): Promise<ChatMemoryNote> {
+      // Rotli Web: the notes service IS the vault (no memex note command), and
+      // the note's slug alias is the stem the chat attaches to.
+      if (!isTauri()) {
+        const note = await notesService.createNote(DEST.board, body);
+        return { id: note.id, stem: noteSlugify(titleOf(body)) || "note", body, revision: note.revision };
+      }
       const created = await writeNote({ instance: input.instance, body });
       const id = `${prefix}${created.id}`;
       const note = await notesService.getNote(id);

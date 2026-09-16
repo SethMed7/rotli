@@ -110,6 +110,12 @@ test("pairing with the helper turns Chat on; a message goes through it and the r
   expect((complete!.args as { provider: string }).provider).toBe("claude");
   // the token never travels anywhere but the helper, and no image rides along
   expect((complete!.args as { images?: unknown }).images).toBeUndefined();
+  // the chat's companion note is created through the browser vault, not a
+  // memex command the web cannot answer (2026-09-16: "Couldn't create this chat's note")
+  await expect(page.getByText(/Couldn.t create this chat.s note/)).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /Open this chat's note|Create this chat's note/ }),
+  ).toBeVisible();
 
   // the pairing survives a reload (browser vault) — the front stays on
   await page.reload();
