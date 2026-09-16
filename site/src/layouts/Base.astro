@@ -369,6 +369,13 @@ const socialImageUrl = new URL(image, siteUrl).href;
       .site-footer p {
         margin: 0;
       }
+      .footer-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.75rem 1.25rem;
+      }
       .site-footer nav {
         display: flex;
         flex-wrap: wrap;
@@ -383,6 +390,11 @@ const socialImageUrl = new URL(image, siteUrl).href;
       .site-footer nav a:hover {
         color: var(--text);
       }
+      .launch-llama-badge {
+        display: block;
+        flex: none;
+        line-height: 0;
+      }
       @media (max-width: 1080px) {
         .primary-nav {
           display: none;
@@ -394,6 +406,10 @@ const socialImageUrl = new URL(image, siteUrl).href;
           grid-template-columns: 1fr;
           gap: 0.5rem;
           padding-block: 2rem;
+        }
+        .footer-actions {
+          align-items: flex-start;
+          flex-direction: column;
         }
       }
 

@@ -16,6 +16,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { repositoryPrivacyFindings } from "./repository-privacy.mjs";
+import { siteRemoteImageCspFindings } from "./site-csp.mjs";
 
 const root = process.cwd();
 const allow = JSON.parse(readFileSync(join(root, "scripts/fixtures/egress-allowlist.json"), "utf8"));
@@ -294,7 +295,17 @@ function stripComments(src) {
   }
 }
 
-// ── (c′) public remote-relay deployment boundary ─────────────────────────────
+// ── (c′) public-site remote images match the deployed CSP ────────────────────
+//
+// Astro's local preview does not apply Caddy's production headers. A remote
+// image can therefore look correct locally and ship blank unless every literal
+// remote <img> origin is present in the one deployed img-src directive.
+{
+  const sources = walkTree("site/src", /\.astro$/).map((path) => ({ path, contents: read(path) }));
+  failures.push(...siteRemoteImageCspFindings(read("site/Caddyfile"), sources));
+}
+
+// ── (c″) public remote-relay deployment boundary ─────────────────────────────
 //
 // The relay is internet-facing and intentionally state-free. Keep the cheap
 // defenses that make arbitrary public traffic an availability problem rather
@@ -399,5 +410,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(
-  "check:security ok — egress sites declared, keychain literals constant-only, CSP/capability/updater snapshot intact, updater checks user-initiated, no sensitive logging",
+  "check:security ok — egress sites declared, site images match CSP, keychain literals constant-only, CSP/capability/updater snapshot intact, updater checks user-initiated, no sensitive logging",
 );

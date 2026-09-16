@@ -138,6 +138,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bundles on macOS, Windows, and Linux runners so the compiler enumerates the
   remaining portability gaps. It never runs on push. The feasibility document
   gained a 2026-09-16 re-count of the seams.
+- The public site footer now includes a Featured on Launch Llama Tools badge.
 
 ## [1.0.0] - 2026-09-15
 

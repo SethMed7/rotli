@@ -18,11 +18,26 @@ const { tagline, links = [] } = Astro.props;
 <footer class="site-footer">
   <a class="footer-brand" href="/" aria-label="Rotli home"><span set:html={mark} aria-hidden="true"></span><b>rotli</b></a>
   <p>{tagline}</p>
-  {links.length > 0 && (
-    <nav aria-label="Footer navigation">
-      {links.map((link) => (
-        <a href={link.href} rel={link.href.startsWith('http') ? 'noopener' : undefined}>{link.label}</a>
-      ))}
-    </nav>
-  )}
+  <div class="footer-actions">
+    {links.length > 0 && (
+      <nav aria-label="Footer navigation">
+        {links.map((link) => (
+          <a href={link.href} rel={link.href.startsWith('http') ? 'noopener' : undefined}>{link.label}</a>
+        ))}
+      </nav>
+    )}
+    <a
+      class="launch-llama-badge"
+      href="https://tools.launchllama.co?utm_source=badge&utm_medium=referral"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      <img
+        src="https://tools.launchllama.co/featured-badge.png?v=2"
+        alt="Featured on Launch Llama Tools"
+        width="200"
+        height="52"
+      />
+    </a>
+  </div>
 </footer>
