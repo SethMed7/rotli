@@ -132,6 +132,7 @@ import {
   WordGlyph,
   XGlyph,
 } from "../glyphs";
+import { ChatClarificationBar } from "./chatClarificationBar";
 import { CHAT_PANE_ATTR, registerChatDrop } from "./chatDrop";
 import { ModelPicker } from "./chatModelPicker";
 import { ChatPromptNavigator } from "./chatPromptNavigator";
@@ -1127,29 +1128,6 @@ const ChatMessage = memo(function ChatMessage({
   );
 });
 
-function ChatClarificationBar({
-  question,
-  onAnswer,
-}: {
-  question: AgentQuestion;
-  onAnswer: (answer: string) => void;
-}) {
-  return (
-    <div className="chat-question-wrap">
-      <section className="chat-question" aria-label="Choose an answer">
-        <p>{question.prompt}</p>
-        <div>
-          {question.options.map((option) => (
-            <button type="button" key={option} onClick={() => onAnswer(option)}>
-              {option}
-            </button>
-          ))}
-        </div>
-      </section>
-    </div>
-  );
-}
-
 export function ChatSurface({
   paneId,
   tabId,
@@ -1314,6 +1292,11 @@ export function ChatSurface({
   // Independent per chat (the maintainer, 2026-08-01): two chat panes side by side each
   // send to their own model, and picking in one never moves the other.
   const chatKeyId = chatKey(active?.id ?? null, chatSlug, tabId);
+  // The run signals are the one truth the sidebar reads too. A turn that
+  // took off from an earlier mount of this chat (the user left and came
+  // back mid-run) is still "running" here while this mount is not busy.
+  const runState = useChatRuns((s) => s.runs[chatKeyId]);
+  const persistedTick = useChatRuns((s) => s.persisted[chatKeyId] ?? 0);
   useEffect(() => {
     if (active && chatSlug) touchChatActivity(`${active.id}:${chatSlug}`);
   }, [active, chatSlug]);
@@ -1370,6 +1353,13 @@ export function ChatSurface({
   );
   const [activePromptIndexes, setActivePromptIndexes] = useState<readonly number[]>([]);
   const [busy, setBusy] = useState(false);
+  /** A predecessor mount's turn is in flight: show it, and hold the composer. */
+  const foreignRun = runState === "running" && !busy;
+  const working = busy || foreignRun;
+  /** The persisted count this mount's own send produced, so its own landing
+   * does not trigger a reread; a foreign landing does. */
+  const ownPersistRef = useRef(0);
+  const loadedTickRef = useRef(0);
   const [status, setStatus] = useState<string>(THINK_WORDS[0]!);
   // the on-device answer forming token-by-token — shown live in the assistant
   // row while it streams, then replaced by the settled message. The ref mirrors
@@ -1516,6 +1506,11 @@ export function ChatSurface({
   // a file that only holds the user turn so far.
   useEffect(() => {
     if (busyRef.current) return;
+    // a reply landed on disk (persistedTick moved): reread unless this mount
+    // wrote it — its thread already holds the settled turn
+    const tickMoved = persistedTick !== loadedTickRef.current;
+    loadedTickRef.current = persistedTick;
+    if (tickMoved && persistedTick === ownPersistRef.current) return;
     let cancelled = false;
     setArtifactErr(null);
     if (active && chatSlug) {
@@ -1547,7 +1542,7 @@ export function ChatSurface({
     return () => {
       cancelled = true;
     };
-  }, [active, chatSlug]);
+  }, [active, chatSlug, persistedTick]);
 
   useLayoutEffect(() => {
     const element = surfaceRef.current;
@@ -1638,7 +1633,7 @@ export function ChatSurface({
     const userAt = new Date().toISOString();
     // an image with no words is a real message ("what is this?") — the guard
     // used to require text, so attaching a picture and pressing send did nothing
-    if (!active || !writable || (!typed && imgs.length === 0) || busy) return;
+    if (!active || !writable || (!typed && imgs.length === 0) || working) return;
     if (!picked) {
       setMessages((p) => [
         ...p,
@@ -2006,6 +2001,8 @@ export function ChatSurface({
           messages: diskTurn,
           secureContext: secureReadRef.current || attachedSecure,
         });
+        // the reply is on disk: a surface that remounted mid-run rereads now
+        ownPersistRef.current = useChatRuns.getState().markPersisted(runKey);
         if (createdArtifacts.length) {
           try {
             await registerChatArtifactTurn(active, sentSlug, assistantTurn, createdArtifacts);
@@ -2079,6 +2076,7 @@ export function ChatSurface({
         bindChat(paneId, tabId, res.slug, active.id); // this tab now IS that chat
         // the run signal + an unread flag follow the unsaved key to the slug
         useChatRuns.getState().retargetRun(runKey, chatKey(active.id, res.slug, tabId));
+        ownPersistRef.current = useChatRuns.getState().markPersisted(chatKey(active.id, res.slug, tabId));
         // the saved chat's maps ride the VAULT-scoped key (2026-08-03)
         const savedKey = chatKey(active.id, res.slug, tabId);
         if (questionAfterRun) setDraftQuestion(tabId, questionAfterRun, savedKey);
@@ -2616,7 +2614,7 @@ export function ChatSurface({
                       <div className="cmsg-bubble">{renderMessage(streamingText)}</div>
                     </div>
                   )}
-                {busy && !streamingText && (
+                {working && !streamingText && (
                   <div className="cmsg ai">
                     <QuokkaMark size={17} className="chat-mark" />
                     {queued ? (
@@ -2750,7 +2748,7 @@ export function ChatSurface({
                         ref={msgRef}
                         className="chat-msg"
                         rows={1}
-                        placeholder={busy ? "thinking…" : "Message rotli…  (⏎ to send · ⇧⏎ new line)"}
+                        placeholder={working ? "thinking…" : "Message rotli…  (⏎ to send · ⇧⏎ new line)"}
                         value={message}
                         onChange={(e) => setDraftMessage(tabId, e.target.value)}
                         onKeyDown={(e) => {
@@ -2807,7 +2805,9 @@ export function ChatSurface({
                           className="chat-send"
                           aria-label={busy ? "Stop" : "Send"}
                           title={busy ? "Stop — cancel this reply and get the prompt back" : undefined}
-                          disabled={busy ? false : (!message.trim() && images.length === 0) || !picked}
+                          disabled={
+                            busy ? false : foreignRun || (!message.trim() && images.length === 0) || !picked
+                          }
                           onClick={() => {
                             if (busy) stopTurn();
                             else void send();

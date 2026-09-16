@@ -8,7 +8,27 @@ import { useChatRuns } from "./chatRuns";
 
 describe("chat run signals", () => {
   beforeEach(() => {
-    useChatRuns.setState({ runs: {} });
+    useChatRuns.setState({ runs: {}, persisted: {} });
+  });
+
+  test("a persisted reply bumps its key's count and the owner learns the count it caused", () => {
+    const s = useChatRuns.getState();
+    s.markRunning("corpus:a");
+    expect(useChatRuns.getState().persisted["corpus:a"]).toBeUndefined();
+    expect(s.markPersisted("corpus:a")).toBe(1);
+    expect(s.markPersisted("corpus:a")).toBe(2);
+    expect(useChatRuns.getState().persisted).toEqual({ "corpus:a": 2 });
+    // unrelated chats never move
+    expect(useChatRuns.getState().persisted["corpus:b"]).toBeUndefined();
+  });
+
+  test("retargeting an unsaved key carries its persisted count to the slug key", () => {
+    const s = useChatRuns.getState();
+    s.markRunning("unsaved:t1");
+    s.markPersisted("unsaved:t1");
+    s.retargetRun("unsaved:t1", "corpus:new");
+    expect(useChatRuns.getState().runs).toEqual({ "corpus:new": "running" });
+    expect(useChatRuns.getState().persisted).toEqual({ "corpus:new": 1 });
   });
 
   test("running → settled-watched stays done; settled-unwatched flips to unread", () => {

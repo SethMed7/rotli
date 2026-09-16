@@ -14,6 +14,15 @@ export type ChatRunState = "running" | "unread" | "done";
 
 interface ChatRunsState {
   runs: Record<string, ChatRunState>;
+  /** Bumped once a turn's reply is on disk (2026-09-16: a surface that
+   * remounted mid-run showed the user's message alone until the tab was
+   * reopened — the run had settled and persisted into a closure the new
+   * mount never heard from). A mounted surface that does not own the run
+   * rereads the transcript when its key's count changes. */
+  persisted: Record<string, number>;
+  /** The reply landed on disk; returns the new count so the owning surface
+   * can tell its own persist from a foreign one. */
+  markPersisted: (key: string) => number;
   /** A turn took off — the sidebar row shows its static working mark. */
   markRunning: (key: string) => void;
   /** The turn settled. `seen` = the surface was still mounted (the user watched
@@ -27,6 +36,12 @@ interface ChatRunsState {
 
 export const useChatRuns = create<ChatRunsState>((set, get) => ({
   runs: {},
+  persisted: {},
+  markPersisted: (key) => {
+    const next = (get().persisted[key] ?? 0) + 1;
+    set({ persisted: { ...get().persisted, [key]: next } });
+    return next;
+  },
   markRunning: (key) => {
     if (get().runs[key] === "running") return;
     set({ runs: { ...get().runs, [key]: "running" } });
@@ -47,7 +62,12 @@ export const useChatRuns = create<ChatRunsState>((set, get) => ({
     const runs = { ...get().runs };
     delete runs[oldKey];
     runs[newKey] = state;
-    set({ runs });
+    const persisted = { ...get().persisted };
+    if (oldKey in persisted) {
+      persisted[newKey] = (persisted[newKey] ?? 0) + (persisted[oldKey] ?? 0);
+      delete persisted[oldKey];
+    }
+    set({ runs, persisted });
   },
   clearUnread: (key) => {
     if (get().runs[key] !== "unread") return;

@@ -27,6 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Chat: leave a chat while it is thinking and come back, and the thread now
+  shows the working row again and the reply when it lands. Before, the
+  remounted chat showed only your message until the tab was closed and
+  reopened, even after the sidebar said Done: the run settled and saved into
+  the earlier mount's closure and the new one never heard. The run signals
+  the sidebar already reads now carry a "reply saved" count that a mounted
+  chat follows, and the composer holds while a run it did not start is in
+  flight.
 - rotli.co theme studio: the twelve environment orbs rendered as blank paper
   circles in production because their colours rode inline `style` attributes,
   which the site's Content-Security-Policy (`style-src 'self'`) blocks. Local
