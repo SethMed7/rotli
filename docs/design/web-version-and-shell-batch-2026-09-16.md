@@ -175,6 +175,25 @@ vault, never the live one.
 - Assets (images) stored as blobs; the editor's image embeds resolve them
   through a blob URL instead of the asset protocol.
 
+### Chat on the web: the three shapes (decision pending, 2026-09-16)
+
+Today the web build shows Chat disabled with "available in the Mac app" on
+hover and a click to the download. The owner asked why chat cannot simply
+work on the web. The models are not in the page: Rotli's chat runs either
+an on-device server on the Mac (MLX, llama.cpp) or a connected CLI process
+(Claude Code, Codex), and a browser tab can neither spawn processes nor,
+by this build's policy, make a network request. Three ways to change that:
+
+| Shape | What it is | Privacy promise | Cost |
+|---|---|---|---|
+| **Local model over localhost** | The page talks to a model server on the user's own machine (Ollama, MLX) at `127.0.0.1`; browsers treat that as a secure context even from https. Needs `connect-src` opened to loopback only, CORS on the server, and a TypeScript transport for the Ollama/OpenAI wire (the ReAct loop is already TypeScript). | "Nothing leaves this machine." | ~1 week |
+| **Bridge to the Mac app** | The Mac app's existing token-gated loopback server exposes chat and the connected CLIs; the page uses it when Rotli for Mac is running. | "Nothing leaves this machine." | ~1 week, after the local-model shape |
+| **Hosted Rotli (login)** | The owner's proposal: a per-user cloud workspace with the CLIs installed, the vault synced to it, and a login. Everything works from any browser with no install. | **The files DO leave the machine**, to Rotli's servers — a different product from the local-first Rotli, with accounts, billing, key custody, a threat model rewrite, and sync. | A product tier, not a feature: weeks, plus operations |
+
+Recommendation: the first two keep the promise the site makes and reuse
+what exists; the third is a real business decision to take separately,
+not a web-version item. None of the three is started.
+
 ### Phase W2 — installable, and a bridge to the Mac
 
 - PWA manifest and service worker (offline, home-screen install, durable
