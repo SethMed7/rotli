@@ -1,0 +1,142 @@
+# Rotli Helper release — manual only.
+#
+# Builds the standalone `rotli-helper` binary (src-tauri/src/bin/rotli_helper.rs)
+# on GitHub's macOS (Apple Silicon and Intel), Windows, and Linux runners,
+# checksums them, and publishes the set as one release, tag `helper-v<version>`,
+# in the releases repository. The site's installers
+# (site/public/helper/install.sh and install.ps1) download from that tag.
+#
+# Unsigned: the helper is a command-line program installed with curl or
+# PowerShell, which do not quarantine downloads; signing and notarizing the
+# CLI is a follow-up (docs/design/web-version-and-shell-batch-2026-09-16.md).
+#
+# The Linux binary links the crate's Tauri dependencies, so it needs the
+# webkit2gtk runtime library present on the user's machine (the same package
+# every Tauri app needs). Windows and macOS have their runtimes built in.
+#
+# Publishing needs a RELEASES_TOKEN repository secret: a fine-grained personal
+# access token for the releases repository with Contents read and write.
+# Without it the build still runs and the binaries stay as workflow artifacts
+# for a manual `gh release create`.
+name: Rotli Helper release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to publish (matches src-tauri/Cargo.toml, e.g. 1.0.0)
+        required: true
+      publish:
+        description: Publish to the releases repository (needs RELEASES_TOKEN)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: helper-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macos-arm64, os: macos-15, asset: rotli-helper-macos-arm64 }
+          - { name: macos-x64, os: macos-15-intel, asset: rotli-helper-macos-x64 }
+          - { name: windows-x64, os: windows-2022, asset: rotli-helper-windows-x64.exe }
+          - { name: linux-x64, os: ubuntu-24.04, asset: rotli-helper-linux-x64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Tauri's Linux build inputs
+        if: matrix.name == 'linux-x64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Install pinned Rust toolchain
+        run: rustup show active-toolchain
+
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2.8.2
+        with:
+          workspaces: src-tauri -> target
+          key: helper-${{ matrix.name }}
+
+      # tauri-build's build script wants the frontend dist directory to exist.
+      - name: Placeholder frontend dist
+        shell: bash
+        run: mkdir -p dist && touch dist/.keep
+
+      - name: Check the version matches the crate
+        shell: bash
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          crate="$(grep -m1 '^version = ' src-tauri/Cargo.toml | sed 's/version = "\(.*\)"/\1/')"
+          if [ "$crate" != "$VERSION" ]; then
+            echo "Cargo.toml is $crate, asked to publish $VERSION" >&2
+            exit 1
+          fi
+
+      - name: Build rotli-helper
+        shell: bash
+        run: cargo build --release --bin rotli-helper --manifest-path src-tauri/Cargo.toml
+
+      - name: Name the asset
+        shell: bash
+        env:
+          ASSET: ${{ matrix.asset }}
+        run: |
+          mkdir -p out
+          if [ -f src-tauri/target/release/rotli-helper.exe ]; then
+            cp src-tauri/target/release/rotli-helper.exe "out/$ASSET"
+          else
+            cp src-tauri/target/release/rotli-helper "out/$ASSET"
+          fi
+          "out/$ASSET" --help
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.asset }}
+          path: out/${{ matrix.asset }}
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish helper-v${{ github.event.inputs.version }}
+    needs: build
+    if: ${{ github.event.inputs.publish == 'true' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          path: assets
+          merge-multiple: true
+
+      - name: Checksums
+        run: |
+          cd assets
+          sha256sum rotli-helper-* > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+          VERSION: ${{ github.event.inputs.version }}
+          REPO: SethMed7/rotli-releases
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "RELEASES_TOKEN is not set; binaries stay as workflow artifacts." >&2
+            exit 1
+          fi
+          gh release create "helper-v$VERSION" assets/* \
+            --repo "$REPO" \
+            --title "Rotli Helper $VERSION" \
+            --notes "Rotli Helper $VERSION — the small program that lets Rotli Web chat through the AI tools on your own computer. Install: curl -fsSL https://rotli.co/helper/install.sh | sh (Mac, Linux) or irm https://rotli.co/helper/install.ps1 | iex (Windows)."

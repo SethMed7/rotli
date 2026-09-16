@@ -7,6 +7,7 @@
 import { useQueries } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { type GuideOs, guideOs } from "../ai/connectorGuides";
 import { PROVIDER_LABELS, type ProviderId } from "../ai/models";
 import { type CliDetect, connectorDetectionQuery } from "../services/connectorSetup";
 import { pairHelper, unpairHelper } from "../services/helperLink";
@@ -17,8 +18,6 @@ import { ConnectorGuide, CopyCommand, GuideStep, GuideSteps } from "./settings/c
 import { WebDialogFrame } from "./webDialogFrame";
 
 const LANES: readonly ProviderId[] = ["claude", "codex", "cursor"];
-const HELPER_BUILD = "cargo build --release --bin rotli-helper";
-const HELPER_RUN = "./src-tauri/target/release/rotli-helper";
 
 function PairHelper() {
   const link = useHelperLink((s) => s.link);
@@ -87,8 +86,29 @@ function PairHelper() {
   );
 }
 
+/** The installer line for this OS. The scripts live on the site
+ * (site/public/helper) and download a prebuilt binary; no toolchain needed. */
+function helperInstall(os: GuideOs): { command: string; detail: string; start: string } {
+  if (os === "windows") {
+    return {
+      command: "irm https://rotli.co/helper/install.ps1 | iex",
+      detail: "Paste it into PowerShell (open it from the Start menu).",
+      start: String.raw`& "$HOME\.rotli\bin\rotli-helper.exe"`,
+    };
+  }
+  return {
+    command: "curl -fsSL https://rotli.co/helper/install.sh | sh",
+    detail:
+      os === "mac"
+        ? "Paste it into Terminal (in Applications → Utilities, or search for it with ⌘Space)."
+        : "Paste it into your terminal. Linux needs the webkit2gtk library your distribution ships.",
+    start: "~/.rotli/bin/rotli-helper",
+  };
+}
+
 export function WebChatSetupDialog() {
   const open = useChatSetupGuide((s) => s.open);
+  const install = helperInstall(guideOs(navigator.platform || navigator.userAgent));
   const hide = useChatSetupGuide((s) => s.hide);
   const linked = useHelperLink((s) => s.link !== null);
   const [lane, setLane] = useState<ProviderId>("claude");
@@ -111,20 +131,18 @@ export function WebChatSetupDialog() {
         as it does in your terminal. On the web that takes three things:
       </p>
       <GuideSteps>
-        <GuideStep n={1} done={linked} title="Run Rotli Helper">
+        <GuideStep n={1} done={linked} title="Install and start Rotli Helper">
           <span className="guide-step-detail">
             A small program for Mac, Windows, and Linux — not the Mac app — that runs your AI tools where your
-            files are and listens only on your own computer. Downloads are not published yet, so build it once
-            from the Rotli source folder, in a terminal:
+            files are and listens only on your own computer. One line in a terminal downloads it and starts
+            it:
           </span>
-          <CopyCommand command={HELPER_BUILD} />
+          <CopyCommand command={install.command} />
           <span className="guide-step-detail">
-            Then start it, and leave that terminal open while you chat:
+            {install.detail} It prints a pairing code. Keep the window open while you chat; Ctrl+C stops it.
+            Next time, start it with:
           </span>
-          <CopyCommand command={HELPER_RUN} />
-          <span className="guide-step-detail">
-            It prints a pairing code. Ctrl+C stops it. The Mac app has chat built in if you would rather.
-          </span>
+          <CopyCommand command={install.start} />
         </GuideStep>
         <GuideStep n={2} done={linked} title="Pair this page with the helper">
           <PairHelper />

@@ -280,3 +280,12 @@ pixel dimensions, and checks that the tutorial has no files in Main.
 current promotion gates; [marketing](../marketing/README.md) owns the reusable
 Remotion films. Keep download availability and feature claims tied to verified
 release capabilities. These source changes do not deploy the site.
+
+## Rotli Helper installers
+
+`public/helper/install.sh` and `public/helper/install.ps1` are served as-is
+at `rotli.co/helper/…`. They download the prebuilt `rotli-helper` for the
+user's OS from the releases repository (tag `helper-v<version>`, published
+by the `Rotli Helper release` workflow), verify the checksum, install it to
+`~/.rotli/bin`, and start it. Bump the version in both scripts with the
+crate version.

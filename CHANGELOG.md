@@ -43,10 +43,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its reply comes back. The helper listens only on your own computer, only
   for pages from rotli.co, and only for a paired page; images are not sent
   through it in this release, and a note in a secure folder or carrying a
-  secret never reaches a model. No downloads are published yet: build it
-  with `cargo build --release --bin rotli-helper`. Safari cannot reach the
-  helper; every other desktop browser can (some ask once for local network
-  access). Web chats are not saved yet.
+  secret never reaches a model. One line in a terminal installs and starts
+  it: `curl -fsSL https://rotli.co/helper/install.sh | sh` on Mac and Linux,
+  `irm https://rotli.co/helper/install.ps1 | iex` on Windows; the dialog
+  shows the line for your computer, with a copy button, and once paired it
+  checks which AI tools are already installed and signed in and says
+  Connected. Safari cannot reach the helper; every other desktop browser can
+  (some ask once for local network access). Web chats are saved in the
+  browser vault.
 - **Guided setup for the connected models.** A lane that is not ready walks
   you through it instead of hiding a hint: Settings → AI Models shows the
   steps open (install with the tool's own command for your OS, copy button
