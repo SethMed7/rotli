@@ -83,27 +83,44 @@ export function SidebarSwitcher({
     // sidebar's own content, not a tabpanel, and the pane tab strip already
     // owns the one tablist in the window (the app's segmented-control grammar)
     <div className="sb-switch" role="group" aria-label="Sidebar front">
-      {SIDEBAR_FRONTS.filter(({ id }) => id !== "chat" || LAUNCH_FEATURES.chat).map(
-        ({ id, label, Glyph, hint, action }) => {
-          const active = !breveActive && value === id;
+      {SIDEBAR_FRONTS.map(({ id, label, Glyph, hint, action }) => {
+        const active = !breveActive && value === id;
+        if (id === "chat" && !LAUNCH_FEATURES.chat) {
+          // Rotli Web: chat lives with the models on the Mac. The front stays
+          // visible so the product reads whole, says so on hover, and one
+          // click opens the site (the download) in a new tab.
           return (
-            <button
+            <a
               key={id}
-              type="button"
-              aria-pressed={active}
-              data-tour={id === "chat" ? "chat" : undefined}
-              title={hint}
-              data-hotkey={action}
-              className={active ? "sb-switch-seg sel" : "sb-switch-seg"}
-              onClick={() => onPick(id)}
+              className="sb-switch-seg desktop-only"
+              aria-disabled="true"
+              title="Chat is available in the Mac app — click to get Rotli for Mac"
+              href="/"
+              target="_blank"
+              rel="noopener"
             >
               <Glyph size={14} />
               <span className="sb-switch-label">{label}</span>
-              {id === "chat" && chatCount > 0 && <span className="sb-switch-n">{chatCount}</span>}
-            </button>
+            </a>
           );
-        },
-      )}
+        }
+        return (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={active}
+            data-tour={id === "chat" ? "chat" : undefined}
+            title={hint}
+            data-hotkey={action}
+            className={active ? "sb-switch-seg sel" : "sb-switch-seg"}
+            onClick={() => onPick(id)}
+          >
+            <Glyph size={14} />
+            <span className="sb-switch-label">{label}</span>
+            {id === "chat" && chatCount > 0 && <span className="sb-switch-n">{chatCount}</span>}
+          </button>
+        );
+      })}
       {onBreve && (
         <button
           type="button"

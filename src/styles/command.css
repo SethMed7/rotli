@@ -3306,3 +3306,15 @@
   margin-top: 14px;
   text-decoration: none;
 }
+
+/* Rotli Web's connect-a-folder explanation: the rename card, a little wider,
+   with plain paragraphs before the actions */
+.web-connect-card {
+  max-width: 34rem;
+}
+.web-connect-line {
+  margin: 0 0 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}

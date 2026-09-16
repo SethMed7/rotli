@@ -428,15 +428,19 @@ export function EditorSurface({
               Restore
             </button>
           )}
-          {LAUNCH_FEATURES.chat && (
+          {
             <button
               type="button"
               ref={chatChipRef}
               className="aachip"
-              disabled={chatBusy || pending}
+              disabled={chatBusy || pending || !LAUNCH_FEATURES.chat}
               aria-label="Chats on this note"
               aria-haspopup="menu"
-              title="Chats on this note — ⌥-click continues the latest"
+              title={
+                LAUNCH_FEATURES.chat
+                  ? "Chats on this note — ⌥-click continues the latest"
+                  : "Chats on this note — available in the Mac app"
+              }
               onClick={(event) => openChatChip(event.altKey)}
               onContextMenu={(event) => {
                 event.preventDefault();
@@ -445,7 +449,7 @@ export function EditorSurface({
             >
               <ChatGlyph size={15} />
             </button>
-          )}
+          }
           <button
             type="button"
             ref={aaChipRef}

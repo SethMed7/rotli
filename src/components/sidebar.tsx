@@ -21,7 +21,6 @@ import { type MemexInstance } from "../memex/config";
 import { initMemexAsCorpus } from "../memex/service";
 import { useConnectBrain, useForgetBrain, useMemexConfig, useSwitchVault } from "../memex/useMemex";
 import { openNewItemMenu } from "../newItems/menu";
-import { importFolderAndReload } from "../services/importedVault";
 import { mainFolderIds } from "../services/mainTree";
 import {
   vaultDisplayName,
@@ -29,12 +28,12 @@ import {
   vaultRowLabel,
   vaultSwitcherItems,
 } from "../services/vaultSwitcher";
-import { connectFolderVault, folderPickerSupported } from "../services/webVaultFolder";
 import { activateCreatedVault, reconnectActiveVault } from "../state/activeVault";
 import { useContextMenu } from "../state/contextMenu";
 import { useFocusedTab } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { requestVaultFolder } from "../state/vaultFolderBrowser";
+import { useWebVaultConnect } from "../state/webVaultConnect";
 import { BreveSidebar } from "./breve/breveSidebar";
 import { ChevronRight, MoreGlyph, NewFileGlyph, NewFolderGlyph, RefreshGlyph, VaultGlyph } from "./glyphs";
 import { SidebarChat } from "./sidebar/sidebarChat";
@@ -104,13 +103,8 @@ export function Sidebar() {
 
   const connectVault = async () => {
     if (isWebVault()) {
-      // Rotli Web: the browser's own folder picker (live folder where the
-      // API exists; a one-time import elsewhere); the page reloads from it
-      if (folderPickerSupported()) {
-        await connectFolderVault();
-        return;
-      }
-      await importFolderAndReload();
+      // Rotli Web: say what is about to happen, then the browser's own picker
+      useWebVaultConnect.getState().show();
       return;
     }
     const path = await requestVaultFolder({

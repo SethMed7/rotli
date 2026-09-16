@@ -30,12 +30,12 @@ export type FolderSupport =
   /** Firefox, Zen, Safari: a folder can be read once and copied in; Export gives it back. */
   | { kind: "import-only"; browser: string };
 
-/** What this browser can do with a folder. Brave hides behind a Chromium
- * user agent, so it is asked directly. */
-export async function browserFolderSupport(): Promise<FolderSupport> {
+/** What this browser can do with a folder, decided from what the page can
+ * see synchronously. Brave hides behind a Chromium user agent but exposes a
+ * `navigator.brave` object; its presence is the tell. */
+export function browserFolderSupportSync(): FolderSupport {
   if (folderPickerSupported()) return { kind: "live" };
-  const brave = (navigator as Navigator & { brave?: { isBrave?: () => Promise<boolean> } }).brave;
-  if (brave?.isBrave && (await brave.isBrave().catch(() => false))) return { kind: "brave-off" };
+  if ("brave" in navigator) return { kind: "brave-off" };
   const ua = navigator.userAgent;
   const browser = /Zen\//.test(ua)
     ? "Zen"
@@ -45,6 +45,11 @@ export async function browserFolderSupport(): Promise<FolderSupport> {
         ? "Safari"
         : "this browser";
   return { kind: "import-only", browser };
+}
+
+/** The same answer, for callers that already await. */
+export function browserFolderSupport(): Promise<FolderSupport> {
+  return Promise.resolve(browserFolderSupportSync());
 }
 
 export async function loadVaultHandle(): Promise<FileSystemDirectoryHandle | null> {

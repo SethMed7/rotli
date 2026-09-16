@@ -63,12 +63,21 @@ test("a note created in a fresh folder is there after a reload", async ({ page }
   await expect(page.locator('.main-tree [data-main-folder="1"]', { hasText: "Kept" })).toBeVisible();
 });
 
-test("the web build withholds chat and says where the notes live", async ({ page }) => {
+test("the web build shows chat disabled, pointing at the Mac app, and says where the notes live", async ({
+  page,
+}) => {
   await page.goto(APP);
   await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
   await expect(page.getByRole("button", { name: "Home", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Chat", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Chats on this note" })).toHaveCount(0);
+  const chatFront = page.locator(".sb-switch-seg.desktop-only");
+  await expect(chatFront).toBeVisible();
+  await expect(chatFront).toHaveAttribute("aria-disabled", "true");
+  await expect(chatFront).toHaveAttribute("href", "/");
+  await expect(chatFront).toHaveAttribute("title", /available in the Mac app/i);
+  const chip = page.getByRole("button", { name: "Chats on this note" });
+  await expect(chip).toBeVisible();
+  await expect(chip).toBeDisabled();
+  await expect(chip).toHaveAttribute("title", /available in the Mac app/);
 
   await page
     .getByRole("button", { name: /Settings/ })
@@ -103,4 +112,21 @@ test("Settings → General offers a real folder (Chromium) and says where the no
   await expect(page.getByText(/Your vault lives in this browser/)).toBeVisible();
   // headless Chromium has the picker, so the folder action is offered
   await expect(page.getByRole("button", { name: "Open a folder on this computer…" })).toBeVisible();
+});
+
+test("connecting a folder explains itself before the browser's picker, and can be cancelled", async ({
+  page,
+}) => {
+  await page.goto(APP);
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await page
+    .getByRole("button", { name: /Settings/ })
+    .first()
+    .click();
+  await page.getByRole("button", { name: "Open a folder on this computer…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Connect a folder" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("Nothing leaves your computer");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
 });

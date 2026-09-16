@@ -20,8 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   folders, Main and named views, settings, and the open tabs persist across
   reloads; a first visit seeds and opens the Welcome folder. Chat and every
   model lane, the Librarian, Breve, agents, sheets, Word files, and Finder
-  drops stay in the Mac app; the web build withholds them by platform
-  (Settings → General says where the notes live). Its top bar is a toolbar,
+  drops stay in the Mac app; the web build withholds them by platform.
+  Chat stays visible, disabled, and says on hover that it is in the Mac app
+  (a click opens the download); Settings → General says where the notes
+  live. Its top bar is a toolbar,
   not window chrome: the brand sits where the Mac app keeps its traffic
   lights and links back to the site, and there is no window drag or private
   browser. In Chrome, Edge, or Arc, **Open a folder on this computer**

@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
 
 import { isWebVault } from "../../lib/browserVault";
-import { forgetImportedVault, importFolderAndReload } from "../../services/importedVault";
+import { forgetImportedVault } from "../../services/importedVault";
 import { connectedFolderName, exportWebVault, webVaultMode } from "../../services/webNotes";
 import {
   type FolderSupport,
   type FolderVaultStatus,
   browserFolderSupport,
-  connectFolderVault,
   disconnectFolderVault,
   folderVaultStatus,
   reconnectFolderVault,
 } from "../../services/webVaultFolder";
+import { useWebVaultConnect } from "../../state/webVaultConnect";
 
 async function forgetImport(): Promise<void> {
   await forgetImportedVault();
@@ -27,6 +27,7 @@ export function WebVaultSettings() {
   const [status, setStatus] = useState<FolderVaultStatus | null>(null);
   const [support, setSupport] = useState<FolderSupport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const openConnect = useWebVaultConnect((s) => s.show);
   useEffect(() => {
     if (!web) return;
     void folderVaultStatus().then(setStatus);
@@ -73,7 +74,7 @@ export function WebVaultSettings() {
         </p>
       )}
       {support?.kind === "live" && status?.kind === "none" && (
-        <button type="button" className="ghostbtn" onClick={run(connectFolderVault)}>
+        <button type="button" className="ghostbtn" onClick={openConnect}>
           Open a folder on this computer…
         </button>
       )}
@@ -83,7 +84,7 @@ export function WebVaultSettings() {
         </button>
       )}
       {support && support.kind !== "live" && (
-        <button type="button" className="ghostbtn" onClick={run(importFolderAndReload)}>
+        <button type="button" className="ghostbtn" onClick={openConnect}>
           {mode === "imported" ? "Import a folder again…" : "Import a folder…"}
         </button>
       )}

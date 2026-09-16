@@ -29,6 +29,7 @@ import { BoardNameDialog } from "./components/boardNameDialog";
 import { Titlebar } from "./components/titlebar";
 import { WhichKey } from "./components/whichKey";
 import { VaultFolderBrowser } from "./components/vaultFolderBrowserDialog";
+import { WebVaultConnectDialog } from "./components/webVaultConnectDialog";
 import { registerDefaultActions } from "./keys/actions";
 import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/registry";
 import { hotkeyPeekDelay, useHeldModifier } from "./keys/useHeldModifier";
@@ -572,6 +573,7 @@ export default function App() {
     <>
       <MainShell />
       <VaultFolderBrowser />
+      {isWebVault() && <WebVaultConnectDialog />}
     </>
   );
 }

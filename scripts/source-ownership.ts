@@ -46,6 +46,7 @@ export const COMPONENT_DIRECTORY_OWNERS = {
  * Feature-specific helpers belong in a named COMPONENT_DIRECTORY_OWNERS home. */
 export const COMPONENT_ROOT_FILE_OWNERS = {
   "backToNotes.tsx": "shared back-to-panes control for full-content views",
+  "webVaultConnectDialog.tsx": "Rotli Web: the connect-a-folder explanation before the browser's own picker",
   "captureCard.tsx": "application-shell quick-capture entry",
   "captureReveal.ts": "capture presentation state shared by shell surfaces",
   "character.tsx": "shared character renderer",
