@@ -10,7 +10,10 @@ import type { Locator, Page } from "@playwright/test";
 /** Load the app and wait for the pane tree (the always-present tab strip) to
  * mount — the signal that the seeded corpus has rendered its first tab. */
 export async function gotoApp(page: Page): Promise<void> {
-  await page.goto("/");
+  // ROTLI_E2E_APP_PATH=/app/ runs the same specs against the web build
+  // served under its sub-path (bun run dev:web), so a shell fix is proved on
+  // both twins with one spec.
+  await page.goto(process.env.ROTLI_E2E_APP_PATH ?? "/");
   await page.getByRole("tablist").waitFor();
 }
 

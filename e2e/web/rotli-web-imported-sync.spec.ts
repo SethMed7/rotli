@@ -18,7 +18,16 @@ const SNAPSHOT = {
   name: "memex-copy",
   dirs: ["wiki", "chats", ".rotli"],
   files: {
-    "wiki/hello.md": "# Hello\n\nA note.\n",
+    "wiki/hello.md":
+      "---\nid: 01TESTNOTE0000000000000001\ntitle: Hello\nshelf: [Inbox]\n---\n\n# Hello\n\nA note.\n",
+    ".rotli/main.json": JSON.stringify({
+      version: 1,
+      tree: [{ folder: "Projects", children: [{ note: "01TESTNOTE0000000000000001" }] }],
+    }),
+    ".rotli/views.json": JSON.stringify({
+      version: 1,
+      views: [{ name: "OpenSource", tree: [{ note: "01TESTNOTE0000000000000001" }] }],
+    }),
     "chats/from-the-app.md": chatFile("From the app", "2026-09-10"),
     "chats/loose-chat.md": chatFile("Loose chat", "2026-09-12"),
     ".rotli/chat-folders.json": JSON.stringify({
@@ -29,6 +38,8 @@ const SNAPSHOT = {
     }),
     ".rotli/settings.json": JSON.stringify({
       onboarded: true,
+      theme: "dark",
+      themeFamily: "ocean",
       chatModel: { "corpus:from-the-app": "gemma-3-12b-it-qat-4bit", "corpus:loose-chat": "gpt-5.6-sol" },
     }),
   },
@@ -83,6 +94,19 @@ test("an imported vault shows the app's chats, their folders, and each chat's mo
   );
   await page.reload();
   await expect(page.getByRole("tab", { selected: true })).toContainText("Hello");
+
+  // the vault's own organization and look, exactly as the app keeps them:
+  // .rotli/main.json (Main folders), .rotli/views.json (named views),
+  // .rotli/settings.json (theme family and mode)
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "ocean-dark");
+  const mainFolder = page.locator('.main-tree [data-main-folder="1"]', { hasText: "Projects" });
+  await expect(mainFolder).toBeVisible();
+  await page.getByRole("button", { name: "Current view: Main. Change view" }).click();
+  await page.getByRole("menuitemcheckbox", { name: "OpenSource" }).click();
+  await expect(page.locator(".main-tree")).toHaveAttribute("data-active-view", "OpenSource");
+  await expect(page.locator(".main-tree").getByText("Hello", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Current view: OpenSource. Change view" }).click();
+  await page.getByRole("menuitemcheckbox", { name: /^Main/ }).click();
 
   // pair so Chat is a front, then read the sidebar
   await page.locator(".sb-switch-seg.desktop-only").click();
