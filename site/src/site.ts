@@ -17,7 +17,11 @@
 // anchors instead. Nothing in the site may claim the source is public unless
 // this is true.
 //
-// All three are read from the process environment during the build, so Railway
+// WEB_APP_ENABLED decides whether pages link to Rotli Web (the app served
+// from /app/ on this origin). Same fail-closed rule: only the exact string
+// "true" shows the links.
+//
+// All four are read from the process environment during the build, so Railway
 // service variables (forwarded as Docker build args) are the only knobs.
 
 import { existsSync, statSync } from 'node:fs';
@@ -29,6 +33,10 @@ export const RELEASES_URL = 'https://github.com/SethMed7/rotli-releases/releases
 // The newest notarized DMG, downloaded directly. scripts/release.sh publishes a
 // stable-named copy (Rotli.dmg) on every release, so this never needs editing.
 export const DOWNLOAD_URL = `${RELEASES_URL}/download/Rotli.dmg`;
+/** Rotli Web, served from this same origin under /app/ (site/Caddyfile,
+ * site/Dockerfile `app` stage). The path is fixed; whether pages link to it is
+ * the WEB_APP_ENABLED knob below. */
+export const WEB_APP_PATH = '/app/';
 export const LICENSE_URL = `${GITHUB_URL}/blob/main/LICENSE`;
 export const PRIVACY_URL = `${GITHUB_URL}/blob/main/PRIVACY.md`;
 export const ROADMAP_URL = `${GITHUB_URL}/blob/main/ROADMAP.md`;
@@ -73,6 +81,13 @@ function readUrl(): string {
 /** Fail closed: anything other than the exact string "true" means private. */
 function readSourcePublic(): boolean {
   return (process.env.SOURCE_REPOSITORY_PUBLIC ?? '').trim() === 'true';
+}
+
+/** Fail closed: pages link to Rotli Web only when this is exactly "true".
+ * The bundle may be present under /app/ regardless; the knob decides whether
+ * the site advertises it, so a deployment can rehearse the app privately. */
+function readWebAppEnabled(): boolean {
+  return (process.env.WEB_APP_ENABLED ?? '').trim() === 'true';
 }
 
 /**
@@ -175,6 +190,8 @@ export const site = {
   showsExperiments: mode === 'dev',
   /** Links to the source repository and its documents are rendered. */
   sourcePublic: readSourcePublic(),
+  /** The hero, navigation, and footer link to Rotli Web at WEB_APP_PATH. */
+  webAppEnabled: readWebAppEnabled(),
   /** Teaser (hero) and full launch film, when their artifacts are present. */
   promo: readPromo(),
 } as const;

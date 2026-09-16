@@ -24,34 +24,67 @@
 	root * /srv
 	encode zstd gzip
 
-	import security
+	# Rotli Web: the app bundle (built with ROTLI_WEB_BASE=/app/) served from
+	# /app/ on the same origin with ITS OWN headers. The site policy below sets
+	# `style-src 'self'`, which the app cannot live under (CodeMirror,
+	# Excalidraw, and Univer inject styles at runtime), so the two are
+	# mutually exclusive `handle` blocks rather than one header stacked on
+	# another. `connect-src 'none'` is the product promise: the browser refuses
+	# every outbound request, so a browser vault cannot leave the tab. Unknown
+	# /app/ paths fall back to the app's index.html (client routing); hashed
+	# assets are immutable.
+	handle /app/* {
+		header {
+			Content-Security-Policy "default-src 'self'; base-uri 'none'; connect-src 'none'; font-src 'self' data:; form-action 'none'; frame-ancestors 'none'; img-src 'self' blob: data:; media-src 'self' blob: data:; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; upgrade-insecure-requests"
+			Cross-Origin-Opener-Policy "same-origin"
+			Cross-Origin-Resource-Policy "same-origin"
+			Permissions-Policy "camera=(), geolocation=(), microphone=()"
+			Referrer-Policy "strict-origin-when-cross-origin"
+			Strict-Transport-Security "max-age=31536000"
+			X-Content-Type-Options "nosniff"
+			X-Frame-Options "DENY"
+			X-Robots-Tag "noindex, nofollow"
+			-Server
+		}
+		@appAssets path /app/assets/*
+		header @appAssets Cache-Control "public, max-age=31536000, immutable"
+		try_files {path} /app/index.html
+		file_server
+	}
 
-	@immutable path /_astro/*
-	header @immutable Cache-Control "public, max-age=31536000, immutable"
+	# The marketing site: everything that is not /app/.
+	handle {
+		import security
 
-	@fonts path /fonts/*
-	header @fonts Cache-Control "public, max-age=604800, stale-while-revalidate=86400"
+		@immutable path /_astro/*
+		header @immutable Cache-Control "public, max-age=31536000, immutable"
 
-	@captures path /rotli-app-*.png /rotli-playground*.png
-	header @captures Cache-Control "public, max-age=86400, stale-while-revalidate=86400"
+		@fonts path /fonts/*
+		header @fonts Cache-Control "public, max-age=604800, stale-while-revalidate=86400"
 
-	# The launch film (same-origin only; CSP media-src 'self'). The caddy:alpine
-	# image ships no /etc/mime.types and Go's built-in table knows neither .mp4
-	# nor .vtt, so the types are explicit: with X-Content-Type-Options: nosniff a
-	# captions track that is not text/vtt is refused by browsers. file_server
-	# answers Range requests, which native <video> controls need for seeking.
-	@media path /media/*
-	header @media Cache-Control "public, max-age=86400, stale-while-revalidate=86400"
-	@mp4 path /media/*.mp4
-	header @mp4 Content-Type "video/mp4"
-	@vtt path /media/*.vtt
-	header @vtt Content-Type "text/vtt; charset=utf-8"
+		@captures path /rotli-app-*.png /rotli-playground*.png
+		header @captures Cache-Control "public, max-age=86400, stale-while-revalidate=86400"
 
-	# The dev site is never indexed; the build already emits noindex meta and a
-	# Disallow robots.txt, this is the HTTP-layer twin (SITE_MODE is a runtime
-	# variable on Railway as well as a build arg).
-	@dev expression `{env.SITE_MODE} == "dev"`
-	header @dev X-Robots-Tag "noindex, nofollow"
+		# The launch film (same-origin only; CSP media-src 'self'). The caddy:alpine
+		# image ships no /etc/mime.types and Go's built-in table knows neither .mp4
+		# nor .vtt, so the types are explicit: with X-Content-Type-Options: nosniff a
+		# captions track that is not text/vtt is refused by browsers. file_server
+		# answers Range requests, which native <video> controls need for seeking.
+		@media path /media/*
+		header @media Cache-Control "public, max-age=86400, stale-while-revalidate=86400"
+		@mp4 path /media/*.mp4
+		header @mp4 Content-Type "video/mp4"
+		@vtt path /media/*.vtt
+		header @vtt Content-Type "text/vtt; charset=utf-8"
+
+		# The dev site is never indexed; the build already emits noindex meta and a
+		# Disallow robots.txt, this is the HTTP-layer twin (SITE_MODE is a runtime
+		# variable on Railway as well as a build arg).
+		@dev expression `{env.SITE_MODE} == "dev"`
+		header @dev X-Robots-Tag "noindex, nofollow"
+
+		file_server
+	}
 
 	# Astro's directory format: /mcp/ -> /mcp/index.html. Caddy redirects a bare
 	# /mcp to /mcp/ on its own. Unknown paths fall through to the 404 page.
@@ -61,6 +94,4 @@
 		rewrite @notfound /404.html
 		file_server
 	}
-
-	file_server
 }

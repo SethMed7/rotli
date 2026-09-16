@@ -14,6 +14,7 @@
 // away from Home and Chat in both directions (audit 2026-09-02 §1.3). Before
 // this it was an unlabeled coffee icon in the header row with no shortcut.
 
+import { LAUNCH_FEATURES } from "../../lib/featurePolicy";
 import type { ContentView, DashboardSection, SidebarView } from "../../state/ui";
 import { ChatGlyph, CoffeeGlyph, HomeGlyph } from "../glyphs";
 
@@ -82,25 +83,27 @@ export function SidebarSwitcher({
     // sidebar's own content, not a tabpanel, and the pane tab strip already
     // owns the one tablist in the window (the app's segmented-control grammar)
     <div className="sb-switch" role="group" aria-label="Sidebar front">
-      {SIDEBAR_FRONTS.map(({ id, label, Glyph, hint, action }) => {
-        const active = !breveActive && value === id;
-        return (
-          <button
-            key={id}
-            type="button"
-            aria-pressed={active}
-            data-tour={id === "chat" ? "chat" : undefined}
-            title={hint}
-            data-hotkey={action}
-            className={active ? "sb-switch-seg sel" : "sb-switch-seg"}
-            onClick={() => onPick(id)}
-          >
-            <Glyph size={14} />
-            <span className="sb-switch-label">{label}</span>
-            {id === "chat" && chatCount > 0 && <span className="sb-switch-n">{chatCount}</span>}
-          </button>
-        );
-      })}
+      {SIDEBAR_FRONTS.filter(({ id }) => id !== "chat" || LAUNCH_FEATURES.chat).map(
+        ({ id, label, Glyph, hint, action }) => {
+          const active = !breveActive && value === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={active}
+              data-tour={id === "chat" ? "chat" : undefined}
+              title={hint}
+              data-hotkey={action}
+              className={active ? "sb-switch-seg sel" : "sb-switch-seg"}
+              onClick={() => onPick(id)}
+            >
+              <Glyph size={14} />
+              <span className="sb-switch-label">{label}</span>
+              {id === "chat" && chatCount > 0 && <span className="sb-switch-n">{chatCount}</span>}
+            </button>
+          );
+        },
+      )}
       {onBreve && (
         <button
           type="button"

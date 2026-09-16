@@ -10,6 +10,7 @@ import { ChatGlyph, ChevronRight, MetaGlyph } from "../components/glyphs";
 import { useNoteMenu } from "../components/useNoteMenu";
 import { dispatch } from "../keys/registry";
 import { relativeLabel } from "../lib/dateLabels";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { brainLocationLabel, noteDiskFolder, noteLocationLabel } from "../lib/noteLocation";
 import { corpusNoteAbsolutePath, corpusRawFrontmatter, corpusWriteFrontmatterRaw } from "../lib/tauri";
 import { useNow } from "../lib/useNow";
@@ -390,22 +391,24 @@ export function EditorSurface({
               {noteLocationLabel(brainFolder, shownInMain)}
             </button>
           </div>
-          <button
-            type="button"
-            ref={chatChipRef}
-            className="aachip"
-            disabled={chatBusy || pending}
-            aria-label="Chats on this note"
-            aria-haspopup="menu"
-            title="Chats on this note — ⌥-click continues the latest"
-            onClick={(event) => openChatChip(event.altKey)}
-            onContextMenu={(event) => {
-              event.preventDefault();
-              openChatChip(false);
-            }}
-          >
-            <ChatGlyph size={15} />
-          </button>
+          {LAUNCH_FEATURES.chat && (
+            <button
+              type="button"
+              ref={chatChipRef}
+              className="aachip"
+              disabled={chatBusy || pending}
+              aria-label="Chats on this note"
+              aria-haspopup="menu"
+              title="Chats on this note — ⌥-click continues the latest"
+              onClick={(event) => openChatChip(event.altKey)}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                openChatChip(false);
+              }}
+            >
+              <ChatGlyph size={15} />
+            </button>
+          )}
           <button
             type="button"
             ref={aaChipRef}

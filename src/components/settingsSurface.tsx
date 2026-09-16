@@ -150,6 +150,7 @@ import { AboutPane } from "./settings/aboutPane";
 import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { Seg } from "./settings/seg";
 import { VoiceSettings } from "./settings/voiceSettings";
+import { WebVaultSettings } from "./settings/webVaultSettings";
 import { WelcomeSettings } from "./welcomeSettings";
 type SettingsPane =
   | "general"
@@ -848,6 +849,7 @@ function GeneralPane() {
         ones in its <code>2/4</code>.
       </p>
 
+      <WebVaultSettings />
       <WelcomeSettings disabled={memexConfig.data?.developmentReadOnly ?? import.meta.env.DEV} />
       <UpdatesSection />
 

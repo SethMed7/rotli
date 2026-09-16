@@ -6,7 +6,7 @@ import showcaseManifest from '../assets/characters/showcase/showcase.json';
 import SiteFooter from './SiteFooter.astro';
 import SiteHeader from './SiteHeader.astro';
 import PlaygroundStory from './PlaygroundStory.astro';
-import { DOWNLOAD_URL, GITHUB_URL, PRIVACY_URL, RELEASES_URL, ROADMAP_URL, site } from '../site';
+import { DOWNLOAD_URL, GITHUB_URL, PRIVACY_URL, RELEASES_URL, ROADMAP_URL, WEB_APP_PATH, site } from '../site';
 
 // Hero leads with the full promo (falls back to the teaser if the full cut
 // is missing). The same clip is never stacked twice below.
@@ -18,9 +18,13 @@ const heroFilm = site.promo.full.enabled
 
 // Secondary calls to action fall back to local anchors while the source
 // repository is private (site.sourcePublic is false by default).
-const secondaryAction = site.sourcePublic
-  ? { href: GITHUB_URL, label: 'Explore the source', external: true }
-  : { href: '#organize', label: 'How organization works', external: false };
+// Rotli Web outranks the source link in the hero: it is the thing a visitor
+// can do right now. The source stays one click away in the footer.
+const secondaryAction = site.webAppEnabled
+  ? { href: WEB_APP_PATH, label: 'Try it in your browser', external: false }
+  : site.sourcePublic
+    ? { href: GITHUB_URL, label: 'Explore the source', external: true }
+    : { href: '#organize', label: 'How organization works', external: false };
 
 const finalAction = site.sourcePublic
   ? { href: GITHUB_URL, label: 'View on GitHub', external: true }
@@ -29,6 +33,7 @@ const finalAction = site.sourcePublic
 const footerLinks = [
   ...(site.sourcePublic ? [{ href: GITHUB_URL, label: 'GitHub' }] : []),
   ...(site.downloadsEnabled ? [{ href: RELEASES_URL, label: 'Releases' }] : []),
+  ...(site.webAppEnabled ? [{ href: WEB_APP_PATH, label: 'Rotli Web' }] : []),
   { href: '#workspace', label: 'Workspace' },
   { href: '#playground', label: 'Playground' },
   ...(site.showsExperiments ? [{ href: '/mcp/', label: 'MCP guide' }] : []),
@@ -167,6 +172,7 @@ const experiments = [
       { href: '#organize', label: 'Organize' },
       { href: '#workspace', label: 'Workspace' },
       { href: '#personal', label: 'Themes' },
+      ...(site.webAppEnabled ? [{ href: '#web', label: 'In your browser' }] : []),
       ...(site.showsExperiments
         ? [
             { href: '#beyond-the-app', label: 'More than an app' },
@@ -412,6 +418,27 @@ const experiments = [
         </dl>
       </div>
     </section>
+
+    {site.webAppEnabled && (
+      <section class="privacy-story web-story" id="web" aria-labelledby="web-title" data-reveal>
+        <div class="privacy-copy">
+          <h2 id="web-title">The same workspace, in your browser. Still nothing leaves your computer.</h2>
+          <p>
+            Rotli Web is the Mac app's editor, folders, tasks, links, and boards served from this site.
+            There is no account. Your vault lives in this browser on this device, and the page's security
+            policy forbids it from sending anything anywhere.
+          </p>
+          <dl class="boundary-list">
+            <div><dt>Where notes live</dt><dd>In this browser's storage, on this device. Clearing site data removes them, so export what you keep.</dd></div>
+            <div><dt>What stays in the Mac app</dt><dd>Chat and every model, the Librarian, Breve, Word and sheet files, and Finder drops.</dd></div>
+            <div><dt>Moving to the Mac</dt><dd>Export the vault as a folder of Markdown files and open it in Rotli for Mac.</dd></div>
+          </dl>
+          <p class="hero-actions">
+            <a class="button secondary" href={WEB_APP_PATH}>Open Rotli Web</a>
+          </p>
+        </div>
+      </section>
+    )}
 
     <section class="personal-story" id="personal" aria-labelledby="personal-title">
       <div class="personal-heading" data-reveal>

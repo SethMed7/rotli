@@ -5,7 +5,7 @@
 
 import { create } from "zustand";
 
-import { corpusMainRead, corpusMainWrite, isTauri } from "../lib/tauri";
+import { corpusMainRead, corpusMainWrite, hasDurableCorpus } from "../lib/tauri";
 import { createRevisionedTrackedWrite } from "../lib/trackedWrite";
 import {
   EMPTY_MAIN,
@@ -56,8 +56,9 @@ export const useMainStore = create<MainState>((set) => ({
     }
     const cleaned = liveIds ? gcManifest(tree, liveIds) : tree;
     const manifest: MainManifest = { version: 1, tree: cleaned };
-    set({ manifest, saveState: isTauri() ? "saving" : "saved", error: null, dirty: isTauri() });
-    if (!isTauri()) return;
+    const durable = hasDurableCorpus();
+    set({ manifest, saveState: durable ? "saving" : "saved", error: null, dirty: durable });
+    if (!durable) return;
     mainWriter.write(serializeMainManifest(manifest), (ok, error) => {
       if (ok) set({ saveState: "saved", dirty: false });
       else

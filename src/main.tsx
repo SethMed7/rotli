@@ -4,6 +4,7 @@ import ReactDOM from "react-dom/client";
 
 import App from "./app";
 import { attachIdleMotion } from "./lib/idleMotion";
+import { hydrateWebNotes } from "./services/notes";
 import { queryClient } from "./services/query";
 import { attachPersistence, hydratePersistedState, runDeferredMaintenance } from "./state/persist";
 
@@ -23,6 +24,7 @@ const root = document.getElementById("root");
 if (!root) throw new Error("missing #root element");
 
 async function bootstrap(rootEl: HTMLElement): Promise<void> {
+  await hydrateWebNotes(); // Rotli Web restores its notes first; a no-op elsewhere
   await hydratePersistedState(); // no-op in a plain browser; never throws
   ReactDOM.createRoot(rootEl).render(
     <React.StrictMode>

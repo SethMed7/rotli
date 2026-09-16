@@ -14,6 +14,7 @@ import type {
   BreveDeliverySettings,
 } from "../routines/breveTypes";
 import type { SearchHit, WelcomeSeed } from "../types";
+import { browserVault, isWebVault } from "./browserVault";
 import {
   type VaultBrowserView,
   browserEmptyFolders,
@@ -25,54 +26,23 @@ export function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window;
 }
 
-export type ModelUsageRange = "24h" | "7d" | "30d" | "90d";
-
-export interface ModelUsageTokens {
-  uncachedInputTokens: number;
-  cachedInputTokens: number;
-  cacheCreationTokens: number;
-  outputTokens: number;
-  /** A subset of output tokens; never add it to a total. */
-  reasoningTokens: number;
+/** True when durable state has somewhere to live: the Tauri shell (files
+ * through Rust) or Rotli Web (the browser vault). The plain browser twin used
+ * by tests and `vite dev` has neither and keeps everything in memory. Stores
+ * that persist consult this, not `isTauri`, so the web build saves. */
+export function hasDurableCorpus(): boolean {
+  return isTauri() || isWebVault();
 }
 
-export interface ModelUsageBucket {
-  bucketStartMs: number;
-  provider: "claude" | "codex";
-  model: string;
-  tokens: ModelUsageTokens;
-  responses: number;
-  sessions: number;
-}
-
-export interface ModelUsageTotal {
-  provider: "claude" | "codex";
-  model: string;
-  tokens: ModelUsageTokens;
-  responses: number;
-  sessions: number;
-}
-
-export interface ModelUsageSource {
-  provider: "claude" | "codex";
-  status: "ok" | "missing" | "partial";
-  scannedFiles: number;
-  skippedFiles: number;
-  malformedRecords: number;
-  message?: string;
-}
-
-export interface ModelUsageSummary {
-  range: ModelUsageRange;
-  readAtMs: number;
-  sinceMs: number;
-  untilMs: number;
-  bucketMs: number;
-  totalSessions: number;
-  buckets: ModelUsageBucket[];
-  models: ModelUsageTotal[];
-  sources: ModelUsageSource[];
-}
+export type {
+  ModelUsageBucket,
+  ModelUsageRange,
+  ModelUsageSource,
+  ModelUsageSummary,
+  ModelUsageTokens,
+  ModelUsageTotal,
+} from "./modelUsageTypes";
+import type { ModelUsageRange, ModelUsageSummary } from "./modelUsageTypes";
 
 /** Aggregate provider-owned local session histories. Rust chooses the only
  * directories that can be scanned and returns counts only—never transcript
@@ -191,11 +161,13 @@ export async function setAppIcon(variant: string): Promise<void> {
 /** Machine-level shell/onboarding preferences. These exist before a vault and
  * intentionally contain no notes, views, or vault-scoped AI policy. */
 export async function appSettingsRead(): Promise<string> {
+  if (isWebVault()) return (await browserVault().read("app-settings")) ?? "{}";
   if (!isTauri()) return "{}";
   return invoke<string>("app_settings_read");
 }
 
 export async function appSettingsWrite(contents: string): Promise<void> {
+  if (isWebVault()) return browserVault().write("app-settings", contents);
   if (!isTauri()) return;
   await invoke("app_settings_write", { contents });
 }
@@ -1556,6 +1528,7 @@ export interface CorpusConfigView {
 /** True only after the user has selected or created a primary vault. This is a
  * read-only probe and never creates the historical default folder. */
 export function corpusStatus(): Promise<boolean> {
+  // Rotli Web is always "configured": its vault is the browser, born ready.
   if (!isTauri()) return Promise.resolve(true);
   return invoke<boolean>("corpus_status");
 }
@@ -1754,11 +1727,20 @@ export type SettingsFile = "settings" | "viewstate";
  * daemon's own convergence state and is never webview-writable (#44). */
 export type WritableSettingsFile = "settings" | "viewstate";
 
-export function corpusSettingsRead(file: SettingsFile): Promise<string> {
+export async function corpusSettingsRead(file: SettingsFile): Promise<string> {
+  if (isWebVault()) {
+    const stored = await browserVault().read(`settings:${file}`);
+    // A first visit has no settings yet: empty defaults, like a fresh vault on
+    // the Mac. Viewstate stays a miss so the pristine startup pane applies.
+    if (stored === undefined && file === "settings") return "{}";
+    if (stored === undefined) throw new Error(`settings file not found: ${file}`);
+    return stored;
+  }
   return corpusInvoke("corpus_settings_read", { file });
 }
 
 export function corpusSettingsWrite(file: WritableSettingsFile, contents: string): Promise<void> {
+  if (isWebVault()) return browserVault().write(`settings:${file}`, contents);
   return corpusInvoke("corpus_settings_write", { file, contents });
 }
 
@@ -1766,9 +1748,11 @@ export function corpusSettingsWrite(file: WritableSettingsFile, contents: string
  * work, unlike per-machine settings/viewstate, and stale whole-tree writes must
  * never replace a newer CLI/MCP/window edit. */
 export function corpusMainRead(): Promise<VersionedText> {
+  if (isWebVault()) return browserVault().readVersioned("main");
   return corpusInvoke("corpus_main_read");
 }
 export function corpusMainWrite(contents: string, expectedRevision: string): Promise<string> {
+  if (isWebVault()) return browserVault().writeVersioned("main", contents, expectedRevision);
   return corpusInvoke("corpus_main_write", { contents, expectedRevision });
 }
 
@@ -1776,9 +1760,11 @@ export function corpusMainWrite(contents: string, expectedRevision: string): Pro
  * host validates unique names and singular membership, then keeps Markdown's
  * managed `view_tag` aligned; boards and binaries remain frontmatter-free. */
 export function corpusViewsRead(): Promise<VersionedText> {
+  if (isWebVault()) return browserVault().readVersioned("views");
   return corpusInvoke("corpus_views_read");
 }
 export function corpusViewsWrite(contents: string, expectedRevision: string): Promise<string> {
+  if (isWebVault()) return browserVault().writeVersioned("views", contents, expectedRevision);
   return corpusInvoke("corpus_views_write", { contents, expectedRevision });
 }
 

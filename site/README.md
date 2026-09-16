@@ -51,6 +51,14 @@ bun run preview  # serve the built dist/ locally
   under review. App enforcement is separate: Breve and Mermaid visual editing
   are disabled in stable builds; conventional file adapters remain available
   pending fidelity review. Site labels do not enforce app access.
+- `WEB_APP_ENABLED` decides whether pages link to **Rotli Web**, the app bundle
+  served from `/app/` on this origin. Fails closed: only the exact string
+  `"true"` shows the hero action, the navigation entry, and the footer link.
+  The bundle is built by the `app` stage of `site/Dockerfile` (repository
+  root, `ROTLI_WEB_BASE=/app/ ROTLI_PLATFORM=web bun run build`) and served
+  by the `handle /app/*` block in `site/Caddyfile` under its own headers
+  (`connect-src 'none'`, inline styles allowed for the editors, `noindex`).
+  Design and phases: `docs/design/web-version-and-shell-batch-2026-09-16.md`.
 - `SOURCE_REPOSITORY_PUBLIC` decides whether pages link to the source
   repository (GitHub header/footer links, "Explore the source", LICENSE,
   PRIVACY.md, ROADMAP.md, and the MCP contract documents). The repository is

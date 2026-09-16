@@ -721,28 +721,30 @@ export function registerDefaultActions(): void {
   // Chat is a FRONT now, not a section. ⌃⌘⇧2 opens a fresh chat pane (it moved
   // off ⌃⌘2 so the two fronts could own ⌃⌘1/⌃⌘2 — bindings persist by action
   // id, so an existing override is untouched). Both reach ⌘K and are rebindable.
-  registerAction({
-    id: "chat.new",
-    title: "New chat",
-    defaultChord: "Meta+Ctrl+Shift+2",
-    run: () => {
-      const ui = useUiStore.getState();
-      ui.setSettingsOpen(false);
-      ui.setSidebarMode("notes");
-      ui.setSidebarView("chat");
-      // chat is a PANE surface now — open a fresh chat pane. The old contentView
-      // "chat" was retired and rendered nothing (the maintainer, 2026-06-30 — audit).
-      usePanesStore.getState().openChat(null);
-    },
-  });
-  registerAction({
-    id: "chat.summon",
-    title: "Summon chat",
-    defaultChord: "Alt+A", // "ask" — the ⌥-letter global family (⌥Space/⌥C/⌥Q)
-    global: true, // the OS chord lives in Rust (show_main + rotli:summon-chat);
-    // run() keeps palette/dispatch parity for in-app invocation
-    run: () => void summonChat(),
-  });
+  if (LAUNCH_FEATURES.chat)
+    registerAction({
+      id: "chat.new",
+      title: "New chat",
+      defaultChord: "Meta+Ctrl+Shift+2",
+      run: () => {
+        const ui = useUiStore.getState();
+        ui.setSettingsOpen(false);
+        ui.setSidebarMode("notes");
+        ui.setSidebarView("chat");
+        // chat is a PANE surface now — open a fresh chat pane. The old contentView
+        // "chat" was retired and rendered nothing (the maintainer, 2026-06-30 — audit).
+        usePanesStore.getState().openChat(null);
+      },
+    });
+  if (LAUNCH_FEATURES.chat)
+    registerAction({
+      id: "chat.summon",
+      title: "Summon chat",
+      defaultChord: "Alt+A", // "ask" — the ⌥-letter global family (⌥Space/⌥C/⌥Q)
+      global: true, // the OS chord lives in Rust (show_main + rotli:summon-chat);
+      // run() keeps palette/dispatch parity for in-app invocation
+      run: () => void summonChat(),
+    });
   registerAction({
     id: "palette.summon",
     title: "Summon search",
@@ -779,31 +781,34 @@ export function registerDefaultActions(): void {
           ),
       );
   };
-  registerAction({
-    id: "note.chat",
-    title: "Chat with this note",
-    defaultChord: "Meta+Shift+C",
-    run: () => runNoteChat(false),
-  });
-  registerAction({
-    id: "note.chatNew",
-    title: "New chat about this note",
-    defaultChord: null,
-    run: () => runNoteChat(true),
-  });
-  registerAction({
-    id: "chat.all",
-    title: "All chats",
-    defaultChord: null,
-    run: () => {
-      const ui = useUiStore.getState();
-      ui.setSettingsOpen(false);
-      ui.setSidebarMode("notes");
-      ui.setSidebarView("chat");
-      // open the All-chats content view (the Chat-front twin of All notes)
-      ui.setContentView("allChats");
-    },
-  });
+  if (LAUNCH_FEATURES.chat)
+    registerAction({
+      id: "note.chat",
+      title: "Chat with this note",
+      defaultChord: "Meta+Shift+C",
+      run: () => runNoteChat(false),
+    });
+  if (LAUNCH_FEATURES.chat)
+    registerAction({
+      id: "note.chatNew",
+      title: "New chat about this note",
+      defaultChord: null,
+      run: () => runNoteChat(true),
+    });
+  if (LAUNCH_FEATURES.chat)
+    registerAction({
+      id: "chat.all",
+      title: "All chats",
+      defaultChord: null,
+      run: () => {
+        const ui = useUiStore.getState();
+        ui.setSettingsOpen(false);
+        ui.setSidebarMode("notes");
+        ui.setSidebarView("chat");
+        // open the All-chats content view (the Chat-front twin of All notes)
+        ui.setContentView("allChats");
+      },
+    });
 
   // — the capture card's own keys (surface: capture — its webview's dispatcher
   //   routes these; the textarea never grows ad-hoc listeners) —

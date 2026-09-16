@@ -1,0 +1,79 @@
+// Rotli Web (ROTLI_PLATFORM=web): the browser is the vault. Every test gets a
+// fresh browser context, so IndexedDB starts empty — a first visit.
+
+import { expect, test } from "@playwright/test";
+
+const APP = "/app/";
+
+test("a first visit seeds the Welcome folder and opens the welcome note", async ({ page }) => {
+  await page.goto(APP);
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await expect(page.locator(".main-tree", { hasText: "Welcome" })).toBeVisible();
+  // the demo corpus of the desktop twin never seeds here
+  await expect(page.getByRole("tab", { name: /notes first/ })).toHaveCount(0);
+});
+
+test("an edit, the open tab, and Main survive a reload", async ({ page }) => {
+  await page.goto(APP);
+  const editor = page.locator(".cm-content").first();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await editor.click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" persisted-in-this-browser");
+  await expect(editor).toContainText("persisted-in-this-browser");
+  // the real signal: the vault (IndexedDB) holds the edit — the editor's
+  // autosave and the vault writer are both debounced
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            new Promise<boolean>((resolve) => {
+              const open = indexedDB.open("rotli-web");
+              open.onsuccess = () => {
+                const db = open.result;
+                if (!db.objectStoreNames.contains("vault")) return resolve(false);
+                const get = db.transaction("vault").objectStore("vault").get("notes");
+                get.onsuccess = () => resolve(String(get.result ?? "").includes("persisted-in-this-browser"));
+                get.onerror = () => resolve(false);
+              };
+              open.onerror = () => resolve(false);
+            }),
+        ),
+      { timeout: 10_000 },
+    )
+    .toBe(true);
+
+  await page.reload();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await expect(page.locator(".cm-content").first()).toContainText("persisted-in-this-browser");
+  // the Welcome folder was not re-seeded over the edit: still one welcome note
+  await expect(page.locator(".main-tree").getByText("Welcome to Rotli", { exact: true })).toHaveCount(1);
+});
+
+test("a note created in a fresh folder is there after a reload", async ({ page }) => {
+  await page.goto(APP);
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await page.getByRole("button", { name: "New folder in Main" }).click();
+  await page.getByRole("textbox", { name: "New folder in Main" }).fill("Kept");
+  await page.getByRole("textbox", { name: "New folder in Main" }).press("Enter");
+  await expect(page.locator('.main-tree [data-main-folder="1"]', { hasText: "Kept" })).toBeVisible();
+
+  await page.reload();
+  await expect(page.locator('.main-tree [data-main-folder="1"]', { hasText: "Kept" })).toBeVisible();
+});
+
+test("the web build withholds chat and says where the notes live", async ({ page }) => {
+  await page.goto(APP);
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await expect(page.getByRole("button", { name: "Home", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Chat", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Chats on this note" })).toHaveCount(0);
+
+  await page
+    .getByRole("button", { name: /Settings/ })
+    .first()
+    .click();
+  await expect(page.getByRole("heading", { name: "Rotli Web" })).toBeVisible();
+  await expect(page.getByText(/Your vault lives in this browser/)).toBeVisible();
+});
