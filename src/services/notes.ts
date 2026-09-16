@@ -7,10 +7,14 @@
 
 import { isWebVault } from "../lib/browserVault";
 import { isTauri } from "../lib/tauri";
+import { registerWebAiCorpus, registerWebMemexBridge } from "../lib/webAiSeam";
 import { seedDemoCorpus, seedReservedRoots } from "./demoCorpus";
 import { FsNotesService } from "./fsNotes";
+import { hydrateHelperLink } from "./helperLink";
 import { InMemoryNotesService } from "./inMemoryNotes";
 import type { NotesService } from "./notesPort";
+import { createWebAiCorpus } from "./webAiCorpus";
+import { createWebChatStore, webMemexBridge } from "./webChats";
 import { activeWebNotesService, hydrateWebNotes, webNotesService, webVaultWasRestored } from "./webNotes";
 
 export { InMemoryNotesService, ulid } from "./inMemoryNotes";
@@ -71,6 +75,12 @@ export let notesService: NotesService = FS_MODE
  * render (main.tsx awaits it). Resolves what hydrateWebNotes resolves. */
 export async function hydrateWebVault(): Promise<boolean> {
   const restored = await hydrateWebNotes();
-  if (WEB_MODE) notesService = activeWebNotesService(notesService);
+  if (WEB_MODE) {
+    notesService = activeWebNotesService(notesService);
+    // the model's view of this vault, and the helper that runs the model
+    registerWebAiCorpus(createWebAiCorpus(() => notesService));
+    registerWebMemexBridge(webMemexBridge(createWebChatStore()));
+    await hydrateHelperLink();
+  }
   return restored;
 }

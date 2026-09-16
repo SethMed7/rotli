@@ -22,6 +22,7 @@ import { mainHasNote } from "../services/mainTree";
 import { markNoteDraftChanged } from "../services/noteDrafts";
 import { useChatSetupGuide } from "../state/chatSetupGuide";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
+import { useHelperLink } from "../state/helperLink";
 import { useMainStore } from "../state/main";
 import { backId, forwardId, useNavHistory } from "../state/navHistory";
 import { MEASURE_MAX_WIDTH, useNoteStyle } from "../state/noteStyle";
@@ -163,6 +164,8 @@ export function EditorSurface({
   const rootRef = useRef<HTMLDivElement>(null);
   const aaChipRef = useRef<HTMLButtonElement>(null);
   const chatChipRef = useRef<HTMLButtonElement>(null);
+  // Rotli Web: paired with Rotli Helper, the chip opens chats like the app
+  const chatReady = useHelperLink((s) => LAUNCH_FEATURES.chat || s.link !== null);
 
   /** The chat chip: a note owns MANY chats (the maintainer, 2026-07-30). No chats yet →
    * create the first directly; otherwise a picker menu lists them (newest work
@@ -438,16 +441,16 @@ export function EditorSurface({
               aria-label="Chats on this note"
               aria-haspopup="menu"
               title={
-                LAUNCH_FEATURES.chat
+                chatReady
                   ? "Chats on this note — ⌥-click continues the latest"
                   : "Chats on this note — not set up on the web yet, click to see how"
               }
               onClick={(event) =>
-                LAUNCH_FEATURES.chat ? openChatChip(event.altKey) : useChatSetupGuide.getState().show()
+                chatReady ? openChatChip(event.altKey) : useChatSetupGuide.getState().show()
               }
               onContextMenu={(event) => {
                 event.preventDefault();
-                if (LAUNCH_FEATURES.chat) openChatChip(false);
+                if (chatReady) openChatChip(false);
                 else useChatSetupGuide.getState().show();
               }}
             >

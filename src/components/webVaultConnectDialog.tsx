@@ -18,7 +18,7 @@ export function connectDialogCopy(support: FolderSupport): {
   action: string;
 } {
   const promise =
-    "Nothing leaves your computer. This page cannot make network requests — its security policy forbids them — so the files are read by the page and go nowhere else.";
+    "Nothing leaves your computer. This page's security policy allows one kind of network request: to Rotli Helper on this same computer, if you pair one for chat. The files are read by the page and go nowhere else.";
   if (support.kind === "live") {
     return {
       title: "Connect a folder",

@@ -57,7 +57,7 @@ bun run preview  # serve the built dist/ locally
   The bundle is built by the `app` stage of `site/Dockerfile` (repository
   root, `ROTLI_WEB_BASE=/app/ ROTLI_PLATFORM=web bun run build`) and served
   by the `handle /app/*` block in `site/Caddyfile` under its own headers
-  (`connect-src 'none'`, inline styles allowed for the editors, `noindex`).
+  (`connect-src` loopback only, for Rotli Helper; inline styles allowed for the editors; `noindex`).
   Design and phases: `docs/design/web-version-and-shell-batch-2026-09-16.md`.
 - To SEE Rotli Web locally: `bun run dev:web` at the repository root serves it
   with hot reload at `http://localhost:1437/app/` (no security headers; for

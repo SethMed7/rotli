@@ -16,6 +16,7 @@
 
 import { LAUNCH_FEATURES } from "../../lib/featurePolicy";
 import { useChatSetupGuide } from "../../state/chatSetupGuide";
+import { useHelperLink } from "../../state/helperLink";
 import type { ContentView, DashboardSection, SidebarView } from "../../state/ui";
 import { ChatGlyph, CoffeeGlyph, HomeGlyph } from "../glyphs";
 
@@ -79,6 +80,8 @@ export function SidebarSwitcher({
   /** Present when the Breve segment is offered (the main window). */
   onBreve?: (() => void) | undefined;
 }) {
+  // Rotli Web: paired with Rotli Helper, chat is a real front
+  const helperLinked = useHelperLink((s) => s.link !== null);
   return (
     // role="group" + aria-pressed, NOT a tablist: these segments switch the
     // sidebar's own content, not a tabpanel, and the pane tab strip already
@@ -86,7 +89,7 @@ export function SidebarSwitcher({
     <div className="sb-switch" role="group" aria-label="Sidebar front">
       {SIDEBAR_FRONTS.map(({ id, label, Glyph, hint, action }) => {
         const active = !breveActive && value === id;
-        if (id === "chat" && !LAUNCH_FEATURES.chat) {
+        if (id === "chat" && !LAUNCH_FEATURES.chat && !helperLinked) {
           // Rotli Web: chat needs the tools on the user's computer. The front
           // stays visible so the product reads whole, says so on hover, and
           // one click opens the walkthrough that gets it there.

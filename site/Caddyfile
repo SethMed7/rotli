@@ -29,13 +29,17 @@
 	# `style-src 'self'`, which the app cannot live under (CodeMirror,
 	# Excalidraw, and Univer inject styles at runtime), so the two are
 	# mutually exclusive `handle` blocks rather than one header stacked on
-	# another. `connect-src 'none'` is the product promise: the browser refuses
+	# another. `connect-src` names loopback alone: the browser refuses
 	# every outbound request, so a browser vault cannot leave the tab. Unknown
 	# /app/ paths fall back to the app's index.html (client routing); hashed
 	# assets are immutable.
 	handle /app/* {
 		header {
-			Content-Security-Policy "default-src 'self'; base-uri 'none'; connect-src 'none'; font-src 'self' data:; form-action 'none'; frame-ancestors 'none'; img-src 'self' blob: data:; media-src 'self' blob: data:; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; upgrade-insecure-requests"
+			# connect-src: loopback ONLY — Rotli Helper on the user's own computer
+			# (chat through the AI tools installed there). No upgrade-insecure-requests
+			# here: it would rewrite http://127.0.0.1 to https and the helper speaks
+			# plain http on loopback (the site block above still redirects to https).
+			Content-Security-Policy "default-src 'self'; base-uri 'none'; connect-src http://127.0.0.1:* http://localhost:*; font-src 'self' data:; form-action 'none'; frame-ancestors 'none'; img-src 'self' blob: data:; media-src 'self' blob: data:; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:"
 			Cross-Origin-Opener-Policy "same-origin"
 			Cross-Origin-Resource-Policy "same-origin"
 			Permissions-Policy "camera=(), geolocation=(), microphone=()"

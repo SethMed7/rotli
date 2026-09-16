@@ -12,6 +12,12 @@
       "reason": "Synthesis verdict: do not fix. The organizer daemon's model-offline backoff (BACKOFF_MIN/MAX ladder) and Breve's restart/lock retry are independently tuned policies for different failure domains; converging them would couple an in-app daemon to a launchd runtime."
     },
     {
+      "id": "loopback-http-status-vocabulary",
+      "signal": "literal",
+      "files": ["src-tauri/src/helper.rs", "src-tauri/src/loopback_http.rs"],
+      "reason": "Not a mirror: loopback_http.rs owns the status \u2192 reason-phrase map for every loopback adapter, and helper.rs is a router that necessarily names the statuses it answers with (204/403/404 \u2026). The shared literals are a caller using its own transport's vocabulary; collapsing them would mean inventing a constant per status code for no behavioural gain. The reading, bearer, refusal-document, and body-bound policy IS shared (loopback_http.rs read_http_head / bearer_authorized / unauthorized / not_found / read_http_body)."
+    },
+    {
       "id": "egress-policy-mirror",
       "signal": "literal",
       "files": ["breve-runtime/scripts/safe-fetch.ts", "src-tauri/src/web.rs"],
@@ -67,6 +73,12 @@
       "signal": "shingle",
       "files": ["src/components/nameFieldDialog.tsx", "src/components/webDialogFrame.tsx"],
       "reason": "The same Escape-closes-the-card keydown handler the shared dialog grammar prescribes (see web-connect-dialog-shares-rename-card)."
+    },
+    {
+      "id": "web-ai-corpus-mirrors-rust-note-meta",
+      "signal": "literal",
+      "files": ["src-tauri/src/workspace.rs", "src/services/webAiCorpus.ts"],
+      "reason": "MIRROR-NOT-IMPORT: the web's model-facing corpus (services/webAiCorpus.ts) projects the same note-meta field names (folderId, diskFolderId) Rust serialises across the IPC boundary; the shared literals are the wire shape, not copied logic (2026-09-16)."
     }
   ]
 }

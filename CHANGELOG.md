@@ -34,6 +34,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   folder** keeps a copy in the browser and **Export vault (.zip)** gives it
   back. Boards are the next phase
   (`docs/design/web-version-and-shell-batch-2026-09-16.md`).
+- **Rotli Helper: chat on the web.** A small program you run on your own
+  computer (`rotli-helper`, Mac, Windows, and Linux; not the Mac app) lets
+  Rotli Web chat through the AI tools installed there — Claude Code, Codex,
+  Cursor — with your notes as context. Start it, paste the pairing code it
+  prints into Chat → Connect, and Chat is a real front: the tools' guides
+  then know what is installed, and a message goes to the tool you pick and
+  its reply comes back. The helper listens only on your own computer, only
+  for pages from rotli.co, and only for a paired page; images are not sent
+  through it in this release, and a note in a secure folder or carrying a
+  secret never reaches a model. No downloads are published yet: build it
+  with `cargo build --release --bin rotli-helper`. Safari cannot reach the
+  helper; every other desktop browser can (some ask once for local network
+  access). Web chats are not saved yet.
 - **Guided setup for the connected models.** A lane that is not ready walks
   you through it instead of hiding a hint: Settings → AI Models shows the
   steps open (install with the tool's own command for your OS, copy button

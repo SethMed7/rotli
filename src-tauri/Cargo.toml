@@ -4,6 +4,15 @@ version = "1.0.0"
 description = "rotli — warm, local-first, hotkey-driven notes for the Mac menu bar"
 authors = ["Rotli contributors"]
 edition = "2021"
+# Two binaries live here: the Tauri app (`src/main.rs`) and `rotli-helper`
+# (`src/bin/rotli_helper.rs`), the standalone loopback bridge Rotli Web pairs
+# with. The file is snake_case because `check:structure` holds that law for
+# `src-tauri/src`; the explicit target keeps the user-facing command hyphenated.
+default-run = "rotli"
+
+[[bin]]
+name = "rotli-helper"
+path = "src/bin/rotli_helper.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

@@ -1226,6 +1226,21 @@
   font-size: 12px;
   color: var(--text-muted);
 }
+.guide-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.guide-pair-input {
+  min-width: 0;
+  width: 18rem;
+  max-width: 100%;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12px;
+}
+.guide-pair-error {
+  color: var(--danger);
+}
 .guide-lanes {
   display: flex;
   flex-wrap: wrap;

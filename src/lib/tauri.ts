@@ -21,6 +21,12 @@ import {
   browserVaultHome,
   browserVaultPreview,
 } from "./vaultBrowserPreview";
+import {
+  type WebAiCorpusShape,
+  currentWebAiBridge,
+  currentWebAiCorpus,
+  currentWebMemexBridge,
+} from "./webAiSeam";
 
 export function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window;
@@ -477,7 +483,10 @@ export interface ChatModelInfo {
  * instead of hanging, and string command errors arrive as Error. */
 function aiInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!isTauri()) {
-    return Promise.reject(new Error(`${cmd}: the on-device model only exists inside the Tauri shell`));
+    const bridge = currentWebAiBridge();
+    return bridge
+      ? (bridge(cmd, args) as Promise<T>)
+      : Promise.reject(new Error(`${cmd}: the on-device model only exists inside the Tauri shell`));
   }
   return invoke<T>(cmd, args).catch((err: unknown) => {
     throw err instanceof Error ? err : new Error(String(err));
@@ -1103,8 +1112,10 @@ export interface FrontmatterView {
 }
 
 /** Read a note's frontmatter for the metadata panel (display + lock state). */
+export type WebAiCorpus = WebAiCorpusShape<CorpusNoteMeta, SearchHit, CorpusAiRead, FrontmatterView>;
+const webCorpus = (): WebAiCorpus | null => currentWebAiCorpus<WebAiCorpus>();
 export async function corpusFrontmatter(id: string): Promise<FrontmatterView | null> {
-  if (!isTauri()) return null;
+  if (!isTauri()) return webCorpus()?.frontmatter(id) ?? null;
   return invoke<FrontmatterView>("corpus_frontmatter", { id });
 }
 
@@ -1411,7 +1422,7 @@ export async function corpusReadAiVersioned(
   id: string,
   model: Pick<ChatModelInfo, "id" | "endpoint">,
 ): Promise<CorpusAiRead> {
-  if (!isTauri()) return { body: "", revision: "browser:0" };
+  if (!isTauri()) return webCorpus()?.read(id) ?? { body: "", revision: "browser:0" };
   return invoke<CorpusAiRead>("corpus_read_ai", {
     id,
     modelId: model.id,
@@ -1438,7 +1449,7 @@ export async function corpusReadableIds(
   ids: string[],
   model: Pick<ChatModelInfo, "id" | "endpoint">,
 ): Promise<string[]> {
-  if (!isTauri()) return [];
+  if (!isTauri()) return webCorpus()?.readableIds(ids) ?? [];
   return invoke<string[]>("corpus_readable_ids", {
     ids,
     modelId: model.id,
@@ -1462,7 +1473,7 @@ export async function corpusSearchAi(
   includeReference: boolean,
   model: Pick<ChatModelInfo, "id" | "endpoint">,
 ): Promise<SearchHit[]> {
-  if (!isTauri()) return [];
+  if (!isTauri()) return webCorpus()?.search(query, limit) ?? [];
   return invoke<SearchHit[]>("corpus_search_ai", {
     query,
     ...(limit === undefined ? {} : { limit }),
@@ -1479,7 +1490,7 @@ export async function corpusSearchAi(
 export async function corpusNotesAi(
   model: Pick<ChatModelInfo, "id" | "endpoint">,
 ): Promise<CorpusNoteMeta[]> {
-  if (!isTauri()) return [];
+  if (!isTauri()) return webCorpus()?.list() ?? [];
   return invoke<CorpusNoteMeta[]>("corpus_notes_ai", {
     modelId: model.id,
     endpoint: model.endpoint,
@@ -1643,9 +1654,9 @@ export function corpusListConfig(): Promise<CorpusConfigView> {
     return Promise.resolve({
       corpus: {
         absPath: "~/Rotli",
-        isMemex: false,
-        memexId: null,
-        perms: null,
+        isMemex: isWebVault(),
+        memexId: isWebVault() ? "browser-vault" : null,
+        perms: isWebVault() ? "chats+inbox" : null,
         brainEnabled: true,
       },
       brains: [],
@@ -1936,7 +1947,10 @@ export interface MemexValidateReport {
 
 function memexInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!isTauri()) {
-    return Promise.reject(new Error(`${cmd}: the memex bridge only exists inside the Tauri shell`));
+    const bridge = currentWebMemexBridge();
+    return bridge
+      ? (bridge(cmd, args) as Promise<T>)
+      : Promise.reject(new Error(`${cmd}: the memex bridge only exists inside the Tauri shell`));
   }
   return invoke<T>(cmd, args).catch((err: unknown) => {
     throw err instanceof Error ? err : new Error(String(err));

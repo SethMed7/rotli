@@ -4,12 +4,19 @@
 // shows every step undone.
 
 import { type CliDetect, cliDetect, isTauri } from "../lib/tauri";
+import { helperLinked } from "../state/helperLink";
 
 export type { CliDetect };
 
+/** Something on this computer can run a model: the Mac app's Rust side, or
+ * Rotli Helper paired with the web page. */
+export function chatRuntimeAvailable(): boolean {
+  return isTauri() || helperLinked();
+}
+
 /** Whether Rotli can look at the user's machine for a connector at all. */
 export function canDetectConnectors(): boolean {
-  return isTauri();
+  return chatRuntimeAvailable();
 }
 
 /** The shared detection query for one lane (same key as Settings → AI Models). */
@@ -22,7 +29,7 @@ export function connectorDetectionQuery(lane: string): {
   return {
     queryKey: ["cli-detect", lane] as const,
     queryFn: () => cliDetect(lane),
-    enabled: isTauri(),
+    enabled: chatRuntimeAvailable(),
     staleTime: 60_000,
   };
 }

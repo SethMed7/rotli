@@ -3,7 +3,9 @@
 // "Check again". Used by the Settings lane cards, the chat's empty state,
 // and Rotli Web's chat setup.
 
-import { type GuideStep, connectorGuide, guideOs, stepDone } from "../../ai/connectorGuides";
+import type { ReactNode } from "react";
+
+import { type GuideStep as GuideStepData, connectorGuide, guideOs, stepDone } from "../../ai/connectorGuides";
 import { PROVIDER_LABELS, type ProviderId } from "../../ai/models";
 import type { CliDetect } from "../../services/connectorSetup";
 import { CheckGlyph, CopyGlyph } from "../glyphs";
@@ -27,6 +29,37 @@ function CopyCommand({ command }: { command: string }) {
   );
 }
 
+/** One numbered step of any walkthrough: the number (a tick when done) and
+ * whatever the step says. The connector guide and the web's chat setup share it. */
+export function GuideStep({
+  n,
+  done,
+  title,
+  children,
+}: {
+  n: number;
+  done: boolean;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <li className={done ? "guide-step done" : "guide-step"}>
+      <span className="guide-step-n" aria-hidden="true">
+        {done ? <CheckGlyph size={12} /> : n}
+      </span>
+      <span className="guide-step-body">
+        <span className="guide-step-title">{title}</span>
+        {children}
+      </span>
+    </li>
+  );
+}
+
+/** The ordered list the steps sit in. */
+export function GuideSteps({ children }: { children: ReactNode }) {
+  return <ol className="ailane-steps guide-steps">{children}</ol>;
+}
+
 export function ConnectorGuide({
   lane,
   detection,
@@ -39,41 +72,35 @@ export function ConnectorGuide({
   onRecheck?: (() => void) | undefined;
   checking?: boolean;
 }) {
-  const steps: GuideStep[] = connectorGuide(lane, guideOs(navigator.platform || navigator.userAgent));
+  const steps: GuideStepData[] = connectorGuide(lane, guideOs(navigator.platform || navigator.userAgent));
   if (steps.length === 0) return null;
   return (
     <div className="guide" aria-label={`Set up ${PROVIDER_LABELS[lane]}`}>
-      <ol className="ailane-steps guide-steps">
+      <GuideSteps>
         {steps.map((step, index) => {
           const done = stepDone(step, detection);
           return (
-            <li key={step.id} className={done ? "guide-step done" : "guide-step"}>
-              <span className="guide-step-n" aria-hidden="true">
-                {done ? <CheckGlyph size={12} /> : index + 1}
+            <GuideStep key={step.id} n={index + 1} done={done} title={step.title}>
+              {step.command && <CopyCommand command={step.command} />}
+              <span className="guide-step-detail">
+                {step.id === "check" && !onRecheck
+                  ? "Once the helper is connected, Rotli sees the tool on its own."
+                  : step.detail}
               </span>
-              <span className="guide-step-body">
-                <span className="guide-step-title">{step.title}</span>
-                {step.command && <CopyCommand command={step.command} />}
-                <span className="guide-step-detail">
-                  {step.id === "check" && !onRecheck
-                    ? "Once the helper is connected, Rotli sees the tool on its own."
-                    : step.detail}
-                </span>
-                {step.id === "check" && onRecheck && (
-                  <button
-                    type="button"
-                    className="ghostbtn guide-check"
-                    disabled={checking}
-                    onClick={onRecheck}
-                  >
-                    {checking ? "Checking…" : "Check again"}
-                  </button>
-                )}
-              </span>
-            </li>
+              {step.id === "check" && onRecheck && (
+                <button
+                  type="button"
+                  className="ghostbtn guide-check"
+                  disabled={checking}
+                  onClick={onRecheck}
+                >
+                  {checking ? "Checking…" : "Check again"}
+                </button>
+              )}
+            </GuideStep>
           );
         })}
-      </ol>
+      </GuideSteps>
     </div>
   );
 }

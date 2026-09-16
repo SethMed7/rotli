@@ -75,12 +75,11 @@ test("the web build keeps Chat visible; clicking it walks through the helper and
   await chatFront.click();
   const dialog = page.getByRole("dialog", { name: "Chat on the web" });
   await expect(dialog).toBeVisible();
-  // step 1 leads with the helper on every OS and is honest that it is not
-  // shipped; the Mac app is an aside, never the only door
-  await expect(dialog.getByText("Install Rotli Helper")).toBeVisible();
-  await expect(dialog.getByText(/not released yet/)).toBeVisible();
-  await expect(dialog.getByRole("button", { name: /Get Rotli Helper/ })).toBeDisabled();
-  await expect(dialog.getByRole("link", { name: /Prefer the Mac app/ })).toHaveAttribute("href", "/");
+  // step 1 leads with the helper on every OS, honest that it is built from
+  // source today; step 2 is the live pairing form
+  await expect(dialog.getByText("Run Rotli Helper")).toBeVisible();
+  await expect(dialog.getByText(/build it from the Rotli source/)).toBeVisible();
+  await expect(dialog.getByLabel("Paste the pairing code the helper printed:")).toBeVisible();
   // step 3 the user can do now: the real install + sign-in commands, copyable
   await expect(dialog.getByText("npm install -g @anthropic-ai/claude-code")).toBeVisible();
   await expect(dialog.getByText("claude auth login")).toBeVisible();

@@ -239,7 +239,61 @@ Phases, each its own branch after this one merges:
    mode stays as the zero-install fallback.
 
 Estimate: phases 1–3 about three weeks; phase 4 two to three more. The
-hosted shape is off the table for now. Nothing of the helper is started.
+hosted shape is off the table for now.
+
+**Rotli Helper, first cut (landed 2026-09-16 evening, branch
+`feat/rotli-helper`).** Phase 1 and phase 3 together, without the terminal
+(phase 2) — the owner's ask was to use the web chat, and Rotli's chat UI
+through the CLI bridge is that. What exists:
+
+- `src-tauri/src/bin/rotli-helper.rs` + `src-tauri/src/helper.rs`: a second
+  bin target of the same crate (it links `rotli_lib`; the GUI feature gate
+  is NOT done — the binary is fat but standalone; on Linux it needs the
+  webkit2gtk runtime library present). Binds `127.0.0.1:43111`, bearer token
+  (32+ chars, `~/.rotli-helper/token` mode 0600, printed once as a pairing
+  code `port:token`), thread per connection, origin allowlist (rotli.co,
+  dev.rotli.co, localhost:1437), Host check, JSON only, bounded bodies and
+  connections. Routes: `GET /health`, `POST /rpc` with `cli_detect`,
+  `cli_complete` (text only — images are refused so no CLI file tool is
+  reachable from a browser-delivered prompt), `cli_cancel`, `chat_models`
+  (`[]`). The same `secret::blocked_for_remote` gate runs before every
+  completion, in the shared `provider::complete_connected`.
+- The page: `src/lib/helperPairing.ts` (pure code parser), `helperClient.ts`
+  (the only `fetch` in `src/`, declared in the egress allowlist),
+  `state/helperLink.ts`, `services/helperLink.ts` (pair, check, unpair;
+  link in the browser vault; registers the AI bridge into the IPC seam),
+  `services/webAiCorpus.ts` (the model's view of the browser vault: a note
+  in a secure folder or with a secret in its body is withheld from every
+  model — the web's twin of Rust's read gate). `chatRuntimeAvailable()` =
+  Tauri or paired; Chat, the note chip, the lane guides, and the chat
+  surface follow it.
+- `/app/`'s CSP: `connect-src http://127.0.0.1:* http://localhost:*`, and no
+  `upgrade-insecure-requests` (it would rewrite the loopback URL to https).
+  The promise is now "nothing leaves this computer": the page talks to the
+  helper, and the helper talks to the AI tool's provider exactly as the
+  terminal does.
+
+Honest limits and the Codex threat review's open points (2026-09-16):
+
+| Point | State |
+|---|---|
+| Browser support | Chrome, Edge, Brave (1.88+), Arc: a "local network access" permission prompt on first pairing. Firefox/Zen: allowed. **Safari refuses an https page reaching http://127.0.0.1**: unsupported. Not yet verified per browser from here. |
+| Secure notes on the web | Enforced in TypeScript (`webAiCorpus`): the browser is the trusted side on the web because there is no Rust corpus. Rust's marker scan runs again in the helper. A note marked `secure: true` by hand that neither sits in a secure folder nor trips the detector is NOT withheld — the notes port does not surface frontmatter flags yet (follow-up). |
+| Token boundary | The pairing lives in IndexedDB of the site origin; marketing-page XSS (`unsafe-inline` allowed there) could read it. Follow-ups: a dedicated app origin (app.rotli.co) and expiring per-origin credentials; `rotli-helper --reset-token` revokes today. |
+| Chats persist | Yes, in the browser vault (`services/webChats.ts` answers the `memex_*` chat commands over keys `chat:<slug>`; revision-gated). In folder mode they land in `.rotli/`, not as `chats/*.md` files yet (follow-up: write them through the vault-dir port). Observed 2026-09-16: after a send the Chat sidebar lists the chat twice for a moment (the run row and the saved row); check natively whether the desktop does the same. |
+| Note edits by the model | `update_note`/`create_note` through the chat are refused on the web in this cut (they ride `corpus_write_ai`). Reads and search work. |
+| Distribution | No downloads yet: build with `cargo build --release --bin rotli-helper`. CI per-OS builds and a one-line installer are the next step. |
+| Terminal (phase 2) | Not started. |
+
+Proof (2026-09-16 evening): `bun run check` green (Rust: 495 tests, clippy clean, 12 helper
+tests over real sockets); `bun run test:e2e:web` 9/9 including `e2e/web/rotli-helper.spec.ts`
+(a Playwright-routed fake helper: pair, refuse a bad code, lane guide asks the helper, "Use
+Claude Code in chat", send, reply, pairing survives a reload, unpair); and one REAL run: the
+release binary on 127.0.0.1:43111, the real page at localhost:1435, pairing code pasted, Claude
+Code detected, "What is the capital of France?" answered "Paris" through the helper in 2.8 s,
+the chat tab restored after a reload. Running it: `cargo build --release --bin rotli-helper`,
+then `./src-tauri/target/release/rotli-helper` (add `--origin http://localhost:PORT` for a dev
+server on a port other than 1437; `--reset-token` mints a new pairing code).
 
 **Guided setup (landed 2026-09-16 PM, this branch).** The owner: "when not
 set up, clicking chat should walk me through the steps; same for the

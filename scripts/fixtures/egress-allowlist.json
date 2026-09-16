@@ -34,6 +34,7 @@
       ],
       "src-tauri/src/provider.rs": [
         "cli_complete",
+        "complete_connected",
         "generate_image",
         "organizer_egress_allowed"
       ],
@@ -72,7 +73,9 @@
   },
   "src": {
     "_comment": "Webview app code. connect-src is ipc-only, so a raw fetch( here cannot reach the network or the asset protocol; vault bytes ride corpusFileBytes. Declare a call site only with a documented reason.",
-    "rawFetchFiles": {}
+    "rawFetchFiles": {
+      "src/lib/helperClient.ts": "Rotli Web only: GET /health and POST /rpc to http://127.0.0.1:<port> — Rotli Helper on the user's own computer, bearer token from the pairing code. Never reachable in the Mac app (ipc-only connect-src); the site's /app/ policy opens connect-src to loopback alone (site/Caddyfile)."
+    }
   },
   "keychain": {
     "_comment": "The allowlisted account names may appear ONLY at their named-constant declaration sites + the parity fixture + tests. Any other literal occurrence fails the check — callers must import the constant.",
@@ -130,6 +133,7 @@
       "src-tauri/src/web_search.rs",
       "src-tauri/src/chat.rs",
       "src-tauri/src/provider.rs",
+      "src-tauri/src/helper.rs",
       "src-tauri/src/breve.rs",
       "src-tauri/src/private_browser.rs",
       "src-tauri/src/remote_agent.rs",

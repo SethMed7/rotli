@@ -55,6 +55,7 @@ import {
   projectChatWorkItems,
   visibleChatText,
 } from "../../lib/chatWork";
+import { PLATFORM } from "../../lib/featurePolicy";
 import { extOf, fileName, IMAGE_EXTS, imageMimeOf } from "../../lib/fileKind";
 import { useAnchoredPopoverBox, useTransientPopover } from "../../lib/popover";
 import {
@@ -99,11 +100,13 @@ import {
   saveChatFolders,
 } from "../../services/chatFolders";
 import { stashRefusedChatDrop } from "../../services/chatImages";
+import { chatRuntimeAvailable } from "../../services/connectorSetup";
 import { invalidateNotes, useNoteIndex } from "../../services/hooks";
 import { artifactMainFolderName, fileNoteInNamedRootFolder } from "../../services/mainTree";
 import { assignChatToView } from "../../services/viewTree";
 import { type ChatImageAttachment, chatDraftFor, useChatDrafts } from "../../state/chatDrafts";
 import { replyPending, useChatRuns } from "../../state/chatRuns";
+import { useChatSetupGuide } from "../../state/chatSetupGuide";
 import { useMainStore } from "../../state/main";
 import { touchChatActivity } from "../../state/mru";
 import { type Measure } from "../../state/noteStyle";
@@ -1213,7 +1216,7 @@ export function ChatSurface({
     queries: PROVIDER_IDS.map((id) => ({
       queryKey: ["cli-detect", id],
       queryFn: () => cliDetect(id),
-      enabled: isTauri() && aiProviders[id],
+      enabled: chatRuntimeAvailable() && aiProviders[id],
       staleTime: 60_000,
     })),
   });
@@ -2273,7 +2276,7 @@ export function ChatSurface({
     setArtifactsOpen(true);
   }, [artifactRevealKey, artifacts.length, artifactsCompact]);
   const showArtifactsPanel = artifactsOpen && !artifactsCompact;
-  const pristineChat = isTauri() && !chatSlug && messages.length === 0 && !busy;
+  const pristineChat = chatRuntimeAvailable() && !chatSlug && messages.length === 0 && !busy;
   const welcomeHour = new Date().getHours();
   const welcomeDaypart = chatDaypart(welcomeHour);
   const welcomeSuggestions = chatWelcomeSuggestions(welcomeHour);
@@ -2487,10 +2490,19 @@ export function ChatSurface({
         )}
       </header>
 
-      {!isTauri() ? (
+      {!chatRuntimeAvailable() ? (
         <div className="list-empty chat-empty">
           <Character name="listening" size={120} accessorized />
-          <p>Chat uses your vault as context — it runs in the app.</p>
+          {PLATFORM === "web" ? (
+            <>
+              <p>Chat runs the AI tools on your own computer. On the web that takes Rotli Helper.</p>
+              <button type="button" className="chat-cta" onClick={() => useChatSetupGuide.getState().show()}>
+                Set up chat on the web
+              </button>
+            </>
+          ) : (
+            <p>Chat uses your vault as context — it runs in the app.</p>
+          )}
         </div>
       ) : !active ? (
         <div className="list-empty chat-empty">
