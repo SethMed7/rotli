@@ -15,6 +15,7 @@
     "deps": "bun scripts/dependency-workflow.mjs",
     "dev": "vite",
     "dev:app": "bun --no-orphans scripts/tauri-dev-supervisor.ts",
+    "dev:web": "ROTLI_WEB_BASE=/app/ ROTLI_PLATFORM=web vite --port 1437 --strictPort",
     "build": "bun scripts/build-character-fills.mjs && bun scripts/sync-excalidraw-fonts.mjs && bun run check:breve-runtime && tsc && vite build",
     "build:web": "bun scripts/build-character-fills.mjs && bun scripts/sync-excalidraw-fonts.mjs && tsc && ROTLI_WEB_BASE=/app/ ROTLI_PLATFORM=web vite build",
     "preview": "vite preview",

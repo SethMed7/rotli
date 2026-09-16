@@ -59,6 +59,10 @@ bun run preview  # serve the built dist/ locally
   by the `handle /app/*` block in `site/Caddyfile` under its own headers
   (`connect-src 'none'`, inline styles allowed for the editors, `noindex`).
   Design and phases: `docs/design/web-version-and-shell-batch-2026-09-16.md`.
+- To SEE Rotli Web locally: `bun run dev:web` at the repository root serves it
+  with hot reload at `http://localhost:1437/app/` (no security headers; for
+  those, build the Docker prod twin below with `--build-arg WEB_APP_ENABLED=true`
+  and open `http://localhost:8080/app/`).
 - `SOURCE_REPOSITORY_PUBLIC` decides whether pages link to the source
   repository (GitHub header/footer links, "Explore the source", LICENSE,
   PRIVACY.md, ROADMAP.md, and the MCP contract documents). The repository is

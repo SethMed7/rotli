@@ -77,3 +77,17 @@ test("the web build withholds chat and says where the notes live", async ({ page
   await expect(page.getByRole("heading", { name: "Rotli Web" })).toBeVisible();
   await expect(page.getByText(/Your vault lives in this browser/)).toBeVisible();
 });
+
+test("the top bar is a toolbar, not window chrome: brand instead of traffic lights, no private browser", async ({
+  page,
+}) => {
+  await page.goto(APP);
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await expect(page.locator("html")).toHaveAttribute("data-platform", "web");
+  const brand = page.locator(".titlebar .tb-brand");
+  await expect(brand).toBeVisible();
+  await expect(brand).toHaveAttribute("href", "/");
+  await expect(page.locator(".titlebar .tb-inset")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "New private browser" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Search notes and actions/ })).toBeVisible();
+});

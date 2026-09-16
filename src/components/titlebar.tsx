@@ -12,6 +12,7 @@
 import type { MouseEvent } from "react";
 
 import { dispatch } from "../keys/registry";
+import { PLATFORM } from "../lib/featurePolicy";
 import { startWindowDrag, toggleMaximize } from "../lib/tauri";
 import { canBack, canForward, useNavHistory } from "../state/navHistory";
 import { usePanesStore } from "../state/panes";
@@ -34,13 +35,19 @@ import { Palette } from "./palette";
  * (the maintainer, 2026-06-15). */
 const TB_ICON = 16;
 
+/** Rotli Web: the bar is a toolbar inside a browser tab, not window chrome.
+ * No traffic-light inset (the brand sits there), no drag region, no zoom on
+ * double-click, and no private browser (that is a native webview). */
+const WEB = PLATFORM === "web";
+
 function onDragRegionMouseDown(event: MouseEvent) {
-  if (event.button !== 0 || event.detail > 1) return;
+  if (WEB || event.button !== 0 || event.detail > 1) return;
   void startWindowDrag();
 }
 
 /** Double-click an empty titlebar region → zoom, like every other Mac app. */
 function onDragRegionDoubleClick() {
+  if (WEB) return;
   void toggleMaximize();
 }
 
@@ -64,7 +71,18 @@ export function Titlebar() {
 
   return (
     <header className="titlebar">
-      <div className="tb-inset" onMouseDown={onDragRegionMouseDown} onDoubleClick={onDragRegionDoubleClick} />
+      {WEB ? (
+        <a className="tb-brand" href="/" title="Rotli — back to the site" aria-label="Rotli">
+          <QuokkaMark size={18} />
+          <span className="tb-brand-word">rotli</span>
+        </a>
+      ) : (
+        <div
+          className="tb-inset"
+          onMouseDown={onDragRegionMouseDown}
+          onDoubleClick={onDragRegionDoubleClick}
+        />
+      )}
       {/* always-visible sidebar toggle (the maintainer, 2026-06-15): the clear way to
           reopen a collapsed left menu — replaces the subtle warm-edge strip.
           .tb-lead left-aligns its tooltip so the label never clips off-window. */}
@@ -184,7 +202,7 @@ export function Titlebar() {
             <span className="tb-sep" aria-hidden="true" />
           </>
         )}
-        {!settingsOpen && (
+        {!settingsOpen && !WEB && (
           <IconButton label="New private browser" onClick={() => usePanesStore.getState().openBrowser()}>
             <BrowserGlyph size={TB_ICON} />
           </IconButton>

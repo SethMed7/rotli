@@ -21,8 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reloads; a first visit seeds and opens the Welcome folder. Chat and every
   model lane, the Librarian, Breve, agents, sheets, Word files, and Finder
   drops stay in the Mac app; the web build withholds them by platform
-  (Settings → General says where the notes live). Boards, "open a folder on
-  this computer", and export are the next phase
+  (Settings → General says where the notes live). Its top bar is a toolbar,
+  not window chrome: the brand sits where the Mac app keeps its traffic
+  lights and links back to the site, and there is no window drag or private
+  browser. Boards, "open a folder on this computer", and export are the next
+  phase
   (`docs/design/web-version-and-shell-batch-2026-09-16.md`).
 
 ### Fixed
