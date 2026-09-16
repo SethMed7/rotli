@@ -352,6 +352,52 @@ Sixteen items from the owner's list. Each landed with its tests and a
 `CHANGELOG.md` line, in commit clusters so the branch can be split into
 pull requests later. The table is filled from the code map below.
 
+### Review on both twins (2026-09-16 evening)
+
+The owner asked for every bug to be reviewed in the app and in Rotli Web.
+"App" below is the desktop browser twin plus the shared code the Mac app
+runs; "Web" is `bun run test:e2e:web` (browser vault) and, for the vault
+files, `e2e/web/rotli-web-imported-sync.spec.ts`. Native-only proofs (Finder
+drops, real files) still need the Mac app in hand.
+
+| # | Bug | App | Web |
+|---|---|---|---|
+| 1 | Delete a folder | Done for Main folders (`shell-batch` spec). Real Library directories still need a Rust command. | Same code; Main folders are `.rotli/main.json` in both. Not separately run (the web seeds no demo corpus). |
+| 2 | Drop image into a note | Native lane unchanged; the browser lane routes through `planDrop` with a notice. Native check owed. | The browser lane IS the web's lane: works for images; other files go to Assets with a notice. |
+| 3 | Drop image into a chat | Partial: a model that cannot see keeps the image in Assets and says so. Native check owed. | Not working: chats have no DataTransfer fallback (documented gap). |
+| 4 | Trash back button | Done (`system-back-and-restore`). | Done — the same spec passes against the web build. |
+| 5 | Restore to the original place | Done: the Main slot survives Trash/Archive. | Same code. |
+| 6 | Captures → Make a note | Done (`captureMerge.test.ts`). | Same code. |
+| 7 | Captures select all | Done (`range-select`). | Same code. |
+| 8, 9 | ⇧-click ranges (Captures, Main, System) | Done (`range-select`). | Same code. |
+| 10 | Restore inside a trashed note | Done (header chip). | Same code. |
+| 11 | Back for Library/Assets/Archive | Done. | Done — passes against the web build. |
+| 12 | All notes global + view tag | Done (`shell-batch`). | Same code. |
+| 13 | Wrapped-list alignment | Partial: wide markers landed; the wrap-boundary space needs a reproduction (the `pre-wrap` attempt broke the caret on the web and was reverted). | Same. |
+| 14 | Flat top-right icons | Done. | Done — passes against the web build. |
+| 15 | Copy a chat as raw Markdown | Done (`chatThreadModel.test.ts`); native check owed. | Same code. |
+| 16 | Chat: leave mid-run and return | Done (run store); native check owed. | Same code; the web's real run showed the reply in place. |
+| 21 | **NEW** Back does not return to the note you were in (reported 2026-09-16 PM) | Not reproduced yet. `nav.back` (⌘[) steps the note trail (`state/navHistory.ts`) and opens the target through `openNavTarget`; a trail entry is dropped when its tab closes and rewritten on rename, so the likely shapes are: the previous note lived in another pane, or the note you "were in" was reached without a trail push (a sidebar reveal, a search hit, a chat's note). Needs the exact steps. | Same code. |
+
+**Vault sync (the owner's law: everything lives in the vault).** Proven on
+the web with an imported copy of a vault: Main folders (`.rotli/main.json`),
+named views (`.rotli/views.json`), theme family and mode (`.rotli/settings.json`),
+chats (`chats/*.md`), chat folders (`.rotli/chat-folders.json`), each chat's
+model (`settings.json` → `chatModel`), and recency. Imported mode is a
+snapshot (Zen, Firefox, Safari, Brave without its flag): re-import to pick up
+the app's later changes. Live folder mode (Chrome, Edge, Arc, Brave with the
+flag) follows the real files.
+
+### Enhancements (reviewed 2026-09-16 evening)
+
+| Enhancement | Assessment |
+|---|---|
+| Chat says it "couldn't open ~/myela/…" instead of asking for permission | Today the connected CLIs run tool-less on purpose (`provider.rs`: Claude `--tools ""`, Codex read-only sandbox, Cursor Ask mode): a chat may read the vault through Rotli's own tools and nothing else. Asking for permission means a new capability: a per-chat, per-folder read grant (Rust `--add-dir`-style, shown as a prompt with the exact path, remembered per vault, never for secure notes), plus the model being told it can ask. Worth doing; it is a security change and needs its own design and Codex review. Not started. |
+| Sidebar opens on hover, closes when you leave | New. Small: a "hover to reveal" mode in Settings → General; the collapsed sidebar becomes a hot edge; keyboard focus and the tour keep the pinned behaviour. Not started. |
+| Sidebar on the right | New. Medium: mirror the shell grid, drag/resize math, tab-strip and pane placement; a Settings toggle plus the sidebar's own menu. Not started. |
+| Red underlines for misspelled words | **Already shipped.** Settings → Editor → Spellcheck toggles the OS spell checker on the editor (`spellcheck` content attribute; macOS's own dictionary in the app, the browser's on the web). No engine to add. |
+| ⌘← / ⌘→ for back and forward | Back and forward exist as ⌘[ and ⌘] (`nav.back`, `nav.forward`) and are remappable in Settings → Hotkeys. ⌘← / ⌘→ are macOS's line-start/line-end in every text field, so binding them app-wide would fight the editor; a user who wants them can rebind. |
+
 ### Status (2026-09-16, end of session)
 
 | Item | State | Proof |
