@@ -282,6 +282,11 @@ export function activeWebNotesService(fallback: NotesService): NotesService {
 }
 
 /** The connected folder's name, or null when notes live in the browser. */
+/** The connected (or imported) folder's directory port; null in browser mode. */
+export function activeWebVaultDir(): VaultDir | null {
+  return folderDir;
+}
+
 export function connectedFolderName(): string | null {
   return folderName;
 }

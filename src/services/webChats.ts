@@ -8,6 +8,7 @@ import type { VaultStore } from "../lib/browserVault";
 import { BrowserVault, RevisionConflict, browserVault } from "../lib/browserVault";
 import type { MemexChatSummary } from "../lib/tauri";
 import type { WebMemexBridge } from "../lib/webAiSeam";
+import type { VaultDir } from "./vaultDir";
 
 const INDEX_KEY = "chat-index";
 const FOLDERS_KEY = "chat-folders";
@@ -53,7 +54,7 @@ function parseIndex(raw: string | undefined): IndexEntry[] {
 }
 
 /** The chat store over one vault; the bridge below routes the memex commands to it. */
-export class WebChatStore {
+export class WebChatStore implements ChatStore {
   constructor(private readonly vault: BrowserVault) {}
 
   private async index(): Promise<IndexEntry[]> {
@@ -139,8 +140,106 @@ export class WebChatStore {
   }
 }
 
+/** What the memex chat commands need from a store, whichever backs it. */
+export interface ChatStore {
+  list(): Promise<MemexChatSummary[]>;
+  read(slug: string): Promise<{ contents: string; revision: string }>;
+  write(slug: string, contents: string, expectedRevision: string | null): Promise<string>;
+  remove(slug: string, bin: "trash" | "archive"): Promise<void>;
+  folders(): Promise<{ contents: string; revision: string }>;
+  writeFolders(contents: string, expectedRevision: string): Promise<string>;
+}
+
+const CHATS_DIR = "chats";
+const CHAT_FOLDERS_FILE = ".rotli/chat-folders.json";
+const CHAT_HEAD_LINES = 41;
+
+function safeSlug(slug: string): string {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) throw new Error(`"${slug}" is not a chat slug`);
+  return slug;
+}
+
+/** Chats as files in the connected folder — `chats/<slug>.md`, the same files
+ * the Mac app reads and writes, so one vault shows the same chats in both.
+ * Revisions are the file's mtime and size, as the folder store's are; trash
+ * and archive move the file under `chats/trash/` and `chats/archive/`, Rust's
+ * buckets. Nothing outside `chats/` and `.rotli/chat-folders.json` is touched. */
+export class FolderChatStore implements ChatStore {
+  constructor(private readonly dir: VaultDir) {}
+
+  private path(slug: string): string {
+    return `${CHATS_DIR}/${safeSlug(slug)}.md`;
+  }
+
+  private async revision(path: string): Promise<string> {
+    const stat = await this.dir.stat(path);
+    return stat ? `${stat.lastModified}:${stat.size}` : "0";
+  }
+
+  async list(): Promise<MemexChatSummary[]> {
+    const entries = await this.dir.list(CHATS_DIR);
+    const rows = await Promise.all(
+      entries
+        .filter((e) => e.kind === "file" && e.name.endsWith(".md") && e.name.toLowerCase() !== "readme.md")
+        .map(async (e) => {
+          const slug = e.name.slice(0, -3);
+          const path = `${CHATS_DIR}/${e.name}`;
+          const [text, stat] = await Promise.all([
+            this.dir.readText(path).catch(() => ""),
+            this.dir.stat(path),
+          ]);
+          const head = text.split("\n").slice(0, CHAT_HEAD_LINES).join("\n");
+          return summarize(slug, head, stat?.lastModified ?? 0);
+        }),
+    );
+    return rows;
+  }
+
+  async read(slug: string): Promise<{ contents: string; revision: string }> {
+    const path = this.path(slug);
+    if (!(await this.dir.exists(path))) throw new Error(`unknown chat "${slug}"`);
+    const [contents, revision] = await Promise.all([this.dir.readText(path), this.revision(path)]);
+    return { contents, revision };
+  }
+
+  async write(slug: string, contents: string, expectedRevision: string | null): Promise<string> {
+    const path = this.path(slug);
+    const current = await this.revision(path);
+    if (expectedRevision === null) {
+      if (current !== "0") throw new Error(`a chat named "${slug}" already exists`);
+    } else if (current !== expectedRevision) {
+      throw new Error("This chat changed on disk — reopen it.");
+    }
+    await this.dir.writeText(path, contents);
+    return path;
+  }
+
+  async remove(slug: string, bin: "trash" | "archive"): Promise<void> {
+    const path = this.path(slug);
+    if (!(await this.dir.exists(path))) return;
+    await this.dir.move(path, `${CHATS_DIR}/${bin}/${safeSlug(slug)}.md`);
+  }
+
+  async folders(): Promise<{ contents: string; revision: string }> {
+    if (!(await this.dir.exists(CHAT_FOLDERS_FILE))) return { contents: "", revision: "0" };
+    const [contents, revision] = await Promise.all([
+      this.dir.readText(CHAT_FOLDERS_FILE),
+      this.revision(CHAT_FOLDERS_FILE),
+    ]);
+    return { contents, revision };
+  }
+
+  async writeFolders(contents: string, expectedRevision: string): Promise<string> {
+    JSON.parse(contents); // Rust refuses a manifest that is not JSON; so does the web
+    const current = await this.revision(CHAT_FOLDERS_FILE);
+    if (current !== expectedRevision) throw new Error("The chat folders changed on disk — reopen them.");
+    await this.dir.writeText(CHAT_FOLDERS_FILE, contents);
+    return this.revision(CHAT_FOLDERS_FILE);
+  }
+}
+
 /** The memex commands the web answers itself; the rest stay in the Mac app. */
-export function webMemexBridge(store: WebChatStore): WebMemexBridge {
+export function webMemexBridge(store: ChatStore): WebMemexBridge {
   const text = (value: unknown, fallback = ""): string => (typeof value === "string" ? value : fallback);
   return (cmd, args) => {
     const a = (args ?? {}) as Record<string, unknown>;
@@ -172,4 +271,10 @@ export function webMemexBridge(store: WebChatStore): WebMemexBridge {
 
 export function createWebChatStore(store?: VaultStore): WebChatStore {
   return new WebChatStore(store ? new BrowserVault(store) : browserVault());
+}
+
+/** Folder or imported mode: the vault's own chat files; browser mode: the
+ * browser vault. */
+export function chatStoreFor(dir: VaultDir | null): ChatStore {
+  return dir ? new FolderChatStore(dir) : createWebChatStore();
 }

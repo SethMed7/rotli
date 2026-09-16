@@ -14,8 +14,14 @@ import { hydrateHelperLink } from "./helperLink";
 import { InMemoryNotesService } from "./inMemoryNotes";
 import type { NotesService } from "./notesPort";
 import { createWebAiCorpus } from "./webAiCorpus";
-import { createWebChatStore, webMemexBridge } from "./webChats";
-import { activeWebNotesService, hydrateWebNotes, webNotesService, webVaultWasRestored } from "./webNotes";
+import { chatStoreFor, webMemexBridge } from "./webChats";
+import {
+  activeWebNotesService,
+  hydrateWebNotes,
+  webNotesService,
+  webVaultWasRestored,
+  activeWebVaultDir,
+} from "./webNotes";
 
 export { InMemoryNotesService, ulid } from "./inMemoryNotes";
 
@@ -79,7 +85,7 @@ export async function hydrateWebVault(): Promise<boolean> {
     notesService = activeWebNotesService(notesService);
     // the model's view of this vault, and the helper that runs the model
     registerWebAiCorpus(createWebAiCorpus(() => notesService));
-    registerWebMemexBridge(webMemexBridge(createWebChatStore()));
+    registerWebMemexBridge(webMemexBridge(chatStoreFor(activeWebVaultDir())));
     await hydrateHelperLink();
   }
   return restored;
