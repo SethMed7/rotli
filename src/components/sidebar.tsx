@@ -13,6 +13,7 @@ import { type MouseEvent, useEffect, useRef, useState } from "react";
 // for anything else.
 
 import { dispatch } from "../keys/registry";
+import { isWebVault } from "../lib/browserVault";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { useTransientPopover } from "../lib/popover";
 import { corpusInspectFolder, corpusRefreshVault } from "../lib/tauri";
@@ -27,6 +28,7 @@ import {
   vaultRowLabel,
   vaultSwitcherItems,
 } from "../services/vaultSwitcher";
+import { connectFolderVault, folderPickerSupported } from "../services/webVaultFolder";
 import { activateCreatedVault, reconnectActiveVault } from "../state/activeVault";
 import { useContextMenu } from "../state/contextMenu";
 import { useFocusedTab } from "../state/panes";
@@ -100,6 +102,16 @@ export function Sidebar() {
     setRowActionError(`Couldn’t ${verb} — ${err instanceof Error ? err.message : String(err)}`);
 
   const connectVault = async () => {
+    if (isWebVault()) {
+      // Rotli Web: the browser's own folder picker; the page reloads from it
+      if (!folderPickerSupported()) {
+        throw new Error(
+          "This browser can’t open folders — Chrome, Edge, or Arc can. Notes stay in this browser’s storage.",
+        );
+      }
+      await connectFolderVault();
+      return;
+    }
     const path = await requestVaultFolder({
       title: "Connect vault",
       description: "Choose an existing Rotli vault, or choose an empty folder to create one.",

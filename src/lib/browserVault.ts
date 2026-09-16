@@ -178,7 +178,8 @@ export class BrowserVault {
       const current = (await this.store.get(`${key}#rev`)) ?? "0";
       throw new RevisionConflict(key, expectedRevision, current);
     }
-    return next;
+    // a folder-backed store stamps its own revision (the file's mtime+size)
+    return (await this.store.get(`${key}#rev`)) ?? next;
   }
 }
 
@@ -207,5 +208,12 @@ let vault: BrowserVault | null = null;
  * which never calls it, never opens a database. */
 export function browserVault(): BrowserVault {
   vault ??= new BrowserVault(chooseStore());
+  return vault;
+}
+
+/** Boot (folder mode) and tests choose the backing store; nothing else may,
+ * and only before the first read. */
+export function configureBrowserVault(store: VaultStore): BrowserVault {
+  vault = new BrowserVault(store);
   return vault;
 }

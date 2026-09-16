@@ -24,7 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (Settings → General says where the notes live). Its top bar is a toolbar,
   not window chrome: the brand sits where the Mac app keeps its traffic
   lights and links back to the site, and there is no window drag or private
-  browser. Boards, "open a folder on this computer", and export are the next
+  browser. In Chrome, Edge, or Arc, **Open a folder on this computer**
+  (sidebar → Connect vault, or Settings → General) makes a real folder the
+  vault: every note is a file there, the same files the Mac app reads, and
+  the browser remembers only the folder. Boards and export are the next
   phase
   (`docs/design/web-version-and-shell-batch-2026-09-16.md`).
 
@@ -46,11 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The note header's actions are plain glyphs now, not cards: no surface
   behind the chat, Aa, and outline buttons, hover brings the ink up, and the
   active one is the accent colour.
-- Wrapped list lines align: a space that landed on the wrap boundary used to
-  start the continuation line one character to the right, and ordered
-  markers of two or more digits overflowed their column. The editor now
-  hangs that space at the line end and widens the marker column for wide
-  numbers so wrapped text sits under the text, never under the number.
+- Ordered-list markers of two or more digits no longer overflow their
+  column: the marker column and the line's hanging indent widen together, so
+  wrapped text sits under the text, never under the number.
 - All notes says which named view a note belongs to (a muted tag before the
   date). The list itself stays global, as designed.
 - Copying a selection across a chat copies the messages' source Markdown, so

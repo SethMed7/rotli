@@ -85,6 +85,8 @@ export const COMPONENT_ROOT_FILE_OWNERS = {
  * turning lib into a general dumping ground. */
 export const LIB_EFFECTFUL_FILE_OWNERS = {
   "clipboard.ts": "host pasteboard adapter (HTML copies with inlined image bytes)",
+  "folderVaultStore.ts": "Rotli Web folder mode: .rotli/ files behind the vault-store port",
+  "fsaVaultDir.ts": "Rotli Web folder mode: File System Access API behind the vault-dir port",
   "mainAddDrag.ts": "cross-surface Main drag workflow",
   "paneDropDrag.ts": "sidebar note → pane drop workflow",
   "nativeDrag.ts": "native Finder drag hover relay adapter",
@@ -118,6 +120,8 @@ export const SERVICE_FILE_OWNERS = {
   "externalCorpusChange.ts": "vault lifecycle",
   "folderTrash.ts": "vault lifecycle",
   "fsNotes.ts": "notes adapter",
+  "folderNotes.ts": "notes",
+  "vaultDir.ts": "notes",
   "antigravity.ts": "connected-provider lane management (Antigravity runtime + sign-in)",
   "hooks.ts": "notes query adapter",
   "imageRepair.ts": "file storage",
@@ -133,6 +137,7 @@ export const SERVICE_FILE_OWNERS = {
   "remoteAgent.ts": "remote-agent relay adapter seam (development builds only)",
   "welcome.ts": "Welcome folder seeding and Main filing composition",
   "webNotes.ts": "notes",
+  "webVaultFolder.ts": "notes",
   "notesPort.ts": "notes application port",
   "query.ts": "notes retrieval",
   "retentionPolicy.ts": "vault lifecycle",

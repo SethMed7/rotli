@@ -11,7 +11,7 @@ import { seedDemoCorpus, seedReservedRoots } from "./demoCorpus";
 import { FsNotesService } from "./fsNotes";
 import { InMemoryNotesService } from "./inMemoryNotes";
 import type { NotesService } from "./notesPort";
-import { hydrateWebNotes, webNotesService, webVaultWasRestored } from "./webNotes";
+import { activeWebNotesService, hydrateWebNotes, webNotesService, webVaultWasRestored } from "./webNotes";
 
 export { InMemoryNotesService, ulid } from "./inMemoryNotes";
 
@@ -47,7 +47,7 @@ if (!FS_MODE && !WEB_MODE) {
   inboxId = seedReservedRoots(svc);
 }
 
-export { hydrateWebNotes, webVaultWasRestored };
+export { webVaultWasRestored };
 
 /** Where captures and ⌘N land when no folder is selected — "Inbox" on disk
  * (fs mode), the seeded folder's id in the browser. */
@@ -58,8 +58,19 @@ export const inboxFolderId = inboxId;
  * pristine first tab once the corpus answers). */
 export const initialNoteId = firstNoteId;
 
-export const notesService: NotesService = FS_MODE
+// A `let`, not a `const`: Rotli Web retargets it at boot when the browser
+// still trusts a remembered folder (hydrateWebVault, before the first render).
+// Consumers read the live binding at call time, never a captured copy.
+export let notesService: NotesService = FS_MODE
   ? new FsNotesService()
   : WEB_MODE
     ? webNotesService(svc)
     : svc;
+
+/** Rotli Web only: choose folder mode or browser storage before the first
+ * render (main.tsx awaits it). Resolves what hydrateWebNotes resolves. */
+export async function hydrateWebVault(): Promise<boolean> {
+  const restored = await hydrateWebNotes();
+  if (WEB_MODE) notesService = activeWebNotesService(notesService);
+  return restored;
+}

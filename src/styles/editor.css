@@ -741,13 +741,10 @@
 .rotli-cm-host .cm-line {
   padding: 0;
 }
-/* CodeMirror wraps with `break-spaces`, which carries a space that lands on
-   the wrap boundary to the START of the continuation line — a wrapped list
-   line then began one space right of its siblings (the maintainer, 2026-09-16).
-   pre-wrap hangs that space at the end of the line instead. */
-.rotli-cm-host .cm-content {
-  white-space: pre-wrap; /* the editor always wraps (cmEditor.tsx lineWrapping) */
-}
+/* Wrapping stays CodeMirror's `break-spaces` (its default for cm-lineWrapping):
+   a pre-wrap override was tried on 2026-09-16 for the space that lands at a
+   wrap boundary and was reverted the same day — the owner saw the caret sit
+   above the text being typed in lists under it. */
 .rotli-cm-host .cm-content ::selection {
   background: color-mix(in srgb, var(--accent) 26%, transparent);
 }

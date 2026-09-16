@@ -91,3 +91,16 @@ test("the top bar is a toolbar, not window chrome: brand instead of traffic ligh
   await expect(page.getByRole("button", { name: "New private browser" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Search notes and actions/ })).toBeVisible();
 });
+
+test("Settings → General offers a real folder (Chromium) and says where the notes live", async ({ page }) => {
+  await page.goto(APP);
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await page
+    .getByRole("button", { name: /Settings/ })
+    .first()
+    .click();
+  await expect(page.getByRole("heading", { name: "Rotli Web" })).toBeVisible();
+  await expect(page.getByText(/Your vault lives in this browser/)).toBeVisible();
+  // headless Chromium has the picker, so the folder action is offered
+  await expect(page.getByRole("button", { name: "Open a folder on this computer…" })).toBeVisible();
+});

@@ -8,12 +8,21 @@
 // clobbered, and a failed write is reported and retried rather than swallowed
 // while the editor believes the note is saved.
 
-import { type BrowserVault, RevisionConflict, browserVault } from "../lib/browserVault";
+import {
+  type BrowserVault,
+  RevisionConflict,
+  browserVault,
+  configureBrowserVault,
+} from "../lib/browserVault";
 import { createDebouncedTask } from "../lib/debouncedTask";
+import { FolderVaultStore } from "../lib/folderVaultStore";
+import { FsaVaultDir } from "../lib/fsaVaultDir";
 import { showFileNotice } from "../state/fileNotice";
 import { DEST } from "./destinations";
+import { FolderNotesService } from "./folderNotes";
 import { type InMemoryNotesService, isNotesSnapshot } from "./inMemoryNotes";
 import type { NotesService } from "./notesPort";
+import { folderVaultStatus } from "./webVaultFolder";
 
 /** The NotesService methods that change state. Every other method is a read. */
 const MUTATORS: ReadonlySet<keyof NotesService> = new Set<keyof NotesService>([
@@ -185,6 +194,9 @@ export function createWebNotesPersistence(
 // ─── the one instance for this page ────────────────────────────────────────
 
 let instance: WebNotesPersistence | null = null;
+/** Set at boot when the browser still trusts a remembered folder. */
+let folderService: FolderNotesService | null = null;
+let folderName: string | null = null;
 
 /** The one web notes service: the in-memory service wrapped so every
  * mutation schedules a vault write. Called once from ./notes.ts. */
@@ -194,20 +206,51 @@ export function webNotesService(inner: InMemoryNotesService): NotesService {
   return instance.service;
 }
 
-/** Rotli Web only: restore the browser vault's notes before the first render
- * (main.tsx awaits it). Resolves false on a first visit, which is how the app
- * knows to seed and open the Welcome folder. A no-op elsewhere. */
+/** Rotli Web only, before the first render (main.tsx awaits it). Folder mode
+ * when the browser remembers a folder AND still trusts it: the notes service
+ * and the `.rotli/` store switch to that folder and the browser vault is
+ * never read. Otherwise the browser-storage vault restores; resolves false
+ * on a first visit, which is how the app knows to seed Welcome. A no-op on
+ * the desktop. */
 export async function hydrateWebNotes(): Promise<boolean> {
   if (!instance) return false;
+  const status = await folderVaultStatus();
+  if (status.kind === "granted") {
+    const dir = new FsaVaultDir(status.handle);
+    configureBrowserVault(new FolderVaultStore(dir));
+    folderService = new FolderNotesService(dir);
+    folderName = status.name;
+    return true; // a real vault is never seeded over
+  }
+  if (status.kind === "prompt") {
+    showFileNotice(
+      `Your vault folder “${status.name}” needs permission again — Settings → General → Reconnect`,
+    );
+  }
   return (await instance.hydrate()) === "restored";
 }
 
-/** True after hydrateWebNotes found a stored vault; false on a first visit. */
-export function webVaultWasRestored(): boolean {
-  return instance?.restored() ?? false;
+/** The service the web build uses after hydrateWebNotes: the folder's when
+ * connected, else the persisted in-memory one. */
+export function activeWebNotesService(fallback: NotesService): NotesService {
+  return folderService ?? fallback;
 }
 
-/** Empty Trash for the browser vault: hard-delete and persist; the count. */
-export function purgeWebTrash(): Promise<number> {
+/** The connected folder's name, or null when notes live in the browser. */
+export function connectedFolderName(): string | null {
+  return folderName;
+}
+
+/** True after hydrateWebNotes found a stored vault (or a connected folder);
+ * false on a first visit. */
+export function webVaultWasRestored(): boolean {
+  return folderService !== null || (instance?.restored() ?? false);
+}
+
+/** Empty Trash for the browser-storage vault: hard-delete and persist; the
+ * count. In folder mode the caller deletes through the notes service itself
+ * (null says so). */
+export function purgeWebTrash(): Promise<number | null> {
+  if (folderService) return Promise.resolve(null);
   return instance ? instance.purgeTrash() : Promise.resolve(0);
 }

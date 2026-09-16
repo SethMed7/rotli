@@ -118,7 +118,46 @@ Playwright lane is still to write.
    there; a board saves and reloads; the console is clean under the CSP; the
    withheld surfaces show their caption. Plus the Docker prod twin.
 
-### Phase W1 — files you own
+### Phase W1 — files you own (started 2026-09-16 PM)
+
+Decisions, per the review before building:
+
+1. **Layout.** A memex vault (a `wiki/` directory): notes are `wiki/**`,
+   `archive/**`, `trash/**`; id = frontmatter id; `diskFolderId` = the
+   physical directory; `folderId` follows the Rust projection table
+   (`wiki/_inbox` and a secure note shelved in Inbox → Captures; sinks →
+   Archive/Trash; everything else its wiki path). New notes land in
+   `wiki/_inbox` through `composeNote`. A plain vault (no `wiki/`) lists its
+   `*.md` as Inbox. `chats/` and the memory lanes are never read. Nothing
+   else is in W1.
+2. **Frontmatter fidelity.** A TS codec mirrors Rust's four owned keys plus
+   `origin`, preserves every other line verbatim in order, and is tested
+   byte-for-byte against the demo-seed notes. A web edit changes `updated:`
+   and the body, nothing else.
+3. **Concurrency.** Revision = the file's mtime and size. A stale write is
+   refused (the Mac app may be editing the same folder); `.rotli/main.json`
+   and friends follow the same rule through `FolderVaultStore`.
+4. **Named views in folder mode are read-only for `view_tag`.** The Mac app
+   keeps Markdown `view_tag` lines in step with `views.json` through Rust;
+   the web writes `views.json` only, so a view assignment made on the web is
+   not mirrored into frontmatter until the Mac app next writes it. Stated
+   here rather than half-implemented.
+5. **What the browser keeps:** the folder's directory handle, nothing else.
+   Permission is per visit: "Reconnect" is one click. Chromium only; Safari
+   and Firefox keep the browser-storage vault and say so.
+
+Seams: `services/vaultDir.ts` (port + in-memory fake), `lib/frontmatter.ts`
+(codec), `services/folderNotes.ts` (the NotesService), `lib/fsaVaultDir.ts`
+(File System Access adapter), `lib/folderVaultStore.ts` (`.rotli/` files
+behind the vault-store port), `services/webVaultFolder.ts` (pick, remember,
+reconnect, forget). Boot: `hydrateWebVault` retargets the live
+`notesService` binding when the browser still trusts the folder.
+
+Proof: unit tests over the fake for every rule above; the picker itself
+cannot be driven headlessly, so the manual check is against a COPY of a
+vault, never the live one.
+
+### Phase W1 — the rest
 
 - "Open a folder" via the File System Access API (Chromium; permission is
   re-asked per visit unless installed as a PWA — measure it). The
@@ -130,7 +169,17 @@ Playwright lane is still to write.
 - Assets (images) stored as blobs; the editor's image embeds resolve them
   through a blob URL instead of the asset protocol.
 
-### Phase W2 — installable and local AI
+### Phase W2 — installable, and a bridge to the Mac
+
+- PWA manifest and service worker (offline, home-screen install, durable
+  folder permission).
+- **Chat through the CLIs cannot happen from the page alone**: a browser tab
+  cannot spawn `claude` or `codex`, and `/app/` refuses every outbound
+  request by design. The path is a bridge: the Mac app (or the CLI's
+  existing token-gated loopback server) exposes chat, and the page talks to
+  `127.0.0.1`, which browsers treat as a secure context even from an https
+  page. That changes the promise from "nothing leaves this tab" to "nothing
+  leaves this machine" and needs its own security review before it exists.
 
 - PWA manifest and service worker (offline, home-screen install, durable
   folder permission).
@@ -166,7 +215,7 @@ pull requests later. The table is filled from the code map below.
 | 8, 9 ⇧-click ranges | Done on Captures, Main tree, and System folders through one helper | `rangeSelect.test.ts`, `e2e/range-select.spec.ts` |
 | 10 Restore inside a trashed note | Done: header Restore chip through the shared helper | `e2e/system-back-and-restore.spec.ts` |
 | 12 All notes and views | Validated global; rows now carry a muted view tag | `e2e/shell-batch-2026-09-16.spec.ts` |
-| 13 Wrapped list alignment | Done: `pre-wrap` on the editor content, wide column for two-digit markers | `listGeometry.test.ts`, `e2e/shell-batch-2026-09-16.spec.ts` |
+| 13 Wrapped list alignment | Partial: wide column for two-digit markers landed. A `pre-wrap` override for the wrap-boundary space was reverted the same day (the owner saw the caret sit above the typed text in lists); the wrap-boundary space needs a reproduction before another attempt | `listGeometry.test.ts`, `e2e/shell-batch-2026-09-16.spec.ts` |
 | 14 Flat header actions | Done: no surface behind the chips | `e2e/shell-batch-2026-09-16.spec.ts` |
 | 15 Copy chat as Markdown | Done: a selection across turns copies their source; needs a native check (the twin has no replies) | `chatThreadModel.test.ts` |
 | 16 Chat remount | Done: working row and reply follow the run store; needs the native check (send, switch tabs, wait for Done, switch back) | `chatRuns.test.ts` |

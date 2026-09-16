@@ -47,15 +47,19 @@ export async function emptyTrash(): Promise<{ purged: number; failed: number }> 
     // what sits in Trash and writes the vault (review 2026-09-16 — this was
     // a successful no-op)
     const purged = await purgeWebTrash();
-    await invalidateNotes();
-    return { purged, failed: 0 };
+    if (purged !== null) {
+      await invalidateNotes();
+      return { purged, failed: 0 };
+    }
+    // a connected folder deletes file by file through the notes service
   }
   const items = await notesService.listNotes(DEST.trash);
   let purged = 0;
   const failures: string[] = [];
   for (const item of items) {
     try {
-      await corpusPurge(item.id);
+      if (isWebVault()) await notesService.deleteNote(item.id);
+      else await corpusPurge(item.id);
       purged += 1;
     } catch (err) {
       failures.push(err instanceof Error ? err.message : String(err));

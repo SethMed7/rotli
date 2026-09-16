@@ -5,7 +5,7 @@ import ReactDOM from "react-dom/client";
 import App from "./app";
 import { PLATFORM } from "./lib/featurePolicy";
 import { attachIdleMotion } from "./lib/idleMotion";
-import { hydrateWebNotes } from "./services/notes";
+import { hydrateWebVault } from "./services/notes";
 import { queryClient } from "./services/query";
 import { attachPersistence, hydratePersistedState, runDeferredMaintenance } from "./state/persist";
 
@@ -28,7 +28,7 @@ async function bootstrap(rootEl: HTMLElement): Promise<void> {
   // Rotli Web lays its chrome out for a browser tab (no traffic lights, no
   // window drag); the stylesheet keys off this before the first paint.
   document.documentElement.dataset.platform = PLATFORM;
-  await hydrateWebNotes(); // Rotli Web restores its notes first; a no-op elsewhere
+  await hydrateWebVault(); // Rotli Web: a connected folder or the browser vault; a no-op elsewhere
   await hydratePersistedState(); // no-op in a plain browser; never throws
   ReactDOM.createRoot(rootEl).render(
     <React.StrictMode>
