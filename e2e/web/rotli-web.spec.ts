@@ -78,7 +78,9 @@ test("the web build keeps Chat visible; clicking it walks through the helper and
   // step 1 leads with the helper on every OS, honest that it is built from
   // source today; step 2 is the live pairing form
   await expect(dialog.getByText("Install and start Rotli Helper")).toBeVisible();
-  await expect(dialog.getByText("curl -fsSL https://rotli.co/helper/install.sh | sh")).toBeVisible();
+  await expect(
+    dialog.getByText(/^curl -fsSL http:\/\/localhost:\d+\/helper\/install\.sh \| sh$/),
+  ).toBeVisible();
   await expect(dialog.getByText("~/.rotli/bin/rotli-helper")).toBeVisible();
   await expect(dialog.getByLabel("Paste the pairing code the helper printed:")).toBeVisible();
   // step 3 the user can do now: the real install + sign-in commands, copyable

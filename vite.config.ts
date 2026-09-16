@@ -28,6 +28,7 @@ import {
   MAX_LAZY_CHUNK_KIB,
   shouldStubLazyLocale,
 } from "./scripts/build-policy.ts";
+import { devHelperServer } from "./scripts/dev-helper-server";
 
 const host = process.env.TAURI_DEV_HOST;
 // The web build (served from the site under a sub-path) sets ROTLI_WEB_BASE,
@@ -50,6 +51,9 @@ export default defineConfig(({ command }) => {
     base,
     plugins: [
       react(),
+      // Rotli Web dev: the helper installers and a local helper "release" at
+      // /helper/*, so the dialog's one-liner works against localhost too.
+      ...(platform === "web" ? [devHelperServer(process.cwd())] : []),
       // ~6 MB of vendor per-locale lazy chunks (Univer hyphenation dictionaries,
       // Excalidraw UI translations) collapse into one empty stub — see
       // shouldStubLazyLocale in scripts/build-policy.ts (perf audit finding 17).

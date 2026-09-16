@@ -89,15 +89,18 @@ function PairHelper() {
 /** The installer line for this OS. The scripts live on the site
  * (site/public/helper) and download a prebuilt binary; no toolchain needed. */
 function helperInstall(os: GuideOs): { command: string; detail: string; start: string } {
+  // the installers live beside this page: rotli.co in production, the dev
+  // server in development (which also serves the locally built binary)
+  const origin = typeof location === "undefined" ? "https://rotli.co" : location.origin;
   if (os === "windows") {
     return {
-      command: "irm https://rotli.co/helper/install.ps1 | iex",
+      command: `irm ${origin}/helper/install.ps1 | iex`,
       detail: "Paste it into PowerShell (open it from the Start menu).",
       start: String.raw`& "$HOME\.rotli\bin\rotli-helper.exe"`,
     };
   }
   return {
-    command: "curl -fsSL https://rotli.co/helper/install.sh | sh",
+    command: `curl -fsSL ${origin}/helper/install.sh | sh`,
     detail:
       os === "mac"
         ? "Paste it into Terminal (in Applications → Utilities, or search for it with ⌘Space)."

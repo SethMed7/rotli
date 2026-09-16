@@ -16,5 +16,5 @@
     "noUncheckedIndexedAccess": true,
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "scripts/build-policy.ts"]
+  "include": ["vite.config.ts", "scripts/build-policy.ts", "scripts/dev-helper-server.ts"]
 }
