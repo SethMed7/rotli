@@ -120,8 +120,8 @@ export function WebChatSetupDialog() {
           </span>
           <span className="guide-step-detail">
             Downloads are not published yet: build it from the Rotli source with
-            <code> cargo build --release --bin rotli-helper</code>, or ask for the binary. The Mac app has
-            chat built in if you would rather.
+            <code> cargo build --release --bin rotli-helper</code>. The Mac app has chat built in if you would
+            rather.
           </span>
         </GuideStep>
         <GuideStep n={2} done={linked} title="Pair this page with the helper">

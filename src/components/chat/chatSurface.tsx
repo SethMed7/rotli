@@ -100,13 +100,13 @@ import {
   saveChatFolders,
 } from "../../services/chatFolders";
 import { stashRefusedChatDrop } from "../../services/chatImages";
-import { chatRuntimeAvailable } from "../../services/connectorSetup";
 import { invalidateNotes, useNoteIndex } from "../../services/hooks";
 import { artifactMainFolderName, fileNoteInNamedRootFolder } from "../../services/mainTree";
 import { assignChatToView } from "../../services/viewTree";
 import { type ChatImageAttachment, chatDraftFor, useChatDrafts } from "../../state/chatDrafts";
 import { replyPending, useChatRuns } from "../../state/chatRuns";
 import { useChatSetupGuide } from "../../state/chatSetupGuide";
+import { useHelperLink } from "../../state/helperLink";
 import { useMainStore } from "../../state/main";
 import { touchChatActivity } from "../../state/mru";
 import { type Measure } from "../../state/noteStyle";
@@ -1199,6 +1199,10 @@ export function ChatSurface({
     (attachedStem ? resolveAttachedNoteId(attachedStem, noteIndex.values()) : null);
   const secureAttachmentHint = attachedStem.startsWith("secure-note-");
 
+  // a runtime that can answer: the Mac app's Rust side, or Rotli Helper paired
+  // with this page — subscribed, so pairing mid-session flips the surface
+  const helperLinked = useHelperLink((s) => s.link !== null);
+  const runtimeAvailable = isTauri() || helperLinked;
   // the on-device models the memex-ai store offers; non-Tauri has no bridge.
   const models = useQuery({
     queryKey: ["chat", "models"],
@@ -1216,7 +1220,7 @@ export function ChatSurface({
     queries: PROVIDER_IDS.map((id) => ({
       queryKey: ["cli-detect", id],
       queryFn: () => cliDetect(id),
-      enabled: chatRuntimeAvailable() && aiProviders[id],
+      enabled: runtimeAvailable && aiProviders[id],
       staleTime: 60_000,
     })),
   });
@@ -2276,7 +2280,7 @@ export function ChatSurface({
     setArtifactsOpen(true);
   }, [artifactRevealKey, artifacts.length, artifactsCompact]);
   const showArtifactsPanel = artifactsOpen && !artifactsCompact;
-  const pristineChat = chatRuntimeAvailable() && !chatSlug && messages.length === 0 && !busy;
+  const pristineChat = runtimeAvailable && !chatSlug && messages.length === 0 && !busy;
   const welcomeHour = new Date().getHours();
   const welcomeDaypart = chatDaypart(welcomeHour);
   const welcomeSuggestions = chatWelcomeSuggestions(welcomeHour);
@@ -2490,7 +2494,7 @@ export function ChatSurface({
         )}
       </header>
 
-      {!chatRuntimeAvailable() ? (
+      {!runtimeAvailable ? (
         <div className="list-empty chat-empty">
           <Character name="listening" size={120} accessorized />
           {PLATFORM === "web" ? (

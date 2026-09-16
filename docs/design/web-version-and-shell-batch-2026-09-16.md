@@ -284,6 +284,8 @@ Honest limits and the Codex threat review's open points (2026-09-16):
 | Note edits by the model | `update_note`/`create_note` through the chat are refused on the web in this cut (they ride `corpus_write_ai`). Reads and search work. |
 | Distribution | No downloads yet: build with `cargo build --release --bin rotli-helper`. CI per-OS builds and a one-line installer are the next step. |
 | Terminal (phase 2) | Not started. |
+| Listing cost | `webAiCorpus.list()` reads every visible note's body to run the secret detector — one read per note per chat turn. Fine on a small vault; in folder mode over a large vault it is hundreds of file reads. Follow-up: cache verdicts by note revision. |
+| Recreate after delete | `webChats` marks a deleted chat's key empty but its revision counter stays; a new chat with the same slug presents no revision and is refused as "changed in another tab". Follow-up: delete the key outright (needs a `delete` on the vault-store port). |
 
 Proof (2026-09-16 evening): `bun run check` green (Rust: 495 tests, clippy clean, 12 helper
 tests over real sockets); `bun run test:e2e:web` 9/9 including `e2e/web/rotli-helper.spec.ts`
