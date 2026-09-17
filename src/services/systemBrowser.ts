@@ -247,6 +247,28 @@ export function isChatItem(n: Pick<NoteSummary, "folderId" | "diskFolderId">): b
   return isChatsPath(noteDiskFolder(n));
 }
 
+/** A sidebar chat as a Library-shaped item, for the source preview (the
+ * owner, 2026-09-17: "I am trying to see the source md"). `isChatItem` and
+ * `chatSlugOf` read it exactly as they read a Library row. */
+export function chatPreviewItem(c: {
+  slug: string;
+  title: string;
+  modifiedMs: number;
+  pinned: boolean;
+}): NoteSummary {
+  return {
+    id: `chats/${c.slug}.md`,
+    title: c.title || c.slug,
+    snippet: "",
+    aliases: [c.slug],
+    folderId: "chats",
+    createdAt: c.modifiedMs,
+    updatedAt: c.modifiedMs,
+    pinned: c.pinned,
+    kind: "note",
+  };
+}
+
 /** The chat's slug — its filename stem, which Rust lists first among aliases. */
 export function chatSlugOf(n: Pick<NoteSummary, "id" | "aliases">): string {
   return n.aliases?.[0] ?? n.id;

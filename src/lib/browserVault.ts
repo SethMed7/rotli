@@ -145,6 +145,17 @@ export function isWebVault(): boolean {
   return PLATFORM === "web";
 }
 
+// The connected (or imported) vault's own name, set by the web boot once it
+// knows which vault it opened — so the switcher says "memex-vault", not
+// "Rotli" (the owner, 2026-09-17). Null while notes live in the browser.
+let webVaultNameValue: string | null = null;
+export function setWebVaultName(name: string | null): void {
+  webVaultNameValue = name || null; // an unnamed handle (tests' OPFS root) has no name
+}
+export function webVaultName(): string | null {
+  return webVaultNameValue;
+}
+
 /** A revisioned text file (the Main/views manifests, settings): the same
  * optimistic-concurrency contract as `corpus_main_write` in Rust — a write
  * must present the revision it read, or it is refused. Revisions are per-key

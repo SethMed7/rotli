@@ -94,6 +94,8 @@ test("an imported vault shows the app's chats, their folders, and each chat's mo
   );
   await page.reload();
   await expect(page.getByRole("tab", { selected: true })).toContainText("Hello");
+  // the switcher names the vault you connected, not the app (2026-09-17)
+  await expect(page.locator(".vault-switch-name")).toHaveText("memex-copy");
 
   // the vault's own organization and look, exactly as the app keeps them:
   // .rotli/main.json (Main folders), .rotli/views.json (named views),
@@ -128,4 +130,11 @@ test("an imported vault shows the app's chats, their folders, and each chat's mo
   const markOf = (slug: string) => page.locator(`.sb-chatrow[data-chat-slug="${slug}"] .sb-chatmark`).first();
   await expect(markOf("loose-chat")).toHaveAttribute("title", /OpenAI/);
   await expect(markOf("from-the-app")).toHaveAttribute("title", /gemma.*this Mac/);
+
+  // the file behind a chat: Show source peeks the transcript as written
+  await page.locator('.sb-chatrow[data-chat-slug="loose-chat"]').click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Show source" }).click();
+  const peek = page.locator(".pv-text");
+  await expect(peek).toContainText("## Messages");
+  await expect(peek).toContainText("title: Loose chat");
 });

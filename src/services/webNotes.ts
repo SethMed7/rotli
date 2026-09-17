@@ -9,10 +9,11 @@
 // while the editor believes the note is saved.
 
 import {
-  type BrowserVault,
-  RevisionConflict,
   browserVault,
   configureBrowserVault,
+  RevisionConflict,
+  setWebVaultName,
+  type BrowserVault,
 } from "../lib/browserVault";
 import { createDebouncedTask } from "../lib/debouncedTask";
 import { FolderVaultStore } from "../lib/folderVaultStore";
@@ -230,6 +231,7 @@ export async function hydrateWebNotes(): Promise<boolean> {
     configureBrowserVault(new FolderVaultStore(dir));
     folderService = new FolderNotesService(dir);
     folderName = status.name;
+    setWebVaultName(status.name);
     folderDir = dir;
     mode = "folder";
     return true; // a real vault is never seeded over
@@ -264,6 +266,7 @@ export async function hydrateWebNotes(): Promise<boolean> {
       configureBrowserVault(new FolderVaultStore(dir));
       folderService = new FolderNotesService(dir);
       folderName = parsed.name;
+      setWebVaultName(parsed.name);
       folderDir = dir;
       mode = "imported";
       return true;

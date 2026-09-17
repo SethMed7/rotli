@@ -84,6 +84,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   image lands at the note's end. The row you are over lights up. On Rotli
   Web a note row works the same; a chat row says the Helper carries text
   only.
+- Rotli Web: the vault switcher names the vault you connected (the folder's
+  own name) instead of "Rotli".
+- Rotli Web: browsers that can only read a folder still **connect** a vault
+  (as a copy kept in the browser) — the dialog and Settings say so, and
+  explain that the browser's "upload" is its word for letting the page read
+  the files; nothing is uploaded anywhere.
+- Chats: **Show source** in a chat's menu shows the transcript file as
+  written (both twins), and **Show in Finder** reveals it on the Mac. In the
+  Library, clicking a chat shows its source too; Open from there goes to the
+  chat.
 - Rotli Web: it is a vault you connect, and the words now say so — "Connect a
   vault on this computer", "Import a copy of a vault", "Your vault needs
   permission again" — instead of "folder" everywhere.

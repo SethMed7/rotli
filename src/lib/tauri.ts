@@ -14,7 +14,7 @@ import type {
   BreveDeliverySettings,
 } from "../routines/breveTypes";
 import type { SearchHit, WelcomeSeed } from "../types";
-import { browserVault, isWebVault } from "./browserVault";
+import { browserVault, isWebVault, webVaultName } from "./browserVault";
 import {
   type VaultBrowserView,
   browserEmptyFolders,
@@ -1636,7 +1636,9 @@ export function corpusListConfig(): Promise<CorpusConfigView> {
   if (!isTauri()) {
     return Promise.resolve({
       corpus: {
-        absPath: "~/Rotli",
+        // the connected or imported vault's own name; "Rotli" only for notes
+        // that live in the browser
+        absPath: `~/${webVaultName() ?? "Rotli"}`,
         isMemex: isWebVault(),
         memexId: isWebVault() ? "browser-vault" : null,
         perms: isWebVault() ? "chats+inbox" : null,
