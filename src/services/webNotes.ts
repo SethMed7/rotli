@@ -291,6 +291,13 @@ export function activeWebNotesService(fallback: NotesService): NotesService {
 }
 
 /** The connected folder's name, or null when notes live in the browser. */
+/** The vault-relative file behind a note, in folder or imported mode; null
+ * when the notes live only in the browser (nothing on disk to reveal). */
+export async function webNoteFilePath(id: string): Promise<string | null> {
+  if (!folderService) return null;
+  return folderService.filePathOf(id).catch(() => null);
+}
+
 /** The connected (or imported) folder's directory port; null in browser mode. */
 export function activeWebVaultDir(): VaultDir | null {
   return folderDir;
@@ -307,8 +314,19 @@ export function webVaultMode(): "browser" | "folder" | "imported" {
 
 /** When the imported copy was taken — null outside imported mode or for a
  * copy from before the stamp existed. */
-export function importedVaultAt(): number | null {
+function importedVaultAt(): number | null {
   return importedAt;
+}
+
+/** A copy younger than this says nothing about itself. */
+const COPY_AGE_NOTICE_MS = 12 * 3_600_000;
+
+/** The connected copy's age for the sidebar: null outside imported mode;
+ * `old` once the copy is half a day old, or when it predates the stamp. */
+export function importedCopyAge(now = Date.now()): { at: number | null; old: boolean } | null {
+  if (mode !== "imported") return null;
+  const at = importedVaultAt();
+  return { at, old: at === null || now - at >= COPY_AGE_NOTICE_MS };
 }
 
 /** Download the connected or imported vault's text files as a zip. */

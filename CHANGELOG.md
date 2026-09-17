@@ -12,10 +12,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Rotli Web says when it is showing a copy.** A connected copy of a vault
-  is a snapshot; it never follows the folder. The sidebar now says so —
-  "Connected to a copy of X, taken 2h ago" — with Reconnect one click away,
-  so a stale copy is never mistaken for the live vault.
+- **Rotli Web: Files opens Finder through the Mac app.** The page hands the
+  file you're in to the installed app by its `rotli://reveal` link, and the
+  app opens Finder at it — for the note or the chat that is open. The app
+  answers only for its own vault. With nothing on disk behind the note, the
+  vault's own browser opens at its folder as before.
+- **⌘← and ⌘→ go back and forward** beside ⌘[ and ⌘], never inside a text
+  field (where ⌘← is line start). Remappable like every chord.
+- **rotli.co has a proper 404.** The site's missing-page screen wears the
+  mark, says what is at `/app` or `/helper` before they are switched on,
+  and offers the ways back: home, the download, Rotli Web, the roadmap.
+- **Rotli Web says when a copy has aged.** A connected copy of a vault is a
+  snapshot; it never follows the folder. Once a copy is half a day old the
+  sidebar says so in one muted line — "Copy of X taken 2d ago. Reconnect" —
+  and Reconnect vault always sits in the vault menu. A fresh copy says
+  nothing.
 - **The open chat shows its file's model.** A chat this device never pinned
   seeds its model from the `model:` line in its file, on the web and the Mac
   alike, so a copy of the vault opens each chat on the lane it ran on.

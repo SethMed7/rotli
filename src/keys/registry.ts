@@ -32,6 +32,9 @@ export interface KeyAction {
   enabled?: () => boolean;
   /** Registered for dispatch but omitted from Settings/⌘K/shortcut maps. */
   transient?: boolean;
+  /** Stands down inside a text field even with a modifier held: ⌘← is
+   * "line start" in an input and must stay so (the nav.*.arrow chords). */
+  unlessEditable?: boolean;
   run: () => void;
 }
 
@@ -173,6 +176,7 @@ export function attachDispatcher(surface: Surface): () => void {
     if (CANVAS_OWNED_CHORDS.has(pressed) && isCanvasTarget(event.target)) return;
     const action = claimingAction(pressed);
     if (action) {
+      if (action.unlessEditable && isEditableTarget(event.target)) return;
       event.preventDefault();
       action.run();
     }

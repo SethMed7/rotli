@@ -16,7 +16,7 @@ const chatFile = (title: string, updated: string) =>
 const SNAPSHOT = {
   version: 1,
   name: "memex-copy",
-  importedAt: Date.now() - 2 * 3_600_000,
+  importedAt: Date.now() - 2 * 86_400_000,
   dirs: ["wiki", "chats", ".rotli"],
   files: {
     "wiki/hello.md":
@@ -121,11 +121,11 @@ test("an imported vault shows the app's chats, their folders, and each chat's mo
   await page.locator(".sb-switch-seg", { hasText: /^Chat/ }).click();
 
   const sidebar = page.locator(".sidebar, aside").first();
-  // a copy says so, and how old it is, with the import one click away
-  const bar = page.locator(".sb-reconnect");
-  await expect(bar).toContainText("Connected to a copy of memex-copy, taken");
-  await expect(bar).toContainText("ago");
-  await expect(bar.getByRole("button", { name: "Reconnect" })).toBeVisible();
+  // an old copy says so in one muted line, with Reconnect beside it
+  const age = page.locator(".sb-copy-age");
+  await expect(age).toContainText("Copy of memex-copy taken 2d ago.");
+  await expect(age.getByRole("button", { name: "Reconnect" })).toBeVisible();
+  await expect(page.locator(".sb-reconnect")).toHaveCount(0);
   // the folder from .rotli/chat-folders.json, with its one chat inside
   await expect(sidebar.getByText("Work", { exact: true })).toBeVisible();
   await expect(sidebar.getByText("Loose chat")).toBeVisible();
@@ -205,23 +205,28 @@ test("reconnecting replaces the copy: the old copy's page-hide save never lands 
     oldSnapshot,
   );
   await page.reload();
-  const bar = page.locator(".sb-reconnect");
-  await expect(bar).toContainText("Connected to a copy of memex-copy");
-  await expect(bar).not.toContainText("taken");
+  // a copy from before the stamp existed: age unknown, so the line shows
+  const age = page.locator(".sb-copy-age");
+  await expect(age).toContainText("Copy of memex-copy.");
   // let the backfill land (it dirties the copy)
   await page.waitForTimeout(600);
 
   // Reconnect → the browser's picker → the folder on disk
   const chooser = page.waitForEvent("filechooser");
-  await bar.getByRole("button", { name: "Reconnect" }).click();
+  await age.getByRole("button", { name: "Reconnect" }).click();
   await page.getByRole("button", { name: "Choose vault…" }).click();
   const logs: string[] = [];
   page.on("console", (m) => logs.push(`[${m.type()}] ${m.text()}`));
   page.on("pageerror", (e) => logs.push(`[pageerror] ${e.message}`));
   await (await chooser).setFiles(folder);
 
-  // the page reloads from the NEW copy — stamped with when it was taken
-  await expect(page.locator(".sb-reconnect")).toContainText("taken just now ago");
+  // the page reloads from the NEW copy — fresh, so nothing to say about it;
+  // Reconnect stays one click away in the vault menu
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Hello");
+  await expect(page.locator(".sb-copy-age")).toHaveCount(0);
+  await page.getByRole("button", { name: /^Vault: memex-copy/ }).click();
+  await expect(page.getByRole("menuitem", { name: "Reconnect vault" })).toBeVisible();
+  await page.keyboard.press("Escape");
   await page.locator(".sb-switch-seg.desktop-only").click();
   const dialog = page.getByRole("dialog", { name: "Chat on the web" });
   await dialog.getByLabel("Paste the pairing code the helper printed:").fill(`${PORT}:${TOKEN}`);
