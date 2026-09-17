@@ -1920,6 +1920,10 @@ export interface MemexChatSummary {
   modifiedMs: number;
   /** `pinned: true` frontmatter — the sidebar sorts pinned chats first. */
   pinned: boolean;
+  /** `model:` / `provider:` frontmatter — who answers this chat, in the file
+   * itself (2026-09-17); "" when the chat predates them. */
+  model: string;
+  provider: string;
 }
 
 export interface MemexValidateReport {

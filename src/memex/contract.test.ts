@@ -5,6 +5,7 @@
 
 import { describe, expect, test } from "bun:test";
 
+import { setChatModel } from "./chatModelFrontmatter";
 import {
   AI_KEYS,
   USER_KEYS,
@@ -498,5 +499,40 @@ describe("parsePrimaryUser (reach default)", () => {
     expect(parsePrimaryUser("{}")).toBeNull();
     expect(parsePrimaryUser("nope")).toBeNull();
     expect(parsePrimaryUser(JSON.stringify({ primary: "" }))).toBeNull();
+  });
+});
+
+describe("setChatModel (who answers, in the file)", () => {
+  test("inserts model and provider into a fresh chat's frontmatter, once", () => {
+    const base = composeChatFile({ title: "Gemma chat", source: "rotli" }, DATE);
+    const out = setChatModel(base, "gemma-3-12b-it-qat-4bit", "mlx");
+    expect(out).toContain("model: gemma-3-12b-it-qat-4bit");
+    expect(out).toContain("provider: mlx");
+    expect(out.match(/^model:/gm)?.length).toBe(1);
+    expect(out).toContain("## Messages");
+    // a second write with the same values changes nothing
+    expect(setChatModel(out, "gemma-3-12b-it-qat-4bit", "mlx")).toBe(out);
+  });
+
+  test("rewrites the lines in place when the chat's model changes", () => {
+    const base = setChatModel(composeChatFile({ title: "T", source: "rotli" }, DATE), "sonnet", "claude");
+    const out = setChatModel(base, "gemini-3.7-flash-high", "antigravity");
+    expect(out).toContain("model: gemini-3.7-flash-high");
+    expect(out).toContain("provider: antigravity");
+    expect(out).not.toContain("sonnet");
+    expect(out.match(/^provider:/gm)?.length).toBe(1);
+  });
+
+  test("an unknown provider writes no provider line, and removes a stale one", () => {
+    const base = composeChatFile({ title: "T", source: "rotli" }, DATE);
+    const out = setChatModel(base, "some-local-model", null);
+    expect(out).toContain("model: some-local-model");
+    expect(out).not.toMatch(/^provider:/m);
+    const stale = setChatModel(base, "x", "claude");
+    expect(setChatModel(stale, "y", null)).not.toMatch(/^provider:/m);
+  });
+
+  test("leaves a file without frontmatter alone", () => {
+    expect(setChatModel("# no frontmatter\n", "m", "p")).toBe("# no frontmatter\n");
   });
 });

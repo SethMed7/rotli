@@ -29,27 +29,28 @@ import {
   memexWriteNote,
 } from "../lib/tauri";
 import { titleOf } from "../services/derive";
+import { setChatModel } from "./chatModelFrontmatter";
 import { type MemexConfig, type MemexInstance, type Perms, fromCorpusConfig } from "./config";
 import {
-  type ChatMsg,
-  type ChatArtifact,
-  type NoteMeta,
-  ROTLI_SOURCE,
-  SPINE,
-  appendMessages,
   addChatArtifact,
   addChatArtifactTurn,
+  appendMessages,
+  parsePrimaryUser,
   canWrite,
+  type ChatArtifact,
+  type ChatMsg,
   chatSlug,
   composeNewChat,
   composeNote,
+  type NoteMeta,
   noteStem,
-  parsePrimaryUser,
+  today,
+  ROTLI_SOURCE,
   setAttachedTo,
   setChatPinned,
-  setChatTitle,
   setChatSecureContext,
-  today,
+  setChatTitle,
+  SPINE,
   ulid,
 } from "./contract";
 
@@ -156,6 +157,24 @@ export async function setChatAttachedTo(instance: MemexInstance, slug: string, s
   }
   const existing = await memexReadChat(instance.root, slug);
   const next = setAttachedTo(existing.contents, stem);
+  if (next !== existing.contents) {
+    await memexWriteChat(instance.root, slug, next, existing.revision);
+  }
+}
+
+/** Record WHO answers an existing chat in its own file (`model:` and
+ * `provider:` frontmatter) — the durable twin of the settings.json map, so a
+ * copied or connected vault shows each chat's mark without that map. */
+export async function setChatModelMeta(
+  instance: MemexInstance,
+  slug: string,
+  model: string,
+  provider: string | null,
+): Promise<void> {
+  const rel = `chats/${slug}.md`;
+  if (!canWrite(rel, instance.perms)) return; // a read-only vault keeps its files as they are
+  const existing = await memexReadChat(instance.root, slug);
+  const next = setChatModel(existing.contents, model, provider);
   if (next !== existing.contents) {
     await memexWriteChat(instance.root, slug, next, existing.revision);
   }

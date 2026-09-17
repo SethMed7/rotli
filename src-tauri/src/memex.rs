@@ -591,6 +591,10 @@ pub struct ChatSummary {
     pub modified_ms: u64,
     /// `pinned: true` frontmatter — the sidebar sorts pinned chats first.
     pub pinned: bool,
+    /// `model:` / `provider:` frontmatter — who answers this chat, in the file
+    /// itself (2026-09-17); "" when the chat predates them.
+    pub model: String,
+    pub provider: String,
 }
 
 /// List the named chats in `chats/` (read-only; mirrors conversations.ts listChats).
@@ -659,6 +663,8 @@ fn list_chats_at(root: &Path) -> Result<Vec<ChatSummary>, String> {
                 path: p.to_string_lossy().to_string(),
                 modified_ms,
                 pinned: fm(&text, "pinned") == "true",
+                model: fm(&text, "model"),
+                provider: fm(&text, "provider"),
             });
         }
     }
