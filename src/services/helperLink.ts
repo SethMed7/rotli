@@ -84,20 +84,33 @@ export async function hydrateHelperLink(): Promise<void> {
 /** Health, then one authenticated call: the whole pairing, re-checked. The
  * dialog's "Check again" runs this; so does boot. */
 export async function verifyHelper(): Promise<"ok" | HelperProblem> {
-  const link = useHelperLink.getState().link;
+  const state = useHelperLink.getState();
+  const link = state.link;
   if (!link) return "unreachable";
-  if (!(await checkHelper())) {
-    useHelperLink.getState().setProblem("unreachable");
-    return "unreachable";
-  }
+  state.setVerifying(true);
   try {
-    await helperRpc(link, "chat_models", {});
-    useHelperLink.getState().setProblem(null);
-    return "ok";
-  } catch (error) {
-    const refused = error instanceof HelperHttpError && error.status === 401;
-    useHelperLink.getState().setProblem(refused ? "refused" : "unreachable");
-    return refused ? "refused" : "unreachable";
+    if (!(await checkHelper())) {
+      state.setProblem("unreachable");
+      return "unreachable";
+    }
+    try {
+      await helperRpc(link, "chat_models", {});
+      state.setProblem(null);
+      return "ok";
+    } catch (error) {
+      if (error instanceof HelperHttpError) {
+        // health answered, so the helper is there: only a 401 is a pairing
+        // problem; any other status is the helper's own error, not ours
+        const refused = error.status === 401;
+        state.setProblem(refused ? "refused" : null);
+        return refused ? "refused" : "ok";
+      }
+      state.setReachable(false);
+      state.setProblem("unreachable");
+      return "unreachable";
+    }
+  } finally {
+    state.setVerifying(false);
   }
 }
 

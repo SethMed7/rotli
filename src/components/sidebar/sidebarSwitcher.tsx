@@ -83,6 +83,7 @@ export function SidebarSwitcher({
   // Rotli Web: paired with Rotli Helper, chat is a real front
   const helperOk = useHelperLink((s) => helperReadyFrom(s));
   const helperProblem = useHelperLink((s) => s.problem);
+  const helperVerifying = useHelperLink((s) => s.verifying);
   return (
     // role="group" + aria-pressed, NOT a tablist: these segments switch the
     // sidebar's own content, not a tabpanel, and the pane tab strip already
@@ -106,7 +107,9 @@ export function SidebarSwitcher({
                   ? "Rotli Helper refused the pairing — click to pair again"
                   : helperProblem === "unreachable"
                     ? "Rotli Helper isn't answering — click to reconnect"
-                    : "Chat isn't set up on the web yet — click to see how"
+                    : helperVerifying
+                      ? "Checking Rotli Helper…"
+                      : "Chat isn't set up on the web yet — click to see how"
               }
               onClick={() => useChatSetupGuide.getState().show()}
             >

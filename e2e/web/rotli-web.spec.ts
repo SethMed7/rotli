@@ -153,3 +153,12 @@ test("connecting a folder explains itself before the browser's picker, and can b
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toHaveCount(0);
 });
+
+test("the Files button is in the footer on the web and opens the Library", async ({ page }) => {
+  await page.goto(APP);
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  const files = page.locator(".sb-foot").getByRole("button", { name: "Files" });
+  await expect(files).toBeVisible();
+  await files.click();
+  await expect(page.locator(".system-browser")).toBeVisible();
+});

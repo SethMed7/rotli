@@ -19,20 +19,25 @@ interface HelperLinkState {
   /** The helper answered but would not take our token (a new install printed
    * a new code), or nothing answers at all. Cleared by a call that succeeds. */
   problem: HelperProblem | null;
+  /** The boot (or Check again) verification is in flight. */
+  verifying: boolean;
   hydrated: boolean;
   setLink: (link: HelperLink | null) => void;
   setReachable: (reachable: boolean | null) => void;
   setProblem: (problem: HelperProblem | null) => void;
+  setVerifying: (verifying: boolean) => void;
 }
 
 export const useHelperLink = create<HelperLinkState>((set) => ({
   link: null,
   reachable: null,
   problem: null,
+  verifying: false,
   hydrated: false,
   setLink: (link) => set({ link, hydrated: true, problem: null }),
   setReachable: (reachable) => set({ reachable }),
   setProblem: (problem) => set({ problem }),
+  setVerifying: (verifying) => set({ verifying }),
 }));
 
 /** Paired with a helper (whether or not it answered yet). */
@@ -40,12 +45,14 @@ export function helperLinked(): boolean {
   return useHelperLink.getState().link !== null;
 }
 
-/** Paired AND nothing known to be wrong: the helper answered health and has
- * not refused the token. A pairing that is unreachable or refused is not a
- * chat runtime — the surfaces route to the setup dialog instead. Pure over
- * the state shape so the rule is testable. */
+/** Paired AND proven: the helper answered health this session and has not
+ * refused the token. A pairing not yet checked (a reload, before the boot
+ * verification lands) is NOT ready — otherwise a stale token opened the chat
+ * for the moment before the 401 came back (review of #19). Unreachable or
+ * refused is not a chat runtime either; the surfaces route to the setup
+ * dialog. Pure over the state shape so the rule is testable. */
 export function helperReadyFrom(s: Pick<HelperLinkState, "link" | "reachable" | "problem">): boolean {
-  return s.link !== null && s.problem === null && s.reachable !== false;
+  return s.link !== null && s.problem === null && s.reachable === true;
 }
 
 export function helperReady(): boolean {
