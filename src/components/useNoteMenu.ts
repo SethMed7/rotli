@@ -367,6 +367,8 @@ export function useNoteMenu() {
                   isSmart: false,
                   localFallback: home,
                   body: copyBody(src.body),
+                  // a duplicated capture is still a capture
+                  ...(note.folderId === DEST.board ? { shelf: ["Inbox"] } : {}),
                 });
                 await invalidateNotes();
                 usePanesStore.getState().openNote(dupId);

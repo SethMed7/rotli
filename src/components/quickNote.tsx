@@ -271,6 +271,7 @@ export function QuickNote() {
           isSmart: folder === inboxFolderId,
           localFallback: inboxFolderId,
           secure: true,
+          shelf: ["Inbox"], // the capture shape; curated into Main at birth
         });
     void create
       .then(async (noteId) => {

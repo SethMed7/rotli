@@ -86,6 +86,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   first row's text. The checkbox now sizes from the line's font (it matches a
   radio choice's size), so wrapped rows align under the text, as bullets and
   numbers already did.
+- Captures: only a Quick capture (⌥C), a Quick Note, or a merge of captures
+  lands on the Captures board. A chat's background note — the conversation
+  notes every chat keeps, and the note its header button creates — was born
+  with the capture shelf and filled Captures with "Notes from [[chat]]"
+  cards, even after the Librarian filed it. Those notes now project to where
+  they live. Existing cards keep their shelf: trash them, or add them to Main
+  to graduate them.
+- Chat: a chat whose note shared its title with another note (the same note
+  filed in two areas, or your own note with that name) created one more
+  conversation note every turn and never attached it. The chat's note is now
+  told apart by its link back to the chat, and a chat whose note truly cannot
+  be found writes nothing rather than minting a duplicate; its note button
+  still recreates one on request.
 - Chat: leave a chat while it is thinking and come back, and the thread now
   shows the working row again and the reply when it lands. Before, the
   remounted chat showed only your message until the tab was closed and
