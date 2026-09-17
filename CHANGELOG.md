@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The sidebar sits where you want it, and stays only if you want it to.**
+  Appearance → Sidebar: Left or Right, and Always or On hover. On hover keeps
+  the sidebar out of the way until the pointer reaches the window's edge,
+  then slides it over the content and away again when the pointer leaves
+  (Esc too); ⌘0 still brings it. Right-click the sidebar's own surface for
+  the same choices. Remembered on the Mac and on the web alike; the defaults
+  are left and always.
 - **Rotli Web: Files opens Finder through the Mac app.** The page hands the
   file you're in to the installed app by its `rotli://reveal` link, and the
   app opens Finder at it — for the note or the chat that is open. The app

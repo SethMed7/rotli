@@ -40,6 +40,7 @@ import { FolderReconnectBar } from "./sidebar/folderReconnectBar";
 import { SidebarChat } from "./sidebar/sidebarChat";
 import { SidebarFooter } from "./sidebar/sidebarFooter";
 import { SidebarHome } from "./sidebar/sidebarHome";
+import { isSidebarSurface, sidebarPlacementMenu } from "./sidebar/sidebarPlacementMenu";
 import { SidebarSwitcher, sidebarFrontBody, sidebarFrontSelection } from "./sidebar/sidebarSwitcher";
 import { useActiveTree } from "./sidebar/useActiveTree";
 import { useChatFolders } from "./sidebar/useChatFolders";
@@ -214,7 +215,12 @@ export function Sidebar() {
       // suppress the WKWebView's default right-click menu ("Reload", …) inside the
       // sidebar; rotli's own row menus (board rename) handle contextmenu instead.
       // The editor keeps its native menu (spell-check / copy) — this is scoped here.
-      onContextMenu={(event) => event.preventDefault()}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        // the sidebar's own surface offers its placement (2026-09-17)
+        if (isSidebarSurface(event.target))
+          openContextMenu(event.clientX, event.clientY, sidebarPlacementMenu());
+      }}
     >
       {/* ONE header row: the active vault never disappears. Breve routines and
           notifications are owned by that vault, so hiding the switcher made

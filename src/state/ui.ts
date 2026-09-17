@@ -26,13 +26,13 @@ import { DEFAULT_VOICE } from "../voice/speech";
 import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
 import type { Measure } from "./noteStyle";
 import { systemPrefersDark } from "./systemScheme";
+import { SOLID_THEMES, type ThemeFamily } from "./themeChoices";
 
 export type ThemeSetting = "light" | "dark" | "system";
 
 /** Every family is a deliberately tuned light/dark pair. The first two retain
  * Rotli's original environments; the others are optional personality layers. */
-export const THEME_FAMILIES = ["warm", "mono", "ocean", "grove", "iris", "midnight"] as const;
-export type ThemeFamily = (typeof THEME_FAMILIES)[number];
+export { THEME_FAMILIES, type ThemeFamily } from "./themeChoices";
 export type OnboardingPhase = "preferences" | "vault" | "models";
 export type SyntaxPalette = "rotli" | "mono";
 
@@ -47,79 +47,14 @@ export type AccentColor = (typeof ACCENT_COLORS)[number];
  * overview; this preference changes only the small trail beside the thread. */
 export const CHAT_NAVIGATOR_STYLES = ["lines", "dots", "paws", "ears"] as const;
 export type ChatNavigatorStyle = (typeof CHAT_NAVIGATOR_STYLES)[number];
+/** Which edge the ONE sidebar lives on (the owner, 2026-09-17). */
+export const SIDEBAR_SIDES = ["left", "right"] as const;
+export type SidebarSide = (typeof SIDEBAR_SIDES)[number];
+/** Pinned in the flow, or out of the way until the pointer reaches the edge. */
+export const SIDEBAR_REVEALS = ["pinned", "hover"] as const;
+export type SidebarReveal = (typeof SIDEBAR_REVEALS)[number];
 
-/** Solid environments, in the order the titlebar sun cycles them. */
-export const SOLID_THEMES: {
-  family: ThemeFamily;
-  mode: "light" | "dark";
-  label: string;
-}[] = [
-  { family: "warm", mode: "light", label: "Warm Light" },
-  { family: "warm", mode: "dark", label: "Warm Dark" },
-  { family: "mono", mode: "light", label: "Paper" },
-  { family: "mono", mode: "dark", label: "Charcoal" },
-  { family: "ocean", mode: "light", label: "Ocean Light" },
-  { family: "ocean", mode: "dark", label: "Ocean Dark" },
-  { family: "grove", mode: "light", label: "Grove Light" },
-  { family: "grove", mode: "dark", label: "Grove Dark" },
-  { family: "iris", mode: "light", label: "Iris Light" },
-  { family: "iris", mode: "dark", label: "Iris Dark" },
-  { family: "midnight", mode: "light", label: "Moonlight" },
-  { family: "midnight", mode: "dark", label: "Midnight" },
-];
-
-/** Settings/onboarding presentation. Each family is one theme with a light and
- * dark environment; System can choose two families independently. */
-export const THEME_FAMILY_PRESENTATIONS: readonly {
-  family: ThemeFamily;
-  label: string;
-  description: string;
-  lightLabel: string;
-  darkLabel: string;
-}[] = [
-  {
-    family: "warm",
-    label: "Rotli",
-    description: "Clay and cream by day, cocoa at night.",
-    lightLabel: "Warm Light",
-    darkLabel: "Warm Dark",
-  },
-  {
-    family: "mono",
-    label: "Paper & Charcoal",
-    description: "Paper in Light, Charcoal in Dark.",
-    lightLabel: "Paper",
-    darkLabel: "Charcoal",
-  },
-  {
-    family: "ocean",
-    label: "Ocean",
-    description: "Airy blue by day, deep water at night.",
-    lightLabel: "Ocean Light",
-    darkLabel: "Ocean Dark",
-  },
-  {
-    family: "grove",
-    label: "Grove",
-    description: "Soft green by day, forest at night.",
-    lightLabel: "Grove Light",
-    darkLabel: "Grove Dark",
-  },
-  {
-    family: "iris",
-    label: "Iris",
-    description: "Lavender by day, inked violet at night.",
-    lightLabel: "Iris Light",
-    darkLabel: "Iris Dark",
-  },
-  {
-    family: "midnight",
-    label: "Midnight",
-    description: "Cool white by day, near-black at night.",
-    lightLabel: "Moonlight",
-    darkLabel: "Midnight",
-  },
-];
+export { SOLID_THEMES, THEME_FAMILY_PRESENTATIONS } from "./themeChoices";
 
 /** The organizer daemon's §4.3 trust ladder, monotonic in risk. Off = dormant ·
  * Suggest (default) = journal proposals only · Tidy = applies annotations +
@@ -346,6 +281,12 @@ interface UiState {
   /** Visual treatment for the prompt navigator shown in longer chats. */
   chatNavigatorStyle: ChatNavigatorStyle;
   setChatNavigatorStyle: (style: ChatNavigatorStyle) => void;
+  /** The sidebar's edge and whether it stays (Appearance → Sidebar; the
+   * sidebar's own menu). On hover, `sidebarCollapsed` means "overlay closed". */
+  sidebarSide: SidebarSide;
+  setSidebarSide: (side: SidebarSide) => void;
+  sidebarReveal: SidebarReveal;
+  setSidebarReveal: (reveal: SidebarReveal) => void;
 
   /** General: visitor (click-away hides, default) vs resident (stays open). */
   stayOpen: boolean;
@@ -782,6 +723,16 @@ export const useUiStore = create<UiState>((set, get) => ({
   setQuokkaIdlePose: (pose) => set({ quokkaIdlePose: pose }),
   chatNavigatorStyle: "paws",
   setChatNavigatorStyle: (style) => set({ chatNavigatorStyle: style }),
+  sidebarSide: "left",
+  setSidebarSide: (side) => set({ sidebarSide: side }),
+  sidebarReveal: "pinned",
+  // only a CHANGE moves the rail: entering hover starts hidden, leaving it
+  // puts the rail back in the flow; re-picking the same mode leaves ⌘0's
+  // open/closed alone (review, 2026-09-17)
+  setSidebarReveal: (reveal) =>
+    set((s) =>
+      s.sidebarReveal === reveal ? {} : { sidebarReveal: reveal, sidebarCollapsed: reveal === "hover" },
+    ),
 
   stayOpen: false,
   setStayOpen: (on) => set({ stayOpen: on }),

@@ -1058,6 +1058,10 @@ function AppearancePane() {
   const setQuokkaIdlePose = useUiStore((s) => s.setQuokkaIdlePose);
   const chatNavigatorStyle = useUiStore((s) => s.chatNavigatorStyle);
   const setChatNavigatorStyle = useUiStore((s) => s.setChatNavigatorStyle);
+  const sidebarSide = useUiStore((s) => s.sidebarSide);
+  const setSidebarSide = useUiStore((s) => s.setSidebarSide);
+  const sidebarReveal = useUiStore((s) => s.sidebarReveal);
+  const setSidebarReveal = useUiStore((s) => s.setSidebarReveal);
   const syntaxPalette = useUiStore((s) => s.syntaxPalette);
   const setSyntaxPalette = useUiStore((s) => s.setSyntaxPalette);
   const chatWelcomeStyle = useUiStore((s) => s.chatWelcomeStyle);
@@ -1350,6 +1354,35 @@ function AppearancePane() {
             </span>
           </button>
         ))}
+      </div>
+
+      <h4 className="sethead">Sidebar</h4>
+      <p className="lead">
+        Where the sidebar sits, and whether it stays. On hover keeps it out of the way until the pointer
+        reaches the window's edge; ⌘0 still brings it. The sidebar's own right-click menu has the same
+        choices.
+      </p>
+      <div className="segfield">
+        <span className="seglabel">Side</span>
+        <Seg
+          value={sidebarSide}
+          options={[
+            ["left", "Left"],
+            ["right", "Right"],
+          ]}
+          onPick={setSidebarSide}
+        />
+      </div>
+      <div className="segfield">
+        <span className="seglabel">Show</span>
+        <Seg
+          value={sidebarReveal}
+          options={[
+            ["pinned", "Always"],
+            ["hover", "On hover"],
+          ]}
+          onPick={setSidebarReveal}
+        />
       </div>
 
       <h4 className="sethead">Chat naming</h4>
