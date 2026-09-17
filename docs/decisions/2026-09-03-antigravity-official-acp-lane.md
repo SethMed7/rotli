@@ -75,3 +75,15 @@ agent, never through the IDE's `agy` command or its login:
 - If Google reverses course or the registry entry disappears, disabling the
   lane is one allowlist edit; Rotli reviews these boundaries and disables a
   route rather than working around a restriction.
+
+## Addendum 2026-09-17 — image attachments
+
+The lane refused images at first ("does not accept image attachments in
+Rotli"). The agent's `initialize` result advertises
+`agentCapabilities.promptCapabilities.image: true`, so attached images now
+ride the `session/prompt` as `{ type: "image", mimeType, data }` blocks
+beside the text (`src-tauri/src/acp_images.rs`; the mime follows the bytes'
+magic number, not the staged file name). The capability is read per turn:
+an agent that advertises no image prompts is refused in words before a byte
+is sent. The catalog marks the Antigravity models vision-capable so the
+composer's attach button and the drop cue treat them like Claude and Codex.

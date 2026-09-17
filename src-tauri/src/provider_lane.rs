@@ -64,7 +64,8 @@ pub(crate) fn complete_blocking(
         } else {
             (Vec::new(), Vec::new())
         };
-        let turn = acp::AcpTurn { lane, bin: &bin, args: &args, env, env_remove, model };
+        let images = staged.map(|s| s.paths.as_slice()).unwrap_or(&[]);
+        let turn = acp::AcpTurn { lane, bin: &bin, args: &args, env, env_remove, model, images };
         return acp::run_acp_registered(children, request_id, turn, prompt, timeout);
     }
     let mut cmd = Command::new(&bin);

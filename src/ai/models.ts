@@ -200,14 +200,15 @@ export const CLI_CATALOG: Record<ProviderId, ChatModelInfo[]> = {
   ],
   // Google's official ACP agent (ADR 2026-09-03). Ids are the agent's own
   // config-option values; Rust re-validates each turn against the account's
-  // list and names what is available on mismatch. No image lane yet.
+  // list and names what is available on mismatch. Images ride the ACP prompt
+  // as blocks (2026-09-17, acp_images.rs); the agent advertises them.
   antigravity: [
-    cli("antigravity", "gemini-3.8-flash-high", "Gemini 3.8 Flash (High)", false),
-    cli("antigravity", "gemini-3.8-flash-medium", "Gemini 3.8 Flash (Medium)", false),
-    cli("antigravity", "gemini-3.8-flash-low", "Gemini 3.8 Flash (Low)", false),
-    cli("antigravity", "gemini-3.7-flash-high", "Gemini 3.7 Flash (High)", false),
-    cli("antigravity", "gemini-3.7-flash-medium", "Gemini 3.7 Flash (Medium)", false),
-    cli("antigravity", "gemini-3.7-flash-low", "Gemini 3.7 Flash (Low)", false),
+    cli("antigravity", "gemini-3.8-flash-high", "Gemini 3.8 Flash (High)"),
+    cli("antigravity", "gemini-3.8-flash-medium", "Gemini 3.8 Flash (Medium)"),
+    cli("antigravity", "gemini-3.8-flash-low", "Gemini 3.8 Flash (Low)"),
+    cli("antigravity", "gemini-3.7-flash-high", "Gemini 3.7 Flash (High)"),
+    cli("antigravity", "gemini-3.7-flash-medium", "Gemini 3.7 Flash (Medium)"),
+    cli("antigravity", "gemini-3.7-flash-low", "Gemini 3.7 Flash (Low)"),
   ],
 };
 
