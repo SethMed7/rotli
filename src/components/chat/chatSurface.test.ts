@@ -49,7 +49,4 @@ test("dropped chat images read back over IPC bytes, never a webview fetch", () =
   );
   expect(surfaceSource).not.toMatch(/(^|[^.\w])fetch\s*\(/);
   expect(attach).toContain("corpusFileBytes(id, CHAT_IMAGE_ASSET_MAX_BYTES)");
-  // the drop lane mirrors the paperclip's vision gate instead of attaching an
-  // image the send path will then refuse
-  expect(attach).toContain("setVisionHint(true)");
 });

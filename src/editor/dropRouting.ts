@@ -14,10 +14,15 @@ import { type DropPoint, isEmbeddablePath } from "./externalImageDrop";
 
 /** What owns a drop outright: dialogs and their backdrops. The tour card is
  * NOT here — the tour is a non-modal overlay the app stays live under. */
-const DROP_BLOCKERS = '[aria-modal="true"], [role="dialog"], .pv-scrim, .pal-focus-scrim';
+const DROP_BLOCKERS = '[aria-modal="true"], [role="dialog"], .pv-scrim, .pal-focus-scrim, .rename-overlay';
 
 interface Closest {
   closest(selector: string): unknown;
+}
+
+/** A blocked drop must stop delivery, including caret and Assets fallbacks. */
+export function dropIsBlocked<E extends Closest>(candidates: readonly DropCandidate<E>[]): boolean {
+  return candidates.some(({ stack }) => stack.some((element) => !!element.closest(DROP_BLOCKERS)));
 }
 
 /** The elements a drop at one point may reach, top-down, ending before the

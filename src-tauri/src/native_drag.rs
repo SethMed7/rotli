@@ -13,9 +13,21 @@
 
 use std::path::PathBuf;
 
-use tauri::{DragDropEvent, Emitter, Manager, Window};
+use tauri::{DragDropEvent, Emitter, Manager, WebviewEvent, Window};
 
 use crate::corpus::ImportAuthorizations;
+
+/// Tauri's multi-webview (`unstable`) runtime emits drags on the WEBVIEW,
+/// including the main content. Only local workspace webviews may grant imports;
+/// a private browser child shares its window but must never import into a note.
+/// Keep this event adapter pure so tests exercise the actual channel and scope.
+pub(crate) fn workspace_drag<'a>(label: &str, event: &'a WebviewEvent) -> Option<&'a DragDropEvent> {
+    if !matches!(label, "main" | "capture" | "quick") { return None; }
+    match event {
+        WebviewEvent::DragDrop(drag) => Some(drag),
+        _ => None,
+    }
+}
 
 /// The webview event a hovering drag rides on (docs/architecture/window-events.md).
 pub(crate) const DRAG_EVENT: &str = "rotli:native-drag";
@@ -82,6 +94,9 @@ pub(crate) fn debug_log(line: &str) {
 pub(crate) fn deliver(window: &Window, offered: usize, paths: &[PathBuf], position: DropPosition) {
     let granted =
         window.app_handle().state::<ImportAuthorizations>().authorize_native_drop(paths);
+    if debug_drops() {
+        debug_log(&format!("drop delivery: offered={offered} granted={} position={},{}", granted.len(), position.x, position.y));
+    }
     if granted.is_empty() {
         // folders, vanished files, a poisoned grant lock: say so instead
         // of dropping the gesture on the floor
@@ -157,7 +172,7 @@ pub(crate) fn handle(window: &Window, event: &DragDropEvent) {
             let _ = window.emit(DRAG_EVENT, NativeDrag { phase: "leave", x: 0.0, y: 0.0, count: 0 });
             let position = DropPosition { x: position.x, y: position.y };
             if debug_drops() {
-                eprintln!("rotli: drop with {} Finder path(s)", paths.len());
+                debug_log(&format!("drop with {} file path(s)", paths.len()));
             }
             if !paths.is_empty() {
                 deliver(window, paths.len(), paths, position);
@@ -166,5 +181,41 @@ pub(crate) fn handle(window: &Window, event: &DragDropEvent) {
             }
         }
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tauri::PhysicalPosition;
+
+    #[test]
+    fn child_webview_drag_phases_reach_the_workspace_with_the_original_payload() {
+        let events = [
+            DragDropEvent::Enter { paths: vec![PathBuf::from("/synthetic/grid.png")], position: PhysicalPosition::new(200., 300.) },
+            DragDropEvent::Over { position: PhysicalPosition::new(220., 320.) },
+            DragDropEvent::Drop { paths: vec![PathBuf::from("/synthetic/grid.png")], position: PhysicalPosition::new(240., 340.) },
+            DragDropEvent::Drop { paths: Vec::new(), position: PhysicalPosition::new(240., 340.) },
+            DragDropEvent::Leave,
+        ];
+        for drag in events {
+            let event = WebviewEvent::DragDrop(drag);
+            let WebviewEvent::DragDrop(original) = &event else { unreachable!() };
+            for label in ["main", "capture", "quick"] {
+                assert!(std::ptr::eq(workspace_drag(label, &event).unwrap(), original));
+            }
+        }
+    }
+
+    #[test]
+    fn private_browser_children_cannot_grant_workspace_imports() {
+        let event = WebviewEvent::DragDrop(DragDropEvent::Drop {
+            paths: vec![PathBuf::from("/synthetic/grid.png")],
+            position: PhysicalPosition::new(200., 300.),
+        });
+        let browser_label = format!("private-browser-{}", 1);
+        for label in [browser_label.as_str(), "remote", "main-browser", ""] {
+            assert!(workspace_drag(label, &event).is_none());
+        }
     }
 }

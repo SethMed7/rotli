@@ -99,7 +99,6 @@ import {
   loadChatFolders,
   saveChatFolders,
 } from "../../services/chatFolders";
-import { stashRefusedChatDrop } from "../../services/chatImages";
 import { invalidateNotes, useNoteIndex } from "../../services/hooks";
 import { artifactMainFolderName, fileNoteInNamedRootFolder } from "../../services/mainTree";
 import { assignChatToView } from "../../services/viewTree";
@@ -136,6 +135,7 @@ import {
   WordGlyph,
   XGlyph,
 } from "../glyphs";
+import { WebDialogFrame } from "../webDialogFrame";
 import { ChatAttachedImages } from "./chatAttachedImages";
 import { ChatClarificationBar } from "./chatClarificationBar";
 import { copyChatSelection } from "./chatCopy";
@@ -1336,6 +1336,7 @@ export function ChatSurface({
   // which message's hover Copy just fired — flips its glyph to a ✓ for a beat
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [visionHint, setVisionHint] = useState(false);
+  const [dropVisionError, setDropVisionError] = useState(false);
   // a failed chats/<slug>.md write — the thread still shows for this session,
   // but SAY it won't survive a reload (#11, audit 2026-07); cleared on the
   // next successful save.
@@ -2227,24 +2228,10 @@ export function ChatSurface({
     [active, tabId, setDraftImages],
   );
 
-  // The drop lane mirrors the paperclip's vision gate: a model that cannot see
-  // gets the hint instead of an attachment that send would then refuse. The
-  // gate lives in this wrapper (not the memoized callback) because canVision
-  // derives from the un-memoized pick, which manual deps cannot express.
+  // The current model gates the drop before any image is imported.
   useEffect(
-    () =>
-      registerChatDrop(paneId, (paths) => {
-        if (!canVision) {
-          // the model cannot see, but the files are the user's: keep them in
-          // Assets and say so (2026-09-16: they were discarded with only a hint)
-          setVisionHint(true);
-          if (active)
-            void stashRefusedChatDrop(active.id === CORPUS_INSTANCE_ID ? "default" : active.id, paths);
-          return;
-        }
-        attachPaths(paths);
-      }),
-    [paneId, attachPaths, canVision, active],
+    () => registerChatDrop(paneId, attachPaths, canVision, () => setDropVisionError(true)),
+    [paneId, attachPaths, canVision],
   );
 
   // this chat's generated assets: everything under storage/chats/<slug>/ in the
@@ -2684,6 +2671,29 @@ export function ChatSurface({
                         ))}
                       </div>
                     )}
+                    {dropVisionError &&
+                      createPortal(
+                        <WebDialogFrame
+                          id="chat-image-drop-error"
+                          title="This model can’t see images"
+                          onClose={() => setDropVisionError(false)}
+                          actions={
+                            <button
+                              type="button"
+                              className="rename-btn primary"
+                              onClick={() => setDropVisionError(false)}
+                            >
+                              OK
+                            </button>
+                          }
+                        >
+                          <p>
+                            Choose a model that supports images, then drop the image again. Nothing was
+                            attached or saved.
+                          </p>
+                        </WebDialogFrame>,
+                        document.body,
+                      )}
                     {visionHint && (
                       <div className="chat-vision-hint">
                         {visionModels.length > 0 ? (

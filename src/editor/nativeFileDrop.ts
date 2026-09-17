@@ -26,7 +26,7 @@ import {
 } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
 import { showFileNotice } from "../state/fileNotice";
-import { type DropCandidate, firstTarget } from "./dropRouting";
+import { type DropCandidate, dropIsBlocked, firstTarget } from "./dropRouting";
 import {
   type DropPoint,
   dropEditorHost,
@@ -108,6 +108,7 @@ export function useNativeFileDrop(): void {
 
     const handleDrop = async (paths: string[], px: number, py: number) => {
       const candidates = candidatesFor(px, py);
+      if (dropIsBlocked(candidates)) return;
       const chat = firstTarget(candidates, chatDropAt);
       if (chat) return deliverFiles(paths, { kind: "chat", attach: chat.target });
       const target =
@@ -124,7 +125,8 @@ export function useNativeFileDrop(): void {
         dropLine.hide();
         return;
       }
-      const target = editorAt(candidatesFor(drag.x, drag.y));
+      const candidates = candidatesFor(drag.x, drag.y);
+      const target = dropIsBlocked(candidates) ? null : editorAt(candidates);
       if (target) {
         hovered = target;
         dropLine.show(target.view, target.point);

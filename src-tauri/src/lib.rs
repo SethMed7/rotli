@@ -2900,6 +2900,13 @@ pub fn run() {
 
             Ok(())
         })
+        // `unstable` makes even the main content a child webview. Its native
+        // drags are WebviewEvent, not WindowEvent (tauri-runtime-wry).
+        .on_webview_event(|webview, event| {
+            if let Some(drag) = native_drag::workspace_drag(webview.label(), event) {
+                native_drag::handle(&webview.window(), drag);
+            }
+        })
         // Click-away hide (the visitor law) — a setting since 2026-06-12:
         // "Stay open" turns it off for the main window. Capture always hides.
         // And closing NEVER destroys (the summon law: summon shows LIVING
@@ -2908,10 +2915,6 @@ pub fn run() {
         // the rest of the process. ⌘W is owned by the frontend registry above.
         .on_window_event(|window, event| {
             match event {
-                WindowEvent::DragDrop(event) => {
-                    native_drag::handle(window, event);
-                    return;
-                }
                 WindowEvent::CloseRequested { api, .. } => {
                     api.prevent_close();
                     let _ = window.hide();

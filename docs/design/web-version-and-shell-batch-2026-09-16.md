@@ -418,42 +418,46 @@ snapshot (Zen, Firefox, Safari, Brave without its flag): re-import to pick up
 the app's later changes. Live folder mode (Chrome, Edge, Arc, Brave with the
 flag) follows the real files.
 
-### Native drops on macOS 26 (diagnosed 2026-09-17, unresolved)
+### Native drops on macOS 26 (event-channel fix, 2026-09-17)
 
-Evidence, all from the dev app in `~/rotli-drop` with `ROTLI_DEBUG_DROPS=1`:
+**Root cause:** Rotli enables Tauri's `unstable` feature for child/private
+browser webviews. With that feature, `tauri-runtime-wry` creates even the main
+workspace as `WebviewKind::WindowChild`. Wry’s native drag handler sends
+`WebviewEvent::DragDrop` for a child, whereas a window-content webview sends
+`WindowEvent::DragDrop`. Rotli listened only to the latter. Correct AppKit
+registration and a working `draggingEntered:` callback therefore produced no
+`native_drag::handle` log or imported file.
 
-- The Rust handler (`native_drag::handle`, reached through Tauri's
-  `WindowEvent::DragDrop`) logs every Enter/Leave/Drop it receives to
-  `$TMPDIR/rotli-drops-debug.log`. Two owner drags (Finder image, screenshot
-  thumbnail) produced **nothing** — not even Enter. So neither the Finder
-  path lane nor the promise lane is reached; the page's HTML5 drop never fires
-  either because wry consumes drags at the AppKit level.
-- Wiring is correct: `tauri-runtime-wry` turns wry drag events into
-  `SynthesizedWindowEvent::DragDrop` for window-content webviews, and the app's
-  `on_window_event` matches it. No `dragDropEnabled: false` anywhere.
-- The startup dump (`native_drag_promise::dump_drop_targets`, debug-only)
-  shows the drop target is right: `TaoView` → `WryWebView` (1512×948,
-  **17 registered dragged types** incl. `NSFilenamesPboardType`, `public.png`,
-  the file-promise type) → `WKFlippedView` (0 types). No overlay window: the
-  capture and quick-note windows are hidden, nothing else is above the main
-  window.
-- Conclusion: on this macOS 26 WebKit, AppKit's drag callbacks no longer
-  reach the wry subclass overrides (`draggingEntered:` … on `WryWebView`),
-  although the subclass instance is the registered destination. Upstream
-  reports the same shape: elixir-desktop/webview#12 ("WebKit's internal drag
-  destination receives Finder drags before the subclass hooks") and fixes it
-  with a runtime bridge (swizzle WebKit's private drag-destination handling,
-  register file-URL + file-promise types there, delegate back). wry has two
-  open PRs on the same file (#1829 forward non-file drags to WebKit, #1844
-  stop panicking on `NSFilenamesPboardType`), neither addressing this.
-- Next step (Rust, macOS-only, in `native_drag_promise.rs`): install our own
-  drag destination at the `TaoView`/window level or swizzle the WebKit
-  destination, feed Enter/Over/Drop into `native_drag::handle` (paths for
-  Finder, `claim` for promises/bytes), and verify with a real drag — this
-  process cannot post synthetic input (not Accessibility-trusted). Also needed
-  for the owner's chat target: drop → attach when the current model can see
-  images, else a modal error (today a blind model keeps the image in Assets
-  and says so in the thread).
+The earlier WebKit-bypass diagnosis was a hypothesis and was disproved by the
+callback trace: `draggingEntered:` reached the WryWebView subclass with Safari
+PNG/TIFF and promise types, but never reached Rotli’s window-event listener.
+The upstream private-WebKit swizzle suggestion does not address this event
+channel mismatch. The exploratory runtime bridge was removed; no Objective-C
+method swizzling or extra native destination ships in this change.
+
+The builder now consumes `on_webview_event` and passes workspace drags through
+`native_drag::workspace_drag` to the existing handler. Only `main`, `capture`,
+and `quick` qualify; remote private-browser children sharing a window cannot
+grant workspace imports. The window-event listener no longer owns drags, so
+there is one subscription and the existing `native_drag::deliver` remains the
+only import-grant/event delivery point. Finder paths and the existing
+promise/image-byte lanes all use it. Opt-in debug logs include the payload,
+selected lane, and granted count in `$TMPDIR/rotli-drops-debug.log`.
+
+Chat now gates image drops before importing: an image-capable model attaches;
+a blind model opens a modal explaining how to choose a suitable model and
+retry. It no longer keeps a refused image in Assets. Drops on the modal and
+its backdrop cannot fall through to a note caret or Assets.
+
+**Native acceptance:** see the ignored
+`_review/codex-astra-2026-09-17-drops/report.md` for exact checks and evidence.
+Computer Use’s initial native drag attempts were inconclusive: Finder’s
+synthetic folder control did not move a file, and Safari initially reported
+only drag-start/end. Later inspection found destination events in the Safari
+control and the Wry callback trace. Those observations establish the receiver
+and, together with the runtime source, the event-channel fault; they do not
+by themselves prove a successful imported note image or chat attachment.
+Screenshot-thumbnail and Photos drags require separate native acceptance.
 
 ### Enhancements (reviewed 2026-09-16 evening)
 

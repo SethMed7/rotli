@@ -268,7 +268,14 @@ second user-visible product or storage location.
   root's managed image lane before the turn is sent. The transcript stores only
   a portable `storage:` reference; Rust bounds the payload, validates its image
   signature and extension, enforces root mutability, and writes atomically.
-  Unsupported drops fail before Rotli imports them. A native Finder drop first
+  Unsupported drops fail before Rotli imports them. A chat whose selected model
+  cannot see images refuses the drop with a modal before importing any image;
+  switching to an image-capable model and dropping again attaches it.
+  With Tauri's multi-webview runtime, native drags arrive on the workspace
+  webview event channel, not the window channel. Only local workspace webviews
+  may forward them to `native_drag::handle`; private-browser children cannot
+  grant workspace imports. Drops on a modal block all delivery fallbacks.
+  A native Finder drop first
   creates short-lived, single-use grants for its exact canonical files; only
   then does Rust emit the authorized paths and drop position to the webview.
   An ordinary webview drag event cannot authorize an arbitrary path. When a
