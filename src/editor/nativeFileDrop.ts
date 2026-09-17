@@ -15,7 +15,7 @@
 import { EditorView } from "@codemirror/view";
 import { useEffect } from "react";
 
-import { chatDropAt } from "../components/chat/chatDrop";
+import { chatDropAt, CHAT_PANE_ATTR } from "../components/chat/chatDrop";
 import { onNativeDrag } from "../lib/nativeDrag";
 import {
   corpusCreateImageAsset,
@@ -161,17 +161,34 @@ export function useNativeFileDrop(): void {
   useNativeFilePaste();
 
   useEffect(() => {
+    // Rotli Web: a chat cannot take a file yet (Rotli Helper carries text only);
+    // the pane still accepts the drag so the drop can say so instead of the
+    // browser opening the file over the app
+    const webChatPane = (event: DragEvent) =>
+      !isTauri() && !!(event.target as Element | null)?.closest(`[${CHAT_PANE_ATTR}]`);
     const onDragOver = (event: DragEvent) => {
       if (!event.dataTransfer?.types.includes("Files")) return;
-      if (!dropEditorHost(event.target as Element | null)) return;
+      if (!dropEditorHost(event.target as Element | null) && !webChatPane(event)) return;
       event.preventDefault();
       event.dataTransfer.dropEffect = "copy";
     };
     const onDrop = (event: DragEvent) => {
+      if (webChatPane(event) && (event.dataTransfer?.files.length ?? 0) > 0) {
+        event.preventDefault();
+        showFileNotice("Files can’t be sent through Rotli Helper yet — drop images into a note instead.");
+        return;
+      }
       const host = dropEditorHost(event.target as Element | null);
       if (!host || !event.dataTransfer) return;
       const files = [...event.dataTransfer.files].filter((file) => isImagePath(file.name));
-      if (files.length === 0) return;
+      if (files.length === 0) {
+        // Rotli Web: an unhandled file drop would open the file over the app
+        if (!isTauri() && event.dataTransfer.files.length > 0) {
+          event.preventDefault();
+          showFileNotice("Rotli Web takes images only — other files stay where they are.");
+        }
+        return;
+      }
       const view = EditorView.findFromDOM(host);
       if (!view) return;
       event.preventDefault();

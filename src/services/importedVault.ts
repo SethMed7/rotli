@@ -6,10 +6,12 @@
 // back as a zip. Nothing here can write to the user's disk; the copy is
 // honest about that.
 
+import { bytesFromBase64 } from "../documents/images";
 import { type BrowserVault, browserVault } from "../lib/browserVault";
 import { createDebouncedTask } from "../lib/debouncedTask";
 import { zipTextFiles } from "../lib/vaultZip";
 import { MemoryVaultDir, type VaultDir, type VaultDirEntry, type VaultStat } from "./vaultDir";
+import { isWebImageName } from "./webFiles";
 
 /** The browser-storage key holding an imported vault's snapshot. */
 export const IMPORTED_VAULT_KEY = "vault-import";
@@ -20,6 +22,8 @@ export interface ImportedVaultSnapshot {
   name: string;
   files: Record<string, string>;
   dirs: string[];
+  /** Binary files written in the browser (dropped images), base64 by path. */
+  binaries?: Record<string, string>;
 }
 
 export interface PickedFile {
@@ -91,11 +95,13 @@ export function pickFolderForImport(): Promise<File[] | null> {
   });
 }
 
-/** Every file and directory of a VaultDir, for a snapshot or an export. */
+/** Every file and directory of a VaultDir, for a snapshot or an export:
+ * text by path, and image files (a dropped screenshot) as bytes. */
 export async function walkVaultDir(
   dir: VaultDir,
-): Promise<{ files: Record<string, string>; dirs: string[] }> {
+): Promise<{ files: Record<string, string>; dirs: string[]; binaries: Record<string, Uint8Array> }> {
   const files: Record<string, string> = {};
+  const binaries: Record<string, Uint8Array> = {};
   const dirs: string[] = [];
   const visit = async (path: string): Promise<void> => {
     for (const entry of await dir.list(path)) {
@@ -103,18 +109,35 @@ export async function walkVaultDir(
       if (entry.kind === "directory") {
         dirs.push(child);
         await visit(child);
-      } else files[child] = await dir.readText(child);
+      } else if (isWebImageName(entry.name)) binaries[child] = await dir.readBytes(child);
+      else files[child] = await dir.readText(child);
     }
   };
   await visit("");
-  return { files, dirs };
+  return { files, dirs, binaries };
 }
 
 /** Seed an in-memory filesystem from a snapshot. */
+// every save re-walks the images; encode each buffer once
+const BASE64_MEMO = new WeakMap<Uint8Array, string>();
+function bytesToBase64(bytes: Uint8Array): string {
+  const known = BASE64_MEMO.get(bytes);
+  if (known !== undefined) return known;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000)
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  const encoded = btoa(binary);
+  BASE64_MEMO.set(bytes, encoded);
+  return encoded;
+}
+
 export async function seedVaultDir(snapshot: ImportedVaultSnapshot): Promise<MemoryVaultDir> {
   const dir = new MemoryVaultDir();
   for (const path of snapshot.dirs) await dir.mkdir(path);
   for (const [path, text] of Object.entries(snapshot.files)) await dir.writeText(path, text);
+  for (const [path, base64] of Object.entries(snapshot.binaries ?? {})) {
+    await dir.writeBytes(path, bytesFromBase64(base64));
+  }
   return dir;
 }
 
@@ -141,8 +164,11 @@ export class PersistedVaultDir implements VaultDir {
     debounceMs = 500,
   ) {
     this.saver = createDebouncedTask(debounceMs, async () => {
-      const { files, dirs } = await walkVaultDir(this.inner);
-      const snapshot: ImportedVaultSnapshot = { version: 1, name: this.name, files, dirs };
+      const walked = await walkVaultDir(this.inner);
+      const binaries: Record<string, string> = {};
+      for (const [path, bytes] of Object.entries(walked.binaries)) binaries[path] = bytesToBase64(bytes);
+      const { files, dirs } = walked;
+      const snapshot: ImportedVaultSnapshot = { version: 1, name: this.name, files, dirs, binaries };
       await save(JSON.stringify(snapshot));
     });
   }
@@ -170,6 +196,20 @@ export class PersistedVaultDir implements VaultDir {
   async writeText(path: string, text: string): Promise<void> {
     await this.inner.writeText(path, text);
     this.touched();
+  }
+  readBytes(path: string): Promise<Uint8Array> {
+    return this.inner.readBytes(path);
+  }
+  /** An image is big and the browser may refuse it (storage quota): save now,
+   * so the drop fails in words instead of vanishing on the next reload. */
+  async writeBytes(path: string, bytes: Uint8Array): Promise<void> {
+    await this.inner.writeBytes(path, bytes);
+    try {
+      await this.flush();
+    } catch (error) {
+      await this.inner.remove(path);
+      throw error;
+    }
   }
   async mkdir(path: string): Promise<void> {
     await this.inner.mkdir(path);
@@ -200,8 +240,8 @@ export async function forgetImportedVault(vault: BrowserVault = browserVault()):
 
 /** Export a vault's text files as `<name>.zip` through the browser's download. */
 export async function downloadVaultZip(dir: VaultDir, name: string): Promise<void> {
-  const { files } = await walkVaultDir(dir);
-  const blob = await zipTextFiles(files);
+  const { files, binaries } = await walkVaultDir(dir);
+  const blob = await zipTextFiles(files, binaries);
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;

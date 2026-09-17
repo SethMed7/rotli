@@ -25,6 +25,7 @@ import {
   type WebAiCorpusShape,
   currentWebAiBridge,
   currentWebAiCorpus,
+  currentWebFileStore,
   currentWebMemexBridge,
 } from "./webAiSeam";
 
@@ -914,7 +915,7 @@ export async function corpusPickImages(): Promise<string[]> {
 /** Persist an image selected in Chat as a collision-safe user-owned asset.
  * The transcript keeps only its portable `storage:` reference. */
 export async function corpusCreateImageAsset(rootId: string, name: string, base64: string): Promise<string> {
-  if (!isTauri()) return "";
+  if (!isTauri()) return currentWebFileStore()?.createImageAsset(rootId, name, base64) ?? "";
   return invoke<string>("corpus_create_image_asset", { rootId, name, base64 });
 }
 
@@ -931,6 +932,7 @@ export async function corpusAbs(rootId: string, rel: string): Promise<string> {
 export async function resolveImageSrc(src: string, rootId = "default"): Promise<string> {
   if (/^(https?:|data:|blob:|asset:)/i.test(src)) return src;
   const rel = src.startsWith("storage:") ? `storage/${src.slice("storage:".length)}` : src;
+  if (!isTauri()) return currentWebFileStore()?.imageUrl(rel) ?? "";
   const abs = await corpusAbs(rootId, rel);
   return abs ? convertFileSrc(abs) : "";
 }

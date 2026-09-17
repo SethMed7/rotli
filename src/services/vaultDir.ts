@@ -27,6 +27,9 @@ export interface VaultDir {
   readText(path: string): Promise<string>;
   /** Creates parent directories as needed. */
   writeText(path: string, text: string): Promise<void>;
+  /** Binary files (images): the same paths, raw bytes. Throws when missing. */
+  readBytes(path: string): Promise<Uint8Array>;
+  writeBytes(path: string, bytes: Uint8Array): Promise<void>;
   /** Recursive and idempotent. */
   mkdir(path: string): Promise<void>;
   /** File move: read → write → remove, in that order, so a failed write leaves
@@ -73,6 +76,8 @@ export function byteLength(text: string): number {
 
 interface MemoryFile {
   text: string;
+  /** Present for a binary file; `text` is "" then. */
+  bytes?: Uint8Array;
   lastModified: number;
   size: number;
 }
@@ -135,6 +140,21 @@ export class MemoryVaultDir implements VaultDir {
     this.files.set(key, { text, lastModified: this.tick(), size: byteLength(text) });
   }
 
+  async readBytes(path: string): Promise<Uint8Array> {
+    const key = normalizeVaultPath(path);
+    const file = this.files.get(key);
+    if (!file) throw new Error(`no such file: ${key}`);
+    return file.bytes ?? new TextEncoder().encode(file.text);
+  }
+
+  async writeBytes(path: string, bytes: Uint8Array): Promise<void> {
+    const key = normalizeVaultPath(path);
+    if (!key) throw new Error("a file needs a name");
+    if (this.dirs.has(key)) throw new Error(`a directory already holds ${key}`);
+    await this.mkdir(parentPath(key));
+    this.files.set(key, { text: "", bytes, lastModified: this.tick(), size: bytes.byteLength });
+  }
+
   async mkdir(path: string): Promise<void> {
     const key = normalizeVaultPath(path);
     if (!key) return;
@@ -151,8 +171,11 @@ export class MemoryVaultDir implements VaultDir {
     const source = normalizeVaultPath(from);
     const target = normalizeVaultPath(to);
     if (source === target) return;
-    const text = await this.readText(source);
-    await this.writeText(target, text);
+    const file = this.files.get(source);
+    if (!file) throw new Error(`no such file: ${source}`);
+    // a binary moves as bytes; reading it as text would leave an empty file
+    if (file.bytes) await this.writeBytes(target, file.bytes);
+    else await this.writeText(target, file.text);
     await this.remove(source);
   }
 

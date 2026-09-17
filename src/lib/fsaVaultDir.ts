@@ -65,11 +65,25 @@ export class FsaVaultDir implements VaultDir {
   }
 
   async writeText(path: string, text: string): Promise<void> {
+    await this.writeFile(path, text);
+  }
+
+  async readBytes(path: string): Promise<Uint8Array> {
+    const handle = await this.file(path);
+    if (!handle) throw new Error(`not found: ${path}`);
+    return new Uint8Array(await (await handle.getFile()).arrayBuffer());
+  }
+
+  async writeBytes(path: string, bytes: Uint8Array): Promise<void> {
+    await this.writeFile(path, bytes.slice().buffer as ArrayBuffer);
+  }
+
+  private async writeFile(path: string, contents: string | ArrayBuffer): Promise<void> {
     const handle = await this.file(path, true);
     if (!handle) throw new Error(`cannot create: ${path}`);
     const writable = await handle.createWritable();
     try {
-      await writable.write(text);
+      await writable.write(contents);
     } finally {
       await writable.close();
     }
@@ -81,8 +95,9 @@ export class FsaVaultDir implements VaultDir {
 
   /** read → write → remove, so a failure at any step leaves the original. */
   async move(from: string, to: string): Promise<void> {
-    const text = await this.readText(from);
-    await this.writeText(to, text);
+    // bytes, so an image moves intact (text is bytes too)
+    const bytes = await this.readBytes(from);
+    await this.writeBytes(to, bytes);
     await this.remove(from);
   }
 

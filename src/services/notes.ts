@@ -5,9 +5,9 @@
 // Components never call either directly — they consume the TanStack Query
 // hooks in ./hooks.ts.
 
-import { isWebVault } from "../lib/browserVault";
+import { browserVault, isWebVault } from "../lib/browserVault";
 import { isTauri } from "../lib/tauri";
-import { registerWebAiCorpus, registerWebMemexBridge } from "../lib/webAiSeam";
+import { registerWebAiCorpus, registerWebFileStore, registerWebMemexBridge } from "../lib/webAiSeam";
 import { seedDemoCorpus, seedReservedRoots } from "./demoCorpus";
 import { FsNotesService } from "./fsNotes";
 import { hydrateHelperLink } from "./helperLink";
@@ -15,6 +15,7 @@ import { InMemoryNotesService } from "./inMemoryNotes";
 import type { NotesService } from "./notesPort";
 import { createWebAiCorpus } from "./webAiCorpus";
 import { chatStoreFor, webMemexBridge } from "./webChats";
+import { createWebFileStore } from "./webFiles";
 import {
   activeWebNotesService,
   hydrateWebNotes,
@@ -86,6 +87,7 @@ export async function hydrateWebVault(): Promise<boolean> {
     // the model's view of this vault, and the helper that runs the model
     registerWebAiCorpus(createWebAiCorpus(() => notesService));
     registerWebMemexBridge(webMemexBridge(chatStoreFor(activeWebVaultDir())));
+    registerWebFileStore(createWebFileStore(activeWebVaultDir(), browserVault));
     await hydrateHelperLink();
   }
   return restored;
