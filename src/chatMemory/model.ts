@@ -128,25 +128,47 @@ export function mergeChatMemory(
 export interface AttachedNoteCandidate {
   id: string;
   aliases?: readonly string[];
+  updatedAt?: number;
 }
 
-export function attachedNoteId(stem: string, candidates: Iterable<AttachedNoteCandidate>): string | null {
+/** Every note that answers to `stem`: an exact alias match (filename stem,
+ * title slug, or a preserved rename), else the pre-readable-filename fallback
+ * that encoded the note ULID's final six characters in the stem. */
+export function attachedNoteMatches<T extends AttachedNoteCandidate>(
+  stem: string,
+  candidates: Iterable<T>,
+): T[] {
   const target = stem.trim().toLocaleLowerCase();
-  if (!target) return null;
+  if (!target) return [];
   const available = [...candidates];
   const exact = available.filter((candidate) =>
     candidate.aliases?.some((alias) => alias.trim().toLocaleLowerCase() === target),
   );
-  if (exact.length === 1) return exact[0]!.id;
-  if (exact.length > 1) return null;
-
-  // Pre-readable-filename chat attachments encoded the note ULID's final six
-  // characters in the stem. Keep that fallback until every old attachment has
-  // been refreshed through the alias-aware path.
+  if (exact.length > 0) return exact;
   const tail = stem.slice(-6).toLowerCase();
-  if (!tail) return null;
-  for (const candidate of available) {
-    if (candidate.id.slice(-6).toLowerCase() === tail) return candidate.id;
-  }
-  return null;
+  if (!tail) return [];
+  return available.filter((candidate) => candidate.id.slice(-6).toLowerCase() === tail);
+}
+
+/** The one note a stem names, or null when none or several do (the same
+ * title filed in two areas — see pickChatNote for the tie-break). */
+export function attachedNoteId(stem: string, candidates: Iterable<AttachedNoteCandidate>): string | null {
+  const matches = attachedNoteMatches(stem, candidates);
+  return matches.length === 1 ? matches[0]!.id : null;
+}
+
+/** Among several notes answering to the chat's stem, the chat's own: the
+ * one whose body links back to the chat (`[[chatSlug]]`, which every note
+ * Rotli writes for a chat carries), newest first when more than one does —
+ * or, when none links back, simply the newest. Never null for a non-empty
+ * list: a resolvable stem must never mint a duplicate (2026-09-17: five
+ * "Omachary Research" notes, one per turn, because two notes with the same
+ * title made the lookup ambiguous and every turn created another). */
+export function pickChatNote(
+  matches: readonly { id: string; updatedAt?: number; linksChat: boolean }[],
+): string | null {
+  if (matches.length === 0) return null;
+  const linked = matches.filter((match) => match.linksChat);
+  const pool = linked.length > 0 ? linked : matches;
+  return [...pool].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0]!.id;
 }

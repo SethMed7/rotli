@@ -547,6 +547,15 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   "Secure notes" or All notes until the user curates them into Main or Quick
   access. Protection is unchanged by the projection (gitignored spine,
   model-gated reads).
+- **Only a capture carries the capture shelf (2026-09-17).** The `Inbox` shelf
+  is written by the Quick capture (⌥C), the Quick Note window, and a merge of
+  captures on the board — nothing else. A chat's background note (the
+  conversation notes a chat keeps, or the note its header button creates),
+  a ⌘N note, an AI-created note, and a duplicate of a non-capture are born
+  with an empty shelf and project to the folder they live in (`wiki/_inbox/`
+  staging until the Librarian files them, then their area). The projection
+  rule itself is unchanged; this is writer policy, so the contract version
+  does not move.
 - A note created in the Quick Note window shares that on-disk shape (secure at
   birth, `wiki/_secure/`, shelf `Inbox`) but is a **full note**: the main window
   files it into Main's root the moment it is born, and curated-in-Main is the

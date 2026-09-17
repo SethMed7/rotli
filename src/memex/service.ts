@@ -285,8 +285,11 @@ export interface WriteNoteInput {
   instance: MemexInstance;
   /** The note body (markdown; its first heading is the title). */
   body: string;
-  /** The user's folder(s) for the projected view; default ["Inbox"]. */
-  shelf?: string[];
+  /** The user's folder(s) for the projected view. `["Inbox"]` is the CAPTURE
+   * shelf — Rust projects it to the Captures board — so only a capture
+   * writes it; every other writer names its shelf or passes `[]` (2026-09-17:
+   * chat notes had defaulted to Inbox and filled Captures). */
+  shelf: string[];
   /** Who may access it; default: the brain's primary user (owner-only). */
   reach?: string[];
   /** Mark the file secure at birth; local-AI access remains denied by default. */
@@ -318,7 +321,7 @@ export async function writeNote(input: WriteNoteInput): Promise<{ id: string; st
   const meta: NoteMeta = {
     id,
     title,
-    shelf: input.shelf ?? ["Inbox"],
+    shelf: input.shelf,
     reach,
     ...(input.secure ? { secure: true } : {}),
   };
