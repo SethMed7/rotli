@@ -44,3 +44,17 @@ export function registerWebMemexBridge(bridge: WebMemexBridge | null): void {
 export function currentWebMemexBridge(): WebMemexBridge | null {
   return webMemexBridge;
 }
+
+/** Rotli Web's file lane: dropped images stored beside the notes and served
+ * back as displayable URLs (services/webFiles). The desktop never sets it. */
+export interface WebFileStoreShape {
+  createImageAsset(rootId: string, name: string, base64: string): Promise<string>;
+  imageUrl(rel: string): Promise<string>;
+}
+let webFileStore: WebFileStoreShape | null = null;
+export function registerWebFileStore(store: WebFileStoreShape | null): void {
+  webFileStore = store;
+}
+export function currentWebFileStore(): WebFileStoreShape | null {
+  return webFileStore;
+}

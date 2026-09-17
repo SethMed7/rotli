@@ -134,3 +134,23 @@ describe("MemoryVaultDir", () => {
     expect(await dir.exists("archive/gone.md")).toBe(false);
   });
 });
+
+describe("binary files", () => {
+  test("bytes round-trip, count as a file with their byte size, and stay out of text reads", async () => {
+    const dir = new MemoryVaultDir();
+    const bytes = new Uint8Array([137, 80, 78, 71, 0, 255]);
+    await dir.writeBytes("storage/images/a.png", bytes);
+    expect(await dir.readBytes("storage/images/a.png")).toEqual(bytes);
+    expect(await dir.exists("storage/images/a.png")).toBe(true);
+    expect(await dir.list("storage/images")).toEqual([{ name: "a.png", kind: "file" }]);
+    expect((await dir.stat("storage/images/a.png"))?.size).toBe(6);
+    // a text file reads back as its UTF-8 bytes
+    await dir.writeText("wiki/a.md", "hi");
+    expect(await dir.readBytes("wiki/a.md")).toEqual(new TextEncoder().encode("hi"));
+    await expect(dir.readBytes("nope.png")).rejects.toThrow(/no such file/);
+    // a move carries the bytes (a text move would leave an empty file)
+    await dir.move("storage/images/a.png", "archive/a.png");
+    expect(await dir.readBytes("archive/a.png")).toEqual(bytes);
+    expect(await dir.exists("storage/images/a.png")).toBe(false);
+  });
+});

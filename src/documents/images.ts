@@ -1,7 +1,8 @@
 import type { DocumentImage } from "./model";
 import { GENERATED_DOCX_THEME } from "./theme";
 
-function bytes(base64: string): Uint8Array {
+/** Raw bytes of a base64 string (a dropped or embedded image). */
+export function bytesFromBase64(base64: string): Uint8Array {
   return Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
 }
 
@@ -47,7 +48,7 @@ export function documentImageFromBase64(
   mimeType: DocumentImage["mimeType"],
   base64: string,
 ): DocumentImage {
-  const natural = dimensions(bytes(base64), mimeType);
+  const natural = dimensions(bytesFromBase64(base64), mimeType);
   const safeWidth = natural.width > 0 ? natural.width : 16;
   const safeHeight = natural.height > 0 ? natural.height : 9;
   const scale = Math.min(

@@ -51,6 +51,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Connected. Safari cannot reach the helper; every other desktop browser can
   (some ask once for local network access). Web chats are saved in the
   browser vault.
+- **Rotli Web: images in notes.** Drop an image onto a note in the browser
+  and it is kept the way the Mac app keeps it: as a file under the vault's
+  `storage/images/` (or `Storage/` in a plain folder) when a folder is
+  connected or imported, and inside the browser vault otherwise. The note
+  gets the same `storage:` link the app writes, so the same note and image
+  open in both, and the image shows from the stored bytes and is still
+  there after a reload. A drop on a web chat says images cannot go through
+  Rotli Helper yet and to use a note instead.
 - **Guided setup for the connected models.** A lane that is not ready walks
   you through it instead of hiding a hint: Settings → AI Models shows the
   steps open (install with the tool's own command for your OS, copy button

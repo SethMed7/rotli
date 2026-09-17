@@ -172,8 +172,28 @@ vault, never the live one.
   folder opens in both.
 - Zip export and import of a browser vault (JSZip is already behind an
   adapter in the documents lane).
-- Assets (images) stored as blobs; the editor's image embeds resolve them
-  through a blob URL instead of the asset protocol.
+- Assets (images) — **done 2026-09-16** (`services/webFiles.ts`, registered
+  through `lib/webAiSeam.ts` at boot). A dropped image is stored the way the
+  app stores it: a real file under `storage/images/` (the app's one asset
+  folder, `create_image_asset`) when a folder is connected or imported (the
+  imported copy carries binaries base64 in its snapshot and saves them at
+  once, so a storage-quota refusal fails the drop in words), and under
+  `asset:<path>` in the browser vault otherwise. Names follow the app's
+  `stem-2.ext` rule, compared case-blind (the folder may sit on a
+  case-insensitive disk), one import at a time; the encoded size is bounded
+  before decoding (`CHAT_IMAGE_ASSET_MAX_BYTES`). The note keeps the app's
+  portable `storage:` image link, so the same file opens in both, and the
+  editor resolves it through an object URL made from the stored bytes
+  instead of the asset protocol (`resolveImageSrc` web branch; a legacy
+  `Storage/` file still answers). Moves and the zip export carry bytes.
+  Chat drops on the web are refused with a notice (the pane accepts the
+  drag so the browser never opens the file over the app) until the helper
+  carries images. Proofs: `e2e/web/rotli-web-image-drop.spec.ts`,
+  `e2e/web/rotli-web-chat-drop.spec.ts`. Still owed: paste (⌘V) of an
+  image on the web (`useNativeFilePaste` is desktop-only), and an imported
+  copy leaves the folder's existing `storage/` images behind
+  (`importableVaultPaths`), so images dropped in the app show as not found
+  there; a connected folder (Chromium) shows them.
 
 ### Chat on the web: the three shapes (decision pending, 2026-09-16)
 
@@ -363,8 +383,8 @@ drops, real files) still need the Mac app in hand.
 | # | Bug | App | Web |
 |---|---|---|---|
 | 1 | Delete a folder | Done for Main folders (`shell-batch` spec). Real Library directories still need a Rust command. | Same code; Main folders are `.rotli/main.json` in both. Not separately run (the web seeds no demo corpus). |
-| 2 | Drop image into a note | Native lane unchanged; the browser lane routes through `planDrop` with a notice. Native check owed. | The browser lane IS the web's lane: works for images; other files go to Assets with a notice. |
-| 3 | Drop image into a chat | Partial: a model that cannot see keeps the image in Assets and says so. Native check owed. | Not working: chats have no DataTransfer fallback (documented gap). |
+| 2 | Drop image into a note | Native lane unchanged, plus screenshot thumbnails and browser images (file promises / bytes) since `native_drag_promise.rs`. Native check owed. | Done: the image is stored in the vault (folder or browser) and the note keeps the app's `storage:` link (`rotli-web-image-drop.spec.ts`). |
+| 3 | Drop image into a chat | Partial: a model that cannot see keeps the image in Assets and says so. Native check owed. | Refused with a notice: Rotli Helper carries text only, so the drop says to use a note instead. |
 | 4 | Trash back button | Done (`system-back-and-restore`). | Done — the same spec passes against the web build. |
 | 5 | Restore to the original place | Done: the Main slot survives Trash/Archive. | Same code. |
 | 6 | Captures → Make a note | Done (`captureMerge.test.ts`). | Same code. |
