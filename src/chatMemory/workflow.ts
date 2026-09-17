@@ -42,8 +42,13 @@ export interface SyncChatMemoryInput {
 export async function syncChatMemory(
   repository: ChatMemoryRepository,
   input: SyncChatMemoryInput,
-): Promise<ChatMemoryNote> {
+): Promise<ChatMemoryNote | null> {
   let note = input.attachedStem ? await repository.findByStem(input.attachedStem) : null;
+  // A chat that points at a note this listing cannot reach (deleted, or a
+  // cold vault) gets NO new note: minting one beside the pointer made a fresh
+  // duplicate every turn and never attached it (2026-09-17). The pointer
+  // stays; the chat's note button self-heals when the user asks for the note.
+  if (!note && input.attachedStem) return null;
   const currentNotes = note ? extractChatNotes(note.body) : null;
 
   let notes: string | null = null;
@@ -59,13 +64,12 @@ export async function syncChatMemory(
   if (!note) {
     const body = mergeChatMemory("", input.title, input.chatSlug, content);
     note = await repository.create(body);
-    // A chat that already points at a note KEEPS pointing at it. `attachedTo`
-    // is the note→chats link the editor's chat chip lists from; re-pointing it
-    // at a freshly written memory note orphaned every chat from the note it was
-    // opened on, so the chip listed nothing, fell through to "continue the
-    // deterministic chat", and the maintainer got the same chat with no picker forever
-    // (2026-08-01). Only an unattached chat adopts its memory note.
-    if (!input.attachedStem) await repository.attach(note.stem);
+    // Only an unattached chat reaches here, and it adopts its memory note.
+    // `attachedTo` is the note→chats link the editor's chat chip lists from;
+    // re-pointing an attached chat at a fresh note orphaned it from the note
+    // it was opened on (2026-08-01), which is why the attached-but-missing
+    // case above returns before creating anything.
+    await repository.attach(note.stem);
     return note;
   }
   const next = mergeChatMemory(note.body, input.title, input.chatSlug, content);

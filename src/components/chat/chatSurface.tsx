@@ -39,7 +39,7 @@ import {
   mergedModels,
 } from "../../ai/models";
 import type { AgentQuestion, ChatTurn, RunInput } from "../../ai/types";
-import { syncManagedChatMemory } from "../../chatMemory/composition";
+import { resolveChatNoteId, syncManagedChatMemory } from "../../chatMemory/composition";
 import {
   attachedNoteId as resolveAttachedNoteId,
   buildChatNotesPrompt,
@@ -2305,7 +2305,9 @@ export function ChatSurface({
   const onNoteToggle = async () => {
     if (!active || !chatSlug || noteBusy) return;
     if (attachedStem) {
-      const existingId = resolveAttachedNoteId(attachedStem, noteIndex.values());
+      // same-title notes are told apart by their back-link to this chat, so
+      // an ambiguous stem opens the chat's note instead of minting another
+      const existingId = await resolveChatNoteId(attachedStem, chatSlug, noteIndex.values());
       if (existingId) {
         openAttachedNote(existingId);
         return;
@@ -2319,6 +2321,7 @@ export function ChatSurface({
       const { id, stem } = await writeNote({
         instance: active,
         body: `# ${name}\n\n> chat: [[${chatSlug}]]\n\n`,
+        shelf: [], // a chat's note is not a capture
       });
       await setAttached.mutateAsync({ instance: active, slug: chatSlug, stem });
       await invalidateNotes();

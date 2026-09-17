@@ -5,10 +5,12 @@ import {
   CHAT_MEMORY_START,
   CHAT_NOTES_HEADING,
   attachedNoteId,
+  attachedNoteMatches,
   buildChatNotesPrompt,
   extractChatNotes,
   fallbackChatNotes,
   mergeChatMemory,
+  pickChatNote,
   sanitizeChatNotes,
 } from "./model";
 
@@ -103,5 +105,41 @@ describe("chat notes model", () => {
     expect(attachedNoteId("project-abc123", [{ id: "vault:01ABCDEFGHABC123" }, { id: "other" }])).toBe(
       "vault:01ABCDEFGHABC123",
     );
+  });
+});
+
+describe("a chat's note among same-title notes (2026-09-17)", () => {
+  test("attachedNoteMatches lists every note answering to the stem", () => {
+    const notes = [
+      { id: "01A", aliases: ["omachary-research", "omachary-research (3)"] },
+      { id: "01B", aliases: ["omachary-research"] },
+      { id: "01C", aliases: ["other"] },
+    ];
+    expect(attachedNoteMatches("omachary-research", notes).map((n) => n.id)).toEqual(["01A", "01B"]);
+    expect(attachedNoteMatches("omachary-research (3)", notes).map((n) => n.id)).toEqual(["01A"]);
+    expect(attachedNoteMatches("", notes)).toEqual([]);
+    // the ambiguous case is exactly where attachedNoteId gives up
+    expect(attachedNoteId("omachary-research", notes)).toBeNull();
+  });
+
+  test("pickChatNote prefers the note that links back to the chat, newest first", () => {
+    expect(
+      pickChatNote([
+        { id: "user-note", updatedAt: 9, linksChat: false },
+        { id: "older-memory", updatedAt: 1, linksChat: true },
+        { id: "newer-memory", updatedAt: 5, linksChat: true },
+      ]),
+    ).toBe("newer-memory");
+  });
+
+  test("pickChatNote falls back to the newest when none links back, and to null for nothing", () => {
+    expect(
+      pickChatNote([
+        { id: "a", updatedAt: 1, linksChat: false },
+        { id: "b", updatedAt: 3, linksChat: false },
+        { id: "c", linksChat: false },
+      ]),
+    ).toBe("b");
+    expect(pickChatNote([])).toBeNull();
   });
 });

@@ -69,6 +69,10 @@ export interface RoutedCreate {
   body?: string;
   /** Quick/private entry points can force secure while keeping their normal home. */
   secure?: boolean;
+  /** The shelf when the route itself names none. Only a capture-shaped note
+   * (Quick Note, a merged capture) passes the capture shelf `["Inbox"]`;
+   * everything else is born without one and projects to where it lives. */
+  shelf?: string[];
   /** Pin model/tool-created work to the chat's registered root instead of
    * consulting ambient UI selection again after an asynchronous run. */
   rootId?: string;
@@ -103,7 +107,7 @@ export async function createRoutedNote(opts: RoutedCreate): Promise<string> {
       instance: active,
       body,
       secure,
-      ...(route.shelf ? { shelf: route.shelf } : {}),
+      shelf: route.shelf ?? opts.shelf ?? [],
     });
     // open the new note via the active root's wire prefix: BARE for a memex CORPUS
     // (the default root), `<id>:` for a connected brain (e.g. `vault:`).
