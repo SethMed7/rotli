@@ -105,7 +105,7 @@ import { assignChatToView } from "../../services/viewTree";
 import { type ChatImageAttachment, chatDraftFor, useChatDrafts } from "../../state/chatDrafts";
 import { replyPending, useChatRuns } from "../../state/chatRuns";
 import { useChatSetupGuide } from "../../state/chatSetupGuide";
-import { useHelperLink } from "../../state/helperLink";
+import { helperReadyFrom, useHelperLink } from "../../state/helperLink";
 import { useMainStore } from "../../state/main";
 import { touchChatActivity } from "../../state/mru";
 import { type Measure } from "../../state/noteStyle";
@@ -1203,7 +1203,7 @@ export function ChatSurface({
 
   // a runtime that can answer: the Mac app's Rust side, or Rotli Helper paired
   // with this page — subscribed, so pairing mid-session flips the surface
-  const helperLinked = useHelperLink((s) => s.link !== null);
+  const helperLinked = useHelperLink((s) => helperReadyFrom(s)); // paired AND answering AND not refused
   const runtimeAvailable = isTauri() || helperLinked;
   // the on-device models the memex-ai store offers; non-Tauri has no bridge.
   const models = useQuery({

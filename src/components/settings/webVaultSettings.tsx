@@ -46,14 +46,14 @@ export function WebVaultSettings() {
       <p className="lead">
         {mode === "folder" && (
           <>
-            Your vault is the folder <strong>{folder}</strong> on this computer: every note is a file there,
-            and the browser remembers only the folder. The same folder opens in Rotli for Mac.
+            Your vault is <strong>{folder}</strong> on this computer: every note is a file there, and the
+            browser remembers only that vault. The same vault opens in Rotli for Mac.
           </>
         )}
         {mode === "imported" && (
           <>
-            Your vault is a copy of the folder <strong>{folder}</strong>, kept in this browser. This browser
-            can read a folder you pick but cannot write to it, so changes stay here until you export them.
+            Your vault is a copy of <strong>{folder}</strong>, kept in this browser. This browser can read a
+            vault you pick but cannot write to it, so changes stay here until you export them.
           </>
         )}
         {mode === "browser" && (
@@ -64,18 +64,18 @@ export function WebVaultSettings() {
       {support?.kind === "brave-off" && (
         <p className="setnote">
           Brave ships the folder API switched off. Turn on <code>brave://flags/#file-system-access-api</code>,
-          relaunch, and a real folder can be the vault. Until then, a folder can be imported as a copy.
+          relaunch, and your vault connects live. Until then, a vault can be imported as a copy.
         </p>
       )}
       {support?.kind === "import-only" && (
         <p className="setnote">
-          {support.browser} can read a folder you pick but cannot write to it. Chrome, Edge, or Arc open a
-          folder live; here, Import keeps a copy and Export gives it back as a zip.
+          {support.browser} can read a vault you pick but cannot write to it. Chrome, Edge, or Arc connect a
+          vault live; here, Import keeps a copy and Export gives it back as a zip.
         </p>
       )}
       {support?.kind === "live" && status?.kind === "none" && (
         <button type="button" className="ghostbtn" onClick={openConnect}>
-          Open a folder on this computer…
+          Connect a vault on this computer…
         </button>
       )}
       {support?.kind === "live" && status?.kind === "prompt" && (
@@ -85,7 +85,7 @@ export function WebVaultSettings() {
       )}
       {support && support.kind !== "live" && (
         <button type="button" className="ghostbtn" onClick={openConnect}>
-          {mode === "imported" ? "Import a folder again…" : "Import a folder…"}
+          {mode === "imported" ? "Import the vault again…" : "Import a copy of a vault…"}
         </button>
       )}
       {mode !== "browser" && (

@@ -10,7 +10,7 @@ import { useState } from "react";
 import { type GuideOs, guideOs } from "../ai/connectorGuides";
 import { PROVIDER_LABELS, type ProviderId } from "../ai/models";
 import { type CliDetect, connectorDetectionQuery } from "../services/connectorSetup";
-import { pairHelper, unpairHelper } from "../services/helperLink";
+import { pairHelper, unpairHelper, verifyHelper } from "../services/helperLink";
 import { useChatSetupGuide } from "../state/chatSetupGuide";
 import { useHelperLink } from "../state/helperLink";
 import { useUiStore } from "../state/ui";
@@ -22,6 +22,13 @@ const LANES: readonly ProviderId[] = ["claude", "codex", "cursor"];
 function PairHelper() {
   const link = useHelperLink((s) => s.link);
   const reachable = useHelperLink((s) => s.reachable);
+  const problem = useHelperLink((s) => s.problem);
+  const [checking, setChecking] = useState(false);
+  const checkAgain = async () => {
+    setChecking(true);
+    await verifyHelper();
+    setChecking(false);
+  };
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,10 +48,20 @@ function PairHelper() {
     return (
       <span className="guide-actions">
         <span className="guide-step-detail" role="status">
-          {reachable === false
-            ? `Paired on port ${link.port}, but nothing answers right now — is Rotli Helper running?`
-            : `Paired with Rotli Helper on port ${link.port}.`}
+          {problem === "refused"
+            ? `Rotli Helper on port ${link.port} refused this pairing — it printed a new code. Unpair, then paste the new one.`
+            : reachable === false || problem === "unreachable"
+              ? `Paired on port ${link.port}, but nothing answers right now — is Rotli Helper running?`
+              : `Paired with Rotli Helper on port ${link.port}.`}
         </span>
+        <button
+          type="button"
+          className="ghostbtn guide-check"
+          disabled={checking}
+          onClick={() => void checkAgain()}
+        >
+          {checking ? "Checking…" : "Check again"}
+        </button>
         <button type="button" className="ghostbtn guide-check" onClick={() => void unpairHelper()}>
           Unpair
         </button>
