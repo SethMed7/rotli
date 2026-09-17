@@ -466,3 +466,77 @@ mod tests {
         assert!(!name.contains(':'));
     }
 }
+
+// ─── Debug: who is the drop target? ──────────────────────────────────────────
+
+/// With `ROTLI_DEBUG_DROPS=1`: after the window is up, write the native view
+/// tree under the window's content view, with each view's registered dragged
+/// types, to the drops debug log. Answers whether WebKit still lets the wry
+/// subclass see drags on this macOS.
+pub(crate) fn dump_drop_targets(window: &Window) {
+    let window = window.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(4));
+        let inner = window.clone();
+        let _ = window.run_on_main_thread(move || {
+            let ptr = match inner.ns_view() {
+                Ok(ptr) => ptr,
+                Err(error) => {
+                    native_drag::debug_log(&format!("dump: no ns_view: {error}"));
+                    return;
+                }
+            };
+            // SAFETY: tauri hands back the window's content NSView; we are on the main thread.
+            let view: &objc2_app_kit::NSView = unsafe { &*(ptr as *const objc2_app_kit::NSView) };
+            let mut out = String::from("native view tree (class, drag types):\n");
+            walk_views(view, 0, &mut out);
+            // every window this app owns: an invisible one above the main
+            // window would take the drag and refuse it silently
+            if let Some(mtm) = objc2::MainThreadMarker::new() {
+                let app = objc2_app_kit::NSApplication::sharedApplication(mtm);
+                out.push_str("windows (class, title, frame, level, visible, alpha, ignoresMouse, content drag types):\n");
+                for win in app.windows().to_vec() {
+                    let frame = win.frame();
+                    let content = win.contentView();
+                    let content_types = content.as_ref().map(|v| v.registeredDraggedTypes().count()).unwrap_or(0);
+                    let content_class = content
+                        .as_ref()
+                        .map(|v| v.class().name().to_string_lossy().into_owned())
+                        .unwrap_or_default();
+                    out.push_str(&format!(
+                        "  {} \"{}\" {}x{}@{},{} level={} visible={} alpha={:.2} ignoresMouse={} content={content_class} types={content_types}\n",
+                        win.class().name().to_string_lossy(),
+                        win.title(),
+                        frame.size.width as i64,
+                        frame.size.height as i64,
+                        frame.origin.x as i64,
+                        frame.origin.y as i64,
+                        win.level(),
+                        win.isVisible(),
+                        win.alphaValue(),
+                        win.ignoresMouseEvents(),
+                    ));
+                }
+            }
+            native_drag::debug_log(&out);
+        });
+    });
+}
+
+fn walk_views(view: &objc2_app_kit::NSView, depth: usize, out: &mut String) {
+    let class = view.class().name().to_string_lossy().into_owned();
+    let types = view.registeredDraggedTypes();
+    let names: Vec<String> = types.to_vec().iter().map(|t| t.to_string()).collect();
+    let frame = view.frame();
+    out.push_str(&format!(
+        "{}{class} {}x{} drag types ({}): {:?}\n",
+        "  ".repeat(depth),
+        frame.size.width as i64,
+        frame.size.height as i64,
+        names.len(),
+        names.iter().take(8).collect::<Vec<_>>()
+    ));
+    for sub in view.subviews().to_vec() {
+        walk_views(&sub, depth + 1, out);
+    }
+}

@@ -393,8 +393,8 @@ drops, real files) still need the Mac app in hand.
 | # | Bug | App | Web |
 |---|---|---|---|
 | 1 | Delete a folder | Done for Main folders (`shell-batch` spec). Real Library directories still need a Rust command. | Same code; Main folders are `.rotli/main.json` in both. Not separately run (the web seeds no demo corpus). |
-| 2 | Drop image into a note | Native lane unchanged, plus screenshot thumbnails and browser images (file promises / bytes) since `native_drag_promise.rs`. Native check owed. | Done: the image is stored in the vault (folder or browser) and the note keeps the app's `storage:` link (`rotli-web-image-drop.spec.ts`). |
-| 3 | Drop image into a chat | Partial: a model that cannot see keeps the image in Assets and says so. Native check owed. | Refused with a notice: Rotli Helper carries text only, so the drop says to use a note instead. |
+| 2 | Drop image into a note | **BROKEN on macOS 26.5.1 (owner test 2026-09-17): no native drag event reaches Rust at all — not Finder, not a screenshot thumbnail.** Diagnosis below (§ Native drops on macOS 26). The promise/bytes lane (`native_drag_promise.rs`) is correct but never invoked. | Done: the image is stored in the vault (folder or browser) and the note keeps the app's `storage:` link (`rotli-web-image-drop.spec.ts`). |
+| 3 | Drop image into a chat | Same native break as #2 (no event arrives). Owner's target behaviour: drag over the chat → land as an attachment when the current model can see images, else a modal error. | Refused with a notice: Rotli Helper carries text only, so the drop says to use a note instead. |
 | 4 | Trash back button | Done (`system-back-and-restore`). | Done — the same spec passes against the web build. |
 | 5 | Restore to the original place | Done: the Main slot survives Trash/Archive. | Same code. |
 | 6 | Captures → Make a note | Done (`captureMerge.test.ts`). | Same code. |
@@ -417,6 +417,43 @@ model (`settings.json` → `chatModel`), and recency. Imported mode is a
 snapshot (Zen, Firefox, Safari, Brave without its flag): re-import to pick up
 the app's later changes. Live folder mode (Chrome, Edge, Arc, Brave with the
 flag) follows the real files.
+
+### Native drops on macOS 26 (diagnosed 2026-09-17, unresolved)
+
+Evidence, all from the dev app in `~/rotli-drop` with `ROTLI_DEBUG_DROPS=1`:
+
+- The Rust handler (`native_drag::handle`, reached through Tauri's
+  `WindowEvent::DragDrop`) logs every Enter/Leave/Drop it receives to
+  `$TMPDIR/rotli-drops-debug.log`. Two owner drags (Finder image, screenshot
+  thumbnail) produced **nothing** — not even Enter. So neither the Finder
+  path lane nor the promise lane is reached; the page's HTML5 drop never fires
+  either because wry consumes drags at the AppKit level.
+- Wiring is correct: `tauri-runtime-wry` turns wry drag events into
+  `SynthesizedWindowEvent::DragDrop` for window-content webviews, and the app's
+  `on_window_event` matches it. No `dragDropEnabled: false` anywhere.
+- The startup dump (`native_drag_promise::dump_drop_targets`, debug-only)
+  shows the drop target is right: `TaoView` → `WryWebView` (1512×948,
+  **17 registered dragged types** incl. `NSFilenamesPboardType`, `public.png`,
+  the file-promise type) → `WKFlippedView` (0 types). No overlay window: the
+  capture and quick-note windows are hidden, nothing else is above the main
+  window.
+- Conclusion: on this macOS 26 WebKit, AppKit's drag callbacks no longer
+  reach the wry subclass overrides (`draggingEntered:` … on `WryWebView`),
+  although the subclass instance is the registered destination. Upstream
+  reports the same shape: elixir-desktop/webview#12 ("WebKit's internal drag
+  destination receives Finder drags before the subclass hooks") and fixes it
+  with a runtime bridge (swizzle WebKit's private drag-destination handling,
+  register file-URL + file-promise types there, delegate back). wry has two
+  open PRs on the same file (#1829 forward non-file drags to WebKit, #1844
+  stop panicking on `NSFilenamesPboardType`), neither addressing this.
+- Next step (Rust, macOS-only, in `native_drag_promise.rs`): install our own
+  drag destination at the `TaoView`/window level or swizzle the WebKit
+  destination, feed Enter/Over/Drop into `native_drag::handle` (paths for
+  Finder, `claim` for promises/bytes), and verify with a real drag — this
+  process cannot post synthetic input (not Accessibility-trusted). Also needed
+  for the owner's chat target: drop → attach when the current model can see
+  images, else a modal error (today a blind model keeps the image in Assets
+  and says so in the thread).
 
 ### Enhancements (reviewed 2026-09-16 evening)
 

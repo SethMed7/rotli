@@ -71,7 +71,7 @@ objc2 = "0.6"
 # (native_drag_promise.rs): the macOS ⌘⇧4/⌘⇧5 preview hands a FILE PROMISE and
 # raw image bytes, never a path, so the promise reader block (block2) and the
 # TIFF→PNG re-encode are what turn that drag into a file Rotli can import.
-objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSBitmapImageRep", "NSFilePromiseReceiver", "NSImage", "NSImageRep", "NSPasteboard", "NSPasteboardItem", "NSResponder", "block2"] }
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSBitmapImageRep", "NSFilePromiseReceiver", "NSImage", "NSImageRep", "NSPasteboard", "NSPasteboardItem", "NSResponder", "NSWindow", "block2"] }
 objc2-foundation = { version = "0.3", features = ["NSArray", "NSData", "NSDictionary", "NSError", "NSOperation", "NSString", "NSURL"] }
 block2 = "0.6"                                                   # the promised-file reader block (already transitive; named here because we write one)
 

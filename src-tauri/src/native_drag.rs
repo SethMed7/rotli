@@ -63,6 +63,17 @@ pub(crate) fn debug_drops() -> bool {
     std::env::var_os("ROTLI_DEBUG_DROPS").is_some_and(|value| value == "1")
 }
 
+/// Narrate to stderr AND to `$TMPDIR/rotli-drops-debug.log`: `tauri dev` pipes
+/// the app's stderr through its own reader, so a file is the one sure trace.
+pub(crate) fn debug_log(line: &str) {
+    eprintln!("rotli: {line}");
+    let path = std::env::temp_dir().join("rotli-drops-debug.log");
+    if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+        use std::io::Write;
+        let _ = writeln!(file, "{} rotli: {line}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0));
+    }
+}
+
 /// Grant one-shot imports for `paths` and tell the webview — or say the drop
 /// delivered nothing. Every lane (Finder paths, file promises, image bytes)
 /// ends here, so authorization and the drop events have exactly one home.
@@ -112,6 +123,15 @@ fn claim_pathless(_window: &Window, _position: DropPosition) -> bool {
 
 /// Relay one native drag-drop event to the window's webview.
 pub(crate) fn handle(window: &Window, event: &DragDropEvent) {
+    if debug_drops() {
+        match event {
+            DragDropEvent::Enter { paths, .. } => debug_log(&format!("drag enter, {} path(s)", paths.len())),
+            DragDropEvent::Leave => debug_log("drag leave"),
+            DragDropEvent::Drop { paths, .. } => debug_log(&format!("drop event, {} path(s)", paths.len())),
+            DragDropEvent::Over { .. } => {}
+            _ => debug_log("drag event of another kind"),
+        }
+    }
     match event {
         DragDropEvent::Enter { paths, position } => {
             let _ = window.emit(

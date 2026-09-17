@@ -2579,6 +2579,12 @@ pub fn run() {
             memex::memex_pick_folder
         ])
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            if native_drag::debug_drops() {
+                if let Some(main) = app.get_webview_window("main") {
+                    native_drag_promise::dump_drop_targets(&main.as_ref().window());
+                }
+            }
             // The visitor law: never in the dock, never in Cmd-Tab.
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
