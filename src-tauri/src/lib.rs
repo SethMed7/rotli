@@ -31,7 +31,7 @@ mod keychain;
 mod loopback_http;
 mod localmodel;
 mod memex;
-mod memex_query; mod native_drag; mod pasteboard; mod remote_agent_url; mod welcome_lessons;
+mod memex_query; mod native_drag; mod pasteboard; mod remote_agent_url; mod welcome_lessons; mod acp_images;
 /// Pathless drops (screenshot thumbnail, browser images) — AppKit only.
 #[cfg(target_os = "macos")]
 mod native_drag_promise;

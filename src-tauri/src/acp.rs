@@ -306,6 +306,9 @@ pub(crate) struct AcpTurn<'a> {
     pub(crate) env: Vec<(String, OsString)>,
     pub(crate) env_remove: Vec<String>,
     pub(crate) model: &'a str,
+    /// Staged attachment files (provider.rs writes them); sent as image
+    /// prompt blocks when the agent advertises them (acp_images.rs).
+    pub(crate) images: &'a [String],
 }
 
 /// One turn through the vendor's ACP agent, registered for cancel and the
@@ -388,7 +391,7 @@ pub(crate) fn run_acp_registered(
         on_plain_line: &mut refuse_sign_in,
     };
     let protocol: Result<String, String> = (|| -> Result<String, String> {
-        handshake(&mut conn)?;
+        let init = handshake(&mut conn)?;
         let session = conn.request(
             3,
             "session/new",
@@ -423,14 +426,8 @@ pub(crate) fn run_acp_registered(
                 )?;
             }
         }
-        conn.request(
-            5,
-            "session/prompt",
-            serde_json::json!({
-                "sessionId": session_id,
-                "prompt": [{ "type": "text", "text": prompt }]
-            }),
-        )?;
+        let blocks = crate::acp_images::prompt_blocks(&init, &prompt, turn.images, label)?;
+        conn.request(5, "session/prompt", serde_json::json!({ "sessionId": session_id, "prompt": blocks }))?;
         let answer = conn.assistant.trim().to_string();
         if answer.is_empty() {
             Err(format!("{label} returned no assistant message"))
@@ -458,14 +455,15 @@ pub(crate) fn run_acp_registered(
 /// `initialize` + `authenticate` — the same two requests for a chat turn and
 /// for the Antigravity sign-in flow, so a setup process can never advertise
 /// more than a chat turn does; only the plain-line hook differs.
-pub(crate) fn handshake<W: Write, R: BufRead>(conn: &mut AcpConn<'_, W, R>) -> Result<(), String> {
-    conn.request(1, "initialize", initialize_params())?;
+pub(crate) fn handshake<W: Write, R: BufRead>(conn: &mut AcpConn<'_, W, R>) -> Result<serde_json::Value, String> {
+    // the initialize result carries the agent's capabilities (image prompts)
+    let init = conn.request(1, "initialize", initialize_params())?;
     conn.request(
         2,
         "authenticate",
         serde_json::json!({ "methodId": conn.lane.auth_method_id() }),
     )?;
-    Ok(())
+    Ok(init)
 }
 
 /// The one `initialize` Rotli ever sends: protocol 1, no filesystem, no

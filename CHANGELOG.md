@@ -84,6 +84,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   image lands at the note's end. The row you are over lights up. On Rotli
   Web a note row works the same; a chat row says the Helper carries text
   only.
+- Chat: Antigravity (Gemini) chats take image attachments. Google's agent
+  advertises image prompts, so Rotli now sends attached images as prompt
+  blocks beside your text instead of refusing them; an agent that advertises
+  no image prompts is refused in words before anything is sent.
 - Chat: a sent message shows each attached image as a small `#1`, `#2` chip
   where the message names it, matching the number on the thumbnail above the
   input, so you can see where an image was added.

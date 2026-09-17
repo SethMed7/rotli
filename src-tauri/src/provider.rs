@@ -348,10 +348,7 @@ pub(crate) fn build_args_tuned(
             if let Some(tier) = service_tier {
                 return Err(format!("service tier \"{tier}\" isn't supported by antigravity"));
             }
-            if imgs.is_some() {
-                return Err("Antigravity chat does not accept image attachments in Rotli".into());
-            }
-            Ok((Vec::new(), PromptVia::Acp))
+            Ok((Vec::new(), PromptVia::Acp)) // images ride the ACP prompt as blocks (acp_images.rs)
         }
         _ => Err(format!("unknown provider \"{provider}\"")),
     }
@@ -369,7 +366,7 @@ fn codex_scratch_dir() -> Result<String, String> {
 /// happens — an attachment must not linger in /tmp after the answer.
 pub(crate) struct ImageFiles {
     dir: std::path::PathBuf,
-    paths: Vec<String>,
+    pub(crate) paths: Vec<String>,
 }
 
 impl Drop for ImageFiles {
@@ -859,16 +856,18 @@ mod tests {
     }
 
     #[test]
-    fn antigravity_takes_no_argv_and_refuses_effort_tier_and_images() {
+    fn antigravity_takes_no_argv_refuses_effort_and_tier_and_takes_images_as_blocks() {
         let m = "gemini-3.8-flash-high";
         let (args, via) = build_args("antigravity", m, "ignored", 60, None).unwrap();
         assert!(args.is_empty(), "the model is a session config option, never argv");
         assert_eq!(via, PromptVia::Acp);
         assert!(build_args_tuned("antigravity", m, "p", 60, Some("high"), None, None).is_err());
         assert!(build_args_tuned("antigravity", m, "p", 60, None, Some("fast"), None).is_err());
+        // 2026-09-17: images become ACP prompt blocks (acp_images.rs), still no argv
         let imgs = ImageFiles { dir: std::env::temp_dir().join("rotli-no-such-dir"), paths: Vec::new() };
-        let refused = build_args("antigravity", m, "p", 60, Some(&imgs)).unwrap_err();
-        assert!(refused.contains("image attachments"), "{refused}");
+        let (args, via) = build_args("antigravity", m, "p", 60, Some(&imgs)).unwrap();
+        assert!(args.is_empty());
+        assert_eq!(via, PromptVia::Acp);
     }
 
     #[test]
