@@ -118,17 +118,21 @@ test("a connected folder's chats show each chat's own model from the folder's se
   await expect(markOf("label-chat")).toHaveAttribute("title", /Google/);
 });
 
-test("Files opens the vault's files at the folder of the note you're in", async ({ page }) => {
+test("Files hands the note you're in to the Mac app, which opens Finder at it", async ({ page }) => {
   await fakeHelper(page);
   await plantFolder(page);
   await page.reload();
   await expect(page.getByRole("tab", { selected: true })).toContainText("Hello");
   await page.locator(".sb-foot").getByRole("button", { name: "Files" }).click();
-  const browser = page.locator(".system-browser");
-  await expect(browser).toBeVisible();
-  // inside wiki/projects — the note itself is a row, not a folder to drill into
-  await expect(browser.locator("[data-note-id]", { hasText: "Hello" }).first()).toBeVisible();
-  await expect(browser).toContainText("projects");
+  // the page cannot open Finder; it hands the FILE to the installed app by
+  // its rotli:// scheme (no handler in this browser — the link is the proof)
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-rotli-deep-link",
+    /^rotli:\/\/reveal\?id=wiki%2Fprojects%2Fhello\.md/,
+  );
+  await expect(page.getByText("Asked the Rotli app to show it in Finder")).toBeVisible();
+  // and it did not wander into the Library instead
+  await expect(page.locator(".system-browser")).toHaveCount(0);
 });
 
 test("a folder waiting on the browser's permission is said in the sidebar, with Reconnect", async ({

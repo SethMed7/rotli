@@ -199,6 +199,11 @@ export class FolderNotesService implements NotesService {
     };
   }
 
+  /** The vault-relative file behind a note id — what a Finder reveal needs. */
+  filePathOf(id: string): Promise<string> {
+    return this.pathOf(id);
+  }
+
   private async pathOf(id: string): Promise<string> {
     const index = await this.ensureIndex();
     const path = index.get(id);

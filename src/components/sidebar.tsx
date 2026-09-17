@@ -294,6 +294,20 @@ export function Sidebar() {
               })}
             </div>
             {vaultItems.length > 0 && <div className="vault-menu-separator" role="separator" />}
+            {isWebVault() && (
+              <button
+                type="button"
+                className="vault-menu-connect"
+                role="menuitem"
+                onClick={() => {
+                  setVaultMenuPosition(null);
+                  useWebVaultConnect.getState().show();
+                }}
+              >
+                <NewFolderGlyph size={15} />
+                <span>Reconnect vault</span>
+              </button>
+            )}
             <button
               type="button"
               className="vault-menu-connect"

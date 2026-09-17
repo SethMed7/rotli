@@ -7,11 +7,15 @@
 // it wears the Librarian's name; internal ids keep "activity".
 
 import { dispatch } from "../../keys/registry";
+import { webVaultName } from "../../lib/browserVault";
 import { isTauri, revealCorpus } from "../../lib/tauri";
 import { deriveJournal } from "../../services/brainJournal";
 import { useChatTranscripts, useJournal, useNoteIndex, useSecureHints } from "../../services/hooks";
+import { revealInMacApp } from "../../services/macAppLink";
 import { chatSlugOf } from "../../services/systemBrowser";
 import { openSystemRoot, revealNoteInSystem } from "../../services/systemNav";
+import { webNoteFilePath } from "../../services/webNotes";
+import { showFileNotice } from "../../state/fileNotice";
 import { useOrganizerLive } from "../../state/organizerLive";
 import { useFocusedChatSlug, useFocusedNoteId, usePanesStore } from "../../state/panes";
 import { useUiStore } from "../../state/ui";
@@ -32,31 +36,44 @@ export function SidebarFooter() {
   const organizerWorking = useOrganizerLive((s) => s.active);
   const organizerCurrent = useOrganizerLive((s) => s.current);
   const brainEnabled = useUiStore((s) => s.brainEnabled);
-  // Files is a shortcut to where you are: Finder on the Mac; on the web the
-  // vault's own browser, opened at the folder of the file you're in (the
-  // owner, 2026-09-17: "it opens the finder against whatever file I am
-  // actively in") — the Library root only when nothing is open
+  // Files is a shortcut to where you are: Finder on the Mac. On the web the
+  // page hands the file to the installed app (rotli://reveal), which opens
+  // Finder at it (the owner, 2026-09-17: "it should open the actual finder in
+  // the location of the file I am in"); with nothing on disk behind the note
+  // (browser-only notes) the vault's own browser opens at its folder instead.
   const focusedNoteId = useFocusedNoteId();
   const focusedChatSlug = useFocusedChatSlug();
   const noteIndex = useNoteIndex();
   const transcripts = useChatTranscripts();
   const showFiles = () => {
     if (isTauri()) return void revealCorpus();
-    // a chat is a file too: chats/<slug>.md, under the Library's Chats folder
     const note = focusedNoteId
       ? noteIndex.get(focusedNoteId)
       : focusedChatSlug
         ? transcripts.find((n) => chatSlugOf(n) === focusedChatSlug)
         : undefined;
-    if (note) revealNoteInSystem(note);
-    else openSystemRoot("Brain");
+    const filePath =
+      focusedChatSlug && !focusedNoteId
+        ? Promise.resolve(`chats/${focusedChatSlug}.md`)
+        : focusedNoteId
+          ? webNoteFilePath(focusedNoteId)
+          : Promise.resolve(null);
+    void filePath.then((rel) => {
+      if (rel) {
+        revealInMacApp(webVaultName(), rel);
+        showFileNotice("Asked the Rotli app to show it in Finder");
+      } else if (note) revealNoteInSystem(note);
+      else openSystemRoot("Brain");
+    });
   };
   return (
     <div className="sb-foot">
       <button
         type="button"
         className="sb-footbtn"
-        title={isTauri() ? "Open the vault folder in Finder" : "Show this file's folder in the vault's files"}
+        title={
+          isTauri() ? "Open the vault folder in Finder" : "Show this file in Finder through the Rotli app"
+        }
         onClick={showFiles}
       >
         <FolderGlyph size={14} />

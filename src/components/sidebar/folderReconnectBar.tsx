@@ -15,7 +15,7 @@ import { useEffect, useState } from "react";
 
 import { isWebVault } from "../../lib/browserVault";
 import { relativeLabel } from "../../lib/dateLabels";
-import { connectedFolderName, importedVaultAt, webVaultMode } from "../../services/webNotes";
+import { connectedFolderName, importedCopyAge } from "../../services/webNotes";
 import {
   type FolderVaultStatus,
   folderVaultStatus,
@@ -30,18 +30,22 @@ export function FolderReconnectBar() {
     if (!isWebVault()) return;
     void folderVaultStatus().then(setStatus);
   }, []);
-  if (isWebVault() && webVaultMode() === "imported") {
-    const at = importedVaultAt();
-    const age = at ? `, taken ${relativeLabel(at)} ago` : "";
+  const copy = isWebVault() ? importedCopyAge() : null;
+  if (copy) {
+    // subtle, and only when it matters (the owner, 2026-09-17): a copy taken
+    // a while ago — or one from before the stamp existed — gets one muted
+    // line; a fresh copy says nothing (Reconnect also lives in the vault menu)
+    if (!copy.old) return null;
+    const at = copy.at;
     return (
-      <div className="sb-reconnect" role="status">
-        <span className="sb-reconnect-text">
-          Connected to a copy of <strong>{connectedFolderName() ?? "your vault"}</strong>
-          {age}. It doesn’t follow the vault: reconnect to see its changes.
-        </span>
+      <div className="sb-copy-age" role="status">
+        <span>
+          Copy of <strong>{connectedFolderName() ?? "your vault"}</strong>
+          {at ? ` taken ${relativeLabel(at)} ago.` : "."}
+        </span>{" "}
         <button
           type="button"
-          className="sb-reconnect-btn"
+          className="sb-copy-reconnect"
           onClick={() => useWebVaultConnect.getState().show()}
         >
           Reconnect

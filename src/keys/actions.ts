@@ -43,6 +43,7 @@ import { SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
 import { registerCaptureActions } from "./captureActions";
 import { EDITOR_ACTION } from "./editorActionIds";
 import { captureHandle, quickHandle, setupHandle } from "./handles";
+import { registerNavArrowActions } from "./navArrows";
 import { registerAction } from "./registry";
 import { runSurfaceFind } from "./surfaceFind";
 
@@ -217,10 +218,8 @@ export function registerDefaultActions(): void {
   });
 
   // — the command layer —
-  // Back / Forward over opened notes (the maintainer #14 — the recorder ran since 0.24.x;
-  // this is the player: the titlebar ‹ › buttons + the browser chords). The
-  // Meta+Bracket chords are FREE on the main surface (quick.next/prev own them
-  // only inside the Quick window — chords scope per surface).
+  // Back / Forward over opened notes (the maintainer #14): the titlebar ‹ › buttons + the
+  // browser chords. Meta+Bracket is FREE on the main surface (quick.* owns it only in Quick).
   registerAction({
     id: "nav.back",
     title: "Back — previous note",
@@ -244,6 +243,7 @@ export function registerDefaultActions(): void {
       navigate(1, openNavTarget);
     },
   });
+  registerNavArrowActions();
   registerAction({
     id: "palette.toggle",
     title: "Search notes & actions",

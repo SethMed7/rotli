@@ -157,6 +157,7 @@ export const SERVICE_FILE_OWNERS = {
   "secureReview.ts": "librarian security",
   "storageTree.ts": "file storage",
   "systemBrowser.ts": "system files",
+  "macAppLink.ts": "system files",
   "systemNav.ts": "system files",
   "systemTrash.ts": "system files",
   "tasksView.ts": "tasks projection",
