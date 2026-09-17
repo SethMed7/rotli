@@ -24,6 +24,9 @@ export interface ImportedVaultSnapshot {
   dirs: string[];
   /** Binary files written in the browser (dropped images), base64 by path. */
   binaries?: Record<string, string>;
+  /** When the copy was taken (ms). A copy never follows the vault; the
+   * sidebar says how old it is so a stale one is never mistaken for live. */
+  importedAt?: number;
 }
 
 export interface PickedFile {
@@ -60,7 +63,7 @@ export async function readPickedFolder(files: readonly File[]): Promise<Imported
   if (!first) return null;
   const name = first.webkitRelativePath.split("/")[0] ?? "vault";
   const byPath = new Map(files.map((file) => [file.webkitRelativePath, file]));
-  const snapshot: ImportedVaultSnapshot = { version: 1, name, files: {}, dirs: [] };
+  const snapshot: ImportedVaultSnapshot = { version: 1, name, files: {}, dirs: [], importedAt: Date.now() };
   for (const { from, to } of importableVaultPaths(
     files.map((f) => ({ relativePath: f.webkitRelativePath, size: f.size })),
   )) {
@@ -162,13 +165,21 @@ export class PersistedVaultDir implements VaultDir {
     private readonly name: string,
     save: (snapshot: string) => Promise<void>,
     debounceMs = 500,
+    private readonly importedAt?: number,
   ) {
     this.saver = createDebouncedTask(debounceMs, async () => {
       const walked = await walkVaultDir(this.inner);
       const binaries: Record<string, string> = {};
       for (const [path, bytes] of Object.entries(walked.binaries)) binaries[path] = bytesToBase64(bytes);
       const { files, dirs } = walked;
-      const snapshot: ImportedVaultSnapshot = { version: 1, name: this.name, files, dirs, binaries };
+      const snapshot: ImportedVaultSnapshot = {
+        version: 1,
+        name: this.name,
+        files,
+        dirs,
+        binaries,
+        ...(this.importedAt ? { importedAt: this.importedAt } : {}),
+      };
       await save(JSON.stringify(snapshot));
     });
   }
