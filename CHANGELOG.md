@@ -75,6 +75,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Editor: copying from a note now puts the note's own Markdown on the
+  clipboard as plain text, so a paste into another note or a chat renders
+  exactly what you copied (headings, tasks, lists). Before, the plain text
+  was a readable rendering ("☐ task", headings as bare lines) and a pasted
+  note lost its structure. Rich targets (Docs, Notes, mail) still get HTML.
+- Editor: a parent task's subtask pill ("0/1") printed its digits over the
+  words before it on a nested task; the pill keeps its digits inside its box.
+- Editor: a wrapped task line landed its second row a few pixels right of the
+  first row's text. The checkbox now sizes from the line's font (it matches a
+  radio choice's size), so wrapped rows align under the text, as bullets and
+  numbers already did.
 - Chat: leave a chat while it is thinking and come back, and the thread now
   shows the working row again and the reply when it lands. Before, the
   remounted chat showed only your message until the tab was closed and
