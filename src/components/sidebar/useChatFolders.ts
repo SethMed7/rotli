@@ -7,11 +7,12 @@
 // One react-query key means the second caller is a cache read, not a fetch.
 
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
-import { type MemexChatSummary, hasDurableCorpus } from "../../lib/tauri";
+import { type MemexChatSummary, chatModels, hasDurableCorpus, isTauri } from "../../lib/tauri";
 import { type MemexInstance, activeInstance } from "../../memex/config";
 import { useInstanceChats, useMemexConfig } from "../../memex/useMemex";
+import { invalidateMemex } from "../../memex/useMemex";
 import {
   CHAT_FOLDERS_KEY,
   type ChatFoldersManifest,
@@ -22,6 +23,7 @@ import {
   loadChatFolders,
   saveChatFolders,
 } from "../../services/chatFolders";
+import { backfillChatModels } from "../../services/chatModelMeta";
 import { useUiStore } from "../../state/ui";
 
 /** The reserved expandedDests key a chat folder's disclosure lives under. */
@@ -63,6 +65,18 @@ export function useChatFolders(): SidebarChatData {
     queryFn: () => loadChatFolders(activeMemex!),
   });
   const manifest = foldersQuery.data?.manifest ?? EMPTY_CHAT_FOLDERS;
+  // chats from before `model:` lived in the file get it once, from this
+  // device's settings map (2026-09-17) — then every copy of the vault agrees
+  const chatModelMap = useUiStore((s) => s.chatModel);
+  const hybridPresets = useUiStore((s) => s.hybridPresets);
+  useEffect(() => {
+    if (!activeMemex || !rawChats || !hasDurableCorpus()) return;
+    const instance = activeMemex;
+    void (isTauri() ? chatModels() : Promise.resolve([]))
+      .then((models) => backfillChatModels(instance, rawChats, chatModelMap, models, hybridPresets))
+      .then((written) => (written > 0 ? invalidateMemex() : undefined))
+      .catch(() => {});
+  }, [activeMemex, rawChats, chatModelMap, hybridPresets]);
   const grouped = useMemo(() => groupChats(chatList, manifest), [chatList, manifest]);
   const folderKeys = useMemo(
     () => manifest.folders.map((folder) => chatFolderKey(folder.id)),

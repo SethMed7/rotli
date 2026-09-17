@@ -99,6 +99,7 @@ import {
   loadChatFolders,
   saveChatFolders,
 } from "../../services/chatFolders";
+import { syncChatModelMeta } from "../../services/chatModelMeta";
 import { invalidateNotes, useNoteIndex } from "../../services/hooks";
 import { artifactMainFolderName, fileNoteInNamedRootFolder } from "../../services/mainTree";
 import { assignChatToView } from "../../services/viewTree";
@@ -1285,6 +1286,7 @@ export function ChatSurface({
   const pickModel = (id: string) => {
     setChatModel(chatKeyId, id);
     setChatModelSeed(id);
+    void syncChatModelMeta(active, chatSlug, id, modelList, hybridPresets); // into the chat's own file
   };
 
   const draft = useChatDrafts((state) => chatDraftFor(state.drafts, tabId));
@@ -1789,6 +1791,7 @@ export function ChatSurface({
         clearChatMeasure(webKey);
         const pinnedModel = chatModelMap[webKey] ?? picked.id;
         setChatModel(savedKey, pinnedModel); // and the model this chat runs on
+        void syncChatModelMeta(active, res.slug, pinnedModel, modelList, hybridPresets);
         clearChatModel(webKey);
         setChatReasoning(savedKey, chatReasoning[webKey] ?? null);
         setChatReasoning(webKey, null);
@@ -2054,6 +2057,7 @@ export function ChatSurface({
         clearChatMeasure(webKey);
         const pinnedModel = chatModelMap[webKey] ?? picked.id;
         setChatModel(savedKey, pinnedModel); // and the model this chat runs on
+        void syncChatModelMeta(active, res.slug, pinnedModel, modelList, hybridPresets);
         clearChatModel(webKey);
         setChatReasoning(savedKey, chatReasoning[webKey] ?? null);
         setChatReasoning(webKey, null);

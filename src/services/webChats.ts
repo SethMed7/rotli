@@ -35,6 +35,8 @@ export function summarize(slug: string, contents: string, modifiedMs: number): M
     path: `chats/${slug}.md`,
     modifiedMs,
     pinned: frontmatterField(contents, "pinned") === "true",
+    model: frontmatterField(contents, "model"),
+    provider: frontmatterField(contents, "provider"),
   };
 }
 

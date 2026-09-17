@@ -115,6 +115,7 @@ export const SERVICE_FILE_OWNERS = {
   "captureRouting.ts": "capture",
   "chatFolders.ts": "chat",
   "chatImages.ts": "chat",
+  "chatModelMeta.ts": "chat",
   "chatRename.ts": "chat",
   "chatSummon.ts": "chat",
   "connectorSetup.ts": "chat",

@@ -84,6 +84,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   image lands at the note's end. The row you are over lights up. On Rotli
   Web a note row works the same; a chat row says the Helper carries text
   only.
+- Chats carry their model in the file. Each chat's `chats/<slug>.md` now
+  records `model:` and `provider:` in its frontmatter — written when you pick
+  a model for the chat and when a chat is first saved — so every copy of the
+  vault, on the web or another Mac, shows the right mark. Chats from before
+  get the lines once, on the next launch, from the per-chat models this Mac
+  already kept in its settings.
 - Rotli Web: the vault switcher names the vault you connected (the folder's
   own name) instead of "Rotli".
 - Rotli Web: browsers that can only read a folder still **connect** a vault

@@ -373,13 +373,12 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         {(() => {
           // the left slot carries the MODEL, not a chat glyph: in a list of
           // nothing but chats, "this is a chat" is the one thing you already
-          // know. A chat with no model picked yet gets a blank badge — it holds
-          // the column, and claims nothing.
-          const ownModel = chatModelMap[runKeyOf(c.slug)];
+          // know. A chat with no model picked yet gets a blank badge — it holds the column, and claims nothing.
+          const ownModel = c.model || chatModelMap[runKeyOf(c.slug)];
           const id = ownModel ?? chatModelId;
           if (!id) return <span className="sb-chatmark none" title="No model picked yet" />;
           const name = modelLabel(id, models.data ?? [], hybridPresets);
-          const mark = chatMark(modelProvider(id, models.data ?? [], hybridPresets), name);
+          const mark = chatMark(c.provider || modelProvider(id, models.data ?? [], hybridPresets), name);
           return (
             <span
               className={`sb-chatmark ${mark.key}${mark.logo ? " has-logo" : ""}`}
