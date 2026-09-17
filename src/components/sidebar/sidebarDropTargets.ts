@@ -25,13 +25,18 @@ export type SidebarDropTarget =
 export const CHAT_ROW_ATTR = "data-chat-slug";
 export const NOTE_ROW_ATTR = "data-note-id";
 
+// SIDEBAR rows only: data-note-id also marks All-notes rows and the Library
+// browser's tiles, which must not spring open under a passing drag
+const CHAT_ROW = `.sb-chatrow[${CHAT_ROW_ATTR}]`;
+const NOTE_ROW = `.main-row[${NOTE_ROW_ATTR}]`;
+
 /** The sidebar row under this element, if it is one that takes a drop. */
 export function sidebarDropTargetAt(element: RowLike | null): SidebarDropTarget | null {
   if (!element) return null;
-  const chat = element.closest(`[${CHAT_ROW_ATTR}]`);
+  const chat = element.closest(CHAT_ROW);
   const slug = chat?.getAttribute(CHAT_ROW_ATTR);
   if (chat && slug) return { kind: "chat", slug, row: chat };
-  const note = element.closest(`[${NOTE_ROW_ATTR}]`);
+  const note = element.closest(NOTE_ROW);
   const id = note?.getAttribute(NOTE_ROW_ATTR);
   if (note && id) return { kind: "note", id, row: note };
   return null;

@@ -7,7 +7,7 @@
 import { useEffect, useRef } from "react";
 
 import { registerChatDrop } from "./chatDrop";
-import { takeChatAttachment } from "./chatDropQueue";
+import { onChatAttachment, takeChatAttachment } from "./chatDropQueue";
 
 export function useChatDropTarget(
   paneId: string,
@@ -15,14 +15,23 @@ export function useChatDropTarget(
   attachPaths: (paths: readonly string[]) => void,
   canVision: boolean,
   refuse: () => void,
+  ready: boolean,
 ): void {
   // A row drop attaches regardless of the model's vision: the composer may
   // mount before the model catalog has settled, and the send path already
   // refuses images for a model that cannot see, in words, at send time.
+  // `ready` is whether attachPaths can import at all (the vault is known):
+  // taking the paths before that would lose them. Drained on mount and
+  // whenever a drop queues more — the chat may already be open.
   useEffect(() => {
-    const queued = chatSlug ? takeChatAttachment(chatSlug) : null;
-    if (queued) attachPaths(queued);
-  }, [chatSlug, attachPaths]);
+    if (!chatSlug || !ready) return;
+    const drain = () => {
+      const queued = takeChatAttachment(chatSlug);
+      if (queued) attachPaths(queued);
+    };
+    drain();
+    return onChatAttachment(chatSlug, drain);
+  }, [chatSlug, attachPaths, ready]);
   // the refusal is an inline closure at the call site; read it through a ref
   // (updated after render, the React Compiler's rule) so a re-render never
   // re-registers the pane

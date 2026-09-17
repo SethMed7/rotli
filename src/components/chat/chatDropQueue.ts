@@ -12,12 +12,26 @@ interface Pending {
 }
 
 const pending = new Map<string, Pending>();
+const listeners = new Map<string, Set<() => void>>();
 
 export function queueChatAttachment(slug: string, paths: readonly string[], now = Date.now()): void {
   if (paths.length === 0) return;
   const prior = pending.get(slug);
   const fresh = prior && now - prior.at <= PENDING_TTL_MS ? prior.paths : [];
   pending.set(slug, { paths: [...fresh, ...paths], at: now });
+  // a chat that is ALREADY open has no mount to drain on; tell its composer
+  for (const listener of listeners.get(slug) ?? []) listener();
+}
+
+/** Be told when paths are queued for this chat. Returns the unsubscribe. */
+export function onChatAttachment(slug: string, listener: () => void): () => void {
+  const set = listeners.get(slug) ?? new Set();
+  set.add(listener);
+  listeners.set(slug, set);
+  return () => {
+    set.delete(listener);
+    if (set.size === 0) listeners.delete(slug);
+  };
 }
 
 /** The paths waiting for this chat, removed from the queue; null when none

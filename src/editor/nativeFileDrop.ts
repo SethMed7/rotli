@@ -38,6 +38,8 @@ import {
   onNativeDropRefused,
   rootIdOf,
 } from "../lib/tauri";
+import { activeInstance } from "../memex/config";
+import { loadConfig } from "../memex/service";
 import { invalidateNotes } from "../services/hooks";
 import { showFileNotice } from "../state/fileNotice";
 import { usePanesStore } from "../state/panes";
@@ -62,7 +64,9 @@ import { awaitEditorFor } from "./openedEditor";
 async function dropOnSidebarRow(target: SidebarDropTarget, paths: string[]): Promise<void> {
   const panes = usePanesStore.getState();
   if (target.kind === "chat") {
-    panes.openChat(target.slug);
+    // the row's own click passes the active vault; the drop opens the same chat
+    const vault = activeInstance(await loadConfig());
+    panes.openChat(target.slug, vault ? { vaultId: vault.id } : undefined);
     return deliverFiles(paths, {
       kind: "chat",
       attach: (images) => queueChatAttachment(target.slug, images),
