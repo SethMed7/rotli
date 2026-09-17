@@ -11,7 +11,10 @@
 // LANDS when the pointer is truly away from both and no context menu is open;
 // a menu closing re-arms it. And a close by Esc or ⌘0 under a resting pointer
 // leaves the strip beneath that pointer — the browser's synthetic enter would
-// reopen it at once — so the strip is disarmed until the pointer leaves it.
+// reopen it at once — so the strip is disarmed until the pointer leaves it,
+// synchronously in the store's own notification, before anything unmounts.
+// Esc goes through the transient stack like every popover: a menu above the
+// rail takes it first, and the window's own Esc never sees it.
 
 import { useEffect, useRef } from "react";
 
@@ -30,6 +33,7 @@ function inside(el: Element | null, x: number, y: number): boolean {
 export function SidebarHoverRail({ side }: { side: SidebarSide }) {
   const open = useUiStore((s) => !s.sidebarCollapsed);
   const setCollapsed = useUiStore((s) => s.setSidebarCollapsed);
+  const registerTransient = useUiStore((s) => s.registerTransient);
   const stripRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const pointer = useRef({ x: -1, y: -1 });
@@ -73,9 +77,15 @@ export function SidebarHoverRail({ side }: { side: SidebarSide }) {
     [],
   );
   useEffect(() => {
-    // closed while the pointer rests on the strip (Esc, ⌘0): hold until it leaves
-    if (!open && inside(stripRef.current, pointer.current.x, pointer.current.y)) armed.current = false;
-  }, [open]);
+    // any close (Esc, ⌘0, the leave timer) while the pointer rests on the
+    // strip: hold the strip until the pointer leaves it — decided in the
+    // store's synchronous notification, before React unmounts anything
+    return useUiStore.subscribe((state, previous) => {
+      if (state.sidebarCollapsed && !previous.sidebarCollapsed) {
+        armed.current = !inside(stripRef.current, pointer.current.x, pointer.current.y);
+      }
+    });
+  }, []);
   useEffect(() => {
     const track = (event: PointerEvent) => {
       pointer.current = { x: event.clientX, y: event.clientY };
@@ -85,19 +95,17 @@ export function SidebarHoverRail({ side }: { side: SidebarSide }) {
   }, []);
   useEffect(() => {
     if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setCollapsed(true);
-    };
-    window.addEventListener("keydown", onKey);
+    // Esc: one layer at a time — the rail is a transient like any popover
+    const unregister = registerTransient(() => setCollapsed(true));
     // the rail's own menu closing (a pick, a dismissal) re-arms the hide
     const unsubscribe = useContextMenu.subscribe((state, previous) => {
       if (previous.menu && !state.menu) hideSoonRef.current();
     });
     return () => {
-      window.removeEventListener("keydown", onKey);
+      unregister();
       unsubscribe();
     };
-  }, [open, setCollapsed]);
+  }, [open, setCollapsed, registerTransient]);
   return (
     <>
       <div
