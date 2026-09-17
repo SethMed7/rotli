@@ -139,7 +139,9 @@ import { WebDialogFrame } from "../webDialogFrame";
 import { ChatAttachedImages } from "./chatAttachedImages";
 import { ChatClarificationBar } from "./chatClarificationBar";
 import { copyChatSelection } from "./chatCopy";
-import { CHAT_PANE_ATTR, registerChatDrop } from "./chatDrop";
+import { CHAT_PANE_ATTR } from "./chatDrop";
+import { useChatDropTarget } from "./chatDropTarget";
+import { UserMessageText } from "./chatImageRefs";
 import { ModelPicker } from "./chatModelPicker";
 import { ChatPromptNavigator } from "./chatPromptNavigator";
 import { conversationPrompts, visiblePromptIndexes } from "./chatPromptNavigatorModel";
@@ -1042,7 +1044,7 @@ const ChatMessage = memo(function ChatMessage({
     <div className={you ? "cmsg you" : "cmsg ai"} data-chat-message-index={index}>
       <div className="cmsg-bubble">
         {you && images.length > 0 && <ChatAttachedImages images={images} />}
-        {you ? text : renderMessage(text)}
+        {you ? <UserMessageText text={text} /> : renderMessage(text)}
       </div>
       {!you && onOpenArtifact && <ChatArtifactButtons artifacts={artifacts} onOpen={onOpenArtifact} />}
       <div className={endMark ? "cmsg-footer has-endmark" : "cmsg-footer"}>
@@ -1303,7 +1305,8 @@ export function ChatSurface({
   const [provisionalTitle, setProvisionalTitle] = useState<string | null>(null);
   const firstUserPrompt = messages.find((item) => item.speaker === "you")?.text ?? "";
   const hasSentPrompt = firstUserPrompt !== "";
-  const provisionalDisplayTitle = provisionalTitle ?? deriveChatTitle(firstUserPrompt);
+  // the title reads the prose, never an attachment's storage path
+  const provisionalDisplayTitle = provisionalTitle ?? deriveChatTitle(visibleChatText(firstUserPrompt));
   const prompts = useMemo(
     () => conversationPrompts(messages.map((item) => ({ ...item, text: visibleChatText(item.text) }))),
     [messages],
@@ -1694,7 +1697,7 @@ export function ChatSurface({
             .map((image, i) => (image.id ? attachmentReference(i + 1, image.id) : `[Image #${i + 1}]`))
             .join(" ")}${providerTyped ? `\n${providerTyped}` : ""}`
         : providerTyped;
-    const sentTitle = normalizeChatTitle(title) || deriveChatTitle(userText);
+    const sentTitle = normalizeChatTitle(title) || deriveChatTitle(visibleChatText(userText));
     setProvisionalTitle(sentTitle);
     lastSentRef.current = { text: typed, images: imgs };
     clearDraft(tabId);
@@ -2228,11 +2231,7 @@ export function ChatSurface({
     [active, tabId, setDraftImages],
   );
 
-  // The current model gates the drop before any image is imported.
-  useEffect(
-    () => registerChatDrop(paneId, attachPaths, canVision, () => setDropVisionError(true)),
-    [paneId, attachPaths, canVision],
-  );
+  useChatDropTarget(paneId, attachPaths, canVision, () => setDropVisionError(true));
 
   // this chat's generated assets: everything under storage/chats/<slug>/ in the
   // active root (wire ids are bare for the corpus, "<rootid>:rel" otherwise)
