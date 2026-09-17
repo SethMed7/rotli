@@ -163,11 +163,15 @@ export function useChatTranscripts(): NoteSummary[] {
  * row-menu lookup read THIS instead. */
 export function useNoteIndex(): Map<string, NoteSummary> {
   const { lists } = useNoteUniverse();
+  // chats/ transcripts sit outside every note scope, but they open as notes
+  // now (the Library, a source peek's Open) — a tab on one has a title too
+  const transcripts = useChatTranscripts();
   return useMemo(() => {
     const index = new Map<string, NoteSummary>();
     for (const list of lists) for (const n of list ?? []) index.set(n.id, n);
+    for (const n of transcripts) index.set(n.id, n);
     return index;
-  }, [lists]);
+  }, [lists, transcripts]);
 }
 
 /** liveIds for the Main-manifest GC — undefined until EVERY listing has

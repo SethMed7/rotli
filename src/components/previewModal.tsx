@@ -13,6 +13,7 @@ import { useTransientPopover } from "../lib/popover";
 import { corpusFileText, fileAssetUrl, isTauri } from "../lib/tauri";
 import { activeInstance } from "../memex/config";
 import { loadConfig, readChat } from "../memex/service";
+import { useChatTranscripts } from "../services/hooks";
 import { notesService } from "../services/notes";
 import { chatSlugOf, isChatItem, kindLabel } from "../services/systemBrowser";
 import { usePanesStore } from "../state/panes";
@@ -28,6 +29,11 @@ export function PreviewModal() {
   const setPreviewItem = useUiStore((s) => s.setPreviewItem);
   const openSummary = usePanesStore((s) => s.openSummary);
   const openChat = usePanesStore((s) => s.openChat);
+  // a chat's Open goes to its FILE — the transcript as a Markdown note in the
+  // editor (the owner, 2026-09-17: "when I click open I am opening the md file
+  // not the chat"). A sidebar peek only knows the slug; the corpus listing
+  // names the note behind it. The chat itself stays one click away in Chat.
+  const transcripts = useChatTranscripts();
   const cardRef = useRef<HTMLDivElement>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [text, setText] = useState<string | null>(null);
@@ -108,8 +114,11 @@ export function PreviewModal() {
   const meta = `${kindLabel(item)} · ${longDateLabel(item.updatedAt)}`;
   const open = () => {
     close();
-    if (isChatItem(item)) openChat(chatSlugOf(item));
-    else openSummary(item);
+    if (!isChatItem(item)) return openSummary(item);
+    const slug = chatSlugOf(item);
+    const note = item.id.startsWith("chats/") ? transcripts.find((n) => chatSlugOf(n) === slug) : item;
+    if (note) openSummary(note);
+    else openChat(slug);
   };
 
   let body: ReactNode;

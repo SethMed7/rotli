@@ -333,6 +333,13 @@ export function modelProvider(
   );
 }
 
+/** The lane behind a model value no catalog knows any more: the old picker
+ * stored its LABEL ("Gemini 3.5 Flash (Medium)"), and a retired Gemini id has
+ * no lane entry — both are Google's Antigravity lane, never "this Mac". */
+export function legacyModelProvider(id: string): string | undefined {
+  return /^gemini[ -]\d/i.test(id) ? "antigravity" : undefined;
+}
+
 export function modelLabel(
   id: string,
   local: readonly ChatModelInfo[],

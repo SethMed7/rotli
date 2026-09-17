@@ -12,6 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A chat opens as its file from the Library and from Show source.** A chat
+  row in the Library opens the transcript as a Markdown note in the editor,
+  editable; the source peek's Open does the same. The Chat front is where
+  the same file opens as a chat.
+- **Every chat carries its lane.** The one-time backfill now completes a
+  chat that has a model but no provider (a model the old picker stored by
+  label, "Gemini 3.5 Flash (Medium)", is Google's Antigravity lane) and
+  stamps a chat this device never pinned with the vault's default model —
+  the mark the app already showed for it.
+- **Rotli Web: Files is a shortcut to where you are.** The footer button
+  opens the vault's files at the folder of the note you're in (the Mac opens
+  Finder); the Library root only when nothing is open.
 - **Rotli Web (first phase).** The app now builds for the browser
   (`bun run build:web`) and the site serves it from `rotli.co/app/` when the
   `WEB_APP_ENABLED` knob is on. No account: the vault lives in the browser's

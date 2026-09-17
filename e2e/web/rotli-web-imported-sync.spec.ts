@@ -137,4 +137,10 @@ test("an imported vault shows the app's chats, their folders, and each chat's mo
   const peek = page.locator(".pv-text");
   await expect(peek).toContainText("## Messages");
   await expect(peek).toContainText("title: Loose chat");
+  // and Open goes to the FILE: the transcript as an editable note, not the chat
+  await page.locator(".pv-scrim .pv-open").click();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Loose chat");
+  const editor = page.locator(".cm-content").first();
+  await expect(editor).toContainText("Messages");
+  await expect(editor).toHaveAttribute("contenteditable", "true");
 });

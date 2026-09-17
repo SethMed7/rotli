@@ -15,7 +15,7 @@ const chatFile = (title: string, updated: string) =>
   `---\nid: ${updated}-${title}\ntitle: ${title}\nsource: rotli\nattachedTo:\nparticipants: [you]\ncreated: ${updated}\nupdated: ${updated}\ntags: [chat]\n---\n\n# ${title}\n\n## Messages\n\n**you** · ${updated}T10:00:00Z — hello\n`;
 
 const FOLDER: Record<string, string> = {
-  "wiki/hello.md":
+  "wiki/projects/hello.md":
     "---\nid: 01TESTNOTE0000000000000001\ntitle: Hello\nshelf: [Inbox]\n---\n\n# Hello\n\nA note.\n",
   ".rotli/main.json": JSON.stringify({ version: 1, tree: [{ note: "01TESTNOTE0000000000000001" }] }),
   "chats/gemma-chat.md": chatFile("Gemma chat", "2026-09-12"),
@@ -116,6 +116,19 @@ test("a connected folder's chats show each chat's own model from the folder's se
   await expect(markOf("gemma-chat")).toHaveClass(/gemma/);
   await expect(markOf("label-chat")).toHaveClass(/gemini/);
   await expect(markOf("label-chat")).toHaveAttribute("title", /Google/);
+});
+
+test("Files opens the vault's files at the folder of the note you're in", async ({ page }) => {
+  await fakeHelper(page);
+  await plantFolder(page);
+  await page.reload();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Hello");
+  await page.locator(".sb-foot").getByRole("button", { name: "Files" }).click();
+  const browser = page.locator(".system-browser");
+  await expect(browser).toBeVisible();
+  // inside wiki/projects — the note itself is a row, not a folder to drill into
+  await expect(browser.locator("[data-note-id]", { hasText: "Hello" }).first()).toBeVisible();
+  await expect(browser).toContainText("projects");
 });
 
 test("a folder waiting on the browser's permission is said in the sidebar, with Reconnect", async ({

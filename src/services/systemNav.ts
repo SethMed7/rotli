@@ -6,11 +6,41 @@
 // A store-mutating command module, so it lives in services/ rather than lib/
 // (docs/development/adding-things.md).
 
+import { noteDiskFolder } from "../lib/noteLocation";
 import { useUiStore } from "../state/ui";
+import type { NoteSummary } from "../types";
+import { DEST } from "./destinations";
+import { isChatItem, libraryPathOfChat, rerootDiskPath } from "./systemBrowser";
+
+/** Per-root session memory of the browser's folder — the surface unmounts on
+ * every content-view switch, and a Finder that forgets its place feels
+ * broken. Shared here so a reveal can set the place before the surface mounts. */
+export const systemCwdMemo = new Map<string, string>();
 
 export function openSystemRoot(id: string): void {
   const ui = useUiStore.getState();
   ui.setSelectedFolderId(id);
   ui.setSystemRoot(id);
   ui.setContentView("system");
+}
+
+/** The System root a note's disk folder sits under, and its browser prefix. */
+function rootOf(folder: string): { id: string; prefix: string } {
+  const top = folder.split("/")[0]?.toLowerCase() ?? "";
+  if (top === "storage") return { id: DEST.storage, prefix: "Storage" };
+  if (top === "archive") return { id: DEST.archive, prefix: "Archive" };
+  if (top === "trash") return { id: DEST.trash, prefix: "Trash" };
+  return { id: "Brain", prefix: "wiki" };
+}
+
+/** Open the System browser AT a note's folder — Rotli Web's "show me where
+ * this file lives" (Finder does it on the Mac). */
+export function revealNoteInSystem(note: NoteSummary): void {
+  const folder = noteDiskFolder(note);
+  const root = rootOf(folder);
+  const path = isChatItem(note)
+    ? libraryPathOfChat(folder, root.prefix)
+    : rerootDiskPath(folder, root.prefix);
+  systemCwdMemo.set(root.id, path);
+  openSystemRoot(root.id);
 }
