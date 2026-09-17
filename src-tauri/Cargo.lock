@@ -3432,6 +3432,7 @@ name = "rotli"
 version = "1.0.0"
 dependencies = [
  "base64 0.22.1",
+ "block2",
  "libc",
  "notify",
  "objc2",

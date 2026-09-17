@@ -64,6 +64,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Drag the macOS screenshot thumbnail straight into a note or a chat.** The
+  floating preview after ⌘⇧4 / ⌘⇧5 used to land as "Nothing imported": it
+  hands over a *promise* of a file, never a path, and Rotli only read paths.
+  Rotli now reads the drag itself — it calls the promise in, waits for the
+  screenshot to be written, and then imports it exactly like a file dragged
+  from Finder, at the point you dropped it. An image dragged out of Safari,
+  Chrome, or Photos works the same way: the picture's own bytes are saved as
+  a PNG named for the moment you dropped it. Staging files sit in the
+  system's temp folder and are swept a day later. Set `ROTLI_DEBUG_DROPS=1`
+  to have the app narrate what a drag carried.
 - Chat: leave a chat while it is thinking and come back, and the thread now
   shows the working row again and the reply when it lands. Before, the
   remounted chat showed only your message until the tab was closed and
