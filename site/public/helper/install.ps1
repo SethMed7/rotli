@@ -10,7 +10,7 @@
 # file to uninstall.
 $ErrorActionPreference = "Stop"
 
-$version = if ($env:ROTLI_HELPER_VERSION) { $env:ROTLI_HELPER_VERSION } else { "1.0.0" }
+$version = if ($env:ROTLI_HELPER_VERSION) { $env:ROTLI_HELPER_VERSION } else { "1.1.0" }
 $releases = if ($env:ROTLI_HELPER_RELEASES) { $env:ROTLI_HELPER_RELEASES } else { "https://github.com/SethMed7/rotli-releases/releases/download" }
 $destDir = Join-Path $HOME ".rotli\bin"
 $dest = Join-Path $destDir "rotli-helper.exe"
