@@ -29,27 +29,28 @@ import {
   memexWriteNote,
 } from "../lib/tauri";
 import { titleOf } from "../services/derive";
+import { setChatModel } from "./chatModelFrontmatter";
 import { type MemexConfig, type MemexInstance, type Perms, fromCorpusConfig } from "./config";
 import {
-  type ChatMsg,
-  type ChatArtifact,
-  type NoteMeta,
-  ROTLI_SOURCE,
-  SPINE,
-  appendMessages,
   addChatArtifact,
   addChatArtifactTurn,
+  appendMessages,
+  parsePrimaryUser,
   canWrite,
+  type ChatArtifact,
+  type ChatMsg,
   chatSlug,
   composeNewChat,
   composeNote,
+  type NoteMeta,
   noteStem,
-  parsePrimaryUser,
+  today,
+  ROTLI_SOURCE,
   setAttachedTo,
   setChatPinned,
-  setChatTitle,
   setChatSecureContext,
-  today,
+  setChatTitle,
+  SPINE,
   ulid,
 } from "./contract";
 
@@ -156,6 +157,24 @@ export async function setChatAttachedTo(instance: MemexInstance, slug: string, s
   }
   const existing = await memexReadChat(instance.root, slug);
   const next = setAttachedTo(existing.contents, stem);
+  if (next !== existing.contents) {
+    await memexWriteChat(instance.root, slug, next, existing.revision);
+  }
+}
+
+/** Record WHO answers an existing chat in its own file (`model:` and
+ * `provider:` frontmatter) — the durable twin of the settings.json map, so a
+ * copied or connected vault shows each chat's mark without that map. */
+export async function setChatModelMeta(
+  instance: MemexInstance,
+  slug: string,
+  model: string,
+  provider: string | null,
+): Promise<void> {
+  const rel = `chats/${slug}.md`;
+  if (!canWrite(rel, instance.perms)) return; // a read-only vault keeps its files as they are
+  const existing = await memexReadChat(instance.root, slug);
+  const next = setChatModel(existing.contents, model, provider);
   if (next !== existing.contents) {
     await memexWriteChat(instance.root, slug, next, existing.revision);
   }
@@ -285,8 +304,11 @@ export interface WriteNoteInput {
   instance: MemexInstance;
   /** The note body (markdown; its first heading is the title). */
   body: string;
-  /** The user's folder(s) for the projected view; default ["Inbox"]. */
-  shelf?: string[];
+  /** The user's folder(s) for the projected view. `["Inbox"]` is the CAPTURE
+   * shelf — Rust projects it to the Captures board — so only a capture
+   * writes it; every other writer names its shelf or passes `[]` (2026-09-17:
+   * chat notes had defaulted to Inbox and filled Captures). */
+  shelf: string[];
   /** Who may access it; default: the brain's primary user (owner-only). */
   reach?: string[];
   /** Mark the file secure at birth; local-AI access remains denied by default. */
@@ -318,7 +340,7 @@ export async function writeNote(input: WriteNoteInput): Promise<{ id: string; st
   const meta: NoteMeta = {
     id,
     title,
-    shelf: input.shelf ?? ["Inbox"],
+    shelf: input.shelf,
     reach,
     ...(input.secure ? { secure: true } : {}),
   };

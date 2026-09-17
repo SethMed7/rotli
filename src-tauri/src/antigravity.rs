@@ -401,7 +401,7 @@ fn sign_in(children: &Arc<Mutex<HashMap<String, Running>>>) -> Result<Antigravit
         assistant: &mut assistant,
         on_plain_line: &mut open_url,
     };
-    let flow = acp::handshake(&mut conn);
+    let flow = acp::handshake(&mut conn).map(|_| ());
     drop(stdin);
     let reaped = {
         let mut map = children.lock().unwrap();

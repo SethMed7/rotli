@@ -14,99 +14,57 @@ import type {
   BreveDeliverySettings,
 } from "../routines/breveTypes";
 import type { SearchHit, WelcomeSeed } from "../types";
+import { browserVault, isWebVault, webVaultName } from "./browserVault";
 import {
   type VaultBrowserView,
   browserEmptyFolders,
   browserVaultHome,
   browserVaultPreview,
 } from "./vaultBrowserPreview";
+import {
+  type WebAiCorpusShape,
+  currentWebAiBridge,
+  currentWebAiCorpus,
+  currentWebFileStore,
+  currentWebMemexBridge,
+} from "./webAiSeam";
 
 export function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window;
 }
 
-export type ModelUsageRange = "24h" | "7d" | "30d" | "90d";
-
-export interface ModelUsageTokens {
-  uncachedInputTokens: number;
-  cachedInputTokens: number;
-  cacheCreationTokens: number;
-  outputTokens: number;
-  /** A subset of output tokens; never add it to a total. */
-  reasoningTokens: number;
+/** True when durable state has somewhere to live: the Tauri shell (files
+ * through Rust) or Rotli Web (the browser vault). The plain browser twin used
+ * by tests and `vite dev` has neither and keeps everything in memory. Stores
+ * that persist consult this, not `isTauri`, so the web build saves. */
+export function hasDurableCorpus(): boolean {
+  return isTauri() || isWebVault();
 }
 
-export interface ModelUsageBucket {
-  bucketStartMs: number;
-  provider: "claude" | "codex";
-  model: string;
-  tokens: ModelUsageTokens;
-  responses: number;
-  sessions: number;
-}
-
-export interface ModelUsageTotal {
-  provider: "claude" | "codex";
-  model: string;
-  tokens: ModelUsageTokens;
-  responses: number;
-  sessions: number;
-}
-
-export interface ModelUsageSource {
-  provider: "claude" | "codex";
-  status: "ok" | "missing" | "partial";
-  scannedFiles: number;
-  skippedFiles: number;
-  malformedRecords: number;
-  message?: string;
-}
-
-export interface ModelUsageSummary {
-  range: ModelUsageRange;
-  readAtMs: number;
-  sinceMs: number;
-  untilMs: number;
-  bucketMs: number;
-  totalSessions: number;
-  buckets: ModelUsageBucket[];
-  models: ModelUsageTotal[];
-  sources: ModelUsageSource[];
-}
+export type {
+  ModelUsageBucket,
+  ModelUsageRange,
+  ModelUsageSource,
+  ModelUsageSummary,
+  ModelUsageTokens,
+  ModelUsageTotal,
+} from "./modelUsageTypes";
+import type { ModelUsageRange, ModelUsageSummary } from "./modelUsageTypes";
+import { emptyModelUsage } from "./modelUsageTypes";
 
 /** Aggregate provider-owned local session histories. Rust chooses the only
  * directories that can be scanned and returns counts only—never transcript
  * text, paths, prompts, responses, or session identifiers. */
 export function modelUsage(range: ModelUsageRange, refresh = false): Promise<ModelUsageSummary> {
   if (!isTauri()) {
-    return Promise.resolve({
-      range,
-      readAtMs: Date.now(),
-      sinceMs: Date.now(),
-      untilMs: Date.now(),
-      bucketMs: range === "24h" ? 60 * 60 * 1_000 : 24 * 60 * 60 * 1_000,
-      totalSessions: 0,
-      buckets: [],
-      models: [],
-      sources: [
-        {
-          provider: "claude",
-          status: "missing",
-          scannedFiles: 0,
-          skippedFiles: 0,
-          malformedRecords: 0,
-          message: "The browser twin does not inspect this computer.",
-        },
-        {
-          provider: "codex",
-          status: "missing",
-          scannedFiles: 0,
-          skippedFiles: 0,
-          malformedRecords: 0,
-          message: "The browser twin does not inspect this computer.",
-        },
-      ],
-    });
+    // Rotli Web paired with Rotli Helper: the helper reads this computer's CLI
+    // transcripts the way the app does; unpaired (or refused), the empty summary
+    if (currentWebAiBridge()) {
+      return aiInvoke<ModelUsageSummary>("model_usage", { range, refresh }).catch(() =>
+        emptyModelUsage(range),
+      );
+    }
+    return Promise.resolve(emptyModelUsage(range));
   }
   return invoke<ModelUsageSummary>("model_usage", { range, refresh });
 }
@@ -191,11 +149,13 @@ export async function setAppIcon(variant: string): Promise<void> {
 /** Machine-level shell/onboarding preferences. These exist before a vault and
  * intentionally contain no notes, views, or vault-scoped AI policy. */
 export async function appSettingsRead(): Promise<string> {
+  if (isWebVault()) return (await browserVault().read("app-settings")) ?? "{}";
   if (!isTauri()) return "{}";
   return invoke<string>("app_settings_read");
 }
 
 export async function appSettingsWrite(contents: string): Promise<void> {
+  if (isWebVault()) return browserVault().write("app-settings", contents);
   if (!isTauri()) return;
   await invoke("app_settings_write", { contents });
 }
@@ -505,7 +465,10 @@ export interface ChatModelInfo {
  * instead of hanging, and string command errors arrive as Error. */
 function aiInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!isTauri()) {
-    return Promise.reject(new Error(`${cmd}: the on-device model only exists inside the Tauri shell`));
+    const bridge = currentWebAiBridge();
+    return bridge
+      ? (bridge(cmd, args) as Promise<T>)
+      : Promise.reject(new Error(`${cmd}: the on-device model only exists inside the Tauri shell`));
   }
   return invoke<T>(cmd, args).catch((err: unknown) => {
     throw err instanceof Error ? err : new Error(String(err));
@@ -952,7 +915,7 @@ export async function corpusPickImages(): Promise<string[]> {
 /** Persist an image selected in Chat as a collision-safe user-owned asset.
  * The transcript keeps only its portable `storage:` reference. */
 export async function corpusCreateImageAsset(rootId: string, name: string, base64: string): Promise<string> {
-  if (!isTauri()) return "";
+  if (!isTauri()) return currentWebFileStore()?.createImageAsset(rootId, name, base64) ?? "";
   return invoke<string>("corpus_create_image_asset", { rootId, name, base64 });
 }
 
@@ -969,6 +932,7 @@ export async function corpusAbs(rootId: string, rel: string): Promise<string> {
 export async function resolveImageSrc(src: string, rootId = "default"): Promise<string> {
   if (/^(https?:|data:|blob:|asset:)/i.test(src)) return src;
   const rel = src.startsWith("storage:") ? `storage/${src.slice("storage:".length)}` : src;
+  if (!isTauri()) return currentWebFileStore()?.imageUrl(rel) ?? "";
   const abs = await corpusAbs(rootId, rel);
   return abs ? convertFileSrc(abs) : "";
 }
@@ -1131,8 +1095,10 @@ export interface FrontmatterView {
 }
 
 /** Read a note's frontmatter for the metadata panel (display + lock state). */
+export type WebAiCorpus = WebAiCorpusShape<CorpusNoteMeta, SearchHit, CorpusAiRead, FrontmatterView>;
+const webCorpus = (): WebAiCorpus | null => currentWebAiCorpus<WebAiCorpus>();
 export async function corpusFrontmatter(id: string): Promise<FrontmatterView | null> {
-  if (!isTauri()) return null;
+  if (!isTauri()) return webCorpus()?.frontmatter(id) ?? null;
   return invoke<FrontmatterView>("corpus_frontmatter", { id });
 }
 
@@ -1439,7 +1405,7 @@ export async function corpusReadAiVersioned(
   id: string,
   model: Pick<ChatModelInfo, "id" | "endpoint">,
 ): Promise<CorpusAiRead> {
-  if (!isTauri()) return { body: "", revision: "browser:0" };
+  if (!isTauri()) return webCorpus()?.read(id) ?? { body: "", revision: "browser:0" };
   return invoke<CorpusAiRead>("corpus_read_ai", {
     id,
     modelId: model.id,
@@ -1466,7 +1432,7 @@ export async function corpusReadableIds(
   ids: string[],
   model: Pick<ChatModelInfo, "id" | "endpoint">,
 ): Promise<string[]> {
-  if (!isTauri()) return [];
+  if (!isTauri()) return webCorpus()?.readableIds(ids) ?? [];
   return invoke<string[]>("corpus_readable_ids", {
     ids,
     modelId: model.id,
@@ -1490,7 +1456,7 @@ export async function corpusSearchAi(
   includeReference: boolean,
   model: Pick<ChatModelInfo, "id" | "endpoint">,
 ): Promise<SearchHit[]> {
-  if (!isTauri()) return [];
+  if (!isTauri()) return webCorpus()?.search(query, limit) ?? [];
   return invoke<SearchHit[]>("corpus_search_ai", {
     query,
     ...(limit === undefined ? {} : { limit }),
@@ -1507,7 +1473,7 @@ export async function corpusSearchAi(
 export async function corpusNotesAi(
   model: Pick<ChatModelInfo, "id" | "endpoint">,
 ): Promise<CorpusNoteMeta[]> {
-  if (!isTauri()) return [];
+  if (!isTauri()) return webCorpus()?.list() ?? [];
   return invoke<CorpusNoteMeta[]>("corpus_notes_ai", {
     modelId: model.id,
     endpoint: model.endpoint,
@@ -1556,6 +1522,7 @@ export interface CorpusConfigView {
 /** True only after the user has selected or created a primary vault. This is a
  * read-only probe and never creates the historical default folder. */
 export function corpusStatus(): Promise<boolean> {
+  // Rotli Web is always "configured": its vault is the browser, born ready.
   if (!isTauri()) return Promise.resolve(true);
   return invoke<boolean>("corpus_status");
 }
@@ -1669,10 +1636,12 @@ export function corpusListConfig(): Promise<CorpusConfigView> {
   if (!isTauri()) {
     return Promise.resolve({
       corpus: {
-        absPath: "~/Rotli",
-        isMemex: false,
-        memexId: null,
-        perms: null,
+        // the connected or imported vault's own name; "Rotli" only for notes
+        // that live in the browser
+        absPath: `~/${webVaultName() ?? "Rotli"}`,
+        isMemex: isWebVault(),
+        memexId: isWebVault() ? "browser-vault" : null,
+        perms: isWebVault() ? "chats+inbox" : null,
         brainEnabled: true,
       },
       brains: [],
@@ -1754,11 +1723,20 @@ export type SettingsFile = "settings" | "viewstate";
  * daemon's own convergence state and is never webview-writable (#44). */
 export type WritableSettingsFile = "settings" | "viewstate";
 
-export function corpusSettingsRead(file: SettingsFile): Promise<string> {
+export async function corpusSettingsRead(file: SettingsFile): Promise<string> {
+  if (isWebVault()) {
+    const stored = await browserVault().read(`settings:${file}`);
+    // A first visit has no settings yet: empty defaults, like a fresh vault on
+    // the Mac. Viewstate stays a miss so the pristine startup pane applies.
+    if (stored === undefined && file === "settings") return "{}";
+    if (stored === undefined) throw new Error(`settings file not found: ${file}`);
+    return stored;
+  }
   return corpusInvoke("corpus_settings_read", { file });
 }
 
 export function corpusSettingsWrite(file: WritableSettingsFile, contents: string): Promise<void> {
+  if (isWebVault()) return browserVault().write(`settings:${file}`, contents);
   return corpusInvoke("corpus_settings_write", { file, contents });
 }
 
@@ -1766,9 +1744,11 @@ export function corpusSettingsWrite(file: WritableSettingsFile, contents: string
  * work, unlike per-machine settings/viewstate, and stale whole-tree writes must
  * never replace a newer CLI/MCP/window edit. */
 export function corpusMainRead(): Promise<VersionedText> {
+  if (isWebVault()) return browserVault().readVersioned("main");
   return corpusInvoke("corpus_main_read");
 }
 export function corpusMainWrite(contents: string, expectedRevision: string): Promise<string> {
+  if (isWebVault()) return browserVault().writeVersioned("main", contents, expectedRevision);
   return corpusInvoke("corpus_main_write", { contents, expectedRevision });
 }
 
@@ -1776,9 +1756,11 @@ export function corpusMainWrite(contents: string, expectedRevision: string): Pro
  * host validates unique names and singular membership, then keeps Markdown's
  * managed `view_tag` aligned; boards and binaries remain frontmatter-free. */
 export function corpusViewsRead(): Promise<VersionedText> {
+  if (isWebVault()) return browserVault().readVersioned("views");
   return corpusInvoke("corpus_views_read");
 }
 export function corpusViewsWrite(contents: string, expectedRevision: string): Promise<string> {
+  if (isWebVault()) return browserVault().writeVersioned("views", contents, expectedRevision);
   return corpusInvoke("corpus_views_write", { contents, expectedRevision });
 }
 
@@ -1938,6 +1920,10 @@ export interface MemexChatSummary {
   modifiedMs: number;
   /** `pinned: true` frontmatter — the sidebar sorts pinned chats first. */
   pinned: boolean;
+  /** `model:` / `provider:` frontmatter — who answers this chat, in the file
+   * itself (2026-09-17); "" when the chat predates them. */
+  model: string;
+  provider: string;
 }
 
 export interface MemexValidateReport {
@@ -1950,7 +1936,10 @@ export interface MemexValidateReport {
 
 function memexInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!isTauri()) {
-    return Promise.reject(new Error(`${cmd}: the memex bridge only exists inside the Tauri shell`));
+    const bridge = currentWebMemexBridge();
+    return bridge
+      ? (bridge(cmd, args) as Promise<T>)
+      : Promise.reject(new Error(`${cmd}: the memex bridge only exists inside the Tauri shell`));
   }
   return invoke<T>(cmd, args).catch((err: unknown) => {
     throw err instanceof Error ? err : new Error(String(err));

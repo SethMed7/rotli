@@ -29,11 +29,14 @@ import { BoardNameDialog } from "./components/boardNameDialog";
 import { Titlebar } from "./components/titlebar";
 import { WhichKey } from "./components/whichKey";
 import { VaultFolderBrowser } from "./components/vaultFolderBrowserDialog";
+import { WebVaultConnectDialog } from "./components/webVaultConnectDialog";
+import { WebChatSetupDialog } from "./components/webChatSetupDialog";
 import { registerDefaultActions } from "./keys/actions";
 import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/registry";
 import { hotkeyPeekDelay, useHeldModifier } from "./keys/useHeldModifier";
 import {
   emitCaptureAck,
+  hasDurableCorpus,
   isTauri,
   onBrainJournal,
   onCaptureSave,
@@ -61,8 +64,9 @@ import { summonChat } from "./services/chatSummon";
 import { DEST } from "./services/destinations";
 import { invalidateFolders, invalidateJournal, invalidateNotes } from "./services/hooks";
 import { adoptPendingAtOrganize } from "./services/librarianAutoAdopt";
-import { notesService } from "./services/notes";
-import { openSeededWelcome } from "./services/welcome";
+import { notesService, webVaultWasRestored } from "./services/notes";
+import { isWebVault } from "./lib/browserVault";
+import { openSeededWelcome, openWelcome } from "./services/welcome";
 import { queryClient } from "./services/query";
 import { hydrateMain } from "./state/main";
 import { onboardingRequired } from "./state/onboarding";
@@ -361,11 +365,18 @@ function MainShell() {
   // hovered/focused editor), storage for everything else
   useNativeFileDrop();
 
+  // Rotli Web, first visit: the vault is empty, so seed the Welcome folder and
+  // open its note — the same landing a fresh Mac vault gets after onboarding.
+  useEffect(() => {
+    if (!isWebVault() || webVaultWasRestored()) return;
+    void openWelcome().catch(() => {});
+  }, []);
+
   // fs mode: the window opens on the freshest note. The in-memory seed decides
   // this synchronously at module init; the disk corpus answers async — fill
   // the pristine startup tab once, never replacing anything the user opened.
   useEffect(() => {
-    if (!isTauri()) return;
+    if (!hasDurableCorpus()) return;
     void notesService.listNotes().then((notes) => {
       const freshest = notes[0];
       if (!freshest) return;
@@ -563,6 +574,8 @@ export default function App() {
     <>
       <MainShell />
       <VaultFolderBrowser />
+      {isWebVault() && <WebVaultConnectDialog />}
+      {isWebVault() && <WebChatSetupDialog />}
     </>
   );
 }

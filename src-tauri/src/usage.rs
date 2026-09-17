@@ -218,13 +218,20 @@ fn provider_roots(home: &Path) -> [(&'static str, PathBuf); 2] {
     ]
 }
 
-#[tauri::command]
-pub async fn model_usage(
-    range: String,
-    refresh: Option<bool>,
-) -> Result<ModelUsageSummary, String> {
-    let cfg = range_config(&range)?;
-    if refresh != Some(true) {
+/// The scan itself, reusable without Tauri's runtime (Rotli Helper serves
+/// it to the web page over loopback): the cache fast path, then one
+/// serialized read of the local CLIs' transcripts.
+pub(crate) fn model_usage_blocking(range: &str, refresh: bool) -> Result<ModelUsageSummary, String> {
+    let cfg = range_config(range)?;
+    // Range changes can arrive while a scan is still running. Serialize
+    // them so the second request can reuse parsed, unchanged files rather
+    // than putting two multi-gigabyte transcript reads on disk at once.
+    let _scan = SCAN_LOCK
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .map_err(|_| "model usage scanner is unavailable".to_string())?;
+
+    if !refresh {
         if let Some(entry) = CACHE
             .get_or_init(|| Mutex::new(HashMap::new()))
             .lock()
@@ -237,48 +244,34 @@ pub async fn model_usage(
         }
     }
 
-    tauri::async_runtime::spawn_blocking(move || {
-        // Range changes can arrive while a scan is still running. Serialize
-        // them so the second request can reuse parsed, unchanged files rather
-        // than putting two multi-gigabyte transcript reads on disk at once.
-        let _scan = SCAN_LOCK
-            .get_or_init(|| Mutex::new(()))
-            .lock()
-            .map_err(|_| "model usage scanner is unavailable".to_string())?;
+    let home = std::env::var_os("HOME")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .ok_or_else(|| "the local account home could not be resolved".to_string())?;
+    let summary = scan_usage(&provider_roots(&home), cfg, now_ms())?;
+    CACHE
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .map_err(|_| "model usage cache is unavailable".to_string())?
+        .insert(
+            cfg.id.to_string(),
+            CacheEntry {
+                read_at: Instant::now(),
+                summary: summary.clone(),
+            },
+        );
+    Ok(summary)
+}
 
-        if refresh != Some(true) {
-            if let Some(entry) = CACHE
-                .get_or_init(|| Mutex::new(HashMap::new()))
-                .lock()
-                .map_err(|_| "model usage cache is unavailable".to_string())?
-                .get(cfg.id)
-                .filter(|entry| entry.read_at.elapsed() < CACHE_TTL)
-                .cloned()
-            {
-                return Ok(entry.summary);
-            }
-        }
-
-        let home = std::env::var_os("HOME")
-            .filter(|value| !value.is_empty())
-            .map(PathBuf::from)
-            .ok_or_else(|| "the local account home could not be resolved".to_string())?;
-        let summary = scan_usage(&provider_roots(&home), cfg, now_ms())?;
-        CACHE
-            .get_or_init(|| Mutex::new(HashMap::new()))
-            .lock()
-            .map_err(|_| "model usage cache is unavailable".to_string())?
-            .insert(
-                cfg.id.to_string(),
-                CacheEntry {
-                    read_at: Instant::now(),
-                    summary: summary.clone(),
-                },
-            );
-        Ok(summary)
-    })
-    .await
-    .map_err(|error| format!("model usage scan failed: {error}"))?
+#[tauri::command]
+pub async fn model_usage(
+    range: String,
+    refresh: Option<bool>,
+) -> Result<ModelUsageSummary, String> {
+    let refresh = refresh == Some(true);
+    tauri::async_runtime::spawn_blocking(move || model_usage_blocking(&range, refresh))
+        .await
+        .map_err(|error| format!("model usage scan failed: {error}"))?
 }
 
 fn scan_usage(

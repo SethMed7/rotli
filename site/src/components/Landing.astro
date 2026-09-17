@@ -6,7 +6,7 @@ import showcaseManifest from '../assets/characters/showcase/showcase.json';
 import SiteFooter from './SiteFooter.astro';
 import SiteHeader from './SiteHeader.astro';
 import PlaygroundStory from './PlaygroundStory.astro';
-import { DOWNLOAD_URL, GITHUB_URL, PRIVACY_URL, RELEASES_URL, ROADMAP_URL, site } from '../site';
+import { DOWNLOAD_URL, GITHUB_URL, PRIVACY_URL, RELEASES_URL, ROADMAP_URL, WEB_APP_PATH, site } from '../site';
 
 // Hero leads with the full promo (falls back to the teaser if the full cut
 // is missing). The same clip is never stacked twice below.
@@ -18,9 +18,13 @@ const heroFilm = site.promo.full.enabled
 
 // Secondary calls to action fall back to local anchors while the source
 // repository is private (site.sourcePublic is false by default).
-const secondaryAction = site.sourcePublic
-  ? { href: GITHUB_URL, label: 'Explore the source', external: true }
-  : { href: '#organize', label: 'How organization works', external: false };
+// Rotli Web outranks the source link in the hero: it is the thing a visitor
+// can do right now. The source stays one click away in the footer.
+const secondaryAction = site.webAppEnabled
+  ? { href: WEB_APP_PATH, label: 'Try it in your browser', external: false }
+  : site.sourcePublic
+    ? { href: GITHUB_URL, label: 'Explore the source', external: true }
+    : { href: '#organize', label: 'How organization works', external: false };
 
 const finalAction = site.sourcePublic
   ? { href: GITHUB_URL, label: 'View on GitHub', external: true }
@@ -29,6 +33,7 @@ const finalAction = site.sourcePublic
 const footerLinks = [
   ...(site.sourcePublic ? [{ href: GITHUB_URL, label: 'GitHub' }] : []),
   ...(site.downloadsEnabled ? [{ href: RELEASES_URL, label: 'Releases' }] : []),
+  ...(site.webAppEnabled ? [{ href: WEB_APP_PATH, label: 'Rotli Web' }] : []),
   { href: '#workspace', label: 'Workspace' },
   { href: '#playground', label: 'Playground' },
   ...(site.showsExperiments ? [{ href: '/mcp/', label: 'MCP guide' }] : []),
@@ -100,8 +105,9 @@ const themeTour = themeFamilies.flatMap((family) => ([
   },
 ]));
 
-const orbStyle = (familyId: string, mode: 'light' | 'dark') =>
-  `--orb-ground: var(--swatch-${familyId}-${mode}); --orb-accent: var(--swatch-${familyId}-${mode}-accent);`;
+// Orb colours are CSS rules keyed by data-orb, never inline style attributes:
+// production's Content-Security-Policy is `style-src 'self'`, which blocks
+// every inline style (astro.config.mjs fails the build if one appears).
 
 // Companion carousel: real, selectable combinations (body preset or line
 // drawing × accessory × line color × pose) rendered by
@@ -166,6 +172,7 @@ const experiments = [
       { href: '#organize', label: 'Organize' },
       { href: '#workspace', label: 'Workspace' },
       { href: '#personal', label: 'Themes' },
+      ...(site.webAppEnabled ? [{ href: '#web', label: 'In your browser' }] : []),
       ...(site.showsExperiments
         ? [
             { href: '#beyond-the-app', label: 'More than an app' },
@@ -412,6 +419,27 @@ const experiments = [
       </div>
     </section>
 
+    {site.webAppEnabled && (
+      <section class="privacy-story web-story" id="web" aria-labelledby="web-title" data-reveal>
+        <div class="privacy-copy">
+          <h2 id="web-title">The same workspace, in your browser. Still nothing leaves your computer.</h2>
+          <p>
+            Rotli Web is the Mac app's editor, folders, tasks, links, and boards served from this site.
+            There is no account. Your vault lives in this browser on this device, and the page's security
+            policy forbids it from sending anything anywhere.
+          </p>
+          <dl class="boundary-list">
+            <div><dt>Where notes live</dt><dd>In this browser's storage, on this device. Clearing site data removes them, so export what you keep.</dd></div>
+            <div><dt>What stays in the Mac app</dt><dd>Chat and every model, the Librarian, Breve, Word and sheet files, and Finder drops.</dd></div>
+            <div><dt>Moving to the Mac</dt><dd>Export the vault as a folder of Markdown files and open it in Rotli for Mac.</dd></div>
+          </dl>
+          <p class="hero-actions">
+            <a class="button secondary" href={WEB_APP_PATH}>Open Rotli Web</a>
+          </p>
+        </div>
+      </section>
+    )}
+
     <section class="personal-story" id="personal" aria-labelledby="personal-title">
       <div class="personal-heading" data-reveal>
         <div>
@@ -454,7 +482,7 @@ const experiments = [
                   aria-label={family.light.environment}
                   title={family.light.environment}
                 >
-                  <span class="theme-orb" style={orbStyle(family.id, 'light')} aria-hidden="true"></span>
+                  <span class="theme-orb" data-orb={`${family.id}-light`} aria-hidden="true"></span>
                 </button>
                 <button
                   class="theme-orb-button"
@@ -464,7 +492,7 @@ const experiments = [
                   aria-label={family.dark.environment}
                   title={family.dark.environment}
                 >
-                  <span class="theme-orb" style={orbStyle(family.id, 'dark')} aria-hidden="true"></span>
+                  <span class="theme-orb" data-orb={`${family.id}-dark`} aria-hidden="true"></span>
                 </button>
                 <span class="theme-row-label">{family.id === 'paper' ? 'Paper' : family.name}</span>
               </>
@@ -1469,6 +1497,67 @@ const experiments = [
         radial-gradient(circle at 70% 74%, var(--orb-accent) 0%, color-mix(in srgb, var(--orb-accent) 55%, transparent) 30%, transparent 62%),
         var(--orb-ground);
       box-shadow: inset 0 -6px 10px color-mix(in srgb, var(--deep) 14%, transparent);
+    }
+
+    /* One rule per environment; the swatch tokens live in Base.astro. */
+    .theme-orb[data-orb='rotli-light'] {
+      --orb-ground: var(--swatch-rotli-light);
+      --orb-accent: var(--swatch-rotli-light-accent);
+    }
+
+    .theme-orb[data-orb='rotli-dark'] {
+      --orb-ground: var(--swatch-rotli-dark);
+      --orb-accent: var(--swatch-rotli-dark-accent);
+    }
+
+    .theme-orb[data-orb='paper-light'] {
+      --orb-ground: var(--swatch-paper-light);
+      --orb-accent: var(--swatch-paper-light-accent);
+    }
+
+    .theme-orb[data-orb='paper-dark'] {
+      --orb-ground: var(--swatch-paper-dark);
+      --orb-accent: var(--swatch-paper-dark-accent);
+    }
+
+    .theme-orb[data-orb='ocean-light'] {
+      --orb-ground: var(--swatch-ocean-light);
+      --orb-accent: var(--swatch-ocean-light-accent);
+    }
+
+    .theme-orb[data-orb='ocean-dark'] {
+      --orb-ground: var(--swatch-ocean-dark);
+      --orb-accent: var(--swatch-ocean-dark-accent);
+    }
+
+    .theme-orb[data-orb='grove-light'] {
+      --orb-ground: var(--swatch-grove-light);
+      --orb-accent: var(--swatch-grove-light-accent);
+    }
+
+    .theme-orb[data-orb='grove-dark'] {
+      --orb-ground: var(--swatch-grove-dark);
+      --orb-accent: var(--swatch-grove-dark-accent);
+    }
+
+    .theme-orb[data-orb='iris-light'] {
+      --orb-ground: var(--swatch-iris-light);
+      --orb-accent: var(--swatch-iris-light-accent);
+    }
+
+    .theme-orb[data-orb='iris-dark'] {
+      --orb-ground: var(--swatch-iris-dark);
+      --orb-accent: var(--swatch-iris-dark-accent);
+    }
+
+    .theme-orb[data-orb='midnight-light'] {
+      --orb-ground: var(--swatch-midnight-light);
+      --orb-accent: var(--swatch-midnight-light-accent);
+    }
+
+    .theme-orb[data-orb='midnight-dark'] {
+      --orb-ground: var(--swatch-midnight-dark);
+      --orb-accent: var(--swatch-midnight-dark-accent);
     }
 
     .theme-row-label {

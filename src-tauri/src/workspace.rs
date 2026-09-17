@@ -22,6 +22,10 @@ use crate::corpus::{
     ReferenceNode as MainNode, SearchHit, ViewsManifest, DEFAULT_ROOT_ID, DOT_DIR,
 };
 use crate::memex_query::{parse_query, record_matches, ParsedQuery};
+use crate::loopback_http::{
+    bearer_authorized, not_found, read_http_body, read_http_head, unauthorized,
+    write_http_response,
+};
 
 const MCP_PROTOCOL: &str = "2025-03-26";
 pub(crate) const MCP_MAX_REQUEST_BYTES: usize = 256_000;
@@ -2474,69 +2478,24 @@ fn run_mcp_http(address: &str, token: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Compare the complete Authorization value in time determined by the expected
-/// token, not by the first mismatching byte. The loopback adapter is still a
-/// credential boundary even though it cannot bind a LAN address.
-fn valid_bearer(value: &str, token: &str) -> bool {
-    let expected = format!("Bearer {token}");
-    let actual = value.as_bytes();
-    let mut difference = expected.len() ^ actual.len();
-    for (index, byte) in expected.bytes().enumerate() {
-        difference |= usize::from(byte ^ actual.get(index).copied().unwrap_or_default());
-    }
-    difference == 0
-}
-
 fn serve_mcp_http(mut stream: TcpStream, token: &str) -> Result<(), String> {
     stream
         .set_read_timeout(Some(std::time::Duration::from_secs(10)))
         .map_err(|error| error.to_string())?;
     let mut reader = io::BufReader::new(stream.try_clone().map_err(|error| error.to_string())?);
-    let mut first = String::new();
-    reader
-        .read_line(&mut first)
-        .map_err(|error| error.to_string())?;
-    let is_post = first.split_whitespace().take(2).eq(["POST", "/mcp"]);
-    let mut content_length = None;
-    let mut authorized = false;
-    loop {
-        let mut line = String::new();
-        reader
-            .read_line(&mut line)
-            .map_err(|error| error.to_string())?;
-        if line == "\r\n" || line.is_empty() {
-            break;
-        }
-        let Some((name, value)) = line.split_once(':') else {
-            continue;
-        };
-        let value = value.trim();
-        if name.eq_ignore_ascii_case("content-length") {
-            content_length = value.parse::<usize>().ok();
-        } else if name.eq_ignore_ascii_case("authorization") {
-            authorized = valid_bearer(value, token);
-        }
-    }
+    let head = read_http_head(&mut reader)?;
+    let is_post = head.method == "POST" && head.path == "/mcp";
+    let authorized = bearer_authorized(&head, token);
     if !is_post {
-        return write_http_response(&mut stream, 404, Some(json!({"error":"not found"})));
+        return write_http_response(&mut stream, 404, Some(not_found()));
     }
     if !authorized {
-        return write_http_response(&mut stream, 401, Some(json!({"error":"unauthorized"})));
+        return write_http_response(&mut stream, 401, Some(unauthorized()));
     }
-    let Some(length) = content_length else {
-        return write_http_response(
-            &mut stream,
-            411,
-            Some(json!({"error":"content-length required"})),
-        );
+    let body = match read_http_body(&mut reader, &head, MCP_MAX_REQUEST_BYTES) {
+        Ok(body) => body,
+        Err((status, refusal)) => return write_http_response(&mut stream, status, Some(refusal)),
     };
-    if length > MCP_MAX_REQUEST_BYTES {
-        return write_http_response(&mut stream, 413, Some(json!({"error":"request too large"})));
-    }
-    let mut body = vec![0; length];
-    reader
-        .read_exact(&mut body)
-        .map_err(|error| error.to_string())?;
     let request: Value = match serde_json::from_slice(&body) {
         Ok(value) => value,
         Err(error) => {
@@ -2557,35 +2516,6 @@ fn serve_mcp_http(mut stream: TcpStream, token: &str) -> Result<(), String> {
         if response.is_some() { 200 } else { 202 },
         response,
     )
-}
-
-fn write_http_response(
-    stream: &mut TcpStream,
-    status: u16,
-    body: Option<Value>,
-) -> Result<(), String> {
-    let encoded = body
-        .map(|value| serde_json::to_vec(&value).map_err(|error| error.to_string()))
-        .transpose()?
-        .unwrap_or_default();
-    let reason = match status {
-        200 => "OK",
-        202 => "Accepted",
-        400 => "Bad Request",
-        401 => "Unauthorized",
-        404 => "Not Found",
-        411 => "Length Required",
-        413 => "Payload Too Large",
-        _ => "Error",
-    };
-    write!(
-        stream,
-        "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-        encoded.len()
-    )
-    .and_then(|_| stream.write_all(&encoded))
-    .and_then(|_| stream.flush())
-    .map_err(|error| error.to_string())
 }
 
 fn read_bounded_mcp_line(reader: &mut impl BufRead) -> Result<Option<(String, bool)>, String> {
@@ -3645,25 +3575,13 @@ mod tests {
     }
 
     #[test]
-    fn loopback_http_refuses_non_loopback_binds_and_near_match_tokens() {
+    fn loopback_http_refuses_non_loopback_binds() {
         assert!(run_mcp_http("0.0.0.0:0", "fixture-token-with-24-chars")
             .unwrap_err()
             .contains("loopback only"));
         assert!(run_mcp_http("[::]:0", "fixture-token-with-24-chars")
             .unwrap_err()
             .contains("loopback only"));
-        assert!(valid_bearer(
-            "Bearer fixture-token-with-24-chars",
-            "fixture-token-with-24-chars"
-        ));
-        assert!(!valid_bearer(
-            "Bearer fixture-token-with-24-charx",
-            "fixture-token-with-24-chars"
-        ));
-        assert!(!valid_bearer(
-            "Bearer fixture-token-with-24-chars-extra",
-            "fixture-token-with-24-chars"
-        ));
     }
 
     #[test]

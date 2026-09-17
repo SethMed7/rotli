@@ -16,6 +16,13 @@ describe("markKeyOf", () => {
     expect(markKeyOf("gemini")).toBe("gemini");
   });
 
+  test("a label-shaped legacy Gemini value keeps Google's mark, not this Mac's", () => {
+    expect(markKeyOf(undefined, "Gemini 3.5 Flash (Medium)")).toBe("gemini");
+    expect(markKeyOf(undefined, "gemini-2.5-pro")).toBe("gemini");
+    // a local model named after the family stays local; only gemini-<digit> is Google's
+    expect(markKeyOf("mlx", "geminiflash-lora")).toBe("local");
+  });
+
   test("a hybrid preset is its own mark", () => {
     expect(markKeyOf("preset")).toBe("preset");
   });

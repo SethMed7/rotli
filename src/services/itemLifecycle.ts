@@ -1,4 +1,7 @@
+import { corpusRestoreFile } from "../lib/tauri";
+import { usePanesStore } from "../state/panes";
 import type { NoteSummary } from "../types";
+import { invalidateNotes } from "./hooks";
 
 export type ActiveItemSinkLane = "note" | "file";
 
@@ -50,4 +53,22 @@ export function fileLifecycleRows(read: FileLifecycleRead): {
     ? `Can’t move file — ${read.stat.lifecycleReason}`
     : "Read-only — can’t move file";
   return { movable: false, archiveLabel: label, trashLabel: label, error: null };
+}
+
+/** Bring an item out of Archive or Trash. Files and boards restore BY PATH
+ * (they carry no frontmatter breadcrumb; the sink keeps the original path
+ * beneath it) and their tabs close; notes go through the lifecycle mutation,
+ * which applies the origin rule. The row menu and the editor's Restore chip
+ * both call this, so they cannot drift. */
+export async function restoreSinkItem(
+  item: Pick<NoteSummary, "id" | "kind">,
+  restoreNote: (id: string) => Promise<unknown>,
+): Promise<void> {
+  if (item.kind === "file" || item.kind === "board") {
+    await corpusRestoreFile(item.id);
+    usePanesStore.getState().closeFileTabs(item.id);
+    await invalidateNotes();
+    return;
+  }
+  await restoreNote(item.id);
 }

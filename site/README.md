@@ -51,6 +51,18 @@ bun run preview  # serve the built dist/ locally
   under review. App enforcement is separate: Breve and Mermaid visual editing
   are disabled in stable builds; conventional file adapters remain available
   pending fidelity review. Site labels do not enforce app access.
+- `WEB_APP_ENABLED` decides whether pages link to **Rotli Web**, the app bundle
+  served from `/app/` on this origin. Fails closed: only the exact string
+  `"true"` shows the hero action, the navigation entry, and the footer link.
+  The bundle is built by the `app` stage of `site/Dockerfile` (repository
+  root, `ROTLI_WEB_BASE=/app/ ROTLI_PLATFORM=web bun run build`) and served
+  by the `handle /app/*` block in `site/Caddyfile` under its own headers
+  (`connect-src` loopback only, for Rotli Helper; inline styles allowed for the editors; `noindex`).
+  Design and phases: `docs/design/web-version-and-shell-batch-2026-09-16.md`.
+- To SEE Rotli Web locally: `bun run dev:web` at the repository root serves it
+  with hot reload at `http://localhost:1437/app/` (no security headers; for
+  those, build the Docker prod twin below with `--build-arg WEB_APP_ENABLED=true`
+  and open `http://localhost:8080/app/`).
 - `SOURCE_REPOSITORY_PUBLIC` decides whether pages link to the source
   repository (GitHub header/footer links, "Explore the source", LICENSE,
   PRIVACY.md, ROADMAP.md, and the MCP contract documents). The repository is
@@ -102,11 +114,45 @@ bun run preview  # serve the built dist/ locally
   integrations left production until refined. The remote route (Grok Bot, the
   relay, self-hosting) sits inside that same dev-only guide. Do not publish a hosted relay URL there until that
   deployment has been verified.
-- `public/social-card.svg` is the editable source for the rendered Open Graph
-  image; run `bun run build:social-card` from the repository root to
-  render it with the bundled fonts and no external requests. The result is
-  `public/social-card.png`; keep its copy and palette aligned with the
-  current hero before rendering a new PNG.
+- `public/social-card.svg` is the editable source for the link preview; run
+  `bun run build:social-card` from the repository root to render it with the
+  bundled fonts, the inlined waving quokka, and no external requests. The
+  results are `public/social-card.png` (1200×630, what iMessage, Slack,
+  LinkedIn, X, and Discord show for a rotli.co link) and
+  `public/social-card-github.png` (1280×640, the 2:1 image GitHub wants for
+  the repository's Settings → Social preview, which has no API and is uploaded
+  by hand). Keep the copy and palette aligned with the current hero before
+  rendering. `layouts/Base.astro` publishes the card with explicit
+  `og:image:width/height/type` so scrapers render it on the first fetch, and
+  ships PNG icons (`favicon-32.png`, `apple-touch-icon.png`, both exported from
+  `src-tauri/icons/icon.png`) for the previews that cannot use the SVG favicon.
+  LinkedIn and Facebook cache scrapes; re-scrape with their post inspectors
+  after a deploy.
+
+## Validate a build under production headers (the prod twin)
+
+`astro dev` and `astro preview` send no security headers, so a page can look
+right locally and break on rotli.co, where Caddy serves every response under
+`style-src 'self'` (inline `style` attributes and `<style>` blocks are dropped
+silently). Two guards and one rehearsal cover this:
+
+- The Astro build fails if any generated page carries an inline style
+  (`astro.config.mjs`, `rotli-csp-inline-style-guard`), and stylesheets are
+  never inlined (`build.inlineStylesheets: 'never'`). This runs in `bun run
+  verify quality`, in CI, and inside the Railway image build.
+- To rehearse the exact production image, headers included, build and run the
+  site's own Dockerfile from the repository root (no version bump, no deploy):
+
+```sh
+cd ..   # repository root: the Dockerfile's build context
+docker build -f site/Dockerfile --build-arg SITE_MODE=full -t rotli-site-twin .
+docker run --rm -p 8080:8080 rotli-site-twin
+# open http://localhost:8080 — same Caddyfile, same CSP, same cache headers
+```
+
+The dev deployment (`dev.rotli.co`, built from the `dev` branch in `dev` mode)
+is the hosted rehearsal for everything else: it is not indexed and offers no
+download, so landing there first costs nothing.
 
 ## Railway deployment
 
@@ -239,3 +285,12 @@ pixel dimensions, and checks that the tutorial has no files in Main.
 current promotion gates; [marketing](../marketing/README.md) owns the reusable
 Remotion films. Keep download availability and feature claims tied to verified
 release capabilities. These source changes do not deploy the site.
+
+## Rotli Helper installers
+
+`public/helper/install.sh` and `public/helper/install.ps1` are served as-is
+at `rotli.co/helper/…`. They download the prebuilt `rotli-helper` for the
+user's OS from the releases repository (tag `helper-v<version>`, published
+by the `Rotli Helper release` workflow), verify the checksum, install it to
+`~/.rotli/bin`, and start it. Bump the version in both scripts with the
+crate version.

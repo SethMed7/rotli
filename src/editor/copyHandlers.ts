@@ -1,16 +1,18 @@
 // Copy and cut in the beautified editor: the clipboard gets the selection as
-// readable text AND as HTML (copyClipboard.ts). Images inside the selection
-// are inlined as data URLs: those already resolved ride the synchronous copy;
-// the rest are fetched and the pasteboard is rewritten a moment later through
-// the host (a paste that lands in between still has the text and the list).
-// Raw mode copies the source verbatim.
+// its source Markdown (text/plain) AND as HTML (copyClipboard.ts), so a paste
+// back into a note or a chat renders exactly what was copied while a rich
+// target gets the list and the picture. Images inside the selection are
+// inlined as data URLs: those already resolved ride the synchronous copy; the
+// rest are fetched and the pasteboard is rewritten a moment later through the
+// host (a paste that lands in between still has the Markdown and the list).
+// Raw mode copies the source verbatim through the browser default.
 
 import { EditorSelection } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 
 import { corpusImageDataUrl, writeClipboardHtml } from "../lib/clipboard";
 import { rootIdOf } from "../lib/tauri";
-import { clipboardHtml, clipboardText, imageSourcesIn } from "./copyClipboard";
+import { clipboardHtml, imageSourcesIn } from "./copyClipboard";
 import { noteIdFacet } from "./livePreview";
 
 /** Resolved image bytes, kept across copies (bounded by count, not bytes:
@@ -35,7 +37,7 @@ export function copySelection(
   const range = view.state.selection.main;
   if (range.empty) return false;
   const markdown = view.state.sliceDoc(range.from, range.to);
-  const text = clipboardText(markdown);
+  const text = markdown;
   const known = new Map([...imageCache].filter(([src]) => markdown.includes(src)));
   event.clipboardData?.setData("text/plain", text);
   event.clipboardData?.setData("text/html", clipboardHtml(markdown, known));

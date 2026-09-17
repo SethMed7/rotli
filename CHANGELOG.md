@@ -10,8 +10,311 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-17
+
+Rotli 1.1: Rotli Web (a vault in the browser, a copy where the browser can't
+write, the Helper for chat), chats that carry their model, native drops
+fixed, the prompt navigator as a stack of cards, a sidebar that sits on
+either edge or opens on hover, and a day of the owner's fixes.
+
 ### Added
 
+- **The sidebar sits where you want it, and stays only if you want it to.**
+  Appearance → Sidebar: Left or Right, and Always or On hover. On hover keeps
+  the sidebar out of the way until the pointer reaches the window's edge,
+  then slides it over the content and away again when the pointer leaves
+  (Esc too); ⌘0 still brings it. Right-click the sidebar's own surface for
+  the same choices. Remembered on the Mac and on the web alike; the defaults
+  are left and always.
+- **Rotli Web: Files opens Finder through the Mac app.** The page hands the
+  file you're in to the installed app by its `rotli://reveal` link, and the
+  app opens Finder at it — for the note or the chat that is open. The app
+  answers only for its own vault. With nothing on disk behind the note, the
+  vault's own browser opens at its folder as before.
+- **⌘← and ⌘→ go back and forward** beside ⌘[ and ⌘], never inside a text
+  field (where ⌘← is line start). Remappable like every chord.
+- **rotli.co has a proper 404.** The site's missing-page screen wears the
+  mark, says what is at `/app` or `/helper` before they are switched on,
+  and offers the ways back: home, the download, Rotli Web, the roadmap.
+- **Rotli Web says when a copy has aged.** A connected copy of a vault is a
+  snapshot; it never follows the folder. Once a copy is half a day old the
+  sidebar says so in one muted line — "Copy of X taken 2d ago. Reconnect" —
+  and Reconnect vault always sits in the vault menu. A fresh copy says
+  nothing.
+- **The open chat shows its file's model.** A chat this device never pinned
+  seeds its model from the `model:` line in its file, on the web and the Mac
+  alike, so a copy of the vault opens each chat on the lane it ran on.
+- **Rotli Web: Files reveals the open chat too.** With a chat open, Files
+  opens the vault's browser at the Chats folder that holds its file.
+- **The prompt navigator is a stack of cards.** Hovering the left-edge
+  markers now shows the prompt you're on as its own card with up to three
+  neighbours above and below, each a step further tinted into the pane
+  (never see-through), instead of one tall list that a long thread outgrew. Hover a marker to move the
+  stack; click a card to jump.
+- **A chat opens as its file from the Library and from Show source.** A chat
+  row in the Library opens the transcript as a Markdown note in the editor,
+  editable; the source peek's Open does the same. The Chat front is where
+  the same file opens as a chat.
+- **Every chat carries its lane.** The one-time backfill now completes a
+  chat that has a model but no provider (a model the old picker stored by
+  label, "Gemini 3.5 Flash (Medium)", is Google's Antigravity lane) and
+  stamps a chat this device never pinned with the vault's default model —
+  the mark the app already showed for it.
+- **Rotli Web: Files is a shortcut to where you are.** The footer button
+  opens the vault's files at the folder of the note you're in (the Mac opens
+  Finder); the Library root only when nothing is open.
+- **Rotli Web (first phase).** The app now builds for the browser
+  (`bun run build:web`) and the site serves it from `rotli.co/app/` when the
+  `WEB_APP_ENABLED` knob is on. No account: the vault lives in the browser's
+  own storage on that device, and the page's Content-Security-Policy is
+  `connect-src 'none'`, so the browser refuses every outbound request. Notes,
+  folders, Main and named views, settings, and the open tabs persist across
+  reloads; a first visit seeds and opens the Welcome folder. Chat and every
+  model lane, the Librarian, Breve, agents, sheets, Word files, and Finder
+  drops stay in the Mac app; the web build withholds them by platform.
+  Chat stays visible, disabled, and says on hover that it is in the Mac app
+  (a click opens the download); Settings → General says where the notes
+  live. Its top bar is a toolbar,
+  not window chrome: the brand sits where the Mac app keeps its traffic
+  lights and links back to the site, and there is no window drag or private
+  browser. In Chrome, Edge, or Arc, **Open a folder on this computer**
+  (sidebar → Connect vault, or Settings → General) makes a real folder the
+  vault: every note is a file there, the same files the Mac app reads, and
+  the browser remembers only the folder. Firefox, Zen, Safari, and Brave
+  (until its folder flag is on) cannot write to a folder; there **Import a
+  folder** keeps a copy in the browser and **Export vault (.zip)** gives it
+  back. Boards are the next phase
+  (`docs/design/web-version-and-shell-batch-2026-09-16.md`).
+- **Rotli Helper: chat on the web.** A small program you run on your own
+  computer (`rotli-helper`, Mac, Windows, and Linux; not the Mac app) lets
+  Rotli Web chat through the AI tools installed there — Claude Code, Codex,
+  Cursor — with your notes as context. Start it, paste the pairing code it
+  prints into Chat → Connect, and Chat is a real front: the tools' guides
+  then know what is installed, and a message goes to the tool you pick and
+  its reply comes back. The helper listens only on your own computer, only
+  for pages from rotli.co, and only for a paired page; images are not sent
+  through it in this release, and a note in a secure folder or carrying a
+  secret never reaches a model. One line in a terminal installs and starts
+  it: `curl -fsSL https://rotli.co/helper/install.sh | sh` on Mac and Linux,
+  `irm https://rotli.co/helper/install.ps1 | iex` on Windows; the dialog
+  shows the line for your computer, with a copy button, and once paired it
+  checks which AI tools are already installed and signed in and says
+  Connected. Safari cannot reach the helper; every other desktop browser can
+  (some ask once for local network access). Web chats are saved in the
+  browser vault.
+- **Rotli Web: images in notes.** Drop an image onto a note in the browser
+  and it is kept the way the Mac app keeps it: as a file under the vault's
+  `storage/images/` (or `Storage/` in a plain folder) when a folder is
+  connected or imported, and inside the browser vault otherwise. The note
+  gets the same `storage:` link the app writes, so the same note and image
+  open in both, and the image shows from the stored bytes and is still
+  there after a reload. The web keeps the app's guards on the way in: only
+  a real raster image (the bytes must match the name), never empty, at most
+  25 MB. A drop on a web chat says files cannot go through Rotli Helper yet
+  and to drop images into a note instead; a non-image dropped on a note says
+  the web takes images only. Either way the page stays put.
+- **Guided setup for the connected models.** A lane that is not ready walks
+  you through it instead of hiding a hint: Settings → AI Models shows the
+  steps open (install with the tool's own command for your OS, copy button
+  beside it; sign in, in your terminal; come back — **Check again** asks
+  right now), and steps Rotli can already see done are ticked. The chat's
+  empty state shows the same steps when no model can answer, with a door to
+  Settings. On Rotli Web, Chat and the note's chat chip stay visible and a
+  click opens **Chat on the web**: install Rotli Helper (a small program
+  for Mac, Windows, and Linux, not the Mac app; marked plainly as not
+  released yet), connect the page to it, and set up the AI tool now.
+
+- Chat: while you drag an image over a chat, its composer rings and a label
+  says what the drop will do — "Drop to attach", or that the current model
+  can't see images. On Rotli Web the label says images can't reach Rotli
+  Helper yet and points you to a note, and a note now draws the same drop
+  line the Mac app shows while an image hovers it.
+- Sidebar: drag an image onto a chat in the sidebar and the chat opens with
+  the image attached; drag it onto a note in Main and, after a short hold,
+  the note springs open so you can drop into it — or drop on the row and the
+  image lands at the note's end. The row you are over lights up. On Rotli
+  Web a note row works the same; a chat row says the Helper carries text
+  only.
+- Chats carry their model in the file. Each chat's `chats/<slug>.md` now
+  records `model:` and `provider:` in its frontmatter — written when you pick
+  a model for the chat and when a chat is first saved — so every copy of the
+  vault, on the web or another Mac, shows the right mark. Chats from before
+  get the lines once, on the next launch, from the per-chat models this Mac
+  already kept in its settings.
+- Rotli Web: the vault switcher names the vault you connected (the folder's
+  own name) instead of "Rotli".
+- Rotli Web: browsers that can only read a folder still **connect** a vault
+  (as a copy kept in the browser) — the dialog and Settings say so, and
+  explain that the browser's "upload" is its word for letting the page read
+  the files; nothing is uploaded anywhere.
+- Chats: **Show source** in a chat's menu shows the transcript file as
+  written (both twins), and **Show in Finder** reveals it on the Mac. In the
+  Library, clicking a chat shows its source too; Open from there goes to the
+  chat.
+- Rotli Web: it is a vault you connect, and the words now say so — "Connect a
+  vault on this computer", "Import a copy of a vault", "Your vault needs
+  permission again" — instead of "folder" everywhere.
+- Rotli Web: the **Files** button is back in the sidebar footer. It opens the
+  Library, the vault's file browser (the Mac app's Files reveals the vault
+  in Finder, which the web cannot do, and the button had simply gone missing).
+- Rotli Web: Chat stays behind the setup dialog until Rotli Helper answers
+  AND takes the pairing. A helper that refuses the token (a reinstall printed
+  a new code) or does not answer no longer opens a chat that cannot send:
+  the Chat segment says what is wrong, the dialog names it, and **Check
+  again** re-runs the whole pairing check. Boot re-checks the token too.
+- Rotli Web: when the connected folder needs the browser's permission again,
+  a bar at the top of the sidebar says so and offers Reconnect, and stays
+  until the folder is back. Before, a passing notice said it once and the app
+  quietly ran on the last copy in browser storage — older chats, and none of
+  the per-chat models the Mac app keeps in the folder's settings, so every
+  chat showed the default model's mark.
+- Chat: a chat whose model was saved under its old label (for example
+  "Gemini 3.5 Flash (Medium)") shows Google's mark again instead of "this
+  Mac".
+- Chat: Antigravity (Gemini) chats take image attachments. Google's agent
+  advertises image prompts, so Rotli now sends attached images as prompt
+  blocks beside your text instead of refusing them; an agent that advertises
+  no image prompts is refused in words before anything is sent.
+- Chat: a sent message shows each attached image as a small `#1`, `#2` chip
+  where the message names it, matching the number on the thumbnail above the
+  input, so you can see where an image was added.
+
+### Fixed
+
+- **Rotli Web: reconnecting a copy now takes.** With a copy connected, the
+  page's vault IS the copy, so the reconnect saved the new copy inside the
+  old one (as `.rotli/web/vault-import`) and reloaded the old one — nothing
+  changed. The new copy now goes to the browser's own storage, and the old
+  copy is retired first so its save-on-page-hide can never write again
+  (Forget too).
+- **Rotli Web, folder mode: a file being written is never read half-way.**
+  Chromium swaps a file in when a write closes, and a read landing inside
+  that window threw; when the model backfill rewrote a chat at boot while
+  the notes listing read it, the listing failed and the window opened on
+  "Untitled". Reads and writes of one path now take turns in the folder
+  adapter, for every writer (chats, notes, `.rotli/`).
+- Chat: a chat whose first message was only an image no longer takes the
+  image's storage path as its title.
+
+- Image drops on a chat whose model cannot see images now show a modal error
+  before importing anything. Choose an image-capable model and drop again to
+  attach. Native drops now reach the import handler through Tauri's webview
+  event channel, restoring the path disconnected when multi-webview support
+  was enabled. Finder, file-promise, and image-byte drops share the existing
+  import grants; private browser child views cannot import into the workspace.
+
+- **Drag the macOS screenshot thumbnail straight into a note or a chat.** The
+  floating preview after ⌘⇧4 / ⌘⇧5 used to land as "Nothing imported": it
+  hands over a *promise* of a file, never a path, and Rotli only read paths.
+  Rotli now reads the drag itself — it calls the promise in, waits for the
+  screenshot to be written, and then imports it exactly like a file dragged
+  from Finder, at the point you dropped it. An image dragged out of Safari,
+  Chrome, or Photos works the same way: the picture's own bytes are saved as
+  a PNG named for the moment you dropped it. Staging files sit in the
+  system's temp folder and are swept a day later. Set `ROTLI_DEBUG_DROPS=1`
+  to have the app narrate what a drag carried.
+- Editor: copying from a note now puts the note's own Markdown on the
+  clipboard as plain text, so a paste into another note or a chat renders
+  exactly what you copied (headings, tasks, lists). Before, the plain text
+  was a readable rendering ("☐ task", headings as bare lines) and a pasted
+  note lost its structure. Rich targets (Docs, Notes, mail) still get HTML.
+- Editor: a parent task's subtask pill ("0/1") printed its digits over the
+  words before it on a nested task; the pill keeps its digits inside its box.
+- Editor: a wrapped task line landed its second row a few pixels right of the
+  first row's text. The checkbox now sizes from the line's font (it matches a
+  radio choice's size), so wrapped rows align under the text, as bullets and
+  numbers already did.
+- Captures: only a Quick capture (⌥C), a Quick Note, or a merge of captures
+  lands on the Captures board. A chat's background note — the conversation
+  notes every chat keeps, and the note its header button creates — was born
+  with the capture shelf and filled Captures with "Notes from [[chat]]"
+  cards, even after the Librarian filed it. Those notes now project to where
+  they live. Existing cards keep their shelf: trash them, or add them to Main
+  to graduate them.
+- Chat: a chat whose note shared its title with another note (the same note
+  filed in two areas, or your own note with that name) created one more
+  conversation note every turn and never attached it. The chat's note is now
+  told apart by its link back to the chat, and a chat whose note truly cannot
+  be found writes nothing rather than minting a duplicate; its note button
+  still recreates one on request.
+- Chat: leave a chat while it is thinking and come back, and the thread now
+  shows the working row again and the reply when it lands. Before, the
+  remounted chat showed only your message until the tab was closed and
+  reopened, even after the sidebar said Done: the run settled and saved into
+  the earlier mount's closure and the new one never heard. The run signals
+  the sidebar already reads now carry a "reply saved" count that a mounted
+  chat follows, and the composer holds while a run it did not start is in
+  flight.
+- **Delete folder** in the Main tree's folder menu: an empty folder goes
+  away at once; a full one moves its items to Trash (recoverable) and then
+  goes away. Notes are never deleted with a folder. (Real Library
+  directories still cannot be deleted from Rotli; that needs a Rust command
+  that routes to the OS Trash and is tracked separately.)
+- The note header's actions are plain glyphs now, not cards: no surface
+  behind the chat, Aa, and outline buttons, hover brings the ink up, and the
+  active one is the accent colour.
+- Ordered-list markers of two or more digits no longer overflow their
+  column: the marker column and the line's hanging indent widen together, so
+  wrapped text sits under the text, never under the number.
+- All notes says which named view a note belongs to (a muted tag before the
+  date). The list itself stays global, as designed.
+- Copying a selection across a chat copies the messages' source Markdown, so
+  a paste into another chat or a note renders as the thread did. The browser
+  default serialised the rendered bubbles and the formatting was lost.
+- Dropping a file a surface cannot take (a PDF on a note or a chat) now says
+  it went to Assets instead of vanishing silently, and a chat whose model
+  cannot see images keeps dropped images in Assets and says so instead of
+  discarding them.
+- Multi-select, the same way everywhere: **⇧-click** selects the range from
+  the last click in Captures and in the Main tree (the System browser already
+  did this; all three now share one rule). Captures has a **Select all**
+  button in its header, and ⌘A selects every card while Captures is open.
+- Restore puts a note back where it was. Moving a note to Trash or Archive
+  removed it from Main, so a restored note came back with no Main home and
+  showed up in Captures instead of its folder. The Main slot now stays (the
+  tree hides a note while it sits in a sink), so Restore returns it to the
+  folder it left, and a note opened from Trash or Archive offers **Restore**
+  in its header.
+- Library, Assets, Archive, and Trash have a **Back to notes** control at
+  their root, the same one Captures has. The header's chevron was up-one-
+  folder only and vanished at the root, which is where Trash is browsed.
+- Captures → **Make a note** (and Merge N into a note) works in a memex vault
+  again. It wrote straight into the literal Inbox folder, which is not a
+  writable surface there, so the create was refused and the button did
+  visibly nothing. The merged note now goes through the same router as every
+  other new note (memex staging when writable, else Inbox), and a refusal is
+  reported in the sidebar instead of swallowed.
+- rotli.co theme studio: the twelve environment orbs rendered as blank paper
+  circles in production because their colours rode inline `style` attributes,
+  which the site's Content-Security-Policy (`style-src 'self'`) blocks. Local
+  `astro dev`/`preview` send no CSP, so the bug was invisible before deploy.
+  The colours are now CSS rules keyed by `data-orb`, and the site build fails
+  on any inline style so the class of bug cannot ship again. `site/README.md`
+  documents the Docker prod twin for validating a build under the real headers.
+
+### Changed
+
+- Link previews: rotli.co's social card now carries the waving quokka, the
+  Baloo 2 wordmark, and the site address; the page publishes explicit Open
+  Graph image dimensions and type, `og:locale`, a theme colour, a 32×32 PNG
+  favicon, and a 180×180 Apple touch icon so iMessage, Slack, and LinkedIn
+  render the card and icon on the first fetch. `bun run build:social-card`
+  also renders a 1280×640 `social-card-github.png` for the repository's
+  social preview.
+
+### Cross-platform groundwork (parked)
+
+- Cross-platform groundwork: `security-framework` moved under the macOS-only
+  dependency table (the Keychain module already carried a non-macOS stub, but
+  the crate was still requested on Linux and would have failed at link time),
+  and a manual-only `Cross-platform build probe` workflow builds unsigned
+  bundles on macOS, Windows, and Linux runners so the compiler enumerates the
+  remaining portability gaps. It never runs on push. The feasibility document
+  gained a 2026-09-16 re-count of the seams.
+- **Chats browse in the Library.** The Library is the vault, so its `chats/`
+  transcripts now show there under a **Chats** folder, marked as chats, with
+  the chat glyph, opening as chats. All notes and search keep hiding them, as
+  before. On the web in folder mode the same folder appears.
 - The public site footer now includes a Featured on Launch Llama Tools badge.
 
 ## [1.0.0] - 2026-09-15

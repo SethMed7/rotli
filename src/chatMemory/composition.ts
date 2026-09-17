@@ -1,11 +1,13 @@
 import { type ChatModelInfo, corpusFrontmatter, corpusWriteAi, isTauri } from "../lib/tauri";
 import { CORPUS_INSTANCE_ID, type MemexInstance } from "../memex/config";
+import { noteSlugify } from "../memex/contract";
 import { listChats, setChatAttachedTo, writeNote } from "../memex/service";
 import { invalidateMemex } from "../memex/useMemex";
+import { titleOf } from "../services/derive";
 import { isChatsPath } from "../services/destinations";
 import { invalidateNotes } from "../services/hooks";
-import { notesService } from "../services/notes";
-import { attachedNoteId, type MemoryTurn } from "./model";
+import { inboxFolderId, notesService } from "../services/notes";
+import { type AttachedNoteCandidate, attachedNoteMatches, type MemoryTurn, pickChatNote } from "./model";
 import { syncChatMemory, type ChatMemoryNote, type ComposeChatNotes } from "./workflow";
 
 export interface ManagedChatMemoryInput {
@@ -47,7 +49,30 @@ export async function updateNoteAsAi(
   await corpusWriteAi(id, body, model ?? { id: "", endpoint: "" }, expectedRevision);
 }
 
-export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Promise<ChatMemoryNote> {
+/** The chat's note among the notes answering to `stem` (model.ts owns the
+ * matching and the tie-break). Only an ambiguous stem reads bodies, and only
+ * the few that match, to find the one that links back to the chat. */
+export async function resolveChatNoteId(
+  stem: string,
+  chatSlug: string,
+  candidates: Iterable<AttachedNoteCandidate>,
+  readBody: (id: string) => Promise<string | null> = async (id) =>
+    (await notesService.getNote(id))?.body ?? null,
+): Promise<string | null> {
+  const matches = attachedNoteMatches(stem, candidates);
+  if (matches.length <= 1) return matches[0]?.id ?? null;
+  const link = `[[${chatSlug}]]`;
+  const ranked = await Promise.all(
+    matches.map(async (match) => ({
+      id: match.id,
+      ...(match.updatedAt === undefined ? {} : { updatedAt: match.updatedAt }),
+      linksChat: ((await readBody(match.id)) ?? "").includes(link),
+    })),
+  );
+  return pickChatNote(ranked);
+}
+
+export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Promise<ChatMemoryNote | null> {
   const prefix = input.instance.id === CORPUS_INSTANCE_ID ? "" : `${input.instance.id}:`;
   const attachedStem =
     input.attachedStem ||
@@ -63,8 +88,9 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
       // minted one more duplicate memory note (2026-08-01). The corpus instance
       // has no prefix and keeps the unscoped listing.
       const summaries = await notesService.listNotes(prefix || undefined);
-      const id = attachedNoteId(
+      const id = await resolveChatNoteId(
         stem,
+        input.chatSlug,
         summaries.filter((note) => !isChatsPath(note.folderId)),
       );
       if (!id) return null;
@@ -72,7 +98,17 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
       return note ? { id, stem, body: note.body, revision: note.revision } : null;
     },
     async create(body: string): Promise<ChatMemoryNote> {
-      const created = await writeNote({ instance: input.instance, body });
+      // Rotli Web: the notes service IS the vault (no memex note command), and
+      // the note's slug alias is the stem the chat attaches to. It is a note,
+      // not a capture, so it is born in the Inbox folder, never on the board.
+      if (!isTauri()) {
+        const note = await notesService.createNote(inboxFolderId, body);
+        return { id: note.id, stem: noteSlugify(titleOf(body)) || "note", body, revision: note.revision };
+      }
+      // no shelf: a chat's note is a background note, not a capture — it
+      // projects to where it lives (staging, then the area the Librarian files
+      // it under), never to the Captures board (the owner, 2026-09-17)
+      const created = await writeNote({ instance: input.instance, body, shelf: [] });
       const id = `${prefix}${created.id}`;
       const note = await notesService.getNote(id);
       if (!note) throw new Error("The new conversation note could not be read back after creation.");

@@ -3,13 +3,14 @@
 // (feature policy `agents`); stable builds list them as coming soon. The
 // Keychain-bound Brave key row is supplied by settingsSurface, which owns the
 // native adapter imports.
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 
 import { WEB_SEARCH_PROVIDERS, webSearchProviderInfo } from "../../ai/searchProvider";
 import { COMING_SOON_CAPTION } from "../../lib/featurePolicy";
 import { useUiStore } from "../../state/ui";
 import { CheckGlyph, CopyGlyph } from "../glyphs";
 import { RemoteAgentsSection } from "../remoteAgentsSection";
+import { useCopyState } from "./useCopyState";
 
 /** The prompt you paste into Claude Code so a project's docs live in your Rotli
  * vault instead of the repo — planning + documentation you organize in rotli,
@@ -103,27 +104,7 @@ function ComingSoonConnections() {
 
 /** The prompt that keeps a project's docs in Rotli — an agent extension. */
 function ClaudeDocsExtension() {
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
-  const copyReset = useRef<number | null>(null);
-
-  useEffect(
-    () => () => {
-      if (copyReset.current !== null) window.clearTimeout(copyReset.current);
-    },
-    [],
-  );
-
-  const copy = async () => {
-    if (copyReset.current !== null) window.clearTimeout(copyReset.current);
-    try {
-      if (!navigator.clipboard) throw new Error("Clipboard access is unavailable");
-      await navigator.clipboard.writeText(CLAUDE_DOCS_COMMAND);
-      setCopyState("copied");
-      copyReset.current = window.setTimeout(() => setCopyState("idle"), 1800);
-    } catch {
-      setCopyState("failed");
-    }
-  };
+  const { copyState, copy } = useCopyState();
   return (
     <section className="aisection">
       <h4 className="set-subhead">Extensions</h4>
@@ -144,7 +125,7 @@ function ClaudeDocsExtension() {
             <button
               type="button"
               className={`claudecmd-copy ${copyState}`}
-              onClick={() => void copy()}
+              onClick={() => void copy(CLAUDE_DOCS_COMMAND)}
               aria-label={
                 copyState === "copied" ? "Copied Claude Code instruction" : "Copy Claude Code instruction"
               }

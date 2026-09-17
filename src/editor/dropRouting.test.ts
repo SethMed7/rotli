@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   emptyPasteOutcome,
+  dropIsBlocked,
   classifyPaste,
   type DropCandidate,
   firstTarget,
@@ -91,8 +92,12 @@ describe("the drop plan", () => {
       attach: ["/a/shot.png"],
       embed: [],
       store: ["/a/logo.svg", "/a/report.pdf"],
-      notice: null,
+      notice: "Saved 2 files to Assets — a chat attaches images",
     });
+  });
+
+  test("a chat that takes every dropped image says nothing extra", () => {
+    expect(planDrop(["/a/shot.png"], "chat").notice).toBeNull();
   });
 
   test("a note embeds images and video and stores everything else", () => {
@@ -100,8 +105,9 @@ describe("the drop plan", () => {
       attach: [],
       embed: ["/a/logo.svg", "/a/clip.mp4"],
       store: ["/a/report.pdf"],
-      notice: null,
+      notice: "Saved 1 file to Assets — a note embeds images and video",
     });
+    expect(planDrop(["/a/logo.svg"], "editor").notice).toBeNull();
   });
 
   test("files with no chat or note under them are stored AND say so", () => {
@@ -152,4 +158,11 @@ describe("a paste of copied files", () => {
     // the files are still there but this copy's one grant is spent
     expect(emptyPasteOutcome(true, "editor", "shot.png")).toBe("copy-again");
   });
+});
+
+test("a refused-chat modal and its backdrop block caret and Assets fallbacks", () => {
+  const backdrop = new FakeElement("image-error-backdrop", ["rename-overlay"]);
+  expect(dropIsBlocked([at(dialog, chat, body)])).toBe(true);
+  expect(dropIsBlocked([at(backdrop, editor, pane, body)])).toBe(true);
+  expect(dropIsBlocked([at(overlay, editor, pane, body)])).toBe(false);
 });

@@ -1,9 +1,18 @@
 [package]
 name = "rotli"
-version = "1.0.0"
+version = "1.1.0"
 description = "rotli — warm, local-first, hotkey-driven notes for the Mac menu bar"
 authors = ["Rotli contributors"]
 edition = "2021"
+# Two binaries live here: the Tauri app (`src/main.rs`) and `rotli-helper`
+# (`src/bin/rotli_helper.rs`), the standalone loopback bridge Rotli Web pairs
+# with. The file is snake_case because `check:structure` holds that law for
+# `src-tauri/src`; the explicit target keeps the user-facing command hyphenated.
+default-run = "rotli"
+
+[[bin]]
+name = "rotli-helper"
+path = "src/bin/rotli_helper.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -39,18 +48,32 @@ sha2 = "0.10"                                                    # Welcome re-se
 tempfile = "3"                                                   # atomic writes: tmp in the same dir + rename
 trash = "5"                                                     # delete = OS trash, never a hard rm
 uuid = { version = "1", features = ["v4"] }                     # mx_<uuid> ids for a rotli-initiated memex
-security-framework = "3"                                        # Keychain-backed user secrets — never argv/ps/config
 # Full-text search index (adapter: src/search_index.rs). DERIVED + gitignored +
 # rebuildable — never a database (the .md files stay durable truth). Large dep;
 # binary-size impact measured in the PR. NOT on check:structure's denied-DB list.
 tantivy = "0.26.1"
 tauri-plugin-clipboard-manager = "2"
 
-# macOS-only: swap the Dock/app icon at runtime (Settings → Appearance → App icon)
+# macOS-only crates: the Keychain and the AppKit bindings behind the runtime
+# Dock/app icon swap (Settings → Appearance → App icon).
+# rotli-helper refuses to reuse a pairing-token file owned by another account;
+# getuid is the one thing std has no portable reader for. Already in the tree
+# transitively — this only names the edge.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [target.'cfg(target_os = "macos")'.dependencies]
+# Keychain-backed user secrets — never argv/ps/config. keychain.rs carries the
+# not(macos) stub, so the crate itself must not be asked for on Linux/Windows.
+security-framework = "3"
 objc2 = "0.6"
-objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSImage", "NSPasteboard", "NSPasteboardItem", "NSResponder"] }
-objc2-foundation = { version = "0.3", features = ["NSArray", "NSData", "NSError", "NSString", "NSURL"] }
+# NSFilePromiseReceiver + NSBitmapImageRep serve the screenshot-thumbnail drop
+# (native_drag_promise.rs): the macOS ⌘⇧4/⌘⇧5 preview hands a FILE PROMISE and
+# raw image bytes, never a path, so the promise reader block (block2) and the
+# TIFF→PNG re-encode are what turn that drag into a file Rotli can import.
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSBitmapImageRep", "NSFilePromiseReceiver", "NSImage", "NSImageRep", "NSPasteboard", "NSPasteboardItem", "NSResponder", "NSWindow", "block2"] }
+objc2-foundation = { version = "0.3", features = ["NSArray", "NSData", "NSDictionary", "NSError", "NSOperation", "NSString", "NSURL"] }
+block2 = "0.6"                                                   # the promised-file reader block (already transitive; named here because we write one)
 
 # Size diet (2026-07-31): the release binary embeds the whole frontend dist, and
 # without a profile the code portion shipped 16 codegen units, no LTO, and 51k

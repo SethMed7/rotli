@@ -83,3 +83,13 @@ describe("list geometry", () => {
     }
   });
 });
+
+test("an ordered marker of two or more digits hangs in the wide column", async () => {
+  const { MARKER_EM, WIDE_MARKER_EM, isWideMarker, numberMarkerEm } = await import("./listGeometry");
+  expect(isWideMarker("1.")).toBe(false);
+  expect(isWideMarker("9)")).toBe(false);
+  expect(isWideMarker("10.")).toBe(true);
+  expect(isWideMarker("iii.")).toBe(true);
+  expect(numberMarkerEm("3.")).toBe(MARKER_EM);
+  expect(numberMarkerEm("12.")).toBe(WIDE_MARKER_EM);
+});

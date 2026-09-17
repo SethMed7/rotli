@@ -55,6 +55,34 @@
   height: 28px;
   flex: 0 0 auto;
 }
+/* Rotli Web (html[data-platform="web"]): the bar is an app toolbar inside a
+   browser tab. The brand takes the traffic lights' place and links back to
+   the site; nothing here is window chrome, so no drag cursor, no inset. */
+.tb-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  margin-left: -6px;
+  border-radius: var(--r-control);
+  color: var(--text);
+  text-decoration: none;
+  flex: 0 0 auto;
+}
+.tb-brand:hover {
+  background: var(--hov);
+}
+.tb-brand-word {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+[data-platform="web"] .titlebar {
+  user-select: none;
+  cursor: default;
+}
 .identity-wrap {
   position: relative;
   flex: 0 0 auto;

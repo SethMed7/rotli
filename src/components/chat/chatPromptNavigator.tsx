@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useReducer, useRef } from "react";
+import { type CSSProperties, useEffect, useLayoutEffect, useReducer, useRef } from "react";
 
 import { useUiStore } from "../../state/ui";
 import {
@@ -6,6 +6,7 @@ import {
   promptNavigatorTransition,
   promptPreview,
   promptStateClassName,
+  promptWindow,
   type PromptLocation,
 } from "./chatPromptNavigatorModel";
 
@@ -158,28 +159,28 @@ export function ChatPromptNavigator({
       {open && (
         <div className="chat-prompt-menu" ref={menuRef} aria-label="Jump to prompt">
           <div className="chat-prompt-list">
-            {prompts.map((prompt) => (
-              <button
-                type="button"
-                key={prompt.messageIndex}
-                className={promptStateClassName(
-                  prompt.messageIndex,
-                  activeMessageIndexes,
-                  previewMessageIndex,
-                )}
-                aria-current={prompt.messageIndex === activeMessageIndexes.at(-1) ? "location" : undefined}
-                onPointerEnter={() => previewPrompt(prompt.messageIndex)}
-                onPointerLeave={() => dispatch({ type: "clear-preview" })}
-                onFocus={() => previewPrompt(prompt.messageIndex)}
-                onBlur={() => dispatch({ type: "clear-preview" })}
-                onClick={() => {
-                  onJump(prompt.messageIndex);
-                  closeMenu();
-                }}
-              >
-                {promptPreview(prompt.text)}
-              </button>
-            ))}
+            {/* a stack of cards around the focal prompt — the marker under the
+                pointer, else the prompt on screen — fading with distance; a
+                card is hovered, never re-centred under the pointer */}
+            {promptWindow(prompts, previewMessageIndex ?? activeMessageIndexes.at(-1) ?? null).map(
+              ({ prompt, distance }) => (
+                <button
+                  type="button"
+                  key={prompt.messageIndex}
+                  className={`chat-prompt-card${distance === 0 ? " focal" : ""} ${
+                    promptStateClassName(prompt.messageIndex, activeMessageIndexes, previewMessageIndex) ?? ""
+                  }`.trimEnd()}
+                  style={{ "--d": distance } as CSSProperties}
+                  aria-current={prompt.messageIndex === activeMessageIndexes.at(-1) ? "location" : undefined}
+                  onClick={() => {
+                    onJump(prompt.messageIndex);
+                    closeMenu();
+                  }}
+                >
+                  {promptPreview(prompt.text, 96)}
+                </button>
+              ),
+            )}
           </div>
         </div>
       )}

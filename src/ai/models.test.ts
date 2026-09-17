@@ -164,9 +164,7 @@ describe("connected catalog policy", () => {
       "gemini-3.7-flash-medium",
       "gemini-3.7-flash-low",
     ]);
-    expect(CLI_CATALOG.antigravity.every((model) => model.vision === false && model.api === "cli")).toBe(
-      true,
-    );
+    expect(CLI_CATALOG.antigravity.every((model) => model.vision === true && model.api === "cli")).toBe(true);
     expect(CLI_CATALOG.claude.length).toBeGreaterThan(0);
     expect(CLI_CATALOG.codex.length).toBeGreaterThan(0);
     expect(CLI_CATALOG.cursor).toContainEqual(
@@ -275,7 +273,7 @@ describe("the frontier/local split (budget + adapter)", () => {
 });
 
 describe("connected-lane vision", () => {
-  test("no connected lane exposes a vision model except Claude and Codex", () => {
+  test("the vision lanes are Claude, Codex, and Antigravity (ACP image blocks, 2026-09-17); Cursor is not", () => {
     const groups = mergedModels([], { claude: true, codex: true, cursor: true, antigravity: true }, [], [], {
       claude: true,
       codex: true,
@@ -285,6 +283,8 @@ describe("connected-lane vision", () => {
     const visionIds = flattenModels(groups)
       .filter((m) => m.vision)
       .map((m) => m.id);
-    expect(visionIds).toEqual([...CLI_CATALOG.claude, ...CLI_CATALOG.codex].map((model) => model.id));
+    expect(visionIds).toEqual(
+      [...CLI_CATALOG.claude, ...CLI_CATALOG.codex, ...CLI_CATALOG.antigravity].map((model) => model.id),
+    );
   });
 });

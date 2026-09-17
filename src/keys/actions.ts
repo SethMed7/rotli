@@ -32,6 +32,7 @@ import { archiveNoteWithImages, trashNoteWithImages } from "../services/noteLife
 import { notesService } from "../services/notes";
 import { trashSystemSelection } from "../services/systemTrash";
 import { reconnectActiveVault } from "../state/activeVault";
+import { chatRuntimeEnabled } from "../state/helperLink";
 import { navigate } from "../state/navHistory";
 import { DEFAULT_NOTE_STYLE, useNoteStyleStore } from "../state/noteStyle";
 import { activeTabOf, findLeaf, leaves, openNavTarget, usePanesStore } from "../state/panes";
@@ -39,8 +40,10 @@ import { cycleQuick, removeQuickNote } from "../state/quick";
 import { toggleSettings } from "../state/settingsToggle";
 import { startTour } from "../state/tour";
 import { SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
+import { registerCaptureActions } from "./captureActions";
 import { EDITOR_ACTION } from "./editorActionIds";
 import { captureHandle, quickHandle, setupHandle } from "./handles";
+import { registerNavArrowActions } from "./navArrows";
 import { registerAction } from "./registry";
 import { runSurfaceFind } from "./surfaceFind";
 
@@ -215,10 +218,8 @@ export function registerDefaultActions(): void {
   });
 
   // — the command layer —
-  // Back / Forward over opened notes (the maintainer #14 — the recorder ran since 0.24.x;
-  // this is the player: the titlebar ‹ › buttons + the browser chords). The
-  // Meta+Bracket chords are FREE on the main surface (quick.next/prev own them
-  // only inside the Quick window — chords scope per surface).
+  // Back / Forward over opened notes (the maintainer #14): the titlebar ‹ › buttons + the
+  // browser chords. Meta+Bracket is FREE on the main surface (quick.* owns it only in Quick).
   registerAction({
     id: "nav.back",
     title: "Back — previous note",
@@ -242,6 +243,7 @@ export function registerDefaultActions(): void {
       navigate(1, openNavTarget);
     },
   });
+  registerNavArrowActions();
   registerAction({
     id: "palette.toggle",
     title: "Search notes & actions",
@@ -251,6 +253,7 @@ export function registerDefaultActions(): void {
       ui.setPaletteOpen(!ui.paletteOpen);
     },
   });
+  registerCaptureActions();
   registerAction({
     id: "view.focus",
     title: "Focus mode",
@@ -722,6 +725,7 @@ export function registerDefaultActions(): void {
   // off ⌃⌘2 so the two fronts could own ⌃⌘1/⌃⌘2 — bindings persist by action
   // id, so an existing override is untouched). Both reach ⌘K and are rebindable.
   registerAction({
+    enabled: chatRuntimeEnabled,
     id: "chat.new",
     title: "New chat",
     defaultChord: "Meta+Ctrl+Shift+2",
@@ -736,6 +740,7 @@ export function registerDefaultActions(): void {
     },
   });
   registerAction({
+    enabled: chatRuntimeEnabled,
     id: "chat.summon",
     title: "Summon chat",
     defaultChord: "Alt+A", // "ask" — the ⌥-letter global family (⌥Space/⌥C/⌥Q)
@@ -780,18 +785,21 @@ export function registerDefaultActions(): void {
       );
   };
   registerAction({
+    enabled: chatRuntimeEnabled,
     id: "note.chat",
     title: "Chat with this note",
     defaultChord: "Meta+Shift+C",
     run: () => runNoteChat(false),
   });
   registerAction({
+    enabled: chatRuntimeEnabled,
     id: "note.chatNew",
     title: "New chat about this note",
     defaultChord: null,
     run: () => runNoteChat(true),
   });
   registerAction({
+    enabled: chatRuntimeEnabled,
     id: "chat.all",
     title: "All chats",
     defaultChord: null,

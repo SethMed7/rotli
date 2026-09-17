@@ -2624,7 +2624,8 @@ pub(crate) const CHAT_IMAGE_ASSET_EXTS: &[&str] = &[
     "png", "jpg", "jpeg", "gif", "webp", "heic", "heif", "avif", "bmp", "tiff", "tif",
 ];
 
-fn image_payload_matches_extension(ext: &str, bytes: &[u8]) -> bool {
+/// Shared with acp_images.rs, which names the mime from the same magic numbers.
+pub(crate) fn image_payload_matches_extension(ext: &str, bytes: &[u8]) -> bool {
     match ext {
         "png" => bytes.starts_with(b"\x89PNG\r\n\x1a\n"),
         "jpg" | "jpeg" => bytes.starts_with(b"\xff\xd8\xff"),

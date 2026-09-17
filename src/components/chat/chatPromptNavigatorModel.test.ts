@@ -6,6 +6,7 @@ import {
   promptMenuOffset,
   promptNavigatorTransition,
   promptPreview,
+  promptWindow,
   promptStateClassName,
 } from "./chatPromptNavigatorModel";
 
@@ -117,5 +118,26 @@ describe("prompt state classes", () => {
     expect(promptStateClassName(4, [4, 8], null)).toBe("active");
     expect(promptStateClassName(8, [4, 8], 8)).toBe("active preview");
     expect(promptStateClassName(0, [4, 8], null)).toBeUndefined();
+  });
+});
+
+describe("promptWindow", () => {
+  const prompts = Array.from({ length: 12 }, (_, i) => ({ messageIndex: i * 2, text: `p${i}` }));
+  test("the focal card sits mid-stack with up to three neighbours each way, distances counted from it", () => {
+    const cards = promptWindow(prompts, 10);
+    expect(cards.map((c) => c.prompt.messageIndex)).toEqual([4, 6, 8, 10, 12, 14, 16]);
+    expect(cards.map((c) => c.distance)).toEqual([3, 2, 1, 0, 1, 2, 3]);
+  });
+  test("at either end the stack is shorter, never padded", () => {
+    expect(promptWindow(prompts, 0).map((c) => c.prompt.messageIndex)).toEqual([0, 2, 4, 6]);
+    expect(promptWindow(prompts, 22).map((c) => c.distance)).toEqual([3, 2, 1, 0]);
+  });
+  test("no focal prompt (nothing on screen, nothing hovered) means the last prompt", () => {
+    expect(promptWindow(prompts, null).at(-1)).toEqual({
+      prompt: { messageIndex: 22, text: "p11" },
+      distance: 0,
+    });
+    expect(promptWindow(prompts, 999).at(-1)?.distance).toBe(0);
+    expect(promptWindow([], null)).toEqual([]);
   });
 });

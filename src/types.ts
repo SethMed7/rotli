@@ -42,6 +42,10 @@ export interface NoteSummary {
    * "file" (any other file — image/pdf/…, surfaced read-only, opened in the OS
    * default app). Optional/defaulted for back-compat with the in-memory seed. */
   kind?: "note" | "board" | "file";
+  /** `secure: true` in the file's frontmatter (auto-flagged or by hand): never
+   * shown to a remote model. Set by adapters that read the file themselves
+   * (folder mode, the in-memory twin); the Rust adapter enforces it in Rust. */
+  secure?: boolean;
 }
 
 export interface Note extends NoteSummary {

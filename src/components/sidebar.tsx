@@ -13,6 +13,7 @@ import { type MouseEvent, useEffect, useRef, useState } from "react";
 // for anything else.
 
 import { dispatch } from "../keys/registry";
+import { isWebVault } from "../lib/browserVault";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { useTransientPopover } from "../lib/popover";
 import { corpusInspectFolder, corpusRefreshVault } from "../lib/tauri";
@@ -32,11 +33,14 @@ import { useContextMenu } from "../state/contextMenu";
 import { useFocusedTab } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { requestVaultFolder } from "../state/vaultFolderBrowser";
+import { useWebVaultConnect } from "../state/webVaultConnect";
 import { BreveSidebar } from "./breve/breveSidebar";
 import { ChevronRight, MoreGlyph, NewFileGlyph, NewFolderGlyph, RefreshGlyph, VaultGlyph } from "./glyphs";
+import { FolderReconnectBar } from "./sidebar/folderReconnectBar";
 import { SidebarChat } from "./sidebar/sidebarChat";
 import { SidebarFooter } from "./sidebar/sidebarFooter";
 import { SidebarHome } from "./sidebar/sidebarHome";
+import { isSidebarSurface, sidebarPlacementMenu } from "./sidebar/sidebarPlacementMenu";
 import { SidebarSwitcher, sidebarFrontBody, sidebarFrontSelection } from "./sidebar/sidebarSwitcher";
 import { useActiveTree } from "./sidebar/useActiveTree";
 import { useChatFolders } from "./sidebar/useChatFolders";
@@ -100,6 +104,11 @@ export function Sidebar() {
     setRowActionError(`Couldn’t ${verb} — ${err instanceof Error ? err.message : String(err)}`);
 
   const connectVault = async () => {
+    if (isWebVault()) {
+      // Rotli Web: say what is about to happen, then the browser's own picker
+      useWebVaultConnect.getState().show();
+      return;
+    }
     const path = await requestVaultFolder({
       title: "Connect vault",
       description: "Choose an existing Rotli vault, or choose an empty folder to create one.",
@@ -206,7 +215,12 @@ export function Sidebar() {
       // suppress the WKWebView's default right-click menu ("Reload", …) inside the
       // sidebar; rotli's own row menus (board rename) handle contextmenu instead.
       // The editor keeps its native menu (spell-check / copy) — this is scoped here.
-      onContextMenu={(event) => event.preventDefault()}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        // the sidebar's own surface offers its placement (2026-09-17)
+        if (isSidebarSurface(event.target))
+          openContextMenu(event.clientX, event.clientY, sidebarPlacementMenu());
+      }}
     >
       {/* ONE header row: the active vault never disappears. Breve routines and
           notifications are owned by that vault, so hiding the switcher made
@@ -286,6 +300,20 @@ export function Sidebar() {
               })}
             </div>
             {vaultItems.length > 0 && <div className="vault-menu-separator" role="separator" />}
+            {isWebVault() && (
+              <button
+                type="button"
+                className="vault-menu-connect"
+                role="menuitem"
+                onClick={() => {
+                  setVaultMenuPosition(null);
+                  useWebVaultConnect.getState().show();
+                }}
+              >
+                <NewFolderGlyph size={15} />
+                <span>Reconnect vault</span>
+              </button>
+            )}
             <button
               type="button"
               className="vault-menu-connect"
@@ -361,6 +389,9 @@ export function Sidebar() {
         </button>
       </div>
 
+      {/* Rotli Web: the connected folder is waiting on the browser's permission
+          — say so where it cannot be missed, above every front (2026-09-17) */}
+      <FolderReconnectBar />
       {/* the FRONT switcher (the maintainer, 2026-08-01) — directly under the vault
           header, above everything the front renders. Breve is a MODE with its
           own rail below, but it sits in the same control (2026-09-02) so the

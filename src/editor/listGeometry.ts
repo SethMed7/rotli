@@ -20,6 +20,20 @@ export const STEP_EM = 1.5;
  * text. Mirrors `.rotli-marker { width }`. */
 export const MARKER_EM = 1.15;
 
+/** An ordered marker of two or more digits ("10.", "iii.") overflows the glyph
+ * column; it hangs in this wider one instead. Mirrors `.rotli-marker.num.wide`. */
+export const WIDE_MARKER_EM = 1.6;
+
+/** True when an ordered-list marker needs the wide column. */
+export function isWideMarker(marker: string): boolean {
+  return marker.replace(/[.)]$/, "").length >= 2;
+}
+
+/** The hanging column for an ordered marker. */
+export function numberMarkerEm(marker: string): number {
+  return isWideMarker(marker) ? WIDE_MARKER_EM : MARKER_EM;
+}
+
 /** A checkbox needs a wider column than a glyph — `.rotli-check` is a 1.1em box
  * with a 0.5em gap, so a task hangs by that instead and its wrapped lines still
  * land under its text. */

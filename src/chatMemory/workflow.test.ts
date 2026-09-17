@@ -17,12 +17,12 @@ describe("syncChatMemory", () => {
       chatSlug: "chat",
       turns: [{ speaker: "you", text: "remember this" }],
     });
-    expect(note.body).toContain("remember this");
-    expect(note.body).toContain(CHAT_NOTES_HEADING);
+    expect(note?.body).toContain("remember this");
+    expect(note?.body).toContain(CHAT_NOTES_HEADING);
     expect(calls).toEqual(["create", "attach"]);
   });
 
-  test("an ATTACHED chat keeps its note even when the note can't be resolved", async () => {
+  test("an ATTACHED chat whose note can't be resolved gets NO new note", async () => {
     const calls: string[] = [];
     const repository: ChatMemoryRepository = {
       findByStem: async () => null, // the attached note is out of this listing's reach
@@ -30,15 +30,18 @@ describe("syncChatMemory", () => {
       update: async () => void calls.push("update"),
       attach: async () => void calls.push("attach"),
     };
-    await syncChatMemory(repository, {
+    const note = await syncChatMemory(repository, {
       title: "Chat",
       chatSlug: "chat",
       attachedStem: "the-note-this-chat-was-opened-from",
       turns: [{ speaker: "you", text: "a turn" }],
     });
-    // never "attach" — re-pointing would orphan the chat from its note, and the
-    // editor's chat chip lists a note's chats by exactly that pointer
-    expect(calls).toEqual(["create"]);
+    // neither "create" (a fresh note beside the pointer every turn — the
+    // 2026-09-17 duplicate factory) nor "attach" (re-pointing would orphan the
+    // chat from its note; the editor's chat chip lists a note's chats by
+    // exactly that pointer): the pointer stays and the turn writes nothing
+    expect(calls).toEqual([]);
+    expect(note).toBeNull();
   });
 
   test("updates an existing note idempotently", async () => {
@@ -82,9 +85,9 @@ describe("syncChatMemory", () => {
         return "```markdown\n## Decisions\n- ship it\n```";
       },
     });
-    expect(note.body).toContain("### Decisions");
-    expect(note.body).toContain("- ship it");
-    expect(note.body).not.toContain("```");
+    expect(note?.body).toContain("### Decisions");
+    expect(note?.body).toContain("- ship it");
+    expect(note?.body).not.toContain("```");
   });
 
   test("a failed or empty model call keeps existing notes instead of wiping them", async () => {

@@ -11,8 +11,11 @@ import { longDateLabel } from "../lib/dateLabels";
 import { extOf, fileName } from "../lib/fileKind";
 import { useTransientPopover } from "../lib/popover";
 import { corpusFileText, fileAssetUrl, isTauri } from "../lib/tauri";
+import { activeInstance } from "../memex/config";
+import { loadConfig, readChat } from "../memex/service";
+import { useChatTranscripts } from "../services/hooks";
 import { notesService } from "../services/notes";
-import { kindLabel } from "../services/systemBrowser";
+import { chatSlugOf, isChatItem, kindLabel } from "../services/systemBrowser";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { kindOf } from "./fileSurface";
@@ -25,6 +28,12 @@ export function PreviewModal() {
   const item = useUiStore((s) => s.previewItem);
   const setPreviewItem = useUiStore((s) => s.setPreviewItem);
   const openSummary = usePanesStore((s) => s.openSummary);
+  const openChat = usePanesStore((s) => s.openChat);
+  // a chat's Open goes to its FILE — the transcript as a Markdown note in the
+  // editor (the owner, 2026-09-17: "when I click open I am opening the md file
+  // not the chat"). A sidebar peek only knows the slug; the corpus listing
+  // names the note behind it. The chat itself stays one click away in Chat.
+  const transcripts = useChatTranscripts();
   const cardRef = useRef<HTMLDivElement>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [text, setText] = useState<string | null>(null);
@@ -76,6 +85,19 @@ export function PreviewModal() {
             .catch(fail);
         }
       }
+    } else if (isChatItem(item)) {
+      // a chat's transcript file, as written: the whole file through the
+      // vault's chat read when a vault is open (frontmatter included), else
+      // the note read (the browser twin's demo corpus has no vault)
+      void loadConfig()
+        .then((config) => {
+          const instance = activeInstance(config);
+          return instance ? readChat(instance, chatSlugOf(item)) : null;
+        })
+        .catch(() => null)
+        .then((source) => source ?? notesService.getNote(item.id).then((n) => n?.body ?? null))
+        .then((source) => live && (source !== null ? setText(source) : setFailed(true)))
+        .catch(fail);
     } else if (item.kind !== "board") {
       void notesService
         .getNote(item.id)
@@ -92,12 +114,23 @@ export function PreviewModal() {
   const meta = `${kindLabel(item)} · ${longDateLabel(item.updatedAt)}`;
   const open = () => {
     close();
-    openSummary(item);
+    if (!isChatItem(item)) return openSummary(item);
+    const slug = chatSlugOf(item);
+    const note = item.id.startsWith("chats/") ? transcripts.find((n) => chatSlugOf(n) === slug) : item;
+    if (note) openSummary(note);
+    else openChat(slug);
   };
 
   let body: ReactNode;
   if (item.kind === "board") {
     body = <MetaCard item={item} note="Boards preview as their live canvas — open to view." />;
+  } else if (isChatItem(item)) {
+    body =
+      text !== null ? (
+        <pre className="pv-text">{text}</pre>
+      ) : (
+        <p className="pv-wait">{failed ? "Couldn’t read the chat." : "Loading…"}</p>
+      );
   } else if (!isFile) {
     body =
       text !== null ? (

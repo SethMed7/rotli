@@ -14,10 +14,15 @@ import { type DropPoint, isEmbeddablePath } from "./externalImageDrop";
 
 /** What owns a drop outright: dialogs and their backdrops. The tour card is
  * NOT here — the tour is a non-modal overlay the app stays live under. */
-const DROP_BLOCKERS = '[aria-modal="true"], [role="dialog"], .pv-scrim, .pal-focus-scrim';
+const DROP_BLOCKERS = '[aria-modal="true"], [role="dialog"], .pv-scrim, .pal-focus-scrim, .rename-overlay';
 
 interface Closest {
   closest(selector: string): unknown;
+}
+
+/** A blocked drop must stop delivery, including caret and Assets fallbacks. */
+export function dropIsBlocked<E extends Closest>(candidates: readonly DropCandidate<E>[]): boolean {
+  return candidates.some(({ stack }) => stack.some((element) => !!element.closest(DROP_BLOCKERS)));
 }
 
 /** The elements a drop at one point may reach, top-down, ending before the
@@ -114,24 +119,34 @@ export interface DropPlan {
 
 export const UNROUTED_MEDIA_NOTICE = "Saved to Assets — drop onto a note or chat to insert";
 
+/** What a surface says when part of a drop went to Assets instead of into it
+ * (2026-09-16: a PDF dropped on a note or chat used to vanish silently). */
+function storedNotice(store: readonly string[], accepts: string): string | null {
+  if (store.length === 0) return null;
+  const count = store.length === 1 ? "1 file" : `${store.length} files`;
+  return `Saved ${count} to Assets — ${accepts}`;
+}
+
 /** Partition external files for the surface that received them. A chat asks
  * the chat what it accepts (an .svg routed by the editor's wider rule was
  * refused there and never stored); a note embeds; nothing else is silent. */
 export function planDrop(paths: readonly string[], surface: DropSurface): DropPlan {
   if (surface === "chat") {
+    const store = paths.filter((path) => !isChatImagePath(path));
     return {
       attach: paths.filter(isChatImagePath),
       embed: [],
-      store: paths.filter((path) => !isChatImagePath(path)),
-      notice: null,
+      store,
+      notice: storedNotice(store, "a chat attaches images"),
     };
   }
   if (surface === "editor") {
+    const store = paths.filter((path) => !isEmbeddablePath(path));
     return {
       attach: [],
       embed: paths.filter(isEmbeddablePath),
-      store: paths.filter((path) => !isEmbeddablePath(path)),
-      notice: null,
+      store,
+      notice: storedNotice(store, "a note embeds images and video"),
     };
   }
   const media = paths.some(isEmbeddablePath);

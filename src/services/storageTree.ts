@@ -22,12 +22,12 @@ const TYPE_ORDER = ["Audio", "Images", "PDFs", "Documents", "Other"];
 // NOT lib/fileKind's extOf: an extensionless name must yield "" (→ the Other
 // bucket), while the shared helper returns the whole name — a file literally
 // named "png" must not land in Images.
-function extOf(name: string): string {
+export function strictExtOf(name: string): string {
   const i = name.lastIndexOf(".");
   return i < 0 ? "" : name.slice(i + 1).toLowerCase();
 }
 function typeCat(name: string): string {
-  const ext = extOf(name);
+  const ext = strictExtOf(name);
   return TYPE_BUCKETS.find(([, set]) => set.has(ext))?.[0] ?? "Other";
 }
 function dateSegs(name: string, mtimeMs: number): string[] {

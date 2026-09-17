@@ -94,6 +94,56 @@
    pill): two segments in one quiet trough directly under the vault header.
    The trough is the recessed tone, the ACTIVE segment is the raised surface —
    hierarchy by surface contrast, no shadow, no glow (DESIGN.md flat material). — */
+/* Rotli Web: the connected folder needs the browser's permission again —
+   a standing bar above the fronts, not a toast (2026-09-17) */
+.sb-reconnect {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 12px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.sb-copy-age {
+  flex: 0 0 auto;
+  margin: 0 14px 6px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+.sb-copy-reconnect {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent-text);
+  font: inherit;
+  cursor: pointer;
+}
+.sb-copy-reconnect:hover {
+  text-decoration: underline;
+}
+.sb-reconnect-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.sb-reconnect-btn {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
 .sb-switch {
   flex: 0 0 auto;
   display: flex;
@@ -391,6 +441,13 @@
 /* The active drop target while a note is dragged onto a destination/folder row
    uses the same inset accent outline as pane detach. */
 .frow.drop-over {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+/* an image from outside hovering a Main note row (2026-09-17): the row lights
+   the same way, and after a short dwell the note springs open so the drop can
+   land in it (nativeFileDrop.ts stamps data-drop-over) */
+.main-row[data-drop-over] {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
@@ -692,11 +749,7 @@
   margin: 4px 10px 2px;
   padding: 6px 8px;
   border-radius: var(--r-control);
-  background: color-mix(
-    in srgb,
-    var(--danger, var(--accent-text)) 9%,
-    transparent
-  );
+  background: color-mix(in srgb, var(--danger, var(--accent-text)) 9%, transparent);
   font-size: 11.5px;
   line-height: 1.45;
   color: var(--danger, var(--accent-text));
@@ -905,8 +958,7 @@
   background: currentColor;
 }
 .model-logo--openai {
-  -webkit-mask: url("../brand/providers/openai-blossom.svg") center / contain
-    no-repeat;
+  -webkit-mask: url("../brand/providers/openai-blossom.svg") center / contain no-repeat;
   mask: url("../brand/providers/openai-blossom.svg") center / contain no-repeat;
 }
 .model-logo--meta {
@@ -914,8 +966,7 @@
   mask: url("../brand/providers/meta.svg") center / contain no-repeat;
 }
 .model-logo--microsoft {
-  -webkit-mask: url("../brand/providers/microsoft.svg") center / contain
-    no-repeat;
+  -webkit-mask: url("../brand/providers/microsoft.svg") center / contain no-repeat;
   mask: url("../brand/providers/microsoft.svg") center / contain no-repeat;
 }
 .model-logo--mistral {
@@ -1852,19 +1903,11 @@
 }
 .tabscroll-wrap::before {
   left: 0;
-  background: linear-gradient(
-    90deg,
-    var(--ground),
-    color-mix(in srgb, var(--ground), transparent 100%)
-  );
+  background: linear-gradient(90deg, var(--ground), color-mix(in srgb, var(--ground), transparent 100%));
 }
 .tabscroll-wrap::after {
   right: 0;
-  background: linear-gradient(
-    270deg,
-    var(--ground),
-    color-mix(in srgb, var(--ground), transparent 100%)
-  );
+  background: linear-gradient(270deg, var(--ground), color-mix(in srgb, var(--ground), transparent 100%));
 }
 .tabscroll-wrap[data-fade-left="true"]::before {
   opacity: 1;
@@ -2235,6 +2278,58 @@
     transform: translateX(-8px);
   }
 }
+/* the hover hot strip: nothing until the pointer is there (a standing accent
+   sliver was the disliked line of 2026-06-15) */
+.warm-edge .edgehint {
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--motion-ease);
+}
+.warm-edge:hover .edgehint {
+  opacity: 0.5;
+}
+.warm-edge[data-side="left"] {
+  left: 0;
+}
+.warm-edge[data-side="right"] {
+  right: 0;
+}
+.warm-edge[data-side="right"] .edgehint {
+  left: auto;
+  right: 0;
+  border-radius: 3px 0 0 3px;
+}
+/* — the sidebar on the RIGHT (the owner, 2026-09-17): the same rail, mirrored:
+   hairline on its inner edge, the grip on its inner edge, the overlay off the
+   right edge — */
+.threepane[data-sidebar-side="right"] {
+  flex-direction: row-reverse;
+}
+.threepane[data-sidebar-side="right"] .rail-wrap > .sidebar,
+.rail-overlay[data-side="right"] > .sidebar {
+  border-right: none;
+  border-left: 1px solid var(--border);
+}
+.threepane[data-sidebar-side="right"] .railgrip {
+  right: auto;
+  left: -4px;
+}
+.threepane[data-sidebar-side="right"] .railgrip.dragging::before {
+  left: auto;
+  right: 3px;
+}
+.rail-overlay[data-side="right"] {
+  left: auto;
+  right: 0;
+  border-right: none;
+  border-left: 1px solid var(--border);
+  animation-name: rail-in-right;
+}
+@keyframes rail-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+}
 
 /* text "▾" carets retired (slice 5, 2026-07-28) — same stroked chevron family
    as every disclosure, rotated to point down */
@@ -2337,13 +2432,7 @@
   position: absolute;
   inset: 0 16px auto;
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--border) 18%,
-    var(--border) 82%,
-    transparent
-  );
+  background: linear-gradient(90deg, transparent, var(--border) 18%, var(--border) 82%, transparent);
   opacity: 0.72;
 }
 .sb-footbtn {
@@ -2478,4 +2567,15 @@
    italic that says "passing through"; editing or re-clicking un-italicizes */
 .tab.preview > span:not(.tglyph) {
   font-style: italic;
+}
+
+/* Rotli Web: a front whose feature lives in the Mac app stays in the
+   switcher, quieter, and reads as a link to the download on hover */
+.sb-switch-seg.desktop-only {
+  opacity: 0.55;
+  text-decoration: none;
+  cursor: default;
+}
+.sb-switch-seg.desktop-only:hover {
+  opacity: 0.8;
 }

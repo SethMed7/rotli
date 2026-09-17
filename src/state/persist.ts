@@ -48,10 +48,10 @@ import { onQuitFlush } from "../lib/quitFlush";
 import {
   appSettingsRead,
   appSettingsWrite,
-  corpusStatus,
   corpusSettingsRead,
   corpusSettingsWrite,
-  isTauri,
+  corpusStatus,
+  hasDurableCorpus,
   organizerSetTrust,
   setDockVisible,
   setGlobalShortcut,
@@ -66,6 +66,8 @@ import { isRetentionEligible, parseRetentionDays } from "../services/retentionPo
 import type { PaneNode, Tab } from "../types";
 import { DEFAULT_VOICE, VOICES } from "../voice/speech";
 import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
+import { APP_SETTINGS_KEYS } from "./appSettingsKeys";
+import { helperLinked } from "./helperLink";
 import { hydrateMain, useMainStore } from "./main";
 import { MRU_CAP, touchItemActivity, touchMru, useMruStore } from "./mru";
 import {
@@ -86,6 +88,10 @@ import {
   type BreveView,
   CHAT_ARTIFACT_OPENS,
   CHAT_NAVIGATOR_STYLES,
+  SIDEBAR_REVEALS,
+  SIDEBAR_SIDES,
+  type SidebarReveal,
+  type SidebarSide,
   CHAT_NAMINGS,
   CHAT_WELCOME_STYLES,
   type ChatArtifactOpen,
@@ -234,6 +240,8 @@ interface PersistedSettings {
   quokkaAccessoryHue: number;
   quokkaIdlePose: QuokkaIdlePose;
   chatNavigatorStyle: ChatNavigatorStyle;
+  sidebarSide: SidebarSide;
+  sidebarReveal: SidebarReveal;
   stayOpen: boolean;
   showInDock: boolean;
   /** What the generic New tab command creates. Markdown remains the safe default. */
@@ -384,46 +392,6 @@ let settingsPassthrough: Record<string, unknown> = {};
 let appSettingsPassthrough: Record<string, unknown> = {};
 let appSettingsNeedsWrite = false;
 
-const APP_SETTINGS_KEYS = new Set([
-  "v",
-  "theme",
-  "themeFamily",
-  // Retired independent System pair. System now follows the OS within the one
-  // selected theme family.
-  "matchLightFamily",
-  "matchDarkFamily",
-  "syntaxPalette",
-  "accentColor",
-  "accentHue",
-  "quokkaCompanionEnabled",
-  "quokkaStyle",
-  "quokkaCustomHue",
-  "quokkaLineColor",
-  // Retired native color-well key: recognized so it migrates once and is not
-  // preserved forever as an unknown setting.
-  "quokkaCustomColor",
-  "quokkaAccessory",
-  "quokkaAccessoryHue",
-  "quokkaIdlePose",
-  "chatNavigatorStyle",
-  "stayOpen",
-  "showInDock",
-  "tabLayout",
-  "privateBrowserSearchEngine",
-  "remoteAgentRelayUrl",
-  "paneVaultMode",
-  "userName",
-  "timeFormat",
-  "chatWelcomeStyle",
-  "chatNaming",
-  "hotkeyPeek",
-  "appIcon",
-  "onboarded",
-  "onboardingVersion",
-  "onboardingPhase",
-  "bindings",
-]);
-
 export function unknownAppSettingsKeys(raw: string): Record<string, unknown> {
   try {
     return Object.fromEntries(
@@ -546,6 +514,8 @@ export function parseSettings(raw: string): PersistedSettings {
     quokkaAccessoryHue: normalizeQuokkaAccessoryHue(data.quokkaAccessoryHue),
     quokkaIdlePose: asEnum(data.quokkaIdlePose, QUOKKA_IDLE_POSES, "rest"),
     chatNavigatorStyle: asEnum(data.chatNavigatorStyle, CHAT_NAVIGATOR_STYLES, "paws"),
+    sidebarSide: asEnum(data.sidebarSide, SIDEBAR_SIDES, "left"),
+    sidebarReveal: asEnum(data.sidebarReveal, SIDEBAR_REVEALS, "pinned"),
     stayOpen: asBool(data.stayOpen, false),
     showInDock: asBool(data.showInDock, false),
     newTabDefault: newTabDefaultFrom(data.newTabDefault, LAUNCH_FEATURES),
@@ -701,7 +671,9 @@ export function parseSettings(raw: string): PersistedSettings {
     sidebarZoom: clampSidebarZoom(typeof data.sidebarZoom === "number" ? data.sidebarZoom : 1),
     sidebarMode: LAUNCH_FEATURES.breve && data.sidebarMode === "breve" ? "breve" : "notes",
     // Home is the safe default front — a fresh (or unknown) value opens on notes
-    sidebarView: data.sidebarView === "chat" ? "chat" : "home",
+    // the Chat front stays when something can chat: the desktop, or Rotli Web
+    // paired with Rotli Helper (hydrated before this runs)
+    sidebarView: data.sidebarView === "chat" && (LAUNCH_FEATURES.chat || helperLinked()) ? "chat" : "home",
     breveView:
       data.breveView === "dashboard" ||
       data.breveView === "briefs" ||
@@ -763,6 +735,8 @@ function applySettings(s: PersistedSettings): void {
     quokkaAccessoryHue: s.quokkaAccessoryHue,
     quokkaIdlePose: s.quokkaIdlePose,
     chatNavigatorStyle: s.chatNavigatorStyle,
+    sidebarSide: s.sidebarSide,
+    sidebarReveal: s.sidebarReveal,
     stayOpen: s.stayOpen,
     showInDock: s.showInDock,
     newTabDefault: s.newTabDefault,
@@ -849,6 +823,8 @@ function applyAppSettings(s: PersistedSettings): void {
     quokkaAccessoryHue: s.quokkaAccessoryHue,
     quokkaIdlePose: s.quokkaIdlePose,
     chatNavigatorStyle: s.chatNavigatorStyle,
+    sidebarSide: s.sidebarSide,
+    sidebarReveal: s.sidebarReveal,
     stayOpen: s.stayOpen,
     showInDock: s.showInDock,
     tabLayout: s.tabLayout,
@@ -884,6 +860,8 @@ function withAppSettings(vault: PersistedSettings, app: PersistedSettings): Pers
     quokkaAccessoryHue: app.quokkaAccessoryHue,
     quokkaIdlePose: app.quokkaIdlePose,
     chatNavigatorStyle: app.chatNavigatorStyle,
+    sidebarSide: app.sidebarSide,
+    sidebarReveal: app.sidebarReveal,
     stayOpen: app.stayOpen,
     showInDock: app.showInDock,
     tabLayout: app.tabLayout,
@@ -1154,7 +1132,7 @@ export function runAutoRetentionMaintenance(now = Date.now()): Promise<void> {
 }
 
 async function performAutoRetentionMaintenance(now: number): Promise<void> {
-  if (!mainMapsReady || !isTauri()) return;
+  if (!mainMapsReady || !hasDurableCorpus()) return;
   const ui = useUiStore.getState();
   if (ui.mainAutoRemoveDays === null && ui.chatAutoArchiveDays === null) return;
 
@@ -1323,7 +1301,7 @@ function prePaint(): void {
 /** Load everything durable from `.rotli/` into the stores. Never throws, never
  * blocks on bad data — a deleted or corrupted dot-file just means defaults. */
 export async function hydratePersistedState(): Promise<void> {
-  if (!isTauri()) return; // the browser keeps the in-memory demo, untouched
+  if (!hasDurableCorpus()) return; // the browser twin keeps the in-memory demo, untouched
   let configured = true;
   try {
     configured = await corpusStatus();
@@ -1437,6 +1415,8 @@ function appSettingsSnapshot(): string {
     quokkaAccessoryHue: ui.quokkaAccessoryHue,
     quokkaIdlePose: ui.quokkaIdlePose,
     chatNavigatorStyle: ui.chatNavigatorStyle,
+    sidebarSide: ui.sidebarSide,
+    sidebarReveal: ui.sidebarReveal,
     stayOpen: ui.stayOpen,
     showInDock: ui.showInDock,
     tabLayout: ui.tabLayout,
@@ -1473,6 +1453,8 @@ function settingsSnapshot(): string {
     quokkaAccessoryHue: ui.quokkaAccessoryHue,
     quokkaIdlePose: ui.quokkaIdlePose,
     chatNavigatorStyle: ui.chatNavigatorStyle,
+    sidebarSide: ui.sidebarSide,
+    sidebarReveal: ui.sidebarReveal,
     stayOpen: ui.stayOpen,
     showInDock: ui.showInDock,
     newTabDefault: ui.newTabDefault,
@@ -1560,7 +1542,7 @@ function viewstateSnapshot(): string {
 /** Durably write the current settings snapshot RIGHT NOW (awaitable) — used
  * before a deliberate relaunch so flags like `onboarded` survive the restart. */
 export async function flushSettingsNow(): Promise<void> {
-  if (!isTauri()) return;
+  if (!hasDurableCorpus()) return;
   const writes: Array<Promise<void>> = [appSettingsWrite(appSettingsSnapshot())];
   if (useVaultStore.getState().status === "configured") {
     writes.push(corpusSettingsWrite("settings", settingsSnapshot()));
@@ -1610,7 +1592,7 @@ export function createPersistDrain(
  * window hides (visibilitychange) or unloads (pagehide). Call once, after
  * hydration, in the main window — no-op anywhere else. */
 export function attachPersistence(): () => void {
-  if (!isTauri() || !isMainSurface()) return () => {};
+  if (!hasDurableCorpus() || !isMainSurface()) return () => {};
 
   const configured = useVaultStore.getState().status === "configured";
 

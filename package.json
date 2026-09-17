@@ -1,21 +1,24 @@
 {
   "name": "rotli",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "packageManager": "bun@1.4.0",
   "overrides": {
     "@codemirror/lang-html": "6.4.12",
     "@codemirror/state": "6.7.1",
     "@codemirror/view": "6.43.8",
     "@tauri-apps/api": "2.11.1",
-    "mermaid": "11.16.1"
+    "mermaid": "11.16.1",
+    "sharp": "0.35.4"
   },
   "type": "module",
   "scripts": {
     "deps": "bun scripts/dependency-workflow.mjs",
     "dev": "vite",
     "dev:app": "bun --no-orphans scripts/tauri-dev-supervisor.ts",
+    "dev:web": "ROTLI_WEB_BASE=/app/ ROTLI_PLATFORM=web vite --port 1437 --strictPort",
     "build": "bun scripts/build-character-fills.mjs && bun scripts/sync-excalidraw-fonts.mjs && bun run check:breve-runtime && tsc && vite build",
+    "build:web": "bun scripts/build-character-fills.mjs && bun scripts/sync-excalidraw-fonts.mjs && tsc && ROTLI_WEB_BASE=/app/ ROTLI_PLATFORM=web vite build",
     "preview": "vite preview",
     "capture:site": "bun scripts/capture-site.mjs",
     "tauri": "tauri",
@@ -28,6 +31,7 @@
     "test:evals": "bun test src/ai/hybrid.test.ts src/ai/loop.test.ts src/ai/models.test.ts src/ai/prompt.test.ts src/chatMemory/retrieval.test.ts src/chatMemory/workflow.test.ts",
     "test:e2e": "env -u NO_COLOR playwright test",
     "test:e2e:ui": "env -u NO_COLOR playwright test --ui",
+    "test:e2e:web": "env -u NO_COLOR playwright test --config playwright.web.config.ts",
     "check:e2e-types": "tsc --noEmit -p tsconfig.e2e.json",
     "test:tooling": "bun test scripts/*.test.ts",
     "test:relay": "bun test services/rotli-mcp-relay/server.test.ts",
@@ -125,7 +129,7 @@
     "oxfmt": "^0.62.0",
     "oxlint": "^1.78.0",
     "oxlint-tsgolint": "^7.0.2001",
-    "sharp": "0.34.5",
+    "sharp": "0.35.4",
     "typescript": "~7.0.2",
     "typescript6": "npm:typescript@~6.0.3",
     "vite": "^8.2.1"

@@ -20,13 +20,22 @@ mod clipboard_assets;
 mod compute;
 mod containment;
 mod corpus;
+mod deep_link;
 mod document_conversion;
 mod feature_policy;
 mod fsutil;
+/// The `rotli-helper` loopback bridge (a second binary, not the app).
+pub mod helper;
+mod helper_args;
+mod helper_token;
 mod keychain;
+mod loopback_http;
 mod localmodel;
 mod memex;
-mod memex_query; mod native_drag; mod pasteboard; mod remote_agent_url; mod welcome_lessons;
+mod memex_query; mod native_drag; mod pasteboard; mod remote_agent_url; mod welcome_lessons; mod acp_images;
+/// Pathless drops (screenshot thumbnail, browser images) — AppKit only.
+#[cfg(target_os = "macos")]
+mod native_drag_promise;
 mod organizer;
 mod organizer_knobs;
 #[cfg(test)]
@@ -331,47 +340,17 @@ mod reopen_tests {
     }
 }
 
-/// Validate one `rotli://open?id=…&kind=…` link into `(id, kind)`. Pure so the
-/// refusal law is unit-tested: ids only (ULID or in-corpus relative path —
-/// resolution happens inside the corpus), kind from the open lane's allowlist,
-/// and hostile shapes (absolute paths, traversal, control chars) are None.
-fn parse_deep_link(url: &tauri::Url) -> Option<(String, String)> {
-    if url.scheme() != "rotli" || url.host_str() != Some("open") {
-        return None;
-    }
-    let mut id = String::new();
-    let mut kind = "note".to_string();
-    for (k, v) in url.query_pairs() {
-        match k.as_ref() {
-            "id" => id = v.into_owned(),
-            "kind" => kind = v.into_owned(),
-            _ => {}
-        }
-    }
-    if id.is_empty() || id.len() > 512 {
-        return None;
-    }
-    // `..` only as a FULL path segment — `draft..final.md` is a legal filename
-    // (review F2); backslashes and control chars stay refused outright.
-    if id.starts_with('/')
-        || id.split('/').any(|seg| seg == "..")
-        || id.contains('\\')
-        || id.chars().any(char::is_control)
-    {
-        return None;
-    }
-    if !matches!(kind.as_str(), "note" | "board" | "file") {
-        return None;
-    }
-    Some((id, kind))
-}
-
 /// One accepted deep link → write the one-shot mailbox at the default root,
 /// surface the window, and let the webview consume it (the exact flow of
 /// `rotli open`, minus the redundant `open -a rotli` — we ARE the app).
 fn handle_deep_link(app: &AppHandle, url: &tauri::Url) {
-    let Some((id, kind)) = parse_deep_link(url) else {
-        return;
+    let (id, kind) = match deep_link::parse(url) {
+        Some(deep_link::DeepLink::Open { id, kind }) => (id, kind),
+        Some(deep_link::DeepLink::Reveal { rel, vault }) => {
+            reveal_deep_link(app, &rel, vault.as_deref());
+            return;
+        }
+        None => return,
     };
     let Ok(root) = app.state::<corpus::CorpusState>().default_root_path() else {
         return;
@@ -389,53 +368,21 @@ fn handle_deep_link(app: &AppHandle, url: &tauri::Url) {
     let _ = app.emit_to("main", "rotli:open-request", ());
 }
 
-#[cfg(test)]
-mod deep_link_tests {
-    use super::parse_deep_link;
-
-    fn parse(s: &str) -> Option<(String, String)> {
-        parse_deep_link(&s.parse::<tauri::Url>().unwrap())
+/// `rotli://reveal`: Finder at a vault file, for Rotli Web (2026-09-17). Only
+/// the default vault answers, and only when the link names it (or names none):
+/// the page is connected to ONE folder by name, and a copy of some other vault
+/// must not reveal this one's files. Same guard as "Show in Finder".
+fn reveal_deep_link(app: &AppHandle, rel: &str, vault: Option<&str>) {
+    let state = app.state::<corpus::CorpusState>();
+    if let Some(name) = vault {
+        let Ok(root) = state.default_root_path() else { return };
+        if root.file_name().and_then(|n| n.to_str()) != Some(name) {
+            return;
+        }
     }
-
-    #[test]
-    fn accepts_ulid_and_rel_path_ids_with_kinds() {
-        assert_eq!(
-            parse("rotli://open?id=01J8Z9ABCDEF"),
-            Some(("01J8Z9ABCDEF".into(), "note".into()))
-        );
-        assert_eq!(
-            parse("rotli://open?id=wiki%2Fprojects%2Fplan.md&kind=note"),
-            Some(("wiki/projects/plan.md".into(), "note".into()))
-        );
-        assert_eq!(
-            parse("rotli://open?id=Board%2Fsketch.excalidraw&kind=board"),
-            Some(("Board/sketch.excalidraw".into(), "board".into()))
-        );
-    }
-
-    #[test]
-    fn refuses_hostile_or_malformed_links() {
-        assert_eq!(parse("rotli://open"), None); // no id
-        assert_eq!(parse("rotli://open?id=%2Fetc%2Fpasswd"), None); // absolute
-        assert_eq!(parse("rotli://open?id=..%2F..%2Fsecrets.md"), None); // traversal
-                                                                         // fully percent-encoded traversal decodes BEFORE the checks — pinned
-                                                                         // so the decode-then-validate ordering can never regress
-        assert_eq!(parse("rotli://open?id=%2e%2e%2f%2e%2e%2fsecrets.md"), None);
-        assert_eq!(parse("rotli://open?id=wiki%2F..%2Fsecrets.md"), None); // mid-path segment
-        assert_eq!(parse("rotli://open?id=a&kind=chat"), None); // kind not in the lane
-        assert_eq!(parse("rotli://elsewhere?id=a"), None); // unknown verb
-        assert_eq!(parse("https://open?id=a"), None); // wrong scheme
-    }
-
-    #[test]
-    fn dots_inside_a_filename_are_not_traversal() {
-        // review F2: `..` as a SUBSTRING is legal — only a full `..` segment is
-        assert_eq!(
-            parse("rotli://open?id=wiki%2Fdraft..final.md"),
-            Some(("wiki/draft..final.md".into(), "note".into()))
-        );
-    }
+    let _ = corpus::corpus_reveal_file(state, rel.to_string());
 }
+
 
 /// The OS-registered accelerators, per global registry action (rebindable
 /// from the frontend via the `set_summon_shortcut` command).
@@ -2571,6 +2518,12 @@ pub fn run() {
             memex::memex_pick_folder
         ])
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            if native_drag::debug_drops() {
+                if let Some(main) = app.get_webview_window("main") {
+                    native_drag_promise::dump_drop_targets(&main.as_ref().window());
+                }
+            }
             // The visitor law: never in the dock, never in Cmd-Tab.
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
@@ -2886,6 +2839,13 @@ pub fn run() {
 
             Ok(())
         })
+        // `unstable` makes even the main content a child webview. Its native
+        // drags are WebviewEvent, not WindowEvent (tauri-runtime-wry).
+        .on_webview_event(|webview, event| {
+            if let Some(drag) = native_drag::workspace_drag(webview.label(), event) {
+                native_drag::handle(&webview.window(), drag);
+            }
+        })
         // Click-away hide (the visitor law) — a setting since 2026-06-12:
         // "Stay open" turns it off for the main window. Capture always hides.
         // And closing NEVER destroys (the summon law: summon shows LIVING
@@ -2894,10 +2854,6 @@ pub fn run() {
         // the rest of the process. ⌘W is owned by the frontend registry above.
         .on_window_event(|window, event| {
             match event {
-                WindowEvent::DragDrop(event) => {
-                    native_drag::handle(window, event);
-                    return;
-                }
                 WindowEvent::CloseRequested { api, .. } => {
                     api.prevent_close();
                     let _ = window.hide();

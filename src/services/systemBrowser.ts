@@ -7,6 +7,7 @@
 
 import { noteDiskFolder } from "../lib/noteLocation";
 import type { NoteSummary } from "../types";
+import { isChatsPath } from "./destinations";
 
 export type SystemViewMode = "folders" | "list" | "columns" | "gallery";
 export type SystemSortKey = "name" | "date" | "kind" | "created";
@@ -34,6 +35,7 @@ export function folderSegmentLabel(seg: string): string {
   if (seg === "_secure") return "Secure notes";
   if (seg === "_inbox") return "Captures";
   if (seg === "Storage") return "Assets";
+  if (seg === "chats") return "Chats";
   return seg;
 }
 
@@ -62,6 +64,57 @@ export function filterSystemItems(items: NoteSummary[], query: string): NoteSumm
 }
 
 const byName = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: "base" });
+
+/** Every folder under the root, from the notes' on-disk paths (each ancestor)
+ * plus the seeded real directories, minus the hidden lanes. */
+function allFolders(
+  items: NoteSummary[],
+  seedFolders: readonly string[],
+  pathOf: (n: NoteSummary) => string,
+  hidden: ReadonlySet<string>,
+): string[] {
+  const out = new Set<string>();
+  const add = (path: string) => {
+    const parts = path.split("/").filter(Boolean);
+    for (let depth = 1; depth <= parts.length; depth += 1) {
+      const folder = parts.slice(0, depth).join("/");
+      if (!hidden.has(folder)) out.add(folder);
+    }
+  };
+  for (const n of items) add(pathOf(n));
+  for (const seed of seedFolders) add(seed);
+  return [...out];
+}
+
+/** The Library's search, for folders: every folder anywhere under the root
+ * whose own name contains the query (the owner, 2026-09-16: "engineering"
+ * never came up for "Engineering" — only its notes did). */
+export function filterSystemFolders(
+  items: NoteSummary[],
+  query: string,
+  seedFolders: readonly string[] = [],
+  pathOf: (n: NoteSummary) => string = noteDiskFolder,
+  hidden: ReadonlySet<string> = new Set(),
+): FolderEntry[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  return allFolders(items, seedFolders, pathOf, hidden)
+    .map((path) => ({ path, name: folderSegmentLabel(path.slice(path.lastIndexOf("/") + 1)) }))
+    .filter(({ name }) => name.toLowerCase().includes(q))
+    .sort((a, b) => byName(a.name, b.name))
+    .map(({ path, name }) => {
+      const inside = items.filter((n) => {
+        const p = pathOf(n);
+        return p === path || p.startsWith(`${path}/`);
+      });
+      return {
+        path,
+        name,
+        itemCount: inside.length,
+        updatedAt: inside.length ? Math.max(...inside.map((n) => n.updatedAt)) : null,
+      };
+    });
+}
 
 /** Map a note's ON-DISK folder path into the browser root's namespace. In a
  * memex the projection renames lifecycle lanes (disk `storage/…` surfaces as
@@ -188,7 +241,49 @@ const FILE_KINDS: Record<string, string> = {
   mov: "Video",
 };
 
+/** A chat transcript surfaced through the Library (`chats/<slug>.md`): the
+ * owner's law is that the Library is the vault, and chats live in it. */
+export function isChatItem(n: Pick<NoteSummary, "folderId" | "diskFolderId">): boolean {
+  return isChatsPath(noteDiskFolder(n));
+}
+
+/** A sidebar chat as a Library-shaped item, for the source preview (the
+ * owner, 2026-09-17: "I am trying to see the source md"). `isChatItem` and
+ * `chatSlugOf` read it exactly as they read a Library row. */
+export function chatPreviewItem(c: {
+  slug: string;
+  title: string;
+  modifiedMs: number;
+  pinned: boolean;
+}): NoteSummary {
+  return {
+    id: `chats/${c.slug}.md`,
+    title: c.title || c.slug,
+    snippet: "",
+    aliases: [c.slug],
+    folderId: "chats",
+    createdAt: c.modifiedMs,
+    updatedAt: c.modifiedMs,
+    pinned: c.pinned,
+    kind: "note",
+  };
+}
+
+/** The chat's slug — its filename stem, which Rust lists first among aliases. */
+export function chatSlugOf(n: Pick<NoteSummary, "id" | "aliases">): string {
+  return n.aliases?.[0] ?? n.id;
+}
+
+/** Where a chat sits in the Library's namespace: a `Chats` folder at the root
+ * (the disk folder `chats/` is a sibling of `wiki/`, not inside it). */
+export function libraryPathOfChat(diskFolder: string, prefix: string): string {
+  const i = diskFolder.indexOf(":");
+  const rel = i >= 0 ? diskFolder.slice(i + 1) : diskFolder;
+  return `${prefix}/${rel}`;
+}
+
 export function kindLabel(n: NoteSummary): string {
+  if (isChatItem(n)) return "Chat";
   if (n.kind === "board") return "Board";
   if (n.kind === "file") {
     const ext = n.id.slice(n.id.lastIndexOf(".") + 1).toLowerCase();

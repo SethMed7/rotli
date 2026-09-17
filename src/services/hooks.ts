@@ -144,6 +144,18 @@ function useNoteUniverse(): { lists: (NoteSummary[] | undefined)[]; complete: bo
   return { lists, complete };
 }
 
+/** The vault's chat transcripts (`chats/**`, `vault:chats/**`) — outside every
+ * note scope on purpose (the Chat front owns them), read from the same
+ * corpus listing for the one place that browses them as files: the Library. */
+export function useChatTranscripts(): NoteSummary[] {
+  const corpus = useQuery({
+    queryKey: keys.notes(UNIVERSE_KEY),
+    queryFn: () => notesService.listAll(),
+  });
+  const raw = corpus.data;
+  return useMemo(() => (raw ?? []).filter((n) => isChatsPath(n.folderId)), [raw]);
+}
+
 /** The ONE id → summary index over EVERY note that exists. useNotes() alone is
  * a VIEW, not the universe; anything that treats it as "all notes" silently
  * loses staged/vaulted/added-root notes (the bug that GC'd the maintainer's seeded Main
@@ -151,11 +163,15 @@ function useNoteUniverse(): { lists: (NoteSummary[] | undefined)[]; complete: bo
  * row-menu lookup read THIS instead. */
 export function useNoteIndex(): Map<string, NoteSummary> {
   const { lists } = useNoteUniverse();
+  // chats/ transcripts sit outside every note scope, but they open as notes
+  // now (the Library, a source peek's Open) — a tab on one has a title too
+  const transcripts = useChatTranscripts();
   return useMemo(() => {
     const index = new Map<string, NoteSummary>();
     for (const list of lists) for (const n of list ?? []) index.set(n.id, n);
+    for (const n of transcripts) index.set(n.id, n);
     return index;
-  }, [lists]);
+  }, [lists, transcripts]);
 }
 
 /** liveIds for the Main-manifest GC — undefined until EVERY listing has

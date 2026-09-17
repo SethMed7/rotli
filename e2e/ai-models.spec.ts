@@ -38,3 +38,29 @@ test("the connected lanes are listed in order with Antigravity last and off", as
   const pane = page.locator(".ailane").last();
   expect(await pane.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
 });
+
+test("a lane that isn't ready shows the walkthrough with copyable commands instead of a folded hint", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 900, height: 700 });
+  await gotoApp(page);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "AI Models", exact: true }).click();
+
+  // the browser twin cannot detect a CLI, so every lane is "app only" and
+  // the steps are open by default — no "How to set this up" to find first
+  const claude = page.locator(".ailane", { hasText: "Claude Code" }).first();
+  await expect(claude.getByText("app only")).toBeVisible();
+  await expect(claude.getByText("How to set this up")).toHaveCount(0);
+  await expect(claude.getByText("Install it")).toBeVisible();
+  await expect(claude.getByText("npm install -g @anthropic-ai/claude-code")).toBeVisible();
+  await expect(claude.getByText("Sign in, in your terminal")).toBeVisible();
+  await expect(claude.getByRole("button", { name: /^Copy: claude auth login/ })).toBeVisible();
+  // the install line is the tool's own for THIS OS (brew on a Mac, npm on
+  // the Linux CI runner); the sign-in line is the same everywhere
+  const codex = page.locator(".ailane", { hasText: "Codex" }).first();
+  await expect(codex.getByText(/^(brew install codex|npm install -g @openai\/codex)$/)).toBeVisible();
+  await expect(codex.getByText("codex login")).toBeVisible();
+  // nothing in the walkthrough overflows the window
+  expect(await claude.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+});

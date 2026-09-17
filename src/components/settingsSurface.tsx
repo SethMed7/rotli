@@ -148,8 +148,10 @@ import {
 } from "./glyphs";
 import { AboutPane } from "./settings/aboutPane";
 import { ConnectionsSettings } from "./settings/connectionsSettings";
+import { ConnectorGuide } from "./settings/connectorGuide";
 import { Seg } from "./settings/seg";
 import { VoiceSettings } from "./settings/voiceSettings";
+import { WebVaultSettings } from "./settings/webVaultSettings";
 import { WelcomeSettings } from "./welcomeSettings";
 type SettingsPane =
   | "general"
@@ -848,6 +850,7 @@ function GeneralPane() {
         ones in its <code>2/4</code>.
       </p>
 
+      <WebVaultSettings />
       <WelcomeSettings disabled={memexConfig.data?.developmentReadOnly ?? import.meta.env.DEV} />
       <UpdatesSection />
 
@@ -1055,6 +1058,10 @@ function AppearancePane() {
   const setQuokkaIdlePose = useUiStore((s) => s.setQuokkaIdlePose);
   const chatNavigatorStyle = useUiStore((s) => s.chatNavigatorStyle);
   const setChatNavigatorStyle = useUiStore((s) => s.setChatNavigatorStyle);
+  const sidebarSide = useUiStore((s) => s.sidebarSide);
+  const setSidebarSide = useUiStore((s) => s.setSidebarSide);
+  const sidebarReveal = useUiStore((s) => s.sidebarReveal);
+  const setSidebarReveal = useUiStore((s) => s.setSidebarReveal);
   const syntaxPalette = useUiStore((s) => s.syntaxPalette);
   const setSyntaxPalette = useUiStore((s) => s.setSyntaxPalette);
   const chatWelcomeStyle = useUiStore((s) => s.chatWelcomeStyle);
@@ -1347,6 +1354,35 @@ function AppearancePane() {
             </span>
           </button>
         ))}
+      </div>
+
+      <h4 className="sethead">Sidebar</h4>
+      <p className="lead">
+        Where the sidebar sits, and whether it stays. On hover keeps it out of the way until the pointer
+        reaches the window's edge; ⌘0 still brings it. The sidebar's own right-click menu has the same
+        choices.
+      </p>
+      <div className="segfield">
+        <span className="seglabel">Side</span>
+        <Seg
+          value={sidebarSide}
+          options={[
+            ["left", "Left"],
+            ["right", "Right"],
+          ]}
+          onPick={setSidebarSide}
+        />
+      </div>
+      <div className="segfield">
+        <span className="seglabel">Show</span>
+        <Seg
+          value={sidebarReveal}
+          options={[
+            ["pinned", "Always"],
+            ["hover", "On hover"],
+          ]}
+          onPick={setSidebarReveal}
+        />
       </div>
 
       <h4 className="sethead">Chat naming</h4>
@@ -2191,26 +2227,6 @@ const PROVIDER_DESC: Record<ProviderId, string> = {
     "Google's official Antigravity ACP agent, installed and signed in from this card — off by default; Google's FAQ still warns about third-party use of an Antigravity login while DeepMind staff say it is not enforced. Your account, your call.",
 };
 
-/** How to get a lane working when it isn't installed / signed in. */
-const LANE_SETUP: Record<ProviderId, string[]> = {
-  claude: [
-    "Install Claude Code — claude.com/claude-code (installer or `npm i -g @anthropic-ai/claude-code`).",
-    "Run `claude auth login` yourself in Terminal and sign in with your Claude account.",
-    "Come back here — the status flips to ready on its own.",
-  ],
-  codex: [
-    "Install the Codex CLI: `brew install codex`.",
-    "Run `codex login` and sign in with your ChatGPT account.",
-    "Come back here — the status flips to ready on its own.",
-  ],
-  cursor: [
-    "Install Cursor Agent from cursor.com/cli (the official installer places `agent` in ~/.local/bin).",
-    "Run `agent login` yourself in Terminal and sign in with your Cursor account.",
-    "Come back here — Rotli uses ACP Ask mode and rejects every requested permission.",
-  ],
-  antigravity: [], // the card below owns install + sign-in
-};
-
 /** A bare switch (the Toggle row's knob, without the full-width row). */
 function LaneSwitch({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
   return (
@@ -2244,7 +2260,6 @@ function LaneCard({ id }: { id: ProviderId }) {
   const providerDefaults = useUiStore((s) => s.providerDefaults);
   const setProviderDefault = useUiStore((s) => s.setProviderDefault);
   const defaultModel = providerDefaultModel(id, providerDefaults);
-  const [help, setHelp] = useState(false);
   const [verify, setVerify] = useState<VerifyState>({ state: "idle" });
 
   const det = useQuery({
@@ -2300,16 +2315,12 @@ function LaneCard({ id }: { id: ProviderId }) {
       {id === "antigravity" && <AntigravitySetup onChange={() => void det.refetch()} />}
       {!ready && id !== "antigravity" && (
         <div className="ailane-help">
-          <button type="button" className="ailane-helptoggle" onClick={() => setHelp((v) => !v)}>
-            {help ? "▾" : "▸"} How to set this up
-          </button>
-          {help && (
-            <ol className="ailane-steps">
-              {LANE_SETUP[id].map((s) => (
-                <li key={s}>{s}</li>
-              ))}
-            </ol>
-          )}
+          <ConnectorGuide
+            lane={id}
+            detection={d}
+            onRecheck={isTauri() ? () => void det.refetch() : undefined}
+            checking={det.isFetching}
+          />
         </div>
       )}
 

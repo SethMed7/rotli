@@ -134,26 +134,30 @@
   color: var(--accent-text);
   font-weight: 600;
 }
+/* header actions are plain glyphs, not cards (the maintainer, 2026-09-16): no
+   surface behind them; hover brings the ink up, "on" is the accent — the same
+   grammar as the location chip beside them. Hit area stays ≥ 28px tall
+   (e2e/tab-strip-layout.spec.ts) — flat, not smaller. */
 .aachip {
   display: flex;
   align-items: center;
   gap: 5px;
   min-height: 28px;
-  padding: 4px 9px;
+  padding: 3px 5px;
   border: none;
   border-radius: var(--r-control);
-  background: var(--surface-2);
+  background: none;
   font-family: var(--font-body);
   font-size: 11.5px;
   font-weight: 600;
-  color: var(--text);
+  color: var(--text-muted);
   cursor: pointer;
 }
 .aachip:hover {
-  background-image: linear-gradient(var(--hov), var(--hov));
+  color: var(--text);
 }
 .aachip.on {
-  background: var(--tint);
+  color: var(--accent-text);
 }
 
 /* — the note body: every source line is a row — */
@@ -738,6 +742,10 @@
 .rotli-cm-host .cm-line {
   padding: 0;
 }
+/* Wrapping stays CodeMirror's `break-spaces` (its default for cm-lineWrapping):
+   a pre-wrap override was tried on 2026-09-16 for the space that lands at a
+   wrap boundary and was reverted the same day — the owner saw the caret sit
+   above the text being typed in lists under it. */
 .rotli-cm-host .cm-content ::selection {
   background: color-mix(in srgb, var(--accent) 26%, transparent);
 }
@@ -880,9 +888,22 @@
 .rotli-marker.num {
   font-variant-numeric: tabular-nums;
 }
+/* two or more digits do not fit the glyph column; the line's hanging indent
+   widens with it (listGeometry.ts WIDE_MARKER_EM) so wrapped lines still
+   land under the text, never under the number */
+.rotli-marker.num.wide {
+  width: 1.6em; /* mirrors WIDE_MARKER_EM */
+  text-align: right;
+  padding-right: 0.2em;
+  box-sizing: border-box;
+}
 .rotli-check {
   /* 1.1em + 0.5em gap = CHECK_EM (listGeometry.ts): a task's text lands on the
-     same left edge as its wrapped lines */
+     same left edge as its wrapped lines. The em must be the LINE's: a button
+     defaults to the UA control font, so without `font: inherit` the column came
+     up short and every wrapped row sat a few px right of the first (the owner,
+     2026-09-17); border-box keeps the 1.5px border inside the 1.1em. */
+  box-sizing: border-box;
   width: 1.1em;
   height: 1.1em;
   margin-right: 0.5em;
@@ -893,6 +914,7 @@
   display: inline-grid;
   place-items: center;
   cursor: pointer;
+  font: inherit;
   vertical-align: -0.15em;
   line-height: 1;
 }
@@ -1073,6 +1095,7 @@
 /* — one-of-many choice, `- ( )` / `- (x)` — adjacent same-indent rows form
    one source-backed group. Selection is accent emphasis, never pass/fail. */
 .rotli-choice {
+  box-sizing: border-box; /* the border lives inside CHOICE_EM's 1.1em */
   width: 1.1em;
   height: 1.1em;
   margin-right: 0.5em;
@@ -2223,6 +2246,10 @@
    text you could edit: quiet, small, and set off from the words. */
 .rotli-progress {
   display: inline-block;
+  /* the task line hangs its checkbox with a negative text-indent; an
+     inline-block inherits it and printed "0/1" over the words before the pill
+     (the owner, 2026-09-17) — the pill's own text starts at its own edge */
+  text-indent: 0;
   margin-left: 8px;
   padding: 0 6px;
   border-radius: var(--r-pill);

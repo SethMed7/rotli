@@ -28,8 +28,18 @@ import {
   MAX_LAZY_CHUNK_KIB,
   shouldStubLazyLocale,
 } from "./scripts/build-policy.ts";
+import { devHelperServer } from "./scripts/dev-helper-server";
 
 const host = process.env.TAURI_DEV_HOST;
+// The web build (served from the site under a sub-path) sets ROTLI_WEB_BASE,
+// e.g. "/app/". The desktop shell loads from the bundle root and never sets it.
+const base = process.env.ROTLI_WEB_BASE ?? "/";
+if (!base.startsWith("/") || !base.endsWith("/"))
+  throw new Error('ROTLI_WEB_BASE must start and end with "/"');
+// Which shell the bundle targets: "desktop" (Tauri) or "web" (browser, no
+// native corpus). Like the channel, only the build chooses it.
+const platform = process.env.ROTLI_PLATFORM ?? (base === "/" ? "desktop" : "web");
+if (platform !== "desktop" && platform !== "web") throw new Error("Invalid ROTLI_PLATFORM");
 // injected sync so the onboardingVersion gate has the build version at first paint
 const appVersion = JSON.parse(readFileSync("package.json", "utf8")).version as string;
 
@@ -38,8 +48,12 @@ export default defineConfig(({ command }) => {
   const channel = process.env.ROTLI_BUILD_CHANNEL ?? (command === "serve" ? "dev" : "stable");
   if (channel !== "dev" && channel !== "stable") throw new Error("Invalid ROTLI_BUILD_CHANNEL");
   return {
+    base,
     plugins: [
       react(),
+      // Rotli Web dev: the helper installers and a local helper "release" at
+      // /helper/*, so the dialog's one-liner works against localhost too.
+      ...(platform === "web" ? [devHelperServer(process.cwd())] : []),
       // ~6 MB of vendor per-locale lazy chunks (Univer hyphenation dictionaries,
       // Excalidraw UI translations) collapse into one empty stub — see
       // shouldStubLazyLocale in scripts/build-policy.ts (perf audit finding 17).
@@ -69,6 +83,7 @@ export default defineConfig(({ command }) => {
       "process.env.IS_PREACT": JSON.stringify("false"),
       __APP_VERSION__: JSON.stringify(appVersion),
       __ROTLI_BUILD_CHANNEL__: JSON.stringify(channel),
+      __ROTLI_PLATFORM__: JSON.stringify(platform),
     },
 
     // katex reaches the graph twice — our blockRender import and

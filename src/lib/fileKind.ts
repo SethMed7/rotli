@@ -83,3 +83,42 @@ export function imageMimeOf(ext: string): string {
 export function managedFileNote(id: string): string | null {
   return /^storage\//i.test(id) ? "Stored in storage/ inside your vault — not tracked by git." : null;
 }
+
+const ascii = (text: string) => [...text].map((c) => c.charCodeAt(0));
+const startsWith = (bytes: Uint8Array, head: number[]) => head.every((b, i) => bytes[i] === b);
+const at = (bytes: Uint8Array, from: number, text: string) => startsWith(bytes.subarray(from), ascii(text));
+
+/** Whether `bytes` really are a `.ext` image: the same magic numbers Rust
+ * checks in corpus.rs `image_payload_matches_extension`, so a `.png` that is
+ * not a PNG is refused on the web exactly as the Mac app refuses it. */
+export function imageBytesMatchExtension(ext: string, bytes: Uint8Array): boolean {
+  switch (ext) {
+    case "png":
+      return startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    case "jpg":
+    case "jpeg":
+      return startsWith(bytes, [0xff, 0xd8, 0xff]);
+    case "gif":
+      return at(bytes, 0, "GIF87a") || at(bytes, 0, "GIF89a");
+    case "webp":
+      return at(bytes, 0, "RIFF") && at(bytes, 8, "WEBP");
+    case "bmp":
+      return at(bytes, 0, "BM");
+    case "tif":
+    case "tiff":
+      return startsWith(bytes, [0x49, 0x49, 0x2a, 0x00]) || startsWith(bytes, [0x4d, 0x4d, 0x00, 0x2a]);
+    case "heic":
+    case "heif":
+    case "avif": {
+      if (!at(bytes, 4, "ftyp")) return false;
+      const brands =
+        ext === "avif" ? ["avif", "avis"] : ["heic", "heix", "hevc", "hevx", "heim", "heis", "mif1", "msf1"];
+      for (let i = 8; i + 4 <= Math.min(bytes.length, 64); i += 4) {
+        if (brands.some((brand) => at(bytes, i, brand))) return true;
+      }
+      return false;
+    }
+    default:
+      return false;
+  }
+}

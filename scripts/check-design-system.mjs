@@ -12,7 +12,7 @@ const colors = read("src/brand/tokens/colors.css");
 const themes = read("src/styles/themes.css");
 const base = read("src/styles/base.css");
 const themeState = read("src/state/theme.ts");
-const uiState = read("src/state/ui.ts");
+const uiState = read("src/state/themeChoices.ts"); // the solid theme picker (seamed out of ui.ts, 2026-09-17)
 const breveStyles = read("src/styles/breve.css");
 const notesStyles = read("src/styles/notes.css");
 const brandBoard = read("src/brand/board.html");
@@ -148,7 +148,8 @@ for (const label of [
   "Moonlight",
   "Midnight",
 ]) {
-  if (!uiState.includes(`label: "${label}"`)) violations.push(`ui.ts: solid theme picker omits ${label}`);
+  if (!uiState.includes(`label: "${label}"`))
+    violations.push(`themeChoices.ts: solid theme picker omits ${label}`);
 }
 
 const importOrder = [

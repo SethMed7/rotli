@@ -39,7 +39,7 @@ import {
   mergedModels,
 } from "../../ai/models";
 import type { AgentQuestion, ChatTurn, RunInput } from "../../ai/types";
-import { syncManagedChatMemory } from "../../chatMemory/composition";
+import { resolveChatNoteId, syncManagedChatMemory } from "../../chatMemory/composition";
 import {
   attachedNoteId as resolveAttachedNoteId,
   buildChatNotesPrompt,
@@ -55,6 +55,7 @@ import {
   projectChatWorkItems,
   visibleChatText,
 } from "../../lib/chatWork";
+import { PLATFORM } from "../../lib/featurePolicy";
 import { extOf, fileName, IMAGE_EXTS, imageMimeOf } from "../../lib/fileKind";
 import { useAnchoredPopoverBox, useTransientPopover } from "../../lib/popover";
 import {
@@ -98,11 +99,14 @@ import {
   loadChatFolders,
   saveChatFolders,
 } from "../../services/chatFolders";
+import { syncChatModelMeta } from "../../services/chatModelMeta";
 import { invalidateNotes, useNoteIndex } from "../../services/hooks";
 import { artifactMainFolderName, fileNoteInNamedRootFolder } from "../../services/mainTree";
 import { assignChatToView } from "../../services/viewTree";
 import { type ChatImageAttachment, chatDraftFor, useChatDrafts } from "../../state/chatDrafts";
-import { useChatRuns } from "../../state/chatRuns";
+import { replyPending, useChatRuns } from "../../state/chatRuns";
+import { useChatSetupGuide } from "../../state/chatSetupGuide";
+import { helperReadyFrom, useHelperLink } from "../../state/helperLink";
 import { useMainStore } from "../../state/main";
 import { touchChatActivity } from "../../state/mru";
 import { type Measure } from "../../state/noteStyle";
@@ -132,7 +136,13 @@ import {
   WordGlyph,
   XGlyph,
 } from "../glyphs";
-import { CHAT_PANE_ATTR, registerChatDrop } from "./chatDrop";
+import { WebDialogFrame } from "../webDialogFrame";
+import { ChatAttachedImages } from "./chatAttachedImages";
+import { ChatClarificationBar } from "./chatClarificationBar";
+import { copyChatSelection } from "./chatCopy";
+import { CHAT_PANE_ATTR } from "./chatDrop";
+import { useChatDropTarget } from "./chatDropTarget";
+import { UserMessageText } from "./chatImageRefs";
 import { ModelPicker } from "./chatModelPicker";
 import { ChatPromptNavigator } from "./chatPromptNavigator";
 import { conversationPrompts, visiblePromptIndexes } from "./chatPromptNavigatorModel";
@@ -142,6 +152,7 @@ import {
   reasoningChoices,
   serviceTierChoices,
 } from "./chatReasoningModel";
+import { ChatSetupGuide } from "./chatSetupGuide";
 import { CHAT_MESSAGE_WINDOW, recentChatThread } from "./chatThreadModel";
 import {
   CHAT_TITLE_MAX_LENGTH,
@@ -991,60 +1002,6 @@ function renderMessage(text: string): ReactNode {
   });
 }
 
-function ChatAttachedImages({ images }: { images: readonly string[] }) {
-  const [preview, setPreview] = useState<string | null>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
-  useTransientPopover([dialogRef], preview !== null, () => setPreview(null));
-  const resolved = useQueries({
-    queries: images.map((source) => ({
-      queryKey: ["chat-attached-image", source],
-      queryFn: () =>
-        /^(?:https?:|data:|blob:|asset:)/i.test(source) ? Promise.resolve(source) : fileAssetUrl(source),
-      staleTime: Infinity,
-    })),
-  });
-  return (
-    <>
-      <div
-        className="cmsg-images"
-        aria-label={`${images.length} attached ${images.length === 1 ? "image" : "images"}`}
-      >
-        {images.map((source, index) => {
-          const url = resolved[index]?.data;
-          return url ? (
-            <button
-              type="button"
-              key={`${index}-${source.slice(-16)}`}
-              className="cmsg-image"
-              aria-label={`Preview attached image ${index + 1}`}
-              onClick={() => setPreview(url)}
-            >
-              <img src={url} alt={`Attached image ${index + 1}`} />
-            </button>
-          ) : null;
-        })}
-      </div>
-      {preview &&
-        createPortal(
-          <div className="cmsg-image-scrim" role="presentation">
-            <div
-              ref={dialogRef}
-              className="cmsg-image-dialog"
-              role="dialog"
-              aria-label="Attached image preview"
-            >
-              <button type="button" aria-label="Close image preview" onClick={() => setPreview(null)}>
-                <XGlyph size={16} />
-              </button>
-              <img src={preview} alt="Attached image preview" />
-            </div>
-          </div>,
-          document.body,
-        )}
-    </>
-  );
-}
-
 // memo: renderMessage re-parses a whole message's markdown on every render, and
 // the surface re-renders on every composer keystroke and every thinking-status
 // tick. With a primitive `text` prop and a stable onCopy, settled messages skip
@@ -1088,7 +1045,7 @@ const ChatMessage = memo(function ChatMessage({
     <div className={you ? "cmsg you" : "cmsg ai"} data-chat-message-index={index}>
       <div className="cmsg-bubble">
         {you && images.length > 0 && <ChatAttachedImages images={images} />}
-        {you ? text : renderMessage(text)}
+        {you ? <UserMessageText text={text} /> : renderMessage(text)}
       </div>
       {!you && onOpenArtifact && <ChatArtifactButtons artifacts={artifacts} onOpen={onOpenArtifact} />}
       <div className={endMark ? "cmsg-footer has-endmark" : "cmsg-footer"}>
@@ -1126,29 +1083,6 @@ const ChatMessage = memo(function ChatMessage({
     </div>
   );
 });
-
-function ChatClarificationBar({
-  question,
-  onAnswer,
-}: {
-  question: AgentQuestion;
-  onAnswer: (answer: string) => void;
-}) {
-  return (
-    <div className="chat-question-wrap">
-      <section className="chat-question" aria-label="Choose an answer">
-        <p>{question.prompt}</p>
-        <div>
-          {question.options.map((option) => (
-            <button type="button" key={option} onClick={() => onAnswer(option)}>
-              {option}
-            </button>
-          ))}
-        </div>
-      </section>
-    </div>
-  );
-}
 
 export function ChatSurface({
   paneId,
@@ -1268,6 +1202,10 @@ export function ChatSurface({
     (attachedStem ? resolveAttachedNoteId(attachedStem, noteIndex.values()) : null);
   const secureAttachmentHint = attachedStem.startsWith("secure-note-");
 
+  // a runtime that can answer: the Mac app's Rust side, or Rotli Helper paired
+  // with this page — subscribed, so pairing mid-session flips the surface
+  const helperLinked = useHelperLink((s) => helperReadyFrom(s)); // paired AND answering AND not refused
+  const runtimeAvailable = isTauri() || helperLinked;
   // the on-device models the memex-ai store offers; non-Tauri has no bridge.
   const models = useQuery({
     queryKey: ["chat", "models"],
@@ -1285,7 +1223,7 @@ export function ChatSurface({
     queries: PROVIDER_IDS.map((id) => ({
       queryKey: ["cli-detect", id],
       queryFn: () => cliDetect(id),
-      enabled: isTauri() && aiProviders[id],
+      enabled: runtimeAvailable && aiProviders[id],
       staleTime: 60_000,
     })),
   });
@@ -1314,10 +1252,18 @@ export function ChatSurface({
   // Independent per chat (the maintainer, 2026-08-01): two chat panes side by side each
   // send to their own model, and picking in one never moves the other.
   const chatKeyId = chatKey(active?.id ?? null, chatSlug, tabId);
+  // The run signals are the one truth the sidebar reads too. A turn that
+  // took off from an earlier mount of this chat (the user left and came
+  // back mid-run) is still "running" here while this mount is not busy.
+  const runState = useChatRuns((s) => s.runs[chatKeyId]);
+  const persistedTick = useChatRuns((s) => s.persisted[chatKeyId] ?? 0);
   useEffect(() => {
     if (active && chatSlug) touchChatActivity(`${active.id}:${chatSlug}`);
   }, [active, chatSlug]);
-  const chatModelId = chatModelFor(chatModelMap, chatKeyId, chatModelSeed);
+  // the file's own `model:` seeds a chat this device never pinned (a copy
+  // of the vault on the web, 2026-09-17) — the sidebar mark reads it too
+  const fileModel = chats.data?.find((c) => c.slug === chatSlug)?.model || null;
+  const chatModelId = chatModelFor(chatModelMap, chatKeyId, fileModel ?? chatModelSeed);
   const savedPick = modelList.find((m) => m.id === chatModelId);
   const fallbackPick = modelList.find((m) => m.isDefault) ?? modelList[0] ?? null;
   // A persisted remote choice must not silently become the local default while
@@ -1343,6 +1289,7 @@ export function ChatSurface({
   const pickModel = (id: string) => {
     setChatModel(chatKeyId, id);
     setChatModelSeed(id);
+    void syncChatModelMeta(active, chatSlug, id, modelList, hybridPresets); // into the chat's own file
   };
 
   const draft = useChatDrafts((state) => chatDraftFor(state.drafts, tabId));
@@ -1363,13 +1310,27 @@ export function ChatSurface({
   const [provisionalTitle, setProvisionalTitle] = useState<string | null>(null);
   const firstUserPrompt = messages.find((item) => item.speaker === "you")?.text ?? "";
   const hasSentPrompt = firstUserPrompt !== "";
-  const provisionalDisplayTitle = provisionalTitle ?? deriveChatTitle(firstUserPrompt);
+  // the title reads the prose, never an attachment's storage path
+  const provisionalDisplayTitle = provisionalTitle ?? deriveChatTitle(visibleChatText(firstUserPrompt));
   const prompts = useMemo(
     () => conversationPrompts(messages.map((item) => ({ ...item, text: visibleChatText(item.text) }))),
     [messages],
   );
   const [activePromptIndexes, setActivePromptIndexes] = useState<readonly number[]>([]);
   const [busy, setBusy] = useState(false);
+  /** A predecessor mount's turn is in flight: show it, and hold the composer. */
+  const foreignRun = runState === "running" && !busy;
+  /** Once a run settles, the composer stays held until its reply has been
+   * persisted and reread (a send in that gap would read a thread without the
+   * answer — review 2026-09-16). Derived from the store: a failed run never
+   * persists, so the store's grace tick releases the hold on its own. */
+  // (any store change, the grace tick included, re-runs this selector)
+  const foreignPending = useChatRuns((s) => !busy && replyPending(s, chatKeyId, Date.now()));
+  const working = busy || foreignRun || foreignPending;
+  /** The persisted count this mount's own send produced, so its own landing
+   * does not trigger a reread; a foreign landing does. */
+  const ownPersistRef = useRef(0);
+  const loadedTickRef = useRef(0);
   const [status, setStatus] = useState<string>(THINK_WORDS[0]!);
   // the on-device answer forming token-by-token — shown live in the assistant
   // row while it streams, then replaced by the settled message. The ref mirrors
@@ -1383,6 +1344,7 @@ export function ChatSurface({
   // which message's hover Copy just fired — flips its glyph to a ✓ for a beat
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [visionHint, setVisionHint] = useState(false);
+  const [dropVisionError, setDropVisionError] = useState(false);
   // a failed chats/<slug>.md write — the thread still shows for this session,
   // but SAY it won't survive a reload (#11, audit 2026-07); cleared on the
   // next successful save.
@@ -1516,6 +1478,11 @@ export function ChatSurface({
   // a file that only holds the user turn so far.
   useEffect(() => {
     if (busyRef.current) return;
+    // a reply landed on disk (persistedTick moved): reread unless this mount
+    // wrote it — its thread already holds the settled turn
+    const tickMoved = persistedTick !== loadedTickRef.current;
+    loadedTickRef.current = persistedTick;
+    if (tickMoved && persistedTick === ownPersistRef.current) return;
     let cancelled = false;
     setArtifactErr(null);
     if (active && chatSlug) {
@@ -1547,7 +1514,7 @@ export function ChatSurface({
     return () => {
       cancelled = true;
     };
-  }, [active, chatSlug]);
+  }, [active, chatSlug, persistedTick]);
 
   useLayoutEffect(() => {
     const element = surfaceRef.current;
@@ -1638,7 +1605,7 @@ export function ChatSurface({
     const userAt = new Date().toISOString();
     // an image with no words is a real message ("what is this?") — the guard
     // used to require text, so attaching a picture and pressing send did nothing
-    if (!active || !writable || (!typed && imgs.length === 0) || busy) return;
+    if (!active || !writable || (!typed && imgs.length === 0) || working) return;
     if (!picked) {
       setMessages((p) => [
         ...p,
@@ -1735,7 +1702,7 @@ export function ChatSurface({
             .map((image, i) => (image.id ? attachmentReference(i + 1, image.id) : `[Image #${i + 1}]`))
             .join(" ")}${providerTyped ? `\n${providerTyped}` : ""}`
         : providerTyped;
-    const sentTitle = normalizeChatTitle(title) || deriveChatTitle(userText);
+    const sentTitle = normalizeChatTitle(title) || deriveChatTitle(visibleChatText(userText));
     setProvisionalTitle(sentTitle);
     lastSentRef.current = { text: typed, images: imgs };
     clearDraft(tabId);
@@ -1827,6 +1794,7 @@ export function ChatSurface({
         clearChatMeasure(webKey);
         const pinnedModel = chatModelMap[webKey] ?? picked.id;
         setChatModel(savedKey, pinnedModel); // and the model this chat runs on
+        void syncChatModelMeta(active, res.slug, pinnedModel, modelList, hybridPresets);
         clearChatModel(webKey);
         setChatReasoning(savedKey, chatReasoning[webKey] ?? null);
         setChatReasoning(webKey, null);
@@ -2006,6 +1974,8 @@ export function ChatSurface({
           messages: diskTurn,
           secureContext: secureReadRef.current || attachedSecure,
         });
+        // the reply is on disk: a surface that remounted mid-run rereads now
+        ownPersistRef.current = useChatRuns.getState().markPersisted(runKey);
         if (createdArtifacts.length) {
           try {
             await registerChatArtifactTurn(active, sentSlug, assistantTurn, createdArtifacts);
@@ -2079,6 +2049,7 @@ export function ChatSurface({
         bindChat(paneId, tabId, res.slug, active.id); // this tab now IS that chat
         // the run signal + an unread flag follow the unsaved key to the slug
         useChatRuns.getState().retargetRun(runKey, chatKey(active.id, res.slug, tabId));
+        ownPersistRef.current = useChatRuns.getState().markPersisted(chatKey(active.id, res.slug, tabId));
         // the saved chat's maps ride the VAULT-scoped key (2026-08-03)
         const savedKey = chatKey(active.id, res.slug, tabId);
         if (questionAfterRun) setDraftQuestion(tabId, questionAfterRun, savedKey);
@@ -2089,6 +2060,7 @@ export function ChatSurface({
         clearChatMeasure(webKey);
         const pinnedModel = chatModelMap[webKey] ?? picked.id;
         setChatModel(savedKey, pinnedModel); // and the model this chat runs on
+        void syncChatModelMeta(active, res.slug, pinnedModel, modelList, hybridPresets);
         clearChatModel(webKey);
         setChatReasoning(savedKey, chatReasoning[webKey] ?? null);
         setChatReasoning(webKey, null);
@@ -2266,21 +2238,7 @@ export function ChatSurface({
     [active, tabId, setDraftImages],
   );
 
-  // The drop lane mirrors the paperclip's vision gate: a model that cannot see
-  // gets the hint instead of an attachment that send would then refuse. The
-  // gate lives in this wrapper (not the memoized callback) because canVision
-  // derives from the un-memoized pick, which manual deps cannot express.
-  useEffect(
-    () =>
-      registerChatDrop(paneId, (paths) => {
-        if (!canVision) {
-          setVisionHint(true);
-          return;
-        }
-        attachPaths(paths);
-      }),
-    [paneId, attachPaths, canVision],
-  );
+  useChatDropTarget(paneId, chatSlug, attachPaths, canVision, () => setDropVisionError(true), !!active);
 
   // this chat's generated assets: everything under storage/chats/<slug>/ in the
   // active root (wire ids are bare for the corpus, "<rootid>:rel" otherwise)
@@ -2315,7 +2273,7 @@ export function ChatSurface({
     setArtifactsOpen(true);
   }, [artifactRevealKey, artifacts.length, artifactsCompact]);
   const showArtifactsPanel = artifactsOpen && !artifactsCompact;
-  const pristineChat = isTauri() && !chatSlug && messages.length === 0 && !busy;
+  const pristineChat = runtimeAvailable && !chatSlug && messages.length === 0 && !busy;
   const welcomeHour = new Date().getHours();
   const welcomeDaypart = chatDaypart(welcomeHour);
   const welcomeSuggestions = chatWelcomeSuggestions(welcomeHour);
@@ -2340,7 +2298,9 @@ export function ChatSurface({
   const onNoteToggle = async () => {
     if (!active || !chatSlug || noteBusy) return;
     if (attachedStem) {
-      const existingId = resolveAttachedNoteId(attachedStem, noteIndex.values());
+      // same-title notes are told apart by their back-link to this chat, so
+      // an ambiguous stem opens the chat's note instead of minting another
+      const existingId = await resolveChatNoteId(attachedStem, chatSlug, noteIndex.values());
       if (existingId) {
         openAttachedNote(existingId);
         return;
@@ -2354,6 +2314,7 @@ export function ChatSurface({
       const { id, stem } = await writeNote({
         instance: active,
         body: `# ${name}\n\n> chat: [[${chatSlug}]]\n\n`,
+        shelf: [], // a chat's note is not a capture
       });
       await setAttached.mutateAsync({ instance: active, slug: chatSlug, stem });
       await invalidateNotes();
@@ -2529,10 +2490,19 @@ export function ChatSurface({
         )}
       </header>
 
-      {!isTauri() ? (
+      {!runtimeAvailable ? (
         <div className="list-empty chat-empty">
           <Character name="listening" size={120} accessorized />
-          <p>Chat uses your vault as context — it runs in the app.</p>
+          {PLATFORM === "web" ? (
+            <>
+              <p>Chat runs the AI tools on your own computer. On the web that takes Rotli Helper.</p>
+              <button type="button" className="chat-cta" onClick={() => useChatSetupGuide.getState().show()}>
+                Set up chat on the web
+              </button>
+            </>
+          ) : (
+            <p>Chat uses your vault as context — it runs in the app.</p>
+          )}
         </div>
       ) : !active ? (
         <div className="list-empty chat-empty">
@@ -2551,7 +2521,7 @@ export function ChatSurface({
               onJump={jumpToPrompt}
             />
             <div className="chat-scroll" ref={scrollRef}>
-              <div className="chat-thread">
+              <div className="chat-thread" onCopy={(event) => copyChatSelection(event, messages)}>
                 {hiddenMessageCount > 0 && (
                   <p className="chat-thread-window" role="status">
                     Showing the latest {CHAT_MESSAGE_WINDOW} messages. {hiddenMessageCount.toLocaleString()}{" "}
@@ -2579,6 +2549,9 @@ export function ChatSurface({
                     </div>
                     {!pristineChat && (
                       <p className="chat-sub">This saved chat is ready for its first message.</p>
+                    )}
+                    {catalogSettled && !picked && (
+                      <ChatSetupGuide secureOnly={secureChat} onOpenSettings={() => setSettingsOpen(true)} />
                     )}
                   </div>
                 ) : (
@@ -2616,7 +2589,7 @@ export function ChatSurface({
                       <div className="cmsg-bubble">{renderMessage(streamingText)}</div>
                     </div>
                   )}
-                {busy && !streamingText && (
+                {working && !streamingText && (
                   <div className="cmsg ai">
                     <QuokkaMark size={17} className="chat-mark" />
                     {queued ? (
@@ -2707,6 +2680,29 @@ export function ChatSurface({
                         ))}
                       </div>
                     )}
+                    {dropVisionError &&
+                      createPortal(
+                        <WebDialogFrame
+                          id="chat-image-drop-error"
+                          title="This model can’t see images"
+                          onClose={() => setDropVisionError(false)}
+                          actions={
+                            <button
+                              type="button"
+                              className="rename-btn primary"
+                              onClick={() => setDropVisionError(false)}
+                            >
+                              OK
+                            </button>
+                          }
+                        >
+                          <p>
+                            Choose a model that supports images, then drop the image again. Nothing was
+                            attached or saved.
+                          </p>
+                        </WebDialogFrame>,
+                        document.body,
+                      )}
                     {visionHint && (
                       <div className="chat-vision-hint">
                         {visionModels.length > 0 ? (
@@ -2750,7 +2746,7 @@ export function ChatSurface({
                         ref={msgRef}
                         className="chat-msg"
                         rows={1}
-                        placeholder={busy ? "thinking…" : "Message rotli…  (⏎ to send · ⇧⏎ new line)"}
+                        placeholder={working ? "thinking…" : "Message rotli…  (⏎ to send · ⇧⏎ new line)"}
                         value={message}
                         onChange={(e) => setDraftMessage(tabId, e.target.value)}
                         onKeyDown={(e) => {
@@ -2807,7 +2803,9 @@ export function ChatSurface({
                           className="chat-send"
                           aria-label={busy ? "Stop" : "Send"}
                           title={busy ? "Stop — cancel this reply and get the prompt back" : undefined}
-                          disabled={busy ? false : (!message.trim() && images.length === 0) || !picked}
+                          disabled={
+                            busy ? false : foreignRun || (!message.trim() && images.length === 0) || !picked
+                          }
                           onClick={() => {
                             if (busy) stopTurn();
                             else void send();

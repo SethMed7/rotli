@@ -1,27 +1,10 @@
-// A copy keeps the structure you see: numbers, bullets, boxes, nesting, and
-// images — as readable text and as real HTML.
+// A copy's rich reading keeps the structure you see: numbers, bullets, boxes,
+// nesting, and images as real HTML (the plain reading is the source Markdown
+// itself, written by copyHandlers.ts).
 import { describe, expect, test } from "bun:test";
 
 import fixture from "../../scripts/fixtures/markdown-strip.json";
-import { clipboardHtml, clipboardText, imageSourcesIn, inlineHtml } from "./copyClipboard";
-
-describe("clipboardText", () => {
-  test("numbers, bullets, boxes, and nesting survive; inline markers do not", () => {
-    const md =
-      "1. **Sale**\n2. Sale + *Refund*\n  1. nested\n- item\n- [ ] todo\n- [x] done\n1. ( ) Red\n# Title\n> quote";
-    expect(clipboardText(md)).toBe(
-      "1. Sale\n2. Sale + Refund\n  1. nested\n- item\n☐ todo\n☑ done\n1. ○ Red\nTitle\nquote",
-    );
-  });
-  test("an image copies as its name (or alt) in brackets", () => {
-    expect(clipboardText("![](storage:551.png)\n- ![shot](storage:a/b.jpg)")).toBe(
-      "[image: 551.png]\n- [image: shot]",
-    );
-  });
-  test("the strip fixture reads the same through the text lane", () => {
-    for (const c of fixture.cases) expect(clipboardText(c.input)).toBe(c.text);
-  });
-});
+import { clipboardHtml, imageSourcesIn, inlineHtml } from "./copyClipboard";
 
 describe("clipboardHtml", () => {
   test("a lettered list exports as an ordered list in letters", () => {

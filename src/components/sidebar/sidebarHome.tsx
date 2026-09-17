@@ -26,6 +26,7 @@ import { createDragGhost } from "../../lib/dragGhost";
 import { noteDiskFolder, projectNoteToBrain } from "../../lib/noteLocation";
 import { commitPaneDrop } from "../../lib/paneDropDrag";
 import { createPointerDragSession } from "../../lib/pointerDrag";
+import { rangeBetween } from "../../lib/rangeSelect";
 import { panePreviewAt } from "../../lib/tabDrag";
 import { useNow } from "../../lib/useNow";
 import { DEST, isRootMarker } from "../../services/destinations";
@@ -48,7 +49,6 @@ import {
   mainParentOfNote,
   mainRowSort,
   moveInTree,
-  removeFromMain,
   renameFolderInMain,
   uniqueRootFolderName,
 } from "../../services/mainTree";
@@ -59,7 +59,6 @@ import {
   deleteNamedView,
   renameNamedView,
   setNamedViewTree,
-  transferTreeItemToView,
   viewFolderNameError,
   viewNameError,
   viewPickerItems,
@@ -88,6 +87,7 @@ import {
 import { InlineRenameInput } from "../inlineRenameInput";
 import { useNoteMenu } from "../useNoteMenu";
 import { homeDashboardSnapshot } from "./homeDashboardModel";
+import { mainFolderMenuItems } from "./mainFolderMenu";
 import { noteDisplayTitle } from "./noteDisplayTitle";
 import { SidebarSystem, type SystemDestRow } from "./sidebarSystem";
 import { useActiveTree } from "./useActiveTree";
@@ -281,71 +281,23 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     openContextMenu(
       x,
       y,
-      [
-        {
-          kind: "action" as const,
-          label: "Rename folder…",
-          onClick: () => setRenamingMainId(f.id),
+      mainFolderMenuItems({
+        folder: f,
+        folderItems,
+        folderScopeComplete,
+        views: viewsManifest,
+        activeView,
+        mainTree: mainManifest.tree,
+        activeTree,
+        liveIds,
+        rename: () => setRenamingMainId(f.id),
+        setViews: setViewsManifest,
+        setActiveTree,
+        trashItems: (items, onSuccess) => {
+          setRowActionError(null);
+          trashItems.mutate(items, { onSuccess });
         },
-        ...(viewsManifest.views.length > 0
-          ? [
-              {
-                kind: "drill" as const,
-                label: "Move to view",
-                items: [
-                  {
-                    kind: "action" as const,
-                    label: "Main only",
-                    checked: activeView === null,
-                    checkedMark: "highlight" as const,
-                    onClick: () =>
-                      setViewsManifest(
-                        transferTreeItemToView(mainManifest.tree, viewsManifest, activeView, f.id, null),
-                      ),
-                  },
-                  ...viewsManifest.views.map((view) => ({
-                    kind: "action" as const,
-                    label: view.name,
-                    checked: activeView === view.name,
-                    checkedMark: "highlight" as const,
-                    onClick: () =>
-                      setViewsManifest(
-                        transferTreeItemToView(mainManifest.tree, viewsManifest, activeView, f.id, view.name),
-                      ),
-                  })),
-                ],
-              },
-            ]
-          : []),
-        { kind: "sep" as const },
-        {
-          kind: "action" as const,
-          label: `Remove from ${activeView ?? "Main"}`,
-          onClick: () => setActiveTree(removeFromMain(activeTree, f.id), liveIds),
-        },
-        { kind: "sep" as const },
-        {
-          kind: "drill" as const,
-          label: folderScopeComplete
-            ? "Move folder contents to Trash…"
-            : "Unavailable items — can’t trash folder",
-          danger: true,
-          disabled: folderItems.length === 0 || !folderScopeComplete,
-          items: [
-            {
-              kind: "action" as const,
-              label: `Move ${folderItems.length} ${folderItems.length === 1 ? "item" : "items"} to Trash`,
-              danger: true,
-              onClick: () => {
-                setRowActionError(null);
-                trashItems.mutate(folderItems, {
-                  onSuccess: () => setActiveTree(removeFromMain(activeTree, f.id), liveIds),
-                });
-              },
-            },
-          ],
-        },
-      ],
+      }),
       opts,
     );
   };
@@ -430,6 +382,9 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   // rows, dragging any gathered row moves the WHOLE selection into a folder;
   // a plain click still just opens (and clears the gathering).
   const [mainSel, setMainSel] = useState<ReadonlySet<string>>(new Set());
+  // ⇧-click ranges from the last row clicked, in the tree's visible order
+  // (the projection's mainOrder is depth-first, exactly how rows render)
+  const mainAnchorRef = useRef<string | null>(null);
   const [mainDrop, setMainDrop] = useState<{ id: string; pos: DropPos } | null>(null);
   const didMainDragRef = useRef(false);
 
@@ -594,7 +549,21 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
               onPointerDown={(e) => startMainDrag(e, n.id, displayTitle)}
               onClick={(e) => {
                 if (didMainDragRef.current) return;
-                // ⌘-click gathers for a multi-drag instead of opening
+                // ⌘-click gathers for a multi-drag instead of opening;
+                // ⇧-click gathers the whole range from the last click
+                if (e.shiftKey && mainAnchorRef.current) {
+                  // the rendered rows ARE the visible order — read them, never re-derive
+                  const scope = e.currentTarget.closest(".main-tree") ?? document;
+                  const order = [...scope.querySelectorAll<HTMLElement>(".main-row[data-main-id]")].map(
+                    (el) => el.dataset.mainId ?? "",
+                  );
+                  const range = rangeBetween(order, (id) => id, mainAnchorRef.current, n.id);
+                  if (range) {
+                    setMainSel((prev) => new Set([...prev, ...range]));
+                    return;
+                  }
+                }
+                mainAnchorRef.current = n.id;
                 if (e.metaKey) {
                   setMainSel((prev) => {
                     const next = new Set(prev);
@@ -629,12 +598,9 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
                   selectedItems,
                   trashSelection: (items) => {
                     trashItems.mutate([...items], {
-                      onSuccess: () => {
-                        let tree = activeTree;
-                        for (const item of items) tree = removeFromMain(tree, item.id);
-                        setActiveTree(tree, liveIds);
-                        setMainSel(new Set());
-                      },
+                      // their Main slots stay (2026-09-16): the projection
+                      // hides sink-resident notes and Restore returns them
+                      onSuccess: () => setMainSel(new Set()),
                     });
                   },
                 });

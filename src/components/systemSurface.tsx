@@ -23,9 +23,17 @@ import { longDateLabel } from "../lib/dateLabels";
 import { IMAGE_EXTS, extOf } from "../lib/fileKind";
 import { startMainAddDrag } from "../lib/mainAddDrag";
 import { noteDiskFolder, projectNoteToBrain } from "../lib/noteLocation";
+import { rangeBetween } from "../lib/rangeSelect";
 import { fileAssetUrl } from "../lib/tauri";
 import { DEST } from "../services/destinations";
-import { invalidateFolders, useFolders, useNoteIndex, useNotes, useSearchableNotes } from "../services/hooks";
+import {
+  invalidateFolders,
+  useFolders,
+  useNoteIndex,
+  useNotes,
+  useSearchableNotes,
+  useChatTranscripts,
+} from "../services/hooks";
 import { notesService } from "../services/notes";
 import {
   type FolderEntry,
@@ -40,12 +48,17 @@ import {
   listFolderContents,
   rerootDiskPath,
   sortFolderListing,
+  filterSystemFolders,
+  isChatItem,
+  libraryPathOfChat,
 } from "../services/systemBrowser";
+import { systemCwdMemo } from "../services/systemNav";
 import { emptyTrash, trashSystemSelection } from "../services/systemTrash";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
+import { BackToNotes } from "./backToNotes";
 import { Character } from "./character";
 import {
   ChevronRight,
@@ -57,8 +70,10 @@ import {
   NewFolderGlyph,
   SearchGlyph,
   glyphForNote,
+  ChatGlyph,
 } from "./glyphs";
 import { NoteListRow } from "./noteListRow";
+import { FolderListRow, SearchFolderHits } from "./system/folderListRow";
 import { useNoteMenu } from "./useNoteMenu";
 
 /** Root id → the browser's title + the prefix its folder labels strip. */
@@ -72,7 +87,7 @@ const ROOTS: Record<string, { title: string; prefix: string }> = {
 // per-root session memory — the surface unmounts on every content-view
 // switch, and a Finder that forgets its view or its place feels broken
 const modeMemo = new Map<string, SystemViewMode>();
-const cwdMemo = new Map<string, string>();
+const cwdMemo = systemCwdMemo;
 // the Columns view's open chain (relative folder paths), per root
 const colPathMemo = new Map<string, string[]>();
 
@@ -125,6 +140,8 @@ function ItemTile({ n, selected, handlers }: { n: NoteSummary; selected: boolean
     >
       {thumb ? (
         <img className="fdr-thumb" src={thumb} alt="" loading="lazy" draggable={false} />
+      ) : isChatItem(n) ? (
+        <ChatGlyph size={38} className="fdr-tile-icon" />
       ) : (
         glyphForNote(n, { size: 38, className: "fdr-tile-icon" })
       )}
@@ -162,22 +179,31 @@ export function SystemSurface({ rootId }: { rootId: string }) {
   // full index carries them, minus the internal wiki/_ lanes (secure arrives
   // through its own destination above).
   const noteIndex = useNoteIndex();
+  const chatTranscripts = useChatTranscripts();
   const items = useMemo<NoteSummary[]>(() => {
     const destItems = destData ?? [];
     if (!isLibrary) return destItems;
     const brain = searchable.map(projectNoteToBrain).filter((n): n is NoteSummary => n !== null);
     const seen = new Set([...brain, ...destItems].map((n) => n.id));
     const extras: NoteSummary[] = [];
-    for (const n of noteIndex.values()) {
-      if (n.kind !== "file" && n.kind !== "board") continue;
+    // chats/ transcripts: outside every note scope (the Chat front owns them),
+    // but the Library is the vault, so they browse here under a Chats folder
+    // (the owner, 2026-09-16)
+    for (const n of chatTranscripts) {
       if (seen.has(n.id)) continue;
+      seen.add(n.id);
+      extras.push(n);
+    }
+    for (const n of noteIndex.values()) {
+      if (seen.has(n.id)) continue;
+      if (n.kind !== "file" && n.kind !== "board") continue;
       const disk = noteDiskFolder(n);
       if (disk !== "wiki" && !disk.startsWith("wiki/")) continue;
       if (disk.startsWith("wiki/_")) continue;
       extras.push(n);
     }
     return [...brain, ...destItems, ...extras];
-  }, [isLibrary, destData, searchable, noteIndex]);
+  }, [isLibrary, destData, searchable, noteIndex, chatTranscripts]);
 
   const [query, setQuery] = useState("");
   const [mode, setModeState] = useState<SystemViewMode>(() => modeMemo.get(rootId) ?? "folders");
@@ -223,6 +249,9 @@ export function SystemSurface({ rootId }: { rootId: string }) {
     [isLibrary, foldersData],
   );
 
+  // a chat row in the Library is the transcript FILE, and it opens as one: a
+  // Markdown note in the editor (the owner, 2026-09-17: "I should be able to
+  // edit it") — the Chat front is where the same file opens as a chat
   const openSummary = usePanesStore((s) => s.openSummary);
   const openMenu = useNoteMenu();
 
@@ -232,7 +261,10 @@ export function SystemSurface({ rootId }: { rootId: string }) {
   // memex the disk lane is lowercase ("storage/…") while the destination id is
   // "Storage", and the raw comparison rendered 422 assets as an empty root
   const pathOf = useMemo(
-    () => (n: NoteSummary) => rerootDiskPath(noteDiskFolder(n), root.prefix),
+    () => (n: NoteSummary) =>
+      isChatItem(n)
+        ? libraryPathOfChat(noteDiskFolder(n), root.prefix)
+        : rerootDiskPath(noteDiskFolder(n), root.prefix),
     [root.prefix],
   );
   // the Library hides its SYSTEM LANES (_inbox → the Captures front,
@@ -241,6 +273,10 @@ export function SystemSurface({ rootId }: { rootId: string }) {
   const hiddenLanes = useMemo<ReadonlySet<string>>(
     () => (isLibrary ? LIBRARY_HIDDEN_LANES : new Set()),
     [isLibrary],
+  );
+  const folderHits = useMemo(
+    () => filterSystemFolders(items, query, folderSeed, pathOf, hiddenLanes),
+    [items, query, folderSeed, pathOf, hiddenLanes],
   );
   const listing = useMemo(
     () =>
@@ -420,12 +456,9 @@ export function SystemSurface({ rootId }: { rootId: string }) {
     } else if (e.shiftKey && folderAnchorRef.current) {
       // ⇧ is single-band like selectItem's mirror rule: only ⌘ mixes bands
       setSelection([]);
-      const order = listing.folders.map((f) => f.path);
-      const a = order.indexOf(folderAnchorRef.current);
-      const b = order.indexOf(path);
-      if (a >= 0 && b >= 0) {
-        setFolderSel(order.slice(Math.min(a, b), Math.max(a, b) + 1));
-      } else {
+      const range = rangeBetween(listing.folders, (f) => f.path, folderAnchorRef.current, path);
+      if (range) setFolderSel(range.map((f) => f.path));
+      else {
         setFolderSel([path]);
         folderAnchorRef.current = path;
       }
@@ -445,12 +478,9 @@ export function SystemSurface({ rootId }: { rootId: string }) {
       anchorRef.current = n.id;
     } else if (e.shiftKey && anchorRef.current) {
       // ⇧-click ranges from the anchor within the visible order
-      const span = order ?? visibleItems;
-      const a = span.findIndex((v) => v.id === anchorRef.current);
-      const b = span.findIndex((v) => v.id === n.id);
-      if (a >= 0 && b >= 0) {
-        setSelection(span.slice(Math.min(a, b), Math.max(a, b) + 1));
-      } else {
+      const range = rangeBetween(order ?? visibleItems, (v) => v.id, anchorRef.current, n.id);
+      if (range) setSelection(range);
+      else {
         setSelection([n]);
         anchorRef.current = n.id;
       }
@@ -643,7 +673,11 @@ export function SystemSurface({ rootId }: { rootId: string }) {
             {...itemHandlers(n)}
           >
             <span className="fdr-name">
-              {glyphForNote(n, { size: 14, className: "fdr-row-icon" })}
+              {isChatItem(n) ? (
+                <ChatGlyph size={14} className="fdr-row-icon" />
+              ) : (
+                glyphForNote(n, { size: 14, className: "fdr-row-icon" })
+              )}
               {n.title || "Empty note"}
             </span>
             <span className="fdr-date">{longDateLabel(n.updatedAt)}</span>
@@ -672,19 +706,19 @@ export function SystemSurface({ rootId }: { rootId: string }) {
       }}
     >
       <header className="board-head">
-        {!atRoot && (
+        {atRoot ? (
+          <BackToNotes onClick={() => useUiStore.getState().setContentView("panes")} />
+        ) : (
           <button
             type="button"
             className="fdr-up"
             aria-label="Back"
-            title="Back"
             onClick={() => enter(crumbs[crumbs.length - 2]?.path ?? root.prefix)}
           >
             <ChevronRight size={11} className="fdr-up-chev" />
           </button>
         )}
-        {/* the full trail lives in the BOTTOM path bar now (Finder's home for
-            it — the maintainer, 2026-07-28); the header keeps just where-am-I */}
+        {/* the trail lives in the BOTTOM path bar (Finder's home, the maintainer 2026-07-28); the header keeps where-am-I */}
         <h2 className="board-title">{crumbs[crumbs.length - 1]?.label ?? root.title}</h2>
         <span className="board-count">{items.length}</span>
         {isLibrary && (
@@ -795,7 +829,7 @@ export function SystemSurface({ rootId }: { rootId: string }) {
       )}
 
       {searching ? (
-        hits.length === 0 ? (
+        hits.length === 0 && folderHits.length === 0 ? (
           <div className="list-empty">
             <p className="be-title">No matches</p>
             <p className="be-sub">Try a different search.</p>
@@ -803,6 +837,13 @@ export function SystemSurface({ rootId }: { rootId: string }) {
         ) : (
           <div className="board-scroll" {...scrollProps}>
             {marqueeNode}
+            <SearchFolderHits
+              folders={folderHits}
+              onOpen={(path) => {
+                setQuery("");
+                setCwd(path);
+              }}
+            />
             <ul className="recent-list">
               {hits.map((n) => (
                 <NoteListRow
@@ -904,7 +945,11 @@ export function SystemSurface({ rootId }: { rootId: string }) {
                       onDoubleClick={() => openSummary(n)}
                       onContextMenu={(e) => openMenu(e, n)}
                     >
-                      {glyphForNote(n, { size: 14, className: "fdr-row-icon" })}
+                      {isChatItem(n) ? (
+                        <ChatGlyph size={14} className="fdr-row-icon" />
+                      ) : (
+                        glyphForNote(n, { size: 14, className: "fdr-row-icon" })
+                      )}
                       <span className="fdrc-name">{n.title || "Empty note"}</span>
                       <span className="fdrc-kind">{kindLabel(n)}</span>
                     </button>
@@ -1134,55 +1179,5 @@ function GalleryView({
         )}
       </div>
     </div>
-  );
-}
-
-function FolderListRow({
-  entry,
-  depth,
-  open,
-  selected,
-  onToggle,
-  onSelect,
-  onEnter,
-}: {
-  entry: FolderEntry;
-  depth: number;
-  open: boolean;
-  selected: boolean;
-  onToggle: () => void;
-  onSelect: (e: { metaKey: boolean; shiftKey: boolean }) => void;
-  onEnter: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      data-folder-path={entry.path}
-      className={selected ? "fdr-row folder sel" : "fdr-row folder"}
-      style={{ paddingLeft: 12 + depth * 18 }}
-      title="Open folder"
-      onClick={onSelect}
-      onDoubleClick={onEnter}
-    >
-      <span className="fdr-name">
-        {/* the disclosure triangle — pointer affordance; the row itself stays
-            the accessible control (double-click enters, single selects) */}
-        <span
-          className={`fchev${open ? " open" : ""}`}
-          aria-hidden="true"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle();
-          }}
-          onDoubleClick={(e) => e.stopPropagation()}
-        >
-          <ChevronRight size={10} />
-        </span>
-        <FolderGlyph size={14} className="fdr-row-icon folder" />
-        {entry.name}
-      </span>
-      <span className="fdr-date">{entry.updatedAt === null ? "—" : longDateLabel(entry.updatedAt)}</span>
-      <span className="fdr-kind">Folder</span>
-    </button>
   );
 }

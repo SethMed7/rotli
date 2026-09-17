@@ -29,3 +29,23 @@ test("public builds keep notes and chat while every experimental capability stay
     voice: true,
   });
 });
+
+test("the web platform withholds every capability that needs the desktop shell, on both channels", () => {
+  for (const development of [false, true]) {
+    const web = launchFeatures(development, "web");
+    expect(web.notes).toBe(true);
+    expect(web.chat).toBe(false);
+    expect(web.breve).toBe(false);
+    expect(web.agents).toBe(false);
+    expect(web.sheets).toBe(false);
+    expect(web.voice).toBe(false);
+    // channel-only gates still follow the channel: nothing about them needs Tauri
+    expect(web.mermaidVisualEditing).toBe(development);
+    expect(web.mermaidDiagrams).toBe(development);
+  }
+});
+
+test("the desktop platform is the default and is unchanged by the platform axis", () => {
+  expect(launchFeatures(true, "desktop")).toEqual(launchFeatures(true));
+  expect(launchFeatures(false, "desktop")).toEqual(launchFeatures(false));
+});
