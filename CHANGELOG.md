@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The prompt navigator is a stack of cards.** Hovering the left-edge
+  markers now shows the prompt you're on as its own card with up to three
+  neighbours above and below, each a step fainter than the last, instead of
+  one tall list that a long thread outgrew. Hover a marker to move the
+  stack; click a card to jump.
 - **A chat opens as its file from the Library and from Show source.** A chat
   row in the Library opens the transcript as a Markdown note in the editor,
   editable; the source peek's Open does the same. The Chat front is where

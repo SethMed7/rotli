@@ -24,6 +24,8 @@ test("a chat missing a model takes this device's map, else the vault's default",
   ]);
   // no default either: nothing to write
   expect(chatsToStamp("corpus", [chat("d")], {}, "")).toEqual([]);
+  // a copy with no map at all (settings lost) is never stamped with the default
+  expect(chatsToStamp("corpus", [chat("d")], {}, "sonnet")).toEqual([]);
 });
 
 test("a chat with a model but no provider is completed with its own model; a complete one is left alone", () => {
