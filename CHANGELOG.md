@@ -73,7 +73,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for Mac, Windows, and Linux, not the Mac app; marked plainly as not
   released yet), connect the page to it, and set up the AI tool now.
 
+- Chat: while you drag an image over a chat, its composer rings and a label
+  says what the drop will do — "Drop to attach", or that the current model
+  can't see images. On Rotli Web the label says images can't reach Rotli
+  Helper yet and points you to a note, and a note now draws the same drop
+  line the Mac app shows while an image hovers it.
+- Chat: a sent message shows each attached image as a small `#1`, `#2` chip
+  where the message names it, matching the number on the thumbnail above the
+  input, so you can see where an image was added.
+
 ### Fixed
+
+- Chat: a chat whose first message was only an image no longer takes the
+  image's storage path as its title.
 
 - Image drops on a chat whose model cannot see images now show a modal error
   before importing anything. Choose an image-capable model and drop again to

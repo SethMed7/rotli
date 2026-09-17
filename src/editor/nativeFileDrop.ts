@@ -9,13 +9,20 @@
 // sends an image silently to storage. A CHAT under the pointer claims images
 // first. Everything else lands in storage/ and says so (dropRouting.ts).
 //
+// While the drag HOVERS a chat, the pane says what the drop will do — attach,
+// or refuse because the model cannot see (the owner, 2026-09-17: "a visual cue
+// when I am hovering an image over that it is working prior to dropping").
+// chatDrop.ts owns the registry and the attribute; memex.css draws the cue.
+//
 // Some WebKit/Tauri combinations surface an ordinary DataTransfer instead of
-// the native path event; an editor-local fallback keeps image drops working.
+// the native path event; an editor-local fallback keeps image drops working,
+// and it is also Rotli Web's whole drop lane: the same drop line and the same
+// chat cue (there, "the Helper carries text only") ride the DataTransfer events.
 
 import { EditorView } from "@codemirror/view";
 import { useEffect } from "react";
 
-import { chatDropAt, CHAT_PANE_ATTR } from "../components/chat/chatDrop";
+import { chatDropAt, ChatDropCueMarker, chatDropTargetAt } from "../components/chat/chatDrop";
 import { onNativeDrag } from "../lib/nativeDrag";
 import {
   corpusCreateImageAsset,
@@ -105,6 +112,7 @@ export function useNativeFileDrop(): void {
     let stopped = false;
     let hovered: { view: EditorView; point: DropPoint } | null = null;
     const dropLine = new DropLine();
+    const chatCue = new ChatDropCueMarker();
 
     const handleDrop = async (paths: string[], px: number, py: number) => {
       const candidates = candidatesFor(px, py);
@@ -123,10 +131,20 @@ export function useNativeFileDrop(): void {
       if (stopped) return;
       if (drag.phase === "leave") {
         dropLine.hide();
+        chatCue.clear();
         return;
       }
       const candidates = candidatesFor(drag.x, drag.y);
-      const target = dropIsBlocked(candidates) ? null : editorAt(candidates);
+      const blocked = dropIsBlocked(candidates);
+      // a chat under the pointer claims the drop, so it claims the cue too
+      const chat = blocked ? null : firstTarget(candidates, chatDropTargetAt);
+      if (chat) {
+        chatCue.show(chat.target.host, chat.target.cue);
+        dropLine.hide();
+        return;
+      }
+      chatCue.clear();
+      const target = blocked ? null : editorAt(candidates);
       if (target) {
         hovered = target;
         dropLine.show(target.view, target.point);
@@ -137,6 +155,7 @@ export function useNativeFileDrop(): void {
     const unlistenDrop = onNativeDropAuthorized((event) => {
       if (stopped) return;
       dropLine.hide();
+      chatCue.clear();
       void handleDrop(event.paths, event.position.x, event.position.y)
         .catch((error: unknown) => {
           const detail = error instanceof Error ? error.message : String(error);
@@ -149,11 +168,13 @@ export function useNativeFileDrop(): void {
     // Rust granted none of the dropped items (folders, files gone mid-drag)
     const unlistenRefused = onNativeDropRefused(() => {
       dropLine.hide();
+      chatCue.clear();
       showFileNotice("Nothing imported — Rotli imports files, not folders");
     });
     return () => {
       stopped = true;
       dropLine.hide();
+      chatCue.clear();
       unlistenDrag();
       unlistenDrop();
       unlistenRefused();
@@ -167,14 +188,39 @@ export function useNativeFileDrop(): void {
     // the pane still accepts the drag so the drop can say so instead of the
     // browser opening the file over the app
     const webChatPane = (event: DragEvent) =>
-      !isTauri() && !!(event.target as Element | null)?.closest(`[${CHAT_PANE_ATTR}]`);
+      isTauri() ? null : (chatDropTargetAt(event.target as Element | null)?.host ?? null);
+    const cue = new ChatDropCueMarker();
+    const line = new DropLine();
+    const settle = () => {
+      cue.clear();
+      line.hide();
+    };
     const onDragOver = (event: DragEvent) => {
       if (!event.dataTransfer?.types.includes("Files")) return;
-      if (!dropEditorHost(event.target as Element | null) && !webChatPane(event)) return;
+      const host = dropEditorHost(event.target as Element | null);
+      const chatHost = webChatPane(event);
+      if (!host && !chatHost) {
+        settle();
+        return;
+      }
       event.preventDefault();
       event.dataTransfer.dropEffect = "copy";
+      if (chatHost) {
+        // the web chat cannot take the file; the cue says so before the drop does
+        cue.show(chatHost, "web");
+        line.hide();
+        return;
+      }
+      cue.clear();
+      const view = host ? EditorView.findFromDOM(host) : null;
+      if (view) line.show(view, { x: event.clientX, y: event.clientY });
+    };
+    // the drag left the window (no relatedTarget) or the gesture ended
+    const onDragLeave = (event: DragEvent) => {
+      if (event.relatedTarget === null) settle();
     };
     const onDrop = (event: DragEvent) => {
+      settle();
       if (webChatPane(event) && (event.dataTransfer?.files.length ?? 0) > 0) {
         event.preventDefault();
         showFileNotice("Files can’t be sent through Rotli Helper yet — drop images into a note instead.");
@@ -206,9 +252,14 @@ export function useNativeFileDrop(): void {
         });
     };
     window.addEventListener("dragover", onDragOver, true);
+    window.addEventListener("dragleave", onDragLeave, true);
+    window.addEventListener("dragend", settle, true);
     window.addEventListener("drop", onDrop, true);
     return () => {
+      settle();
       window.removeEventListener("dragover", onDragOver, true);
+      window.removeEventListener("dragleave", onDragLeave, true);
+      window.removeEventListener("dragend", settle, true);
       window.removeEventListener("drop", onDrop, true);
     };
   }, []);

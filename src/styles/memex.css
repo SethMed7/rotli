@@ -1401,6 +1401,55 @@
   cursor: pointer;
 }
 
+/* the drop cue (2026-09-17): while an image hovers a chat, its box rings and a
+   label says what the drop will do — attach, refuse (a blind model), or, on
+   Rotli Web, "drop into a note" because the Helper carries text only.
+   nativeFileDrop.ts stamps data-drop-over on the pane; nothing animates. */
+.chat-surface[data-drop-over] .chat-box {
+  border-color: var(--accent);
+  outline: 3px solid color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.chat-surface[data-drop-over] .chat-composer-inner {
+  position: relative;
+}
+.chat-surface[data-drop-over] .chat-composer-inner::after {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: -10px;
+  transform: translate(-50%, -100%);
+  padding: 4px 11px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.chat-surface[data-drop-over="attach"] .chat-composer-inner::after {
+  content: "Drop to attach";
+}
+.chat-surface[data-drop-over="blind"] .chat-box,
+.chat-surface[data-drop-over="web"] .chat-box {
+  border-color: var(--text-muted);
+  outline: 3px solid color-mix(in srgb, var(--text-muted) 18%, transparent);
+}
+.chat-surface[data-drop-over="blind"] .chat-composer-inner::after,
+.chat-surface[data-drop-over="web"] .chat-composer-inner::after {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+.chat-surface[data-drop-over="blind"] .chat-composer-inner::after {
+  content: "This model can’t see images — pick a vision model";
+}
+.chat-surface[data-drop-over="web"] .chat-composer-inner::after {
+  content: "Images can’t reach Rotli Helper yet — drop into a note";
+}
+
 /* image-attach vision-capability hint */
 .chat-vision-hint {
   display: flex;
@@ -3038,6 +3087,21 @@ body:has(.document-editor) [role="dialog"][class*="univer-"] input:disabled {
 .cmsg-codehead button:hover {
   background: var(--hov);
   color: var(--text);
+}
+/* an attachment's `[Image #n]` in the sent bubble reads as the same #n chip
+   the composer put on its thumbnail (2026-09-17) */
+.cmsg-imgref {
+  display: inline-block;
+  margin: 0 2px;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.78em;
+  font-weight: 600;
+  line-height: 1.6;
+  vertical-align: 0.08em;
+  white-space: nowrap;
 }
 .cmsg-images {
   display: grid;
