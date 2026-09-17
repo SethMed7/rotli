@@ -39,9 +39,18 @@ describe("importing a picked folder", () => {
       files: { "wiki/_inbox/a.md": "# A\n", ".rotli/main.json": "{}" },
       dirs: ["wiki/empty"],
     });
+    await dir.writeBytes("storage/images/shot.png", new Uint8Array([1, 2, 3]));
     const walked = await walkVaultDir(dir);
     expect(walked.files).toEqual({ "wiki/_inbox/a.md": "# A\n", ".rotli/main.json": "{}" });
-    expect(walked.dirs.sort()).toEqual([".rotli", "wiki", "wiki/_inbox", "wiki/empty"]);
+    expect(walked.binaries).toEqual({ "storage/images/shot.png": new Uint8Array([1, 2, 3]) });
+    expect(walked.dirs.sort()).toEqual([
+      ".rotli",
+      "storage",
+      "storage/images",
+      "wiki",
+      "wiki/_inbox",
+      "wiki/empty",
+    ]);
     expect(isImportedVaultSnapshot({ version: 1, name: "x", files: {}, dirs: [] })).toBe(true);
     expect(isImportedVaultSnapshot({ version: 2, name: "x", files: {}, dirs: [] })).toBe(false);
   });
@@ -75,5 +84,48 @@ describe("importing a picked folder", () => {
     expect(await vault.read(IMPORTED_VAULT_KEY)).toContain('"a.md"');
     await forgetImportedVault(vault);
     expect(await vault.read(IMPORTED_VAULT_KEY)).toBeUndefined();
+  });
+});
+
+describe("binaries in an imported copy", () => {
+  test("an image the browser refuses to keep is not kept in memory either", async () => {
+    const inner = await seedVaultDir({ version: 1, name: "memex", files: {}, dirs: [] });
+    const dir = new PersistedVaultDir(
+      inner,
+      "memex",
+      async () => {
+        throw new Error("QuotaExceededError");
+      },
+      0,
+    );
+    await expect(dir.writeBytes("storage/images/shot.png", new Uint8Array([1]))).rejects.toThrow(/Quota/);
+    expect(await inner.exists("storage/images/shot.png")).toBe(false);
+  });
+
+  test("an image written in the browser rides the snapshot and comes back as bytes", async () => {
+    let stored = "{}";
+    const inner = await seedVaultDir({
+      version: 1,
+      name: "memex",
+      files: { "wiki/a.md": "# A\n" },
+      dirs: [],
+    });
+    const dir = new PersistedVaultDir(
+      inner,
+      "memex",
+      async (snapshot) => {
+        stored = snapshot;
+      },
+      0,
+    );
+    const bytes = new Uint8Array([137, 80, 78, 71]);
+    await dir.writeBytes("storage/images/shot.png", bytes);
+    await dir.flush();
+    const saved = JSON.parse(stored);
+    expect(saved.binaries).toEqual({ "storage/images/shot.png": btoa("\x89PNG") });
+    expect(saved.files["storage/images/shot.png"]).toBeUndefined();
+    const again = await seedVaultDir(saved);
+    expect(await again.readBytes("storage/images/shot.png")).toEqual(bytes);
+    expect(await again.readText("wiki/a.md")).toBe("# A\n");
   });
 });

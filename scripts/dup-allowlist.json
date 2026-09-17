@@ -112,6 +112,16 @@
         "src/components/systemSurface.tsx"
       ],
       "reason": "The System browser's folder row moved to its own file (2026-09-16); it and the note rows in systemSurface are the one Finder-column row grammar (.fdr-name/.fdr-date/.fdr-kind), so the shared literals are class names, not copied logic."
+    },
+    {
+      "id": "image-magic-bytes-twin",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/corpus.rs",
+        "src/lib/fileKind.ts",
+        "src/lib/fileKind.test.ts"
+      ],
+      "reason": "Deliberate TS twin of the Rust image magic-number table: Rotli Web has no Rust, so lib/fileKind.ts imageBytesMatchExtension must refuse the same non-images corpus.rs image_payload_matches_extension refuses (a .png that is not a PNG). The literals ARE the contract (GIF87a, RIFF/WEBP, the ftyp brands); the test asserts them so the two cannot drift silently. Same shape as the search_match.rs / TS twin entry."
     }
   ]
 }

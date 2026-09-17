@@ -121,6 +121,7 @@ export const SERVICE_FILE_OWNERS = {
   "helperLink.ts": "chat",
   "webAiCorpus.ts": "chat",
   "webChats.ts": "chat",
+  "webFiles.ts": "notes",
   "createNote.ts": "notes",
   "demoCorpus.ts": "notes",
   "inMemoryNotes.ts": "notes",
