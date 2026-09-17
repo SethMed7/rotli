@@ -230,3 +230,16 @@ export function configureBrowserVault(store: VaultStore): BrowserVault {
   vault = new BrowserVault(store);
   return vault;
 }
+
+let storageVault: BrowserVault | null = null;
+
+/** The browser's OWN storage, whatever store the page swapped in: where the
+ * remembered folder handle and an imported copy live. In folder or imported
+ * mode `browserVault()` is the vault's files, so a write meant for the
+ * browser (a reconnect's new copy) must come here (2026-09-17: it landed
+ * inside the old copy as `.rotli/web/vault-import`, and reconnecting
+ * changed nothing). */
+export function browserStorageVault(): BrowserVault {
+  storageVault ??= new BrowserVault(chooseStore());
+  return storageVault;
+}

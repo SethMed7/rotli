@@ -78,6 +78,39 @@ describe("importing a picked folder", () => {
     expect(last.name).toBe("memex");
   });
 
+  test("a reconnect retires the live copy: its write-on-page-hide never lands on the new one", async () => {
+    const vault = new BrowserVault(new MemoryVaultStore());
+    const old = new PersistedVaultDir(
+      new MemoryVaultDir(),
+      "memex",
+      (snapshot) => vault.write(IMPORTED_VAULT_KEY, snapshot),
+      0,
+    );
+    await old.writeText("chats/a.md", "old, unsaved"); // dirty, save pending
+    await saveImportedVault(
+      { version: 1, name: "memex", files: { "chats/a.md": "new" }, dirs: ["chats"] },
+      vault,
+    );
+    await old.flush(); // the reload's pagehide
+    await old.writeText("chats/b.md", "late"); // a straggler after retirement
+    await old.flush();
+    expect(JSON.parse((await vault.read(IMPORTED_VAULT_KEY))!).files).toEqual({ "chats/a.md": "new" });
+  });
+
+  test("forgetting the copy retires it too, so it cannot resurrect itself", async () => {
+    const vault = new BrowserVault(new MemoryVaultStore());
+    const old = new PersistedVaultDir(
+      new MemoryVaultDir(),
+      "memex",
+      (snapshot) => vault.write(IMPORTED_VAULT_KEY, snapshot),
+      0,
+    );
+    await old.writeText("wiki/a.md", "x");
+    await forgetImportedVault(vault);
+    await old.flush();
+    expect(await vault.read(IMPORTED_VAULT_KEY)).toBeUndefined();
+  });
+
   test("save and forget round-trip through the browser vault", async () => {
     const vault = new BrowserVault(new MemoryVaultStore());
     await saveImportedVault({ version: 1, name: "m", files: { "a.md": "x" }, dirs: [] }, vault);

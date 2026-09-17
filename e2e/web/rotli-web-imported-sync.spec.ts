@@ -123,9 +123,9 @@ test("an imported vault shows the app's chats, their folders, and each chat's mo
   const sidebar = page.locator(".sidebar, aside").first();
   // a copy says so, and how old it is, with the import one click away
   const bar = page.locator(".sb-reconnect");
-  await expect(bar).toContainText("A copy of memex-copy imported");
+  await expect(bar).toContainText("Connected to a copy of memex-copy, taken");
   await expect(bar).toContainText("ago");
-  await expect(bar.getByRole("button", { name: "Import again" })).toBeVisible();
+  await expect(bar.getByRole("button", { name: "Reconnect" })).toBeVisible();
   // the folder from .rotli/chat-folders.json, with its one chat inside
   await expect(sidebar.getByText("Work", { exact: true })).toBeVisible();
   await expect(sidebar.getByText("Loose chat")).toBeVisible();
@@ -149,4 +149,88 @@ test("an imported vault shows the app's chats, their folders, and each chat's mo
   const editor = page.locator(".cm-content").first();
   await expect(editor).toContainText("Messages");
   await expect(editor).toHaveAttribute("contenteditable", "true");
+});
+
+test("reconnecting replaces the copy: the old copy's page-hide save never lands on the new one", async ({
+  page,
+}, testInfo) => {
+  // an OLD copy: the chat file has no model line, but settings pin it, so the
+  // boot-time backfill dirties the copy (a save is pending at reload)
+  const oldSnapshot = {
+    ...SNAPSHOT,
+    importedAt: undefined,
+    files: {
+      ...SNAPSHOT.files,
+      "chats/loose-chat.md": chatFile("Loose chat", "2026-09-12"),
+      ".rotli/settings.json": JSON.stringify({
+        onboarded: true,
+        chatModel: { "corpus:loose-chat": "sonnet" },
+      }),
+    },
+  };
+  // the vault as it is NOW on disk: the app wrote the chat's real lane
+  const folder = testInfo.outputPath("memex-copy");
+  const { mkdirSync, writeFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  mkdirSync(join(folder, "chats"), { recursive: true });
+  mkdirSync(join(folder, "wiki"), { recursive: true });
+  writeFileSync(join(folder, "wiki", "hello.md"), SNAPSHOT.files["wiki/hello.md"]);
+  writeFileSync(
+    join(folder, "chats", "loose-chat.md"),
+    chatFile("Loose chat", "2026-09-12").replace(
+      "tags: [chat]\n",
+      "tags: [chat]\nmodel: gpt-5.6-sol\nprovider: codex\n",
+    ),
+  );
+
+  await fakeHelper(page);
+  // a browser without the live folder API: the copy path, through the picker
+  await page.addInitScript(() => {
+    Reflect.deleteProperty(window as unknown as Record<string, unknown>, "showDirectoryPicker");
+  });
+  await page.goto(APP);
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await page.evaluate(
+    (snapshot) =>
+      new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open("rotli-web");
+        open.onsuccess = () => {
+          const tx = open.result.transaction("vault", "readwrite");
+          tx.objectStore("vault").put(JSON.stringify(snapshot), "vault-import");
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        };
+        open.onerror = () => reject(open.error);
+      }),
+    oldSnapshot,
+  );
+  await page.reload();
+  const bar = page.locator(".sb-reconnect");
+  await expect(bar).toContainText("Connected to a copy of memex-copy");
+  await expect(bar).not.toContainText("taken");
+  // let the backfill land (it dirties the copy)
+  await page.waitForTimeout(600);
+
+  // Reconnect → the browser's picker → the folder on disk
+  const chooser = page.waitForEvent("filechooser");
+  await bar.getByRole("button", { name: "Reconnect" }).click();
+  await page.getByRole("button", { name: "Choose vault…" }).click();
+  const logs: string[] = [];
+  page.on("console", (m) => logs.push(`[${m.type()}] ${m.text()}`));
+  page.on("pageerror", (e) => logs.push(`[pageerror] ${e.message}`));
+  await (await chooser).setFiles(folder);
+
+  // the page reloads from the NEW copy — stamped with when it was taken
+  await expect(page.locator(".sb-reconnect")).toContainText("taken just now ago");
+  await page.locator(".sb-switch-seg.desktop-only").click();
+  const dialog = page.getByRole("dialog", { name: "Chat on the web" });
+  await dialog.getByLabel("Paste the pairing code the helper printed:").fill(`${PORT}:${TOKEN}`);
+  await dialog.getByRole("button", { name: "Pair" }).click();
+  await expect(dialog.getByRole("status").filter({ hasText: "Paired with" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Done" }).click();
+  await page.locator(".sb-switch-seg", { hasText: /^Chat/ }).click();
+  await expect(page.locator('.sb-chatrow[data-chat-slug="loose-chat"] .sb-chatmark').first()).toHaveAttribute(
+    "title",
+    /OpenAI/,
+  );
 });

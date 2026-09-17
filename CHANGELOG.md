@@ -12,10 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Rotli Web says when it is showing a copy.** An imported vault is a
-  snapshot; it never follows the folder. The sidebar now says so — "A copy
-  of X imported 2h ago" — with Import again one click away, so a stale copy
-  is never mistaken for the live vault.
+- **Rotli Web says when it is showing a copy.** A connected copy of a vault
+  is a snapshot; it never follows the folder. The sidebar now says so —
+  "Connected to a copy of X, taken 2h ago" — with Reconnect one click away,
+  so a stale copy is never mistaken for the live vault.
+- **The open chat shows its file's model.** A chat this device never pinned
+  seeds its model from the `model:` line in its file, on the web and the Mac
+  alike, so a copy of the vault opens each chat on the lane it ran on.
 - **Rotli Web: Files reveals the open chat too.** With a chat open, Files
   opens the vault's browser at the Chats folder that holds its file.
 - **The prompt navigator is a stack of cards.** Hovering the left-edge
@@ -153,6 +156,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Rotli Web: reconnecting a copy now takes.** With a copy connected, the
+  page's vault IS the copy, so the reconnect saved the new copy inside the
+  old one (as `.rotli/web/vault-import`) and reloaded the old one — nothing
+  changed. The new copy now goes to the browser's own storage, and the old
+  copy is retired first so its save-on-page-hide can never write again
+  (Forget too).
 - **Rotli Web, folder mode: a file being written is never read half-way.**
   Chromium swaps a file in when a write closes, and a read landing inside
   that window threw; when the model backfill rewrote a chat at boot while
