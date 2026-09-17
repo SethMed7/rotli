@@ -25,7 +25,8 @@ test("copying a note's selection puts its Markdown on the clipboard, and HTML be
   const editor = page.locator(".cm-content").last();
   await editor.click();
   await page.keyboard.insertText(NOTE);
-  await page.keyboard.press("Meta+A");
+  // ControlOrMeta: CodeMirror binds select-all to Mod-a, which is Ctrl on the Linux CI runner
+  await page.keyboard.press("ControlOrMeta+A");
 
   const copied = await editor.evaluate((content) => {
     const data = new DataTransfer();
