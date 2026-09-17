@@ -3,17 +3,37 @@
 // reveals the same sidebar as an overlay over the content; it slides away
 // once the pointer leaves it, or on Esc. ⌘0 still brings it — in this mode
 // `sidebarCollapsed` is simply "the overlay is closed".
+//
+// Two races the review caught (2026-09-17): a graze — the pointer leaves the
+// strip before the overlay has mounted, so no leave ever reaches the overlay
+// — and the sidebar's own context menu, whose portal takes focus and the
+// pointer. So a hide is ARMED by leaving the strip or the overlay, but only
+// LANDS when the pointer is truly away from both and no context menu is open;
+// a menu closing re-arms it. And a close by Esc or ⌘0 under a resting pointer
+// leaves the strip beneath that pointer — the browser's synthetic enter would
+// reopen it at once — so the strip is disarmed until the pointer leaves it.
 
 import { useEffect, useRef } from "react";
 
+import { useContextMenu } from "../../state/contextMenu";
 import { type SidebarSide, useUiStore } from "../../state/ui";
 import { Sidebar } from "../sidebar";
 
 const LEAVE_GRACE_MS = 260;
 
+function inside(el: Element | null, x: number, y: number): boolean {
+  if (!el) return false;
+  const r = el.getBoundingClientRect();
+  return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+}
+
 export function SidebarHoverRail({ side }: { side: SidebarSide }) {
   const open = useUiStore((s) => !s.sidebarCollapsed);
   const setCollapsed = useUiStore((s) => s.setSidebarCollapsed);
+  const stripRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const pointer = useRef({ x: -1, y: -1 });
+  const armed = useRef(true);
   const timer = useRef<number | null>(null);
   const cancel = () => {
     if (timer.current === null) return;
@@ -21,6 +41,7 @@ export function SidebarHoverRail({ side }: { side: SidebarSide }) {
     timer.current = null;
   };
   const show = () => {
+    if (!armed.current) return;
     cancel();
     setCollapsed(false);
   };
@@ -28,25 +49,70 @@ export function SidebarHoverRail({ side }: { side: SidebarSide }) {
     cancel();
     timer.current = window.setTimeout(() => {
       timer.current = null;
+      const { x, y } = pointer.current;
+      // still over the rail or its strip, or its menu is up: stay
+      if (inside(overlayRef.current, x, y) || inside(stripRef.current, x, y)) return;
+      if (useContextMenu.getState().menu) return;
       setCollapsed(true);
     }, LEAVE_GRACE_MS);
   };
-  useEffect(() => cancel, []);
+  const leaveStrip = () => {
+    armed.current = true;
+    hideSoon();
+  };
+  // the latest hide for the menu subscription below (no memo: the compiler
+  // owns memoisation here)
+  const hideSoonRef = useRef(hideSoon);
+  useEffect(() => {
+    hideSoonRef.current = hideSoon;
+  });
+  useEffect(
+    () => () => {
+      if (timer.current !== null) window.clearTimeout(timer.current);
+    },
+    [],
+  );
+  useEffect(() => {
+    // closed while the pointer rests on the strip (Esc, ⌘0): hold until it leaves
+    if (!open && inside(stripRef.current, pointer.current.x, pointer.current.y)) armed.current = false;
+  }, [open]);
+  useEffect(() => {
+    const track = (event: PointerEvent) => {
+      pointer.current = { x: event.clientX, y: event.clientY };
+    };
+    window.addEventListener("pointermove", track);
+    return () => window.removeEventListener("pointermove", track);
+  }, []);
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") setCollapsed(true);
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // the rail's own menu closing (a pick, a dismissal) re-arms the hide
+    const unsubscribe = useContextMenu.subscribe((state, previous) => {
+      if (previous.menu && !state.menu) hideSoonRef.current();
+    });
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      unsubscribe();
+    };
   }, [open, setCollapsed]);
   return (
     <>
-      <div className="warm-edge" data-side={side} aria-hidden="true" onPointerEnter={show}>
+      <div
+        ref={stripRef}
+        className="warm-edge"
+        data-side={side}
+        aria-hidden="true"
+        onPointerEnter={show}
+        onPointerLeave={leaveStrip}
+      >
         <span className="edgehint" />
       </div>
       {open && (
         <div
+          ref={overlayRef}
           className="rail-overlay"
           data-side={side}
           onPointerEnter={cancel}

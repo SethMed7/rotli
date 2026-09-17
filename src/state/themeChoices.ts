@@ -78,7 +78,3 @@ export const THEME_FAMILY_PRESENTATIONS: readonly {
     darkLabel: "Midnight",
   },
 ];
-
-/** The organizer daemon's §4.3 trust ladder, monotonic in risk. Off = dormant ·
- * Suggest (default) = journal proposals only · Tidy = applies annotations +
- * files brand-new captures · Organize = applies everything, fully journaled. */

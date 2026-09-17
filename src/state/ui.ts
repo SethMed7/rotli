@@ -56,6 +56,9 @@ export type SidebarReveal = (typeof SIDEBAR_REVEALS)[number];
 
 export { SOLID_THEMES, THEME_FAMILY_PRESENTATIONS } from "./themeChoices";
 
+/** The organizer daemon's §4.3 trust ladder, monotonic in risk. Off = dormant ·
+ * Suggest (default) = journal proposals only · Tidy = applies annotations +
+ * files brand-new captures · Organize = applies everything, fully journaled. */
 export type OrganizerTrust = "off" | "suggest" | "tidy" | "organize";
 /** The macOS Dock/app icon variants (Settings → Appearance → App icon). */
 export type AppIcon = "default" | "warm" | "paper" | "charcoal" | "clay";
@@ -723,8 +726,13 @@ export const useUiStore = create<UiState>((set, get) => ({
   sidebarSide: "left",
   setSidebarSide: (side) => set({ sidebarSide: side }),
   sidebarReveal: "pinned",
-  // hover starts hidden; back to pinned puts the rail back in the flow
-  setSidebarReveal: (reveal) => set({ sidebarReveal: reveal, sidebarCollapsed: reveal === "hover" }),
+  // only a CHANGE moves the rail: entering hover starts hidden, leaving it
+  // puts the rail back in the flow; re-picking the same mode leaves ⌘0's
+  // open/closed alone (review, 2026-09-17)
+  setSidebarReveal: (reveal) =>
+    set((s) =>
+      s.sidebarReveal === reveal ? {} : { sidebarReveal: reveal, sidebarCollapsed: reveal === "hover" },
+    ),
 
   stayOpen: false,
   setStayOpen: (on) => set({ stayOpen: on }),

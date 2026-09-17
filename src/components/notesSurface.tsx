@@ -63,8 +63,10 @@ function RailGrip({
   };
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const step = event.shiftKey ? 32 : 8;
-    if (event.key === "ArrowLeft") onResize(width - step);
-    else if (event.key === "ArrowRight") onResize(width + step);
+    // on the right edge the keys follow the grip's visual axis too
+    const sign = side === "right" ? -1 : 1;
+    if (event.key === "ArrowLeft") onResize(width - sign * step);
+    else if (event.key === "ArrowRight") onResize(width + sign * step);
     else if (event.key === "Home") onResize(190);
     else if (event.key === "End") onResize(460);
     else return;
