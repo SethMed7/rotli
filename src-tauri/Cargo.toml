@@ -67,8 +67,13 @@ libc = "0.2"
 # not(macos) stub, so the crate itself must not be asked for on Linux/Windows.
 security-framework = "3"
 objc2 = "0.6"
-objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSImage", "NSPasteboard", "NSPasteboardItem", "NSResponder"] }
-objc2-foundation = { version = "0.3", features = ["NSArray", "NSData", "NSError", "NSString", "NSURL"] }
+# NSFilePromiseReceiver + NSBitmapImageRep serve the screenshot-thumbnail drop
+# (native_drag_promise.rs): the macOS ⌘⇧4/⌘⇧5 preview hands a FILE PROMISE and
+# raw image bytes, never a path, so the promise reader block (block2) and the
+# TIFF→PNG re-encode are what turn that drag into a file Rotli can import.
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSBitmapImageRep", "NSFilePromiseReceiver", "NSImage", "NSImageRep", "NSPasteboard", "NSPasteboardItem", "NSResponder", "NSWindow", "block2"] }
+objc2-foundation = { version = "0.3", features = ["NSArray", "NSData", "NSDictionary", "NSError", "NSOperation", "NSString", "NSURL"] }
+block2 = "0.6"                                                   # the promised-file reader block (already transitive; named here because we write one)
 
 # Size diet (2026-07-31): the release binary embeds the whole frontend dist, and
 # without a profile the code portion shipped 16 codegen units, no LTO, and 51k

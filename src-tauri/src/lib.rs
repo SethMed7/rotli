@@ -32,6 +32,9 @@ mod loopback_http;
 mod localmodel;
 mod memex;
 mod memex_query; mod native_drag; mod pasteboard; mod remote_agent_url; mod welcome_lessons;
+/// Pathless drops (screenshot thumbnail, browser images) — AppKit only.
+#[cfg(target_os = "macos")]
+mod native_drag_promise;
 mod organizer;
 mod organizer_knobs;
 #[cfg(test)]
@@ -2576,6 +2579,12 @@ pub fn run() {
             memex::memex_pick_folder
         ])
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            if native_drag::debug_drops() {
+                if let Some(main) = app.get_webview_window("main") {
+                    native_drag_promise::dump_drop_targets(&main.as_ref().window());
+                }
+            }
             // The visitor law: never in the dock, never in Cmd-Tab.
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
@@ -2891,6 +2900,13 @@ pub fn run() {
 
             Ok(())
         })
+        // `unstable` makes even the main content a child webview. Its native
+        // drags are WebviewEvent, not WindowEvent (tauri-runtime-wry).
+        .on_webview_event(|webview, event| {
+            if let Some(drag) = native_drag::workspace_drag(webview.label(), event) {
+                native_drag::handle(&webview.window(), drag);
+            }
+        })
         // Click-away hide (the visitor law) — a setting since 2026-06-12:
         // "Stay open" turns it off for the main window. Capture always hides.
         // And closing NEVER destroys (the summon law: summon shows LIVING
@@ -2899,10 +2915,6 @@ pub fn run() {
         // the rest of the process. ⌘W is owned by the frontend registry above.
         .on_window_event(|window, event| {
             match event {
-                WindowEvent::DragDrop(event) => {
-                    native_drag::handle(window, event);
-                    return;
-                }
                 WindowEvent::CloseRequested { api, .. } => {
                     api.prevent_close();
                     let _ = window.hide();

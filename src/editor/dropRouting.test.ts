@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   emptyPasteOutcome,
+  dropIsBlocked,
   classifyPaste,
   type DropCandidate,
   firstTarget,
@@ -157,4 +158,11 @@ describe("a paste of copied files", () => {
     // the files are still there but this copy's one grant is spent
     expect(emptyPasteOutcome(true, "editor", "shot.png")).toBe("copy-again");
   });
+});
+
+test("a refused-chat modal and its backdrop block caret and Assets fallbacks", () => {
+  const backdrop = new FakeElement("image-error-backdrop", ["rename-overlay"]);
+  expect(dropIsBlocked([at(dialog, chat, body)])).toBe(true);
+  expect(dropIsBlocked([at(backdrop, editor, pane, body)])).toBe(true);
+  expect(dropIsBlocked([at(overlay, editor, pane, body)])).toBe(false);
 });

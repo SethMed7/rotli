@@ -75,6 +75,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Image drops on a chat whose model cannot see images now show a modal error
+  before importing anything. Choose an image-capable model and drop again to
+  attach. Native drops now reach the import handler through Tauri's webview
+  event channel, restoring the path disconnected when multi-webview support
+  was enabled. Finder, file-promise, and image-byte drops share the existing
+  import grants; private browser child views cannot import into the workspace.
+
+- **Drag the macOS screenshot thumbnail straight into a note or a chat.** The
+  floating preview after ⌘⇧4 / ⌘⇧5 used to land as "Nothing imported": it
+  hands over a *promise* of a file, never a path, and Rotli only read paths.
+  Rotli now reads the drag itself — it calls the promise in, waits for the
+  screenshot to be written, and then imports it exactly like a file dragged
+  from Finder, at the point you dropped it. An image dragged out of Safari,
+  Chrome, or Photos works the same way: the picture's own bytes are saved as
+  a PNG named for the moment you dropped it. Staging files sit in the
+  system's temp folder and are swept a day later. Set `ROTLI_DEBUG_DROPS=1`
+  to have the app narrate what a drag carried.
 - Editor: copying from a note now puts the note's own Markdown on the
   clipboard as plain text, so a paste into another note or a chat renders
   exactly what you copied (headings, tasks, lists). Before, the plain text

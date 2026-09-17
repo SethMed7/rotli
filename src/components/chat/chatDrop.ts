@@ -26,11 +26,21 @@ export function isChatImagePath(path: string): boolean {
 const targets = new Map<string, AttachImages>();
 
 /** A mounted chat composer offers itself as a drop target for its pane. */
-export function registerChatDrop(paneId: string, attach: AttachImages): () => void {
-  targets.set(paneId, attach);
+export function registerChatDrop(
+  paneId: string,
+  attach: AttachImages,
+  canVision: boolean,
+  refuse: () => void,
+): () => void {
+  // Refuse before the attachment callback can import anything into Assets.
+  const receive: AttachImages = (paths) => {
+    if (canVision) attach(paths);
+    else refuse();
+  };
+  targets.set(paneId, receive);
   return () => {
     // only clear if still ours — a remount can register the next surface first
-    if (targets.get(paneId) === attach) targets.delete(paneId);
+    if (targets.get(paneId) === receive) targets.delete(paneId);
   };
 }
 
