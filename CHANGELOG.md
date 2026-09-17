@@ -84,6 +84,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   image lands at the note's end. The row you are over lights up. On Rotli
   Web a note row works the same; a chat row says the Helper carries text
   only.
+- Rotli Web: when the connected folder needs the browser's permission again,
+  a bar at the top of the sidebar says so and offers Reconnect, and stays
+  until the folder is back. Before, a passing notice said it once and the app
+  quietly ran on the last copy in browser storage — older chats, and none of
+  the per-chat models the Mac app keeps in the folder's settings, so every
+  chat showed the default model's mark.
+- Chat: a chat whose model was saved under its old label (for example
+  "Gemini 3.5 Flash (Medium)") shows Google's mark again instead of "this
+  Mac".
 - Chat: Antigravity (Gemini) chats take image attachments. Google's agent
   advertises image prompts, so Rotli now sends attached images as prompt
   blocks beside your text instead of refusing them; an agent that advertises

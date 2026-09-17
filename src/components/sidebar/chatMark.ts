@@ -72,6 +72,10 @@ export function markKeyOf(provider: string | undefined, modelName = ""): ChatMar
       return "preset";
     default: {
       const family = modelName.toLowerCase();
+      // a value the old picker stored as its LABEL ("Gemini 3.5 Flash (Medium)")
+      // or a Gemini id with no lane behind it any more: still Google's, never
+      // "this Mac" — a local model is never named gemini-<digit>
+      if (/^gemini[ -]\d/.test(family)) return "gemini";
       if (family.includes("gemma")) return "gemma";
       if (family.includes("qwen")) return "qwen";
       if (family.includes("llama")) return "meta";

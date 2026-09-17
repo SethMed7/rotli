@@ -36,6 +36,7 @@ import { requestVaultFolder } from "../state/vaultFolderBrowser";
 import { useWebVaultConnect } from "../state/webVaultConnect";
 import { BreveSidebar } from "./breve/breveSidebar";
 import { ChevronRight, MoreGlyph, NewFileGlyph, NewFolderGlyph, RefreshGlyph, VaultGlyph } from "./glyphs";
+import { FolderReconnectBar } from "./sidebar/folderReconnectBar";
 import { SidebarChat } from "./sidebar/sidebarChat";
 import { SidebarFooter } from "./sidebar/sidebarFooter";
 import { SidebarHome } from "./sidebar/sidebarHome";
@@ -368,6 +369,9 @@ export function Sidebar() {
         </button>
       </div>
 
+      {/* Rotli Web: the connected folder is waiting on the browser's permission
+          — say so where it cannot be missed, above every front (2026-09-17) */}
+      <FolderReconnectBar />
       {/* the FRONT switcher (the maintainer, 2026-08-01) — directly under the vault
           header, above everything the front renders. Breve is a MODE with its
           own rail below, but it sits in the same control (2026-09-02) so the
