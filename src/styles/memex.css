@@ -1005,49 +1005,51 @@
   top: 0;
   display: flex;
   width: min(340px, calc(100vw - 110px));
-  max-height: min(420px, var(--chat-prompt-menu-max-height, 68vh));
+  max-height: min(520px, var(--chat-prompt-menu-max-height, 68vh));
   transform: translateY(var(--chat-prompt-menu-offset, 0));
   overflow: hidden;
   flex-direction: column;
-  padding: 10px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--r-card);
-  background: var(--surface-2);
+  /* no chrome of its own: the cards are the surface (the owner, 2026-09-17:
+     "individual cards… the big card for long threads won't work") */
+  padding: 2px 0;
   color: var(--text);
 }
 .chat-prompt-list {
   display: flex;
   min-height: 0;
-  overflow-y: auto;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
 }
-.chat-prompt-list button {
-  display: block;
+.chat-prompt-card {
+  display: -webkit-box;
   width: 100%;
   min-width: 0;
-  border: none;
-  border-radius: var(--r-control);
-  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
   color: var(--text);
-  padding: 8px 9px;
+  padding: 9px 11px;
   font: inherit;
   font-size: 12.5px;
+  line-height: 1.35;
   text-align: left;
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   cursor: pointer;
+  /* each step away from the card you're on fades a little more: 1 → .74 → .48 → .22 */
+  opacity: calc(1 - var(--d, 0) * 0.26);
+  transition: opacity 120ms ease;
 }
-.chat-prompt-list button:hover:not(.active),
-.chat-prompt-list button.preview:not(.active) {
-  opacity: 0.68;
+.chat-prompt-card:hover,
+.chat-prompt-card.focal {
+  opacity: 1;
 }
-.chat-prompt-list button.active {
+.chat-prompt-card.active {
   background: var(--selected-bg);
   font-weight: 600;
 }
-.chat-prompt-list button:focus-visible {
+.chat-prompt-card:focus-visible {
   outline: 2px solid var(--accent-text);
   outline-offset: -2px;
 }

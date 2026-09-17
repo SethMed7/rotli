@@ -50,7 +50,11 @@ export function chatsToStamp(
 ): { slug: string; modelId: string }[] {
   return chats.flatMap((chat) => {
     if (chat.model && chat.provider) return [];
-    const modelId = chat.model || chatModelMap[chatKey(instanceId, chat.slug, "")] || defaultModel;
+    // the default stands in only where this device's map exists at all: a
+    // copy that lost its settings (a stale browser-storage vault, an import
+    // without .rotli/) must not be stamped "the default" on every chat
+    const fallback = Object.keys(chatModelMap).length > 0 ? defaultModel : "";
+    const modelId = chat.model || chatModelMap[chatKey(instanceId, chat.slug, "")] || fallback;
     return modelId ? [{ slug: chat.slug, modelId }] : [];
   });
 }

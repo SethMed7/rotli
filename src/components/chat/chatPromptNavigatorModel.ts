@@ -55,6 +55,30 @@ export function conversationPrompts(
   );
 }
 
+export interface PromptCard {
+  prompt: PromptLocation;
+  /** 0 for the card you're on; grows by one per step away from it. */
+  distance: number;
+}
+
+/** The menu is a STACK OF CARDS around the prompt you're on, not one long
+ * list: the focal card and up to `radius` neighbours each way (the owner,
+ * 2026-09-17: "I can see 2-3 up and 2-3 down… the big card for long threads
+ * won't work"). The focal prompt is the marker under the pointer, else the
+ * prompt on screen, else the last one. */
+export function promptWindow(
+  prompts: readonly PromptLocation[],
+  focalMessageIndex: number | null,
+  radius = 3,
+): PromptCard[] {
+  if (prompts.length === 0) return [];
+  let focal = prompts.findIndex((p) => p.messageIndex === focalMessageIndex);
+  if (focal < 0) focal = prompts.length - 1;
+  const start = Math.max(0, focal - radius);
+  const end = Math.min(prompts.length, focal + radius + 1);
+  return prompts.slice(start, end).map((prompt, k) => ({ prompt, distance: Math.abs(start + k - focal) }));
+}
+
 /** One line for the compact prompt menu. Preserve meaning, collapse Markdown
  * whitespace, and avoid a single long prompt widening the pane. */
 export function promptPreview(text: string, maxLength = 72): string {
