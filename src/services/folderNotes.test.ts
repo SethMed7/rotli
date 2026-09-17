@@ -341,4 +341,20 @@ describe("a plain folder of Markdown files", () => {
     expect(await dir.exists("fresh.md")).toBe(true);
     expect((await notes.searchNotes("quarterly")).map((h) => h.id)).toEqual(["work/plan.md"]);
   });
+
+  test("chats/ transcripts are indexed for the Library but stay out of All notes and search", async () => {
+    const dir = new MemoryVaultDir();
+    await dir.writeText("wiki/plan.md", "# Plan\n\nlaunch");
+    await dir.writeText(
+      "chats/planning.md",
+      "---\nid: 2026-09-16-planning\ntitle: Planning\nsource: rotli\n---\n\n# Planning\n\n## Messages\n\n**you** · t — launch\n",
+    );
+    const svc = new FolderNotesService(dir);
+    const all = await svc.listAll();
+    const chat = all.find((n) => n.folderId === "chats");
+    expect(chat?.title).toBe("Planning");
+    expect(chat?.aliases?.[0]).toBe("planning");
+    expect((await svc.listNotes()).some((n) => n.folderId === "chats")).toBe(false);
+    expect((await svc.searchNotes("launch")).map((h) => h.folderId)).toEqual(["wiki"]);
+  });
 });

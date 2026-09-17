@@ -144,6 +144,18 @@ function useNoteUniverse(): { lists: (NoteSummary[] | undefined)[]; complete: bo
   return { lists, complete };
 }
 
+/** The vault's chat transcripts (`chats/**`, `vault:chats/**`) — outside every
+ * note scope on purpose (the Chat front owns them), read from the same
+ * corpus listing for the one place that browses them as files: the Library. */
+export function useChatTranscripts(): NoteSummary[] {
+  const corpus = useQuery({
+    queryKey: keys.notes(UNIVERSE_KEY),
+    queryFn: () => notesService.listAll(),
+  });
+  const raw = corpus.data;
+  return useMemo(() => (raw ?? []).filter((n) => isChatsPath(n.folderId)), [raw]);
+}
+
 /** The ONE id → summary index over EVERY note that exists. useNotes() alone is
  * a VIEW, not the universe; anything that treats it as "all notes" silently
  * loses staged/vaulted/added-root notes (the bug that GC'd the maintainer's seeded Main

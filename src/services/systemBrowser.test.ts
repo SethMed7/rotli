@@ -15,6 +15,9 @@ import {
   rerootDiskPath,
   sortFolderListing,
   filterSystemFolders,
+  chatSlugOf,
+  isChatItem,
+  libraryPathOfChat,
 } from "./systemBrowser";
 
 const note = (over: Partial<NoteSummary>): NoteSummary => ({
@@ -255,5 +258,30 @@ describe("hidden lanes", () => {
       "wiki/engineering/empty-sub",
     ]);
     expect(filterSystemFolders(notes, "theo", [], undefined, new Set(["wiki/theology"]))).toEqual([]);
+  });
+
+  test("chats browse in the Library under a Chats folder and open by their slug", () => {
+    const chat = note({
+      id: "2026-09-16-planning",
+      title: "Planning",
+      folderId: "chats",
+      aliases: ["planning", "planning-chat"],
+    });
+    const vaultChat = note({
+      id: "c2",
+      title: "Vault chat",
+      folderId: "vault:chats",
+      aliases: ["vault-chat"],
+    });
+    const plain = note({ id: "n", title: "Note", folderId: "wiki/engineering" });
+    expect(isChatItem(chat)).toBe(true);
+    expect(isChatItem(vaultChat)).toBe(true);
+    expect(isChatItem(plain)).toBe(false);
+    expect(chatSlugOf(chat)).toBe("planning");
+    expect(chatSlugOf(note({ id: "bare" }))).toBe("bare");
+    expect(libraryPathOfChat("chats", "wiki")).toBe("wiki/chats");
+    expect(libraryPathOfChat("vault:chats", "wiki")).toBe("wiki/chats");
+    expect(kindLabel(chat)).toBe("Chat");
+    expect(folderSegmentLabel("chats")).toBe("Chats");
   });
 });

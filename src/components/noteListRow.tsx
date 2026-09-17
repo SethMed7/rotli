@@ -6,8 +6,10 @@ import { type MouseEvent, type ReactNode, memo } from "react";
 
 import { longDateLabel } from "../lib/dateLabels";
 import { startMainAddDrag } from "../lib/mainAddDrag";
+import { noteDiskFolder } from "../lib/noteLocation";
+import { isChatsPath } from "../services/destinations";
 import type { NoteSummary } from "../types";
-import { glyphForNote, PinGlyph } from "./glyphs";
+import { ChatGlyph, glyphForNote, PinGlyph } from "./glyphs";
 
 // memo: list surfaces render hundreds of rows and re-render per search
 // keystroke / corpus invalidation — with stable summaries and callbacks the
@@ -57,7 +59,11 @@ function NoteListRowImpl({
         onContextMenu={onContextMenu ? (e) => onContextMenu(e, note) : undefined}
         title={board ? "Open board" : file ? "Open file" : "Open note"}
       >
-        {glyphForNote(note, { size: 14, className: "rr-icon" })}
+        {isChatsPath(noteDiskFolder(note)) ? (
+          <ChatGlyph size={14} className="rr-icon" />
+        ) : (
+          glyphForNote(note, { size: 14, className: "rr-icon" })
+        )}
         <span className="rr-title">{note.title || (board ? "Untitled board" : "Empty note")}</span>
         {snippetNode ? (
           <span className="rr-snippet">{snippetNode}</span>

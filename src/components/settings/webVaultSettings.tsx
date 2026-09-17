@@ -109,7 +109,8 @@ export function WebVaultSettings() {
         </p>
       )}
       <p className="setnote">
-        Chat and every model, the Librarian, Breve, Word and sheet files, and Finder drops are in{" "}
+        Chat runs through Rotli Helper on this computer (Home → Chat walks you through it). On-device models,
+        the Librarian, Breve, Word and sheet files, and Finder drops are in{" "}
         <a href="/" rel="noopener">
           Rotli for Mac
         </a>

@@ -61,6 +61,16 @@ export function seedDemoCorpus(
   const storageNorthstar = svc.seedReserved(`${DEST.storage}/Northstar`, "Northstar", DEST.storage);
 
   if (!empty) {
+    // one transcript, so the Library's Chats folder has something to show (the
+    // Chat front lists chats through the memex bridge, which the twin lacks)
+    svc.seedNote(
+      "vault:chats",
+      "# Planning chat\n\n## Messages\n\n**you** · 2026-09-10T10:00:00Z — where do we start?\n",
+      {
+        createdAt: Date.parse("2026-09-10"),
+        updatedAt: Date.parse("2026-09-10"),
+      },
+    );
     // —— Inbox: the welcome note + a quick capture ——
     const welcome = svc.seedNote(
       inbox.id,
