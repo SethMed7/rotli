@@ -78,6 +78,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   can't see images. On Rotli Web the label says images can't reach Rotli
   Helper yet and points you to a note, and a note now draws the same drop
   line the Mac app shows while an image hovers it.
+- Sidebar: drag an image onto a chat in the sidebar and the chat opens with
+  the image attached; drag it onto a note in Main and, after a short hold,
+  the note springs open so you can drop into it — or drop on the row and the
+  image lands at the note's end. The row you are over lights up. On Rotli
+  Web a note row works the same; a chat row says the Helper carries text
+  only.
 - Chat: a sent message shows each attached image as a small `#1`, `#2` chip
   where the message names it, matching the number on the thumbnail above the
   input, so you can see where an image was added.

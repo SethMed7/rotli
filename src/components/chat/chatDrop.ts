@@ -96,8 +96,9 @@ export function chatDropTargetAt(element: Element | null): ChatDropTarget | null
   return { host: found.host as unknown as Element, cue: entry.canVision ? "attach" : "blind" };
 }
 
-/** The attribute the hovered pane carries; memex.css draws the cue from it. */
-export const CHAT_DROP_OVER_ATTR = "data-drop-over";
+/** The attribute a hovered drop target carries; the stylesheets draw the cue
+ * from it — a chat pane (memex.css) or a sidebar row (notes.css). */
+export const DROP_OVER_ATTR = "data-drop-over";
 
 interface CueHost {
   getAttribute(name: string): string | null;
@@ -105,20 +106,20 @@ interface CueHost {
   removeAttribute(name: string): void;
 }
 
-/** One pane shows the cue at a time. Idempotent: the same host and cue write
+/** One target shows a cue at a time. Idempotent: the same host and cue write
  * nothing, so a hover that fires every few milliseconds never thrashes the
  * DOM; a different host clears the previous one first. */
-export class ChatDropCueMarker {
+export class DropCueMarker {
   private host: CueHost | null = null;
 
-  show(host: CueHost, cue: ChatDropCue): void {
+  show(host: CueHost, cue: string): void {
     if (this.host && this.host !== host) this.clear();
-    if (host.getAttribute(CHAT_DROP_OVER_ATTR) !== cue) host.setAttribute(CHAT_DROP_OVER_ATTR, cue);
+    if (host.getAttribute(DROP_OVER_ATTR) !== cue) host.setAttribute(DROP_OVER_ATTR, cue);
     this.host = host;
   }
 
   clear(): void {
-    this.host?.removeAttribute(CHAT_DROP_OVER_ATTR);
+    this.host?.removeAttribute(DROP_OVER_ATTR);
     this.host = null;
   }
 
