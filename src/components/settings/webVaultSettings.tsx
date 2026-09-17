@@ -52,8 +52,9 @@ export function WebVaultSettings() {
         )}
         {mode === "imported" && (
           <>
-            Your vault is a copy of <strong>{folder}</strong>, kept in this browser. This browser can read a
-            vault you pick but cannot write to it, so changes stay here until you export them.
+            Your vault is <strong>{folder}</strong>, connected as a copy kept in this browser. This browser
+            can read a vault but cannot write to it, so changes stay here until you export them; connect it
+            again to pick up what the app changed.
           </>
         )}
         {mode === "browser" && (
@@ -70,7 +71,7 @@ export function WebVaultSettings() {
       {support?.kind === "import-only" && (
         <p className="setnote">
           {support.browser} can read a vault you pick but cannot write to it. Chrome, Edge, or Arc connect a
-          vault live; here, Import keeps a copy and Export gives it back as a zip.
+          vault live; here, connecting keeps a copy and Export gives it back as a zip.
         </p>
       )}
       {support?.kind === "live" && status?.kind === "none" && (
@@ -85,7 +86,7 @@ export function WebVaultSettings() {
       )}
       {support && support.kind !== "live" && (
         <button type="button" className="ghostbtn" onClick={openConnect}>
-          {mode === "imported" ? "Import the vault again…" : "Import a copy of a vault…"}
+          {mode === "imported" ? "Connect the vault again…" : "Connect a vault…"}
         </button>
       )}
       {mode !== "browser" && (

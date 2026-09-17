@@ -32,13 +32,13 @@ import { useViewsStore } from "../../state/views";
 import { ChevronRight, FolderGlyph, MoreGlyph, PinGlyph, PlusGlyph, SearchGlyph } from "../glyphs";
 import { InlineRenameInput } from "../inlineRenameInput";
 import { compactUsageNumber, modelUsageSnapshot } from "../modelUsageSummary";
+import { chatFileMenuItems } from "./chatFileActions";
 import { chatMark } from "./chatMark";
 import { ModelLogo } from "./modelLogo";
 import { relativeChatAge, visibleSidebarChats } from "./sidebarChatProjection";
 import { type SidebarChatData, chatFolderKey } from "./useChatFolders";
 
-/** Where a dragged chat would land: a folder row (assignment — positional
- * reordering retired 2026-08-03, response recency rules). */
+/** Where a dragged chat would land: a folder row (positional reordering retired 2026-08-03). */
 type ChatDrop = { kind: "folder"; id: string };
 
 export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: number }) {
@@ -136,8 +136,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   //   properly"): the Main tree's pointer-drag grammar (HTML5 DnD stays dead in
   //   the WKWebView shell). Dropping on a folder row assigns through the same
   //   manifest write the row menu uses; an in-folder row is a POSITION target;
-  //   anywhere else abandons. The dragged row dims, the hovered folder tints,
-  //   the title rides as a ghost. —
+  //   anywhere else abandons. The dragged row dims, the hovered folder tints, the title rides as a ghost. —
   const [dragSlug, setDragSlug] = useState<string | null>(null);
   const [drop, setDrop] = useState<ChatDrop | null>(null);
   const didDragRef = useRef(false);
@@ -203,6 +202,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
         label: "Open to the right",
         onClick: () => usePanesStore.getState().openToSide("chat", c.slug),
       },
+      ...chatFileMenuItems(c), // the transcript file, as written
       { kind: "sep" as const },
       {
         kind: "action" as const,

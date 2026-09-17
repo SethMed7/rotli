@@ -17,6 +17,12 @@ test("the Library shows a Chats folder whose rows are chats and open as chats", 
   await expect(row).toBeVisible();
   await expect(row).toContainText("Chat");
   await row.dblclick();
+  // in the Library a chat is a FILE: activating it shows the transcript as
+  // written (the owner, 2026-09-17), and the peek's Open goes to the chat
+  const peek = page.locator(".pv-text");
+  await expect(peek).toBeVisible();
+  await expect(peek).toContainText("## Messages");
+  await page.locator(".pv-scrim .pv-open").click();
   // it opened as a chat pane, not a note editor
   await expect(page.getByRole("tab", { selected: true })).toContainText(/planning chat/i);
   // the chat surface (the twin has no runtime, so its empty state stands in for the composer)

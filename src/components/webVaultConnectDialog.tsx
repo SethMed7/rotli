@@ -33,14 +33,14 @@ export function connectDialogCopy(support: FolderSupport): {
   const first =
     support.kind === "brave-off"
       ? "Brave ships the folder API switched off, so it can read a vault you pick but cannot write to it. Turn on brave://flags/#file-system-access-api and relaunch to connect a vault live."
-      : `${support.browser} can read a vault you pick but cannot write to it.`;
+      : `${support.browser} can read a vault you pick but cannot write to it, so Rotli connects a copy.`;
   return {
-    title: "Import a copy of a vault",
+    title: "Connect a vault",
     lines: [
       first,
-      "Your browser will show its own picker and may say “upload”: that is the browser's word for letting this page read the files.",
+      "Your browser will show its own picker and may say “upload”: that is the browser's word for letting this page read the files. Nothing is uploaded anywhere.",
       promise,
-      "Rotli keeps a copy of the vault's notes in this browser. Export vault (.zip) gives the files back.",
+      "Rotli keeps the copy in this browser; connect the vault again to pick up changes made in the app. Export vault (.zip) gives the files back.",
     ],
     action: "Choose vault…",
   };

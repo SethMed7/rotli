@@ -50,7 +50,6 @@ import {
   rerootDiskPath,
   sortFolderListing,
   filterSystemFolders,
-  chatSlugOf,
   isChatItem,
   libraryPathOfChat,
 } from "../services/systemBrowser";
@@ -251,12 +250,13 @@ export function SystemSurface({ rootId }: { rootId: string }) {
   );
 
   const openSummaryPane = usePanesStore((s) => s.openSummary);
-  const openChatPane = usePanesStore((s) => s.openChat);
-  // a chat row opens the chat, not its transcript file as a note
+  // a chat row in the Library shows the transcript FILE (the owner, 2026-09-17:
+  // "I am trying to see the source md"); the source peek's Open goes to the chat
+  const setPreviewItem = useUiStore((s) => s.setPreviewItem);
   const openSummary = useCallback(
     (n: NoteSummary, opts?: { newTab?: boolean }) =>
-      isChatItem(n) ? openChatPane(chatSlugOf(n), opts) : openSummaryPane(n, opts),
-    [openChatPane, openSummaryPane],
+      isChatItem(n) ? setPreviewItem(n) : openSummaryPane(n, opts),
+    [setPreviewItem, openSummaryPane],
   );
   const openMenu = useNoteMenu();
 
