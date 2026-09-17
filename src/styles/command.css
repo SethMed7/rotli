@@ -2400,7 +2400,18 @@
 /* a settings segmented choice stays a compact CONTROL — the Aa panel's
    flex:1 segments stretched each half to ~360px in the 720px body and the
    pair read as two lost bars (the maintainer, 2026-07-30) */
-.set-main .segrow {
+.set-main .segfield {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 6px 0;
+}
+.seglabel {
+  flex: 0 0 52px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.segrow {
   max-width: 344px;
 }
 /* app-icon picker (Settings → Appearance → App icon) */

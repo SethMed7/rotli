@@ -12,7 +12,7 @@ import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { DEST } from "../services/destinations";
 import { useNotes } from "../services/hooks";
 import { leaves, usePanesStore } from "../state/panes";
-import { useUiStore } from "../state/ui";
+import { type SidebarSide, useUiStore } from "../state/ui";
 import { AllChatsSurface } from "./allChatsSurface";
 import { BoardSurface } from "./boardSurface";
 import { DashboardSurface } from "./dashboardSurface";
@@ -21,6 +21,7 @@ import { ClockGlyph } from "./glyphs";
 import { NoteListSurface } from "./noteListSurface";
 import { PaneTree } from "./paneTree";
 import { Sidebar } from "./sidebar";
+import { SidebarHoverRail } from "./sidebar/sidebarHoverRail";
 import { SystemSurface } from "./systemSurface";
 import { TasksSurface } from "./tasksSurface";
 
@@ -30,7 +31,15 @@ const BreveSurface = lazy(() => import("./breve/breveSurface").then((m) => ({ de
 
 /** Drag grip on the sidebar's right edge — same pointer grammar as the pane
  * dividers (8px hit zone, cocoa-tinted line while dragging, never clay). */
-function RailGrip({ width, onResize }: { width: number; onResize: (px: number) => void }) {
+function RailGrip({
+  width,
+  side,
+  onResize,
+}: {
+  width: number;
+  side: SidebarSide;
+  onResize: (px: number) => void;
+}) {
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     event.preventDefault();
@@ -39,7 +48,9 @@ function RailGrip({ width, onResize }: { width: number; onResize: (px: number) =
     const startWidth = width;
     grip.classList.add("dragging");
     grip.setPointerCapture(event.pointerId);
-    const onMove = (e: globalThis.PointerEvent) => onResize(startWidth + (e.clientX - startX));
+    // on the right edge the grip sits on the rail's LEFT: dragging left widens
+    const sign = side === "right" ? -1 : 1;
+    const onMove = (e: globalThis.PointerEvent) => onResize(startWidth + sign * (e.clientX - startX));
     const end = () => {
       grip.classList.remove("dragging");
       grip.removeEventListener("pointermove", onMove);
@@ -77,6 +88,8 @@ function RailGrip({ width, onResize }: { width: number; onResize: (px: number) =
 
 export function NotesSurface() {
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
+  const sidebarSide = useUiStore((s) => s.sidebarSide);
+  const sidebarReveal = useUiStore((s) => s.sidebarReveal);
   const sidebarWidth = useUiStore((s) => s.sidebarWidth);
   const setSidebarWidth = useUiStore((s) => s.setSidebarWidth);
   const contentView = useUiStore((s) => s.contentView);
@@ -99,12 +112,18 @@ export function NotesSurface() {
   const railVars = { "--sidebar-w": `${sidebarWidth}px` } as CSSProperties;
 
   return (
-    <div className="threepane" style={railVars}>
-      {!sidebarCollapsed && (
-        <div className="rail-wrap">
-          <Sidebar />
-          <RailGrip width={sidebarWidth} onResize={setSidebarWidth} />
-        </div>
+    <div className="threepane" style={railVars} data-sidebar-side={sidebarSide}>
+      {/* the sidebar's edge and reveal are the owner's (2026-09-17): pinned in
+          the flow on either side, or a hover overlay off the window's edge */}
+      {sidebarReveal === "hover" ? (
+        <SidebarHoverRail side={sidebarSide} />
+      ) : (
+        !sidebarCollapsed && (
+          <div className="rail-wrap">
+            <Sidebar />
+            <RailGrip width={sidebarWidth} side={sidebarSide} onResize={setSidebarWidth} />
+          </div>
+        )
       )}
       {/* the content area: the note panes, or a grid view (Board / All notes)
           that renders HERE so the sidebar never moves (the maintainer, 2026-06-24) */}

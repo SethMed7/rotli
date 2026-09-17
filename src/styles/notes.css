@@ -2278,6 +2278,58 @@
     transform: translateX(-8px);
   }
 }
+/* the hover hot strip: nothing until the pointer is there (a standing accent
+   sliver was the disliked line of 2026-06-15) */
+.warm-edge .edgehint {
+  opacity: 0;
+  transition: opacity var(--motion-exit) var(--motion-ease);
+}
+.warm-edge:hover .edgehint {
+  opacity: 0.5;
+}
+.warm-edge[data-side="left"] {
+  left: 0;
+}
+.warm-edge[data-side="right"] {
+  right: 0;
+}
+.warm-edge[data-side="right"] .edgehint {
+  left: auto;
+  right: 0;
+  border-radius: 3px 0 0 3px;
+}
+/* — the sidebar on the RIGHT (the owner, 2026-09-17): the same rail, mirrored:
+   hairline on its inner edge, the grip on its inner edge, the overlay off the
+   right edge — */
+.threepane[data-sidebar-side="right"] {
+  flex-direction: row-reverse;
+}
+.threepane[data-sidebar-side="right"] .rail-wrap > .sidebar,
+.rail-overlay[data-side="right"] > .sidebar {
+  border-right: none;
+  border-left: 1px solid var(--border);
+}
+.threepane[data-sidebar-side="right"] .railgrip {
+  right: auto;
+  left: -4px;
+}
+.threepane[data-sidebar-side="right"] .railgrip.dragging::before {
+  left: auto;
+  right: 3px;
+}
+.rail-overlay[data-side="right"] {
+  left: auto;
+  right: 0;
+  border-right: none;
+  border-left: 1px solid var(--border);
+  animation-name: rail-in-right;
+}
+@keyframes rail-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+}
 
 /* text "▾" carets retired (slice 5, 2026-07-28) — same stroked chevron family
    as every disclosure, rotated to point down */
