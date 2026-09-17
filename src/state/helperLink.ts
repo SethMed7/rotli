@@ -45,14 +45,18 @@ export function helperLinked(): boolean {
   return useHelperLink.getState().link !== null;
 }
 
-/** Paired AND proven: the helper answered health this session and has not
- * refused the token. A pairing not yet checked (a reload, before the boot
- * verification lands) is NOT ready — otherwise a stale token opened the chat
- * for the moment before the 401 came back (review of #19). Unreachable or
- * refused is not a chat runtime either; the surfaces route to the setup
- * dialog. Pure over the state shape so the rule is testable. */
-export function helperReadyFrom(s: Pick<HelperLinkState, "link" | "reachable" | "problem">): boolean {
-  return s.link !== null && s.problem === null && s.reachable === true;
+/** Paired AND proven: the helper answered health this session, has not
+ * refused the token, and no verification is mid-flight. A pairing not yet
+ * checked (a reload, before the boot verification lands) is NOT ready, and
+ * neither is one being checked — health answers before the authenticated
+ * call does, and a reinstalled helper answers health while refusing the old
+ * token (review of #19, twice). Unreachable or refused is not a chat runtime
+ * either; the surfaces route to the setup dialog. Pure over the state shape
+ * so the rule is testable. */
+export function helperReadyFrom(
+  s: Pick<HelperLinkState, "link" | "reachable" | "problem" | "verifying">,
+): boolean {
+  return s.link !== null && s.problem === null && s.reachable === true && !s.verifying;
 }
 
 export function helperReady(): boolean {
