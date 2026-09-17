@@ -7,7 +7,7 @@
 // honest about that.
 
 import { bytesFromBase64 } from "../documents/images";
-import { type BrowserVault, browserVault } from "../lib/browserVault";
+import { type BrowserVault, browserStorageVault } from "../lib/browserVault";
 import { createDebouncedTask } from "../lib/debouncedTask";
 import { zipTextFiles } from "../lib/vaultZip";
 import { MemoryVaultDir, type VaultDir, type VaultDirEntry, type VaultStat } from "./vaultDir";
@@ -158,8 +158,20 @@ export function isImportedVaultSnapshot(value: unknown): value is ImportedVaultS
 
 /** A VaultDir whose every mutation is mirrored, debounced, into a snapshot
  * string handed to `save` (browser storage). Reads are the inner dir's. */
+/** The copies live on this page. A NEW copy (reconnect) or Forget retires
+ * them first, so the old copy's write-on-page-hide can never land on top of
+ * the new one (2026-09-17: the owner reconnected the vault and nothing
+ * changed — the reload's pagehide flushed the old copy back over the new). */
+const liveCopies = new Set<PersistedVaultDir>();
+
+export function retireLiveCopies(): void {
+  for (const copy of liveCopies) copy.retire();
+  liveCopies.clear();
+}
+
 export class PersistedVaultDir implements VaultDir {
   private readonly saver;
+  private retired = false;
   constructor(
     private readonly inner: MemoryVaultDir,
     private readonly name: string,
@@ -180,14 +192,23 @@ export class PersistedVaultDir implements VaultDir {
         binaries,
         ...(this.importedAt ? { importedAt: this.importedAt } : {}),
       };
+      if (this.retired) return;
       await save(JSON.stringify(snapshot));
     });
+    liveCopies.add(this);
   }
   /** Write now (page hide, tests). */
   flush(): Promise<void> {
-    return this.saver.flush();
+    return this.retired ? Promise.resolve() : this.saver.flush();
+  }
+  /** Never write again: a newer copy owns the store now. */
+  retire(): void {
+    this.retired = true;
+    this.saver.cancel();
+    liveCopies.delete(this);
   }
   private touched(): void {
+    if (this.retired) return;
     const hidden = typeof document !== "undefined" && document.hidden;
     if (hidden) void this.saver.flush().catch(() => {});
     else this.saver.schedule();
@@ -239,13 +260,15 @@ export class PersistedVaultDir implements VaultDir {
 /** Store a freshly picked folder's snapshot and boot from it. */
 export async function saveImportedVault(
   snapshot: ImportedVaultSnapshot,
-  vault: BrowserVault = browserVault(),
+  vault: BrowserVault = browserStorageVault(),
 ): Promise<void> {
+  retireLiveCopies();
   await vault.write(IMPORTED_VAULT_KEY, JSON.stringify(snapshot));
 }
 
 /** Forget the imported copy (the folder on disk is untouched). */
-export async function forgetImportedVault(vault: BrowserVault = browserVault()): Promise<void> {
+export async function forgetImportedVault(vault: BrowserVault = browserStorageVault()): Promise<void> {
+  retireLiveCopies();
   await vault.store.delete(IMPORTED_VAULT_KEY);
 }
 

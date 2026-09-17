@@ -32,19 +32,19 @@ export function FolderReconnectBar() {
   }, []);
   if (isWebVault() && webVaultMode() === "imported") {
     const at = importedVaultAt();
-    const age = at ? ` imported ${relativeLabel(at)} ago` : "";
+    const age = at ? `, taken ${relativeLabel(at)} ago` : "";
     return (
       <div className="sb-reconnect" role="status">
         <span className="sb-reconnect-text">
-          A copy of <strong>{connectedFolderName() ?? "your vault"}</strong>
-          {age}. It doesn’t follow the vault: import again to see its changes.
+          Connected to a copy of <strong>{connectedFolderName() ?? "your vault"}</strong>
+          {age}. It doesn’t follow the vault: reconnect to see its changes.
         </span>
         <button
           type="button"
           className="sb-reconnect-btn"
           onClick={() => useWebVaultConnect.getState().show()}
         >
-          Import again
+          Reconnect
         </button>
       </div>
     );

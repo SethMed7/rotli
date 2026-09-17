@@ -1260,7 +1260,10 @@ export function ChatSurface({
   useEffect(() => {
     if (active && chatSlug) touchChatActivity(`${active.id}:${chatSlug}`);
   }, [active, chatSlug]);
-  const chatModelId = chatModelFor(chatModelMap, chatKeyId, chatModelSeed);
+  // the file's own `model:` seeds a chat this device never pinned (a copy
+  // of the vault on the web, 2026-09-17) — the sidebar mark reads it too
+  const fileModel = chats.data?.find((c) => c.slug === chatSlug)?.model || null;
+  const chatModelId = chatModelFor(chatModelMap, chatKeyId, fileModel ?? chatModelSeed);
   const savedPick = modelList.find((m) => m.id === chatModelId);
   const fallbackPick = modelList.find((m) => m.isDefault) ?? modelList[0] ?? null;
   // A persisted remote choice must not silently become the local default while
