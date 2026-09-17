@@ -1,12 +1,6 @@
 import { expect, test } from "bun:test";
 
-import {
-  CHAT_DROP_OVER_ATTR,
-  chatDropAt,
-  ChatDropCueMarker,
-  chatDropTargetAt,
-  registerChatDrop,
-} from "./chatDrop";
+import { DROP_OVER_ATTR, chatDropAt, DropCueMarker, chatDropTargetAt, registerChatDrop } from "./chatDrop";
 
 function pane(id: string): Element {
   return { closest: () => ({ getAttribute: () => id }) } as unknown as Element;
@@ -90,18 +84,18 @@ test("the cue marker writes once per change and moves between panes", () => {
   };
   const a = host("a");
   const b = host("b");
-  const marker = new ChatDropCueMarker();
+  const marker = new DropCueMarker();
   marker.show(a, "attach");
   marker.show(a, "attach");
   marker.show(a, "attach");
   expect(a.writes).toBe(1);
-  expect(a.getAttribute(CHAT_DROP_OVER_ATTR)).toBe("attach");
+  expect(a.getAttribute(DROP_OVER_ATTR)).toBe("attach");
   marker.show(a, "blind");
   expect(a.writes).toBe(2);
   marker.show(b, "web");
-  expect(a.getAttribute(CHAT_DROP_OVER_ATTR)).toBeNull();
-  expect(b.getAttribute(CHAT_DROP_OVER_ATTR)).toBe("web");
+  expect(a.getAttribute(DROP_OVER_ATTR)).toBeNull();
+  expect(b.getAttribute(DROP_OVER_ATTR)).toBe("web");
   marker.clear();
-  expect(b.getAttribute(CHAT_DROP_OVER_ATTR)).toBeNull();
+  expect(b.getAttribute(DROP_OVER_ATTR)).toBeNull();
   expect(marker.current).toBeNull();
 });

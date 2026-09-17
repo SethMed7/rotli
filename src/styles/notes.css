@@ -394,6 +394,13 @@
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
+/* an image from outside hovering a Main note row (2026-09-17): the row lights
+   the same way, and after a short dwell the note springs open so the drop can
+   land in it (nativeFileDrop.ts stamps data-drop-over) */
+.main-row[data-drop-over] {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
 
 /* — Main: the user's hand-arranged view over the Brain (the maintainer, 2026-07-01) — */
 .main-empty,
@@ -692,11 +699,7 @@
   margin: 4px 10px 2px;
   padding: 6px 8px;
   border-radius: var(--r-control);
-  background: color-mix(
-    in srgb,
-    var(--danger, var(--accent-text)) 9%,
-    transparent
-  );
+  background: color-mix(in srgb, var(--danger, var(--accent-text)) 9%, transparent);
   font-size: 11.5px;
   line-height: 1.45;
   color: var(--danger, var(--accent-text));
@@ -905,8 +908,7 @@
   background: currentColor;
 }
 .model-logo--openai {
-  -webkit-mask: url("../brand/providers/openai-blossom.svg") center / contain
-    no-repeat;
+  -webkit-mask: url("../brand/providers/openai-blossom.svg") center / contain no-repeat;
   mask: url("../brand/providers/openai-blossom.svg") center / contain no-repeat;
 }
 .model-logo--meta {
@@ -914,8 +916,7 @@
   mask: url("../brand/providers/meta.svg") center / contain no-repeat;
 }
 .model-logo--microsoft {
-  -webkit-mask: url("../brand/providers/microsoft.svg") center / contain
-    no-repeat;
+  -webkit-mask: url("../brand/providers/microsoft.svg") center / contain no-repeat;
   mask: url("../brand/providers/microsoft.svg") center / contain no-repeat;
 }
 .model-logo--mistral {
@@ -1852,19 +1853,11 @@
 }
 .tabscroll-wrap::before {
   left: 0;
-  background: linear-gradient(
-    90deg,
-    var(--ground),
-    color-mix(in srgb, var(--ground), transparent 100%)
-  );
+  background: linear-gradient(90deg, var(--ground), color-mix(in srgb, var(--ground), transparent 100%));
 }
 .tabscroll-wrap::after {
   right: 0;
-  background: linear-gradient(
-    270deg,
-    var(--ground),
-    color-mix(in srgb, var(--ground), transparent 100%)
-  );
+  background: linear-gradient(270deg, var(--ground), color-mix(in srgb, var(--ground), transparent 100%));
 }
 .tabscroll-wrap[data-fade-left="true"]::before {
   opacity: 1;
@@ -2337,13 +2330,7 @@
   position: absolute;
   inset: 0 16px auto;
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--border) 18%,
-    var(--border) 82%,
-    transparent
-  );
+  background: linear-gradient(90deg, transparent, var(--border) 18%, var(--border) 82%, transparent);
   opacity: 0.72;
 }
 .sb-footbtn {

@@ -2231,7 +2231,7 @@ export function ChatSurface({
     [active, tabId, setDraftImages],
   );
 
-  useChatDropTarget(paneId, attachPaths, canVision, () => setDropVisionError(true));
+  useChatDropTarget(paneId, chatSlug, attachPaths, canVision, () => setDropVisionError(true), !!active);
 
   // this chat's generated assets: everything under storage/chats/<slug>/ in the
   // active root (wire ids are bare for the corpus, "<rootid>:rel" otherwise)
