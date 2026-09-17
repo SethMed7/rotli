@@ -9,10 +9,10 @@
 import { dispatch } from "../../keys/registry";
 import { isTauri, revealCorpus } from "../../lib/tauri";
 import { deriveJournal } from "../../services/brainJournal";
-import { useJournal, useSecureHints } from "../../services/hooks";
-import { openSystemRoot } from "../../services/systemNav";
+import { useJournal, useNoteIndex, useSecureHints } from "../../services/hooks";
+import { openSystemRoot, revealNoteInSystem } from "../../services/systemNav";
 import { useOrganizerLive } from "../../state/organizerLive";
-import { usePanesStore } from "../../state/panes";
+import { useFocusedNoteId, usePanesStore } from "../../state/panes";
 import { useUiStore } from "../../state/ui";
 import { ActivityGlyph, FolderGlyph } from "../glyphs";
 import { Icon } from "../icon";
@@ -31,16 +31,25 @@ export function SidebarFooter() {
   const organizerWorking = useOrganizerLive((s) => s.active);
   const organizerCurrent = useOrganizerLive((s) => s.current);
   const brainEnabled = useUiStore((s) => s.brainEnabled);
+  // Files is a shortcut to where you are: Finder on the Mac; on the web the
+  // vault's own browser, opened at the folder of the file you're in (the
+  // owner, 2026-09-17: "it opens the finder against whatever file I am
+  // actively in") — the Library root only when nothing is open
+  const focusedNoteId = useFocusedNoteId();
+  const noteIndex = useNoteIndex();
+  const showFiles = () => {
+    if (isTauri()) return void revealCorpus();
+    const note = focusedNoteId ? noteIndex.get(focusedNoteId) : undefined;
+    if (note) revealNoteInSystem(note);
+    else openSystemRoot("Brain");
+  };
   return (
     <div className="sb-foot">
-      {/* Files: the vault's files — Finder on the Mac; on the web, the Library
-          browser (there is no Finder to reveal into, and the button had simply
-          gone missing there — the owner, 2026-09-17) */}
       <button
         type="button"
         className="sb-footbtn"
-        title={isTauri() ? "Open the vault folder in Finder" : "Browse the vault's files in the Library"}
-        onClick={() => (isTauri() ? void revealCorpus() : openSystemRoot("Brain"))}
+        title={isTauri() ? "Open the vault folder in Finder" : "Show this file's folder in the vault's files"}
+        onClick={showFiles}
       >
         <FolderGlyph size={14} />
         <span className="fname">Files</span>

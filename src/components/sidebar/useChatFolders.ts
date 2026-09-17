@@ -68,15 +68,18 @@ export function useChatFolders(): SidebarChatData {
   // chats from before `model:` lived in the file get it once, from this
   // device's settings map (2026-09-17) — then every copy of the vault agrees
   const chatModelMap = useUiStore((s) => s.chatModel);
+  const defaultModel = useUiStore((s) => s.chatModelId) ?? "";
   const hybridPresets = useUiStore((s) => s.hybridPresets);
   useEffect(() => {
     if (!activeMemex || !rawChats || !hasDurableCorpus()) return;
     const instance = activeMemex;
     void (isTauri() ? chatModels() : Promise.resolve([]))
-      .then((models) => backfillChatModels(instance, rawChats, chatModelMap, models, hybridPresets))
+      .then((models) =>
+        backfillChatModels(instance, rawChats, chatModelMap, defaultModel, models, hybridPresets),
+      )
       .then((written) => (written > 0 ? invalidateMemex() : undefined))
       .catch(() => {});
-  }, [activeMemex, rawChats, chatModelMap, hybridPresets]);
+  }, [activeMemex, rawChats, chatModelMap, defaultModel, hybridPresets]);
   const grouped = useMemo(() => groupChats(chatList, manifest), [chatList, manifest]);
   const folderKeys = useMemo(
     () => manifest.folders.map((folder) => chatFolderKey(folder.id)),

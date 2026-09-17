@@ -17,7 +17,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useCallback,
 } from "react";
 
 import { longDateLabel } from "../lib/dateLabels";
@@ -53,6 +52,7 @@ import {
   isChatItem,
   libraryPathOfChat,
 } from "../services/systemBrowser";
+import { systemCwdMemo } from "../services/systemNav";
 import { emptyTrash, trashSystemSelection } from "../services/systemTrash";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { usePanesStore } from "../state/panes";
@@ -87,7 +87,7 @@ const ROOTS: Record<string, { title: string; prefix: string }> = {
 // per-root session memory — the surface unmounts on every content-view
 // switch, and a Finder that forgets its view or its place feels broken
 const modeMemo = new Map<string, SystemViewMode>();
-const cwdMemo = new Map<string, string>();
+const cwdMemo = systemCwdMemo;
 // the Columns view's open chain (relative folder paths), per root
 const colPathMemo = new Map<string, string[]>();
 
@@ -249,15 +249,10 @@ export function SystemSurface({ rootId }: { rootId: string }) {
     [isLibrary, foldersData],
   );
 
-  const openSummaryPane = usePanesStore((s) => s.openSummary);
-  // a chat row in the Library shows the transcript FILE (the owner, 2026-09-17:
-  // "I am trying to see the source md"); the source peek's Open goes to the chat
-  const setPreviewItem = useUiStore((s) => s.setPreviewItem);
-  const openSummary = useCallback(
-    (n: NoteSummary, opts?: { newTab?: boolean }) =>
-      isChatItem(n) ? setPreviewItem(n) : openSummaryPane(n, opts),
-    [setPreviewItem, openSummaryPane],
-  );
+  // a chat row in the Library is the transcript FILE, and it opens as one: a
+  // Markdown note in the editor (the owner, 2026-09-17: "I should be able to
+  // edit it") — the Chat front is where the same file opens as a chat
+  const openSummary = usePanesStore((s) => s.openSummary);
   const openMenu = useNoteMenu();
 
   const searching = query.trim() !== "";

@@ -154,7 +154,9 @@ test("connecting a folder explains itself before the browser's picker, and can b
   await expect(dialog).toHaveCount(0);
 });
 
-test("the Files button is in the footer on the web and opens the Library", async ({ page }) => {
+test("the Files button is in the footer on the web and opens the vault's files", async ({ page }) => {
+  // browser mode keeps its notes in memory outside wiki/, so the browser lands
+  // on the Library root here; the folder-vault spec proves "at the note's folder"
   await page.goto(APP);
   await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
   const files = page.locator(".sb-foot").getByRole("button", { name: "Files" });
