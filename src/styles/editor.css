@@ -899,7 +899,11 @@
 }
 .rotli-check {
   /* 1.1em + 0.5em gap = CHECK_EM (listGeometry.ts): a task's text lands on the
-     same left edge as its wrapped lines */
+     same left edge as its wrapped lines. The em must be the LINE's: a button
+     defaults to the UA control font, so without `font: inherit` the column came
+     up short and every wrapped row sat a few px right of the first (the owner,
+     2026-09-17); border-box keeps the 1.5px border inside the 1.1em. */
+  box-sizing: border-box;
   width: 1.1em;
   height: 1.1em;
   margin-right: 0.5em;
@@ -910,6 +914,7 @@
   display: inline-grid;
   place-items: center;
   cursor: pointer;
+  font: inherit;
   vertical-align: -0.15em;
   line-height: 1;
 }
@@ -1090,6 +1095,7 @@
 /* — one-of-many choice, `- ( )` / `- (x)` — adjacent same-indent rows form
    one source-backed group. Selection is accent emphasis, never pass/fail. */
 .rotli-choice {
+  box-sizing: border-box; /* the border lives inside CHOICE_EM's 1.1em */
   width: 1.1em;
   height: 1.1em;
   margin-right: 0.5em;
@@ -2240,6 +2246,10 @@
    text you could edit: quiet, small, and set off from the words. */
 .rotli-progress {
   display: inline-block;
+  /* the task line hangs its checkbox with a negative text-indent; an
+     inline-block inherits it and printed "0/1" over the words before the pill
+     (the owner, 2026-09-17) — the pill's own text starts at its own edge */
+  text-indent: 0;
   margin-left: 8px;
   padding: 0 6px;
   border-radius: var(--r-pill);

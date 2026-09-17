@@ -35,6 +35,8 @@ export function captureWireId(instance: MemexInstance, noteId: string): string {
 export async function createVaultCapture(targetId: string | null, body: string): Promise<string | null> {
   const instance = captureDestination(await loadConfig(), targetId);
   if (!instance) return null;
-  const { id } = await writeNote({ instance, body, secure: true });
+  // ⌥C is the ONE writer of the capture shelf: `Inbox` is what Rust projects
+  // to the Captures board (the owner, 2026-09-17: nothing else adds to it)
+  const { id } = await writeNote({ instance, body, secure: true, shelf: ["Inbox"] });
   return captureWireId(instance, id);
 }

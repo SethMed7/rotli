@@ -21,5 +21,12 @@ export function joinCaptureBodies(bodies: Array<string | null | undefined>): str
  * (a smart-row selection: memex staging when the vault is writable, else the
  * local Inbox) and return its wire id for opening. */
 export function createMergedCaptureNote(body: string): Promise<string> {
-  return createRoutedNote({ selectedFolderId: DEST.board, isSmart: true, localFallback: DEST.inbox, body });
+  // merged captures stay captures: the capture shelf keeps the card on the board
+  return createRoutedNote({
+    selectedFolderId: DEST.board,
+    isSmart: true,
+    localFallback: DEST.inbox,
+    body,
+    shelf: ["Inbox"],
+  });
 }

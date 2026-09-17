@@ -403,11 +403,12 @@ drops, real files) still need the Mac app in hand.
 | 10 | Restore inside a trashed note | Done (header chip). | Same code. |
 | 11 | Back for Library/Assets/Archive | Done. | Done — passes against the web build. |
 | 12 | All notes global + view tag | Done (`shell-batch`). | Same code. |
-| 13 | Wrapped-list alignment | Partial: wide markers landed; the wrap-boundary space needs a reproduction (the `pre-wrap` attempt broke the caret on the web and was reverted). | Same. |
+| 13 | Wrapped-list alignment | Done (2026-09-17, PR #13): the checkbox is a `<button>` and took the UA control font, so its 1.1em + 0.5em column was short and wrapped rows sat right of the first row's text; `.rotli-check` now inherits the line's font (it matches a radio's size) with border-box. The same inherited hanging indent printed a parent task's "0/1" pill over the words before it; the pill resets `text-indent`. `e2e/list-geometry.spec.ts` measures both. | Same code. |
 | 14 | Flat top-right icons | Done. | Done — passes against the web build. |
-| 15 | Copy a chat as raw Markdown | Done (`chatThreadModel.test.ts`); native check owed. | Same code. |
+| 15 | Copy a chat as raw Markdown | Done (`chatThreadModel.test.ts`); native check owed. The owner's 2026-09-17 screenshots were a NOTE copied into a note: the editor's copy wrote a readable rendering as text/plain, so the paste lost its structure. Fixed in PR #13 — text/plain is the source Markdown, HTML kept (`e2e/copy-markdown.spec.ts`). | Same code. |
 | 16 | Chat: leave mid-run and return | Done (run store); native check owed. | Same code; the web's real run showed the reply in place. |
 | 21 | **NEW** Back does not return to the note you were in (reported 2026-09-16 PM) | Not reproduced yet. `nav.back` (⌘[) steps the note trail (`state/navHistory.ts`) and opens the target through `openNavTarget`; a trail entry is dropped when its tab closes and rewritten on rename, so the likely shapes are: the previous note lived in another pane, or the note you "were in" was reached without a trail push (a sidebar reveal, a search hit, a chat's note). Needs the exact steps. | Same code. |
+| 22 | **NEW** Captures fill with cards no ⌥C wrote (reported 2026-09-17) | Done (PR #14): `writeNote` defaulted every note's shelf to `Inbox`, the shelf Rust projects to Captures, so a chat's conversation note and its header-button note landed there. `shelf` is now required; only ⌥C, Quick Note, a merge of captures, and a duplicate of a capture write `Inbox`. The same chat also minted a duplicate note every turn when two notes shared its title — the chat's note is now resolved by its back-link (`resolveChatNoteId`). | Web twin creates the chat note in Inbox, not on the board. |
 
 **Vault sync (the owner's law: everything lives in the vault).** Proven on
 the web with an imported copy of a vault: Main folders (`.rotli/main.json`),
