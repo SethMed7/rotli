@@ -1,9 +1,10 @@
 // A true copy. The clipboard gets two readings of the selection:
-//   text/plain — what you SEE, structure kept: "1. Sale", "- item", "☐ task",
-//                headings as their text, inline markers stripped, an image as
-//                its name in brackets. Pasting into an AI chat or a terminal
-//                keeps the numbers (before this the numbers vanished — Seth,
-//                2026-09-03).
+//   text/plain — the SOURCE Markdown, verbatim (copyHandlers.ts): a paste into
+//                another note, a chat, an AI, or a terminal renders or reads
+//                exactly what was copied. The readable "☐ task" rendering that
+//                lived here until 2026-09-17 lost the structure on the way back
+//                into Rotli (the owner: "copy the raw markdown on copy so when
+//                we paste it renders properly").
 //   text/html  — real <ol>/<ul>/<li> nesting, headings, quotes, code, inline
 //                marks, and <img src="data:…"> so Google Docs, Notes, and
 //                mail paste the list AND the picture.
@@ -15,7 +16,6 @@ import { imageSourceSpan } from "./imageSelection";
 import { underscoreEm } from "./inlineEmphasis";
 import { type OrderedStyle, parseOrderedMarker } from "./listMarkers";
 import { type Block, parseBlock } from "./render";
-import { stripMarkdown } from "./stripMarkdown";
 
 /** Resolved image bytes by source; an unresolved image copies as its name. */
 export type ImageDataUrls = ReadonlyMap<string, string>;
@@ -48,40 +48,6 @@ function imageName(src: string): string {
       .split("/")
       .pop() ?? src;
   return base.split("?")[0] ?? base;
-}
-
-/** The plain reading: structure kept, markers made readable. */
-export function clipboardText(markdown: string): string {
-  return markdown
-    .split("\n")
-    .map((line) => {
-      const image = imageSourceSpan(line, 0);
-      const block = parseBlock(line);
-      const indent = /^[ \t]*/.exec(line)?.[0] ?? "";
-      if (image) {
-        const prefix = line.slice(0, image.from);
-        return `${clipboardText(prefix)}[image: ${image.alt || imageName(image.src)}]`;
-      }
-      switch (block.kind) {
-        case "numbered":
-          return `${indent}${block.marker ?? "1."} ${stripMarkdown(block.text)}`;
-        case "bullet":
-          return `${indent}- ${stripMarkdown(block.text)}`;
-        case "task": {
-          const glyph = TASK_GLYPH[block.state ?? "open"] ?? "☐";
-          const num = block.marker ? `${block.marker} ` : "";
-          return `${indent}${num}${glyph} ${stripMarkdown(block.text)}`;
-        }
-        case "choice":
-          if (block.choiceVariant === "prompt") return `${indent}${stripMarkdown(block.text)}`;
-          return `${indent}${block.marker ? `${block.marker} ` : ""}${block.choiceVariant === "multi" ? (block.choiceSelected ? "☑" : "☐") : block.choiceSelected ? "◉" : "○"} ${stripMarkdown(block.text)}`;
-        case "toggle":
-          return `${indent}${block.marker ? `${block.marker} ` : ""}${block.toggleOn ? "On" : "Off"} ${stripMarkdown(block.text)}`;
-        default:
-          return stripMarkdown(line);
-      }
-    })
-    .join("\n");
 }
 
 interface ListFrame {
