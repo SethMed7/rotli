@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-17
+
+Rotli 1.1: Rotli Web (a vault in the browser, a copy where the browser can't
+write, the Helper for chat), chats that carry their model, native drops
+fixed, the prompt navigator as a stack of cards, a sidebar that sits on
+either edge or opens on hover, and a day of the owner's fixes.
+
 ### Added
 
 - **The sidebar sits where you want it, and stays only if you want it to.**
