@@ -2,6 +2,14 @@
 // user's disk, opened by the browser with the user's permission. Chromium
 // only; the caller decides what to do where `showDirectoryPicker` is absent.
 // Effectful adapter (scripts/source-ownership.ts LIB_EFFECTFUL_FILE_OWNERS).
+//
+// Reads and writes of ONE path take turns. Chromium writes through a swap
+// file and swaps it in at `close()`; a `getFile()` that lands inside that
+// window throws NotReadableError or NotFoundError (2026-09-17: the boot
+// listing read a chat while the model backfill rewrote it, the whole notes
+// query rejected, and the window opened on "Untitled"). Every writer to the
+// folder — chats, notes, `.rotli/` — shares this one adapter, so the lock
+// lives here, per path, and never serializes unrelated files.
 
 import type { VaultDir, VaultDirEntry, VaultStat } from "../services/vaultDir";
 
@@ -10,7 +18,28 @@ function segments(path: string): string[] {
 }
 
 export class FsaVaultDir implements VaultDir {
+  private readonly turns = new Map<string, Promise<void>>();
+
   constructor(readonly root: FileSystemDirectoryHandle) {}
+
+  /** Run `task` after every earlier read or write of the same path settles. */
+  private async inTurn<T>(path: string, task: () => Promise<T>): Promise<T> {
+    const key = segments(path).join("/");
+    const before = this.turns.get(key) ?? Promise.resolve();
+    let done!: () => void;
+    const mine = new Promise<void>((resolve) => {
+      done = resolve;
+    });
+    const turn = before.then(() => mine);
+    this.turns.set(key, turn);
+    await before;
+    try {
+      return await task();
+    } finally {
+      done();
+      if (this.turns.get(key) === turn) this.turns.delete(key);
+    }
+  }
 
   private async dir(path: string, create = false): Promise<FileSystemDirectoryHandle | null> {
     let handle = this.root;
@@ -52,16 +81,20 @@ export class FsaVaultDir implements VaultDir {
   }
 
   async stat(path: string): Promise<VaultStat | null> {
-    const handle = await this.file(path);
-    if (!handle) return null;
-    const file = await handle.getFile();
-    return { lastModified: file.lastModified, size: file.size };
+    return this.inTurn(path, async () => {
+      const handle = await this.file(path);
+      if (!handle) return null;
+      const file = await handle.getFile();
+      return { lastModified: file.lastModified, size: file.size };
+    });
   }
 
   async readText(path: string): Promise<string> {
-    const handle = await this.file(path);
-    if (!handle) throw new Error(`not found: ${path}`);
-    return (await handle.getFile()).text();
+    return this.inTurn(path, async () => {
+      const handle = await this.file(path);
+      if (!handle) throw new Error(`not found: ${path}`);
+      return (await handle.getFile()).text();
+    });
   }
 
   async writeText(path: string, text: string): Promise<void> {
@@ -69,9 +102,11 @@ export class FsaVaultDir implements VaultDir {
   }
 
   async readBytes(path: string): Promise<Uint8Array> {
-    const handle = await this.file(path);
-    if (!handle) throw new Error(`not found: ${path}`);
-    return new Uint8Array(await (await handle.getFile()).arrayBuffer());
+    return this.inTurn(path, async () => {
+      const handle = await this.file(path);
+      if (!handle) throw new Error(`not found: ${path}`);
+      return new Uint8Array(await (await handle.getFile()).arrayBuffer());
+    });
   }
 
   async writeBytes(path: string, bytes: Uint8Array): Promise<void> {
@@ -79,14 +114,16 @@ export class FsaVaultDir implements VaultDir {
   }
 
   private async writeFile(path: string, contents: string | ArrayBuffer): Promise<void> {
-    const handle = await this.file(path, true);
-    if (!handle) throw new Error(`cannot create: ${path}`);
-    const writable = await handle.createWritable();
-    try {
-      await writable.write(contents);
-    } finally {
-      await writable.close();
-    }
+    await this.inTurn(path, async () => {
+      const handle = await this.file(path, true);
+      if (!handle) throw new Error(`cannot create: ${path}`);
+      const writable = await handle.createWritable();
+      try {
+        await writable.write(contents);
+      } finally {
+        await writable.close(); // the swap happens here; readers wait for it
+      }
+    });
   }
 
   async mkdir(path: string): Promise<void> {

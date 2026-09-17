@@ -130,6 +130,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Rotli Web, folder mode: a file being written is never read half-way.**
+  Chromium swaps a file in when a write closes, and a read landing inside
+  that window threw; when the model backfill rewrote a chat at boot while
+  the notes listing read it, the listing failed and the window opened on
+  "Untitled". Reads and writes of one path now take turns in the folder
+  adapter, for every writer (chats, notes, `.rotli/`).
 - Chat: a chat whose first message was only an image no longer takes the
   image's storage path as its title.
 
