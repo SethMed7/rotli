@@ -7,6 +7,7 @@
 
 import { noteDiskFolder } from "../lib/noteLocation";
 import type { NoteSummary } from "../types";
+import { isChatsPath } from "./destinations";
 
 export type SystemViewMode = "folders" | "list" | "columns" | "gallery";
 export type SystemSortKey = "name" | "date" | "kind" | "created";
@@ -34,6 +35,7 @@ export function folderSegmentLabel(seg: string): string {
   if (seg === "_secure") return "Secure notes";
   if (seg === "_inbox") return "Captures";
   if (seg === "Storage") return "Assets";
+  if (seg === "chats") return "Chats";
   return seg;
 }
 
@@ -239,7 +241,27 @@ const FILE_KINDS: Record<string, string> = {
   mov: "Video",
 };
 
+/** A chat transcript surfaced through the Library (`chats/<slug>.md`): the
+ * owner's law is that the Library is the vault, and chats live in it. */
+export function isChatItem(n: Pick<NoteSummary, "folderId" | "diskFolderId">): boolean {
+  return isChatsPath(noteDiskFolder(n));
+}
+
+/** The chat's slug — its filename stem, which Rust lists first among aliases. */
+export function chatSlugOf(n: Pick<NoteSummary, "id" | "aliases">): string {
+  return n.aliases?.[0] ?? n.id;
+}
+
+/** Where a chat sits in the Library's namespace: a `Chats` folder at the root
+ * (the disk folder `chats/` is a sibling of `wiki/`, not inside it). */
+export function libraryPathOfChat(diskFolder: string, prefix: string): string {
+  const i = diskFolder.indexOf(":");
+  const rel = i >= 0 ? diskFolder.slice(i + 1) : diskFolder;
+  return `${prefix}/${rel}`;
+}
+
 export function kindLabel(n: NoteSummary): string {
+  if (isChatItem(n)) return "Chat";
   if (n.kind === "board") return "Board";
   if (n.kind === "file") {
     const ext = n.id.slice(n.id.lastIndexOf(".") + 1).toLowerCase();

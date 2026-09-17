@@ -138,6 +138,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bundles on macOS, Windows, and Linux runners so the compiler enumerates the
   remaining portability gaps. It never runs on push. The feasibility document
   gained a 2026-09-16 re-count of the seams.
+- **Chats browse in the Library.** The Library is the vault, so its `chats/`
+  transcripts now show there under a **Chats** folder, marked as chats, with
+  the chat glyph, opening as chats. All notes and search keep hiding them, as
+  before. On the web in folder mode the same folder appears.
 - The public site footer now includes a Featured on Launch Llama Tools badge.
 
 ## [1.0.0] - 2026-09-15

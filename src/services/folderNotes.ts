@@ -28,10 +28,12 @@ import { type VaultDir, baseName, joinVaultPath, parentPath } from "./vaultDir";
 /** Disk roots that hold notes in a memex vault. Everything else — `.rotli/`,
  * dotfiles, `chats/` transcripts, and the `identity/ personality/ history/`
  * knowledge spine — is deliberately outside the note universe. */
-const MEMEX_NOTE_ROOTS = ["wiki", "archive", "trash"] as const;
+const MEMEX_NOTE_ROOTS = ["wiki", "chats", "archive", "trash"] as const;
 /** Roots a PLAIN folder never walks, so a vault that happens to hold a memex
  * spine without a `wiki/` still keeps those files out of the note list. */
-const SKIPPED_ROOTS = new Set(["chats", "identity", "personality", "history", "node_modules"]);
+// chats/ is indexed (the Library shows it; All notes still hides it through
+// isChats); the memory lanes stay out of the note universe
+const SKIPPED_ROOTS = new Set(["identity", "personality", "history", "node_modules"]);
 const WIKI = "wiki";
 const WIKI_INBOX = "wiki/_inbox";
 const WIKI_SECURE = "wiki/_secure";

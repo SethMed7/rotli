@@ -17,6 +17,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useCallback,
 } from "react";
 
 import { longDateLabel } from "../lib/dateLabels";
@@ -26,7 +27,14 @@ import { noteDiskFolder, projectNoteToBrain } from "../lib/noteLocation";
 import { rangeBetween } from "../lib/rangeSelect";
 import { fileAssetUrl } from "../lib/tauri";
 import { DEST } from "../services/destinations";
-import { invalidateFolders, useFolders, useNoteIndex, useNotes, useSearchableNotes } from "../services/hooks";
+import {
+  invalidateFolders,
+  useFolders,
+  useNoteIndex,
+  useNotes,
+  useSearchableNotes,
+  useChatTranscripts,
+} from "../services/hooks";
 import { notesService } from "../services/notes";
 import {
   type FolderEntry,
@@ -42,6 +50,9 @@ import {
   rerootDiskPath,
   sortFolderListing,
   filterSystemFolders,
+  chatSlugOf,
+  isChatItem,
+  libraryPathOfChat,
 } from "../services/systemBrowser";
 import { emptyTrash, trashSystemSelection } from "../services/systemTrash";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
@@ -60,6 +71,7 @@ import {
   NewFolderGlyph,
   SearchGlyph,
   glyphForNote,
+  ChatGlyph,
 } from "./glyphs";
 import { NoteListRow } from "./noteListRow";
 import { FolderListRow, SearchFolderHits } from "./system/folderListRow";
@@ -129,6 +141,8 @@ function ItemTile({ n, selected, handlers }: { n: NoteSummary; selected: boolean
     >
       {thumb ? (
         <img className="fdr-thumb" src={thumb} alt="" loading="lazy" draggable={false} />
+      ) : isChatItem(n) ? (
+        <ChatGlyph size={38} className="fdr-tile-icon" />
       ) : (
         glyphForNote(n, { size: 38, className: "fdr-tile-icon" })
       )}
@@ -166,22 +180,31 @@ export function SystemSurface({ rootId }: { rootId: string }) {
   // full index carries them, minus the internal wiki/_ lanes (secure arrives
   // through its own destination above).
   const noteIndex = useNoteIndex();
+  const chatTranscripts = useChatTranscripts();
   const items = useMemo<NoteSummary[]>(() => {
     const destItems = destData ?? [];
     if (!isLibrary) return destItems;
     const brain = searchable.map(projectNoteToBrain).filter((n): n is NoteSummary => n !== null);
     const seen = new Set([...brain, ...destItems].map((n) => n.id));
     const extras: NoteSummary[] = [];
-    for (const n of noteIndex.values()) {
-      if (n.kind !== "file" && n.kind !== "board") continue;
+    // chats/ transcripts: outside every note scope (the Chat front owns them),
+    // but the Library is the vault, so they browse here under a Chats folder
+    // (the owner, 2026-09-16)
+    for (const n of chatTranscripts) {
       if (seen.has(n.id)) continue;
+      seen.add(n.id);
+      extras.push(n);
+    }
+    for (const n of noteIndex.values()) {
+      if (seen.has(n.id)) continue;
+      if (n.kind !== "file" && n.kind !== "board") continue;
       const disk = noteDiskFolder(n);
       if (disk !== "wiki" && !disk.startsWith("wiki/")) continue;
       if (disk.startsWith("wiki/_")) continue;
       extras.push(n);
     }
     return [...brain, ...destItems, ...extras];
-  }, [isLibrary, destData, searchable, noteIndex]);
+  }, [isLibrary, destData, searchable, noteIndex, chatTranscripts]);
 
   const [query, setQuery] = useState("");
   const [mode, setModeState] = useState<SystemViewMode>(() => modeMemo.get(rootId) ?? "folders");
@@ -227,7 +250,14 @@ export function SystemSurface({ rootId }: { rootId: string }) {
     [isLibrary, foldersData],
   );
 
-  const openSummary = usePanesStore((s) => s.openSummary);
+  const openSummaryPane = usePanesStore((s) => s.openSummary);
+  const openChatPane = usePanesStore((s) => s.openChat);
+  // a chat row opens the chat, not its transcript file as a note
+  const openSummary = useCallback(
+    (n: NoteSummary, opts?: { newTab?: boolean }) =>
+      isChatItem(n) ? openChatPane(chatSlugOf(n), opts) : openSummaryPane(n, opts),
+    [openChatPane, openSummaryPane],
+  );
   const openMenu = useNoteMenu();
 
   const searching = query.trim() !== "";
@@ -236,7 +266,10 @@ export function SystemSurface({ rootId }: { rootId: string }) {
   // memex the disk lane is lowercase ("storage/…") while the destination id is
   // "Storage", and the raw comparison rendered 422 assets as an empty root
   const pathOf = useMemo(
-    () => (n: NoteSummary) => rerootDiskPath(noteDiskFolder(n), root.prefix),
+    () => (n: NoteSummary) =>
+      isChatItem(n)
+        ? libraryPathOfChat(noteDiskFolder(n), root.prefix)
+        : rerootDiskPath(noteDiskFolder(n), root.prefix),
     [root.prefix],
   );
   // the Library hides its SYSTEM LANES (_inbox → the Captures front,
@@ -645,7 +678,11 @@ export function SystemSurface({ rootId }: { rootId: string }) {
             {...itemHandlers(n)}
           >
             <span className="fdr-name">
-              {glyphForNote(n, { size: 14, className: "fdr-row-icon" })}
+              {isChatItem(n) ? (
+                <ChatGlyph size={14} className="fdr-row-icon" />
+              ) : (
+                glyphForNote(n, { size: 14, className: "fdr-row-icon" })
+              )}
               {n.title || "Empty note"}
             </span>
             <span className="fdr-date">{longDateLabel(n.updatedAt)}</span>
@@ -913,7 +950,11 @@ export function SystemSurface({ rootId }: { rootId: string }) {
                       onDoubleClick={() => openSummary(n)}
                       onContextMenu={(e) => openMenu(e, n)}
                     >
-                      {glyphForNote(n, { size: 14, className: "fdr-row-icon" })}
+                      {isChatItem(n) ? (
+                        <ChatGlyph size={14} className="fdr-row-icon" />
+                      ) : (
+                        glyphForNote(n, { size: 14, className: "fdr-row-icon" })
+                      )}
                       <span className="fdrc-name">{n.title || "Empty note"}</span>
                       <span className="fdrc-kind">{kindLabel(n)}</span>
                     </button>
