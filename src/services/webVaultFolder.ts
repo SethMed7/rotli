@@ -90,7 +90,7 @@ export async function folderVaultStatus(): Promise<FolderVaultStatus> {
  * the app boots from it. */
 export async function connectFolderVault(): Promise<void> {
   if (!window.showDirectoryPicker)
-    throw new Error("This browser can't open folders. Chrome, Edge, or Arc can.");
+    throw new Error("This browser can't connect a vault live. Chrome, Edge, or Arc can.");
   const handle = await window.showDirectoryPicker({ id: "rotli-vault", mode: "readwrite" });
   await saveVaultHandle(handle);
   window.location.reload();

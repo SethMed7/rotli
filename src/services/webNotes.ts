@@ -236,7 +236,7 @@ export async function hydrateWebNotes(): Promise<boolean> {
   }
   if (status.kind === "prompt") {
     showFileNotice(
-      `Your vault folder “${status.name}” needs permission again — Settings → General → Reconnect`,
+      `Your vault “${status.name}” needs permission again — Reconnect at the top of the sidebar`,
     );
   }
   // an imported copy (browsers without the live API): the same filesystem

@@ -16,7 +16,7 @@
 
 import { LAUNCH_FEATURES } from "../../lib/featurePolicy";
 import { useChatSetupGuide } from "../../state/chatSetupGuide";
-import { useHelperLink } from "../../state/helperLink";
+import { helperReadyFrom, useHelperLink } from "../../state/helperLink";
 import type { ContentView, DashboardSection, SidebarView } from "../../state/ui";
 import { ChatGlyph, CoffeeGlyph, HomeGlyph } from "../glyphs";
 
@@ -81,7 +81,9 @@ export function SidebarSwitcher({
   onBreve?: (() => void) | undefined;
 }) {
   // Rotli Web: paired with Rotli Helper, chat is a real front
-  const helperLinked = useHelperLink((s) => s.link !== null);
+  const helperOk = useHelperLink((s) => helperReadyFrom(s));
+  const helperProblem = useHelperLink((s) => s.problem);
+  const helperVerifying = useHelperLink((s) => s.verifying);
   return (
     // role="group" + aria-pressed, NOT a tablist: these segments switch the
     // sidebar's own content, not a tabpanel, and the pane tab strip already
@@ -89,17 +91,26 @@ export function SidebarSwitcher({
     <div className="sb-switch" role="group" aria-label="Sidebar front">
       {SIDEBAR_FRONTS.map(({ id, label, Glyph, hint, action }) => {
         const active = !breveActive && value === id;
-        if (id === "chat" && !LAUNCH_FEATURES.chat && !helperLinked) {
+        if (id === "chat" && !LAUNCH_FEATURES.chat && !helperOk) {
           // Rotli Web: chat needs the tools on the user's computer. The front
           // stays visible so the product reads whole, says so on hover, and
-          // one click opens the walkthrough that gets it there.
+          // one click opens the walkthrough that gets it there — also when a
+          // pairing exists but the helper is silent or refuses the token.
           return (
             <button
               key={id}
               type="button"
               className="sb-switch-seg desktop-only"
               aria-pressed={false}
-              title="Chat isn't set up on the web yet — click to see how"
+              title={
+                helperProblem === "refused"
+                  ? "Rotli Helper refused the pairing — click to pair again"
+                  : helperProblem === "unreachable"
+                    ? "Rotli Helper isn't answering — click to reconnect"
+                    : helperVerifying
+                      ? "Checking Rotli Helper…"
+                      : "Chat isn't set up on the web yet — click to see how"
+              }
               onClick={() => useChatSetupGuide.getState().show()}
             >
               <Glyph size={14} />

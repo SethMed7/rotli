@@ -10,6 +10,7 @@ import { dispatch } from "../../keys/registry";
 import { isTauri, revealCorpus } from "../../lib/tauri";
 import { deriveJournal } from "../../services/brainJournal";
 import { useJournal, useSecureHints } from "../../services/hooks";
+import { openSystemRoot } from "../../services/systemNav";
 import { useOrganizerLive } from "../../state/organizerLive";
 import { usePanesStore } from "../../state/panes";
 import { useUiStore } from "../../state/ui";
@@ -32,17 +33,18 @@ export function SidebarFooter() {
   const brainEnabled = useUiStore((s) => s.brainEnabled);
   return (
     <div className="sb-foot">
-      {isTauri() && (
-        <button
-          type="button"
-          className="sb-footbtn"
-          title="Open the vault folder in Finder"
-          onClick={() => void revealCorpus()}
-        >
-          <FolderGlyph size={14} />
-          <span className="fname">Files</span>
-        </button>
-      )}
+      {/* Files: the vault's files — Finder on the Mac; on the web, the Library
+          browser (there is no Finder to reveal into, and the button had simply
+          gone missing there — the owner, 2026-09-17) */}
+      <button
+        type="button"
+        className="sb-footbtn"
+        title={isTauri() ? "Open the vault folder in Finder" : "Browse the vault's files in the Library"}
+        onClick={() => (isTauri() ? void revealCorpus() : openSystemRoot("Brain"))}
+      >
+        <FolderGlyph size={14} />
+        <span className="fname">Files</span>
+      </button>
       <button
         type="button"
         className="sb-footbtn"

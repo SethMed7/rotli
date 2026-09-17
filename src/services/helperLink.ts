@@ -3,10 +3,10 @@
 // sends to Rust ride the helper instead, through the same IPC seam.
 
 import { IndexedDbVaultStore, MemoryVaultStore, type VaultStore } from "../lib/browserVault";
-import { helperHealth, helperRpc } from "../lib/helperClient";
+import { HelperHttpError, helperHealth, helperRpc } from "../lib/helperClient";
 import { HELPER_COMMANDS, type HelperLink, parsePairingCode } from "../lib/helperPairing";
 import { registerWebAiBridge } from "../lib/webAiSeam";
-import { useHelperLink } from "../state/helperLink";
+import { type HelperProblem, useHelperLink } from "../state/helperLink";
 
 const LINK_KEY = "helper-link";
 
@@ -30,8 +30,35 @@ function bridgeFor(link: HelperLink) {
     if (cmd === "cli_complete" && Array.isArray(images) && images.length > 0) {
       return Promise.reject(new Error("Images are not sent through Rotli Helper in this release."));
     }
-    return helperRpc(link, cmd, args ?? {});
+    return helperRpc(link, cmd, args ?? {}).then(
+      (result) => {
+        // a call that lands clears whatever was wrong
+        const state = useHelperLink.getState();
+        if (state.problem !== null) state.setProblem(null);
+        if (state.reachable !== true) state.setReachable(true);
+        return result;
+      },
+      (error: unknown) => {
+        noteFailure(error);
+        throw error;
+      },
+    );
   };
+}
+
+/** Record what a failed call says about the pairing: a 401 is a refused
+ * token, a network failure is an unreachable helper; a tool's own error is
+ * neither and leaves the pairing alone. */
+function noteFailure(error: unknown): void {
+  const state = useHelperLink.getState();
+  if (error instanceof HelperHttpError) {
+    if (error.status === 401) state.setProblem("refused");
+    return;
+  }
+  if (error instanceof TypeError) {
+    state.setReachable(false);
+    state.setProblem("unreachable");
+  }
 }
 
 function adopt(link: HelperLink | null): void {
@@ -39,7 +66,9 @@ function adopt(link: HelperLink | null): void {
   registerWebAiBridge(link ? bridgeFor(link) : null);
 }
 
-/** Boot: restore the pairing and ask the helper whether it is there. */
+/** Boot: restore the pairing and ask the helper whether it is there — and
+ * whether it still takes our token, so a new install's new code is caught
+ * before the chat opens. */
 export async function hydrateHelperLink(): Promise<void> {
   let link: HelperLink | null = null;
   try {
@@ -49,7 +78,40 @@ export async function hydrateHelperLink(): Promise<void> {
     link = null;
   }
   adopt(link);
-  if (link) void checkHelper();
+  if (link) void verifyHelper();
+}
+
+/** Health, then one authenticated call: the whole pairing, re-checked. The
+ * dialog's "Check again" runs this; so does boot. */
+export async function verifyHelper(): Promise<"ok" | HelperProblem> {
+  const state = useHelperLink.getState();
+  const link = state.link;
+  if (!link) return "unreachable";
+  state.setVerifying(true);
+  try {
+    if (!(await checkHelper())) {
+      state.setProblem("unreachable");
+      return "unreachable";
+    }
+    try {
+      await helperRpc(link, "chat_models", {});
+      state.setProblem(null);
+      return "ok";
+    } catch (error) {
+      if (error instanceof HelperHttpError) {
+        // health answered, so the helper is there: only a 401 is a pairing
+        // problem; any other status is the helper's own error, not ours
+        const refused = error.status === 401;
+        state.setProblem(refused ? "refused" : null);
+        return refused ? "refused" : "ok";
+      }
+      state.setReachable(false);
+      state.setProblem("unreachable");
+      return "unreachable";
+    }
+  } finally {
+    state.setVerifying(false);
+  }
 }
 
 /** Ask the helper whether it answers; remembered for the surfaces. */

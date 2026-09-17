@@ -64,7 +64,7 @@ function fakeHelper(page: Page) {
 }
 
 /** Write the folder into the origin-private file system and remember its
- * handle the way "Open a folder on this computer" does. */
+ * handle the way "Connect a vault on this computer" does. */
 async function plantFolder(page: Page): Promise<void> {
   await page.goto(APP);
   await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");

@@ -136,3 +136,63 @@ test("unpairing takes Chat back to the walkthrough", async ({ page }) => {
   await dialog.getByRole("button", { name: "Close" }).click();
   await expect(page.locator(".sb-switch-seg.desktop-only")).toBeVisible();
 });
+
+test("a helper that refuses the pairing token keeps Chat behind the setup dialog until it answers again", async ({
+  page,
+}) => {
+  // the helper's mood is switchable mid-test: first it takes the token, then
+  // (a reinstall printed a new code) it refuses it, then it takes it again
+  let refuse = false;
+  await page.route(`${HELPER}/**`, async (route) => {
+    const request = route.request();
+    const headers = {
+      "access-control-allow-origin": request.headers()["origin"] ?? "*",
+      "access-control-allow-headers": "authorization, content-type",
+      "access-control-allow-methods": "GET, POST, OPTIONS",
+      "content-type": "application/json",
+    };
+    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers });
+    if (new URL(request.url()).pathname === "/health") {
+      return route.fulfill({
+        status: 200,
+        headers,
+        body: JSON.stringify({ ok: true, name: "rotli-helper", version: "t" }),
+      });
+    }
+    if (refuse)
+      return route.fulfill({ status: 401, headers, body: JSON.stringify({ error: "unauthorized" }) });
+    const body = request.postDataJSON() as { cmd: string };
+    const result =
+      body.cmd === "chat_models"
+        ? []
+        : body.cmd === "cli_detect"
+          ? { installed: true, version: "2.1.0", authenticated: true }
+          : null;
+    return route.fulfill({ status: 200, headers, body: JSON.stringify({ result }) });
+  });
+  await page.goto(APP);
+  await page.locator(".sb-switch-seg.desktop-only").click();
+  const dialog = page.getByRole("dialog", { name: "Chat on the web" });
+  await dialog.getByLabel("Paste the pairing code the helper printed:").fill(`${PORT}:${TOKEN}`);
+  await dialog.getByRole("button", { name: "Pair" }).click();
+  await expect(dialog.getByRole("status").filter({ hasText: "Paired with" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Done" }).click();
+  // paired and answering: the Chat segment is a real front
+  await expect(page.locator(".sb-switch-seg.desktop-only")).toHaveCount(0);
+
+  // the helper restarts with a new token: the next visit finds the old one refused
+  refuse = true;
+  await page.reload();
+  const gate = page.locator(".sb-switch-seg.desktop-only");
+  await expect(gate).toBeVisible();
+  await expect(gate).toHaveAttribute("title", /refused the pairing/);
+  await gate.click();
+  await expect(dialog.getByRole("status").filter({ hasText: "refused this pairing" })).toBeVisible();
+
+  // the code is pasted into a helper that takes it again: Check again clears the way
+  refuse = false;
+  await dialog.getByRole("button", { name: "Check again" }).first().click();
+  await expect(dialog.getByRole("status").filter({ hasText: "Paired with" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Done" }).click();
+  await expect(page.locator(".sb-switch-seg.desktop-only")).toHaveCount(0);
+});

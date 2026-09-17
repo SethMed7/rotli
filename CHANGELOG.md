@@ -84,6 +84,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   image lands at the note's end. The row you are over lights up. On Rotli
   Web a note row works the same; a chat row says the Helper carries text
   only.
+- Rotli Web: it is a vault you connect, and the words now say so — "Connect a
+  vault on this computer", "Import a copy of a vault", "Your vault needs
+  permission again" — instead of "folder" everywhere.
+- Rotli Web: the **Files** button is back in the sidebar footer. It opens the
+  Library, the vault's file browser (the Mac app's Files reveals the vault
+  in Finder, which the web cannot do, and the button had simply gone missing).
+- Rotli Web: Chat stays behind the setup dialog until Rotli Helper answers
+  AND takes the pairing. A helper that refuses the token (a reinstall printed
+  a new code) or does not answer no longer opens a chat that cannot send:
+  the Chat segment says what is wrong, the dialog names it, and **Check
+  again** re-runs the whole pairing check. Boot re-checks the token too.
 - Rotli Web: when the connected folder needs the browser's permission again,
   a bar at the top of the sidebar says so and offers Reconnect, and stays
   until the folder is back. Before, a passing notice said it once and the app

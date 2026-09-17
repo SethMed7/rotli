@@ -21,28 +21,28 @@ export function connectDialogCopy(support: FolderSupport): {
     "Nothing leaves your computer. This page's security policy allows one kind of network request: to Rotli Helper on this same computer, if you pair one for chat. The files are read by the page and go nowhere else.";
   if (support.kind === "live") {
     return {
-      title: "Connect a folder",
+      title: "Connect a vault",
       lines: [
-        "Your browser will open its own folder picker and ask whether Rotli may view and save changes to the folder you choose.",
+        "Your browser will open its own folder picker and ask whether Rotli may view and save changes to the vault you choose — a Rotli vault, or an empty folder that becomes one.",
         promise,
-        "The browser remembers only the folder. Next time it asks once more, with one click.",
+        "The browser remembers only the vault. Next time it asks once more, with one click.",
       ],
-      action: "Choose folder…",
+      action: "Choose vault…",
     };
   }
   const first =
     support.kind === "brave-off"
-      ? "Brave ships the folder API switched off, so it can read a folder you pick but cannot write to it. Turn on brave://flags/#file-system-access-api and relaunch for a live folder."
-      : `${support.browser} can read a folder you pick but cannot write to it.`;
+      ? "Brave ships the folder API switched off, so it can read a vault you pick but cannot write to it. Turn on brave://flags/#file-system-access-api and relaunch to connect a vault live."
+      : `${support.browser} can read a vault you pick but cannot write to it.`;
   return {
-    title: "Import a folder",
+    title: "Import a copy of a vault",
     lines: [
       first,
       "Your browser will show its own picker and may say “upload”: that is the browser's word for letting this page read the files.",
       promise,
-      "Rotli keeps a copy of the folder's notes in this browser. Export vault (.zip) gives the files back.",
+      "Rotli keeps a copy of the vault's notes in this browser. Export vault (.zip) gives the files back.",
     ],
-    action: "Choose folder…",
+    action: "Choose vault…",
   };
 }
 

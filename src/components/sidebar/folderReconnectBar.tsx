@@ -32,7 +32,7 @@ export function FolderReconnectBar() {
   return (
     <div className="sb-reconnect" role="status">
       <span className="sb-reconnect-text">
-        Your folder <strong>{status.name}</strong> needs permission again. Until then this is the last copy.
+        Your vault <strong>{status.name}</strong> needs permission again. Until then this is the last copy.
       </span>
       <button type="button" className="sb-reconnect-btn" onClick={reconnect}>
         Reconnect

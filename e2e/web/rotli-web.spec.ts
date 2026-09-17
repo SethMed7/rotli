@@ -134,7 +134,7 @@ test("Settings → General offers a real folder (Chromium) and says where the no
   await expect(page.getByRole("heading", { name: "Rotli Web" })).toBeVisible();
   await expect(page.getByText(/Your vault lives in this browser/)).toBeVisible();
   // headless Chromium has the picker, so the folder action is offered
-  await expect(page.getByRole("button", { name: "Open a folder on this computer…" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Connect a vault on this computer…" })).toBeVisible();
 });
 
 test("connecting a folder explains itself before the browser's picker, and can be cancelled", async ({
@@ -146,10 +146,19 @@ test("connecting a folder explains itself before the browser's picker, and can b
     .getByRole("button", { name: /Settings/ })
     .first()
     .click();
-  await page.getByRole("button", { name: "Open a folder on this computer…" }).click();
-  const dialog = page.getByRole("dialog", { name: "Connect a folder" });
+  await page.getByRole("button", { name: "Connect a vault on this computer…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Connect a vault" });
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("Nothing leaves your computer");
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toHaveCount(0);
+});
+
+test("the Files button is in the footer on the web and opens the Library", async ({ page }) => {
+  await page.goto(APP);
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  const files = page.locator(".sb-foot").getByRole("button", { name: "Files" });
+  await expect(files).toBeVisible();
+  await files.click();
+  await expect(page.locator(".system-browser")).toBeVisible();
 });
