@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { BrowserVault, MemoryVaultStore } from "../lib/browserVault";
 import { MemoryVaultDir } from "./vaultDir";
-import { ASSET_FOLDER, createWebFileStore, freeName, safeAssetName } from "./webFiles";
+import { ASSET_FOLDER, createWebFileStore, freeName, readableImagePath, safeAssetName } from "./webFiles";
 
 // a 1×1 PNG, the smallest real image bytes a drop can carry
 const PNG_BASE64 =
@@ -16,6 +16,14 @@ describe("where a dropped image lands", () => {
     expect(safeAssetName("/Users/x/Screenshot 1.png")).toBe("Screenshot 1.png");
     expect(safeAssetName("..\\..\\evil.png")).toBe("evil.png");
     expect(safeAssetName(".hidden.png")).toBe("hidden.png");
+    expect(safeAssetName("a:b.png")).toBe("a-b.png"); // `:` routes multi-root ids in the app
+    // a note may show an image from anywhere in the vault, never a dot directory or a climb
+    expect(readableImagePath("storage/images/a.png")).toBe(true);
+    expect(readableImagePath("wiki/pics/a.svg")).toBe(true);
+    expect(readableImagePath(".rotli/main.json")).toBe(false);
+    expect(readableImagePath(".rotli/x.png")).toBe(false);
+    expect(readableImagePath("storage/../wiki/a.png")).toBe(false);
+    expect(readableImagePath("wiki/a.md")).toBe(false);
     // `a-2.png`, never `a (2).png`: the Markdown image link cannot hold a `)`
     const taken = new Set(["a.png", "a-2.png"]);
     expect(freeName("a.png", (n) => taken.has(n))).toBe("a-3.png");
@@ -56,6 +64,9 @@ describe("folder mode (a connected or imported folder)", () => {
     await dir.writeBytes("Storage/old.png", new Uint8Array([1]));
     expect((await store.imageUrl("storage/old.png")).startsWith("blob:")).toBe(true);
     expect(await store.imageUrl("storage/nope.png")).toBe("");
+    // a note cannot turn the vault's own files into an image blob
+    await dir.writeText(".rotli/main.json", "{}");
+    expect(await store.imageUrl(".rotli/main.json")).toBe("");
   });
 
   test("refuses non-image names and oversized bytes without writing", async () => {
@@ -63,6 +74,15 @@ describe("folder mode (a connected or imported folder)", () => {
     const store = createWebFileStore(dir, kv);
     await expect(store.createImageAsset("default", "notes.md", PNG_BASE64)).rejects.toThrow(
       /images must use/,
+    );
+    // the app's bytes lane takes raster images only (svg is a note-side embed, not an asset)
+    await expect(store.createImageAsset("default", "mark.svg", PNG_BASE64)).rejects.toThrow(
+      /images must use/,
+    );
+    await expect(store.createImageAsset("default", "empty.png", "")).rejects.toThrow(/payload is empty/);
+    // a .png that is not a PNG is refused, as on the Mac
+    await expect(store.createImageAsset("default", "fake.png", btoa("not a png at all"))).rejects.toThrow(
+      /does not match its \.png/,
     );
     // refused on the encoded length, before any decoding
     const huge = "A".repeat(Math.ceil((25_000_000 * 4) / 3) + 12);

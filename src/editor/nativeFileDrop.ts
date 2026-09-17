@@ -175,13 +175,20 @@ export function useNativeFileDrop(): void {
     const onDrop = (event: DragEvent) => {
       if (webChatPane(event) && (event.dataTransfer?.files.length ?? 0) > 0) {
         event.preventDefault();
-        showFileNotice("Images can’t be sent through Rotli Helper yet — drop them into a note instead.");
+        showFileNotice("Files can’t be sent through Rotli Helper yet — drop images into a note instead.");
         return;
       }
       const host = dropEditorHost(event.target as Element | null);
       if (!host || !event.dataTransfer) return;
       const files = [...event.dataTransfer.files].filter((file) => isImagePath(file.name));
-      if (files.length === 0) return;
+      if (files.length === 0) {
+        // Rotli Web: an unhandled file drop would open the file over the app
+        if (!isTauri() && event.dataTransfer.files.length > 0) {
+          event.preventDefault();
+          showFileNotice("Rotli Web takes images only — other files stay where they are.");
+        }
+        return;
+      }
       const view = EditorView.findFromDOM(host);
       if (!view) return;
       event.preventDefault();

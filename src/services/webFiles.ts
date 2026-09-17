@@ -8,14 +8,16 @@
 
 import { bytesFromBase64 } from "../documents/images";
 import type { BrowserVault } from "../lib/browserVault";
-import { CHAT_IMAGE_ASSET_MAX_BYTES } from "../lib/chatWork";
-import { IMAGE_EXTS, imageMimeOf } from "../lib/fileKind";
+import { CHAT_IMAGE_ASSET_EXTS, CHAT_IMAGE_ASSET_MAX_BYTES } from "../lib/chatWork";
+import { IMAGE_EXTS, imageBytesMatchExtension, imageMimeOf } from "../lib/fileKind";
 import type { WebFileStoreShape } from "../lib/webAiSeam";
 import { strictExtOf } from "./storageTree";
 import type { VaultDir } from "./vaultDir";
 
-// what the app's drop lane accepts (editor NATIVE_IMAGE_EXTS): raster + svg/ico
+// image files the web keeps as bytes (the walk, the zip, a link's read): raster + svg/ico
 const WEB_IMAGE_EXTS = new Set([...IMAGE_EXTS, "svg", "ico"]);
+// what the app's bytes lane writes (corpus.rs create_image_asset): the raster set only
+const STORABLE_EXTS = new Set<string>(CHAT_IMAGE_ASSET_EXTS);
 
 /** Where the app files an imported image (corpus.rs `create_image_asset`):
  * every vault the app opens is a memex, so this is the one folder. */
@@ -28,15 +30,27 @@ export function isWebImageName(name: string): boolean {
   return WEB_IMAGE_EXTS.has(strictExtOf(name));
 }
 
-/** A filename safe to write beside the notes: no separators, no leading dot. */
+/** A filename safe to write beside the notes: no separators, no `:` (the
+ * app's multi-root router char, corpus.rs `validate_component`), no leading dot. */
 export function safeAssetName(name: string): string {
   const base = name.split(/[\\/]/).pop() ?? "";
   const cleaned = [...base]
     .filter((c) => c.charCodeAt(0) >= 0x20)
     .join("")
+    .replace(/:/g, "-")
     .replace(/^\.+/, "")
     .trim();
   return cleaned || "image";
+}
+
+/** A vault path a note may show as an image: an image file, no `..`, no dot
+ * directory (`.rotli/` is never a picture). */
+export function readableImagePath(rel: string): boolean {
+  const parts = rel.split("/");
+  const dirs = parts.slice(0, -1);
+  return (
+    isWebImageName(rel) && parts.every((p) => p !== "" && p !== "..") && !dirs.some((p) => p.startsWith("."))
+  );
 }
 
 /** `name.png` → `name-2.png` … until `taken` says no: the app's `free_name`
@@ -79,13 +93,18 @@ export function createWebFileStore(dir: VaultDir | null, kv: () => BrowserVault)
   const store = async (name: string, base64: string): Promise<string> => {
     const safe = safeAssetName(name);
     const ext = strictExtOf(safe);
-    if (!WEB_IMAGE_EXTS.has(ext))
-      throw new Error(`images must use one of: ${[...WEB_IMAGE_EXTS].join(", ")}`);
-    // bound the encoded size before decoding, as the app does (corpus_create_image_asset)
+    if (!STORABLE_EXTS.has(ext))
+      throw new Error(`images must use one of: ${CHAT_IMAGE_ASSET_EXTS.join(", ")}`);
+    // the app's payload guards (corpus_create_image_asset), in the same order:
+    // bound the encoded size before decoding, refuse an empty file, and refuse
+    // bytes that are not the picture the name claims
     if (base64.length > (CHAT_IMAGE_ASSET_MAX_BYTES * 4) / 3 + 8)
       throw new Error("image is larger than 25 MB");
     const bytes = bytesFromBase64(base64);
+    if (bytes.byteLength === 0) throw new Error("image payload is empty");
     if (bytes.byteLength > CHAT_IMAGE_ASSET_MAX_BYTES) throw new Error("image is larger than 25 MB");
+    if (!imageBytesMatchExtension(ext, bytes))
+      throw new Error(`image payload does not match its .${ext} filename`);
     // names compare case-blind: the connected folder may sit on a case-insensitive disk
     const taken = dir
       ? new Set(
@@ -108,6 +127,7 @@ export function createWebFileStore(dir: VaultDir | null, kv: () => BrowserVault)
     },
     // no cache here: the editor keeps one url per (root, src) for the session
     async imageUrl(rel) {
+      if (!readableImagePath(rel)) return "";
       // a `storage:` link may name a legacy `Storage/` file (case-insensitive disk)
       const candidates = [rel, rel.replace(/^storage\//, "Storage/")];
       for (const candidate of candidates) {

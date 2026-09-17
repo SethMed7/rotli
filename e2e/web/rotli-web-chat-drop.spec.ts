@@ -70,6 +70,6 @@ test("a file dropped on a web chat says to use a note, and the app stays open", 
   }, PNG_BASE64);
   // the drag was accepted (so the browser never takes the drop) and the drop was answered
   expect(handled).toEqual({ over: true, drop: true });
-  await expect(page.getByText(/Images can.t be sent through Rotli Helper yet/)).toBeVisible();
+  await expect(page.getByText(/Files can.t be sent through Rotli Helper yet/)).toBeVisible();
   expect(page.url()).toContain("/app/");
 });

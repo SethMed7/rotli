@@ -1,5 +1,6 @@
-// Zip a set of text files (a vault export) — the one place Rotli Web touches
-// JSZip, kept behind this adapter like the document codecs.
+// Zip a vault export (text files plus the images dropped in the browser) — the
+// one place Rotli Web touches JSZip, kept behind this adapter like the document
+// codecs.
 
 import JSZip from "jszip";
 

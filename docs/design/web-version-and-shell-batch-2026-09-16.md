@@ -180,16 +180,26 @@ vault, never the live one.
   once, so a storage-quota refusal fails the drop in words), and under
   `asset:<path>` in the browser vault otherwise. Names follow the app's
   `stem-2.ext` rule, compared case-blind (the folder may sit on a
-  case-insensitive disk), one import at a time; the encoded size is bounded
-  before decoding (`CHAT_IMAGE_ASSET_MAX_BYTES`). The note keeps the app's
+  case-insensitive disk), one import at a time; the app's payload guards
+  in the app's order — encoded size bounded before decoding
+  (`CHAT_IMAGE_ASSET_MAX_BYTES`), empty refused, bytes must match the
+  extension (`lib/fileKind.ts imageBytesMatchExtension`, the twin of
+  `corpus.rs image_payload_matches_extension`), raster set only
+  (`CHAT_IMAGE_ASSET_EXTS`). A link resolves only to an image path outside
+  dot directories (`readableImagePath`), so a note cannot blob `.rotli/`. The note keeps the app's
   portable `storage:` image link, so the same file opens in both, and the
   editor resolves it through an object URL made from the stored bytes
   instead of the asset protocol (`resolveImageSrc` web branch; a legacy
   `Storage/` file still answers). Moves and the zip export carry bytes.
   Chat drops on the web are refused with a notice (the pane accepts the
   drag so the browser never opens the file over the app) until the helper
-  carries images. Proofs: `e2e/web/rotli-web-image-drop.spec.ts`,
-  `e2e/web/rotli-web-chat-drop.spec.ts`. Still owed: paste (⌘V) of an
+  carries images; a non-image dropped on a note is refused the same way.
+  Proofs: `e2e/web/rotli-web-image-drop.spec.ts` (browser vault),
+  `e2e/web/rotli-web-imported-image-drop.spec.ts` (imported copy: saved at
+  once into the snapshot, back after a reload), `e2e/web/rotli-web-chat-drop.spec.ts`.
+  Not proven end to end: a connected folder's real disk write (the File
+  System Access picker cannot be driven headless) and a quota refusal; both
+  are unit-tested over the same `VaultDir` port. Still owed: paste (⌘V) of an
   image on the web (`useNativeFilePaste` is desktop-only), and an imported
   copy leaves the folder's existing `storage/` images behind
   (`importableVaultPaths`), so images dropped in the app show as not found
