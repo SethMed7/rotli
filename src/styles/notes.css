@@ -94,6 +94,38 @@
    pill): two segments in one quiet trough directly under the vault header.
    The trough is the recessed tone, the ACTIVE segment is the raised surface —
    hierarchy by surface contrast, no shadow, no glow (DESIGN.md flat material). — */
+/* Rotli Web: the connected folder needs the browser's permission again —
+   a standing bar above the fronts, not a toast (2026-09-17) */
+.sb-reconnect {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 12px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.sb-reconnect-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.sb-reconnect-btn {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
 .sb-switch {
   flex: 0 0 auto;
   display: flex;
