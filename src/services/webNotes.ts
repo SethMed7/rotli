@@ -208,6 +208,7 @@ let folderService: FolderNotesService | null = null;
 let folderName: string | null = null;
 let folderDir: VaultDir | null = null;
 let mode: "browser" | "folder" | "imported" = "browser";
+let importedAt: number | null = null;
 
 /** The one web notes service: the in-memory service wrapped so every
  * mutation schedules a vault write. Called once from ./notes.ts. */
@@ -253,9 +254,14 @@ export async function hydrateWebNotes(): Promise<boolean> {
       parsed = null;
     }
     if (isImportedVaultSnapshot(parsed)) {
-      const dir = new PersistedVaultDir(await seedVaultDir(parsed), parsed.name, (snapshot) =>
-        idb.write(IMPORTED_VAULT_KEY, snapshot),
+      const dir = new PersistedVaultDir(
+        await seedVaultDir(parsed),
+        parsed.name,
+        (snapshot) => idb.write(IMPORTED_VAULT_KEY, snapshot),
+        undefined,
+        parsed.importedAt,
       );
+      importedAt = parsed.importedAt ?? null;
       if (typeof window !== "undefined") {
         const flush = () => void dir.flush().catch(() => {});
         document.addEventListener("visibilitychange", () => {
@@ -297,6 +303,12 @@ export function connectedFolderName(): string | null {
 /** Where this web session's notes live. */
 export function webVaultMode(): "browser" | "folder" | "imported" {
   return mode;
+}
+
+/** When the imported copy was taken — null outside imported mode or for a
+ * copy from before the stamp existed. */
+export function importedVaultAt(): number | null {
+  return importedAt;
 }
 
 /** Download the connected or imported vault's text files as a zip. */

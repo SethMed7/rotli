@@ -16,6 +16,7 @@ const chatFile = (title: string, updated: string) =>
 const SNAPSHOT = {
   version: 1,
   name: "memex-copy",
+  importedAt: Date.now() - 2 * 3_600_000,
   dirs: ["wiki", "chats", ".rotli"],
   files: {
     "wiki/hello.md":
@@ -120,6 +121,11 @@ test("an imported vault shows the app's chats, their folders, and each chat's mo
   await page.locator(".sb-switch-seg", { hasText: /^Chat/ }).click();
 
   const sidebar = page.locator(".sidebar, aside").first();
+  // a copy says so, and how old it is, with the import one click away
+  const bar = page.locator(".sb-reconnect");
+  await expect(bar).toContainText("A copy of memex-copy imported");
+  await expect(bar).toContainText("ago");
+  await expect(bar.getByRole("button", { name: "Import again" })).toBeVisible();
   // the folder from .rotli/chat-folders.json, with its one chat inside
   await expect(sidebar.getByText("Work", { exact: true })).toBeVisible();
   await expect(sidebar.getByText("Loose chat")).toBeVisible();

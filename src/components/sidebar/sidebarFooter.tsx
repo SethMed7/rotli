@@ -9,10 +9,11 @@
 import { dispatch } from "../../keys/registry";
 import { isTauri, revealCorpus } from "../../lib/tauri";
 import { deriveJournal } from "../../services/brainJournal";
-import { useJournal, useNoteIndex, useSecureHints } from "../../services/hooks";
+import { useChatTranscripts, useJournal, useNoteIndex, useSecureHints } from "../../services/hooks";
+import { chatSlugOf } from "../../services/systemBrowser";
 import { openSystemRoot, revealNoteInSystem } from "../../services/systemNav";
 import { useOrganizerLive } from "../../state/organizerLive";
-import { useFocusedNoteId, usePanesStore } from "../../state/panes";
+import { useFocusedChatSlug, useFocusedNoteId, usePanesStore } from "../../state/panes";
 import { useUiStore } from "../../state/ui";
 import { ActivityGlyph, FolderGlyph } from "../glyphs";
 import { Icon } from "../icon";
@@ -36,10 +37,17 @@ export function SidebarFooter() {
   // owner, 2026-09-17: "it opens the finder against whatever file I am
   // actively in") — the Library root only when nothing is open
   const focusedNoteId = useFocusedNoteId();
+  const focusedChatSlug = useFocusedChatSlug();
   const noteIndex = useNoteIndex();
+  const transcripts = useChatTranscripts();
   const showFiles = () => {
     if (isTauri()) return void revealCorpus();
-    const note = focusedNoteId ? noteIndex.get(focusedNoteId) : undefined;
+    // a chat is a file too: chats/<slug>.md, under the Library's Chats folder
+    const note = focusedNoteId
+      ? noteIndex.get(focusedNoteId)
+      : focusedChatSlug
+        ? transcripts.find((n) => chatSlugOf(n) === focusedChatSlug)
+        : undefined;
     if (note) revealNoteInSystem(note);
     else openSystemRoot("Brain");
   };

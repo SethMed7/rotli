@@ -58,31 +58,33 @@ test("the prompt menu opens beside and top-aligned with its marker", async ({ pa
 
   const stack = await page.locator(".chat-prompt-menu").evaluate((menu) => {
     const cards = Array.from(menu.querySelectorAll<HTMLElement>(".chat-prompt-card"));
-    const opacity = (el: Element) => Number(getComputedStyle(el).opacity);
     const focal = menu.querySelector<HTMLElement>(".focal");
     const active = menu.querySelector<HTMLElement>(".active");
     if (!focal || !active) throw new Error("prompt card scaffold missing");
+    const style = (el: Element) => getComputedStyle(el);
     return {
       // the container has no chrome of its own — the cards are the surface
-      menuBorder: getComputedStyle(menu).borderStyle,
-      menuBackground: getComputedStyle(menu).backgroundColor,
-      cardBorder: getComputedStyle(cards[0]!).borderStyle,
-      opacities: cards.map(opacity),
-      focalOpacity: opacity(focal),
-      activeBackground: getComputedStyle(active).backgroundColor,
-      cardBackground: getComputedStyle(cards[0]!).backgroundColor,
-      previewDecoration: getComputedStyle(focal).textDecorationLine,
+      menuBorder: style(menu).borderStyle,
+      menuBackground: style(menu).backgroundColor,
+      cardBorder: style(cards[0]!).borderStyle,
+      // a tint, never transparency: every card is opaque, the words behind never show
+      opacities: cards.map((c) => Number(style(c).opacity)),
+      colors: cards.map((c) => style(c).color),
+      backgrounds: cards.map((c) => style(c).backgroundColor),
+      focalColor: style(focal).color,
+      activeBackground: style(active).backgroundColor,
+      cardBackground: style(cards[0]!).backgroundColor,
+      previewDecoration: style(focal).textDecorationLine,
     };
   });
   expect(stack.menuBorder).toBe("none");
   expect(stack.menuBackground).toBe("rgba(0, 0, 0, 0)");
   expect(stack.cardBorder).toBe("solid");
-  expect(stack.focalOpacity).toBe(1);
-  // three steps up: each further card fainter than the one nearer the focal
-  expect(stack.opacities[0]).toBeLessThan(stack.opacities[1]!);
-  expect(stack.opacities[1]).toBeLessThan(stack.opacities[2]!);
-  expect(stack.opacities[2]).toBeLessThan(1);
-  expect(stack.opacities[0]).toBeGreaterThan(0.1);
+  expect(stack.opacities).toEqual([1, 1, 1, 1, 1]);
+  // three steps up: each further card a different, fainter tint than the nearer one
+  expect(new Set(stack.colors.slice(0, 4)).size).toBe(4);
+  expect(new Set(stack.backgrounds.slice(0, 4)).size).toBe(4);
+  expect(stack.colors[3]).toBe(stack.focalColor);
   // the prompt on screen keeps its selected tint even one step away
   expect(stack.activeBackground).not.toBe(stack.cardBackground);
   expect(stack.previewDecoration).toBe("none");

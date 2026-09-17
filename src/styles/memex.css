@@ -1037,16 +1037,24 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   cursor: pointer;
-  /* each step away from the card you're on fades a little more: 1 → .74 → .48 → .22 */
-  opacity: calc(1 - var(--d, 0) * 0.26);
-  transition: opacity 120ms ease;
+  /* each step away from the card you're on sinks a little further into the
+     pane — a TINT, never transparency (the owner, 2026-09-17: "just tint in
+     color not opacity"): the words behind a card never show through */
+  --chat-prompt-fade: calc(var(--d, 0) * 24%);
+  color: color-mix(in srgb, var(--text) calc(100% - var(--chat-prompt-fade)), var(--ground));
+  background: color-mix(in srgb, var(--surface-2) calc(100% - var(--chat-prompt-fade)), var(--ground));
+  border-color: color-mix(in srgb, var(--border-strong) calc(100% - var(--chat-prompt-fade)), var(--ground));
+  transition:
+    color 120ms ease,
+    background-color 120ms ease,
+    border-color 120ms ease;
 }
 .chat-prompt-card:hover,
 .chat-prompt-card.focal {
-  opacity: 1;
+  --chat-prompt-fade: 0%;
 }
 .chat-prompt-card.active {
-  background: var(--selected-bg);
+  background: color-mix(in srgb, var(--selected-bg) calc(100% - var(--chat-prompt-fade)), var(--ground));
   font-weight: 600;
 }
 .chat-prompt-card:focus-visible {
