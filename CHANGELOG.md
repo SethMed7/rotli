@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-18
+
+Rotli 1.2: Add to folder for a whole selection, Tasks rebuilt (and working in
+Rotli Web), Captures tidied, a hover sidebar that pushes instead of covering,
+spelling underlines in the Mac app, a Secure switch with ⌘⇧L, a helper that
+says what went wrong instead of "network error", and a larger rotli.co
+(Resources, Blog, About, Download, and a new link preview).
+
 ### Added
 
 - **rotli.co: Resources, Blog, and About.** The header now lists Product,
@@ -121,7 +129,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Broken pipe". It now reads the request first, so the page shows the
   helper's real words — "pair again" when the code is stale — and a page that
   simply left is no longer logged as an error. The Mac app's local agent
-  server had the same flaw and the same fix. Needs the next helper release.
+  server had the same flaw and the same fix. Ships in helper 1.2.0; run the
+  installer line again to get it.
 
 ## [1.1.0] - 2026-09-17
 
