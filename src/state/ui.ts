@@ -21,6 +21,7 @@ import {
 } from "../lib/privateBrowser";
 import { DEFAULT_NEW_ITEM_KIND, type NameFirstKind, type NewItemKind } from "../newItems/model";
 import { inboxFolderId } from "../services/notes";
+import { DEFAULT_TASK_ARCHIVE_AGE, type TaskArchiveAge } from "../services/tasksView";
 import type { NoteSummary } from "../types";
 import { DEFAULT_VOICE } from "../voice/speech";
 import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
@@ -506,6 +507,10 @@ interface UiState {
    * persisted (transient); dismissed by the × or replaced by the next failure. */
   rowActionError: string | null;
   setRowActionError: (e: string | null) => void;
+  /** A Main folder made away from the sidebar ("New folder…" in a menu) asks
+   * the sidebar to open its name for editing; the sidebar clears it. */
+  mainRenameRequest: string | null;
+  setMainRenameRequest: (folderId: string | null) => void;
 
   /** The chat that was focused when a NEW chat was opened (the maintainer, 2026-07-30:
    * "this chat should default to folder I was in") — the first save reads it
@@ -519,6 +524,9 @@ interface UiState {
   setUserName: (name: string) => void;
   timeFormat: TimeFormat;
   setTimeFormat: (format: TimeFormat) => void;
+  /** How long a note rests before Tasks sets its open tasks aside (or never). */
+  taskArchiveAge: TaskArchiveAge;
+  setTaskArchiveAge: (age: TaskArchiveAge) => void;
   /** Optional, vault-scoped housekeeping. Null is deliberately OFF. Main
    * cleanup unlinks only the projection; chat cleanup uses recoverable Archive. */
   mainAutoRemoveDays: number | null;
@@ -912,6 +920,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setRenamingChatSlug: (slug) => set({ renamingChatSlug: slug }),
   rowActionError: null,
   setRowActionError: (e) => set({ rowActionError: e }),
+  mainRenameRequest: null,
+  setMainRenameRequest: (folderId) => set({ mainRenameRequest: folderId }),
 
   newChatOrigin: null,
   setNewChatOrigin: (slug) => set({ newChatOrigin: slug }),
@@ -920,6 +930,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setUserName: (name) => set({ userName: name }),
   timeFormat: "12",
   setTimeFormat: (format) => set({ timeFormat: format }),
+  taskArchiveAge: DEFAULT_TASK_ARCHIVE_AGE,
+  setTaskArchiveAge: (age) => set({ taskArchiveAge: age }),
   mainAutoRemoveDays: null,
   setMainAutoRemoveDays: (days) => set({ mainAutoRemoveDays: days }),
   chatAutoArchiveDays: null,

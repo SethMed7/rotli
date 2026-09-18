@@ -66,7 +66,7 @@ use serde_json::{json, Value};
 
 use crate::helper_token::{load_or_create_token, token_dir};
 use crate::loopback_http::{
-    bearer_authorized, malformed_head, not_found, read_http_body, read_http_head, unauthorized,
+    bearer_authorized, drain_http_body, malformed_head, not_found, read_http_body, read_http_head, unauthorized,
     write_http_response_with_headers, HttpHead,
 };
 use crate::provider::Running;
@@ -176,14 +176,15 @@ fn handle(mut stream: TcpStream, helper: &Helper) -> Result<(), String> {
     let origin = match helper.origin_verdict(&head) {
         OriginVerdict::Denied => {
             let refusal = json!({"error":"this origin is not paired with Rotli Helper"});
-            return respond(&mut stream, &[], 403, refusal);
+            return refuse(&mut stream, &mut reader, &head, &[], 403, refusal);
         }
         OriginVerdict::Absent => None,
         OriginVerdict::Allowed(origin) => Some(origin),
     };
     let cors = cors_headers(origin.as_deref());
     if !helper.host_is_loopback(&head) {
-        return respond(&mut stream, &cors, 400, json!({"error":"unexpected Host header"}));
+        let refusal = json!({"error":"unexpected Host header"});
+        return refuse(&mut stream, &mut reader, &head, &cors, 400, refusal);
     }
     if head.method == "OPTIONS" {
         // the preflight carries no credential by design — answer before auth
@@ -196,7 +197,7 @@ fn handle(mut stream: TcpStream, helper: &Helper) -> Result<(), String> {
             respond(&mut stream, &cors, 200, alive)
         }
         ("POST", "/rpc") => serve_rpc(&mut stream, &mut reader, &head, helper, &cors),
-        _ => respond(&mut stream, &cors, 404, not_found()),
+        _ => refuse(&mut stream, &mut reader, &head, &cors, 404, not_found()),
     }
 }
 
@@ -218,6 +219,20 @@ fn respond(s: &mut TcpStream, cors: &[(&str, String)], status: u16, body: Value)
     write_http_response_with_headers(s, status, cors, Some(body))
 }
 
+/// A refusal that precedes `read_http_body`: the declared body is read and
+/// discarded first, so the answer reaches the page instead of a reset.
+fn refuse(
+    stream: &mut TcpStream,
+    reader: &mut BufReader<TcpStream>,
+    head: &HttpHead,
+    cors: &[(&str, String)],
+    status: u16,
+    body: Value,
+) -> Result<(), String> {
+    drain_http_body(reader, head, HELPER_MAX_REQUEST_BYTES);
+    respond(stream, cors, status, body)
+}
+
 fn serve_rpc(
     stream: &mut TcpStream,
     reader: &mut BufReader<TcpStream>,
@@ -226,11 +241,11 @@ fn serve_rpc(
     cors: &[(&str, String)],
 ) -> Result<(), String> {
     if !bearer_authorized(head, &helper.token) {
-        return respond(stream, cors, 401, unauthorized());
+        return refuse(stream, reader, head, cors, 401, unauthorized());
     }
     let media = head.header("content-type").unwrap_or_default();
     if !media.split(';').next().unwrap_or_default().trim().eq_ignore_ascii_case("application/json") {
-        return respond(stream, cors, 415, json!({"error":"send application/json"}));
+        return refuse(stream, reader, head, cors, 415, json!({"error":"send application/json"}));
     }
     let raw = match read_http_body(reader, head, HELPER_MAX_REQUEST_BYTES) {
         Ok(raw) => raw,
@@ -394,6 +409,26 @@ mod tests {
         assert!(anonymous.starts_with("HTTP/1.1 401"), "{anonymous}");
         let wrong = rpc(port, "Authorization: Bearer not-the-token\r\n", "{\"cmd\":\"chat_models\"}");
         assert!(wrong.starts_with("HTTP/1.1 401"), "{wrong}");
+    }
+
+    /// The page's chat requests carry notes as context, so they are large. A
+    /// refusal written before that body is read closes the socket on unread
+    /// data; the kernel answers with a reset, and the browser reports a network
+    /// error instead of the refusal (the owner, 2026-09-18: "Broken pipe").
+    #[test]
+    fn a_refusal_still_reaches_a_page_that_sent_a_large_body() {
+        let (port, _, _) = helper();
+        let body = format!("{{\"cmd\":\"chat_models\",\"pad\":\"{}\"}}", "x".repeat(4 * 1024 * 1024));
+        let request = format!(
+            "POST /rpc HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nOrigin: https://rotli.co\r\nAuthorization: Bearer not-the-token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+            body.len()
+        );
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        stream.write_all(request.as_bytes()).expect("the helper must read the whole request before it closes");
+        let mut answer = String::new();
+        stream.read_to_string(&mut answer).expect("the refusal must arrive, not a reset");
+        assert!(answer.starts_with("HTTP/1.1 401"), "{answer}");
+        assert!(answer.contains("Access-Control-Allow-Origin: https://rotli.co"), "{answer}");
     }
 
     #[test]

@@ -1,20 +1,50 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title description">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title description">
   <title id="title">Rotli — room to think, files you keep</title>
-  <desc id="description">A Rotli Light product card: the waving quokka, the Rotli wordmark, and a folder of notes and chats you own.</desc>
-  <style>@font-face { font-family: "General Sans"; src: url("fonts/GeneralSans-Regular.woff2"); font-weight: 400; } @font-face { font-family: "General Sans"; src: url("fonts/GeneralSans-Semibold.woff2"); font-weight: 700; } @font-face { font-family: "Baloo 2"; src: url("fonts/Baloo2-600.ttf"); font-weight: 600; }</style>
-  <rect width="1200" height="630" fill="#f8f2e9"/>
-  <rect x="42" y="42" width="1116" height="546" rx="22" fill="#f8f2e9" stroke="#e2d3c1" stroke-width="2"/>
+  <desc id="description">The rotli wordmark and "Room to think. Files you keep." over a faint pattern of file icons, the app tilted in from the right, and the line-art quokka waving up from the bottom edge.</desc>
+  <!-- Rendered by scripts/build-social-card.mjs: fonts/ and asset: references are inlined, the network is off. -->
+  <style>@font-face { font-family: "General Sans"; src: url("fonts/GeneralSans-Semibold.woff2"); font-weight: 700; } @font-face { font-family: "Baloo 2"; src: url("fonts/Baloo2-600.ttf"); font-weight: 600; }</style>
+  <defs>
+    <!-- The background: a faint tile of notes, a folder, and a checklist. -->
+    <pattern id="files" width="160" height="160" patternUnits="userSpaceOnUse">
+      <g fill="none" stroke="#3a3028" stroke-opacity="0.09" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><g transform="translate(18 22) rotate(-8)"><path d="M0 0h20l8 8v28H0z M20 0v8h8"/><path d="M5 15h16M5 21h16M5 27h10"/></g><g transform="translate(96 30) rotate(6)"><path d="M0 4h11l4 4h19v22H0z"/></g><g transform="translate(40 100) rotate(5)"><path d="M0 0h26v34H0z"/><path d="M5 9h5v5H5zM14 11h8M5 20h5v5H5zM14 22h8"/></g><g transform="translate(112 104) rotate(-4)"><path d="M0 0h18l7 7v25H0z M18 0v7h7"/><path d="M5 14h14M5 20h9"/></g></g>
+    </pattern>
+    <!-- The pattern fades out behind the headline. -->
+    <radialGradient id="files-fade" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(336 239) scale(720 441)">
+      <stop offset="0.3" stop-color="#000"/>
+      <stop offset="0.8" stop-color="#fff"/>
+    </radialGradient>
+    <mask id="files-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="1200" height="630">
+      <rect width="1200" height="630" fill="url(#files-fade)"/>
+    </mask>
+    <filter id="window-shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="30" stdDeviation="26" flood-color="#3a3028" flood-opacity="0.3"/>
+    </filter>
+    <clipPath id="window-clip"><rect x="700" y="120" width="860" height="537.5" rx="18"/></clipPath>
+    <!-- The quokka's silhouette, so the pattern never shows inside it. -->
+    <mask id="quokka-mask" maskUnits="userSpaceOnUse" x="150" y="432" width="330" height="330">
+      <image href="asset:src/assets/characters/masks/waving.webp" x="150" y="432" width="330" height="330"/>
+    </mask>
+  </defs>
 
-  <g font-family="General Sans, Arial, sans-serif">
-    <text x="94" y="112" fill="#8f4e37" font-size="22" font-weight="700" letter-spacing="2">ROTLI / LOCAL-FIRST WORKSPACE</text>
-    <text x="92" y="224" fill="#3a3028" font-size="72" font-weight="700" letter-spacing="-3">Room to think.</text>
-    <text x="92" y="306" fill="#3a3028" font-size="72" font-weight="700" letter-spacing="-3">Files you keep.</text>
-    <text x="96" y="376" fill="#6e6155" font-size="25">One folder on your Mac. Notes, tasks, links,</text>
-    <text x="96" y="414" fill="#6e6155" font-size="25">and optional AI conversations.</text>
+  <rect width="1200" height="630" fill="#f8f2e9"/>
+  <rect width="1200" height="630" fill="url(#files)" mask="url(#files-mask)"/>
+
+  <text x="72" y="100" fill="#3a3028" font-family="'Baloo 2', sans-serif" font-size="40" font-weight="600" letter-spacing="-0.5">rotli</text>
+  <g font-family="'General Sans', Arial, sans-serif" font-size="78" font-weight="700" letter-spacing="-3.5" fill="#3a3028">
+    <text x="68" y="219">Room to think.</text>
+    <text x="68" y="295">Files you keep.</text>
   </g>
 
-  <!-- The waving quokka (docs/media/quokka-waving.svg, inlined so the renderer never fetches). -->
-  <svg x="88" y="446" width="128" height="128" viewBox="0 0 1024 1024" aria-hidden="true">
+  <!-- The app, tilted in from the right. -->
+  <g transform="rotate(-7 1130 388.75)">
+    <rect x="700" y="120" width="860" height="537.5" rx="18" fill="#fbf6ee" filter="url(#window-shadow)"/>
+    <image href="asset:site/public/rotli-app-warm-light@3x.png" x="700" y="120" width="860" height="537.5" clip-path="url(#window-clip)" preserveAspectRatio="xMidYMid slice"/>
+    <rect x="700.5" y="120.5" width="859" height="536.5" rx="17.5" fill="none" stroke="#3a3028" stroke-opacity="0.1"/>
+  </g>
+
+  <!-- The quokka, waving up from the bottom edge (src/assets/characters/waving.svg). -->
+  <rect x="150" y="432" width="330" height="330" fill="#f8f2e9" mask="url(#quokka-mask)"/>
+  <svg x="150" y="432" width="330" height="330" viewBox="0 0 1024 1024" aria-hidden="true">
 <g transform="translate(0.000000,1024.000000) scale(0.100000,-0.100000)"
 fill="#3A3028" stroke="none">
 <path d="M6320 9705 c-246 -54 -464 -243 -575 -497 -28 -65 -28 -65 -69 -53
@@ -131,30 +161,4 @@ c96 -75 78 -161 -47 -216 -68 -30 -96 -30 -126 1 -29 28 -30 37 -9 70 10 16
 93 -59z"/>
 </g>
   </svg>
-  <g>
-    <text x="232" y="516" fill="#3a3028" font-family="Baloo 2, General Sans, Arial, sans-serif" font-size="44" font-weight="600" letter-spacing="-0.5">rotli</text>
-    <text x="234" y="552" fill="#6e6155" font-family="General Sans, Arial, sans-serif" font-size="18">No account required · notes work offline · rotli.co</text>
-  </g>
-
-  <g transform="translate(748 104)">
-    <rect width="344" height="390" rx="16" fill="#ffffff" stroke="#e2d3c1" stroke-width="2"/>
-    <rect width="344" height="54" rx="16" fill="#f1e7d8"/>
-    <path d="M0 54H344" stroke="#e2d3c1" stroke-width="2"/>
-    <circle cx="24" cy="27" r="6" fill="#c97e62"/>
-    <circle cx="44" cy="27" r="6" fill="#5f6b49"/>
-    <circle cx="64" cy="27" r="6" fill="#cdb8a1"/>
-    <rect x="92" y="15" width="196" height="24" rx="12" fill="#f8f2e9" stroke="#e2d3c1"/>
-
-    <g font-family="General Sans, Arial, sans-serif">
-      <text x="24" y="92" fill="#8f4e37" font-size="13" font-weight="700" letter-spacing="1">ONE FOLDER</text>
-      <text x="24" y="128" fill="#3a3028" font-size="25" font-weight="700">Field Notes</text>
-      <text x="24" y="164" fill="#6e6155" font-size="15">⌄  wiki/</text>
-      <text x="46" y="194" fill="#3a3028" font-size="15">◇  launch-notes.md</text>
-      <text x="46" y="224" fill="#3a3028" font-size="15">◇  reading-list.md</text>
-      <text x="24" y="264" fill="#6e6155" font-size="15">⌄  chats/</text>
-      <text x="46" y="294" fill="#3a3028" font-size="15">◇  a-fresh-perspective.md</text>
-      <text x="46" y="324" fill="#3a3028" font-size="15">◇  next-steps.md</text>
-      <text x="24" y="364" fill="#6e6155" font-size="15">·  .rotli/  rebuildable metadata</text>
-    </g>
-  </g>
 </svg>

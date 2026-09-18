@@ -11,6 +11,7 @@
 
 import { type KeyboardEvent, useLayoutEffect, useRef, useState } from "react";
 
+import { placeMenu } from "../lib/menuPlacement";
 import { useTransientPopover } from "../lib/popover";
 import { menuUsesCheckGutter, type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { ChevronRight, LockGlyph } from "./glyphs";
@@ -32,18 +33,23 @@ export function ContextMenu() {
     setPos(menu ? { left: menu.x, top: menu.y } : null);
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // clamp inside the viewport once we know the menu's size, then focus the
+  // place it once we know the menu's size (flipping to the pointer's other
+  // side when a side has no room — lib/menuPlacement), then focus the
   // first enabled item so Arrow/Enter work immediately (mouse users are
   // unaffected — hover still runs items on click)
   useLayoutEffect(() => {
     if (!menu || !ref.current) return;
-    const r = ref.current.getBoundingClientRect();
-    const pad = 8;
-    let left = menu.x;
-    let top = menu.y;
-    if (left + r.width + pad > window.innerWidth) left = Math.max(pad, window.innerWidth - r.width - pad);
-    if (top + r.height + pad > window.innerHeight) top = Math.max(pad, window.innerHeight - r.height - pad);
-    setPos({ left, top });
+    // measure its NATURAL size from the top-left corner: a fixed box pressed
+    // against the window's edge shrinks to fit, reports that narrower width,
+    // and then grows back once it is moved — past the pointer it was placed by
+    const el = ref.current;
+    const { left: wasLeft, top: wasTop } = el.style;
+    el.style.left = "0px";
+    el.style.top = "0px";
+    const r = el.getBoundingClientRect();
+    el.style.left = wasLeft;
+    el.style.top = wasTop;
+    setPos(placeMenu({ x: menu.x, y: menu.y }, r, { width: window.innerWidth, height: window.innerHeight }));
     ref.current.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
   }, [menu, stack.length]);
 

@@ -41,12 +41,14 @@ import {
   CHECK_EM,
   CHOICE_EM,
   GROUP_INSET_PX,
-  isWideMarker,
+  type NumberColumn,
+  numberColumn,
   listStyle,
   MARKER_EM,
-  numberMarkerEm,
+  numberColumnEm,
   RESULT_EM,
 } from "./listGeometry";
+import { widestOrdinalInRun } from "./listNumbers";
 import { parseBlock } from "./render";
 import { resultTextParts } from "./resultState";
 import { ChoiceControlWidget, ResultReasonWidget, ResultWidget, ToggleWidget } from "./resultWidget";
@@ -95,6 +97,18 @@ function fixed(open: number, close: number) {
       content: [open, L - close] as [number, number],
     };
   };
+}
+
+/** Code, link targets, and URLs are not prose: the system spellchecker flags
+ * them wholesale, and every squiggle there is noise. Their spans (and fenced
+ * lines, below) opt out; ordinary words keep the checker. */
+const NOT_PROSE = /\brotli-(?:code|wikilink|link)\b/;
+
+export function spellAttrs(
+  cls: string,
+  attrs: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  return NOT_PROSE.test(cls) ? { ...attrs, spellcheck: "false" } : attrs;
 }
 
 const INLINE: InlineRule[] = [
@@ -267,15 +281,19 @@ class ProgressWidget extends WidgetType {
 }
 
 class NumberWidget extends WidgetType {
-  constructor(readonly marker: string) {
+  constructor(
+    readonly marker: string,
+    /** the run's column (listGeometry.numberColumn), so a run shares one */
+    readonly column: NumberColumn,
+  ) {
     super();
   }
   eq(o: NumberWidget) {
-    return o.marker === this.marker;
+    return o.marker === this.marker && o.column === this.column;
   }
   toDOM() {
     const s = document.createElement("span");
-    s.className = isWideMarker(this.marker) ? "rotli-marker num wide" : "rotli-marker num";
+    s.className = this.column === "one" ? "rotli-marker num" : `rotli-marker num ${this.column}`;
     s.textContent = this.marker;
     s.setAttribute("aria-hidden", "true");
     return s;
@@ -684,7 +702,7 @@ function scanInline(
     const ce = matchStart + cr[1];
     if (ce > cs) {
       const cls = rule.clsFor?.(m) ?? rule.cls;
-      const attrs = rule.attrsFor?.(m) ?? rule.attrs;
+      const attrs = spellAttrs(cls, rule.attrsFor?.(m) ?? rule.attrs);
       decos.push(Decoration.mark(attrs ? { class: cls, attributes: attrs } : { class: cls }).range(cs, ce));
       if (rule.nest) scanInline(m[0].slice(cr[0], cr[1]), cs, sel, decos, atomics);
     }
@@ -795,7 +813,11 @@ function build(view: EditorView): {
         // only (a line class never collides with a replace decoration; target
         // fences stay untouched since blockRender swaps their whole range).
         if (fence && !fence.target) {
-          decos.push(Decoration.line({ class: "rotli-fenceline" }).range(line.from));
+          decos.push(
+            Decoration.line({ class: "rotli-fenceline", attributes: { spellcheck: "false" } }).range(
+              line.from,
+            ),
+          );
         }
         pos = line.to + 1;
         continue;
@@ -857,17 +879,20 @@ function build(view: EditorView): {
           if (listItemImage(content, contentBase, line.to, lineTouched, sel, decos, atomics)) break;
           scanInline(content, contentBase, sel, decos, atomics);
           break;
-        case "numbered":
+        case "numbered": {
+          // the whole run hangs in ONE column, sized by its widest number
+          const column = numberColumn(widestOrdinalInRun(doc, line.number));
           decos.push(
             Decoration.line({
               class: "rotli-li",
-              attributes: { style: listStyle(depth, numberMarkerEm(block.marker ?? "1.")) },
+              attributes: { style: listStyle(depth, numberColumnEm(column)) },
             }).range(ls),
           );
-          hidePrefix(ls, prefixEnd, new NumberWidget(block.marker ?? "1."), decos, atomics);
+          hidePrefix(ls, prefixEnd, new NumberWidget(block.marker ?? "1.", column), decos, atomics);
           if (listItemImage(content, contentBase, line.to, lineTouched, sel, decos, atomics)) break;
           scanInline(content, contentBase, sel, decos, atomics);
           break;
+        }
         case "task":
           decos.push(
             Decoration.line({

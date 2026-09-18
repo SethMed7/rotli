@@ -84,12 +84,18 @@ describe("list geometry", () => {
   });
 });
 
-test("an ordered marker of two or more digits hangs in the wide column", async () => {
-  const { MARKER_EM, WIDE_MARKER_EM, isWideMarker, numberMarkerEm } = await import("./listGeometry");
-  expect(isWideMarker("1.")).toBe(false);
-  expect(isWideMarker("9)")).toBe(false);
-  expect(isWideMarker("10.")).toBe(true);
-  expect(isWideMarker("iii.")).toBe(true);
-  expect(numberMarkerEm("3.")).toBe(MARKER_EM);
-  expect(numberMarkerEm("12.")).toBe(WIDE_MARKER_EM);
+// The owner, 2026-09-18: a run sizes its column to its widest number, so "1."
+// and "10." share a left edge; a list that never reaches ten keeps the glyph column.
+test("a numbered run's column follows its widest marker", async () => {
+  const { MARKER_EM, NUMBER_EM, WIDE_MARKER_EM, numberColumn, numberColumnEm } =
+    await import("./listGeometry");
+  expect(numberColumn(1)).toBe("one");
+  expect(numberColumn(2)).toBe("two");
+  expect(numberColumn(3)).toBe("wide");
+  expect(numberColumn(5)).toBe("wide");
+  expect(numberColumnEm("one")).toBe(MARKER_EM);
+  expect(numberColumnEm("two")).toBe(NUMBER_EM);
+  expect(numberColumnEm("wide")).toBe(WIDE_MARKER_EM);
+  expect(MARKER_EM).toBeLessThan(NUMBER_EM);
+  expect(NUMBER_EM).toBeLessThan(WIDE_MARKER_EM);
 });

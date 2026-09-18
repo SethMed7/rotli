@@ -47,6 +47,7 @@ mod remote_agent;
 mod routines;
 mod search_index; mod search_match;
 mod secret;
+mod spellcheck;
 mod usage;
 mod vault_browser;
 mod vault_location;
@@ -2243,6 +2244,8 @@ fn set_summon_shortcut(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // before any window exists: the webview reads this default at creation
+    spellcheck::enable_continuous_spellcheck_by_default();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init()).plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_updater::Builder::new().build())

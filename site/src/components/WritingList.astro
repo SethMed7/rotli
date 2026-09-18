@@ -1,0 +1,72 @@
+---
+// An index of writing: title, one line, and an optional date or label.
+interface Item {
+  href: string;
+  title: string;
+  description: string;
+  meta?: string;
+}
+
+interface Props {
+  items: Item[];
+  empty: string;
+}
+
+const { items, empty } = Astro.props;
+---
+
+{
+  items.length === 0 ? (
+    <p class="empty">{empty}</p>
+  ) : (
+    <ul class="writing-list">
+      {items.map((item) => (
+        <li>
+          <a href={item.href}>
+            <strong>{item.title}</strong>
+            <span>{item.description}</span>
+            {item.meta && <small>{item.meta}</small>}
+          </a>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+<style>
+  .writing-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--border);
+  }
+  .writing-list li {
+    margin: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .writing-list a {
+    display: grid;
+    gap: 0.3rem;
+    padding: 1.3rem 0.25rem;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .writing-list strong {
+    font-size: 1.2rem;
+    letter-spacing: -0.01em;
+  }
+  .writing-list a:hover strong {
+    color: var(--accent-text);
+  }
+  .writing-list span {
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+  .writing-list small {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+  }
+  .empty {
+    color: var(--text-muted);
+  }
+</style>

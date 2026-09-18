@@ -122,6 +122,15 @@
         "src/lib/fileKind.test.ts"
       ],
       "reason": "Deliberate TS twin of the Rust image magic-number table: Rotli Web has no Rust, so lib/fileKind.ts imageBytesMatchExtension must refuse the same non-images corpus.rs image_payload_matches_extension refuses (a .png that is not a PNG). The literals ARE the contract (GIF87a, RIFF/WEBP, the ftyp brands); the test asserts them so the two cannot drift silently. Same shape as the search_match.rs / TS twin entry."
+    },
+    {
+      "id": "task-lines-rust-twin",
+      "files": [
+        "src-tauri/src/corpus.rs",
+        "src/lib/taskLines.ts",
+        "src/lib/taskLines.test.ts"
+      ],
+      "reason": "Deliberate TS twin of the Rust open-task grammar: Rotli Web has no Rust, so lib/taskLines.ts must read and check off exactly the lines corpus.rs open_task_text / check_off do ('[ ]', '[/]', the box found by position). The literals ARE the contract; the test mirrors the Rust cases so the two cannot drift silently. Same shape as the search_match.rs and image-magic twin entries."
     }
   ]
 }

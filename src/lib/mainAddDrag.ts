@@ -12,7 +12,14 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 
 import { inheritFolderView } from "../newItems/composition";
-import { MAIN_ROOT, addNoteToMain, type DropPos, mainParentOfNote, moveInTree } from "../services/mainTree";
+import {
+  addNoteToMain,
+  dropOrder,
+  MAIN_ROOT,
+  mainParentOfNote,
+  moveInTree,
+  type DropPos,
+} from "../services/mainTree";
 import { useMainStore } from "../state/main";
 import { createDragGhost } from "./dragGhost";
 import { createPointerDragSession } from "./pointerDrag";
@@ -54,8 +61,16 @@ export function startMainAddDrag(
   event: ReactPointerEvent,
   id: string,
   label: string,
-  opts?: { allowMain?: boolean; onTrash?: () => void },
+  opts?: {
+    allowMain?: boolean;
+    onTrash?: () => void;
+    /** The gathered selection `id` belongs to: one drag lands all of it in Main
+     * (Finder's rule), in this order. Files never enter Main; callers leave them out. */
+    ids?: readonly string[];
+  },
 ): void {
+  const ids = opts?.ids && opts.ids.length > 1 && opts.ids.includes(id) ? opts.ids : [id];
+  const ghostLabel = ids.length > 1 ? `${ids.length} items` : label;
   let drop: { kind: "main"; id: string; pos: DropPos } | { kind: "trash" } | null = null;
   let hovered: HTMLElement | null = null;
 
@@ -65,7 +80,7 @@ export function startMainAddDrag(
   };
 
   createPointerDragSession(event, {
-    ghost: (x, y) => createDragGhost(label, x, y),
+    ghost: (x, y) => createDragGhost(ghostLabel, x, y),
     onMove: (x, y) => {
       const trash = opts?.onTrash
         ? ((document.elementFromPoint(x, y) as HTMLElement | null)?.closest(
@@ -91,7 +106,9 @@ export function startMainAddDrag(
     },
     onDrop: () => {
       if (drop?.kind === "trash") opts?.onTrash?.();
-      else if (drop?.kind === "main") commitMainAdd(id, drop);
+      else if (drop?.kind === "main") {
+        for (const each of dropOrder(ids, drop.id, drop.pos)) commitMainAdd(each, drop);
+      }
     },
     onEnd: clearHover,
     // swallow the trailing click so the row doesn't also open on drop

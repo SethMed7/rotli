@@ -260,6 +260,14 @@ export function moveInTree(tree: MainNode[], dragId: string, targetId: string, p
   return r.found ? r.tree : tree;
 }
 
+/** The order to apply a multi-item drop in so the items LAND in the order
+ * given: "after" a row and "into" a folder each place the newest first, so those
+ * run backwards; "before" a row and the Main root (an append) run forwards. */
+export function dropOrder(itemIds: readonly string[], targetId: string, pos: DropPos): string[] {
+  const forwards = pos === "before" || targetId === MAIN_ROOT;
+  return forwards ? [...itemIds] : [...itemIds].reverse();
+}
+
 /** Add a note to the Main root (a no-op if it's already anywhere in Main). */
 export function addNoteToMain(tree: MainNode[], noteId: string): MainNode[] {
   return containsNote(tree, noteId) ? tree : [...tree, { note: noteId }];
@@ -338,6 +346,48 @@ export function fileNoteInNamedRootFolder(tree: MainNode[], noteId: string, name
     return { folder: node.folder, children: [...node.children, { note: noteId }] };
   });
   return found ? next : [...next, { folder: trimmed, children: [{ note: noteId }] }];
+}
+
+/** File several items into the Main folder with rendered id `folderId`, in the
+ * order given, after whatever it already holds. An item already in Main MOVES
+ * (one file, one slot); one that is not is added. The folder missing, or an
+ * item that IS the folder or an ancestor of it, changes nothing for that item. */
+export function fileItemsInMainFolder(
+  tree: MainNode[],
+  itemIds: readonly string[],
+  folderId: string,
+): MainNode[] {
+  if (!mainFolderIds(tree).includes(folderId)) return tree;
+  let next = tree;
+  for (const id of itemIds) {
+    if (id === folderId || folderId.startsWith(`${id}/`)) continue;
+    const { tree: without, node } = findAndRemove(next, id, MAIN_ROOT);
+    const ref: MainNode = node ?? { note: id };
+    const placed = insertAtFolderEnd(without, ref, folderId, MAIN_ROOT);
+    if (placed.found) next = placed.tree;
+  }
+  return next;
+}
+
+function insertAtFolderEnd(
+  nodes: MainNode[],
+  node: MainNode,
+  folderId: string,
+  parentId: string,
+): { tree: MainNode[]; found: boolean } {
+  let found = false;
+  const tree = nodes.map((n): MainNode => {
+    if (!("folder" in n)) return n;
+    const id = idOf(n, parentId);
+    if (id === folderId) {
+      found = true;
+      return { folder: n.folder, children: [...n.children, node] };
+    }
+    const inner = insertAtFolderEnd(n.children, node, folderId, id);
+    if (inner.found) found = true;
+    return { folder: n.folder, children: inner.tree };
+  });
+  return { tree, found };
 }
 
 export function artifactMainFolderName(chatTitle: string): string {

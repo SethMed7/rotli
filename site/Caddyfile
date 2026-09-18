@@ -57,6 +57,10 @@
 	}
 
 	# The marketing site: everything that is not /app/.
+	# The MCP guide moved under Resources on 2026-09-18; old links keep working.
+	redir /mcp /resources/mcp/ permanent
+	redir /mcp/ /resources/mcp/ permanent
+
 	handle {
 		import security
 
@@ -90,8 +94,8 @@
 		file_server
 	}
 
-	# Astro's directory format: /mcp/ -> /mcp/index.html. Caddy redirects a bare
-	# /mcp to /mcp/ on its own. Unknown paths fall through to the 404 page.
+	# Astro's directory format: /about/ -> /about/index.html. Caddy redirects a bare
+	# /about to /about/ on its own. Unknown paths fall through to the 404 page.
 	handle_errors {
 		import security
 		@notfound expression {http.error.status_code} == 404

@@ -41,9 +41,9 @@ bun run preview  # serve the built dist/ locally
 
   | Mode          | Deployment                    | Pages                    | Downloads | Indexed |
   | ------------- | ----------------------------- | ------------------------ | --------- | ------- |
-  | `coming-soon` | production · `rotli.co`       | holding page + 404       | no        | yes     |
-  | `dev`         | live dev site · `dev.rotli.co`| landing + `/mcp/` + 404  | no        | no      |
-  | `full`        | launch (default for local dev)| landing + 404            | yes       | yes     |
+  | `coming-soon` | holding page                  | holding page + 404       | no        | yes     |
+  | `dev`         | live dev site · `dev.rotli.co`| full site + drafts + `/resources/mcp/` | no | no |
+  | `full`        | production · `rotli.co`       | landing, Resources, Blog, About, 404 | yes | yes |
 
   An unknown value fails the build. Flipping production to launch is a variable
   change (`SITE_MODE=full`), not a code change — see "Going live" below. `dev` additionally sets
@@ -51,6 +51,33 @@ bun run preview  # serve the built dist/ locally
   under review. App enforcement is separate: Breve and Mermaid visual editing
   are disabled in stable builds; conventional file adapters remain available
   pending fidelity review. Site labels do not enforce app access.
+- **Structure and navigation.** `src/nav.ts` is the one navigation policy:
+  the header lists Product · Resources · Blog · About, and the footer's links
+  and tagline default from it. Pages pass only `current`. Below 1080px the
+  sections fold into a Menu disclosure (`<details>`, Escape and outside click
+  close it); below 560px the header actions move into it too.
+- **Writing.** Resources (evergreen, question-titled) and blog posts are
+  Markdown in one content collection, `src/content/writing/{resources,posts}/`
+  (schema: `src/content.config.ts`). `src/writing.ts` decides what a build
+  publishes: nothing in `coming-soon`; `draft: true` and `experiment: true`
+  entries only on the dev site. Routes: `/resources/`, `/resources/<file>/`,
+  `/blog/`, `/blog/<file>/`, and `/about/` (which holds the name story and
+  links the `the-creation-of-rotli` post once it is published). Markdown code
+  blocks are not syntax-highlighted: Shiki writes inline `style=` attributes,
+  which the production CSP drops. Keep article images local.
+- **`/download/`** lists every way in by device: the Mac DMG, Rotli Web for
+  Windows, Linux, and everything else, and Rotli Helper. The header and hero
+  Download buttons still fetch the DMG directly; pointing `DOWNLOAD_HREF` at
+  `/download/` makes this page the chooser once other native builds exist. The
+  Helper guide is `/resources/rotli-helper/`; the 404 page's `/helper` hint
+  links there.
+- **Download and the browser.** `SiteActions.astro` renders the two ways in —
+  Open in browser and Download — in the header, the hero, and the mobile menu.
+  `DOWNLOAD_HREF` in `src/site.ts` is where every Download button goes (today
+  the newest Mac DMG, directly; point it at a download page when Windows and
+  Linux builds exist). `Base.astro` stamps `data-platform` on `<html>`; off a
+  Mac (iPads included) the browser action leads and the download reads
+  "Download for Mac". Without script the Mac order stays.
 - `WEB_APP_ENABLED` decides whether pages link to **Rotli Web**, the app bundle
   served from `/app/` on this origin. Fails closed: only the exact string
   `"true"` shows the hero action, the navigation entry, and the footer link.
@@ -59,6 +86,12 @@ bun run preview  # serve the built dist/ locally
   by the `handle /app/*` block in `site/Caddyfile` under its own headers
   (`connect-src` loopback only, for Rotli Helper; inline styles allowed for the editors; `noindex`).
   Design and phases: `docs/design/web-version-and-shell-batch-2026-09-16.md`.
+- **Locally, `/app/` on the site is the web app's dev server.** `astro dev` and
+  `astro preview` have no Caddy and no Docker `app` stage, so they pass `/app/`
+  through to `bun run dev:web` (port 1437, run at the repository root). "Open
+  in browser" then works on the site's own port, as on rotli.co. With that
+  server off, `/app/` says so (a 503 page with the command) instead of the
+  site's 404. Server config only (`astro.config.mjs`); the build is untouched.
 - To SEE Rotli Web locally: `bun run dev:web` at the repository root serves it
   with hot reload at `http://localhost:1437/app/` (no security headers; for
   those, build the Docker prod twin below with `--build-arg WEB_APP_ENABLED=true`
@@ -94,6 +127,9 @@ bun run preview  # serve the built dist/ locally
 - `src/components/SiteHeader.astro` and `SiteFooter.astro` are the only header
   and footer; their shared styles live in
   `src/layouts/Base.astro`. Pages own only their sections.
+- The Rotli Web section shows `public/rotli-web@2x.webp`, a lossless capture
+  of `rotli.co/app/` on a first visit (fresh browser, seeded Welcome folder
+  only) at 1280 × 800 logical, 2× density.
 - The hero and theme studio use lossless 3840 × 2400 browser-demo captures
   (1280 × 800 logical viewport at 3× density), never a live vault. The Playground
   uses a 4320 × 2700 capture in Rotli Light. The `@3x.png` filenames replace the
@@ -107,16 +143,22 @@ bun run preview  # serve the built dist/ locally
   public, "Watch the film" when the film exists, and otherwise nothing. Mobile
   uses one column; the product preview sits beside the copy from 960px.
   It does not expose downloads or the full landing page's navigation.
-- `/mcp/` is the connection guide for local stdio clients (Claude Code, Codex,
+- `/resources/mcp/` (moved from `/mcp/` on 2026-09-18; the Caddyfile
+  redirects the old path) is the connection guide for local stdio clients (Claude Code, Codex,
   Cursor), the workspace policy, and disposable verification. Since 2026-09-11
   the whole guide, the landing page's agent section, and their navigation
   render only on the dev site under the experiment label: MCP and agent
   integrations left production until refined. The remote route (Grok Bot, the
   relay, self-hosting) sits inside that same dev-only guide. Do not publish a hosted relay URL there until that
   deployment has been verified.
-- `public/social-card.svg` is the editable source for the link preview; run
+- `public/social-card.svg` is the editable source for the link preview: the
+  wordmark, the hero line, a faint file-icon pattern that fades out behind
+  the headline, the Warm Light app capture tilted in from the right, and the
+  line-art quokka waving up from the bottom edge (a ground-colored silhouette
+  from `src/assets/characters/masks/` keeps the pattern out of it). Run
   `bun run build:social-card` from the repository root to render it with the
-  bundled fonts, the inlined waving quokka, and no external requests. The
+  bundled fonts and every `href="asset:<repo path>"` raster inlined, with no
+  external requests. The
   results are `public/social-card.png` (1200×630, what iMessage, Slack,
   LinkedIn, X, and Discord show for a rotli.co link) and
   `public/social-card-github.png` (1280×640, the 2:1 image GitHub wants for
@@ -175,8 +217,9 @@ environments use these variables and domains:
 | Railway project `rotli-site`, service `site` | production                   | dev                          |
 | -------------------------------------------- | ---------------------------- | ---------------------------- |
 | `RAILWAY_DOCKERFILE_PATH`                    | `site/Dockerfile`            | `site/Dockerfile`            |
-| `SITE_MODE`                                  | `coming-soon`                | `dev`                        |
+| `SITE_MODE`                                  | `full`                       | `dev`                        |
 | `SITE_URL`                                   | `https://rotli.co`           | `https://dev.rotli.co`       |
+| `WEB_APP_ENABLED` (set 2026-09-18)            | `true`                       | `true`                       |
 | Custom domain                                | `rotli.co`                   | `dev.rotli.co`               |
 
 Railway forwards service variables to the Dockerfile as build args; the image

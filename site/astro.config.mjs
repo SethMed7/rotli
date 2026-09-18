@@ -48,14 +48,47 @@ function cspInlineStyleGuard() {
   };
 }
 
+/**
+ * Locally there is no Caddy and no Docker `app` stage, so `/app/` (Rotli Web)
+ * has nothing behind it and "Open in browser" landed on the 404 page. Dev and
+ * preview pass `/app/` through to the web app's own dev server
+ * (`bun run dev:web` at the repository root, port 1437, already based at
+ * /app/), so the button works on the same origin as it does on rotli.co. When
+ * that server is not running, say so instead of a bare proxy error. Build
+ * output is untouched: this is server config only.
+ */
+const WEB_APP_DEV_ORIGIN = "http://localhost:1437";
+const localWebApp = {
+  "/app": {
+    target: WEB_APP_DEV_ORIGIN,
+    ws: true,
+    configure: (proxy) => {
+      proxy.on("error", (_error, _request, response) => {
+        if (!("writeHead" in response) || response.headersSent) return;
+        response.writeHead(503, { "content-type": "text/html; charset=utf-8" });
+        response.end(
+          `<!doctype html><meta charset="utf-8"><title>Rotli Web is not running locally</title>` +
+            `<body><h1>Rotli Web is not running locally</h1>` +
+            `<p>On rotli.co the web app is served from <code>/app/</code>. Here it comes from its dev server: ` +
+            `run <code>bun run dev:web</code> at the repository root, then reload.</p></body>`,
+        );
+      });
+    },
+  },
+};
+
 // Minimal static build. Which pages exist, whether downloads are offered, and
 // the canonical origin all come from src/site.ts (SITE_MODE + SITE_URL).
 export default defineConfig({
+  // No syntax highlighter: Shiki writes inline style= attributes, which the
+  // production CSP (style-src 'self') drops. Code blocks are styled by class.
+  markdown: { syntaxHighlight: false },
   site: site.url,
   // Never inline a stylesheet into a <style> block: the production CSP allows
   // only external stylesheets, and Astro's default inlines small ones (the 404
   // page shipped unstyled that way). The guard below proves it.
   build: { inlineStylesheets: "never" },
+  vite: { server: { proxy: localWebApp }, preview: { proxy: localWebApp } },
   integrations: [
     ...(site.indexable ? [sitemap({ filter: (page) => page !== `${site.url}/404/` })] : []),
     cspInlineStyleGuard(),
