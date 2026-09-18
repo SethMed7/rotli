@@ -9,12 +9,12 @@
 
 import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
 
-import { registerSurfaceFind } from "../keys/surfaceFind";
 import { relativeLabel } from "../lib/dateLabels";
 import { createDragGhost } from "../lib/dragGhost";
 import { plainSnippet } from "../lib/plainSnippet";
 import { createPointerDragSession } from "../lib/pointerDrag";
 import { rangeBetween } from "../lib/rangeSelect";
+import { toggledSet } from "../lib/toggledSet";
 import { createMergedCaptureNote, joinCaptureBodies } from "../services/captureMerge";
 import { DEST } from "../services/destinations";
 import { invalidateNotes, useNotes } from "../services/hooks";
@@ -29,6 +29,7 @@ import { BackToNotes } from "./backToNotes";
 import { pendingRevealKey } from "./captureReveal";
 import { Character } from "./character";
 import { ArchiveGlyph, CheckGlyph, SearchGlyph, TrashGlyph, glyphForNote } from "./glyphs";
+import { SurfaceSearch } from "./surfaceSearch";
 import { useNoteMenu } from "./useNoteMenu";
 
 /** Per-item accounting for a batched archive: say exactly how many failed (and
@@ -80,15 +81,6 @@ export function BoardSurface() {
   const [busy, setBusy] = useState(false);
   // the header's search narrows the cards by title or text (the owner, 2026-09-18)
   const [query, setQuery] = useState("");
-  const searchRef = useRef<HTMLInputElement>(null);
-  useEffect(
-    () =>
-      registerSurfaceFind(() => {
-        searchRef.current?.focus();
-        searchRef.current?.select();
-      }),
-    [],
-  );
 
   // "Show in Brain" on a Captures note: select + scroll the card into view.
   // Fires once per (focus, nonce) — captures stays in the deps only so a
@@ -220,12 +212,7 @@ export function BoardSurface() {
       return;
     }
     anchorRef.current = id;
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setSelected((prev) => toggledSet(prev, id));
   };
   const selectAll = () => setSelected(new Set(ordered.map((c) => c.id)));
   // ⌘A asks through the capture-selection store; only a NEW request selects
@@ -312,23 +299,12 @@ export function BoardSurface() {
         <span className="board-count">{captures.length}</span>
         {captures.length > 0 && (
           <>
-            <label className="surface-search">
-              <SearchGlyph size={14} />
-              <input
-                ref={searchRef}
-                type="text"
-                role="searchbox"
-                value={query}
-                placeholder="Search captures…"
-                aria-label="Search captures"
-                onChange={(event) => setQuery(event.currentTarget.value)}
-              />
-              {query && (
-                <button type="button" aria-label="Clear capture search" onClick={() => setQuery("")}>
-                  ×
-                </button>
-              )}
-            </label>
+            <SurfaceSearch
+              value={query}
+              onChange={setQuery}
+              label="Search captures"
+              clearLabel="Clear capture search"
+            />
             {/* a bulk verb belongs with the header's tools, not beside the
                 title where it read as a heading (the owner, 2026-09-18) */}
             <button
