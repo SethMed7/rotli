@@ -213,6 +213,7 @@ environments use these variables and domains:
 | `RAILWAY_DOCKERFILE_PATH`                    | `site/Dockerfile`            | `site/Dockerfile`            |
 | `SITE_MODE`                                  | `full`                       | `dev`                        |
 | `SITE_URL`                                   | `https://rotli.co`           | `https://dev.rotli.co`       |
+| `WEB_APP_ENABLED` (set 2026-09-18)            | `true`                       | `true`                       |
 | Custom domain                                | `rotli.co`                   | `dev.rotli.co`               |
 
 Railway forwards service variables to the Dockerfile as build args; the image
