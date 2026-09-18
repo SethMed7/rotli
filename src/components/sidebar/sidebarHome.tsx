@@ -40,16 +40,17 @@ import {
   useTrashItems,
 } from "../../services/hooks";
 import {
-  type DropPos,
-  MAIN_ROOT,
   addFolderToMain,
   buildMainTree,
+  dropOrder,
+  MAIN_ROOT,
   mainItemIdsInFolder,
   mainNoteIds,
   mainParentOfNote,
   mainRowSort,
   moveInTree,
   renameFolderInMain,
+  type DropPos,
   uniqueRootFolderName,
 } from "../../services/mainTree";
 import { buildStorageTree } from "../../services/storageTree";
@@ -307,6 +308,13 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   //   turns that folder's row into an inline input (the board-row pattern);
   //   mainNewFolder is the name-first input at the Main root. —
   const [renamingMainId, setRenamingMainId] = useState<string | null>(null);
+  // "New folder…" from a note's menu: the folder exists, now name it here
+  const mainRenameRequest = useUiStore((s) => s.mainRenameRequest);
+  useEffect(() => {
+    if (!mainRenameRequest) return;
+    setRenamingMainId(mainRenameRequest);
+    useUiStore.getState().setMainRenameRequest(null);
+  }, [mainRenameRequest]);
   const [mainNewFolder, setMainNewFolder] = useState(false);
   const [editingView, setEditingView] = useState<"create" | "rename" | null>(null);
   const [viewInputError, setViewInputError] = useState<string | null>(null);
@@ -444,7 +452,13 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
         const d = drop;
         if (!d) return;
         let tree = activeTree;
-        for (const moveId of dragIds) tree = moveInTree(tree, moveId, d.id, d.pos);
+        // the rows land in the order they were listed, not the order gathered
+        // (the rendered rows ARE the visible order — read them, never re-derive)
+        const shown = [...document.querySelectorAll<HTMLElement>(".main-tree [data-main-id]")].map(
+          (el) => el.dataset.mainId ?? "",
+        );
+        const listed = [...dragIds].sort((x, y) => shown.indexOf(x) - shown.indexOf(y));
+        for (const moveId of dropOrder(listed, d.id, d.pos)) tree = moveInTree(tree, moveId, d.id, d.pos);
         setActiveTree(tree, liveIds);
         setMainSel(new Set());
       },
@@ -567,6 +581,18 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
                 if (e.metaKey) {
                   setMainSel((prev) => {
                     const next = new Set(prev);
+                    // Finder's rule (the owner, 2026-09-18): the open note already
+                    // reads as selected, so the first ⌘-click gathers it too —
+                    // otherwise dragging by it moved it alone
+                    const open = focusedItemId;
+                    if (
+                      prev.size === 0 &&
+                      open &&
+                      open !== n.id &&
+                      mainProjection.notes.some((m) => m.id === open)
+                    ) {
+                      next.add(open);
+                    }
                     if (next.has(n.id)) next.delete(n.id);
                     else next.add(n.id);
                     return next;

@@ -36,7 +36,17 @@ import {
 } from "../services/itemLifecycle";
 import { renameLane } from "../services/itemRename";
 import { isEmptyNote } from "../services/mainDismiss";
-import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
+import {
+  MAIN_ROOT,
+  addFolderToMain,
+  addNoteToMain,
+  fileItemsInMainFolder,
+  mainFolderIds,
+  mainHasNote,
+  mainNoteIds,
+  removeFromMain,
+  uniqueRootFolderName,
+} from "../services/mainTree";
 import { markNoteDraftChanged } from "../services/noteDrafts";
 import { notesService } from "../services/notes";
 import { assignItemToView, assignedView, projectionMenuAction } from "../services/viewTree";
@@ -124,6 +134,14 @@ export function useNoteMenu() {
       e.stopPropagation?.();
       const x = e.clientX;
       const y = e.clientY;
+      // a gathered selection the clicked row belongs to; the menu's bulk verbs
+      // (Add to folder, Trash) act on all of it
+      const gathered =
+        opts?.selectedItems &&
+        opts.selectedItems.length > 1 &&
+        opts.selectedItems.some((item) => item.id === note.id)
+          ? [...new Map(opts.selectedItems.map((item) => [item.id, item])).values()]
+          : null;
       const selectedItems =
         opts?.trashSelection &&
         opts.selectedItems &&
@@ -414,6 +432,42 @@ export function useNoteMenu() {
             checked: starred,
             disabled: full,
             onClick: () => togglePinQuick(note.id),
+          });
+        }
+        // Add to folder (the owner, 2026-09-18): the whole selection into a Main
+        // folder, or a new one. Main only: a named view's folders are its own
+        // subset, and files never sit in Main.
+        // Items already in Main keep the order Main lists them in; the rest follow.
+        const listed = [...mainNoteIds(manifest.tree)];
+        const rank = (id: string) => (listed.includes(id) ? listed.indexOf(id) : listed.length);
+        const filing = (gathered ?? [note])
+          .filter((item) => item.kind !== "file")
+          .map((item) => item.id)
+          .sort((a, b) => rank(a) - rank(b));
+        if (activeView === null && filing.length > 0) {
+          const fileInto = (tree: typeof manifest.tree, folderId: string) =>
+            setTree(fileItemsInMainFolder(tree, filing, folderId), liveIds);
+          items.push({
+            kind: "drill" as const,
+            label: filing.length > 1 ? `Add ${filing.length} items to folder` : "Add to folder",
+            items: [
+              ...mainFolderIds(manifest.tree).map((folderId) => ({
+                kind: "action" as const,
+                label: folderId.slice(MAIN_ROOT.length),
+                onClick: () => fileInto(manifest.tree, folderId),
+              })),
+              {
+                kind: "action" as const,
+                label: "New folder…",
+                onClick: () => {
+                  // made, filled, then handed to the sidebar to be named in place
+                  const name = uniqueRootFolderName(manifest.tree, "New folder");
+                  const folderId = `${MAIN_ROOT}${name}`;
+                  fileInto(addFolderToMain(manifest.tree, name), folderId);
+                  useUiStore.getState().setMainRenameRequest(folderId);
+                },
+              },
+            ],
           });
         }
         const projectionAction = projectionMenuAction(activeView, currentView, inMain);

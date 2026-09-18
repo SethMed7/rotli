@@ -506,6 +506,10 @@ interface UiState {
    * persisted (transient); dismissed by the × or replaced by the next failure. */
   rowActionError: string | null;
   setRowActionError: (e: string | null) => void;
+  /** A Main folder made away from the sidebar ("New folder…" in a menu) asks
+   * the sidebar to open its name for editing; the sidebar clears it. */
+  mainRenameRequest: string | null;
+  setMainRenameRequest: (folderId: string | null) => void;
 
   /** The chat that was focused when a NEW chat was opened (the maintainer, 2026-07-30:
    * "this chat should default to folder I was in") — the first save reads it
@@ -912,6 +916,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setRenamingChatSlug: (slug) => set({ renamingChatSlug: slug }),
   rowActionError: null,
   setRowActionError: (e) => set({ rowActionError: e }),
+  mainRenameRequest: null,
+  setMainRenameRequest: (folderId) => set({ mainRenameRequest: folderId }),
 
   newChatOrigin: null,
   setNewChatOrigin: (slug) => set({ newChatOrigin: slug }),

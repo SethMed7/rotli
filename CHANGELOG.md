@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   system — and `/download/`, which lists the Mac app, Rotli Web for Windows and
   Linux, and the helper in one place.
 
+- **Add to folder, for one note or a whole selection.** Select several notes,
+  right-click, and choose **Add to folder**: pick one of your Main folders, or
+  **New folder…**, which files them and opens the folder's name for you to
+  type. They land in the order Main lists them. Works from the sidebar and
+  the Library browser, on the Mac and the web.
+
 ### Changed
 
 - **rotli.co: Download and the browser, side by side.** The hero offers Open
@@ -42,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Dragging a selection moves all of it.** Click a note, then ⌘-click two
+  more, and the first one now counts as selected too (as in Finder); before,
+  dragging by it moved it alone. A selection dragged out of the Library browser
+  into Main now lands whole as well, and dropped notes keep their order.
 - **The sidebar on hover pushes your note over instead of covering it.** Opened
   from the window's edge it is now the same sidebar ⌘0 shows: the content
   moves aside, nothing sits on top of the note, and the edge can be dragged to

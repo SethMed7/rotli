@@ -499,11 +499,14 @@ export function SystemSurface({ rootId }: { rootId: string }) {
         openSummary(n, { newTab: true });
       }
     },
-    onContextMenu: (e: MouseEvent) => openMenu(e, n),
+    onContextMenu: (e: MouseEvent) =>
+      openMenu(e, n, { selectedItems: selectedIds.has(n.id) ? selection : [n] }),
     onPointerDown: (e: ReactPointerEvent) => {
       const draggedItems = selectedIds.has(n.id) ? selection : [n];
       startMainAddDrag(e, n.id, n.title || "Empty note", {
         allowMain: n.kind !== "file",
+        // the whole selection lands in Main (files never do)
+        ids: draggedItems.filter((item) => item.kind !== "file").map((item) => item.id),
         onTrash: () => {
           setSelection(draggedItems);
           void trashSystemSelection();
