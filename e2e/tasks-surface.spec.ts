@@ -40,3 +40,28 @@ test("tasks group under their note, fold, search, and checking one off edits the
   const other = page.locator(".cm-line", { hasText: "Plain .md files" });
   await expect(other.locator(".rotli-check.done")).toHaveCount(0);
 });
+
+test("a task's words open its note with the caret on that task", async ({ page }) => {
+  await gotoApp(page);
+  await page.locator(".sb-notes-tree .frow", { hasText: "Tasks" }).first().click();
+  await page.getByRole("button", { name: "Plain .md files on disk — the corpus" }).click();
+  const editor = page.locator(".cm-content").first();
+  await expect(editor).toBeFocused();
+  // the caret sits at the end of that task: typing extends it
+  await page.keyboard.type(" JUMPED");
+  await expect(page.locator(".cm-line", { hasText: "the corpus JUMPED" })).toHaveCount(1);
+});
+
+test("the archive age is a setting: two weeks archives what thirty days kept, Never archives nothing", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Tasks", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Never", exact: true }).click();
+  await page.getByText("Back to notes").click();
+  await page.locator(".sb-notes-tree .frow", { hasText: "Tasks" }).first().click();
+  await expect(page.locator(".task-age-section.archived")).toHaveCount(0);
+  await page.getByRole("button", { name: "What is this list?" }).click();
+  await expect(page.locator(".task-intro")).toContainText("Nothing is archived");
+});

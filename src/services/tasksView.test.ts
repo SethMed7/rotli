@@ -4,7 +4,14 @@
 import { describe, expect, test } from "bun:test";
 
 import type { TaskItem } from "../lib/tauri";
-import { filterTaskGroups, groupTasks, sectionTaskGroups, taskCount } from "./tasksView";
+import {
+  TASK_ARCHIVE_AGES,
+  filterTaskGroups,
+  groupTasks,
+  sectionTaskGroups,
+  taskArchiveDays,
+  taskCount,
+} from "./tasksView";
 
 const t = (over: Partial<TaskItem>): TaskItem => ({
   noteId: "01A",
@@ -57,7 +64,7 @@ describe("groupTasks", () => {
     ).toEqual([
       ["This week", "this"],
       ["Last week", "last"],
-      ["Earlier this month", "month"],
+      ["Earlier", "month"],
       ["Archived", "old"],
     ]);
     // only the last is archived: it starts closed and carries a count
@@ -67,6 +74,30 @@ describe("groupTasks", () => {
       false,
       true,
     ]);
+  });
+
+  test("the archive cutoff is a setting: shorter archives sooner, never archives nothing", () => {
+    const day = 24 * 60 * 60 * 1_000;
+    const now = Date.UTC(2026, 8, 18);
+    const groups = groupTasks(
+      [t({ noteId: "recent", noteTitle: "Recent" }), t({ noteId: "stale", noteTitle: "Stale" })],
+      new Map([
+        ["recent", now - 3 * day],
+        ["stale", now - 20 * day],
+      ]),
+    );
+    const archivedIds = (days: number) =>
+      sectionTaskGroups(groups, now, days)
+        .filter((section) => section.archived)
+        .flatMap((section) => section.groups.map((group) => group.noteId));
+    expect(archivedIds(taskArchiveDays("14"))).toEqual(["stale"]);
+    expect(archivedIds(taskArchiveDays("30"))).toEqual([]);
+    expect(archivedIds(taskArchiveDays("never"))).toEqual([]);
+    // every group lands in exactly one section, whatever the cutoff
+    for (const age of TASK_ARCHIVE_AGES) {
+      const placed = sectionTaskGroups(groups, now, taskArchiveDays(age)).flatMap((s) => s.groups);
+      expect(placed).toHaveLength(2);
+    }
   });
 
   test("a task-text match keeps only the matching tasks; a title match keeps the note whole", () => {

@@ -39,6 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tasks works in Rotli Web.** The list was always empty in the browser; it
   now shows every open checkbox there too, and checking one off edits the
   note, exactly as on the Mac.
+- **Click a task to land on it.** A task's words in Tasks open its note with
+  the cursor on that task, even if the note changed since. The note's title
+  still opens it at the top.
+- **You choose when tasks are archived.** Settings → General → Tasks: two
+  weeks, 30, 60, or 90 days, or Never. Thirty days is the default.
 - **Archived tasks.** Tasks in notes you haven't touched for 30 days rest in a
   closed **Archived** section with a count. Nothing moves; edit the note and
   they come back.

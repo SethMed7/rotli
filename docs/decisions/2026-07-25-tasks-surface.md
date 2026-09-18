@@ -95,5 +95,12 @@ that whatever the app does, the web does too.
   input with the searchbox role.
 - **Archived.** Tasks in notes untouched for `TASK_ARCHIVE_DAYS` (30) sit in a
   closed section with a count; a search opens it. Nothing moves on disk, and
-  editing the note brings its tasks back. The cutoff is a constant today; it
-  becomes a setting when someone needs a different number.
+  editing the note brings its tasks back. The cutoff is Settings → General →
+  Tasks (`taskArchiveAge`: two weeks, 30, 60, or 90 days, or Never; default 30),
+  and the live sections clamp to it so every note lands in exactly one.
+- **A task's words open the note AT that task.** `src/editor/lineJump.ts` waits
+  for the note's editor, and `resolveLine.ts` checks the line against the
+  task's words first — the reported line when it still matches, else the
+  nearest line that does — so a note edited since the list was built never
+  lands the caret somewhere arbitrary. The note's title still opens it at the
+  top.

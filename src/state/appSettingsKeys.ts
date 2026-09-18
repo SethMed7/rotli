@@ -35,6 +35,7 @@ export const APP_SETTINGS_KEYS = new Set([
   "paneVaultMode",
   "userName",
   "timeFormat",
+  "taskArchiveAge",
   "chatWelcomeStyle",
   "chatNaming",
   "hotkeyPeek",

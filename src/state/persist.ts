@@ -63,6 +63,7 @@ import { type NewItemKind, newTabDefaultFrom } from "../newItems/model";
 import { mainFolderIds, mainNoteIds, removeFromMain } from "../services/mainTree";
 import { inboxFolderId, notesService } from "../services/notes";
 import { isRetentionEligible, parseRetentionDays } from "../services/retentionPolicy";
+import { DEFAULT_TASK_ARCHIVE_AGE, TASK_ARCHIVE_AGES, type TaskArchiveAge } from "../services/tasksView";
 import type { PaneNode, Tab } from "../types";
 import { DEFAULT_VOICE, VOICES } from "../voice/speech";
 import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
@@ -270,6 +271,7 @@ interface PersistedSettings {
   userName: string;
   /** App-global message clock display. */
   timeFormat: TimeFormat;
+  taskArchiveAge: TaskArchiveAge;
   /** Null means disabled. These remain vault-scoped because their effects are
    * limited to the active vault's projection and chat lifecycle lane. */
   mainAutoRemoveDays: number | null;
@@ -536,6 +538,7 @@ export function parseSettings(raw: string): PersistedSettings {
     blockHandles2: asBool(data.blockHandles2, true),
     userName: typeof data.userName === "string" ? data.userName : "",
     timeFormat: asEnum(data.timeFormat, TIME_FORMATS, "12"),
+    taskArchiveAge: asEnum(data.taskArchiveAge, TASK_ARCHIVE_AGES, DEFAULT_TASK_ARCHIVE_AGE),
     mainAutoRemoveDays: parseRetentionDays(data.mainAutoRemoveDays),
     chatAutoArchiveDays: parseRetentionDays(data.chatAutoArchiveDays),
     chatModelId: typeof data.chatModelId === "string" ? data.chatModelId : null,
@@ -750,6 +753,7 @@ function applySettings(s: PersistedSettings): void {
     blockHandles: s.blockHandles2,
     userName: s.userName,
     timeFormat: s.timeFormat,
+    taskArchiveAge: s.taskArchiveAge,
     mainAutoRemoveDays: s.mainAutoRemoveDays,
     chatAutoArchiveDays: s.chatAutoArchiveDays,
     chatModelId: s.chatModelId,
@@ -833,6 +837,7 @@ function applyAppSettings(s: PersistedSettings): void {
     paneVaultMode: s.paneVaultMode,
     userName: s.userName,
     timeFormat: s.timeFormat,
+    taskArchiveAge: s.taskArchiveAge,
     chatWelcomeStyle: s.chatWelcomeStyle,
     chatNaming: s.chatNaming,
     hotkeyPeek: s.hotkeyPeek,
@@ -870,6 +875,7 @@ function withAppSettings(vault: PersistedSettings, app: PersistedSettings): Pers
     paneVaultMode: app.paneVaultMode,
     userName: app.userName,
     timeFormat: app.timeFormat,
+    taskArchiveAge: app.taskArchiveAge,
     chatWelcomeStyle: app.chatWelcomeStyle,
     chatNaming: app.chatNaming,
     hotkeyPeek: app.hotkeyPeek,
@@ -1425,6 +1431,7 @@ function appSettingsSnapshot(): string {
     paneVaultMode: ui.paneVaultMode,
     userName: ui.userName,
     timeFormat: ui.timeFormat,
+    taskArchiveAge: ui.taskArchiveAge,
     chatWelcomeStyle: ui.chatWelcomeStyle,
     chatNaming: ui.chatNaming,
     hotkeyPeek: ui.hotkeyPeek,
@@ -1468,6 +1475,7 @@ function settingsSnapshot(): string {
     blockHandles2: ui.blockHandles,
     userName: ui.userName,
     timeFormat: ui.timeFormat,
+    taskArchiveAge: ui.taskArchiveAge,
     mainAutoRemoveDays: ui.mainAutoRemoveDays,
     chatAutoArchiveDays: ui.chatAutoArchiveDays,
     chatModelId: ui.chatModelId,

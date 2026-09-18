@@ -3,27 +3,29 @@
 // what note at a glance"): every open Markdown checkbox across the corpus,
 // grouped by note — each note a headed group whose tasks hang under it on a
 // rule, a note can fold, long tasks wrap, and tasks in notes untouched for
-// TASK_ARCHIVE_DAYS sit in a closed Archived section. A projection, never a store (Markdown is the
+// the chosen archive age sit in a closed Archived section. A projection, never a store (Markdown is the
 // only truth; docs/decisions/2026-07-25-tasks-surface.md). Checking a task off
 // is a real note edit through the ordinary write path; Rust re-validates the
 // exact text first, so a stale row refuses instead of flipping the wrong line.
 
 import { useMemo, useState } from "react";
 
+import { jumpToLineWhenOpen } from "../editor/lineJump";
 import { stripMarkdown } from "../editor/stripMarkdown";
 import { corpusToggleTask, isTauri } from "../lib/tauri";
 import { toggledSet } from "../lib/toggledSet";
 import { useNow } from "../lib/useNow";
 import { invalidateNotes, useNoteIndex, useTasks } from "../services/hooks";
 import {
-  TASK_ARCHIVE_DAYS,
   filterTaskGroups,
   groupTasks,
   sectionTaskGroups,
+  taskArchiveDays,
   taskCount,
 } from "../services/tasksView";
 import { toggleWebTask } from "../services/webTasks";
 import { usePanesStore } from "../state/panes";
+import { useUiStore } from "../state/ui";
 import { Character } from "./character";
 import { ChevronRight, FileGlyph, SearchGlyph } from "./glyphs";
 import { SurfaceSearch } from "./surfaceSearch";
@@ -52,7 +54,9 @@ export function TasksSurface() {
   const groups = useMemo(() => groupTasks(items ?? [], updatedAtByNote), [items, updatedAtByNote]);
   const filtered = useMemo(() => filterTaskGroups(groups, query), [groups, query]);
   const now = useNow();
-  const sections = useMemo(() => sectionTaskGroups(filtered, now), [filtered, now]);
+  const archiveAge = useUiStore((s) => s.taskArchiveAge);
+  const archiveDays = taskArchiveDays(archiveAge);
+  const sections = useMemo(() => sectionTaskGroups(filtered, now, archiveDays), [filtered, now, archiveDays]);
   const taskKey = (noteId: string, line: number) => `${noteId}:${line}`;
 
   const check = (noteId: string, line: number, text: string) => {
@@ -118,8 +122,10 @@ export function TasksSurface() {
           {helpOpen && (
             <p className="task-intro" id="task-intro">
               Every open checkbox from your notes, grouped by the note it lives in. Checking one off edits the
-              note itself. Tasks in notes you haven’t touched for {TASK_ARCHIVE_DAYS} days rest under
-              Archived; edit the note and they come back.
+              note itself.{" "}
+              {archiveAge === "never"
+                ? "Nothing is archived (Settings → General → Tasks)."
+                : `Tasks in notes you haven’t touched for ${archiveDays} days rest under Archived; edit the note and they come back. Change that in Settings → General.`}
             </p>
           )}
           {sections.map((section) => {
@@ -194,7 +200,17 @@ export function TasksSurface() {
                                       disabled={checked || busy === key}
                                       onClick={() => check(t.noteId, t.line, t.text)}
                                     />
-                                    <span className="task-text">{label}</span>
+                                    <button
+                                      type="button"
+                                      className="task-text"
+                                      title="Open the note at this task"
+                                      onClick={() => {
+                                        openNote(t.noteId);
+                                        jumpToLineWhenOpen(t.line, t.text);
+                                      }}
+                                    >
+                                      {label}
+                                    </button>
                                   </div>
                                 </li>
                               );

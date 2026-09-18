@@ -51,6 +51,17 @@ export function filterTaskGroups(groups: readonly TaskGroup[], query: string): T
  * edit to the note brings its tasks back. */
 export const TASK_ARCHIVE_DAYS = 30;
 
+/** Settings → General → Tasks: how long a note rests before its tasks are set
+ * aside, or never. A string enum so it persists like every other choice. */
+export type TaskArchiveAge = "14" | "30" | "60" | "90" | "never";
+export const TASK_ARCHIVE_AGES: readonly TaskArchiveAge[] = ["14", "30", "60", "90", "never"];
+export const DEFAULT_TASK_ARCHIVE_AGE: TaskArchiveAge = "30";
+
+/** The cutoff in days; Infinity when nothing is ever archived. */
+export function taskArchiveDays(age: TaskArchiveAge): number {
+  return age === "never" ? Infinity : Number(age);
+}
+
 export interface TaskSection {
   id: "this-week" | "last-week" | "last-30-days" | "archived";
   label: string;
@@ -63,12 +74,16 @@ export function taskCount(groups: readonly TaskGroup[]): number {
   return groups.reduce((sum, group) => sum + group.tasks.length, 0);
 }
 
-export function sectionTaskGroups(groups: readonly TaskGroup[], nowMs: number): TaskSection[] {
+export function sectionTaskGroups(
+  groups: readonly TaskGroup[],
+  nowMs: number,
+  archiveDays: number = TASK_ARCHIVE_DAYS,
+): TaskSection[] {
   const day = 24 * 60 * 60 * 1_000;
   const definitions: Array<Omit<TaskSection, "groups"> & { maxAge: number }> = [
-    { id: "this-week", label: "This week", maxAge: 7 * day, archived: false },
-    { id: "last-week", label: "Last week", maxAge: 14 * day, archived: false },
-    { id: "last-30-days", label: "Earlier this month", maxAge: TASK_ARCHIVE_DAYS * day, archived: false },
+    { id: "this-week", label: "This week", maxAge: Math.min(7, archiveDays) * day, archived: false },
+    { id: "last-week", label: "Last week", maxAge: Math.min(14, archiveDays) * day, archived: false },
+    { id: "last-30-days", label: "Earlier", maxAge: archiveDays * day, archived: false },
     { id: "archived", label: "Archived", maxAge: Infinity, archived: true },
   ];
   return definitions
