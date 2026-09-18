@@ -95,7 +95,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from the window's edge it is now the same sidebar ⌘0 shows: the content
   moves aside, nothing sits on top of the note, and the edge can be dragged to
   resize it — the width is remembered. Resizing, or dragging a note out of the
-  sidebar, holds it open until you let go. On the Mac and the web alike.
+  sidebar, holds it open until you let go. On the Mac and the web alike. And ⌘0 pressed just
+  after the pointer leaves the edge no longer has the sidebar shut itself a
+  moment later.
 - **The window can no longer slide sideways.** Jumping to a find match could
   push the whole frame left, cutting the sidebar off, with no way to scroll it
   back. The frame now clips instead of scrolling.

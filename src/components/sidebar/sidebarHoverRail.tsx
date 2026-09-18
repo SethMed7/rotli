@@ -92,6 +92,13 @@ export function SidebarHoverRail({ side, grip }: { side: SidebarSide; grip: Reac
       if (state.sidebarCollapsed && !previous.sidebarCollapsed) {
         armed.current = !inside(stripRef.current, pointer.current.x, pointer.current.y);
       }
+      // any OPEN (⌘0, the menu, the strip) outranks a close armed earlier:
+      // leaving the strip and pressing ⌘0 within the grace shut the sidebar
+      // 260ms after it opened (CI, 2026-09-18). A later leave re-arms it.
+      if (!state.sidebarCollapsed && previous.sidebarCollapsed && timer.current !== null) {
+        window.clearTimeout(timer.current);
+        timer.current = null;
+      }
     });
   }, []);
   useEffect(() => {
