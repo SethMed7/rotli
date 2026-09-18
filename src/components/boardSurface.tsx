@@ -15,6 +15,7 @@ import { createDragGhost } from "../lib/dragGhost";
 import { plainSnippet } from "../lib/plainSnippet";
 import { createPointerDragSession } from "../lib/pointerDrag";
 import { rangeBetween } from "../lib/rangeSelect";
+import { toggledSet } from "../lib/toggledSet";
 import { createMergedCaptureNote, joinCaptureBodies } from "../services/captureMerge";
 import { DEST } from "../services/destinations";
 import { invalidateNotes, useNotes } from "../services/hooks";
@@ -220,12 +221,7 @@ export function BoardSurface() {
       return;
     }
     anchorRef.current = id;
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setSelected((prev) => toggledSet(prev, id));
   };
   const selectAll = () => setSelected(new Set(ordered.map((c) => c.id)));
   // ⌘A asks through the capture-selection store; only a NEW request selects
