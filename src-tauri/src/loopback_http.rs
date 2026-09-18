@@ -58,11 +58,7 @@ pub(crate) fn read_http_head(reader: &mut impl BufRead) -> Result<HttpHead, Stri
         }
         let line = read_bounded_line(reader)?;
         if line == "\r\n" || line == "\n" || line.is_empty() {
-            return Ok(HttpHead {
-                method,
-                path,
-                headers,
-            });
+            return Ok(HttpHead { method, path, headers });
         }
         let Some((name, value)) = line.split_once(':') else {
             return Err("a request head line is not a header".into());
@@ -104,8 +100,7 @@ pub(crate) fn malformed_head() -> Value {
 /// Does this request carry the expected bearer? The header name and the
 /// constant-time compare belong together and to neither adapter in particular.
 pub(crate) fn bearer_authorized(head: &HttpHead, token: &str) -> bool {
-    head.header("authorization")
-        .is_some_and(|value| valid_bearer(value, token))
+    head.header("authorization").is_some_and(|value| valid_bearer(value, token))
 }
 
 /// Read the body a request head declares. Both loopback adapters bound it the
@@ -118,9 +113,7 @@ pub(crate) fn read_http_body(
     head: &HttpHead,
     max_bytes: usize,
 ) -> Result<Vec<u8>, (u16, Value)> {
-    let declared = head
-        .header("content-length")
-        .and_then(|value| value.trim().parse::<usize>().ok());
+    let declared = head.header("content-length").and_then(|value| value.trim().parse::<usize>().ok());
     let Some(length) = declared else {
         return Err((411, serde_json::json!({"error": "content-length required"})));
     };
@@ -140,9 +133,7 @@ pub(crate) fn read_http_body(
 /// a network error instead of the answer. Every refusal that precedes
 /// `read_http_body` drains first. The caller's read timeout still bounds it.
 pub(crate) fn drain_http_body(reader: &mut impl BufRead, head: &HttpHead, max_bytes: usize) {
-    let declared = head
-        .header("content-length")
-        .and_then(|value| value.trim().parse::<u64>().ok());
+    let declared = head.header("content-length").and_then(|value| value.trim().parse::<u64>().ok());
     let length = declared.unwrap_or(0).min(max_bytes as u64);
     let _ = std::io::copy(&mut reader.take(length), &mut std::io::sink());
 }
@@ -217,9 +208,7 @@ pub(crate) fn write_http_response_with_headers(
         .or_else(|error| match error.kind() {
             // the peer left before the answer (a page reload, an aborted
             // fetch): nobody is there to tell, and it is not the adapter's error
-            ErrorKind::BrokenPipe | ErrorKind::ConnectionReset | ErrorKind::ConnectionAborted => {
-                Ok(())
-            }
+            ErrorKind::BrokenPipe | ErrorKind::ConnectionReset | ErrorKind::ConnectionAborted => Ok(()),
             _ => Err(error.to_string()),
         })
 }
@@ -234,31 +223,17 @@ mod tests {
     fn a_head_is_bounded_in_lines_and_refuses_a_line_that_is_not_a_header() {
         let good = "GET /health HTTP/1.1\r\nHost: localhost:1\r\n\r\n";
         let head = read_http_head(&mut Cursor::new(good.as_bytes())).unwrap();
-        assert_eq!(
-            (head.method.as_str(), head.path.as_str()),
-            ("GET", "/health")
-        );
+        assert_eq!((head.method.as_str(), head.path.as_str()), ("GET", "/health"));
         assert_eq!(head.header("host"), Some("localhost:1"));
         let refusal = |raw: String| {
-            read_http_head(&mut Cursor::new(raw.into_bytes()))
-                .err()
-                .unwrap_or_default()
+            read_http_head(&mut Cursor::new(raw.into_bytes())).err().unwrap_or_default()
         };
-        let junk = refusal(format!(
-            "GET / HTTP/1.1\r\n{}\r\n",
-            "nonsense\r\n".repeat(500)
-        ));
+        let junk = refusal(format!("GET / HTTP/1.1\r\n{}\r\n", "nonsense\r\n".repeat(500)));
         assert!(junk.contains("not a header"), "{junk}");
         // a flood of WELL-FORMED headers still stops at the cap
-        let many = refusal(format!(
-            "GET / HTTP/1.1\r\n{}\r\n",
-            "X-Pad: 1\r\n".repeat(500)
-        ));
+        let many = refusal(format!("GET / HTTP/1.1\r\n{}\r\n", "X-Pad: 1\r\n".repeat(500)));
         assert!(many.contains("more than 64"), "{many}");
-        let wide = refusal(format!(
-            "GET / HTTP/1.1\r\nX-Pad: {}\r\n\r\n",
-            "y".repeat(9000)
-        ));
+        let wide = refusal(format!("GET / HTTP/1.1\r\nX-Pad: {}\r\n\r\n", "y".repeat(9000)));
         assert!(wide.contains("8 KB"), "{wide}");
     }
 
@@ -269,10 +244,7 @@ mod tests {
         let token = "fixture-token-with-24-chars";
         assert!(valid_bearer("Bearer fixture-token-with-24-chars", token));
         assert!(!valid_bearer("Bearer fixture-token-with-24-charx", token));
-        assert!(!valid_bearer(
-            "Bearer fixture-token-with-24-chars-extra",
-            token
-        ));
+        assert!(!valid_bearer("Bearer fixture-token-with-24-chars-extra", token));
         assert!(!valid_bearer("fixture-token-with-24-chars", token));
         assert!(!valid_bearer("", token));
     }

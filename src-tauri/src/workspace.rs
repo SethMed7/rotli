@@ -21,11 +21,11 @@ use crate::corpus::{
     Frontmatter, NamedView, NoteDoc, NoteKind, NoteMeta, ReferenceManifest as MainManifest,
     ReferenceNode as MainNode, SearchHit, ViewsManifest, DEFAULT_ROOT_ID, DOT_DIR,
 };
+use crate::memex_query::{parse_query, record_matches, ParsedQuery};
 use crate::loopback_http::{
     bearer_authorized, drain_http_body, not_found, read_http_body, read_http_head, unauthorized,
     write_http_response,
 };
-use crate::memex_query::{parse_query, record_matches, ParsedQuery};
 
 const MCP_PROTOCOL: &str = "2025-03-26";
 pub(crate) const MCP_MAX_REQUEST_BYTES: usize = 256_000;
@@ -2420,6 +2420,7 @@ fn agent_self_test() -> Result<Value, String> {
         }
     }))
 }
+
 
 fn run_mcp() -> Result<(), String> {
     let stdin = io::stdin();
