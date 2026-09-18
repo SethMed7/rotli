@@ -86,6 +86,12 @@ bun run preview  # serve the built dist/ locally
   by the `handle /app/*` block in `site/Caddyfile` under its own headers
   (`connect-src` loopback only, for Rotli Helper; inline styles allowed for the editors; `noindex`).
   Design and phases: `docs/design/web-version-and-shell-batch-2026-09-16.md`.
+- **Locally, `/app/` on the site is the web app's dev server.** `astro dev` and
+  `astro preview` have no Caddy and no Docker `app` stage, so they pass `/app/`
+  through to `bun run dev:web` (port 1437, run at the repository root). "Open
+  in browser" then works on the site's own port, as on rotli.co. With that
+  server off, `/app/` says so (a 503 page with the command) instead of the
+  site's 404. Server config only (`astro.config.mjs`); the build is untouched.
 - To SEE Rotli Web locally: `bun run dev:web` at the repository root serves it
   with hot reload at `http://localhost:1437/app/` (no security headers; for
   those, build the Docker prod twin below with `--build-arg WEB_APP_ENABLED=true`
