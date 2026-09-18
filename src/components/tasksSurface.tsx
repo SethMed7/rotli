@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { stripMarkdown } from "../editor/stripMarkdown";
 import { registerSurfaceFind } from "../keys/surfaceFind";
 import { corpusToggleTask, isTauri } from "../lib/tauri";
+import { toggledSet } from "../lib/toggledSet";
 import { useNow } from "../lib/useNow";
 import { invalidateNotes, useNoteIndex, useTasks } from "../services/hooks";
 import {
@@ -41,13 +42,7 @@ export function TasksSurface() {
   const [folded, setFolded] = useState<ReadonlySet<string>>(new Set());
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const toggleFold = (noteId: string) =>
-    setFolded((prev) => {
-      const next = new Set(prev);
-      if (next.has(noteId)) next.delete(noteId);
-      else next.add(noteId);
-      return next;
-    });
+  const toggleFold = (noteId: string) => setFolded((prev) => toggledSet(prev, noteId));
   const searchRef = useRef<HTMLInputElement>(null);
 
   const items = tasks.data ?? null;
