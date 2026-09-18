@@ -97,7 +97,7 @@ export function TasksSurface() {
         >
           ?
         </button>
-        <label className="task-search">
+        <label className="surface-search">
           <SearchGlyph size={14} />
           {/* text, not search: the search type draws its own magnifier and
               clear button beside ours (the owner's screenshot, 2026-09-18) */}

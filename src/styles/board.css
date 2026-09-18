@@ -452,7 +452,7 @@ span.fdr-col {
   color: var(--text);
   border-color: var(--border-strong);
 }
-.task-search {
+.surface-search {
   flex: 0 1 320px;
   min-width: 160px;
   margin-left: auto;
@@ -465,13 +465,13 @@ span.fdr-col {
   background: var(--surface);
   color: var(--text-muted);
 }
-.task-search:focus-within {
+.surface-search:focus-within {
   border-color: color-mix(in srgb, var(--accent-text) 45%, var(--border));
 }
-.task-search svg {
+.surface-search svg {
   flex: 0 0 auto;
 }
-.task-search input {
+.surface-search input {
   flex: 1;
   min-width: 0;
   border: none;
@@ -481,13 +481,13 @@ span.fdr-col {
   font-size: 13px;
   color: var(--text);
 }
-.task-search input::placeholder {
+.surface-search input::placeholder {
   color: var(--text-muted);
 }
-.task-search input:focus-visible {
+.surface-search input:focus-visible {
   outline: none;
 }
-.task-search button {
+.surface-search button {
   flex: 0 0 auto;
   border: none;
   background: none;
@@ -498,7 +498,7 @@ span.fdr-col {
   line-height: 1;
   cursor: pointer;
 }
-.task-search button:hover {
+.surface-search button:hover {
   color: var(--text);
 }
 .tasks .board-scroll {
@@ -779,18 +779,28 @@ span.fdr-col {
   border-color: var(--accent);
   background: var(--tint);
 }
+/* the select box: the app's checkbox shape (not a radio circle), and quiet —
+   it shows on the card under the pointer, on a focused card, and on every card
+   once a selection has begun (the owner, 2026-09-18: "the circles look weird") */
 .bc-check {
   position: absolute;
   top: 10px;
   right: 10px;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1.5px solid var(--border);
-  border-radius: var(--r-pill);
+  border: 1.5px solid var(--text-muted);
+  border-radius: 4px;
   color: var(--on-accent);
+  opacity: 0;
+  transition: opacity 120ms var(--motion-ease);
+}
+.board-card:hover .bc-check,
+.board-card:focus-visible .bc-check,
+.board-grid.selecting .bc-check {
+  opacity: 1;
 }
 .board-card.sel .bc-check {
   background: var(--accent);
@@ -902,6 +912,11 @@ span.fdr-col {
   background-image: linear-gradient(var(--hov), var(--hov));
 }
 .board-btn.ghost {
+  /* command.css has a global .ghost (onboarding's footnote) with a 14px top
+     margin; a ghost BUTTON here must sit on its row's baseline (the owner,
+     2026-09-18: "the clear button is off") */
+  margin-top: 0;
+  font-size: 12.5px;
   border-color: transparent;
   background: none;
   color: var(--text-muted);

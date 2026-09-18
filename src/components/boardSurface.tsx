@@ -9,8 +9,10 @@
 
 import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
 
+import { registerSurfaceFind } from "../keys/surfaceFind";
 import { relativeLabel } from "../lib/dateLabels";
 import { createDragGhost } from "../lib/dragGhost";
+import { plainSnippet } from "../lib/plainSnippet";
 import { createPointerDragSession } from "../lib/pointerDrag";
 import { rangeBetween } from "../lib/rangeSelect";
 import { createMergedCaptureNote, joinCaptureBodies } from "../services/captureMerge";
@@ -26,7 +28,7 @@ import { useUiStore } from "../state/ui";
 import { BackToNotes } from "./backToNotes";
 import { pendingRevealKey } from "./captureReveal";
 import { Character } from "./character";
-import { ArchiveGlyph, CheckGlyph, TrashGlyph, glyphForNote } from "./glyphs";
+import { ArchiveGlyph, CheckGlyph, SearchGlyph, TrashGlyph, glyphForNote } from "./glyphs";
 import { useNoteMenu } from "./useNoteMenu";
 
 /** Per-item accounting for a batched archive: say exactly how many failed (and
@@ -76,6 +78,17 @@ export function BoardSurface() {
   const openMenu = useNoteMenu();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  // the header's search narrows the cards by title or text (the owner, 2026-09-18)
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  useEffect(
+    () =>
+      registerSurfaceFind(() => {
+        searchRef.current?.focus();
+        searchRef.current?.select();
+      }),
+    [],
+  );
 
   // "Show in Brain" on a Captures note: select + scroll the card into view.
   // Fires once per (focus, nonce) — captures stays in the deps only so a
@@ -118,11 +131,14 @@ export function BoardSurface() {
     const pos = new Map(captureOrder.map((id, i) => [id, i] as const));
     // pinned captures FLOAT above the manual order (the maintainer, 2026-07-09) — the
     // saved order itself is untouched, same rule as Main
-    return [...captures].sort(
-      (a, b) =>
-        Number(b.pinned) - Number(a.pinned) || (pos.get(a.id) ?? Infinity) - (pos.get(b.id) ?? Infinity),
-    );
-  }, [captures, captureOrder]);
+    const q = query.trim().toLocaleLowerCase();
+    return captures
+      .filter((c) => !q || `${c.title}\n${c.snippet}`.toLocaleLowerCase().includes(q))
+      .sort(
+        (a, b) =>
+          Number(b.pinned) - Number(a.pinned) || (pos.get(a.id) ?? Infinity) - (pos.get(b.id) ?? Infinity),
+      );
+  }, [captures, captureOrder, query]);
 
   // pointer-drag reorder (HTML5 DnD is dead in the WKWebView shell). A move past
   // the threshold is a DRAG (reorder); no move falls through to the click (select).
@@ -295,14 +311,35 @@ export function BoardSurface() {
         <h2 className="board-title">Captures</h2>
         <span className="board-count">{captures.length}</span>
         {captures.length > 0 && (
-          <button
-            type="button"
-            className="board-btn ghost board-select-all"
-            disabled={busy || selected.size === ordered.length}
-            onClick={selectAll}
-          >
-            Select all
-          </button>
+          <>
+            <label className="surface-search">
+              <SearchGlyph size={14} />
+              <input
+                ref={searchRef}
+                type="text"
+                role="searchbox"
+                value={query}
+                placeholder="Search captures…"
+                aria-label="Search captures"
+                onChange={(event) => setQuery(event.currentTarget.value)}
+              />
+              {query && (
+                <button type="button" aria-label="Clear capture search" onClick={() => setQuery("")}>
+                  ×
+                </button>
+              )}
+            </label>
+            {/* a bulk verb belongs with the header's tools, not beside the
+                title where it read as a heading (the owner, 2026-09-18) */}
+            <button
+              type="button"
+              className="board-btn ghost"
+              disabled={busy || ordered.length === 0 || selected.size === ordered.length}
+              onClick={selectAll}
+            >
+              Select all
+            </button>
+          </>
         )}
       </header>
 
@@ -323,7 +360,14 @@ export function BoardSurface() {
             A card added to Main or starred for Quick access graduates — it leaves this board and lives with
             your notes.
           </p>
-          <div className="board-grid">
+          {ordered.length === 0 && (
+            <div className="list-empty compact">
+              <SearchGlyph size={28} />
+              <p className="be-title">No matching captures</p>
+              <p className="be-sub">Try a word from the card.</p>
+            </div>
+          )}
+          <div className={chosen.length > 0 ? "board-grid selecting" : "board-grid"}>
             {ordered.map((c) => {
               const sel = selected.has(c.id);
               const cls = ["board-card"];
@@ -346,7 +390,7 @@ export function BoardSurface() {
                     select(c.id, e);
                   }}
                   onDoubleClick={() => openOne(c)}
-                  onContextMenu={(e) => openMenu(e, c)}
+                  onContextMenu={(e) => openMenu(e, c, { selectedItems: sel ? chosen : [c] })}
                   title="Drag to reorder · click to select · double-click to open · right-click for actions"
                 >
                   <span className="bc-check" aria-hidden="true">
@@ -357,7 +401,7 @@ export function BoardSurface() {
                       {glyphForNote(c, { size: 13, className: "bc-icon" })}
                       {c.title || "Empty capture"}
                     </span>
-                    {c.snippet && <span className="bc-snippet">{c.snippet}</span>}
+                    {c.snippet && <span className="bc-snippet">{plainSnippet(c.snippet)}</span>}
                   </span>
                   <span className="bc-date">{relativeLabel(c.updatedAt)}</span>
                 </button>
@@ -370,6 +414,14 @@ export function BoardSurface() {
       {chosen.length > 0 && (
         <div className="board-bar" role="toolbar" aria-label="Selected captures">
           <span className="board-bar-count">{chosen.length} selected</span>
+          <button
+            type="button"
+            className="board-btn ghost"
+            disabled={busy}
+            onClick={() => setSelected(new Set())}
+          >
+            Clear
+          </button>
           <span className="board-bar-grow" />
           <button type="button" className="board-btn" disabled={busy} onClick={() => void archiveSelected()}>
             <ArchiveGlyph size={14} />
@@ -386,14 +438,6 @@ export function BoardSurface() {
           </button>
           <button type="button" className="board-btn primary" disabled={busy} onClick={() => void merge()}>
             {busy ? "Merging…" : chosen.length > 1 ? `Merge ${chosen.length} into a note` : "Make a note"}
-          </button>
-          <button
-            type="button"
-            className="board-btn ghost"
-            disabled={busy}
-            onClick={() => setSelected(new Set())}
-          >
-            Clear
           </button>
         </div>
       )}

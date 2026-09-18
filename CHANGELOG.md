@@ -41,6 +41,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Captures, tidied.** A search field narrows the cards, **Select all** sits
+  with the header's tools instead of beside the title, the select mark is the
+  app's checkbox (not a circle) and stays out of the way until you point at a
+  card or start selecting, **Clear** sits beside the count on the same line as
+  the actions, and cards show words rather than `[[link]]` syntax. Right-click
+  a selection to **Add to folder**.
 - **Tasks is easier to read.** Each note is a clear group: its title as a
   header, its tasks hanging under it on a rule, and a chevron to fold it away.
   Long tasks wrap instead of being cut off, the search field is a proper one
