@@ -11,7 +11,6 @@ import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import {
   corpusFrontmatter,
   corpusSetPinned,
-  corpusSetSecure,
   hideMainWindow,
   hideQuickWindow,
   isTauri,
@@ -29,7 +28,6 @@ import { type NewItemKind, isNameFirstKind, isNewItemAvailable } from "../newIte
 import { openChatForNote } from "../noteChat/composition";
 import { summonChat } from "../services/chatSummon";
 import { invalidateNotes, lifecycleError } from "../services/hooks";
-import { markNoteDraftChanged } from "../services/noteDrafts";
 import { archiveNoteWithImages, trashNoteWithImages } from "../services/noteLifecycle";
 import { notesService } from "../services/notes";
 import { trashSystemSelection } from "../services/systemTrash";
@@ -44,23 +42,12 @@ import { startTour } from "../state/tour";
 import { SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
 import { registerCaptureActions } from "./captureActions";
 import { EDITOR_ACTION } from "./editorActionIds";
+import { focusedNoteIdNow, notesWorkspaceActive } from "./focusNow";
 import { captureHandle, quickHandle, setupHandle } from "./handles";
 import { registerNavArrowActions } from "./navArrows";
+import { registerNoteProtectionActions } from "./noteProtectionActions";
 import { registerAction } from "./registry";
 import { runSurfaceFind } from "./surfaceFind";
-
-const notesWorkspaceActive = (): boolean => useUiStore.getState().sidebarMode !== "breve";
-
-/** The focused pane's active tab noteId, read imperatively for action runs
- * (the hook form useFocusedNoteId is for components). null when the pane has no
- * resolvable tab (the maintainer, 2026-06-13: the lifecycle chords target this note). */
-function focusedNoteIdNow(): string | null {
-  const { root, focusedPaneId } = usePanesStore.getState();
-  const leaf = findLeaf(root, focusedPaneId) ?? leaves(root)[0];
-  if (!leaf) return null;
-  const tab = leaf.tabs.find((t) => t.id === leaf.activeTabId) ?? leaf.tabs[0];
-  return tab && tab.surfaceKind === "note" ? tab.noteId : null;
-}
 
 function focusedTabNow() {
   const { root, focusedPaneId } = usePanesStore.getState();
@@ -433,21 +420,7 @@ export function registerDefaultActions(): void {
     },
   });
 
-  // Mark the FOCUSED note secure (the owner, 2026-09-18: "hot key for marking a
-  // note secure"). One direction only: a stray chord must never EXPOSE a note
-  // to remote AI, so removing protection stays a deliberate menu choice.
-  registerAction({
-    id: "notes.markSecure",
-    title: "Mark note secure — block remote AI",
-    defaultChord: "Meta+Shift+L",
-    run: () => {
-      if (!notesWorkspaceActive()) return;
-      const id = focusedNoteIdNow();
-      if (!id) return;
-      markNoteDraftChanged(id);
-      void corpusSetSecure(id, true).then(invalidateNotes).catch(lifecycleError("mark secure"));
-    },
-  });
+  registerNoteProtectionActions();
 
   // — tabs (created only by explicit gestures; plain click replaces). ⌘T uses
   //   the configured item default in the workspace and a fresh private sibling
