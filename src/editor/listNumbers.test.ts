@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test";
 
 import { EditorSelection, EditorState, Text } from "@codemirror/state";
 
-import { listNumbering, renumberLines, renumberRunAt } from "./listNumbers";
+import { listNumbering, renumberLines, renumberRunAt, widestOrdinalInRun } from "./listNumbers";
 
 const apply = (doc: string, changes: { from: number; to: number; insert: string }[]) => {
   let out = doc;
@@ -115,5 +115,29 @@ describe("lettered runs", () => {
     const letters = "abcdefghijklmnopqrstuvwxyz".split("");
     const doc = [...letters.map((l) => `${l}. item`), "a. extra"].join("\n");
     expect(renumber(doc)).toBe(doc);
+  });
+});
+
+describe("widestOrdinalInRun — one number column per run", () => {
+  const twelve = Array.from({ length: 12 }, (_, i) => `${i + 1}. item`);
+
+  test("every item of a run that reaches ten reports two characters, from any line", () => {
+    const doc = Text.of(twelve);
+    expect(widestOrdinalInRun(doc, 1)).toBe(2);
+    expect(widestOrdinalInRun(doc, 9)).toBe(2);
+    expect(widestOrdinalInRun(doc, 12)).toBe(2);
+  });
+
+  test("a run that stays under ten keeps one; prose ends a run; nested runs are their own", () => {
+    const doc = Text.of(["1. a", "2. b", "", "prose", ...twelve, "   1. nested", "   2. nested"]);
+    expect(widestOrdinalInRun(doc, 1)).toBe(1);
+    expect(widestOrdinalInRun(doc, 5)).toBe(2);
+    expect(widestOrdinalInRun(doc, 17)).toBe(1);
+    expect(widestOrdinalInRun(doc, 4)).toBe(0);
+  });
+
+  test("deeper items ride along without ending the outer run", () => {
+    const doc = Text.of(["8. a", "   - child", "9. b", "10. c"]);
+    expect(widestOrdinalInRun(doc, 1)).toBe(2);
   });
 });

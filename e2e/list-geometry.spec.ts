@@ -90,3 +90,46 @@ test("a parent task's subtask pill keeps its digits inside the pill", async ({ p
   });
   expect(offset, `digits start ${offset}px from the pill's left edge`).toBeGreaterThanOrEqual(0);
 });
+
+// The owner, 2026-09-18: "numbers should not go more left than any text could,
+// no matter what it is … it needs to respect the same width boundary." Every
+// list marker — bullet, number (one digit, two, three), checkbox, choice —
+// starts at or right of the note's own text edge. Measured on the GLYPH, not
+// the marker's box: an inherited text-indent once drew the digits a whole
+// column to the left of a correctly placed box.
+test("no list marker starts left of the note's text edge", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  const numbered = Array.from({ length: 12 }, (_, i) => `${i + 1}. item ${i + 1}`).join("\n");
+  await page.keyboard.insertText(
+    `# Boundary\n\nplain paragraph\n\n${numbered}\n\n100. a hundred\n101. and one\n\n- bullet\n- [ ] task\n- ( ) choice\n`,
+  );
+  await page.locator(".cm-content .cm-line").first().click();
+  const result = await editor.evaluate((content) => {
+    const glyphLeft = (el: Element) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const rect = range.getBoundingClientRect();
+      return rect.width > 0 ? rect.left : el.getBoundingClientRect().left;
+    };
+    const paragraph = [...content.querySelectorAll(".cm-line")].find(
+      (l) => l.textContent === "plain paragraph",
+    );
+    if (!paragraph) throw new Error("no paragraph");
+    const edge = glyphLeft(paragraph);
+    const markers = [...content.querySelectorAll(".rotli-marker, .rotli-check, .rotli-choice")];
+    return {
+      edge,
+      count: markers.length,
+      lefts: markers.map((m) => [m.textContent ?? "", glyphLeft(m)] as const),
+    };
+  });
+  expect(result.count).toBeGreaterThanOrEqual(17);
+  for (const [text, left] of result.lefts) {
+    expect(left, `marker "${text}" at ${left}, text edge at ${result.edge}`).toBeGreaterThanOrEqual(
+      result.edge - 0.75,
+    );
+  }
+});

@@ -84,17 +84,18 @@ describe("list geometry", () => {
   });
 });
 
-// The owner, 2026-09-18: at "10." the number and its text jumped right of "9.".
-// One and two digits share ONE column, so a list that crosses ten stays aligned.
-test("ordered markers of one and two digits share a column; three or more get the wide one", async () => {
-  const { NUMBER_EM, WIDE_MARKER_EM, isWideMarker, numberMarkerEm } = await import("./listGeometry");
-  expect(numberMarkerEm("9.")).toBe(numberMarkerEm("10."));
-  expect(numberMarkerEm("3.")).toBe(NUMBER_EM);
-  expect(numberMarkerEm("12)")).toBe(NUMBER_EM);
-  expect(isWideMarker("1.")).toBe(false);
-  expect(isWideMarker("10.")).toBe(false);
-  expect(isWideMarker("100.")).toBe(true);
-  expect(isWideMarker("iii.")).toBe(true);
-  expect(numberMarkerEm("100.")).toBe(WIDE_MARKER_EM);
-  expect(WIDE_MARKER_EM).toBeGreaterThan(NUMBER_EM);
+// The owner, 2026-09-18: a run sizes its column to its widest number, so "1."
+// and "10." share a left edge; a list that never reaches ten keeps the glyph column.
+test("a numbered run's column follows its widest marker", async () => {
+  const { MARKER_EM, NUMBER_EM, WIDE_MARKER_EM, numberColumn, numberColumnEm } =
+    await import("./listGeometry");
+  expect(numberColumn(1)).toBe("one");
+  expect(numberColumn(2)).toBe("two");
+  expect(numberColumn(3)).toBe("wide");
+  expect(numberColumn(5)).toBe("wide");
+  expect(numberColumnEm("one")).toBe(MARKER_EM);
+  expect(numberColumnEm("two")).toBe(NUMBER_EM);
+  expect(numberColumnEm("wide")).toBe(WIDE_MARKER_EM);
+  expect(MARKER_EM).toBeLessThan(NUMBER_EM);
+  expect(NUMBER_EM).toBeLessThan(WIDE_MARKER_EM);
 });

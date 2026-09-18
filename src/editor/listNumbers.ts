@@ -96,6 +96,30 @@ export function renumberRunAt(doc: Text, lineNumber: number): NumberChange[] {
   return changes;
 }
 
+/** How many characters the WIDEST ordinal in the run containing `lineNumber`
+ * (1-based) has. Runs count in sequence, so that is the run's last item: walk
+ * forward only. The editor sizes the whole run's number column from it. Bounded,
+ * because this runs while decorating. 0 when the line is not an ordered item. */
+export function widestOrdinalInRun(doc: Text, lineNumber: number, maxLines = 600): number {
+  const line = doc.line(lineNumber);
+  const here = orderedLineOf(line.text, line.from);
+  if (!here) return 0;
+  let widest = here.ordinal.length;
+  const last = Math.min(doc.lines, lineNumber + maxLines);
+  for (let n = lineNumber + 1; n <= last; n++) {
+    const l = doc.line(n);
+    const item = orderedLineOf(l.text, l.from);
+    if (item && item.indent === here.indent && item.style !== here.style) break;
+    if (item && item.indent === here.indent) {
+      widest = Math.max(widest, item.ordinal.length);
+      continue;
+    }
+    if (item && item.indent < here.indent) break;
+    if (!item && !ridesAlong(l.text, here.indent)) break;
+  }
+  return widest;
+}
+
 /** Renumber every ordered run touching the given line range, at every indent
  * level present in it. Runs are visited once each. */
 export function renumberLines(doc: Text, fromLine: number, toLine: number): NumberChange[] {

@@ -41,12 +41,14 @@ import {
   CHECK_EM,
   CHOICE_EM,
   GROUP_INSET_PX,
-  isWideMarker,
+  type NumberColumn,
+  numberColumn,
   listStyle,
   MARKER_EM,
-  numberMarkerEm,
+  numberColumnEm,
   RESULT_EM,
 } from "./listGeometry";
+import { widestOrdinalInRun } from "./listNumbers";
 import { parseBlock } from "./render";
 import { resultTextParts } from "./resultState";
 import { ChoiceControlWidget, ResultReasonWidget, ResultWidget, ToggleWidget } from "./resultWidget";
@@ -279,15 +281,19 @@ class ProgressWidget extends WidgetType {
 }
 
 class NumberWidget extends WidgetType {
-  constructor(readonly marker: string) {
+  constructor(
+    readonly marker: string,
+    /** the run's column (listGeometry.numberColumn), so a run shares one */
+    readonly column: NumberColumn,
+  ) {
     super();
   }
   eq(o: NumberWidget) {
-    return o.marker === this.marker;
+    return o.marker === this.marker && o.column === this.column;
   }
   toDOM() {
     const s = document.createElement("span");
-    s.className = isWideMarker(this.marker) ? "rotli-marker num wide" : "rotli-marker num";
+    s.className = this.column === "one" ? "rotli-marker num" : `rotli-marker num ${this.column}`;
     s.textContent = this.marker;
     s.setAttribute("aria-hidden", "true");
     return s;
@@ -873,17 +879,20 @@ function build(view: EditorView): {
           if (listItemImage(content, contentBase, line.to, lineTouched, sel, decos, atomics)) break;
           scanInline(content, contentBase, sel, decos, atomics);
           break;
-        case "numbered":
+        case "numbered": {
+          // the whole run hangs in ONE column, sized by its widest number
+          const column = numberColumn(widestOrdinalInRun(doc, line.number));
           decos.push(
             Decoration.line({
               class: "rotli-li",
-              attributes: { style: listStyle(depth, numberMarkerEm(block.marker ?? "1.")) },
+              attributes: { style: listStyle(depth, numberColumnEm(column)) },
             }).range(ls),
           );
-          hidePrefix(ls, prefixEnd, new NumberWidget(block.marker ?? "1."), decos, atomics);
+          hidePrefix(ls, prefixEnd, new NumberWidget(block.marker ?? "1.", column), decos, atomics);
           if (listItemImage(content, contentBase, line.to, lineTouched, sel, decos, atomics)) break;
           scanInline(content, contentBase, sel, decos, atomics);
           break;
+        }
         case "task":
           decos.push(
             Decoration.line({
