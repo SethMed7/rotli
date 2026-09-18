@@ -32,7 +32,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   type. They land in the order Main lists them. Works from the sidebar and
   the Library browser, on the Mac and the web.
 
+- **Tasks works in Rotli Web.** The list was always empty in the browser; it
+  now shows every open checkbox there too, and checking one off edits the
+  note, exactly as on the Mac.
+- **Archived tasks.** Tasks in notes you haven't touched for 30 days rest in a
+  closed **Archived** section with a count. Nothing moves; edit the note and
+  they come back.
+
 ### Changed
+
+- **Tasks is easier to read.** Each note is a clear group: its title as a
+  header, its tasks hanging under it on a rule, and a chevron to fold it away.
+  Long tasks wrap instead of being cut off, the search field is a proper one
+  (no more doubled magnifier) and narrows to the tasks that match, and the
+  explanation line waits behind a **?**.
 
 - **rotli.co: Download and the browser, side by side.** The hero offers Open
   in your browser and Download for Mac; on Windows, Linux, and phones the

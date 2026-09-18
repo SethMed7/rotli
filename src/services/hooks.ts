@@ -24,6 +24,7 @@ import { memexRootMarkers, scopeCorpusNotes } from "./fsNotes";
 import { archiveNoteWithImages, trashNoteWithImages } from "./noteLifecycle";
 import { notesService } from "./notes";
 import { queryClient } from "./query";
+import { listWebTasks } from "./webTasks";
 
 /** Surface a lifecycle failure inline instead of swallowing it — the memex write
  * gate can refuse a move, and a silent rejection reads as "nothing happened"
@@ -378,7 +379,8 @@ export function useSecureHints() {
 /** The Tasks projection (decision 2026-07-25) — every open checkbox, derived
  * per call. Rides the notes invalidation beat (a toggle IS a note edit). */
 export function useTasks() {
-  return useQuery({ queryKey: keys.tasks, queryFn: corpusTasks });
+  // the Mac app projects tasks in Rust; the web has the same rules in TS
+  return useQuery({ queryKey: keys.tasks, queryFn: isTauri() ? corpusTasks : listWebTasks });
 }
 
 export async function invalidateJournal(): Promise<void> {

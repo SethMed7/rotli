@@ -4,7 +4,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { TaskItem } from "../lib/tauri";
-import { filterTaskGroups, groupTasks, sectionTaskGroups } from "./tasksView";
+import { filterTaskGroups, groupTasks, sectionTaskGroups, taskCount } from "./tasksView";
 
 const t = (over: Partial<TaskItem>): TaskItem => ({
   noteId: "01A",
@@ -57,9 +57,26 @@ describe("groupTasks", () => {
     ).toEqual([
       ["This week", "this"],
       ["Last week", "last"],
-      ["Last 30 days", "month"],
-      ["30+ days ago", "old"],
+      ["Earlier this month", "month"],
+      ["Archived", "old"],
     ]);
+    // only the last is archived: it starts closed and carries a count
+    expect(sectionTaskGroups(groups, now).map((section) => section.archived)).toEqual([
+      false,
+      false,
+      false,
+      true,
+    ]);
+  });
+
+  test("a task-text match keeps only the matching tasks; a title match keeps the note whole", () => {
+    const groups = groupTasks([
+      t({ noteId: "plan", noteTitle: "Launch plan", text: "Call the bank", line: 1 }),
+      t({ noteId: "plan", noteTitle: "Launch plan", text: "Order cake", line: 2 }),
+    ]);
+    expect(filterTaskGroups(groups, "cake")[0]?.tasks.map((task) => task.text)).toEqual(["Order cake"]);
+    expect(filterTaskGroups(groups, "launch")[0]?.tasks).toHaveLength(2);
+    expect(taskCount(filterTaskGroups(groups, "launch"))).toBe(2);
   });
 
   test("searches note titles and task text", () => {
