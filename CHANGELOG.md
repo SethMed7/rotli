@@ -71,6 +71,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Spellcheck leaves code and links alone.** Inline code, link targets, and
+  code blocks are no longer spell-checked, so red underlines stay on your own
+  words. (Underlines that come and go on ordinary text are still being looked
+  into; the Mac draws those itself.)
 - **Numbered lists stay lined up past 9.** "9." and "10." now end on the same
   edge and their text starts on the same one; before, a list jumped to the
   right as it crossed ten.
