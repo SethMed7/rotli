@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   system — and `/download/`, which lists the Mac app, Rotli Web for Windows and
   Linux, and the helper in one place.
 
+- **⌘⇧L marks the open note secure.** One key to keep a note away from remote
+  AI; it appears in ⌘K and can be rebound like every other shortcut. It only
+  ever adds protection — removing it stays a deliberate choice in the note's
+  menu, so a stray key press can never expose a note.
 - **Add to folder, for one note or a whole selection.** Select several notes,
   right-click, and choose **Add to folder**: pick one of your Main folders, or
   **New folder…**, which files them and opens the folder's name for you to
@@ -67,6 +71,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Numbered lists stay lined up past 9.** "9." and "10." now end on the same
+  edge and their text starts on the same one; before, a list jumped to the
+  right as it crossed ten.
+- **The highlight in Main starts beside the note's icon.** Hover, the open
+  note, and a gathered selection no longer paint all the way to the sidebar's
+  edge, so notes inside folders still read as nested. The whole line is still
+  clickable.
 - **Dragging a selection moves all of it.** Click a note, then ⌘-click two
   more, and the first one now counts as selected too (as in Finder); before,
   dragging by it moved it alone. A selection dragged out of the Library browser

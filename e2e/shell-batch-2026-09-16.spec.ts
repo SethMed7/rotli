@@ -78,11 +78,19 @@ test("note header actions carry no surface, and a wide ordered marker widens its
   await page.keyboard.press("End");
   await page.keyboard.press("Enter");
   await page.keyboard.press("Enter");
-  await page.keyboard.type("10. tenth item");
+  await page.keyboard.type("9. ninth item");
   await page.keyboard.press("Enter");
-  await page.keyboard.type("11. eleventh item");
+  await page.keyboard.type("tenth item");
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("ArrowUp");
-  await expect(page.locator(".rotli-marker.num.wide")).toHaveCount(2);
+  // "9." and "10." hang in ONE right-aligned column (2026-09-18): the numbers
+  // end on the same edge, so the text starts on the same one
+  const markers = page.locator(".rotli-marker.num");
+  await expect(markers).toHaveText(["9.", "10."]);
+  const nine = (await markers.nth(0).boundingBox())!;
+  const ten = (await markers.nth(1).boundingBox())!;
+  expect(Math.abs(nine.x + nine.width - (ten.x + ten.width))).toBeLessThan(0.5);
+  expect(Math.abs(nine.x - ten.x)).toBeLessThan(0.5);
+  await expect(page.locator(".rotli-marker.num.wide")).toHaveCount(0);
 });

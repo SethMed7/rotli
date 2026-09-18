@@ -20,18 +20,25 @@ export const STEP_EM = 1.5;
  * text. Mirrors `.rotli-marker { width }`. */
 export const MARKER_EM = 1.15;
 
-/** An ordered marker of two or more digits ("10.", "iii.") overflows the glyph
- * column; it hangs in this wider one instead. Mirrors `.rotli-marker.num.wide`. */
-export const WIDE_MARKER_EM = 1.6;
+/** The hanging column EVERY ordered marker of one or two characters sits in,
+ * right-aligned, so "9." and "10." end on the same edge and their text starts
+ * on the same one. Before 2026-09-18 a single digit used the glyph column and
+ * two digits a wider one, so a list jumped sideways as it crossed ten (the
+ * owner: "weird space on the left side"). Mirrors `.rotli-marker.num`. */
+export const NUMBER_EM = 1.6;
+
+/** Three or more characters ("100.", "iii.") overflow even that; they hang in
+ * this wider column. Mirrors `.rotli-marker.num.wide`. */
+export const WIDE_MARKER_EM = 2.2;
 
 /** True when an ordered-list marker needs the wide column. */
 export function isWideMarker(marker: string): boolean {
-  return marker.replace(/[.)]$/, "").length >= 2;
+  return marker.replace(/[.)]$/, "").length >= 3;
 }
 
 /** The hanging column for an ordered marker. */
 export function numberMarkerEm(marker: string): number {
-  return isWideMarker(marker) ? WIDE_MARKER_EM : MARKER_EM;
+  return isWideMarker(marker) ? WIDE_MARKER_EM : NUMBER_EM;
 }
 
 /** A checkbox needs a wider column than a glyph — `.rotli-check` is a 1.1em box

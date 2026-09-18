@@ -19,6 +19,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
 } from "react";
 
 import { dispatch } from "../../keys/registry";
@@ -126,6 +127,16 @@ const DEST_ROWS: SystemDestRow[] = [
   { id: DEST.archive, label: "Archive", Glyph: ArchiveGlyph },
   { id: DEST.trash, label: "Trash", Glyph: TrashGlyph },
 ];
+
+/** How far left of a row's icon its hover/selected wash begins (the owner,
+ * 2026-09-18: "only a tad to the left of the file icon, not all the way to the
+ * edge" — inside folders a full-width wash hid the nesting). */
+const ROW_INSET_LEAD = 8;
+
+/** A Main row's indent plus where its wash starts (`--row-inset`, notes.css). */
+function rowInset(paddingLeft: number, inset: number): CSSProperties {
+  return { paddingLeft, "--row-inset": `${Math.max(0, inset)}px` } as CSSProperties;
+}
 
 export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatData }) {
   const foldersData = useFolders().data;
@@ -559,7 +570,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
               /* the current file's Main copy wins the highlight (#25) — the same
                  accent pill a compact row gets when it's the focused note */
               className={`snrow main-row${n.id === focusedItemId ? " sel" : ""}${mainSel.has(n.id) ? " msel" : ""}${dropCls(n.id)}${mainDragId === n.id ? " dragging" : ""}`}
-              style={{ paddingLeft: contentPad }}
+              style={rowInset(contentPad, contentPad - ROW_INSET_LEAD)}
               onPointerDown={(e) => startMainDrag(e, n.id, displayTitle)}
               onClick={(e) => {
                 if (didMainDragRef.current) return;
@@ -681,7 +692,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
                 data-main-folder="1"
                 aria-expanded={open}
                 className={`frow child main-row${dropCls(f.id)}${mainDragId === f.id ? " dragging" : ""}`}
-                style={{ paddingLeft: rowPad }}
+                style={rowInset(rowPad, rowPad - ROW_INSET_LEAD / 2)}
                 onPointerDown={(e) => startMainDrag(e, f.id, f.name)}
                 onClick={() => {
                   // toggle against the OPEN default (?? true) — toggleDestExpanded

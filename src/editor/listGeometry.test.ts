@@ -84,12 +84,17 @@ describe("list geometry", () => {
   });
 });
 
-test("an ordered marker of two or more digits hangs in the wide column", async () => {
-  const { MARKER_EM, WIDE_MARKER_EM, isWideMarker, numberMarkerEm } = await import("./listGeometry");
+// The owner, 2026-09-18: at "10." the number and its text jumped right of "9.".
+// One and two digits share ONE column, so a list that crosses ten stays aligned.
+test("ordered markers of one and two digits share a column; three or more get the wide one", async () => {
+  const { NUMBER_EM, WIDE_MARKER_EM, isWideMarker, numberMarkerEm } = await import("./listGeometry");
+  expect(numberMarkerEm("9.")).toBe(numberMarkerEm("10."));
+  expect(numberMarkerEm("3.")).toBe(NUMBER_EM);
+  expect(numberMarkerEm("12)")).toBe(NUMBER_EM);
   expect(isWideMarker("1.")).toBe(false);
-  expect(isWideMarker("9)")).toBe(false);
-  expect(isWideMarker("10.")).toBe(true);
+  expect(isWideMarker("10.")).toBe(false);
+  expect(isWideMarker("100.")).toBe(true);
   expect(isWideMarker("iii.")).toBe(true);
-  expect(numberMarkerEm("3.")).toBe(MARKER_EM);
-  expect(numberMarkerEm("12.")).toBe(WIDE_MARKER_EM);
+  expect(numberMarkerEm("100.")).toBe(WIDE_MARKER_EM);
+  expect(WIDE_MARKER_EM).toBeGreaterThan(NUMBER_EM);
 });

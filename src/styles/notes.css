@@ -2553,6 +2553,39 @@
   background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
+/* A Main row's wash (hover, open, gathered) starts just left of its icon
+   (--row-inset, set per row by sidebarHome's rowInset) instead of at the
+   sidebar's edge: inside a folder a full-width pill hid the nesting (the owner,
+   2026-09-18). The ROW keeps its full-width hit area; only the paint moves. */
+.main-tree .main-row {
+  position: relative;
+  isolation: isolate;
+}
+.main-tree .main-row::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 var(--row-inset, 0px);
+  z-index: -1;
+  border-radius: var(--r-control);
+  background: transparent;
+}
+.main-tree .main-row:hover,
+.main-tree .main-row.sel,
+.main-tree .main-row.sel:hover,
+.main-tree .main-row.msel {
+  background: none;
+}
+.main-tree .main-row:hover::before {
+  background: var(--hov);
+}
+.main-tree .main-row.msel::before {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.main-tree .main-row.sel::before,
+.main-tree .main-row.sel:hover::before {
+  background: var(--selected-bg);
+}
+
 /* preview tabs (the maintainer, 2026-07-28: browse without piling up tabs) — the quiet
    italic that says "passing through"; editing or re-clicking un-italicizes */
 .tab.preview > span:not(.tglyph) {
