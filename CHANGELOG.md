@@ -40,6 +40,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   faint pattern of file icons. The wordmark now renders in Baloo 2 as it
   always meant to.
 
+### Fixed
+
+- **Rotli Helper: a refused chat request no longer looks like a network error.**
+  When the helper turned a request away (a stale pairing code, for one) it
+  answered before it had read what the page sent, so the connection was cut,
+  the page reported "network error", and the helper's window filled with
+  "Broken pipe". It now reads the request first, so the page shows the
+  helper's real words — "pair again" when the code is stale — and a page that
+  simply left is no longer logged as an error. The Mac app's local agent
+  server had the same flaw and the same fix. Needs the next helper release.
+
 ## [1.1.0] - 2026-09-17
 
 Rotli 1.1: Rotli Web (a vault in the browser, a copy where the browser can't

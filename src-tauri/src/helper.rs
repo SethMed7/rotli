@@ -66,8 +66,8 @@ use serde_json::{json, Value};
 
 use crate::helper_token::{load_or_create_token, token_dir};
 use crate::loopback_http::{
-    bearer_authorized, malformed_head, not_found, read_http_body, read_http_head, unauthorized,
-    write_http_response_with_headers, HttpHead,
+    bearer_authorized, drain_http_body, malformed_head, not_found, read_http_body, read_http_head,
+    unauthorized, write_http_response_with_headers, HttpHead,
 };
 use crate::provider::Running;
 
@@ -106,7 +106,10 @@ impl Drop for Reservation<'_> {
 
 fn reserve<'a>(ids: &'a Mutex<HashSet<String>>, id: &str) -> Option<Reservation<'a>> {
     let taken = ids.lock().unwrap().insert(id.to_string());
-    taken.then(|| Reservation { ids, id: id.to_string() })
+    taken.then(|| Reservation {
+        ids,
+        id: id.to_string(),
+    })
 }
 
 /// What `Origin` means here. `Absent` = a non-browser caller.
@@ -137,7 +140,16 @@ pub fn run(args: &[String]) -> Result<(), String> {
     let children = Arc::new(Mutex::new(HashMap::new()));
     let origins = options.origins;
     let in_flight = Mutex::new(HashSet::new());
-    serve(listener, Arc::new(Helper { port, origins, token, children, in_flight }))
+    serve(
+        listener,
+        Arc::new(Helper {
+            port,
+            origins,
+            token,
+            children,
+            in_flight,
+        }),
+    )
 }
 
 // ── the service ───────────────────────────────────────────────────────────────
@@ -147,7 +159,12 @@ fn serve(listener: TcpListener, helper: Arc<Helper>) -> Result<(), String> {
     for stream in listener.incoming() {
         let Ok(mut stream) = stream else { continue };
         if live.load(Ordering::SeqCst) >= MAX_CONNECTIONS {
-            let _ = respond(&mut stream, &[], 503, json!({"error":"too many connections"}));
+            let _ = respond(
+                &mut stream,
+                &[],
+                503,
+                json!({"error":"too many connections"}),
+            );
             continue;
         }
         live.fetch_add(1, Ordering::SeqCst);
@@ -166,7 +183,9 @@ fn serve(listener: TcpListener, helper: Arc<Helper>) -> Result<(), String> {
 }
 
 fn handle(mut stream: TcpStream, helper: &Helper) -> Result<(), String> {
-    stream.set_read_timeout(Some(HEAD_READ_TIMEOUT)).map_err(|error| error.to_string())?;
+    stream
+        .set_read_timeout(Some(HEAD_READ_TIMEOUT))
+        .map_err(|error| error.to_string())?;
     let mut reader = BufReader::new(stream.try_clone().map_err(|error| error.to_string())?);
     let head = match read_http_head(&mut reader) {
         Ok(head) => head,
@@ -176,14 +195,21 @@ fn handle(mut stream: TcpStream, helper: &Helper) -> Result<(), String> {
     let origin = match helper.origin_verdict(&head) {
         OriginVerdict::Denied => {
             let refusal = json!({"error":"this origin is not paired with Rotli Helper"});
-            return respond(&mut stream, &[], 403, refusal);
+            return refuse(&mut stream, &mut reader, &head, &[], 403, refusal);
         }
         OriginVerdict::Absent => None,
         OriginVerdict::Allowed(origin) => Some(origin),
     };
     let cors = cors_headers(origin.as_deref());
     if !helper.host_is_loopback(&head) {
-        return respond(&mut stream, &cors, 400, json!({"error":"unexpected Host header"}));
+        return refuse(
+            &mut stream,
+            &mut reader,
+            &head,
+            &cors,
+            400,
+            json!({"error":"unexpected Host header"}),
+        );
     }
     if head.method == "OPTIONS" {
         // the preflight carries no credential by design — answer before auth
@@ -196,26 +222,53 @@ fn handle(mut stream: TcpStream, helper: &Helper) -> Result<(), String> {
             respond(&mut stream, &cors, 200, alive)
         }
         ("POST", "/rpc") => serve_rpc(&mut stream, &mut reader, &head, helper, &cors),
-        _ => respond(&mut stream, &cors, 404, not_found()),
+        _ => refuse(&mut stream, &mut reader, &head, &cors, 404, not_found()),
     }
 }
 
 fn cors_headers(origin: Option<&str>) -> Vec<(&'static str, String)> {
-    let Some(origin) = origin else { return Vec::new() };
+    let Some(origin) = origin else {
+        return Vec::new();
+    };
     // the matching origin, echoed — never `*`, which would pair the helper with
     // every site the user visits
     vec![
         ("Access-Control-Allow-Origin", origin.to_string()),
         ("Vary", "Origin".to_string()),
-        ("Access-Control-Allow-Headers", "authorization, content-type".to_string()),
-        ("Access-Control-Allow-Methods", "GET, POST, OPTIONS".to_string()),
+        (
+            "Access-Control-Allow-Headers",
+            "authorization, content-type".to_string(),
+        ),
+        (
+            "Access-Control-Allow-Methods",
+            "GET, POST, OPTIONS".to_string(),
+        ),
         ("Access-Control-Allow-Private-Network", "true".to_string()),
         ("Access-Control-Max-Age", "600".to_string()),
     ]
 }
 
-fn respond(s: &mut TcpStream, cors: &[(&str, String)], status: u16, body: Value) -> Result<(), String> {
+fn respond(
+    s: &mut TcpStream,
+    cors: &[(&str, String)],
+    status: u16,
+    body: Value,
+) -> Result<(), String> {
     write_http_response_with_headers(s, status, cors, Some(body))
+}
+
+/// A refusal that precedes `read_http_body`: the declared body is read and
+/// discarded first, so the answer reaches the page instead of a reset.
+fn refuse(
+    stream: &mut TcpStream,
+    reader: &mut BufReader<TcpStream>,
+    head: &HttpHead,
+    cors: &[(&str, String)],
+    status: u16,
+    body: Value,
+) -> Result<(), String> {
+    drain_http_body(reader, head, HELPER_MAX_REQUEST_BYTES);
+    respond(stream, cors, status, body)
 }
 
 fn serve_rpc(
@@ -226,20 +279,42 @@ fn serve_rpc(
     cors: &[(&str, String)],
 ) -> Result<(), String> {
     if !bearer_authorized(head, &helper.token) {
-        return respond(stream, cors, 401, unauthorized());
+        return refuse(stream, reader, head, cors, 401, unauthorized());
     }
     let media = head.header("content-type").unwrap_or_default();
-    if !media.split(';').next().unwrap_or_default().trim().eq_ignore_ascii_case("application/json") {
-        return respond(stream, cors, 415, json!({"error":"send application/json"}));
+    if !media
+        .split(';')
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .eq_ignore_ascii_case("application/json")
+    {
+        return refuse(
+            stream,
+            reader,
+            head,
+            cors,
+            415,
+            json!({"error":"send application/json"}),
+        );
     }
     let raw = match read_http_body(reader, head, HELPER_MAX_REQUEST_BYTES) {
         Ok(raw) => raw,
         Err((status, refusal)) => return respond(stream, cors, status, refusal),
     };
     let Ok(request) = serde_json::from_slice::<Value>(&raw) else {
-        return respond(stream, cors, 400, json!({"error":"the request body must be JSON"}));
+        return respond(
+            stream,
+            cors,
+            400,
+            json!({"error":"the request body must be JSON"}),
+        );
     };
-    let command = request.get("cmd").and_then(Value::as_str).unwrap_or_default().to_string();
+    let command = request
+        .get("cmd")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string();
     let arguments = request.get("args").cloned().unwrap_or(Value::Null);
     // the run may take minutes and nothing else reads this socket until it
     // ends; a head-read deadline must not cut the answer short
@@ -261,7 +336,9 @@ fn text_argument(arguments: &Value, key: &str) -> Result<String, (u16, String)> 
 
 impl Helper {
     fn origin_verdict(&self, head: &HttpHead) -> OriginVerdict {
-        let Some(origin) = head.header("origin") else { return OriginVerdict::Absent };
+        let Some(origin) = head.header("origin") else {
+            return OriginVerdict::Absent;
+        };
         let normalized = normalize_origin(origin);
         // "null" is what a sandboxed frame or a file:// page sends; it names no
         // site, so it can never be on an allowlist
@@ -274,9 +351,15 @@ impl Helper {
     /// A DNS-rebinding guard: an attacker page whose hostname resolves to
     /// 127.0.0.1 reaches this socket, but its `Host` header names the attacker.
     fn host_is_loopback(&self, head: &HttpHead) -> bool {
-        let Some(host) = head.header("host") else { return false };
+        let Some(host) = head.header("host") else {
+            return false;
+        };
         let host = host.trim().to_ascii_lowercase();
-        [format!("127.0.0.1:{}", self.port), format!("localhost:{}", self.port)].contains(&host)
+        [
+            format!("127.0.0.1:{}", self.port),
+            format!("localhost:{}", self.port),
+        ]
+        .contains(&host)
     }
 
     fn dispatch(&self, command: &str, arguments: &Value) -> Result<Value, (u16, String)> {
@@ -320,17 +403,35 @@ impl Helper {
         let prompt = text_argument(arguments, "prompt")?;
         // v1 is TEXT ONLY: the image lanes enable a file-reading tool on the CLI,
         // unreachable-by-design from a browser prompt. Refused before disk.
-        if arguments.get("images").and_then(Value::as_array).is_some_and(|i| !i.is_empty()) {
-            return Err((400, "Images are not sent through Rotli Helper in this release.".into()));
+        if arguments
+            .get("images")
+            .and_then(Value::as_array)
+            .is_some_and(|i| !i.is_empty())
+        {
+            return Err((
+                400,
+                "Images are not sent through Rotli Helper in this release.".into(),
+            ));
         }
         let Some(_held) = reserve(&self.in_flight, &request_id) else {
-            return Err((409, format!("a run is already in flight for \"{request_id}\"")));
+            return Err((
+                409,
+                format!("a run is already in flight for \"{request_id}\""),
+            ));
         };
         let effort = arguments.get("reasoningEffort").and_then(Value::as_str);
         let tier = arguments.get("serviceTier").and_then(Value::as_str);
         let timeout = arguments.get("timeoutMs").and_then(Value::as_u64);
         crate::provider::complete_connected(
-            &self.children, &request_id, &provider, &model, &prompt, timeout, effort, tier, &[],
+            &self.children,
+            &request_id,
+            &provider,
+            &model,
+            &prompt,
+            timeout,
+            effort,
+            tier,
+            &[],
         )
         .map_err(|error| (400, error))
     }
@@ -353,7 +454,13 @@ mod tests {
         let origins = DEFAULT_ORIGINS.iter().map(|o| (*o).to_string()).collect();
         let children = Arc::new(Mutex::new(HashMap::new()));
         let in_flight = Mutex::new(HashSet::new());
-        let service = Arc::new(Helper { port, origins, token: token.clone(), children, in_flight });
+        let service = Arc::new(Helper {
+            port,
+            origins,
+            token: token.clone(),
+            children,
+            in_flight,
+        });
         let serving = Arc::clone(&service);
         std::thread::spawn(move || drop(serve(listener, serving)));
         (port, token, service)
@@ -381,7 +488,10 @@ mod tests {
     #[test]
     fn health_answers_without_a_token() {
         let (port, _, _) = helper();
-        let answer = raw_request(port, &format!("GET /health HTTP/1.1\r\nHost: localhost:{port}\r\n\r\n"));
+        let answer = raw_request(
+            port,
+            &format!("GET /health HTTP/1.1\r\nHost: localhost:{port}\r\n\r\n"),
+        );
         assert!(answer.starts_with("HTTP/1.1 200 OK"), "{answer}");
         assert!(answer.contains("\"name\":\"rotli-helper\""), "{answer}");
         assert!(answer.contains(env!("CARGO_PKG_VERSION")), "{answer}");
@@ -392,8 +502,42 @@ mod tests {
         let (port, _, _) = helper();
         let anonymous = rpc(port, "", "{\"cmd\":\"chat_models\",\"args\":{}}");
         assert!(anonymous.starts_with("HTTP/1.1 401"), "{anonymous}");
-        let wrong = rpc(port, "Authorization: Bearer not-the-token\r\n", "{\"cmd\":\"chat_models\"}");
+        let wrong = rpc(
+            port,
+            "Authorization: Bearer not-the-token\r\n",
+            "{\"cmd\":\"chat_models\"}",
+        );
         assert!(wrong.starts_with("HTTP/1.1 401"), "{wrong}");
+    }
+
+    /// The page's chat requests carry notes as context, so they are large. A
+    /// refusal written before that body is read closes the socket on unread
+    /// data; the kernel answers with a reset, and the browser reports a network
+    /// error instead of the refusal (the owner, 2026-09-18: "Broken pipe").
+    #[test]
+    fn a_refusal_still_reaches_a_page_that_sent_a_large_body() {
+        let (port, _, _) = helper();
+        let body = format!(
+            "{{\"cmd\":\"chat_models\",\"pad\":\"{}\"}}",
+            "x".repeat(4 * 1024 * 1024)
+        );
+        let request = format!(
+            "POST /rpc HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nOrigin: https://rotli.co\r\nAuthorization: Bearer not-the-token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+            body.len()
+        );
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        stream
+            .write_all(request.as_bytes())
+            .expect("the helper must read the whole request before it closes");
+        let mut answer = String::new();
+        stream
+            .read_to_string(&mut answer)
+            .expect("the refusal must arrive, not a reset");
+        assert!(answer.starts_with("HTTP/1.1 401"), "{answer}");
+        assert!(
+            answer.contains("Access-Control-Allow-Origin: https://rotli.co"),
+            "{answer}"
+        );
     }
 
     #[test]
@@ -404,7 +548,10 @@ mod tests {
             &format!("OPTIONS /rpc HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nOrigin: http://localhost:1437\r\nAccess-Control-Request-Method: POST\r\n\r\n"),
         );
         assert!(answer.starts_with("HTTP/1.1 204 No Content"), "{answer}");
-        assert!(!answer.contains("Access-Control-Allow-Origin: *"), "{answer}");
+        assert!(
+            !answer.contains("Access-Control-Allow-Origin: *"),
+            "{answer}"
+        );
         for expected in [
             "Access-Control-Allow-Origin: http://localhost:1437",
             "Vary: Origin",
@@ -413,7 +560,10 @@ mod tests {
             "Access-Control-Allow-Private-Network: true",
             "Access-Control-Max-Age: 600",
         ] {
-            assert!(answer.contains(expected), "{expected} missing from {answer}");
+            assert!(
+                answer.contains(expected),
+                "{expected} missing from {answer}"
+            );
         }
     }
 
@@ -434,7 +584,10 @@ mod tests {
     #[test]
     fn a_rebound_host_header_is_refused() {
         let (port, _, _) = helper();
-        let answer = raw_request(port, "GET /health HTTP/1.1\r\nHost: attacker.example\r\n\r\n");
+        let answer = raw_request(
+            port,
+            "GET /health HTTP/1.1\r\nHost: attacker.example\r\n\r\n",
+        );
         assert!(answer.starts_with("HTTP/1.1 400"), "{answer}");
     }
 
@@ -442,10 +595,17 @@ mod tests {
     fn an_unknown_command_is_a_404_and_an_unknown_route_too() {
         let (port, token, _) = helper();
         let authorization = format!("Authorization: Bearer {token}\r\n");
-        let unknown = rpc(port, &authorization, "{\"cmd\":\"corpus_read\",\"args\":{}}");
+        let unknown = rpc(
+            port,
+            &authorization,
+            "{\"cmd\":\"corpus_read\",\"args\":{}}",
+        );
         assert!(unknown.starts_with("HTTP/1.1 404"), "{unknown}");
         assert!(unknown.contains("unknown command"), "{unknown}");
-        let route = raw_request(port, &format!("GET /vault HTTP/1.1\r\nHost: localhost:{port}\r\n\r\n"));
+        let route = raw_request(
+            port,
+            &format!("GET /vault HTTP/1.1\r\nHost: localhost:{port}\r\n\r\n"),
+        );
         assert!(route.starts_with("HTTP/1.1 404"), "{route}");
     }
 
@@ -470,7 +630,10 @@ mod tests {
             "{\"cmd\":\"cli_complete\",\"args\":{\"requestId\":\"r1\",\"provider\":\"claude\",\"model\":\"sonnet\",\"prompt\":\"hi\",\"images\":[\"AAAA\"]}}",
         );
         assert!(answer.starts_with("HTTP/1.1 400"), "{answer}");
-        assert!(answer.contains("Images are not sent through Rotli Helper"), "{answer}");
+        assert!(
+            answer.contains("Images are not sent through Rotli Helper"),
+            "{answer}"
+        );
     }
 
     #[test]
@@ -506,7 +669,10 @@ mod tests {
     fn a_second_run_under_one_request_id_is_refused_while_the_first_holds_it() {
         let (port, token, service) = helper();
         let held = reserve(&service.in_flight, "busy").expect("the first run takes the id");
-        assert!(reserve(&service.in_flight, "busy").is_none(), "nobody else may take it");
+        assert!(
+            reserve(&service.in_flight, "busy").is_none(),
+            "nobody else may take it"
+        );
         let answer = rpc(
             port,
             &format!("Authorization: Bearer {token}\r\n"),
@@ -514,10 +680,19 @@ mod tests {
         );
         assert!(answer.starts_with("HTTP/1.1 409"), "{answer}");
         assert!(answer.contains("already in flight"), "{answer}");
-        assert!(service.in_flight.lock().unwrap().contains("busy"), "the first run keeps it");
+        assert!(
+            service.in_flight.lock().unwrap().contains("busy"),
+            "the first run keeps it"
+        );
         drop(held);
-        assert!(service.in_flight.lock().unwrap().is_empty(), "Drop gives the id back");
-        assert!(reserve(&service.in_flight, "busy").is_some(), "and the id is takeable again");
+        assert!(
+            service.in_flight.lock().unwrap().is_empty(),
+            "Drop gives the id back"
+        );
+        assert!(
+            reserve(&service.in_flight, "busy").is_some(),
+            "and the id is takeable again"
+        );
     }
 
     #[test]
@@ -525,15 +700,20 @@ mod tests {
         let (port, _, _) = helper();
         // nothing follows the junk line, so the server consumes the whole
         // request and closes cleanly — the body is readable
-        let one = raw_request(port, &format!("GET /health HTTP/1.1\r\nHost: localhost:{port}\r\nnope\r\n"));
+        let one = raw_request(
+            port,
+            &format!("GET /health HTTP/1.1\r\nHost: localhost:{port}\r\nnope\r\n"),
+        );
         assert!(one.starts_with("HTTP/1.1 400"), "{one}");
         assert!(one.contains("malformed request head"), "{one}");
         // A flood is REFUSED at the first junk line rather than absorbed. Only
         // the status is asserted: bytes the helper deliberately never read are
         // still in flight, so the close can reset and drop the body.
         let flood = "nonsense-with-no-colon\r\n".repeat(500);
-        let many = raw_request(port, &format!("GET /health HTTP/1.1\r\nHost: localhost:{port}\r\n{flood}"));
+        let many = raw_request(
+            port,
+            &format!("GET /health HTTP/1.1\r\nHost: localhost:{port}\r\n{flood}"),
+        );
         assert!(many.starts_with("HTTP/1.1 400"), "{many}");
     }
-
 }
