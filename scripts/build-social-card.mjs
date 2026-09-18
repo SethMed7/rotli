@@ -1,6 +1,6 @@
 // Render the editable, code-native SVG with the same bundled fonts as the site.
-// Every asset the card needs is inlined (fonts as data URIs, the quokka as a
-// nested <svg>) and every network route is aborted, so a missing inline shows
+// Every asset the card needs is inlined (fonts and raster art as data URIs,
+// the quokka's lines as a nested <svg>) and every network route is aborted, so a missing inline shows
 // up as a visibly blank region in the PNG rather than a silent fallback.
 //
 // Two renders:
@@ -22,6 +22,16 @@ for (const [font, mime] of fonts) {
   svg = svg.replace(`fonts/${font}`, `data:${mime};base64,${bytes.toString("base64")}`);
 }
 if (/url\("fonts\//.test(svg)) throw new Error("social-card.svg references a font that was not inlined");
+// Raster art (the app capture, the quokka's silhouette) is referenced as
+// href="asset:<path from the repository root>" and inlined the same way.
+const mimes = { png: "image/png", webp: "image/webp", jpg: "image/jpeg" };
+for (const [, path] of [...svg.matchAll(/href="asset:([^"]+)"/g)]) {
+  const mime = mimes[path.split(".").pop()];
+  if (!mime) throw new Error(`social-card.svg references an asset of unknown type: ${path}`);
+  const bytes = await readFile(new URL(`../${path}`, import.meta.url));
+  svg = svg.replaceAll(`asset:${path}`, `data:${mime};base64,${bytes.toString("base64")}`);
+}
+if (/href="asset:/.test(svg)) throw new Error("social-card.svg references an asset that was not inlined");
 
 const out = (name) => new URL(`../site/public/${name}`, import.meta.url).pathname;
 const browser = await chromium.launch();

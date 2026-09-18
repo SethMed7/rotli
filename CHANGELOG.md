@@ -10,6 +10,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **rotli.co: Resources, Blog, and About.** The header now lists Product,
+  Resources, Blog, and About, with Open in browser and Download beside them
+  on every page, and folds into a Menu on narrow windows and phones.
+  Resources answers questions in short articles ("Why local?", "rotli in the
+  browser and on the Mac"); About tells where the name comes from — rotli is
+  short for Rottnest, the island where quokkas live. Blog posts can sit as
+  drafts on the dev site until they are ready. The MCP guide moved to
+  `/resources/mcp/` (still dev-only); `/mcp/` redirects.
+
+### Changed
+
+- **rotli.co: Download and the browser, side by side.** The hero offers Open
+  in your browser and Download for Mac; on Windows, Linux, and phones the
+  browser comes first. The Rotli Web section moved up under the hero, with a
+  real capture of the web app and copy that matches 1.1 (open a real folder in
+  Chrome, Edge, or Arc; chat through Rotli Helper).
+- **rotli.co: the vault drawn on the page.** "One folder. Every path out stays
+  open." shows its example folder larger and straight on the page, without a card.
+- **A new link preview.** Shared rotli.co links show one line, the app tilted
+  in from the right, and the quokka waving up from the bottom edge over a
+  faint pattern of file icons. The wordmark now renders in Baloo 2 as it
+  always meant to.
+
 ## [1.1.0] - 2026-09-17
 
 Rotli 1.1: Rotli Web (a vault in the browser, a copy where the browser can't

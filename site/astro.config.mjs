@@ -51,6 +51,9 @@ function cspInlineStyleGuard() {
 // Minimal static build. Which pages exist, whether downloads are offered, and
 // the canonical origin all come from src/site.ts (SITE_MODE + SITE_URL).
 export default defineConfig({
+  // No syntax highlighter: Shiki writes inline style= attributes, which the
+  // production CSP (style-src 'self') drops. Code blocks are styled by class.
+  markdown: { syntaxHighlight: false },
   site: site.url,
   // Never inline a stylesheet into a <style> block: the production CSP allows
   // only external stylesheets, and Astro's default inlines small ones (the 404

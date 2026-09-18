@@ -3,7 +3,7 @@ import Base from '../layouts/Base.astro';
 import mark from '../../../src/assets/characters/_logo.svg?raw';
 import SiteFooter from '../components/SiteFooter.astro';
 import SiteHeader from '../components/SiteHeader.astro';
-import { DOWNLOAD_URL, GITHUB_URL, PRIVACY_URL, RELEASES_URL, ROADMAP_URL, WEB_APP_PATH, site } from '../site';
+import { DOWNLOAD_HREF, ROADMAP_URL, WEB_APP_PATH, site } from '../site';
 
 // One page for every missing path. The hint under the headline is chosen in
 // the browser from the path itself: /app when Rotli Web is not switched on
@@ -11,21 +11,13 @@ import { DOWNLOAD_URL, GITHUB_URL, PRIVACY_URL, RELEASES_URL, ROADMAP_URL, WEB_A
 const links = [
   { href: '/', label: 'Home', note: 'The site, from the top.' },
   ...(site.downloadsEnabled
-    ? [{ href: DOWNLOAD_URL, label: 'Download Rotli', note: 'The Mac app, a .dmg.' }]
+    ? [{ href: DOWNLOAD_HREF, label: 'Download Rotli', note: 'The Mac app, a .dmg.' }]
     : []),
   ...(site.webAppEnabled
     ? [{ href: WEB_APP_PATH, label: 'Rotli Web', note: 'Your vault, in a browser.' }]
     : []),
   ...(site.sourcePublic ? [{ href: ROADMAP_URL, label: 'Roadmap', note: 'What is next.' }] : []),
 ];
-const footerLinks = [
-  ...(site.sourcePublic ? [{ href: GITHUB_URL, label: 'GitHub' }] : []),
-  ...(site.downloadsEnabled ? [{ href: RELEASES_URL, label: 'Releases' }] : []),
-  { href: site.sourcePublic ? PRIVACY_URL : '/#privacy', label: 'Privacy' },
-];
-const footerTagline = site.sourcePublic
-  ? 'Local-first, free, and open source under the MIT license.'
-  : 'Local-first and free. One folder you own, no account required.';
 ---
 
 <Base
@@ -34,7 +26,7 @@ const footerTagline = site.sourcePublic
   canonicalPath="/404/"
   noindex
 >
-  <SiteHeader nav={[]} />
+  <SiteHeader />
   <main class="not-found" data-web-app={site.webAppEnabled ? 'on' : 'off'}>
     <div class="mark" aria-hidden="true" set:html={mark} />
     <p class="code">404</p>
@@ -58,7 +50,7 @@ const footerTagline = site.sourcePublic
       }
     </nav>
   </main>
-  <SiteFooter tagline={footerTagline} links={footerLinks} />
+  <SiteFooter />
 
   <script>
     const main = document.querySelector<HTMLElement>('.not-found');
