@@ -9,11 +9,11 @@
 # PATH edits, no sudo, no launch agents. Run ~/.rotli/bin/rotli-helper later
 # to start it again; delete ~/.rotli/bin/rotli-helper to uninstall.
 #
-# ROTLI_HELPER_VERSION=1.1.0 overrides the version; ROTLI_HELPER_DRY_RUN=1
+# ROTLI_HELPER_VERSION=1.2.0 overrides the version; ROTLI_HELPER_DRY_RUN=1
 # prints what would be downloaded and stops.
 set -eu
 
-VERSION="${ROTLI_HELPER_VERSION:-1.1.0}"
+VERSION="${ROTLI_HELPER_VERSION:-1.2.0}"
 RELEASES="${ROTLI_HELPER_RELEASES:-https://github.com/SethMed7/rotli-releases/releases/download}"
 DEST_DIR="${ROTLI_HELPER_DIR:-$HOME/.rotli/bin}"
 DEST="$DEST_DIR/rotli-helper"
