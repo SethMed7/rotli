@@ -42,6 +42,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The sidebar on hover pushes your note over instead of covering it.** Opened
+  from the window's edge it is now the same sidebar ⌘0 shows: the content
+  moves aside, nothing sits on top of the note, and the edge can be dragged to
+  resize it — the width is remembered. Resizing, or dragging a note out of the
+  sidebar, holds it open until you let go. On the Mac and the web alike.
+- **The window can no longer slide sideways.** Jumping to a find match could
+  push the whole frame left, cutting the sidebar off, with no way to scroll it
+  back. The frame now clips instead of scrolling.
 - **Rotli Helper: a refused chat request no longer looks like a network error.**
   When the helper turned a request away (a stale pairing code, for one) it
   answered before it had read what the page sent, so the connection was cut,
