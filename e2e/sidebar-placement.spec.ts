@@ -194,3 +194,38 @@ test("the app frame never scrolls sideways", async ({ page }) => {
   });
   expect(moved).toBe(0);
 });
+
+// The owner, 2026-09-18: with the sidebar on the right, a right-click menu
+// "comes out weird" — it was shoved along the window's edge, over the row that
+// was clicked. It opens on the pointer's other side instead.
+test("on the right edge a context menu opens leftward, ending at the pointer", async ({ page }) => {
+  await gotoApp(page);
+  await openAppearance(page);
+  await page.getByRole("button", { name: "Right", exact: true }).click();
+  await backToNotes(page);
+  const menu = page.locator(".ctxmenu");
+  // a REAL right-click: a dispatched contextmenu event carries no coordinates,
+  // so the menu would be placed from nothing
+  const box = (await page.locator("aside.sidebar").boundingBox())!;
+  const x = Math.round(box.x + box.width - 30);
+  let y = 0;
+  for (const tryY of [480, 520, 560, 600]) {
+    await page.mouse.click(x, tryY, { button: "right" });
+    if ((await menu.count()) > 0) {
+      y = tryY;
+      break;
+    }
+  }
+  expect(y, "no empty sidebar surface found to right-click").toBeGreaterThan(0);
+  await expect(menu).toBeVisible();
+  const placed = (await menu.boundingBox())!;
+  // it ends AT the pointer and starts at its height: the clicked spot is not
+  // underneath it, and it is not shoved along the window's edge
+  expect(Math.abs(placed.x + placed.width - x)).toBeLessThan(1.5);
+  expect(Math.abs(placed.y - y)).toBeLessThan(1.5);
+  // moved to the left, with room, it opens right from the pointer as before
+  await page.getByRole("menuitem", { name: "Move sidebar to left" }).click();
+  await page.mouse.click(60, y, { button: "right" });
+  await expect(menu).toBeVisible();
+  expect(Math.abs((await menu.boundingBox())!.x - 60)).toBeLessThan(1.5);
+});

@@ -883,22 +883,29 @@
   display: inline-block;
   width: 1.15em; /* mirrors MARKER_EM in listGeometry.ts */
   text-align: center;
+  /* the line's hanging text-indent is inherited, and inside this box it pulls
+     the glyph left — half the indent when centred, all of it when left-aligned
+     — so bullets sat a few px LEFT of the note's text edge and left-aligned
+     numbers a whole column left of it. Nothing may start left of that edge
+     (the owner, 2026-09-18; e2e/list-geometry.spec.ts). */
+  text-indent: 0;
   color: var(--text-muted);
 }
-/* every number hangs right-aligned in ONE column, so "9." and "10." end on
-   the same edge and their text starts on the same one (the owner, 2026-09-18);
-   the line's hanging indent matches (listGeometry.ts NUMBER_EM) so wrapped
-   lines land under the text, never under the number */
+/* a numbered run hangs in ONE column sized by its widest number
+   (listGeometry.ts numberColumn): a run that reaches ten gives EVERY item the
+   wider column, numbers left-aligned, so "1." and "10." start on the same edge
+   and their text starts on the same one (the owner, 2026-09-18). A run that
+   stays under ten keeps the narrow glyph column. */
 .rotli-marker.num {
-  width: 1.6em; /* mirrors NUMBER_EM */
-  text-align: right;
-  padding-right: 0.2em;
-  box-sizing: border-box;
+  /* numbers start ON the text edge, whatever their width */
+  text-align: left;
   font-variant-numeric: tabular-nums;
 }
-/* three or more characters ("100.", "iii.") need the wider column */
+.rotli-marker.num.two {
+  width: 1.75em; /* mirrors NUMBER_EM */
+}
 .rotli-marker.num.wide {
-  width: 2.2em; /* mirrors WIDE_MARKER_EM */
+  width: 2.35em; /* mirrors WIDE_MARKER_EM */
 }
 .rotli-check {
   /* 1.1em + 0.5em gap = CHECK_EM (listGeometry.ts): a task's text lands on the
@@ -1728,6 +1735,20 @@
   padding: 7px 0;
   font-weight: 600;
   background: var(--surface-2);
+}
+/* the Secure row: its shortcut rides the label, a plain line says what it does */
+.aalabel .aakey {
+  float: right;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--text-muted);
+}
+.aahint {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin: -4px 0 12px;
 }
 .aanote {
   font-size: 10.5px;

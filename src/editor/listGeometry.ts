@@ -20,25 +20,28 @@ export const STEP_EM = 1.5;
  * text. Mirrors `.rotli-marker { width }`. */
 export const MARKER_EM = 1.15;
 
-/** The hanging column EVERY ordered marker of one or two characters sits in,
- * right-aligned, so "9." and "10." end on the same edge and their text starts
- * on the same one. Before 2026-09-18 a single digit used the glyph column and
- * two digits a wider one, so a list jumped sideways as it crossed ten (the
- * owner: "weird space on the left side"). Mirrors `.rotli-marker.num`. */
-export const NUMBER_EM = 1.6;
+/** A numbered run sizes its column to its WIDEST marker, and every item in the
+ * run uses it, so the numbers share a left edge and the text a left edge (the
+ * owner, 2026-09-18: first a list jumped right as it crossed ten; then, with a
+ * right-aligned column, "1." sat indented — "the first number should always
+ * align"). Runs renumber in sequence, so the widest is the last item.
+ *
+ * One character keeps the glyph column every bullet uses, so a short list looks
+ * as it always has. Mirrors `.rotli-marker.num` / `.two` / `.wide`. */
+export const NUMBER_EM = 1.75;
 
-/** Three or more characters ("100.", "iii.") overflow even that; they hang in
- * this wider column. Mirrors `.rotli-marker.num.wide`. */
-export const WIDE_MARKER_EM = 2.2;
+/** Three or more characters ("100.", "iii."). */
+export const WIDE_MARKER_EM = 2.35;
 
-/** True when an ordered-list marker needs the wide column. */
-export function isWideMarker(marker: string): boolean {
-  return marker.replace(/[.)]$/, "").length >= 3;
+export type NumberColumn = "one" | "two" | "wide";
+
+/** The column for a run whose widest ordinal has `widest` characters. */
+export function numberColumn(widest: number): NumberColumn {
+  return widest >= 3 ? "wide" : widest === 2 ? "two" : "one";
 }
 
-/** The hanging column for an ordered marker. */
-export function numberMarkerEm(marker: string): number {
-  return isWideMarker(marker) ? WIDE_MARKER_EM : NUMBER_EM;
+export function numberColumnEm(column: NumberColumn): number {
+  return column === "wide" ? WIDE_MARKER_EM : column === "two" ? NUMBER_EM : MARKER_EM;
 }
 
 /** A checkbox needs a wider column than a glyph — `.rotli-check` is a 1.1em box

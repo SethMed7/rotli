@@ -26,10 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   system — and `/download/`, which lists the Mac app, Rotli Web for Windows and
   Linux, and the helper in one place.
 
-- **⌘⇧L marks the open note secure.** One key to keep a note away from remote
-  AI; it appears in ⌘K and can be rebound like every other shortcut. It only
-  ever adds protection — removing it stays a deliberate choice in the note's
-  menu, so a stray key press can never expose a note.
+- **⌘⇧L turns Secure on and off for the open note, and the Aa panel has the
+  switch.** One key keeps a note away from remote AI, and the same key lifts it
+  again. It appears in ⌘K and can be rebound like every other shortcut. The Aa
+  panel gains a **Secure · this note** row (Off / Secure) that shows the current
+  state and the shortcut beside its label. Mac app only.
 - **Add to folder, for one note or a whole selection.** Select several notes,
   right-click, and choose **Add to folder**: pick one of your Main folders, or
   **New folder…**, which files them and opens the folder's name for you to
@@ -80,9 +81,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   code blocks are no longer spell-checked, so red underlines stay on your own
   words. (Underlines that come and go on ordinary text are still being looked
   into; the Mac draws those itself.)
-- **Numbered lists stay lined up past 9.** "9." and "10." now end on the same
-  edge and their text starts on the same one; before, a list jumped to the
-  right as it crossed ten.
+- **Spelling underlines in the Mac app.** Misspelled words were underlined in
+  Rotli Web but not in the Mac app: macOS only checks spelling as you type in
+  an embedded web view when the app asks it to, and rotli never had. It does
+  now, unless you have turned "Check Spelling While Typing" off yourself.
+- **Nothing in a note starts left of its text edge.** Bullets sat a few pixels
+  outside it and always had; they, numbers, and checkboxes now start on the
+  edge or inside it.
+- **Numbered lists line up, whatever they count to.** Numbers start on the text
+  edge, and a list that reaches ten gives every item the same column, so "1."
+  and "10." start together and so does their text. A list that stays under ten
+  looks as it always has.
+- **Right-click menus open away from the window's edge.** With the sidebar on
+  the right the menu was pushed along the edge and landed on top of the row you
+  clicked; it now opens to the left of the pointer (and upward near the
+  bottom), like every Mac menu.
 - **The highlight in Main starts beside the note's icon.** Hover, the open
   note, and a gathered selection no longer paint all the way to the sidebar's
   edge, so notes inside folders still read as nested. The whole line is still

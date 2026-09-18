@@ -93,4 +93,16 @@ test("note header actions carry no surface, and a wide ordered marker widens its
   expect(Math.abs(nine.x + nine.width - (ten.x + ten.width))).toBeLessThan(0.5);
   expect(Math.abs(nine.x - ten.x)).toBeLessThan(0.5);
   await expect(page.locator(".rotli-marker.num.wide")).toHaveCount(0);
+  // and the DIGITS sit inside their box, starting on its left edge: a marker
+  // that inherits the line's hanging indent draws a column to the left of it
+  const glyphs = await markers.evaluateAll((els) =>
+    els.map((el) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      return { glyph: range.getBoundingClientRect().left, box: el.getBoundingClientRect().left };
+    }),
+  );
+  for (const g of glyphs) expect(Math.abs(g.glyph - g.box)).toBeLessThan(1);
+  // the run reaches ten, so both items use the run's wider column
+  await expect(page.locator(".rotli-marker.num.two")).toHaveCount(2);
 });
