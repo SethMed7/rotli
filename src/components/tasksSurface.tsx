@@ -8,10 +8,9 @@
 // is a real note edit through the ordinary write path; Rust re-validates the
 // exact text first, so a stale row refuses instead of flipping the wrong line.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { stripMarkdown } from "../editor/stripMarkdown";
-import { registerSurfaceFind } from "../keys/surfaceFind";
 import { corpusToggleTask, isTauri } from "../lib/tauri";
 import { toggledSet } from "../lib/toggledSet";
 import { useNow } from "../lib/useNow";
@@ -27,6 +26,7 @@ import { toggleWebTask } from "../services/webTasks";
 import { usePanesStore } from "../state/panes";
 import { Character } from "./character";
 import { ChevronRight, FileGlyph, SearchGlyph } from "./glyphs";
+import { SurfaceSearch } from "./surfaceSearch";
 
 export function TasksSurface() {
   const tasks = useTasks();
@@ -43,7 +43,6 @@ export function TasksSurface() {
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const toggleFold = (noteId: string) => setFolded((prev) => toggledSet(prev, noteId));
-  const searchRef = useRef<HTMLInputElement>(null);
 
   const items = tasks.data ?? null;
   const updatedAtByNote = useMemo(
@@ -55,13 +54,6 @@ export function TasksSurface() {
   const now = useNow();
   const sections = useMemo(() => sectionTaskGroups(filtered, now), [filtered, now]);
   const taskKey = (noteId: string, line: number) => `${noteId}:${line}`;
-
-  useEffect(() => {
-    return registerSurfaceFind(() => {
-      searchRef.current?.focus();
-      searchRef.current?.select();
-    });
-  }, []);
 
   const check = (noteId: string, line: number, text: string) => {
     const key = taskKey(noteId, line);
@@ -92,25 +84,12 @@ export function TasksSurface() {
         >
           ?
         </button>
-        <label className="surface-search">
-          <SearchGlyph size={14} />
-          {/* text, not search: the search type draws its own magnifier and
-              clear button beside ours (the owner's screenshot, 2026-09-18) */}
-          <input
-            ref={searchRef}
-            type="text"
-            role="searchbox"
-            value={query}
-            placeholder="Search tasks…"
-            aria-label="Search tasks"
-            onChange={(event) => setQuery(event.currentTarget.value)}
-          />
-          {query && (
-            <button type="button" aria-label="Clear task search" onClick={() => setQuery("")}>
-              ×
-            </button>
-          )}
-        </label>
+        <SurfaceSearch
+          value={query}
+          onChange={setQuery}
+          label="Search tasks"
+          clearLabel="Clear task search"
+        />
       </header>
       {err && (
         <p className="file-err" style={{ padding: "0 22px 8px" }}>
