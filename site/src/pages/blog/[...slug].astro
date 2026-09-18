@@ -1,0 +1,55 @@
+---
+// /blog/ (the index, newest first) and /blog/<post>/.
+import { render } from 'astro:content';
+import WritingList from '../../components/WritingList.astro';
+import WritingPage from '../../components/WritingPage.astro';
+import { site } from '../../site';
+import { publishedWriting, slugOf, type Writing } from '../../writing';
+
+export async function getStaticPaths() {
+  if (!site.showsFullSite) return [];
+  const entries = await publishedWriting('post');
+  return [
+    { params: { slug: undefined }, props: { entry: null, entries } },
+    ...entries.map((entry) => ({ params: { slug: slugOf(entry) }, props: { entry, entries } })),
+  ];
+}
+
+const { entry, entries } = Astro.props as { entry: Writing | null; entries: Writing[] };
+const formatDate = (date: Date) =>
+  date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+const items = entries.map((item) => ({
+  href: `/blog/${slugOf(item)}/`,
+  title: item.data.title,
+  description: item.data.description,
+  meta: item.data.draft ? 'Draft · dev site only' : formatDate(item.data.date),
+}));
+const { Content } = entry ? await render(entry) : { Content: null };
+---
+
+{
+  entry && Content ? (
+    <WritingPage
+      title={`${entry.data.title} — rotli`}
+      description={entry.data.description}
+      canonicalPath={`/blog/${slugOf(entry)}/`}
+      section="blog"
+      kicker={entry.data.draft ? 'Draft · dev site only' : formatDate(entry.data.date)}
+      heading={entry.data.title}
+      lede={entry.data.description}
+    >
+      <Content />
+    </WritingPage>
+  ) : (
+    <WritingPage
+      title="Blog — rotli"
+      description="Notes from building rotli."
+      canonicalPath="/blog/"
+      section="blog"
+      heading="Blog"
+      lede="Notes from building rotli."
+    >
+      <WritingList items={items} empty="The first post is on its way." />
+    </WritingPage>
+  )
+}

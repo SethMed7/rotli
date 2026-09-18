@@ -1,0 +1,66 @@
+---
+// /resources/ (the index) and /resources/<article>/. The MCP guide is its own
+// page (resources/mcp/) and joins the index on the dev site only.
+import { render } from 'astro:content';
+import WritingList from '../../components/WritingList.astro';
+import WritingPage from '../../components/WritingPage.astro';
+import { site } from '../../site';
+import { publishedWriting, slugOf, type Writing } from '../../writing';
+
+export async function getStaticPaths() {
+  if (!site.showsFullSite) return [];
+  const entries = await publishedWriting('resource');
+  return [
+    { params: { slug: undefined }, props: { entry: null, entries } },
+    ...entries.map((entry) => ({ params: { slug: slugOf(entry) }, props: { entry, entries } })),
+  ];
+}
+
+const { entry, entries } = Astro.props as { entry: Writing | null; entries: Writing[] };
+const items = [
+  ...entries.map((item) => ({
+    href: `/resources/${slugOf(item)}/`,
+    title: item.data.title,
+    description: item.data.description,
+    meta: item.data.draft ? 'Draft · dev site only' : undefined,
+  })),
+  ...(site.showsExperiments
+    ? [
+        {
+          href: '/resources/mcp/',
+          title: 'Work from Claude, Grok, or any agent',
+          description: 'Connect an MCP client and your rotli folder becomes the memory your agents read and write.',
+          meta: 'In development · dev site only',
+        },
+      ]
+    : []),
+];
+const { Content } = entry ? await render(entry) : { Content: null };
+---
+
+{
+  entry && Content ? (
+    <WritingPage
+      title={`${entry.data.title} — rotli`}
+      description={entry.data.description}
+      canonicalPath={`/resources/${slugOf(entry)}/`}
+      section="resources"
+      kicker={entry.data.draft ? 'Resources · draft' : 'Resources'}
+      heading={entry.data.title}
+      lede={entry.data.description}
+    >
+      <Content />
+    </WritingPage>
+  ) : (
+    <WritingPage
+      title="Resources — rotli"
+      description="Short answers to the questions people ask about rotli: why local, where notes live, and how it works."
+      canonicalPath="/resources/"
+      section="resources"
+      heading="Resources"
+      lede="Short answers to the questions people ask about rotli."
+    >
+      <WritingList items={items} empty="Nothing here yet." />
+    </WritingPage>
+  )
+}

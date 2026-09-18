@@ -50,3 +50,32 @@ test("System browser: ⇧-click ranges folder tiles", async ({ page }) => {
   await expect(projects).toHaveClass(/sel/);
   await expect(people).toHaveClass(/sel/);
 });
+
+// The owner's Captures review, 2026-09-18: a search, Select all with the
+// header's tools, a quiet select box, and Clear on the bar's baseline.
+test("Captures: search narrows the cards, and the select box waits for the pointer", async ({ page }) => {
+  await gotoApp(page);
+  await page.locator(".sb-notes-tree .frow", { hasText: "Captures" }).first().click();
+  const cards = page.locator(".board-card");
+  await expect(cards).toHaveCount(3);
+  // the select box is quiet until a card is hovered or a selection has begun
+  await page.mouse.move(5, 5);
+  await expect(cards.nth(1).locator(".bc-check")).toHaveCSS("opacity", "0");
+  await cards.nth(1).hover();
+  await expect(cards.nth(1).locator(".bc-check")).toHaveCSS("opacity", "1");
+
+  const search = page.getByRole("searchbox", { name: "Search captures" });
+  await search.fill("maria");
+  await expect(cards).toHaveCount(1);
+  await search.fill("nothing matches this");
+  await expect(page.getByText("No matching captures")).toBeVisible();
+  await search.fill("");
+  await expect(cards).toHaveCount(3);
+
+  // Clear sits on the same line as the bar's actions
+  await cards.nth(0).click();
+  await expect(cards.nth(2).locator(".bc-check")).toHaveCSS("opacity", "1");
+  const clear = (await page.getByRole("button", { name: "Clear", exact: true }).boundingBox())!;
+  const archive = (await page.getByRole("button", { name: "Archive" }).boundingBox())!;
+  expect(Math.abs(clear.y + clear.height / 2 - (archive.y + archive.height / 2))).toBeLessThan(1.5);
+});

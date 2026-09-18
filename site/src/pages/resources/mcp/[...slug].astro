@@ -1,8 +1,8 @@
 ---
-import Base from '../../layouts/Base.astro';
-import SiteFooter from '../../components/SiteFooter.astro';
-import SiteHeader from '../../components/SiteHeader.astro';
-import { GITHUB_URL, PRIVACY_URL, site } from '../../site';
+import Base from '../../../layouts/Base.astro';
+import SiteFooter from '../../../components/SiteFooter.astro';
+import SiteHeader from '../../../components/SiteHeader.astro';
+import { GITHUB_URL, PRIVACY_URL, site } from '../../../site';
 
 // MCP and agent integrations left production on 2026-09-11 until refined: the
 // guide exists only on the dev site, alongside the other experiments.
@@ -25,25 +25,10 @@ const description = remote
   ? 'Connect Claude Code, Codex, Cursor, Grok Bot, and other MCP clients to the Rotli workspace on your Mac without turning the vault into cloud storage.'
   : 'Connect Claude Code, Codex, Cursor, and other local MCP clients to the Rotli workspace on your Mac. Your files stay on your Mac and Rotli’s own policy applies.';
 
-const footerLinks = [
-  { href: '/', label: 'Product' },
-  ...(site.sourcePublic ? [{ href: GITHUB_URL, label: 'GitHub' }] : []),
-  { href: site.sourcePublic ? PRIVACY_URL : '/#privacy', label: 'Privacy' },
-];
-const footerTagline = site.sourcePublic
-  ? 'Your vault stays on your Mac. Open source under the MIT license.'
-  : 'Your vault stays on your Mac. Local-first and free.';
 ---
 
-<Base title={title} description={description} canonicalPath="/mcp/" noindex={!site.indexable}>
-  <SiteHeader
-    nav={[
-      { href: '/', label: 'Product' },
-      { href: '#connect', label: 'MCP', current: true },
-      { href: '#policy', label: 'Safety' },
-      ...(remote ? [{ href: '#self-host', label: 'Self-host' }] : []),
-    ]}
-  />
+<Base title={title} description={description} canonicalPath="/resources/mcp/" noindex={!site.indexable}>
+  <SiteHeader current="resources" />
 
   <main id="content">
     <section class="hero" aria-labelledby="hero-title">
@@ -245,7 +230,7 @@ After connecting, call tools/list and report the available Rotli tools.</code></
     )}
   </main>
 
-  <SiteFooter tagline={footerTagline} links={footerLinks} />
+  <SiteFooter />
 
   <style>
     main > section,

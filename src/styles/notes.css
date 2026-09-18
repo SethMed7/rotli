@@ -32,7 +32,11 @@
   min-height: 0;
   position: relative;
   background: var(--ground);
+  /* clip, not hidden: a hidden box is still a scroll container, and a
+     scroll-into-view (find, focus) could push the whole frame sideways with no
+     way back (the owner's screenshot, 2026-09-18) */
   overflow: hidden;
+  overflow: clip;
 }
 
 /* — rail wrap: the ONE sidebar + its resize grip; width rides the --sidebar-w
@@ -2256,21 +2260,12 @@
   opacity: 1;
   color: var(--text);
 }
-.rail-overlay {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  display: flex;
-  background: var(--ground);
-  border-right: 1px solid var(--border);
-  animation: rail-in var(--motion-enter) var(--motion-ease);
+/* revealed on hover it is the in-flow rail (.rail-wrap): the content moves
+   over and the grip works. Above the hot strip, so the strip never takes a
+   click meant for the sidebar's first 14px. */
+.rail-hover {
   z-index: 8;
-}
-/* the reveal overlay honors the persisted width, not the 240px .sidebar
-   fallback (the overlay sidebar is not inside a .rail-wrap) (the maintainer, 2026-06-13) */
-.rail-overlay > .sidebar {
-  flex: 0 0 var(--sidebar-w, 240px);
+  animation: rail-in var(--motion-enter) var(--motion-ease);
 }
 @keyframes rail-in {
   from {
@@ -2304,8 +2299,7 @@
 .threepane[data-sidebar-side="right"] {
   flex-direction: row-reverse;
 }
-.threepane[data-sidebar-side="right"] .rail-wrap > .sidebar,
-.rail-overlay[data-side="right"] > .sidebar {
+.threepane[data-sidebar-side="right"] .rail-wrap > .sidebar {
   border-right: none;
   border-left: 1px solid var(--border);
 }
@@ -2317,11 +2311,7 @@
   left: auto;
   right: 3px;
 }
-.rail-overlay[data-side="right"] {
-  left: auto;
-  right: 0;
-  border-right: none;
-  border-left: 1px solid var(--border);
+.rail-hover[data-side="right"] {
   animation-name: rail-in-right;
 }
 @keyframes rail-in-right {
@@ -2561,6 +2551,39 @@
    gathered row carries the whole selection into a folder */
 .main-row.msel {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+/* A Main row's wash (hover, open, gathered) starts just left of its icon
+   (--row-inset, set per row by sidebarHome's rowInset) instead of at the
+   sidebar's edge: inside a folder a full-width pill hid the nesting (the owner,
+   2026-09-18). The ROW keeps its full-width hit area; only the paint moves. */
+.main-tree .main-row {
+  position: relative;
+  isolation: isolate;
+}
+.main-tree .main-row::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 var(--row-inset, 0px);
+  z-index: -1;
+  border-radius: var(--r-control);
+  background: transparent;
+}
+.main-tree .main-row:hover,
+.main-tree .main-row.sel,
+.main-tree .main-row.sel:hover,
+.main-tree .main-row.msel {
+  background: none;
+}
+.main-tree .main-row:hover::before {
+  background: var(--hov);
+}
+.main-tree .main-row.msel::before {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.main-tree .main-row.sel::before,
+.main-tree .main-row.sel:hover::before {
+  background: var(--selected-bg);
 }
 
 /* preview tabs (the maintainer, 2026-07-28: browse without piling up tabs) — the quiet

@@ -114,6 +114,7 @@ import { isChatsPath, isHidden, isVault, isWikiPath } from "../services/destinat
 import { useFolders } from "../services/hooks";
 import { queryClient } from "../services/query";
 import { DEFAULT_RETENTION_DAYS, MAX_RETENTION_DAYS, parseRetentionDays } from "../services/retentionPolicy";
+import type { TaskArchiveAge } from "../services/tasksView";
 import { reconnectActiveVault } from "../state/activeVault";
 import { resetAndReonboard } from "../state/onboarding";
 import { usePanesStore } from "../state/panes";
@@ -544,6 +545,8 @@ function GeneralPane() {
   const userName = useUiStore((s) => s.userName);
   const setUserName = useUiStore((s) => s.setUserName);
   const timeFormat = useUiStore((s) => s.timeFormat);
+  const taskArchiveAge = useUiStore((s) => s.taskArchiveAge);
+  const setTaskArchiveAge = useUiStore((s) => s.setTaskArchiveAge);
   const setTimeFormat = useUiStore((s) => s.setTimeFormat);
   const mainAutoRemoveDays = useUiStore((s) => s.mainAutoRemoveDays);
   const setMainAutoRemoveDays = useUiStore((s) => s.setMainAutoRemoveDays);
@@ -633,6 +636,23 @@ function GeneralPane() {
           ["24", "24-hour"],
         ]}
         onPick={(value) => setTimeFormat(value as TimeFormat)}
+      />
+
+      <h4 className="sethead">Tasks</h4>
+      <p className="lead">
+        Open tasks in a note you haven’t touched for this long rest under Archived in Tasks. Nothing moves;
+        edit the note and they come back.
+      </p>
+      <Seg
+        value={taskArchiveAge}
+        options={[
+          ["14", "2 weeks"],
+          ["30", "30 days"],
+          ["60", "60 days"],
+          ["90", "90 days"],
+          ["never", "Never"],
+        ]}
+        onPick={(value) => setTaskArchiveAge(value as TaskArchiveAge)}
       />
 
       <h4 className="sethead">Automatic housekeeping</h4>

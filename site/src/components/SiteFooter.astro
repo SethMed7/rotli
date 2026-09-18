@@ -1,6 +1,8 @@
 ---
-// The one site footer: brand, a short tagline, and optional links.
+// The one site footer: brand, a short tagline, and links. Both default to the
+// site-wide policy in src/nav.ts; the holding page passes its own.
 import mark from '../../../src/assets/characters/_logo.svg?raw';
+import { footerLinks, footerTagline } from '../nav';
 
 interface FooterLink {
   href: string;
@@ -8,11 +10,11 @@ interface FooterLink {
 }
 
 interface Props {
-  tagline: string;
+  tagline?: string;
   links?: FooterLink[];
 }
 
-const { tagline, links = [] } = Astro.props;
+const { tagline = footerTagline, links = footerLinks() } = Astro.props;
 ---
 
 <footer class="site-footer">

@@ -429,40 +429,170 @@ span.fdr-col {
   white-space: nowrap;
 }
 
-/* — the Tasks surface (decision 2026-07-25; regroomed 2026-07-31): open
-   checkboxes grouped by note. Quiet list grammar; the checkbox is the one
-   interactive accent, the group header is visibly a NOTE (glyph + count +
-   open affordance). Reading measure capped — no full-width lines. — */
+/* — the Tasks surface (decision 2026-07-25; regroomed 2026-09-18): open
+   checkboxes grouped by note. Each note is a headed group; its tasks hang
+   under it on a rule, so what belongs to what reads at a glance. The checkbox
+   is the one interactive accent. Reading measure capped; long tasks wrap. — */
+.task-help {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+.task-help:hover,
+.task-help[aria-expanded="true"] {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.surface-search {
+  flex: 0 1 320px;
+  min-width: 160px;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  color: var(--text-muted);
+}
+.surface-search:focus-within {
+  border-color: color-mix(in srgb, var(--accent-text) 45%, var(--border));
+}
+.surface-search svg {
+  flex: 0 0 auto;
+}
+.surface-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+}
+.surface-search input::placeholder {
+  color: var(--text-muted);
+}
+.surface-search input:focus-visible {
+  outline: none;
+}
+.surface-search button {
+  flex: 0 0 auto;
+  border: none;
+  background: none;
+  padding: 0 2px;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.surface-search button:hover {
+  color: var(--text);
+}
+.tasks .board-scroll {
+  padding-bottom: 40px;
+}
 .task-intro {
-  margin: 2px 22px 10px;
-  font-size: 12px;
+  margin: 14px 22px 0;
+  font-size: 12.5px;
+  line-height: 1.5;
   color: var(--text-muted);
   max-width: 640px;
 }
-.tasks .task-group {
-  padding: 8px 22px 12px;
-  max-width: 720px;
+.task-age-section {
+  max-width: 760px;
+  padding: 18px 22px 0;
 }
-.task-note {
-  display: flex;
+.task-age-section > h3 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.task-archive-toggle {
+  display: inline-flex;
   align-items: center;
   gap: 7px;
   border: none;
   background: none;
   padding: 2px 0;
-  color: var(--text-muted);
   font: inherit;
-  font-size: 12.5px;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.task-archive-toggle:hover {
+  color: var(--text);
+}
+.tasks .task-group {
+  padding: 8px 0 10px;
+}
+.task-note-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: -4px;
+}
+.task-fold-button {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.task-fold-button:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.task-fold {
+  transition: transform 120ms var(--motion-ease);
+}
+.task-fold.open {
+  transform: rotate(90deg);
+}
+.task-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  border: none;
+  border-radius: var(--r-control);
+  background: none;
+  padding: 3px 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
   font-weight: 600;
   text-align: left;
   cursor: pointer;
-  max-width: 100%;
 }
 .task-note:hover {
-  color: var(--text);
+  background: var(--hov);
 }
 .task-note-icon {
   flex: 0 0 auto;
+  color: var(--text-muted);
 }
 .task-note-title {
   min-width: 0;
@@ -474,33 +604,28 @@ span.fdr-col {
   flex: 0 0 auto;
   font-size: 10.5px;
   font-weight: 500;
+  letter-spacing: 0;
   border: 1px solid var(--border);
   border-radius: var(--r-pill);
   padding: 0 6px;
   color: var(--text-muted);
 }
-.task-note-go {
-  flex: 0 0 auto;
-  opacity: 0;
-  transition: opacity 120ms var(--motion-ease);
-}
-.task-note:hover .task-note-go {
-  opacity: 1;
-}
+/* the tasks hang off their note on one rule, under the fold chevron */
 .task-list {
-  margin: 2px 0 0;
-  padding: 0;
+  margin: 2px 0 0 5px;
+  padding: 0 0 0 17px;
   list-style: none;
+  border-left: 1px solid var(--border);
 }
 .task-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 9px;
-  padding: 4px 6px;
-  margin: 0 -6px;
+  padding: 5px 6px;
   border-radius: var(--r-control);
   color: var(--text);
   font-size: 13px;
+  line-height: 1.45;
 }
 .task-row:hover {
   background: var(--hov);
@@ -513,6 +638,7 @@ span.fdr-col {
   flex: 0 0 auto;
   width: 15px;
   height: 15px;
+  margin-top: 2px;
   border: 1.5px solid var(--text-muted);
   border-radius: 4px;
   background: none;
@@ -527,11 +653,23 @@ span.fdr-col {
   background: var(--hov);
 }
 .task-text {
-  /* one line per task; the full (joined) text lives in the title tooltip */
+  /* the whole task, wrapped — a clipped line hid what the task was. A button:
+     the words open the note AT this task (editor/lineJump.ts). */
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  line-height: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.task-text:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 0.2em;
 }
 
 .board-head {
@@ -655,18 +793,28 @@ span.fdr-col {
   border-color: var(--accent);
   background: var(--tint);
 }
+/* the select box: the app's checkbox shape (not a radio circle), and quiet —
+   it shows on the card under the pointer, on a focused card, and on every card
+   once a selection has begun (the owner, 2026-09-18: "the circles look weird") */
 .bc-check {
   position: absolute;
   top: 10px;
   right: 10px;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1.5px solid var(--border);
-  border-radius: var(--r-pill);
+  border: 1.5px solid var(--text-muted);
+  border-radius: 4px;
   color: var(--on-accent);
+  opacity: 0;
+  transition: opacity 120ms var(--motion-ease);
+}
+.board-card:hover .bc-check,
+.board-card:focus-visible .bc-check,
+.board-grid.selecting .bc-check {
+  opacity: 1;
 }
 .board-card.sel .bc-check {
   background: var(--accent);
@@ -778,6 +926,11 @@ span.fdr-col {
   background-image: linear-gradient(var(--hov), var(--hov));
 }
 .board-btn.ghost {
+  /* command.css has a global .ghost (onboarding's footnote) with a 14px top
+     margin; a ghost BUTTON here must sit on its row's baseline (the owner,
+     2026-09-18: "the clear button is off") */
+  margin-top: 0;
+  font-size: 12.5px;
   border-color: transparent;
   background: none;
   color: var(--text-muted);

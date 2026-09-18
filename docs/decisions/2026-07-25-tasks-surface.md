@@ -71,3 +71,36 @@ stays the only truth — this adds a mark to the grammar, not a field to a file.
 - **The box is found by position, never by search.** `check_off` targets the
   three characters after the list marker, so a task whose own words contain a
   bracket pair ("- [/] fix the [ ] case") has the right box flipped.
+
+## Amendment 2026-09-18 — Tasks on the web, the regroomed surface, Archived
+
+The owner's review: "search needs to be addressed, the width, clarity of what
+is part of what note at a glance", an Archived section, and the standing rule
+that whatever the app does, the web does too.
+
+- **Tasks exists outside the Mac app.** `corpusTasks()` answered `[]` whenever
+  there was no Tauri, so Rotli Web and the browser twin always showed "Nothing
+  open". The projection and the check-off now also run in TypeScript:
+  `src/lib/taskLines.ts` is the pure twin of `open_task_text`,
+  `task_continuation`, `joined_task_text`, and `check_off`, and
+  `src/services/webTasks.ts` applies it over the notes port (live notes only:
+  never Archive, Trash, or chat transcripts; a changed line refuses as stale).
+  Still a projection — nothing is stored.
+- **Each note is a headed group.** The title is the header, its tasks hang
+  under it on one rule, a chevron folds the note, and long tasks wrap instead
+  of clipping. A search that matches task text keeps only the matching tasks;
+  a title match keeps the note whole.
+- **The search field is ours.** It was an unstyled `type="search"`, which draws
+  the browser's own magnifier and clear button beside Rotli's. It is a text
+  input with the searchbox role.
+- **Archived.** Tasks in notes untouched for `TASK_ARCHIVE_DAYS` (30) sit in a
+  closed section with a count; a search opens it. Nothing moves on disk, and
+  editing the note brings its tasks back. The cutoff is Settings → General →
+  Tasks (`taskArchiveAge`: two weeks, 30, 60, or 90 days, or Never; default 30),
+  and the live sections clamp to it so every note lands in exactly one.
+- **A task's words open the note AT that task.** `src/editor/lineJump.ts` waits
+  for the note's editor, and `resolveLine.ts` checks the line against the
+  task's words first — the reported line when it still matches, else the
+  nearest line that does — so a note edited since the list was built never
+  lands the caret somewhere arbitrary. The note's title still opens it at the
+  top.

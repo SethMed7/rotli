@@ -25,6 +25,7 @@ import {
   organizerStop,
   secureRepairApply,
 } from "../lib/tauri";
+import { toggledSet } from "../lib/toggledSet";
 import { type BrainAction, canUndo, deriveJournal, describeAction } from "../services/brainJournal";
 import { approveProposal, dismissProposal, undoAction } from "../services/brainJournalComposition";
 import {
@@ -232,13 +233,7 @@ export function ActivitySurface() {
   const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(new Set());
   // expanded history rows — a log row's click shows before → after (2026-07-31)
   const [expandedRows, setExpandedRows] = useState<ReadonlySet<string>>(new Set());
-  const toggleRow = (id: string) =>
-    setExpandedRows((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const toggleRow = (id: string) => setExpandedRows((prev) => toggledSet(prev, id));
   const [stopRequested, setStopRequested] = useState(false);
   // the explicit Run now must react INSTANTLY (the maintainer, 2026-07-31: "issues with
   // visually seeing something is even happening") — the band shows on click,

@@ -116,9 +116,12 @@ export function NotesSurface() {
   return (
     <div className="threepane" style={railVars} data-sidebar-side={sidebarSide}>
       {/* the sidebar's edge and reveal are the owner's (2026-09-17): pinned in
-          the flow on either side, or a hover overlay off the window's edge */}
+          the flow on either side, or revealed into the flow from the window's edge */}
       {sidebarReveal === "hover" ? (
-        <SidebarHoverRail side={sidebarSide} />
+        <SidebarHoverRail
+          side={sidebarSide}
+          grip={<RailGrip width={sidebarWidth} side={sidebarSide} onResize={setSidebarWidth} />}
+        />
       ) : (
         !sidebarCollapsed && (
           <div className="rail-wrap">

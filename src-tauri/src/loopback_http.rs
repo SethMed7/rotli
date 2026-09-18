@@ -7,7 +7,7 @@
 //! document. Duplicating any of that would mean two places to get a credential
 //! boundary wrong, so it lives here.
 
-use std::io::{BufRead, Read, Write};
+use std::io::{BufRead, ErrorKind, Read, Write};
 use std::net::TcpStream;
 use std::time::{Duration, Instant};
 
@@ -127,6 +127,17 @@ pub(crate) fn read_http_body(
     Ok(body)
 }
 
+/// Read and discard the body a refused request declared, up to `max_bytes`.
+/// A refusal written while that body is still unread closes the socket on
+/// pending data; the kernel then resets the connection and the browser reports
+/// a network error instead of the answer. Every refusal that precedes
+/// `read_http_body` drains first. The caller's read timeout still bounds it.
+pub(crate) fn drain_http_body(reader: &mut impl BufRead, head: &HttpHead, max_bytes: usize) {
+    let declared = head.header("content-length").and_then(|value| value.trim().parse::<u64>().ok());
+    let length = declared.unwrap_or(0).min(max_bytes as u64);
+    let _ = std::io::copy(&mut reader.take(length), &mut std::io::sink());
+}
+
 /// Compare the complete Authorization value in time determined by the expected
 /// token, not by the first mismatching byte. A loopback adapter is still a
 /// credential boundary even though it cannot bind a LAN address.
@@ -194,7 +205,12 @@ pub(crate) fn write_http_response_with_headers(
         .write_all(head.as_bytes())
         .and_then(|_| stream.write_all(encoded.as_deref().unwrap_or_default()))
         .and_then(|_| stream.flush())
-        .map_err(|error| error.to_string())
+        .or_else(|error| match error.kind() {
+            // the peer left before the answer (a page reload, an aborted
+            // fetch): nobody is there to tell, and it is not the adapter's error
+            ErrorKind::BrokenPipe | ErrorKind::ConnectionReset | ErrorKind::ConnectionAborted => Ok(()),
+            _ => Err(error.to_string()),
+        })
 }
 
 #[cfg(test)]

@@ -1,0 +1,137 @@
+---
+// The frame every resource, post, index, and the About page shares: the site
+// header and footer around one readable column. Rendered Markdown arrives as
+// children, so its typography is styled with :global() inside .prose.
+import Base from '../layouts/Base.astro';
+import type { NavSection } from '../nav';
+import { site } from '../site';
+import SiteFooter from './SiteFooter.astro';
+import SiteHeader from './SiteHeader.astro';
+
+interface Props {
+  title: string;
+  description: string;
+  canonicalPath: string;
+  /** Which header section to mark current; none for pages outside the nav. */
+  section?: NavSection;
+  /** Small line above the headline: a date, "Resource", a draft label. */
+  kicker?: string;
+  heading: string;
+  lede?: string;
+}
+
+const { title, description, canonicalPath, section, kicker, heading, lede } = Astro.props;
+---
+
+<Base title={title} description={description} canonicalPath={canonicalPath} noindex={!site.indexable}>
+  <SiteHeader current={section} />
+  <main id="content" class="writing">
+    <header class="writing-head">
+      {kicker && <p class="kicker">{kicker}</p>}
+      <h1>{heading}</h1>
+      {lede && <p class="lede">{lede}</p>}
+    </header>
+    <div class="prose">
+      <slot />
+    </div>
+  </main>
+  <SiteFooter />
+</Base>
+
+<style>
+  .writing {
+    width: min(100% - 3rem, 44rem);
+    margin: 0 auto;
+    padding-block: clamp(3rem, 8vw, 5.5rem) clamp(4rem, 10vw, 7rem);
+  }
+  .kicker {
+    margin: 0 0 0.9rem;
+    color: var(--accent-text);
+    font-size: 0.86rem;
+    font-weight: 600;
+  }
+  h1 {
+    margin: 0;
+    font-size: clamp(2.3rem, 5vw, 3.4rem);
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+  }
+  .lede {
+    margin: 1.2rem 0 0;
+    color: var(--text-muted);
+    font-size: 1.2rem;
+    line-height: 1.55;
+    text-wrap: pretty;
+  }
+  .prose {
+    margin-top: 2.75rem;
+    font-size: 1.06rem;
+    line-height: 1.7;
+  }
+  .prose :global(h2) {
+    margin: 2.6rem 0 0.8rem;
+    font-size: 1.45rem;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    scroll-margin-top: 1.5rem;
+  }
+  .prose :global(h3) {
+    margin: 2rem 0 0.6rem;
+    font-size: 1.15rem;
+  }
+  .prose :global(p),
+  .prose :global(ul),
+  .prose :global(ol) {
+    margin: 0 0 1.1rem;
+    text-wrap: pretty;
+  }
+  .prose :global(li + li) {
+    margin-top: 0.35rem;
+  }
+  .prose :global(a) {
+    color: var(--accent-text);
+    text-underline-offset: 0.2em;
+  }
+  .prose :global(code) {
+    padding: 0.1em 0.35em;
+    border-radius: 0.35rem;
+    background: var(--surface-2);
+    font-size: 0.92em;
+  }
+  .prose :global(pre) {
+    overflow-x: auto;
+    padding: 1rem 1.2rem;
+    border: 1px solid var(--border);
+    border-radius: 0.7rem;
+    background: var(--surface);
+  }
+  .prose :global(pre code) {
+    padding: 0;
+    background: none;
+  }
+  .prose :global(table) {
+    width: 100%;
+    margin: 0 0 1.4rem;
+    border-collapse: collapse;
+    font-size: 0.98rem;
+  }
+  .prose :global(th),
+  .prose :global(td) {
+    padding: 0.7rem 0.75rem 0.7rem 0;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+  }
+  .prose :global(th) {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+  .prose :global(blockquote) {
+    margin: 1.6rem 0;
+    padding-left: 1.1rem;
+    border-left: 3px solid var(--accent);
+    color: var(--text-muted);
+  }
+</style>

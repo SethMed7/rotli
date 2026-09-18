@@ -1,0 +1,52 @@
+---
+// /about/: what rotli is, the name, who makes it. Kept short on purpose; the
+// longer story is the "creation" post, linked once it is published here.
+import WritingPage from '../../components/WritingPage.astro';
+import { site } from '../../site';
+import { publishedWriting, slugOf } from '../../writing';
+
+export function getStaticPaths() {
+  return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
+}
+
+const posts = await publishedWriting('post');
+const story = posts.find((post) => slugOf(post) === 'the-creation-of-rotli');
+---
+
+<WritingPage
+  title="About — rotli"
+  description="rotli is a calm, local-first workspace: one folder of ordinary files, on your Mac or in your browser."
+  canonicalPath="/about/"
+  section="about"
+  heading="About rotli"
+  lede="A calm place to think, built on one folder of ordinary files you keep."
+>
+  <p>
+    rotli is a local-first workspace for notes, tasks, links, and optional AI conversations. Everything
+    lives in one folder you choose, as plain Markdown files, so your work opens anywhere and outlasts any
+    app, including this one.{site.webAppEnabled ? ' It runs on your Mac, and in your browser with Rotli Web.' : ''}
+  </p>
+
+  <h2 id="name">Why "rotli"?</h2>
+  <p>
+    rotli is short for Rottnest, the island off Western Australia where quokkas live. Short, quick to say,
+    easy to remember. The workspace is the island, and you're the quokka.
+  </p>
+  <p>
+    Quokkas are famous for looking like they can't stop smiling. That's the feeling rotli is built for: a
+    workspace that feels good to be in, so getting things done feels good too.
+  </p>
+
+  <h2 id="who">Who makes it</h2>
+  <p>
+    rotli is designed and built by Seth Medina.
+    {
+      story && (
+        <>
+          The story of how it came together is on the blog:{' '}
+          <a href={`/blog/${slugOf(story)}/`}>{story.data.title}</a>.
+        </>
+      )
+    }
+  </p>
+</WritingPage>
