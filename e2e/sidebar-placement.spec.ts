@@ -156,6 +156,12 @@ test("revealed on hover, the sidebar pushes the content and keeps its resize gri
   await page.mouse.move(g.x + 60, 400, { steps: 4 });
   await page.waitForTimeout(400);
   await page.mouse.move(g.x + 70, 400);
+  // the drag ends at +70 from the grip's left edge: wait for THAT width before
+  // letting go, or a loaded runner reads the width one move early
+  const dragged = 70 - g.width / 2;
+  await expect
+    .poll(async () => (await sidebar.boundingBox())!.width)
+    .toBeGreaterThan(side.width + dragged - 1);
   await page.mouse.up();
   await expect(sidebar).toBeVisible();
   // the last move lands a frame after the button is up
