@@ -65,6 +65,12 @@ bun run preview  # serve the built dist/ locally
   links the `the-creation-of-rotli` post once it is published). Markdown code
   blocks are not syntax-highlighted: Shiki writes inline `style=` attributes,
   which the production CSP drops. Keep article images local.
+- **`/download/`** lists every way in by device: the Mac DMG, Rotli Web for
+  Windows, Linux, and everything else, and Rotli Helper. The header and hero
+  Download buttons still fetch the DMG directly; pointing `DOWNLOAD_HREF` at
+  `/download/` makes this page the chooser once other native builds exist. The
+  Helper guide is `/resources/rotli-helper/`; the 404 page's `/helper` hint
+  links there.
 - **Download and the browser.** `SiteActions.astro` renders the two ways in —
   Open in browser and Download — in the header, the hero, and the mobile menu.
   `DOWNLOAD_HREF` in `src/site.ts` is where every Download button goes (today

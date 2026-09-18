@@ -21,6 +21,7 @@ export function footerLinks(): SiteLink[] {
     { href: '/resources/', label: 'Resources' },
     { href: '/blog/', label: 'Blog' },
     { href: '/about/', label: 'About' },
+    { href: '/download/', label: 'Download' },
     ...(site.webAppEnabled ? [{ href: WEB_APP_PATH, label: 'Rotli Web' }] : []),
     ...(site.downloadsEnabled ? [{ href: RELEASES_URL, label: 'Releases' }] : []),
     ...(site.sourcePublic ? [{ href: GITHUB_URL, label: 'GitHub' }] : []),

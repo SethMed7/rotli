@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   short for Rottnest, the island where quokkas live. Blog posts can sit as
   drafts on the dev site until they are ready. The MCP guide moved to
   `/resources/mcp/` (still dev-only); `/mcp/` redirects.
+- **rotli.co: more to read, and a download page.** Three new resources —
+  "Getting started", "What does AI see in rotli?" (secure and locked,
+  explained), and "What is Rotli Helper?" with the install line for each
+  system — and `/download/`, which lists the Mac app, Rotli Web for Windows and
+  Linux, and the helper in one place.
 
 ### Changed
 

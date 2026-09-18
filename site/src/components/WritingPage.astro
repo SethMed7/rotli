@@ -12,7 +12,8 @@ interface Props {
   title: string;
   description: string;
   canonicalPath: string;
-  section: NavSection;
+  /** Which header section to mark current; none for pages outside the nav. */
+  section?: NavSection;
   /** Small line above the headline: a date, "Resource", a draft label. */
   kicker?: string;
   heading: string;
@@ -108,6 +109,24 @@ const { title, description, canonicalPath, section, kicker, heading, lede } = As
   .prose :global(pre code) {
     padding: 0;
     background: none;
+  }
+  .prose :global(table) {
+    width: 100%;
+    margin: 0 0 1.4rem;
+    border-collapse: collapse;
+    font-size: 0.98rem;
+  }
+  .prose :global(th),
+  .prose :global(td) {
+    padding: 0.7rem 0.75rem 0.7rem 0;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+  }
+  .prose :global(th) {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
   }
   .prose :global(blockquote) {
     margin: 1.6rem 0;
