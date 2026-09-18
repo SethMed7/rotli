@@ -11,6 +11,7 @@ import {
   buildMainTree,
   mainParentOfNote,
   gcManifest,
+  fileItemsInMainFolder,
   mainFolderIds,
   mainItemIdsInFolder,
   mainNoteIds,
@@ -420,5 +421,40 @@ describe("mainRowSort", () => {
       { pinned: false, mainOrder: 1 },
     ];
     expect([...rows].sort(mainRowSort).map((r) => r.mainOrder)).toEqual([2, 0, 1]);
+  });
+});
+
+describe("fileItemsInMainFolder — Add to folder for a whole selection", () => {
+  const tree = [
+    { note: "a.md" },
+    { note: "b.md" },
+    { folder: "Bugs", children: [{ note: "c.md" }, { folder: "Old", children: [] }] },
+  ];
+
+  test("moves items already in Main and adds ones that are not, in order, after what is there", () => {
+    const next = fileItemsInMainFolder(tree, ["b.md", "new.md", "a.md"], "main:Bugs");
+    expect(next).toEqual([
+      {
+        folder: "Bugs",
+        children: [
+          { note: "c.md" },
+          { folder: "Old", children: [] },
+          { note: "b.md" },
+          { note: "new.md" },
+          { note: "a.md" },
+        ],
+      },
+    ]);
+  });
+
+  test("reaches a nested folder, and an item already there just moves to its end", () => {
+    const next = fileItemsInMainFolder(tree, ["c.md"], "main:Bugs/Old");
+    expect(next[2]).toEqual({ folder: "Bugs", children: [{ folder: "Old", children: [{ note: "c.md" }] }] });
+  });
+
+  test("a missing folder changes nothing, and a folder is never filed into itself or its own child", () => {
+    expect(fileItemsInMainFolder(tree, ["a.md"], "main:Nope")).toBe(tree);
+    expect(fileItemsInMainFolder(tree, ["main:Bugs"], "main:Bugs/Old")).toEqual(tree);
+    expect(fileItemsInMainFolder(tree, ["main:Bugs"], "main:Bugs")).toEqual(tree);
   });
 });

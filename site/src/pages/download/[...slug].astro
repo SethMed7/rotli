@@ -1,0 +1,68 @@
+---
+// /download/: every way to get rotli, by device. The site's Download buttons
+// still fetch the Mac DMG directly (DOWNLOAD_HREF in src/site.ts); point that
+// knob here once Windows and Linux builds exist and this page becomes the
+// chooser.
+import WritingList from '../../components/WritingList.astro';
+import WritingPage from '../../components/WritingPage.astro';
+import { DOWNLOAD_URL, RELEASES_URL, WEB_APP_PATH, site } from '../../site';
+
+export function getStaticPaths() {
+  return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
+}
+
+const options = [
+  ...(site.downloadsEnabled
+    ? [
+        {
+          href: DOWNLOAD_URL,
+          title: 'Mac',
+          description: 'The full app: the editor, the Librarian, on-device and connected AI, and ⌥Space from anywhere.',
+          meta: 'Download .dmg · Apple silicon · free, no account',
+        },
+      ]
+    : []),
+  ...(site.webAppEnabled
+    ? [
+        {
+          href: WEB_APP_PATH,
+          title: 'Windows, Linux, and everything else',
+          description:
+            'Rotli Web runs in your browser today, with the same editor, folders, tasks, and links. In Chrome, Edge, or Arc it works in a real folder on your computer.',
+          meta: 'Open in your browser · nothing to install',
+        },
+        {
+          href: '/resources/rotli-helper/',
+          title: 'Rotli Helper',
+          description: 'Optional. A small program for Mac, Windows, and Linux that lets Rotli Web chat through the AI tools on your computer.',
+          meta: 'One line in a terminal',
+        },
+      ]
+    : []),
+];
+---
+
+<WritingPage
+  title="Download — rotli"
+  description="Get rotli for your Mac, or open it in any browser on Windows and Linux."
+  canonicalPath="/download/"
+  heading="Get rotli"
+  lede="Free, with no account. Your notes stay in a folder you choose."
+>
+  <WritingList items={options} empty="The Mac alpha is in preparation." />
+  {
+    site.downloadsEnabled && (
+      <p class="after">
+        Native Windows and Linux apps are planned. <a href={RELEASES_URL} rel="noopener">Release notes and older versions</a>.
+      </p>
+    )
+  }
+</WritingPage>
+
+<style>
+  .after {
+    margin-top: 1.75rem;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+  }
+</style>

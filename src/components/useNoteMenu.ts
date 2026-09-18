@@ -47,6 +47,7 @@ import { QUICK_MAX, togglePinQuick } from "../state/quick";
 import { useUiStore } from "../state/ui";
 import { useViewsStore } from "../state/views";
 import type { NoteSummary } from "../types";
+import { addToFolderMenu } from "./sidebar/addToFolderMenu";
 
 /** What the opener hands us — a real MouseEvent qualifies, and a keyboard
  * opener passes a plain {clientX, clientY} built from its row's rect. */
@@ -415,6 +416,16 @@ export function useNoteMenu() {
             disabled: full,
             onClick: () => togglePinQuick(note.id),
           });
+        }
+        if (activeView === null) {
+          const filing = addToFolderMenu({
+            tree: manifest.tree,
+            note,
+            selection: opts?.selectedItems,
+            setTree: (tree) => setTree(tree, liveIds),
+            requestRename: (folderId) => useUiStore.getState().setMainRenameRequest(folderId),
+          });
+          if (filing) items.push(filing);
         }
         const projectionAction = projectionMenuAction(activeView, currentView, inMain);
         items.push({

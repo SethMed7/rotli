@@ -10,6 +10,106 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **rotli.co: Resources, Blog, and About.** The header now lists Product,
+  Resources, Blog, and About, with Open in browser and Download beside them
+  on every page, and folds into a Menu on narrow windows and phones.
+  Resources answers questions in short articles ("Why local?", "rotli in the
+  browser and on the Mac"); About tells where the name comes from — rotli is
+  short for Rottnest, the island where quokkas live. Blog posts can sit as
+  drafts on the dev site until they are ready. The MCP guide moved to
+  `/resources/mcp/` (still dev-only); `/mcp/` redirects.
+- **rotli.co: more to read, and a download page.** Three new resources —
+  "Getting started", "What does AI see in rotli?" (secure and locked,
+  explained), and "What is Rotli Helper?" with the install line for each
+  system — and `/download/`, which lists the Mac app, Rotli Web for Windows and
+  Linux, and the helper in one place.
+
+- **⌘⇧L marks the open note secure.** One key to keep a note away from remote
+  AI; it appears in ⌘K and can be rebound like every other shortcut. It only
+  ever adds protection — removing it stays a deliberate choice in the note's
+  menu, so a stray key press can never expose a note.
+- **Add to folder, for one note or a whole selection.** Select several notes,
+  right-click, and choose **Add to folder**: pick one of your Main folders, or
+  **New folder…**, which files them and opens the folder's name for you to
+  type. They land in the order Main lists them. Works from the sidebar and
+  the Library browser, on the Mac and the web.
+
+- **Tasks works in Rotli Web.** The list was always empty in the browser; it
+  now shows every open checkbox there too, and checking one off edits the
+  note, exactly as on the Mac.
+- **Click a task to land on it.** A task's words in Tasks open its note with
+  the cursor on that task, even if the note changed since. The note's title
+  still opens it at the top.
+- **You choose when tasks are archived.** Settings → General → Tasks: two
+  weeks, 30, 60, or 90 days, or Never. Thirty days is the default.
+- **Archived tasks.** Tasks in notes you haven't touched for 30 days rest in a
+  closed **Archived** section with a count. Nothing moves; edit the note and
+  they come back.
+
+### Changed
+
+- **Captures, tidied.** A search field narrows the cards, **Select all** sits
+  with the header's tools instead of beside the title, the select mark is the
+  app's checkbox (not a circle) and stays out of the way until you point at a
+  card or start selecting, **Clear** sits beside the count on the same line as
+  the actions, and cards show words rather than `[[link]]` syntax. Right-click
+  a selection to **Add to folder**.
+- **Tasks is easier to read.** Each note is a clear group: its title as a
+  header, its tasks hanging under it on a rule, and a chevron to fold it away.
+  Long tasks wrap instead of being cut off, the search field is a proper one
+  (no more doubled magnifier) and narrows to the tasks that match, and the
+  explanation line waits behind a **?**.
+
+- **rotli.co: Download and the browser, side by side.** The hero offers Open
+  in your browser and Download for Mac; on Windows, Linux, and phones the
+  browser comes first. The Rotli Web section moved up under the hero, with a
+  real capture of the web app and copy that matches 1.1 (open a real folder in
+  Chrome, Edge, or Arc; chat through Rotli Helper).
+- **rotli.co: the vault drawn on the page.** "One folder. Every path out stays
+  open." shows its example folder larger and straight on the page, without a card.
+- **A new link preview.** Shared rotli.co links show one line, the app tilted
+  in from the right, and the quokka waving up from the bottom edge over a
+  faint pattern of file icons. The wordmark now renders in Baloo 2 as it
+  always meant to.
+
+### Fixed
+
+- **Spellcheck leaves code and links alone.** Inline code, link targets, and
+  code blocks are no longer spell-checked, so red underlines stay on your own
+  words. (Underlines that come and go on ordinary text are still being looked
+  into; the Mac draws those itself.)
+- **Numbered lists stay lined up past 9.** "9." and "10." now end on the same
+  edge and their text starts on the same one; before, a list jumped to the
+  right as it crossed ten.
+- **The highlight in Main starts beside the note's icon.** Hover, the open
+  note, and a gathered selection no longer paint all the way to the sidebar's
+  edge, so notes inside folders still read as nested. The whole line is still
+  clickable.
+- **Dragging a selection moves all of it.** Click a note, then ⌘-click two
+  more, and the first one now counts as selected too (as in Finder); before,
+  dragging by it moved it alone. A selection dragged out of the Library browser
+  into Main now lands whole as well, and dropped notes keep their order.
+- **The sidebar on hover pushes your note over instead of covering it.** Opened
+  from the window's edge it is now the same sidebar ⌘0 shows: the content
+  moves aside, nothing sits on top of the note, and the edge can be dragged to
+  resize it — the width is remembered. Resizing, or dragging a note out of the
+  sidebar, holds it open until you let go. On the Mac and the web alike. And ⌘0 pressed just
+  after the pointer leaves the edge no longer has the sidebar shut itself a
+  moment later.
+- **The window can no longer slide sideways.** Jumping to a find match could
+  push the whole frame left, cutting the sidebar off, with no way to scroll it
+  back. The frame now clips instead of scrolling.
+- **Rotli Helper: a refused chat request no longer looks like a network error.**
+  When the helper turned a request away (a stale pairing code, for one) it
+  answered before it had read what the page sent, so the connection was cut,
+  the page reported "network error", and the helper's window filled with
+  "Broken pipe". It now reads the request first, so the page shows the
+  helper's real words — "pair again" when the code is stale — and a page that
+  simply left is no longer logged as an error. The Mac app's local agent
+  server had the same flaw and the same fix. Needs the next helper release.
+
 ## [1.1.0] - 2026-09-17
 
 Rotli 1.1: Rotli Web (a vault in the browser, a copy where the browser can't

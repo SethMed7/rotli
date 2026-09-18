@@ -53,7 +53,16 @@ const socialImageUrl = new URL(image, siteUrl).href;
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <script is:inline>document.documentElement.classList.add('js');</script>
+    <!-- data-platform: SiteActions leads with the browser on anything but a Mac
+         (iPads report a Mac user agent, so touch points rule them out). -->
+    <script is:inline>
+      (function () {
+        var root = document.documentElement;
+        root.classList.add('js');
+        var mac = /Macintosh/.test(navigator.userAgent) && !(navigator.maxTouchPoints > 1);
+        root.dataset.platform = mac ? 'mac' : 'other';
+      })();
+    </script>
     <style is:global>
       @font-face {
         font-family: 'General Sans';
@@ -348,6 +357,112 @@ const socialImageUrl = new URL(image, siteUrl).href;
         cursor: default;
         opacity: 0.82;
       }
+      /* The two ways in (SiteActions.astro). Off a Mac the browser leads and the
+         download names the Mac; without script the Mac order stays. */
+      .site-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+      }
+      .action-download .for-other,
+      :root[data-platform='other'] .action-download .for-mac {
+        display: none;
+      }
+      :root[data-platform='other'] .action-download .for-other {
+        display: inline;
+      }
+      :root[data-platform='other'] .action-web {
+        order: -1;
+        background: var(--text);
+        color: var(--ground);
+        border-color: var(--text);
+      }
+      :root[data-platform='other'] .action-web:hover {
+        background: var(--accent-text);
+        border-color: var(--accent-text);
+        color: var(--on-accent);
+      }
+      :root[data-platform='other'] .action-download {
+        background: transparent;
+        color: var(--text);
+        border-color: var(--border-strong);
+      }
+      :root[data-platform='other'] .action-download:hover {
+        background: var(--surface);
+      }
+      .site-header .site-actions {
+        gap: 0.5rem;
+        flex-wrap: nowrap;
+      }
+      .site-header .button {
+        min-height: 40px;
+        padding: 0.45rem 0.95rem;
+        border-radius: 0.6rem;
+        font-size: 0.88rem;
+        white-space: nowrap;
+      }
+
+      /* Below 1080px the sections fold into Menu; below 560px the actions do too. */
+      .nav-menu {
+        display: none;
+        position: relative;
+      }
+      .nav-menu summary {
+        min-height: 40px;
+        display: inline-flex;
+        align-items: center;
+        padding: 0.45rem 0.9rem;
+        border: 1px solid var(--border-strong);
+        border-radius: 0.6rem;
+        color: var(--text);
+        font-size: 0.88rem;
+        font-weight: 600;
+        cursor: pointer;
+        list-style: none;
+      }
+      .nav-menu summary::-webkit-details-marker {
+        display: none;
+      }
+      .nav-menu[open] summary,
+      .nav-menu summary:hover {
+        background: var(--surface);
+      }
+      .nav-menu-panel {
+        position: absolute;
+        top: calc(100% + 0.5rem);
+        right: 0;
+        min-width: 15rem;
+        display: grid;
+        gap: 0.15rem;
+        padding: 0.5rem;
+        border: 1px solid var(--border);
+        border-radius: 0.8rem;
+        background: var(--ground);
+        box-shadow: 0 18px 40px -18px rgb(58 48 40 / 0.35);
+      }
+      .nav-menu-panel > a {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        padding-inline: 0.75rem;
+        border-radius: 0.5rem;
+        color: var(--text);
+        text-decoration: none;
+      }
+      .nav-menu-panel > a:hover {
+        background: var(--surface);
+      }
+      .nav-menu-panel > a[aria-current='page'] {
+        background: var(--surface-2);
+      }
+      .nav-menu-panel .site-actions {
+        display: none;
+        margin-top: 0.4rem;
+        padding-top: 0.6rem;
+        border-top: 1px solid var(--border);
+        flex-direction: column;
+      }
+
       .site-footer {
         min-height: 8rem;
         display: grid;
@@ -399,6 +514,12 @@ const socialImageUrl = new URL(image, siteUrl).href;
         .primary-nav {
           display: none;
         }
+        .nav-menu {
+          display: block;
+        }
+        .site-header .header-actions {
+          margin-left: auto;
+        }
       }
 
       @media (max-width: 760px) {
@@ -420,6 +541,13 @@ const socialImageUrl = new URL(image, siteUrl).href;
         }
         .site-header {
           gap: 0.75rem;
+        }
+        .header-actions > .site-actions,
+        .header-actions > .github-link {
+          display: none;
+        }
+        .nav-menu-panel .site-actions {
+          display: flex;
         }
         .github-link {
           min-width: 44px;

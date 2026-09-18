@@ -6,7 +6,8 @@ import showcaseManifest from '../assets/characters/showcase/showcase.json';
 import SiteFooter from './SiteFooter.astro';
 import SiteHeader from './SiteHeader.astro';
 import PlaygroundStory from './PlaygroundStory.astro';
-import { DOWNLOAD_URL, GITHUB_URL, PRIVACY_URL, RELEASES_URL, ROADMAP_URL, WEB_APP_PATH, site } from '../site';
+import SiteActions from './SiteActions.astro';
+import { DOWNLOAD_HREF, GITHUB_URL, WEB_APP_PATH, site } from '../site';
 
 // Hero leads with the full promo (falls back to the teaser if the full cut
 // is missing). The same clip is never stacked twice below.
@@ -16,34 +17,14 @@ const heroFilm = site.promo.full.enabled
     ? { ...site.promo.teaser, kind: 'teaser' as const }
     : null;
 
-// Secondary calls to action fall back to local anchors while the source
-// repository is private (site.sourcePublic is false by default).
-// Rotli Web outranks the source link in the hero: it is the thing a visitor
-// can do right now. The source stays one click away in the footer.
-const secondaryAction = site.webAppEnabled
-  ? { href: WEB_APP_PATH, label: 'Try it in your browser', external: false }
+// The closing call to action: Rotli Web when it is on (the thing a visitor can
+// do right now), else the source, else a local anchor while the repository is private.
+const finalAction = site.webAppEnabled
+  ? { href: WEB_APP_PATH, label: 'Open in your browser', external: false }
   : site.sourcePublic
-    ? { href: GITHUB_URL, label: 'Explore the source', external: true }
-    : { href: '#organize', label: 'How organization works', external: false };
-
-const finalAction = site.sourcePublic
   ? { href: GITHUB_URL, label: 'View on GitHub', external: true }
   : { href: '#organize', label: 'How organization works', external: false };
 
-const footerLinks = [
-  ...(site.sourcePublic ? [{ href: GITHUB_URL, label: 'GitHub' }] : []),
-  ...(site.downloadsEnabled ? [{ href: RELEASES_URL, label: 'Releases' }] : []),
-  ...(site.webAppEnabled ? [{ href: WEB_APP_PATH, label: 'Rotli Web' }] : []),
-  { href: '#workspace', label: 'Workspace' },
-  { href: '#playground', label: 'Playground' },
-  ...(site.showsExperiments ? [{ href: '/mcp/', label: 'MCP guide' }] : []),
-  { href: site.sourcePublic ? PRIVACY_URL : '#privacy', label: 'Privacy' },
-  ...(site.sourcePublic ? [{ href: ROADMAP_URL, label: 'Roadmap' }] : []),
-];
-
-const footerTagline = site.sourcePublic
-  ? 'Local-first, free, and open source under the MIT license.'
-  : 'Local-first and free. One folder you own, no account required.';
 
 // Orb colors read the site swatch layer (Base.astro), which mirrors the app's
 // per-environment ground and accent tokens.
@@ -166,21 +147,7 @@ const experiments = [
 ---
 
 <Base noindex={!site.indexable}>
-  <SiteHeader
-    nav={[
-      { href: '#why-local', label: 'Why local' },
-      { href: '#organize', label: 'Organize' },
-      { href: '#workspace', label: 'Workspace' },
-      { href: '#personal', label: 'Themes' },
-      ...(site.webAppEnabled ? [{ href: '#web', label: 'In your browser' }] : []),
-      ...(site.showsExperiments
-        ? [
-            { href: '#beyond-the-app', label: 'More than an app' },
-            { href: '/mcp/', label: 'MCP' },
-          ]
-        : []),
-    ]}
-  />
+  <SiteHeader current="product" />
 
   <main id="content">
     <section class="hero-shell" aria-labelledby="hero-title">
@@ -192,16 +159,11 @@ const experiments = [
             and optional AI conversations—without turning your work into an export from a service.
           </p>
           <div class="hero-actions">
-            {site.downloadsEnabled ? (
-              <a class="button primary" href={DOWNLOAD_URL} rel="noopener">Download for Mac</a>
-            ) : (
-              <span class="button primary pending" aria-disabled="true">Mac alpha coming soon</span>
-            )}
-            <a class="button secondary" href={secondaryAction.href} rel={secondaryAction.external ? 'noopener' : undefined}>
-              {secondaryAction.label}
-            </a>
+            <SiteActions webLabel="Open in your browser" downloadLabel="Download for Mac" />
           </div>
-          <p class="release-note">Free · Apple silicon · {site.downloadsEnabled ? 'Mac alpha' : 'Alpha in preparation'} · no account</p>
+          <p class="release-note">
+            Free · no account · {site.downloadsEnabled ? 'Mac app (Apple silicon)' : 'Mac alpha in preparation'}{site.webAppEnabled && ' or any browser'}
+          </p>
         </div>
 
         {heroFilm ? (
@@ -273,6 +235,44 @@ const experiments = [
       <span><b>Offline</b> remains useful without AI</span>
       <span><b>Local-first</b> is the architecture</span>
     </div>
+
+    {site.webAppEnabled && (
+      <section class="privacy-story web-story" id="web" aria-labelledby="web-title" data-reveal>
+        <div class="privacy-copy">
+          <h2 id="web-title">No Mac? Open rotli in your browser.</h2>
+          <p>
+            Rotli Web is the Mac app's editor, folders, tasks, and links, served from this site. There is
+            no account, and the page cannot send your notes anywhere: the only connection it is allowed to
+            make is to Rotli Helper, if you run it on your own computer.
+          </p>
+          <dl class="boundary-list">
+            <div><dt>Where notes live</dt><dd>In Chrome, Edge, or Arc, open a real folder and every note is a file in it. Other browsers keep the vault in their own storage on this device; export it as a .zip whenever you like.</dd></div>
+            <div><dt>Chat</dt><dd>Run Rotli Helper and chat through the AI tools already on your computer, like Claude Code or Codex. The Mac app runs models directly.</dd></div>
+            <div><dt>What stays in the Mac app</dt><dd>The Librarian, Breve, Word and sheet files, and Finder drops.</dd></div>
+          </dl>
+          <p class="hero-actions">
+            <a class="button secondary" href={WEB_APP_PATH}>Open Rotli Web</a>
+          </p>
+        </div>
+        <figure class="web-visual">
+          <div class="web-window">
+            <div class="web-bar" aria-hidden="true">
+              <span></span><span></span><span></span>
+              <b>rotli.co/app</b>
+            </div>
+            <img
+              src="/rotli-web@2x.webp"
+              width="2560"
+              height="1600"
+              alt="Rotli Web in a browser, open to the Welcome note"
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+          <figcaption>Rotli Web on a first visit: the Welcome folder, ready to edit.</figcaption>
+        </figure>
+      </section>
+    )}
 
     <section class="folder-story" id="why-local" aria-labelledby="folder-title" data-reveal>
       <div class="section-copy">
@@ -419,26 +419,6 @@ const experiments = [
       </div>
     </section>
 
-    {site.webAppEnabled && (
-      <section class="privacy-story web-story" id="web" aria-labelledby="web-title" data-reveal>
-        <div class="privacy-copy">
-          <h2 id="web-title">The same workspace, in your browser. Still nothing leaves your computer.</h2>
-          <p>
-            Rotli Web is the Mac app's editor, folders, tasks, links, and boards served from this site.
-            There is no account. Your vault lives in this browser on this device, and the page's security
-            policy forbids it from sending anything anywhere.
-          </p>
-          <dl class="boundary-list">
-            <div><dt>Where notes live</dt><dd>In this browser's storage, on this device. Clearing site data removes them, so export what you keep.</dd></div>
-            <div><dt>What stays in the Mac app</dt><dd>Chat and every model, the Librarian, Breve, Word and sheet files, and Finder drops.</dd></div>
-            <div><dt>Moving to the Mac</dt><dd>Export the vault as a folder of Markdown files and open it in Rotli for Mac.</dd></div>
-          </dl>
-          <p class="hero-actions">
-            <a class="button secondary" href={WEB_APP_PATH}>Open Rotli Web</a>
-          </p>
-        </div>
-      </section>
-    )}
 
     <section class="personal-story" id="personal" aria-labelledby="personal-title">
       <div class="personal-heading" data-reveal>
@@ -552,6 +532,10 @@ const experiments = [
             <li>2 accessories + custom color</li>
             <li>semantic poses for empty states</li>
           </ul>
+          <p class="companion-name">
+            Why a quokka? rotli is short for Rottnest, the island quokkas call home.
+            <a href="/about/#name">The story behind the name <span aria-hidden="true">→</span></a>
+          </p>
         </div>
       </div>
     </section>
@@ -574,7 +558,7 @@ const experiments = [
           </p>
           <p class="lane-proof">
             <span>Stdio stays local · one policy engine · being refined before release</span>
-            <a href="/mcp/">Read the MCP guide <span aria-hidden="true">→</span></a>
+            <a href="/resources/mcp/">Read the MCP guide <span aria-hidden="true">→</span></a>
           </p>
         </article>
             <article class="experiment-lane">
@@ -611,7 +595,7 @@ const experiments = [
       </div>
       <div class="final-actions">
         {site.downloadsEnabled ? (
-          <a class="button final-button" href={DOWNLOAD_URL} rel="noopener">Download the Mac alpha</a>
+          <a class="button final-button" href={DOWNLOAD_HREF} rel="noopener">Download the Mac alpha</a>
         ) : (
           <span class="button final-button pending" aria-disabled="true">Mac alpha coming soon</span>
         )}
@@ -622,7 +606,7 @@ const experiments = [
     </section>
   </main>
 
-  <SiteFooter tagline={footerTagline} links={footerLinks} />
+  <SiteFooter />
 
   <script>
     type ThemeStop = {
@@ -1190,59 +1174,53 @@ const experiments = [
       color: var(--text);
     }
 
+    /* The vault, drawn straight on the page: no card, just the tree. */
     .vault-anatomy {
-      border: 1px solid var(--border-strong);
-      border-radius: 0.85rem;
-      overflow: hidden;
-      background: var(--surface);
+      padding-top: clamp(0.5rem, 2vw, 1.5rem);
     }
 
     .vault-heading {
-      min-height: 56px;
       display: flex;
-      align-items: center;
+      align-items: baseline;
       justify-content: space-between;
       gap: 1rem;
-      padding-inline: 1.2rem;
-      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.1rem;
+      border-bottom: 1px solid var(--border-strong);
       color: var(--text-muted);
-      font-size: 0.82rem;
+      font-size: 0.9rem;
     }
 
     .vault-heading span:first-child {
       color: var(--text);
+      font-size: 1.15rem;
       font-weight: 600;
     }
 
     .file-tree {
       list-style: none;
-      padding: 0.6rem 1.2rem;
+      padding: 0;
       margin: 0;
     }
 
     .file-tree li {
-      min-height: 48px;
+      min-height: 64px;
       display: grid;
-      grid-template-columns: 1.4rem minmax(0, 1fr) auto;
+      grid-template-columns: 1.6rem minmax(0, 1fr) auto;
       align-items: center;
-      gap: 0.55rem;
+      gap: 0.75rem;
       border-bottom: 1px solid var(--border);
       color: var(--text);
-      font-size: 0.9rem;
-    }
-
-    .file-tree li:last-child {
-      border-bottom: 0;
+      font-size: 1.08rem;
     }
 
     .file-tree li.nested {
-      padding-left: 1.4rem;
+      padding-left: 2rem;
       color: var(--text-muted);
     }
 
     .file-tree small {
       color: var(--text-muted);
-      font-size: 0.75rem;
+      font-size: 0.86rem;
     }
 
     .folder-icon {
@@ -1250,12 +1228,9 @@ const experiments = [
     }
 
     .anatomy-note {
-      margin: 0;
-      padding: 1rem 1.2rem;
-      border-top: 1px solid var(--border);
-      background: var(--surface-2);
+      margin: 1.4rem 0 0;
       color: var(--text-muted);
-      font-size: 0.82rem;
+      font-size: 0.95rem;
     }
 
     .workspace-story {
@@ -1372,6 +1347,61 @@ const experiments = [
       padding-block: clamp(6rem, 10vw, 9rem);
       border-top: 1px solid var(--border);
       color: var(--text);
+    }
+
+    .web-story {
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    }
+
+    .web-visual {
+      min-width: 0;
+      margin: 0;
+    }
+
+    .web-window {
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 0.9rem;
+      background: var(--surface);
+      box-shadow: 0 30px 60px -30px rgb(58 48 40 / 0.35);
+    }
+
+    .web-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.6rem 0.8rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+    }
+
+    .web-bar span {
+      width: 0.6rem;
+      height: 0.6rem;
+      border-radius: 50%;
+      background: var(--border-strong);
+    }
+
+    .web-bar b {
+      margin-left: 0.8rem;
+      padding: 0.2rem 0.9rem;
+      border-radius: 999px;
+      background: var(--ground);
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      font-weight: 500;
+    }
+
+    .web-window img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .web-visual figcaption {
+      margin-top: 0.9rem;
+      color: var(--text-muted);
+      font-size: 0.86rem;
     }
 
     .privacy-visual {
@@ -1739,6 +1769,22 @@ const experiments = [
     .companion-copy p {
       margin: 1.1rem 0 0;
       color: var(--text-muted);
+    }
+
+    .companion-name {
+      margin-top: 1.25rem;
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .companion-name a {
+      color: var(--accent-text);
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .companion-name a:hover {
+      text-decoration: underline;
     }
 
     .companion-copy ul {

@@ -1,0 +1,27 @@
+---
+// The site's two ways in, defined once: open Rotli Web, or download the app.
+// Base.astro stamps data-platform on <html>; on anything but a Mac the browser
+// action leads and the download says it is the Mac app (styles in Base.astro).
+import { DOWNLOAD_HREF, WEB_APP_PATH, site } from '../site';
+
+interface Props {
+  webLabel?: string;
+  downloadLabel?: string;
+}
+
+const { webLabel = 'Open in browser', downloadLabel = 'Download' } = Astro.props;
+---
+
+<div class="site-actions">
+  {site.webAppEnabled && <a class="button secondary action-web" href={WEB_APP_PATH}>{webLabel}</a>}
+  {
+    site.downloadsEnabled ? (
+      <a class="button primary action-download" href={DOWNLOAD_HREF} rel="noopener">
+        <span class="for-mac">{downloadLabel}</span>
+        <span class="for-other">Download for Mac</span>
+      </a>
+    ) : (
+      <span class="button primary pending" aria-disabled="true">Mac alpha coming soon</span>
+    )
+  }
+</div>

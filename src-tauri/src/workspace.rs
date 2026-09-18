@@ -23,7 +23,7 @@ use crate::corpus::{
 };
 use crate::memex_query::{parse_query, record_matches, ParsedQuery};
 use crate::loopback_http::{
-    bearer_authorized, not_found, read_http_body, read_http_head, unauthorized,
+    bearer_authorized, drain_http_body, not_found, read_http_body, read_http_head, unauthorized,
     write_http_response,
 };
 
@@ -2486,10 +2486,14 @@ fn serve_mcp_http(mut stream: TcpStream, token: &str) -> Result<(), String> {
     let head = read_http_head(&mut reader)?;
     let is_post = head.method == "POST" && head.path == "/mcp";
     let authorized = bearer_authorized(&head, token);
+    // a refusal answers only after the declared body is read: closing on unread
+    // data resets the connection and the client sees no answer at all
     if !is_post {
+        drain_http_body(&mut reader, &head, MCP_MAX_REQUEST_BYTES);
         return write_http_response(&mut stream, 404, Some(not_found()));
     }
     if !authorized {
+        drain_http_body(&mut reader, &head, MCP_MAX_REQUEST_BYTES);
         return write_http_response(&mut stream, 401, Some(unauthorized()));
     }
     let body = match read_http_body(&mut reader, &head, MCP_MAX_REQUEST_BYTES) {

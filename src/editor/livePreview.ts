@@ -97,6 +97,18 @@ function fixed(open: number, close: number) {
   };
 }
 
+/** Code, link targets, and URLs are not prose: the system spellchecker flags
+ * them wholesale, and every squiggle there is noise. Their spans (and fenced
+ * lines, below) opt out; ordinary words keep the checker. */
+const NOT_PROSE = /\brotli-(?:code|wikilink|link)\b/;
+
+export function spellAttrs(
+  cls: string,
+  attrs: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  return NOT_PROSE.test(cls) ? { ...attrs, spellcheck: "false" } : attrs;
+}
+
 const INLINE: InlineRule[] = [
   {
     re: /`([^`]+)`/,
@@ -684,7 +696,7 @@ function scanInline(
     const ce = matchStart + cr[1];
     if (ce > cs) {
       const cls = rule.clsFor?.(m) ?? rule.cls;
-      const attrs = rule.attrsFor?.(m) ?? rule.attrs;
+      const attrs = spellAttrs(cls, rule.attrsFor?.(m) ?? rule.attrs);
       decos.push(Decoration.mark(attrs ? { class: cls, attributes: attrs } : { class: cls }).range(cs, ce));
       if (rule.nest) scanInline(m[0].slice(cr[0], cr[1]), cs, sel, decos, atomics);
     }
@@ -795,7 +807,11 @@ function build(view: EditorView): {
         // only (a line class never collides with a replace decoration; target
         // fences stay untouched since blockRender swaps their whole range).
         if (fence && !fence.target) {
-          decos.push(Decoration.line({ class: "rotli-fenceline" }).range(line.from));
+          decos.push(
+            Decoration.line({ class: "rotli-fenceline", attributes: { spellcheck: "false" } }).range(
+              line.from,
+            ),
+          );
         }
         pos = line.to + 1;
         continue;
