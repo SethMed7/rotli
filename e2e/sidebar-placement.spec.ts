@@ -97,6 +97,10 @@ test("on the right, the hover overlay comes off the right edge; Esc and ⌘0 clo
   await page.mouse.move(paneBox.x + 200, paneBox.y + 200);
   await page.keyboard.press("Meta+0");
   await expect(overlay).toBeVisible();
+  // and it STAYS: leaving the strip armed a close timer, and opening by key
+  // must cancel it (CI caught the sidebar shutting itself 260ms after ⌘0)
+  await page.waitForTimeout(450);
+  await expect(overlay).toBeVisible();
   await page.keyboard.press("Meta+0");
   await expect(overlay).toHaveCount(0);
 });
