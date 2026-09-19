@@ -1,73 +1,177 @@
 # Roadmap
 
-Planned features — direction, not commitment. Order within a section is rough
-priority; nothing here has a date. What's already built lives in
-[README.md](README.md); how things get built lives in [AGENTS.md](AGENTS.md)
-and [docs/](docs/README.md).
+Direction, not commitment. Nothing here has a date, and order within a section
+is rough priority. What's already released lives in [README.md](README.md); how
+things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
 
-## Inbox — a calm layer over your own email
+| Word | Meaning |
+|---|---|
+| In the work | Being built. Lives in development builds only, not released, so not done. |
+| Planned | Decided, not started. |
+| Idea | Not decided yet. |
 
-The third front. The sidebar once carried a placeholder Inbox section
-(account → thread structure, disabled); it was removed on 2026-07-30 so the
-shell only shows what works. It returns when the mail integration is real.
+**Size:** S = hours · M = days · L = 1–3 weeks · XL = a month or more
 
-- Connect your own accounts; rotli reads and organizes, never hosts.
-- Threads become linkable objects in the memex — an email can be referenced
-  from a note the way notes reference each other.
-- Same calm rules as the rest of the shell: no badges, no unread anxiety.
-- Restore blueprint for the sidebar section:
+## 1. In the work
+
+- **Sheets** · L — spreadsheets (XLSX) inside Rotli. CSV editing already ships.
+  Left: finish, polish, release.
+- **Mermaid visual editor** · M — edit a Mermaid diagram by hand on a canvas
+  instead of only in code. View and Code already ship.
+- **MCP / Grok Bot plugin** · L — lets an AI agent work in the vault through
+  Rotli's own rules: the `rotli mcp` server, the agent commands, and the remote
+  relay a Grok Bot connects through
+  ([contract](docs/architecture/agent-workspace.md)). Includes a custom Grok Bot
+  that manages Rotli: create, file, search, and organize notes.
+- **Read aloud** · M — select text and have it read to you, on-device.
+- **Breve in public builds** · M — the morning brief and routines. Runs in
+  development builds today.
+
+## 2. Planned
+
+- **Add-ons system** · L — one way for the user to install and manage add-ons
+  locally. Email providers, drive providers, and the Grok Bot all plug into it
+  instead of each being a one-off. Comes before email and drive sync, because
+  it decides how they get built.
+- **Backup now** · M — a scheduled zip of the vault to a folder or external
+  disk the user picks, plus a "Back up now" button. The cheap first step toward
+  drive sync: protection if you lose the computer, long before full sync
+  exists.
+- **Email inbox** · XL — a calm layer over your own email. Rotli reads and
+  organizes it, never hosts it, and an email can be linked from a note the way
+  notes link to each other. Same calm rules as the rest of the shell: no
+  badges, no unread anxiety. Restore blueprint for the sidebar section:
   [docs/archive/notes-chat-inbox-rearchitecture.md](docs/archive/notes-chat-inbox-rearchitecture.md)
   (the `sec:inbox` expansion key is still honored by the persistence layer).
+- **Drive sync** · XL — sync notes to Google Drive, OneDrive, Proton Drive, and
+  others. The purpose is backup: your data also lives somewhere not tied to the
+  computer, in case you lose the computer. Never on by default. The user
+  connects it and controls it. It does not lower security.
+- **Send email from a checklist** · L — makes checklists actionable: you do the
+  task without leaving the list. Sent through add-ons the user sets up and
+  manages locally, for example Proton Bridge; not a built-in full integration.
+  After sending, the task is checked and becomes a link to the email, with the
+  subject as the link text. A setting chooses where that link opens: the email
+  app, Rotli, or a drop-down to pick each time.
 
-## Mobile app
+  ```
+  /email:send {person}-{subject}--body
 
-rotli on iPhone. The vault stays the source of truth — plain files, synced by
-whatever the user already trusts (iCloud Drive, Syncthing, git). Capture-first:
-the phone is primarily a way in (quick capture, voice, photos into Assets),
-with a readable library second and editing third.
+  [ ] Email Gabriel - "/email:send {person}-{subject}--body"
+  [x] Email Gabriel - {hyperlink to email}
+  ```
 
-## Tablet app
+- **Open with Rotli** · L — right-click any file on the Mac and open it with
+  Rotli. Works like VS Code: the file stays where it is, outside the vault, and
+  edits change the real file. The tab gets its own color so you can tell it is
+  an outside file. ⌘S offers to put a copy in the vault, and you pick where it
+  goes. Only if wanted.
 
-rotli on iPad. Same vault, bigger canvas: reading, reviewing, and boards.
-Pencil input pairs with the notebook experience below.
+## 3. Ideas
 
-## Handwriting → text: the full notebook experience
+- **Pull Chat out into its own window** · L — hold and drag "Chat" out of the
+  Home | Chat switch into an independent window that shows only what belongs to
+  it; even its tabs are only chat tabs. An icon groups it back into its original
+  place. Home can never be pulled out: the main app is where Home lives.
+- **Per-note version history** · L — local snapshots of a note with a diff
+  view, so nothing typed is ever lost.
+- **Import from Obsidian, Notion, and Apple Notes** · L — bring an existing
+  library in, links and images included.
+- **Backlinks panel** · M — every note that links to this one, plus places that
+  mention it without a link.
+- **Templates via slash** · S — `/template meeting` drops in a saved note
+  layout.
+- **Actionable checklists as a family** · L — `/email:send` is the first one.
+  The same pattern for `/remind`, `/event`, and `/open`, so a checkbox can carry
+  an action.
+- **Chat can look inside a folder** · M — access is managed via metadata, not a
+  grant per chat. Still to define.
+- **Beta channel** · M — a setting that lets testers opt into in-the-work
+  features like Sheets. Today those only exist in development builds.
+- **Shortcuts and Raycast hooks** · M — extend the `rotli://` link so other
+  apps can create a note or a capture, for example `rotli://new?title=`. Only
+  open and reveal exist today.
+- **Touch ID on secure notes** · M — secure notes are hidden from remote AI
+  today, but anyone at the Mac can open them. Ask for Touch ID first.
+- **Due dates on tasks** · M — write `due friday` on a task, and the Tasks page
+  gets a Today group. Pairs with actionable checklists.
+- **Task board view** · M — the Tasks page as columns: open, in progress, done.
+  The in-progress `[/]` state already exists, so it is one more view over the
+  same notes.
+- **Librarian weekly digest** · M — what you wrote this week, notes nothing
+  links to, and stale tasks, delivered through Breve.
+- **Tags browser** · M — a place to see every tag and the notes under it. Tags
+  already exist in note metadata.
 
-Write by hand, keep real notes. A notebook surface where handwritten pages
-(Pencil on iPad, imported scans on Mac) are recognized on-device into Markdown
-that lands in the same memex — the handwriting stays as the artifact, the text
-becomes searchable, linkable, and organizable by the Librarian.
+## 4. Known bugs
 
-- On-device recognition only — handwriting never leaves the machine.
-- Pages are assets; recognized text is a note linked to its page.
-- Boards and notebooks converge: sketch, write, and type on one surface.
+- **Confusing errors when files move** — these are just files moving; no one
+  will know what these messages mean, so they should never show.
+  - Part 1 · S: a view folder name can be typed with `/` or `:`, which Rotli
+    then refuses on save. Fix: stop it when the folder is named, with a plain
+    message.
+  - Part 2 · M: when something else (the CLI or the Librarian) changes Main
+    while the app holds an older copy, a raw revision conflict shows. Fix:
+    re-read, merge, and retry quietly; plain wording if it ever still shows.
+- **First drag and drop lands too high** · M — on the first drag, the drop does
+  not line up with the pointer. Needs a reproduction first.
+- **Image tags show up in the chat name** · S — a chat that starts with an
+  image gets the raw image tag as its name.
 
-## Publish to Substack — waiting on the official channel
+## 5. Small enhancements
 
-A note-level verb, not a surface: write in rotli's calm, clutter-free editor,
-then publish straight to Substack — no browser tab, no editor noise, no
-distraction between finishing a piece and shipping it. That's the whole point:
-rotli stays the clean place to write and think; Substack is just where it lands.
+- **Remove the count on "Chat"** · S — the number in the Home | Chat switch. It
+  will not hold up at 1k chats.
+- **Name chats by meaning** · M — name a chat from the purpose of the first
+  prompt, not its first few words.
+- **Hotkey to switch views** · M — ⌘⇧W opens the views, then ⌘number picks one.
+- **Hotkey to jump into the sidebar** · M — ⌘⇧S enters the sidebar, then
+  ⌘number opens one of the top 9 notes in the current view. Reorder and pin
+  notes in the sidebar so 1–9 stay put.
+- **Two-step hotkeys** · M — needed first by the two hotkeys above. ⌘1–9
+  already jump tabs, and Rotli has no "press one chord, then another" yet.
+- **Wikilink hover preview** · S/M — hover a `[[link]]` and see the top of that
+  note without opening it.
+- **Send feedback in-app** · S — a button that opens a prefilled GitHub issue.
 
-**Deliberately parked (decided 2026-07-31).** Substack has no official publish
-API; every existing route is reverse-engineered private endpoints or browser
-automation — hacky, fragile, and against the spirit of their ToS, so we don't
-build on it. The official story is moving our way: Substack shipped a read-only
-analytics MCP on 2026-07-07 (`mcp.substack.com`, Bestseller publications only),
-and CEO Chris Best has said publicly that MCP write/act capabilities are coming.
-When the official write channel ships, this feature lights up through it.
+## 6. Keeping the web version in sync
 
-- Trigger: Substack's official MCP gains write/publish (watchlisted in Breve;
-  follow @chrisbest for the announcement).
-- Design already sketched: publish is a ⋯-menu/palette verb; draft-first (never
-  auto-publish); credentials in Keychain; `secure:` notes blocked by the
-  existing remote gate; state in `.rotli/`, never frontmatter; built behind a
-  provider abstraction so Ghost/Buttondown (real, stable APIs) can follow.
-- Interim option if wanted sooner: "Copy for Substack" (rich-HTML clipboard) —
-  touches no endpoints, can't break, zero ToS exposure.
+- **Parity list** · L — every native command is marked "has a web version",
+  "refused on web with a notice", or "Mac only on purpose". A check fails when
+  a new command has no decision.
+- **No silent gaps on web** · M — about 40 features quietly do nothing on web
+  today. They should say "In the Mac app".
+- **A real web contract doc** · M — the only one today is an old plan that
+  still says web has no chat.
+- **Rule:** every user-facing change is proven on the web build too, and adds
+  or extends a web test.
 
-## Returning ideas parked earlier
+## 7. Platforms
 
-- **Feature A — secure organization** (needs its own session with injection
-  evals before any build).
-- **Calendar integration** — cal.diy base; Apple + Google + Proton providers.
+- **Windows** · XL
+- **Linux** · XL
+- **Mobile / Tablet** · XL — depends on drive sync: the notes come from a
+  connected drive (possibly a home NAS). There will be a slight delay, so it
+  needs a "Sync now" button. Later: instant sync through cloud options, only
+  once the structure is consistent and the project is big enough to invest in
+  cloud infrastructure; to explore through partnerships for secure cloud.
+
+## 8. Later — to be placed
+
+- **Handwriting to text notebook** — write by hand, keep real notes.
+  Handwritten pages (Pencil on iPad, imported scans on Mac) are recognized
+  on-device into Markdown that lands in the same memex. The handwriting stays
+  as the artifact; the text becomes searchable and linkable. Recognition never
+  leaves the machine.
+- **Publish to Substack** — a note-level verb, not a surface. Deliberately
+  parked (decided 2026-07-31): Substack has no official publish API, and every
+  existing route is reverse-engineered private endpoints or browser automation,
+  so we don't build on it. It lights up when Substack's official MCP gains
+  write/publish. Design already sketched: a ⋯-menu/palette verb; draft-first,
+  never auto-publish; credentials in Keychain; `secure:` notes blocked by the
+  existing remote gate; state in `.rotli/`, never frontmatter; behind a
+  provider abstraction so Ghost and Buttondown can follow. Interim option:
+  "Copy for Substack" (rich-HTML clipboard), which touches no endpoints.
+- **Calendar integration** — cal.diy base; Apple, Google, and Proton providers.
+- **Secure organization** — needs its own session with injection evals before
+  any build.
