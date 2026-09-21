@@ -118,6 +118,7 @@ export const SERVICE_FILE_OWNERS = {
   "chatImages.ts": "chat",
   "chatModelMeta.ts": "chat",
   "chatRename.ts": "chat",
+  "chatAutoTitle.ts": "chat",
   "chatSummon.ts": "chat",
   "connectorSetup.ts": "chat",
   "helperLink.ts": "chat",

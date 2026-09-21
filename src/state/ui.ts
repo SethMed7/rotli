@@ -689,6 +689,11 @@ interface UiState {
    * dot — never a download, never a modal. Persisted. */
   autoUpdateCheck: boolean;
   setAutoUpdateCheck: (on: boolean) => void;
+  /** Name a new chat by its purpose: one extra request to the chat's OWN model
+   * after the first reply (services/chatAutoTitle). Off = the first
+   * six words stay the name. Persisted. */
+  chatTitleByMeaning: boolean;
+  setChatTitleByMeaning: (on: boolean) => void;
   /** The version the feed offers, when known (e.g. "0.2.0"). */
   updateVersion: string | null;
   setUpdateVersion: (version: string | null) => void;
@@ -1062,6 +1067,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setUpdateAvailable: (on) => set({ updateAvailable: on }),
   autoUpdateCheck: true,
   setAutoUpdateCheck: (on) => set({ autoUpdateCheck: on }),
+  chatTitleByMeaning: true,
+  setChatTitleByMeaning: (on) => set({ chatTitleByMeaning: on }),
   updateVersion: null,
   setUpdateVersion: (version) => set({ updateVersion: version }),
 

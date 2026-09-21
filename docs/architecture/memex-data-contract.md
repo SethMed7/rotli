@@ -303,6 +303,16 @@ second user-visible product or storage location.
   clears that draft; sending it does. The first successful save binds the
   initiating tab rather than whichever tab happens to be active when an async
   write completes.
+- A chat's filename comes from the title it is created with and never moves
+  when the title later changes; only the `title:` line and the contract-owned
+  H1 follow a rename. A chat the person left unnamed is created with a
+  words-first title (image handles are not words) and, after its first reply
+  is saved, may have that title improved once by the chat's **own** model —
+  never the Librarian's or any other. The request goes through the same
+  secure-context refusal as the chat's turns, its reply is accepted only as a
+  short plain title that is safe to write bare into YAML, and a name the person
+  typed (before or during the request) is never replaced. The
+  `chatTitleByMeaning` setting turns the request off.
 - A newly scaffolded vault contains one app-owned root note,
   `Welcome to Rotli.md`. It is real, durable Markdown, opens in the ordinary
   editor, gives the user a short list of things to try, and may be edited or

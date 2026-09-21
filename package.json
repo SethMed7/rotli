@@ -28,7 +28,7 @@
     "test": "bun run test:unit && bun run test:breve && bun run test:tooling && bun run test:relay",
     "test:unit": "bun test --parallel --isolate src",
     "test:changed": "bun test --changed --isolate",
-    "test:evals": "bun test src/ai/hybrid.test.ts src/ai/loop.test.ts src/ai/models.test.ts src/ai/prompt.test.ts src/chatMemory/retrieval.test.ts src/chatMemory/workflow.test.ts",
+    "test:evals": "bun test src/ai/chatTitleEval.test.ts src/ai/hybrid.test.ts src/ai/loop.test.ts src/ai/models.test.ts src/ai/prompt.test.ts src/chatMemory/retrieval.test.ts src/chatMemory/workflow.test.ts",
     "test:e2e": "env -u NO_COLOR playwright test",
     "test:e2e:ui": "env -u NO_COLOR playwright test --ui",
     "test:e2e:web": "env -u NO_COLOR playwright test --config playwright.web.config.ts",

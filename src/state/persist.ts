@@ -258,6 +258,7 @@ interface PersistedSettings {
   /** Editor spell-check (red squiggles); on by default. */
   spellcheck: boolean;
   autoUpdateCheck: boolean;
+  chatTitleByMeaning: boolean;
   /** Images follow their note into Archive/Trash (sole references only). */
   tidyImagesWithNote: boolean;
   /** Editor view: raw markdown vs beautified (WYSIWYG); beautified by default. */
@@ -535,6 +536,7 @@ export function parseSettings(raw: string): PersistedSettings {
     paneVaultMode: asEnum(data.paneVaultMode, PANE_VAULT_MODES, "single"),
     spellcheck: asBool(data.spellcheck, true),
     autoUpdateCheck: asBool(data.autoUpdateCheck, true),
+    chatTitleByMeaning: asBool(data.chatTitleByMeaning, true),
     tidyImagesWithNote: asBool(data.tidyImagesWithNote, true),
     rawEditor: asBool(data.rawEditor, false),
     blockHandles2: asBool(data.blockHandles2, true),
@@ -751,6 +753,7 @@ function applySettings(s: PersistedSettings): void {
     paneVaultMode: s.paneVaultMode,
     spellcheck: s.spellcheck,
     autoUpdateCheck: s.autoUpdateCheck,
+    chatTitleByMeaning: s.chatTitleByMeaning,
     tidyImagesWithNote: s.tidyImagesWithNote,
     rawEditor: s.rawEditor,
     blockHandles: s.blockHandles2,
@@ -1474,6 +1477,7 @@ function settingsSnapshot(): string {
     paneVaultMode: ui.paneVaultMode,
     spellcheck: ui.spellcheck,
     autoUpdateCheck: ui.autoUpdateCheck,
+    chatTitleByMeaning: ui.chatTitleByMeaning,
     tidyImagesWithNote: ui.tidyImagesWithNote,
     rawEditor: ui.rawEditor,
     blockHandles2: ui.blockHandles,

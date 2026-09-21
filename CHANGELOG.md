@@ -24,6 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   numbers; press one to open it. Pin or drag a note to keep it in its slot.
   ⌘1–9 still jump between tabs the rest of the time, Esc backs out, and both
   hotkeys can be changed in Settings → Hotkeys. Works in Rotli Web too.
+- **New chats are named by what they are about.** A chat still gets its name
+  the moment you send — then, after the first reply, the model you are
+  chatting with suggests a short name that says what the chat is for, and the
+  name updates. It is one small extra request to that same model and no other;
+  a chat that touched a secure note is never sent to a remote model for this;
+  a name you typed is never replaced; and the chat's file never moves.
+  Settings → General → "Name new chats by what they are about" turns it off.
+  In Rotli Web without the Helper, chats keep their first-words name.
 - **Hover a `[[link]]` to see the top of that note.** Rest the pointer on a
   link and a small card shows the note's title and first lines without
   opening it; a click still opens it. A secure note's card shows its name and

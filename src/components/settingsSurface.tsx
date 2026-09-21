@@ -546,6 +546,8 @@ function GeneralPane() {
   const showInDock = useUiStore((s) => s.showInDock);
   const setShowInDock = useUiStore((s) => s.setShowInDock);
   const spellcheck = useUiStore((s) => s.spellcheck);
+  const chatTitleByMeaning = useUiStore((s) => s.chatTitleByMeaning);
+  const setChatTitleByMeaning = useUiStore((s) => s.setChatTitleByMeaning);
   const setSpellcheck = useUiStore((s) => s.setSpellcheck);
   const tidyImagesWithNote = useUiStore((s) => s.tidyImagesWithNote);
   const setTidyImagesWithNote = useUiStore((s) => s.setTidyImagesWithNote);
@@ -702,6 +704,12 @@ function GeneralPane() {
             <span>days</span>
           </label>
         )}
+        <Toggle
+          on={chatTitleByMeaning}
+          title="Name new chats by what they are about"
+          desc="After the first reply, the model you are chatting with suggests a short name for the chat — one small extra request. A name you type yourself is never replaced. Off, a chat is named by its first few words."
+          onChange={() => setChatTitleByMeaning(!chatTitleByMeaning)}
+        />
         <Toggle
           on={chatAutoArchiveDays !== null}
           title="Archive inactive chats"
