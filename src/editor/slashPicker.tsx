@@ -8,7 +8,7 @@ import { extOf, fileName } from "../lib/fileKind";
 import { corpusManagedFileCreationAvailable, isTauri } from "../lib/tauri";
 import { createManagedItem } from "../newItems/composition";
 import { DEST } from "../services/destinations";
-import { useNotes, useSearchableNotes } from "../services/hooks";
+import { useChatTranscripts, useNotes, useSearchableNotes } from "../services/hooks";
 import { inboxFolderId } from "../services/notes";
 import { TEMPLATES_FOLDER, isTemplateNote } from "../services/templates";
 import { SHEET_EDITABLE } from "../sheets/kinds";
@@ -29,6 +29,7 @@ function fuzzy(query: string, text: string): boolean {
 function filterNotes(notes: NoteSummary[], mode: SlashPickerMode, query: string): NoteSummary[] {
   const q = query.trim();
   let pool = notes;
+  // (linkChat is handed the chats themselves — every one of them is a target)
   if (mode === "insertTemplate") pool = notes.filter(isTemplateNote);
   else if (mode === "embedBoard") pool = notes.filter((n) => n.kind === "board");
   else if (mode === "embedSheet")
@@ -39,7 +40,7 @@ function filterNotes(notes: NoteSummary[], mode: SlashPickerMode, query: string)
 }
 
 async function createEmbeddedItem(mode: SlashPickerMode): Promise<string | null> {
-  if (!isTauri() || mode === "linkNote" || mode === "insertTemplate") return null;
+  if (!isTauri() || mode === "linkNote" || mode === "linkChat" || mode === "insertTemplate") return null;
   const kind = mode === "embedBoard" ? "board" : mode === "embedSheet" ? "sheet" : "document";
   const item = await createManagedItem(kind, { open: false });
   return item.id || null;
@@ -47,6 +48,7 @@ async function createEmbeddedItem(mode: SlashPickerMode): Promise<string | null>
 
 const MODE_LABEL: Record<SlashPickerMode, string> = {
   linkNote: "Link note",
+  linkChat: "Link chat",
   insertTemplate: "Template",
   embedBoard: "Board",
   embedSheet: "Sheet",
@@ -74,17 +76,18 @@ export function SlashPicker({
   const [creationAvailable, setCreationAvailable] = useState<boolean | null>(null);
   const [createError, setCreateError] = useState("");
   const searchable = useSearchableNotes();
+  const chats = useChatTranscripts();
   const storage = useNotes(DEST.storage);
   const usesStorage = mode === "embedSheet" || mode === "embedDocument";
   const storageData = storage.data;
   const ready = usesStorage ? storage.isSuccess : searchable.ready;
   const items = useMemo(() => {
-    const notes = usesStorage ? (storageData ?? []) : searchable.notes;
+    const notes = mode === "linkChat" ? chats : usesStorage ? (storageData ?? []) : searchable.notes;
     return filterNotes(notes, mode, query);
-  }, [usesStorage, storageData, searchable.notes, mode, query]);
+  }, [usesStorage, storageData, searchable.notes, chats, mode, query]);
   useEffect(() => {
     let cancelled = false;
-    if (mode === "linkNote" || mode === "insertTemplate" || !isTauri()) return;
+    if (mode === "linkNote" || mode === "linkChat" || mode === "insertTemplate" || !isTauri()) return;
     void corpusManagedFileCreationAvailable()
       .then((available) => {
         if (!cancelled) setCreationAvailable(available);
@@ -168,9 +171,11 @@ export function SlashPicker({
         <div className="slashpicker-empty">
           {mode === "embedDocument"
             ? "No editable DOCX documents in Storage yet"
-            : mode === "insertTemplate" && !query.trim()
-              ? `No templates yet — any note you keep in a folder named ${TEMPLATES_FOLDER} shows up here`
-              : "No matches"}
+            : mode === "linkChat" && !query.trim()
+              ? "No chats yet"
+              : mode === "insertTemplate" && !query.trim()
+                ? `No templates yet — any note you keep in a folder named ${TEMPLATES_FOLDER} shows up here`
+                : "No matches"}
         </div>
       )}
       {createError && <div className="slashpicker-empty is-error">{createError}</div>}

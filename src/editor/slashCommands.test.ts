@@ -45,6 +45,7 @@ describe("slash command catalog", () => {
       "Generate image",
       "Template",
       "Link note",
+      "Link chat",
       "Board",
       "Sheet",
       "Document",
@@ -234,7 +235,45 @@ describe("slash commands inside a result row's reason", () => {
     expect(slashSpanAtCaret("- [ ][x] Hello — and/or", 23)).toBeNull();
     expect(slashSpanAtCaret("- [ ][x] Hello — fail /table", 20)).toBeNull();
     expect(slashSpanAtCaret("- [ ][x] Hello /table", 21)).toBeNull();
-    expect(slashSpanAtCaret("- item /table", 13)).toBeNull();
+  });
+
+  test("after text, a trailing /query is a command — in a paragraph and in any list item", () => {
+    const item = "- [ ] Ask Gabriel /li";
+    expect(slashSpanAtCaret(item, item.length)).toEqual({
+      from: 18, // the slash itself: the space before it stays, the token goes
+      to: item.length,
+      lead: "\n      ",
+      continuation: "      ",
+      query: "li",
+    });
+    expect(slashSpanAtCaret("some words /link", 16)).toMatchObject({
+      from: 11,
+      query: "link",
+      continuation: "",
+    });
+    expect(slashSpanAtCaret("- item /table", 13)).toMatchObject({ from: 7, query: "table" });
+    expect(slashSpanAtCaret("1. step /code", 13)).toMatchObject({ from: 8, query: "code" });
+  });
+
+  test("an INLINE command stays in the sentence; a block lands on a continuation line beneath", () => {
+    const item = "- [ ] Ask Gabriel /li";
+    const link = { kind: "picker", mode: "linkNote" } as const;
+    const chat = { kind: "picker", mode: "linkChat" } as const;
+    expect(slashSpanAtCaret(item, item.length, link)?.lead).toBe("");
+    expect(slashSpanAtCaret(item, item.length, chat)?.lead).toBe("");
+    expect(slashSpanAtCaret(item, item.length, { kind: "code" })?.lead).toBe("");
+    expect(slashSpanAtCaret(item, item.length, { kind: "table" })?.lead).toBe("\n      ");
+    // a command that owns the whole item was always in place, whatever it is
+    expect(slashSpanAtCaret("- [ ] /table", 12, { kind: "table" })?.lead).toBe("");
+  });
+
+  test("prose keeps its slashes: no space before, nothing typed yet, or nothing that matches", () => {
+    expect(slashSpanAtCaret("yes and/or no", 13)).toBeNull();
+    expect(slashSpanAtCaret("see https://rotli.co", 20)).toBeNull();
+    expect(slashSpanAtCaret("either / or", 8)).toBeNull(); // a bare slash after text
+    expect(slashSpanAtCaret("run it from /usr", 16)).toBeNull(); // no command is called "usr"
+    expect(slashSpanAtCaret("from /usr/bin", 13)).toBeNull();
+    expect(slashSpanAtCaret("- [ ] done /li later", 14)).toBeNull(); // caret not at the end
   });
 });
 

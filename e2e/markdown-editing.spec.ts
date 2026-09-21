@@ -1140,3 +1140,45 @@ test("/template inserts a saved layout: whole into an empty note, without its ti
   await expect(second).not.toContainText("Meeting notes");
   await expect(page.getByRole("tab", { selected: true })).toContainText("Standup 21 Sep");
 });
+
+test("a slash command works after text inside a checklist item, and can link a chat", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".pane.focused .cm-content");
+  await editor.click();
+  await page.keyboard.insertText("# Slash in a list\n\n- [ ] Ask Gabriel about ");
+  // typed, like a person would: the menu follows the keystrokes
+  await page.keyboard.type("/chat");
+  const menu = page.getByRole("menu", { name: "Insert block" });
+  await expect(menu.getByRole("menuitem", { name: /Link chat/ })).toBeVisible();
+  await menu.getByRole("menuitem", { name: /Link chat/ }).click();
+
+  const picker = page.getByRole("menu", { name: "Link chat" });
+  await expect(picker.locator(".slashlabel")).toHaveText(["Planning chat"]);
+  await page.keyboard.press("Enter");
+
+  // the link sits IN the sentence, the item is still one checklist item, and
+  // the link resolves (a dead link would wear the missing look)
+  const link = editor.locator(".rotli-wikilink", { hasText: "Planning chat" });
+  await expect(link).toBeVisible();
+  await expect(link).not.toHaveClass(/rotli-wikilink-missing/);
+  await expect(editor.locator(".cm-line", { hasText: "Ask Gabriel about" })).toContainText("Planning chat");
+
+  // a block command after text lands BENEATH the item, leaving its text whole
+  await page.keyboard.press("End");
+  await page.keyboard.type(" then /divider");
+  await menu.getByRole("menuitem", { name: /Divider/ }).click();
+  await expect(editor.locator(".cm-line", { hasText: "Ask Gabriel about" })).toContainText("then");
+
+  // prose keeps its slashes
+  await page.keyboard.press("Meta+T");
+  const second = page.locator(".pane.focused .cm-content");
+  await second.click();
+  await page.keyboard.type("yes and/or no, either / or, see /usr");
+  await expect(menu).toHaveCount(0);
+
+  // clicking the chat link opens the CONVERSATION, not its transcript file
+  await page.getByRole("tab", { name: /Slash in a list/ }).click();
+  await link.click();
+  await expect(page.locator(".pane.focused [data-chat-pane]").first()).toBeVisible();
+});

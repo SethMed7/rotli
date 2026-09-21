@@ -108,13 +108,15 @@ describe("filterSlashItems", () => {
     expect(filterSlashItems("not a command")).toEqual([]);
   });
 
-  test("a slash query must own the line and trail the caret", () => {
+  test("a slash query trails the caret: the whole line, or (1.3.0) a trailing /query after text", () => {
     expect(slashQueryAtCaret("/code block", 11)).toBe("code block");
     expect(slashQueryAtCaret("1. /", 4)).toBe("");
     expect(slashQueryAtCaret("  - /code", 9)).toBe("code");
     expect(slashQueryAtCaret("- [ ][ ] /table", 15)).toBe("table");
     expect(slashQueryAtCaret("/code block", 5)).toBeNull();
-    expect(slashQueryAtCaret("prefix /code", 12)).toBeNull();
+    expect(slashQueryAtCaret("prefix /code", 12)).toBe("code");
+    expect(slashQueryAtCaret("prefix/code", 11)).toBeNull();
+    expect(slashQueryAtCaret("prefix /", 8)).toBeNull();
     expect(slashQueryAtCaret("//code", 6)).toBeNull();
   });
 });
