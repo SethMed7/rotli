@@ -249,6 +249,13 @@
         "m4v",
         "ogv"
       ]
+    },
+    "viewFolderForbiddenChars": {
+      "sourceOfTruth": "src/services/viewTree.ts VIEW_FOLDER_FORBIDDEN_CHARS ↔ src-tauri/src/corpus.rs VIEW_FOLDER_FORBIDDEN_CHARS",
+      "value": [
+        "/",
+        ":"
+      ]
     }
   }
 }

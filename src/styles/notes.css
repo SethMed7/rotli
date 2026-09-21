@@ -2021,13 +2021,17 @@
 }
 /* the floating drag ghost EVERY pointer drag paints at the cursor (the shared
    lib/dragGhost — tabs, Main tree rows, Board cards); positioned imperatively,
-   offset off the pointer, pointer-events:none so the drags' elementFromPoint
-   hit-tests pass straight through it (the maintainer, 2026-06-15 / one impl 2026-07-01) */
+   pointer-events:none so the drags' elementFromPoint hit-tests pass straight
+   through it (the maintainer, 2026-06-15 / one impl 2026-07-01). It rides BESIDE the
+   pointer and is centred on its height: the chip's middle is the exact line
+   the drop is hit-tested at. Hanging below the pointer (the old 8px) put that
+   middle most of a sidebar row under the hit point, so aiming with the chip
+   landed the item one slot too high. */
 .drag-ghost {
   position: fixed;
   top: 0;
   left: 0;
-  transform: translate(10px, 8px);
+  transform: translate(12px, -50%);
   z-index: 1000;
   pointer-events: none;
   max-width: 220px;

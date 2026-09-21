@@ -10,6 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **"Couldn't save Main — revision conflict" is gone, and so is the lock-up
+  behind it.** When the CLI, the Librarian, or a views change saved Main while
+  the app held an older copy, the app showed a raw revision error — and then
+  every later change to Main failed the same way until a restart. Rotli now
+  re-reads Main, keeps your rearrangement together with whatever was added or
+  removed meanwhile, and saves again without a word. If Main was rearranged in
+  both places at once, you see the saved version and one plain sentence asking
+  you to make the change again. Named views recover the same way, in the Mac
+  app and in Rotli Web.
+- **A folder name with `/` or `:` is refused when you type it.** Main used to
+  accept the name and a view refused it later with "invalid folder name in
+  view". The rule is now the same everywhere, in plain words, and a folder
+  that already has such a name moves into a view with the character replaced
+  by a space.
+- **Dragged rows land where you aim.** The label that follows the pointer hung
+  below it, so its middle sat most of a row under the real drop point and a
+  row aimed with the label landed one place too high. The label now rides
+  beside the pointer, centred on the drop line, and the drop is checked once
+  more at the moment you let go. This applies to every drag: Main, tabs,
+  board cards, and chats.
+- **A chat that starts with an image is no longer named "[Image #1] …".** Image
+  tags are left out of the chat's name, its file name, and its Main folder; a
+  first message with only images is called "New chat".
+
 ## [1.2.0] - 2026-09-18
 
 Rotli 1.2: Add to folder for a whole selection, Tasks rebuilt (and working in

@@ -16,6 +16,21 @@ second user-visible product or storage location.
   uniquely named reference trees with their own virtual folders. Main retains
   every item assigned to a named view; switching views changes navigation and
   creation context, never physical storage.
+- **Both manifests are revision-gated, and a conflict is recovered quietly.**
+  The app presents the revision it read with every `main.json` / `views.json`
+  write; the CLI, the Librarian, and a views write that files a new item into
+  Main may all save in between. On a refused write the app re-reads the file
+  and saves once more: Main carries the local arrangement over notes added or
+  removed on disk (a filed note keeps its folder, or lands at the root when that
+  folder is gone); views save again only when the file's contents are
+  unchanged. When both sides rearranged, the disk version shows with one
+  plain sentence — never a revision id — and nothing on disk is overwritten.
+  A conflict never blocks later edits or the external-change reload.
+- **One folder-name rule.** A Main or view folder name cannot contain `/` (the
+  folder path separator) or `:` (the vault-root router). The app refuses both
+  where the folder is named, in Main and in views alike; a folder that already
+  carries one has it replaced by a space when it moves into a view. The
+  characters are pinned TS↔Rust in `scripts/fixtures/parity.json`.
 - **Chats join named views (2026-08-03).** A view may carry a `chats` list of
   chat slugs (additive field, absent = none; singular membership like notes).
   Chats have no frontmatter `view_tag` — the list is their whole membership —

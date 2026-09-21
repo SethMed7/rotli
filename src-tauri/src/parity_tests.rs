@@ -69,6 +69,15 @@ fn video_exts_match_fixture() {
 }
 
 #[test]
+fn view_folder_forbidden_chars_match_fixture() {
+    let chars: Vec<String> = crate::corpus::VIEW_FOLDER_FORBIDDEN_CHARS
+        .iter()
+        .map(char::to_string)
+        .collect();
+    assert_eq!(string_list(&entry("viewFolderForbiddenChars")), chars);
+}
+
+#[test]
 fn chat_image_asset_max_bytes_matches_fixture() {
     assert_eq!(
         entry("chatImageAssetMaxBytes").as_u64(),

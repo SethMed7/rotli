@@ -669,12 +669,13 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
                   placeholder="Folder name…"
                   ariaLabel="Rename Main folder"
                   onCommit={(value) => {
-                    if (activeView) {
-                      const error = viewFolderNameError(value);
-                      if (error) {
-                        setRowActionError(`Couldn’t rename folder — ${error}`);
-                        return;
-                      }
+                    // an emptied input is a cancel (renameFolderInMain no-ops);
+                    // anything else obeys the one folder-name rule in Main and
+                    // in views alike, so a name can never be refused later
+                    const error = value.trim() ? viewFolderNameError(value) : null;
+                    if (error) {
+                      setRowActionError(`Couldn’t rename folder — ${error}`);
+                      return;
                     }
                     setRenamingMainId(null);
                     setActiveTree(renameFolderInMain(activeTree, f.id, value), liveIds);
@@ -1008,12 +1009,10 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     const name = raw.trim();
     setMainNewFolder(false);
     if (!name) return;
-    if (activeView) {
-      const error = viewFolderNameError(name);
-      if (error) {
-        setRowActionError(`Couldn’t create folder — ${error}`);
-        return;
-      }
+    const error = viewFolderNameError(name);
+    if (error) {
+      setRowActionError(`Couldn’t create folder — ${error}`);
+      return;
     }
     // compute the rendered id BEFORE the commit (same uniquify law) so the
     // fresh row — appended after every root note — can be scrolled into view

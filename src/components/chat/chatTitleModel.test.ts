@@ -18,6 +18,14 @@ describe("chat title model", () => {
     expect(deriveChatTitle("   ")).toBe("New chat");
   });
 
+  test("never names a chat after its image tags", () => {
+    expect(deriveChatTitle("[Image #1]\nWhat does this show?")).toBe("What does this show?");
+    expect(deriveChatTitle("[Image #1](storage:chat/a.png) compare with [Image #2] please")).toBe(
+      "compare with please",
+    );
+    expect(deriveChatTitle("[Image #1] [Image #2]")).toBe("New chat");
+  });
+
   test("keeps the skip instruction inside the pristine input placeholder", () => {
     expect(CHAT_TITLE_PLACEHOLDER).toBe("Name this chat (optional) · Enter to skip");
   });
