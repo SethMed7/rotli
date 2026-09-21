@@ -23,6 +23,7 @@ import { GuidedTour } from "./components/tour/guidedTour";
 import { HotkeyBadges } from "./components/hotkeyBadges";
 import { NotesSurface } from "./components/notesSurface";
 import { PreviewModal } from "./components/previewModal";
+import { ChatShell } from "./components/chatWindow/chatShell";
 import { QuickNote } from "./components/quickNote";
 import { RenameDialog } from "./components/renameDialog";
 import { BoardNameDialog } from "./components/boardNameDialog";
@@ -56,6 +57,7 @@ import {
   workspaceTakeOpenRequest,
 } from "./lib/tauri";
 import { useNativeFileDrop } from "./editor/nativeFileDrop";
+import { PLATFORM } from "./lib/featurePolicy";
 import { onQuitFlushFailure } from "./lib/quitFlush";
 import { isOnboardingReview } from "./lib/reviewMode";
 import { fileQuickNoteInMain } from "./newItems/composition";
@@ -69,7 +71,8 @@ import { isWebVault } from "./lib/browserVault";
 import { startRoutineUpdateCheck } from "./services/updateCheck";
 import { openSeededWelcome, openWelcome } from "./services/welcome";
 import { queryClient } from "./services/query";
-import { hydrateMain } from "./state/main";
+import { attachChatWindow } from "./state/chatWindow";
+import { addFragmentToMain, hydrateMain } from "./state/main";
 import { onboardingRequired } from "./state/onboarding";
 import { useOrganizerLive } from "./state/organizerLive";
 import { activeTabOf, leaves, usePanesStore } from "./state/panes";
@@ -131,11 +134,12 @@ if (import.meta.env.DEV) {
 
 /** Which surface this webview shows. Default = the main window;
  *  `?window=capture` = the quick-capture card; `?window=quick` = the floating
- *  Quick Note window. */
+ *  Quick Note window; `?window=chat` = Chat pulled out into its own window. */
 function surfaceFromUrl(): Surface {
   const param = new URLSearchParams(window.location.search).get("window");
   if (param === "capture") return "capture";
   if (param === "quick") return "quick";
+  if (param === "chat" && PLATFORM !== "web") return "chat"; // a NATIVE window: nothing on the web
   return "main";
 }
 
@@ -542,6 +546,8 @@ export default function App() {
     return onQuickCreated(({ id }) => fileQuickNoteInMain(id));
   }, [surface]);
 
+  // Chat in its own window: main records, the chat window reports (state/chatWindow.ts)
+  useEffect(() => attachChatWindow(addFragmentToMain), []);
   // A vault switch rebinds the live Rust default store. Keep all native windows
   // alive and replace only their vault-scoped caches/projections.
   useEffect(
@@ -578,6 +584,7 @@ export default function App() {
 
   if (surface === "capture") return <CaptureCard />;
   if (surface === "quick") return <QuickNote />;
+  if (surface === "chat") return <ChatShell />;
   return (
     <>
       <MainShell />

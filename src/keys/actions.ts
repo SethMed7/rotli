@@ -42,6 +42,7 @@ import { startTour } from "../state/tour";
 import { SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
 import { registerAppLinkActions } from "./appLinkActions";
 import { registerCaptureActions } from "./captureActions";
+import { registerChatWindowActions } from "./chatWindowActions";
 import { EDITOR_ACTION } from "./editorActionIds";
 import { focusedNoteIdNow, notesWorkspaceActive } from "./focusNow";
 import { captureHandle, quickHandle, setupHandle } from "./handles";
@@ -884,4 +885,6 @@ export function registerDefaultActions(): void {
       void hideQuickWindow();
     },
   });
+  // LAST: it opts already-registered tab/pane/chat actions into the Chat window
+  registerChatWindowActions();
 }

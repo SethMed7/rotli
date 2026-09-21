@@ -177,6 +177,32 @@ is retired with its Settings control: the Chat view shows every chat, so a cap
 would be a knob for a problem that no longer exists. Its stored value survives
 in the unknown-key passthrough (`#35`), so a downgrade keeps the user's cap.
 
+## Chat in its own window (1.3.0, in the work)
+
+Chat can be pulled out of this switch into a window of its own; Home cannot —
+main is where Home lives. Decision and seams:
+[`docs/decisions/2026-09-21-chat-window-same-vault.md`](../decisions/2026-09-21-chat-window-same-vault.md).
+Development builds only until the native checklist passes
+(`LAUNCH_FEATURES.chatWindow`), the Mac app only.
+
+- **In main, Chat here:** the Chat segment is an ordinary front. Beside it sits
+  a small companion button (a sibling — a button cannot hold a button), quiet
+  until the pointer or the keyboard is on the pair: *Pull Chat out into its own
+  window*. The segment's context menu and the `chat.window` action do the same.
+- **In main, Chat out:** the segment is not a front here (`aria-pressed=false`);
+  clicking it brings the chat window forward, and the companion — now always
+  visible, because it is the way back — puts Chat back. A chat opened from
+  anywhere in main (a row, `⌥A`, a note's chat, a link) opens in that window.
+- **A chat that is still answering blocks pop-out**, in plain words in the
+  sidebar's error strip: a reply cannot follow its chat to another window.
+- **The chat window** shows the chat sidebar and panes whose tabs are chats, and
+  nothing else: no front switch, no Breve, no System zone, no footer, no
+  Settings. Its panes hold only chat tabs — enforced, since the pane store boots
+  (and a vault switch resets) with a note placeholder. Its title strip carries
+  New chat and *Put Chat back in the main window*; its close button does the
+  same, so a chat is never stranded in a hidden window.
+- The pair is static: nothing here animates (idle citizenship).
+
 ## Keyboard model
 
 Every command stays remappable through `src/keys/` — these are default chords.

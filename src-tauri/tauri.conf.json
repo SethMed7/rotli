@@ -61,6 +61,23 @@
         "skipTaskbar": true,
         "visible": false,
         "center": true
+      },
+      {
+        "label": "chat",
+        "url": "index.html?window=chat",
+        "title": "rotli chat",
+        "width": 900,
+        "height": 680,
+        "minWidth": 560,
+        "minHeight": 420,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": {
+          "x": 19,
+          "y": 24
+        },
+        "visible": false,
+        "center": true
       }
     ],
     "security": {

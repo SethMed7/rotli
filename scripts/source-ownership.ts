@@ -35,6 +35,7 @@ export const SOURCE_ROOT_FILE_OWNERS = {
 export const COMPONENT_DIRECTORY_OWNERS = {
   breve: "Breve presentation feature",
   chat: "Chat pane presentation feature",
+  chatWindow: "the Chat window's shell: Chat pulled out of main into a window of its own",
   onboarding: "first-run, vault activation, and model setup presentation",
   settings: "Settings pane sections and controls composed by settingsSurface (voice, connections, about)",
   sidebar: "sidebar presentation feature",
@@ -97,6 +98,7 @@ export const LIB_EFFECTFUL_FILE_OWNERS = {
   "paneDropDrag.ts": "sidebar note → pane drop workflow",
   "nativeDrag.ts": "native Finder drag hover relay adapter",
   "popover.ts": "shared transient-popover hook backed by UI state",
+  "chatWindowBridge.ts": "native Chat window adapter: show/hide and the two shell windows' messages",
   "quitFlush.ts": "native quit lifecycle adapter",
   "tabDrag.ts": "cross-surface tab drag workflow",
   "tauri.ts": "typed native-host adapter facade",
@@ -120,6 +122,7 @@ export const SERVICE_FILE_OWNERS = {
   "chatRename.ts": "chat",
   "chatAutoTitle.ts": "chat",
   "chatSummon.ts": "chat",
+  "chatWindowShell.ts": "chat (the Chat window's native side, for presentation)",
   "connectorSetup.ts": "chat",
   "helperLink.ts": "chat",
   "webAiCorpus.ts": "chat",

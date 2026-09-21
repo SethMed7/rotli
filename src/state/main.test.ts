@@ -8,7 +8,11 @@
 
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
-import * as realTauri from "../lib/tauri";
+import * as liveTauri from "../lib/tauri";
+
+// a SNAPSHOT of the real exports: the namespace import is live, so after
+// mock.module it points at the mocks and "restoring" it would re-install them
+const realTauri = { ...liveTauri };
 import { type MainNode, parseMainManifest, serializeMainManifest } from "../services/mainTree";
 
 let disk = { contents: "", revision: "r0" };
