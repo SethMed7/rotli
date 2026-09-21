@@ -15,9 +15,14 @@
 // this it was an unlabeled coffee icon in the header row with no shortcut.
 
 import { LAUNCH_FEATURES } from "../../lib/featurePolicy";
+import { chatWindowSupported, focusChatWindow } from "../../services/chatWindowShell";
 import { useChatSetupGuide } from "../../state/chatSetupGuide";
+import { popOutChat, regroupChat } from "../../state/chatWindow";
+import { useChatWindowStore } from "../../state/chatWindowStore";
+import { useContextMenu } from "../../state/contextMenu";
 import { helperReadyFrom, useHelperLink } from "../../state/helperLink";
-import type { ContentView, DashboardSection, SidebarView } from "../../state/ui";
+import { type ContentView, type DashboardSection, type SidebarView, useUiStore } from "../../state/ui";
+import { PopOutGlyph, RegroupGlyph } from "../chatWindow/windowGlyphs";
 import { ChatGlyph, CoffeeGlyph, HomeGlyph } from "../glyphs";
 
 const SIDEBAR_FRONTS: {
@@ -80,6 +85,16 @@ export function SidebarSwitcher({
   const helperOk = useHelperLink((s) => helperReadyFrom(s));
   const helperProblem = useHelperLink((s) => s.problem);
   const helperVerifying = useHelperLink((s) => s.verifying);
+  // Pull Chat out into its own window: the Mac app only, and in the work
+  const chatWindow = chatWindowSupported();
+  const chatDetached = useChatWindowStore((s) => s.detached);
+  const openContextMenu = useContextMenu((s) => s.open);
+  const pullChatOut = () => {
+    const blocked = popOutChat();
+    if (blocked) useUiStore.getState().setRowActionError(blocked);
+    // Chat left this window: its front has nothing to show here
+    else if (value === "chat") onPick("home");
+  };
   return (
     // role="group" + aria-pressed, NOT a tablist: these segments switch the
     // sidebar's own content, not a tabpanel, and the pane tab strip already
@@ -112,6 +127,49 @@ export function SidebarSwitcher({
               <Glyph size={14} />
               <span className="sb-switch-label">{label}</span>
             </button>
+          );
+        }
+        if (id === "chat" && chatWindow) {
+          // Chat can live in its own window (1.3.0). The segment and its small
+          // companion button are SIBLINGS — a button cannot hold a button. Out:
+          // the segment brings that window forward and the companion puts Chat
+          // back. In: the companion (on hover/focus) or the context menu pulls
+          // it out. Home has no such control: main is where Home lives.
+          return (
+            <span key={id} className={chatDetached ? "sb-switch-chat out" : "sb-switch-chat"}>
+              <button
+                type="button"
+                aria-pressed={!chatDetached && active}
+                data-tour="chat"
+                title={chatDetached ? "Chat is in its own window — click to bring it forward" : hint}
+                data-hotkey={action}
+                className={!chatDetached && active ? "sb-switch-seg sel" : "sb-switch-seg"}
+                onClick={() => (chatDetached ? focusChatWindow() : onPick(id))}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  openContextMenu(event.clientX, event.clientY, [
+                    chatDetached
+                      ? { kind: "action", label: "Put Chat back in this window", onClick: regroupChat }
+                      : { kind: "action", label: "Pull Chat out into its own window", onClick: pullChatOut },
+                  ]);
+                }}
+              >
+                <Glyph size={14} />
+                <span className="sb-switch-label">{label}</span>
+              </button>
+              <button
+                type="button"
+                className="sb-switch-window"
+                aria-label={
+                  chatDetached ? "Put Chat back in this window" : "Pull Chat out into its own window"
+                }
+                title={chatDetached ? "Put Chat back in this window" : "Pull Chat out into its own window"}
+                onClick={chatDetached ? regroupChat : pullChatOut}
+              >
+                {chatDetached ? <RegroupGlyph size={12} /> : <PopOutGlyph size={12} />}
+              </button>
+            </span>
           );
         }
         return (

@@ -190,6 +190,48 @@
 .sb-switch-seg.sel svg {
   color: var(--selected-icon);
 }
+/* Chat can live in its own window: the segment plus a small sibling button
+   (a button cannot hold a button). The companion is quiet until the pointer or
+   the keyboard is on the pair; once Chat is out it stays visible, because it is
+   then the way back. Static — nothing here animates. */
+.sb-switch-chat {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.sb-switch-chat > .sb-switch-seg {
+  flex: 1 1 auto;
+}
+.sb-switch-window {
+  position: absolute;
+  top: 50%;
+  right: 3px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-inner);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+}
+.sb-switch-chat:hover .sb-switch-window,
+.sb-switch-chat:focus-within .sb-switch-window,
+.sb-switch-chat.out .sb-switch-window {
+  opacity: 1;
+}
+.sb-switch-window:hover {
+  color: var(--text);
+}
+.sb-switch-chat.out > .sb-switch-seg {
+  color: var(--text-muted);
+}
 .sb-switch-label {
   overflow: hidden;
   text-overflow: ellipsis;

@@ -5,6 +5,7 @@
 
 import { create } from "zustand";
 
+import { sendChatWindow } from "../lib/chatWindowBridge";
 import { corpusMainRead, corpusMainWrite, hasDurableCorpus } from "../lib/tauri";
 import {
   createRevisionedTrackedWrite,
@@ -22,6 +23,7 @@ import {
   renameNoteRef,
   serializeMainManifest,
 } from "../services/mainTree";
+import { windowSurface } from "./chatWindowStore";
 
 export type MainSaveState = "idle" | "saving" | "saved" | "error";
 
@@ -62,7 +64,11 @@ export const useMainStore = create<MainState>((set) => ({
   dirty: false,
   setTree: (tree, liveIds) => {
     if (!isMainSurface()) {
-      console.warn("main.json write refused off the main surface");
+      // the Chat window never hydrates Main, so whatever it computed is purely
+      // ADDITIONS (a chat's artifact under its folder): hand them to main, the
+      // one writer, which merges them into the real tree (state/chatWindow.ts)
+      if (windowSurface() === "chat") sendChatWindow({ kind: "file-into-main", tree });
+      else console.warn("main.json write refused off the main surface");
       return;
     }
     const cleaned = liveIds ? gcManifest(tree, liveIds) : tree;

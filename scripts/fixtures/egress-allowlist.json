@@ -112,7 +112,8 @@
     "defaultWebviews": [
       "main",
       "capture",
-      "quick"
+      "quick",
+      "chat"
     ],
     "defaultWindows": []
   },

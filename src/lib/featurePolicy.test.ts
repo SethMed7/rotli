@@ -17,6 +17,7 @@ test("public builds keep notes and chat while every experimental capability stay
     sheets: false,
     mermaidDiagrams: false,
     voice: false,
+    chatWindow: false,
   });
   expect(launchFeatures(true)).toEqual({
     notes: true,
@@ -27,6 +28,7 @@ test("public builds keep notes and chat while every experimental capability stay
     sheets: true,
     mermaidDiagrams: true,
     voice: true,
+    chatWindow: true,
   });
 });
 
@@ -39,6 +41,8 @@ test("the web platform withholds every capability that needs the desktop shell, 
     expect(web.agents).toBe(false);
     expect(web.sheets).toBe(false);
     expect(web.voice).toBe(false);
+    // a second browser tab would be a second writer with no coordination
+    expect(web.chatWindow).toBe(false);
     // channel-only gates still follow the channel: nothing about them needs Tauri
     expect(web.mermaidVisualEditing).toBe(development);
     expect(web.mermaidDiagrams).toBe(development);

@@ -2402,7 +2402,7 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                     if report.applied > 0 {
                         // our writes are suppress-marked, so the watcher won't
                         // echo them — tell the frontend ourselves
-                        let _ = app.emit_to("main", "rotli:corpus-changed", ());
+                        crate::chat_window::emit_corpus_changed(&app);
                     }
                     if report.model_offline {
                         next_model_try = Some(Instant::now() + backoff);

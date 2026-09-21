@@ -24,6 +24,11 @@ export function launchFeatures(development: boolean, platform: Platform = "deskt
     sheets: desktop && development,
     mermaidDiagrams: development,
     voice: desktop && development,
+    // Pull Chat out into its own window: in the work. The native half (a
+    // second shell webview, the quit handshake with four windows) cannot be
+    // proven by CI, so it stays a development-build feature until the owner has
+    // exercised it in the Mac app.
+    chatWindow: desktop && development,
   } as const;
 }
 

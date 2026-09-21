@@ -16,6 +16,7 @@ mod app_settings;
 mod board;
 mod breve;
 mod chat;
+mod chat_window;
 mod clipboard_assets;
 mod compute;
 mod containment;
@@ -80,7 +81,8 @@ enum NativeCloseAction {
 }
 
 fn native_close_action(window_label: &str) -> NativeCloseAction {
-    if window_label == "main" {
+    // the two shell windows own tabs; every other window is a visitor
+    if chat_window::SHELL_LABELS.contains(&window_label) {
         NativeCloseAction::CloseMainTab
     } else {
         NativeCloseAction::HideWindow
@@ -120,6 +122,7 @@ mod native_close_tests {
     #[test]
     fn command_w_closes_a_main_tab_but_hides_visitor_windows() {
         assert_eq!(native_close_action("main"), NativeCloseAction::CloseMainTab);
+        assert_eq!(native_close_action("chat"), NativeCloseAction::CloseMainTab);
         assert_eq!(native_close_action("quick"), NativeCloseAction::HideWindow);
         assert_eq!(
             native_close_action("capture"),
@@ -568,7 +571,7 @@ fn quit_flush_done(app: AppHandle, attempt_id: u64, ok: bool, error: Option<Stri
 /// Called by the tray's Quit item and the app menu's ⌘Q replacement. Hidden
 /// panels ack in milliseconds (nothing dirty), so this adds no quit latency.
 fn flush_webviews_before_shutdown(app: &AppHandle) -> Result<(), String> {
-    let labels: Vec<&str> = ["main", "quick", "capture"]
+    let labels: Vec<&str> = ["main", "quick", "capture", chat_window::LABEL]
         .into_iter()
         .filter(|label| app.get_webview_window(label).is_some())
         .collect();
@@ -928,6 +931,16 @@ fn hide_capture_window(app: AppHandle) {
 #[tauri::command]
 fn finish_capture_window(app: AppHandle) {
     finish_capture(&app);
+}
+
+#[tauri::command]
+fn show_chat_window(app: AppHandle) {
+    chat_window::show(&app);
+}
+
+#[tauri::command]
+fn hide_chat_window(app: AppHandle) {
+    chat_window::hide(&app);
 }
 
 #[tauri::command]
@@ -1743,7 +1756,7 @@ fn install_live_root_watcher(
         if active.as_ref() == Some(&active_root) {
             organizer.enqueue(&active_root, paths);
         }
-        let _ = handle.emit_to("main", "rotli:corpus-changed", ());
+        chat_window::emit_corpus_changed(&handle);
     }) {
         eprintln!(
             "rotli: new active vault has no live watcher ({error}) — refresh remains available"
@@ -1953,14 +1966,14 @@ fn mount_connected_brain(
         let _ = app.asset_protocol_scope().allow_directory(&root, true);
         let handle = app.clone();
         if let Err(error) = corpus::spawn_watcher(root, suppress, move |_| {
-            let _ = handle.emit_to("main", "rotli:corpus-changed", ());
+            chat_window::emit_corpus_changed(&handle);
         }) {
             eprintln!(
                 "rotli: connected vault {root_id} has no live watcher ({error}) — refresh remains available"
             );
         }
     }
-    let _ = app.emit_to("main", "rotli:corpus-changed", ());
+    chat_window::emit_corpus_changed(&app);
     Ok(())
 }
 
@@ -2044,7 +2057,7 @@ fn corpus_forget_brain(app: AppHandle, id: String) -> Result<(), String> {
             root.display()
         );
     }
-    let _ = app.emit_to("main", "rotli:corpus-changed", ());
+    chat_window::emit_corpus_changed(&app);
     Ok(())
 }
 
@@ -2279,8 +2292,14 @@ pub fn run() {
                     if chat.as_deref().is_some_and(matches) {
                         // ⌥A: SHOW (never toggle — "ask" must always land you in a
                         // chat, not hide the app); the webview picks/creates the chat
-                        show_main(app);
-                        let _ = app.emit_to("main", "rotli:summon-chat", ());
+                        // …in whichever window Chat lives right now
+                        if chat_window::is_open(app) {
+                            chat_window::show(app);
+                            let _ = app.emit_to(chat_window::LABEL, "rotli:summon-chat", ());
+                        } else {
+                            show_main(app);
+                            let _ = app.emit_to("main", "rotli:summon-chat", ());
+                        }
                         return;
                     }
                     let search = chords.search.lock().unwrap().clone();
@@ -2335,6 +2354,8 @@ pub fn run() {
             hide_capture_window,
             finish_capture_window,
             toggle_quick_window,
+            show_chat_window,
+            hide_chat_window,
             hide_quick_window,
             corpus_reveal,
             vault_browser::vault_browser_start,
@@ -2612,7 +2633,7 @@ pub fn run() {
                             if active.as_ref() == Some(&org_root) {
                                 org.enqueue(&org_root, paths);
                             }
-                            let _ = handle.emit_to("main", "rotli:corpus-changed", ());
+                            chat_window::emit_corpus_changed(&handle);
                         }) {
                             eprintln!(
                                 "rotli: corpus watcher unavailable for root {} ({e}) — external edits won't auto-refresh",
@@ -2673,7 +2694,7 @@ pub fn run() {
                 let queue_app = app.handle().clone();
                 app.state::<compute::ComputeState>().0.install_sink(Box::new(
                     move |v: serde_json::Value| {
-                        let _ = queue_app.emit_to("main", "rotli:local-queue", v);
+                        chat_window::emit_to_shells(&queue_app, "rotli:local-queue", v);
                     },
                 ));
             }
@@ -2859,6 +2880,12 @@ pub fn run() {
             match event {
                 WindowEvent::CloseRequested { api, .. } => {
                     api.prevent_close();
+                    // closing the chat window hands its chats back to main
+                    // first (the webview hides itself once it has)
+                    if window.label() == chat_window::LABEL {
+                        chat_window::request_regroup(window.app_handle());
+                        return;
+                    }
                     let _ = window.hide();
                     return;
                 }
@@ -2914,7 +2941,8 @@ pub fn run() {
                 if let tauri::RunEvent::Reopen { has_visible_windows, .. } = event {
                     let ours_up = is_visible(app, "quick")
                         || is_visible(app, "capture")
-                        || is_visible(app, "main");
+                        || is_visible(app, "main")
+                        || chat_window::is_open(app);
                     // backstop for the show→focus race: if a panel was just
                     // summoned, this Reopen IS its spurious app-activation event.
                     // take() consumes the latch — one summon swallows exactly one

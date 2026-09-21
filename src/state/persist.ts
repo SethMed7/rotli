@@ -68,6 +68,8 @@ import type { PaneNode, Tab } from "../types";
 import { DEFAULT_VOICE, VOICES } from "../voice/speech";
 import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
 import { APP_SETTINGS_KEYS } from "./appSettingsKeys";
+import { useChatWindowStore } from "./chatWindowStore";
+import { withDetachedChats } from "./chatWindowTabs";
 import { helperLinked } from "./helperLink";
 import { hydrateMain, useMainStore } from "./main";
 import { MRU_CAP, touchItemActivity, touchMru, useMruStore } from "./mru";
@@ -1544,7 +1546,7 @@ function viewstateSnapshot(): string {
   const panes = usePanesStore.getState();
   const snapshot: PersistedViewstate = {
     v: 1,
-    root: durablePane(panes.root),
+    root: withDetachedChats(durablePane(panes.root), useChatWindowStore.getState().refs),
     focusedPaneId: panes.focusedPaneId,
     selectedFolderId: useUiStore.getState().selectedFolderId,
     activeView: useUiStore.getState().activeView,
@@ -1647,6 +1649,7 @@ export function attachPersistence(): () => void {
     useNoteStyleStore.subscribe(schedule),
     useTableWidthsStore.subscribe(schedule),
     usePanesStore.subscribe(schedule),
+    useChatWindowStore.subscribe(schedule),
     useMruStore.subscribe(schedule),
   ];
   const onVisibility = (): void => {
