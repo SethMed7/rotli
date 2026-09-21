@@ -4,12 +4,18 @@
 
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
-import * as realHost from "../ai/host";
+import * as liveHost from "../ai/host";
 import type { ChatModelInfo } from "../lib/tauri";
 import type { MemexInstance } from "../memex/config";
-import * as realService from "../memex/service";
-import * as realMemex from "../memex/useMemex";
+import * as liveService from "../memex/service";
+import * as liveMemex from "../memex/useMemex";
 import { useUiStore } from "../state/ui";
+
+// SNAPSHOTS of the real exports: a namespace import is live, so after
+// mock.module it points at the mocks and "restoring" it would re-install them
+const realHost = { ...liveHost };
+const realService = { ...liveService };
+const realMemex = { ...liveMemex };
 
 let reply: () => Promise<string> = async () => "Partner portal launch plan";
 let requests: Array<{ model: string; secure: boolean }> = [];

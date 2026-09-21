@@ -16,6 +16,8 @@ import {
   EMPTY_MAIN,
   type MainManifest,
   type MainNode,
+  addNoteToMain,
+  fileNoteInNamedRootFolder,
   gcManifest,
   mainHasNote,
   mergeMainTrees,
@@ -49,7 +51,9 @@ function isMainSurface(): boolean {
 // back-to-back setTree calls (drags, draft composition) race their writes —
 // only the LATEST call's outcome may report, or a stale completion masks a
 // lost arrangement (audit 2026-07-30, correctness #3; same guard as views.ts)
-const mainWriter = createRevisionedTrackedWrite(corpusMainWrite);
+// (a wrapper, not the bare function: the writer must reach the adapter through
+// the live binding, so whoever loads this module first cannot pin it)
+const mainWriter = createRevisionedTrackedWrite((contents, revision) => corpusMainWrite(contents, revision));
 
 /** Shown only when Main was rearranged on disk while a different arrangement
  * was being made here — the one case with no honest merge. Plain words: the
@@ -131,6 +135,24 @@ async function recoverMain(local: MainManifest, mayRetry: boolean): Promise<void
       dirty: false,
     });
   }
+}
+
+/** Merge ADDITIONS a non-main window computed (the Chat window: a chat's
+ * artifact under its folder, or a loose note at the root). Such a window never
+ * hydrates Main, so its tree is a pure fragment; this is the one writer folding
+ * it into the real tree. */
+export function addFragmentToMain(fragment: readonly MainNode[]): void {
+  const { manifest, setTree } = useMainStore.getState();
+  let tree = manifest.tree;
+  for (const node of fragment) {
+    if ("note" in node) tree = addNoteToMain(tree, node.note);
+    else {
+      for (const child of node.children) {
+        if ("note" in child) tree = fileNoteInNamedRootFolder(tree, child.note, node.folder);
+      }
+    }
+  }
+  if (tree !== manifest.tree) setTree(tree);
 }
 
 /** Retarget a Main note-ref after a path-id rename (boards: rename mints a new

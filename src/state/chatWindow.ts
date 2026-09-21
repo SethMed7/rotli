@@ -21,13 +21,12 @@ import {
   sendChatWindow,
   showChatWindow,
 } from "../lib/chatWindowBridge";
-import { fileNoteInNamedRootFolder, addNoteToMain, type MainNode } from "../services/mainTree";
+import type { MainNode } from "../services/mainTree";
 import { chatDraftFor, useChatDrafts } from "./chatDrafts";
 import { useChatRuns } from "./chatRuns";
 import { useChatWindowStore, windowSurface } from "./chatWindowStore";
 import { type ChatTabRef, type DraftOf, movableChatTabs, savedChatRefs } from "./chatWindowTabs";
-import { useMainStore } from "./main";
-import { activeTabOf, findLeaf, usePanesStore } from "./panes";
+import { activeTabOf, findLeaf, leaves, usePanesStore } from "./panes";
 
 export const POP_OUT_BLOCKED =
   "A chat is still answering. Let it finish, then pull Chat out — a reply can’t follow its chat to another window.";
@@ -89,24 +88,11 @@ export function regroupChat(): void {
   sendChatWindow({ kind: "regroup" });
 }
 
-/** Additions computed by a window that never hydrated Main: merge them into the
- * real tree (a chat's artifact under its folder; a loose note at the root). */
-function fileIntoMain(fragment: readonly MainNode[]): void {
-  const main = useMainStore.getState();
-  let tree = main.manifest.tree;
-  for (const node of fragment) {
-    if ("note" in node) tree = addNoteToMain(tree, node.note);
-    else {
-      for (const child of node.children) {
-        if ("note" in child) tree = fileNoteInNamedRootFolder(tree, child.note, node.folder);
-      }
-    }
-  }
-  if (tree !== main.manifest.tree) main.setTree(tree);
-}
-
-/** Attach this webview's half of the protocol. Returns the teardown. */
-export function attachChatWindow(): () => void {
+/** Attach this webview's half of the protocol. Returns the teardown.
+ * `fileIntoMain` is main's writer for additions a non-main window computed
+ * (state/main.ts addFragmentToMain) — passed in, so this module never loads the
+ * Main store. */
+export function attachChatWindow(fileIntoMain: (fragment: MainNode[]) => void): () => void {
   const surface = windowSurface();
   if (surface === "main") {
     return onChatWindow((message) => {
@@ -121,6 +107,18 @@ export function attachChatWindow(): () => void {
   }
   if (surface !== "chat") return () => {};
 
+  // THE invariant of this window: its panes hold chat tabs and nothing else.
+  // The store boots (and a vault switch resets) with a note placeholder, and
+  // any stray open would land here too — so it is enforced, not assumed.
+  const keepOnlyChats = () => {
+    const panes = usePanesStore.getState();
+    for (const leaf of leaves(panes.root)) {
+      for (const tab of leaf.tabs) {
+        if (tab.surfaceKind !== "chat") panes.closeTabById(leaf.id, tab.id, { record: false });
+      }
+    }
+  };
+  keepOnlyChats();
   const currentRefs = () => savedChatRefs(usePanesStore.getState().root);
   const report = () => sendChatWindow({ kind: "tabs", refs: currentRefs() });
   // the window is about to hide: EVERYTHING goes back (force), so no chat is
@@ -139,6 +137,7 @@ export function attachChatWindow(): () => void {
   // every change to the open chats is reported, so main's saved layout follows
   let last = JSON.stringify(currentRefs());
   const offPanes = usePanesStore.subscribe(() => {
+    keepOnlyChats();
     const next = JSON.stringify(currentRefs());
     if (next === last) return;
     last = next;

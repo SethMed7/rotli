@@ -30,7 +30,9 @@ interface ViewsState {
 
 // the shared latest-wins guard (lib/trackedWrite) — this store's original
 // inline writeSequence, extracted so main.ts uses the identical policy
-const viewsWriter = createRevisionedTrackedWrite(corpusViewsWrite);
+const viewsWriter = createRevisionedTrackedWrite((contents, revision) =>
+  corpusViewsWrite(contents, revision),
+);
 
 /** Shown only when views.json really changed on disk under an edit made here
  * (main.ts MAIN_RELOADED_NOTICE is the twin). */

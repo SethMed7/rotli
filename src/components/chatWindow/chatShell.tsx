@@ -9,7 +9,7 @@
 // does listen for vault changes itself: a shell that never hears
 // `rotli:corpus-changed` shows a stale chat and then fails its next save.
 
-import { useEffect } from "react";
+import { type CSSProperties, useEffect } from "react";
 
 import { dispatch } from "../../keys/registry";
 import { attachChatShell, dragChatWindow, zoomChatWindow } from "../../services/chatWindowShell";
@@ -30,6 +30,8 @@ export function ChatShell() {
   const sidebarZoom = useUiStore((state) => state.sidebarZoom);
   const rowActionError = useUiStore((state) => state.rowActionError);
   const setRowActionError = useUiStore((state) => state.setRowActionError);
+  const sidebarWidth = useUiStore((state) => state.sidebarWidth);
+  const railVars = { "--sidebar-w": `${sidebarWidth}px` } as CSSProperties;
   const chats = useChatFolders();
   const empty = usePanesStore((state) => leaves(state.root).every((leaf) => leaf.tabs.length === 0));
 
@@ -74,7 +76,7 @@ export function ChatShell() {
         </div>
       </header>
       <main className="app-content">
-        <div className="threepane" data-sidebar-side="left">
+        <div className="threepane" style={railVars} data-sidebar-side="left">
           <div className="rail-wrap">
             <aside className="sidebar chat-window-rail" aria-label="Chats">
               {rowActionError && (

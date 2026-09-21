@@ -190,6 +190,27 @@
 .sb-switch-seg.sel svg {
   color: var(--selected-icon);
 }
+/* — the Chat window (components/chatWindow/chatShell.tsx): main's frame with
+   only Chat inside. The title strip is the drag region; nothing here animates. */
+.chat-window-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  user-select: none;
+}
+/* the tab strip's "+" makes a NOTE; this window only holds chats, and its
+   title strip has the New chat button */
+.chat-window .tabplus {
+  display: none;
+}
+.chat-window-rail {
+  padding-top: 8px;
+}
+
 /* Chat can live in its own window: the segment plus a small sibling button
    (a button cannot hold a button). The companion is quiet until the pointer or
    the keyboard is on the pair; once Chat is out it stays visible, because it is

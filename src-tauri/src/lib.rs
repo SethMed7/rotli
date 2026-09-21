@@ -1973,7 +1973,7 @@ fn mount_connected_brain(
             );
         }
     }
-    chat_window::emit_corpus_changed(&app);
+    chat_window::emit_corpus_changed(app);
     Ok(())
 }
 

@@ -124,6 +124,21 @@ test("the top bar is a toolbar, not window chrome: brand instead of traffic ligh
   await expect(page.getByRole("button", { name: /Search notes and actions/ })).toBeVisible();
 });
 
+test("Rotli Web has one window: Chat cannot be pulled out, and ?window=chat is not a second app", async ({
+  page,
+}) => {
+  // a second browser tab would be a second writer with no coordination
+  await page.goto(APP);
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await expect(page.locator(".sb-switch-window")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Pull Chat out/ })).toHaveCount(0);
+
+  // the native window's address is just the app here, never a chat-only shell
+  await page.goto(`${APP}?window=chat`);
+  await expect(page.getByRole("group", { name: "Sidebar front" })).toBeVisible();
+  await expect(page.locator(".chat-window")).toHaveCount(0);
+});
+
 test("Settings → General offers a real folder (Chromium) and says where the notes live", async ({ page }) => {
   await page.goto(APP);
   await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");

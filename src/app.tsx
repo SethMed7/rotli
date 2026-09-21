@@ -57,6 +57,7 @@ import {
   workspaceTakeOpenRequest,
 } from "./lib/tauri";
 import { useNativeFileDrop } from "./editor/nativeFileDrop";
+import { PLATFORM } from "./lib/featurePolicy";
 import { onQuitFlushFailure } from "./lib/quitFlush";
 import { isOnboardingReview } from "./lib/reviewMode";
 import { fileQuickNoteInMain } from "./newItems/composition";
@@ -71,7 +72,7 @@ import { startRoutineUpdateCheck } from "./services/updateCheck";
 import { openSeededWelcome, openWelcome } from "./services/welcome";
 import { queryClient } from "./services/query";
 import { attachChatWindow } from "./state/chatWindow";
-import { hydrateMain } from "./state/main";
+import { addFragmentToMain, hydrateMain } from "./state/main";
 import { onboardingRequired } from "./state/onboarding";
 import { useOrganizerLive } from "./state/organizerLive";
 import { activeTabOf, leaves, usePanesStore } from "./state/panes";
@@ -138,7 +139,7 @@ function surfaceFromUrl(): Surface {
   const param = new URLSearchParams(window.location.search).get("window");
   if (param === "capture") return "capture";
   if (param === "quick") return "quick";
-  if (param === "chat") return "chat";
+  if (param === "chat" && PLATFORM !== "web") return "chat"; // a NATIVE window: nothing on the web
   return "main";
 }
 
@@ -545,10 +546,8 @@ export default function App() {
     return onQuickCreated(({ id }) => fileQuickNoteInMain(id));
   }, [surface]);
 
-  // Chat in its own window: each shell webview attaches its half of the
-  // hand-off (main records; the chat window reports) — state/chatWindow.ts
-  useEffect(() => attachChatWindow(), []);
-
+  // Chat in its own window: main records, the chat window reports (state/chatWindow.ts)
+  useEffect(() => attachChatWindow(addFragmentToMain), []);
   // A vault switch rebinds the live Rust default store. Keep all native windows
   // alive and replace only their vault-scoped caches/projections.
   useEffect(
