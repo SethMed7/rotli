@@ -190,19 +190,10 @@
 .sb-switch-seg.sel svg {
   color: var(--selected-icon);
 }
-.sb-switch-seg.sel .sb-switch-n {
-  color: var(--selected-muted);
-}
 .sb-switch-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.sb-switch-n {
-  flex: 0 0 auto;
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--text-muted);
 }
 
 /* — destination / folder / smart rows (shared .frow grammar) — */
@@ -491,6 +482,19 @@
    its slot even when hidden (opacity, not display), so nothing shifts on hover. */
 .main-row .snact {
   margin-left: 0;
+}
+/* ⌘⇧S pending: the top nine root notes wear their number (keys/leader.ts).
+   Static, like every sidebar hint — nothing to composite while idle. */
+.main-slot-n {
+  flex: 0 0 auto;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: var(--r-inner);
+  background: var(--selected-bg);
+  color: var(--selected-ink);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 .main-row.dragging {
   opacity: 0.4;
@@ -2460,6 +2464,16 @@
 .sb-footbtn .count {
   font-size: 10px;
   color: var(--text-muted);
+}
+/* "update available" on the footer's Settings button — the titlebar dot's twin
+   (.tb-update-dot): a warm clay dot in the row's flow, never a red badge, and
+   static (a hidden window must not composite) */
+.sb-footbtn .sb-update-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-text);
 }
 
 /* — the primary-color swatch row (Appearance + onboarding) — */

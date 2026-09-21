@@ -23,6 +23,7 @@ import { ActivityGlyph, FolderGlyph } from "../glyphs";
 import { Icon } from "../icon";
 
 export function SidebarFooter() {
+  const updateAvailable = useUiStore((state) => state.updateAvailable);
   // unreviewed daemon proposals — the badge on the Librarian link (§4.4.2);
   // sensitive-data decisions waiting on the user wear the RED variant instead
   // (the maintainer, 2026-07-31: "or I will never know")
@@ -110,17 +111,28 @@ export function SidebarFooter() {
           pendingProposals > 0 && <span className="count pill">{pendingProposals}</span>
         )}
       </button>
-      <button
-        type="button"
-        className="sb-footbtn"
-        title="Settings"
-        data-tour="settings"
-        data-hotkey="app.settings"
-        onClick={() => dispatch("app.settings")}
-      >
-        <Icon name="rotli-settings" size={14} />
-        <span className="fname">Settings</span>
-      </button>
+      <SettingsFootButton updateAvailable={updateAvailable} />
     </div>
+  );
+}
+
+/** Settings, wearing the same quiet clay dot as the titlebar's Settings button
+ * when a newer build is on the feed (the routine check, services/updateCheck).
+ * The dot is decoration; the button's name says it in words. */
+export function SettingsFootButton({ updateAvailable }: { updateAvailable: boolean }) {
+  return (
+    <button
+      type="button"
+      className="sb-footbtn"
+      title={updateAvailable ? "Update available — open Settings" : "Settings"}
+      aria-label={updateAvailable ? "Settings — update available" : undefined}
+      data-tour="settings"
+      data-hotkey="app.settings"
+      onClick={() => dispatch("app.settings")}
+    >
+      <Icon name="rotli-settings" size={14} />
+      <span className="fname">Settings</span>
+      {updateAvailable && <span className="sb-update-dot" aria-hidden="true" />}
+    </button>
   );
 }

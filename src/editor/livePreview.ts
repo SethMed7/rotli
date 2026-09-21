@@ -126,9 +126,11 @@ const INLINE: InlineRule[] = [
     // the silent dead click read as broken (the maintainer, 2026-07-28)
     clsFor: (m) =>
       resolveWikilinkTarget(m[1] ?? "") ? "rotli-wikilink" : "rotli-wikilink rotli-wikilink-missing",
+    // a live link gets the hover card (wikilinkHover) — a native title would
+    // pop over it; only the dead link keeps a plain one
     attrsFor: (m) =>
       resolveWikilinkTarget(m[1] ?? "")
-        ? { title: "Click to open note" }
+        ? undefined
         : { title: "No note with this name — the link has nowhere to go" },
     // [[target|display]] hides "[[target|" and "]]", showing only the display
     // (an EMPTY display falls back to showing the whole inner text)

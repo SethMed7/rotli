@@ -159,6 +159,10 @@ imports.
   aliases and substrings; an empty query offers the newest notes); Enter, Tab,
   or a click writes the closed link, using the id only when titles collide.
   Escape dismisses it and the text stays a plain, still-typed link.
+  Resting the pointer on a link that resolves shows a small card with the
+  note's title and its first lines as they read (markers, fences, and image
+  embeds left out); a click still opens the note. A secure note's card names
+  it and shows none of its text, and a link with no target shows no card.
 - Ordered lists count with numbers (`1. `) or a single ASCII letter
   (`a. `, `A. `). Rotli keeps each run consecutive in its own style: `a. a.
   d.` reads `a. b. c.`, a nested run starts at `1.` or `a.`, and a run never

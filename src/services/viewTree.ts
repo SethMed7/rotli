@@ -191,7 +191,10 @@ export function viewPickerItems(
     rename: () => void;
     remove: (name: string) => void;
   },
+  /** The two-step hotkey opened it: the first nine choices wear ⌘1–⌘9. */
+  numbered = false,
 ): MenuSpec[] {
+  const slot = (index: number) => (numbered && index < 9 ? { hint: `⌘${index + 1}` } : {});
   const items: MenuSpec[] = [
     {
       kind: "action",
@@ -199,13 +202,15 @@ export function viewPickerItems(
       checked: activeView === null,
       checkedMark: "highlight",
       onClick: () => on.show(null),
+      ...slot(0),
     },
-    ...manifest.views.map((view) => ({
+    ...manifest.views.map((view, index) => ({
       kind: "action" as const,
       label: view.name,
       checked: activeView === view.name,
       checkedMark: "highlight" as const,
       onClick: () => on.show(view.name),
+      ...slot(index + 1),
     })),
     { kind: "sep" },
     { kind: "action", label: "New view…", disabled: !writable, onClick: on.create },
@@ -235,6 +240,13 @@ export function viewPickerItems(
     );
   }
   return items;
+}
+
+/** Slot `n` (1–9) of the view picker: Main first, then the views in order.
+ * `undefined` when the slot is empty — the hotkey then does nothing. */
+export function viewAtSlot(manifest: ViewsManifest, n: number): string | null | undefined {
+  if (n === 1) return null;
+  return manifest.views[n - 2]?.name;
 }
 
 export function deleteNamedView(manifest: ViewsManifest, name: string): ViewsManifest {

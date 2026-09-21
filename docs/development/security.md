@@ -69,7 +69,7 @@ from every diagnostics path. Full record: egress threat model O7, design in
 | Breve local-model tier (`llm.ts`) | loopback only | memex/Signal/watcher text + prompts | managed config is normalized to a registered local model at every native boundary; legacy cloud-spawn helpers refuse before binary lookup |
 | Breve safe-fetch | curated public hosts | watchlist/summarize URLs | `safe-fetch.ts` (https-only, SSRF block, same-host redirects, caps) |
 | YouTube probes (`signal-daemon.ts`, `creator-alerts.ts`) | literal `youtube.com` | handle/channelId in the path/query only | host-pinned literal, `checkUrl`-gated |
-| Updater | GitHub releases | — | minisign-signed feed, single pinned HTTPS endpoint |
+| Updater | GitHub releases | — | minisign-signed feed, single pinned HTTPS endpoint. Two callers only, enforced by `check:security`: the Settings button, and the routine check (`src/services/updateCheck.ts`) behind the `autoUpdateCheck` switch — packaged builds only, no download without the user |
 | Private browser child webview | user-selected HTTP(S) destination through the chosen search provider | address/search text plus ordinary page traffic | explicit user navigation + `blocked_for_remote` address scan + scheme allowlist; only the provider ID persists; non-persistent datastore; remote guest omitted from every Tauri capability |
 | ImapFlow (`mail.ts`) | configured mail hosts | — | TLS strict except loopback |
 | Rotli app webviews | nothing | — | CSP `connect-src ipc:` only; no fetch/XHR/WebSocket in `src/` (`check:security` fails any undeclared raw `fetch(` under `src/`); capabilities target only `main`, `capture`, and `quick` labels rather than their whole windows |

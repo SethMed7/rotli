@@ -10,6 +10,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Rotli tells you when there is an update.** It checks its release page
+  shortly after it opens and a few times a day, and marks the Settings button
+  — in the title bar and at the bottom of the sidebar — with a small dot when a
+  newer version is out. Nothing downloads until you choose Install & relaunch.
+  Settings → General → "Check for updates automatically" turns the routine
+  check off; the Check for updates button stays either way.
+- **Two-step hotkeys: ⌘⇧W for views, ⌘⇧S for your top notes.** Press ⌘⇧W and
+  the view menu opens with ⌘1–⌘9 beside its choices; press the number to
+  switch. Press ⌘⇧S and the first nine notes at the top of Main show their
+  numbers; press one to open it. Pin or drag a note to keep it in its slot.
+  ⌘1–9 still jump between tabs the rest of the time, Esc backs out, and both
+  hotkeys can be changed in Settings → Hotkeys. Works in Rotli Web too.
+- **New chats are named by what they are about.** A chat still gets its name
+  the moment you send — then, after the first reply, the model you are
+  chatting with suggests a short name that says what the chat is for, and the
+  name updates. It is one small extra request to that same model and no other;
+  a chat that touched a secure note is never sent to a remote model for this;
+  a name you typed is never replaced; and the chat's file never moves.
+  Settings → General → "Name new chats by what they are about" turns it off.
+  In Rotli Web without the Helper, chats keep their first-words name.
+- **Hover a `[[link]]` to see the top of that note.** Rest the pointer on a
+  link and a small card shows the note's title and first lines without
+  opening it; a click still opens it. A secure note's card shows its name and
+  none of its text. Works in the Mac app and in Rotli Web.
+- **Send feedback.** Settings → About Rotli (and ⌘K → "Send feedback") opens a
+  new GitHub issue that starts with your Rotli version and operating system,
+  and nothing else.
+
+### Changed
+
+- **The Chat switch no longer shows a number.** The count of chats would not
+  hold up at a thousand, and screen readers read the button as "Chat 3"; it is
+  just "Chat" now.
+
 ### Fixed
 
 - **"Couldn't save Main — revision conflict" is gone, and so is the lock-up

@@ -12,7 +12,6 @@
 // the 3px clay ::before is the one selection grammar, shared with the panes.
 
 import {
-  type MouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
   useEffect,
@@ -94,6 +93,7 @@ import { noteDisplayTitle } from "./noteDisplayTitle";
 import { SidebarSystem, type SystemDestRow } from "./sidebarSystem";
 import { useActiveTree } from "./useActiveTree";
 import type { SidebarChatData } from "./useChatFolders";
+import { MainSlotHint, useHomeLeader } from "./useHomeLeader";
 import { type RovingRow, useRovingList } from "./useRovingList";
 
 /** Capture-board glyph — a 2×2 grid of cards (the quick-capture Board button).
@@ -372,27 +372,27 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     setViewInputError(null);
   };
 
-  const openViewMenu = (e: MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const items = viewPickerItems(viewsManifest, activeView, viewsWritable, {
-      show: setActiveView,
-      create: () => {
-        setEditingView("create");
-        setViewInputError(null);
+  const viewMenuItems = (numbered: boolean) =>
+    viewPickerItems(
+      viewsManifest,
+      activeView,
+      viewsWritable,
+      {
+        show: setActiveView,
+        create: () => {
+          setEditingView("create");
+          setViewInputError(null);
+        },
+        rename: () => {
+          setEditingView("rename");
+          setViewInputError(null);
+        },
+        remove: setDeletingView,
       },
-      rename: () => {
-        setEditingView("rename");
-        setViewInputError(null);
-      },
-      remove: setDeletingView,
-    });
-    const trigger = e.currentTarget;
-    const rect = trigger.getBoundingClientRect();
-    openContextMenu(rect.left, rect.bottom + 4, items, {
-      returnFocus: () => trigger.focus(),
-    });
-  };
+      numbered,
+    );
+  // the view menu by pointer, and numbered for ⌘⇧W; ⌘⇧S numbers the root notes
+  const { viewsButtonRef, openViewMenu } = useHomeLeader(viewMenuItems, setActiveView);
 
   // — Main pointer-drag reorder (HTML5 DnD is dead in the WKWebView shell, so the
   //   BoardSurface pointer pattern; a threshold distinguishes drag from click) —
@@ -558,7 +558,11 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     };
     return (
       <>
-        {childNotes.map((n) => {
+        {childNotes.map((n, noteIndex) => {
+          // ⌘⇧S then ⌘1–9: the first nine ROOT notes, in painted order (pinned
+          // float first, then the hand-arranged order) — root only, so opening a
+          // folder never renumbers them
+          const slot = parentId === MAIN_ROOT && noteIndex < 9 ? noteIndex + 1 : undefined;
           const parentFolderName = mainProjection.folders.find((folder) => folder.id === parentId)?.name;
           const displayTitle = noteDisplayTitle(n.title, parentFolderName) || "Empty note";
           return (
@@ -567,6 +571,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
               type="button"
               data-main-id={n.id}
               data-note-id={n.id}
+              data-main-slot={slot}
               /* the current file's Main copy wins the highlight (#25) — the same
                  accent pill a compact row gets when it's the focused note */
               className={`snrow main-row${n.id === focusedItemId ? " sel" : ""}${mainSel.has(n.id) ? " msel" : ""}${dropCls(n.id)}${mainDragId === n.id ? " dragging" : ""}`}
@@ -646,6 +651,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
             >
               {glyphForNote(n, { size: 14, className: "snicon" })}
               <span className="snt">{displayTitle}</span>
+              <MainSlotHint slot={slot} />
               {/* the floated pin's marker — same quiet glyph as pinned chats */}
               {n.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
               {starBtn(n.id)}
@@ -1110,6 +1116,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
             <button
               type="button"
               className="fsec-view"
+              ref={viewsButtonRef}
               data-tour="views"
               aria-label={`Current view: ${activeView ?? "Main"}. Change view`}
               aria-haspopup="menu"

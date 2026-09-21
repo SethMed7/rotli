@@ -180,6 +180,29 @@ test("an exact note-title wikilink opens on an ordinary click", async ({ page })
   await expect(page.locator(".cm-content")).toContainText("Free local forever.");
 });
 
+test("hovering a wikilink shows the top of that note; a dead link shows no card", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText("# Hover test\n\n[[Pricing decision]] and [[No such note at all]]\n\nafter");
+
+  const card = page.locator(".rotli-linkcard");
+  await page.locator(".rotli-wikilink", { hasText: "Pricing decision" }).hover();
+  await expect(card.locator(".rotli-linkcard-title")).toHaveText("Pricing decision");
+  await expect(card.locator(".rotli-linkcard-body")).toContainText("Free local forever.");
+  // the card reads like the note, never like its source
+  await expect(card.locator(".rotli-linkcard-body")).not.toContainText("#");
+
+  await page.locator(".rotli-wikilink-missing").hover();
+  await expect(card).toHaveCount(0);
+  await expect(page.locator(".rotli-wikilink-missing")).toHaveAttribute("title", /nowhere to go/);
+
+  // still a link: the card never swallows the click
+  await page.locator(".rotli-wikilink", { hasText: "Pricing decision" }).click();
+  await expect(page.locator(".cm-content")).toContainText("Free local forever.");
+});
+
 test("blank space below a note that ends with a wikilink does not open the link", async ({ page }) => {
   await gotoApp(page);
   await page.keyboard.press("Meta+T");

@@ -141,6 +141,11 @@ export function ContextMenu() {
               </span>
             )}
             <span className="ctxmenu-label">{item.label}</span>
+            {item.hint && (
+              <span className="ctxmenu-hint" aria-hidden="true">
+                {item.hint}
+              </span>
+            )}
           </button>
         );
       })}
