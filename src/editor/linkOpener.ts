@@ -10,12 +10,13 @@
 import { EditorView, showTooltip, type Tooltip } from "@codemirror/view";
 
 import { openUrl } from "../lib/tauri";
+import { chatSlugOf, isChatItem } from "../services/systemBrowser";
 import { usePanesStore } from "../state/panes";
 import { LINK_OPEN_FAILED, linkHref } from "./inlineLinks";
 import { linkFailureAt, linkFailureField, linkFailurePos, webLinkAt } from "./linkTarget";
 import { editorLinkOpensOnClick } from "./wikilink";
 import { wikilinkHover } from "./wikilinkHover";
-import { resolveWikilinkTarget } from "./wikilinkIndex";
+import { resolveWikilinkNote } from "./wikilinkIndex";
 import { wikilinkAt } from "./wikilinkPreview";
 
 const failureTooltip = showTooltip.compute([linkFailureField], (state): Tooltip | null => {
@@ -45,9 +46,12 @@ function openWebAddress(view: EditorView, raw: string, pos: number): void {
 
 function tryOpenWikilinkAt(lineText: string, col: number): boolean {
   const span = wikilinkAt(lineText, col);
-  const id = span ? resolveWikilinkTarget(span.target) : null;
-  if (!id) return false;
-  usePanesStore.getState().openNote(id);
+  const note = span ? resolveWikilinkNote(span.target) : null;
+  if (!note) return false;
+  // a linked CHAT opens as the conversation — the transcript file is what the
+  // Library shows; a link in a note is a way back into the chat itself
+  if (isChatItem(note)) usePanesStore.getState().openChat(chatSlugOf(note));
+  else usePanesStore.getState().openNote(note.id);
   return true;
 }
 

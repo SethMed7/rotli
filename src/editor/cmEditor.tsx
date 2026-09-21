@@ -18,8 +18,7 @@ import { type CSSProperties, memo, useCallback, useEffect, useMemo, useRef, useS
 import { ArrowUpGlyph, SearchGlyph } from "../components/glyphs";
 import { clamp } from "../lib/clamp";
 import { corpusImportFile, corpusPickImages, rootIdOf } from "../lib/tauri";
-import { DEST } from "../services/destinations";
-import { invalidateNotes, useNotes, useSearchableNotes } from "../services/hooks";
+import { invalidateNotes } from "../services/hooks";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
@@ -66,9 +65,9 @@ import {
 import { SlashPicker } from "./slashPicker";
 import { tableRender } from "./tableRender";
 import { insertTemplateFromPicker } from "./templateInsert";
+import { useWikilinkIndex } from "./useWikilinkIndex";
 import { vendorKeymap } from "./vendorKeymap";
 import { buildTitleCounts, wikilinkLabel } from "./wikilink";
-import { setWikilinkNotes } from "./wikilinkIndex";
 import { wikilinkPicker } from "./wikilinkPicker";
 
 /** The floating format bar (bottom-center, ~42px tall, sitting 16px up) covers
@@ -276,33 +275,9 @@ function CmEditorImpl({
     },
     [findIndex, findMatches, selectFindMatch],
   );
-  const { notes: searchableNotes } = useSearchableNotes();
-  // ARCHIVED notes still exist — their wikilinks must keep resolving (and
-  // opening); only Trash reads as deleted → the missing look (the maintainer, 2026-07-28:
-  // "if I delete then it should show like that")
-  const archivedNotes = useNotes(DEST.archive).data;
-
-  // Resolution reads only id + title + aliases, so the rebuild-and-redecorate
-  // effect keys on THAT fingerprint — not on array identity, which churns per
-  // save cycle while typing (snippet/updatedAt change) and used to force a
-  // whole-document wikilink decoration recompute each time (perf audit
-  // 2026-07-30, finding 9).
-  const wikilinkSource = useMemo(() => {
-    const archived = (archivedNotes ?? []).filter((n) => n.kind !== "file");
-    const list = archived.length ? [...searchableNotes, ...archived] : searchableNotes;
-    const key = list.map((n) => `${n.id}\0${n.title}\0${(n.aliases ?? []).join("\x01")}`).join("\n");
-    return { list, key };
-  }, [searchableNotes, archivedNotes]);
-  const wikilinkSourceRef = useRef(wikilinkSource);
-  wikilinkSourceRef.current = wikilinkSource;
-  useEffect(() => {
-    setWikilinkNotes(wikilinkSourceRef.current.list);
-    // re-decorate: the resolved-vs-missing wikilink look reads this index,
-    // which lands async after the view first painted — an explicit (no-move)
-    // selection transaction is the cheapest "selectionSet" rebuild trigger
-    const view = viewRef.current;
-    if (view) view.dispatch({ selection: view.state.selection });
-  }, [wikilinkSource.key]);
+  // what a [[link]] can resolve to — notes, archived notes, chats — and the
+  // re-decoration when that changes (useWikilinkIndex.ts)
+  const { linkable } = useWikilinkIndex(viewRef);
   // the slash key-handler reads live state through this ref (the CM dom handler
   // is created once, but it must see the current query/index)
   const slashRef = useRef<{ open: boolean; handle: (e: KeyboardEvent) => boolean }>({
@@ -405,8 +380,8 @@ function CmEditorImpl({
       if (mode === "insertTemplate") return insertTemplateFromPicker(view, note.id, picker, setPicker);
       let insert: string;
       let caret: number;
-      if (mode === "linkNote") {
-        const label = wikilinkLabel(note, buildTitleCounts(searchableNotes));
+      if (mode === "linkNote" || mode === "linkChat") {
+        const label = wikilinkLabel(note, buildTitleCounts(linkable));
         insert = `[[${label}]]`;
         caret = insert.length;
       } else {
@@ -421,7 +396,7 @@ function CmEditorImpl({
       setPicker(null);
       view.focus();
     },
-    [picker, searchableNotes],
+    [picker, linkable],
   );
 
   const openPicker = useCallback(
@@ -444,7 +419,7 @@ function CmEditorImpl({
       const view = viewRef.current;
       if (!view) return;
       const line = view.state.doc.lineAt(view.state.selection.main.head);
-      const span = slashSpanAtCaret(line.text, view.state.selection.main.head - line.from);
+      const span = slashSpanAtCaret(line.text, view.state.selection.main.head - line.from, item.op);
       if (!span) return;
       const spanFrom = line.from + span.from;
       // where the command's content begins once the span is cleared — on a

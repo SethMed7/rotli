@@ -41,7 +41,7 @@ export function slashInsertion(op: SlashOp): SlashInsertion | null {
 }
 
 export function pickerFence(
-  mode: Exclude<SlashPickerMode, "linkNote" | "insertTemplate">,
+  mode: Exclude<SlashPickerMode, "linkNote" | "linkChat" | "insertTemplate">,
   fileId: string,
 ): string {
   const lang = mode === "embedBoard" ? "board" : mode === "embedSheet" ? "sheet" : "document";

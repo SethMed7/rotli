@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Slash commands work inside a list item, after your text.** Type
+  `- [ ] Ask Gabriel /link` and the menu opens right there — no need to drop to
+  a new line. Link note, Link chat, and Inline code go into the sentence; any
+  other command lands just beneath the item. Ordinary slashes in your writing
+  (`and/or`, a web address, `yes / no`) never open it.
+- **Link a chat, not just a note.** The new **Link chat** command lists your
+  chats and inserts a link; clicking it opens that conversation. Hovering shows
+  the top of the chat, like any linked note.
 - **Templates.** Keep your reusable layouts as ordinary notes in a folder named
   **Templates**, then type `/template` in any note, pick one, and its content
   drops in where you were typing. In an empty note the template's heading

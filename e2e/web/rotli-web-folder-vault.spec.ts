@@ -172,6 +172,33 @@ test("/template inserts a layout from the connected folder's Templates folder", 
   await expect(page.getByRole("tab", { selected: true })).toContainText("Hello");
 });
 
+test("a slash after text in a checklist item links one of the folder's chats", async ({ page }) => {
+  await fakeHelper(page);
+  await plantFolder(page);
+  await page.reload();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Hello");
+
+  const editor = page.locator(".pane.focused .cm-content");
+  await editor.locator(".cm-line").last().click();
+  await page.keyboard.press("End");
+  await page.keyboard.insertText("\n\n- [ ] follow up on ");
+  await page.keyboard.type("/chat");
+  await page
+    .getByRole("menu", { name: "Insert block" })
+    .getByRole("menuitem", { name: /Link chat/ })
+    .click();
+  await page.getByRole("searchbox").fill("sonnet");
+  await expect(page.getByRole("menu", { name: "Link chat" }).locator(".slashlabel")).toHaveText([
+    "Sonnet chat",
+  ]);
+  await page.keyboard.press("Enter");
+
+  const link = editor.locator(".rotli-wikilink", { hasText: "Sonnet chat" });
+  await expect(link).toBeVisible();
+  await expect(link).not.toHaveClass(/rotli-wikilink-missing/);
+  await expect(editor.locator(".cm-line", { hasText: "follow up on" })).toContainText("Sonnet chat");
+});
+
 test("a folder waiting on the browser's permission is said in the sidebar, with Reconnect", async ({
   page,
 }) => {

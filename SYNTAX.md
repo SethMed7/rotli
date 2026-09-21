@@ -88,6 +88,18 @@ imports.
   a picture. Rotli renders it as a playable embed with native
   controls; the `|width` suffix and the resize grip apply. Elsewhere the line
   stays an ordinary Markdown image reference.
+- A slash command is the whole content of a line or list item (`/table`,
+  `- [ ] /link`), or a `/command` typed as the last word after text — in a
+  paragraph or in any bullet, numbered, or checklist item — so a command can be
+  reached without leaving the item. After text, prose keeps its slashes: the
+  slash needs a space before it (`and/or`, a URL), at least one letter after it
+  (`yes / no`), and a command that matches (`/usr`). A command that belongs in
+  a sentence (**Link note**, **Link chat**, **Inline code**) inserts in place;
+  any other lands on a continuation line beneath, leaving the text whole.
+- **Link chat** lists your chats and inserts an ordinary wikilink
+  (`[[Chat title]]`, or its slug when the title is not unique). A chat is a
+  transcript file in the vault, so the link resolves like any other; clicking
+  it opens the conversation rather than the transcript file.
 - Inside a result row's ` — reason`, a `/command` typed as the last word (after
   a space, or as the whole reason) opens the same slash menu. The picked block
   lands on a continuation line beneath the row, the row keeps its label and
