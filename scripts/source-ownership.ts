@@ -147,6 +147,7 @@ export const SERVICE_FILE_OWNERS = {
   "noteLifecycle.ts": "vault lifecycle",
   "notes.ts": "notes adapter",
   "remoteAgent.ts": "remote-agent relay adapter seam (development builds only)",
+  "updateCheck.ts": "app updates (the routine, switchable check of the signed release feed)",
   "welcome.ts": "Welcome folder seeding and Main filing composition",
   "webNotes.ts": "notes",
   "webTasks.ts": "Tasks projection outside the Mac app (the corpus.rs twin)",

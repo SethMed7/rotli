@@ -10,6 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Rotli tells you when there is an update.** It checks its release page
+  shortly after it opens and a few times a day, and marks the Settings button
+  — in the title bar and at the bottom of the sidebar — with a small dot when a
+  newer version is out. Nothing downloads until you choose Install & relaunch.
+  Settings → General → "Check for updates automatically" turns the routine
+  check off; the Check for updates button stays either way.
+- **Send feedback.** Settings → About Rotli (and ⌘K → "Send feedback") opens a
+  new GitHub issue that starts with your Rotli version and operating system,
+  and nothing else.
+
+### Changed
+
+- **The Chat switch no longer shows a number.** The count of chats would not
+  hold up at a thousand, and screen readers read the button as "Chat 3"; it is
+  just "Chat" now.
+
 ## [1.2.0] - 2026-09-18
 
 Rotli 1.2: Add to folder for a whole selection, Tasks rebuilt (and working in

@@ -190,19 +190,10 @@
 .sb-switch-seg.sel svg {
   color: var(--selected-icon);
 }
-.sb-switch-seg.sel .sb-switch-n {
-  color: var(--selected-muted);
-}
 .sb-switch-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.sb-switch-n {
-  flex: 0 0 auto;
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--text-muted);
 }
 
 /* — destination / folder / smart rows (shared .frow grammar) — */
@@ -2456,6 +2447,16 @@
 .sb-footbtn .count {
   font-size: 10px;
   color: var(--text-muted);
+}
+/* "update available" on the footer's Settings button — the titlebar dot's twin
+   (.tb-update-dot): a warm clay dot in the row's flow, never a red badge, and
+   static (a hidden window must not composite) */
+.sb-footbtn .sb-update-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-text);
 }
 
 /* — the primary-color swatch row (Appearance + onboarding) — */

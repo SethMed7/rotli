@@ -19,7 +19,11 @@ store. Deleting the app does not transfer ownership of the files to Rotli.
 Rotli does not operate an analytics or account endpoint. Network activity is
 limited to declared product capabilities:
 
-- the signed updater may check the pinned GitHub release feed;
+- the signed updater checks the pinned GitHub release feed for a newer version:
+  shortly after the app opens and a few times a day, and whenever you press
+  "Check for updates". The request carries no account, vault, or note data.
+  Settings → General → "Check for updates automatically" turns the routine
+  check off; nothing is downloaded until you choose Install;
 - a user-enabled connected chat lane launches the already-authenticated official
   Claude Code, Codex, or Cursor client on the same Mac; that client sends the
   bounded conversation/context needed for the request under its provider's

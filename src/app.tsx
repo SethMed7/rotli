@@ -66,6 +66,7 @@ import { invalidateFolders, invalidateJournal, invalidateNotes } from "./service
 import { adoptPendingAtOrganize } from "./services/librarianAutoAdopt";
 import { notesService, webVaultWasRestored } from "./services/notes";
 import { isWebVault } from "./lib/browserVault";
+import { startRoutineUpdateCheck } from "./services/updateCheck";
 import { openSeededWelcome, openWelcome } from "./services/welcome";
 import { queryClient } from "./services/query";
 import { hydrateMain } from "./state/main";
@@ -550,6 +551,13 @@ export default function App() {
       }),
     [],
   );
+
+  // the routine update check (services/updateCheck): main only, packaged
+  // builds only, behind its Settings switch — it lights the Settings dot
+  useEffect(() => {
+    if (surface !== "main") return;
+    return startRoutineUpdateCheck();
+  }, [surface]);
 
   useEffect(() => {
     if (surface !== "main") return;

@@ -40,6 +40,7 @@ import { cycleQuick, removeQuickNote } from "../state/quick";
 import { toggleSettings } from "../state/settingsToggle";
 import { startTour } from "../state/tour";
 import { SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
+import { registerAppLinkActions } from "./appLinkActions";
 import { registerCaptureActions } from "./captureActions";
 import { EDITOR_ACTION } from "./editorActionIds";
 import { focusedNoteIdNow, notesWorkspaceActive } from "./focusNow";
@@ -292,6 +293,7 @@ export function registerDefaultActions(): void {
     },
   });
   registerAction({ id: "app.tour", title: "Show me around", defaultChord: null, run: startTour });
+  registerAppLinkActions();
   registerAction({
     id: "app.settings",
     title: "Settings",
