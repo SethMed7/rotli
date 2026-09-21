@@ -22,6 +22,7 @@ import { NATIVE_IMAGE_EXTS } from "../editor/externalImageDrop";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { BLOCK_MARKERS } from "../services/derive";
 import { DEST } from "../services/destinations";
+import { TEMPLATES_BRAIN_FOLDER } from "../services/templates";
 import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
 import { CHAT_IMAGE_ASSET_EXTS, CHAT_IMAGE_ASSET_MAX_BYTES } from "./chatWork";
 import { VIDEO_EXTS } from "./fileKind";
@@ -53,6 +54,10 @@ describe("parity.json ↔ TS constants", () => {
 
   test("nativeImagePickerExts", () => {
     expect([...NATIVE_IMAGE_EXTS]).toEqual(entries.nativeImagePickerExts.value);
+  });
+
+  test("templatesBrainFolder", () => {
+    expect<string>(TEMPLATES_BRAIN_FOLDER).toBe(entries.templatesBrainFolder.value);
   });
 
   test("videoExts", () => {

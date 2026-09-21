@@ -40,7 +40,23 @@ export function slashInsertion(op: SlashOp): SlashInsertion | null {
   return { insert: result.line, caret: result.line.length };
 }
 
-export function pickerFence(mode: Exclude<SlashPickerMode, "linkNote">, fileId: string): string {
+export function pickerFence(
+  mode: Exclude<SlashPickerMode, "linkNote" | "insertTemplate">,
+  fileId: string,
+): string {
   const lang = mode === "embedBoard" ? "board" : mode === "embedSheet" ? "sheet" : "document";
   return `\`\`\`${lang}\n${fileId}\n\`\`\`\n\n`;
+}
+
+/** What `/template` inserts from a template note's body. Into an EMPTY note it
+ * comes whole: its leading `# Heading` becomes the new note's title, which is
+ * the point of starting from a template. Into a note that already has content
+ * that leading H1 is the TEMPLATE's name, not content — a note's first H1 is
+ * its title, so carrying it in could retitle and rename the host. Bodies
+ * arrive frontmatter-free from every adapter; a stray leading fence is skipped
+ * anyway, because frontmatter is Rotli's to own. */
+export function templateInsertion(body: string, hostIsEmpty: boolean): string {
+  let text = body.replace(/^\uFEFF?---\n[\s\S]*?\n---\n?/, "");
+  if (!hostIsEmpty) text = text.replace(/^\s*# [^\n]*(?:\n|$)/, "");
+  return text.trim();
 }

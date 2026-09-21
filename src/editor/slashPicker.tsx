@@ -10,6 +10,7 @@ import { createManagedItem } from "../newItems/composition";
 import { DEST } from "../services/destinations";
 import { useNotes, useSearchableNotes } from "../services/hooks";
 import { inboxFolderId } from "../services/notes";
+import { TEMPLATES_FOLDER, isTemplateNote } from "../services/templates";
 import { SHEET_EDITABLE } from "../sheets/kinds";
 import type { NoteSummary } from "../types";
 import type { SlashPickerMode } from "./slashMenu";
@@ -28,7 +29,8 @@ function fuzzy(query: string, text: string): boolean {
 function filterNotes(notes: NoteSummary[], mode: SlashPickerMode, query: string): NoteSummary[] {
   const q = query.trim();
   let pool = notes;
-  if (mode === "embedBoard") pool = notes.filter((n) => n.kind === "board");
+  if (mode === "insertTemplate") pool = notes.filter(isTemplateNote);
+  else if (mode === "embedBoard") pool = notes.filter((n) => n.kind === "board");
   else if (mode === "embedSheet")
     pool = notes.filter((n) => n.kind === "file" && SHEET_EDITABLE.has(extOf(fileName(n.id))));
   else if (mode === "embedDocument")
@@ -37,7 +39,7 @@ function filterNotes(notes: NoteSummary[], mode: SlashPickerMode, query: string)
 }
 
 async function createEmbeddedItem(mode: SlashPickerMode): Promise<string | null> {
-  if (!isTauri() || mode === "linkNote") return null;
+  if (!isTauri() || mode === "linkNote" || mode === "insertTemplate") return null;
   const kind = mode === "embedBoard" ? "board" : mode === "embedSheet" ? "sheet" : "document";
   const item = await createManagedItem(kind, { open: false });
   return item.id || null;
@@ -45,6 +47,7 @@ async function createEmbeddedItem(mode: SlashPickerMode): Promise<string | null>
 
 const MODE_LABEL: Record<SlashPickerMode, string> = {
   linkNote: "Link note",
+  insertTemplate: "Template",
   embedBoard: "Board",
   embedSheet: "Sheet",
   embedDocument: "Document",
@@ -81,7 +84,7 @@ export function SlashPicker({
   }, [usesStorage, storageData, searchable.notes, mode, query]);
   useEffect(() => {
     let cancelled = false;
-    if (mode === "linkNote" || !isTauri()) return;
+    if (mode === "linkNote" || mode === "insertTemplate" || !isTauri()) return;
     void corpusManagedFileCreationAvailable()
       .then((available) => {
         if (!cancelled) setCreationAvailable(available);
@@ -163,7 +166,11 @@ export function SlashPicker({
       {!ready && <div className="slashpicker-empty">Loading…</div>}
       {ready && rows === 0 && (
         <div className="slashpicker-empty">
-          {mode === "embedDocument" ? "No editable DOCX documents in Storage yet" : "No matches"}
+          {mode === "embedDocument"
+            ? "No editable DOCX documents in Storage yet"
+            : mode === "insertTemplate" && !query.trim()
+              ? `No templates yet — any note you keep in a folder named ${TEMPLATES_FOLDER} shows up here`
+              : "No matches"}
         </div>
       )}
       {createError && <div className="slashpicker-empty is-error">{createError}</div>}

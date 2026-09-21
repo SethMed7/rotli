@@ -65,6 +65,7 @@ import {
 } from "./slashMenu";
 import { SlashPicker } from "./slashPicker";
 import { tableRender } from "./tableRender";
+import { insertTemplateFromPicker } from "./templateInsert";
 import { vendorKeymap } from "./vendorKeymap";
 import { buildTitleCounts, wikilinkLabel } from "./wikilink";
 import { setWikilinkNotes } from "./wikilinkIndex";
@@ -401,6 +402,7 @@ function CmEditorImpl({
       const view = viewRef.current;
       if (!view || picker == null) return;
       const at = picker.insertAt;
+      if (mode === "insertTemplate") return insertTemplateFromPicker(view, note.id, picker, setPicker);
       let insert: string;
       let caret: number;
       if (mode === "linkNote") {

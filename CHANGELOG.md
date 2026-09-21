@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Templates.** Keep your reusable layouts as ordinary notes in a folder named
+  **Templates**, then type `/template` in any note, pick one, and its content
+  drops in where you were typing. In an empty note the template's heading
+  becomes the note's title; in a note you have already started, only the
+  content below that heading is added, so your note keeps its own name. The
+  Librarian leaves the Templates folder alone. Works in the Mac app and in
+  Rotli Web.
+
 ## [1.2.0] - 2026-09-18
 
 Rotli 1.2: Add to folder for a whole selection, Tasks rebuilt (and working in

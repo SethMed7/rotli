@@ -240,6 +240,10 @@
         "ico"
       ]
     },
+    "templatesBrainFolder": {
+      "sourceOfTruth": "src/services/templates.ts TEMPLATES_BRAIN_FOLDER ↔ src-tauri/src/organizer.rs TEMPLATES_BRAIN_FOLDER",
+      "value": "wiki/Templates"
+    },
     "videoExts": {
       "sourceOfTruth": "src/lib/fileKind.ts VIDEO_EXTS ↔ src-tauri/src/corpus.rs VIDEO_EXTS",
       "value": [
