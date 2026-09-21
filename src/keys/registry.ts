@@ -166,18 +166,20 @@ export function attachDispatcher(surface: Surface): () => void {
     if (event.repeat) return; // auto-repeat is not a fresh press — never re-fire a command
     const pressed = chordFromEvent(event);
     if (!pressed) return;
-    // a pending two-step hotkey (keys/leader.ts) is offered the key first:
-    // for that one keystroke ⌘1–9 mean "slot 1–9", not a tab jump
-    if (leaderConsumes(pressed)) {
-      event.preventDefault();
-      return;
-    }
     // a modifier-less chord must never swallow typing: inside editable targets
     // only Esc / Enter / F-keys may dispatch bare (the capture card's ⏎ save,
     // Esc everywhere) — a bare-letter rebind stays typable in text fields
     if (!(event.ctrlKey || event.altKey || event.metaKey) && isEditableTarget(event.target)) {
       const key = pressed.split("+").pop() ?? "";
       if (!/^(Esc|Enter|F\d{1,2})$/.test(key)) return;
+    }
+    // a pending two-step hotkey (keys/leader.ts) is offered the key before any
+    // action: for that one keystroke ⌘1–9 mean "slot 1–9", not a tab jump.
+    // AFTER the typing guard above, so a bare digit typed into the editor or a
+    // filter while a leader is pending is still just a digit.
+    if (leaderConsumes(pressed)) {
+      event.preventDefault();
+      return;
     }
     // over an Excalidraw canvas the clash chords belong to the canvas
     if (CANVAS_OWNED_CHORDS.has(pressed) && isCanvasTarget(event.target)) return;

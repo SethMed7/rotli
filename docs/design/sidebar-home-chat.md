@@ -197,7 +197,8 @@ id, not by chord.
 **Two-step hotkeys (1.3.0).** `⌘⇧W` and `⌘⇧S` are leaders
 (`src/keys/leader.ts`): ordinary, rebindable actions whose job is to arm one
 more keystroke. While a leader is pending the dispatcher offers it every key
-first, so for that one press `⌘1–9` (or the bare number) means "slot 1–9"
+first, so for that one press `⌘1–9` (or the bare number, outside a text field —
+a digit typed into a note is never stolen) means "slot 1–9"
 instead of a tab jump; the binding format, the recorder, and saved overrides
 are untouched. A pick, `Esc`, any other chord, four seconds, or another leader
 ends it — a leader is never sticky. The Home front answers both, because it
