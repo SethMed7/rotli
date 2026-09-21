@@ -7,6 +7,7 @@ import { EditorSelection } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 
 import { notesService } from "../services/notes";
+import { isPresetTemplate, presetTemplateBody } from "../services/templates";
 import { useUiStore } from "../state/ui";
 import { templateInsertion } from "./slashActions";
 import { adaptSlashInsertion } from "./slashMenu";
@@ -19,8 +20,11 @@ export function insertTemplateFromPicker(
 ): void {
   closePicker(null);
   view.focus();
-  void notesService
-    .getNote(templateId)
+  // a built-in preset is Rotli's own text, not a note in the vault
+  const read = isPresetTemplate(templateId)
+    ? Promise.resolve(presetTemplateBody(templateId)).then((body) => (body === null ? null : { body }))
+    : notesService.getNote(templateId);
+  void read
     .then((template) => {
       if (!template) throw new Error("that template is no longer there");
       if (!view.dom.isConnected) return;

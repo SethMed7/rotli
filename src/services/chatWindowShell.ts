@@ -17,7 +17,7 @@ import { invalidateChatFolders } from "./chatFolders";
 import { summonChat } from "./chatSummon";
 import { invalidateNotes } from "./hooks";
 
-/** The Mac app only, and in the work (lib/featurePolicy.ts chatWindow). */
+/** The Mac app only (lib/featurePolicy.ts chatWindow). */
 export function chatWindowSupported(): boolean {
   return LAUNCH_FEATURES.chatWindow && isTauri();
 }

@@ -8,22 +8,15 @@ import { useUiStore } from "../../state/ui";
 export function sidebarPlacementMenu(): MenuSpec[] {
   const ui = useUiStore.getState();
   const other = ui.sidebarSide === "left" ? "right" : "left";
+  // one verb per knob, always the OTHER state (the owner, 2026-09-21: picking
+  // the already-current "Open sidebar on hover" row changed nothing)
+  const hover = ui.sidebarReveal === "hover";
   return [
     { kind: "action", label: `Move sidebar to ${other}`, onClick: () => ui.setSidebarSide(other) },
-    { kind: "sep" },
     {
       kind: "action",
-      label: "Keep sidebar open",
-      checked: ui.sidebarReveal === "pinned",
-      checkedMark: "highlight",
-      onClick: () => ui.setSidebarReveal("pinned"),
-    },
-    {
-      kind: "action",
-      label: "Open sidebar on hover",
-      checked: ui.sidebarReveal === "hover",
-      checkedMark: "highlight",
-      onClick: () => ui.setSidebarReveal("hover"),
+      label: hover ? "Keep sidebar open" : "Open sidebar on hover",
+      onClick: () => ui.setSidebarReveal(hover ? "pinned" : "hover"),
     },
   ];
 }

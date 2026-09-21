@@ -13,7 +13,9 @@ function askHomeFront(id: "views" | "sidebar"): void {
   // a dirty form, which is not a hotkey's call to make
   if (ui.sidebarMode !== "notes") return;
   if (ui.sidebarCollapsed) ui.setSidebarCollapsed(false);
-  if (ui.sidebarView !== "home") ui.setSidebarView("home");
+  // Chat has its own view row and answers the view menu itself (2026-09-21);
+  // the numbered notes live only in Home
+  if (ui.sidebarView !== "home" && !(id === "views" && ui.sidebarView === "chat")) ui.setSidebarView("home");
   ui.requestLeader(id);
 }
 

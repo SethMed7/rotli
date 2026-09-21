@@ -97,12 +97,22 @@ test("⌘⇧W opens the numbered view menu; ⌘number switches view, even from t
   await expect(menu).toHaveCount(0);
   await expect(switcher).toHaveAccessibleName(/Current view: Work/);
 
-  // from the Chat front the hotkey brings Home back, then answers
+  // from the Chat front the hotkey answers right there — Chat has its own
+  // view row now (2026-09-21) — and the front stays Chat
   await page.getByRole("button", { name: "Chat", exact: true }).click();
-  await expect(switcher).toHaveCount(0);
+  const chatSwitcher = page.getByRole("group", { name: "Chat view context" }).getByRole("button", {
+    name: /Current view:/,
+  });
+  await expect(chatSwitcher).toHaveAccessibleName(/Current view: Work/);
   await page.keyboard.press("Meta+Shift+W");
   await expect(menu.locator(".ctxmenu-hint")).toHaveText(["⌘1", "⌘2"]);
   await page.keyboard.press("Meta+1");
+  await expect(chatSwitcher).toHaveAccessibleName(/Current view: Main/);
+  await expect(page.getByRole("button", { name: "Chat", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("button", { name: "Home", exact: true }).click();
   await expect(switcher).toHaveAccessibleName(/Current view: Main/);
 
   // opened by pointer, the same menu carries no numbers

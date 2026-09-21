@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-09-21
+
 ### Added
 
 - **Slash commands work inside a list item, after your text.** Type
@@ -25,8 +27,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   drops in where you were typing. In an empty note the template's heading
   becomes the note's title; in a note you have already started, only the
   content below that heading is added, so your note keeps its own name. The
-  Librarian leaves the Templates folder alone. Works in the Mac app and in
-  Rotli Web.
+  Librarian leaves the Templates folder alone. The picker's **Create new**
+  makes a new template right there and opens it. Rotli also offers a few
+  built-in starters — meeting notes, a daily note, a project brief, a bug
+  report, a weekly review — after your own; they are never saved into your
+  vault, one of yours with the same name takes its place, and Settings →
+  General → "Offer built-in templates" turns them off. Works in the Mac app
+  and in Rotli Web.
+- **Settings → Chat.** One place for how chats start: the model every new chat
+  opens on (with a button that sends it a real test message), whether a new
+  chat asks for a name first, and whether it is renamed by what it is about.
+  The naming choices moved here from General and Appearance.
+- **Chat in its own window.** Drag the Chat switch out of the sidebar — or
+  use its small corner button, or right-click it — and Chat opens in a window
+  of its own that holds only chats; ⌘T and ⌘N there start a new chat, and
+  the sidebar button up top (or ⌘0) hides and shows its chat list. While
+  Chat is out, the main window's switch shows only Home (and Breve), with a
+  button at its end that brings Chat back; the Chat window has the same "Put
+  Chat back in the main window" button at the top of its list. Chat cannot be
+  pulled out while a chat is still answering. Mac app only.
+- **Change views from Chat.** The Chat side now shows which view you are in
+  and lets you switch — Main for every chat, or one of your views — without
+  going back to Home. A note made with ⌘T or ⌘N while a view is active lands
+  in that view and in Main, wherever you press it. A view lists only the chats in it —
+  a view with none shows none, instead of falling back to every chat — and
+  Main still lists them all.
 - **Rotli tells you when there is an update.** It checks its release page
   shortly after it opens and a few times a day, and marks the Settings button
   — in the title bar and at the bottom of the sidebar — with a small dot when a
@@ -45,7 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   name updates. It is one small extra request to that same model and no other;
   a chat that touched a secure note is never sent to a remote model for this;
   a name you typed is never replaced; and the chat's file never moves.
-  Settings → General → "Name new chats by what they are about" turns it off.
+  Settings → Chat → "Name new chats by what they are about" turns it off.
   In Rotli Web without the Helper, chats keep their first-words name.
 - **Hover a `[[link]]` to see the top of that note.** Rest the pointer on a
   link and a small card shows the note's title and first lines without
@@ -60,6 +85,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The Chat switch no longer shows a number.** The count of chats would not
   hold up at a thousand, and screen readers read the button as "Chat 3"; it is
   just "Chat" now.
+- **The sidebar's right-click menu always offers the other choice.** It used
+  to list "Keep sidebar open" and "Open sidebar on hover" together, and
+  picking the one already in use did nothing. It now shows only the one you
+  are not using, so a click always changes something.
 
 ### Fixed
 

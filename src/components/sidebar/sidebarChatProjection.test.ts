@@ -5,9 +5,9 @@ import { relativeChatAge, visibleSidebarChats } from "./sidebarChatProjection";
 const chats = [{ slug: "one" }, { slug: "two" }];
 
 describe("Chat-front projection", () => {
-  test("an empty or legacy named view falls back to every saved chat", () => {
-    expect(visibleSidebarChats(chats, [])).toEqual(chats);
-    expect(visibleSidebarChats(chats, ["no-longer-present"])).toEqual(chats);
+  test("a named view with no chats of its own shows none — never every chat", () => {
+    expect(visibleSidebarChats(chats, [])).toEqual([]);
+    expect(visibleSidebarChats(chats, ["no-longer-present"])).toEqual([]);
   });
 
   test("a named view with chat membership still narrows the list", () => {

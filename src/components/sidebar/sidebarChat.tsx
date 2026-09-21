@@ -34,6 +34,7 @@ import { InlineRenameInput } from "../inlineRenameInput";
 import { compactUsageNumber, modelUsageSnapshot } from "../modelUsageSummary";
 import { chatFileMenuItems } from "./chatFileActions";
 import { chatMark } from "./chatMark";
+import { ChatViewPicker } from "./chatViewPicker";
 import { ModelLogo } from "./modelLogo";
 import { relativeChatAge, visibleSidebarChats } from "./sidebarChatProjection";
 import { type SidebarChatData, chatFolderKey } from "./useChatFolders";
@@ -84,9 +85,8 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   const chatModelMap = useUiStore((s) => s.chatModel);
   const chatModelId = useUiStore((s) => s.chatModelId);
 
-  // Chats participate in named views (2026-08-03), but an empty/legacy view
-  // must not turn a non-empty Chat front into a blank list. Once that view has
-  // at least one live chat membership it narrows normally.
+  // Chats participate in named views (2026-08-03): a view lists only the chats
+  // assigned to it, even none (2026-09-21); Main lists every chat.
   const activeView = useUiStore((s) => s.activeView);
   const setActiveView = useUiStore((s) => s.setActiveView);
   const viewsManifest = useViewsStore((s) => s.manifest);
@@ -96,8 +96,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
     chatList,
     activeView ? viewChats(viewsManifest, activeView) : null,
   );
-  const visibleSlugs =
-    visibleChats.length === chatList.length ? null : new Set(visibleChats.map((c) => c.slug));
+  const visibleSlugs = activeView ? new Set(visibleChats.map((c) => c.slug)) : null;
   const inView = (c: MemexChatSummary) => visibleSlugs === null || visibleSlugs.has(c.slug);
   const showAllChats = () => {
     setActiveView(null);
@@ -485,23 +484,19 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
           <SearchGlyph size={14} />
           <span className="fname">All chats</span>
         </button>
-        {activeView && (
-          <div className="sb-chatview" role="group" aria-label="Chat view context">
-            <span className="sb-chatview-label">View</span>
-            <span className="sb-chatview-name" title={activeView}>
-              {activeView}
-            </span>
-            <button type="button" className="sb-chatview-all" onClick={showAllChats}>
-              Show all chats
-            </button>
-          </div>
-        )}
+        <ChatViewPicker
+          onNewChat={() => openChat(null, chats.activeMemex ? { vaultId: chats.activeMemex.id } : undefined)}
+        />
         {!activeMemex ? (
           <button type="button" className="sb-chat-empty" onClick={() => dispatch("app.settings")}>
             Choose a vault in Settings → Location
           </button>
         ) : chatList.length === 0 ? (
           <p className="sb-empty">No chats yet.</p>
+        ) : activeView && visibleChats.length === 0 ? (
+          <p className="sb-empty">
+            No chats in {activeView} yet — start one here, or move one in from its menu.
+          </p>
         ) : (
           <>
             {activityChats.length > 0 && (

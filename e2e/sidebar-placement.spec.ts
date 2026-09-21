@@ -67,7 +67,8 @@ test("on hover the sidebar leaves the flow; the edge reveals it and leaving hide
   await enterEdge(page, box.x + 3, box.y + box.height / 2);
   await expect(overlay).toBeVisible();
   await overlay.dispatchEvent("contextmenu", { clientX: 40, clientY: 300 });
-  await page.getByRole("menuitemcheckbox", { name: "Keep sidebar open" }).click();
+  await expect(page.getByRole("menuitem", { name: "Open sidebar on hover" })).toHaveCount(0);
+  await page.getByRole("menuitem", { name: "Keep sidebar open" }).click();
   await expect(page.locator(".rail-wrap aside.sidebar")).toBeVisible();
 });
 
@@ -228,4 +229,33 @@ test("on the right edge a context menu opens leftward, ending at the pointer", a
   await page.mouse.click(60, y, { button: "right" });
   await expect(menu).toBeVisible();
   expect(Math.abs((await menu.boundingBox())!.x - 60)).toBeLessThan(1.5);
+});
+
+// The owner, 2026-09-21: right-click the pinned sidebar and pick "Open sidebar
+// on hover" — the sidebar must actually change mode: leave the flow and close.
+test("the sidebar's own menu always offers the other reveal, and picking it switches", async ({ page }) => {
+  await gotoApp(page);
+  await expect(page.locator(".rail-wrap aside.sidebar")).toBeVisible();
+  const menu = page.locator(".ctxmenu");
+  const box = (await page.locator("aside.sidebar").boundingBox())!;
+  let opened = false;
+  for (const y of [480, 520, 560, 600]) {
+    await page.mouse.click(box.x + 40, y, { button: "right" });
+    if ((await menu.count()) > 0) {
+      opened = true;
+      break;
+    }
+  }
+  expect(opened, "no empty sidebar surface found to right-click").toBe(true);
+  await page.getByRole("menuitem", { name: "Open sidebar on hover" }).click();
+  await expect(menu).toHaveCount(0);
+  await expect(page.locator(".warm-edge[data-side='left']")).toHaveCount(1);
+  await expect(page.locator("aside.sidebar")).toHaveCount(0);
+  // reached through the edge, the menu now offers the way back
+  await enterEdge(page, 3, 400);
+  const overlay = page.locator(".rail-hover aside.sidebar");
+  await expect(overlay).toBeVisible();
+  await overlay.dispatchEvent("contextmenu", { clientX: 40, clientY: 300 });
+  await expect(page.getByRole("menuitem", { name: "Open sidebar on hover" })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: "Keep sidebar open" })).toBeVisible();
 });

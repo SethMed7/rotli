@@ -1,6 +1,6 @@
 # The Chat window: a second shell window over the same vault
 
-**Date:** 2026-09-21 · **Status:** accepted, in the work (development builds)
+**Date:** 2026-09-21 · **Status:** accepted; in every desktop build since 2026-09-21 (un-gated for the owner's UAT pass before release)
 
 ## Context
 

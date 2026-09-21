@@ -1115,9 +1115,15 @@ test("/template inserts a saved layout: whole into an empty note, without its ti
     .click();
   const picker = page.getByRole("searchbox");
   await expect(picker).toBeFocused();
-  // only the Templates folder is offered — never the rest of the library
+  // only the Templates folder is offered — never the rest of the library —
+  // then Rotli's built-in presets, minus the one this vault keeps its own of
   await expect(page.getByRole("menu", { name: "Template" }).locator(".slashlabel")).toHaveText([
     "Meeting notes",
+    "Daily note",
+    "Project brief",
+    "Bug report",
+    "Weekly review",
+    "Create new",
   ]);
   await page.keyboard.press("Enter");
   const editor = page.locator(".pane.focused .cm-content");
@@ -1188,4 +1194,48 @@ test("a slash command works after text inside a checklist item, and can link a c
   await page.getByRole("tab", { name: /Slash in a list/ }).click();
   await link.click();
   await expect(page.locator(".pane.focused [data-chat-pane]").first()).toBeVisible();
+});
+
+test("/template offers built-in presets that Settings can turn off, and Create new makes a template", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  const openPicker = async (prefix = "") => {
+    await page.keyboard.press("Meta+T");
+    await page.locator(".cm-content").last().click();
+    await page.keyboard.insertText(`${prefix}/template`);
+    await page
+      .getByRole("menu", { name: "Insert block" })
+      .getByRole("menuitem", { name: /Template/ })
+      .click();
+    return page.getByRole("menu", { name: "Template" });
+  };
+
+  // a preset inserts like any template, and is marked as Rotli's own
+  let picker = await openPicker();
+  const daily = picker.getByRole("menuitem", { name: /Daily note/ });
+  await expect(daily).toContainText("Built-in");
+  await daily.click();
+  await expect(page.locator(".pane.focused .cm-content")).toContainText("Tomorrow");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Daily note");
+
+  // Create new is ready at once (it was stuck on "Checking permissions…"), and
+  // makes a note in the Templates folder, opened to be written
+  picker = await openPicker();
+  const create = picker.getByRole("menuitem", { name: /Create new/ });
+  await expect(create).toBeEnabled();
+  await expect(create).toContainText("New note in Templates");
+  await create.click();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("New template");
+  // …and the next /template lists it among the vault's own
+  picker = await openPicker();
+  await expect(picker.locator(".slashlabel")).toContainText(["Meeting notes", "New template"]);
+  await page.keyboard.press("Escape");
+
+  // off in Settings: only the vault's own templates remain
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("switch", { name: /Offer built-in templates/ }).click();
+  await page.getByText("Back to notes").click();
+  picker = await openPicker();
+  await expect(picker.locator(".slashlabel")).toHaveText(["Meeting notes", "New template", "Create new"]);
 });

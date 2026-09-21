@@ -212,9 +212,10 @@
 }
 
 /* Chat can live in its own window: the segment plus a small sibling button
-   (a button cannot hold a button). The companion is quiet until the pointer or
-   the keyboard is on the pair; once Chat is out it stays visible, because it is
-   then the way back. Static — nothing here animates. */
+   (a button cannot hold a button), tucked into the segment's top-right corner
+   and deliberately faint (the owner, 2026-09-21: "way more subtle, top
+   right"), shown only while the pointer or the keyboard is on the pair. The
+   segment itself is the drag handle. Static — nothing here animates. */
 .sb-switch-chat {
   position: relative;
   display: flex;
@@ -226,32 +227,71 @@
 }
 .sb-switch-window {
   position: absolute;
-  top: 50%;
-  right: 3px;
-  transform: translateY(-50%);
+  top: 2px;
+  right: 2px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 15px;
+  height: 15px;
   padding: 0;
   border: none;
   border-radius: var(--r-inner);
-  background: var(--surface);
+  background: none;
   color: var(--text-muted);
   cursor: pointer;
   opacity: 0;
 }
 .sb-switch-chat:hover .sb-switch-window,
-.sb-switch-chat:focus-within .sb-switch-window,
-.sb-switch-chat.out .sb-switch-window {
-  opacity: 1;
+.sb-switch-chat:focus-within .sb-switch-window {
+  opacity: 0.55;
 }
-.sb-switch-window:hover {
+.sb-switch-window:hover,
+.sb-switch-window:focus-visible {
+  opacity: 1;
   color: var(--text);
 }
-.sb-switch-chat.out > .sb-switch-seg {
+/* Chat is out: the switch's last slot brings it back (the owner, 2026-09-21:
+   "on very right of menu have a button that brings everything back") */
+.sb-switch-regroup {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  background: none;
   color: var(--text-muted);
+  cursor: pointer;
+}
+.sb-switch-regroup:hover,
+.sb-switch-regroup:focus-visible {
+  color: var(--text);
+  background: var(--selected-bg);
+}
+/* the Chat window's rail opens with the way home, where main has its switch */
+.chat-window-regroup {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 0 12px 8px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--r-tab);
+  background: var(--tint);
+  font: inherit;
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.chat-window-regroup:hover,
+.chat-window-regroup:focus-visible {
+  color: var(--text);
 }
 .sb-switch-label {
   overflow: hidden;
@@ -1206,41 +1246,6 @@
 .sb-chatnew:hover,
 .sb-chatrow:hover {
   background: var(--hov);
-}
-.sb-chatview {
-  display: flex;
-  align-items: baseline;
-  min-width: 0;
-  gap: 5px;
-  padding: 4px 10px 7px;
-  color: var(--text-muted);
-  font-size: 11px;
-}
-.sb-chatview-label {
-  flex: 0 0 auto;
-}
-.sb-chatview-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text);
-  font-weight: 600;
-}
-.sb-chatview-all {
-  flex: 0 0 auto;
-  margin-left: auto;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--accent-text);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-.sb-chatview-all:hover {
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
 /* Open chats and notes use a quiet wash: enough orientation without making the
    sidebar compete with the work surface. */

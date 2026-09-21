@@ -24,11 +24,12 @@ export function launchFeatures(development: boolean, platform: Platform = "deskt
     sheets: desktop && development,
     mermaidDiagrams: development,
     voice: desktop && development,
-    // Pull Chat out into its own window: in the work. The native half (a
-    // second shell webview, the quit handshake with four windows) cannot be
-    // proven by CI, so it stays a development-build feature until the owner has
-    // exercised it in the Mac app.
-    chatWindow: desktop && development,
+    // Pull Chat out into its own window: on in every desktop build (the owner,
+    // 2026-09-21: "should not be behind a feature flag — I need to test in UAT
+    // before live"). The native half (a second shell webview, the quit
+    // handshake) is proven in the Mac app, not CI; Rotli Web never gets it — a
+    // second browser tab would be a second, uncoordinated writer.
+    chatWindow: desktop,
   } as const;
 }
 

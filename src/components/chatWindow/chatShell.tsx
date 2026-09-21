@@ -18,7 +18,7 @@ import { leaves, usePanesStore } from "../../state/panes";
 import { useUiStore } from "../../state/ui";
 import { ContextMenu } from "../contextMenu";
 import { FileNotice } from "../fileNotice";
-import { ChatGlyph, PlusGlyph } from "../glyphs";
+import { ChatGlyph, PlusGlyph, SidebarGlyph } from "../glyphs";
 import { IconButton } from "../iconButton";
 import { PaneTree } from "../paneTree";
 import { RenameDialog } from "../renameDialog";
@@ -31,6 +31,9 @@ export function ChatShell() {
   const rowActionError = useUiStore((state) => state.rowActionError);
   const setRowActionError = useUiStore((state) => state.setRowActionError);
   const sidebarWidth = useUiStore((state) => state.sidebarWidth);
+  // the same sidebar toggle as main (the owner, 2026-09-21): this window's own
+  // store, so hiding the chat list here never hides main's sidebar
+  const sidebarCollapsed = useUiStore((state) => state.sidebarCollapsed);
   const railVars = { "--sidebar-w": `${sidebarWidth}px` } as CSSProperties;
   const chats = useChatFolders();
   const empty = usePanesStore((state) => leaves(state.root).every((leaf) => leaf.tabs.length === 0));
@@ -53,6 +56,14 @@ export function ChatShell() {
           }}
           onDoubleClick={zoomChatWindow}
         />
+        <IconButton
+          className="tb-lead"
+          label={sidebarCollapsed ? "Show sidebar — ⌘0" : "Hide sidebar — ⌘0"}
+          hotkey="chrome.toggleSidebars"
+          onClick={() => dispatch("chrome.toggleSidebars")}
+        >
+          <SidebarGlyph size={16} />
+        </IconButton>
         <div
           className="tb-mid chat-window-title"
           onMouseDown={(event) => {
@@ -64,34 +75,44 @@ export function ChatShell() {
           <span>Chat</span>
         </div>
         <div className="tb-actions">
-          <IconButton label="New chat" hotkey="chat.new" onClick={() => dispatch("chat.new")}>
+          <IconButton
+            className="tb-trail"
+            label="New chat"
+            hotkey="chat.new"
+            onClick={() => dispatch("chat.new")}
+          >
             <PlusGlyph size={16} />
-          </IconButton>
-          <IconButton className="tb-trail" label="Put Chat back in the main window" onClick={regroupChat}>
-            <RegroupGlyph size={16} />
           </IconButton>
         </div>
       </header>
       <main className="app-content">
         <div className="threepane" style={railVars} data-sidebar-side="left">
-          <div className="rail-wrap">
-            <aside className="sidebar chat-window-rail" aria-label="Chats">
-              {rowActionError && (
-                <div className="sb-error" role="alert">
-                  <span className="sb-error-text">⚠ {rowActionError}</span>
-                  <button
-                    type="button"
-                    className="sb-error-x"
-                    aria-label="Dismiss"
-                    onClick={() => setRowActionError(null)}
-                  >
-                    ×
-                  </button>
-                </div>
-              )}
-              <SidebarChat chats={chats} zoom={sidebarZoom} />
-            </aside>
-          </div>
+          {!sidebarCollapsed && (
+            <div className="rail-wrap">
+              <aside className="sidebar chat-window-rail" aria-label="Chats">
+                {rowActionError && (
+                  <div className="sb-error" role="alert">
+                    <span className="sb-error-text">⚠ {rowActionError}</span>
+                    <button
+                      type="button"
+                      className="sb-error-x"
+                      aria-label="Dismiss"
+                      onClick={() => setRowActionError(null)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+                {/* where main has its Home | Chat switch, this window has its way
+                  home (the owner, 2026-09-21) */}
+                <button type="button" className="chat-window-regroup" onClick={regroupChat}>
+                  <RegroupGlyph size={14} />
+                  Put Chat back in the main window
+                </button>
+                <SidebarChat chats={chats} zoom={sidebarZoom} />
+              </aside>
+            </div>
+          )}
           {empty ? (
             <div className="list-empty empty-stage">
               <div className="et">No chat open</div>

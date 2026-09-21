@@ -110,6 +110,10 @@ describe("slash command catalog", () => {
     expect(slashPickerCanCreate("linkNote", true)).toBe(false);
     expect(slashPickerCanCreate("embedSheet", false)).toBe(false);
     expect(slashPickerCanCreate("embedDocument", true, false)).toBe(false);
+    // a template is an ordinary note: creatable in every build that can write
+    expect(slashPickerCanCreate("insertTemplate", false)).toBe(true);
+    expect(slashPickerCanCreate("insertTemplate", true, false)).toBe(false);
+    expect(slashPickerCanCreate("linkChat", true)).toBe(false);
   });
 
   test("document discovery uses the editable DOCX vocabulary", () => {
@@ -297,8 +301,8 @@ describe("/template", () => {
     expect(filterPickerNotes(pool, "insertTemplate", "meet").map((n) => n.id)).toEqual(["01MEET"]);
   });
 
-  test("it never offers to create: a template is made like any note, in its folder", () => {
-    expect(slashPickerCanCreate("insertTemplate", true, true)).toBe(false);
+  test("it offers to create one — a note made like any other, then moved into its folder", () => {
+    expect(slashPickerCanCreate("insertTemplate", true, true)).toBe(true);
   });
 
   test("into an EMPTY note the template comes whole — its heading names the new note", () => {

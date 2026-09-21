@@ -14,8 +14,12 @@
 // away from Home and Chat in both directions (audit 2026-09-02 §1.3). Before
 // this it was an unlabeled coffee icon in the header row with no shortcut.
 
+import type { PointerEvent as ReactPointerEvent } from "react";
+
+import { createDragGhost } from "../../lib/dragGhost";
 import { LAUNCH_FEATURES } from "../../lib/featurePolicy";
-import { chatWindowSupported, focusChatWindow } from "../../services/chatWindowShell";
+import { createPointerDragSession } from "../../lib/pointerDrag";
+import { chatWindowSupported } from "../../services/chatWindowShell";
 import { useChatSetupGuide } from "../../state/chatSetupGuide";
 import { popOutChat, regroupChat } from "../../state/chatWindow";
 import { useChatWindowStore } from "../../state/chatWindowStore";
@@ -85,7 +89,7 @@ export function SidebarSwitcher({
   const helperOk = useHelperLink((s) => helperReadyFrom(s));
   const helperProblem = useHelperLink((s) => s.problem);
   const helperVerifying = useHelperLink((s) => s.verifying);
-  // Pull Chat out into its own window: the Mac app only, and in the work
+  // Pull Chat out into its own window: the Mac app only
   const chatWindow = chatWindowSupported();
   const chatDetached = useChatWindowStore((s) => s.detached);
   const pullChatOut = () => {
@@ -128,11 +132,13 @@ export function SidebarSwitcher({
             </button>
           );
         }
+        // Chat is in its own window: main shows no trace of it here (the
+        // owner, 2026-09-21) — the switch's trailing button brings it back
+        if (id === "chat" && chatWindow && chatDetached) return null;
         if (id === "chat" && chatWindow) {
           return (
             <ChatWindowSegment
               key={id}
-              detached={chatDetached}
               active={active}
               hint={hint}
               action={action}
@@ -170,24 +176,49 @@ export function SidebarSwitcher({
           <span className="sb-switch-label">Breve</span>
         </button>
       )}
+      {chatWindow && chatDetached && (
+        <button
+          type="button"
+          className="sb-switch-regroup"
+          aria-label="Bring Chat back into this window"
+          title="Bring Chat back into this window"
+          onClick={regroupChat}
+        >
+          <RegroupGlyph size={14} />
+        </button>
+      )}
     </div>
   );
 }
 
-/** The Chat segment in a build where Chat can live in its own window (1.3.0).
- * The segment and its small companion button are SIBLINGS — a button cannot
- * hold a button. In main: the companion (on hover/focus) or the context menu
- * pulls Chat out. Out: the segment brings that window forward and the
- * companion puts Chat back. Home has no such control: main is where Home lives. */
+/** How far past the switch a release must land to tear Chat off (px). */
+const TEAR_OFF_MARGIN_PX = 16;
+
+/** A drag of the Chat segment tears it off only when released clear of the
+ * whole switch — dropped back on it, the drag changes nothing. */
+export function tearOffLanded(
+  sw: { left: number; top: number; right: number; bottom: number },
+  x: number,
+  y: number,
+) {
+  const m = TEAR_OFF_MARGIN_PX;
+  return x < sw.left - m || x > sw.right + m || y < sw.top - m || y > sw.bottom + m;
+}
+
+/** The Chat segment in a build where Chat can live in its own window (1.3.0),
+ * while Chat is still here. The segment and its small companion button are
+ * SIBLINGS — a button cannot hold a button. Dragging the segment out (the
+ * owner, 2026-09-21: "grab and drag out"), the corner companion, or the
+ * context menu pulls Chat out. Home has no such control: main is where Home
+ * lives. Once Chat is out the segment is gone; the switch's regroup button is
+ * the way back. */
 export function ChatWindowSegment({
-  detached,
   active,
   hint,
   action,
   onPick,
   onPullOut,
 }: {
-  detached: boolean;
   active: boolean;
   hint: string;
   action: string;
@@ -195,22 +226,39 @@ export function ChatWindowSegment({
   onPullOut: () => void;
 }) {
   const openContextMenu = useContextMenu((s) => s.open);
-  const companion = detached ? "Put Chat back in this window" : "Pull Chat out into its own window";
+  const pullOut = "Pull Chat out into its own window";
+  const tearOff = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const sw = event.currentTarget.closest(".sb-switch")?.getBoundingClientRect();
+    if (!sw) return;
+    let landed = false;
+    createPointerDragSession(event, {
+      thresholdPx: 8,
+      ghost: (x, y) => createDragGhost("Release to open Chat in its own window", x, y),
+      onMove: (x, y) => {
+        landed = tearOffLanded(sw, x, y);
+      },
+      onDrop: () => {
+        if (landed) onPullOut();
+      },
+      swallowClick: true,
+    });
+  };
   return (
-    <span className={detached ? "sb-switch-chat out" : "sb-switch-chat"}>
+    <span className="sb-switch-chat">
       <button
         type="button"
-        aria-pressed={!detached && active}
+        aria-pressed={active}
         data-tour="chat"
-        title={detached ? "Chat is in its own window — click to bring it forward" : hint}
+        title={hint}
         data-hotkey={action}
-        className={!detached && active ? "sb-switch-seg sel" : "sb-switch-seg"}
-        onClick={() => (detached ? focusChatWindow() : onPick())}
+        className={active ? "sb-switch-seg sel" : "sb-switch-seg"}
+        onClick={onPick}
+        onPointerDown={tearOff}
         onContextMenu={(event) => {
           event.preventDefault();
           event.stopPropagation();
           openContextMenu(event.clientX, event.clientY, [
-            { kind: "action", label: companion, onClick: detached ? regroupChat : onPullOut },
+            { kind: "action", label: pullOut, onClick: onPullOut },
           ]);
         }}
       >
@@ -220,11 +268,11 @@ export function ChatWindowSegment({
       <button
         type="button"
         className="sb-switch-window"
-        aria-label={companion}
-        title={companion}
-        onClick={detached ? regroupChat : onPullOut}
+        aria-label={pullOut}
+        title={pullOut}
+        onClick={onPullOut}
       >
-        {detached ? <RegroupGlyph size={12} /> : <PopOutGlyph size={12} />}
+        <PopOutGlyph size={11} />
       </button>
     </span>
   );

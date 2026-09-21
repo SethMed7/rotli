@@ -23,18 +23,33 @@ test("the chat window shows only Chat, and its panes never hold a note", async (
   await expect(shell.getByText("No chat open")).toBeVisible();
   await expect(shell.getByRole("button", { name: "Put Chat back in the main window" })).toBeVisible();
 
+  // the sidebar toggle works here too (2026-09-21): its button up top, and ⌘0
+  const rail = shell.getByRole("complementary", { name: "Chats" });
+  await expect(rail).toBeVisible();
+  await shell.getByRole("button", { name: "Hide sidebar — ⌘0" }).click();
+  await expect(rail).toHaveCount(0);
+  await page.keyboard.press("Meta+0");
+  await expect(rail).toBeVisible();
+
   // a new chat is a chat tab; the strip offers no way to make a note
   await shell.getByRole("button", { name: "New chat" }).first().click();
   await expect(page.getByRole("tab")).toHaveCount(1);
   await expect(page.locator(".pane.focused [data-chat-pane]")).toBeVisible();
   await expect(page.locator(".tabplus")).toBeHidden();
 
-  // ⌘T is main's "new note": it is not opted into this window
+  // ⌘T and ⌘N mean "new" here too, and new is a chat — never a note tab
   await page.keyboard.press("Meta+T");
-  await expect(page.getByRole("tab")).toHaveCount(1);
-  // ⌘W is: the chat tab closes and the window rests, still a chat window
-  await page.keyboard.press("Meta+W");
-  await expect(page.getByRole("tab")).toHaveCount(0);
+  await expect(page.getByRole("tab")).toHaveCount(2);
+  await page.keyboard.press("Meta+N");
+  await expect(page.getByRole("tab")).toHaveCount(3);
+  // every tab is a chat: no note editor, no "choose a type" tab
+  await expect(page.locator(".cm-content")).toHaveCount(0);
+  await expect(page.locator(".pane.focused [data-chat-pane]:visible")).toHaveCount(1);
+  // ⌘W closes chat tabs until the window rests, still a chat window
+  for (const left of [2, 1, 0]) {
+    await page.keyboard.press("Meta+W");
+    await expect(page.getByRole("tab")).toHaveCount(left);
+  }
   await expect(shell.getByText("No chat open")).toBeVisible();
 });
 
