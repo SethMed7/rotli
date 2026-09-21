@@ -267,4 +267,15 @@ describe("createPointerDragSession", () => {
     expect(b.ghosts[0]?.destroys).toBe(1);
     expect(listenerCount()).toBe(0);
   });
+
+  test("the drop commits where the pointer was RELEASED, not where it last moved", () => {
+    // rows can shift under a still pointer between the last pointermove and the
+    // release (the first drag's own re-render, a smooth scroll still settling);
+    // the release carries coordinates, so the target is hit-tested once more
+    const { calls, opts } = recorder();
+    createPointerDragSession(press(), opts);
+    move(100, 140);
+    dispatch("pointerup", { clientX: 100, clientY: 180 });
+    expect(calls.slice(-4)).toEqual(["move@100,180", "drop", "ghostDestroy", "end"]);
+  });
 });

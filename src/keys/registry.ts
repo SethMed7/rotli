@@ -9,6 +9,7 @@
 import { emitRebind, setGlobalShortcut } from "../lib/tauri";
 import { resolveChord, useBindingsStore } from "./bindings";
 import { chordFromEvent, normalizeChord, toAccelerator } from "./chords";
+import { leaderConsumes } from "./leader";
 
 /** Which webview an action belongs to — the dispatcher only fires actions for
  * its own surface (global actions are handled OS-side in Rust and skipped).
@@ -171,6 +172,14 @@ export function attachDispatcher(surface: Surface): () => void {
     if (!(event.ctrlKey || event.altKey || event.metaKey) && isEditableTarget(event.target)) {
       const key = pressed.split("+").pop() ?? "";
       if (!/^(Esc|Enter|F\d{1,2})$/.test(key)) return;
+    }
+    // a pending two-step hotkey (keys/leader.ts) is offered the key before any
+    // action: for that one keystroke ⌘1–9 mean "slot 1–9", not a tab jump.
+    // AFTER the typing guard above, so a bare digit typed into the editor or a
+    // filter while a leader is pending is still just a digit.
+    if (leaderConsumes(pressed)) {
+      event.preventDefault();
+      return;
     }
     // over an Excalidraw canvas the clash chords belong to the canvas
     if (CANVAS_OWNED_CHORDS.has(pressed) && isCanvasTarget(event.target)) return;

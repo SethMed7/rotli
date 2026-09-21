@@ -6,13 +6,18 @@
 import { create } from "zustand";
 
 import { corpusMainRead, corpusMainWrite, hasDurableCorpus } from "../lib/tauri";
-import { createRevisionedTrackedWrite } from "../lib/trackedWrite";
+import {
+  createRevisionedTrackedWrite,
+  isRevisionConflict,
+  recoverRevisionConflict,
+} from "../lib/trackedWrite";
 import {
   EMPTY_MAIN,
   type MainManifest,
   type MainNode,
   gcManifest,
   mainHasNote,
+  mergeMainTrees,
   parseMainManifest,
   renameNoteRef,
   serializeMainManifest,
@@ -44,6 +49,12 @@ function isMainSurface(): boolean {
 // lost arrangement (audit 2026-07-30, correctness #3; same guard as views.ts)
 const mainWriter = createRevisionedTrackedWrite(corpusMainWrite);
 
+/** Shown only when Main was rearranged on disk while a different arrangement
+ * was being made here — the one case with no honest merge. Plain words: the
+ * revision ids behind it mean nothing to the person reading. */
+export const MAIN_RELOADED_NOTICE =
+  "Main changed outside Rotli, so your last change wasn’t kept. Make it again.";
+
 export const useMainStore = create<MainState>((set) => ({
   manifest: EMPTY_MAIN,
   saveState: "idle",
@@ -58,17 +69,63 @@ export const useMainStore = create<MainState>((set) => ({
     const manifest: MainManifest = { version: 1, tree: cleaned };
     const durable = hasDurableCorpus();
     set({ manifest, saveState: durable ? "saving" : "saved", error: null, dirty: durable });
-    if (!durable) return;
-    mainWriter.write(serializeMainManifest(manifest), (ok, error) => {
-      if (ok) set({ saveState: "saved", dirty: false });
-      else
-        set({
-          saveState: "error",
-          error: `Couldn’t save Main — ${error instanceof Error ? error.message : String(error)}`,
-        });
-    });
+    if (durable) persistMain(manifest, true);
   },
 }));
+
+function persistMain(manifest: MainManifest, mayRecover: boolean): void {
+  mainWriter.write(serializeMainManifest(manifest), (ok, error) => {
+    if (ok) useMainStore.setState({ saveState: "saved", dirty: false });
+    else if (isRevisionConflict(error)) void recoverMain(manifest, mayRecover);
+    else
+      useMainStore.setState({
+        saveState: "error",
+        error: `Couldn’t save Main — ${error instanceof Error ? error.message : String(error)}`,
+      });
+  });
+}
+
+/** Something else (the CLI, the Librarian, a views write) saved Main first.
+ * Re-read it, carry this edit over the new version, and save once more —
+ * quietly. `dirty` always clears on the way out: a stuck flag is what used to
+ * lock hydrateMain out and fail every later edit until a restart. */
+async function recoverMain(local: MainManifest, mayRetry: boolean): Promise<void> {
+  try {
+    const outcome = await recoverRevisionConflict({
+      writer: mainWriter,
+      read: corpusMainRead,
+      current: () => useMainStore.getState().manifest === local,
+      merge: (base, remote) => {
+        if (!mayRetry) return null;
+        const tree = mergeMainTrees(
+          parseMainManifest(base || "{}").tree,
+          local.tree,
+          parseMainManifest(remote || "{}").tree,
+        );
+        return tree && serializeMainManifest({ version: 1, tree });
+      },
+    });
+    if (!outcome) return;
+    if (outcome.merged === null) {
+      useMainStore.setState({
+        manifest: parseMainManifest(outcome.remote || "{}"),
+        saveState: "error",
+        error: MAIN_RELOADED_NOTICE,
+        dirty: false,
+      });
+      return;
+    }
+    const manifest = parseMainManifest(outcome.merged);
+    useMainStore.setState({ manifest });
+    persistMain(manifest, false);
+  } catch (error) {
+    useMainStore.setState({
+      saveState: "error",
+      error: `Couldn’t save Main — ${error instanceof Error ? error.message : String(error)}`,
+      dirty: false,
+    });
+  }
+}
 
 /** Retarget a Main note-ref after a path-id rename (boards: rename mints a new
  * id) — the manifest slot follows the note instead of being GC'd on the next
@@ -85,7 +142,7 @@ export async function hydrateMain(): Promise<void> {
   if (useMainStore.getState().dirty) return;
   try {
     const opened = await corpusMainRead();
-    mainWriter.setRevision(opened.revision);
+    mainWriter.setRevision(opened.revision, opened.contents);
     useMainStore.setState({
       manifest: parseMainManifest(opened.contents || "{}"),
       saveState: "idle",

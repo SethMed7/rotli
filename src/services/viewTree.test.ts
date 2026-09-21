@@ -15,6 +15,7 @@ import {
   renameViewItemRef,
   setNamedViewTree,
   transferTreeItemToView,
+  viewFolderNameError,
   viewChats,
   viewNameError,
   viewPickerItems,
@@ -205,5 +206,37 @@ describe("renamed path items", () => {
         JSON.parse(JSON.stringify(node).replace("untitled-1.docx", "Plan.docx")),
       ),
     );
+  });
+  test("a folder name refuses the path and root separators, with plain words", () => {
+    expect(viewFolderNameError("Rotli Bugs/Enhancements")).toBe(
+      "Folder names cannot contain slashes or colons.",
+    );
+    expect(viewFolderNameError("Q1: plans")).toBe("Folder names cannot contain slashes or colons.");
+    expect(viewFolderNameError("   ")).toBe("Enter a folder name.");
+    expect(viewFolderNameError("Plans 2026 – drafts")).toBeNull();
+  });
+
+  test("a badly named Main folder still moves into a view, made portable", () => {
+    const main = [
+      { note: "loose" },
+      {
+        folder: "Rotli Bugs/Enhancements",
+        children: [
+          { folder: "a:b", children: [{ note: "one" }] },
+          { folder: "a b", children: [{ note: "two" }] },
+        ],
+      },
+    ];
+    const manifest = createNamedView(EMPTY_VIEWS, "Work");
+    const moved = transferTreeItemToView(main, manifest, null, "main:Rotli Bugs/Enhancements", "Work");
+    expect(moved.views[0]?.tree).toEqual([
+      {
+        folder: "Rotli Bugs Enhancements",
+        children: [
+          { folder: "a b", children: [{ note: "one" }] },
+          { folder: "a b 2", children: [{ note: "two" }] },
+        ],
+      },
+    ]);
   });
 });

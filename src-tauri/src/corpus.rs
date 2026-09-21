@@ -2738,6 +2738,11 @@ fn valid_view_name(name: &str) -> bool {
             .all(|ch| ch.is_alphanumeric() || matches!(ch, ' ' | '.' | '_' | '-'))
 }
 
+/// `/` separates a folder's path id and `:` routes a vault root, so neither can
+/// sit inside a view folder name — byte-identical to VIEW_FOLDER_FORBIDDEN_CHARS
+/// in src/services/viewTree.ts (parity.json viewFolderForbiddenChars)
+pub(crate) const VIEW_FOLDER_FORBIDDEN_CHARS: [char; 2] = ['/', ':'];
+
 fn collect_view_membership(
     nodes: &[ReferenceNode],
     view: &str,
@@ -2748,7 +2753,7 @@ fn collect_view_membership(
             ReferenceNode::Folder { folder, children } => {
                 if folder.trim().is_empty()
                     || folder != folder.trim()
-                    || folder.contains(['/', ':'])
+                    || folder.contains(VIEW_FOLDER_FORBIDDEN_CHARS)
                 {
                     return Err(format!("invalid folder name in view {view}: {folder}"));
                 }

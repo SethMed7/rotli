@@ -22,6 +22,7 @@ import {
   renameFolderInMain,
   renameNoteRef,
   mainRowSort,
+  mergeMainTrees,
 } from "./mainTree";
 
 const note = (id: string, folderId = "wiki/projects"): NoteSummary =>
@@ -456,5 +457,49 @@ describe("fileItemsInMainFolder — Add to folder for a whole selection", () => 
     expect(fileItemsInMainFolder(tree, ["a.md"], "main:Nope")).toBe(tree);
     expect(fileItemsInMainFolder(tree, ["main:Bugs"], "main:Bugs/Old")).toEqual(tree);
     expect(fileItemsInMainFolder(tree, ["main:Bugs"], "main:Bugs")).toEqual(tree);
+  });
+});
+
+describe("mergeMainTrees", () => {
+  const base = [{ note: "a" }, { folder: "Work", children: [{ note: "b" }] }];
+
+  test("an unchanged disk keeps the local arrangement", () => {
+    const local = [{ folder: "Work", children: [{ note: "b" }, { note: "a" }] }];
+    expect(mergeMainTrees(base, local, base)).toEqual(local);
+  });
+
+  test("a note the CLI added survives a local drag, in the folder it was filed under", () => {
+    const local = [{ folder: "Work", children: [{ note: "b" }, { note: "a" }] }];
+    const remote = [
+      { note: "a" },
+      { folder: "Work", children: [{ note: "b" }, { note: "cli" }] },
+      { note: "loose" },
+    ];
+    expect(mergeMainTrees(base, local, remote)).toEqual([
+      { folder: "Work", children: [{ note: "b" }, { note: "a" }, { note: "cli" }] },
+      { note: "loose" },
+    ]);
+  });
+
+  test("a note removed on disk stays removed, even if it was just moved here", () => {
+    const local = [{ folder: "Work", children: [{ note: "b" }, { note: "a" }] }];
+    const remote = [{ folder: "Work", children: [{ note: "b" }] }];
+    expect(mergeMainTrees(base, local, remote)).toEqual([{ folder: "Work", children: [{ note: "b" }] }]);
+  });
+
+  test("a filed note lands at the root when the local edit renamed its folder away", () => {
+    const local = [{ note: "a" }, { folder: "Job", children: [{ note: "b" }] }];
+    const remote = [{ note: "a" }, { folder: "Work", children: [{ note: "b" }, { note: "cli" }] }];
+    expect(mergeMainTrees(base, local, remote)).toEqual([
+      { note: "a" },
+      { folder: "Job", children: [{ note: "b" }] },
+      { note: "cli" },
+    ]);
+  });
+
+  test("two rearrangements cannot be merged — the caller reloads instead of guessing", () => {
+    const local = [{ folder: "Work", children: [{ note: "b" }, { note: "a" }] }];
+    const remote = [{ folder: "Work", children: [{ note: "b" }] }, { note: "a" }];
+    expect(mergeMainTrees(base, local, remote)).toBeNull();
   });
 });

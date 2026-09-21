@@ -13,8 +13,10 @@ import { openUrl } from "../lib/tauri";
 import { usePanesStore } from "../state/panes";
 import { LINK_OPEN_FAILED, linkHref } from "./inlineLinks";
 import { linkFailureAt, linkFailureField, linkFailurePos, webLinkAt } from "./linkTarget";
-import { editorLinkOpensOnClick, WIKILINK_RE } from "./wikilink";
+import { editorLinkOpensOnClick } from "./wikilink";
+import { wikilinkHover } from "./wikilinkHover";
 import { resolveWikilinkTarget } from "./wikilinkIndex";
+import { wikilinkAt } from "./wikilinkPreview";
 
 const failureTooltip = showTooltip.compute([linkFailureField], (state): Tooltip | null => {
   const pos = linkFailurePos(state);
@@ -42,18 +44,11 @@ function openWebAddress(view: EditorView, raw: string, pos: number): void {
 }
 
 function tryOpenWikilinkAt(lineText: string, col: number): boolean {
-  WIKILINK_RE.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = WIKILINK_RE.exec(lineText)) !== null) {
-    if (col >= m.index && col <= m.index + m[0].length) {
-      const id = resolveWikilinkTarget(m[1] ?? "");
-      if (!id) return false;
-      usePanesStore.getState().openNote(id);
-      return true;
-    }
-    if (m.index > col) break;
-  }
-  return false;
+  const span = wikilinkAt(lineText, col);
+  const id = span ? resolveWikilinkTarget(span.target) : null;
+  if (!id) return false;
+  usePanesStore.getState().openNote(id);
+  return true;
 }
 
 const clickHandler = EditorView.domEventHandlers({
@@ -78,4 +73,4 @@ const clickHandler = EditorView.domEventHandlers({
   },
 });
 
-export const linkOpener = [clickHandler, linkFailureField, failureTooltip];
+export const linkOpener = [clickHandler, linkFailureField, failureTooltip, wikilinkHover];

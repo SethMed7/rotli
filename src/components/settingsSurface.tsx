@@ -16,6 +16,7 @@ import {
   useState,
 } from "react";
 
+import { guideOs } from "../ai/connectorGuides";
 import { makeTauriHost } from "../ai/host";
 import { suggestPresets } from "../ai/hybrid";
 import { LIBRARIAN_LABELS, librarianCaption, librarianModelFor, librarianOptions } from "../ai/librarianLane";
@@ -58,6 +59,7 @@ import {
   setDispatchSuspended,
 } from "../keys/registry";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { feedbackUrl } from "../lib/feedback";
 import { PRIVATE_BROWSER_SEARCH_ENGINE_PRESENTATIONS } from "../lib/privateBrowser";
 import {
   type ChatModelInfo,
@@ -456,8 +458,11 @@ function UpdatesSection() {
   const updateVersion = useUiStore((s) => s.updateVersion);
   const setUpdateAvailable = useUiStore((s) => s.setUpdateAvailable);
   const setUpdateVersion = useUiStore((s) => s.setUpdateVersion);
+  const autoUpdateCheck = useUiStore((s) => s.autoUpdateCheck);
+  const setAutoUpdateCheck = useUiStore((s) => s.setAutoUpdateCheck);
   const version = useAppVersion() ?? "0.1.0";
-  // Preserve the result of an explicit check while Settings is reopened.
+  // Preserve the result of a check (this button's, or the routine one's) while
+  // Settings is reopened.
   const [state, setState] = useState<CheckState>(
     updateAvailable ? { kind: "available", version: updateVersion } : { kind: "idle" },
   );
@@ -513,6 +518,14 @@ function UpdatesSection() {
         )}
       </div>
       {state.kind === "error" && <p className="setnote err">Couldn’t check for updates: {state.message}</p>}
+      <div className="swgroup">
+        <Toggle
+          on={autoUpdateCheck}
+          title="Check for updates automatically"
+          desc="Rotli asks its release page for the newest version shortly after it opens and a few times a day, then marks the Settings button when there is one. Nothing downloads until you choose Install."
+          onChange={() => setAutoUpdateCheck(!autoUpdateCheck)}
+        />
+      </div>
     </>
   );
 }
@@ -533,6 +546,8 @@ function GeneralPane() {
   const showInDock = useUiStore((s) => s.showInDock);
   const setShowInDock = useUiStore((s) => s.setShowInDock);
   const spellcheck = useUiStore((s) => s.spellcheck);
+  const chatTitleByMeaning = useUiStore((s) => s.chatTitleByMeaning);
+  const setChatTitleByMeaning = useUiStore((s) => s.setChatTitleByMeaning);
   const setSpellcheck = useUiStore((s) => s.setSpellcheck);
   const tidyImagesWithNote = useUiStore((s) => s.tidyImagesWithNote);
   const setTidyImagesWithNote = useUiStore((s) => s.setTidyImagesWithNote);
@@ -689,6 +704,12 @@ function GeneralPane() {
             <span>days</span>
           </label>
         )}
+        <Toggle
+          on={chatTitleByMeaning}
+          title="Name new chats by what they are about"
+          desc="After the first reply, the model you are chatting with suggests a short name for the chat — one small extra request. A name you type yourself is never replaced. Off, a chat is named by its first few words."
+          onChange={() => setChatTitleByMeaning(!chatTitleByMeaning)}
+        />
         <Toggle
           on={chatAutoArchiveDays !== null}
           title="Archive inactive chats"
@@ -3120,7 +3141,11 @@ function AboutRotliPane() {
   return (
     <>
       <PaneHead title="About Rotli" char="waving" />
-      <AboutPane version={version} onOpenWebsite={(url) => void openUrl(url)} />
+      <AboutPane
+        version={version}
+        feedbackUrl={feedbackUrl(version, guideOs(navigator.platform || navigator.userAgent))}
+        onOpenUrl={(url) => void openUrl(url)}
+      />
     </>
   );
 }

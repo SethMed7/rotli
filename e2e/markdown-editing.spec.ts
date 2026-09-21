@@ -180,6 +180,29 @@ test("an exact note-title wikilink opens on an ordinary click", async ({ page })
   await expect(page.locator(".cm-content")).toContainText("Free local forever.");
 });
 
+test("hovering a wikilink shows the top of that note; a dead link shows no card", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText("# Hover test\n\n[[Pricing decision]] and [[No such note at all]]\n\nafter");
+
+  const card = page.locator(".rotli-linkcard");
+  await page.locator(".rotli-wikilink", { hasText: "Pricing decision" }).hover();
+  await expect(card.locator(".rotli-linkcard-title")).toHaveText("Pricing decision");
+  await expect(card.locator(".rotli-linkcard-body")).toContainText("Free local forever.");
+  // the card reads like the note, never like its source
+  await expect(card.locator(".rotli-linkcard-body")).not.toContainText("#");
+
+  await page.locator(".rotli-wikilink-missing").hover();
+  await expect(card).toHaveCount(0);
+  await expect(page.locator(".rotli-wikilink-missing")).toHaveAttribute("title", /nowhere to go/);
+
+  // still a link: the card never swallows the click
+  await page.locator(".rotli-wikilink", { hasText: "Pricing decision" }).click();
+  await expect(page.locator(".cm-content")).toContainText("Free local forever.");
+});
+
 test("blank space below a note that ends with a wikilink does not open the link", async ({ page }) => {
   await gotoApp(page);
   await page.keyboard.press("Meta+T");
@@ -1075,4 +1098,45 @@ test("deleting a column keeps the table in view and shows a resize grip on the b
         .evaluate((el) => el.scrollTop),
     )
     .toBeLessThan(200);
+});
+
+test("/template inserts a saved layout: whole into an empty note, without its title into a written one", async ({
+  page,
+}) => {
+  await gotoApp(page);
+
+  // an EMPTY note takes the template whole — its heading names the new note
+  await page.keyboard.press("Meta+T");
+  await page.locator(".cm-content").last().click();
+  await page.keyboard.insertText("/template");
+  await page
+    .getByRole("menu", { name: "Insert block" })
+    .getByRole("menuitem", { name: /Template/ })
+    .click();
+  const picker = page.getByRole("searchbox");
+  await expect(picker).toBeFocused();
+  // only the Templates folder is offered — never the rest of the library
+  await expect(page.getByRole("menu", { name: "Template" }).locator(".slashlabel")).toHaveText([
+    "Meeting notes",
+  ]);
+  await page.keyboard.press("Enter");
+  const editor = page.locator(".pane.focused .cm-content");
+  await expect(editor).toContainText("Attendees");
+  await expect(editor).toContainText("Decisions");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Meeting notes");
+
+  // a note that already has a title keeps it: the template's own H1 stays behind
+  await page.keyboard.press("Meta+T");
+  await page.locator(".cm-content").last().click();
+  await page.keyboard.insertText("# Standup 21 Sep\n\n/template");
+  await page
+    .getByRole("menu", { name: "Insert block" })
+    .getByRole("menuitem", { name: /Template/ })
+    .click();
+  await page.getByRole("searchbox").fill("meet");
+  await page.keyboard.press("Enter");
+  const second = page.locator(".pane.focused .cm-content");
+  await expect(second).toContainText("Attendees");
+  await expect(second).not.toContainText("Meeting notes");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Standup 21 Sep");
 });

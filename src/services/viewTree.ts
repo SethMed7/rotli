@@ -38,11 +38,39 @@ export interface ParsedViewsManifest {
 
 export const EMPTY_VIEWS: ViewsManifest = { version: 1, views: [] };
 
+/** `/` separates a folder's path id and `:` routes a vault root, so neither can
+ * sit inside a folder name — byte-identical to VIEW_FOLDER_FORBIDDEN_CHARS in
+ * src-tauri/src/corpus.rs (parity.json viewFolderForbiddenChars). */
+export const VIEW_FOLDER_FORBIDDEN_CHARS = ["/", ":"] as const;
+
 export function viewFolderNameError(value: string): string | null {
   const name = value.trim();
   if (!name) return "Enter a folder name.";
-  if (name.includes("/") || name.includes(":")) return "Folder names cannot contain slashes or colons.";
+  if (VIEW_FOLDER_FORBIDDEN_CHARS.some((ch) => name.includes(ch))) {
+    return "Folder names cannot contain slashes or colons.";
+  }
   return null;
+}
+
+/** A folder named before the rule was enforced (or written by another tool)
+ * still has to enter a view: swap the forbidden characters for spaces rather
+ * than refuse the whole move. */
+function portableFolderName(name: string): string {
+  let clean = name;
+  for (const ch of VIEW_FOLDER_FORBIDDEN_CHARS) clean = clean.split(ch).join(" ");
+  return clean.replace(/\s+/g, " ").trim() || "Folder";
+}
+
+function portableFolderTree(nodes: MainNode[]): MainNode[] {
+  const taken = new Set<string>();
+  return nodes.map((node) => {
+    if ("note" in node) return node;
+    const base = portableFolderName(node.folder);
+    let folder = base;
+    for (let i = 2; taken.has(folder); i++) folder = `${base} ${i}`;
+    taken.add(folder);
+    return { folder, children: portableFolderTree(node.children) };
+  });
 }
 
 export function viewNameError(
@@ -163,7 +191,10 @@ export function viewPickerItems(
     rename: () => void;
     remove: (name: string) => void;
   },
+  /** The two-step hotkey opened it: the first nine choices wear ⌘1–⌘9. */
+  numbered = false,
 ): MenuSpec[] {
+  const slot = (index: number) => (numbered && index < 9 ? { hint: `⌘${index + 1}` } : {});
   const items: MenuSpec[] = [
     {
       kind: "action",
@@ -171,13 +202,15 @@ export function viewPickerItems(
       checked: activeView === null,
       checkedMark: "highlight",
       onClick: () => on.show(null),
+      ...slot(0),
     },
-    ...manifest.views.map((view) => ({
+    ...manifest.views.map((view, index) => ({
       kind: "action" as const,
       label: view.name,
       checked: activeView === view.name,
       checkedMark: "highlight" as const,
       onClick: () => on.show(view.name),
+      ...slot(index + 1),
     })),
     { kind: "sep" },
     { kind: "action", label: "New view…", disabled: !writable, onClick: on.create },
@@ -207,6 +240,13 @@ export function viewPickerItems(
     );
   }
   return items;
+}
+
+/** Slot `n` (1–9) of the view picker: Main first, then the views in order.
+ * `undefined` when the slot is empty — the hotkey then does nothing. */
+export function viewAtSlot(manifest: ViewsManifest, n: number): string | null | undefined {
+  if (n === 1) return null;
+  return manifest.views[n - 2]?.name;
 }
 
 export function deleteNamedView(manifest: ViewsManifest, name: string): ViewsManifest {
@@ -371,9 +411,11 @@ export function transferTreeItemToView(
     views = views.map((view) => {
       if (view.name !== targetView) return view;
       if ("note" in sourceNode) return { ...view, tree: [...view.tree, sourceNode] };
+      const [portable] = portableFolderTree([sourceNode]);
+      if (!portable || !("folder" in portable)) return view;
       return {
         ...view,
-        tree: [...view.tree, { ...sourceNode, folder: uniqueRootFolderName(view.tree, sourceNode.folder) }],
+        tree: [...view.tree, { ...portable, folder: uniqueRootFolderName(view.tree, portable.folder) }],
       };
     });
   }

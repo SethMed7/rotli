@@ -2342,6 +2342,36 @@
 }
 
 /* ─── the `[[` picker: matching notes while a wikilink target is typed ─── */
+/* the wikilink hover card (wikilinkHover): the [[ picker's surface, read-only.
+   Static on purpose — no entrance animation, nothing to composite when idle. */
+.rotli-linkcard {
+  width: max-content;
+  max-width: min(360px, calc(100vw - 24px));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 9px 11px;
+  z-index: 7;
+  pointer-events: none;
+}
+.rotli-linkcard-title {
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rotli-linkcard-body {
+  margin-top: 4px;
+  font-size: 0.88em;
+  line-height: 1.45;
+  color: var(--text);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.rotli-linkcard-body.is-quiet {
+  color: var(--text-muted);
+}
 .rotli-linkpick {
   min-width: 220px;
   max-width: min(420px, calc(100vw - 24px));

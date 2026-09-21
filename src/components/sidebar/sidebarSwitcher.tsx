@@ -66,15 +66,11 @@ export function sidebarFrontBody(
 export function SidebarSwitcher({
   value,
   onPick,
-  chatCount,
   breveActive = false,
   onBreve,
 }: {
   value: SidebarView | null;
   onPick: (view: SidebarView) => void;
-  /** Chats in this vault — a quiet count on the Chat segment, so switching
-   * fronts is never a blind jump. Hidden at 0. */
-  chatCount: number;
   /** Breve owns the sidebar body right now; Home and Chat read as unselected. */
   breveActive?: boolean;
   /** Present when the Breve segment is offered (the main window). */
@@ -131,7 +127,6 @@ export function SidebarSwitcher({
           >
             <Glyph size={14} />
             <span className="sb-switch-label">{label}</span>
-            {id === "chat" && chatCount > 0 && <span className="sb-switch-n">{chatCount}</span>}
           </button>
         );
       })}

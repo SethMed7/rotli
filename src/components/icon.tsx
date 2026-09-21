@@ -23,7 +23,8 @@ export type RotliIconName =
 let injected = false;
 
 function ensureSprite(): void {
-  if (injected || typeof document === "undefined") return;
+  // no DOM to inject into: server render, or the unit tests' minimal `document`
+  if (injected || typeof document === "undefined" || !document.body) return;
   injected = true;
 
   const host = document.createElement("div");

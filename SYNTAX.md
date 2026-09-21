@@ -75,6 +75,14 @@ imports.
   conventional `/attach` query finds the same command. Selected bytes are
   copied into the note's registered vault and the note receives only portable
   `storage:` image links; absolute source paths never enter Markdown.
+- Typing `/template` and confirming **Template** opens a picker of the notes
+  in the Templates folder; Enter inserts the chosen note's body where the slash
+  was typed. It is two steps, like every slash command that needs a target —
+  there is no inline `/template name` form. Into an empty note the template
+  comes whole, so its leading `# Heading` names the new note; into a note that
+  already has content that leading H1 is left out, because a note's first H1
+  is its title. A template is plain Markdown: there is no placeholder or
+  variable syntax.
 - A video file (`mp4`, `mov`, `webm`, `m4v`, `ogv`) dropped on a note or chosen
   through **Attach image** uses the same portable `storage:` image source as
   a picture. Rotli renders it as a playable embed with native
@@ -159,6 +167,10 @@ imports.
   aliases and substrings; an empty query offers the newest notes); Enter, Tab,
   or a click writes the closed link, using the id only when titles collide.
   Escape dismisses it and the text stays a plain, still-typed link.
+  Resting the pointer on a link that resolves shows a small card with the
+  note's title and its first lines as they read (markers, fences, and image
+  embeds left out); a click still opens the note. A secure note's card names
+  it and shows none of its text, and a link with no target shows no card.
 - Ordered lists count with numbers (`1. `) or a single ASCII letter
   (`a. `, `A. `). Rotli keeps each run consecutive in its own style: `a. a.
   d.` reads `a. b. c.`, a nested run starts at `1.` or `a.`, and a run never

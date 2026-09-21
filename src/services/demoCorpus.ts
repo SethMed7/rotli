@@ -6,6 +6,7 @@
 
 import { DEST } from "./destinations";
 import { InMemoryNotesService } from "./inMemoryNotes";
+import { TEMPLATES_BRAIN_FOLDER } from "./templates";
 
 /** The reserved LOCAL roots: id === name (mirrors fs mode where folderId is the
  * path), so DEST.inbox === folder.id holds off-disk too. Returns the Inbox id. */
@@ -54,6 +55,8 @@ export function seedDemoCorpus(
   svc.seedReserved("wiki", "wiki", null);
   const wikiProjects = svc.seedReserved("wiki/Projects", "Projects", "wiki");
   svc.seedReserved("wiki/People", "People", "wiki");
+  // the Templates folder (services/templates.ts): ordinary notes `/template` offers
+  const wikiTemplates = svc.seedReserved(TEMPLATES_BRAIN_FOLDER, "Templates", "wiki");
 
   // A couple of LOCAL user folders under Storage — path-style ids so the tree
   // renders and descendant scoping behaves exactly like fs mode.
@@ -200,6 +203,21 @@ Scrap this. The three-tier idea died; we went free-local + one paid sync line. K
 
 Filed under **Projects** by the Librarian — same file, reachable from Main and the Library alike.`,
       { createdAt: now - 2 * DAY, updatedAt: now - DAY },
+    );
+
+    // —— Templates: one saved layout, so `/template` has something to insert ——
+    svc.seedNote(
+      wikiTemplates.id,
+      `# Meeting notes
+
+## Attendees
+
+-
+
+## Decisions
+
+- [ ]`,
+      { createdAt: now - 3 * DAY, updatedAt: now - 3 * DAY },
     );
 
     // —— Board: loose quick-captures, the staging area. Cards, not notes — you

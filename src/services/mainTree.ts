@@ -410,6 +410,25 @@ export function removeFromMain(tree: MainNode[], dragId: string): MainNode[] {
   return findAndRemove(tree, dragId, MAIN_ROOT).tree;
 }
 
+/** Carry a local rearrangement over a Main that changed on disk meanwhile (the
+ * CLI, the Librarian, or a views write filing a new item). Only membership
+ * merges: notes added on disk join the local tree under the folder they were
+ * filed in (the root when that folder is gone), notes removed on disk leave
+ * it. When the disk was ALSO rearranged there is no honest merge — null, and
+ * the caller shows the disk version rather than overwrite someone's work. */
+export function mergeMainTrees(base: MainNode[], local: MainNode[], remote: MainNode[]): MainNode[] | null {
+  const baseIds = mainNoteIds(base);
+  const remoteIds = mainNoteIds(remote);
+  const added = [...remoteIds].filter((id) => !baseIds.has(id));
+  const removed = [...baseIds].filter((id) => !remoteIds.has(id));
+  const without = (tree: MainNode[], ids: string[]) => ids.reduce(removeFromMain, tree);
+  if (JSON.stringify(without(remote, added)) !== JSON.stringify(without(base, removed))) return null;
+  return added.reduce(
+    (tree, id) => addNoteToMainAt(tree, id, mainParentOfNote(remote, id) ?? MAIN_ROOT),
+    without(local, removed),
+  );
+}
+
 /** Rename a Main folder by its rendered id ("main:<path>"). The new name
  * uniquifies against its SIBLING folders (addFolderToMain's collision law —
  * twins would collide as React keys / drag targets); children, order and

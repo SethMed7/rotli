@@ -93,6 +93,7 @@ import { splitMessageBlocks } from "../../noteChat/chatMessageBlocks";
 import { structureMessageLines } from "../../noteChat/chatMessageBlocks";
 import { formatChatTime } from "../../noteChat/chatTime";
 import { rememberedChatNote, rememberChatNote } from "../../noteChat/session";
+import { nameNewChat } from "../../services/chatAutoTitle";
 import {
   assignChatToFolder,
   invalidateChatFolders,
@@ -1976,6 +1977,7 @@ export function ChatSurface({
         });
         // the reply is on disk: a surface that remounted mid-run rereads now
         ownPersistRef.current = useChatRuns.getState().markPersisted(runKey);
+        nameNewChat(active, chatSlug, sentSlug, turnModel, userText, sentTitle, title, isSecureContext());
         if (createdArtifacts.length) {
           try {
             await registerChatArtifactTurn(active, sentSlug, assistantTurn, createdArtifacts);

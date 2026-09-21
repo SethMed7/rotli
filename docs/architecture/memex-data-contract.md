@@ -16,6 +16,21 @@ second user-visible product or storage location.
   uniquely named reference trees with their own virtual folders. Main retains
   every item assigned to a named view; switching views changes navigation and
   creation context, never physical storage.
+- **Both manifests are revision-gated, and a conflict is recovered quietly.**
+  The app presents the revision it read with every `main.json` / `views.json`
+  write; the CLI, the Librarian, and a views write that files a new item into
+  Main may all save in between. On a refused write the app re-reads the file
+  and saves once more: Main carries the local arrangement over notes added or
+  removed on disk (a filed note keeps its folder, or lands at the root when that
+  folder is gone); views save again only when the file's contents are
+  unchanged. When both sides rearranged, the disk version shows with one
+  plain sentence — never a revision id — and nothing on disk is overwritten.
+  A conflict never blocks later edits or the external-change reload.
+- **One folder-name rule.** A Main or view folder name cannot contain `/` (the
+  folder path separator) or `:` (the vault-root router). The app refuses both
+  where the folder is named, in Main and in views alike; a folder that already
+  carries one has it replaced by a space when it moves into a view. The
+  characters are pinned TS↔Rust in `scripts/fixtures/parity.json`.
 - **Chats join named views (2026-08-03).** A view may carry a `chats` list of
   chat slugs (additive field, absent = none; singular membership like notes).
   Chats have no frontmatter `view_tag` — the list is their whole membership —
@@ -303,6 +318,16 @@ second user-visible product or storage location.
   clears that draft; sending it does. The first successful save binds the
   initiating tab rather than whichever tab happens to be active when an async
   write completes.
+- A chat's filename comes from the title it is created with and never moves
+  when the title later changes; only the `title:` line and the contract-owned
+  H1 follow a rename. A chat the person left unnamed is created with a
+  words-first title (image handles are not words) and, after its first reply
+  is saved, may have that title improved once by the chat's **own** model —
+  never the Librarian's or any other. The request goes through the same
+  secure-context refusal as the chat's turns, its reply is accepted only as a
+  short plain title that is safe to write bare into YAML, and a name the person
+  typed (before or during the request) is never replaced. The
+  `chatTitleByMeaning` setting turns the request off.
 - A newly scaffolded vault contains one app-owned root note,
   `Welcome to Rotli.md`. It is real, durable Markdown, opens in the ordinary
   editor, gives the user a short list of things to try, and may be edited or
@@ -311,6 +336,19 @@ second user-visible product or storage location.
   read-only. Because Library is the `wiki/` projection, the welcome note never
   appears there. Scaffolding still restores Home/Notes navigation after carrying
   the outgoing vault's reusable appearance and editor preferences.
+- **Templates are ordinary notes in a folder named Templates** —
+  `wiki/Templates/` in a memex layout, `Templates/` in a plain notes folder
+  (subfolders count). There is no template frontmatter key and no `.rotli/`
+  state: a template is made, edited, moved, and trashed like any note, and the
+  folder is created by the user the first time they want one. `/template`
+  lists the notes whose **physical** folder is Templates (a shelf projection
+  never hides one) and inserts the chosen body, which every adapter already
+  returns without frontmatter. A **secure** template is never offered, because
+  inserting it would copy protected text into a note that is not. The
+  Librarian treats the folder as the user's, not as knowledge: it is not a
+  filing area, its notes are never enriched, and no `_index.md` is written
+  there; the folder name is pinned TS↔Rust in `scripts/fixtures/parity.json`.
+  Agents reach templates as ordinary notes; there is no template verb.
 - Every new vault starts with a **Welcome** folder in Main: the root welcome
   note first, then nine lessons. `src/assets/welcome.json` is the one catalog;
   its first entry is the welcome note body the scaffold writes, and the rest

@@ -7,11 +7,14 @@ export const ROTLI_WEBSITE_URL = "https://sethmedina.com";
 
 export function AboutPane({
   version,
-  onOpenWebsite,
+  feedbackUrl,
+  onOpenUrl,
 }: {
   /** The installed bundle version; null in the browser preview. */
   version: string | null;
-  onOpenWebsite: (url: string) => void;
+  /** A prefilled new issue (lib/feedback) — version and OS family only. */
+  feedbackUrl: string;
+  onOpenUrl: (url: string) => void;
 }) {
   return (
     <>
@@ -29,12 +32,27 @@ export function AboutPane({
         href={ROTLI_WEBSITE_URL}
         onClick={(event) => {
           event.preventDefault();
-          onOpenWebsite(ROTLI_WEBSITE_URL);
+          onOpenUrl(ROTLI_WEBSITE_URL);
         }}
       >
         <span>Website — sethmedina.com</span>
         <ExternalLinkGlyph size={13} />
       </a>
+      <a
+        className="ghostbtn about-link"
+        href={feedbackUrl}
+        onClick={(event) => {
+          event.preventDefault();
+          onOpenUrl(feedbackUrl);
+        }}
+      >
+        <span>Send feedback — opens an issue on GitHub</span>
+        <ExternalLinkGlyph size={13} />
+      </a>
+      <p className="setnote">
+        The issue starts with your Rotli version and operating system, nothing else. Issues are public, so
+        leave out anything private.
+      </p>
     </>
   );
 }
