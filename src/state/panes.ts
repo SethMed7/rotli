@@ -724,8 +724,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
 
     openChat: (chatSlug, opts) => {
       if (opts?.vaultId && !allowPaneVault(opts.vaultId)) return;
-      if (chatWindowTakes(chatSlug, opts?.vaultId, () => get().activateSurface("chat", chatSlug ?? "")))
-        return;
+      if (chatWindowTakes(chatSlug, opts?.vaultId)) return;
       // chats aren't notes — no touchMru. Like openCanvas, surface the panes.
       if (chatSlug) recordNav(navEntry("chat", chatSlug)); // fresh null chats have no identity yet
       if (chatSlug === null) {

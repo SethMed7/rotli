@@ -182,7 +182,9 @@ imports.
   Resting the pointer on a link that resolves shows a small card with the
   note's title and its first lines as they read (markers, fences, and image
   embeds left out); a click still opens the note. A secure note's card names
-  it and shows none of its text, and a link with no target shows no card.
+  it and shows none of its text, as does a chat's (a conversation is not
+  something to flash on an accidental hover), and a link with no target shows
+  no card.
 - Ordered lists count with numbers (`1. `) or a single ASCII letter
   (`a. `, `A. `). Rotli keeps each run consecutive in its own style: `a. a.
   d.` reads `a. b. c.`, a nested run starts at `1.` or `a.`, and a run never

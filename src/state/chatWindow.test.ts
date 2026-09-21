@@ -23,7 +23,8 @@ afterAll(() => {
   void mock.module("../lib/chatWindowBridge", () => realBridge);
 });
 
-const { POP_OUT_BLOCKED, popOutBlocker, popOutChat } = await import("./chatWindow");
+const { POP_OUT_BLOCKED, POP_OUT_IMAGES, attachChatWindow, popOutBlocker, popOutChat } =
+  await import("./chatWindow");
 const { useChatDrafts } = await import("./chatDrafts");
 const { useChatRuns } = await import("./chatRuns");
 const { useChatWindowStore } = await import("./chatWindowStore");
@@ -86,5 +87,38 @@ describe("pulling Chat out of main", () => {
     // a finished or unread chat does not block
     useChatRuns.setState({ runs: { "corpus:plan": "unread" } });
     expect(popOutBlocker()).toBeNull();
+  });
+
+  test("a draft holding images blocks it too, so no chat is left behind in main", () => {
+    usePanesStore.getState().openChat("plan", { newTab: true });
+    const tab = chatTabs()[0];
+    useChatDrafts.getState().setImages(tab?.id ?? "", [{ id: "i", name: "shot.png", src: "blob:x" }]);
+    expect(popOutBlocker()).toBe(POP_OUT_IMAGES);
+    expect(popOutChat()).toBe(POP_OUT_IMAGES);
+    expect(chatTabs()).toHaveLength(1);
+    expect(sent).toEqual([]);
+  });
+});
+
+describe("main while Chat is out", () => {
+  test("a chat tab that turns up in main anyway (⌘⇧T, a split) moves to the window", () => {
+    const detach = attachChatWindow(() => {});
+    try {
+      expect(popOutChat()).toBeNull();
+      sent = [];
+      usePanesStore.getState().openChat("plan", { newTab: true }); // routed — main never gets it
+      expect(chatTabs()).toEqual([]);
+      // a path that bypasses openChat: ⌘⇧T reopens a chat closed before
+      useChatWindowStore.getState().setDetached(false);
+      usePanesStore.getState().openChat("budget", { newTab: true });
+      usePanesStore.getState().closeTab(); // recorded on the closed-tab stack
+      useChatWindowStore.getState().setDetached(true);
+      sent = [];
+      usePanesStore.getState().reopenClosedTab();
+      expect(chatTabs()).toEqual([]);
+      expect(sent).toEqual([{ kind: "open", refs: [{ slug: "budget" }] }]);
+    } finally {
+      detach();
+    }
   });
 });

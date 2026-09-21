@@ -193,8 +193,10 @@ Development builds only until the native checklist passes
   clicking it brings the chat window forward, and the companion — now always
   visible, because it is the way back — puts Chat back. A chat opened from
   anywhere in main (a row, `⌥A`, a note's chat, a link) opens in that window.
-- **A chat that is still answering blocks pop-out**, in plain words in the
-  sidebar's error strip: a reply cannot follow its chat to another window.
+- **A chat that is still answering blocks pop-out and regroup**, in plain
+  words in that window's error strip: a reply cannot follow its chat to another
+  window. So does a draft holding images on pop-out (images cannot move
+  between windows); send or remove them first.
 - **The chat window** shows the chat sidebar and panes whose tabs are chats, and
   nothing else: no front switch, no Breve, no System zone, no footer, no
   Settings. Its panes hold only chat tabs — enforced, since the pane store boots

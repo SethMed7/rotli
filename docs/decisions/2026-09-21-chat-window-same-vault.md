@@ -31,33 +31,45 @@ both windows share one vault, one Rust store, one watcher, one settings file.
    Main (main merges the fragment). This is the Quick window's
    `rotli:quick-set` / `rotli:quick-created` shape, as one event with a `kind`.
 3. **A chat moves as a reference, with its unsent text.** Each webview keeps
-   session drafts in its own memory. A tab whose draft holds image attachments
-   stays put on pop-out (their sources are that window's object URLs); on
-   regroup the window is about to hide, so everything goes back and those images
-   are dropped rather than stranded. One chat is never open in both windows —
-   that would be two writers on one file.
-4. **A running chat blocks pop-out.** A turn lives in the origin webview's
-   memory (React refs, a stream channel bound to that webview); Rust is
-   stateless per turn. Moving it would orphan the reply and leave the model
-   process running for nothing. Handing a live run across webviews needs a
-   Rust-side run registry — a separate, larger decision.
-5. **The shell windows hear the same vault events.** `rotli:corpus-changed` and
+   session drafts in its own memory. A draft holding image attachments cannot
+   cross webviews (their sources are that window's object URLs), so pop-out
+   waits for it — in plain words — rather than leave that tab behind in main.
+   On regroup the window is about to hide, so everything goes back and such
+   images are dropped rather than stranded.
+4. **One chat is never open in both windows** (two writers on one transcript).
+   Three rules hold it: `panes.openChat` in main routes every chat to the
+   window while Chat is out; main keeps an invariant that moves any chat tab
+   that turns up there anyway (a split, ⌘⇧T reopening one); and within a
+   window a handed-over chat already open is brought forward, never opened as
+   a second tab.
+5. **A running chat does not move, in either direction.** A turn lives in the
+   webview it runs in (React refs, a stream channel bound to that webview);
+   Rust is stateless per turn. Moving it would orphan the reply and leave the
+   model process running for nothing. Pop-out refuses; regroup (the button in
+   main, or the window's close button) keeps the window up, brings it forward,
+   and says why. Handing a live run across webviews needs a Rust-side run
+   registry — a separate, larger decision.
+6. **The shell windows hear the same vault events.** `rotli:corpus-changed` and
    `rotli:local-queue` go to every shell window (`chat_window::SHELL_LABELS`). A
    shell that misses `corpus-changed` shows a stale chat and then fails its next
    save on the revision gate — silently, with no CI proof. `⌥A` goes to
-   whichever window Chat lives in.
-6. **Keys are opted in, not shared.** The key registry gains a `chat` surface;
+   whichever window Chat lives in, and follows the same policy in both: back to
+   the chat already open, else the newest, else a fresh one.
+   While handing back, the window does not report its (emptying) tabs: an
+   interim empty report reaching main before the hand-back would drop those
+   chats from the layout main saves, and a quit in between would lose them.
+7. **Keys are opted in, not shared.** The key registry gains a `chat` surface;
    main's tab, pane, zoom, and New chat actions are opted in one by one
    (`alsoOnSurface`). `shared` would also fire them in Quick and Capture, and no
    note command may reach a window made of chats.
-7. **Pop out by button, not by drag — yet.** The roadmap says "hold and drag
+8. **Pop out by button, not by drag — yet.** The roadmap says "hold and drag
    Chat out". Pointer drags here are hand-rolled (`lib/pointerDrag.ts`: HTML5
    drag is dead in WKWebView) and listen on `window` without pointer capture;
    whether WKWebView keeps delivering `pointermove` outside the window's bounds
    is unverified and cannot be proven in CI. The drag form waits on a half-day
    native spike. Until then: the companion button on the Chat segment, its
    context menu, and the `chat.window` action.
-8. **Not on the web.** A second browser tab would be a second writer with no
+9. **Not on the web.** A second browser tab would be a second writer with no
    revision coordination between them.
 
 ## Status: behind `LAUNCH_FEATURES.chatWindow`

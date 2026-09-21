@@ -14,6 +14,7 @@ import {
 } from "../lib/tauri";
 import { invalidateMemex } from "../memex/useMemex";
 import { invalidateChatFolders } from "./chatFolders";
+import { summonChat } from "./chatSummon";
 import { invalidateNotes } from "./hooks";
 
 /** The Mac app only, and in the work (lib/featurePolicy.ts chatWindow). */
@@ -37,9 +38,10 @@ export function zoomChatWindow(): void {
  *  - the vault changed on disk → re-read chats, chat folders, and notes. A
  *    shell that never hears this shows a stale chat, then fails its next save
  *    on the revision gate.
- *  - File → Close Tab, and ⌥A while Chat lives in this window (Rust routes both
- *    to the focused / chat window). */
-export function attachChatShell(on: { closeTab: () => void; newChat: () => void }): () => void {
+ *  - File → Close Tab (Rust routes it to the focused shell window).
+ *  - ⌥A while Chat lives in this window: the SAME summon policy as main —
+ *    return to the chat already here, else the newest, else a fresh one. */
+export function attachChatShell(on: { closeTab: () => void }): () => void {
   const offs = [
     onCorpusChanged(() => {
       void invalidateMemex();
@@ -47,7 +49,7 @@ export function attachChatShell(on: { closeTab: () => void; newChat: () => void 
       void invalidateNotes();
     }),
     onNativeCloseTab(on.closeTab),
-    onSummonChat(on.newChat),
+    onSummonChat(() => void summonChat({ here: true })),
   ];
   return () => offs.forEach((off) => off());
 }

@@ -10,6 +10,7 @@ import { type Extension } from "@codemirror/state";
 import { hoverTooltip, type Tooltip } from "@codemirror/view";
 
 import { notesService } from "../services/notes";
+import { isChatItem } from "../services/systemBrowser";
 import type { NoteSummary } from "../types";
 import { wikilinkNotes, resolveWikilinkTarget } from "./wikilinkIndex";
 import { previewText, wikilinkAt } from "./wikilinkPreview";
@@ -48,6 +49,9 @@ function card(note: NoteSummary): HTMLElement {
   };
   const kind = note.kind ?? "note";
   if (note.secure) say("Secure note — open it to read.", true);
+  // a CHAT links like a note (its transcript is a file), but a conversation is
+  // not something to flash on an accidental hover or a shared screen
+  else if (isChatItem(note)) say("Chat — open it to read.", true);
   else if (kind !== "note") say(kind === "board" ? "Board" : "File", true);
   else {
     say("…", true);

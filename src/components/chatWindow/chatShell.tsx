@@ -41,10 +41,7 @@ export function ChatShell() {
     useUiStore.getState().setContentView("panes");
   }, []);
 
-  useEffect(
-    () => attachChatShell({ closeTab: () => dispatch("tabs.close"), newChat: () => dispatch("chat.new") }),
-    [],
-  );
+  useEffect(() => attachChatShell({ closeTab: () => dispatch("tabs.close") }), []);
 
   return (
     <div className="app-window chat-window">

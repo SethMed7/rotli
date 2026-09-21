@@ -1163,6 +1163,13 @@ test("a slash command works after text inside a checklist item, and can link a c
   await expect(link).toBeVisible();
   await expect(link).not.toHaveClass(/rotli-wikilink-missing/);
   await expect(editor.locator(".cm-line", { hasText: "Ask Gabriel about" })).toContainText("Planning chat");
+  // a chat link's hover card names the chat and never shows the conversation
+  await link.hover();
+  const card = page.locator(".rotli-linkcard");
+  await expect(card.locator(".rotli-linkcard-title")).toHaveText("Planning chat");
+  await expect(card.locator(".rotli-linkcard-body")).toHaveText("Chat — open it to read.");
+  await expect(card).not.toContainText("where do we start");
+  await page.mouse.move(0, 0);
 
   // a block command after text lands BENEATH the item, leaving its text whole
   await page.keyboard.press("End");

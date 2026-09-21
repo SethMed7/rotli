@@ -33,29 +33,22 @@ beforeEach(() => {
 
 describe("where a chat opens", () => {
   test("with Chat in main, nothing is routed anywhere", () => {
-    expect(chatWindowTakes("plan", undefined, () => false)).toBe(false);
+    expect(chatWindowTakes("plan", undefined)).toBe(false);
     expect(sent).toEqual([]);
     expect(shown).toBe(0);
   });
 
   test("with Chat pulled out, a chat opened in main opens THERE and the window comes forward", () => {
     useChatWindowStore.getState().setDetached(true);
-    expect(chatWindowTakes("plan", "vault", () => false)).toBe(true);
+    expect(chatWindowTakes("plan", "vault")).toBe(true);
     expect(sent).toEqual([{ kind: "open", refs: [{ slug: "plan", vaultId: "vault" }] }]);
     expect(shown).toBe(1);
   });
 
   test("a fresh chat goes there too", () => {
     useChatWindowStore.getState().setDetached(true);
-    expect(chatWindowTakes(null, undefined, () => false)).toBe(true);
+    expect(chatWindowTakes(null, undefined)).toBe(true);
     expect(sent).toEqual([{ kind: "open", refs: [{ slug: null }] }]);
-  });
-
-  test("a chat main still holds is shown in main — never open in both windows", () => {
-    useChatWindowStore.getState().setDetached(true);
-    expect(chatWindowTakes("plan", undefined, () => true)).toBe(true);
-    expect(sent).toEqual([]);
-    expect(shown).toBe(0);
   });
 
   test("regrouping forgets what the window held", () => {

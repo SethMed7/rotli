@@ -8,10 +8,15 @@
 // open chats, and main folds them into the layout it saves (viewstate.ts), so a
 // quit with the window up loses nothing — the next launch finds them regrouped.
 //
-// A RUNNING chat cannot move: its turn lives in the origin webview's memory
-// (refs, a stream channel bound to that webview), so moving it would orphan the
-// reply and leave the model process running for nothing. Pop-out says so
-// instead.
+// A RUNNING chat cannot move — in EITHER direction: its turn lives in the
+// webview it runs in (refs, a stream channel bound to that webview), so moving
+// it would orphan the reply and leave the model process running for nothing.
+// Pop-out and regroup both say so instead.
+//
+// One chat is never open in both windows (two writers on one transcript): a
+// draft holding images cannot cross webviews, so pop-out waits for it rather
+// than leave that tab behind; and while Chat is out, any chat tab that turns up
+// in main anyway (a split, ⌘⇧T) is moved to the window at once.
 
 import {
   hideChatWindow,
@@ -27,20 +32,31 @@ import { useChatRuns } from "./chatRuns";
 import { useChatWindowStore, windowSurface } from "./chatWindowStore";
 import { type ChatTabRef, type DraftOf, movableChatTabs, savedChatRefs } from "./chatWindowTabs";
 import { activeTabOf, findLeaf, leaves, usePanesStore } from "./panes";
+import { useUiStore } from "./ui";
 
 export const POP_OUT_BLOCKED =
   "A chat is still answering. Let it finish, then pull Chat out — a reply can’t follow its chat to another window.";
 
-/** Why Chat cannot be pulled out right now, or null. */
-export function popOutBlocker(): string | null {
-  const running = Object.values(useChatRuns.getState().runs).some((state) => state === "running");
-  return running ? POP_OUT_BLOCKED : null;
-}
+export const POP_OUT_IMAGES =
+  "A chat has images waiting to be sent. Send or remove them, then pull Chat out — images can’t move to another window.";
+
+export const REGROUP_BLOCKED =
+  "A chat is still answering. Let it finish, then put Chat back — a reply can’t follow its chat to another window.";
 
 const draftOf: DraftOf = (tabId) => {
   const draft = chatDraftFor(useChatDrafts.getState().drafts, tabId);
   return { message: draft.message, images: draft.images.length };
 };
+
+const anyRunning = () => Object.values(useChatRuns.getState().runs).some((state) => state === "running");
+
+/** Why Chat cannot be pulled out right now, or null. */
+export function popOutBlocker(): string | null {
+  if (anyRunning()) return POP_OUT_BLOCKED;
+  const root = usePanesStore.getState().root;
+  const withImages = movableChatTabs(root, draftOf, true).length > movableChatTabs(root, draftOf).length;
+  return withImages ? POP_OUT_IMAGES : null;
+}
 
 /** Take the movable chat tabs out of THIS window's panes and return them. */
 function takeChatTabs(force: boolean): ChatTabRef[] {
@@ -55,11 +71,14 @@ function takeChatTabs(force: boolean): ChatTabRef[] {
   return moving.map((entry) => entry.ref);
 }
 
-/** Open handed-over chats in THIS window, each with the text it carried. */
+/** Open handed-over chats in THIS window, each with the text it carried. A
+ * saved chat already open here (in any pane) is brought forward, never opened
+ * twice — two tabs on one file would fight over its revision. */
 function openRefs(refs: readonly ChatTabRef[]): void {
   for (const ref of refs) {
     const panes = usePanesStore.getState();
-    panes.openChat(ref.slug, { newTab: true, ...(ref.vaultId ? { vaultId: ref.vaultId } : {}) });
+    const shown = ref.slug !== null && panes.activateSurface("chat", ref.slug);
+    if (!shown) panes.openChat(ref.slug, ref.vaultId ? { vaultId: ref.vaultId } : undefined);
     if (!ref.draft) continue;
     const after = usePanesStore.getState();
     const leaf = findLeaf(after.root, after.focusedPaneId);
@@ -95,15 +114,40 @@ export function regroupChat(): void {
 export function attachChatWindow(fileIntoMain: (fragment: MainNode[]) => void): () => void {
   const surface = windowSurface();
   if (surface === "main") {
-    return onChatWindow((message) => {
+    const offMessages = onChatWindow((message) => {
       const store = useChatWindowStore.getState();
-      if (message.kind === "tabs") store.setRefs(message.refs);
-      else if (message.kind === "file-into-main") fileIntoMain(message.tree);
+      // a report that lands after the regroup is stale: Chat is home again
+      if (message.kind === "tabs") {
+        if (store.detached) store.setRefs(message.refs);
+      } else if (message.kind === "file-into-main") fileIntoMain(message.tree);
       else if (message.kind === "regrouped") {
         store.setDetached(false);
         openRefs(message.refs);
       }
     });
+    // while Chat is out, main holds no chat tab: one that turns up anyway (a
+    // split duplicating a tab, ⌘⇧T reopening one) moves to the window at once
+    // (closing a tab re-enters this subscription mid-loop, so the sweep is
+    // guarded and repeats until main holds no chat tab)
+    let sweeping = false;
+    const offPanes = usePanesStore.subscribe(() => {
+      if (sweeping || !useChatWindowStore.getState().detached) return;
+      sweeping = true;
+      const strays: ChatTabRef[] = [];
+      try {
+        for (let taken = takeChatTabs(true); taken.length > 0; taken = takeChatTabs(true))
+          strays.push(...taken);
+      } finally {
+        sweeping = false;
+      }
+      if (strays.length === 0) return;
+      sendChatWindow({ kind: "open", refs: strays });
+      void showChatWindow();
+    });
+    return () => {
+      offMessages();
+      offPanes();
+    };
   }
   if (surface !== "chat") return () => {};
 
@@ -121,10 +165,26 @@ export function attachChatWindow(fileIntoMain: (fragment: MainNode[]) => void): 
   keepOnlyChats();
   const currentRefs = () => savedChatRefs(usePanesStore.getState().root);
   const report = () => sendChatWindow({ kind: "tabs", refs: currentRefs() });
-  // the window is about to hide: EVERYTHING goes back (force), so no chat is
-  // ever stranded in a window nobody can see
+  // The window is about to hide: EVERYTHING goes back (force), so no chat is
+  // ever stranded in a window nobody can see — unless a chat here is still
+  // answering, which cannot move: then the window stays, comes forward, and
+  // says why. While handing back, the tab closes must not be REPORTED: an
+  // interim empty report reaching main before "regrouped" would drop these
+  // chats from the layout main saves (a quit in between would lose them).
+  let handingBack = false;
   const handBack = () => {
-    sendChatWindow({ kind: "regrouped", refs: takeChatTabs(true) });
+    if (anyRunning()) {
+      useUiStore.getState().setRowActionError(REGROUP_BLOCKED);
+      void showChatWindow();
+      return;
+    }
+    handingBack = true;
+    try {
+      sendChatWindow({ kind: "regrouped", refs: takeChatTabs(true) });
+    } finally {
+      handingBack = false;
+    }
+    last = JSON.stringify(currentRefs());
     void hideChatWindow();
   };
   const offMessages = onChatWindow((message) => {
@@ -138,6 +198,7 @@ export function attachChatWindow(fileIntoMain: (fragment: MainNode[]) => void): 
   let last = JSON.stringify(currentRefs());
   const offPanes = usePanesStore.subscribe(() => {
     keepOnlyChats();
+    if (handingBack) return;
     const next = JSON.stringify(currentRefs());
     if (next === last) return;
     last = next;

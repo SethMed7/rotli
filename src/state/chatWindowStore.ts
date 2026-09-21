@@ -31,19 +31,13 @@ export const useChatWindowStore = create<ChatWindowState>((set) => ({
   setRefs: (refs) => set({ refs: uniqueChatRefs(refs) }),
 }));
 
-/** The ONE routing rule, asked by panes.openChat: while Chat lives in its own
- * window, a chat opened from anywhere in main (a sidebar row, ⌥A, a note's
- * chat, a link) opens THERE instead, and the window comes forward. `openHere`
- * is asked first: a chat main still holds (a tab that could not move) is shown
- * in main — one chat is never open in both windows, which would be two writers
- * on one file. */
-export function chatWindowTakes(
-  chatSlug: string | null,
-  vaultId: string | undefined,
-  openHere: () => boolean,
-): boolean {
+/** The routing rule panes.openChat asks: while Chat lives in its own window,
+ * a chat opened from anywhere in main (a sidebar row, ⌥A, a note's chat, a
+ * link) opens THERE instead, and the window comes forward. Paths that place a
+ * chat tab without openChat (a split, ⌘⇧T) are caught by main's invariant in
+ * state/chatWindow.ts, which moves any chat tab that turns up in main. */
+export function chatWindowTakes(chatSlug: string | null, vaultId: string | undefined): boolean {
   if (windowSurface() !== "main" || !useChatWindowStore.getState().detached) return false;
-  if (chatSlug !== null && openHere()) return true;
   sendChatWindow(
     chatSlug
       ? { kind: "open", refs: [{ slug: chatSlug, ...(vaultId ? { vaultId } : {}) }] }
