@@ -261,6 +261,7 @@ interface PersistedSettings {
   spellcheck: boolean;
   autoUpdateCheck: boolean;
   chatTitleByMeaning: boolean;
+  templatePresets: boolean;
   /** Images follow their note into Archive/Trash (sole references only). */
   tidyImagesWithNote: boolean;
   /** Editor view: raw markdown vs beautified (WYSIWYG); beautified by default. */
@@ -539,6 +540,7 @@ export function parseSettings(raw: string): PersistedSettings {
     spellcheck: asBool(data.spellcheck, true),
     autoUpdateCheck: asBool(data.autoUpdateCheck, true),
     chatTitleByMeaning: asBool(data.chatTitleByMeaning, true),
+    templatePresets: asBool(data.templatePresets, true),
     tidyImagesWithNote: asBool(data.tidyImagesWithNote, true),
     rawEditor: asBool(data.rawEditor, false),
     blockHandles2: asBool(data.blockHandles2, true),
@@ -756,6 +758,7 @@ function applySettings(s: PersistedSettings): void {
     spellcheck: s.spellcheck,
     autoUpdateCheck: s.autoUpdateCheck,
     chatTitleByMeaning: s.chatTitleByMeaning,
+    templatePresets: s.templatePresets,
     tidyImagesWithNote: s.tidyImagesWithNote,
     rawEditor: s.rawEditor,
     blockHandles: s.blockHandles2,
@@ -1480,6 +1483,7 @@ function settingsSnapshot(): string {
     spellcheck: ui.spellcheck,
     autoUpdateCheck: ui.autoUpdateCheck,
     chatTitleByMeaning: ui.chatTitleByMeaning,
+    templatePresets: ui.templatePresets,
     tidyImagesWithNote: ui.tidyImagesWithNote,
     rawEditor: ui.rawEditor,
     blockHandles2: ui.blockHandles,

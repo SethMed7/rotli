@@ -10,7 +10,7 @@ import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { popOutChat, regroupChat } from "../state/chatWindow";
 import { useChatWindowStore, windowSurface } from "../state/chatWindowStore";
 import { useUiStore } from "../state/ui";
-import { alsoOnSurface, registerAction } from "./registry";
+import { alsoOnSurface, dispatch, getAction, registerAction } from "./registry";
 
 /** main's actions that also belong to a window made of chat tabs */
 const ALSO_IN_CHAT_WINDOW = [
@@ -30,12 +30,29 @@ const ALSO_IN_CHAT_WINDOW = [
   "view.zoomIn",
   "view.zoomOut",
   "view.zoomReset",
+  "chrome.toggleSidebars",
   "chat.new",
 ];
+
+/** main's "new tab" actions, which make a new chat in the chat window */
+const NEW_MEANS_NEW_CHAT = ["tabs.new", "tabs.newChooser"];
 
 export function registerChatWindowActions(): void {
   if (!LAUNCH_FEATURES.chatWindow) return;
   for (const id of ALSO_IN_CHAT_WINDOW) alsoOnSurface(id, "chat");
+
+  // ⌘T and ⌘N mean "new" wherever you are; in a window made of chats, new is a
+  // chat (the owner, 2026-09-21). Wrapping main's actions keeps their chords —
+  // rebound ones included — and changes nothing in main.
+  for (const id of NEW_MEANS_NEW_CHAT) {
+    const action = getAction(id);
+    if (!action) continue;
+    registerAction({
+      ...action,
+      also: [...(action.also ?? []), "chat"],
+      run: () => (windowSurface() === "chat" ? dispatch("chat.new") : action.run()),
+    });
+  }
 
   // One action, read from where you are: in main it pulls Chat out (or brings
   // it back when it is already out); in the chat window it regroups.

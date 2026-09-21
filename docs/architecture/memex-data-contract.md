@@ -340,7 +340,13 @@ second user-visible product or storage location.
   `wiki/Templates/` in a memex layout, `Templates/` in a plain notes folder
   (subfolders count). There is no template frontmatter key and no `.rotli/`
   state: a template is made, edited, moved, and trashed like any note, and the
-  folder is created by the user the first time they want one. `/template`
+  folder is created the first time one is made — by hand, or by the picker's
+  **Create new**, which makes an ordinary note through the normal creation
+  route and moves it into `wiki/Templates` (a memex) or `Templates` (a plain
+  folder), chosen by where that vault put the new note. Rotli's **built-in
+  presets** (`TEMPLATE_PRESETS`) are listed after the vault's own and are never
+  written into the vault; a vault template with a preset's name hides that
+  preset, and the per-vault `templatePresets` setting turns them all off. `/template`
   lists the notes whose **physical** folder is Templates (a shelf projection
   never hides one) and inserts the chosen body, which every adapter already
   returns without frontmatter. A **secure** template is never offered, because

@@ -161,7 +161,10 @@ test("/template inserts a layout from the connected folder's Templates folder", 
     .getByRole("menu", { name: "Insert block" })
     .getByRole("menuitem", { name: /Template/ })
     .click();
-  await expect(page.getByRole("menu", { name: "Template" }).locator(".slashlabel")).toHaveText(["Standup"]);
+  // the folder's own template first, then the built-in presets, then Create new
+  const labels = page.getByRole("menu", { name: "Template" }).locator(".slashlabel");
+  await expect(labels.first()).toHaveText("Standup");
+  await expect(labels).toContainText(["Daily note", "Create new"]);
   await page.keyboard.press("Enter");
 
   // the note already has content, so it keeps its own title: the template's
@@ -217,4 +220,29 @@ test("a folder waiting on the browser's permission is said in the sidebar, with 
   await expect(bar).toBeVisible();
   await expect(bar).toContainText("needs permission again");
   await expect(bar.getByRole("button", { name: "Reconnect" })).toBeVisible();
+});
+
+// The owner, 2026-09-21: "chats need to respect the view too — this view should
+// have no chats". A view lists only its own chats, even none; Main lists all.
+test("a view with no chats of its own shows none in Chat, and Main shows every chat", async ({ page }) => {
+  await fakeHelper(page);
+  await plantFolder(page);
+  await page.reload();
+  const homeSwitcher = page.getByRole("button", { name: /Current view: Main/ });
+  await homeSwitcher.scrollIntoViewIfNeeded();
+  await homeSwitcher.click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "New view…" }).click();
+  await page.getByRole("textbox", { name: "New view" }).fill("Demos");
+  await page.getByRole("button", { name: "Save" }).click();
+
+  await pairAndOpenChat(page);
+  const rows = page.locator(".sidebar .sb-chatrow:not(.all)");
+  await expect(page.locator(".sidebar .sb-empty")).toHaveText(/No chats in Demos yet/);
+  await expect(rows.filter({ hasText: "Sonnet chat" })).toHaveCount(0);
+
+  const context = page.getByRole("group", { name: "Chat view context" });
+  await context.getByRole("button", { name: /Current view: Demos/ }).click();
+  await page.getByRole("menu").getByRole("menuitemcheckbox", { name: "Main — all chats" }).click();
+  await expect(rows.filter({ hasText: "Sonnet chat" })).toBeVisible();
+  await expect(rows.filter({ hasText: "Gemma chat" })).toBeVisible();
 });

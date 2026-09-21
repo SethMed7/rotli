@@ -7,7 +7,7 @@ test("visual diagram editing is unavailable in production and available for deve
   expect(launchFeatures(true).mermaidVisualEditing).toBe(true);
 });
 
-test("public builds keep notes and chat while every experimental capability stays in development", () => {
+test("public builds keep notes, chat and the Chat window while every experimental capability stays in development", () => {
   expect(launchFeatures(false)).toEqual({
     notes: true,
     chat: true,
@@ -17,7 +17,7 @@ test("public builds keep notes and chat while every experimental capability stay
     sheets: false,
     mermaidDiagrams: false,
     voice: false,
-    chatWindow: false,
+    chatWindow: true,
   });
   expect(launchFeatures(true)).toEqual({
     notes: true,

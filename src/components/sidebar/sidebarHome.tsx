@@ -87,6 +87,7 @@ import {
 } from "../glyphs";
 import { InlineRenameInput } from "../inlineRenameInput";
 import { useNoteMenu } from "../useNoteMenu";
+import { ViewSectionHeader } from "./chatViewPicker";
 import { homeDashboardSnapshot } from "./homeDashboardModel";
 import { mainFolderMenuItems } from "./mainFolderMenu";
 import { noteDisplayTitle } from "./noteDisplayTitle";
@@ -1112,45 +1113,28 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
               (the maintainer, 2026-07-01). Add with the row menu or drag from the Library.
               The header (reworked 2026-07-28, the maintainer: "not collapsible — just a way
               to change the views"): the label + ▾ are ONE view switcher. — */}
-          <div className="fsec fsec-hdr">
-            <button
-              type="button"
-              className="fsec-view"
-              ref={viewsButtonRef}
-              data-tour="views"
-              aria-label={`Current view: ${activeView ?? "Main"}. Change view`}
-              aria-haspopup="menu"
-              title="Change view"
-              onClick={openViewMenu}
-            >
-              <span>{activeView ?? "Main"}</span>
-              <span className="caret-down" aria-hidden="true">
-                <ChevronRight size={9} />
-              </span>
-            </button>
-            <button
-              type="button"
-              className="fsec-add"
-              data-tour="new"
-              aria-label={`New note in ${activeView ?? "Main"}`}
-              title={`New note in ${activeView ?? "Main"}`}
-              onClick={() => dispatch("notes.new")}
-            >
-              <NewFileGlyph size={13} />
-            </button>
-            <button
-              type="button"
-              className="fsec-add"
-              aria-label={`New folder in ${activeView ?? "Main"}`}
-              title={`New folder in ${activeView ?? "Main"}`}
-              disabled={!!activeView && !viewsWritable}
-              /* name-FIRST (#16): open the inline input instead of minting a
-                 permanent "New folder 2" the old flow could never rename */
-              onClick={() => setMainNewFolder(true)}
-            >
-              <NewFolderGlyph size={13} />
-            </button>
-          </div>
+          <ViewSectionHeader
+            current={activeView ?? "Main"}
+            viewRef={viewsButtonRef}
+            onPickView={openViewMenu}
+            tour
+            actions={[
+              {
+                label: `New note in ${activeView ?? "Main"}`,
+                glyph: <NewFileGlyph size={13} />,
+                onClick: () => dispatch("notes.new"),
+                tour: "new",
+              },
+              {
+                label: `New folder in ${activeView ?? "Main"}`,
+                glyph: <NewFolderGlyph size={13} />,
+                disabled: !!activeView && !viewsWritable,
+                // name-FIRST (#16): open the inline input instead of minting a
+                // permanent "New folder 2" the old flow could never rename
+                onClick: () => setMainNewFolder(true),
+              },
+            ]}
+          />
           {editingView && (
             <div className="view-editor">
               <label htmlFor="new-view-name">{editingView === "rename" ? "Rename view" : "New view"}</label>

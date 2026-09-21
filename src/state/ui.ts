@@ -694,6 +694,10 @@ interface UiState {
    * six words stay the name. Persisted. */
   chatTitleByMeaning: boolean;
   setChatTitleByMeaning: (on: boolean) => void;
+  /** Offer Rotli's built-in templates in `/template` beside the vault's own
+   * (services/templates TEMPLATE_PRESETS — never files). Persisted. */
+  templatePresets: boolean;
+  setTemplatePresets: (on: boolean) => void;
   /** The version the feed offers, when known (e.g. "0.2.0"). */
   updateVersion: string | null;
   setUpdateVersion: (version: string | null) => void;
@@ -1069,6 +1073,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setAutoUpdateCheck: (on) => set({ autoUpdateCheck: on }),
   chatTitleByMeaning: true,
   setChatTitleByMeaning: (on) => set({ chatTitleByMeaning: on }),
+  templatePresets: true,
+  setTemplatePresets: (on) => set({ templatePresets: on }),
   updateVersion: null,
   setUpdateVersion: (version) => set({ updateVersion: version }),
 

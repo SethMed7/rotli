@@ -27,11 +27,13 @@ import {
 import { type NewItemKind, isNameFirstKind, isNewItemAvailable } from "../newItems/model";
 import { openChatForNote } from "../noteChat/composition";
 import { summonChat } from "../services/chatSummon";
+import { focusChatWindow } from "../services/chatWindowShell";
 import { invalidateNotes, lifecycleError } from "../services/hooks";
 import { archiveNoteWithImages, trashNoteWithImages } from "../services/noteLifecycle";
 import { notesService } from "../services/notes";
 import { trashSystemSelection } from "../services/systemTrash";
 import { reconnectActiveVault } from "../state/activeVault";
+import { useChatWindowStore } from "../state/chatWindowStore";
 import { chatRuntimeEnabled } from "../state/helperLink";
 import { navigate } from "../state/navHistory";
 import { DEFAULT_NOTE_STYLE, useNoteStyleStore } from "../state/noteStyle";
@@ -691,6 +693,7 @@ export function registerDefaultActions(): void {
     title: "Go to Chat",
     defaultChord: "Meta+Ctrl+2",
     run: () => {
+      if (useChatWindowStore.getState().detached) return focusChatWindow(); // Chat lives out there now
       const ui = useUiStore.getState();
       ui.setSettingsOpen(false);
       ui.setSidebarMode("notes");
