@@ -336,6 +336,19 @@ second user-visible product or storage location.
   read-only. Because Library is the `wiki/` projection, the welcome note never
   appears there. Scaffolding still restores Home/Notes navigation after carrying
   the outgoing vault's reusable appearance and editor preferences.
+- **Templates are ordinary notes in a folder named Templates** —
+  `wiki/Templates/` in a memex layout, `Templates/` in a plain notes folder
+  (subfolders count). There is no template frontmatter key and no `.rotli/`
+  state: a template is made, edited, moved, and trashed like any note, and the
+  folder is created by the user the first time they want one. `/template`
+  lists the notes whose **physical** folder is Templates (a shelf projection
+  never hides one) and inserts the chosen body, which every adapter already
+  returns without frontmatter. A **secure** template is never offered, because
+  inserting it would copy protected text into a note that is not. The
+  Librarian treats the folder as the user's, not as knowledge: it is not a
+  filing area, its notes are never enriched, and no `_index.md` is written
+  there; the folder name is pinned TS↔Rust in `scripts/fixtures/parity.json`.
+  Agents reach templates as ordinary notes; there is no template verb.
 - Every new vault starts with a **Welcome** folder in Main: the root welcome
   note first, then nine lessons. `src/assets/welcome.json` is the one catalog;
   its first entry is the welcome note body the scaffold writes, and the rest

@@ -30,7 +30,7 @@ function Heading({ level }: { level: 1 | 2 | 3 }) {
 // stays the inline-backticks primitive, and the multi-line kinds (table /
 // divider / fences) insert their scaffold with the caret placed inside
 // (CmEditor's pickSlash owns the caret math).
-export type SlashPickerMode = "linkNote" | "embedBoard" | "embedSheet" | "embedDocument";
+export type SlashPickerMode = "linkNote" | "insertTemplate" | "embedBoard" | "embedSheet" | "embedDocument";
 
 export type SlashOp =
   | { kind: "heading"; level: 1 | 2 | 3 }
@@ -126,6 +126,24 @@ const imageGenGlyph = (
     <path d="M21 15.5 16.5 11 7 20" />
   </svg>
 );
+// a page with its layout already ruled in: a heading bar, then two blocks
+const templateGlyph = (
+  <svg
+    viewBox="0 0 24 24"
+    width={15}
+    height={15}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.7}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <rect x="4" y="3" width="16" height="18" rx="2" />
+    <path d="M8 8h8M8 12.5h3.5v4.5H8zM14.5 12.5H16M14.5 17H16" />
+  </svg>
+);
+
 const linkGlyph = (
   <svg
     viewBox="0 0 24 24"
@@ -301,6 +319,14 @@ export const SLASH_ITEMS: SlashItem[] = [
     glyph: imageGenGlyph,
     op: { kind: "imageGen" },
     keywords: ["image-gen", "imagegen", "image", "ai", "picture", "photo", "generate"],
+  },
+  {
+    label: "Template",
+    group: "Insert",
+    hint: "Insert a saved note layout",
+    glyph: templateGlyph,
+    op: { kind: "picker", mode: "insertTemplate" },
+    keywords: ["template", "layout", "snippet", "boilerplate", "meeting"],
   },
   {
     label: "Link note",

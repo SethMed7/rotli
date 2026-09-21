@@ -78,6 +78,14 @@ fn view_folder_forbidden_chars_match_fixture() {
 }
 
 #[test]
+fn templates_brain_folder_matches_fixture() {
+    assert_eq!(
+        entry("templatesBrainFolder").as_str(),
+        Some(crate::organizer::TEMPLATES_BRAIN_FOLDER)
+    );
+}
+
+#[test]
 fn chat_image_asset_max_bytes_matches_fixture() {
     assert_eq!(
         entry("chatImageAssetMaxBytes").as_u64(),

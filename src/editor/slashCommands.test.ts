@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { NoteSummary } from "../types";
 import { imageGenMarkdown, readyImageEngines } from "./imageGenPopover";
-import { pickerFence, slashInsertion } from "./slashActions";
+import { pickerFence, slashInsertion, templateInsertion } from "./slashActions";
 import {
   adaptSlashInsertion,
   filterSlashItems,
@@ -43,6 +43,7 @@ describe("slash command catalog", () => {
       "Mermaid",
       "Attach image",
       "Generate image",
+      "Template",
       "Link note",
       "Board",
       "Sheet",
@@ -234,5 +235,49 @@ describe("slash commands inside a result row's reason", () => {
     expect(slashSpanAtCaret("- [ ][x] Hello — fail /table", 20)).toBeNull();
     expect(slashSpanAtCaret("- [ ][x] Hello /table", 21)).toBeNull();
     expect(slashSpanAtCaret("- item /table", 13)).toBeNull();
+  });
+});
+
+describe("/template", () => {
+  const note = (id: string, over: Partial<NoteSummary> = {}): NoteSummary => ({
+    ...file(id),
+    kind: "note",
+    folderId: "wiki/Templates",
+    ...over,
+  });
+
+  test("the picker offers only the notes in the Templates folder", () => {
+    const pool = [
+      note("01MEET", { title: "Meeting notes" }),
+      note("01SHELF", { title: "Weekly review", folderId: "Board", diskFolderId: "wiki/Templates" }),
+      note("01SECRET", { title: "Secret layout", secure: true }),
+      note("01ELSE", { title: "Meeting with Ana", folderId: "wiki/Projects" }),
+      file("Storage/Meeting.docx"),
+    ];
+    expect(filterPickerNotes(pool, "insertTemplate", "").map((n) => n.id)).toEqual(["01MEET", "01SHELF"]);
+    expect(filterPickerNotes(pool, "insertTemplate", "meet").map((n) => n.id)).toEqual(["01MEET"]);
+  });
+
+  test("it never offers to create: a template is made like any note, in its folder", () => {
+    expect(slashPickerCanCreate("insertTemplate", true, true)).toBe(false);
+  });
+
+  test("into an EMPTY note the template comes whole — its heading names the new note", () => {
+    expect(templateInsertion("# Meeting notes\n\n## Attendees\n\n- \n", true)).toBe(
+      "# Meeting notes\n\n## Attendees\n\n-",
+    );
+  });
+
+  test("into a note with content the template's own title is left out, so the note is never renamed", () => {
+    expect(templateInsertion("# Meeting notes\n\n## Attendees\n\n- \n", false)).toBe("## Attendees\n\n-");
+    // only a LEADING H1 is the template's name; a later one is content
+    expect(templateInsertion("intro\n\n# Part one\n", false)).toBe("intro\n\n# Part one");
+    expect(templateInsertion("## Agenda\n- item\n", false)).toBe("## Agenda\n- item");
+  });
+
+  test("stray frontmatter never rides into the host note, and an empty template inserts nothing", () => {
+    expect(templateInsertion("---\ntitle: x\nsecure: false\n---\n\n## Agenda\n", false)).toBe("## Agenda");
+    expect(templateInsertion("# Only a title\n", false)).toBe("");
+    expect(templateInsertion("\n\n", true)).toBe("");
   });
 });

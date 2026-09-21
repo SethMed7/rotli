@@ -149,6 +149,7 @@ export const SERVICE_FILE_OWNERS = {
   "notes.ts": "notes adapter",
   "remoteAgent.ts": "remote-agent relay adapter seam (development builds only)",
   "updateCheck.ts": "app updates (the routine, switchable check of the signed release feed)",
+  "templates.ts": "the Templates folder rule (which notes /template may offer)",
   "welcome.ts": "Welcome folder seeding and Main filing composition",
   "webNotes.ts": "notes",
   "webTasks.ts": "Tasks projection outside the Mac app (the corpus.rs twin)",
