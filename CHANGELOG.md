@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   newer version is out. Nothing downloads until you choose Install & relaunch.
   Settings → General → "Check for updates automatically" turns the routine
   check off; the Check for updates button stays either way.
+- **Hover a `[[link]]` to see the top of that note.** Rest the pointer on a
+  link and a small card shows the note's title and first lines without
+  opening it; a click still opens it. A secure note's card shows its name and
+  none of its text. Works in the Mac app and in Rotli Web.
 - **Send feedback.** Settings → About Rotli (and ⌘K → "Send feedback") opens a
   new GitHub issue that starts with your Rotli version and operating system,
   and nothing else.
