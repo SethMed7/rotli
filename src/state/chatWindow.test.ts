@@ -117,6 +117,11 @@ describe("main while Chat is out", () => {
       usePanesStore.getState().reopenClosedTab();
       expect(chatTabs()).toEqual([]);
       expect(sent).toEqual([{ kind: "open", refs: [{ slug: "budget" }] }]);
+      // "open to the side" is routed too, before any split is made
+      sent = [];
+      usePanesStore.getState().openToSide("chat", "notes-from-call");
+      expect(chatTabs()).toEqual([]);
+      expect(sent).toEqual([{ kind: "open", refs: [{ slug: "notes-from-call" }] }]);
     } finally {
       detach();
     }

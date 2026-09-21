@@ -33,8 +33,9 @@ export const useChatWindowStore = create<ChatWindowState>((set) => ({
 
 /** The routing rule panes.openChat asks: while Chat lives in its own window,
  * a chat opened from anywhere in main (a sidebar row, ⌥A, a note's chat, a
- * link) opens THERE instead, and the window comes forward. Paths that place a
- * chat tab without openChat (a split, ⌘⇧T) are caught by main's invariant in
+ * link) opens THERE instead, and the window comes forward. Asked by
+ * panes.openChat and panes.openToSide; paths that place a chat tab without
+ * either (a split duplicating a tab, ⌘⇧T) are caught by main's invariant in
  * state/chatWindow.ts, which moves any chat tab that turns up in main. */
 export function chatWindowTakes(chatSlug: string | null, vaultId: string | undefined): boolean {
   if (windowSurface() !== "main" || !useChatWindowStore.getState().detached) return false;

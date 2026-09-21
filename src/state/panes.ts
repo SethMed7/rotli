@@ -1015,6 +1015,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
 
     openToSide: (kind, id) => {
       if (kind !== "chat" && !allowPaneVault(contentVaultId(id))) return;
+      if (kind === "chat" && chatWindowTakes(id, undefined)) return; // Chat lives in its own window
       const tab =
         kind === "canvas"
           ? makeCanvasTab(id)

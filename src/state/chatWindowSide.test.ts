@@ -16,6 +16,7 @@ let hidden = 0;
 let shown = 0;
 let onMessage: ((message: { kind: string; refs?: unknown }) => void) | null = null;
 let onClose: (() => void) | null = null;
+let onShown: (() => void) | null = null;
 
 void mock.module("../lib/chatWindowBridge", () => ({
   ...realBridge,
@@ -28,7 +29,10 @@ void mock.module("../lib/chatWindowBridge", () => ({
     onClose = cb;
     return () => {};
   },
-  onChatWindowShown: () => () => {},
+  onChatWindowShown: (cb: () => void) => {
+    onShown = cb;
+    return () => {};
+  },
   hideChatWindow: async () => {
     hidden += 1;
   },
@@ -97,5 +101,15 @@ describe("the Chat window", () => {
     expect(hidden).toBe(0);
     expect(shown).toBe(1);
     expect(useUiStore.getState().rowActionError).toBe(REGROUP_BLOCKED);
+  });
+
+  test("being shown before the handed-over chats open never reports an empty list", () => {
+    sent = [];
+    onShown?.();
+    expect(sent).toEqual([]);
+    onMessage?.({ kind: "open", refs: [{ slug: "plan" }] });
+    expect(sent).toEqual([{ kind: "tabs", refs: [{ slug: "plan" }] }]);
+    onShown?.();
+    expect(sent.at(-1)).toEqual({ kind: "tabs", refs: [{ slug: "plan" }] });
   });
 });

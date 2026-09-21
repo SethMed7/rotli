@@ -192,8 +192,13 @@ export function attachChatWindow(fileIntoMain: (fragment: MainNode[]) => void): 
     else if (message.kind === "regroup") handBack();
   });
   const offClose = onChatWindowCloseRequest(handBack);
-  // shown again: tell main what is here, so its saved layout starts in step
-  const offShown = onChatWindowShown(report);
+  // shown again: tell main what is here, so its saved layout starts in step —
+  // but never an EMPTY list: on pop-out "shown" can arrive before the handed-
+  // over chats are open, and an empty report would drop them from the layout
+  // main saves (the pane subscription reports once they are open)
+  const offShown = onChatWindowShown(() => {
+    if (currentRefs().length > 0) report();
+  });
   // every change to the open chats is reported, so main's saved layout follows
   let last = JSON.stringify(currentRefs());
   const offPanes = usePanesStore.subscribe(() => {
