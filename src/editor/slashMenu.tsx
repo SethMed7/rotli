@@ -30,7 +30,13 @@ function Heading({ level }: { level: 1 | 2 | 3 }) {
 // stays the inline-backticks primitive, and the multi-line kinds (table /
 // divider / fences) insert their scaffold with the caret placed inside
 // (CmEditor's pickSlash owns the caret math).
-export type SlashPickerMode = "linkNote" | "embedBoard" | "embedSheet" | "embedDocument";
+export type SlashPickerMode =
+  | "linkNote"
+  | "linkChat"
+  | "insertTemplate"
+  | "embedBoard"
+  | "embedSheet"
+  | "embedDocument";
 
 export type SlashOp =
   | { kind: "heading"; level: 1 | 2 | 3 }
@@ -126,6 +132,41 @@ const imageGenGlyph = (
     <path d="M21 15.5 16.5 11 7 20" />
   </svg>
 );
+// a page with its layout already ruled in: a heading bar, then two blocks
+const templateGlyph = (
+  <svg
+    viewBox="0 0 24 24"
+    width={15}
+    height={15}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.7}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <rect x="4" y="3" width="16" height="18" rx="2" />
+    <path d="M8 8h8M8 12.5h3.5v4.5H8zM14.5 12.5H16M14.5 17H16" />
+  </svg>
+);
+
+// a speech bubble — the chat the link points at
+const chatLinkGlyph = (
+  <svg
+    viewBox="0 0 24 24"
+    width={15}
+    height={15}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.7}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M5 5h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9l-4 3.5V7a2 2 0 0 1 2-2Z" />
+  </svg>
+);
+
 const linkGlyph = (
   <svg
     viewBox="0 0 24 24"
@@ -303,12 +344,28 @@ export const SLASH_ITEMS: SlashItem[] = [
     keywords: ["image-gen", "imagegen", "image", "ai", "picture", "photo", "generate"],
   },
   {
+    label: "Template",
+    group: "Insert",
+    hint: "Insert a saved note layout",
+    glyph: templateGlyph,
+    op: { kind: "picker", mode: "insertTemplate" },
+    keywords: ["template", "layout", "snippet", "boilerplate", "meeting"],
+  },
+  {
     label: "Link note",
     group: "Link",
     hint: "Wikilink to another note",
     glyph: linkGlyph,
     op: { kind: "picker", mode: "linkNote" },
     keywords: ["note", "wiki", "link"],
+  },
+  {
+    label: "Link chat",
+    group: "Link",
+    hint: "Wikilink to one of your chats",
+    glyph: chatLinkGlyph,
+    op: { kind: "picker", mode: "linkChat" },
+    keywords: ["chat", "conversation", "link", "wiki"],
   },
   {
     label: "Board",
@@ -413,12 +470,28 @@ export interface SlashApplySpan {
   query: string;
 }
 
+/** A command that belongs INSIDE a sentence: it inserts in place. Everything
+ * else is a block, and a block picked after text lands on a continuation line
+ * beneath, so the sentence (or the list item's text) stays whole. */
+function isInlineOp(op: SlashOp | undefined): boolean {
+  if (!op) return false;
+  if (op.kind === "code") return true;
+  return op.kind === "picker" && (op.mode === "linkNote" || op.mode === "linkChat");
+}
+
 /** A slash command owns paragraph or list-item content while the caret trails
- * it. A result row that already carries a ` — reason` is the one exception:
- * the trailing `/query` token of the reason is the command, and its block goes
- * on a continuation line beneath the row so the answer keeps its label and
- * reason. A reason that was only the slash drops its dangling separator. */
-export function slashSpanAtCaret(line: string, caret: number): SlashApplySpan | null {
+ * it — the whole line (`/table`), or a trailing ` /query` after text, so a
+ * command can be reached from inside a checklist item without leaving it.
+ *
+ * After text, prose keeps its slashes: the slash needs a space before it
+ * (`and/or`, a URL), at least one letter after it (`yes / no`), and a command
+ * that matches (`/usr`). `op` is the command being applied: it decides whether
+ * the insertion stays in the sentence or goes beneath (isInlineOp).
+ *
+ * A result row is the one exception to "after text": its LABEL is an answer,
+ * not prose, so only the trailing token of its ` — reason` is a command, and a
+ * reason that was only the slash drops its dangling separator. */
+export function slashSpanAtCaret(line: string, caret: number, op?: SlashOp): SlashApplySpan | null {
   if (caret !== line.length) return null;
   const target = slashLineTarget(line);
   const whole = /^\/([^/]*)$/.exec(line.slice(target.from));
@@ -432,7 +505,19 @@ export function slashSpanAtCaret(line: string, caret: number): SlashApplySpan | 
     };
   }
   const block = parseBlock(line);
-  if (block.kind !== "result") return null;
+  const beneath = isInlineOp(op) ? "" : `\n${target.continuation}`;
+  if (block.kind !== "result") {
+    if (block.kind === "choice") return null;
+    const tail = /\s\/([^/\s]+)$/.exec(line.slice(target.from));
+    if (!tail || filterSlashItems(tail[1] ?? "").length === 0) return null;
+    return {
+      from: target.from + tail.index + 1,
+      to: line.length,
+      lead: beneath,
+      continuation: target.continuation,
+      query: tail[1] ?? "",
+    };
+  }
   const parts = resultTextParts(block.text);
   if (parts.reason === null) return null;
   const labelEnd = block.prefixLen + parts.label.length;

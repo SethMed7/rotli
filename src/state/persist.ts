@@ -68,6 +68,8 @@ import type { PaneNode, Tab } from "../types";
 import { DEFAULT_VOICE, VOICES } from "../voice/speech";
 import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
 import { APP_SETTINGS_KEYS } from "./appSettingsKeys";
+import { useChatWindowStore } from "./chatWindowStore";
+import { withDetachedChats } from "./chatWindowTabs";
 import { helperLinked } from "./helperLink";
 import { hydrateMain, useMainStore } from "./main";
 import { MRU_CAP, touchItemActivity, touchMru, useMruStore } from "./mru";
@@ -257,6 +259,9 @@ interface PersistedSettings {
   paneVaultMode: PaneVaultMode;
   /** Editor spell-check (red squiggles); on by default. */
   spellcheck: boolean;
+  autoUpdateCheck: boolean;
+  chatTitleByMeaning: boolean;
+  templatePresets: boolean;
   /** Images follow their note into Archive/Trash (sole references only). */
   tidyImagesWithNote: boolean;
   /** Editor view: raw markdown vs beautified (WYSIWYG); beautified by default. */
@@ -533,6 +538,9 @@ export function parseSettings(raw: string): PersistedSettings {
         : "",
     paneVaultMode: asEnum(data.paneVaultMode, PANE_VAULT_MODES, "single"),
     spellcheck: asBool(data.spellcheck, true),
+    autoUpdateCheck: asBool(data.autoUpdateCheck, true),
+    chatTitleByMeaning: asBool(data.chatTitleByMeaning, true),
+    templatePresets: asBool(data.templatePresets, true),
     tidyImagesWithNote: asBool(data.tidyImagesWithNote, true),
     rawEditor: asBool(data.rawEditor, false),
     blockHandles2: asBool(data.blockHandles2, true),
@@ -748,6 +756,9 @@ function applySettings(s: PersistedSettings): void {
     remoteAgentRelayUrl: s.remoteAgentRelayUrl,
     paneVaultMode: s.paneVaultMode,
     spellcheck: s.spellcheck,
+    autoUpdateCheck: s.autoUpdateCheck,
+    chatTitleByMeaning: s.chatTitleByMeaning,
+    templatePresets: s.templatePresets,
     tidyImagesWithNote: s.tidyImagesWithNote,
     rawEditor: s.rawEditor,
     blockHandles: s.blockHandles2,
@@ -1470,6 +1481,9 @@ function settingsSnapshot(): string {
     remoteAgentRelayUrl: ui.remoteAgentRelayUrl,
     paneVaultMode: ui.paneVaultMode,
     spellcheck: ui.spellcheck,
+    autoUpdateCheck: ui.autoUpdateCheck,
+    chatTitleByMeaning: ui.chatTitleByMeaning,
+    templatePresets: ui.templatePresets,
     tidyImagesWithNote: ui.tidyImagesWithNote,
     rawEditor: ui.rawEditor,
     blockHandles2: ui.blockHandles,
@@ -1536,7 +1550,7 @@ function viewstateSnapshot(): string {
   const panes = usePanesStore.getState();
   const snapshot: PersistedViewstate = {
     v: 1,
-    root: durablePane(panes.root),
+    root: withDetachedChats(durablePane(panes.root), useChatWindowStore.getState().refs),
     focusedPaneId: panes.focusedPaneId,
     selectedFolderId: useUiStore.getState().selectedFolderId,
     activeView: useUiStore.getState().activeView,
@@ -1639,6 +1653,7 @@ export function attachPersistence(): () => void {
     useNoteStyleStore.subscribe(schedule),
     useTableWidthsStore.subscribe(schedule),
     usePanesStore.subscribe(schedule),
+    useChatWindowStore.subscribe(schedule),
     useMruStore.subscribe(schedule),
   ];
   const onVisibility = (): void => {

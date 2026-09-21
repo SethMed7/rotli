@@ -27,11 +27,13 @@ import {
 import { type NewItemKind, isNameFirstKind, isNewItemAvailable } from "../newItems/model";
 import { openChatForNote } from "../noteChat/composition";
 import { summonChat } from "../services/chatSummon";
+import { focusChatWindow } from "../services/chatWindowShell";
 import { invalidateNotes, lifecycleError } from "../services/hooks";
 import { archiveNoteWithImages, trashNoteWithImages } from "../services/noteLifecycle";
 import { notesService } from "../services/notes";
 import { trashSystemSelection } from "../services/systemTrash";
 import { reconnectActiveVault } from "../state/activeVault";
+import { useChatWindowStore } from "../state/chatWindowStore";
 import { chatRuntimeEnabled } from "../state/helperLink";
 import { navigate } from "../state/navHistory";
 import { DEFAULT_NOTE_STYLE, useNoteStyleStore } from "../state/noteStyle";
@@ -40,10 +42,13 @@ import { cycleQuick, removeQuickNote } from "../state/quick";
 import { toggleSettings } from "../state/settingsToggle";
 import { startTour } from "../state/tour";
 import { SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
+import { registerAppLinkActions } from "./appLinkActions";
 import { registerCaptureActions } from "./captureActions";
+import { registerChatWindowActions } from "./chatWindowActions";
 import { EDITOR_ACTION } from "./editorActionIds";
 import { focusedNoteIdNow, notesWorkspaceActive } from "./focusNow";
 import { captureHandle, quickHandle, setupHandle } from "./handles";
+import { registerLeaderActions } from "./leaderActions";
 import { registerNavArrowActions } from "./navArrows";
 import { registerNoteProtectionActions } from "./noteProtectionActions";
 import { registerAction } from "./registry";
@@ -292,6 +297,7 @@ export function registerDefaultActions(): void {
     },
   });
   registerAction({ id: "app.tour", title: "Show me around", defaultChord: null, run: startTour });
+  registerAppLinkActions();
   registerAction({
     id: "app.settings",
     title: "Settings",
@@ -421,6 +427,7 @@ export function registerDefaultActions(): void {
   });
 
   registerNoteProtectionActions();
+  registerLeaderActions();
 
   // — tabs (created only by explicit gestures; plain click replaces). ⌘T uses
   //   the configured item default in the workspace and a fresh private sibling
@@ -686,6 +693,7 @@ export function registerDefaultActions(): void {
     title: "Go to Chat",
     defaultChord: "Meta+Ctrl+2",
     run: () => {
+      if (useChatWindowStore.getState().detached) return focusChatWindow(); // Chat lives out there now
       const ui = useUiStore.getState();
       ui.setSettingsOpen(false);
       ui.setSidebarMode("notes");
@@ -880,4 +888,6 @@ export function registerDefaultActions(): void {
       void hideQuickWindow();
     },
   });
+  // LAST: it opts already-registered tab/pane/chat actions into the Chat window
+  registerChatWindowActions();
 }

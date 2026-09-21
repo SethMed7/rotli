@@ -16,6 +16,7 @@ import {
   useState,
 } from "react";
 
+import { guideOs } from "../ai/connectorGuides";
 import { makeTauriHost } from "../ai/host";
 import { suggestPresets } from "../ai/hybrid";
 import { LIBRARIAN_LABELS, librarianCaption, librarianModelFor, librarianOptions } from "../ai/librarianLane";
@@ -58,6 +59,7 @@ import {
   setDispatchSuspended,
 } from "../keys/registry";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { feedbackUrl } from "../lib/feedback";
 import { PRIVATE_BROWSER_SEARCH_ENGINE_PRESENTATIONS } from "../lib/privateBrowser";
 import {
   type ChatModelInfo,
@@ -137,6 +139,7 @@ import { AntigravitySetup } from "./antigravitySetup";
 import { Character, type CharacterName, QuokkaMark } from "./character";
 import {
   BrowserGlyph,
+  ChatGlyph,
   CheckGlyph,
   CloudGlyph,
   DatabaseGlyph,
@@ -162,6 +165,7 @@ type SettingsPane =
   | "brain"
   | "security"
   | "models"
+  | "chat"
   | "location"
   | "connections"
   | "about";
@@ -179,6 +183,8 @@ const NAV: { id: SettingsPane; label: string; glyph: (props: { size?: number }) 
   { id: "security", label: "Security", glyph: ShieldGlyph },
   // connected subscription models + hybrid presets (the maintainer, 2026-07-02)
   { id: "models", label: "AI Models", glyph: CloudGlyph },
+  // how chats start and get their names (the owner, 2026-09-21)
+  { id: "chat", label: "Chat", glyph: ChatGlyph },
   // Storage + Memory collapsed into one "Location" tab (the maintainer, 2026-06-27): your
   // notes folder *is* (or can become) a brain — one concept, not two overlapping
   // ones. See LocationPane below.
@@ -456,8 +462,11 @@ function UpdatesSection() {
   const updateVersion = useUiStore((s) => s.updateVersion);
   const setUpdateAvailable = useUiStore((s) => s.setUpdateAvailable);
   const setUpdateVersion = useUiStore((s) => s.setUpdateVersion);
+  const autoUpdateCheck = useUiStore((s) => s.autoUpdateCheck);
+  const setAutoUpdateCheck = useUiStore((s) => s.setAutoUpdateCheck);
   const version = useAppVersion() ?? "0.1.0";
-  // Preserve the result of an explicit check while Settings is reopened.
+  // Preserve the result of a check (this button's, or the routine one's) while
+  // Settings is reopened.
   const [state, setState] = useState<CheckState>(
     updateAvailable ? { kind: "available", version: updateVersion } : { kind: "idle" },
   );
@@ -513,6 +522,14 @@ function UpdatesSection() {
         )}
       </div>
       {state.kind === "error" && <p className="setnote err">Couldn’t check for updates: {state.message}</p>}
+      <div className="swgroup">
+        <Toggle
+          on={autoUpdateCheck}
+          title="Check for updates automatically"
+          desc="Rotli asks its release page for the newest version shortly after it opens and a few times a day, then marks the Settings button when there is one. Nothing downloads until you choose Install."
+          onChange={() => setAutoUpdateCheck(!autoUpdateCheck)}
+        />
+      </div>
     </>
   );
 }
@@ -534,6 +551,8 @@ function GeneralPane() {
   const setShowInDock = useUiStore((s) => s.setShowInDock);
   const spellcheck = useUiStore((s) => s.spellcheck);
   const setSpellcheck = useUiStore((s) => s.setSpellcheck);
+  const templatePresets = useUiStore((s) => s.templatePresets);
+  const setTemplatePresets = useUiStore((s) => s.setTemplatePresets);
   const tidyImagesWithNote = useUiStore((s) => s.tidyImagesWithNote);
   const setTidyImagesWithNote = useUiStore((s) => s.setTidyImagesWithNote);
   const fileMetadata = useUiStore((s) => s.fileMetadata);
@@ -839,6 +858,12 @@ function GeneralPane() {
           onChange={() => setSpellcheck(!spellcheck)}
         />
         <Toggle
+          on={templatePresets}
+          title="Offer built-in templates"
+          desc="/template lists Rotli's own starters — meeting notes, a daily note, a project brief and more — after the templates in your Templates folder. They are never saved into your vault."
+          onChange={() => setTemplatePresets(!templatePresets)}
+        />
+        <Toggle
           on={tidyImagesWithNote}
           title="Images follow their note"
           desc="Trashing or archiving a note takes its images along — unless another note also uses them."
@@ -1086,8 +1111,6 @@ function AppearancePane() {
   const setSyntaxPalette = useUiStore((s) => s.setSyntaxPalette);
   const chatWelcomeStyle = useUiStore((s) => s.chatWelcomeStyle);
   const setChatWelcomeStyle = useUiStore((s) => s.setChatWelcomeStyle);
-  const chatNaming = useUiStore((s) => s.chatNaming);
-  const setChatNaming = useUiStore((s) => s.setChatNaming);
   const appIcon = useUiStore((s) => s.appIcon);
   const setAppIconState = useUiStore((s) => s.setAppIcon);
   const pickFamily = (family: ThemeFamily) => setThemeFamily(family);
@@ -1404,20 +1427,6 @@ function AppearancePane() {
           onPick={setSidebarReveal}
         />
       </div>
-
-      <h4 className="sethead">Chat naming</h4>
-      <p className="lead">
-        Ask first keeps an optional name in the chat header. First message skips that step and names the chat
-        automatically. You can rename either later.
-      </p>
-      <Seg
-        value={chatNaming}
-        options={[
-          ["ask", "Ask first"],
-          ["automatic", "First message"],
-        ]}
-        onPick={setChatNaming}
-      />
 
       <h4 className="sethead">New chat welcome</h4>
       <p className="lead">
@@ -2260,6 +2269,124 @@ function LaneSwitch({ on, onToggle, label }: { on: boolean; onToggle: () => void
     >
       <SwitchKnob />
     </button>
+  );
+}
+
+/** How chats start: the model a new chat opens on (with a real test of it) and
+ * how it gets its name — gathered from General, Appearance and AI Models (the
+ * owner, 2026-09-21: "we should have chat settings"). The model list is the
+ * chat picker's: this Mac's models, the connected lanes that are on, presets. */
+function ChatPane() {
+  const chatModelId = useUiStore((s) => s.chatModelId);
+  const setChatModelId = useUiStore((s) => s.setChatModelId);
+  const chatNaming = useUiStore((s) => s.chatNaming);
+  const setChatNaming = useUiStore((s) => s.setChatNaming);
+  const chatTitleByMeaning = useUiStore((s) => s.chatTitleByMeaning);
+  const setChatTitleByMeaning = useUiStore((s) => s.setChatTitleByMeaning);
+  const aiProviders = useUiStore((s) => s.aiProviders);
+  const hybridPresets = useUiStore((s) => s.hybridPresets);
+  const blockedModels = useUiStore((s) => s.blockedModels);
+  const local = useQuery({
+    queryKey: ["chat", "models"],
+    queryFn: () => (isTauri() ? chatModels() : Promise.resolve([])),
+    staleTime: Infinity,
+  });
+  const available = useMemo(
+    () => flattenModels(mergedModels(local.data ?? [], aiProviders, hybridPresets, blockedModels)),
+    [local.data, aiProviders, hybridPresets, blockedModels],
+  );
+  const chosen = available.find((m) => m.id === chatModelId);
+  const lane = chosen
+    ? PROVIDER_IDS.find((id) => CLI_CATALOG[id].some((m) => m.id === chosen.id))
+    : undefined;
+  const [verify, setVerify] = useState<VerifyState>({ state: "idle" });
+  const test = () => {
+    if (!chosen) return;
+    // a model on this Mac answers from the local store: listed = installed
+    if (!lane) {
+      setVerify({ state: "ok", ms: 0, model: `${chosen.label} — on this Mac` });
+      return;
+    }
+    setVerify({ state: "running" });
+    verifyLane(lane, chosen.id)
+      .then((r) =>
+        setVerify(
+          r.ok ? { state: "ok", ms: r.ms, model: r.model } : { state: "fail", error: r.error ?? "failed" },
+        ),
+      )
+      .catch((e: unknown) => setVerify({ state: "fail", error: e instanceof Error ? e.message : "failed" }));
+  };
+  return (
+    <>
+      <PaneHead title="Chat" char="chat" />
+      <h4 className="sethead">New chats start on</h4>
+      <p className="lead">
+        The model every new chat opens with. A chat can still switch models on its own, and keeps the one it
+        picked. Connect more providers in AI Models.
+      </p>
+      <label className="ailane-default">
+        <span>
+          Default model
+          <small>
+            {available.length === 0
+              ? "No models yet — set one up in AI Models."
+              : "From your connected providers and this Mac."}
+          </small>
+        </span>
+        <select
+          className="setselect"
+          aria-label="Default model for new chats"
+          value={chosen ? chosen.id : ""}
+          onChange={(event) => {
+            setChatModelId(event.currentTarget.value || null);
+            setVerify({ state: "idle" });
+          }}
+        >
+          <option value="">Rotli picks (this Mac's default)</option>
+          {available.map((model) => (
+            <option value={model.id} key={model.id}>
+              {model.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {chosen && chosen.api !== "preset" && (
+        <div className="ailane-verify">
+          <button type="button" className="ghostbtn" disabled={verify.state === "running"} onClick={test}>
+            {verify.state === "running" ? "Testing…" : "Test this model"}
+          </button>
+          {verify.state === "ok" && (
+            <span className="ailane-chip ok">
+              working ✓ · {verify.model}
+              {verify.ms > 0 ? ` · ${(verify.ms / 1000).toFixed(1)}s` : ""}
+            </span>
+          )}
+          {verify.state === "fail" && <span className="ailane-chip err">{verify.error}</span>}
+        </div>
+      )}
+
+      <h4 className="sethead">Naming</h4>
+      <p className="lead">
+        Ask first keeps an optional name box at the top of a new chat. First message skips it and names the
+        chat from what you send. You can rename either later.
+      </p>
+      <Seg
+        value={chatNaming}
+        options={[
+          ["ask", "Ask first"],
+          ["automatic", "First message"],
+        ]}
+        onPick={setChatNaming}
+      />
+      <div className="swgroup">
+        <Toggle
+          on={chatTitleByMeaning}
+          title="Name new chats by what they are about"
+          desc="After the first reply, the model you are chatting with suggests a short name for the chat — one small extra request. A name you type yourself is never replaced. Off, a chat keeps its first few words."
+          onChange={() => setChatTitleByMeaning(!chatTitleByMeaning)}
+        />
+      </div>
+    </>
   );
 }
 
@@ -3120,7 +3247,11 @@ function AboutRotliPane() {
   return (
     <>
       <PaneHead title="About Rotli" char="waving" />
-      <AboutPane version={version} onOpenWebsite={(url) => void openUrl(url)} />
+      <AboutPane
+        version={version}
+        feedbackUrl={feedbackUrl(version, guideOs(navigator.platform || navigator.userAgent))}
+        onOpenUrl={(url) => void openUrl(url)}
+      />
     </>
   );
 }
@@ -3173,6 +3304,7 @@ export function SettingsSurface() {
           {pane === "brain" && <BrainPane />}
           {pane === "security" && <SecurityPane />}
           {pane === "models" && <ModelsPane />}
+          {pane === "chat" && <ChatPane />}
           {pane === "location" && <LocationPane />}
           {pane === "connections" && <ConnectionsPane />}
           {pane === "about" && <AboutRotliPane />}

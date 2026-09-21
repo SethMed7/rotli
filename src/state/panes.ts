@@ -19,6 +19,7 @@ import { create } from "zustand";
 import { clamp } from "../lib/clamp";
 import { initialNoteId, ulid } from "../services/notes";
 import type { LeafNode, PaneNode, SplitDir, Tab } from "../types";
+import { chatWindowTakes } from "./chatWindowStore";
 import { touchItemActivity, touchMru } from "./mru";
 import {
   type NavKind,
@@ -723,6 +724,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
 
     openChat: (chatSlug, opts) => {
       if (opts?.vaultId && !allowPaneVault(opts.vaultId)) return;
+      if (chatWindowTakes(chatSlug, opts?.vaultId)) return;
       // chats aren't notes — no touchMru. Like openCanvas, surface the panes.
       if (chatSlug) recordNav(navEntry("chat", chatSlug)); // fresh null chats have no identity yet
       if (chatSlug === null) {
@@ -1013,6 +1015,7 @@ export const usePanesStore = create<PanesState>((set, get) => {
 
     openToSide: (kind, id) => {
       if (kind !== "chat" && !allowPaneVault(contentVaultId(id))) return;
+      if (kind === "chat" && chatWindowTakes(id, undefined)) return; // Chat lives in its own window
       const tab =
         kind === "canvas"
           ? makeCanvasTab(id)

@@ -190,19 +190,113 @@
 .sb-switch-seg.sel svg {
   color: var(--selected-icon);
 }
-.sb-switch-seg.sel .sb-switch-n {
-  color: var(--selected-muted);
+/* — the Chat window (components/chatWindow/chatShell.tsx): main's frame with
+   only Chat inside. The title strip is the drag region; nothing here animates. */
+.chat-window-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  user-select: none;
+}
+/* the tab strip's "+" makes a NOTE; this window only holds chats, and its
+   title strip has the New chat button */
+.chat-window .tabplus {
+  display: none;
+}
+.chat-window-rail {
+  padding-top: 8px;
+}
+
+/* Chat can live in its own window: the segment plus a small sibling button
+   (a button cannot hold a button), tucked into the segment's top-right corner
+   and deliberately faint (the owner, 2026-09-21: "way more subtle, top
+   right"), shown only while the pointer or the keyboard is on the pair. The
+   segment itself is the drag handle. Static — nothing here animates. */
+.sb-switch-chat {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.sb-switch-chat > .sb-switch-seg {
+  flex: 1 1 auto;
+}
+.sb-switch-window {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-inner);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+}
+.sb-switch-chat:hover .sb-switch-window,
+.sb-switch-chat:focus-within .sb-switch-window {
+  opacity: 0.55;
+}
+.sb-switch-window:hover,
+.sb-switch-window:focus-visible {
+  opacity: 1;
+  color: var(--text);
+}
+/* Chat is out: the switch's last slot brings it back (the owner, 2026-09-21:
+   "on very right of menu have a button that brings everything back") */
+.sb-switch-regroup {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.sb-switch-regroup:hover,
+.sb-switch-regroup:focus-visible {
+  color: var(--text);
+  background: var(--selected-bg);
+}
+/* the Chat window's rail opens with the way home, where main has its switch */
+.chat-window-regroup {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 0 12px 8px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--r-tab);
+  background: var(--tint);
+  font: inherit;
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.chat-window-regroup:hover,
+.chat-window-regroup:focus-visible {
+  color: var(--text);
 }
 .sb-switch-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.sb-switch-n {
-  flex: 0 0 auto;
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--text-muted);
 }
 
 /* — destination / folder / smart rows (shared .frow grammar) — */
@@ -491,6 +585,19 @@
    its slot even when hidden (opacity, not display), so nothing shifts on hover. */
 .main-row .snact {
   margin-left: 0;
+}
+/* ⌘⇧S pending: the top nine root notes wear their number (keys/leader.ts).
+   Static, like every sidebar hint — nothing to composite while idle. */
+.main-slot-n {
+  flex: 0 0 auto;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: var(--r-inner);
+  background: var(--selected-bg);
+  color: var(--selected-ink);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 .main-row.dragging {
   opacity: 0.4;
@@ -1139,41 +1246,6 @@
 .sb-chatnew:hover,
 .sb-chatrow:hover {
   background: var(--hov);
-}
-.sb-chatview {
-  display: flex;
-  align-items: baseline;
-  min-width: 0;
-  gap: 5px;
-  padding: 4px 10px 7px;
-  color: var(--text-muted);
-  font-size: 11px;
-}
-.sb-chatview-label {
-  flex: 0 0 auto;
-}
-.sb-chatview-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text);
-  font-weight: 600;
-}
-.sb-chatview-all {
-  flex: 0 0 auto;
-  margin-left: auto;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--accent-text);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-.sb-chatview-all:hover {
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
 /* Open chats and notes use a quiet wash: enough orientation without making the
    sidebar compete with the work surface. */
@@ -2021,13 +2093,17 @@
 }
 /* the floating drag ghost EVERY pointer drag paints at the cursor (the shared
    lib/dragGhost — tabs, Main tree rows, Board cards); positioned imperatively,
-   offset off the pointer, pointer-events:none so the drags' elementFromPoint
-   hit-tests pass straight through it (the maintainer, 2026-06-15 / one impl 2026-07-01) */
+   pointer-events:none so the drags' elementFromPoint hit-tests pass straight
+   through it (the maintainer, 2026-06-15 / one impl 2026-07-01). It rides BESIDE the
+   pointer and is centred on its height: the chip's middle is the exact line
+   the drop is hit-tested at. Hanging below the pointer (the old 8px) put that
+   middle most of a sidebar row under the hit point, so aiming with the chip
+   landed the item one slot too high. */
 .drag-ghost {
   position: fixed;
   top: 0;
   left: 0;
-  transform: translate(10px, 8px);
+  transform: translate(12px, -50%);
   z-index: 1000;
   pointer-events: none;
   max-width: 220px;
@@ -2456,6 +2532,16 @@
 .sb-footbtn .count {
   font-size: 10px;
   color: var(--text-muted);
+}
+/* "update available" on the footer's Settings button — the titlebar dot's twin
+   (.tb-update-dot): a warm clay dot in the row's flow, never a red badge, and
+   static (a hidden window must not composite) */
+.sb-footbtn .sb-update-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-text);
 }
 
 /* — the primary-color swatch row (Appearance + onboarding) — */

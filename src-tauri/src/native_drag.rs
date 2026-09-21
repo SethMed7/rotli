@@ -22,7 +22,7 @@ use crate::corpus::ImportAuthorizations;
 /// a private browser child shares its window but must never import into a note.
 /// Keep this event adapter pure so tests exercise the actual channel and scope.
 pub(crate) fn workspace_drag<'a>(label: &str, event: &'a WebviewEvent) -> Option<&'a DragDropEvent> {
-    if !matches!(label, "main" | "capture" | "quick") { return None; }
+    if !matches!(label, "main" | "capture" | "quick" | "chat") { return None; }
     match event {
         WebviewEvent::DragDrop(drag) => Some(drag),
         _ => None,
@@ -201,7 +201,7 @@ mod tests {
         for drag in events {
             let event = WebviewEvent::DragDrop(drag);
             let WebviewEvent::DragDrop(original) = &event else { unreachable!() };
-            for label in ["main", "capture", "quick"] {
+            for label in ["main", "capture", "quick", "chat"] {
                 assert!(std::ptr::eq(workspace_drag(label, &event).unwrap(), original));
             }
         }

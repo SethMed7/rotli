@@ -371,20 +371,33 @@ function stripComments(src) {
   }
 }
 
-// ── (e) update checks are user-initiated ─────────────────────────────────────
+// ── (e) update checks have exactly two owners ────────────────────────────────
 //
-// Local-first also describes network behavior: the updater feed may be queried
-// from the explicit Settings control, never from app mount, visibility, or a
-// timer. This catches a recurrence without pretending that a grep proves the
-// wider absence of network activity (the egress inventory above owns that).
+// Local-first also describes network behavior. The updater feed may be queried
+// from the explicit Settings control, and from the ONE routine check
+// (services/updateCheck.ts, owner's decision 2026-09-21) — which must stay
+// behind the `autoUpdateCheck` Settings switch and out of development builds.
+// Any other caller is phoning home. This catches a recurrence without
+// pretending that a grep proves the wider absence of network activity (the
+// egress inventory above owns that).
 {
+  const routine = "src/services/updateCheck.ts";
   const allowedCallers = new Set(["src/components/settingsSurface.tsx"]);
   for (const rel of walkTree("src", /\.(ts|tsx)$/)) {
-    if (rel === "src/lib/tauri.ts") continue; // capability implementation
+    if (rel === "src/lib/tauri.ts" || /\.test\.tsx?$/.test(rel)) continue; // capability implementation
     const code = stripComments(read(rel));
-    if (/\bcheckForUpdate\s*\(/.test(code) && !allowedCallers.has(rel)) {
+    if (rel === routine) {
+      if (!/enabled:\s*\(\)\s*=>\s*useUiStore\.getState\(\)\.autoUpdateCheck\b/.test(code)) {
+        failures.push(`${rel}: the routine update check must be gated on the autoUpdateCheck setting.`);
+      }
+      if (!/import\.meta\.env\.DEV/.test(code)) {
+        failures.push(`${rel}: a development build must never check the updater feed on its own.`);
+      }
+      continue;
+    }
+    if (/\bcheckForUpdate\b/.test(code) && !allowedCallers.has(rel)) {
       failures.push(
-        `${rel}: checks the updater feed outside the explicit Settings action — Rotli must not phone home on launch, visibility, or a timer.`,
+        `${rel}: checks the updater feed outside Settings and the one routine check — Rotli must not phone home from anywhere else.`,
       );
     }
   }
@@ -410,5 +423,5 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(
-  "check:security ok — egress sites declared, site images match CSP, keychain literals constant-only, CSP/capability/updater snapshot intact, updater checks user-initiated, no sensitive logging",
+  "check:security ok — egress sites declared, site images match CSP, keychain literals constant-only, CSP/capability/updater snapshot intact, updater checks limited to Settings and the gated routine, no sensitive logging",
 );

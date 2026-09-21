@@ -20,6 +20,10 @@ test("the native dev command uses an unmistakable identity without changing prod
   };
 
   expect(pkg.scripts?.["dev:app"]).toBe("bun --no-orphans scripts/tauri-dev-supervisor.ts");
+  // UAT: the same supervised dev app, gated exactly like a public release
+  expect(pkg.scripts?.["dev:uat"]).toBe(
+    "ROTLI_BUILD_CHANNEL=stable bun --no-orphans scripts/tauri-dev-supervisor.ts",
+  );
   expect(development.productName).toBe("Rotli (Dev)");
   expect(development.bundle?.icon).toContain("icons-dev/icon.icns");
   expect(production.productName).toBe("rotli");

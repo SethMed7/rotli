@@ -420,6 +420,12 @@ interface UiState {
    * is the seam (the requestSystemFolder pattern). Transient. */
   sidebarFolderNonce: number;
   requestSidebarFolder: () => void;
+  /** A two-step hotkey's first step (keys/leaderActions): the Home front owns
+   * the view menu and the rendered Main rows, so it answers — opening the
+   * numbered view menu, or numbering the top Main notes. Transient. */
+  leaderRequest: { id: "views" | "sidebar"; at: number } | null;
+  requestLeader: (id: "views" | "sidebar") => void;
+  clearLeaderRequest: () => void;
   /** The System browser's current multi-selection (Finder gestures: ⌘/⇧-click,
    * rubber band) — item SUMMARIES so ⌘⌫'s registry action can trash kind-aware
    * without reaching back into a component. */
@@ -672,11 +678,26 @@ interface UiState {
   settingsPaneRequest: string | null;
   setSettingsPaneRequest: (pane: string | null) => void;
 
-  /** A newer signed build is on the feed — set once by App.tsx's quiet on-mount
-   * check (CARL rule 2: no auto-download, no modal). Just lets Settings → General
+  /** A newer signed build is on the feed — set by the Settings button or by the
+   * routine check (services/updateCheck). No auto-download, no modal: it lights
+   * the dot on both Settings buttons and lets Settings → General
    * surface "Update available". Transient, not persisted. */
   updateAvailable: boolean;
   setUpdateAvailable: (on: boolean) => void;
+  /** Ask the release feed on its own (services/updateCheck): shortly after
+   * launch, then a few times a day. On by default; it only lights the Settings
+   * dot — never a download, never a modal. Persisted. */
+  autoUpdateCheck: boolean;
+  setAutoUpdateCheck: (on: boolean) => void;
+  /** Name a new chat by its purpose: one extra request to the chat's OWN model
+   * after the first reply (services/chatAutoTitle). Off = the first
+   * six words stay the name. Persisted. */
+  chatTitleByMeaning: boolean;
+  setChatTitleByMeaning: (on: boolean) => void;
+  /** Offer Rotli's built-in templates in `/template` beside the vault's own
+   * (services/templates TEMPLATE_PRESETS — never files). Persisted. */
+  templatePresets: boolean;
+  setTemplatePresets: (on: boolean) => void;
   /** The version the feed offers, when known (e.g. "0.2.0"). */
   updateVersion: string | null;
   setUpdateVersion: (version: string | null) => void;
@@ -872,6 +893,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   requestSystemFolder: () => set((s) => ({ systemFolderNonce: s.systemFolderNonce + 1 })),
   sidebarFolderNonce: 0,
   requestSidebarFolder: () => set((s) => ({ sidebarFolderNonce: s.sidebarFolderNonce + 1 })),
+  leaderRequest: null,
+  requestLeader: (id) => set({ leaderRequest: { id, at: Date.now() } }),
+  clearLeaderRequest: () => set({ leaderRequest: null }),
   systemSelection: [],
   setSystemSelection: (items) => set({ systemSelection: items }),
   activeView: null,
@@ -1045,6 +1069,12 @@ export const useUiStore = create<UiState>((set, get) => ({
 
   updateAvailable: false,
   setUpdateAvailable: (on) => set({ updateAvailable: on }),
+  autoUpdateCheck: true,
+  setAutoUpdateCheck: (on) => set({ autoUpdateCheck: on }),
+  chatTitleByMeaning: true,
+  setChatTitleByMeaning: (on) => set({ chatTitleByMeaning: on }),
+  templatePresets: true,
+  setTemplatePresets: (on) => set({ templatePresets: on }),
   updateVersion: null,
   setUpdateVersion: (version) => set({ updateVersion: version }),
 

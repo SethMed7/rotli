@@ -12,7 +12,6 @@
 // the 3px clay ::before is the one selection grammar, shared with the panes.
 
 import {
-  type MouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
   useEffect,
@@ -88,12 +87,14 @@ import {
 } from "../glyphs";
 import { InlineRenameInput } from "../inlineRenameInput";
 import { useNoteMenu } from "../useNoteMenu";
+import { ViewSectionHeader } from "./chatViewPicker";
 import { homeDashboardSnapshot } from "./homeDashboardModel";
 import { mainFolderMenuItems } from "./mainFolderMenu";
 import { noteDisplayTitle } from "./noteDisplayTitle";
 import { SidebarSystem, type SystemDestRow } from "./sidebarSystem";
 import { useActiveTree } from "./useActiveTree";
 import type { SidebarChatData } from "./useChatFolders";
+import { MainSlotHint, useHomeLeader } from "./useHomeLeader";
 import { type RovingRow, useRovingList } from "./useRovingList";
 
 /** Capture-board glyph — a 2×2 grid of cards (the quick-capture Board button).
@@ -372,27 +373,27 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     setViewInputError(null);
   };
 
-  const openViewMenu = (e: MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const items = viewPickerItems(viewsManifest, activeView, viewsWritable, {
-      show: setActiveView,
-      create: () => {
-        setEditingView("create");
-        setViewInputError(null);
+  const viewMenuItems = (numbered: boolean) =>
+    viewPickerItems(
+      viewsManifest,
+      activeView,
+      viewsWritable,
+      {
+        show: setActiveView,
+        create: () => {
+          setEditingView("create");
+          setViewInputError(null);
+        },
+        rename: () => {
+          setEditingView("rename");
+          setViewInputError(null);
+        },
+        remove: setDeletingView,
       },
-      rename: () => {
-        setEditingView("rename");
-        setViewInputError(null);
-      },
-      remove: setDeletingView,
-    });
-    const trigger = e.currentTarget;
-    const rect = trigger.getBoundingClientRect();
-    openContextMenu(rect.left, rect.bottom + 4, items, {
-      returnFocus: () => trigger.focus(),
-    });
-  };
+      numbered,
+    );
+  // the view menu by pointer, and numbered for ⌘⇧W; ⌘⇧S numbers the root notes
+  const { viewsButtonRef, openViewMenu } = useHomeLeader(viewMenuItems, setActiveView);
 
   // — Main pointer-drag reorder (HTML5 DnD is dead in the WKWebView shell, so the
   //   BoardSurface pointer pattern; a threshold distinguishes drag from click) —
@@ -558,7 +559,11 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     };
     return (
       <>
-        {childNotes.map((n) => {
+        {childNotes.map((n, noteIndex) => {
+          // ⌘⇧S then ⌘1–9: the first nine ROOT notes, in painted order (pinned
+          // float first, then the hand-arranged order) — root only, so opening a
+          // folder never renumbers them
+          const slot = parentId === MAIN_ROOT && noteIndex < 9 ? noteIndex + 1 : undefined;
           const parentFolderName = mainProjection.folders.find((folder) => folder.id === parentId)?.name;
           const displayTitle = noteDisplayTitle(n.title, parentFolderName) || "Empty note";
           return (
@@ -567,6 +572,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
               type="button"
               data-main-id={n.id}
               data-note-id={n.id}
+              data-main-slot={slot}
               /* the current file's Main copy wins the highlight (#25) — the same
                  accent pill a compact row gets when it's the focused note */
               className={`snrow main-row${n.id === focusedItemId ? " sel" : ""}${mainSel.has(n.id) ? " msel" : ""}${dropCls(n.id)}${mainDragId === n.id ? " dragging" : ""}`}
@@ -646,6 +652,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
             >
               {glyphForNote(n, { size: 14, className: "snicon" })}
               <span className="snt">{displayTitle}</span>
+              <MainSlotHint slot={slot} />
               {/* the floated pin's marker — same quiet glyph as pinned chats */}
               {n.pinned && <PinGlyph size={11} filled className="sb-chatpin" />}
               {starBtn(n.id)}
@@ -669,12 +676,13 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
                   placeholder="Folder name…"
                   ariaLabel="Rename Main folder"
                   onCommit={(value) => {
-                    if (activeView) {
-                      const error = viewFolderNameError(value);
-                      if (error) {
-                        setRowActionError(`Couldn’t rename folder — ${error}`);
-                        return;
-                      }
+                    // an emptied input is a cancel (renameFolderInMain no-ops);
+                    // anything else obeys the one folder-name rule in Main and
+                    // in views alike, so a name can never be refused later
+                    const error = value.trim() ? viewFolderNameError(value) : null;
+                    if (error) {
+                      setRowActionError(`Couldn’t rename folder — ${error}`);
+                      return;
                     }
                     setRenamingMainId(null);
                     setActiveTree(renameFolderInMain(activeTree, f.id, value), liveIds);
@@ -1008,12 +1016,10 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     const name = raw.trim();
     setMainNewFolder(false);
     if (!name) return;
-    if (activeView) {
-      const error = viewFolderNameError(name);
-      if (error) {
-        setRowActionError(`Couldn’t create folder — ${error}`);
-        return;
-      }
+    const error = viewFolderNameError(name);
+    if (error) {
+      setRowActionError(`Couldn’t create folder — ${error}`);
+      return;
     }
     // compute the rendered id BEFORE the commit (same uniquify law) so the
     // fresh row — appended after every root note — can be scrolled into view
@@ -1107,44 +1113,28 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
               (the maintainer, 2026-07-01). Add with the row menu or drag from the Library.
               The header (reworked 2026-07-28, the maintainer: "not collapsible — just a way
               to change the views"): the label + ▾ are ONE view switcher. — */}
-          <div className="fsec fsec-hdr">
-            <button
-              type="button"
-              className="fsec-view"
-              data-tour="views"
-              aria-label={`Current view: ${activeView ?? "Main"}. Change view`}
-              aria-haspopup="menu"
-              title="Change view"
-              onClick={openViewMenu}
-            >
-              <span>{activeView ?? "Main"}</span>
-              <span className="caret-down" aria-hidden="true">
-                <ChevronRight size={9} />
-              </span>
-            </button>
-            <button
-              type="button"
-              className="fsec-add"
-              data-tour="new"
-              aria-label={`New note in ${activeView ?? "Main"}`}
-              title={`New note in ${activeView ?? "Main"}`}
-              onClick={() => dispatch("notes.new")}
-            >
-              <NewFileGlyph size={13} />
-            </button>
-            <button
-              type="button"
-              className="fsec-add"
-              aria-label={`New folder in ${activeView ?? "Main"}`}
-              title={`New folder in ${activeView ?? "Main"}`}
-              disabled={!!activeView && !viewsWritable}
-              /* name-FIRST (#16): open the inline input instead of minting a
-                 permanent "New folder 2" the old flow could never rename */
-              onClick={() => setMainNewFolder(true)}
-            >
-              <NewFolderGlyph size={13} />
-            </button>
-          </div>
+          <ViewSectionHeader
+            current={activeView ?? "Main"}
+            viewRef={viewsButtonRef}
+            onPickView={openViewMenu}
+            tour
+            actions={[
+              {
+                label: `New note in ${activeView ?? "Main"}`,
+                glyph: <NewFileGlyph size={13} />,
+                onClick: () => dispatch("notes.new"),
+                tour: "new",
+              },
+              {
+                label: `New folder in ${activeView ?? "Main"}`,
+                glyph: <NewFolderGlyph size={13} />,
+                disabled: !!activeView && !viewsWritable,
+                // name-FIRST (#16): open the inline input instead of minting a
+                // permanent "New folder 2" the old flow could never rename
+                onClick: () => setMainNewFolder(true),
+              },
+            ]}
+          />
           {editingView && (
             <div className="view-editor">
               <label htmlFor="new-view-name">{editingView === "rename" ? "Rename view" : "New view"}</label>

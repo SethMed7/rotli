@@ -84,8 +84,10 @@ test("Chat names the inherited Notes view and can leave it for all chats", async
   const allChats = page.getByRole("button", { name: "All chats", exact: true });
   await expect(allChats).not.toHaveClass(/\bsel\b/);
 
-  await context.getByRole("button", { name: "Show all chats" }).click();
-  await expect(context).toHaveCount(0);
+  // Chat's own view header leaves the view: Main is every chat
+  await context.getByRole("button", { name: /Current view: Client work/ }).click();
+  await page.getByRole("menu").getByRole("menuitemcheckbox", { name: "Main — all chats" }).click();
+  await expect(context.getByRole("button", { name: /Current view: Main/ })).toBeVisible();
   await expect(allChats).toHaveClass(/\bsel\b/);
 
   await page.getByRole("button", { name: "Home", exact: true }).click();
@@ -161,4 +163,58 @@ test("any named view can be deleted from Main's picker, and Main keeps its items
   await expect(menu.getByRole("menuitemcheckbox", { name: "Beta" })).toBeVisible();
   await expect(menu.getByRole("menuitemcheckbox", { name: "Alpha" })).toHaveCount(0);
   await page.keyboard.press("Escape");
+});
+
+// The owner, 2026-09-21: "I need ability to toggle between views while in chat
+// too. And any sort of ⌘T/⌘N needs to be aware of the view I am in — but Main
+// is still everything."
+test("Chat switches views without leaving Chat, and ⌘T there files into that view and Main", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  const homeSwitcher = page.getByRole("button", { name: /Current view: Main/ });
+  await homeSwitcher.scrollIntoViewIfNeeded();
+  await homeSwitcher.click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "New view…" }).click();
+  await page.getByRole("textbox", { name: "New view" }).fill("Research");
+  await page.getByRole("button", { name: "Save" }).click();
+  // back to Main, then do the rest from Chat
+  await page.getByRole("button", { name: /Current view: Research/ }).click();
+  await page.getByRole("menu").getByRole("menuitemcheckbox", { name: "Main — all items" }).click();
+
+  await page.getByRole("button", { name: "Chat", exact: true }).click();
+  const context = page.getByRole("group", { name: "Chat view context" });
+  await context.getByRole("button", { name: /Current view: Main/ }).click();
+  await page.getByRole("menu").getByRole("menuitemcheckbox", { name: "Research" }).click();
+  await expect(context.getByRole("button", { name: /Current view: Research/ })).toBeVisible();
+  // still in Chat
+  await expect(page.getByRole("button", { name: "Chat", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
+  // ⌘T from here makes a note in Research — and in Main, which holds everything
+  await page.keyboard.press("Meta+T");
+  await page.keyboard.type("# Research draft");
+  await page.getByRole("button", { name: "Home", exact: true }).click();
+  await expect(
+    page.locator('.main-tree[data-active-view="Research"] [data-main-id]', { hasText: "Research draft" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: /Current view: Research/ })
+    .first()
+    .click();
+  await page.getByRole("menu").getByRole("menuitemcheckbox", { name: "Main — all items" }).click();
+  await expect(
+    page.locator('.main-tree[data-active-view="Main"] [data-main-id]', { hasText: "Research draft" }),
+  ).toBeVisible();
+
+  // and Chat follows Home back to Main — with New chat and New folder beside it
+  await page.getByRole("button", { name: "Chat", exact: true }).click();
+  await expect(context.getByRole("button", { name: /Current view: Main/ })).toBeVisible();
+  // the same request as the title bar's New chat folder (a chat folder is
+  // written through the Mac app's corpus — the owner's native check)
+  await expect(context.getByRole("button", { name: "New chat folder in Main" })).toBeEnabled();
+  await context.getByRole("button", { name: "New chat in Main" }).click();
+  await expect(page.locator(".pane.focused [data-chat-pane]")).toBeVisible();
 });

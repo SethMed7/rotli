@@ -5,7 +5,12 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { createRevisionedTrackedWrite, createTrackedWrite } from "./trackedWrite";
+import {
+  createRevisionedTrackedWrite,
+  createTrackedWrite,
+  isRevisionConflict,
+  recoverRevisionConflict,
+} from "./trackedWrite";
 
 function deferred(): { promise: Promise<void>; resolve: () => void; reject: (e: Error) => void } {
   let resolve!: () => void;
@@ -117,5 +122,69 @@ describe("createRevisionedTrackedWrite", () => {
     expect(reports).toEqual([
       { ok: false, message: "The vault projection has no revision. Reload it before editing." },
     ]);
+  });
+
+  test("remembers the contents that sit at its revision", async () => {
+    const writer = createRevisionedTrackedWrite(async () => "r2");
+    writer.setRevision("r1", "hydrated");
+    expect(writer.synced()).toBe("hydrated");
+    writer.write("edited", () => {});
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(writer.synced()).toBe("edited");
+  });
+});
+
+describe("revision conflict recovery", () => {
+  const conflict = new Error(
+    "revision conflict: expected r1, found r9; the file changed after it was opened",
+  );
+
+  test("recognizes the host and the browser vault wording, and nothing else", () => {
+    expect(isRevisionConflict(conflict)).toBe(true);
+    expect(isRevisionConflict(new Error("revision conflict on main: expected 3, found 4"))).toBe(true);
+    expect(isRevisionConflict(new Error("disk full"))).toBe(false);
+    expect(isRevisionConflict("revision conflict")).toBe(false);
+  });
+
+  test("a wedged writer saves again after one quiet re-read", async () => {
+    let disk = { contents: "cli", revision: "r9" };
+    const writer = createRevisionedTrackedWrite(async (payload, expected) => {
+      if (expected !== disk.revision) throw conflict;
+      disk = { contents: payload, revision: `${disk.revision}+` };
+      return disk.revision;
+    });
+    writer.setRevision("r1", "base");
+
+    const failures: unknown[] = [];
+    writer.write("mine", (ok, error) => !ok && failures.push(error));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(failures).toEqual([conflict]);
+
+    const outcome = await recoverRevisionConflict({
+      writer,
+      read: async () => disk,
+      current: () => true,
+      merge: (base, remote) => `${base}|${remote}|mine`,
+    });
+    expect(outcome).toEqual({ remote: "cli", merged: "base|cli|mine" });
+
+    const reports: boolean[] = [];
+    writer.write(outcome?.merged ?? "", (ok) => reports.push(ok));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(reports).toEqual([true]);
+    expect(disk.contents).toBe("base|cli|mine");
+  });
+
+  test("a newer edit owns the outcome — the older recovery adopts nothing", async () => {
+    const writer = createRevisionedTrackedWrite(async () => "r2");
+    writer.setRevision("r1", "base");
+    const outcome = await recoverRevisionConflict({
+      writer,
+      read: async () => ({ contents: "cli", revision: "r9" }),
+      current: () => false,
+      merge: () => "never",
+    });
+    expect(outcome).toBeNull();
+    expect(writer.synced()).toBe("base");
   });
 });

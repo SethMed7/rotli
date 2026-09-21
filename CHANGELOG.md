@@ -10,6 +10,112 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-09-21
+
+### Added
+
+- **Slash commands work inside a list item, after your text.** Type
+  `- [ ] Ask Gabriel /link` and the menu opens right there — no need to drop to
+  a new line. Link note, Link chat, and Inline code go into the sentence; any
+  other command lands just beneath the item. Ordinary slashes in your writing
+  (`and/or`, a web address, `yes / no`) never open it.
+- **Link a chat, not just a note.** The new **Link chat** command lists your
+  chats and inserts a link; clicking it opens that conversation. Hovering shows
+  the top of the chat, like any linked note.
+- **Templates.** Keep your reusable layouts as ordinary notes in a folder named
+  **Templates**, then type `/template` in any note, pick one, and its content
+  drops in where you were typing. In an empty note the template's heading
+  becomes the note's title; in a note you have already started, only the
+  content below that heading is added, so your note keeps its own name. The
+  Librarian leaves the Templates folder alone. The picker's **Create new**
+  makes a new template right there and opens it. Rotli also offers a few
+  built-in starters — meeting notes, a daily note, a project brief, a bug
+  report, a weekly review — after your own; they are never saved into your
+  vault, one of yours with the same name takes its place, and Settings →
+  General → "Offer built-in templates" turns them off. Works in the Mac app
+  and in Rotli Web.
+- **Settings → Chat.** One place for how chats start: the model every new chat
+  opens on (with a button that sends it a real test message), whether a new
+  chat asks for a name first, and whether it is renamed by what it is about.
+  The naming choices moved here from General and Appearance.
+- **Chat in its own window.** Drag the Chat switch out of the sidebar — or
+  use its small corner button, or right-click it — and Chat opens in a window
+  of its own that holds only chats; ⌘T and ⌘N there start a new chat, and
+  the sidebar button up top (or ⌘0) hides and shows its chat list. While
+  Chat is out, the main window's switch shows only Home (and Breve), with a
+  button at its end that brings Chat back; the Chat window has the same "Put
+  Chat back in the main window" button at the top of its list. Chat cannot be
+  pulled out while a chat is still answering. Mac app only.
+- **Change views from Chat.** The Chat side now shows which view you are in
+  and lets you switch — Main for every chat, or one of your views — without
+  going back to Home. A note made with ⌘T or ⌘N while a view is active lands
+  in that view and in Main, wherever you press it. A view lists only the chats in it —
+  a view with none shows none, instead of falling back to every chat — and
+  Main still lists them all.
+- **Rotli tells you when there is an update.** It checks its release page
+  shortly after it opens and a few times a day, and marks the Settings button
+  — in the title bar and at the bottom of the sidebar — with a small dot when a
+  newer version is out. Nothing downloads until you choose Install & relaunch.
+  Settings → General → "Check for updates automatically" turns the routine
+  check off; the Check for updates button stays either way.
+- **Two-step hotkeys: ⌘⇧W for views, ⌘⇧S for your top notes.** Press ⌘⇧W and
+  the view menu opens with ⌘1–⌘9 beside its choices; press the number to
+  switch. Press ⌘⇧S and the first nine notes at the top of Main show their
+  numbers; press one to open it. Pin or drag a note to keep it in its slot.
+  ⌘1–9 still jump between tabs the rest of the time, Esc backs out, and both
+  hotkeys can be changed in Settings → Hotkeys. Works in Rotli Web too.
+- **New chats are named by what they are about.** A chat still gets its name
+  the moment you send — then, after the first reply, the model you are
+  chatting with suggests a short name that says what the chat is for, and the
+  name updates. It is one small extra request to that same model and no other;
+  a chat that touched a secure note is never sent to a remote model for this;
+  a name you typed is never replaced; and the chat's file never moves.
+  Settings → Chat → "Name new chats by what they are about" turns it off.
+  In Rotli Web without the Helper, chats keep their first-words name.
+- **Hover a `[[link]]` to see the top of that note.** Rest the pointer on a
+  link and a small card shows the note's title and first lines without
+  opening it; a click still opens it. A secure note's card shows its name and
+  none of its text. Works in the Mac app and in Rotli Web.
+- **Send feedback.** Settings → About Rotli (and ⌘K → "Send feedback") opens a
+  new GitHub issue that starts with your Rotli version and operating system,
+  and nothing else.
+
+### Changed
+
+- **The Chat switch no longer shows a number.** The count of chats would not
+  hold up at a thousand, and screen readers read the button as "Chat 3"; it is
+  just "Chat" now.
+- **The sidebar's right-click menu always offers the other choice.** It used
+  to list "Keep sidebar open" and "Open sidebar on hover" together, and
+  picking the one already in use did nothing. It now shows only the one you
+  are not using, so a click always changes something.
+
+### Fixed
+
+- **"Couldn't save Main — revision conflict" is gone, and so is the lock-up
+  behind it.** When the CLI, the Librarian, or a views change saved Main while
+  the app held an older copy, the app showed a raw revision error — and then
+  every later change to Main failed the same way until a restart. Rotli now
+  re-reads Main, keeps your rearrangement together with whatever was added or
+  removed meanwhile, and saves again without a word. If Main was rearranged in
+  both places at once, you see the saved version and one plain sentence asking
+  you to make the change again. Named views recover the same way, in the Mac
+  app and in Rotli Web.
+- **A folder name with `/` or `:` is refused when you type it.** Main used to
+  accept the name and a view refused it later with "invalid folder name in
+  view". The rule is now the same everywhere, in plain words, and a folder
+  that already has such a name moves into a view with the character replaced
+  by a space.
+- **Dragged rows land where you aim.** The label that follows the pointer hung
+  below it, so its middle sat most of a row under the real drop point and a
+  row aimed with the label landed one place too high. The label now rides
+  beside the pointer, centred on the drop line, and the drop is checked once
+  more at the moment you let go. This applies to every drag: Main, tabs,
+  board cards, and chats.
+- **A chat that starts with an image is no longer named "[Image #1] …".** Image
+  tags are left out of the chat's name, its file name, and its Main folder; a
+  first message with only images is called "New chat".
+
 ## [1.2.0] - 2026-09-18
 
 Rotli 1.2: Add to folder for a whole selection, Tasks rebuilt (and working in

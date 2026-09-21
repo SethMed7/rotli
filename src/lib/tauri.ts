@@ -191,8 +191,10 @@ export async function toggleMaximize(): Promise<void> {
 //     browser/dev demo never imports the plugins; outside Tauri every call is a
 //     safe no-op ("nothing available, nothing to install"). The Rust side
 //     registers tauri-plugin-updater. Relaunch is a narrow Rust command that
-//     first completes the same all-webview save handshake as Quit. Nothing here
-//     pings on its own: only the user's explicit Settings action calls the feed.
+//     first completes the same all-webview save handshake as Quit. The feed has
+//     exactly two callers (check:security enforces it): the explicit Settings
+//     action, and the routine check in services/updateCheck.ts, which sits
+//     behind the autoUpdateCheck switch and never runs in a development build.
 
 export interface UpdateStatus {
   available: boolean;

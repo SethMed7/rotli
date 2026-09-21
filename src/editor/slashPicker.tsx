@@ -8,9 +8,18 @@ import { extOf, fileName } from "../lib/fileKind";
 import { corpusManagedFileCreationAvailable, isTauri } from "../lib/tauri";
 import { createManagedItem } from "../newItems/composition";
 import { DEST } from "../services/destinations";
-import { useNotes, useSearchableNotes } from "../services/hooks";
+import { useChatTranscripts, useNotes, useSearchableNotes } from "../services/hooks";
 import { inboxFolderId } from "../services/notes";
+import { createTemplateNote } from "../services/templateCreate";
+import {
+  TEMPLATES_FOLDER,
+  isPresetTemplate,
+  isTemplateNote,
+  presetTemplateNotes,
+} from "../services/templates";
 import { SHEET_EDITABLE } from "../sheets/kinds";
+import { usePanesStore } from "../state/panes";
+import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import type { SlashPickerMode } from "./slashMenu";
 
@@ -28,7 +37,9 @@ function fuzzy(query: string, text: string): boolean {
 function filterNotes(notes: NoteSummary[], mode: SlashPickerMode, query: string): NoteSummary[] {
   const q = query.trim();
   let pool = notes;
-  if (mode === "embedBoard") pool = notes.filter((n) => n.kind === "board");
+  // (linkChat is handed the chats themselves — every one of them is a target)
+  if (mode === "insertTemplate") pool = notes.filter(isTemplateNote);
+  else if (mode === "embedBoard") pool = notes.filter((n) => n.kind === "board");
   else if (mode === "embedSheet")
     pool = notes.filter((n) => n.kind === "file" && SHEET_EDITABLE.has(extOf(fileName(n.id))));
   else if (mode === "embedDocument")
@@ -37,7 +48,7 @@ function filterNotes(notes: NoteSummary[], mode: SlashPickerMode, query: string)
 }
 
 async function createEmbeddedItem(mode: SlashPickerMode): Promise<string | null> {
-  if (!isTauri() || mode === "linkNote") return null;
+  if (!isTauri() || mode === "linkNote" || mode === "linkChat" || mode === "insertTemplate") return null;
   const kind = mode === "embedBoard" ? "board" : mode === "embedSheet" ? "sheet" : "document";
   const item = await createManagedItem(kind, { open: false });
   return item.id || null;
@@ -45,12 +56,16 @@ async function createEmbeddedItem(mode: SlashPickerMode): Promise<string | null>
 
 const MODE_LABEL: Record<SlashPickerMode, string> = {
   linkNote: "Link note",
+  linkChat: "Link chat",
+  insertTemplate: "Template",
   embedBoard: "Board",
   embedSheet: "Sheet",
   embedDocument: "Document",
 };
 
 export function slashPickerCanCreate(mode: SlashPickerMode, tauri = isTauri(), writable = true): boolean {
+  // a template is an ordinary note: every vault can make one, web included
+  if (mode === "insertTemplate") return writable;
   return tauri && writable && (mode === "embedBoard" || mode === "embedSheet" || mode === "embedDocument");
 }
 
@@ -71,17 +86,27 @@ export function SlashPicker({
   const [creationAvailable, setCreationAvailable] = useState<boolean | null>(null);
   const [createError, setCreateError] = useState("");
   const searchable = useSearchableNotes();
+  const chats = useChatTranscripts();
   const storage = useNotes(DEST.storage);
   const usesStorage = mode === "embedSheet" || mode === "embedDocument";
   const storageData = storage.data;
   const ready = usesStorage ? storage.isSuccess : searchable.ready;
+  const presetsOn = useUiStore((s) => s.templatePresets);
   const items = useMemo(() => {
-    const notes = usesStorage ? (storageData ?? []) : searchable.notes;
-    return filterNotes(notes, mode, query);
-  }, [usesStorage, storageData, searchable.notes, mode, query]);
+    const notes = mode === "linkChat" ? chats : usesStorage ? (storageData ?? []) : searchable.notes;
+    const found = filterNotes(notes, mode, query);
+    if (mode !== "insertTemplate" || !presetsOn) return found;
+    // the vault's own templates first, then Rotli's built-in presets — a preset
+    // the person keeps a template of the same name for steps aside
+    const q = query.trim();
+    const own = new Set(notes.filter(isTemplateNote).map((n) => n.title.toLowerCase()));
+    const presets = presetTemplateNotes().filter((n) => !own.has(n.title.toLowerCase()) && fuzzy(q, n.title));
+    return [...found, ...presets];
+  }, [usesStorage, storageData, searchable.notes, chats, mode, query, presetsOn]);
   useEffect(() => {
     let cancelled = false;
-    if (mode === "linkNote" || !isTauri()) return;
+    if (mode === "linkNote" || mode === "linkChat") return;
+    if (!isTauri()) return;
     void corpusManagedFileCreationAvailable()
       .then((available) => {
         if (!cancelled) setCreationAvailable(available);
@@ -93,13 +118,26 @@ export function SlashPicker({
       cancelled = true;
     };
   }, [mode]);
-  const supportsCreate = isTauri() && mode !== "linkNote";
-  const canCreate = slashPickerCanCreate(mode, isTauri(), creationAvailable === true);
+  const supportsCreate =
+    mode === "insertTemplate" || (isTauri() && mode !== "linkNote" && mode !== "linkChat");
+  // Rotli Web writes to the folder the person connected — nothing to ask
+  const canCreate = slashPickerCanCreate(mode, isTauri(), !isTauri() || creationAvailable === true);
   const rows = canCreate ? items.length + 1 : items.length;
   const createSelected = canCreate && selectedIndex === items.length;
 
   const runCreate = async () => {
     setCreateError("");
+    if (mode === "insertTemplate") {
+      // a new template is written, not inserted: open it beside this note
+      try {
+        const id = await createTemplateNote();
+        onClose();
+        usePanesStore.getState().openNote(id, { newTab: true });
+      } catch (error) {
+        setCreateError(error instanceof Error ? error.message : "Could not create the template");
+      }
+      return;
+    }
     try {
       const id = await createEmbeddedItem(mode);
       if (!id) return;
@@ -163,7 +201,13 @@ export function SlashPicker({
       {!ready && <div className="slashpicker-empty">Loading…</div>}
       {ready && rows === 0 && (
         <div className="slashpicker-empty">
-          {mode === "embedDocument" ? "No editable DOCX documents in Storage yet" : "No matches"}
+          {mode === "embedDocument"
+            ? "No editable DOCX documents in Storage yet"
+            : mode === "linkChat" && !query.trim()
+              ? "No chats yet"
+              : mode === "insertTemplate" && !query.trim()
+                ? `No templates yet — any note you keep in a folder named ${TEMPLATES_FOLDER} shows up here`
+                : "No matches"}
         </div>
       )}
       {createError && <div className="slashpicker-empty is-error">{createError}</div>}
@@ -179,7 +223,7 @@ export function SlashPicker({
         >
           <span className="slashglyph">{glyphForNote(note)}</span>
           <span className="slashlabel">{note.title}</span>
-          <span className="slashhint">{fileName(note.id)}</span>
+          <span className="slashhint">{isPresetTemplate(note.id) ? "Built-in" : fileName(note.id)}</span>
         </button>
       ))}
       {supportsCreate && (
@@ -200,7 +244,9 @@ export function SlashPicker({
           <span className="slashlabel">Create new</span>
           <span className="slashhint">
             {canCreate
-              ? `New ${MODE_LABEL[mode].toLowerCase()}`
+              ? mode === "insertTemplate"
+                ? `New note in ${TEMPLATES_FOLDER}`
+                : `New ${MODE_LABEL[mode].toLowerCase()}`
               : creationAvailable === null
                 ? "Checking permissions…"
                 : "Read-only in development"}
