@@ -37,6 +37,18 @@ test("⌘⇧S numbers the top Main notes; ⌘number opens one, then ⌘number is
   await expect(page.getByRole("tab", { selected: true })).toContainText(firstTab);
 });
 
+test("a digit typed into the note while a leader is pending is still just a digit", async ({ page }) => {
+  await gotoApp(page);
+  await newNote(page, "Slot delta");
+  const editor = page.locator(".pane.focused .cm-content");
+  await editor.click();
+  await page.keyboard.press("Meta+Shift+S");
+  await expect(page.locator(".main-tree .main-slot-n")).toHaveCount(1);
+  await page.keyboard.type("1");
+  await expect(editor).toContainText("1");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Slot delta");
+});
+
 test("Esc and an unrelated chord both stand the leader down", async ({ page }) => {
   await gotoApp(page);
   await newNote(page, "Slot gamma");

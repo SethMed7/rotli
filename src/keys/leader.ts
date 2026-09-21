@@ -6,6 +6,10 @@
 // ordinary registered actions, so they are listed and rebindable like
 // everything else; the number step is positional by nature.
 //
+// The number step is ⌘1–9 anywhere, or the bare digit when focus is not in a
+// text field (the dispatcher's typing guard runs first — a digit typed into a
+// note is never stolen).
+//
 // Pending is never sticky: a pick, Esc, any other chord, a timeout, or another
 // leader all end it.
 
