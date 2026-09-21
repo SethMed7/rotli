@@ -5,7 +5,8 @@
   "webviews": [
     "main",
     "capture",
-    "quick"
+    "quick",
+    "chat"
   ],
   "permissions": [
     "core:default",

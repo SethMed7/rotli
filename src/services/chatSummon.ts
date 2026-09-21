@@ -22,8 +22,10 @@ export function newestChatSlug(chats: Pick<MemexChatSummary, "slug" | "modifiedM
   return best?.slug ?? null;
 }
 
-export async function summonChat(): Promise<void> {
-  await showMainWindow();
+/** `here`: the summon was routed to THIS window (the Chat window while Chat
+ * lives there) — same policy, without bringing main forward. */
+export async function summonChat(opts?: { here?: boolean }): Promise<void> {
+  if (!opts?.here) await showMainWindow();
   // chat is a pane surface — Settings would sit on top of it (mirrors chat.new)
   useUiStore.getState().setSettingsOpen(false);
   useUiStore.getState().setSidebarMode("notes");

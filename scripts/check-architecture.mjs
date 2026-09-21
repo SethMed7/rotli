@@ -226,6 +226,7 @@ for (const dir of cleanFeatureDirs) {
 // the shell plus the lib adapters that own a native seam (LIB_EFFECTFUL_FILE_OWNERS)
 const tauriAllowlist = new Set([
   "src/app.tsx",
+  "src/lib/chatWindowBridge.ts",
   "src/lib/clipboard.ts",
   "src/lib/nativeDrag.ts",
   "src/lib/quitFlush.ts",

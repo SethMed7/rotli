@@ -9,11 +9,13 @@
 import { emitRebind, setGlobalShortcut } from "../lib/tauri";
 import { resolveChord, useBindingsStore } from "./bindings";
 import { chordFromEvent, normalizeChord, toAccelerator } from "./chords";
+import { leaderConsumes } from "./leader";
 
 /** Which webview an action belongs to — the dispatcher only fires actions for
  * its own surface (global actions are handled OS-side in Rust and skipped).
- * "quick" is the floating Quick Note window. */
-export type Surface = "main" | "capture" | "quick";
+ * "quick" is the floating Quick Note window; "chat" is Chat pulled out into its
+ * own window. */
+export type Surface = "main" | "capture" | "quick" | "chat";
 
 export interface KeyAction {
   id: string;
@@ -28,6 +30,10 @@ export interface KeyAction {
    * through activeEditor(), so they belong to the main AND quick windows). Like
    * global, a shared chord conflicts across surfaces. */
   shared?: boolean;
+  /** Extra surfaces this action ALSO fires on (alsoOnSurface). Narrower than
+   * `shared`, which would fire in Quick and Capture too: the Chat window wants
+   * main's tab and pane chords and none of its note commands. */
+  also?: Surface[];
   /** Runtime availability for transient surfaces such as first-run setup. */
   enabled?: () => boolean;
   /** Registered for dispatch but omitted from Settings/⌘K/shortcut maps. */
@@ -44,6 +50,12 @@ const actions = new Map<string, KeyAction>();
 
 export function registerAction(action: KeyActionInput): void {
   actions.set(action.id, { surface: "main", ...action });
+}
+
+/** Let an already-registered action fire on one more surface. */
+export function alsoOnSurface(id: string, surface: Surface): void {
+  const action = actions.get(id);
+  if (action) actions.set(id, { ...action, also: [...(action.also ?? []), surface] });
 }
 
 export function getAction(id: string): KeyAction | undefined {
@@ -145,7 +157,9 @@ export function claimingAction(pressed: string): KeyAction | null {
   if (suspended) return null;
   for (const action of actions.values()) {
     if (action.global) continue; // OS-side, handled in Rust
-    if (!action.shared && action.surface !== attachedSurface) continue;
+    const here =
+      action.shared || action.surface === attachedSurface || action.also?.includes(attachedSurface);
+    if (!here) continue;
     if (action.enabled && !action.enabled()) continue;
     const chord = currentChord(action.id);
     if (chord && normalizeChord(chord) === pressed) return action;
@@ -171,6 +185,14 @@ export function attachDispatcher(surface: Surface): () => void {
     if (!(event.ctrlKey || event.altKey || event.metaKey) && isEditableTarget(event.target)) {
       const key = pressed.split("+").pop() ?? "";
       if (!/^(Esc|Enter|F\d{1,2})$/.test(key)) return;
+    }
+    // a pending two-step hotkey (keys/leader.ts) is offered the key before any
+    // action: for that one keystroke ⌘1–9 mean "slot 1–9", not a tab jump.
+    // AFTER the typing guard above, so a bare digit typed into the editor or a
+    // filter while a leader is pending is still just a digit.
+    if (leaderConsumes(pressed)) {
+      event.preventDefault();
+      return;
     }
     // over an Excalidraw canvas the clash chords belong to the canvas
     if (CANVAS_OWNED_CHORDS.has(pressed) && isCanvasTarget(event.target)) return;

@@ -180,6 +180,29 @@ test("an exact note-title wikilink opens on an ordinary click", async ({ page })
   await expect(page.locator(".cm-content")).toContainText("Free local forever.");
 });
 
+test("hovering a wikilink shows the top of that note; a dead link shows no card", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.insertText("# Hover test\n\n[[Pricing decision]] and [[No such note at all]]\n\nafter");
+
+  const card = page.locator(".rotli-linkcard");
+  await page.locator(".rotli-wikilink", { hasText: "Pricing decision" }).hover();
+  await expect(card.locator(".rotli-linkcard-title")).toHaveText("Pricing decision");
+  await expect(card.locator(".rotli-linkcard-body")).toContainText("Free local forever.");
+  // the card reads like the note, never like its source
+  await expect(card.locator(".rotli-linkcard-body")).not.toContainText("#");
+
+  await page.locator(".rotli-wikilink-missing").hover();
+  await expect(card).toHaveCount(0);
+  await expect(page.locator(".rotli-wikilink-missing")).toHaveAttribute("title", /nowhere to go/);
+
+  // still a link: the card never swallows the click
+  await page.locator(".rotli-wikilink", { hasText: "Pricing decision" }).click();
+  await expect(page.locator(".cm-content")).toContainText("Free local forever.");
+});
+
 test("blank space below a note that ends with a wikilink does not open the link", async ({ page }) => {
   await gotoApp(page);
   await page.keyboard.press("Meta+T");
@@ -1075,4 +1098,94 @@ test("deleting a column keeps the table in view and shows a resize grip on the b
         .evaluate((el) => el.scrollTop),
     )
     .toBeLessThan(200);
+});
+
+test("/template inserts a saved layout: whole into an empty note, without its title into a written one", async ({
+  page,
+}) => {
+  await gotoApp(page);
+
+  // an EMPTY note takes the template whole — its heading names the new note
+  await page.keyboard.press("Meta+T");
+  await page.locator(".cm-content").last().click();
+  await page.keyboard.insertText("/template");
+  await page
+    .getByRole("menu", { name: "Insert block" })
+    .getByRole("menuitem", { name: /Template/ })
+    .click();
+  const picker = page.getByRole("searchbox");
+  await expect(picker).toBeFocused();
+  // only the Templates folder is offered — never the rest of the library
+  await expect(page.getByRole("menu", { name: "Template" }).locator(".slashlabel")).toHaveText([
+    "Meeting notes",
+  ]);
+  await page.keyboard.press("Enter");
+  const editor = page.locator(".pane.focused .cm-content");
+  await expect(editor).toContainText("Attendees");
+  await expect(editor).toContainText("Decisions");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Meeting notes");
+
+  // a note that already has a title keeps it: the template's own H1 stays behind
+  await page.keyboard.press("Meta+T");
+  await page.locator(".cm-content").last().click();
+  await page.keyboard.insertText("# Standup 21 Sep\n\n/template");
+  await page
+    .getByRole("menu", { name: "Insert block" })
+    .getByRole("menuitem", { name: /Template/ })
+    .click();
+  await page.getByRole("searchbox").fill("meet");
+  await page.keyboard.press("Enter");
+  const second = page.locator(".pane.focused .cm-content");
+  await expect(second).toContainText("Attendees");
+  await expect(second).not.toContainText("Meeting notes");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Standup 21 Sep");
+});
+
+test("a slash command works after text inside a checklist item, and can link a chat", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".pane.focused .cm-content");
+  await editor.click();
+  await page.keyboard.insertText("# Slash in a list\n\n- [ ] Ask Gabriel about ");
+  // typed, like a person would: the menu follows the keystrokes
+  await page.keyboard.type("/chat");
+  const menu = page.getByRole("menu", { name: "Insert block" });
+  await expect(menu.getByRole("menuitem", { name: /Link chat/ })).toBeVisible();
+  await menu.getByRole("menuitem", { name: /Link chat/ }).click();
+
+  const picker = page.getByRole("menu", { name: "Link chat" });
+  await expect(picker.locator(".slashlabel")).toHaveText(["Planning chat"]);
+  await page.keyboard.press("Enter");
+
+  // the link sits IN the sentence, the item is still one checklist item, and
+  // the link resolves (a dead link would wear the missing look)
+  const link = editor.locator(".rotli-wikilink", { hasText: "Planning chat" });
+  await expect(link).toBeVisible();
+  await expect(link).not.toHaveClass(/rotli-wikilink-missing/);
+  await expect(editor.locator(".cm-line", { hasText: "Ask Gabriel about" })).toContainText("Planning chat");
+  // a chat link's hover card names the chat and never shows the conversation
+  await link.hover();
+  const card = page.locator(".rotli-linkcard");
+  await expect(card.locator(".rotli-linkcard-title")).toHaveText("Planning chat");
+  await expect(card.locator(".rotli-linkcard-body")).toHaveText("Chat — open it to read.");
+  await expect(card).not.toContainText("where do we start");
+  await page.mouse.move(0, 0);
+
+  // a block command after text lands BENEATH the item, leaving its text whole
+  await page.keyboard.press("End");
+  await page.keyboard.type(" then /divider");
+  await menu.getByRole("menuitem", { name: /Divider/ }).click();
+  await expect(editor.locator(".cm-line", { hasText: "Ask Gabriel about" })).toContainText("then");
+
+  // prose keeps its slashes
+  await page.keyboard.press("Meta+T");
+  const second = page.locator(".pane.focused .cm-content");
+  await second.click();
+  await page.keyboard.type("yes and/or no, either / or, see /usr");
+  await expect(menu).toHaveCount(0);
+
+  // clicking the chat link opens the CONVERSATION, not its transcript file
+  await page.getByRole("tab", { name: /Slash in a list/ }).click();
+  await link.click();
+  await expect(page.locator(".pane.focused [data-chat-pane]").first()).toBeVisible();
 });

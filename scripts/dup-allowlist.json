@@ -131,6 +131,14 @@
         "src/lib/taskLines.test.ts"
       ],
       "reason": "Deliberate TS twin of the Rust open-task grammar: Rotli Web has no Rust, so lib/taskLines.ts must read and check off exactly the lines corpus.rs open_task_text / check_off do ('[ ]', '[/]', the box found by position). The literals ARE the contract; the test mirrors the Rust cases so the two cannot drift silently. Same shape as the search_match.rs and image-magic twin entries."
+    },
+    {
+      "id": "chat-window-protocol-test",
+      "files": [
+        "src/state/chatWindow.ts",
+        "src/state/chatWindowSide.test.ts"
+      ],
+      "reason": "The Chat window test asserts the hand-off protocol by its message names ('regroup', 'regrouped'). The literals ARE the contract between the two webviews (docs/architecture/window-events.md rotli:chat-window); a test that did not name them could not prove what the other window receives."
     }
   ]
 }

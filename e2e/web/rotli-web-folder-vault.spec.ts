@@ -11,6 +11,13 @@ const APP = "/app/";
 const PORT = 43115;
 const TOKEN = "fixture-token-with-at-least-twenty-four-chars";
 
+// a saved layout in the Templates folder — carrying a shelf on purpose: the
+// shelf projects it elsewhere, and `/template` must still find it by its folder
+const TEMPLATE: Record<string, string> = {
+  "wiki/Templates/standup.md":
+    "---\nid: 01TESTTEMPLATE00000000001\ntitle: Standup\nshelf: [Inbox]\n---\n\n# Standup\n\n## Yesterday\n\n## Today\n",
+};
+
 const chatFile = (title: string, updated: string) =>
   `---\nid: ${updated}-${title}\ntitle: ${title}\nsource: rotli\nattachedTo:\nparticipants: [you]\ncreated: ${updated}\nupdated: ${updated}\ntags: [chat]\n---\n\n# ${title}\n\n## Messages\n\n**you** · ${updated}T10:00:00Z — hello\n`;
 
@@ -65,31 +72,34 @@ function fakeHelper(page: Page) {
 
 /** Write the folder into the origin-private file system and remember its
  * handle the way "Connect a vault on this computer" does. */
-async function plantFolder(page: Page): Promise<void> {
+async function plantFolder(page: Page, extra: Record<string, string> = {}): Promise<void> {
   await page.goto(APP);
   await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
-  await page.evaluate(async (files) => {
-    const root = await navigator.storage.getDirectory();
-    for (const [path, text] of Object.entries(files)) {
-      const parts = path.split("/");
-      let dir = root;
-      for (const part of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(part, { create: true });
-      const file = await dir.getFileHandle(parts[parts.length - 1]!, { create: true });
-      const writable = await file.createWritable();
-      await writable.write(text);
-      await writable.close();
-    }
-    await new Promise<void>((resolve, reject) => {
-      const open = indexedDB.open("rotli-web");
-      open.onsuccess = () => {
-        const tx = open.result.transaction("vault", "readwrite");
-        tx.objectStore("vault").put(root, "vault-handle");
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-      };
-      open.onerror = () => reject(open.error);
-    });
-  }, FOLDER);
+  await page.evaluate(
+    async (files) => {
+      const root = await navigator.storage.getDirectory();
+      for (const [path, text] of Object.entries(files)) {
+        const parts = path.split("/");
+        let dir = root;
+        for (const part of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(part, { create: true });
+        const file = await dir.getFileHandle(parts[parts.length - 1]!, { create: true });
+        const writable = await file.createWritable();
+        await writable.write(text);
+        await writable.close();
+      }
+      await new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open("rotli-web");
+        open.onsuccess = () => {
+          const tx = open.result.transaction("vault", "readwrite");
+          tx.objectStore("vault").put(root, "vault-handle");
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        };
+        open.onerror = () => reject(open.error);
+      });
+    },
+    { ...FOLDER, ...extra },
+  );
 }
 
 async function pairAndOpenChat(page: Page): Promise<void> {
@@ -133,6 +143,60 @@ test("Files hands the note you're in to the Mac app, which opens Finder at it", 
   await expect(page.getByText("Asked the Rotli app to show it in Finder")).toBeVisible();
   // and it did not wander into the Library instead
   await expect(page.locator(".system-browser")).toHaveCount(0);
+});
+
+test("/template inserts a layout from the connected folder's Templates folder", async ({ page }) => {
+  await fakeHelper(page);
+  await plantFolder(page, TEMPLATE);
+  await page.reload();
+  await page.locator(".main-tree .main-row", { hasText: "Hello" }).click();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Hello");
+
+  const editor = page.locator(".pane.focused .cm-content");
+  // the caret to the end of the note's last line, portably
+  await editor.locator(".cm-line").last().click();
+  await page.keyboard.press("End");
+  await page.keyboard.insertText("\n\n/template");
+  await page
+    .getByRole("menu", { name: "Insert block" })
+    .getByRole("menuitem", { name: /Template/ })
+    .click();
+  await expect(page.getByRole("menu", { name: "Template" }).locator(".slashlabel")).toHaveText(["Standup"]);
+  await page.keyboard.press("Enter");
+
+  // the note already has content, so it keeps its own title: the template's
+  // heading stays behind and only its sections arrive
+  await expect(editor).toContainText("Yesterday");
+  await expect(editor).toContainText("Today");
+  await expect(editor).not.toContainText("Standup");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Hello");
+});
+
+test("a slash after text in a checklist item links one of the folder's chats", async ({ page }) => {
+  await fakeHelper(page);
+  await plantFolder(page);
+  await page.reload();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Hello");
+
+  const editor = page.locator(".pane.focused .cm-content");
+  await editor.locator(".cm-line").last().click();
+  await page.keyboard.press("End");
+  await page.keyboard.insertText("\n\n- [ ] follow up on ");
+  await page.keyboard.type("/chat");
+  await page
+    .getByRole("menu", { name: "Insert block" })
+    .getByRole("menuitem", { name: /Link chat/ })
+    .click();
+  await page.getByRole("searchbox").fill("sonnet");
+  await expect(page.getByRole("menu", { name: "Link chat" }).locator(".slashlabel")).toHaveText([
+    "Sonnet chat",
+  ]);
+  await page.keyboard.press("Enter");
+
+  const link = editor.locator(".rotli-wikilink", { hasText: "Sonnet chat" });
+  await expect(link).toBeVisible();
+  await expect(link).not.toHaveClass(/rotli-wikilink-missing/);
+  await expect(editor.locator(".cm-line", { hasText: "follow up on" })).toContainText("Sonnet chat");
 });
 
 test("a folder waiting on the browser's permission is said in the sidebar, with Reconnect", async ({

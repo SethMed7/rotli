@@ -453,6 +453,19 @@ fn parse_state(json: &str) -> OrganizerFile {
     serde_json::from_str(json).unwrap_or_default()
 }
 
+/// The Templates folder (1.3.0) — byte-identical to TEMPLATES_BRAIN_FOLDER in
+/// src/services/templates.ts (parity.json templatesBrainFolder). The notes in it
+/// are the user's saved layouts for `/template`: placeholders, not knowledge. So
+/// the daemon never files a capture INTO it (it is no area), never enriches what
+/// is in it, and writes no `_index.md` there. It stays an ordinary, visible
+/// folder to everything else.
+pub(crate) const TEMPLATES_BRAIN_FOLDER: &str = "wiki/Templates";
+
+fn in_templates(rel: &str) -> bool {
+    rel.strip_prefix(TEMPLATES_BRAIN_FOLDER)
+        .is_some_and(|rest| rest.starts_with('/'))
+}
+
 /// The enqueue/sweep filter: only `wiki/**/*.md` notes are the daemon's input.
 /// `_index.md` is the daemon's own OUTPUT (never an input candidate),
 /// `wiki/README.md` is the pinned human trust artifact (§3.4 — never touched),
@@ -463,6 +476,7 @@ fn candidate_rel(rel: &str) -> bool {
         && rel != "wiki/README.md"
         && rel.rsplit('/').next() != Some("_index.md")
         && !rel.split('/').any(|c| c.starts_with('.'))
+        && !in_templates(rel)
 }
 
 /// In-memory snapshot of one note read straight off disk. NEVER
@@ -594,6 +608,8 @@ fn area_vocab(root: &Path) -> Vec<(String, String)> {
         .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
         .filter_map(|e| e.file_name().to_str().map(str::to_string))
         .filter(|n| !n.starts_with('_') && !n.starts_with('.'))
+        // saved layouts are not an area to file captures under
+        .filter(|n| format!("wiki/{n}") != TEMPLATES_BRAIN_FOLDER)
         .collect();
     names.sort();
     names
@@ -2386,7 +2402,7 @@ pub fn spawn_organizer(app: tauri::AppHandle, handle: OrganizerHandle, root_id: 
                     if report.applied > 0 {
                         // our writes are suppress-marked, so the watcher won't
                         // echo them — tell the frontend ourselves
-                        let _ = app.emit_to("main", "rotli:corpus-changed", ());
+                        crate::chat_window::emit_corpus_changed(&app);
                     }
                     if report.model_offline {
                         next_model_try = Some(Instant::now() + backoff);
@@ -2794,6 +2810,22 @@ mod tests {
         assert!(!candidate_rel("wiki/Projects/photo.png"));
         assert!(!candidate_rel("wiki/.hidden/x.md"));
         assert!(!candidate_rel(".rotli/settings.json"));
+    }
+
+    #[test]
+    fn the_templates_folder_is_neither_input_nor_a_filing_area() {
+        assert!(!candidate_rel("wiki/Templates/meeting-notes.md"));
+        assert!(!candidate_rel("wiki/Templates/Work/weekly.md"));
+        // only that folder: a lookalike name and a nested namesake stay ordinary
+        assert!(candidate_rel("wiki/TemplatesOld/a.md"));
+        assert!(candidate_rel("wiki/Projects/Templates/a.md"));
+
+        let dir = TempDir::new().unwrap();
+        for area in ["Projects", "Templates", "_inbox"] {
+            std::fs::create_dir_all(dir.path().join("wiki").join(area)).unwrap();
+        }
+        let areas: Vec<String> = area_vocab(dir.path()).into_iter().map(|(name, _)| name).collect();
+        assert_eq!(areas, ["Projects"]);
     }
 
     #[test]

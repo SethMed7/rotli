@@ -81,9 +81,15 @@ export function createPointerDragSession(event: ReactPointerEvent, opts: Pointer
     opts.onEnd?.();
   };
 
-  const onUp = () => {
+  const onUp = (e: PointerEvent) => {
     const wasDragging = dragging;
-    if (wasDragging) opts.onDrop?.();
+    if (wasDragging) {
+      // hit-test once more at the release point: rows can shift under a still
+      // pointer after the last pointermove (the drag's own first re-render, a
+      // smooth scroll settling), and the commit must match what is under it NOW
+      if (Number.isFinite(e.clientX) && Number.isFinite(e.clientY)) opts.onMove(e.clientX, e.clientY);
+      opts.onDrop?.();
+    }
     teardown();
     if (wasDragging && opts.swallowClick) {
       // swallow the click that fires after a drag so the pressed element

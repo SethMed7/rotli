@@ -399,7 +399,6 @@ export function Sidebar() {
       <SidebarSwitcher
         value={sidebarMode === "breve" ? null : sidebarFrontSelection(sidebarView, contentView)}
         onPick={pickSidebarView}
-        chatCount={chats.chatList.length}
         breveActive={sidebarMode === "breve"}
         onBreve={LAUNCH_FEATURES.breve ? () => dispatch("view.breve") : undefined}
       />

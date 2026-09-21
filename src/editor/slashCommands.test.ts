@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { NoteSummary } from "../types";
 import { imageGenMarkdown, readyImageEngines } from "./imageGenPopover";
-import { pickerFence, slashInsertion } from "./slashActions";
+import { pickerFence, slashInsertion, templateInsertion } from "./slashActions";
 import {
   adaptSlashInsertion,
   filterSlashItems,
@@ -43,7 +43,9 @@ describe("slash command catalog", () => {
       "Mermaid",
       "Attach image",
       "Generate image",
+      "Template",
       "Link note",
+      "Link chat",
       "Board",
       "Sheet",
       "Document",
@@ -233,6 +235,88 @@ describe("slash commands inside a result row's reason", () => {
     expect(slashSpanAtCaret("- [ ][x] Hello — and/or", 23)).toBeNull();
     expect(slashSpanAtCaret("- [ ][x] Hello — fail /table", 20)).toBeNull();
     expect(slashSpanAtCaret("- [ ][x] Hello /table", 21)).toBeNull();
-    expect(slashSpanAtCaret("- item /table", 13)).toBeNull();
+  });
+
+  test("after text, a trailing /query is a command — in a paragraph and in any list item", () => {
+    const item = "- [ ] Ask Gabriel /li";
+    expect(slashSpanAtCaret(item, item.length)).toEqual({
+      from: 18, // the slash itself: the space before it stays, the token goes
+      to: item.length,
+      lead: "\n      ",
+      continuation: "      ",
+      query: "li",
+    });
+    expect(slashSpanAtCaret("some words /link", 16)).toMatchObject({
+      from: 11,
+      query: "link",
+      continuation: "",
+    });
+    expect(slashSpanAtCaret("- item /table", 13)).toMatchObject({ from: 7, query: "table" });
+    expect(slashSpanAtCaret("1. step /code", 13)).toMatchObject({ from: 8, query: "code" });
+  });
+
+  test("an INLINE command stays in the sentence; a block lands on a continuation line beneath", () => {
+    const item = "- [ ] Ask Gabriel /li";
+    const link = { kind: "picker", mode: "linkNote" } as const;
+    const chat = { kind: "picker", mode: "linkChat" } as const;
+    expect(slashSpanAtCaret(item, item.length, link)?.lead).toBe("");
+    expect(slashSpanAtCaret(item, item.length, chat)?.lead).toBe("");
+    expect(slashSpanAtCaret(item, item.length, { kind: "code" })?.lead).toBe("");
+    expect(slashSpanAtCaret(item, item.length, { kind: "table" })?.lead).toBe("\n      ");
+    // a command that owns the whole item was always in place, whatever it is
+    expect(slashSpanAtCaret("- [ ] /table", 12, { kind: "table" })?.lead).toBe("");
+  });
+
+  test("prose keeps its slashes: no space before, nothing typed yet, or nothing that matches", () => {
+    expect(slashSpanAtCaret("yes and/or no", 13)).toBeNull();
+    expect(slashSpanAtCaret("see https://rotli.co", 20)).toBeNull();
+    expect(slashSpanAtCaret("either / or", 8)).toBeNull(); // a bare slash after text
+    expect(slashSpanAtCaret("run it from /usr", 16)).toBeNull(); // no command is called "usr"
+    expect(slashSpanAtCaret("from /usr/bin", 13)).toBeNull();
+    expect(slashSpanAtCaret("- [ ] done /li later", 14)).toBeNull(); // caret not at the end
+  });
+});
+
+describe("/template", () => {
+  const note = (id: string, over: Partial<NoteSummary> = {}): NoteSummary => ({
+    ...file(id),
+    kind: "note",
+    folderId: "wiki/Templates",
+    ...over,
+  });
+
+  test("the picker offers only the notes in the Templates folder", () => {
+    const pool = [
+      note("01MEET", { title: "Meeting notes" }),
+      note("01SHELF", { title: "Weekly review", folderId: "Board", diskFolderId: "wiki/Templates" }),
+      note("01SECRET", { title: "Secret layout", secure: true }),
+      note("01ELSE", { title: "Meeting with Ana", folderId: "wiki/Projects" }),
+      file("Storage/Meeting.docx"),
+    ];
+    expect(filterPickerNotes(pool, "insertTemplate", "").map((n) => n.id)).toEqual(["01MEET", "01SHELF"]);
+    expect(filterPickerNotes(pool, "insertTemplate", "meet").map((n) => n.id)).toEqual(["01MEET"]);
+  });
+
+  test("it never offers to create: a template is made like any note, in its folder", () => {
+    expect(slashPickerCanCreate("insertTemplate", true, true)).toBe(false);
+  });
+
+  test("into an EMPTY note the template comes whole — its heading names the new note", () => {
+    expect(templateInsertion("# Meeting notes\n\n## Attendees\n\n- \n", true)).toBe(
+      "# Meeting notes\n\n## Attendees\n\n-",
+    );
+  });
+
+  test("into a note with content the template's own title is left out, so the note is never renamed", () => {
+    expect(templateInsertion("# Meeting notes\n\n## Attendees\n\n- \n", false)).toBe("## Attendees\n\n-");
+    // only a LEADING H1 is the template's name; a later one is content
+    expect(templateInsertion("intro\n\n# Part one\n", false)).toBe("intro\n\n# Part one");
+    expect(templateInsertion("## Agenda\n- item\n", false)).toBe("## Agenda\n- item");
+  });
+
+  test("stray frontmatter never rides into the host note, and an empty template inserts nothing", () => {
+    expect(templateInsertion("---\ntitle: x\nsecure: false\n---\n\n## Agenda\n", false)).toBe("## Agenda");
+    expect(templateInsertion("# Only a title\n", false)).toBe("");
+    expect(templateInsertion("\n\n", true)).toBe("");
   });
 });

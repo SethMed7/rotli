@@ -15,9 +15,14 @@
 // this it was an unlabeled coffee icon in the header row with no shortcut.
 
 import { LAUNCH_FEATURES } from "../../lib/featurePolicy";
+import { chatWindowSupported, focusChatWindow } from "../../services/chatWindowShell";
 import { useChatSetupGuide } from "../../state/chatSetupGuide";
+import { popOutChat, regroupChat } from "../../state/chatWindow";
+import { useChatWindowStore } from "../../state/chatWindowStore";
+import { useContextMenu } from "../../state/contextMenu";
 import { helperReadyFrom, useHelperLink } from "../../state/helperLink";
-import type { ContentView, DashboardSection, SidebarView } from "../../state/ui";
+import { type ContentView, type DashboardSection, type SidebarView, useUiStore } from "../../state/ui";
+import { PopOutGlyph, RegroupGlyph } from "../chatWindow/windowGlyphs";
 import { ChatGlyph, CoffeeGlyph, HomeGlyph } from "../glyphs";
 
 const SIDEBAR_FRONTS: {
@@ -66,15 +71,11 @@ export function sidebarFrontBody(
 export function SidebarSwitcher({
   value,
   onPick,
-  chatCount,
   breveActive = false,
   onBreve,
 }: {
   value: SidebarView | null;
   onPick: (view: SidebarView) => void;
-  /** Chats in this vault — a quiet count on the Chat segment, so switching
-   * fronts is never a blind jump. Hidden at 0. */
-  chatCount: number;
   /** Breve owns the sidebar body right now; Home and Chat read as unselected. */
   breveActive?: boolean;
   /** Present when the Breve segment is offered (the main window). */
@@ -84,6 +85,15 @@ export function SidebarSwitcher({
   const helperOk = useHelperLink((s) => helperReadyFrom(s));
   const helperProblem = useHelperLink((s) => s.problem);
   const helperVerifying = useHelperLink((s) => s.verifying);
+  // Pull Chat out into its own window: the Mac app only, and in the work
+  const chatWindow = chatWindowSupported();
+  const chatDetached = useChatWindowStore((s) => s.detached);
+  const pullChatOut = () => {
+    const blocked = popOutChat();
+    if (blocked) useUiStore.getState().setRowActionError(blocked);
+    // Chat left this window: its front has nothing to show here
+    else if (value === "chat") onPick("home");
+  };
   return (
     // role="group" + aria-pressed, NOT a tablist: these segments switch the
     // sidebar's own content, not a tabpanel, and the pane tab strip already
@@ -118,6 +128,19 @@ export function SidebarSwitcher({
             </button>
           );
         }
+        if (id === "chat" && chatWindow) {
+          return (
+            <ChatWindowSegment
+              key={id}
+              detached={chatDetached}
+              active={active}
+              hint={hint}
+              action={action}
+              onPick={() => onPick(id)}
+              onPullOut={pullChatOut}
+            />
+          );
+        }
         return (
           <button
             key={id}
@@ -131,7 +154,6 @@ export function SidebarSwitcher({
           >
             <Glyph size={14} />
             <span className="sb-switch-label">{label}</span>
-            {id === "chat" && chatCount > 0 && <span className="sb-switch-n">{chatCount}</span>}
           </button>
         );
       })}
@@ -149,5 +171,61 @@ export function SidebarSwitcher({
         </button>
       )}
     </div>
+  );
+}
+
+/** The Chat segment in a build where Chat can live in its own window (1.3.0).
+ * The segment and its small companion button are SIBLINGS — a button cannot
+ * hold a button. In main: the companion (on hover/focus) or the context menu
+ * pulls Chat out. Out: the segment brings that window forward and the
+ * companion puts Chat back. Home has no such control: main is where Home lives. */
+export function ChatWindowSegment({
+  detached,
+  active,
+  hint,
+  action,
+  onPick,
+  onPullOut,
+}: {
+  detached: boolean;
+  active: boolean;
+  hint: string;
+  action: string;
+  onPick: () => void;
+  onPullOut: () => void;
+}) {
+  const openContextMenu = useContextMenu((s) => s.open);
+  const companion = detached ? "Put Chat back in this window" : "Pull Chat out into its own window";
+  return (
+    <span className={detached ? "sb-switch-chat out" : "sb-switch-chat"}>
+      <button
+        type="button"
+        aria-pressed={!detached && active}
+        data-tour="chat"
+        title={detached ? "Chat is in its own window — click to bring it forward" : hint}
+        data-hotkey={action}
+        className={!detached && active ? "sb-switch-seg sel" : "sb-switch-seg"}
+        onClick={() => (detached ? focusChatWindow() : onPick())}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          openContextMenu(event.clientX, event.clientY, [
+            { kind: "action", label: companion, onClick: detached ? regroupChat : onPullOut },
+          ]);
+        }}
+      >
+        <ChatGlyph size={14} />
+        <span className="sb-switch-label">Chat</span>
+      </button>
+      <button
+        type="button"
+        className="sb-switch-window"
+        aria-label={companion}
+        title={companion}
+        onClick={detached ? regroupChat : onPullOut}
+      >
+        {detached ? <RegroupGlyph size={12} /> : <PopOutGlyph size={12} />}
+      </button>
+    </span>
   );
 }
