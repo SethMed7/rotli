@@ -9,6 +9,7 @@
 import { emitRebind, setGlobalShortcut } from "../lib/tauri";
 import { resolveChord, useBindingsStore } from "./bindings";
 import { chordFromEvent, normalizeChord, toAccelerator } from "./chords";
+import { leaderConsumes } from "./leader";
 
 /** Which webview an action belongs to — the dispatcher only fires actions for
  * its own surface (global actions are handled OS-side in Rust and skipped).
@@ -165,6 +166,12 @@ export function attachDispatcher(surface: Surface): () => void {
     if (event.repeat) return; // auto-repeat is not a fresh press — never re-fire a command
     const pressed = chordFromEvent(event);
     if (!pressed) return;
+    // a pending two-step hotkey (keys/leader.ts) is offered the key first:
+    // for that one keystroke ⌘1–9 mean "slot 1–9", not a tab jump
+    if (leaderConsumes(pressed)) {
+      event.preventDefault();
+      return;
+    }
     // a modifier-less chord must never swallow typing: inside editable targets
     // only Esc / Enter / F-keys may dispatch bare (the capture card's ⏎ save,
     // Esc everywhere) — a bare-letter rebind stays typable in text fields

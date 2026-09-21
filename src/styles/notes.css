@@ -483,6 +483,19 @@
 .main-row .snact {
   margin-left: 0;
 }
+/* ⌘⇧S pending: the top nine root notes wear their number (keys/leader.ts).
+   Static, like every sidebar hint — nothing to composite while idle. */
+.main-slot-n {
+  flex: 0 0 auto;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: var(--r-inner);
+  background: var(--selected-bg);
+  color: var(--selected-ink);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 .main-row.dragging {
   opacity: 0.4;
 }

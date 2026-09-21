@@ -20,6 +20,9 @@ export type MenuSpec =
        * sibling). */
       checked?: boolean;
       checkedMark?: "check" | "star" | "highlight" | "lock";
+      /** A quiet trailing key hint ("⌘1") — the numbered view menu a two-step
+       * hotkey opens (keys/leader.ts). Decoration: never part of the name. */
+      hint?: string;
     }
   | { kind: "sep" }
   | { kind: "drill"; label: string; items: MenuSpec[]; disabled?: boolean; danger?: boolean };

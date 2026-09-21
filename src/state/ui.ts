@@ -420,6 +420,12 @@ interface UiState {
    * is the seam (the requestSystemFolder pattern). Transient. */
   sidebarFolderNonce: number;
   requestSidebarFolder: () => void;
+  /** A two-step hotkey's first step (keys/leaderActions): the Home front owns
+   * the view menu and the rendered Main rows, so it answers — opening the
+   * numbered view menu, or numbering the top Main notes. Transient. */
+  leaderRequest: { id: "views" | "sidebar"; at: number } | null;
+  requestLeader: (id: "views" | "sidebar") => void;
+  clearLeaderRequest: () => void;
   /** The System browser's current multi-selection (Finder gestures: ⌘/⇧-click,
    * rubber band) — item SUMMARIES so ⌘⌫'s registry action can trash kind-aware
    * without reaching back into a component. */
@@ -878,6 +884,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   requestSystemFolder: () => set((s) => ({ systemFolderNonce: s.systemFolderNonce + 1 })),
   sidebarFolderNonce: 0,
   requestSidebarFolder: () => set((s) => ({ sidebarFolderNonce: s.sidebarFolderNonce + 1 })),
+  leaderRequest: null,
+  requestLeader: (id) => set({ leaderRequest: { id, at: Date.now() } }),
+  clearLeaderRequest: () => set({ leaderRequest: null }),
   systemSelection: [],
   setSystemSelection: (items) => set({ systemSelection: items }),
   activeView: null,

@@ -2901,6 +2901,14 @@
 .ctxmenu-label {
   flex: 1 1 auto;
 }
+/* a trailing key hint (the numbered view menu): quiet, never the label */
+.ctxmenu-hint {
+  margin-left: auto;
+  padding-left: 18px;
+  font-size: 0.85em;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
 .ctxmenu-check {
   width: 14px;
   flex: 0 0 auto;

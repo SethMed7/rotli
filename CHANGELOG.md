@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   newer version is out. Nothing downloads until you choose Install & relaunch.
   Settings → General → "Check for updates automatically" turns the routine
   check off; the Check for updates button stays either way.
+- **Two-step hotkeys: ⌘⇧W for views, ⌘⇧S for your top notes.** Press ⌘⇧W and
+  the view menu opens with ⌘1–⌘9 beside its choices; press the number to
+  switch. Press ⌘⇧S and the first nine notes at the top of Main show their
+  numbers; press one to open it. Pin or drag a note to keep it in its slot.
+  ⌘1–9 still jump between tabs the rest of the time, Esc backs out, and both
+  hotkeys can be changed in Settings → Hotkeys. Works in Rotli Web too.
 - **Hover a `[[link]]` to see the top of that note.** Rest the pointer on a
   link and a small card shows the note's title and first lines without
   opening it; a click still opens it. A secure note's card shows its name and
