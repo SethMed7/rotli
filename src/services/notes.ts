@@ -89,9 +89,16 @@ export async function hydrateWebVault(): Promise<boolean> {
   const vault = webVaultKey();
   if (connected && vault && typeof window !== "undefined") {
     // typing the last page couldn't save before it unloaded
-    const { keptAside } = await replayJournal(window.localStorage, journalKey(vault), notesService);
-    if (keptAside.length > 0) {
-      showFileNotice(`Kept unsaved edits beside the changed note: “${keptAside.join("”, “")}”`);
+    try {
+      const { keptAside } = await replayJournal(window.localStorage, journalKey(vault), notesService);
+      if (keptAside.length > 0) {
+        showFileNotice(`Kept unsaved edits beside the changed note: “${keptAside.join("”, “")}”`);
+      }
+    } catch (cause) {
+      // storage refused: the journal is left exactly as it was for the next boot
+      showFileNotice(
+        `Couldn’t finish saving edits from last time — they are kept and retried next time (${String(cause)})`,
+      );
     }
   }
   // the model's view of this vault, and the helper that runs the model

@@ -217,11 +217,19 @@ test("a hard refresh the instant after typing keeps the words, in the vault's fi
 // Adversarial review, round 2: choosing the SAME folder again must keep this
 // browser's id for it — the unsaved journal is keyed by that id, and a new
 // one would orphan any edit still waiting in it.
-test("choosing the same folder again keeps its identity (and so its unsaved journal)", async ({ page }) => {
+test("choosing a folder again keeps its identity — right away, or after another (A → B → A)", async ({
+  page,
+}) => {
+  // the picker hands back the stand-in root ("a") or a folder inside it ("b")
   await page.addInitScript(() => {
     (
       window as unknown as { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> }
-    ).showDirectoryPicker = () => navigator.storage.getDirectory();
+    ).showDirectoryPicker = async () => {
+      const root = await navigator.storage.getDirectory();
+      return window.sessionStorage.getItem("pick") === "b"
+        ? root.getDirectoryHandle("b", { create: true })
+        : root;
+    };
   });
   await startWithVault(page);
   const folderId = () =>
@@ -235,19 +243,30 @@ test("choosing the same folder again keeps its identity (and so its unsaved jour
           };
         }),
     );
-  const before = await folderId();
-  expect(before).not.toBe("");
-  await page
-    .getByRole("button", { name: /Settings/ })
-    .first()
-    .click();
-  await page.getByRole("button", { name: "Change vault…" }).click();
-  await page
-    .getByRole("dialog", { name: "Change vault" })
-    .getByRole("button", { name: /Choose another vault/ })
-    .click();
-  await expect(vaultGate(page)).toHaveText("Choose your vault");
-  await page.locator(".setup-button.primary", { hasText: "Choose vault…" }).click();
-  await expect(page.getByRole("tab", { selected: true })).toBeVisible();
-  expect(await folderId()).toBe(before);
+  const choose = async (pick: "a" | "b") => {
+    await page
+      .getByRole("button", { name: /Settings/ })
+      .first()
+      .click();
+    await page.getByRole("button", { name: "Change vault…" }).click();
+    await page
+      .getByRole("dialog", { name: "Change vault" })
+      .getByRole("button", { name: /Choose another vault/ })
+      .click();
+    await expect(vaultGate(page)).toHaveText("Choose your vault");
+    await page.evaluate((value) => window.sessionStorage.setItem("pick", value), pick);
+    await page.locator(".setup-button.primary", { hasText: "Choose vault…" }).click();
+    // a new vault opens on its Welcome note once seeding lands; wait for it,
+    // or the seeding's own "close Settings" races the next step
+    if (pick === "b")
+      await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+    else await expect(page.getByRole("tab", { selected: true })).toBeVisible();
+    return folderId();
+  };
+  const a = await folderId();
+  expect(a).not.toBe("");
+  expect(await choose("a")).toBe(a);
+  const b = await choose("b");
+  expect(b).not.toBe(a);
+  expect(await choose("a")).toBe(a);
 });

@@ -26,9 +26,11 @@ import {
 } from "./webVaultFolder";
 
 const BINDING_KEY = "vault-binding";
-const PENDING_KEY = "vault-pending";
+/** What a tab's unload left unacknowledged, per vault: an unload of vault B
+ * never touches vault A's record. */
+const pendingKey = (vaultId: string) => `vault-pending:${vaultId}`;
 /** Operations a replay couldn't finish yet, per vault: their own key, so the
- * next page's unload (which rewrites PENDING_KEY) can never drop them. */
+ * next page's unload (which rewrites the unload record) can never drop them. */
 const keptKey = (vaultId: string) => `vault-pending:kept:${vaultId}`;
 
 async function readRecord(store: VaultStore, key: string): Promise<PendingRecord | null> {
@@ -241,9 +243,11 @@ function watchPendingOps(dir: HelperVaultDir, vaultId: string): void {
   window.addEventListener("pagehide", () => {
     const ops = dir.pendingOps();
     const store = deviceVaultStore();
-    if (ops.length === 0) void store.delete(PENDING_KEY).catch(() => {});
+    if (ops.length === 0) void store.delete(pendingKey(vaultId)).catch(() => {});
     else
-      void store.set(PENDING_KEY, JSON.stringify({ vaultId, ops } satisfies PendingRecord)).catch(() => {});
+      void store
+        .set(pendingKey(vaultId), JSON.stringify({ vaultId, ops } satisfies PendingRecord))
+        .catch(() => {});
   });
 }
 
@@ -256,8 +260,7 @@ export async function replayPendingOps(
   store = deviceVaultStore(),
 ): Promise<number> {
   const kept = await readRecord(store, keptKey(vaultId));
-  const last = await readRecord(store, PENDING_KEY);
-  // another vault's unload record waits for that vault; never replayed here
+  const last = await readRecord(store, pendingKey(vaultId));
   const lastHere = last?.vaultId === vaultId ? last : null;
   const ops = [...(kept?.ops ?? []), ...(lastHere?.ops ?? [])];
   if (ops.length === 0) return 0;
@@ -278,10 +281,11 @@ export async function replayPendingOps(
         }
       } else if (op.kind === "mkdir") await dir.mkdir(op.path);
       else if (op.kind === "move") await dir.move(op.from, op.to);
-      else {
-        // a delete decided against an older version never removes a newer one
-        const now = op.base ? await dir.stat(op.path) : null;
-        if (!op.base || !now || `${now.lastModified}:${now.size}` === op.base) await dir.remove(op.path);
+      else if (op.base) {
+        // a delete decided against an older version never removes a newer one;
+        // a folder removal isn't replayed at all (at worst an empty folder stays)
+        const now = await dir.stat(op.path);
+        if (now && `${now.lastModified}:${now.size}` === op.base) await dir.remove(op.path);
       }
       replayed += 1;
     } catch (error) {
@@ -290,8 +294,10 @@ export async function replayPendingOps(
       console.warn("rotli: a saved-while-offline change couldn't be replayed yet", error);
     }
   }
-  if (lastHere) await store.delete(PENDING_KEY);
+  // persist what's left BEFORE clearing what it came from: a failed write
+  // throws here, and both records stay for the next boot
   if (retained.length === 0) await store.delete(keptKey(vaultId));
   else await store.set(keptKey(vaultId), JSON.stringify({ vaultId, ops: retained } satisfies PendingRecord));
+  if (lastHere) await store.delete(pendingKey(vaultId));
   return replayed;
 }

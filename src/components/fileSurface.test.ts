@@ -62,6 +62,11 @@ describe("htmlPreviewDoc — policy and <base> for the sandboxed srcdoc Preview"
     expect(doc).toBe(`<!DOCTYPE html>${LEAD}\n<p>hi</p>`);
   });
 
+  test("a legacy doctype with a quoted > can't swallow the policy: it goes first", () => {
+    const doc = htmlPreviewDoc('<!doctype html PUBLIC "x>"><img src="/app/leak?t=S">', URL);
+    expect(doc.startsWith(LEAD)).toBe(true);
+  });
+
   test("a quote in the URL can't break out of the href attribute", () => {
     expect(htmlPreviewDoc("x", 'a"><script>1</script>')).toBe(
       `${HTML_PREVIEW_CSP}<base href="a%22><script>1</script>">x`,

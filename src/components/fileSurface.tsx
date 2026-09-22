@@ -141,7 +141,9 @@ export function htmlPreviewDoc(text: string, baseUrl: string): string {
   // "after <head>": a regex finds <head> inside a comment too, and a policy
   // inside a comment protects nothing (adversarial review, 2026-09-22)
   const lead = `${HTML_PREVIEW_CSP}<base href="${baseUrl.replace(/"/g, "%22")}">`;
-  const doctype = /^\s*<!doctype[^>]*>/i.exec(text);
+  // only the plain HTML5 doctype may precede it: a quoted ">" inside a
+  // legacy doctype would otherwise end the match early and swallow the policy
+  const doctype = /^\s*<!doctype\s+html\s*>/i.exec(text);
   if (!doctype) return lead + text;
   const at = doctype[0].length;
   return text.slice(0, at) + lead + text.slice(at);

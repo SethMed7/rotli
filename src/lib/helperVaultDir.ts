@@ -372,12 +372,15 @@ export class HelperVaultDir implements VaultDir {
    * the desktop app changed meanwhile is kept (409). Folders aren't gated. */
   async remove(path: string): Promise<void> {
     const key = normalize(path);
+    // decide against what is really there, never against an empty cache
+    if (!this.entries.has(key)) await this.fresh();
     const entry = this.entries.get(key);
-    const base = entry?.kind === "file" ? revisionOf(entry) : "";
+    if (!entry) return; // nothing there: the port's "missing is a no-op"
+    const base = entry.kind === "file" ? revisionOf(entry) : "";
     const seen = this.texts.get(key);
     const gate =
-      entry?.kind !== "file"
-        ? {}
+      entry.kind !== "file"
+        ? { directory: true } // a folder removal never deletes a file that took its name
         : seen && seen.revision === base
           ? { expectedContent: contentRevision(seen.text) }
           : { expectedRevision: base };

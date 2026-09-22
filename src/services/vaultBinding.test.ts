@@ -63,7 +63,7 @@ describe("edits a closed tab couldn't deliver", () => {
     await dir.writeText("wiki/b.md", "changed elsewhere");
     const store = new MemoryVaultStore();
     await store.set(
-      "vault-pending",
+      "vault-pending:hv_1",
       JSON.stringify({
         vaultId: "hv_1",
         ops: [
@@ -78,13 +78,13 @@ describe("edits a closed tab couldn't deliver", () => {
     expect(await dir.readText("wiki/b.md")).toBe("changed elsewhere");
     expect(await dir.readText("wiki/b (unsaved copy).md")).toBe("offline b");
     expect(await dir.exists("chats")).toBe(true);
-    expect(await store.get("vault-pending")).toBeUndefined();
+    expect(await store.get("vault-pending:hv_1")).toBeUndefined();
   });
 
   test("another vault's pending edits are never replayed here", async () => {
     const store = new MemoryVaultStore();
     await store.set(
-      "vault-pending",
+      "vault-pending:hv_other",
       JSON.stringify({ vaultId: "hv_other", ops: [{ kind: "mkdir", path: "x" }] }),
     );
     const dir = new MemoryVaultDir();
@@ -98,7 +98,7 @@ describe("edits a closed tab couldn't deliver", () => {
     await dir.writeText("wiki/a (unsaved copy).md", "the first offline edit");
     const store = new MemoryVaultStore();
     await store.set(
-      "vault-pending",
+      "vault-pending:hv_1",
       JSON.stringify({
         vaultId: "hv_1",
         ops: [{ kind: "write", path: "wiki/a.md", text: "second", base: "stale" }],
@@ -118,7 +118,7 @@ describe("edits a closed tab couldn't deliver", () => {
     const b = await dir.stat("wiki/b.md");
     const store = new MemoryVaultStore();
     await store.set(
-      "vault-pending",
+      "vault-pending:hv_1",
       JSON.stringify({
         vaultId: "hv_1",
         ops: [
@@ -136,16 +136,16 @@ describe("edits a closed tab couldn't deliver", () => {
     const dir = new MemoryVaultDir();
     const store = new MemoryVaultStore();
     const ops = [{ kind: "move", from: "missing.md", to: "b.md" }];
-    await store.set("vault-pending", JSON.stringify({ vaultId: "hv_1", ops }));
+    await store.set("vault-pending:hv_1", JSON.stringify({ vaultId: "hv_1", ops }));
     expect(await replayPendingOps(dir, "hv_1", store)).toBe(0);
     // retained under the vault's own key, which no unload overwrites
-    expect(await store.get("vault-pending")).toBeUndefined();
+    expect(await store.get("vault-pending:hv_1")).toBeUndefined();
     expect(JSON.parse((await store.get("vault-pending:kept:hv_1")) ?? "{}")).toEqual({
       vaultId: "hv_1",
       ops,
     });
     // the next unload writes its own record; the kept one survives it
-    await store.set("vault-pending", JSON.stringify({ vaultId: "hv_1", ops: [] }));
+    await store.set("vault-pending:hv_1", JSON.stringify({ vaultId: "hv_1", ops: [] }));
     expect(await store.get("vault-pending:kept:hv_1")).toBeDefined();
     // and the next boot tries it again (still failing, still kept)
     expect(await replayPendingOps(dir, "hv_1", store)).toBe(0);

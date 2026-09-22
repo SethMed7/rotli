@@ -92,7 +92,10 @@ export async function replayJournal(
       else unresolved.push(draft); // neither saved nor kept aside: keep it for the next boot
     }
   }
+  // store what's left BEFORE clearing what it came from: if storage refuses,
+  // this throws and both entries stay for the next boot
+  if (unresolved.length === 0) storage.removeItem(keptKey(key));
+  else storage.setItem(keptKey(key), JSON.stringify(unresolved));
   storage.removeItem(key);
-  writeJournal(storage, keptKey(key), unresolved);
   return { saved, keptAside, unresolved: unresolved.length };
 }

@@ -507,32 +507,49 @@ fn move_file(root: &Path, from: &[String], to: &[String]) -> Result<Value, Refus
         return Err((404, format!("no such file: {}", joined(from))));
     }
     let target = resolve(root, to)?;
-    if fs::symlink_metadata(&target).is_ok() {
+    // "a.md" → "A.md" on a case-insensitive disk names the SAME file: a
+    // plain rename changes its spelling; a copy-then-delete would lose it
+    let case_only = joined(from).eq_ignore_ascii_case(&joined(to));
+    if !case_only && fs::symlink_metadata(&target).is_ok() {
         // never replace: a stale listing must not destroy the note already there
         return Err((409, format!("{} already exists", joined(to))));
     }
     make_parents(root, to)?;
-    // No-replace, atomically: a hard link fails if `to` exists at that instant
-    // (a check-then-rename would race another writer), then the old name goes.
-    // Across volumes, a create-new copy is just as strict.
-    let exists = |e: &std::io::Error| e.kind() == ErrorKind::AlreadyExists;
-    let already = || (409, format!("{} already exists", joined(to)));
-    match fs::hard_link(&source, &target) {
-        Ok(()) => {}
-        Err(e) if exists(&e) => return Err(already()),
-        Err(_) => {
-            let mut out = fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&target)
-                .map_err(|e| if exists(&e) { already() } else { (500, format!("couldn't move {}: {e}", joined(from))) })?;
-            let mut input = fs::File::open(&source).map_err(|e| (500, e.to_string()))?;
-            std::io::copy(&mut input, &mut out).map_err(|e| (500, format!("couldn't move {}: {e}", joined(from))))?;
-            out.sync_all().map_err(|e| (500, e.to_string()))?;
+    // the source's lock (the desktop's writers hold it too) spans publish AND
+    // unlink, so a newer version written in between can't be the one removed
+    crate::fsutil::with_file_lock(&source, || {
+        if case_only {
+            return fs::rename(&source, &target).map_err(|e| format!("couldn't rename {}: {e}", joined(from)));
         }
+        publish_no_replace(&source, &target)?;
+        fs::remove_file(&source).map_err(|e| format!("couldn't remove {}: {e}", joined(from)))
+    })
+    .map(|()| Value::Null)
+    .map_err(|e| (if e.starts_with("already exists") { 409 } else { 500 }, e))
+}
+
+/// Make `target` the source's content without ever replacing a file already
+/// there. Same volume: a hard link (fails if `target` exists). Across
+/// volumes: a complete temp copy beside the target, then published with
+/// `persist_noclobber` — a failed copy never leaves a partial note behind.
+fn publish_no_replace(source: &Path, target: &Path) -> Result<(), String> {
+    let already = || format!("already exists: {}", target.display());
+    match fs::hard_link(source, target) {
+        Ok(()) => return Ok(()),
+        Err(e) if e.kind() == ErrorKind::AlreadyExists => return Err(already()),
+        Err(_) => {}
     }
-    fs::remove_file(&source).map_err(|e| (500, format!("couldn't remove {}: {e}", joined(from))))?;
-    Ok(Value::Null)
+    let dir = target.parent().ok_or("no parent folder")?;
+    let mut tmp = tempfile::Builder::new()
+        .prefix(WRITE_PREFIX)
+        .tempfile_in(dir)
+        .map_err(|e| format!("temp file in {}: {e}", dir.display()))?;
+    let mut input = fs::File::open(source).map_err(|e| e.to_string())?;
+    std::io::copy(&mut input, tmp.as_file_mut()).map_err(|e| e.to_string())?;
+    tmp.as_file().sync_all().map_err(|e| e.to_string())?;
+    tmp.persist_noclobber(target).map(|_| ()).map_err(|e| {
+        if e.error.kind() == ErrorKind::AlreadyExists { already() } else { e.error.to_string() }
+    })
 }
 
 fn remove(root: &Path, rel: &[String], args: &Value) -> Result<Value, Refusal> {
@@ -541,6 +558,10 @@ fn remove(root: &Path, rel: &[String], args: &Value) -> Result<Value, Refusal> {
         return Err((400, "the vault itself can't be removed".into()));
     }
     let path = resolve(root, rel)?;
+    // a folder removal never deletes a file that has since taken its name
+    if path.is_file() && args.get("directory").and_then(Value::as_bool) == Some(true) {
+        return Err((409, format!("{} is a file now, not a folder", joined(rel))));
+    }
     // a delete decided against an older version of a FILE must not remove a
     // newer one (an outage replay, or the desktop app writing meanwhile)
     if path.is_file() {

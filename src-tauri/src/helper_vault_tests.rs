@@ -288,3 +288,43 @@ fn a_delete_decided_against_an_older_version_keeps_the_newer_file() {
     call(&served, "vault_remove", json!({ "path": "a.md", "expectedContent": current })).unwrap();
     assert!(!vault.path().join("a.md").exists());
 }
+
+#[test]
+fn a_case_only_rename_keeps_the_note() {
+    let (vault, _config, served) = serving();
+    fs::write(vault.path().join("plan.md"), "the only copy").unwrap();
+    call(&served, "vault_move", json!({ "from": "plan.md", "to": "Plan.md" })).unwrap();
+    let names: Vec<String> = fs::read_dir(vault.path())
+        .unwrap()
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|n| n.ends_with(".md"))
+        .collect();
+    assert_eq!(names, vec!["Plan.md".to_string()]);
+    assert_eq!(fs::read_to_string(vault.path().join("Plan.md")).unwrap(), "the only copy");
+}
+
+#[test]
+fn a_folder_removal_never_deletes_a_file_that_took_its_name() {
+    let (vault, _config, served) = serving();
+    fs::write(vault.path().join("drafts"), "a file now").unwrap();
+    let refused = call(&served, "vault_remove", json!({ "path": "drafts", "directory": true })).unwrap_err();
+    assert_eq!(refused.0, 409);
+    assert!(vault.path().join("drafts").exists());
+}
+
+#[test]
+fn publishing_a_copy_never_replaces_and_leaves_no_partial_file() {
+    let dir = TempDir::new().unwrap();
+    let source = dir.path().join("a.md");
+    let target = dir.path().join("b.md");
+    fs::write(&source, "A").unwrap();
+    fs::write(&target, "B").unwrap();
+    assert!(publish_no_replace(&source, &target).unwrap_err().starts_with("already exists"));
+    assert_eq!(fs::read_to_string(&target).unwrap(), "B");
+    fs::remove_file(&target).unwrap();
+    publish_no_replace(&source, &target).unwrap();
+    assert_eq!(fs::read_to_string(&target).unwrap(), "A");
+    let leftovers = fs::read_dir(dir.path()).unwrap().flatten().filter(|e| e.file_name().to_string_lossy().starts_with(".rotli-write-")).count();
+    assert_eq!(leftovers, 0);
+}
