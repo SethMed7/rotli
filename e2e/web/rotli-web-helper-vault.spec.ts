@@ -149,7 +149,10 @@ async function connectThroughHelper(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Pair" }).click();
   await expect(vaultGate(page)).toHaveText("Choose your vault");
   await page.locator(".setup-button.primary", { hasText: "Choose folder…" }).click();
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  // a reload plus Welcome seeding: allow a loaded runner its time
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli", {
+    timeout: 15_000,
+  });
 }
 
 test("the installer's #pair= tab pairs the waiting setup, and an empty folder becomes the vault", async ({
@@ -169,11 +172,18 @@ test("the installer's #pair= tab pairs the waiting setup, and an empty folder be
   const installerTab = await context.newPage();
   await installerTab.goto(`${APP}#pair=${PORT}:${TOKEN}`);
   await expect(installerTab).toHaveURL((url) => !url.hash.includes(TOKEN));
+  // the person closes the extra tab (left open, it would connect too and race
+  // this one to set up the new vault — harmless, but then either may open it)
+  await expect(vaultGate(installerTab)).toBeVisible();
+  await installerTab.close();
 
   // the waiting tab moves on by itself, then the helper's picker chooses
   await expect(vaultGate(page)).toHaveText("Choose your vault", { timeout: 10_000 });
   await page.locator(".setup-button.primary", { hasText: "Choose folder…" }).click();
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  // a reload plus Welcome seeding: allow a loaded runner its time
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli", {
+    timeout: 15_000,
+  });
   // the lessons are files in the served folder, and the spine the Mac app reads
   expect(helper.files.get("wiki/Welcome/Welcome to Rotli.md")?.text).toMatch(/^# Welcome to Rotli/);
   expect(helper.files.has("memex.json")).toBe(true);
@@ -208,11 +218,15 @@ test("a helper that stops answering is waited out: the edit lands when it's back
   await helper.install(context);
   await withoutFolderApi(context);
   await connectThroughHelper(page);
-  helper.state.down = true;
   const editor = page.locator(".cm-content").first();
   await editor.click();
   await page.keyboard.press("End");
-  await page.keyboard.type(" typed-while-offline");
+  // the helper goes away between the keystrokes and their save (the editor
+  // waits a beat before saving): the SAVE meets the outage. Taking it down
+  // first raced background calls on a slow runner — the cover then (rightly)
+  // blocked the click before any typing happened
+  await page.keyboard.type(" typed-while-offline", { delay: 0 });
+  helper.state.down = true;
   await expect(page.getByRole("alertdialog", { name: /Reconnecting to “notes”/ })).toBeVisible({
     timeout: 10_000,
   });
