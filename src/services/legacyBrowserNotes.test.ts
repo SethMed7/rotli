@@ -101,6 +101,14 @@ describe("copying into the connected vault", () => {
     expect(await dir.readText("a (from this browser 2).md")).toBe("newest");
   });
 
+  test("copying an image again adds nothing: binaries are compared byte for byte", async () => {
+    const dir = new MemoryVaultDir();
+    const image = { path: "storage/p.png", base64: "AAEC", note: false };
+    expect(await copyLegacyInto(dir, [image])).toEqual({ written: 1, failed: [] });
+    expect(await copyLegacyInto(dir, [image])).toEqual({ written: 0, failed: [] });
+    expect(await dir.exists("storage/p (from this browser).png")).toBe(false);
+  });
+
   test("a file that can't be written is reported, so the browser's copy is not cleared", async () => {
     const dir = new MemoryVaultDir();
     await dir.writeText("wiki", "a FILE where a folder is needed");

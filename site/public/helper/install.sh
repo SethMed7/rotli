@@ -30,8 +30,9 @@ while [ $# -gt 0 ]; do
 done
 # the pairing code only ever goes to Rotli's own page: the WHOLE address must
 # match (a shell glob like http://localhost:*/app/ would also admit
-# http://localhost:@evil.example/app/, whose host is evil.example)
-if [ -n "$OPEN_URL" ] && { [ "$(printf '%s' "$OPEN_URL" | wc -l | tr -d ' ')" != "0" ] || ! printf '%s\n' "$OPEN_URL" | grep -Eqx 'https://(dev\.)?rotli\.co/app/|http://(localhost|127\.0\.0\.1):[0-9]{1,5}/app/'; }; then
+# http://localhost:@evil.example/app/, whose host is evil.example). Local
+# development is the web dev server's port only, the helper's own origin list.)
+if [ -n "$OPEN_URL" ] && { [ "$(printf '%s' "$OPEN_URL" | wc -l | tr -d ' ')" != "0" ] || ! printf '%s\n' "$OPEN_URL" | grep -Eqx 'https://(dev\.)?rotli\.co/app/|http://(localhost|127\.0\.0\.1):1437/app/'; }; then
   echo "rotli-helper: --open only accepts Rotli Web's own address, not $OPEN_URL" >&2
   exit 1
 fi

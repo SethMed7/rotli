@@ -89,7 +89,11 @@ opens as it is.
   `fsutil::atomic_write_bytes` under the same `.lock` sidecar the desktop
   app's writers hold (`fsutil::with_file_lock`), gated by the desktop's
   content revision (`fnv1a64`, `expectedContent`) when the page knows the text
-  it edited, else by `${mtimeMs}:${size}`; a stale write is 409. Deletes of a
+  it edited, else by `${mtimeMs}:${size}`; a stale write is 409, and a write
+  or delete of an EXISTING file with no gate at all is refused (only creating
+  a file needs none), so no token holder can clobber without saying what it
+  saw. A page can never create a `<file>.lock` sidecar (the desktop writers'
+  lock), and Windows junctions are skipped in listings like symlinks. Deletes of a
   file take the same lock and gate, so a delete decided against an older
   version never removes a newer one, and a folder removal never deletes a file
   that has taken the folder's name. A move never replaces an existing file —
@@ -125,7 +129,9 @@ opens as it is.
 - **The helper starts at login.** The installers register a LaunchAgent
   (`co.rotli.helper`), a systemd user service, or a Windows Startup shortcut,
   and `--uninstall` / `-Uninstall` removes it (`site/public/helper/`).
-- **Pairing is automatic.** `install.sh … --open <Rotli Web>` opens the page
+- **Pairing is automatic.** `install.sh … --open <Rotli Web>` (only
+  `https://rotli.co/app/`, `https://dev.rotli.co/app/`, or the dev server's
+  `http://localhost:1437/app/` — the helper's own origins) opens the page
   with `#pair=<port>:<token>`; a fragment never reaches a server, and the page
   strips it before anything else (`services/helperLink.ts`
   `adoptPairingFromUrl`). A setup tab still waiting picks the pairing up from
@@ -133,8 +139,11 @@ opens as it is.
 - **An outage mid-session** holds every write pending — the save dot stays
   dim — behind a "Reconnecting to <vault>…" cover, and replays in order when
   the helper answers; a retried write carries the revision it started from.
-  Writes still pending when the tab closes are kept in the device store and
-  replayed on the next boot; a file that changed meanwhile keeps its version
+  Writes still pending when the tab closes are kept — synchronously, in this
+  browser's localStorage, per vault, because an unloading page can't count on
+  an IndexedDB write finishing — and replayed on the next boot; the record is
+  cleared the moment an outage recovers in-session, and replay skips an edit
+  the file already holds; a file that changed meanwhile keeps its version
   and the edit lands beside it as an unsaved copy under a name nothing holds
   (`freeSiblingPath`), a queued delete of a changed file is dropped, and a
   queued folder removal isn't replayed. Records are per vault, and what a

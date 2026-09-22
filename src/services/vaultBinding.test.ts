@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
 import { MemoryVaultStore } from "../lib/browserVault";
-import { helperConnection, replayPendingOps, unsupportedBrowser } from "./vaultBinding";
+import {
+  helperConnection,
+  persistPendingOnUnload,
+  replayPendingOps,
+  unsupportedBrowser,
+} from "./vaultBinding";
 import { MemoryVaultDir } from "./vaultDir";
 
 const binding = { kind: "helper", vaultId: "hv_1", vaultName: "memex" } as const;
@@ -53,58 +58,64 @@ test("Safari and phones can't reach a folder; Zen and Firefox can, through the h
   expect(unsupportedBrowser({ kind: "live" }, "Mozilla/5.0 (Macintosh) Chrome/140")).toBeNull();
 });
 
+/** localStorage's shape, in memory: where an unloading page writes. */
+function syncStore() {
+  const values = new Map<string, string>();
+  return {
+    values,
+    getItem: (k: string) => values.get(k) ?? null,
+    setItem: (k: string, v: string) => void values.set(k, v),
+    removeItem: (k: string) => void values.delete(k),
+  };
+}
+
+const revisionOf = (stat: { lastModified: number; size: number } | null) =>
+  stat ? `${stat.lastModified}:${stat.size}` : "0";
+
 describe("edits a closed tab couldn't deliver", () => {
   test("replay onto an unchanged file, and beside a changed one — never over it", async () => {
     const dir = new MemoryVaultDir();
     await dir.writeText("wiki/a.md", "base");
     await dir.writeText("wiki/b.md", "base");
-    const a = await dir.stat("wiki/a.md");
-    const b = await dir.stat("wiki/b.md");
+    const a = revisionOf(await dir.stat("wiki/a.md"));
+    const b = revisionOf(await dir.stat("wiki/b.md"));
     await dir.writeText("wiki/b.md", "changed elsewhere");
-    const store = new MemoryVaultStore();
-    await store.set(
-      "vault-pending:hv_1",
-      JSON.stringify({
-        vaultId: "hv_1",
-        ops: [
-          { kind: "write", path: "wiki/a.md", text: "offline a", base: `${a?.lastModified}:${a?.size}` },
-          { kind: "write", path: "wiki/b.md", text: "offline b", base: `${b?.lastModified}:${b?.size}` },
-          { kind: "mkdir", path: "chats" },
-        ],
-      }),
-    );
-    expect(await replayPendingOps(dir, "hv_1", store)).toBe(3);
+    const unload = syncStore();
+    persistPendingOnUnload(unload, "hv_1", [
+      { kind: "write", path: "wiki/a.md", text: "offline a", base: a },
+      { kind: "write", path: "wiki/b.md", text: "offline b", base: b },
+      { kind: "mkdir", path: "chats" },
+    ]);
+    expect(await replayPendingOps(dir, "hv_1", new MemoryVaultStore(), unload)).toBe(3);
     expect(await dir.readText("wiki/a.md")).toBe("offline a");
     expect(await dir.readText("wiki/b.md")).toBe("changed elsewhere");
     expect(await dir.readText("wiki/b (unsaved copy).md")).toBe("offline b");
     expect(await dir.exists("chats")).toBe(true);
-    expect(await store.get("vault-pending:hv_1")).toBeUndefined();
+    expect(unload.values.size).toBe(0);
   });
 
-  test("another vault's pending edits are never replayed here", async () => {
-    const store = new MemoryVaultStore();
-    await store.set(
-      "vault-pending:hv_other",
-      JSON.stringify({ vaultId: "hv_other", ops: [{ kind: "mkdir", path: "x" }] }),
-    );
+  test("an edit that landed before the tab closed is not copied again", async () => {
     const dir = new MemoryVaultDir();
-    expect(await replayPendingOps(dir, "hv_1", store)).toBe(0);
-    expect(await dir.exists("x")).toBe(false);
+    await dir.writeText("wiki/a.md", "base");
+    const stale = revisionOf(await dir.stat("wiki/a.md"));
+    await dir.writeText("wiki/a.md", "the offline edit"); // the helper came back; it landed
+    const unload = syncStore();
+    persistPendingOnUnload(unload, "hv_1", [
+      { kind: "write", path: "wiki/a.md", text: "the offline edit", base: stale },
+    ]);
+    await replayPendingOps(dir, "hv_1", new MemoryVaultStore(), unload);
+    expect(await dir.exists("wiki/a (unsaved copy).md")).toBe(false);
   });
 
   test("a second conflict never overwrites the first unsaved copy", async () => {
     const dir = new MemoryVaultDir();
     await dir.writeText("wiki/a.md", "changed elsewhere");
     await dir.writeText("wiki/a (unsaved copy).md", "the first offline edit");
-    const store = new MemoryVaultStore();
-    await store.set(
-      "vault-pending:hv_1",
-      JSON.stringify({
-        vaultId: "hv_1",
-        ops: [{ kind: "write", path: "wiki/a.md", text: "second", base: "stale" }],
-      }),
-    );
-    expect(await replayPendingOps(dir, "hv_1", store)).toBe(1);
+    const unload = syncStore();
+    persistPendingOnUnload(unload, "hv_1", [
+      { kind: "write", path: "wiki/a.md", text: "second", base: "stale" },
+    ]);
+    expect(await replayPendingOps(dir, "hv_1", new MemoryVaultStore(), unload)).toBe(1);
     expect(await dir.readText("wiki/a (unsaved copy).md")).toBe("the first offline edit");
     expect(await dir.readText("wiki/a (unsaved copy 2).md")).toBe("second");
   });
@@ -112,22 +123,16 @@ describe("edits a closed tab couldn't deliver", () => {
   test("a delete decided while offline never removes a note changed meanwhile", async () => {
     const dir = new MemoryVaultDir();
     await dir.writeText("wiki/a.md", "old");
-    const stale = await dir.stat("wiki/a.md");
+    const stale = revisionOf(await dir.stat("wiki/a.md"));
     await dir.writeText("wiki/a.md", "newer, from the Mac app");
     await dir.writeText("wiki/b.md", "untouched");
-    const b = await dir.stat("wiki/b.md");
-    const store = new MemoryVaultStore();
-    await store.set(
-      "vault-pending:hv_1",
-      JSON.stringify({
-        vaultId: "hv_1",
-        ops: [
-          { kind: "remove", path: "wiki/a.md", base: `${stale?.lastModified}:${stale?.size}` },
-          { kind: "remove", path: "wiki/b.md", base: `${b?.lastModified}:${b?.size}` },
-        ],
-      }),
-    );
-    await replayPendingOps(dir, "hv_1", store);
+    const b = revisionOf(await dir.stat("wiki/b.md"));
+    const unload = syncStore();
+    persistPendingOnUnload(unload, "hv_1", [
+      { kind: "remove", path: "wiki/a.md", base: stale },
+      { kind: "remove", path: "wiki/b.md", base: b },
+    ]);
+    await replayPendingOps(dir, "hv_1", new MemoryVaultStore(), unload);
     expect(await dir.readText("wiki/a.md")).toBe("newer, from the Mac app");
     expect(await dir.exists("wiki/b.md")).toBe(false);
   });
@@ -135,20 +140,31 @@ describe("edits a closed tab couldn't deliver", () => {
   test("a change that can't be replayed yet is kept for the next boot, not dropped", async () => {
     const dir = new MemoryVaultDir();
     const store = new MemoryVaultStore();
-    const ops = [{ kind: "move", from: "missing.md", to: "b.md" }];
-    await store.set("vault-pending:hv_1", JSON.stringify({ vaultId: "hv_1", ops }));
-    expect(await replayPendingOps(dir, "hv_1", store)).toBe(0);
-    // retained under the vault's own key, which no unload overwrites
-    expect(await store.get("vault-pending:hv_1")).toBeUndefined();
+    const unload = syncStore();
+    const ops = [{ kind: "move", from: "missing.md", to: "b.md" }] as const;
+    persistPendingOnUnload(unload, "hv_1", ops);
+    expect(await replayPendingOps(dir, "hv_1", store, unload)).toBe(0);
+    // retained under the vault's own kept key; the unload record is consumed
+    expect(unload.values.size).toBe(0);
     expect(JSON.parse((await store.get("vault-pending:kept:hv_1")) ?? "{}")).toEqual({
       vaultId: "hv_1",
       ops,
     });
-    // the next unload writes its own record; the kept one survives it
-    await store.set("vault-pending:hv_1", JSON.stringify({ vaultId: "hv_1", ops: [] }));
-    expect(await store.get("vault-pending:kept:hv_1")).toBeDefined();
-    // and the next boot tries it again (still failing, still kept)
-    expect(await replayPendingOps(dir, "hv_1", store)).toBe(0);
+    // the next unload (nothing pending) can't touch it, and the next boot retries it
+    persistPendingOnUnload(unload, "hv_1", []);
+    expect(await replayPendingOps(dir, "hv_1", store, unload)).toBe(0);
     expect(JSON.parse((await store.get("vault-pending:kept:hv_1")) ?? "{}").ops).toEqual(ops);
+  });
+
+  test("one vault's unload never touches another vault's record, and it isn't replayed there", async () => {
+    const unload = syncStore();
+    persistPendingOnUnload(unload, "hv_a", [{ kind: "mkdir", path: "x" }]);
+    persistPendingOnUnload(unload, "hv_b", []); // vault B closes with nothing pending
+    expect(unload.values.has("rotli-vault-pending:hv_a")).toBe(true);
+    const dir = new MemoryVaultDir();
+    expect(await replayPendingOps(dir, "hv_b", new MemoryVaultStore(), unload)).toBe(0);
+    expect(await dir.exists("x")).toBe(false);
+    expect(await replayPendingOps(dir, "hv_a", new MemoryVaultStore(), unload)).toBe(1);
+    expect(await dir.exists("x")).toBe(true);
   });
 });

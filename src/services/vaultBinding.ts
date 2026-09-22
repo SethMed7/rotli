@@ -26,9 +26,6 @@ import {
 } from "./webVaultFolder";
 
 const BINDING_KEY = "vault-binding";
-/** What a tab's unload left unacknowledged, per vault: an unload of vault B
- * never touches vault A's record. */
-const pendingKey = (vaultId: string) => `vault-pending:${vaultId}`;
 /** Operations a replay couldn't finish yet, per vault: their own key, so the
  * next page's unload (which rewrites the unload record) can never drop them. */
 const keptKey = (vaultId: string) => `vault-pending:kept:${vaultId}`;
@@ -210,6 +207,11 @@ export function helperVaultDir(link: HelperLink, vaultId: string): HelperVaultDi
     ping: async () => (await helperHealth(link.port)).ok === true,
     unreachable: helperUnreachable,
     onReconnecting: (reconnecting) => useVaultConnection.getState().setReconnecting(reconnecting),
+    // everything acknowledged (an outage recovered in-session): an unload
+    // record written during the outage must not replay a landed edit
+    onDrained: () => {
+      if (typeof window !== "undefined") persistPendingOnUnload(window.localStorage, vaultId, []);
+    },
   });
   if (typeof document !== "undefined") {
     // back to the front: another app may have changed the vault meanwhile
@@ -240,28 +242,54 @@ interface PendingRecord {
  * is kept on this device, so a closed tab doesn't lose the last edits. */
 function watchPendingOps(dir: HelperVaultDir, vaultId: string): void {
   if (typeof window === "undefined") return;
-  window.addEventListener("pagehide", () => {
-    const ops = dir.pendingOps();
-    const store = deviceVaultStore();
-    if (ops.length === 0) void store.delete(pendingKey(vaultId)).catch(() => {});
-    else
-      void store
-        .set(pendingKey(vaultId), JSON.stringify({ vaultId, ops } satisfies PendingRecord))
-        .catch(() => {});
-  });
+  window.addEventListener("pagehide", () =>
+    persistPendingOnUnload(window.localStorage, vaultId, dir.pendingOps()),
+  );
+}
+
+type SyncStore = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+
+/** The unload record for one vault: in this browser's localStorage, because
+ * an unloading page can only rely on a SYNCHRONOUS write (IndexedDB may not
+ * finish). Per vault, so one vault's unload never touches another's. */
+const unloadKey = (vaultId: string) => `rotli-vault-pending:${vaultId}`;
+
+/** Write (or clear) what the helper hasn't acknowledged, now. Storage that
+ * refuses (quota: a large binary) leaves the journal of note text as the
+ * backstop. Exported for tests. */
+export function persistPendingOnUnload(storage: SyncStore, vaultId: string, ops: readonly PendingOp[]): void {
+  try {
+    if (ops.length === 0) storage.removeItem(unloadKey(vaultId));
+    else storage.setItem(unloadKey(vaultId), JSON.stringify({ vaultId, ops } satisfies PendingRecord));
+  } catch {
+    // quota or a blocked store: nothing more an unloading page can do
+  }
+}
+
+function readUnloadRecord(storage: SyncStore | null, vaultId: string): PendingRecord | null {
+  try {
+    const raw = storage?.getItem(unloadKey(vaultId));
+    const record = raw ? (JSON.parse(raw) as PendingRecord) : null;
+    return record?.vaultId === vaultId && Array.isArray(record.ops) ? record : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Replay edits a previous tab couldn't deliver, each against the revision
  * it started from. A file that changed meanwhile is never overwritten: the
  * edit lands beside it as an unsaved copy. Resolves the count replayed. */
 export async function replayPendingOps(
-  dir: Pick<VaultDir, "writeText" | "writeBytes" | "mkdir" | "move" | "remove" | "stat" | "exists">,
+  dir: Pick<
+    VaultDir,
+    "writeText" | "writeBytes" | "readText" | "mkdir" | "move" | "remove" | "stat" | "exists"
+  >,
   vaultId: string,
   store = deviceVaultStore(),
+  unload: SyncStore | null = typeof window === "undefined" ? null : window.localStorage,
 ): Promise<number> {
   const kept = await readRecord(store, keptKey(vaultId));
-  const last = await readRecord(store, pendingKey(vaultId));
-  const lastHere = last?.vaultId === vaultId ? last : null;
+  const lastHere = readUnloadRecord(unload, vaultId);
   const ops = [...(kept?.ops ?? []), ...(lastHere?.ops ?? [])];
   if (ops.length === 0) return 0;
   let replayed = 0;
@@ -269,6 +297,11 @@ export async function replayPendingOps(
   for (const op of ops) {
     try {
       if (op.kind === "write") {
+        // it landed after all (the helper came back before this tab closed)
+        if (op.text !== undefined && (await dir.readText(op.path).catch(() => null)) === op.text) {
+          replayed += 1;
+          continue;
+        }
         const now = await dir.stat(op.path);
         const current = now ? `${now.lastModified}:${now.size}` : "0";
         const target = current === op.base ? op.path : await freeSiblingPath(dir, op.path, "unsaved copy");
@@ -298,6 +331,6 @@ export async function replayPendingOps(
   // throws here, and both records stay for the next boot
   if (retained.length === 0) await store.delete(keptKey(vaultId));
   else await store.set(keptKey(vaultId), JSON.stringify({ vaultId, ops: retained } satisfies PendingRecord));
-  if (lastHere) await store.delete(pendingKey(vaultId));
+  if (lastHere) unload?.removeItem(unloadKey(vaultId));
   return replayed;
 }

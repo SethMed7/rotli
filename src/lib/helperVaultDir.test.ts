@@ -87,10 +87,12 @@ function fakeHelper(disk = new MemoryVaultDir()) {
     }
   };
   const reconnecting: boolean[] = [];
+  const drained: number[] = [];
   const dir = new HelperVaultDir(call, {
     ping: async () => !down,
     unreachable: (error) => error instanceof TypeError,
     onReconnecting: (value) => reconnecting.push(value),
+    onDrained: () => drained.push(Date.now()),
     freshMs: 60_000,
     retryMs: 5,
   });
@@ -99,6 +101,7 @@ function fakeHelper(disk = new MemoryVaultDir()) {
     disk,
     calls,
     reconnecting,
+    drained,
     setDown: (value: boolean) => {
       down = value;
     },
@@ -229,6 +232,8 @@ describe("an outage", () => {
     expect(await fake.disk.readText("wiki/a.md")).toBe("two");
     expect(fake.dir.pendingOps()).toEqual([]);
     expect(fake.reconnecting).toEqual([true, false]);
+    // recovered in-session: the unload record written during the outage is cleared
+    expect(fake.drained.length).toBeGreaterThan(0);
   });
 
   test("a retried write is refused when the file changed on disk meanwhile", async () => {

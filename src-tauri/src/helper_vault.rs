@@ -43,7 +43,7 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::Engine as _;
-use serde_json::{json, Map, Value};
+use serde_json::{json, Value};
 
 use crate::containment::resolve_beneath;
 
@@ -291,6 +291,11 @@ fn refuse_git(rel: &[String]) -> Result<(), Refusal> {
     if in_git(rel) {
         return Err((403, "Rotli never writes inside .git".into()));
     }
+    // `<file>.lock` is the desktop writers' lock sidecar: a page that could
+    // create one could stall every desktop save of that file
+    if rel.last().is_some_and(|name| name.to_ascii_lowercase().ends_with(".lock")) {
+        return Err((403, "lock files belong to Rotli's writers".into()));
+    }
     Ok(())
 }
 
@@ -319,6 +324,11 @@ fn stale_revision(path: &Path, args: &Value) -> Result<Option<String>, String> {
         let current = revision_of(path);
         return Ok(if current == expected { None } else { conflict(current) });
     }
+    // no gate at all: fine for creating a file, never for replacing or
+    // deleting one — a client that doesn't say what it saw can't clobber
+    if path.is_file() {
+        return Ok(Some("revision conflict: replacing or deleting a file needs expectedContent or expectedRevision".into()));
+    }
     Ok(None)
 }
 
@@ -334,109 +344,6 @@ fn joined(rel: &[String]) -> String {
 }
 
 // ── verbs ─────────────────────────────────────────────────────────────────────
-
-/// Every file and directory beneath `rel`, one call: what the page's notes
-/// service would otherwise ask for one `stat` at a time.
-fn walk(root: &Path, rel: &[String]) -> Result<Value, Refusal> {
-    let start = resolve(root, rel)?;
-    let mut out = Vec::new();
-    if fs::symlink_metadata(&start).is_ok_and(|m| m.is_dir()) {
-        walk_into(&start, &joined(rel), &mut out)?;
-    }
-    Ok(Value::Array(out))
-}
-
-fn walk_into(dir: &Path, prefix: &str, out: &mut Vec<Value>) -> Result<(), Refusal> {
-    let Ok(entries) = fs::read_dir(dir) else { return Ok(()) };
-    for entry in entries.flatten() {
-        let Some(name) = entry.file_name().to_str().map(str::to_string) else { continue };
-        // file_type() does not follow links: a symlink is neither, and skipped
-        let Ok(kind) = entry.file_type() else { continue };
-        let path = if prefix.is_empty() { name.clone() } else { format!("{prefix}/{name}") };
-        if kind.is_dir() {
-            if skipped_dir(&name) {
-                continue;
-            }
-            let metadata = entry.metadata().map_err(|e| (500, e.to_string()))?;
-            out.push(json!({ "path": path, "kind": "directory", "lastModified": millis(metadata.modified()), "size": 0 }));
-            if out.len() > MAX_WALK_ENTRIES {
-                return Err((413, "This folder holds too many files to be a notes vault.".into()));
-            }
-            walk_into(&entry.path(), &path, out)?;
-        } else if kind.is_file() {
-            let metadata = entry.metadata().map_err(|e| (500, e.to_string()))?;
-            out.push(json!({ "path": path, "kind": "file", "lastModified": millis(metadata.modified()), "size": metadata.len() }));
-            if out.len() > MAX_WALK_ENTRIES {
-                return Err((413, "This folder holds too many files to be a notes vault.".into()));
-            }
-        }
-    }
-    Ok(())
-}
-
-fn list(root: &Path, rel: &[String]) -> Result<Value, Refusal> {
-    let dir = resolve(root, rel)?;
-    let Ok(entries) = fs::read_dir(&dir) else { return Ok(json!([])) };
-    let mut out: Vec<(String, &str)> = Vec::new();
-    for entry in entries.flatten() {
-        let Some(name) = entry.file_name().to_str().map(str::to_string) else { continue };
-        let Ok(kind) = entry.file_type() else { continue };
-        if kind.is_dir() && !skipped_dir(&name) {
-            out.push((name, "directory"));
-        } else if kind.is_file() {
-            out.push((name, "file"));
-        }
-    }
-    out.sort();
-    Ok(Value::Array(out.into_iter().map(|(name, kind)| json!({ "name": name, "kind": kind })).collect()))
-}
-
-fn stat(root: &Path, rel: &[String]) -> Result<Value, Refusal> {
-    let path = resolve(root, rel)?;
-    match fs::symlink_metadata(&path) {
-        Ok(m) if m.is_file() || m.is_dir() => Ok(stat_json(&m)),
-        _ => Ok(Value::Null),
-    }
-}
-
-fn read(root: &Path, rel: &[String], encoding: Option<&str>) -> Result<Value, Refusal> {
-    let path = resolve(root, rel)?;
-    let bytes = match fs::read(&path) {
-        Ok(bytes) => bytes,
-        Err(e) if e.kind() == ErrorKind::NotFound => return Err((404, format!("no such file: {}", joined(rel)))),
-        Err(e) => return Err((500, format!("couldn't read {}: {e}", joined(rel)))),
-    };
-    Ok(Value::String(if encoding == Some("base64") {
-        base64::engine::general_purpose::STANDARD.encode(&bytes)
-    } else {
-        String::from_utf8_lossy(&bytes).into_owned()
-    }))
-}
-
-/// Many texts in one answer, up to a budget; `more` lists what didn't fit.
-fn read_many(root: &Path, args: &Value) -> Result<Value, Refusal> {
-    let paths = args.get("paths").and_then(Value::as_array).ok_or((400, "\"paths\" is required".to_string()))?;
-    let mut files = Map::new();
-    let mut more = Vec::new();
-    let mut spent = 0usize;
-    for raw in paths {
-        let raw = raw.as_str().ok_or((400, "every path must be a string".to_string()))?;
-        if spent >= READ_MANY_BUDGET {
-            more.push(Value::String(raw.to_string()));
-            continue;
-        }
-        let rel = parse_rel(raw).map_err(|e| (400, e))?;
-        let text = match read(root, &rel, None) {
-            Ok(Value::String(text)) => Value::String(text),
-            Err((404, _)) => Value::Null,
-            Err(refusal) => return Err(refusal),
-            Ok(_) => Value::Null,
-        };
-        spent += text.as_str().map_or(0, str::len);
-        files.insert(raw.to_string(), text);
-    }
-    Ok(json!({ "files": files, "more": more }))
-}
 
 fn write(root: &Path, args: &Value) -> Result<Value, Refusal> {
     let rel = path_arg(args, "path")?;
@@ -586,6 +493,10 @@ fn remove(root: &Path, rel: &[String], args: &Value) -> Result<Value, Refusal> {
         Ok(_) => fs::remove_file(&path).map(|()| Value::Null).map_err(|e| (500, e.to_string())),
     }
 }
+
+#[path = "helper_vault_read.rs"]
+mod read_verbs;
+use read_verbs::{list, read, read_many, stat, walk};
 
 #[cfg(test)]
 #[path = "helper_vault_tests.rs"]

@@ -98,8 +98,15 @@ export async function legacyBrowserFiles(vault: BrowserVault = browserStorageVau
 /** The vault already has this file's text, at its path or in an earlier
  * "(from this browser …)" copy beside it — copying again adds nothing. */
 async function alreadyHolds(dir: VaultDir, path: string, file: LegacyFile): Promise<boolean> {
-  if (file.text === undefined) return false;
-  const same = async (at: string) => (await dir.readText(at).catch(() => null)) === file.text;
+  // text compares as text; a binary (base64) compares byte for byte
+  const same = async (at: string) =>
+    file.text !== undefined
+      ? (await dir.readText(at).catch(() => null)) === file.text
+      : file.base64 !== undefined &&
+        (await dir
+          .readBytes(at)
+          .then((bytes) => btoa(String.fromCharCode(...bytes)) === file.base64)
+          .catch(() => false));
   if (await same(path)) return true;
   for (let n = 1; ; n += 1) {
     const copy = siblingPath(path, "from this browser", n);

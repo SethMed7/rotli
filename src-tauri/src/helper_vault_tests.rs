@@ -139,7 +139,11 @@ fn move_mkdir_and_remove_follow_the_page_port() {
     call(&served, "vault_mkdir", json!({ "path": "chats/2026" })).unwrap();
     call(&served, "vault_mkdir", json!({ "path": "chats/2026" })).unwrap();
     assert_eq!(call(&served, "vault_remove", json!({ "path": "wiki/Welcome" })).unwrap_err().0, 409);
-    call(&served, "vault_remove", json!({ "path": "wiki/Welcome/a.md" })).unwrap();
+    // deleting a file says which version it decided against
+    let ungated = call(&served, "vault_remove", json!({ "path": "wiki/Welcome/a.md" })).unwrap_err();
+    assert_eq!(ungated.0, 409);
+    let known = crate::fsutil::revision(b"A");
+    call(&served, "vault_remove", json!({ "path": "wiki/Welcome/a.md", "expectedContent": known })).unwrap();
     call(&served, "vault_remove", json!({ "path": "wiki/Welcome" })).unwrap();
     call(&served, "vault_remove", json!({ "path": "wiki/Welcome" })).unwrap();
     assert_eq!(call(&served, "vault_remove", json!({ "path": "" })).unwrap_err().0, 400);
@@ -327,4 +331,25 @@ fn publishing_a_copy_never_replaces_and_leaves_no_partial_file() {
     assert_eq!(fs::read_to_string(&target).unwrap(), "A");
     let leftovers = fs::read_dir(dir.path()).unwrap().flatten().filter(|e| e.file_name().to_string_lossy().starts_with(".rotli-write-")).count();
     assert_eq!(leftovers, 0);
+}
+
+#[test]
+fn replacing_a_file_needs_a_gate_but_creating_one_does_not() {
+    let (_vault, _config, served) = serving();
+    call(&served, "vault_write", json!({ "path": "a.md", "text": "new" })).unwrap();
+    let ungated = call(&served, "vault_write", json!({ "path": "a.md", "text": "clobber" })).unwrap_err();
+    assert_eq!(ungated.0, 409);
+    assert_eq!(call(&served, "vault_read", json!({ "path": "a.md" })).unwrap(), "new");
+}
+
+#[test]
+fn a_page_can_never_create_a_writers_lock_sidecar() {
+    let (vault, _config, served) = serving();
+    for (command, args) in [
+        ("vault_write", json!({ "path": "wiki/a.md.lock", "text": "x" })),
+        ("vault_mkdir", json!({ "path": "wiki/b.md.LOCK" })),
+    ] {
+        assert_eq!(call(&served, command, args).unwrap_err().0, 403, "{command}");
+    }
+    assert!(!vault.path().join("wiki/a.md.lock").exists());
 }

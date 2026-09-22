@@ -55,6 +55,8 @@ export interface HelperVaultDirOptions {
   unreachable: (error: unknown) => boolean;
   /** The overlay's switch: true while calls wait for the helper. */
   onReconnecting?: (reconnecting: boolean) => void;
+  /** Every mutation acknowledged: nothing is pending any more. */
+  onDrained?: () => void;
   /** How long one walk answers list/stat/exists (default 2 s). */
   freshMs?: number;
   /** How often an outage re-asks (default 1.5 s). */
@@ -184,6 +186,7 @@ export class HelperVaultDir implements VaultDir {
       this.mutations += 1;
       const at = this.pending.indexOf(op);
       if (at >= 0) this.pending.splice(at, 1);
+      if (this.pending.length === 0) this.options.onDrained?.();
     };
     run.then(settle, settle);
     this.chain = run.catch(() => undefined);
