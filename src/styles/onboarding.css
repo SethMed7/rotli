@@ -640,6 +640,49 @@
   color: var(--success);
 }
 
+/* Rotli Web's first screen: what the browser's own picker is about to do,
+   said in Rotli's voice before it opens (the same lines the Connect dialog
+   shows once a vault exists). */
+.web-vault-gate-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 590px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+/* Rotli Web lost Rotli Helper mid-session: the editor waits under the flat
+   scrim (writes stay pending) until the helper answers again. Above every
+   dialog; the card takes focus so typing stops while nothing can save. */
+.web-vault-reconnecting {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+}
+.web-vault-reconnecting-card {
+  width: min(28rem, calc(100vw - 32px));
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-card);
+  outline: none;
+}
+.web-vault-reconnecting-card h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+.web-vault-reconnecting-card p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .setup-warning,
 .setup-error {
   padding: 8px 10px;

@@ -1,14 +1,23 @@
 # Rotli Helper installer - Windows (PowerShell).
 #
-#   irm https://rotli.co/helper/install.ps1 | iex
+#   & ([scriptblock]::Create((irm https://rotli.co/helper/install.ps1))) -Open https://rotli.co/app/
 #
 # Downloads the prebuilt rotli-helper.exe for this computer into
 # %USERPROFILE%\.rotli\bin, checks its SHA-256 against the release's checksum
-# file, and starts it, which prints the pairing code Rotli Web asks for. No
-# PATH edits, no admin rights, no services. Run
-# & "$HOME\.rotli\bin\rotli-helper.exe" later to start it again; delete the
-# file to uninstall.
+# file, and adds a shortcut to your Startup folder so it starts when you log
+# in (the vault Rotli Web opens through it stays connected across reboots).
+# With -Open, it then opens Rotli Web with the pairing code in the URL
+# fragment (#pair=...), which the browser never sends to any server. No PATH
+# edits, no admin rights. It listens on 127.0.0.1 only and touches only the
+# vault folder you choose. -Uninstall stops it and removes it.
+param([string]$Open = "", [switch]$Uninstall)
 $ErrorActionPreference = "Stop"
+
+# the pairing code only ever goes to Rotli's own page
+if ($Open -and $Open -notmatch '^(https://(dev\.)?rotli\.co|http://(localhost|127\.0\.0\.1):\d+)/app/$') {
+  throw "rotli-helper: -Open only accepts Rotli Web's own address, not $Open"
+}
+$startup = Join-Path ([Environment]::GetFolderPath("Startup")) "Rotli Helper.lnk"
 
 $version = if ($env:ROTLI_HELPER_VERSION) { $env:ROTLI_HELPER_VERSION } else { "1.2.0" }
 $releases = if ($env:ROTLI_HELPER_RELEASES) { $env:ROTLI_HELPER_RELEASES } else { "https://github.com/SethMed7/rotli-releases/releases/download" }
@@ -20,7 +29,16 @@ $asset = "rotli-helper-windows-$arch.exe"
 $url = "$releases/helper-v$version/$asset"
 $sumsUrl = "$releases/helper-v$version/SHA256SUMS"
 
+if ($Uninstall) {
+  Get-Process -Name "rotli-helper" -ErrorAction SilentlyContinue | Stop-Process -Force
+  Remove-Item -Force $startup, $dest -ErrorAction SilentlyContinue
+  Write-Host "Rotli Helper is stopped and removed. Your vault folder is untouched."
+  Write-Host "Its pairing code and vault choice stay in $HOME\.rotli-helper; delete that folder to forget them too."
+  return
+}
+
 if ($env:ROTLI_HELPER_DRY_RUN -eq "1") {
+  Write-Host "would add $startup and open $(if ($Open) { $Open } else { 'nothing' })"
   Write-Host "would download $url"
   Write-Host "would install to $dest"
   return
@@ -54,11 +72,34 @@ try {
     Write-Host "This release publishes no checksum file; installing unverified."
   }
   New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+  # an upgrade replaces a running helper
+  Get-Process -Name "rotli-helper" -ErrorAction SilentlyContinue | Stop-Process -Force
   Move-Item -Force (Join-Path $tmp $asset) $dest
   Write-Host "Installed to $dest"
-  Write-Host "Starting it now - keep this window open while you chat (Ctrl+C stops it)."
+
+  # start at login (a minimized window), and now
+  $shell = New-Object -ComObject WScript.Shell
+  $link = $shell.CreateShortcut($startup)
+  $link.TargetPath = $dest
+  $link.WindowStyle = 7
+  $link.Save()
+  Start-Process -FilePath $dest -WindowStyle Hidden
+  Write-Host "Rotli Helper starts when you log in (Startup folder shortcut)."
+
+  $ready = $false
+  for ($i = 0; $i -lt 50 -and -not $ready; $i++) {
+    try { Invoke-WebRequest -Uri "http://127.0.0.1:43111/health" -UseBasicParsing -TimeoutSec 1 | Out-Null; $ready = $true }
+    catch { Start-Sleep -Milliseconds 200 }
+  }
+  if (-not $ready) { throw "rotli-helper: it didn't start." }
+  $code = ((& $dest --print-code) -replace '^Pairing code: ', '').Trim()
   Write-Host ""
-  & $dest
+  Write-Host "Pairing code: $code"
+  if ($Open) {
+    Write-Host "Opening Rotli Web to pair..."
+    Start-Process "$Open#pair=$code"
+  }
+  Write-Host "Done. Rotli Web pairs with it automatically; if it asks, paste the code above."
 } finally {
   Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
 }

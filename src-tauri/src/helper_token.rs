@@ -36,15 +36,22 @@ pub(crate) fn load_or_create_token(dir: &Path, reset: bool) -> Result<String, St
             }
         }
     }
-    std::fs::create_dir_all(dir)
-        .map_err(|error| format!("couldn't create {}: {error}", dir.display()))?;
-    set_private(dir, 0o700)?;
+    ensure_private_dir(dir)?;
     let token = new_token();
     write_private(&path, &token)?;
     Ok(token)
 }
 
-fn write_private(path: &Path, token: &str) -> Result<(), String> {
+/// The helper's own directory, owner-only (0700): the token and the served
+/// vault's config live here.
+pub(crate) fn ensure_private_dir(dir: &Path) -> Result<(), String> {
+    std::fs::create_dir_all(dir)
+        .map_err(|error| format!("couldn't create {}: {error}", dir.display()))?;
+    set_private(dir, 0o700)
+}
+
+/// Write a file created owner-only (0600) — the token, the vault config.
+pub(crate) fn write_private(path: &Path, token: &str) -> Result<(), String> {
     let mut options = std::fs::OpenOptions::new();
     options.write(true).create(true).truncate(true);
     // created private — never world-readable for even an instant

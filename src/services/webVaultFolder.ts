@@ -47,11 +47,6 @@ export function browserFolderSupportSync(): FolderSupport {
   return { kind: "import-only", browser };
 }
 
-/** The same answer, for callers that already await. */
-export function browserFolderSupport(): Promise<FolderSupport> {
-  return Promise.resolve(browserFolderSupportSync());
-}
-
 export async function loadVaultHandle(): Promise<FileSystemDirectoryHandle | null> {
   if (typeof indexedDB === "undefined") return null;
   try {
@@ -106,8 +101,8 @@ export async function reconnectFolderVault(): Promise<boolean> {
   return true;
 }
 
-/** Forget the folder and go back to notes in this browser's storage. The
- * folder itself is untouched. */
+/** Forget the folder (setup asks again after the reload). The folder itself
+ * is untouched. */
 export async function disconnectFolderVault(): Promise<void> {
   await saveVaultHandle(null);
   window.location.reload();

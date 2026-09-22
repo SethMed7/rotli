@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
-import { HELPER_COMMANDS, HELPER_DEFAULT_PORT, helperBaseUrl, parsePairingCode } from "./helperPairing";
+import {
+  HELPER_COMMANDS,
+  HELPER_DEFAULT_PORT,
+  HELPER_VAULT_COMMANDS,
+  helperBaseUrl,
+  pairingFromHash,
+  parsePairingCode,
+} from "./helperPairing";
 
 const TOKEN = "abcdefghijklmnopqrstuvwxyz0123456789";
 
@@ -25,4 +32,17 @@ describe("helper pairing", () => {
     expect(HELPER_COMMANDS.has("model_usage")).toBe(true);
     expect(HELPER_COMMANDS.has("corpus_read")).toBe(false);
   });
+});
+
+test("the installer's #pair= fragment carries a code; anything else is ignored", () => {
+  const token = "a".repeat(64);
+  expect(pairingFromHash(`#pair=43111:${token}`)).toBe(`43111:${token}`);
+  expect(pairingFromHash(`#pair=${encodeURIComponent(`43111:${token}`)}`)).toBe(`43111:${token}`);
+  expect(pairingFromHash("#pair=nope")).toBeNull();
+  expect(pairingFromHash(`#other=43111:${token}`)).toBeNull();
+  expect(pairingFromHash("")).toBeNull();
+});
+
+test("vault verbs are never AI commands", () => {
+  for (const verb of HELPER_VAULT_COMMANDS) expect(HELPER_COMMANDS.has(verb)).toBe(false);
 });

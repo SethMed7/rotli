@@ -84,7 +84,7 @@ bun run preview  # serve the built dist/ locally
   The bundle is built by the `app` stage of `site/Dockerfile` (repository
   root, `ROTLI_WEB_BASE=/app/ ROTLI_PLATFORM=web bun run build`) and served
   by the `handle /app/*` block in `site/Caddyfile` under its own headers
-  (`connect-src` loopback only, for Rotli Helper; inline styles allowed for the editors; `noindex`).
+  (`connect-src http://127.0.0.1:*` only, for Rotli Helper — held by `check:web-privacy`; inline styles allowed for the editors; `noindex`).
   Design and phases: `docs/design/web-version-and-shell-batch-2026-09-16.md`.
 - **Locally, `/app/` on the site is the web app's dev server.** `astro dev` and
   `astro preview` have no Caddy and no Docker `app` stage, so they pass `/app/`
@@ -335,5 +335,11 @@ release capabilities. These source changes do not deploy the site.
 at `rotli.co/helper/…`. They download the prebuilt `rotli-helper` for the
 user's OS from the releases repository (tag `helper-v<version>`, published
 by the `Rotli Helper release` workflow), verify the checksum, install it to
-`~/.rotli/bin`, and start it. Bump the version in both scripts with the
-crate version.
+`~/.rotli/bin`, register it to start at login (LaunchAgent `co.rotli.helper`,
+systemd user service `rotli-helper`, or a Windows Startup shortcut), and — with
+`--open <Rotli Web>` / `-Open` — open the app with the pairing code in the URL
+fragment. `--open` accepts only Rotli's own addresses; `--uninstall` /
+`-Uninstall` removes the login item and the binary. Bump the version in both
+scripts with the crate version, and publish that `helper-v<version>` release
+BEFORE deploying a site whose scripts point at it — Rotli Web needs a helper
+with the vault verbs, and an older one reads as "outdated".

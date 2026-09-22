@@ -10,6 +10,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Rotli Web needs a vault, and sets one up first.** Nothing opens until a
+  vault folder on your computer is connected, so a note can only ever be a real
+  file there. Chrome, Edge, and Arc pick the folder directly; Zen, Firefox, and
+  Brave use Rotli Helper, which now saves your notes into the folder you choose
+  instead of keeping a copy in the browser. An empty folder becomes a new vault
+  with the Welcome lessons; an existing vault opens as it is. Safari and phones
+  are told plainly that they can't connect a vault yet.
+- **Rotli Helper starts when you log in and pairs itself.** The install line
+  registers it as a login item and opens Rotli Web already paired; `--uninstall`
+  removes it. It serves only the one folder you pick with your computer's own
+  folder picker.
+- **Nothing leaves your computer.** Rotli Web may talk only to Rotli Helper on
+  this computer; a new check fails the build if that ever widens, and a test
+  proves the app never asks. Notes kept inside the browser by an earlier
+  version are offered for copying into your vault.
+
+### Fixed
+
+- **Connecting a vault on Rotli Web no longer bounces you back.** In Zen,
+  Firefox, and Safari an empty folder looked exactly like a cancelled picker
+  and nothing happened.
+- **A lost connection never lands notes somewhere else.** A vault that can't be
+  reached at startup shows a reconnect screen naming it, instead of quietly
+  opening an older copy in the browser; a helper that stops answering holds
+  your edits until it is back.
+- **A hard refresh right after typing keeps what you typed.**
+- **Welcome lessons in a connected folder are ordinary notes**, not Captures,
+  in Rotli Web and in Rotli for Mac.
+
 ## [1.3.0] - 2026-09-21
 
 ### Added

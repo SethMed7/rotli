@@ -37,11 +37,17 @@ export class HelperHttpError extends Error {
 
 /** One command to the helper. A non-2xx answer becomes an Error carrying the
  * helper's own message, so the chat shows the tool's words, not a status. */
-export async function helperRpc<T>(link: HelperLink, cmd: string, args: Record<string, unknown>): Promise<T> {
+export async function helperRpc<T>(
+  link: HelperLink,
+  cmd: string,
+  args: Record<string, unknown>,
+  options: { timeoutMs?: number | undefined } = {},
+): Promise<T> {
   const response = await fetch(`${helperBaseUrl(link.port)}/rpc`, {
     method: "POST",
     headers: { authorization: `Bearer ${link.token}`, "content-type": "application/json" },
     body: JSON.stringify({ cmd, args }),
+    ...(options.timeoutMs ? { signal: AbortSignal.timeout(options.timeoutMs) } : {}),
   });
   const text = await response.text();
   let body: unknown = null;
@@ -61,4 +67,12 @@ export async function helperRpc<T>(link: HelperLink, cmd: string, args: Record<s
   }
   if (body && typeof body === "object" && "result" in body) return (body as { result: T }).result;
   return body as T;
+}
+
+/** Nothing answered: the helper isn't running, or it hung past a deadline.
+ * Every other failure is an answer (a refusal, a tool error) and says so. */
+export function helperUnreachable(error: unknown): boolean {
+  if (error instanceof HelperHttpError) return false;
+  if (error instanceof TypeError) return true; // fetch's "network error"
+  return error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError");
 }

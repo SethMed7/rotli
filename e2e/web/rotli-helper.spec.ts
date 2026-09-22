@@ -5,7 +5,8 @@
 
 import { expect, test } from "@playwright/test";
 
-const APP = "/app/";
+import { startWithVault } from "./support";
+
 const PORT = 43111;
 const TOKEN = "fixture-token-with-at-least-twenty-four-chars";
 const HELPER = `http://127.0.0.1:${PORT}`;
@@ -71,8 +72,7 @@ test("pairing with the helper turns Chat on; a message goes through it and the r
 }) => {
   const calls: { cmd: string; args: unknown }[] = [];
   await fakeHelper(page, calls);
-  await page.goto(APP);
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await startWithVault(page);
 
   // before pairing: the Chat front opens the walkthrough
   await page.locator(".sb-switch-seg.desktop-only").click();
@@ -125,7 +125,7 @@ test("pairing with the helper turns Chat on; a message goes through it and the r
 test("unpairing takes Chat back to the walkthrough", async ({ page }) => {
   const calls: { cmd: string; args: unknown }[] = [];
   await fakeHelper(page, calls);
-  await page.goto(APP);
+  await startWithVault(page);
   await page.locator(".sb-switch-seg.desktop-only").click();
   const dialog = page.getByRole("dialog", { name: "Chat on the web" });
   await dialog.getByLabel("Paste the pairing code the helper printed:").fill(`${PORT}:${TOKEN}`);
@@ -170,7 +170,7 @@ test("a helper that refuses the pairing token keeps Chat behind the setup dialog
           : null;
     return route.fulfill({ status: 200, headers, body: JSON.stringify({ result }) });
   });
-  await page.goto(APP);
+  await startWithVault(page);
   await page.locator(".sb-switch-seg.desktop-only").click();
   const dialog = page.getByRole("dialog", { name: "Chat on the web" });
   await dialog.getByLabel("Paste the pairing code the helper printed:").fill(`${PORT}:${TOKEN}`);

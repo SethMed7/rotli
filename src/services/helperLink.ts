@@ -2,22 +2,19 @@
 // browser vault (this device only); once paired, the AI commands the Mac app
 // sends to Rust ride the helper instead, through the same IPC seam.
 
-import { IndexedDbVaultStore, MemoryVaultStore, type VaultStore } from "../lib/browserVault";
+import { deviceVaultStore } from "../lib/browserVault";
 import { HelperHttpError, helperHealth, helperRpc } from "../lib/helperClient";
-import { HELPER_COMMANDS, type HelperLink, parsePairingCode } from "../lib/helperPairing";
+import { HELPER_COMMANDS, type HelperLink, pairingFromHash, parsePairingCode } from "../lib/helperPairing";
 import { registerWebAiBridge } from "../lib/webAiSeam";
+import { showFileNotice } from "../state/fileNotice";
 import { type HelperProblem, useHelperLink } from "../state/helperLink";
 
 const LINK_KEY = "helper-link";
 
-// The pairing is a DEVICE credential, never vault data: in folder or imported
-// mode the browser vault maps keys to .rotli/ files that travel with an export,
-// so the link lives in this browser's own database whatever the vault mode.
-let deviceStore: VaultStore | null = null;
-function device(): VaultStore {
-  deviceStore ??= typeof indexedDB === "undefined" ? new MemoryVaultStore() : new IndexedDbVaultStore();
-  return deviceStore;
-}
+// The pairing is a DEVICE credential, never vault data: in folder mode the
+// browser vault maps keys to .rotli/ files that travel with the vault, so the
+// link lives in this browser's own database whatever the vault mode.
+const device = deviceVaultStore;
 
 function bridgeFor(link: HelperLink) {
   return (cmd: string, args: Record<string, unknown> | undefined): Promise<unknown> => {
@@ -158,4 +155,37 @@ export async function unpairHelper(): Promise<void> {
   }
   adopt(null);
   useHelperLink.getState().setReachable(null);
+}
+
+/** The installer opens Rotli Web with the pairing code in the URL fragment
+ * (`#pair=43111:…`), which no browser sends to any server. It is stripped
+ * from the address bar FIRST — before pairing, before a render — so the
+ * token never sits in history or a bookmark, then used to pair. */
+export async function adoptPairingFromUrl(): Promise<void> {
+  if (typeof location === "undefined" || !location.hash.startsWith("#pair=")) return;
+  const code = pairingFromHash(location.hash);
+  history.replaceState(history.state, "", `${location.pathname}${location.search}`);
+  if (!code) return;
+  try {
+    await pairHelper(code);
+  } catch (error) {
+    showFileNotice(
+      `Couldn’t pair with Rotli Helper — ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+/** Another tab (the one the installer opened) may pair while setup waits in
+ * this one: re-read the stored link and adopt it. True once linked. */
+export async function adoptStoredPairing(): Promise<boolean> {
+  try {
+    const raw = await device().get(LINK_KEY);
+    const link = raw ? parsePairingCode(raw) : null;
+    if (!link) return false;
+    const current = useHelperLink.getState().link;
+    if (current?.token !== link.token || current.port !== link.port) adopt(link);
+    return true;
+  } catch {
+    return false;
+  }
 }

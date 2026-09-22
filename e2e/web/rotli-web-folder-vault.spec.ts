@@ -3,11 +3,12 @@
 // picker does, so a planted folder stands in for one the user chose. Two
 // truths: the chat rows show each chat's own model from the folder's
 // settings.json (the file the Mac app writes), and a folder waiting on the
-// browser's permission is said out loud in the sidebar with a Reconnect.
+// browser's permission is reconnected by name before any editor shows.
 
 import { expect, type Page, test } from "@playwright/test";
 
-const APP = "/app/";
+import { APP, vaultGate } from "./support";
+
 const PORT = 43115;
 const TOKEN = "fixture-token-with-at-least-twenty-four-chars";
 
@@ -74,7 +75,12 @@ function fakeHelper(page: Page) {
  * handle the way "Connect a vault on this computer" does. */
 async function plantFolder(page: Page, extra: Record<string, string> = {}): Promise<void> {
   await page.goto(APP);
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await expect(vaultGate(page)).toBeVisible();
+  await plantFolderFiles(page, extra);
+}
+
+/** The planting alone, on whatever page is open. */
+async function plantFolderFiles(page: Page, extra: Record<string, string> = {}): Promise<void> {
   await page.evaluate(
     async (files) => {
       const root = await navigator.storage.getDirectory();
@@ -202,26 +208,38 @@ test("a slash after text in a checklist item links one of the folder's chats", a
   await expect(editor.locator(".cm-line", { hasText: "follow up on" })).toContainText("Sonnet chat");
 });
 
-test("a folder waiting on the browser's permission is said in the sidebar, with Reconnect", async ({
+/** The next visit in Chromium: the browser remembers the folder but asks
+ * again — until the page's Reconnect asks, which this stand-in grants. */
+function permissionAsksAgain(page: Page) {
+  return page.addInitScript(() => {
+    const proto = FileSystemDirectoryHandle.prototype as unknown as {
+      queryPermission: () => Promise<string>;
+      requestPermission: () => Promise<string>;
+    };
+    const session = window.sessionStorage;
+    proto.queryPermission = async () => (session.getItem("granted") ? "granted" : "prompt");
+    proto.requestPermission = async () => {
+      session.setItem("granted", "1");
+      return "granted";
+    };
+  });
+}
+
+test("a folder waiting on the browser's permission is reconnected by name — no stand-in vault", async ({
   page,
 }) => {
   await fakeHelper(page);
   await plantFolder(page);
-  // the next visit: Chromium remembers the folder but asks again
-  await page.addInitScript(() => {
-    const proto = FileSystemDirectoryHandle.prototype as unknown as {
-      queryPermission: () => Promise<string>;
-    };
-    proto.queryPermission = async () => "prompt";
-  });
+  await permissionAsksAgain(page);
   await page.reload();
-  await page.getByRole("tablist").waitFor();
-  const bar = page.locator(".sb-reconnect");
-  await expect(bar).toBeVisible();
-  await expect(bar).toContainText("needs permission again");
-  await expect(bar.getByRole("button", { name: "Reconnect" })).toBeVisible();
+  // no editor until the vault itself is back
+  await expect(vaultGate(page)).toHaveText("Choose your vault");
+  await expect(page.locator(".cm-content")).toHaveCount(0);
+  await page.locator(".setup-button.primary", { hasText: /Reconnect “/ }).click();
+  // granted → the page reloads from the folder
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Hello");
+  await expect(vaultGate(page)).toHaveCount(0);
 });
-
 // The owner, 2026-09-21: "chats need to respect the view too — this view should
 // have no chats". A view lists only its own chats, even none; Main lists all.
 test("a view with no chats of its own shows none in Chat, and Main shows every chat", async ({ page }) => {
@@ -245,4 +263,63 @@ test("a view with no chats of its own shows none in Chat, and Main shows every c
   await page.getByRole("menu").getByRole("menuitemcheckbox", { name: "Main — all chats" }).click();
   await expect(rows.filter({ hasText: "Sonnet chat" })).toBeVisible();
   await expect(rows.filter({ hasText: "Gemma chat" })).toBeVisible();
+});
+
+// An EMPTY folder connected from the gate becomes a vault: the Welcome folder
+// is seeded into it (as a created Mac vault gets) and its note opens. An
+// existing vault (every test above) is never seeded over.
+test("an empty connected folder becomes a vault and gets the Welcome folder", async ({ page }) => {
+  await page.goto(APP);
+  await expect(vaultGate(page)).toBeVisible();
+  // the handle the picker would hand back, remembered — pointing at nothing
+  await page.evaluate(async () => {
+    const root = await navigator.storage.getDirectory();
+    await new Promise<void>((resolve, reject) => {
+      const open = indexedDB.open("rotli-web");
+      open.onsuccess = () => {
+        const tx = open.result.transaction("vault", "readwrite");
+        tx.objectStore("vault").put(root, "vault-handle");
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      };
+      open.onerror = () => reject(open.error);
+    });
+  });
+  await page.reload();
+  await expect(vaultGate(page)).toHaveCount(0);
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await expect(page.locator(".main-tree", { hasText: "Welcome" })).toBeVisible();
+  // the folder is a vault now — the same spine the Mac app scaffolds — and
+  // the lessons are real files inside its wiki/
+  const files = await page.evaluate(async () => {
+    const root = await navigator.storage.getDirectory();
+    const names: string[] = [];
+    for await (const [name] of root.entries()) names.push(name);
+    const lessons: string[] = [];
+    const walk = async (dir: FileSystemDirectoryHandle): Promise<void> => {
+      for await (const [name, child] of dir.entries()) {
+        if (child.kind === "directory") await walk(child as FileSystemDirectoryHandle);
+        else lessons.push(name);
+      }
+    };
+    await walk(await root.getDirectoryHandle("wiki"));
+    const welcome = await (await root.getDirectoryHandle("wiki")).getDirectoryHandle("Welcome");
+    const text = await (await (await welcome.getFileHandle("Welcome to Rotli.md")).getFile()).text();
+    return { names: names.sort(), lessons: lessons.sort(), text };
+  });
+  for (const name of ["memex.json", "wiki", "chats", "storage", ".rotli"])
+    expect(files.names).toContain(name);
+  // plain Markdown, as the Mac seed writes: no Inbox shelf, which would file
+  // every lesson under Captures in the Mac app
+  expect(files.lessons).toContain("Welcome to Rotli.md");
+  expect(files.text.startsWith("# Welcome to Rotli\n")).toBe(true);
+  // and a second boot finds an existing vault: it opens on its freshest note
+  // (a lesson, never an empty tab — the lessons are notes, not Captures), and
+  // there is one welcome note, not two
+  await page.reload();
+  // lessons written in the same instant tie on mtime, so which is freshest
+  // varies; what matters is that one of them opens, never an empty tab
+  await expect(page.getByRole("tab", { selected: true })).toBeVisible();
+  await expect(page.getByRole("tab", { selected: true })).not.toHaveAttribute("title", "Untitled");
+  await expect(page.locator(".main-tree").getByText("Welcome to Rotli", { exact: true })).toHaveCount(1);
 });

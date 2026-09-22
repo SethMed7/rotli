@@ -1,11 +1,11 @@
 // Rotli Web keeps a dropped image the way the app does: the bytes land in the
 // vault's asset store, the note gets the same portable `storage:` link, and
-// the editor renders it — here from the browser vault, on a folder from the
-// real file. A chat drop is refused with a notice (the helper carries text only).
+// the editor renders it from the vault's own file. A chat drop is refused with a notice (the helper carries text only).
 
 import { expect, test } from "@playwright/test";
 
-const APP = "/app/";
+import { readOpfsBase64, readOpfsFile, startWithVault } from "./support";
+
 // a 1×1 PNG
 const PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
@@ -13,8 +13,7 @@ const PNG_BASE64 =
 test("an image dropped on a note is stored in the vault, linked with storage:, and rendered", async ({
   page,
 }) => {
-  await page.goto(APP);
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await startWithVault(page);
   // the open note's editor (another mounted editor would take the drop otherwise)
   const editor = page.locator(".cm-content:visible", { hasText: "Things to try" }).first();
 
@@ -38,48 +37,14 @@ test("an image dropped on a note is stored in the vault, linked with storage:, a
 
   // the link is the app's, and the image shows from the stored bytes
   await expect(editor.locator('img[src^="blob:"]').first()).toBeVisible();
+  // the bytes are a real file in the vault's storage/
   await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () =>
-            new Promise<string>((resolve) => {
-              const open = indexedDB.open("rotli-web");
-              open.onsuccess = () => {
-                const get = open.result
-                  .transaction("vault")
-                  .objectStore("vault")
-                  .get("asset:storage/images/shot.png");
-                get.onsuccess = () => resolve(String(get.result ?? ""));
-                get.onerror = () => resolve("");
-              };
-              open.onerror = () => resolve("");
-            }),
-        ),
-      { timeout: 10_000 },
-    )
+    .poll(() => readOpfsBase64(page, "storage/images/shot.png"), { timeout: 10_000 })
     .toBe(PNG_BASE64);
-
-  // the note itself carries the portable link (the autosave is debounced)…
+  // …and the note itself carries the portable link (the autosave is debounced)
   await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () =>
-            new Promise<boolean>((resolve) => {
-              const open = indexedDB.open("rotli-web");
-              open.onsuccess = () => {
-                const get = open.result.transaction("vault").objectStore("vault").get("notes");
-                get.onsuccess = () =>
-                  resolve(String(get.result ?? "").includes("![](storage:images/shot.png)"));
-                get.onerror = () => resolve(false);
-              };
-              open.onerror = () => resolve(false);
-            }),
-        ),
-      { timeout: 10_000 },
-    )
-    .toBe(true);
+    .poll(() => readOpfsFile(page, "wiki/Welcome/Welcome to Rotli.md"), { timeout: 10_000 })
+    .toContain("![](storage:images/shot.png)");
   // …and the image is back from the vault after a reload
   await page.reload();
   await expect(

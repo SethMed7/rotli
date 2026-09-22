@@ -139,6 +139,44 @@
         "src/state/chatWindowSide.test.ts"
       ],
       "reason": "The Chat window test asserts the hand-off protocol by its message names ('regroup', 'regrouped'). The literals ARE the contract between the two webviews (docs/architecture/window-events.md rotli:chat-window); a test that did not name them could not prove what the other window receives."
+    },
+    {
+      "id": "vault-scaffold-ts-twin",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/memex.rs",
+        "src/services/vaultScaffold.ts"
+      ],
+      "reason": "Deliberate twin: Rotli Web scaffolds an empty connected folder with the same spine Rust scaffold_memex writes, so the folder opens in Rotli for Mac as a vault it recognizes. The browser cannot call Rust; the shared literals ARE the on-disk contract."
+    },
+    {
+      "id": "onboarding-setup-shell-classes",
+      "signal": "literal",
+      "files": [
+        "src/components/onboarding/onboarding.tsx",
+        "src/components/onboarding/vaultActivation.tsx",
+        "src/components/onboarding/modelSetup.tsx",
+        "src/components/onboarding/webVaultGate.tsx"
+      ],
+      "reason": "Every setup screen renders the same setup-shell layout (onboarding.css) by class name; the shared literals are the design system's layout vocabulary, not copied logic. Each screen's content and actions differ."
+    },
+    {
+      "id": "web-vault-gate-tests-name-their-copy",
+      "signal": "literal",
+      "files": [
+        "src/components/onboarding/webVaultGate.tsx",
+        "src/components/onboarding/webVaultGate.test.tsx"
+      ],
+      "reason": "The tests assert the gate's user-facing copy verbatim; repeating the literals is the point of the test."
+    },
+    {
+      "id": "app-shell-vs-chat-shell-vocabulary",
+      "signal": "literal",
+      "files": [
+        "src/app.tsx",
+        "src/components/chatWindow/chatShell.tsx"
+      ],
+      "reason": "The main window and the pulled-out Chat window each render their own shell and bind the same close-tab action id and content class; the shared literals are registry and layout names, not duplicated behaviour."
     }
   ]
 }
