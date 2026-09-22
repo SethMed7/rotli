@@ -203,6 +203,7 @@ test("a helper that stops answering is waited out: the edit lands when it's back
   context,
   page,
 }) => {
+  test.slow(); // real debounce + retry timers; a loaded runner stretches them
   const helper = fakeHelperVault();
   await helper.install(context);
   await withoutFolderApi(context);
@@ -233,6 +234,7 @@ test("a helper that isn't running at boot is named on the setup screen, and no e
   context,
   page,
 }) => {
+  test.slow(); // real debounce + retry timers; a loaded runner stretches them
   const helper = fakeHelperVault();
   await helper.install(context);
   await withoutFolderApi(context);
