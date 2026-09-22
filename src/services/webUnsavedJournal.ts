@@ -67,10 +67,11 @@ export async function replayJournal(
   storage: KeyValue,
   key: string,
   service: Pick<NotesService, "getNote" | "updateNote" | "createNote">,
-): Promise<{ saved: number; keptAside: string[] }> {
+): Promise<{ saved: number; keptAside: string[]; unresolved: number }> {
   const drafts = readJournal(storage, key);
   let saved = 0;
   const keptAside: string[] = [];
+  const unresolved: JournalDraft[] = [];
   for (const draft of drafts) {
     const note = await service.getNote(draft.noteId).catch(() => null);
     if (note?.body === draft.body) continue; // the unload's own save made it
@@ -81,8 +82,9 @@ export async function replayJournal(
     } catch {
       const copy = await service.createNote(note?.folderId ?? "", draft.body).catch(() => null);
       if (copy) keptAside.push(copy.title);
+      else unresolved.push(draft); // neither saved nor kept aside: keep it for the next boot
     }
   }
-  storage.removeItem(key);
-  return { saved, keptAside };
+  writeJournal(storage, key, unresolved);
+  return { saved, keptAside, unresolved: unresolved.length };
 }

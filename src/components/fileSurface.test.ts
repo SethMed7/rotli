@@ -7,6 +7,7 @@
 
 import { describe, expect, test } from "bun:test";
 
+import { HTML_PREVIEW_CSP } from "../lib/htmlPreviewPolicy";
 import { ZOOM_MAX, ZOOM_MIN, clampZoom, fitScale, htmlPreviewDoc, kindOf, zoomStep } from "./fileSurface";
 
 describe("kindOf", () => {
@@ -41,7 +42,8 @@ describe("kindOf", () => {
 
 describe("htmlPreviewDoc — <base> injection for the sandboxed srcdoc Preview", () => {
   const URL = "asset://localhost/%2FUsers%2Fx%2Fpage.html";
-  const BASE = `<base href="${URL}">`;
+  // the no-network policy rides in front of the base, wherever it lands
+  const BASE = `${HTML_PREVIEW_CSP}<base href="${URL}">`;
 
   test("goes right after <head> when one exists", () => {
     expect(htmlPreviewDoc("<html><head><title>t</title></head><body>b</body></html>", URL)).toBe(
@@ -64,7 +66,9 @@ describe("htmlPreviewDoc — <base> injection for the sandboxed srcdoc Preview",
   });
 
   test("a quote in the URL can't break out of the href attribute", () => {
-    expect(htmlPreviewDoc("x", 'a"><script>1</script>')).toBe('<base href="a%22><script>1</script>">x');
+    expect(htmlPreviewDoc("x", 'a"><script>1</script>')).toBe(
+      `${HTML_PREVIEW_CSP}<base href="a%22><script>1</script>">x`,
+    );
   });
 });
 
@@ -109,4 +113,9 @@ describe("image zoom math", () => {
     expect(clampZoom(0.0001)).toBe(ZOOM_MIN);
     expect(clampZoom(2)).toBe(2);
   });
+});
+
+test("previewed HTML may request nothing — not even the app's own origin", () => {
+  expect(HTML_PREVIEW_CSP).toContain("default-src 'none'");
+  expect(HTML_PREVIEW_CSP).not.toMatch(/'self'|https?:/);
 });

@@ -6,24 +6,54 @@
 // production CSP enforces the same rule in the browser (site/Caddyfile,
 // scripts/check-web-privacy.mjs); this spec proves the app never even asks.
 
+import { readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
+
 import { type BrowserContext, expect, test } from "@playwright/test";
 
-import { APP, startWithVault } from "./support";
+import { APP, plantOpfsFiles, startWithVault } from "./support";
 
-/** Every request the context makes, as URLs. */
+/** Every request that actually LEFT the page, as URLs. A request the
+ * browser's content policy stopped before sending (Chromium reports it as
+ * failed with "csp") never reached the network, so it isn't one. */
 function recordRequests(context: BrowserContext): string[] {
   const urls: string[] = [];
   context.on("request", (request) => urls.push(request.url()));
+  context.on("requestfailed", (request) => {
+    if (!/csp/i.test(request.failure()?.errorText ?? "")) return;
+    const at = urls.lastIndexOf(request.url());
+    if (at >= 0) urls.splice(at, 1);
+  });
   return urls;
 }
 
-/** What a request may be: the app's own static files (GET, same origin) or
- * the helper on loopback. Anything else is an egress. */
+/** The files the build ships: the only same-origin paths the app may load.
+ * A URL a note made up (`/app/?note=…`, `/app/private-text`) is not one of
+ * them, so a request for it fails the test even though it stays same-origin. */
+function shippedPaths(): Set<string> {
+  const dist = join(process.cwd(), "dist");
+  const out = new Set(["/app/", "/app/index.html"]);
+  const walk = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      const path = join(dir, name);
+      if (statSync(path).isDirectory()) walk(path);
+      else out.add(`/app/${relative(dist, path).split("\\").join("/")}`);
+    }
+  };
+  walk(dist);
+  return out;
+}
+
+/** What a request may be: a shipped file of the app (no query string) or the
+ * helper on loopback. Anything else is an egress. */
 function egress(urls: readonly string[], origin: string): string[] {
+  const shipped = shippedPaths();
   return urls.filter((url) => {
     if (url.startsWith("data:") || url.startsWith("blob:")) return false;
     if (url.startsWith("http://127.0.0.1:")) return false;
-    return !url.startsWith(`${origin}/`);
+    if (!url.startsWith(`${origin}/`)) return true;
+    const parsed = new URL(url);
+    return parsed.search !== "" || !shipped.has(parsed.pathname);
   });
 }
 
@@ -59,4 +89,41 @@ test("setup, writing, reloads, Settings, and chat setup never leave this compute
   expect(posts).toEqual([]);
   // and no request URL ever carries what was typed
   expect(urls.filter((url) => url.includes("private"))).toEqual([]);
+});
+
+// Adversarial review, 2026-09-22: the page policy allows 'self', so a note
+// could try to smuggle its text to the site in an image request, or from an
+// ```html fence. Neither may leave a single request behind.
+test("a note's images and HTML can't send its text anywhere, not even to this site", async ({
+  context,
+  page,
+  baseURL,
+}) => {
+  const urls = recordRequests(context);
+  const origin = new URL(baseURL ?? APP).origin;
+  await startWithVault(page);
+  await plantOpfsFiles(page, {
+    "wiki/leak.md": [
+      "# Leak attempt",
+      "",
+      `![x](${origin}/app/?note=secret-image-text)`,
+      "",
+      "```html",
+      `<img src="${origin}/app/secret-fence-text.png"><div style="background:url(${origin}/app/secret-css-text)">x</div>`,
+      "```",
+      "",
+    ].join("\n"),
+  });
+  await page.reload();
+  await page.locator(".main-tree, .sb-foot").first().waitFor();
+  await page
+    .getByRole("button", { name: /Search/ })
+    .first()
+    .click();
+  await page.keyboard.type("Leak attempt");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Leak attempt");
+  await page.waitForTimeout(1_500);
+  expect(urls.filter((url) => url.includes("secret"))).toEqual([]);
+  expect(egress(urls, origin)).toEqual([]);
 });

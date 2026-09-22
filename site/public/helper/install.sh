@@ -28,12 +28,13 @@ while [ $# -gt 0 ]; do
     *) echo "rotli-helper: unknown option $1" >&2; exit 1 ;;
   esac
 done
-# the pairing code only ever goes to Rotli's own page
-case "$OPEN_URL" in
-  ""|https://rotli.co/app/|https://dev.rotli.co/app/) ;;
-  http://localhost:*/app/|http://127.0.0.1:*/app/) ;;
-  *) echo "rotli-helper: --open only accepts Rotli Web's own address, not $OPEN_URL" >&2; exit 1 ;;
-esac
+# the pairing code only ever goes to Rotli's own page: the WHOLE address must
+# match (a shell glob like http://localhost:*/app/ would also admit
+# http://localhost:@evil.example/app/, whose host is evil.example)
+if [ -n "$OPEN_URL" ] && { [ "$(printf '%s' "$OPEN_URL" | wc -l | tr -d ' ')" != "0" ] || ! printf '%s\n' "$OPEN_URL" | grep -Eqx 'https://(dev\.)?rotli\.co/app/|http://(localhost|127\.0\.0\.1):[0-9]{1,5}/app/'; }; then
+  echo "rotli-helper: --open only accepts Rotli Web's own address, not $OPEN_URL" >&2
+  exit 1
+fi
 
 VERSION="${ROTLI_HELPER_VERSION:-1.2.0}"
 RELEASES="${ROTLI_HELPER_RELEASES:-https://github.com/SethMed7/rotli-releases/releases/download}"

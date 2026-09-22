@@ -25,6 +25,7 @@ let folderService: FolderNotesService | null = null;
 let folderName: string | null = null;
 let folderDir: VaultDir | null = null;
 let mode: "folder" | "helper" | null = null;
+let identity: string | null = null;
 /** True when the connected folder held nothing at boot: an empty folder the
  * user chose to become a vault, the way onboarding's empty folder does. */
 let freshFolder = false;
@@ -63,6 +64,7 @@ export async function hydrateWebNotes(link: HelperLink | null): Promise<boolean>
   setWebVaultName(name);
   folderDir = dir;
   mode = resolved.connection.via;
+  identity = resolved.identity ?? null;
   return true;
 }
 
@@ -90,7 +92,7 @@ export function connectedFolderName(): string | null {
 /** This vault's key for browser-local bookkeeping (the unsaved journal);
  * null before a vault is connected. */
 export function webVaultKey(): string | null {
-  return mode && folderName !== null ? `${mode}:${folderName}` : null;
+  return identity;
 }
 
 /** How this session reaches its vault: the browser's live folder, Rotli

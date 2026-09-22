@@ -16,7 +16,11 @@ fn serving() -> (TempDir, TempDir, ServedVault) {
     (vault, config, served)
 }
 
-fn call(served: &ServedVault, command: &str, args: Value) -> Result<Value, Refusal> {
+/// A verb as the bound page sends it: with the served vault's id.
+fn call(served: &ServedVault, command: &str, mut args: Value) -> Result<Value, Refusal> {
+    if let (Some(config), Some(map)) = (served.current(), args.as_object_mut()) {
+        map.entry("vaultId").or_insert_with(|| Value::String(config.id));
+    }
     served.dispatch(command, &args)
 }
 
@@ -146,11 +150,15 @@ fn move_mkdir_and_remove_follow_the_page_port() {
 fn git_is_never_written() {
     let (vault, _config, served) = serving();
     fs::create_dir(vault.path().join(".git")).unwrap();
+    fs::write(vault.path().join("a.md"), "A").unwrap();
     for (command, args) in [
         ("vault_write", json!({ "path": ".git/config", "text": "x" })),
+        ("vault_write", json!({ "path": "wiki/.git/config", "text": "x" })),
+        ("vault_write", json!({ "path": ".GIT/config", "text": "x" })),
         ("vault_mkdir", json!({ "path": ".git/hooks" })),
         ("vault_remove", json!({ "path": ".git" })),
         ("vault_move", json!({ "from": "a.md", "to": ".git/a.md" })),
+        ("vault_move", json!({ "from": ".git/HEAD", "to": "b.md" })),
     ] {
         assert_eq!(call(&served, command, args).unwrap_err().0, 403, "{command}");
     }
@@ -201,4 +209,68 @@ fn info_reports_an_empty_folder_the_way_the_page_does() {
     assert_eq!(call(&served, "vault_info", json!({})).unwrap()["empty"], true);
     fs::write(vault.path().join("MAP.md"), "# MAP\n").unwrap();
     assert_eq!(call(&served, "vault_info", json!({})).unwrap()["empty"], false);
+}
+
+#[test]
+fn a_root_holding_the_helpers_own_settings_is_refused() {
+    let home = TempDir::new().unwrap();
+    let config = home.path().join(".rotli-helper").join(CONFIG_FILE);
+    fs::create_dir_all(config.parent().unwrap()).unwrap();
+    let refused = choose_config(&config, home.path()).unwrap_err();
+    assert!(refused.contains("Rotli Helper's own settings"), "{refused}");
+    // and a config hand-edited to point at it is not served
+    fs::write(&config, json!({ "root": home.path(), "id": "hv_x" }).to_string()).unwrap();
+    let served = ServedVault::new(config.parent().unwrap(), Box::new(|| Ok(None)));
+    assert_eq!(served.current(), None);
+}
+
+#[test]
+fn a_page_bound_to_another_vault_is_refused_before_disk() {
+    let (vault, _config, served) = serving();
+    for command in ["vault_write", "vault_walk", "vault_read", "vault_remove"] {
+        let refused = served
+            .dispatch(command, &json!({ "path": "a.md", "text": "x", "vaultId": "hv_other" }))
+            .unwrap_err();
+        assert_eq!(refused.0, 409, "{command}");
+        assert!(refused.1.contains("vault changed"), "{command}");
+    }
+    let unbound = served.dispatch("vault_list", &json!({ "path": "" })).unwrap_err();
+    assert_eq!(unbound.0, 409);
+    assert!(!vault.path().join("a.md").exists());
+}
+
+#[test]
+fn a_move_never_replaces_an_existing_note() {
+    let (vault, _config, served) = serving();
+    fs::write(vault.path().join("a.md"), "A").unwrap();
+    fs::write(vault.path().join("b.md"), "B").unwrap();
+    let refused = call(&served, "vault_move", json!({ "from": "a.md", "to": "b.md" })).unwrap_err();
+    assert_eq!(refused.0, 409);
+    assert_eq!(fs::read_to_string(vault.path().join("b.md")).unwrap(), "B");
+    assert_eq!(fs::read_to_string(vault.path().join("a.md")).unwrap(), "A");
+}
+
+#[test]
+fn a_content_revision_catches_a_same_size_same_instant_edit() {
+    let (vault, _config, served) = serving();
+    fs::write(vault.path().join("a.md"), "one").unwrap();
+    let known = crate::fsutil::revision(b"one");
+    // same size, and (on a coarse clock) the same mtime: only the content differs
+    fs::write(vault.path().join("a.md"), "two").unwrap();
+    let refused = call(&served, "vault_write", json!({ "path": "a.md", "text": "mine", "expectedContent": known }));
+    assert_eq!(refused.unwrap_err().0, 409);
+    assert_eq!(fs::read_to_string(vault.path().join("a.md")).unwrap(), "two");
+    let current = crate::fsutil::revision(b"two");
+    call(&served, "vault_write", json!({ "path": "a.md", "text": "mine", "expectedContent": current })).unwrap();
+    assert_eq!(fs::read_to_string(vault.path().join("a.md")).unwrap(), "mine");
+    assert!(!vault.path().join("a.md.lock").exists(), "the desktop's lock sidecar is released");
+}
+
+/// The page computes the same content revision in TypeScript
+/// (`contentRevision`, src/lib/helperVaultDir.ts); these values are pinned there too.
+#[test]
+fn the_content_revision_matches_the_pages_twin() {
+    assert_eq!(crate::fsutil::revision(b"one"), "fnv1a64:1a08aa1921ca5caf");
+    assert_eq!(crate::fsutil::revision("# Welcome — ✓\n".as_bytes()), "fnv1a64:4b5f65bd38bda967");
+    assert_eq!(crate::fsutil::revision(b""), "fnv1a64:cbf29ce484222325");
 }

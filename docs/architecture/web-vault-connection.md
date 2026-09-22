@@ -20,6 +20,13 @@ Decided by the owner on 2026-09-22; the history is in
    never asks. The one outbound path is a chat the user starts, which runs the
    user's own AI CLI through the helper; secure notes are refused before it
    runs (`blocked_for_remote`, with the ledger warmed from the served vault).
+   Note content can't make a request either: on the web a Markdown image that
+   names an `http(s)` URL is never fetched (`resolveImageSrc`), and previewed
+   HTML (a ```html fence, an `.html` file) runs under its own
+   `default-src 'none'` policy (`lib/htmlPreviewPolicy.ts`), so not even the
+   site's own origin can receive note text in a request URL. The no-egress
+   E2E counts only requests that left the page and allows same-origin ones
+   only for files the build ships.
 3. **A lost connection is a reconnect screen, never a stand-in vault.**
    Nothing is written anywhere but the bound vault.
 4. **Typing is never lost** to an outage, a closed tab, or a hard refresh.
@@ -69,9 +76,25 @@ opens as it is.
 - **Confined.** Every path is relative and resolved by
   `containment::resolve_beneath`; `..`, absolute paths, drive prefixes,
   backslashes, and colons are refused first. Symlinks are neither listed nor
-  followed (as the Mac corpus walk). `.git/` is never written.
-- **Atomic and revision-gated.** Writes use `fsutil::atomic_write_bytes`;
-  `expectedRevision` (`${mtimeMs}:${size}`) refuses a stale write with 409.
+  followed (as the Mac corpus walk). No `.git` directory at any depth, in any
+  letter case, is written, moved into or out of, or removed. A root that
+  contains the helper's own directory (`~/.rotli-helper`, e.g. the home
+  folder) is refused, so the page can never rewrite the config that names the
+  root or read the pairing token.
+- **Bound to one vault per page.** Every verb carries the `vaultId` the page
+  bound to; a helper since pointed at another folder answers 409 "vault
+  changed" before touching disk, and the page reloads into setup.
+- **Atomic, locked, revision-gated, no-clobber.** Writes use
+  `fsutil::atomic_write_bytes` under the same `.lock` sidecar the desktop
+  app's writers hold (`fsutil::with_file_lock`), gated by the desktop's
+  content revision (`fnv1a64`, `expectedContent`) when the page knows the text
+  it edited, else by `${mtimeMs}:${size}`; a stale write is 409. A move never
+  replaces an existing file.
+- **Residual, documented:** checks resolve a path and the operation then
+  reopens it. Another process running as the same user that swaps a folder
+  inside the vault for a symlink in that instant could redirect one
+  operation; such a process can already read and write everything the user
+  can, and the page has no way to create a link.
 - **Few round trips.** `vault_walk` answers every list/stat in one call and
   `vault_read_many` batches reads (12 MB per answer). Measured 2026-09-22 on
   a 900-note, 14 MB vault in Firefox: about 1.3 s per full reload, 11–12

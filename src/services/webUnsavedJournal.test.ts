@@ -28,7 +28,7 @@ test("a draft typed against the file on disk is saved onto its note at the next 
       expectedBody: note.body,
     },
   ]);
-  expect(await replayJournal(store, key, svc)).toEqual({ saved: 1, keptAside: [] });
+  expect(await replayJournal(store, key, svc)).toEqual({ saved: 1, keptAside: [], unresolved: 0 });
   expect((await svc.getNote(note.id))?.body).toBe("# Plan\n\nbefore and after");
   expect(store.values.has(key)).toBe(false);
 });
@@ -44,7 +44,7 @@ test("a file that changed since is never overwritten: the draft is kept as its o
   writeJournal(store, key, [
     { noteId: note.id, body: "# Plan\n\nmine", expectedRevision: stale, expectedBody: note.body },
   ]);
-  expect(await replayJournal(store, key, svc)).toEqual({ saved: 0, keptAside: ["Plan"] });
+  expect(await replayJournal(store, key, svc)).toEqual({ saved: 0, keptAside: ["Plan"], unresolved: 0 });
   expect((await svc.getNote(note.id))?.body).toBe("# Plan\n\nchanged in the Mac app");
   expect((await svc.listAll()).filter((n) => n.title === "Plan")).toHaveLength(2);
 });
@@ -58,7 +58,29 @@ test("a draft the unload's own save already landed is skipped; nothing drafts, n
   writeJournal(store, key, [
     { noteId: note.id, body: "# Plan\n\nsaved", expectedRevision: "old", expectedBody: "" },
   ]);
-  expect(await replayJournal(store, key, svc)).toEqual({ saved: 0, keptAside: [] });
+  expect(await replayJournal(store, key, svc)).toEqual({ saved: 0, keptAside: [], unresolved: 0 });
   writeJournal(store, key, []);
   expect(store.values.size).toBe(0);
+});
+
+test("a draft that can be neither saved nor kept aside stays in the journal for the next boot", async () => {
+  const svc = new InMemoryNotesService();
+  const folder = seedReservedRoots(svc);
+  const note = await svc.createNote(folder, "# Plan\n\nbefore");
+  const store = storage();
+  const key = journalKey("folder:x");
+  const draft = {
+    noteId: note.id,
+    body: "# Plan\n\nunsaved",
+    expectedRevision: "stale",
+    expectedBody: note.body,
+  };
+  writeJournal(store, key, [draft]);
+  const failing = {
+    getNote: (id: string) => svc.getNote(id),
+    updateNote: () => Promise.reject(new Error("disk full")),
+    createNote: () => Promise.reject(new Error("disk full")),
+  };
+  expect(await replayJournal(store, key, failing)).toEqual({ saved: 0, keptAside: [], unresolved: 1 });
+  expect(JSON.parse(store.values.get(key) ?? "[]")).toEqual([draft]);
 });

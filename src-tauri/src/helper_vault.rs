@@ -13,10 +13,24 @@
 //!   prefixes, and backslashes are refused before the filesystem is touched.
 //! - Symlinks are not followed and not listed (the Mac corpus walk skips them
 //!   the same way), so one link cannot widen the served tree.
-//! - `.git/` is never written, moved into, or removed.
-//! - Writes are atomic (temp file + rename) and optionally revision-gated
-//!   (`${mtimeMs}:${size}`, the page's `FolderVaultStore` stamp), so a queued
-//!   edit replayed after an outage cannot silently overwrite a newer file.
+//! - No `.git` directory, at any depth and in any letter case, is ever
+//!   written, moved into or out of, or removed.
+//! - A root that CONTAINS the helper's own directory (`~/.rotli-helper`, e.g.
+//!   the home folder) is refused, so the page can never rewrite the config
+//!   that names the root, or read the pairing token.
+//! - Every verb names the vault id the page bound to; a helper since pointed
+//!   at another folder refuses before touching disk (409 "vault changed").
+//! - Writes are atomic (temp file + rename), taken under the SAME `.lock`
+//!   sidecar the desktop app's writes hold (`fsutil::with_file_lock`), and
+//!   revision-gated: by content (`fnv1a64`, the desktop's own revision) when
+//!   the page knows the text it edited, else by `${mtimeMs}:${size}`. Moves
+//!   never replace an existing file.
+//!
+//! Residual (documented, not defended): the checks resolve a path, then the
+//! operation reopens it. Another process running as the same user that swaps
+//! a folder inside the vault for a symlink in that instant could redirect one
+//! operation — but such a process can already read and write everything the
+//! user can; the page itself has no way to create a link.
 //!
 //! Nothing here touches the network. The secure-prose ledger is warmed from
 //! the served vault so `cli_complete`'s `blocked_for_remote` gate guards the
@@ -35,8 +49,13 @@ use crate::containment::resolve_beneath;
 
 pub(crate) const CONFIG_FILE: &str = "vault.json";
 const WRITE_PREFIX: &str = ".rotli-write-";
-/// Build output and history nobody edits from Rotli: never walked or listed.
+/// Build output and history nobody edits from Rotli: never walked or listed
+/// (compared without letter case: `.GIT` on a case-insensitive disk is `.git`).
 const SKIPPED_DIRS: [&str; 2] = [".git", "node_modules"];
+
+fn skipped_dir(name: &str) -> bool {
+    SKIPPED_DIRS.iter().any(|skip| skip.eq_ignore_ascii_case(name))
+}
 /// A walk that finds more than this is not a notes vault (a home folder, a
 /// drive root); it is refused rather than streamed.
 const MAX_WALK_ENTRIES: usize = 200_000;
@@ -115,6 +134,12 @@ impl ServedVault {
             }
             return Err((409, "Rotli Helper isn't serving a vault yet — choose one first.".into()));
         };
+        if command != "vault_info" {
+            let bound = args.get("vaultId").and_then(Value::as_str).unwrap_or_default();
+            if bound != config.id {
+                return Err((409, "vault changed: Rotli Helper now serves a different folder than this page opened".into()));
+            }
+        }
         let root = config.root.as_path();
         match command {
             "vault_info" => Ok(info(&config)),
@@ -156,6 +181,9 @@ fn read_config(path: &Path) -> Option<VaultConfig> {
     let id = raw.get("id")?.as_str()?.to_string();
     // a folder that was moved or deleted is not served; the page says so
     let root = fs::canonicalize(root).ok().filter(|r| r.is_dir())?;
+    if contains_helper_dir(&root, path) {
+        return None; // a hand-edited or tampered config never serves the helper's own files
+    }
     (!id.is_empty()).then_some(VaultConfig { root, id })
 }
 
@@ -169,6 +197,12 @@ pub(crate) fn choose_config(config_path: &Path, folder: &Path) -> Result<VaultCo
     if root.parent().is_none() {
         return Err("a whole drive can't be a vault — choose a folder".into());
     }
+    if contains_helper_dir(&root, config_path) {
+        return Err(format!(
+            "{} holds Rotli Helper's own settings — choose the folder your notes are in, not one above it",
+            root.display()
+        ));
+    }
     let id = match read_config(config_path) {
         Some(existing) if existing.root == root => existing.id,
         _ => format!("hv_{}", uuid::Uuid::new_v4().simple()),
@@ -178,6 +212,15 @@ pub(crate) fn choose_config(config_path: &Path, folder: &Path) -> Result<VaultCo
     let body = json!({ "root": root.to_string_lossy(), "id": id });
     crate::helper_token::write_private(config_path, &format!("{body:#}\n"))?;
     Ok(VaultConfig { root, id })
+}
+
+/// True when `root` is, or contains, the directory the helper's config lives
+/// in: serving it would let the page rewrite the config (and so the root) or
+/// read the pairing token.
+fn contains_helper_dir(root: &Path, config_path: &Path) -> bool {
+    let Some(dir) = config_path.parent() else { return true };
+    let dir = fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf());
+    dir.starts_with(root)
 }
 
 /// The Mac app's own warm-up, read-only: the ledger then holds this vault's
@@ -236,8 +279,12 @@ fn resolve(root: &Path, rel: &[String]) -> Result<PathBuf, Refusal> {
     resolve_beneath(root, &relative).map_err(|e| (400, e))
 }
 
+fn is_git(name: &str) -> bool {
+    name.eq_ignore_ascii_case(".git")
+}
+
 fn in_git(rel: &[String]) -> bool {
-    rel.first().is_some_and(|first| first == ".git")
+    rel.iter().any(|part| is_git(part))
 }
 
 fn refuse_git(rel: &[String]) -> Result<(), Refusal> {
@@ -290,7 +337,7 @@ fn walk_into(dir: &Path, prefix: &str, out: &mut Vec<Value>) -> Result<(), Refus
         let Ok(kind) = entry.file_type() else { continue };
         let path = if prefix.is_empty() { name.clone() } else { format!("{prefix}/{name}") };
         if kind.is_dir() {
-            if SKIPPED_DIRS.contains(&name.as_str()) {
+            if skipped_dir(&name) {
                 continue;
             }
             let metadata = entry.metadata().map_err(|e| (500, e.to_string()))?;
@@ -317,7 +364,7 @@ fn list(root: &Path, rel: &[String]) -> Result<Value, Refusal> {
     for entry in entries.flatten() {
         let Some(name) = entry.file_name().to_str().map(str::to_string) else { continue };
         let Ok(kind) = entry.file_type() else { continue };
-        if kind.is_dir() && !SKIPPED_DIRS.contains(&name.as_str()) {
+        if kind.is_dir() && !skipped_dir(&name) {
             out.push((name, "directory"));
         } else if kind.is_file() {
             out.push((name, "file"));
@@ -391,14 +438,26 @@ fn write(root: &Path, args: &Value) -> Result<Value, Refusal> {
     if target.is_dir() {
         return Err((409, format!("a directory already holds {}", joined(&rel))));
     }
-    if let Some(expected) = args.get("expectedRevision").and_then(Value::as_str) {
-        let current = revision_of(&target);
-        if current != expected {
-            return Err((409, format!("revision conflict: expected {expected}, found {current}; the file changed on disk")));
-        }
-    }
     make_parents(root, &rel)?;
-    crate::fsutil::atomic_write_bytes(&target, &bytes, WRITE_PREFIX).map_err(|e| (500, e))?;
+    let expected = args.get("expectedRevision").and_then(Value::as_str);
+    let expected_content = args.get("expectedContent").and_then(Value::as_str);
+    // the desktop app's writers hold this same lock: compare and replace as one step
+    crate::fsutil::with_file_lock(&target, || {
+        let conflict = |found: String| format!("revision conflict: the file changed on disk ({found})");
+        if let Some(content) = expected_content {
+            let current = if target.is_file() { crate::fsutil::file_revision(&target)? } else { "0".into() };
+            if current != content {
+                return Err(conflict(current));
+            }
+        } else if let Some(expected) = expected {
+            let current = revision_of(&target);
+            if current != expected {
+                return Err(conflict(current));
+            }
+        }
+        crate::fsutil::atomic_write_bytes(&target, &bytes, WRITE_PREFIX)
+    })
+    .map_err(|e| (if e.starts_with("revision conflict") { 409 } else { 500 }, e))?;
     let metadata = fs::metadata(&target).map_err(|e| (500, e.to_string()))?;
     Ok(stat_json(&metadata))
 }
@@ -442,8 +501,9 @@ fn move_file(root: &Path, from: &[String], to: &[String]) -> Result<Value, Refus
         return Err((404, format!("no such file: {}", joined(from))));
     }
     let target = resolve(root, to)?;
-    if target.is_dir() {
-        return Err((409, format!("a directory already holds {}", joined(to))));
+    if fs::symlink_metadata(&target).is_ok() {
+        // never replace: a stale listing must not destroy the note already there
+        return Err((409, format!("{} already exists", joined(to))));
     }
     make_parents(root, to)?;
     if fs::rename(&source, &target).is_err() {

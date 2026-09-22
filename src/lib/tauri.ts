@@ -932,6 +932,10 @@ export async function corpusAbs(rootId: string, rel: string): Promise<string> {
  * pass through; a bare relative path is treated as corpus-relative. macOS's
  * case-insensitive FS means `storage:` also resolves a legacy `Storage/` folder. */
 export async function resolveImageSrc(src: string, rootId = "default"): Promise<string> {
+  // Rotli Web never fetches an image a note names by URL: the page's policy
+  // allows its own origin, so a note could otherwise ship its text to the
+  // site in an image request (adversarial review, 2026-09-22)
+  if (/^https?:/i.test(src) && !isTauri()) return "";
   if (/^(https?:|data:|blob:|asset:)/i.test(src)) return src;
   const rel = src.startsWith("storage:") ? `storage/${src.slice("storage:".length)}` : src;
   if (!isTauri()) return currentWebFileStore()?.imageUrl(rel) ?? "";

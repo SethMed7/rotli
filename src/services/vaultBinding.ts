@@ -16,12 +16,13 @@ import { HelperHttpError, helperHealth, helperRpc, helperUnreachable } from "../
 import type { HelperLink } from "../lib/helperPairing";
 import { HelperVaultDir, type PendingOp } from "../lib/helperVaultDir";
 import { type VaultConnection, useVaultConnection } from "../state/vaultConnection";
-import type { VaultDir } from "./vaultDir";
+import { type VaultDir, freeSiblingPath } from "./vaultDir";
 import {
   type FolderSupport,
   browserFolderSupportSync,
   disconnectFolderVault,
   folderVaultStatus,
+  vaultFolderId,
 } from "./webVaultFolder";
 
 const BINDING_KEY = "vault-binding";
@@ -127,6 +128,9 @@ export interface ResolvedVault {
   connection: VaultConnection;
   /** The vault's files when connected; null means "show setup". */
   dir: VaultDir | null;
+  /** A stable id for this vault on this browser (never its folder name, which
+   * two vaults can share): keys per-vault bookkeeping like the unsaved journal. */
+  identity?: string;
 }
 
 /** The whole boot decision. Resolves before the first render; a helper that
@@ -145,16 +149,17 @@ export async function resolveVault(link: HelperLink | null): Promise<ResolvedVau
     }
     const connection = helperConnection(binding, await probeHelper(link));
     if (connection.status !== "connected" || !binding) return { connection, dir: null };
-    const dir = helperVaultDir(link);
+    const dir = helperVaultDir(link, binding.vaultId);
     await replayPendingOps(dir, binding.vaultId);
     watchPendingOps(dir, binding.vaultId);
-    return { connection, dir };
+    return { connection, dir, identity: `helper:${binding.vaultId}` };
   }
   const status = await folderVaultStatus();
   if (status.kind === "granted") {
     return {
       connection: { status: "connected", via: "folder", name: status.name },
       dir: new FsaVaultDir(status.handle),
+      identity: `folder:${await vaultFolderId()}`,
     };
   }
   if (status.kind === "prompt")
@@ -171,8 +176,22 @@ function deadlineFor(cmd: string): number | undefined {
   return cmd === "vault_walk" || cmd === "vault_read_many" ? 60_000 : 20_000;
 }
 
-export function helperVaultDir(link: HelperLink): HelperVaultDir {
-  const dir = new HelperVaultDir((cmd, args) => helperRpc(link, cmd, args, { timeoutMs: deadlineFor(cmd) }), {
+/** "vault changed": the helper was pointed at another folder while this page
+ * had one open. Nothing was touched; boot again, into setup. */
+function vaultChanged(error: unknown): boolean {
+  return (
+    error instanceof HelperHttpError && error.status === 409 && error.message.startsWith("vault changed")
+  );
+}
+
+export function helperVaultDir(link: HelperLink, vaultId: string): HelperVaultDir {
+  // every verb names the vault this page bound to; the helper refuses a mismatch
+  const call = (cmd: string, args: Record<string, unknown>) =>
+    helperRpc(link, cmd, { ...args, vaultId }, { timeoutMs: deadlineFor(cmd) }).catch((error: unknown) => {
+      if (vaultChanged(error) && typeof window !== "undefined") window.location.reload();
+      throw error;
+    });
+  const dir = new HelperVaultDir(call, {
     ping: async () => (await helperHealth(link.port)).ok === true,
     unreachable: helperUnreachable,
     onReconnecting: (reconnecting) => useVaultConnection.getState().setReconnecting(reconnecting),
@@ -215,21 +234,11 @@ function watchPendingOps(dir: HelperVaultDir, vaultId: string): void {
   });
 }
 
-/** "a.md" → "a (unsaved copy).md": where a replayed edit goes when the file
- * changed on disk while this browser couldn't reach it. Pure. */
-export function unsavedCopyPath(path: string): string {
-  const slash = path.lastIndexOf("/");
-  const dot = path.lastIndexOf(".");
-  return dot > slash + 1
-    ? `${path.slice(0, dot)} (unsaved copy)${path.slice(dot)}`
-    : `${path} (unsaved copy)`;
-}
-
 /** Replay edits a previous tab couldn't deliver, each against the revision
  * it started from. A file that changed meanwhile is never overwritten: the
  * edit lands beside it as an unsaved copy. Resolves the count replayed. */
 export async function replayPendingOps(
-  dir: Pick<VaultDir, "writeText" | "writeBytes" | "mkdir" | "move" | "remove" | "stat">,
+  dir: Pick<VaultDir, "writeText" | "writeBytes" | "mkdir" | "move" | "remove" | "stat" | "exists">,
   vaultId: string,
   store = deviceVaultStore(),
 ): Promise<number> {
@@ -242,12 +251,13 @@ export async function replayPendingOps(
   }
   if (!record || record.vaultId !== vaultId || !Array.isArray(record.ops)) return 0;
   let replayed = 0;
+  const kept: PendingOp[] = [];
   for (const op of record.ops) {
     try {
       if (op.kind === "write") {
         const now = await dir.stat(op.path);
         const current = now ? `${now.lastModified}:${now.size}` : "0";
-        const target = current === op.base ? op.path : unsavedCopyPath(op.path);
+        const target = current === op.base ? op.path : await freeSiblingPath(dir, op.path, "unsaved copy");
         if (op.text !== undefined) await dir.writeText(target, op.text);
         else if (op.base64 !== undefined) {
           await dir.writeBytes(
@@ -260,9 +270,12 @@ export async function replayPendingOps(
       else await dir.remove(op.path);
       replayed += 1;
     } catch (error) {
-      console.warn("rotli: a saved-while-offline change couldn't be replayed", error);
+      // kept for the next boot, never dropped: nothing is forgotten silently
+      kept.push(op);
+      console.warn("rotli: a saved-while-offline change couldn't be replayed yet", error);
     }
   }
-  await store.delete(PENDING_KEY);
+  if (kept.length === 0) await store.delete(PENDING_KEY);
+  else await store.set(PENDING_KEY, JSON.stringify({ vaultId, ops: kept } satisfies PendingRecord));
   return replayed;
 }

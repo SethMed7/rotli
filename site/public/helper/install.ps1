@@ -14,7 +14,7 @@ param([string]$Open = "", [switch]$Uninstall)
 $ErrorActionPreference = "Stop"
 
 # the pairing code only ever goes to Rotli's own page
-if ($Open -and $Open -notmatch '^(https://(dev\.)?rotli\.co|http://(localhost|127\.0\.0\.1):\d+)/app/$') {
+if ($Open -and $Open -cnotmatch '\A(https://(dev\.)?rotli\.co|http://(localhost|127\.0\.0\.1):\d{1,5})/app/\z') {
   throw "rotli-helper: -Open only accepts Rotli Web's own address, not $Open"
 }
 $startup = Join-Path ([Environment]::GetFolderPath("Startup")) "Rotli Helper.lnk"

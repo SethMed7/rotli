@@ -69,6 +69,18 @@ function revisionOf(entry: Entry | undefined): string {
   return entry?.kind === "file" ? `${entry.lastModified}:${entry.size}` : "0";
 }
 
+/** The desktop app's content revision (`fsutil::revision`): FNV-1a 64 over the
+ * UTF-8 bytes. Sent with a write whose text this tab knows, so the helper's
+ * gate compares content, not a millisecond stamp two edits can share. */
+export function contentRevision(text: string): string {
+  let hash = 0xcbf29ce484222325n;
+  for (const byte of new TextEncoder().encode(text)) {
+    hash ^= BigInt(byte);
+    hash = (hash * 0x100000001b3n) & 0xffffffffffffffffn;
+  }
+  return `fnv1a64:${hash.toString(16).padStart(16, "0")}`;
+}
+
 function toBase64(bytes: Uint8Array): string {
   let binary = "";
   for (let i = 0; i < bytes.length; i += 0x8000)
@@ -303,9 +315,15 @@ export class HelperVaultDir implements VaultDir {
       if (base === null && this.walkedAt === 0) await this.fresh();
       base ??= revisionOf(this.entries.get(key));
       op.base = base;
+      // the text this tab last saw in the file, when it knows it
+      const seen = this.texts.get(key);
+      const gate =
+        seen && seen.revision === base
+          ? { expectedContent: contentRevision(seen.text) }
+          : { expectedRevision: base };
       let stat: VaultStat;
       try {
-        stat = (await this.call("vault_write", { path: key, ...body, expectedRevision: base })) as VaultStat;
+        stat = (await this.call("vault_write", { path: key, ...body, ...gate })) as VaultStat;
       } catch (error) {
         // a retried write whose first attempt DID land (the answer was lost):
         // the file already holds exactly these bytes, which is success

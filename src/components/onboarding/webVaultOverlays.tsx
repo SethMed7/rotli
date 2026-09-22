@@ -97,9 +97,16 @@ function LegacyNotesOffer() {
     setBusy(true);
     setError(null);
     copyLegacyInto(dir, files)
-      .then(async (written) => {
-        await clearLegacyBrowserFiles();
+      .then(async ({ written, failed }) => {
         await Promise.all([invalidateNotes(), invalidateFolders()]);
+        if (failed.length > 0) {
+          // the browser keeps everything until every file is safely in the vault
+          setError(
+            `${failed.length} could not be copied (${failed.slice(0, 3).join(", ")}). Nothing was removed from this browser; try again.`,
+          );
+          return;
+        }
+        await clearLegacyBrowserFiles();
         setDone(written);
       })
       .catch((reason) => setError(reason instanceof Error ? reason.message : String(reason)))

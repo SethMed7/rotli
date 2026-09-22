@@ -65,8 +65,27 @@ export async function loadVaultHandle(): Promise<FileSystemDirectoryHandle | nul
 async function saveVaultHandle(handle: FileSystemDirectoryHandle | null): Promise<void> {
   const db = await openDatabase();
   const store = db.transaction(VAULT_STORE, "readwrite").objectStore(VAULT_STORE);
-  if (handle) await requestToPromise(store.put(handle, HANDLE_KEY));
-  else await requestToPromise(store.delete(HANDLE_KEY));
+  if (handle) {
+    await requestToPromise(store.put(handle, HANDLE_KEY));
+    // a folder handle has no stable id of its own: this browser mints one per
+    // chosen folder, so per-vault bookkeeping never crosses into another
+    await requestToPromise(store.put(crypto.randomUUID(), FOLDER_ID_KEY));
+  } else await requestToPromise(store.delete(HANDLE_KEY));
+}
+
+const FOLDER_ID_KEY = "vault-folder-id";
+
+/** This browser's id for the remembered folder (minted if an older build
+ * saved the handle without one). */
+export async function vaultFolderId(): Promise<string> {
+  const db = await openDatabase();
+  const read = db.transaction(VAULT_STORE, "readonly").objectStore(VAULT_STORE);
+  const known: unknown = await requestToPromise(read.get(FOLDER_ID_KEY));
+  if (typeof known === "string" && known) return known;
+  const minted = crypto.randomUUID();
+  const write = db.transaction(VAULT_STORE, "readwrite").objectStore(VAULT_STORE);
+  await requestToPromise(write.put(minted, FOLDER_ID_KEY));
+  return minted;
 }
 
 /** Where the web build stands at boot: no picker, no folder, a folder the

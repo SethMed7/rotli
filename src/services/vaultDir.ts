@@ -67,6 +67,29 @@ export function joinVaultPath(...parts: string[]): string {
   return normalizeVaultPath(parts.join("/"));
 }
 
+/** "a.md" → "a (label).md", then "a (label 2).md", … — the first name the
+ * folder doesn't already hold. A copy kept beside a file never replaces
+ * anything, not even an earlier copy. */
+export async function freeSiblingPath(
+  dir: Pick<VaultDir, "exists">,
+  path: string,
+  label: string,
+): Promise<string> {
+  for (let n = 1; ; n += 1) {
+    const candidate = siblingPath(path, label, n);
+    if (!(await dir.exists(candidate))) return candidate;
+  }
+}
+
+/** The nth labelled sibling of a file: "a.md" → "a (label).md" (n = 1),
+ * "a (label 2).md", …. Pure. */
+export function siblingPath(path: string, label: string, n: number): string {
+  const slash = path.lastIndexOf("/");
+  const dot = path.lastIndexOf(".");
+  const [stem, ext] = dot > slash + 1 ? [path.slice(0, dot), path.slice(dot)] : [path, ""];
+  return `${stem} (${n === 1 ? label : `${label} ${n}`})${ext}`;
+}
+
 /** UTF-8 byte length — the size a real file reports, and the one half of the
  * revision stamp. A note full of em dashes and curly quotes must not disagree
  * with what the browser adapter reads back from `File.size`. */

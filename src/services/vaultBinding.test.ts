@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { MemoryVaultStore } from "../lib/browserVault";
-import { helperConnection, replayPendingOps, unsavedCopyPath, unsupportedBrowser } from "./vaultBinding";
+import { helperConnection, replayPendingOps, unsupportedBrowser } from "./vaultBinding";
 import { MemoryVaultDir } from "./vaultDir";
 
 const binding = { kind: "helper", vaultId: "hv_1", vaultName: "memex" } as const;
@@ -92,8 +92,29 @@ describe("edits a closed tab couldn't deliver", () => {
     expect(await dir.exists("x")).toBe(false);
   });
 
-  test("the unsaved copy sits beside the file", () => {
-    expect(unsavedCopyPath("wiki/a.md")).toBe("wiki/a (unsaved copy).md");
-    expect(unsavedCopyPath("wiki/.rotli")).toBe("wiki/.rotli (unsaved copy)");
+  test("a second conflict never overwrites the first unsaved copy", async () => {
+    const dir = new MemoryVaultDir();
+    await dir.writeText("wiki/a.md", "changed elsewhere");
+    await dir.writeText("wiki/a (unsaved copy).md", "the first offline edit");
+    const store = new MemoryVaultStore();
+    await store.set(
+      "vault-pending",
+      JSON.stringify({
+        vaultId: "hv_1",
+        ops: [{ kind: "write", path: "wiki/a.md", text: "second", base: "stale" }],
+      }),
+    );
+    expect(await replayPendingOps(dir, "hv_1", store)).toBe(1);
+    expect(await dir.readText("wiki/a (unsaved copy).md")).toBe("the first offline edit");
+    expect(await dir.readText("wiki/a (unsaved copy 2).md")).toBe("second");
+  });
+
+  test("a change that can't be replayed yet is kept for the next boot, not dropped", async () => {
+    const dir = new MemoryVaultDir();
+    const store = new MemoryVaultStore();
+    const ops = [{ kind: "move", from: "missing.md", to: "b.md" }];
+    await store.set("vault-pending", JSON.stringify({ vaultId: "hv_1", ops }));
+    expect(await replayPendingOps(dir, "hv_1", store)).toBe(0);
+    expect(JSON.parse((await store.get("vault-pending")) ?? "{}")).toEqual({ vaultId: "hv_1", ops });
   });
 });

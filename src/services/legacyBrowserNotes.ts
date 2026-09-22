@@ -9,7 +9,7 @@ import { type BrowserVault, browserStorageVault } from "../lib/browserVault";
 import { DEST } from "./destinations";
 import { IMPORTED_VAULT_KEY, isImportedVaultSnapshot } from "./importedVault";
 import { InMemoryNotesService, isNotesSnapshot } from "./inMemoryNotes";
-import type { VaultDir } from "./vaultDir";
+import { type VaultDir, freeSiblingPath, siblingPath } from "./vaultDir";
 
 /** The key the browser-storage vault kept its notes snapshot under. */
 const BROWSER_NOTES_KEY = "notes";
@@ -95,39 +95,52 @@ export async function legacyBrowserFiles(vault: BrowserVault = browserStorageVau
   return files;
 }
 
-/** "a.md" → "a (from this browser).md". Pure. */
-export function fromBrowserPath(path: string): string {
-  const slash = path.lastIndexOf("/");
-  const dot = path.lastIndexOf(".");
-  return dot > slash + 1
-    ? `${path.slice(0, dot)} (from this browser)${path.slice(dot)}`
-    : `${path} (from this browser)`;
+/** The vault already has this file's text, at its path or in an earlier
+ * "(from this browser …)" copy beside it — copying again adds nothing. */
+async function alreadyHolds(dir: VaultDir, path: string, file: LegacyFile): Promise<boolean> {
+  if (file.text === undefined) return false;
+  const same = async (at: string) => (await dir.readText(at).catch(() => null)) === file.text;
+  if (await same(path)) return true;
+  for (let n = 1; ; n += 1) {
+    const copy = siblingPath(path, "from this browser", n);
+    if (!(await dir.exists(copy))) return false;
+    if (await same(copy)) return true;
+  }
 }
 
 /** Copy into the connected vault without overwriting anything: a missing
- * file is written, an identical one skipped, a different one lands beside
- * the vault's own. Resolves how many files were written. */
-export async function copyLegacyInto(dir: VaultDir, files: readonly LegacyFile[]): Promise<number> {
+ * file is written, an identical one skipped, and a different one lands beside
+ * the vault's own under a name nothing holds yet. Resolves how many were
+ * written and which could not be — the browser's copy may be cleared only
+ * when that list is empty. */
+export async function copyLegacyInto(
+  dir: VaultDir,
+  files: readonly LegacyFile[],
+): Promise<{ written: number; failed: string[] }> {
   const memex = await dir.exists("wiki");
   let written = 0;
+  const failed: string[] = [];
   for (const file of files) {
     const path = file.note && memex ? `wiki/${file.path}` : file.path;
-    let target = path;
-    if (await dir.exists(path)) {
-      if (file.text !== undefined && (await dir.readText(path).catch(() => null)) === file.text) continue;
-      target = fromBrowserPath(path);
-      if (await dir.exists(target)) continue; // an earlier copy already put it there
+    try {
+      let target = path;
+      if (await dir.exists(path)) {
+        if (await alreadyHolds(dir, path, file)) continue;
+        target = await freeSiblingPath(dir, path, "from this browser");
+      }
+      if (file.text !== undefined) await dir.writeText(target, file.text);
+      else if (file.base64 !== undefined) {
+        await dir.writeBytes(
+          target,
+          Uint8Array.from(atob(file.base64), (c) => c.charCodeAt(0)),
+        );
+      }
+      written += 1;
+    } catch {
+      failed.push(path);
     }
-    if (file.text !== undefined) await dir.writeText(target, file.text);
-    else if (file.base64 !== undefined) {
-      await dir.writeBytes(
-        target,
-        Uint8Array.from(atob(file.base64), (c) => c.charCodeAt(0)),
-      );
-    }
-    written += 1;
   }
-  return written;
+  return { written, failed };
 }
 
 /** Forget what the browser held, after it has been copied. */

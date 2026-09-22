@@ -177,6 +177,15 @@
         "src/components/chatWindow/chatShell.tsx"
       ],
       "reason": "The main window and the pulled-out Chat window each render their own shell and bind the same close-tab action id and content class; the shared literals are registry and layout names, not duplicated behaviour."
+    },
+    {
+      "id": "content-revision-parity-pins",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/helper_vault_tests.rs",
+        "src/lib/helperVaultDir.test.ts"
+      ],
+      "reason": "Deliberate cross-language parity: the page computes the desktop's fnv1a64 content revision in TypeScript, and both suites pin the same known values so the Rust and TS twins cannot drift apart."
     }
   ]
 }

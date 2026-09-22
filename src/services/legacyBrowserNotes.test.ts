@@ -10,7 +10,6 @@ import {
   clearLegacyBrowserFiles,
   copyLegacyInto,
   filesFromBrowserSnapshot,
-  fromBrowserPath,
   legacyBrowserFiles,
   safeFileName,
 } from "./legacyBrowserNotes";
@@ -41,7 +40,6 @@ describe("notes an older Rotli Web kept in the browser", () => {
   test("a title becomes a name every OS accepts", () => {
     expect(safeFileName('a/b:c*?"<>|')).toBe("a b c");
     expect(safeFileName("   ")).toBe("Untitled");
-    expect(fromBrowserPath("wiki/a.md")).toBe("wiki/a (from this browser).md");
   });
 
   test("both old stores are read, and cleared only when asked", async () => {
@@ -76,14 +74,38 @@ describe("copying into the connected vault", () => {
       { path: `${FROM_BROWSER_FOLDER}/n.md`, text: "note", note: true },
       { path: "storage/p.png", base64: "AAEC", note: false },
     ]);
-    expect(written).toBe(3);
+    expect(written).toEqual({ written: 3, failed: [] });
     expect(await dir.readText("wiki/mine.md")).toBe("the vault's own");
     expect(await dir.readText("wiki/mine (from this browser).md")).toBe("the browser's");
     // a memex puts browser notes under wiki/
     expect(await dir.readText(`wiki/${FROM_BROWSER_FOLDER}/n.md`)).toBe("note");
     expect([...(await dir.readBytes("storage/p.png"))]).toEqual([0, 1, 2]);
     // a second copy changes nothing
-    expect(await copyLegacyInto(dir, [{ path: "wiki/mine.md", text: "the browser's", note: false }])).toBe(0);
+    expect(await copyLegacyInto(dir, [{ path: "wiki/mine.md", text: "the browser's", note: false }])).toEqual(
+      {
+        written: 0,
+        failed: [],
+      },
+    );
+  });
+
+  test("an earlier copy with different text is never overwritten: the next free name is used", async () => {
+    const dir = new MemoryVaultDir();
+    await dir.writeText("a.md", "the vault's");
+    await dir.writeText("a (from this browser).md", "an older browser copy");
+    expect(await copyLegacyInto(dir, [{ path: "a.md", text: "newest", note: false }])).toEqual({
+      written: 1,
+      failed: [],
+    });
+    expect(await dir.readText("a (from this browser).md")).toBe("an older browser copy");
+    expect(await dir.readText("a (from this browser 2).md")).toBe("newest");
+  });
+
+  test("a file that can't be written is reported, so the browser's copy is not cleared", async () => {
+    const dir = new MemoryVaultDir();
+    await dir.writeText("wiki", "a FILE where a folder is needed");
+    const result = await copyLegacyInto(dir, [{ path: "wiki/x.md", text: "x", note: false }]);
+    expect(result).toEqual({ written: 0, failed: ["wiki/x.md"] });
   });
 
   test("Trash in the browser stays out of the vault", async () => {

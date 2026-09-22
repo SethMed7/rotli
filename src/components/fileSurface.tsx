@@ -28,6 +28,7 @@ import {
 } from "../documents/kinds";
 import { clamp } from "../lib/clamp";
 import { IMAGE_EXTS, VIDEO_EXTS, extOf, fileName, managedFileNote } from "../lib/fileKind";
+import { HTML_PREVIEW_CSP } from "../lib/htmlPreviewPolicy";
 import {
   type FileStat,
   corpusFileBytes,
@@ -135,7 +136,9 @@ const READ_MAX_BYTES = 8_000_000;
  * after <head>/<html>/the doctype when present — never before a doctype,
  * which would flip the document into quirks mode. Exported for tests. */
 export function htmlPreviewDoc(text: string, baseUrl: string): string {
-  const base = `<base href="${baseUrl.replace(/"/g, "%22")}">`;
+  // a policy of its own inside the frame, stacked on the app's: the markup may
+  // show local images and inline styles, and may request nothing at all
+  const base = `${HTML_PREVIEW_CSP}<base href="${baseUrl.replace(/"/g, "%22")}">`;
   const m = /<head[^>]*>/i.exec(text) ?? /<html[^>]*>/i.exec(text) ?? /^\s*<!doctype[^>]*>/i.exec(text);
   if (!m) return base + text;
   const at = m.index + m[0].length;

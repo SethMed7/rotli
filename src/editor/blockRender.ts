@@ -22,6 +22,7 @@ import { Decoration, type DecorationSet, EditorView, ViewPlugin, WidgetType } fr
 
 import { createEditableBoardFromMermaid } from "../boards/composition";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { HTML_PREVIEW_CSP } from "../lib/htmlPreviewPolicy";
 import { isTauri } from "../lib/tauri";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { isDarkDataTheme } from "../state/theme";
@@ -221,7 +222,7 @@ const RENDERERS: Record<StaticLangKey, (code: string, ctx: RenderCtx) => HTMLEle
       const frame = document.createElement("iframe");
       frame.setAttribute("sandbox", ""); // opaque origin, no scripts
       frame.title = "html preview";
-      frame.srcdoc = src;
+      frame.srcdoc = HTML_PREVIEW_CSP + src; // no network from note markup, not even same-origin
       el.appendChild(frame);
       return el;
     },

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { MemoryVaultDir, type VaultDir } from "../services/vaultDir";
-import { HelperVaultDir } from "./helperVaultDir";
+import { HelperVaultDir, contentRevision } from "./helperVaultDir";
 
 /** Rotli Helper's vault verbs, served from a MemoryVaultDir: the wire the
  * adapter speaks, with the helper's revision gate. Counts every call. */
@@ -49,7 +49,12 @@ function fakeHelper(disk = new MemoryVaultDir()) {
       case "vault_stat":
         return disk.stat(path);
       case "vault_write": {
-        if (typeof args.expectedRevision === "string" && args.expectedRevision !== (await revision(path))) {
+        const onDisk = (await disk.exists(path)) ? contentRevision(await disk.readText(path)) : "0";
+        const stale =
+          typeof args.expectedContent === "string"
+            ? args.expectedContent !== onDisk
+            : typeof args.expectedRevision === "string" && args.expectedRevision !== (await revision(path));
+        if (stale) {
           throw Object.assign(new Error("revision conflict: the file changed on disk"), { status: 409 });
         }
         if (typeof args.text === "string") await disk.writeText(path, args.text);
@@ -209,4 +214,12 @@ describe("an outage", () => {
     await expect(edit).rejects.toThrow(/revision conflict/);
     expect(await fake.disk.readText("wiki/a.md")).toBe("changed in the Mac app");
   });
+});
+
+test("the content revision is the desktop's own (fnv1a64 over UTF-8)", () => {
+  // the Rust fsutil::revision of b"one" and of an empty file
+  expect(contentRevision("")).toBe("fnv1a64:cbf29ce484222325");
+  // pinned to the same values the Rust suite asserts (helper_vault_tests.rs)
+  expect(contentRevision("one")).toBe("fnv1a64:1a08aa1921ca5caf");
+  expect(contentRevision("# Welcome — ✓\n")).toBe("fnv1a64:4b5f65bd38bda967");
 });

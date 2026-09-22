@@ -225,18 +225,18 @@ fn a_junk_head_line_is_answered_400_and_a_flood_stops_at_the_first() {
 fn a_paired_page_writes_a_real_file_in_the_chosen_vault_and_nothing_without_the_token() {
     let (port, token, service) = helper();
     let folder = tempfile::TempDir::new().unwrap();
-    service.vault.choose(folder.path()).unwrap();
-    let body = "{\"cmd\":\"vault_write\",\"args\":{\"path\":\"wiki/hello.md\",\"text\":\"# Hello\\n\"}}";
-    let refused = rpc(port, "", body);
+    let id = service.vault.choose(folder.path()).unwrap().id;
+    let body = format!("{{\"cmd\":\"vault_write\",\"args\":{{\"path\":\"wiki/hello.md\",\"text\":\"# Hello\\n\",\"vaultId\":\"{id}\"}}}}");
+    let refused = rpc(port, "", &body);
     assert!(refused.starts_with("HTTP/1.1 401"), "{refused}");
     assert!(!folder.path().join("wiki/hello.md").exists());
-    let written = rpc(port, &format!("Authorization: Bearer {token}\r\n"), body);
+    let written = rpc(port, &format!("Authorization: Bearer {token}\r\n"), &body);
     assert!(written.starts_with("HTTP/1.1 200"), "{written}");
     assert_eq!(std::fs::read_to_string(folder.path().join("wiki/hello.md")).unwrap(), "# Hello\n");
     let escape = rpc(
         port,
         &format!("Authorization: Bearer {token}\r\n"),
-        "{\"cmd\":\"vault_read\",\"args\":{\"path\":\"../../etc/passwd\"}}",
+        &format!("{{\"cmd\":\"vault_read\",\"args\":{{\"path\":\"../../etc/passwd\",\"vaultId\":\"{id}\"}}}}"),
     );
     assert!(escape.starts_with("HTTP/1.1 400"), "{escape}");
 }
