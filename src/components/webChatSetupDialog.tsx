@@ -29,21 +29,6 @@ function PairHelper() {
     await verifyHelper();
     setChecking(false);
   };
-  const [code, setCode] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const pair = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await pairHelper(code);
-      setCode("");
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
-    } finally {
-      setBusy(false);
-    }
-  };
   if (link) {
     return (
       <span className="guide-actions">
@@ -68,6 +53,27 @@ function PairHelper() {
       </span>
     );
   }
+  return <PairingCodeForm id="helper-pairing-code" label="Paste the pairing code the helper printed:" />;
+}
+
+/** Paste the code Rotli Helper printed; proven with one call before it is
+ * kept. Shared by chat setup and vault setup. */
+export function PairingCodeForm({ id, label }: { id: string; label: string }) {
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pair = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await pairHelper(code);
+      setCode("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <form
       className="guide-pair"
@@ -76,12 +82,12 @@ function PairHelper() {
         void pair();
       }}
     >
-      <label className="guide-step-detail" htmlFor="helper-pairing-code">
-        Paste the pairing code the helper printed:
+      <label className="guide-step-detail" htmlFor={id}>
+        {label}
       </label>
       <span className="guide-actions">
         <input
-          id="helper-pairing-code"
+          id={id}
           className="rename-input guide-pair-input"
           value={code}
           placeholder="43111:…"
@@ -105,19 +111,21 @@ function PairHelper() {
 
 /** The installer line for this OS. The scripts live on the site
  * (site/public/helper) and download a prebuilt binary; no toolchain needed. */
-function helperInstall(os: GuideOs): { command: string; detail: string; start: string } {
+export function helperInstall(os: GuideOs): { command: string; detail: string; start: string } {
   // the installers live beside this page: rotli.co in production, the dev
   // server in development (which also serves the locally built binary)
   const origin = typeof location === "undefined" ? "https://rotli.co" : location.origin;
   if (os === "windows") {
     return {
-      command: `irm ${origin}/helper/install.ps1 | iex`,
+      // the installer registers a logon task, then opens ${origin}/app/ with
+      // the pairing code in the URL fragment (never sent to a server)
+      command: `& ([scriptblock]::Create((irm ${origin}/helper/install.ps1))) -Open ${origin}/app/`,
       detail: "Paste it into PowerShell (open it from the Start menu).",
       start: String.raw`& "$HOME\.rotli\bin\rotli-helper.exe"`,
     };
   }
   return {
-    command: `curl -fsSL ${origin}/helper/install.sh | sh`,
+    command: `curl -fsSL ${origin}/helper/install.sh | sh -s -- --open ${origin}/app/`,
     detail:
       os === "mac"
         ? "Paste it into Terminal (in Applications → Utilities, or search for it with ⌘Space)."

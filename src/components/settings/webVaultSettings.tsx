@@ -1,117 +1,51 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { isWebVault } from "../../lib/browserVault";
-import { forgetImportedVault } from "../../services/importedVault";
 import { connectedFolderName, exportWebVault, webVaultMode } from "../../services/webNotes";
-import {
-  type FolderSupport,
-  type FolderVaultStatus,
-  browserFolderSupport,
-  disconnectFolderVault,
-  folderVaultStatus,
-  reconnectFolderVault,
-} from "../../services/webVaultFolder";
 import { useWebVaultConnect } from "../../state/webVaultConnect";
 
-async function forgetImport(): Promise<void> {
-  await forgetImportedVault();
-  window.location.reload();
-}
-
-/** Settings → General in Rotli Web only: where the notes live, what that
- * means, and the way to a real folder on this computer — live where the
- * browser can (Chrome, Edge, Arc), a one-time import plus Export elsewhere.
- * Renders nothing in the desktop shell and in the browser twin. */
+/** Settings → General in Rotli Web only: which vault this browser opens, how
+ * it reaches it, and the way to another one. Renders nothing in the desktop
+ * shell and in the browser twin. */
 export function WebVaultSettings() {
   const web = isWebVault();
-  const [status, setStatus] = useState<FolderVaultStatus | null>(null);
-  const [support, setSupport] = useState<FolderSupport | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const openConnect = useWebVaultConnect((s) => s.show);
-  useEffect(() => {
-    if (!web) return;
-    void folderVaultStatus().then(setStatus);
-    void browserFolderSupport().then(setSupport);
-  }, [web]);
+  const openChange = useWebVaultConnect((s) => s.show);
   if (!web) return null;
   const mode = webVaultMode();
   const folder = connectedFolderName();
-  const run = (action: () => Promise<unknown>) => () => {
+  const exportZip = () => {
     setError(null);
-    void action().catch((reason) => setError(reason instanceof Error ? reason.message : String(reason)));
+    void exportWebVault().catch((reason) =>
+      setError(reason instanceof Error ? reason.message : String(reason)),
+    );
   };
   return (
     <>
       <h4 className="sethead">Rotli Web</h4>
       <p className="lead">
-        {mode === "folder" && (
-          <>
-            Your vault is <strong>{folder}</strong> on this computer: every note is a file there, and the
-            browser remembers only that vault. The same vault opens in Rotli for Mac.
-          </>
-        )}
-        {mode === "imported" && (
-          <>
-            Your vault is <strong>{folder}</strong>, connected as a copy kept in this browser. This browser
-            can read a vault but cannot write to it, so changes stay here until you export them; connect it
-            again to pick up what the app changed.
-          </>
-        )}
-        {mode === "browser" && (
-          <>Your vault lives in this browser, on this device. Clearing this site&rsquo;s data removes it.</>
-        )}{" "}
-        Nothing is sent anywhere: the page&rsquo;s security policy forbids every outbound request.
+        Your vault is <strong>{folder}</strong> on this computer: every note is a file there, the same files
+        Rotli for Mac reads.{" "}
+        {mode === "helper"
+          ? "This browser reaches it through Rotli Helper, which starts when you log in and touches only this folder."
+          : "The browser remembers only this folder."}{" "}
+        Nothing is sent anywhere: this page may talk only to your own computer.
       </p>
-      {support?.kind === "brave-off" && (
-        <p className="setnote">
-          Brave ships the folder API switched off. Turn on <code>brave://flags/#file-system-access-api</code>,
-          relaunch, and your vault connects live. Until then, a vault can be imported as a copy.
-        </p>
-      )}
-      {support?.kind === "import-only" && (
-        <p className="setnote">
-          {support.browser} can read a vault you pick but cannot write to it. Chrome, Edge, or Arc connect a
-          vault live; here, connecting keeps a copy and Export gives it back as a zip.
-        </p>
-      )}
-      {support?.kind === "live" && status?.kind === "none" && (
-        <button type="button" className="ghostbtn" onClick={openConnect}>
-          Connect a vault on this computer…
-        </button>
-      )}
-      {support?.kind === "live" && status?.kind === "prompt" && (
-        <button type="button" className="ghostbtn" onClick={run(reconnectFolderVault)}>
-          Reconnect &ldquo;{status.name}&rdquo;
-        </button>
-      )}
-      {support && support.kind !== "live" && (
-        <button type="button" className="ghostbtn" onClick={openConnect}>
-          {mode === "imported" ? "Connect the vault again…" : "Connect a vault…"}
-        </button>
-      )}
-      {mode !== "browser" && (
-        <button type="button" className="ghostbtn" onClick={run(exportWebVault)}>
-          Export vault (.zip)
-        </button>
-      )}
-      {(status?.kind === "granted" || status?.kind === "prompt") && (
-        <button type="button" className="ghostbtn" onClick={run(disconnectFolderVault)}>
-          Use browser storage instead
-        </button>
-      )}
-      {mode === "imported" && (
-        <button type="button" className="ghostbtn" onClick={run(forgetImport)}>
-          Forget the imported copy
-        </button>
-      )}
+      <button type="button" className="ghostbtn" onClick={openChange}>
+        Change vault…
+      </button>
+      <button type="button" className="ghostbtn" onClick={exportZip}>
+        Export vault (.zip)
+      </button>
       {error && (
         <p className="setnote err" role="alert" aria-live="polite">
           {error}
         </p>
       )}
       <p className="setnote">
-        Chat runs through Rotli Helper on this computer (Home → Chat walks you through it). On-device models,
-        the Librarian, Breve, Word and sheet files, and Finder drops are in{" "}
+        Chat runs through Rotli Helper on this computer (Home → Chat walks you through it); only a chat you
+        start reaches the AI tool you chose, and secure notes never do. On-device models, the Librarian,
+        Breve, Word and sheet files, and Finder drops are in{" "}
         <a href="/" rel="noopener">
           Rotli for Mac
         </a>

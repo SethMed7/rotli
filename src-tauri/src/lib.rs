@@ -28,6 +28,8 @@ mod fsutil;
 /// The `rotli-helper` loopback bridge (a second binary, not the app).
 pub mod helper;
 mod helper_args;
+mod helper_picker;
+mod helper_vault;
 mod helper_token;
 mod keychain;
 mod loopback_http;

@@ -51,6 +51,21 @@ The destination inventory and guards are documented in
 an account service, crash upload, sync, or another destination requires an
 explicit privacy and threat-model change before implementation.
 
+## Rotli Web
+
+Rotli Web (`rotli.co/app/`) keeps every note as a file in a vault folder on
+your computer; it has no browser-storage vault. The page loads only its own
+files and its security policy lets it contact nothing but `127.0.0.1` — Rotli
+Helper on the same computer, for browsers without a folder API. The helper
+listens on `127.0.0.1` only, reads and writes only the one folder you choose
+with your computer's own folder picker, and starts when you log in (remove it
+with the installer's `--uninstall`). The installer hands the page its pairing
+code in the address's `#` fragment, which browsers never send to a server.
+Unsaved typing is held briefly in this browser's local storage so a refresh
+can't lose it, then written into the vault and cleared. The one outbound path
+is a chat you start: the helper runs your own AI tool, which contacts its
+provider as above, and secure notes are refused before it runs.
+
 ## Secure notes and locked notes
 
 Secure notes are excluded from remote models, remote search observations, and

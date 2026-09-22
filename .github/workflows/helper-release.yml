@@ -139,4 +139,4 @@ jobs:
           gh release create "helper-v$VERSION" assets/* \
             --repo "$REPO" \
             --title "Rotli Helper $VERSION" \
-            --notes "Rotli Helper $VERSION — the small program that lets Rotli Web chat through the AI tools on your own computer. Install: curl -fsSL https://rotli.co/helper/install.sh | sh (Mac, Linux) or irm https://rotli.co/helper/install.ps1 | iex (Windows)."
+            --notes "Rotli Helper $VERSION — the small program that lets Rotli Web save notes into the vault folder you choose, in browsers without a folder API, and chat through the AI tools on your own computer. It listens on 127.0.0.1 only and starts at login. Install from Rotli Web's setup screen (rotli.co/app), which gives the one line for your computer."

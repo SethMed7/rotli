@@ -28,7 +28,7 @@ async function bootstrap(rootEl: HTMLElement): Promise<void> {
   // Rotli Web lays its chrome out for a browser tab (no traffic lights, no
   // window drag); the stylesheet keys off this before the first paint.
   document.documentElement.dataset.platform = PLATFORM;
-  await hydrateWebVault(); // Rotli Web: a connected folder or the browser vault; a no-op elsewhere
+  await hydrateWebVault(); // Rotli Web: connect the bound vault, or leave setup to show; a no-op elsewhere
   await hydratePersistedState(); // no-op in a plain browser; never throws
   ReactDOM.createRoot(rootEl).render(
     <React.StrictMode>

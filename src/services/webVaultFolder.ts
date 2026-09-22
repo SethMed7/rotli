@@ -47,11 +47,6 @@ export function browserFolderSupportSync(): FolderSupport {
   return { kind: "import-only", browser };
 }
 
-/** The same answer, for callers that already await. */
-export function browserFolderSupport(): Promise<FolderSupport> {
-  return Promise.resolve(browserFolderSupportSync());
-}
-
 export async function loadVaultHandle(): Promise<FileSystemDirectoryHandle | null> {
   if (typeof indexedDB === "undefined") return null;
   try {
@@ -69,9 +64,60 @@ export async function loadVaultHandle(): Promise<FileSystemDirectoryHandle | nul
 
 async function saveVaultHandle(handle: FileSystemDirectoryHandle | null): Promise<void> {
   const db = await openDatabase();
+  if (!handle) {
+    await requestToPromise(
+      db.transaction(VAULT_STORE, "readwrite").objectStore(VAULT_STORE).delete(HANDLE_KEY),
+    );
+    return;
+  }
+  const id = await idForFolder(handle);
   const store = db.transaction(VAULT_STORE, "readwrite").objectStore(VAULT_STORE);
-  if (handle) await requestToPromise(store.put(handle, HANDLE_KEY));
-  else await requestToPromise(store.delete(HANDLE_KEY));
+  await requestToPromise(store.put(handle, HANDLE_KEY));
+  await requestToPromise(store.put(id, FOLDER_ID_KEY));
+}
+
+/** Folders this browser has opened, each with the id it minted for it. A
+ * folder handle has no stable id of its own; this map is what lets choosing a
+ * folder AGAIN — right away, or after others (A → B → A) — keep its id, and
+ * with it its unsaved journal. Capped; the oldest entries fall off. */
+const KNOWN_FOLDERS_KEY = "vault-folders-known";
+const KNOWN_FOLDERS_CAP = 25;
+
+interface KnownFolder {
+  handle: FileSystemDirectoryHandle;
+  id: string;
+}
+
+async function idForFolder(handle: FileSystemDirectoryHandle): Promise<string> {
+  const db = await openDatabase();
+  const read = db.transaction(VAULT_STORE, "readonly").objectStore(VAULT_STORE);
+  const stored: unknown = await requestToPromise(read.get(KNOWN_FOLDERS_KEY));
+  const known = Array.isArray(stored) ? (stored as KnownFolder[]) : [];
+  for (const entry of known) {
+    if (await handle.isSameEntry(entry.handle).catch(() => false)) return entry.id;
+  }
+  const id = crypto.randomUUID();
+  const next = [...known, { handle, id }].slice(-KNOWN_FOLDERS_CAP);
+  const write = db.transaction(VAULT_STORE, "readwrite").objectStore(VAULT_STORE);
+  await requestToPromise(write.put(next, KNOWN_FOLDERS_KEY));
+  return id;
+}
+
+const FOLDER_ID_KEY = "vault-folder-id";
+
+/** This browser's id for the remembered folder (minted if an older build
+ * saved the handle without one). */
+export async function vaultFolderId(): Promise<string> {
+  const db = await openDatabase();
+  const read = db.transaction(VAULT_STORE, "readonly").objectStore(VAULT_STORE);
+  const known: unknown = await requestToPromise(read.get(FOLDER_ID_KEY));
+  if (typeof known === "string" && known) return known;
+  // a handle an older build saved without an id: give it one, remembered
+  const handle = await loadVaultHandle();
+  const id = handle ? await idForFolder(handle) : crypto.randomUUID();
+  const write = db.transaction(VAULT_STORE, "readwrite").objectStore(VAULT_STORE);
+  await requestToPromise(write.put(id, FOLDER_ID_KEY));
+  return id;
 }
 
 /** Where the web build stands at boot: no picker, no folder, a folder the
@@ -106,8 +152,8 @@ export async function reconnectFolderVault(): Promise<boolean> {
   return true;
 }
 
-/** Forget the folder and go back to notes in this browser's storage. The
- * folder itself is untouched. */
+/** Forget the folder (setup asks again after the reload). The folder itself
+ * is untouched. */
 export async function disconnectFolderVault(): Promise<void> {
   await saveVaultHandle(null);
   window.location.reload();

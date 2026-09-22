@@ -23,7 +23,7 @@ those manifests are the executable truth when they drift.
 | Serialization and text | serde, serde_json, regex, base64, time, ulid, uuid, sha2 | across `src-tauri/src/` |
 | Local HTTP from Rust | ureq (on-device model calls the webview CSP blocks) | `src-tauri/src/chat.rs`, `localmodel.rs` |
 | PDF text extraction | pdf-extract, wrapped in `catch_unwind` | `src-tauri/src/document_conversion.rs` |
-| Second binary | `rotli-helper`, the loopback bridge Rotli Web pairs with | `src-tauri/src/bin/rotli_helper.rs` |
+| Second binary | `rotli-helper`, the loopback bridge Rotli Web pairs with: it serves the one vault folder the user chose to browsers without a folder API, and runs chat through the user's AI tools ([`web-vault-connection.md`](web-vault-connection.md)) | `src-tauri/src/bin/rotli_helper.rs`, `helper_vault.rs` |
 
 The same crate also exposes the headless workspace service behind the CLI and
 MCP adapters (`src-tauri/src/workspace.rs`).

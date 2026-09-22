@@ -8,9 +8,11 @@
 import { browserVault, isWebVault } from "../lib/browserVault";
 import { isTauri } from "../lib/tauri";
 import { registerWebAiCorpus, registerWebFileStore, registerWebMemexBridge } from "../lib/webAiSeam";
+import { showFileNotice } from "../state/fileNotice";
+import { useHelperLink } from "../state/helperLink";
 import { seedDemoCorpus, seedReservedRoots } from "./demoCorpus";
 import { FsNotesService } from "./fsNotes";
-import { hydrateHelperLink } from "./helperLink";
+import { adoptPairingFromUrl, hydrateHelperLink } from "./helperLink";
 import { InMemoryNotesService } from "./inMemoryNotes";
 import type { NotesService } from "./notesPort";
 import { createWebAiCorpus } from "./webAiCorpus";
@@ -18,11 +20,12 @@ import { chatStoreFor, webMemexBridge } from "./webChats";
 import { createWebFileStore } from "./webFiles";
 import {
   activeWebNotesService,
-  hydrateWebNotes,
-  webNotesService,
-  webVaultWasRestored,
   activeWebVaultDir,
+  hydrateWebNotes,
+  webVaultIsFreshFolder,
+  webVaultKey,
 } from "./webNotes";
+import { journalKey, replayJournal } from "./webUnsavedJournal";
 
 export { InMemoryNotesService, ulid } from "./inMemoryNotes";
 
@@ -58,7 +61,7 @@ if (!FS_MODE && !WEB_MODE) {
   inboxId = seedReservedRoots(svc);
 }
 
-export { webVaultWasRestored };
+export { activeWebVaultDir, webVaultIsFreshFolder };
 
 /** Where captures and ⌘N land when no folder is selected — "Inbox" on disk
  * (fs mode), the seeded folder's id in the browser. */
@@ -72,23 +75,35 @@ export const initialNoteId = firstNoteId;
 // A `let`, not a `const`: Rotli Web retargets it at boot when the browser
 // still trusts a remembered folder (hydrateWebVault, before the first render).
 // Consumers read the live binding at call time, never a captured copy.
-export let notesService: NotesService = FS_MODE
-  ? new FsNotesService()
-  : WEB_MODE
-    ? webNotesService(svc)
-    : svc;
+export let notesService: NotesService = FS_MODE ? new FsNotesService() : svc;
 
-/** Rotli Web only: choose folder mode or browser storage before the first
- * render (main.tsx awaits it). Resolves what hydrateWebNotes resolves. */
+/** Rotli Web only: connect the bound vault before the first render (main.tsx
+ * awaits it). The helper pairing comes first — a vault served by Rotli Helper
+ * needs it. Resolves true when a vault is connected; false means setup. */
 export async function hydrateWebVault(): Promise<boolean> {
-  const restored = await hydrateWebNotes();
-  if (WEB_MODE) {
-    notesService = activeWebNotesService(notesService);
-    // the model's view of this vault, and the helper that runs the model
-    registerWebAiCorpus(createWebAiCorpus(() => notesService));
-    registerWebMemexBridge(webMemexBridge(chatStoreFor(activeWebVaultDir())));
-    registerWebFileStore(createWebFileStore(activeWebVaultDir(), browserVault));
-    await hydrateHelperLink();
+  if (!WEB_MODE) return false;
+  await hydrateHelperLink();
+  await adoptPairingFromUrl(); // the installer's `#pair=` handoff, if this tab carries one
+  const connected = await hydrateWebNotes(useHelperLink.getState().link);
+  notesService = activeWebNotesService(notesService);
+  const vault = webVaultKey();
+  if (connected && vault && typeof window !== "undefined") {
+    // typing the last page couldn't save before it unloaded
+    try {
+      const { keptAside } = await replayJournal(window.localStorage, journalKey(vault), notesService);
+      if (keptAside.length > 0) {
+        showFileNotice(`Kept unsaved edits beside the changed note: “${keptAside.join("”, “")}”`);
+      }
+    } catch (cause) {
+      // storage refused: the journal is left exactly as it was for the next boot
+      showFileNotice(
+        `Couldn’t finish saving edits from last time — they are kept and retried next time (${String(cause)})`,
+      );
+    }
   }
-  return restored;
+  // the model's view of this vault, and the helper that runs the model
+  registerWebAiCorpus(createWebAiCorpus(() => notesService));
+  registerWebMemexBridge(webMemexBridge(chatStoreFor(activeWebVaultDir())));
+  registerWebFileStore(createWebFileStore(activeWebVaultDir(), browserVault));
+  return connected;
 }

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_modified": "2026-09-01",
+  "last_modified": "2026-09-22T19:48:49.757Z",
   "config": {
     "devmode": false,
     "post_compact_gate": true,
@@ -713,6 +713,15 @@
       "rationale": "2026-08-19 four-tool parity work: Cursor and Antigravity previously had no repo wiring at all, and the read-only boundary existed only for Codex (config-level). Now the server enforces it and the gate smoke-tests it.",
       "source": "docs/architecture/ai-context-architecture.md",
       "proposed_at": "2026-08-19T15:29:05.185Z",
+      "status": "pending"
+    },
+    {
+      "id": "stg-009",
+      "proposed_domain": "ROTLI_SECURITY",
+      "rule_text": "Rotli Web requires a connected vault folder and never stores notes in the browser. Its /app/ CSP reaches only http://127.0.0.1 (check:web-privacy + e2e/web/rotli-web-privacy.spec.ts). Rotli Helper may serve ONE vault a person chose (--vault or the OS picker, never the page): paths via resolve_beneath, symlinks skipped, .git never written, revision-gated atomic writes, vault verbs only from the vault adapter (never the AI seam). A lost connection is a reconnect screen, never a stand-in vault.",
+      "rationale": "2026-09-22 the owner reversed the helper's 'no vault access' threat model so Zen/Firefox write real files, required a vault on the web, and made privacy (nothing leaves the computer) the top rule. Contract: docs/architecture/web-vault-connection.md.",
+      "source": "docs/architecture/web-vault-connection.md",
+      "proposed_at": "2026-09-22T19:48:49.756Z",
       "status": "pending"
     }
   ]

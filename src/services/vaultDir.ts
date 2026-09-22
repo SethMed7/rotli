@@ -33,7 +33,9 @@ export interface VaultDir {
   /** Recursive and idempotent. */
   mkdir(path: string): Promise<void>;
   /** File move: read → write → remove, in that order, so a failed write leaves
-   * the original in place. Parent directories of `to` are created. */
+   * the original in place. Parent directories of `to` are created. NEVER
+   * replaces: a `to` that exists is refused ("already exists") — callers pick
+   * a free name first (`freeSiblingPath`). */
   move(from: string, to: string): Promise<void>;
   /** A file or an EMPTY directory; a missing path is a no-op. */
   remove(path: string): Promise<void>;
@@ -65,6 +67,29 @@ export function baseName(path: string): string {
 /** Join path fragments, skipping empties ("", "wiki", "a.md" → "wiki/a.md"). */
 export function joinVaultPath(...parts: string[]): string {
   return normalizeVaultPath(parts.join("/"));
+}
+
+/** "a.md" → "a (label).md", then "a (label 2).md", … — the first name the
+ * folder doesn't already hold. A copy kept beside a file never replaces
+ * anything, not even an earlier copy. */
+export async function freeSiblingPath(
+  dir: Pick<VaultDir, "exists">,
+  path: string,
+  label: string,
+): Promise<string> {
+  for (let n = 1; ; n += 1) {
+    const candidate = siblingPath(path, label, n);
+    if (!(await dir.exists(candidate))) return candidate;
+  }
+}
+
+/** The nth labelled sibling of a file: "a.md" → "a (label).md" (n = 1),
+ * "a (label 2).md", …. Pure. */
+export function siblingPath(path: string, label: string, n: number): string {
+  const slash = path.lastIndexOf("/");
+  const dot = path.lastIndexOf(".");
+  const [stem, ext] = dot > slash + 1 ? [path.slice(0, dot), path.slice(dot)] : [path, ""];
+  return `${stem} (${n === 1 ? label : `${label} ${n}`})${ext}`;
 }
 
 /** UTF-8 byte length — the size a real file reports, and the one half of the
@@ -173,6 +198,7 @@ export class MemoryVaultDir implements VaultDir {
     if (source === target) return;
     const file = this.files.get(source);
     if (!file) throw new Error(`no such file: ${source}`);
+    if (await this.exists(target)) throw new Error(`${target} already exists`);
     // a binary moves as bytes; reading it as text would leave an empty file
     if (file.bytes) await this.writeBytes(target, file.bytes);
     else await this.writeText(target, file.text);

@@ -54,6 +54,7 @@ fix both in the same change.
 | Token-efficient AI context and project CARL | [`architecture/ai-context-architecture.md`](architecture/ai-context-architecture.md) |
 | Claude/Codex workspace CLI and MCP | [`architecture/agent-workspace.md`](architecture/agent-workspace.md) |
 | Opt-in cloud MCP relay boundary | [`architecture/remote-agent-relay.md`](architecture/remote-agent-relay.md) |
+| Rotli Web: the required vault, Rotli Helper's vault lane, staying connected, and the no-egress rule | [`architecture/web-vault-connection.md`](architecture/web-vault-connection.md) |
 
 ## Source-of-truth boundaries
 

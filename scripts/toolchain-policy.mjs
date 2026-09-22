@@ -2,10 +2,10 @@
 // tsc rejects, and in the parallel log that crash buried the real type error
 // (audit 2026-09-03). +0.6s on green; the same failures, readable.
 export const PARALLEL_LINT_COMMAND =
-  "bun run --parallel typecheck check:e2e-types typecheck:tsc6 format:check check:code-shape check:react-compiler check:naming check:hex check:architecture check:ipc check:secret-parity check:parity check:structure check:security check:knip check:docs check:ratchets check:window-events check:dup:gate && bun run lint:oxlint";
+  "bun run --parallel typecheck check:e2e-types typecheck:tsc6 format:check check:code-shape check:react-compiler check:naming check:hex check:architecture check:ipc check:secret-parity check:parity check:structure check:security check:knip check:docs check:ratchets check:window-events check:web-privacy check:dup:gate && bun run lint:oxlint";
 
 export const SERIAL_LINT_COMMAND =
-  "bun run typecheck && bun run check:e2e-types && bun run typecheck:tsc6 && bun run format:check && bun run check:code-shape && bun run check:react-compiler && bun run check:naming && bun run check:hex && bun run check:architecture && bun run check:ipc && bun run check:secret-parity && bun run check:parity && bun run check:structure && bun run check:security && bun run check:knip && bun run check:docs && bun run check:ratchets && bun run check:window-events && bun run check:dup:gate && bun run lint:oxlint";
+  "bun run typecheck && bun run check:e2e-types && bun run typecheck:tsc6 && bun run format:check && bun run check:code-shape && bun run check:react-compiler && bun run check:naming && bun run check:hex && bun run check:architecture && bun run check:ipc && bun run check:secret-parity && bun run check:parity && bun run check:structure && bun run check:security && bun run check:knip && bun run check:docs && bun run check:ratchets && bun run check:window-events && bun run check:web-privacy && bun run check:dup:gate && bun run lint:oxlint";
 
 export const OXLINT_COMMAND =
   "oxlint --disable-nested-config -c .oxlintrc.json --report-unused-disable-directives-severity=error src e2e scripts breve-runtime services/rotli-mcp-relay playwright.config.ts vite.config.ts";

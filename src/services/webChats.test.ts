@@ -114,3 +114,19 @@ describe("web chat store", () => {
     expect((await store.folders()).revision).toBe(rev);
   });
 });
+
+test("trashing a second chat with the same name keeps the first one's file", async () => {
+  const dir = new MemoryVaultDir();
+  const store = new FolderChatStore(dir);
+  for (const text of ["first", "second"]) {
+    const chat = composeNewChat(
+      { title: "Plan", source: "rotli", slug: "plan" },
+      [{ speaker: "you", text }],
+      DATE,
+    );
+    await store.write("plan", chat.contents, null);
+    await store.remove("plan", "trash");
+  }
+  expect(await dir.readText("chats/trash/plan.md")).toContain("first");
+  expect(await dir.readText("chats/trash/plan (another).md")).toContain("second");
+});
