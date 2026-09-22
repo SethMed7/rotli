@@ -29,6 +29,11 @@ export function journalKey(vault: string): string {
   return `${PREFIX}${vault}`;
 }
 
+/** Where drafts a boot couldn't place wait for the next one. */
+function keptKey(key: string): string {
+  return `${key}:kept`;
+}
+
 /** Write (or clear) the journal now. Synchronous: this runs as the page
  * unloads, where nothing asynchronous is guaranteed to finish. */
 export function writeJournal(storage: KeyValue, key: string, drafts: readonly JournalDraft[]): void {
@@ -68,7 +73,9 @@ export async function replayJournal(
   key: string,
   service: Pick<NotesService, "getNote" | "updateNote" | "createNote">,
 ): Promise<{ saved: number; keptAside: string[]; unresolved: number }> {
-  const drafts = readJournal(storage, key);
+  // the last unload's drafts, and any a previous boot couldn't place yet —
+  // kept under their own key, which no unload ever overwrites
+  const drafts = [...readJournal(storage, keptKey(key)), ...readJournal(storage, key)];
   let saved = 0;
   const keptAside: string[] = [];
   const unresolved: JournalDraft[] = [];
@@ -85,6 +92,7 @@ export async function replayJournal(
       else unresolved.push(draft); // neither saved nor kept aside: keep it for the next boot
     }
   }
-  writeJournal(storage, key, unresolved);
+  storage.removeItem(key);
+  writeJournal(storage, keptKey(key), unresolved);
   return { saved, keptAside, unresolved: unresolved.length };
 }

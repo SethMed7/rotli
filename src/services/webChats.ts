@@ -8,7 +8,7 @@ import type { VaultStore } from "../lib/browserVault";
 import { BrowserVault, RevisionConflict, browserVault } from "../lib/browserVault";
 import type { MemexChatSummary } from "../lib/tauri";
 import type { WebMemexBridge } from "../lib/webAiSeam";
-import type { VaultDir } from "./vaultDir";
+import { type VaultDir, freeSiblingPath } from "./vaultDir";
 
 const INDEX_KEY = "chat-index";
 const FOLDERS_KEY = "chat-folders";
@@ -227,7 +227,12 @@ export class FolderChatStore implements ChatStore {
   async remove(slug: string, bin: "trash" | "archive"): Promise<void> {
     const path = this.path(slug);
     if (!(await this.dir.exists(path))) return;
-    await this.dir.move(path, `${CHATS_DIR}/${bin}/${safeSlug(slug)}.md`);
+    // a chat already archived under this name keeps its file: take the next free name
+    const direct = `${CHATS_DIR}/${bin}/${safeSlug(slug)}.md`;
+    const target = (await this.dir.exists(direct))
+      ? await freeSiblingPath(this.dir, direct, "another")
+      : direct;
+    await this.dir.move(path, target);
   }
 
   async folders(): Promise<{ contents: string; revision: string }> {

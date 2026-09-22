@@ -47,12 +47,12 @@ export function browserFolderSupportSync(): FolderSupport {
   return { kind: "import-only", browser };
 }
 
-export async function loadVaultHandle(): Promise<FileSystemDirectoryHandle | null> {
+export async function loadVaultHandle(key = HANDLE_KEY): Promise<FileSystemDirectoryHandle | null> {
   if (typeof indexedDB === "undefined") return null;
   try {
     const db = await openDatabase();
     const value = await requestToPromise(
-      db.transaction(VAULT_STORE, "readonly").objectStore(VAULT_STORE).get(HANDLE_KEY),
+      db.transaction(VAULT_STORE, "readonly").objectStore(VAULT_STORE).get(key),
     );
     return value && typeof value === "object" && "kind" in value
       ? (value as FileSystemDirectoryHandle)
@@ -63,15 +63,27 @@ export async function loadVaultHandle(): Promise<FileSystemDirectoryHandle | nul
 }
 
 async function saveVaultHandle(handle: FileSystemDirectoryHandle | null): Promise<void> {
+  // a folder handle has no stable id of its own: this browser mints one per
+  // chosen folder, so per-vault bookkeeping never crosses into another — and
+  // choosing the SAME folder again keeps its id (and so its unsaved journal)
+  // (the folder just closed with Change vault counts: it is kept as "previous")
+  const previous = handle
+    ? ((await loadVaultHandle()) ?? (await loadVaultHandle(PREVIOUS_HANDLE_KEY)))
+    : null;
+  const same = previous ? await handle?.isSameEntry(previous).catch(() => false) : false;
+  const current = handle ? null : await loadVaultHandle();
   const db = await openDatabase();
   const store = db.transaction(VAULT_STORE, "readwrite").objectStore(VAULT_STORE);
   if (handle) {
     await requestToPromise(store.put(handle, HANDLE_KEY));
-    // a folder handle has no stable id of its own: this browser mints one per
-    // chosen folder, so per-vault bookkeeping never crosses into another
-    await requestToPromise(store.put(crypto.randomUUID(), FOLDER_ID_KEY));
-  } else await requestToPromise(store.delete(HANDLE_KEY));
+    if (!same) await requestToPromise(store.put(crypto.randomUUID(), FOLDER_ID_KEY));
+  } else {
+    if (current) await requestToPromise(store.put(current, PREVIOUS_HANDLE_KEY));
+    await requestToPromise(store.delete(HANDLE_KEY));
+  }
 }
+
+const PREVIOUS_HANDLE_KEY = "vault-handle-previous";
 
 const FOLDER_ID_KEY = "vault-folder-id";
 

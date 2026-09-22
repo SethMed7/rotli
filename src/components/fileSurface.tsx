@@ -136,13 +136,15 @@ const READ_MAX_BYTES = 8_000_000;
  * after <head>/<html>/the doctype when present — never before a doctype,
  * which would flip the document into quirks mode. Exported for tests. */
 export function htmlPreviewDoc(text: string, baseUrl: string): string {
-  // a policy of its own inside the frame, stacked on the app's: the markup may
-  // show local images and inline styles, and may request nothing at all
-  const base = `${HTML_PREVIEW_CSP}<base href="${baseUrl.replace(/"/g, "%22")}">`;
-  const m = /<head[^>]*>/i.exec(text) ?? /<html[^>]*>/i.exec(text) ?? /^\s*<!doctype[^>]*>/i.exec(text);
-  if (!m) return base + text;
-  const at = m.index + m[0].length;
-  return text.slice(0, at) + base + text.slice(at);
+  // the policy (and base) go BEFORE every author-controlled token — only a
+  // leading doctype may precede them, so quirks mode never flips. Never
+  // "after <head>": a regex finds <head> inside a comment too, and a policy
+  // inside a comment protects nothing (adversarial review, 2026-09-22)
+  const lead = `${HTML_PREVIEW_CSP}<base href="${baseUrl.replace(/"/g, "%22")}">`;
+  const doctype = /^\s*<!doctype[^>]*>/i.exec(text);
+  if (!doctype) return lead + text;
+  const at = doctype[0].length;
+  return text.slice(0, at) + lead + text.slice(at);
 }
 
 // per-file SESSION memory for the two small view prefs — PaneTree unmounts the

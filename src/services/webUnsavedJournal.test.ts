@@ -82,5 +82,11 @@ test("a draft that can be neither saved nor kept aside stays in the journal for 
     createNote: () => Promise.reject(new Error("disk full")),
   };
   expect(await replayJournal(store, key, failing)).toEqual({ saved: 0, keptAside: [], unresolved: 1 });
-  expect(JSON.parse(store.values.get(key) ?? "[]")).toEqual([draft]);
+  // kept under its own key: the next unload (which rewrites `key`) can't drop it
+  expect(store.values.has(key)).toBe(false);
+  expect(JSON.parse(store.values.get(`${key}:kept`) ?? "[]")).toEqual([draft]);
+  writeJournal(store, key, []);
+  expect(JSON.parse(store.values.get(`${key}:kept`) ?? "[]")).toEqual([draft]);
+  // the next boot tries it again
+  expect((await replayJournal(store, key, failing)).unresolved).toBe(1);
 });

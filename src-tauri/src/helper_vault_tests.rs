@@ -274,3 +274,17 @@ fn the_content_revision_matches_the_pages_twin() {
     assert_eq!(crate::fsutil::revision("# Welcome — ✓\n".as_bytes()), "fnv1a64:4b5f65bd38bda967");
     assert_eq!(crate::fsutil::revision(b""), "fnv1a64:cbf29ce484222325");
 }
+
+#[test]
+fn a_delete_decided_against_an_older_version_keeps_the_newer_file() {
+    let (vault, _config, served) = serving();
+    fs::write(vault.path().join("a.md"), "one").unwrap();
+    let old = crate::fsutil::revision(b"one");
+    fs::write(vault.path().join("a.md"), "two").unwrap();
+    let refused = call(&served, "vault_remove", json!({ "path": "a.md", "expectedContent": old })).unwrap_err();
+    assert_eq!(refused.0, 409);
+    assert_eq!(fs::read_to_string(vault.path().join("a.md")).unwrap(), "two");
+    let current = crate::fsutil::revision(b"two");
+    call(&served, "vault_remove", json!({ "path": "a.md", "expectedContent": current })).unwrap();
+    assert!(!vault.path().join("a.md").exists());
+}

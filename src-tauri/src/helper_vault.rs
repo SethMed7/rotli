@@ -151,7 +151,7 @@ impl ServedVault {
             "vault_write" => write(root, args),
             "vault_mkdir" => mkdir(root, &path_arg(args, "path")?),
             "vault_move" => move_file(root, &path_arg(args, "from")?, &path_arg(args, "to")?),
-            "vault_remove" => remove(root, &path_arg(args, "path")?),
+            "vault_remove" => remove(root, &path_arg(args, "path")?, args),
             _ => Err((404, "unknown command".into())),
         }
     }
@@ -305,6 +305,23 @@ fn stat_json(metadata: &fs::Metadata) -> Value {
     json!({ "lastModified": millis(metadata.modified()), "size": size })
 }
 
+/// The gate every mutation of an existing file shares: by content
+/// (`expectedContent`, the desktop's fnv1a64) when the page knows the text,
+/// else by `${mtimeMs}:${size}` (`expectedRevision`). Some(message) when the
+/// file on disk is not the one the page decided against. Call under the lock.
+fn stale_revision(path: &Path, args: &Value) -> Result<Option<String>, String> {
+    let conflict = |found: String| Some(format!("revision conflict: the file changed on disk ({found})"));
+    if let Some(content) = args.get("expectedContent").and_then(Value::as_str) {
+        let current = if path.is_file() { crate::fsutil::file_revision(path)? } else { "0".into() };
+        return Ok(if current == content { None } else { conflict(current) });
+    }
+    if let Some(expected) = args.get("expectedRevision").and_then(Value::as_str) {
+        let current = revision_of(path);
+        return Ok(if current == expected { None } else { conflict(current) });
+    }
+    Ok(None)
+}
+
 fn revision_of(path: &Path) -> String {
     match fs::symlink_metadata(path) {
         Ok(m) if m.is_file() => format!("{}:{}", millis(m.modified()), m.len()),
@@ -439,21 +456,10 @@ fn write(root: &Path, args: &Value) -> Result<Value, Refusal> {
         return Err((409, format!("a directory already holds {}", joined(&rel))));
     }
     make_parents(root, &rel)?;
-    let expected = args.get("expectedRevision").and_then(Value::as_str);
-    let expected_content = args.get("expectedContent").and_then(Value::as_str);
     // the desktop app's writers hold this same lock: compare and replace as one step
     crate::fsutil::with_file_lock(&target, || {
-        let conflict = |found: String| format!("revision conflict: the file changed on disk ({found})");
-        if let Some(content) = expected_content {
-            let current = if target.is_file() { crate::fsutil::file_revision(&target)? } else { "0".into() };
-            if current != content {
-                return Err(conflict(current));
-            }
-        } else if let Some(expected) = expected {
-            let current = revision_of(&target);
-            if current != expected {
-                return Err(conflict(current));
-            }
+        if let Some(stale) = stale_revision(&target, args)? {
+            return Err(stale);
         }
         crate::fsutil::atomic_write_bytes(&target, &bytes, WRITE_PREFIX)
     })
@@ -506,20 +512,47 @@ fn move_file(root: &Path, from: &[String], to: &[String]) -> Result<Value, Refus
         return Err((409, format!("{} already exists", joined(to))));
     }
     make_parents(root, to)?;
-    if fs::rename(&source, &target).is_err() {
-        // a different volume under the same root: copy, then remove
-        fs::copy(&source, &target).map_err(|e| (500, format!("couldn't move {}: {e}", joined(from))))?;
-        fs::remove_file(&source).map_err(|e| (500, format!("couldn't remove {}: {e}", joined(from))))?;
+    // No-replace, atomically: a hard link fails if `to` exists at that instant
+    // (a check-then-rename would race another writer), then the old name goes.
+    // Across volumes, a create-new copy is just as strict.
+    let exists = |e: &std::io::Error| e.kind() == ErrorKind::AlreadyExists;
+    let already = || (409, format!("{} already exists", joined(to)));
+    match fs::hard_link(&source, &target) {
+        Ok(()) => {}
+        Err(e) if exists(&e) => return Err(already()),
+        Err(_) => {
+            let mut out = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&target)
+                .map_err(|e| if exists(&e) { already() } else { (500, format!("couldn't move {}: {e}", joined(from))) })?;
+            let mut input = fs::File::open(&source).map_err(|e| (500, e.to_string()))?;
+            std::io::copy(&mut input, &mut out).map_err(|e| (500, format!("couldn't move {}: {e}", joined(from))))?;
+            out.sync_all().map_err(|e| (500, e.to_string()))?;
+        }
     }
+    fs::remove_file(&source).map_err(|e| (500, format!("couldn't remove {}: {e}", joined(from))))?;
     Ok(Value::Null)
 }
 
-fn remove(root: &Path, rel: &[String]) -> Result<Value, Refusal> {
+fn remove(root: &Path, rel: &[String], args: &Value) -> Result<Value, Refusal> {
     refuse_git(rel)?;
     if rel.is_empty() {
         return Err((400, "the vault itself can't be removed".into()));
     }
     let path = resolve(root, rel)?;
+    // a delete decided against an older version of a FILE must not remove a
+    // newer one (an outage replay, or the desktop app writing meanwhile)
+    if path.is_file() {
+        return crate::fsutil::with_file_lock(&path, || {
+            if let Some(stale) = stale_revision(&path, args)? {
+                return Err(stale);
+            }
+            fs::remove_file(&path).map_err(|e| e.to_string())
+        })
+        .map(|()| Value::Null)
+        .map_err(|e| (if e.starts_with("revision conflict") { 409 } else { 500 }, e));
+    }
     match fs::symlink_metadata(&path) {
         Err(_) => Ok(Value::Null),
         Ok(m) if m.is_dir() => match fs::remove_dir(&path) {

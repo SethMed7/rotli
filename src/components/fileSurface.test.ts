@@ -40,29 +40,26 @@ describe("kindOf", () => {
   });
 });
 
-describe("htmlPreviewDoc — <base> injection for the sandboxed srcdoc Preview", () => {
+describe("htmlPreviewDoc — policy and <base> for the sandboxed srcdoc Preview", () => {
   const URL = "asset://localhost/%2FUsers%2Fx%2Fpage.html";
-  // the no-network policy rides in front of the base, wherever it lands
-  const BASE = `${HTML_PREVIEW_CSP}<base href="${URL}">`;
+  const LEAD = `${HTML_PREVIEW_CSP}<base href="${URL}">`;
 
-  test("goes right after <head> when one exists", () => {
+  test("goes before every author token, so no markup can precede the policy", () => {
     expect(htmlPreviewDoc("<html><head><title>t</title></head><body>b</body></html>", URL)).toBe(
-      `<html><head>${BASE}<title>t</title></head><body>b</body></html>`,
+      `${LEAD}<html><head><title>t</title></head><body>b</body></html>`,
     );
-    // attributes + case survive
-    expect(htmlPreviewDoc('<HEAD lang="en">x</HEAD>', URL)).toBe(`<HEAD lang="en">${BASE}x</HEAD>`);
+    expect(htmlPreviewDoc("<p>hi</p>", URL)).toBe(`${LEAD}<p>hi</p>`);
+    expect(htmlPreviewDoc("", URL)).toBe(LEAD);
   });
 
-  test("falls back to after <html>, then after the doctype — NEVER before it", () => {
-    expect(htmlPreviewDoc("<html><body>b</body></html>", URL)).toBe(`<html>${BASE}<body>b</body></html>`);
+  test("a <head> inside a comment can't pull the policy into the comment", () => {
+    const doc = htmlPreviewDoc('<!-- <head> --><img src="/app/leak?text=SECRET">', URL);
+    expect(doc.startsWith(LEAD)).toBe(true);
+  });
+
+  test("only a leading doctype comes first — quirks mode is never triggered", () => {
     const doc = htmlPreviewDoc("<!DOCTYPE html>\n<p>hi</p>", URL);
-    expect(doc.startsWith("<!DOCTYPE html>")).toBe(true); // quirks mode never triggered
-    expect(doc).toBe(`<!DOCTYPE html>${BASE}\n<p>hi</p>`);
-  });
-
-  test("a bare fragment just gets the base prepended", () => {
-    expect(htmlPreviewDoc("<p>hi</p>", URL)).toBe(`${BASE}<p>hi</p>`);
-    expect(htmlPreviewDoc("", URL)).toBe(BASE);
+    expect(doc).toBe(`<!DOCTYPE html>${LEAD}\n<p>hi</p>`);
   });
 
   test("a quote in the URL can't break out of the href attribute", () => {

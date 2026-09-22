@@ -132,6 +132,9 @@ export class FsaVaultDir implements VaultDir {
 
   /** read → write → remove, so a failure at any step leaves the original. */
   async move(from: string, to: string): Promise<void> {
+    // never replace what is already there (a stale listing must not destroy
+    // a note); the caller picks a free name
+    if (await this.exists(to)) throw new Error(`${to} already exists`);
     // bytes, so an image moves intact (text is bytes too)
     const bytes = await this.readBytes(from);
     await this.writeBytes(to, bytes);

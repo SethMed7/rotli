@@ -213,3 +213,41 @@ test("a hard refresh the instant after typing keeps the words, in the vault's fi
     .toContain("typed-then-refreshed");
   await expect(page.locator(".main-tree").getByText("Welcome to Rotli", { exact: true })).toHaveCount(1);
 });
+
+// Adversarial review, round 2: choosing the SAME folder again must keep this
+// browser's id for it — the unsaved journal is keyed by that id, and a new
+// one would orphan any edit still waiting in it.
+test("choosing the same folder again keeps its identity (and so its unsaved journal)", async ({ page }) => {
+  await page.addInitScript(() => {
+    (
+      window as unknown as { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> }
+    ).showDirectoryPicker = () => navigator.storage.getDirectory();
+  });
+  await startWithVault(page);
+  const folderId = () =>
+    page.evaluate(
+      () =>
+        new Promise<string>((resolve) => {
+          const open = indexedDB.open("rotli-web");
+          open.onsuccess = () => {
+            const get = open.result.transaction("vault").objectStore("vault").get("vault-folder-id");
+            get.onsuccess = () => resolve(String(get.result ?? ""));
+          };
+        }),
+    );
+  const before = await folderId();
+  expect(before).not.toBe("");
+  await page
+    .getByRole("button", { name: /Settings/ })
+    .first()
+    .click();
+  await page.getByRole("button", { name: "Change vault…" }).click();
+  await page
+    .getByRole("dialog", { name: "Change vault" })
+    .getByRole("button", { name: /Choose another vault/ })
+    .click();
+  await expect(vaultGate(page)).toHaveText("Choose your vault");
+  await page.locator(".setup-button.primary", { hasText: "Choose vault…" }).click();
+  await expect(page.getByRole("tab", { selected: true })).toBeVisible();
+  expect(await folderId()).toBe(before);
+});

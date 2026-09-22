@@ -69,8 +69,19 @@ function fakeHelper(disk = new MemoryVaultDir()) {
         return disk.mkdir(path);
       case "vault_move":
         return disk.move(String(args.from), String(args.to));
-      case "vault_remove":
+      case "vault_remove": {
+        if (await disk.exists(path)) {
+          const text = await disk.readText(path).catch(() => null);
+          const onDisk = text === null ? "0" : contentRevision(text);
+          const stale =
+            (typeof args.expectedContent === "string" && args.expectedContent !== onDisk) ||
+            (typeof args.expectedRevision === "string" && args.expectedRevision !== (await revision(path)));
+          if (stale && text !== null) {
+            throw Object.assign(new Error("revision conflict: the file changed on disk"), { status: 409 });
+          }
+        }
         return disk.remove(path);
+      }
       default:
         throw new Error(`unknown ${cmd}`);
     }
@@ -114,6 +125,15 @@ for (const [name, make] of contract) {
       expect(await dir.stat("nope")).toBeNull();
       expect(await dir.readText("wiki/ideas/a.md")).toBe("# A\n");
       await expect(dir.readText("wiki/none.md")).rejects.toThrow();
+    });
+
+    test("a move never replaces a file already at the destination", async () => {
+      const dir = make();
+      await dir.writeText("a.md", "A");
+      await dir.writeText("b.md", "B");
+      await expect(dir.move("a.md", "b.md")).rejects.toThrow(/already exists/);
+      expect(await dir.readText("b.md")).toBe("B");
+      expect(await dir.readText("a.md")).toBe("A");
     });
 
     test("bytes round-trip; mkdir is idempotent; move and remove follow the port", async () => {
@@ -170,6 +190,14 @@ describe("never overwriting another writer", () => {
     expect(await fake.disk.readText("wiki/a.md")).toBe("edited in the Mac app");
     // the refusal re-reads the vault: the next read sees the Mac's text
     expect(await fake.dir.readText("wiki/a.md")).toBe("edited in the Mac app");
+  });
+
+  test("a delete never removes a version this tab didn't see", async () => {
+    const fake = fakeHelper();
+    await fake.dir.writeText("wiki/a.md", "mine");
+    await fake.disk.writeText("wiki/a.md", "edited in the Mac app");
+    await expect(fake.dir.remove("wiki/a.md")).rejects.toThrow(/revision conflict/);
+    expect(await fake.disk.readText("wiki/a.md")).toBe("edited in the Mac app");
   });
 
   test("rapid saves of one note each land: every write is gated on the one before it", async () => {

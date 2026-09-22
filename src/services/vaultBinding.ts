@@ -10,7 +10,7 @@
 // Privacy: every call here is local — IndexedDB, the File System Access API,
 // or Rotli Helper on 127.0.0.1. Nothing goes to the network.
 
-import { deviceVaultStore } from "../lib/browserVault";
+import { type VaultStore, deviceVaultStore } from "../lib/browserVault";
 import { FsaVaultDir } from "../lib/fsaVaultDir";
 import { HelperHttpError, helperHealth, helperRpc, helperUnreachable } from "../lib/helperClient";
 import type { HelperLink } from "../lib/helperPairing";
@@ -27,6 +27,19 @@ import {
 
 const BINDING_KEY = "vault-binding";
 const PENDING_KEY = "vault-pending";
+/** Operations a replay couldn't finish yet, per vault: their own key, so the
+ * next page's unload (which rewrites PENDING_KEY) can never drop them. */
+const keptKey = (vaultId: string) => `vault-pending:kept:${vaultId}`;
+
+async function readRecord(store: VaultStore, key: string): Promise<PendingRecord | null> {
+  try {
+    const raw = await store.get(key);
+    const record = raw ? (JSON.parse(raw) as PendingRecord) : null;
+    return record && Array.isArray(record.ops) ? record : null;
+  } catch {
+    return null;
+  }
+}
 
 export interface HelperBinding {
   kind: "helper";
@@ -242,17 +255,15 @@ export async function replayPendingOps(
   vaultId: string,
   store = deviceVaultStore(),
 ): Promise<number> {
-  let record: PendingRecord | null = null;
-  try {
-    const raw = await store.get(PENDING_KEY);
-    record = raw ? (JSON.parse(raw) as PendingRecord) : null;
-  } catch {
-    record = null;
-  }
-  if (!record || record.vaultId !== vaultId || !Array.isArray(record.ops)) return 0;
+  const kept = await readRecord(store, keptKey(vaultId));
+  const last = await readRecord(store, PENDING_KEY);
+  // another vault's unload record waits for that vault; never replayed here
+  const lastHere = last?.vaultId === vaultId ? last : null;
+  const ops = [...(kept?.ops ?? []), ...(lastHere?.ops ?? [])];
+  if (ops.length === 0) return 0;
   let replayed = 0;
-  const kept: PendingOp[] = [];
-  for (const op of record.ops) {
+  const retained: PendingOp[] = [];
+  for (const op of ops) {
     try {
       if (op.kind === "write") {
         const now = await dir.stat(op.path);
@@ -267,15 +278,20 @@ export async function replayPendingOps(
         }
       } else if (op.kind === "mkdir") await dir.mkdir(op.path);
       else if (op.kind === "move") await dir.move(op.from, op.to);
-      else await dir.remove(op.path);
+      else {
+        // a delete decided against an older version never removes a newer one
+        const now = op.base ? await dir.stat(op.path) : null;
+        if (!op.base || !now || `${now.lastModified}:${now.size}` === op.base) await dir.remove(op.path);
+      }
       replayed += 1;
     } catch (error) {
       // kept for the next boot, never dropped: nothing is forgotten silently
-      kept.push(op);
+      retained.push(op);
       console.warn("rotli: a saved-while-offline change couldn't be replayed yet", error);
     }
   }
-  if (kept.length === 0) await store.delete(PENDING_KEY);
-  else await store.set(PENDING_KEY, JSON.stringify({ vaultId, ops: kept } satisfies PendingRecord));
+  if (lastHere) await store.delete(PENDING_KEY);
+  if (retained.length === 0) await store.delete(keptKey(vaultId));
+  else await store.set(keptKey(vaultId), JSON.stringify({ vaultId, ops: retained } satisfies PendingRecord));
   return replayed;
 }

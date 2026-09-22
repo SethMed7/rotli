@@ -109,12 +109,46 @@ describe("edits a closed tab couldn't deliver", () => {
     expect(await dir.readText("wiki/a (unsaved copy 2).md")).toBe("second");
   });
 
+  test("a delete decided while offline never removes a note changed meanwhile", async () => {
+    const dir = new MemoryVaultDir();
+    await dir.writeText("wiki/a.md", "old");
+    const stale = await dir.stat("wiki/a.md");
+    await dir.writeText("wiki/a.md", "newer, from the Mac app");
+    await dir.writeText("wiki/b.md", "untouched");
+    const b = await dir.stat("wiki/b.md");
+    const store = new MemoryVaultStore();
+    await store.set(
+      "vault-pending",
+      JSON.stringify({
+        vaultId: "hv_1",
+        ops: [
+          { kind: "remove", path: "wiki/a.md", base: `${stale?.lastModified}:${stale?.size}` },
+          { kind: "remove", path: "wiki/b.md", base: `${b?.lastModified}:${b?.size}` },
+        ],
+      }),
+    );
+    await replayPendingOps(dir, "hv_1", store);
+    expect(await dir.readText("wiki/a.md")).toBe("newer, from the Mac app");
+    expect(await dir.exists("wiki/b.md")).toBe(false);
+  });
+
   test("a change that can't be replayed yet is kept for the next boot, not dropped", async () => {
     const dir = new MemoryVaultDir();
     const store = new MemoryVaultStore();
     const ops = [{ kind: "move", from: "missing.md", to: "b.md" }];
     await store.set("vault-pending", JSON.stringify({ vaultId: "hv_1", ops }));
     expect(await replayPendingOps(dir, "hv_1", store)).toBe(0);
-    expect(JSON.parse((await store.get("vault-pending")) ?? "{}")).toEqual({ vaultId: "hv_1", ops });
+    // retained under the vault's own key, which no unload overwrites
+    expect(await store.get("vault-pending")).toBeUndefined();
+    expect(JSON.parse((await store.get("vault-pending:kept:hv_1")) ?? "{}")).toEqual({
+      vaultId: "hv_1",
+      ops,
+    });
+    // the next unload writes its own record; the kept one survives it
+    await store.set("vault-pending", JSON.stringify({ vaultId: "hv_1", ops: [] }));
+    expect(await store.get("vault-pending:kept:hv_1")).toBeDefined();
+    // and the next boot tries it again (still failing, still kept)
+    expect(await replayPendingOps(dir, "hv_1", store)).toBe(0);
+    expect(JSON.parse((await store.get("vault-pending:kept:hv_1")) ?? "{}").ops).toEqual(ops);
   });
 });

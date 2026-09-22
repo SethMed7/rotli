@@ -33,7 +33,9 @@ export interface VaultDir {
   /** Recursive and idempotent. */
   mkdir(path: string): Promise<void>;
   /** File move: read → write → remove, in that order, so a failed write leaves
-   * the original in place. Parent directories of `to` are created. */
+   * the original in place. Parent directories of `to` are created. NEVER
+   * replaces: a `to` that exists is refused ("already exists") — callers pick
+   * a free name first (`freeSiblingPath`). */
   move(from: string, to: string): Promise<void>;
   /** A file or an EMPTY directory; a missing path is a no-op. */
   remove(path: string): Promise<void>;
@@ -196,6 +198,7 @@ export class MemoryVaultDir implements VaultDir {
     if (source === target) return;
     const file = this.files.get(source);
     if (!file) throw new Error(`no such file: ${source}`);
+    if (await this.exists(target)) throw new Error(`${target} already exists`);
     // a binary moves as bytes; reading it as text would leave an empty file
     if (file.bytes) await this.writeBytes(target, file.bytes);
     else await this.writeText(target, file.text);

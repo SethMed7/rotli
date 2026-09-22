@@ -23,7 +23,8 @@ Decided by the owner on 2026-09-22; the history is in
    Note content can't make a request either: on the web a Markdown image that
    names an `http(s)` URL is never fetched (`resolveImageSrc`), and previewed
    HTML (a ```html fence, an `.html` file) runs under its own
-   `default-src 'none'` policy (`lib/htmlPreviewPolicy.ts`), so not even the
+   `default-src 'none'` policy (`lib/htmlPreviewPolicy.ts`), placed before
+   every author token (only a leading doctype precedes it), so not even the
    site's own origin can receive note text in a request URL. The no-egress
    E2E counts only requests that left the page and allows same-origin ones
    only for files the build ships.
@@ -88,9 +89,15 @@ opens as it is.
   `fsutil::atomic_write_bytes` under the same `.lock` sidecar the desktop
   app's writers hold (`fsutil::with_file_lock`), gated by the desktop's
   content revision (`fnv1a64`, `expectedContent`) when the page knows the text
-  it edited, else by `${mtimeMs}:${size}`; a stale write is 409. A move never
-  replaces an existing file.
-- **Residual, documented:** checks resolve a path and the operation then
+  it edited, else by `${mtimeMs}:${size}`; a stale write is 409. Deletes of a
+  file take the same lock and gate, so a delete decided against an older
+  version never removes a newer one. A move never replaces an existing file —
+  atomically in the helper (hard link, then unlink; a create-new copy across
+  volumes), and by refusal in every `VaultDir` (the port's contract).
+- **Residual, documented:** a write whose text the page never read (a binary,
+  or a `.rotli/` file written after a stat) is gated by `${mtimeMs}:${size}`
+  only; an external edit of the same size in the same millisecond would pass
+  it (still under the lock). Checks resolve a path and the operation then
   reopens it. Another process running as the same user that swaps a folder
   inside the vault for a symlink in that instant could redirect one
   operation; such a process can already read and write everything the user
@@ -121,11 +128,18 @@ opens as it is.
   the helper answers; a retried write carries the revision it started from.
   Writes still pending when the tab closes are kept in the device store and
   replayed on the next boot; a file that changed meanwhile keeps its version
-  and the edit lands beside it as an unsaved copy.
+  and the edit lands beside it as an unsaved copy under a name nothing holds
+  (`freeSiblingPath`), and a queued delete of a changed file is dropped. An
+  operation that can't be replayed yet moves to a per-vault "kept" record no
+  unload overwrites, and is retried every boot.
 - **A hard refresh or closed tab** can't finish an async file write, so on
   `pagehide` the editor's unsaved text is journaled synchronously to
   localStorage and written into the vault on the next boot, before the editor
   opens (`services/webUnsavedJournal.ts`), under the same never-overwrite rule.
+  The journal is keyed by the vault's identity on this browser (the helper's
+  vault id, or an id this browser mints for a chosen folder and keeps when the
+  same folder is chosen again), never by folder name; a draft that can be
+  neither saved nor kept as a note waits under its own "kept" key.
 
 ## Migration
 

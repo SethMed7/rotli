@@ -45,7 +45,8 @@ export type PendingOp =
   | { kind: "write"; path: string; text?: string; base64?: string; base: string }
   | { kind: "mkdir"; path: string }
   | { kind: "move"; from: string; to: string }
-  | { kind: "remove"; path: string };
+  /** `base`: the revision the delete was decided against ("" for a folder). */
+  | { kind: "remove"; path: string; base: string };
 
 export interface HelperVaultDirOptions {
   /** Does the helper answer? Polled while an outage lasts. */
@@ -367,9 +368,25 @@ export class HelperVaultDir implements VaultDir {
     if (entry) this.noteFile(target, entry, text?.text);
   }
 
+  /** A file is removed only if it is still the version this tab saw — a note
+   * the desktop app changed meanwhile is kept (409). Folders aren't gated. */
   async remove(path: string): Promise<void> {
     const key = normalize(path);
-    await this.mutate({ kind: "remove", path: key }, () => this.call("vault_remove", { path: key }));
+    const entry = this.entries.get(key);
+    const base = entry?.kind === "file" ? revisionOf(entry) : "";
+    const seen = this.texts.get(key);
+    const gate =
+      entry?.kind !== "file"
+        ? {}
+        : seen && seen.revision === base
+          ? { expectedContent: contentRevision(seen.text) }
+          : { expectedRevision: base };
+    await this.mutate({ kind: "remove", path: key, base }, () =>
+      this.call("vault_remove", { path: key, ...gate }).catch((error: unknown) => {
+        if (isConflict(error)) this.invalidate();
+        throw error;
+      }),
+    );
     this.entries.delete(key);
     this.texts.delete(key);
   }
