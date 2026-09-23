@@ -16,6 +16,15 @@ by name for the exact source commit.
 | Dependency vulnerability audit | `ubuntu-24.04` | `bun audit` and RustSec; current accepted transitive findings remain advisory and are tracked in [`security.md`](security.md) |
 | Rust | `macos-15` | `cargo clippy --all-targets -- -D warnings` and `cargo test` against the shipped operating-system branches |
 
+A **Change scope** job ([`scripts/ci-scope.ts`](../../scripts/ci-scope.ts))
+runs first. When every changed path is under `site/`, under `docs/`, or a root
+Markdown file, Browser E2E, the dependency audit, and both Rust lanes are
+skipped: a website or docs change proves nothing about the app, and a skipped
+job counts as a passing required check. Quality (which checks and builds the
+site too) and the secret scan run on every change. The gated lanes run unless
+the scope job explicitly answered `app=false`, so a missing base commit, an
+empty or failed diff, a manual run, or a failed scope job runs everything.
+
 Linux carries every portable Bun, TypeScript, Vite, Astro, Playwright, and
 dependency check. Rust stays on macOS because the crate contains macOS-gated
 code and a Linux build would prove a different binary. GitHub bills macOS

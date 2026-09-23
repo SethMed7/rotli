@@ -22,6 +22,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A website- or docs-only change skips the app lanes (scripts/ci-scope.ts).
+  # A skipped job passes a required check, so the gated lanes run unless this
+  # job explicitly answered "false" — a failed scope runs everything.
+  changes:
+    name: Change scope
+    runs-on: ubuntu-24.04
+    outputs:
+      app: ${{ steps.scope.outputs.app }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+      - id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || '0000000000000000000000000000000000000000' }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: bun scripts/ci-scope.ts "$BASE_SHA" "$HEAD_SHA" >> "$GITHUB_OUTPUT"
+
   repository-secrets:
     name: Repository secret scan
     runs-on: ubuntu-24.04
@@ -86,6 +108,8 @@ jobs:
 
   e2e:
     name: Browser E2E (Playwright)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.app != 'false' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -114,6 +138,8 @@ jobs:
 
   dependency-audit:
     name: Dependency vulnerability audit (advisory)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.app != 'false' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -153,6 +179,8 @@ jobs:
     # without paying macOS minutes; tests still run on macOS where the native
     # tool paths exist.
     name: Rust (Linux cargo check)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.app != 'false' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -171,6 +199,8 @@ jobs:
 
   rust-macos:
     name: Rust (clippy + tests)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.app != 'false' }}
     runs-on: macos-15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
