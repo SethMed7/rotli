@@ -76,10 +76,11 @@ pub(crate) fn recoverable(root: &Path) -> bool {
 }
 
 /// Read-only: a folder that is or was a vault — any root `memex.json` (ours or
-/// not) or our hidden backup. The plain-folder open never scaffolds its
-/// reserved folders into one (the 2026-09-23 incident's second harm).
+/// not), our hidden backup, or a marker still sitting in a sweep folder. The
+/// plain-folder open never scaffolds its reserved folders into one (the
+/// 2026-09-23 incident's second harm), even when the heal before it failed.
 pub(crate) fn refuses_scaffolding(root: &Path) -> bool {
-    root.join(MARKER).exists() || marker_at(&root.join(BACKUP))
+    root.join(MARKER).exists() || marker_at(&root.join(BACKUP)) || recoverable(root)
 }
 
 /// Heal a displaced marker, then protect it. Never overwrites an existing root
@@ -233,6 +234,20 @@ mod tests {
         heal(temp.path()).unwrap();
         assert!(crate::corpus::is_memex_root(temp.path()));
         assert!(temp.path().join(GUARD).is_dir());
+    }
+
+    #[test]
+    fn a_marker_still_in_a_sweep_folder_refuses_scaffolding_even_if_the_heal_failed() {
+        // no root marker, no backup yet: only the swept copy says "vault"
+        let temp = tempfile::TempDir::new().unwrap();
+        fs::create_dir(temp.path().join("assets")).unwrap();
+        fs::write(temp.path().join("assets").join(MARKER), ID).unwrap();
+        assert!(recoverable(temp.path()));
+        assert!(refuses_scaffolding(temp.path()));
+        // a plain Markdown folder still gets the plain-folder treatment
+        let plain = tempfile::TempDir::new().unwrap();
+        fs::write(plain.path().join("note.md"), "# Note\n").unwrap();
+        assert!(!refuses_scaffolding(plain.path()));
     }
 
     #[test]
