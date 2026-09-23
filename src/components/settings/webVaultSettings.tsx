@@ -1,7 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { isWebVault } from "../../lib/browserVault";
-import { connectedFolderName, exportWebVault, webVaultMode } from "../../services/webNotes";
+import { legacyFilesToCopy } from "../../services/legacyBrowserNotes";
+import {
+  activeWebVaultDir,
+  connectedFolderName,
+  exportWebVault,
+  webVaultMode,
+} from "../../services/webNotes";
+import { useLegacyNotesOffer } from "../../state/legacyNotesOffer";
 import { useWebVaultConnect } from "../../state/webVaultConnect";
 
 /** Settings → General in Rotli Web only: which vault this browser opens, how
@@ -11,6 +18,18 @@ export function WebVaultSettings() {
   const web = isWebVault();
   const [error, setError] = useState<string | null>(null);
   const openChange = useWebVaultConnect((s) => s.show);
+  const settled = useLegacyNotesOffer((s) => s.settled);
+  const requestOffer = useLegacyNotesOffer((s) => s.request);
+  // notes an older Rotli Web kept inside this browser that the vault doesn't
+  // hold yet — re-read whenever the offer settles (copied, cleared, closed)
+  const [kept, setKept] = useState(0);
+  useEffect(() => {
+    const dir = activeWebVaultDir();
+    if (!web || !dir) return;
+    void legacyFilesToCopy(dir)
+      .then((files) => setKept(files.length))
+      .catch(() => setKept(0));
+  }, [web, settled]);
   if (!web) return null;
   const mode = webVaultMode();
   const folder = connectedFolderName();
@@ -37,6 +56,11 @@ export function WebVaultSettings() {
       <button type="button" className="ghostbtn" onClick={exportZip}>
         Export vault (.zip)
       </button>
+      {kept > 0 && (
+        <button type="button" className="ghostbtn" onClick={requestOffer}>
+          Copy notes kept in this browser…
+        </button>
+      )}
       {error && (
         <p className="setnote err" role="alert" aria-live="polite">
           {error}

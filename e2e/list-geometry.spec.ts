@@ -133,3 +133,49 @@ test("no list marker starts left of the note's text edge", async ({ page }) => {
     );
   }
 });
+
+test("an empty task keeps the caret in text, level with its box, on the text column", async ({ page }) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  await page.locator(".cm-content").last().click();
+  await page.keyboard.type("Test okay world");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("[] ");
+
+  // the caret's own rectangle: a real text position, not a gap beside the widget
+  // (2026-09-23: in Zen the caret floated above-right of an empty task's box)
+  const caret = () =>
+    page.evaluate(() => {
+      const selection = window.getSelection();
+      const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+      const rect = range?.getClientRects()[0];
+      const line = selection?.anchorNode?.parentElement?.closest(".cm-line");
+      const box = line?.querySelector(".rotli-check")?.getBoundingClientRect();
+      return {
+        inText: selection?.anchorNode?.nodeType === Node.TEXT_NODE,
+        caret: rect ? { left: rect.left, top: rect.top, bottom: rect.bottom } : null,
+        box: box ? { top: box.top, bottom: box.bottom } : null,
+      };
+    });
+  const empty = await caret();
+  expect(empty.inText).toBe(true);
+  expect(empty.caret).not.toBeNull();
+  expect(empty.box).not.toBeNull();
+  // vertically: the caret's middle sits within the box
+  const middle = (empty.caret!.top + empty.caret!.bottom) / 2;
+  expect(middle).toBeGreaterThan(empty.box!.top);
+  expect(middle).toBeLessThan(empty.box!.bottom);
+
+  // horizontally: where the first typed letter goes
+  await page.keyboard.type("t");
+  const typed = await page.evaluate(() => {
+    const line = [...document.querySelectorAll(".cm-content .cm-line.rotli-task")].pop();
+    const text = [...(line?.childNodes ?? [])].find((node) => node.nodeType === Node.TEXT_NODE);
+    const range = document.createRange();
+    range.setStart(text!, 0);
+    range.setEnd(text!, 1);
+    return range.getBoundingClientRect().left;
+  });
+  expect(Math.abs(empty.caret!.left - typed)).toBeLessThanOrEqual(1.5);
+});

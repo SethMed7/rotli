@@ -128,7 +128,7 @@ export async function copyLegacyInto(
   let written = 0;
   const failed: string[] = [];
   for (const file of files) {
-    const path = file.note && memex ? `wiki/${file.path}` : file.path;
+    const path = vaultPathOf(file, memex);
     try {
       let target = path;
       if (await dir.exists(path)) {
@@ -148,6 +148,50 @@ export async function copyLegacyInto(
     }
   }
   return { written, failed };
+}
+
+/** Where a browser file lands in this vault (a note under `wiki/` in a memex). */
+function vaultPathOf(file: LegacyFile, memex: boolean): string {
+  return file.note && memex ? `wiki/${file.path}` : file.path;
+}
+
+/** The browser's files this vault doesn't hold yet. When it already holds
+ * every one (copied on an earlier visit), the browser's copy is cleared:
+ * nothing is left to offer, and nothing is lost. */
+export async function legacyFilesToCopy(
+  dir: VaultDir,
+  vault: BrowserVault = browserStorageVault(),
+): Promise<LegacyFile[]> {
+  const files = await legacyBrowserFiles(vault);
+  if (files.length === 0) return [];
+  const memex = await dir.exists("wiki");
+  const missing: LegacyFile[] = [];
+  for (const file of files) {
+    const path = vaultPathOf(file, memex);
+    if (!(await dir.exists(path)) || !(await alreadyHolds(dir, path, file))) missing.push(file);
+  }
+  if (missing.length === 0) await clearLegacyBrowserFiles(vault);
+  return missing;
+}
+
+const LATER_PREFIX = "rotli-legacy-notes-later:";
+
+/** "Not now" is remembered per vault on this browser, so the offer doesn't
+ * return on every visit; Settings → General asks again. */
+export function legacyOfferDeferred(storage: Pick<Storage, "getItem">, vaultKey: string): boolean {
+  try {
+    return storage.getItem(`${LATER_PREFIX}${vaultKey}`) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function deferLegacyOffer(storage: Pick<Storage, "setItem">, vaultKey: string): void {
+  try {
+    storage.setItem(`${LATER_PREFIX}${vaultKey}`, "1");
+  } catch {
+    /* storage refused: the offer simply returns next visit */
+  }
 }
 
 /** Forget what the browser held, after it has been copied. */

@@ -64,6 +64,13 @@ export function resolveWikilink(target: string, index: WikilinkIndex): string | 
   const t = wikilinkTargetOf(target);
   if (!t) return null;
   if (index.byId.has(t)) return t;
+  // a note with no frontmatter id is identified by its path, `.md` included —
+  // the id the picker writes when titles collide. Only a link written with
+  // the `.md`, or as a path, means that id: a bare [[Plan]] must not open
+  // whichever note is stored as Plan.md over the note titled "Plan".
+  const written = ((target.split("|")[0] ?? "").split("#")[0] ?? "").trim();
+  const pathId = `${t}.md`;
+  if ((written.toLowerCase().endsWith(".md") || t.includes("/")) && index.byId.has(pathId)) return pathId;
   const lookup = (value: string): string | null => {
     const key = linkKey(value);
     const candidates = [...(index.byTitle.get(key) ?? []), ...(index.byAlias.get(key) ?? [])].filter(
