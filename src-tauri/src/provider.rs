@@ -89,7 +89,9 @@ pub(crate) const CLIS: &[CliSpec] = &[
             "/opt/homebrew/bin/claude",
             "/usr/local/bin/claude",
         ],
-        models: &["sonnet", "opus", "haiku", "fable"],
+        // what `claude` offered on 2026-09-23, plus the bare aliases older
+        // chats saved; the live list is discovered (provider_models.rs)
+        models: &["default", "opus[1m]", "claude-fable-5-1[1m]", "sonnet", "haiku", "opus", "fable"],
     },
     CliSpec {
         id: "codex",
@@ -99,10 +101,7 @@ pub(crate) const CLIS: &[CliSpec] = &[
             "/usr/local/bin/codex",
         ],
         models: &[
-            "gpt-5.6-sol",
-            "gpt-5.6-terra",
-            "gpt-5.6-luna",
-            "gpt-5.5",
+            "gpt-6-sol", "gpt-6-astra", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5",
             "gpt-5.3-codex-spark",
         ],
     },
@@ -183,7 +182,8 @@ fn build_args(
 
 /// The webview may request quality/cost controls, but the trusted native side
 /// owns the allowlists and translates them into provider-native argv. Unknown
-/// values fail closed before any process is started.
+/// values fail closed before any process is started. A model is allowed when
+/// it is a static id or the client itself reported it (provider_models.rs).
 pub(crate) fn build_args_tuned(
     provider: &str,
     model: &str,
@@ -193,12 +193,26 @@ pub(crate) fn build_args_tuned(
     service_tier: Option<&str>,
     imgs: Option<&ImageFiles>,
 ) -> Result<(Vec<String>, PromptVia), String> {
+    let found = crate::provider_models::lookup(provider, model);
+    build_args_for(provider, model, reasoning_effort, service_tier, imgs, found.as_ref())
+}
+
+/// `build_args_tuned` with the client-reported entry passed in — pure.
+pub(crate) fn build_args_for(
+    provider: &str,
+    model: &str,
+    reasoning_effort: Option<&str>,
+    service_tier: Option<&str>,
+    imgs: Option<&ImageFiles>,
+    found: Option<&crate::provider_models::DiscoveredModel>,
+) -> Result<(Vec<String>, PromptVia), String> {
+    use crate::provider_models::{effort_allowed, fast_tier_allowed, valid_model_id, CLAUDE_DEFAULT_ID};
     let s = spec(provider)?;
-    if !s.models.contains(&model) {
-        return Err(format!(
-            "model \"{model}\" isn't in the {provider} allowlist"
-        ));
+    let reported = found.is_some_and(|m| m.id == model) && valid_model_id(model);
+    if !s.models.contains(&model) && !reported {
+        return Err(format!("model \"{model}\" isn't in the {provider} allowlist"));
     }
+    let found = found.filter(|_| reported);
     let own = |xs: &[&str]| xs.iter().map(|x| x.to_string()).collect::<Vec<_>>();
     match provider {
         // print mode, safe mode (no ambient hooks/MCP/plugins/instructions),
@@ -211,28 +225,16 @@ pub(crate) fn build_args_tuned(
             if let Some(tier) = service_tier {
                 return Err(format!("service tier \"{tier}\" isn't supported by claude"));
             }
-            if let Some(effort) = reasoning_effort {
-                if model == "haiku"
-                    || !matches!(effort, "low" | "medium" | "high" | "xhigh" | "max")
-                {
-                    return Err(format!(
-                        "reasoning effort \"{effort}\" isn't allowed for claude model \"{model}\""
-                    ));
-                }
+            if let Some(effort) = reasoning_effort.filter(|e| !effort_allowed(provider, model, e, found)) {
+                return Err(format!("reasoning effort \"{effort}\" isn't allowed for claude model \"{model}\""));
             }
             let mut args = own(&["-p", "--safe-mode", "--tools"]);
-            args.push(if imgs.is_some() {
-                "Read".into()
-            } else {
-                String::new()
-            });
-            args.extend(own(&[
-                "--model",
-                model,
-                "--output-format",
-                "json",
-                "--no-session-persistence",
-            ]));
+            args.push(if imgs.is_some() { "Read".into() } else { String::new() });
+            // `default` = the account's own default: like cursor-auto, no flag
+            if model != CLAUDE_DEFAULT_ID {
+                args.extend(own(&["--model", model]));
+            }
+            args.extend(own(&["--output-format", "json", "--no-session-persistence"]));
             if let Some(effort) = reasoning_effort {
                 args.push("--effort".into());
                 args.push(effort.into());
@@ -248,27 +250,11 @@ pub(crate) fn build_args_tuned(
         // sandbox, shell tool off, JSONL out, no session litter (--ephemeral);
         // "-" = prompt from stdin. --cd pins it to a scratch dir OUTSIDE any repo.
         "codex" => {
-            if let Some(effort) = reasoning_effort {
-                let allowed = match model {
-                    "gpt-5.6-sol" | "gpt-5.6-terra" => {
-                        matches!(
-                            effort,
-                            "low" | "medium" | "high" | "xhigh" | "max" | "ultra"
-                        )
-                    }
-                    "gpt-5.6-luna" => {
-                        matches!(effort, "low" | "medium" | "high" | "xhigh" | "max")
-                    }
-                    _ => matches!(effort, "low" | "medium" | "high" | "xhigh"),
-                };
-                if !allowed {
-                    return Err(format!(
-                        "reasoning effort \"{effort}\" isn't allowed for codex model \"{model}\""
-                    ));
-                }
+            if let Some(effort) = reasoning_effort.filter(|e| !effort_allowed(provider, model, e, found)) {
+                return Err(format!("reasoning effort \"{effort}\" isn't allowed for codex model \"{model}\""));
             }
             if let Some(tier) = service_tier {
-                if !model.starts_with("gpt-5.6-") || !matches!(tier, "standard" | "fast") {
+                if !fast_tier_allowed(provider, model, found) || !matches!(tier, "standard" | "fast") {
                     return Err(format!(
                         "service tier \"{tier}\" isn't allowed for codex model \"{model}\""
                     ));

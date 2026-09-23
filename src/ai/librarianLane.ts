@@ -3,7 +3,8 @@
 // organizer_knobs::LIBRARIAN_LANES (byte-identical id list).
 
 import type { CliDetect } from "../lib/tauri";
-import { CLI_CATALOG, type ProviderId, providerDefaultModel } from "./models";
+import { currentDiscovery, type DiscoveryLanes } from "../state/connectedModels";
+import { type ProviderId, modelLabel, providerDefaultModel, resolveLaneModel } from "./models";
 
 /** Cursor is a read-only code-chat lane and never takes part in background work. */
 export const LIBRARIAN_LANES = ["claude", "codex", "antigravity"] as const satisfies readonly ProviderId[];
@@ -15,10 +16,15 @@ export type OrganizerModel = LibrarianChoice;
 export const ORGANIZER_MODELS: readonly OrganizerModel[] = ["local", ...LIBRARIAN_LANES];
 
 /** A Librarian-specific model id is kept only when it belongs to the chosen
- * lane's catalog; anything else (or a local lane) is null. */
-export function librarianModelId(lane: LibrarianChoice, id: unknown): string | null {
+ * lane's catalog (the client's live list once it has answered); anything else
+ * (or a local lane) is null. */
+export function librarianModelId(
+  lane: LibrarianChoice,
+  id: unknown,
+  lanes: DiscoveryLanes = currentDiscovery(),
+): string | null {
   if (lane === "local" || typeof id !== "string") return null;
-  return CLI_CATALOG[lane].some((model) => model.id === id) ? id : null;
+  return resolveLaneModel(lane, id, lanes);
 }
 
 /** The model the Librarian asks: its own choice when valid, else the lane's
@@ -27,8 +33,9 @@ export function librarianModelFor(
   lane: LibrarianLane,
   ownId: string | null,
   providerDefaults: Readonly<Partial<Record<ProviderId, string>>>,
+  lanes: DiscoveryLanes = currentDiscovery(),
 ): string {
-  return librarianModelId(lane, ownId) ?? providerDefaultModel(lane, providerDefaults);
+  return librarianModelId(lane, ownId, lanes) ?? providerDefaultModel(lane, providerDefaults, lanes);
 }
 
 export const LIBRARIAN_LABELS: Record<LibrarianChoice, string> = {
@@ -77,7 +84,7 @@ export function librarianCaption(choice: LibrarianChoice, laneOn: boolean): stri
     : `${label} is chosen but turned off in Connections, so the Librarian files on this Mac until you turn it on.`;
 }
 
-/** A journal row's `filed_by` for people: "claude:opus" → "Claude · Claude Opus";
+/** A journal row's `filed_by` for people: "claude:sonnet" → "Claude · Claude Sonnet 5";
  * a bare local model id is shown as recorded. */
 export function describeFiledBy(model: string): string {
   const colon = model.indexOf(":");
@@ -85,7 +92,7 @@ export function describeFiledBy(model: string): string {
   const lane = model.slice(0, colon);
   const id = model.slice(colon + 1);
   if (!isLibrarianLane(lane)) return model;
-  const label = CLI_CATALOG[lane].find((entry) => entry.id === id)?.label ?? id;
+  const label = modelLabel(id, [], []);
   return `${LIBRARIAN_LABELS[lane]} · ${label}`;
 }
 

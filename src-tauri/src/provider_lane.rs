@@ -21,10 +21,10 @@ pub(crate) fn default_model(provider_id: &str) -> Option<&'static str> {
     provider::spec(provider_id).ok()?.models.first().copied()
 }
 
-/// Whether `model` is on the lane's allowlist (the same check the argv builder
-/// applies; exposed so a settings choice can be validated before a spawn).
+/// Whether `model` is on the lane's allowlist: a static id, or one the client
+/// itself reported (asked once, bounded, when the cache has never seen it).
 pub(crate) fn model_allowed(provider_id: &str, model: &str) -> bool {
-    provider::spec(provider_id).is_ok_and(|s| s.models.contains(&model))
+    crate::provider_models::ensure_allowed(provider_id, model)
 }
 
 /// Run one prompt through a connected client and return its reply text.
@@ -47,6 +47,9 @@ pub(crate) fn complete_blocking(
     }
     let bin = provider::resolve_bin(provider::spec(provider_id)?)
         .ok_or_else(|| format!("{provider_id} isn't installed (checked its usual homes)"))?;
+    // a discovered id the cache has not seen since launch is re-read from the
+    // client before the argv builder (which reads the cache only) decides
+    let _ = model_allowed(provider_id, model);
     let (args, via) = provider::build_args_tuned(
         provider_id,
         model,

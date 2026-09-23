@@ -145,6 +145,17 @@ fn detect_reports_an_unknown_provider_as_an_error() {
 }
 
 #[test]
+fn model_discovery_is_a_helper_verb_that_refuses_an_unknown_provider() {
+    let (port, token, _) = helper();
+    let auth = format!("Authorization: Bearer {token}\r\n");
+    let answer = rpc(port, &auth, "{\"cmd\":\"cli_models\",\"args\":{\"provider\":\"definitely-not-a-cli\"}}");
+    assert!(answer.starts_with("HTTP/1.1 400"), "{answer}");
+    assert!(answer.contains("unknown provider"), "{answer}");
+    let missing = rpc(port, &auth, "{\"cmd\":\"cli_models\",\"args\":{}}");
+    assert!(missing.contains("\\\"provider\\\" is required"), "{missing}");
+}
+
+#[test]
 fn a_completion_with_images_is_refused_before_anything_is_staged() {
     let (port, token, _) = helper();
     let answer = rpc(

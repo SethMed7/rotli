@@ -12,8 +12,9 @@
 //!
 //! Exposed: ONE vault folder the user chose (`helper_vault.rs`: file verbs
 //! confined beneath that root, symlinks neither followed nor listed, `.git`
-//! never written, atomic and revision-gated writes); three provider verbs —
-//! detect a CLI, run one completion, cancel a running one; and an
+//! never written, atomic and revision-gated writes); four provider verbs —
+//! detect a CLI, list the models it offers, run one completion, cancel a
+//! running one; and an
 //! unauthenticated liveness probe carrying a name and a version. The page
 //! NEVER names a folder: the root comes from `--vault <dir>` or the OS folder
 //! picker (`vault_choose`), and the page learns only its name and an id. NOT
@@ -62,8 +63,8 @@
 //! prompt, an uninstalled CLI, a bad argument) is 400, an unknown command 404,
 //! a duplicate run 409, the helper's own faults 500. The page treats any
 //! non-2xx as an Error carrying `error`; `result` is the command's own shape —
-//! a string for `cli_complete`, an object for `cli_detect`, `null` for
-//! `cli_cancel`, `[]` for `chat_models`.
+//! a string for `cli_complete`, an object for `cli_detect`, a model array for
+//! `cli_models`, `null` for `cli_cancel`, `[]` for `chat_models`.
 
 use crate::helper_args::{normalize_origin, parse_args};
 use crate::helper_vault::{ServedVault, CONFIG_FILE};
@@ -327,6 +328,14 @@ impl Helper {
                 let provider = text_argument(arguments, "provider")?;
                 let detected = crate::provider::detect(&provider).map_err(|e| (400, e))?;
                 serde_json::to_value(detected).map_err(|e| (500, e.to_string()))
+            }
+            // the same discovery the app runs (provider_models.rs): the client's
+            // own model list, no prompt; the ids it reports become runnable here
+            "cli_models" => {
+                let provider = text_argument(arguments, "provider")?;
+                let refresh = arguments.get("refresh").and_then(Value::as_bool).unwrap_or(false);
+                let models = crate::provider_models::discover(&provider, refresh).map_err(|e| (400, e))?;
+                serde_json::to_value(models).map_err(|e| (500, e.to_string()))
             }
             "cli_complete" => self.complete(arguments).map(Value::String),
             "cli_cancel" => {

@@ -9,6 +9,7 @@ import { createPortal } from "react-dom";
 
 import { PROVIDER_IDS, PROVIDER_LABELS, type ModelGroups, type ProviderId } from "../../ai/models";
 import { useAnchoredPopoverBox, useTransientPopover } from "../../lib/popover";
+import { refreshShownLanes } from "../../services/connectedModels";
 import { CloudGlyph, EyeGlyph, LaptopGlyph, SearchGlyph } from "../glyphs";
 import { chatMark } from "../sidebar/chatMark";
 import { ModelLogo } from "../sidebar/modelLogo";
@@ -201,6 +202,8 @@ export function ModelPicker({
         onClick={() => {
           setActiveSection(selectedSection?.key ?? sections[0]?.key ?? null);
           setQuery("");
+          // an old answer is re-asked, so a model the client just added shows up
+          if (!open) refreshShownLanes(groups.connected.map((m) => m.provider));
           setOpen((v) => !v);
         }}
         onKeyDown={(event) => {

@@ -59,6 +59,11 @@ Interactive connected chat has exactly three executable official-client adapters
 | Antigravity | **Unavailable** before spec or binary lookup; no launcher, argv builder, retry, sandbox, image, detection, Keychain, or Breve resolver implementation remains | No Google subscription credential is requested, inspected, or used |
 | Direct Gemini API | **Not implemented.** Google documents AI Studio API keys and Vertex AI as authorized, separately billed routes; Rotli has neither transport nor credential slot | No Gemini API key is requested, read, or stored |
 
+Each lane's "bounded model allowlist" is its static `CliSpec.models` plus the
+ids that client itself reports as selectable (`provider_models.rs`, 2026-09-23).
+Discovery carries no vault content — no prompt is ever sent — and every
+reported id must match the strict argv id shape before it can run.
+
 Google&rsquo;s Antigravity FAQ explicitly says third-party access through an
 Antigravity login violates its terms and may lead to suspension or termination;
 it directs third-party coding agents to a

@@ -129,7 +129,7 @@ other is removed, bypassed, or compromised.
 | Filer write | `filer_writable` | locked + secure refusal (unchanged) |
 | Organizer | `snapshot_note` / `auto_applies` | skips secure and locked (unchanged) |
 | Send | `chat::egress_allowed` | a non-local endpoint refuses secret-shaped, secure-marked, or secure-ECHOING transcripts |
-| CLI send | `provider::cli_complete` | native policy permits only official local Claude Code, Codex, and Cursor clients, then applies `blocked_for_remote`; provider/model ids are allowlisted, and Cursor additionally uses ACP Ask mode in an empty scratch workspace with client permissions denied; every other provider id is refused before binary lookup |
+| CLI send | `provider::cli_complete` | native policy permits only official local Claude Code, Codex, and Cursor clients, then applies `blocked_for_remote`; provider ids are allowlisted and a model id must be a static `CliSpec.models` entry or one the client itself reported through model discovery (`provider_models.rs`, strict id shape, never a flag), and Cursor additionally uses ACP Ask mode in an empty scratch workspace with client permissions denied; every other provider id is refused before binary lookup |
 | Image send | `provider::generate_image` | provider-backed image generation is unavailable before path, credential, or process work |
 | Organizer send | local MLX transport only | legacy remote organizer settings normalize to local; no remote organizer transport exists |
 | Web | `web.rs` `blocked_for_remote` | search queries, fetch URLs, **and `open_url`** never carry protected content |

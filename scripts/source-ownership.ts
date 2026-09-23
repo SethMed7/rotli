@@ -127,6 +127,7 @@ export const SERVICE_FILE_OWNERS = {
   "chatSummon.ts": "chat",
   "chatWindowShell.ts": "chat (the Chat window's native side, for presentation)",
   "connectorSetup.ts": "chat",
+  "connectedModels.ts": "chat (the connected clients' own model lists)",
   "helperLink.ts": "chat",
   "webAiCorpus.ts": "chat",
   "webChats.ts": "chat",

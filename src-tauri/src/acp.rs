@@ -392,14 +392,7 @@ pub(crate) fn run_acp_registered(
     };
     let protocol: Result<String, String> = (|| -> Result<String, String> {
         let init = handshake(&mut conn)?;
-        let session = conn.request(
-            3,
-            "session/new",
-            serde_json::json!({
-                "cwd": scratch.path().to_string_lossy(),
-                "mcpServers": []
-            }),
-        )?;
+        let session = new_session(&mut conn, scratch.path())?;
         let session_id = session
             .get("sessionId")
             .and_then(|v| v.as_str())
@@ -464,6 +457,12 @@ pub(crate) fn handshake<W: Write, R: BufRead>(conn: &mut AcpConn<'_, W, R>) -> R
         serde_json::json!({ "methodId": conn.lane.auth_method_id() }),
     )?;
     Ok(init)
+}
+
+/// `session/new` in an empty scratch directory with no MCP servers — the only
+/// session Rotli opens, for a chat turn or for model discovery.
+pub(crate) fn new_session<W: Write, R: BufRead>(conn: &mut AcpConn<'_, W, R>, cwd: &Path) -> Result<serde_json::Value, String> {
+    conn.request(3, "session/new", serde_json::json!({ "cwd": cwd.to_string_lossy(), "mcpServers": [] }))
 }
 
 /// The one `initialize` Rotli ever sends: protocol 1, no filesystem, no
