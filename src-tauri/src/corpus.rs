@@ -2862,6 +2862,11 @@ impl CorpusStore {
     }
 
     fn open_with_mode(root: PathBuf, read_only: bool) -> Result<Self, String> {
+        // A marker another app moved or deleted comes back first, so a vault
+        // never silently reopens as a plain folder (vault_marker.rs).
+        if !read_only {
+            crate::vault_marker::heal_best_effort(&root);
+        }
         // Probe BEFORE create_dir_all so an absent dir reads as "not a memex"
         // (→ legacy first-run), never as a memex over an empty folder.
         if is_memex_root(&root) {

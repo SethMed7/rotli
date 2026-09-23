@@ -3,7 +3,13 @@
 import { describe, expect, test } from "bun:test";
 
 import { CORPUS_INSTANCE_ID, type MemexInstance } from "../memex/config";
-import { vaultDisplayName, vaultOverflowItems, vaultRowLabel, vaultSwitcherItems } from "./vaultSwitcher";
+import {
+  connectPlan,
+  vaultDisplayName,
+  vaultOverflowItems,
+  vaultRowLabel,
+  vaultSwitcherItems,
+} from "./vaultSwitcher";
 
 const inst = (over: Partial<MemexInstance>): MemexInstance => ({
   id: "mx1",
@@ -76,5 +82,33 @@ describe("vaultOverflowItems", () => {
       label: expect.stringContaining("switch vaults first"),
     });
     expect(items.some((item) => item.kind === "drill")).toBe(false);
+  });
+});
+
+describe("an open folder that is not a vault", () => {
+  const folder = inst({ id: CORPUS_INSTANCE_ID, label: "Obsidian Notes", memexId: null, role: "corpus" });
+
+  test("is still the current row and names the header", () => {
+    const items = vaultSwitcherItems([inst({ id: "mx1", label: "connected" })], folder);
+    expect(items.map(({ instance, active }) => [instance.label, active])).toEqual([
+      ["Obsidian Notes", true],
+      ["connected", false],
+    ]);
+    expect(vaultDisplayName([], folder)).toBe("Obsidian Notes");
+  });
+
+  test("a vault corpus wins over the plain-folder row", () => {
+    const vault = inst({ id: CORPUS_INSTANCE_ID, label: "memex-vault" });
+    expect(vaultSwitcherItems([vault], folder).map(({ instance }) => instance.label)).toEqual([
+      "memex-vault",
+    ]);
+  });
+});
+
+describe("connectPlan", () => {
+  test("Connect vault refuses nothing: empty creates, a vault links, any other folder opens in place", () => {
+    expect(connectPlan("empty")).toBe("create");
+    expect(connectPlan("memex")).toBe("link");
+    expect(connectPlan("markdown")).toBe("open");
   });
 });

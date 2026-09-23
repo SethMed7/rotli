@@ -44,6 +44,8 @@ mod organizer_knobs;
 #[cfg(test)]
 mod parity_tests;
 mod private_browser;
+mod quick_window;
+mod vault_marker;
 mod provider;
 mod provider_lane; mod provider_models;
 mod remote_agent;
@@ -504,19 +506,6 @@ mod capture_return_tests {
     }
 }
 
-/// Whether the Quick Note window has been positioned this session. We center it
-/// on the FIRST summon (on the active display); after that we leave it where the
-/// user dragged it — re-centering on every summon meant it felt "stuck in the
-/// middle, can't move it" (the maintainer, 2026-06-22).
-struct QuickPlaced(Mutex<bool>);
-
-/// Where closing the Quick Note returns focus: true = back to the main window
-/// (you were working in it), false = out of rotli entirely (you came from
-/// another app, or main was tucked away). Captured at summon time so the ⌥Q
-/// chord controls ONLY the quick note — closing it never surfaces the main app
-/// (the maintainer, 2026-06-24). Mirrors CaptureReturn.
-struct QuickReturn(Mutex<bool>);
-
 /// The quit-flush handshake (#4 follow-up, review 2026-07). Dirty spreadsheet
 /// sessions flush on window-hide/pagehide, but BOTH real quit paths could fire
 /// with the window still up and no hide ever seen ("Stay open" mode): tray-Quit
@@ -737,7 +726,7 @@ fn show_capture(app: &AppHandle) {
         return;
     };
     // Remember where you came from — the SAME rule the Quick Note uses
-    // (remember_quick_return): "in rotli" means main was visible AND focused.
+    // (quick_window::remember_return): "in rotli" means main was visible AND focused.
     // Visible-but-behind (rotli open under another app) counts as away, and
     // main is tucked out of sight for the capture so activating the app cannot
     // raise it over the app you were in (2026-09-01: "⌥C opens the app").
@@ -766,7 +755,7 @@ fn finish_capture(app: &AppHandle) {
     let plan = *app.state::<CaptureReturn>().0.lock().unwrap();
     if plan.was_in_main {
         // main is already underneath and regains focus naturally — never a
-        // forced raise (the Quick Note law, hide_quick_return)
+        // forced raise (the Quick Note law, quick_window::close)
         return;
     }
     // came from another app — step out of rotli so focus returns there
@@ -779,89 +768,6 @@ fn finish_capture(app: &AppHandle) {
             let _ = window.show();
         }
     }
-}
-
-/// Record where closing the Quick Note should return focus, BEFORE the quick
-/// window steals it: back to the main window only if you were actively in it,
-/// otherwise out of rotli. Mirrors how `show_capture` snapshots CaptureReturn.
-fn remember_quick_return(app: &AppHandle) {
-    let in_main = app
-        .get_webview_window("main")
-        .map(|w| w.is_visible().unwrap_or(false) && w.is_focused().unwrap_or(false))
-        .unwrap_or(false);
-    *app.state::<QuickReturn>().0.lock().unwrap() = in_main;
-}
-
-/// Close the Quick Note via its own chord / Esc. The quick chord controls ONLY
-/// the quick note — closing it NEVER surfaces the main window (the maintainer, 2026-06-26).
-/// If you came from OUTSIDE rotli (main wasn't the focused window), step out of
-/// rotli (NSApp hide) so focus returns to whatever you were in — and so the chord
-/// can never raise main. If you WERE working in main, just hide the quick note and
-/// let main regain focus naturally (it's already underneath) — no forced raise.
-/// The blur-hide path (clicking elsewhere) stays a plain `hide_quick`.
-fn hide_quick_return(app: &AppHandle) {
-    hide_quick(app);
-    let was_in_main = *app.state::<QuickReturn>().0.lock().unwrap();
-    if !was_in_main {
-        // came from another app — step out of rotli rather than surface main
-        #[cfg(target_os = "macos")]
-        let _ = app.hide();
-    }
-}
-
-fn show_quick(app: &AppHandle) {
-    let Some(window) = app.get_webview_window("quick") else {
-        return;
-    };
-    // snapshot the return target before we steal focus (so a later ⌥Q-close
-    // knows whether you were in main or came from somewhere else)
-    remember_quick_return(app);
-    // center only the first time this session — afterwards keep the user's
-    // dragged position (the window keeps it across hide/show on its own)
-    {
-        let placed = app.state::<QuickPlaced>();
-        let mut done = placed.0.lock().unwrap();
-        if !*done {
-            center_on_cursor_display(app, &window);
-            *done = true;
-        }
-    }
-    // stamp BEFORE we show/focus — focusing activates the app and can fire the
-    // spurious Reopen before the window registers as visible (the race that made
-    // ⌥Q / a rebound ⌥. open main too) (the maintainer, 2026-06-30).
-    *app.state::<LastPanelSummon>().0.lock().unwrap() = Some(Instant::now());
-    let _ = window.show();
-    let _ = window.set_focus();
-    let _ = app.emit_to("quick", "rotli:quick-show", ());
-}
-
-fn hide_quick(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window("quick") {
-        let _ = window.hide();
-    }
-}
-
-/// The quick chord toggles the floating note: visible + focused → hide; visible
-/// but behind → bring it forward; hidden → show on the active display.
-fn toggle_quick(app: &AppHandle) {
-    let Some(window) = app.get_webview_window("quick") else {
-        return;
-    };
-    if window.is_visible().unwrap_or(false) {
-        if window.is_focused().unwrap_or(true) {
-            // the ⌥Q chord controls ONLY the quick note — closing it returns
-            // focus to where you came from, never surfaces the main window
-            hide_quick_return(app);
-        } else {
-            // visible but behind: bring it forward, and refresh the return
-            // target (you may have moved to another app since the last summon)
-            remember_quick_return(app);
-            let _ = window.show();
-            let _ = window.set_focus();
-        }
-        return;
-    }
-    show_quick(app);
 }
 
 fn is_visible(app: &AppHandle, label: &str) -> bool {
@@ -947,14 +853,14 @@ fn hide_chat_window(app: AppHandle) {
 
 #[tauri::command]
 fn toggle_quick_window(app: AppHandle) {
-    toggle_quick(&app);
+    quick_window::toggle(&app);
 }
 
 #[tauri::command]
 fn hide_quick_window(app: AppHandle) {
     // Esc-dismiss from the quick webview — same intent as the ⌥Q chord close,
     // so return focus the same way (never surface main).
-    hide_quick_return(&app);
+    quick_window::close(&app);
 }
 
 // `show_quick_window` was UNREGISTERED and removed in the 2026-07 audit (#68):
@@ -1327,16 +1233,18 @@ fn inspect_vault_path(path: &std::path::Path) -> Result<VaultInspection, String>
             }
         }
     }
-    let source = if root.join(".obsidian").is_dir() {
+    // a displaced marker still reads as a vault; opening it heals (vault_marker.rs)
+    let is_vault = corpus::is_memex_root(&root) || vault_marker::recoverable(&root);
+    let source = if is_vault {
+        "Rotli vault"
+    } else if root.join(".obsidian").is_dir() {
         "Obsidian vault"
     } else if root.join(".zennotes").is_dir() || root.join(".zen").is_dir() {
         "ZenNotes vault"
-    } else if corpus::is_memex_root(&root) {
-        "Rotli vault"
     } else {
         "Markdown folder"
     };
-    let kind = if corpus::is_memex_root(&root) {
+    let kind = if is_vault {
         "memex"
     } else if empty {
         "empty"
@@ -1596,6 +1504,7 @@ fn corpus_choose_folder_blocking(app: AppHandle, path: Option<String>) -> Result
         return Ok(false);
     }
     flush_webviews_before_shutdown(&app)?;
+    vault_marker::heal_best_effort(&abs);
     let adopted = match memex::detect_folder(&abs).kind.as_str() {
         "memex" => {
             if let Some(current) = &current {
@@ -2020,6 +1929,7 @@ fn corpus_connect_brain_blocking(app: AppHandle, path: Option<String>) -> Result
         }
     };
     reject_privileged_root(&app, &abs)?;
+    vault_marker::heal_best_effort(&abs);
     let meta = memex::prepare_brain_connect(&abs)?;
     let mut store = corpus::CorpusStore::open(abs.clone())?;
     store.set_perms_read_only(meta.perms.read_only());
@@ -2287,7 +2197,7 @@ pub fn run() {
                     }
                     let quick = chords.quick.lock().unwrap().clone();
                     if quick.as_deref().is_some_and(matches) {
-                        toggle_quick(app);
+                        quick_window::toggle(app);
                         return;
                     }
                     let chat = chords.chat.lock().unwrap().clone();
@@ -2326,8 +2236,8 @@ pub fn run() {
         .manage(LastPanelSummon(Mutex::new(None)))
         .manage(HideOnBlur(Mutex::new(true)))
         .manage(CaptureReturn(Mutex::new(CaptureReturnPlan::default())))
-        .manage(QuickPlaced(Mutex::new(false)))
-        .manage(QuickReturn(Mutex::new(false)))
+        .manage(quick_window::QuickPlaced(Mutex::new(false)))
+        .manage(quick_window::QuickReturn(Mutex::new(CaptureReturnPlan::default())))
         .manage(QuitFlush { status: Mutex::new(QuitFlushStatus::default()), cv: Condvar::new() })
         .manage(corpus::ImportAuthorizations::default())
         .manage(pasteboard::PasteboardGrants::default())
@@ -2912,9 +2822,7 @@ pub fn run() {
                 }
                 // the floating Quick Note is a visitor by nature — always hide on
                 // click-away (the close-on-blur the maintainer wanted for quick access)
-                "quick" => {
-                    let _ = window.hide();
-                }
+                "quick" => quick_window::on_blur(window),
                 _ => {}
             }
         })
@@ -2937,7 +2845,7 @@ pub fn run() {
                 // panels that macOS does NOT count there, so summoning Quick — e.g.
                 // ⌥. / ⌥Q, which activates the app — fires a spurious Reopen with
                 // has_visible_windows=false and wrongly surfaces the whole main
-                // window (the maintainer, 2026-06-30). show_quick() shows the panel BEFORE it
+                // window (the maintainer, 2026-06-30). quick_window::show shows the panel BEFORE it
                 // steals focus, so our own is_visible() check sees it and suppresses
                 // the reopen. The quick chord must open ONLY the floating note.
                 if let tauri::RunEvent::Reopen { has_visible_windows, .. } = event {

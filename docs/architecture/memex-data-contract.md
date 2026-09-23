@@ -603,6 +603,11 @@ but it must remain rebuildable, optional, and behind the retrieval port.
 - Quick captures and notes created from the Quick Note window are secure at
   birth. The user may deliberately remove protection from the note menu or the
   Quick Note shield control.
+- A Quick Note is a view until you write in it, like a new note in main: the
+  window files it into Main on its first non-empty save, reuses a blank open
+  note instead of creating another, and discards a blank note it created once
+  you switch away (Rust refuses to discard anything with content). Its picker
+  never lists blank notes, and a blank open note is titled "New note".
 - A secure quick capture therefore lives in `wiki/_secure/` but keeps the
   capture shelf `Inbox`, and Rust projects it to the reserved `Board` root the
   sidebar reads as **Captures** — the same surface a plain staged capture in
@@ -715,6 +720,25 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   remain path-based; if macOS cannot resolve a move, activation asks the user to
   select the folder again instead of falling back to the historical Documents
   location.
+- **A vault is shared with other notes apps, and keeps its marker** (2026-09-23).
+  The same folder may be open in Obsidian and ZenNotes at once. Other apps may
+  treat root `memex.json` as loose clutter: ZenNotes 2.x moves every visible
+  non-Markdown root file into `assets/` on each launch unless the folder has
+  `.obsidian/`, and a vault without its marker used to reopen as a plain folder
+  with scaffolding added. So on every writable open or connect of a folder Rotli
+  has used (it has `.rotli/`), `src-tauri/src/vault_marker.rs` first moves a
+  displaced marker back from `assets/`, `attachements/`, or `_assets/`, together
+  with `users.json`, `memex.local.json`, and `identities.local.json` from that
+  folder (never overwriting a root file), else restores it from the hidden
+  backup `.rotli/memex.json`. It then refreshes that backup and creates an empty
+  `.obsidian/`, the guard those sweeps honour; Obsidian fills it in when it
+  first opens the folder. Folder inspection reports a recoverable vault as a
+  vault. Plain Markdown and Obsidian folders never get a marker.
+- **Connect vault refuses no folder.** The switcher's Connect creates a vault in
+  an empty folder, links an existing vault as a switch target, and opens any
+  other folder (Markdown, Obsidian, ZenNotes) in place without a marker, the
+  same as onboarding's "Open an existing folder". An open plain folder is still
+  the switcher's current row and names its header.
 - **A vault may be raw** (vault-vs-brain, 2026-07-26): the per-vault
   `brainEnabled` setting (missing ⇒ on) turns the Librarian layer off entirely.
   Raw means the organizer never acts and the filer write lane refuses —

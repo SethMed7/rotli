@@ -19,10 +19,17 @@ import { useTransientPopover } from "../lib/popover";
 import { corpusInspectFolder, corpusRefreshVault } from "../lib/tauri";
 import { type MemexInstance } from "../memex/config";
 import { initMemexAsCorpus } from "../memex/service";
-import { useConnectBrain, useForgetBrain, useMemexConfig, useSwitchVault } from "../memex/useMemex";
+import {
+  useChooseFolder,
+  useConnectBrain,
+  useForgetBrain,
+  useMemexConfig,
+  useSwitchVault,
+} from "../memex/useMemex";
 import { openNewItemMenu } from "../newItems/menu";
 import { mainFolderIds } from "../services/mainTree";
 import {
+  connectPlan,
   vaultDisplayName,
   vaultOverflowItems,
   vaultRowLabel,
@@ -31,6 +38,7 @@ import {
 import { activateCreatedVault, reconnectActiveVault } from "../state/activeVault";
 import { useContextMenu } from "../state/contextMenu";
 import { useFocusedTab } from "../state/panes";
+import { flushSettingsNow } from "../state/persist";
 import { useUiStore } from "../state/ui";
 import { requestVaultFolder } from "../state/vaultFolderBrowser";
 import { useWebVaultConnect } from "../state/webVaultConnect";
@@ -90,9 +98,10 @@ export function Sidebar() {
   const memexCfg = useMemexConfig();
   const switchVaultMut = useSwitchVault();
   const connectBrainMut = useConnectBrain();
+  const chooseFolderMut = useChooseFolder();
   const forgetBrainMut = useForgetBrain();
-  const vaultName = vaultDisplayName(memexCfg.data?.instances ?? []);
-  const vaultItems = vaultSwitcherItems(memexCfg.data?.instances ?? []);
+  const vaultName = vaultDisplayName(memexCfg.data?.instances ?? [], memexCfg.data?.currentFolder);
+  const vaultItems = vaultSwitcherItems(memexCfg.data?.instances ?? [], memexCfg.data?.currentFolder);
   const vaultTriggerRef = useRef<HTMLButtonElement>(null);
   const vaultMenuRef = useRef<HTMLDivElement>(null);
   const [vaultMenuPosition, setVaultMenuPosition] = useState<{ left: number; top: number } | null>(null);
@@ -115,16 +124,16 @@ export function Sidebar() {
       requireEmpty: false,
     });
     if (!path) return;
-    const report = await corpusInspectFolder(path);
-    if (report.kind === "empty") {
+    const plan = connectPlan((await corpusInspectFolder(path)).kind);
+    if (plan === "create") {
       await initMemexAsCorpus(path);
       await activateCreatedVault();
-      return;
+    } else if (plan === "link") {
+      await connectBrainMut.mutateAsync(path);
+    } else {
+      await flushSettingsNow();
+      await chooseFolderMut.mutateAsync(path);
     }
-    if (report.kind !== "memex") {
-      throw new Error("Choose an existing Rotli vault or an empty folder.");
-    }
-    await connectBrainMut.mutateAsync(path);
   };
 
   const refreshVault = async (id: string, active: boolean) => {

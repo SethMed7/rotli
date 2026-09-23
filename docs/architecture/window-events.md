@@ -32,7 +32,7 @@ writer, the floating windows announce), **W→R** webview to Rust.
 | `rotli:native-drop-refused` | R→W | A native drop delivered nothing that could be granted (folders, files gone mid-drag, a drag with no path, promise, or image bytes); the webview shows a notice instead of doing nothing. |
 | `rotli:open-request` | R→W | `rotli open <id>` (CLI/deep link) or a Reopen wants the main webview to consume the open mailbox. |
 | `rotli:organizer-progress` | R→W | Librarian run progress for the live Activity lane. |
-| `rotli:quick-created` | W→W | A note was born in the Quick Note window; main files it into Main so it is a full note, never a capture. |
+| `rotli:quick-created` | W→W | A note born in the Quick Note window got its first non-empty save; main files it into Main so it is a full note, never a capture. A blank one is never announced. |
 | `rotli:quick-set` | W→W | The quick-access set (ids, active id, folder, vault) changed in one webview; the other applies it and main persists it. |
 | `rotli:quick-show` | R→W | The Quick Note window was summoned; refocus its editor. |
 | `rotli:quit-flush-failed` | R→W | A quit-time flush could not save; the app stays open and the main webview shows why. |

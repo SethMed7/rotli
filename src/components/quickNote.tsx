@@ -10,9 +10,14 @@
 import { type KeyboardEvent, type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { EditorSurface } from "../editor/editorSurface";
-import { setQuickHandle } from "../keys/handles";
+import { evictDocument } from "../editor/model";
+import { quickHandle, setQuickHandle } from "../keys/handles";
+import { hotkeyPeekDelay, useHeldModifier } from "../keys/useHeldModifier";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { useTransientPopover } from "../lib/popover";
+import { pickableNotes, quickNoteTitle } from "../lib/quickNoteList";
 import {
+  corpusDiscardBlank,
   corpusFrontmatter,
   corpusSetSecure,
   emitQuickCreated,
@@ -25,6 +30,7 @@ import { createVaultCapture } from "../services/captureRouting";
 import { createRoutedNote } from "../services/createNote";
 import { isChatsPath, isVault, isWikiPath } from "../services/destinations";
 import { invalidateNotes, useSearchableNotes } from "../services/hooks";
+import { claimClosedNoteDrafts, markNoteDraftChanged, trackNewNoteDraft } from "../services/noteDrafts";
 import { inboxFolderId, notesService } from "../services/notes";
 import { usePanesStore } from "../state/panes";
 import { pruneQuick, setQuickActive, togglePinQuick } from "../state/quick";
@@ -32,7 +38,9 @@ import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import { ContextMenu } from "./contextMenu";
 import { PlusGlyph, SearchGlyph, ShieldGlyph, glyphForNote } from "./glyphs";
+import { HotkeyBadges } from "./hotkeyBadges";
 import { IconButton } from "./iconButton";
+import { WhichKey } from "./whichKey";
 
 /** activeEditor() resolves through the panes store's focusedPaneId; the quick
  * webview has no pane tree, so we pin it to this id and register the editor
@@ -43,6 +51,18 @@ const QUICK_PANE_ID = "quick";
 function onDragRegionMouseDown(event: MouseEvent) {
   if (event.button !== 0 || event.detail > 1) return;
   void startWindowDrag();
+}
+
+/** Leaving a note this window created and never wrote in discards it — the
+ * ephemeral-note lifecycle main already follows. Rust re-checks blankness and
+ * refuses anything with content, so a refusal just keeps the note. */
+function discardAbandonedDraft(noteId: string): void {
+  for (const id of claimClosedNoteDrafts([noteId], [])) {
+    evictDocument(id);
+    void corpusDiscardBlank(id)
+      .then(() => invalidateNotes())
+      .catch(() => {});
+  }
 }
 
 /** Forgiving subsequence match — instant, no scoring (mirrors the palette). */
@@ -177,8 +197,26 @@ export function QuickNote() {
   // garbage). useNotes() alone missed staged notes (the search audit's P0).
   const universe = useSearchableNotes();
   const notes = useMemo(() => universe.notes.filter((n) => n.kind !== "board"), [universe.notes]);
+  const pickable = useMemo(() => pickableNotes(notes), [notes]);
   const byId = useMemo(() => new Map(notes.map((n) => [n.id, n])), [notes]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // hold ⌘ to see this window's shortcuts — the main window's peek, scoped here
+  const hotkeyPeek = useUiStore((s) => s.hotkeyPeek);
+  const [peek, setPeek] = useState(false);
+  useHeldModifier({
+    modifier: "Meta",
+    delayMs: hotkeyPeekDelay(pickerOpen),
+    enabled: LAUNCH_FEATURES.hotkeys && hotkeyPeek !== "off",
+    onHold: () => setPeek(true),
+    onRelease: () => setPeek(false),
+  });
+  // the note open before this one — leaving a blank draft discards it
+  const previousActiveRef = useRef(activeId);
+  useEffect(() => {
+    const previous = previousActiveRef.current;
+    previousActiveRef.current = activeId;
+    if (previous && previous !== activeId) discardAbandonedDraft(previous);
+  }, [activeId]);
   // a failed new-note create, surfaced in the window (#6 — never silent)
   const [err, setErr] = useState<string | null>(null);
   // bumped each summon — keys the editor so it REMOUNTS on every show, re-running
@@ -203,6 +241,7 @@ export function QuickNote() {
 
   const toggleSecure = () => {
     if (!activeId || securityBusy) return;
+    markNoteDraftChanged(activeId); // protecting a note is intent to keep it
     const next = !secure;
     setSecurityBusy(true);
     void corpusSetSecure(activeId, next)
@@ -254,6 +293,14 @@ export function QuickNote() {
   }, [universe.ready, notes, ids, activeId]);
 
   const newNote = () => {
+    // the open note is still blank: it IS the new note — never stack another
+    const open = useUiStore.getState().quickActiveId;
+    if (open && byId.get(open)?.bodyEmpty === true) {
+      setErr(null);
+      setPickerOpen(false);
+      setShowNonce((n) => n + 1);
+      return;
+    }
     // Without an exact vault choice, preserve the legacy local-folder/current
     // memex route. An exact writable vault bypasses that folder and uses its
     // guarded intake; a stale choice surfaces an error instead of misfiling.
@@ -277,11 +324,14 @@ export function QuickNote() {
       .then(async (noteId) => {
         await invalidateNotes();
         setErr(null);
-        // a Quick Note is a FULL note: main files it into Main at birth so it
-        // never sits in Captures (the quick webview cannot write the manifest;
-        // in the browser twin there is no main, so file it here)
-        if (isTauri()) emitQuickCreated({ id: noteId });
-        else fileQuickNoteInMain(noteId);
+        // a Quick Note is a FULL note: main files it into Main so it never sits
+        // in Captures — on its first non-empty save, so a blank one never shows
+        // up there (the quick webview cannot write the manifest; in the browser
+        // twin there is no main, so file it here)
+        trackNewNoteDraft(noteId, () => {
+          if (isTauri()) emitQuickCreated({ id: noteId });
+          else fileQuickNoteInMain(noteId);
+        });
         setQuickActive(noteId); // open it (not pinned — pin deliberately via ★)
         setPickerOpen(false);
       })
@@ -312,12 +362,13 @@ export function QuickNote() {
         setPickerOpen(false);
         setErr(null); // a fresh summon starts clean; a re-failure re-surfaces
         setShowNonce((n) => n + 1);
-        if (!creatingRef.current && !useUiStore.getState().quickActiveId) newNote();
+        // the latest newNote, through the handle re-registered every render
+        if (!creatingRef.current && !useUiStore.getState().quickActiveId) quickHandle()?.newNote();
       }),
     [],
   );
 
-  const activeTitle = (activeId && byId.get(activeId)?.title) || "Untitled";
+  const activeTitle = quickNoteTitle(activeId ? byId.get(activeId) : undefined);
 
   return (
     <div className="quick-window">
@@ -369,10 +420,10 @@ export function QuickNote() {
               <ShieldGlyph size={15} />
             </IconButton>
           )}
-          <IconButton label="Switch or pin a note — ⌘P" onClick={openPicker}>
+          <IconButton label="Switch or pin a note — ⌘P" hotkey="quick.search" onClick={openPicker}>
             <SearchGlyph size={15} />
           </IconButton>
-          <IconButton label="New quick note — ⌘N" onClick={newNote}>
+          <IconButton label="New quick note — ⌘N" hotkey="quick.new" onClick={newNote}>
             <PlusGlyph size={15} />
           </IconButton>
         </div>
@@ -401,14 +452,17 @@ export function QuickNote() {
 
       {pickerOpen && (
         <NotePicker
-          notes={notes}
+          notes={pickable}
           pinned={new Set(ids)}
           activeId={activeId}
           onOpen={(id) => {
             setQuickActive(id);
             setPickerOpen(false);
           }}
-          onTogglePin={togglePinQuick}
+          onTogglePin={(id) => {
+            markNoteDraftChanged(id); // pinning a note is intent to keep it
+            togglePinQuick(id);
+          }}
           onClose={() => setPickerOpen(false)}
         />
       )}
@@ -416,6 +470,12 @@ export function QuickNote() {
           window has its own React root — without a mounted host the grips would
           open nothing here (remediation Batch 3, F13) */}
       <ContextMenu />
+      {peek &&
+        (hotkeyPeek === "badges" ? (
+          <HotkeyBadges />
+        ) : (
+          <WhichKey surface="quick" onClose={() => setPeek(false)} />
+        ))}
     </div>
   );
 }
