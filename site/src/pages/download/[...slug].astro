@@ -29,7 +29,7 @@ const platforms: { name: string; detail: string; status: Status; action?: { href
     ? [
         {
           name: 'Any browser',
-          detail: 'Rotli Web: the editor, folders, tasks, and links, working in a folder on your computer.',
+          detail: 'Rotli Web in Chrome, Edge, Arc, Firefox, Zen, or Brave: the editor, folders, tasks, and links, working in a folder on your computer.',
           status: 'available' as const,
           action: { href: WEB_APP_PATH, label: 'Open Rotli Web' },
         },
@@ -69,7 +69,7 @@ const platforms: { name: string; detail: string; status: Status; action?: { href
           <h2>{os === 'windows' ? 'rotli for Windows is coming soon' : os === 'linux' ? 'rotli for Linux is coming soon' : 'rotli runs on your computer'}</h2>
           <p>
             {web
-              ? 'In the meantime, Rotli Web runs the same workspace in your browser, with no account and nothing to install.'
+              ? 'In the meantime, Rotli Web runs the same workspace in your browser, with no account. In Chrome, Edge, or Arc there is nothing to install.'
               : 'Native apps for Windows and Linux are planned. Today, rotli is a Mac app.'}
           </p>
           <div class="pick-actions">
@@ -78,8 +78,9 @@ const platforms: { name: string; detail: string; status: Status; action?: { href
           </div>
           {web && (
             <p class="pick-note">
-              Using Firefox, Safari, or another browser? <a href="/resources/rotli-helper/">Install Rotli Helper</a>, a
-              small program that lets Rotli Web save into your folder and chat through the AI tools on your computer.
+              Using Firefox, Zen, or Brave? <a href="/resources/rotli-helper/">Install Rotli Helper</a>, a small program
+              that lets Rotli Web save into your folder and chat through the AI tools on your computer. Safari and
+              phones aren’t supported yet.
             </p>
           )}
         </div>

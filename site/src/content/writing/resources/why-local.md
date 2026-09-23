@@ -31,5 +31,5 @@ secure never go to a remote model. A locked note can be read, but no AI can edit
 ## And the browser?
 
 Rotli Web follows the same rule: every note is a file in a folder on your computer. Chrome, Edge, and Arc
-open the folder directly; other browsers use [Rotli Helper](/resources/rotli-helper/). See
+open the folder directly; Firefox, Zen, and Brave use [Rotli Helper](/resources/rotli-helper/). See
 [rotli in the browser and on the Mac](/resources/web-and-mac/).

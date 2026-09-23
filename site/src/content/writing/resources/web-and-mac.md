@@ -19,9 +19,10 @@ Every note is a real file in a folder on your computer, the same files the Mac a
 asks for that folder before anything opens.
 
 - **Chrome, Edge, or Arc** open the folder directly.
-- **Firefox, Safari, and other browsers** can't write to a folder themselves, so they use
+- **Firefox, Zen, and Brave** can't write to a folder themselves, so they use
   [Rotli Helper](/resources/rotli-helper/), a small program on your computer that reads and writes the
   one folder you pick.
+- **Safari, phones, and tablets** aren't supported yet: they can't reach a folder on your computer.
 
 The page can't send your notes anywhere. Its security policy only allows it to connect to Rotli Helper,
 and only if you run it on your own computer.
