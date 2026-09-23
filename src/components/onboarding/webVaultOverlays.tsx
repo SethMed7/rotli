@@ -87,20 +87,21 @@ function LegacyNotesOffer() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Settings → General asks again after Not now
-  const requested = useLegacyNotesOffer((s) => s.open);
-  const hideRequest = useLegacyNotesOffer((s) => s.hide);
+  // Settings → General asks again after Not now (a count: every click looks again)
+  const requested = useLegacyNotesOffer((s) => s.requested);
+  const settle = useLegacyNotesOffer((s) => s.settle);
   useEffect(() => {
     const dir = activeWebVaultDir();
     const key = webVaultKey();
     if (!dir) return;
-    if (!requested && key && legacyOfferDeferred(window.localStorage, key)) return;
+    if (requested === 0 && key && legacyOfferDeferred(window.localStorage, key)) return;
     // only what the vault doesn't already hold; nothing left clears the browser's copy
     void legacyFilesToCopy(dir).then((found) => {
       setDone(null);
       setFiles(found.length > 0 ? found : null);
+      if (found.length === 0) settle();
     });
-  }, [requested]);
+  }, [requested, settle]);
   if (!files) return null;
   const vault = connectedFolderName() ?? "your vault";
   const close = () => {
@@ -108,7 +109,7 @@ function LegacyNotesOffer() {
     const key = webVaultKey();
     if (done === null && key) deferLegacyOffer(window.localStorage, key);
     setFiles(null);
-    hideRequest();
+    settle();
   };
   const copy = () => {
     const dir = activeWebVaultDir();

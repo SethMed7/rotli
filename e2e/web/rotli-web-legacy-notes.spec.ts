@@ -47,18 +47,25 @@ test("Not now is remembered; Settings offers it again, and a copied browser stor
   await page.waitForTimeout(500);
   await expect(offer(page)).toHaveCount(0);
 
-  // Settings → General asks again, and copying clears the browser's copy
+  // Settings → General asks again — every time it's clicked (review of #63)
   await page
     .getByRole("button", { name: /Settings/ })
     .first()
     .click();
-  await page.getByRole("button", { name: "Copy notes kept in this browser…" }).click();
+  const again = page.getByRole("button", { name: "Copy notes kept in this browser…" });
+  await again.click();
+  await expect(offer(page)).toBeVisible();
+  await offer(page).getByRole("button", { name: "Not now" }).click();
+  await again.click();
+  await expect(offer(page)).toBeVisible();
+  // copying clears the browser's copy, and Settings stops offering it
   await offer(page)
     .getByRole("button", { name: /^Copy into/ })
     .click();
   await expect(offer(page)).toContainText("Copied 1 file");
   expect(await readOpfsFile(page, "Old note.md")).toContain("kept in the browser");
   await offer(page).getByRole("button", { name: "Done" }).click();
+  await expect(again).toHaveCount(0);
   await page.goto(APP);
   await expect(page.locator(".cm-content").first()).toBeVisible();
   await page.waitForTimeout(500);
@@ -90,4 +97,11 @@ test("a browser copy the vault already holds is cleared without asking", async (
       }),
   );
   expect(left).toBeNull();
+  // and Settings has nothing to offer
+  await page
+    .getByRole("button", { name: /Settings/ })
+    .first()
+    .click();
+  await expect(page.getByRole("button", { name: "Export vault (.zip)" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copy notes kept in this browser…" })).toHaveCount(0);
 });

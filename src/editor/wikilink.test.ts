@@ -61,6 +61,17 @@ describe("wikilink", () => {
     expect(resolveWikilink("AI and privacy", index)).toBeNull();
   });
 
+  test("a bare title never opens a different note stored under that name as its path", () => {
+    // review of #63: a ULID note titled "Plan", and a frontmatter-less file
+    // Plan.md (id = its path, stem alias "Plan") titled something else
+    const index = buildWikilinkIndex([
+      note("01JPLANULID", "Plan"),
+      aliasedNote("Plan.md", "Planning notes", ["Plan"]),
+    ]);
+    expect(resolveWikilink("Plan", index)).toBeNull(); // ambiguous, as before
+    expect(resolveWikilink("Plan.md", index)).toBe("Plan.md"); // the path id, written as one
+  });
+
   test("resolveWikilink by unique title", () => {
     const index = buildWikilinkIndex([note("path/x", "My Note")]);
     expect(resolveWikilink("My Note", index)).toBe("path/x");

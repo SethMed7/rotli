@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
 
 import { isWebVault } from "../../lib/browserVault";
-import { legacyBrowserFiles } from "../../services/legacyBrowserNotes";
-import { connectedFolderName, exportWebVault, webVaultMode } from "../../services/webNotes";
+import { legacyFilesToCopy } from "../../services/legacyBrowserNotes";
+import {
+  activeWebVaultDir,
+  connectedFolderName,
+  exportWebVault,
+  webVaultMode,
+} from "../../services/webNotes";
 import { useLegacyNotesOffer } from "../../state/legacyNotesOffer";
 import { useWebVaultConnect } from "../../state/webVaultConnect";
 
@@ -13,16 +18,18 @@ export function WebVaultSettings() {
   const web = isWebVault();
   const [error, setError] = useState<string | null>(null);
   const openChange = useWebVaultConnect((s) => s.show);
-  const offerOpen = useLegacyNotesOffer((s) => s.open);
-  const showOffer = useLegacyNotesOffer((s) => s.show);
-  // notes an older Rotli Web kept inside this browser, still waiting to be copied
+  const settled = useLegacyNotesOffer((s) => s.settled);
+  const requestOffer = useLegacyNotesOffer((s) => s.request);
+  // notes an older Rotli Web kept inside this browser that the vault doesn't
+  // hold yet — re-read whenever the offer settles (copied, cleared, closed)
   const [kept, setKept] = useState(0);
   useEffect(() => {
-    if (!web) return;
-    void legacyBrowserFiles()
+    const dir = activeWebVaultDir();
+    if (!web || !dir) return;
+    void legacyFilesToCopy(dir)
       .then((files) => setKept(files.length))
       .catch(() => setKept(0));
-  }, [web, offerOpen]);
+  }, [web, settled]);
   if (!web) return null;
   const mode = webVaultMode();
   const folder = connectedFolderName();
@@ -50,7 +57,7 @@ export function WebVaultSettings() {
         Export vault (.zip)
       </button>
       {kept > 0 && (
-        <button type="button" className="ghostbtn" onClick={showOffer}>
+        <button type="button" className="ghostbtn" onClick={requestOffer}>
           Copy notes kept in this browser…
         </button>
       )}
