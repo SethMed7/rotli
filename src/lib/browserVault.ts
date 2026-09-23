@@ -231,6 +231,16 @@ export function configureBrowserVault(store: VaultStore): BrowserVault {
   return vault;
 }
 
+let device: VaultStore | null = null;
+
+/** This BROWSER's own key-value store, never the vault's: device credentials
+ * and bindings (the helper pairing, which vault this browser opens, writes
+ * waiting out an outage) live here, so they never travel with a vault. */
+export function deviceVaultStore(): VaultStore {
+  device ??= typeof indexedDB === "undefined" ? new MemoryVaultStore() : new IndexedDbVaultStore();
+  return device;
+}
+
 let storageVault: BrowserVault | null = null;
 
 /** The browser's OWN storage, whatever store the page swapped in: where the

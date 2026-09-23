@@ -12,7 +12,7 @@ import { useUiStore } from "../state/ui";
 import type { WelcomeSeed } from "../types";
 import { invalidateFolders, invalidateNoteLists } from "./hooks";
 import { fileNoteInNamedRootFolder, mainHasNote } from "./mainTree";
-import { notesService } from "./notes";
+import { activeWebVaultDir, notesService } from "./notes";
 
 export const WELCOME_FOLDER = "Welcome";
 
@@ -40,10 +40,25 @@ async function seedInMemory(): Promise<WelcomeSeed> {
       noteIds.push(match.id);
       continue;
     }
-    noteIds.push((await notesService.createNote(folder.id, entry.body)).id);
+    noteIds.push(await createLesson(folder.id, entry));
     created = true;
   }
   return { created, noteIds };
+}
+
+/** One lesson, as a note in the Welcome folder. A connected (or imported)
+ * folder vault gets a plain Markdown file, as the Rust seed writes: generic
+ * note creation there files into intake with the Inbox shelf, which every
+ * reader — the Mac app included — shows as Captures. */
+async function createLesson(folderId: string, entry: { filename: string; body: string }): Promise<string> {
+  const dir = activeWebVaultDir();
+  if (!dir) return (await notesService.createNote(folderId, entry.body)).id;
+  const path = `${folderId}/${entry.filename}`;
+  if (!(await dir.exists(path))) await dir.writeText(path, entry.body);
+  const title = titleOf(entry.body);
+  const note = (await notesService.listAll()).find((n) => n.folderId === folderId && n.title === title);
+  if (!note) throw new Error(`The lesson “${title}” was written but could not be read back.`);
+  return note.id;
 }
 
 function mainSettled(): Promise<void> {

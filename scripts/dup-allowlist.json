@@ -139,6 +139,91 @@
         "src/state/chatWindowSide.test.ts"
       ],
       "reason": "The Chat window test asserts the hand-off protocol by its message names ('regroup', 'regrouped'). The literals ARE the contract between the two webviews (docs/architecture/window-events.md rotli:chat-window); a test that did not name them could not prove what the other window receives."
+    },
+    {
+      "id": "board-files-ts-twin",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/corpus.rs",
+        "src/services/folderBoards.ts",
+        "src/services/folderBoards.test.ts"
+      ],
+      "reason": "Deliberate TS twin of the Rust board rules: Rotli Web has no Rust, so services/folderBoards.ts must name, place, and collide boards exactly as corpus.rs board_name_stem / create_board_with_stem / free_name do (Project/Map → Project-Map, name-2.excalidraw, storage/excalidraw). The literals ARE the on-disk contract; the test mirrors the Rust cases so the two cannot drift silently. parity.json pins the empty scene and the lane."
+    },
+    {
+      "id": "vault-scaffold-ts-twin",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/memex.rs",
+        "src/services/vaultScaffold.ts"
+      ],
+      "reason": "Deliberate twin: Rotli Web scaffolds an empty connected folder with the same spine Rust scaffold_memex writes, so the folder opens in Rotli for Mac as a vault it recognizes. The browser cannot call Rust; the shared literals ARE the on-disk contract."
+    },
+    {
+      "id": "onboarding-setup-shell-classes",
+      "signal": "literal",
+      "files": [
+        "src/components/onboarding/onboarding.tsx",
+        "src/components/onboarding/vaultActivation.tsx",
+        "src/components/onboarding/modelSetup.tsx",
+        "src/components/onboarding/webVaultGate.tsx"
+      ],
+      "reason": "Every setup screen renders the same setup-shell layout (onboarding.css) by class name; the shared literals are the design system's layout vocabulary, not copied logic. Each screen's content and actions differ."
+    },
+    {
+      "id": "web-vault-gate-tests-name-their-copy",
+      "signal": "literal",
+      "files": [
+        "src/components/onboarding/webVaultGate.tsx",
+        "src/components/onboarding/webVaultGate.test.tsx"
+      ],
+      "reason": "The tests assert the gate's user-facing copy verbatim; repeating the literals is the point of the test."
+    },
+    {
+      "id": "app-shell-vs-chat-shell-vocabulary",
+      "signal": "literal",
+      "files": [
+        "src/app.tsx",
+        "src/components/chatWindow/chatShell.tsx"
+      ],
+      "reason": "The main window and the pulled-out Chat window each render their own shell and bind the same close-tab action id and content class; the shared literals are registry and layout names, not duplicated behaviour."
+    },
+    {
+      "id": "content-revision-parity-pins",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/helper_vault_tests.rs",
+        "src/lib/helperVaultDir.test.ts"
+      ],
+      "reason": "Deliberate cross-language parity: the page computes the desktop's fnv1a64 content revision in TypeScript, and both suites pin the same known values so the Rust and TS twins cannot drift apart."
+    },
+    {
+      "id": "acp-session-fixture-vocabulary",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/acp.rs",
+        "src-tauri/src/provider_models_tests.rs"
+      ],
+      "reason": "Protocol vocabulary, not a mirror: model discovery (provider_models.rs) reads the same ACP session/new result a chat turn validates against, so its test fixture necessarily spells the configOptions/currentValue shape acp.rs parses. The traversal itself is shared (acp::session_model_options)."
+    },
+    {
+      "id": "claude-initialize-request-reply",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/provider_models.rs",
+        "src-tauri/src/provider_models_fetch.rs"
+      ],
+      "reason": "The initialize control request (fetch) and the parser of its reply (provider_models.rs) name the same Agent SDK envelope fields (request_id, subtype) because one is the other's answer; there is no shared logic to extract."
+    },
+    {
+      "id": "model-allowlist-twin-vectors",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/provider.rs",
+        "src-tauri/src/provider_models_tests.rs",
+        "src/ai/models.test.ts"
+      ],
+      "reason": "Deliberate twin test vectors: the Rust argv gate (provider.rs build_args_for + provider_models::valid_model_id) and its TS mirror (isModelIdShape) are proven against the same refusal ids (--help, opus[2m], …) and the same codex/cursor argv literals, so drift in either side fails a test."
     }
   ]
 }

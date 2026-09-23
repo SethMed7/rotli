@@ -8,12 +8,14 @@ pub(crate) const DEFAULT_ORIGINS: &[&str] = &[
     "http://localhost:1437",
     "http://127.0.0.1:1437",
 ];
-const USAGE: &str = "rotli-helper [--port N] [--origin URL]... [--print-code] [--reset-token]";
+const USAGE: &str = "rotli-helper [--port N] [--origin URL]... [--print-code] [--reset-token] [--vault DIR]";
 pub(crate) struct Options {
     pub(crate) port: u16,
     pub(crate) origins: Vec<String>,
     pub(crate) print_code: bool,
     pub(crate) reset_token: bool,
+    /// `--vault DIR`: record the folder to serve, then exit.
+    pub(crate) vault: Option<String>,
 }
 
 pub(crate) fn parse_args(args: &[String]) -> Result<Options, String> {
@@ -22,6 +24,7 @@ pub(crate) fn parse_args(args: &[String]) -> Result<Options, String> {
         origins: DEFAULT_ORIGINS.iter().map(|origin| (*origin).to_string()).collect(),
         print_code: false,
         reset_token: false,
+        vault: None,
     };
     let mut index = 0;
     while index < args.len() {
@@ -37,6 +40,10 @@ pub(crate) fn parse_args(args: &[String]) -> Result<Options, String> {
             }
             "--origin" => {
                 options.origins.push(normalize_origin(&value(index, "--origin")?));
+                index += 1;
+            }
+            "--vault" => {
+                options.vault = Some(value(index, "--vault")?);
                 index += 1;
             }
             "--print-code" => options.print_code = true,
@@ -70,5 +77,8 @@ mod tests {
         assert!(parsed.origins.contains(&"https://rotli.co".to_string()));
         assert!(parse_args(&["--nope".into()]).is_err());
         assert!(parse_args(&["--port".into()]).is_err());
+        let vault = parse_args(&["--vault".into(), "/tmp/notes".into()]).unwrap();
+        assert_eq!(vault.vault.as_deref(), Some("/tmp/notes"));
+        assert!(parse_args(&["--vault".into()]).is_err());
     }
 }

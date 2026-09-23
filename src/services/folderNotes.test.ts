@@ -8,6 +8,7 @@ import { today } from "../memex/contract";
 import { DEST } from "./destinations";
 import { FolderNotesService } from "./folderNotes";
 import { MemoryVaultDir } from "./vaultDir";
+import { FolderChatStore, webMemexBridge } from "./webChats";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SEED = join(HERE, "..", "..", "src-tauri", "demo-seed", "wiki");
@@ -168,6 +169,62 @@ describe("creating notes", () => {
     await notes.createNote(DEST.inbox, "# Keys\n", { secure: true });
     const fm = parseNoteDocument(await dir.readText("wiki/_inbox/keys.md")).frontmatter;
     expect(fm?.foreign).toContain("secure: true");
+  });
+});
+
+describe("the web's memex note lane (Rust write_note_at)", () => {
+  const born = (id: string, extra = "") =>
+    `---\nid: ${id}\ncreated: ${today()}\nupdated: ${today()}\nshelf: []\n${extra}---\n# Plan\n`;
+
+  test("⌘N's note lands in wiki/_inbox while the Librarian is on, and opens by its id", async () => {
+    const dir = await memexVault();
+    const notes = new FolderNotesService(dir);
+    const bridge = webMemexBridge(new FolderChatStore(dir), notes);
+    expect(await bridge("memex_write_note", { stem: "plan", contents: born("01NEWNOTE") })).toBe(
+      "wiki/_inbox/plan.md",
+    );
+    expect(await bridge("memex_write_note", { stem: "plan", contents: born("01NEWNOTE2") })).toBe(
+      "wiki/_inbox/plan (2).md",
+    );
+    const note = await notes.getNote("01NEWNOTE");
+    expect(note?.diskFolderId).toBe("wiki/_inbox");
+    expect(note?.title).toBe("Plan");
+  });
+
+  test("with the Librarian off it lands at the wiki root; a secure note goes to _secure and .gitignore", async () => {
+    const dir = await memexVault();
+    await dir.writeText(".rotli/settings.json", JSON.stringify({ brainEnabled: false }));
+    await dir.writeText(".gitignore", ".rotli/");
+    const notes = new FolderNotesService(dir);
+    expect(await notes.writeMemexNote("plan", born("01ROOT"))).toBe("wiki/plan.md");
+    expect(await notes.writeMemexNote("keys", born("01SECURE", "secure: true\n"))).toBe(
+      "wiki/_secure/keys.md",
+    );
+    expect(await dir.readText(".gitignore")).toBe(".rotli/\nwiki/_secure/keys.md\n");
+    expect((await notes.getNote("01SECURE"))?.secure).toBe(true);
+  });
+
+  test("a plain folder's note lands at its root, and a stem that isn't a slug is refused", async () => {
+    const dir = new MemoryVaultDir();
+    await dir.writeText("todo.md", "# Todo\n");
+    const notes = new FolderNotesService(dir);
+    expect(await notes.writeMemexNote("plan", born("01PLAIN"))).toBe("plan.md");
+    await expect(notes.writeMemexNote("../escape", born("01BAD"))).rejects.toThrow(/unsafe note stem/);
+    expect(await dir.exists("wiki")).toBe(false);
+  });
+
+  test("the contract read answers missing files with empty text", async () => {
+    const dir = await memexVault();
+    await dir.writeText("users.json", '{"primary":"seth"}');
+    const bridge = webMemexBridge(new FolderChatStore(dir), new FolderNotesService(dir));
+    expect(await bridge("memex_read_contract", { root: "~/vault" })).toEqual({
+      memexJson: "",
+      usersJson: '{"primary":"seth"}',
+      identitiesJson: "",
+    });
+    await expect(webMemexBridge(new FolderChatStore(dir))("memex_write_note", {})).rejects.toThrow(
+      /no vault is connected/,
+    );
   });
 });
 

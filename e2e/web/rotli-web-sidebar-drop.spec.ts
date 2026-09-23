@@ -2,11 +2,12 @@
 // the drop answers in words — the Helper carries text only — instead of the
 // browser opening the image over the app (2026-09-17). A note row takes the
 // drop into the note; the desktop twin proves that lane in
-// e2e/sidebar-drop-targets.spec.ts. Chats come from an imported vault copy.
+// e2e/sidebar-drop-targets.spec.ts. Chats come from a connected folder.
 
 import { expect, type Locator, test } from "@playwright/test";
 
-const APP = "/app/";
+import { startWithFolder } from "./support";
+
 const PORT = 43113;
 const TOKEN = "fixture-token-with-at-least-twenty-four-chars";
 const PNG_BASE64 =
@@ -15,17 +16,12 @@ const PNG_BASE64 =
 const chatFile = (title: string, updated: string) =>
   `---\nid: ${updated}-${title}\ntitle: ${title}\nsource: rotli\nattachedTo:\nparticipants: [you]\ncreated: ${updated}\nupdated: ${updated}\ntags: [chat]\n---\n\n# ${title}\n\n## Messages\n\n**you** · ${updated}T10:00:00Z — hello\n`;
 
-const SNAPSHOT = {
-  version: 1,
-  name: "memex-copy",
-  dirs: ["wiki", "chats", ".rotli"],
-  files: {
-    "wiki/hello.md":
-      "---\nid: 01TESTNOTE0000000000000001\ntitle: Hello\nshelf: [Inbox]\n---\n\n# Hello\n\nA note.\n",
-    ".rotli/main.json": JSON.stringify({ version: 1, tree: [{ note: "01TESTNOTE0000000000000001" }] }),
-    "chats/loose-chat.md": chatFile("Loose chat", "2026-09-12"),
-    ".rotli/settings.json": JSON.stringify({ onboarded: true }),
-  },
+const FOLDER: Record<string, string> = {
+  "wiki/hello.md":
+    "---\nid: 01TESTNOTE0000000000000001\ntitle: Hello\nshelf: [Inbox]\n---\n\n# Hello\n\nA note.\n",
+  ".rotli/main.json": JSON.stringify({ version: 1, tree: [{ note: "01TESTNOTE0000000000000001" }] }),
+  "chats/loose-chat.md": chatFile("Loose chat", "2026-09-12"),
+  ".rotli/settings.json": JSON.stringify({ onboarded: true }),
 };
 
 function fakeHelper(page: import("@playwright/test").Page) {
@@ -81,23 +77,7 @@ test("an image over a chat row lights the row; the drop says the Helper carries 
   page,
 }) => {
   await fakeHelper(page);
-  await page.goto(APP);
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
-  await page.evaluate(
-    (snapshot) =>
-      new Promise<void>((resolve, reject) => {
-        const open = indexedDB.open("rotli-web");
-        open.onsuccess = () => {
-          const tx = open.result.transaction("vault", "readwrite");
-          tx.objectStore("vault").put(JSON.stringify(snapshot), "vault-import");
-          tx.oncomplete = () => resolve();
-          tx.onerror = () => reject(tx.error);
-        };
-        open.onerror = () => reject(open.error);
-      }),
-    SNAPSHOT,
-  );
-  await page.reload();
+  await startWithFolder(page, FOLDER);
   await expect(page.getByRole("tab", { selected: true })).toContainText("Hello");
 
   await page.locator(".sb-switch-seg.desktop-only").click();

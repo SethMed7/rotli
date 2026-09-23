@@ -7,7 +7,7 @@
 
 import type { ChatModelInfo } from "../lib/tauri";
 import { runAgent } from "./loop";
-import { type HybridPreset, PRESET_PREFIX } from "./models";
+import { type HybridPreset, PRESET_PREFIX, findModel } from "./models";
 import { extractJsonObject } from "./parse";
 import type { AgentEvent, Host, RunInput } from "./types";
 
@@ -66,7 +66,8 @@ export async function* runHybrid(
   makeHost: MakeHost,
   requestId?: string,
 ): AsyncGenerator<AgentEvent, void, void> {
-  const byId = new Map(models.map((m) => [m.id, m]));
+  // exact ids, plus the ids older model lists saved (`opus` → `opus[1m]`)
+  const byId = { get: (id: string) => findModel(models, id) };
   const routes = preset.routes
     .map((r) => ({ when: r.when, model: byId.get(r.model) }))
     .filter((r): r is { when: string; model: ChatModelInfo } => !!r.model);

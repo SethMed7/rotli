@@ -132,6 +132,19 @@ export class FsaVaultDir implements VaultDir {
 
   /** read → write → remove, so a failure at any step leaves the original. */
   async move(from: string, to: string): Promise<void> {
+    // "a.md" → "A.md" on a case-insensitive disk names the SAME file: writing
+    // the target and removing the source would delete the note. Go through a
+    // unique temporary name instead, so the file exists at every step.
+    if (from !== to && from.toLowerCase() === to.toLowerCase()) {
+      const via = `${to}.rotli-rename-${crypto.randomUUID()}`;
+      await this.move(from, via);
+      await this.move(via, to);
+      return;
+    }
+    // never replace what is already there (a stale listing must not destroy
+    // a note); the caller picks a free name. Residual: the browser API has no
+    // no-replace write, so another writer creating `to` in this instant wins.
+    if (await this.exists(to)) throw new Error(`${to} already exists`);
     // bytes, so an image moves intact (text is bytes too)
     const bytes = await this.readBytes(from);
     await this.writeBytes(to, bytes);

@@ -12,9 +12,10 @@ import { attachPersistence, hydratePersistedState, runDeferredMaintenance } from
 // Excalidraw otherwise fetches its fonts from a CDN (unpkg). For an offline
 // desktop app (Tauri, no network) point its asset path at the app origin so it
 // resolves the fonts copied into public/fonts -> /fonts. Set before any
-// <Excalidraw/> mounts. Works for both `vite dev` (served from /) and the Tauri
-// build (tauri://localhost root).
-(window as unknown as { EXCALIDRAW_ASSET_PATH?: string }).EXCALIDRAW_ASSET_PATH = "/";
+// <Excalidraw/> mounts. The build's base is "/" for `vite dev` and the Tauri
+// build (tauri://localhost root) and "/app/" for Rotli Web, whose fonts ship
+// under /app/fonts (the site's own /fonts is a different folder).
+(window as unknown as { EXCALIDRAW_ASSET_PATH?: string }).EXCALIDRAW_ASSET_PATH = import.meta.env.BASE_URL;
 
 // Theme is owned by the ui store (explicit light/dark/system, default "light");
 // index.html pins data-theme="light" so first paint is deterministic. In the
@@ -28,7 +29,7 @@ async function bootstrap(rootEl: HTMLElement): Promise<void> {
   // Rotli Web lays its chrome out for a browser tab (no traffic lights, no
   // window drag); the stylesheet keys off this before the first paint.
   document.documentElement.dataset.platform = PLATFORM;
-  await hydrateWebVault(); // Rotli Web: a connected folder or the browser vault; a no-op elsewhere
+  await hydrateWebVault(); // Rotli Web: connect the bound vault, or leave setup to show; a no-op elsewhere
   await hydratePersistedState(); // no-op in a plain browser; never throws
   ReactDOM.createRoot(rootEl).render(
     <React.StrictMode>

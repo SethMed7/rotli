@@ -4,7 +4,8 @@
 
 import { expect, test } from "@playwright/test";
 
-const APP = "/app/";
+import { startWithVault } from "./support";
+
 const PORT = 43112;
 const TOKEN = "fixture-token-with-at-least-twenty-four-chars";
 const HELPER = `http://127.0.0.1:${PORT}`;
@@ -37,8 +38,7 @@ test("a file dropped on a web chat says to use a note, and the app stays open", 
           : null;
     return route.fulfill({ status: 200, headers, body: JSON.stringify({ result }) });
   });
-  await page.goto(APP);
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await startWithVault(page);
   await page.locator(".sb-switch-seg.desktop-only").click();
   const dialog = page.getByRole("dialog", { name: "Chat on the web" });
   await dialog.getByLabel("Paste the pairing code the helper printed:").fill(`${PORT}:${TOKEN}`);

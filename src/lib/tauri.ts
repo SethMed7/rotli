@@ -49,6 +49,7 @@ export type {
   ModelUsageTokens,
   ModelUsageTotal,
 } from "./modelUsageTypes";
+import type { DiscoveredModel } from "./cliModelTypes";
 import type { ModelUsageRange, ModelUsageSummary } from "./modelUsageTypes";
 import { emptyModelUsage } from "./modelUsageTypes";
 
@@ -602,6 +603,10 @@ export function cliDetect(provider: string): Promise<CliDetect> {
   return aiInvoke("cli_detect", { provider });
 }
 
+export function cliModels(provider: string, refresh = false): Promise<DiscoveredModel[]> {
+  return aiInvoke("cli_models", { provider, refresh });
+}
+
 /** One constrained completion step on a connected client. Rust owns the binary
  * + model allowlist and sandbox/protocol flags; the prompt is the only
  * caller-shaped input. `requestId` keys kill-on-cancel across the whole turn. */
@@ -932,6 +937,10 @@ export async function corpusAbs(rootId: string, rel: string): Promise<string> {
  * pass through; a bare relative path is treated as corpus-relative. macOS's
  * case-insensitive FS means `storage:` also resolves a legacy `Storage/` folder. */
 export async function resolveImageSrc(src: string, rootId = "default"): Promise<string> {
+  // Rotli Web never fetches an image a note names by URL: the page's policy
+  // allows its own origin, so a note could otherwise ship its text to the
+  // site in an image request (adversarial review, 2026-09-22)
+  if (/^https?:/i.test(src) && !isTauri()) return "";
   if (/^(https?:|data:|blob:|asset:)/i.test(src)) return src;
   const rel = src.startsWith("storage:") ? `storage/${src.slice("storage:".length)}` : src;
   if (!isTauri()) return currentWebFileStore()?.imageUrl(rel) ?? "";

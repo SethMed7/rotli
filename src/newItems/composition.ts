@@ -8,9 +8,10 @@ import {
 } from "../editor/model";
 import { MERMAID_STARTER } from "../editor/slashActions";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
-import { corpusCreateBoard, corpusCreateManagedFile } from "../lib/tauri";
+import { corpusCreateManagedFile } from "../lib/tauri";
 /** Composition root for item creation. Product rules stay in model/workflow. */
 import { invalidateMemex } from "../memex/useMemex";
+import { boardStore } from "../services/boardStore";
 import { createRoutedNote } from "../services/createNote";
 import { DEST, isHidden, isStorageLane, isVault } from "../services/destinations";
 import { invalidateNoteLists, primeNote } from "../services/hooks";
@@ -186,7 +187,7 @@ export async function createManagedItem(
     kind === "board"
       ? {
           async create() {
-            const board = await corpusCreateBoard(resolvedPhysicalFolder(), name);
+            const board = await boardStore().create(resolvedPhysicalFolder(), name);
             return { id: board.id, kind: "board" };
           },
         }
@@ -382,6 +383,7 @@ export function createManagedDocumentWithContent(
     rootId?: string;
   } = {},
 ): Promise<CreatedItem> {
+  refuseWithheldKind("document");
   const populatedDocumentCreator: NewItemCreator = {
     async create() {
       const { createManagedDocumentFromMarkdown } = await import("../documents/composition");
@@ -451,7 +453,7 @@ export function createManagedBoardWithBody(
           ? DEST.storage
           : `${options.rootId}:storage/excalidraw`
         : resolvedPhysicalFolder();
-      const board = await corpusCreateBoard(folder, name, body);
+      const board = await boardStore().create(folder, name, body);
       return { id: board.id, kind: "board" };
     },
   };

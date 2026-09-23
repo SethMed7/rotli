@@ -28,6 +28,8 @@ mod fsutil;
 /// The `rotli-helper` loopback bridge (a second binary, not the app).
 pub mod helper;
 mod helper_args;
+mod helper_picker;
+mod helper_vault;
 mod helper_token;
 mod keychain;
 mod loopback_http;
@@ -43,7 +45,7 @@ mod organizer_knobs;
 mod parity_tests;
 mod private_browser;
 mod provider;
-mod provider_lane;
+mod provider_lane; mod provider_models;
 mod remote_agent;
 mod routines;
 mod search_index; mod search_match;
@@ -2470,7 +2472,7 @@ pub fn run() {
             chat::chat_models,
             chat::chat_messages,
             chat::chat_messages_stream,
-            provider::cli_detect,
+            provider::cli_detect, provider_models::cli_models,
             provider::cli_complete,
             provider::cli_cancel,
             provider::antigravity::antigravity_manage,

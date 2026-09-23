@@ -9,12 +9,11 @@ import "./styles/onboarding.css";
 import "./styles/board.css";
 import "./styles/memex.css";
 import "./styles/breve.css";
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 // Excalidraw's vendor stylesheet (~144 KB raw / 23 KB gz) + canvas.css are no
 // longer eager here — they load with the lazy board engine (boards/engine/
 // excalidraw.tsx), so a session that never opens a board never pays for them at
 // startup (perf audit 2026-08).
-import { Suspense, lazy } from "react";
 
 import { CaptureCard } from "./components/captureCard";
 import { ContextMenu } from "./components/contextMenu";
@@ -30,7 +29,7 @@ import { BoardNameDialog } from "./components/boardNameDialog";
 import { Titlebar } from "./components/titlebar";
 import { WhichKey } from "./components/whichKey";
 import { VaultFolderBrowser } from "./components/vaultFolderBrowserDialog";
-import { WebVaultConnectDialog } from "./components/webVaultConnectDialog";
+import { WebVaultOverlays } from "./components/onboarding/webVaultOverlays";
 import { WebChatSetupDialog } from "./components/webChatSetupDialog";
 import { registerDefaultActions } from "./keys/actions";
 import { type Surface, applyRebind, attachDispatcher, dispatch } from "./keys/registry";
@@ -57,7 +56,7 @@ import {
   workspaceTakeOpenRequest,
 } from "./lib/tauri";
 import { useNativeFileDrop } from "./editor/nativeFileDrop";
-import { PLATFORM } from "./lib/featurePolicy";
+import { LAUNCH_FEATURES, PLATFORM } from "./lib/featurePolicy";
 import { onQuitFlushFailure } from "./lib/quitFlush";
 import { isOnboardingReview } from "./lib/reviewMode";
 import { fileQuickNoteInMain } from "./newItems/composition";
@@ -66,10 +65,15 @@ import { summonChat } from "./services/chatSummon";
 import { DEST } from "./services/destinations";
 import { invalidateFolders, invalidateJournal, invalidateNotes } from "./services/hooks";
 import { adoptPendingAtOrganize } from "./services/librarianAutoAdopt";
-import { notesService, webVaultWasRestored } from "./services/notes";
+import { notesService } from "./services/notes";
 import { isWebVault } from "./lib/browserVault";
 import { startRoutineUpdateCheck } from "./services/updateCheck";
-import { openSeededWelcome, openWelcome } from "./services/welcome";
+import { openSeededWelcome } from "./services/welcome";
+import {
+  WebVaultGateHost,
+  useFreshFolderWelcome,
+  useWebVaultGateShown,
+} from "./components/onboarding/webVaultGateHost";
 import { queryClient } from "./services/query";
 import { attachChatWindow } from "./state/chatWindow";
 import { addFragmentToMain, hydrateMain } from "./state/main";
@@ -172,6 +176,8 @@ function MainShell() {
     vaultActivationPending ||
     (onboardingActive && onboardingPhase === "vault") ||
     (isTauri() && vaultStatus === "unconfigured" && !onboardingActive);
+  const showWebVaultGate = useWebVaultGateShown();
+  const setupFront = showOnboarding || showVaultActivation || showModelSetup || showWebVaultGate;
 
   // A lone ⌘ reveals shortcut help immediately in the normal workspace. When
   // a modal/popover owns attention, keep the deliberate hold threshold so a
@@ -183,8 +189,7 @@ function MainShell() {
   useHeldModifier({
     modifier: "Meta",
     delayMs: hotkeyPeekDelay(transientCount > 0 || paletteOpen),
-    enabled:
-      hotkeyPeek !== "off" && !settingsOpen && !showOnboarding && !showVaultActivation && !showModelSetup,
+    enabled: LAUNCH_FEATURES.hotkeys && hotkeyPeek !== "off" && !settingsOpen && !setupFront,
     onHold: () => setWhichKey(true),
     onRelease: () => setWhichKey(false),
   });
@@ -370,12 +375,7 @@ function MainShell() {
   // hovered/focused editor), storage for everything else
   useNativeFileDrop();
 
-  // Rotli Web, first visit: the vault is empty, so seed the Welcome folder and
-  // open its note — the same landing a fresh Mac vault gets after onboarding.
-  useEffect(() => {
-    if (!isWebVault() || webVaultWasRestored()) return;
-    void openWelcome().catch(() => {});
-  }, []);
+  useFreshFolderWelcome();
 
   // fs mode: the window opens on the freshest note. The in-memory seed decides
   // this synchronously at module init; the disk corpus answers async — fill
@@ -401,6 +401,8 @@ function MainShell() {
   useEffect(() => {
     if (showOnboarding || showVaultActivation || showModelSetup) void setHideOnBlur(false);
   }, [showOnboarding, showVaultActivation, showModelSetup]);
+
+  if (showWebVaultGate) return <WebVaultGateHost />;
 
   if (showOnboarding) {
     return (
@@ -589,7 +591,7 @@ export default function App() {
     <>
       <MainShell />
       <VaultFolderBrowser />
-      {isWebVault() && <WebVaultConnectDialog />}
+      {isWebVault() && <WebVaultOverlays />}
       {isWebVault() && <WebChatSetupDialog />}
     </>
   );

@@ -10,10 +10,97 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-23
+
 ### Added
 
 - The public site footer now also includes a Featured on Founder.best badge,
   beside the Launch Llama one.
+- **Boards on Rotli Web.** ⌘N → Board (or ⌘⇧T) makes a named Excalidraw
+  board as a real `.excalidraw` file in your vault folder — the same file, in
+  the same place, Rotli for Mac makes — and your strokes save into it. Boards
+  are listed in Main and All notes, open after a reload, and move to Archive or
+  Trash and back like notes. The canvas's fonts ship with the app, so drawing
+  and writing on a board never reaches the internet. Reveal in Finder stays a
+  Mac-only action.
+- **Chat offers every model your CLI does.** The model picker, Settings, and
+  setup now ask Claude Code, Codex, Cursor, and Antigravity which models they
+  offer and list exactly those — Claude's Default (Opus 5.5 with 1M context),
+  Opus, Fable 5.1, Sonnet 5, and Haiku 4.5; Codex's GPT-6 Astra, Sol, and Luna;
+  Cursor's full list — so a new model shows up without an update to Rotli.
+  Reasoning effort and Fast follow what each client says the model supports.
+  Nothing is sent to a model to find out. Chats saved on a bare `opus` or
+  `fable` open on the matching model. Rotli Web gets the same lists once Rotli
+  Helper is updated; an older helper keeps the built-in list.
+
+### Changed
+
+- **Documents stay on the Mac for now.** On Rotli Web the ⌘N chooser shows
+  Document as coming soon, and no menu, command, or chat tool creates one
+  there; Rotli for Mac is unchanged.
+- **Rotli Web needs a vault, and sets one up first.** Nothing opens until a
+  vault folder on your computer is connected, so a note can only ever be a real
+  file there. Chrome, Edge, and Arc pick the folder directly; Zen, Firefox, and
+  Brave use Rotli Helper, which now saves your notes into the folder you choose
+  instead of keeping a copy in the browser. An empty folder becomes a new vault
+  with the Welcome lessons; an existing vault opens as it is. Safari and phones
+  are told plainly that they can't connect a vault yet.
+- **Rotli Helper starts when you log in, and pairing is one press.** The
+  install line registers it as a login item and opens Rotli Web with the
+  pairing code already filled in: press **Pair**, see that it worked, and
+  **Continue** to choose your vault. `--uninstall` removes it. It serves only
+  the one folder you pick with your computer's own folder picker, and the
+  installers now download Rotli Helper 1.3.0, the version that can serve it.
+- **Nothing leaves your computer.** Rotli Web may talk only to Rotli Helper on
+  this computer; a new check fails the build if that ever widens, and a test
+  proves the app never asks. Notes kept inside the browser by an earlier
+  version are offered for copying into your vault.
+
+### Fixed
+
+- **The sidebar shows where you are after following a link.** A note Main
+  doesn't hold now highlights the row it lives under — Captures, Library,
+  Assets, Archive, or Trash — instead of leaving nothing (or the note you left)
+  highlighted.
+- **Rotli Web leaves the browser's shortcuts to the browser.** App hotkeys
+  (tabs, history, panes, views, the two-step leaders) no longer fire on the
+  web, where ⌃Tab, ⌘[, ⌘← and friends belong to the browser; bold, italic,
+  and the other formatting keys still work, and no hint names a key that does
+  nothing. Settings has no Keybindings pane on the web.
+- **The caret sits beside an empty task's box.** After typing `[] ` the caret
+  floated above and to the right of the new checkbox (most visibly in Zen and
+  Firefox); it now sits level with the box, where your text will start.
+- **The caret sits on the "Write…" line of an empty note** instead of above it
+  (Zen and Firefox).
+- **A link to one of two same-titled notes opens it.** When titles collide
+  the link picker writes the note's path, and on Rotli Web that link read "No
+  note with this name"; it now opens the note it names.
+- **"Notes kept in this browser" asks once.** Rotli Web offers to copy notes an
+  older version kept inside the browser into your vault. Not now is now
+  remembered (Settings → General offers it again), and notes already copied
+  on an earlier visit are cleared from the browser without asking.
+- **New notes can be created on Rotli Web.** ⌘N and the tab strip's **+** said
+  "Couldn't create"; a new note is now a file in your vault's `wiki/_inbox`
+  (or `wiki/` with the Librarian off), exactly where Rotli for Mac puts it.
+- **Dragging a block by its handle moves it whole.** A block dragged down
+  landed inside the text below it, splitting a word; it now lands where the
+  drop line shows. Dropping below the last line moves it to the end of the
+  note, and a move no longer leaves blank lines behind.
+- **Pairing waits while the browser asks.** Zen and Firefox ask before a page
+  may connect to apps on your computer; pairing gave up before you could
+  answer and said nothing was running. It now waits, and says to choose Allow.
+  Setup also follows the helper's latest answer, so after Allow it moves on
+  to choosing your vault instead of still saying the helper isn't answering.
+- **Connecting a vault on Rotli Web no longer bounces you back.** In Zen,
+  Firefox, and Safari an empty folder looked exactly like a cancelled picker
+  and nothing happened.
+- **A lost connection never lands notes somewhere else.** A vault that can't be
+  reached at startup shows a reconnect screen naming it, instead of quietly
+  opening an older copy in the browser; a helper that stops answering holds
+  your edits until it is back.
+- **A hard refresh right after typing keeps what you typed.**
+- **Welcome lessons in a connected folder are ordinary notes**, not Captures,
+  in Rotli Web and in Rotli for Mac.
 
 ## [1.3.0] - 2026-09-21
 

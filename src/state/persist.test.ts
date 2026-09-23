@@ -316,8 +316,8 @@ describe("parseSettings — the AI Models keys (the maintainer, 2026-07-02)", ()
     const s = parseSettings("{}");
     expect(s.aiProviders).toEqual({ claude: false, codex: false, cursor: false, antigravity: false });
     expect(s.providerDefaults).toEqual({
-      claude: "sonnet",
-      codex: "gpt-5.6-sol",
+      claude: "default",
+      codex: "gpt-6-sol",
       cursor: "grok-4.6",
       antigravity: "gemini-3.8-flash-high",
     });
@@ -349,13 +349,13 @@ describe("parseSettings — the AI Models keys (the maintainer, 2026-07-02)", ()
 
   test("provider defaults validate against their own catalog", () => {
     const parsed = parseSettings(
-      '{"providerDefaults":{"claude":"opus","codex":"sonnet","cursor":"cursor-auto"}}',
+      '{"providerDefaults":{"claude":"opus","codex":"sonnet","cursor":"cursor-auto","antigravity":"-x"}}',
     );
     expect(parsed.providerDefaults).toEqual({
-      claude: "opus",
-      codex: "gpt-5.6-sol",
+      claude: "opus[1m]", // the bare alias older versions saved → Claude Code's own entry
+      codex: "gpt-6-sol", // another lane's model never crosses over
       cursor: "cursor-auto",
-      antigravity: "gemini-3.8-flash-high",
+      antigravity: "gemini-3.8-flash-high", // a malformed id heals
     });
   });
 

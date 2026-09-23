@@ -14,8 +14,16 @@ test("the Librarian lane keeps the connected clients and fails closed on everyth
 
 test("a Librarian model id is kept only when its lane's catalog lists it", () => {
   const id = (raw: string) => parseSettings(raw).organizerModelId;
-  expect(id('{"organizerModel":"claude","organizerModelId":"opus"}')).toBe("opus");
+  expect(id('{"organizerModel":"claude","organizerModelId":"opus"}')).toBe("opus[1m]");
   expect(id('{"organizerModel":"claude","organizerModelId":"gemini-3.8-flash-high"}')).toBeNull();
   expect(id('{"organizerModel":"local","organizerModelId":"opus"}')).toBeNull();
   expect(id("{}")).toBeNull();
+});
+
+test("a model id the client may still report survives load; discovery has not answered yet", () => {
+  const parsed = parseSettings(
+    '{"providerDefaults":{"codex":"gpt-7-nova"},"organizerModel":"codex","organizerModelId":"gpt-7-nova"}',
+  );
+  expect(parsed.providerDefaults.codex).toBe("gpt-7-nova");
+  expect(parsed.organizerModelId).toBe("gpt-7-nova");
 });

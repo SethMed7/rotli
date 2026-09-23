@@ -1,59 +1,112 @@
-// Rotli Web (ROTLI_PLATFORM=web): the browser is the vault. Every test gets a
-// fresh browser context, so IndexedDB starts empty — a first visit.
+// Rotli Web (ROTLI_PLATFORM=web): a vault is required — every note is a file
+// in a folder on this computer. Every test gets a fresh browser context, so
+// the first visit lands on setup; the origin-private file system stands in
+// for a folder the user chose (see ./support.ts).
 
 import { expect, test } from "@playwright/test";
 
-const APP = "/app/";
+import { APP, listOpfsFiles, readOpfsFile, rememberOpfsVault, startWithVault, vaultGate } from "./support";
 
-test("a first visit seeds the Welcome folder and opens the welcome note", async ({ page }) => {
+test("a first visit is setup: no editor until a vault is connected", async ({ page }) => {
   await page.goto(APP);
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await expect(vaultGate(page)).toHaveText("Choose your vault");
+  // no editor, no sidebar, nothing seeded, and no way around it
+  await expect(page.locator(".cm-content")).toHaveCount(0);
+  await expect(page.getByRole("tab")).toHaveCount(0);
+  await expect(page.getByText(/Keep notes in this browser/)).toHaveCount(0);
+  await expect(page.getByText("Nothing leaves your computer", { exact: false }).first()).toBeVisible();
+  // headless Chromium has the live folder API: the browser's own picker, and
+  // the note that makes the next visit ask nothing
+  await expect(page.getByRole("button", { name: /Choose vault/ })).toBeVisible();
+  await expect(page.getByText("Allow on every visit")).toBeVisible();
+});
+
+test("an empty folder becomes a vault with the Welcome lessons, as files in the folder", async ({ page }) => {
+  await startWithVault(page);
   await expect(page.locator(".main-tree", { hasText: "Welcome" })).toBeVisible();
   // the demo corpus of the desktop twin never seeds here
   await expect(page.getByRole("tab", { name: /notes first/ })).toHaveCount(0);
-});
-
-test("an edit, the open tab, and Main survive a reload", async ({ page }) => {
-  await page.goto(APP);
-  const editor = page.locator(".cm-content").first();
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
-  await editor.click();
-  await page.keyboard.press("End");
-  await page.keyboard.type(" persisted-in-this-browser");
-  await expect(editor).toContainText("persisted-in-this-browser");
-  // the real signal: the vault (IndexedDB) holds the edit — the editor's
-  // autosave and the vault writer are both debounced
+  // the lesson is a plain Markdown file in the vault, not browser storage
   await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () =>
-            new Promise<boolean>((resolve) => {
-              const open = indexedDB.open("rotli-web");
-              open.onsuccess = () => {
-                const db = open.result;
-                if (!db.objectStoreNames.contains("vault")) return resolve(false);
-                const get = db.transaction("vault").objectStore("vault").get("notes");
-                get.onsuccess = () => resolve(String(get.result ?? "").includes("persisted-in-this-browser"));
-                get.onerror = () => resolve(false);
-              };
-              open.onerror = () => resolve(false);
-            }),
-        ),
-      { timeout: 10_000 },
-    )
-    .toBe(true);
-
+    .poll(() => readOpfsFile(page, "wiki/Welcome/Welcome to Rotli.md"))
+    .toMatch(/^# Welcome to Rotli/);
   await page.reload();
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
-  await expect(page.locator(".cm-content").first()).toContainText("persisted-in-this-browser");
-  // the Welcome folder was not re-seeded over the edit: still one welcome note
+  await expect(vaultGate(page)).toHaveCount(0);
   await expect(page.locator(".main-tree").getByText("Welcome to Rotli", { exact: true })).toHaveCount(1);
 });
 
-test("a note created in a fresh folder is there after a reload", async ({ page }) => {
+test("an edit is saved into the vault's file and is there after a reload", async ({ page }) => {
+  await startWithVault(page);
+  const editor = page.locator(".cm-content").first();
+  await editor.click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" saved-in-the-vault");
+  await expect(editor).toContainText("saved-in-the-vault");
+  await expect
+    .poll(() => readOpfsFile(page, "wiki/Welcome/Welcome to Rotli.md"), { timeout: 10_000 })
+    .toContain("saved-in-the-vault");
+  await page.reload();
+  await expect(page.locator(".cm-content").first()).toContainText("saved-in-the-vault");
+  await expect(page.locator(".main-tree").getByText("Welcome to Rotli", { exact: true })).toHaveCount(1);
+});
+
+test("New tab → Markdown note creates a file in the vault; the words are there after a reload", async ({
+  page,
+}) => {
+  await startWithVault(page);
+  // the chooser through real controls (a ⌘-chord differs on the Linux runner)
+  await page.getByRole("button", { name: /Search notes and actions/ }).click();
+  await page.getByPlaceholder("Search notes, files, chats, actions…").fill("choose type");
+  await page.locator(".prow", { hasText: "New tab (choose type)" }).click();
+  await page.getByRole("button", { name: /^New Markdown note \(press/ }).click();
+  await expect(page.locator(".row-action-error")).toHaveCount(0);
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Untitled");
+  await page.locator(".pane.focused .cm-content").click();
+  await page.keyboard.type("# Web note\n\nwritten on the web");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Web note");
+  // a Librarian-on vault stages a new note in wiki/_inbox, as the Mac app does
+  await expect
+    .poll(async () => (await listOpfsFiles(page, "wiki/_inbox")).length, { timeout: 10_000 })
+    .toBe(1);
+  const [file] = await listOpfsFiles(page, "wiki/_inbox");
+  await expect.poll(() => readOpfsFile(page, `wiki/_inbox/${file}`)).toContain("written on the web");
+  await page.reload();
+  const row = page.locator(".main-tree [data-main-id]", { hasText: "Web note" });
+  await expect(row).toBeVisible();
+  await row.click();
+  await expect(page.locator(".cm-content").first()).toContainText("written on the web");
+});
+
+test("the tab strip's + makes a note in the vault too", async ({ page }) => {
+  await startWithVault(page);
+  await page.getByRole("button", { name: /^New Markdown note tab/ }).click();
+  await page.keyboard.type("# From the plus");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("From the plus");
+  await expect(page.locator(".row-action-error")).toHaveCount(0);
+  await expect
+    .poll(async () => (await listOpfsFiles(page, "wiki/_inbox")).length, { timeout: 10_000 })
+    .toBe(1);
+});
+
+test("a remembered vault the browser wants to re-ask about is reconnected by name, never replaced", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const proto = FileSystemDirectoryHandle.prototype as unknown as {
+      queryPermission: () => Promise<string>;
+    };
+    proto.queryPermission = async () => "prompt";
+  });
   await page.goto(APP);
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await rememberOpfsVault(page);
+  await page.reload();
+  await expect(vaultGate(page)).toHaveText("Choose your vault");
+  await expect(page.getByRole("button", { name: /^Reconnect “/ })).toBeVisible();
+  await expect(page.locator(".cm-content")).toHaveCount(0);
+});
+
+test("a folder created in Main is there after a reload", async ({ page }) => {
+  await startWithVault(page);
   await page.getByRole("button", { name: "New folder in Main" }).click();
   await page.getByRole("textbox", { name: "New folder in Main" }).fill("Kept");
   await page.getByRole("textbox", { name: "New folder in Main" }).press("Enter");
@@ -66,8 +119,7 @@ test("a note created in a fresh folder is there after a reload", async ({ page }
 test("the web build keeps Chat visible; clicking it walks through the helper and the tool sign-in", async ({
   page,
 }) => {
-  await page.goto(APP);
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await startWithVault(page);
   await expect(page.getByRole("button", { name: "Home", exact: true })).toBeVisible();
   const chatFront = page.locator(".sb-switch-seg.desktop-only");
   await expect(chatFront).toBeVisible();
@@ -79,7 +131,9 @@ test("the web build keeps Chat visible; clicking it walks through the helper and
   // source today; step 2 is the live pairing form
   await expect(dialog.getByText("Install and start Rotli Helper")).toBeVisible();
   await expect(
-    dialog.getByText(/^curl -fsSL http:\/\/localhost:\d+\/helper\/install\.sh \| sh$/),
+    dialog.getByText(
+      /^curl -fsSL http:\/\/localhost:\d+\/helper\/install\.sh \| sh -s -- --open http:\/\/localhost:\d+\/app\/$/,
+    ),
   ).toBeVisible();
   await expect(dialog.getByText("~/.rotli/bin/rotli-helper")).toBeVisible();
   await expect(dialog.getByLabel("Paste the pairing code the helper printed:")).toBeVisible();
@@ -107,14 +161,13 @@ test("the web build keeps Chat visible; clicking it walks through the helper and
     .first()
     .click();
   await expect(page.getByRole("heading", { name: "Rotli Web" })).toBeVisible();
-  await expect(page.getByText(/Your vault lives in this browser/)).toBeVisible();
+  await expect(page.getByText(/every note is a file there/)).toBeVisible();
 });
 
 test("the top bar is a toolbar, not window chrome: brand instead of traffic lights, no private browser", async ({
   page,
 }) => {
-  await page.goto(APP);
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await startWithVault(page);
   await expect(page.locator("html")).toHaveAttribute("data-platform", "web");
   const brand = page.locator(".titlebar .tb-brand");
   await expect(brand).toBeVisible();
@@ -128,8 +181,7 @@ test("Rotli Web has one window: Chat cannot be pulled out, and ?window=chat is n
   page,
 }) => {
   // a second browser tab would be a second writer with no coordination
-  await page.goto(APP);
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await startWithVault(page);
   await expect(page.locator(".sb-switch-window")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Pull Chat out/ })).toHaveCount(0);
 
@@ -139,43 +191,120 @@ test("Rotli Web has one window: Chat cannot be pulled out, and ?window=chat is n
   await expect(page.locator(".chat-window")).toHaveCount(0);
 });
 
-test("Settings → General offers a real folder (Chromium) and says where the notes live", async ({ page }) => {
-  await page.goto(APP);
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+test("Settings says which vault this browser opens, and offers Change vault and Export", async ({ page }) => {
+  await startWithVault(page);
   await page
     .getByRole("button", { name: /Settings/ })
     .first()
     .click();
   await expect(page.getByRole("heading", { name: "Rotli Web" })).toBeVisible();
-  await expect(page.getByText(/Your vault lives in this browser/)).toBeVisible();
-  // headless Chromium has the picker, so the folder action is offered
-  await expect(page.getByRole("button", { name: "Connect a vault on this computer…" })).toBeVisible();
-});
-
-test("connecting a folder explains itself before the browser's picker, and can be cancelled", async ({
-  page,
-}) => {
-  await page.goto(APP);
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
-  await page
-    .getByRole("button", { name: /Settings/ })
-    .first()
-    .click();
-  await page.getByRole("button", { name: "Connect a vault on this computer…" }).click();
-  const dialog = page.getByRole("dialog", { name: "Connect a vault" });
-  await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText("Nothing leaves your computer");
+  await expect(page.getByText(/every note is a file there/)).toBeVisible();
+  await expect(page.getByText(/Nothing is sent anywhere/)).toBeVisible();
+  await page.getByRole("button", { name: "Change vault…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Change vault" });
+  await expect(dialog).toContainText("Nothing in the vault changes");
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toHaveCount(0);
 });
 
-test("the Files button is in the footer on the web and opens the vault's files", async ({ page }) => {
-  // browser mode keeps its notes in memory outside wiki/, so the browser lands
-  // on the Library root here; the folder-vault spec proves "at the note's folder"
+test("Change vault closes it here and returns to setup; the folder keeps its files", async ({ page }) => {
+  await startWithVault(page);
+  await page
+    .getByRole("button", { name: /Settings/ })
+    .first()
+    .click();
+  await page.getByRole("button", { name: "Change vault…" }).click();
+  await page
+    .getByRole("dialog", { name: "Change vault" })
+    .getByRole("button", { name: /Choose another vault/ })
+    .click();
+  await expect(vaultGate(page)).toHaveText("Choose your vault");
+  await expect.poll(() => readOpfsFile(page, "wiki/Welcome/Welcome to Rotli.md")).toMatch(/^# Welcome/);
+});
+
+test("Safari is told plainly it can't connect a vault, with the way forward", async ({ page }) => {
+  await page.addInitScript(() => {
+    Reflect.deleteProperty(window as unknown as Record<string, unknown>, "showDirectoryPicker");
+    Object.defineProperty(navigator, "userAgent", {
+      get: () =>
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0) AppleWebKit/605.1.15 Version/19.0 Safari/605.1.15",
+    });
+  });
   await page.goto(APP);
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
-  const files = page.locator(".sb-foot").getByRole("button", { name: "Files" });
-  await expect(files).toBeVisible();
-  await files.click();
-  await expect(page.locator(".system-browser")).toBeVisible();
+  await expect(vaultGate(page)).toHaveText("Rotli Web needs a computer");
+  await expect(page.getByText(/Safari can’t connect one/)).toBeVisible();
+  await expect(page.locator(".cm-content")).toHaveCount(0);
+});
+
+// The owner, 2026-09-22: a hard refresh must not lose anything. The file write
+// can't finish while the page unloads; the typing is journaled synchronously
+// and written into the vault on the next boot, before the editor opens.
+test("a hard refresh the instant after typing keeps the words, in the vault's file", async ({ page }) => {
+  await startWithVault(page);
+  const editor = page.locator(".cm-content").first();
+  await editor.click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" typed-then-refreshed");
+  await page.reload();
+  await expect
+    .poll(() => readOpfsFile(page, "wiki/Welcome/Welcome to Rotli.md"), { timeout: 10_000 })
+    .toContain("typed-then-refreshed");
+  await expect(page.locator(".main-tree").getByText("Welcome to Rotli", { exact: true })).toHaveCount(1);
+});
+
+// Adversarial review, round 2: choosing the SAME folder again must keep this
+// browser's id for it — the unsaved journal is keyed by that id, and a new
+// one would orphan any edit still waiting in it.
+test("choosing a folder again keeps its identity — right away, or after another (A → B → A)", async ({
+  page,
+}) => {
+  // the picker hands back the stand-in root ("a") or a folder inside it ("b")
+  await page.addInitScript(() => {
+    (
+      window as unknown as { showDirectoryPicker: () => Promise<FileSystemDirectoryHandle> }
+    ).showDirectoryPicker = async () => {
+      const root = await navigator.storage.getDirectory();
+      return window.sessionStorage.getItem("pick") === "b"
+        ? root.getDirectoryHandle("b", { create: true })
+        : root;
+    };
+  });
+  await startWithVault(page);
+  const folderId = () =>
+    page.evaluate(
+      () =>
+        new Promise<string>((resolve) => {
+          const open = indexedDB.open("rotli-web");
+          open.onsuccess = () => {
+            const get = open.result.transaction("vault").objectStore("vault").get("vault-folder-id");
+            get.onsuccess = () => resolve(String(get.result ?? ""));
+          };
+        }),
+    );
+  const choose = async (pick: "a" | "b") => {
+    await page
+      .getByRole("button", { name: /Settings/ })
+      .first()
+      .click();
+    await page.getByRole("button", { name: "Change vault…" }).click();
+    await page
+      .getByRole("dialog", { name: "Change vault" })
+      .getByRole("button", { name: /Choose another vault/ })
+      .click();
+    await expect(vaultGate(page)).toHaveText("Choose your vault");
+    await page.evaluate((value) => window.sessionStorage.setItem("pick", value), pick);
+    await page.locator(".setup-button.primary", { hasText: "Choose vault…" }).click();
+    // a new vault opens on its Welcome note once seeding lands; wait for it,
+    // or the seeding's own "close Settings" races the next step
+    if (pick === "b")
+      await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+    else await expect(page.getByRole("tab", { selected: true })).toBeVisible();
+    return folderId();
+  };
+  const a = await folderId();
+  expect(a).not.toBe("");
+  expect(await choose("a")).toBe(a);
+  const b = await choose("b");
+  expect(b).not.toBe(a);
+  expect(await choose("a")).toBe(a);
 });

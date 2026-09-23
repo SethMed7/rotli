@@ -28,6 +28,8 @@ import {
 } from "../documents/kinds";
 import { clamp } from "../lib/clamp";
 import { IMAGE_EXTS, VIDEO_EXTS, extOf, fileName, managedFileNote } from "../lib/fileKind";
+import { hotkeyHint } from "../lib/hotkeyHint";
+import { HTML_PREVIEW_CSP } from "../lib/htmlPreviewPolicy";
 import {
   type FileStat,
   corpusFileBytes,
@@ -135,11 +137,17 @@ const READ_MAX_BYTES = 8_000_000;
  * after <head>/<html>/the doctype when present — never before a doctype,
  * which would flip the document into quirks mode. Exported for tests. */
 export function htmlPreviewDoc(text: string, baseUrl: string): string {
-  const base = `<base href="${baseUrl.replace(/"/g, "%22")}">`;
-  const m = /<head[^>]*>/i.exec(text) ?? /<html[^>]*>/i.exec(text) ?? /^\s*<!doctype[^>]*>/i.exec(text);
-  if (!m) return base + text;
-  const at = m.index + m[0].length;
-  return text.slice(0, at) + base + text.slice(at);
+  // the policy (and base) go BEFORE every author-controlled token — only a
+  // leading doctype may precede them, so quirks mode never flips. Never
+  // "after <head>": a regex finds <head> inside a comment too, and a policy
+  // inside a comment protects nothing (adversarial review, 2026-09-22)
+  const lead = `${HTML_PREVIEW_CSP}<base href="${baseUrl.replace(/"/g, "%22")}">`;
+  // only the plain HTML5 doctype may precede it: a quoted ">" inside a
+  // legacy doctype would otherwise end the match early and swallow the policy
+  const doctype = /^\s*<!doctype\s+html\s*>/i.exec(text);
+  if (!doctype) return lead + text;
+  const at = doctype[0].length;
+  return text.slice(0, at) + lead + text.slice(at);
 }
 
 // per-file SESSION memory for the two small view prefs — PaneTree unmounts the
@@ -490,7 +498,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           <button
             type="button"
             className="file-dims"
-            title="Toggle fit ⇄ actual size (⌘0 fit · ⌘1 100% · ⌘± zoom · pinch)"
+            title={`Toggle fit ⇄ actual size${hotkeyHint(" (⌘0 fit · ⌘1 100% · ⌘± zoom · pinch)")}`}
             onClick={() => setImgZoom(imgZoom === "fit" ? 1 : "fit")}
           >
             {imgNat.w}×{imgNat.h} · {Math.round(imgScale * 100)}%

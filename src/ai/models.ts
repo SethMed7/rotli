@@ -9,7 +9,9 @@
 // (chat.rs / guard.ts), so a `secure: true` note can never reach a connected
 // model without any new gating code.
 
+import type { DiscoveredModel } from "../lib/cliModelTypes";
 import type { ChatModelInfo } from "../lib/tauri";
+import { currentDiscovery, type DiscoveryLanes } from "../state/connectedModels";
 
 /** The connectable provider lanes (Settings → AI Models). */
 export type ProviderId = "claude" | "codex" | "cursor" | "antigravity";
@@ -24,11 +26,11 @@ export const PROVIDER_LABELS: Record<ProviderId, string> = {
 };
 
 /** Initial explicit choices for a provider tag with no model suffix. Claude's
- * `sonnet` alias follows the newest Sonnet available to Claude Code; Codex and
- * Cursor use the newest provider-documented model ids validated for Rotli. */
+ * `default` is the account's own default in Claude Code (run with no model
+ * flag); Codex and Cursor use provider-documented ids validated for Rotli. */
 export const DEFAULT_PROVIDER_MODELS: Record<ProviderId, string> = {
-  claude: "sonnet",
-  codex: "gpt-5.6-sol",
+  claude: "default",
+  codex: "gpt-6-sol",
   cursor: "grok-4.6",
   antigravity: "gemini-3.8-flash-high",
 };
@@ -176,21 +178,25 @@ const cli = (provider: ProviderId, id: string, label: string, vision = true): Ch
   isDefault: DEFAULT_PROVIDER_MODELS[provider] === id,
 });
 
-/** Only these catalogs can be merged into a live picker. Rust independently
- * applies the same provider allowlist before resolving or spawning a binary. */
+/** The OFFLINE fallback: what each client offered when this was written
+ * (2026-09-23). The live list is discovered from the client itself
+ * (`providerCatalog`); Rust independently allowlists both before any spawn. */
 export const CLI_CATALOG: Record<ProviderId, ChatModelInfo[]> = {
   claude: [
+    cli("claude", "default", "Claude Default · Opus 5.5 (1M context)"),
+    cli("claude", "opus[1m]", "Claude Opus 5.5 (1M context)"),
+    cli("claude", "claude-fable-5-1[1m]", "Claude Fable 5.1"),
     cli("claude", "sonnet", "Claude Sonnet 5"),
-    cli("claude", "opus", "Claude Opus"),
-    cli("claude", "haiku", "Claude Haiku"),
-    cli("claude", "fable", "Claude Fable 5"),
+    cli("claude", "haiku", "Claude Haiku 4.5"),
   ],
   codex: [
+    cli("codex", "gpt-6-astra", "GPT-6 Astra"),
+    cli("codex", "gpt-6-sol", "GPT-6 Sol"),
+    cli("codex", "gpt-6-luna", "GPT-6 Luna"),
     cli("codex", "gpt-5.6-sol", "GPT-5.6 Sol"),
     cli("codex", "gpt-5.6-terra", "GPT-5.6 Terra"),
     cli("codex", "gpt-5.6-luna", "GPT-5.6 Luna"),
     cli("codex", "gpt-5.5", "GPT-5.5"),
-    cli("codex", "gpt-5.3-codex-spark", "GPT-5.3 Codex Spark"),
   ],
   cursor: [
     cli("cursor", "grok-4.6", "Grok 4.6", false),
@@ -212,17 +218,115 @@ export const CLI_CATALOG: Record<ProviderId, ChatModelInfo[]> = {
   ],
 };
 
-/** A persisted provider default is executable only when it still belongs to
- * that provider's allowlisted catalog. Stale/hand-edited values heal to the
- * reviewed default instead of becoming argv or silently crossing providers. */
+/** Mirror of Rust `provider_models::valid_model_id` — the only id shape that
+ * may reach argv. */
+export function isModelIdShape(id: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}(\[1m\])?$/.test(id);
+}
+
+function discoveredInfo(provider: ProviderId, model: DiscoveredModel, isDefault: boolean): ChatModelInfo {
+  return {
+    id: model.id,
+    label: model.label,
+    provider,
+    endpoint: "",
+    api: "cli",
+    vision: model.vision,
+    isDefault,
+  };
+}
+
+/** One lane's picker list: what the client itself reported once discovery
+ * has answered, else the offline fallback. Exactly one entry is the default —
+ * the client's own default entry, else the reviewed default, else the first. */
+export function providerCatalog(
+  provider: ProviderId,
+  lanes: DiscoveryLanes = currentDiscovery(),
+): ChatModelInfo[] {
+  const lane = lanes[provider];
+  // Cursor also lists vendor models (gpt-5.5, gemini-3.8-flash-high): the
+  // vendor's own lane owns those ids, so a saved chat never changes lanes
+  const owned = provider === "cursor" ? idsOwnedElsewhere(provider, lanes) : new Set<string>();
+  const models = lane?.status === "ready" ? lane.models.filter((model) => !owned.has(model.id)) : [];
+  if (models.length === 0) return CLI_CATALOG[provider];
+  const own =
+    models.find((model) => model.isDefault)?.id ??
+    models.find((model) => model.id === DEFAULT_PROVIDER_MODELS[provider])?.id ??
+    models[0]!.id;
+  return models.map((model) => discoveredInfo(provider, model, model.id === own));
+}
+
+function idsOwnedElsewhere(provider: ProviderId, lanes: DiscoveryLanes): Set<string> {
+  const others = PROVIDER_IDS.filter((other) => other !== provider);
+  return new Set(
+    others.flatMap((other) => [
+      ...CLI_CATALOG[other].map((model) => model.id),
+      ...(lanes[other]?.status === "ready" ? lanes[other].models.map((model) => model.id) : []),
+    ]),
+  );
+}
+
+/** The client-reported entry for a model, when discovery has one. */
+export function discoveredModel(
+  provider: string | undefined,
+  id: string | undefined,
+  lanes: DiscoveryLanes = currentDiscovery(),
+): DiscoveredModel | undefined {
+  const lane = provider && id ? lanes[provider as ProviderId] : undefined;
+  return lane?.status === "ready" ? lane.models.find((model) => model.id === id) : undefined;
+}
+
+const CLAUDE_FAMILIES = new Set(["opus", "fable", "sonnet", "haiku"]);
+
+/** The entry in `list` a saved id means. Exact first; then the ids older
+ * versions saved: Claude's bare family aliases (`opus` → `opus[1m]`) and
+ * retired built-in ids that share a label with a live entry (Cursor's
+ * `grok-4.6` → the `cursor-grok-4.6-high` Cursor lists as "Grok 4.6"). */
+export function findModel(list: readonly ChatModelInfo[], id: string): ChatModelInfo | undefined {
+  const exact = list.find((model) => model.id === id);
+  if (exact) return exact;
+  const family = id.toLowerCase();
+  if (CLAUDE_FAMILIES.has(family)) {
+    const hit = list.find((m) => m.provider === "claude" && m.id !== "default" && m.id.includes(family));
+    if (hit) return hit;
+  }
+  const retired = PROVIDER_IDS.flatMap((p) => CLI_CATALOG[p]).find((model) => model.id === id);
+  return retired ? list.find((m) => m.provider === retired.provider && m.label === retired.label) : undefined;
+}
+
+/** What a saved model id resolves to on its lane, or null when it must heal:
+ * a live (or aliased) entry wins; while discovery has not answered, a
+ * well-formed id is KEPT — it may be one the client reports — and only a
+ * discovery answer without it (or a failed discovery) retires it. */
+export function resolveLaneModel(
+  provider: ProviderId,
+  id: string | null | undefined,
+  lanes: DiscoveryLanes = currentDiscovery(),
+): string | null {
+  if (!id || !isModelIdShape(id)) return null;
+  const hit = findModel(providerCatalog(provider, lanes), id);
+  if (hit) return hit.id;
+  // another lane's model never crosses over, answered or not
+  const foreign = PROVIDER_IDS.some(
+    (other) => other !== provider && CLI_CATALOG[other].some((m) => m.id === id),
+  );
+  if (foreign || (provider !== "claude" && CLAUDE_FAMILIES.has(id.toLowerCase()))) return null;
+  const status = lanes[provider]?.status;
+  return status === "ready" || status === "error" ? null : id;
+}
+
+/** A persisted provider default, resolved against the lane's live catalog.
+ * Stale/hand-edited values heal to the lane default instead of becoming argv
+ * or silently crossing providers. */
 export function providerDefaultModel(
   provider: ProviderId,
   configured?: Readonly<Partial<Record<ProviderId, string>>> | null,
+  lanes: DiscoveryLanes = currentDiscovery(),
 ): string {
-  const requested = configured?.[provider];
-  return requested && CLI_CATALOG[provider].some((model) => model.id === requested)
-    ? requested
-    : DEFAULT_PROVIDER_MODELS[provider];
+  const catalog = providerCatalog(provider, lanes);
+  const fallback =
+    (catalog.find((model) => model.isDefault) ?? catalog[0])?.id ?? DEFAULT_PROVIDER_MODELS[provider];
+  return resolveLaneModel(provider, configured?.[provider], lanes) ?? fallback;
 }
 
 export interface ModelGroups {
@@ -259,6 +363,7 @@ export function mergedModels(
   presets: HybridPreset[],
   blocked: readonly string[] = [],
   ready?: Readonly<Partial<Record<ProviderId, boolean>>>,
+  lanes: DiscoveryLanes = currentDiscovery(),
 ): ModelGroups {
   const off = new Set(blocked);
   const connected: ChatModelInfo[] = [];
@@ -266,7 +371,7 @@ export function mergedModels(
     // Settings can omit `ready` while editing a lane. The chat supplies it so
     // an enabled-but-missing/expired CLI never masquerades as a usable model.
     if (enabled[id] && (ready === undefined || ready[id] === true)) {
-      connected.push(...CLI_CATALOG[id].filter((m) => !off.has(m.id)));
+      connected.push(...providerCatalog(id, lanes).filter((m) => !off.has(m.id)));
     }
   }
   return { local, connected, presets: presets.map(presetModel) };
@@ -275,8 +380,8 @@ export function mergedModels(
 /** Cheapest verification model for each executable connected lane. */
 export const LANE_PING_MODEL: Record<ConnectedProviderId, string> = {
   claude: "haiku",
-  codex: "gpt-5.6-luna",
-  cursor: "grok-4.6",
+  codex: "gpt-6-luna",
+  cursor: "cursor-auto",
   antigravity: "gemini-3.8-flash-low",
 };
 
@@ -290,7 +395,7 @@ export const STARTER_PRESETS: HybridPreset[] = [
     routes: [
       { when: "notes lookups, summaries, quick questions", model: "gemma-3-12b-it-qat-4bit" },
       { when: "deep reasoning, long documents, careful writing", model: "sonnet" },
-      { when: "code questions and debugging", model: "gpt-5.6-sol" },
+      { when: "code questions and debugging", model: "gpt-6-sol" },
     ],
     fallback: "gemma-3-12b-it-qat-4bit",
   },
@@ -299,8 +404,8 @@ export const STARTER_PRESETS: HybridPreset[] = [
     name: "Frontier delegate — route to the specialist",
     organizer: "gemma-3-12b-it-qat-4bit",
     routes: [
-      { when: "hard reasoning, analysis, strategy", model: "opus" },
-      { when: "coding, refactors, technical depth", model: "gpt-5.6-sol" },
+      { when: "hard reasoning, analysis, strategy", model: "opus[1m]" },
+      { when: "coding, refactors, technical depth", model: "gpt-6-sol" },
       { when: "everything else", model: "sonnet" },
     ],
     fallback: "gemma-3-12b-it-qat-4bit",
@@ -313,10 +418,12 @@ export function flattenModels(g: ModelGroups): ChatModelInfo[] {
   return [...g.local, ...g.connected, ...g.presets];
 }
 
-/** A model id's human label wherever one is known — the local store's listing,
- * any CLI lane's catalog (enabled or not: a sidebar badge should still read
- * well for a lane that's currently off), or a hybrid preset's name — else the
- * raw id. For the sidebar's per-chat model chip (the maintainer, 2026-08-03). */
+/** Every connected entry Rotli knows: the live lists, then the built-in ones
+ * (a saved id from an older list still finds its lane and label). */
+function knownConnected(lanes: DiscoveryLanes): ChatModelInfo[] {
+  return PROVIDER_IDS.flatMap((p) => [...providerCatalog(p, lanes), ...CLI_CATALOG[p]]);
+}
+
 /** Which LANE a model id belongs to ("claude", "codex", "cursor",
  * "preset", or a local model's own provider). Undefined when the id matches
  * nothing rotli knows. Sibling of modelLabel — same three-catalog search, so
@@ -325,10 +432,11 @@ export function modelProvider(
   id: string,
   local: readonly ChatModelInfo[],
   presets: readonly HybridPreset[],
+  lanes: DiscoveryLanes = currentDiscovery(),
 ): string | undefined {
   return (
     local.find((m) => m.id === id)?.provider ??
-    PROVIDER_IDS.flatMap((p) => CLI_CATALOG[p]).find((m) => m.id === id)?.provider ??
+    findModel(knownConnected(lanes), id)?.provider ??
     (presets.some((p) => `${PRESET_PREFIX}${p.id}` === id) ? "preset" : undefined)
   );
 }
@@ -340,14 +448,19 @@ export function legacyModelProvider(id: string): string | undefined {
   return /^gemini[ -]\d/i.test(id) ? "antigravity" : undefined;
 }
 
+/** A model id's human label wherever one is known — the local store's listing,
+ * any CLI lane's catalog (enabled or not: a sidebar badge should still read
+ * well for a lane that's currently off), or a hybrid preset's name — else the
+ * raw id. For the sidebar's per-chat model chip. */
 export function modelLabel(
   id: string,
   local: readonly ChatModelInfo[],
   presets: readonly HybridPreset[],
+  lanes: DiscoveryLanes = currentDiscovery(),
 ): string {
   return (
     local.find((m) => m.id === id)?.label ??
-    PROVIDER_IDS.flatMap((p) => CLI_CATALOG[p]).find((m) => m.id === id)?.label ??
+    findModel(knownConnected(lanes), id)?.label ??
     presets.find((p) => p.id === id)?.name ??
     id
   );

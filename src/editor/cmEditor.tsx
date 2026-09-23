@@ -12,7 +12,7 @@ import { history } from "@codemirror/commands";
 // One view per (noteId, pane); EditorSurface keys it by noteId so it remounts on
 // a note switch (fresh caret/scroll, no bleed).
 import { Compartment, EditorSelection, EditorState, Prec } from "@codemirror/state";
-import { EditorView, keymap, placeholder } from "@codemirror/view";
+import { EditorView, keymap } from "@codemirror/view";
 import { type CSSProperties, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ArrowUpGlyph, SearchGlyph } from "../components/glyphs";
@@ -40,6 +40,7 @@ import {
   unregisterEditor,
 } from "./commands";
 import { copyHandlers } from "./copyHandlers";
+import { emptyPlaceholder } from "./emptyPlaceholder";
 import { importImagePathsAtPosition, isEmbeddablePath } from "./externalImageDrop";
 import { findTextMatches, nextFindMatch } from "./find";
 import { fmBlock } from "./fmBlock";
@@ -587,7 +588,7 @@ function CmEditorImpl({
         copyHandlers(() => rawEditorRef.current),
         spellComp.of(EditorView.contentAttributes.of({ spellcheck: String(spellcheckRef.current) })),
         focusComp.of(focusModeRef.current ? focusDim : []),
-        placeholder("Write…"),
+        emptyPlaceholder("Write…"),
         EditorView.updateListener.of((u) => {
           if (u.docChanged && !applyingExternal.current) {
             setDocumentText(noteId, u.state.doc.toString());

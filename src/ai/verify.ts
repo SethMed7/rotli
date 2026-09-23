@@ -2,7 +2,7 @@
 // executable lanes; every requested model is rechecked against the catalog.
 
 import { cliComplete } from "../lib/tauri";
-import { CLI_CATALOG, LANE_PING_MODEL, type ProviderId } from "./models";
+import { LANE_PING_MODEL, type ProviderId, resolveLaneModel } from "./models";
 
 const PING = "For this software integration check, reply with exactly: OK";
 const PING_TIMEOUT_MS = 90_000;
@@ -17,13 +17,15 @@ export interface LaneVerify {
 }
 
 export async function verifyLane(id: ProviderId, requestedModel?: string): Promise<LaneVerify> {
-  const model = requestedModel ?? LANE_PING_MODEL[id];
-  if (!CLI_CATALOG[id].some((entry) => entry.id === model)) {
+  const asked = requestedModel ?? LANE_PING_MODEL[id];
+  // the lane's live list (or the built-in one until it answers)
+  const model = resolveLaneModel(id, asked);
+  if (!model) {
     return {
       ok: false,
       ms: 0,
-      model,
-      error: `Model “${model}” is not available for this provider.`,
+      model: asked,
+      error: `Model “${asked}” is not available for this provider.`,
     };
   }
   const start = Date.now();

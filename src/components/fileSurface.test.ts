@@ -7,6 +7,7 @@
 
 import { describe, expect, test } from "bun:test";
 
+import { HTML_PREVIEW_CSP } from "../lib/htmlPreviewPolicy";
 import { ZOOM_MAX, ZOOM_MIN, clampZoom, fitScale, htmlPreviewDoc, kindOf, zoomStep } from "./fileSurface";
 
 describe("kindOf", () => {
@@ -39,32 +40,37 @@ describe("kindOf", () => {
   });
 });
 
-describe("htmlPreviewDoc — <base> injection for the sandboxed srcdoc Preview", () => {
+describe("htmlPreviewDoc — policy and <base> for the sandboxed srcdoc Preview", () => {
   const URL = "asset://localhost/%2FUsers%2Fx%2Fpage.html";
-  const BASE = `<base href="${URL}">`;
+  const LEAD = `${HTML_PREVIEW_CSP}<base href="${URL}">`;
 
-  test("goes right after <head> when one exists", () => {
+  test("goes before every author token, so no markup can precede the policy", () => {
     expect(htmlPreviewDoc("<html><head><title>t</title></head><body>b</body></html>", URL)).toBe(
-      `<html><head>${BASE}<title>t</title></head><body>b</body></html>`,
+      `${LEAD}<html><head><title>t</title></head><body>b</body></html>`,
     );
-    // attributes + case survive
-    expect(htmlPreviewDoc('<HEAD lang="en">x</HEAD>', URL)).toBe(`<HEAD lang="en">${BASE}x</HEAD>`);
+    expect(htmlPreviewDoc("<p>hi</p>", URL)).toBe(`${LEAD}<p>hi</p>`);
+    expect(htmlPreviewDoc("", URL)).toBe(LEAD);
   });
 
-  test("falls back to after <html>, then after the doctype — NEVER before it", () => {
-    expect(htmlPreviewDoc("<html><body>b</body></html>", URL)).toBe(`<html>${BASE}<body>b</body></html>`);
+  test("a <head> inside a comment can't pull the policy into the comment", () => {
+    const doc = htmlPreviewDoc('<!-- <head> --><img src="/app/leak?text=SECRET">', URL);
+    expect(doc.startsWith(LEAD)).toBe(true);
+  });
+
+  test("only a leading doctype comes first — quirks mode is never triggered", () => {
     const doc = htmlPreviewDoc("<!DOCTYPE html>\n<p>hi</p>", URL);
-    expect(doc.startsWith("<!DOCTYPE html>")).toBe(true); // quirks mode never triggered
-    expect(doc).toBe(`<!DOCTYPE html>${BASE}\n<p>hi</p>`);
+    expect(doc).toBe(`<!DOCTYPE html>${LEAD}\n<p>hi</p>`);
   });
 
-  test("a bare fragment just gets the base prepended", () => {
-    expect(htmlPreviewDoc("<p>hi</p>", URL)).toBe(`${BASE}<p>hi</p>`);
-    expect(htmlPreviewDoc("", URL)).toBe(BASE);
+  test("a legacy doctype with a quoted > can't swallow the policy: it goes first", () => {
+    const doc = htmlPreviewDoc('<!doctype html PUBLIC "x>"><img src="/app/leak?t=S">', URL);
+    expect(doc.startsWith(LEAD)).toBe(true);
   });
 
   test("a quote in the URL can't break out of the href attribute", () => {
-    expect(htmlPreviewDoc("x", 'a"><script>1</script>')).toBe('<base href="a%22><script>1</script>">x');
+    expect(htmlPreviewDoc("x", 'a"><script>1</script>')).toBe(
+      `${HTML_PREVIEW_CSP}<base href="a%22><script>1</script>">x`,
+    );
   });
 });
 
@@ -109,4 +115,9 @@ describe("image zoom math", () => {
     expect(clampZoom(0.0001)).toBe(ZOOM_MIN);
     expect(clampZoom(2)).toBe(2);
   });
+});
+
+test("previewed HTML may request nothing — not even the app's own origin", () => {
+  expect(HTML_PREVIEW_CSP).toContain("default-src 'none'");
+  expect(HTML_PREVIEW_CSP).not.toMatch(/'self'|https?:/);
 });

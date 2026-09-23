@@ -5,7 +5,8 @@
 
 import { expect, test } from "@playwright/test";
 
-const APP = "/app/";
+import { startWithVault } from "./support";
+
 const PORT = 43111;
 const TOKEN = "fixture-token-with-at-least-twenty-four-chars";
 const HELPER = `http://127.0.0.1:${PORT}`;
@@ -19,7 +20,22 @@ function cors(origin: string | undefined) {
   };
 }
 
-function fakeHelper(page: import("@playwright/test").Page, calls: { cmd: string; args: unknown }[]) {
+/** What a helper with model discovery answers for `cli_models` (the shape
+ * Rust provider_models.rs returns); `null` = an older helper without the verb. */
+type ModelList = {
+  id: string;
+  label: string;
+  efforts: string[];
+  fastTier: boolean;
+  vision: boolean;
+  isDefault: boolean;
+}[];
+
+function fakeHelper(
+  page: import("@playwright/test").Page,
+  calls: { cmd: string; args: unknown }[],
+  models: ModelList | null = null,
+) {
   return page.route(`${HELPER}/**`, async (route) => {
     const request = route.request();
     const CORS = cors(request.headers()["origin"]);
@@ -56,23 +72,23 @@ function fakeHelper(page: import("@playwright/test").Page, calls: { cmd: string;
         return reply("Hello from the fake helper.");
       case "cli_cancel":
         return reply(null);
+      case "cli_models":
+        // an older helper answers like any unknown verb
+        return models ? reply(models) : route.fulfill({ status: 404, headers: CORS, body: UNKNOWN });
       default:
-        return route.fulfill({
-          status: 404,
-          headers: CORS,
-          body: JSON.stringify({ error: "unknown command" }),
-        });
+        return route.fulfill({ status: 404, headers: CORS, body: UNKNOWN });
     }
   });
 }
+
+const UNKNOWN = JSON.stringify({ error: "unknown command" });
 
 test("pairing with the helper turns Chat on; a message goes through it and the reply comes back", async ({
   page,
 }) => {
   const calls: { cmd: string; args: unknown }[] = [];
   await fakeHelper(page, calls);
-  await page.goto(APP);
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
+  await startWithVault(page);
 
   // before pairing: the Chat front opens the walkthrough
   await page.locator(".sb-switch-seg.desktop-only").click();
@@ -122,10 +138,81 @@ test("pairing with the helper turns Chat on; a message goes through it and the r
   await expect(page.locator(".sb-switch-seg.desktop-only")).toHaveCount(0);
 });
 
+const model = (id: string, label: string, isDefault = false) => ({
+  id,
+  label,
+  efforts: ["low", "high"],
+  fastTier: false,
+  vision: true,
+  isDefault,
+});
+
+/** Pair, switch Claude Code on from the walkthrough, open a new chat. */
+async function pairAndOpenChat(page: import("@playwright/test").Page) {
+  await startWithVault(page);
+  await page.locator(".sb-switch-seg.desktop-only").click();
+  const dialog = page.getByRole("dialog", { name: "Chat on the web" });
+  await dialog.getByLabel("Paste the pairing code the helper printed:").fill(`${PORT}:${TOKEN}`);
+  await dialog.getByRole("button", { name: "Pair" }).click();
+  await dialog.getByRole("button", { name: "Use Claude Code in chat" }).click();
+  await dialog.getByRole("button", { name: "Done" }).click();
+  await page.getByRole("button", { name: "Chat", exact: true }).click();
+  await page.getByRole("button", { name: "New chat", exact: true }).click();
+}
+
+test("the chat picker lists the models the paired helper's Claude Code reports, and a pick runs on it", async ({
+  page,
+}) => {
+  const calls: { cmd: string; args: unknown }[] = [];
+  await fakeHelper(page, calls, [
+    model("default", "Claude Default · Opus 6 (1M context)", true),
+    model("claude-opus-6[1m]", "Claude Opus 6 (1M context)"),
+    model("claude-fable-5-1[1m]", "Claude Fable 5.1"),
+    model("haiku", "Claude Haiku 4.5"),
+  ]);
+  await pairAndOpenChat(page);
+
+  // the client's own default is the lane default: the chat opens on it
+  const trigger = page.locator(".chat-model-trigger");
+  await expect(trigger).toContainText("Claude Default · Opus 6 (1M context)");
+  await trigger.click();
+  const picker = page.getByRole("dialog", { name: "Model" });
+  const rows = picker.getByRole("radiogroup", { name: "Available models" }).getByRole("radio");
+  await expect(rows).toHaveText([
+    /Claude Default · Opus 6 \(1M context\)/,
+    /Claude Opus 6 \(1M context\)/,
+    /Claude Fable 5\.1/,
+    /Claude Haiku 4\.5/,
+  ]);
+  // a model the built-in list never had is selectable, and runs as its own id
+  await picker.getByRole("radio", { name: /Claude Opus 6 \(1M context\)/ }).click();
+  await expect(trigger).toContainText("Claude Opus 6 (1M context)");
+  const composer = page.getByPlaceholder(/Message rotli/).first();
+  await composer.fill("Say hello");
+  await composer.press("Enter");
+  await expect(page.getByText("Hello from the fake helper.")).toBeVisible({ timeout: 15_000 });
+  const complete = calls.find((c) => c.cmd === "cli_complete");
+  expect((complete!.args as { model: string }).model).toBe("claude-opus-6[1m]");
+  expect(calls.find((c) => c.cmd === "cli_models")?.args).toMatchObject({ provider: "claude" });
+});
+
+test("an older helper without model discovery keeps the built-in list", async ({ page }) => {
+  const calls: { cmd: string; args: unknown }[] = [];
+  await fakeHelper(page, calls, null);
+  await pairAndOpenChat(page);
+  const trigger = page.locator(".chat-model-trigger");
+  await expect(trigger).toContainText("Claude Default · Opus 5.5 (1M context)");
+  await trigger.click();
+  const picker = page.getByRole("dialog", { name: "Model" });
+  await expect(picker.getByRole("radio", { name: /Claude Sonnet 5/ })).toBeVisible();
+  await expect(picker.getByRole("radio", { name: /Opus 6/ })).toHaveCount(0);
+  expect(calls.some((c) => c.cmd === "cli_models")).toBe(true);
+});
+
 test("unpairing takes Chat back to the walkthrough", async ({ page }) => {
   const calls: { cmd: string; args: unknown }[] = [];
   await fakeHelper(page, calls);
-  await page.goto(APP);
+  await startWithVault(page);
   await page.locator(".sb-switch-seg.desktop-only").click();
   const dialog = page.getByRole("dialog", { name: "Chat on the web" });
   await dialog.getByLabel("Paste the pairing code the helper printed:").fill(`${PORT}:${TOKEN}`);
@@ -170,7 +257,7 @@ test("a helper that refuses the pairing token keeps Chat behind the setup dialog
           : null;
     return route.fulfill({ status: 200, headers, body: JSON.stringify({ result }) });
   });
-  await page.goto(APP);
+  await startWithVault(page);
   await page.locator(".sb-switch-seg.desktop-only").click();
   const dialog = page.getByRole("dialog", { name: "Chat on the web" });
   await dialog.getByLabel("Paste the pairing code the helper printed:").fill(`${PORT}:${TOKEN}`);

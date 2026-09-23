@@ -15,6 +15,8 @@ test("public builds keep notes, chat and the Chat window while every experimenta
     mermaidVisualEditing: false,
     agents: false,
     sheets: false,
+    documents: true,
+    hotkeys: true,
     mermaidDiagrams: false,
     voice: false,
     chatWindow: true,
@@ -26,6 +28,8 @@ test("public builds keep notes, chat and the Chat window while every experimenta
     mermaidVisualEditing: true,
     agents: true,
     sheets: true,
+    documents: true,
+    hotkeys: true,
     mermaidDiagrams: true,
     voice: true,
     chatWindow: true,
@@ -36,10 +40,13 @@ test("the web platform withholds every capability that needs the desktop shell, 
   for (const development of [false, true]) {
     const web = launchFeatures(development, "web");
     expect(web.notes).toBe(true);
+    expect(web.hotkeys).toBe(false);
     expect(web.chat).toBe(false);
     expect(web.breve).toBe(false);
     expect(web.agents).toBe(false);
     expect(web.sheets).toBe(false);
+    // DOCX needs the desktop document lane; the web names it coming soon
+    expect(web.documents).toBe(false);
     expect(web.voice).toBe(false);
     // a second browser tab would be a second writer with no coordination
     expect(web.chatWindow).toBe(false);

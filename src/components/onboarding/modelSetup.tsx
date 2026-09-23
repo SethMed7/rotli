@@ -8,10 +8,10 @@ import {
   suggestedLibrarian,
 } from "../../ai/librarianLane";
 import {
-  CLI_CATALOG,
   PROVIDER_LABELS,
   type ProviderId,
   installableCatalog,
+  providerCatalog,
   providerDefaultModel,
 } from "../../ai/models";
 import { setSetupHandle } from "../../keys/handles";
@@ -24,6 +24,7 @@ import {
   localModelSetDefault,
   localModelUninstall,
 } from "../../lib/tauri";
+import { readyFrom, useConnectedCatalog } from "../../services/connectedModels";
 import { ONBOARDING_STEP_NUMBER, ONBOARDING_TOTAL_STEPS } from "../../state/onboarding";
 import {
   providerReady,
@@ -87,6 +88,7 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
   // the answers are usually in, so this step opens knowing what is here
   const local = useSetupDetection((state) => state.local);
   const detections = useSetupDetection((state) => state.detections);
+  const { lanes } = useConnectedCatalog(providers, readyFrom(detections)); // each client's own list
   const [expanded, setExpanded] = useState<ProviderId | null>(null);
   const [installing, setInstalling] = useState<{
     requestId: string;
@@ -454,13 +456,13 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
                                 </span>
                                 <select
                                   className="setselect"
-                                  value={providerDefaultModel(provider, providerDefaults)}
+                                  value={providerDefaultModel(provider, providerDefaults, lanes)}
                                   aria-label={`Default model for ${PROVIDER_LABELS[provider]}`}
                                   onChange={(event) =>
                                     setProviderDefault(provider, event.currentTarget.value)
                                   }
                                 >
-                                  {CLI_CATALOG[provider].map((model) => (
+                                  {providerCatalog(provider, lanes).map((model) => (
                                     <option key={model.id} value={model.id}>
                                       {model.label}
                                     </option>
@@ -523,7 +525,7 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
                     value={librarianModelFor(organizerModel, organizerModelId, providerDefaults)}
                     onChange={(event) => setOrganizerModelId(event.currentTarget.value)}
                   >
-                    {CLI_CATALOG[organizerModel].map((entry) => (
+                    {providerCatalog(organizerModel, lanes).map((entry) => (
                       <option key={entry.id} value={entry.id}>
                         {entry.label}
                       </option>

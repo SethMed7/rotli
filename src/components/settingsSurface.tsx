@@ -21,19 +21,20 @@ import { makeTauriHost } from "../ai/host";
 import { suggestPresets } from "../ai/hybrid";
 import { LIBRARIAN_LABELS, librarianCaption, librarianModelFor, librarianOptions } from "../ai/librarianLane";
 import {
-  CLI_CATALOG,
   type HybridPreset,
   type LocalCatalogEntry,
   PROVIDER_IDS,
   PROVIDER_LABELS,
   type ProviderId,
   STARTER_PRESETS,
+  findModel,
   fitLabel,
   flattenModels,
   installableCatalog,
   isValidRepo,
   mergedModels,
   nameFromRepo,
+  providerCatalog,
   providerDefaultModel,
   scanVerdict,
 } from "../ai/models";
@@ -58,8 +59,9 @@ import {
   rebind,
   setDispatchSuspended,
 } from "../keys/registry";
-import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 import { feedbackUrl } from "../lib/feedback";
+import { SHOW_HOTKEYS, hotkeyHint } from "../lib/hotkeyHint";
 import { PRIVATE_BROWSER_SEARCH_ENGINE_PRESENTATIONS } from "../lib/privateBrowser";
 import {
   type ChatModelInfo,
@@ -112,6 +114,7 @@ import {
   useSwitchVault,
 } from "../memex/useMemex";
 import { availableNewItems } from "../newItems/model";
+import { readyFrom, useConnectedCatalog } from "../services/connectedModels";
 import { isChatsPath, isHidden, isVault, isWikiPath } from "../services/destinations";
 import { useFolders } from "../services/hooks";
 import { queryClient } from "../services/query";
@@ -192,6 +195,11 @@ const NAV: { id: SettingsPane; label: string; glyph: (props: { size?: number }) 
   { id: "connections", label: "Connections", glyph: ExternalLinkGlyph },
   { id: "about", label: "About Rotli", glyph: QuokkaMark },
 ];
+
+/** Rotli Web has no app hotkeys (featurePolicy `hotkeys`), so no Keybindings
+ * pane, and no private browser, so no Browser pane. */
+const WEB_HIDDEN_PANES: ReadonlySet<SettingsPane> = new Set(["hotkeys", "browser"]);
+const SHOWN_NAV = PLATFORM === "web" ? NAV.filter((pane) => !WEB_HIDDEN_PANES.has(pane.id)) : NAV;
 
 /** A settings pane heading with its quokka character accent (the maintainer, 2026-06-26) —
  * a small, muted line-art quokka at the top-right of each section. This is an
@@ -597,37 +605,42 @@ function GeneralPane() {
   return (
     <>
       <PaneHead title="General" char="base" />
-      <p className="lead">
-        rotli is a visitor by default — summon it, write, dismiss it. Make it a resident when you&rsquo;re
-        living in it.
-      </p>
-      <div className="swgroup">
-        <Toggle
-          on={stayOpen}
-          title="Stay open"
-          desc="Don’t hide when I click away."
-          onChange={() => {
-            const next = !stayOpen;
-            setStayOpen(next);
-            void setHideOnBlur(!next);
-          }}
-        />
-        <Toggle
-          on={showInDock}
-          title="Show in the Dock"
-          desc="Otherwise rotli lives in the menu bar only."
-          onChange={() => {
-            const next = !showInDock;
-            setShowInDock(next);
-            void setDockVisible(next);
-          }}
-        />
-      </div>
-      <p className="setnote">
-        Either way the menu-bar icon stays, {chordLabel(bindingOverrides, "app.toggleWindow")} opens the app,
-        and {chordLabel(bindingOverrides, "capture.summon")} is the one-breath capture — all rebindable in
-        Keybindings.
-      </p>
+      {/* visitor vs resident, the Dock, and the menu bar are the Mac app's */}
+      {PLATFORM === "desktop" && (
+        <>
+          <p className="lead">
+            rotli is a visitor by default — summon it, write, dismiss it. Make it a resident when you&rsquo;re
+            living in it.
+          </p>
+          <div className="swgroup">
+            <Toggle
+              on={stayOpen}
+              title="Stay open"
+              desc="Don’t hide when I click away."
+              onChange={() => {
+                const next = !stayOpen;
+                setStayOpen(next);
+                void setHideOnBlur(!next);
+              }}
+            />
+            <Toggle
+              on={showInDock}
+              title="Show in the Dock"
+              desc="Otherwise rotli lives in the menu bar only."
+              onChange={() => {
+                const next = !showInDock;
+                setShowInDock(next);
+                void setDockVisible(next);
+              }}
+            />
+          </div>
+          <p className="setnote">
+            Either way the menu-bar icon stays, {chordLabel(bindingOverrides, "app.toggleWindow")} opens the
+            app, and {chordLabel(bindingOverrides, "capture.summon")} is the one-breath capture — all
+            rebindable in Keybindings.
+          </p>
+        </>
+      )}
 
       <h4 className="sethead">Your name</h4>
       <p className="lead">
@@ -744,9 +757,9 @@ function GeneralPane() {
 
       <h4 className="sethead">New tabs</h4>
       <p className="lead">
-        Choose what {chordLabel(bindingOverrides, "tabs.new")} and the tab-strip plus create. The New menu
-        always offers every type. While a private browser is active, both create another private browser tab
-        instead.
+        Choose what {SHOW_HOTKEYS ? `${chordLabel(bindingOverrides, "tabs.new")} and ` : ""}the tab-strip plus
+        create. The New menu always offers every type. While a private browser is active, both create another
+        private browser tab instead.
       </p>
       <label className="setselect-row">
         <span>New tab creates</span>
@@ -781,72 +794,81 @@ function GeneralPane() {
         onPick={setTabLayout}
       />
 
-      <h4 className="sethead">Quick note</h4>
-      <p className="lead">
-        A floating note you summon with {chordLabel(bindingOverrides, "quick.summon")} — open any note in it,
-        star up to five for quick access, cycle those with ⌘] and ⌘[, and ⌘P searches every note to swap one
-        in. A note you create here is a full note filed into Main, never a capture. It always reopens where
-        you left off and closes when you click away.
-      </p>
-      <label className="setselect-row">
-        <span>Destination vault</span>
-        <select
-          className="setselect"
-          aria-label="Quick Note destination vault"
-          value={quickVaultId ?? ""}
-          onChange={(e) => setQuickVaultSynced(e.target.value || null)}
-        >
-          <option value="">Current destination{currentVault ? ` — ${currentVault.label}` : ""}</option>
-          {!hasQuickVault && <option value={quickVaultId ?? ""}>Unavailable vault — {quickVaultId}</option>}
-          {writableVaults.map((vault) => (
-            <option key={vault.id} value={vault.id}>
-              Always {vault.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      {!quickVaultId && (
-        <label className="setselect-row">
-          <span>Folder</span>
-          <select
-            className="setselect"
-            value={quickFolder}
-            onChange={(e) => setQuickFolderSynced(e.target.value)}
-          >
-            {!hasCurrent && <option value={quickFolder}>{quickFolder}</option>}
-            {folderOpts.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      <p className="setnote">A named vault must have write access in Location before it appears here.</p>
-
-      <h4 className="sethead">Quick capture</h4>
-      <p className="lead">
-        One-breath captures can follow the current writable vault or stay pinned to a separate capture vault.
-      </p>
-      <label className="setselect-row">
-        <span>Destination vault</span>
-        <select
-          className="setselect"
-          aria-label="Quick capture destination vault"
-          value={captureVaultId ?? ""}
-          onChange={(e) => setCaptureVaultId(e.target.value || null)}
-        >
-          <option value="">Current destination{currentVault ? ` — ${currentVault.label}` : ""}</option>
-          {!hasCaptureVault && (
-            <option value={captureVaultId ?? ""}>Unavailable vault — {captureVaultId}</option>
+      {/* the Quick window and Quick capture are Mac features (global shortcuts,
+          a floating window); Rotli Web has neither */}
+      {PLATFORM === "desktop" && (
+        <>
+          <h4 className="sethead">Quick note</h4>
+          <p className="lead">
+            A floating note you summon with {chordLabel(bindingOverrides, "quick.summon")} — open any note in
+            it, star up to five for quick access, cycle those with ⌘] and ⌘[, and ⌘P searches every note to
+            swap one in. A note you create here is a full note filed into Main, never a capture. It always
+            reopens where you left off and closes when you click away.
+          </p>
+          <label className="setselect-row">
+            <span>Destination vault</span>
+            <select
+              className="setselect"
+              aria-label="Quick Note destination vault"
+              value={quickVaultId ?? ""}
+              onChange={(e) => setQuickVaultSynced(e.target.value || null)}
+            >
+              <option value="">Current destination{currentVault ? ` — ${currentVault.label}` : ""}</option>
+              {!hasQuickVault && (
+                <option value={quickVaultId ?? ""}>Unavailable vault — {quickVaultId}</option>
+              )}
+              {writableVaults.map((vault) => (
+                <option key={vault.id} value={vault.id}>
+                  Always {vault.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {!quickVaultId && (
+            <label className="setselect-row">
+              <span>Folder</span>
+              <select
+                className="setselect"
+                value={quickFolder}
+                onChange={(e) => setQuickFolderSynced(e.target.value)}
+              >
+                {!hasCurrent && <option value={quickFolder}>{quickFolder}</option>}
+                {folderOpts.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
-          {writableVaults.map((vault) => (
-            <option key={vault.id} value={vault.id}>
-              Always {vault.label}
-            </option>
-          ))}
-        </select>
-      </label>
+          <p className="setnote">A named vault must have write access in Location before it appears here.</p>
+
+          <h4 className="sethead">Quick capture</h4>
+          <p className="lead">
+            One-breath captures can follow the current writable vault or stay pinned to a separate capture
+            vault.
+          </p>
+          <label className="setselect-row">
+            <span>Destination vault</span>
+            <select
+              className="setselect"
+              aria-label="Quick capture destination vault"
+              value={captureVaultId ?? ""}
+              onChange={(e) => setCaptureVaultId(e.target.value || null)}
+            >
+              <option value="">Current destination{currentVault ? ` — ${currentVault.label}` : ""}</option>
+              {!hasCaptureVault && (
+                <option value={captureVaultId ?? ""}>Unavailable vault — {captureVaultId}</option>
+              )}
+              {writableVaults.map((vault) => (
+                <option key={vault.id} value={vault.id}>
+                  Always {vault.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
+      )}
 
       <h4 className="sethead">Writing</h4>
       <p className="lead">How the editor behaves while you type.</p>
@@ -1402,8 +1424,8 @@ function AppearancePane() {
       <h4 className="sethead">Sidebar</h4>
       <p className="lead">
         Where the sidebar sits, and whether it stays. On hover keeps it out of the way until the pointer
-        reaches the window's edge; ⌘0 still brings it. The sidebar's own right-click menu has the same
-        choices.
+        reaches the window's edge{hotkeyHint("; ⌘0 still brings it")}. The sidebar's own right-click menu has
+        the same choices.
       </p>
       <div className="segfield">
         <span className="seglabel">Side</span>
@@ -1866,6 +1888,7 @@ function BrainPane() {
   const detections = useSetupDetection((s) => s.detections);
   // the picker offers signed-in clients, so make sure the probes have run
   useEffect(() => startSetupDetection(), []);
+  const { lanes } = useConnectedCatalog(providers, readyFrom(detections));
   const quiet = useUiStore((s) => s.organizerQuietSecs);
   const setQuiet = useUiStore((s) => s.setOrganizerQuietSecs);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
@@ -1959,7 +1982,7 @@ function BrainPane() {
                 value={librarianModelFor(model, modelId, providerDefaults)}
                 onChange={(event) => setModelId(event.currentTarget.value)}
               >
-                {CLI_CATALOG[model].map((entry) => (
+                {providerCatalog(model, lanes).map((entry) => (
                   <option key={entry.id} value={entry.id}>
                     {entry.label}
                   </option>
@@ -2291,14 +2314,16 @@ function ChatPane() {
     queryFn: () => (isTauri() ? chatModels() : Promise.resolve([])),
     staleTime: Infinity,
   });
+  const { lanes } = useConnectedCatalog(aiProviders);
   const available = useMemo(
-    () => flattenModels(mergedModels(local.data ?? [], aiProviders, hybridPresets, blockedModels)),
-    [local.data, aiProviders, hybridPresets, blockedModels],
+    () =>
+      flattenModels(
+        mergedModels(local.data ?? [], aiProviders, hybridPresets, blockedModels, undefined, lanes),
+      ),
+    [local.data, aiProviders, hybridPresets, blockedModels, lanes],
   );
-  const chosen = available.find((m) => m.id === chatModelId);
-  const lane = chosen
-    ? PROVIDER_IDS.find((id) => CLI_CATALOG[id].some((m) => m.id === chosen.id))
-    : undefined;
+  const chosen = chatModelId ? findModel(available, chatModelId) : undefined;
+  const lane = PROVIDER_IDS.find((id) => chosen?.provider === id && chosen.api === "cli");
   const [verify, setVerify] = useState<VerifyState>({ state: "idle" });
   const test = () => {
     if (!chosen) return;
@@ -2406,7 +2431,6 @@ function LaneCard({ id }: { id: ProviderId }) {
   const toggleBlockedModel = useUiStore((s) => s.toggleBlockedModel);
   const providerDefaults = useUiStore((s) => s.providerDefaults);
   const setProviderDefault = useUiStore((s) => s.setProviderDefault);
-  const defaultModel = providerDefaultModel(id, providerDefaults);
   const [verify, setVerify] = useState<VerifyState>({ state: "idle" });
 
   const det = useQuery({
@@ -2417,6 +2441,10 @@ function LaneCard({ id }: { id: ProviderId }) {
   });
   const d = det.data;
   const ready = !!d && d.installed && d.authenticated;
+  // the models this client offers right now (the built-in list until it answers)
+  const { lanes } = useConnectedCatalog({ [id]: enabled }, { [id]: ready });
+  const catalog = providerCatalog(id, lanes);
+  const defaultModel = providerDefaultModel(id, providerDefaults, lanes);
   // "2.1.199 (Claude Code)" / "codex-cli 0.137.0" → "v2.1.199" / "v0.137.0"
   const version = d?.version?.match(/\d+(?:\.\d+)+/)?.[0];
   const status = !isTauri()
@@ -2483,7 +2511,7 @@ function LaneCard({ id }: { id: ProviderId }) {
             aria-label={`Default model for ${PROVIDER_LABELS[id]}`}
             onChange={(event) => setProviderDefault(id, event.currentTarget.value)}
           >
-            {CLI_CATALOG[id]
+            {catalog
               .filter((model) => !blockedModels.includes(model.id) || model.id === defaultModel)
               .map((model) => (
                 <option value={model.id} key={model.id}>
@@ -2514,7 +2542,7 @@ function LaneCard({ id }: { id: ProviderId }) {
           </div>
           <div className="ailane-models">
             <span className="ailane-modelslabel">Models — click one to hide it from the picker:</span>
-            {CLI_CATALOG[id].map((m) => {
+            {catalog.map((m) => {
               const off = blockedModels.includes(m.id);
               const isDefault = m.id === defaultModel;
               return (
@@ -2825,9 +2853,10 @@ function ModelsPane() {
   // minus anything blocked inside a lane. Memoized: this pane re-renders per
   // keystroke in the "what do you use it for" box, and the merge had no reason
   // to run again (perf audit 2026-07-30, finding 24).
+  const { lanes } = useConnectedCatalog(aiProviders);
   const available = useMemo(
-    () => flattenModels(mergedModels(local.data ?? [], aiProviders, [], blockedModels)),
-    [local.data, aiProviders, blockedModels],
+    () => flattenModels(mergedModels(local.data ?? [], aiProviders, [], blockedModels, undefined, lanes)),
+    [local.data, aiProviders, blockedModels, lanes],
   );
 
   const [draft, setDraft] = useState<HybridPreset | null>(null);
@@ -3263,7 +3292,7 @@ export function SettingsSurface() {
   const paneRequest = useUiStore((s) => s.settingsPaneRequest);
   useEffect(() => {
     if (!paneRequest) return;
-    if (NAV.some((p) => p.id === paneRequest)) setPane(paneRequest as SettingsPane);
+    if (SHOWN_NAV.some((p) => p.id === paneRequest)) setPane(paneRequest as SettingsPane);
     useUiStore.getState().setSettingsPaneRequest(null);
   }, [paneRequest]);
 
@@ -3283,7 +3312,7 @@ export function SettingsSurface() {
           </svg>
           <span className="set-back-label">Back to notes</span>
         </button>
-        {NAV.map(({ id, label, glyph: G }) => (
+        {SHOWN_NAV.map(({ id, label, glyph: G }) => (
           <button
             type="button"
             key={id}

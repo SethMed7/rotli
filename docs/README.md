@@ -17,6 +17,7 @@ fix both in the same change.
 | Public privacy boundary | [`../PRIVACY.md`](../PRIVACY.md) |
 | Public beta support boundary | [`../SUPPORT.md`](../SUPPORT.md) |
 | Project-level system architecture | [`../ARCHITECTURE.md`](../ARCHITECTURE.md) |
+| Languages, frameworks, libraries, and tools (the stack inventory) | [`architecture/tech-stack.md`](architecture/tech-stack.md) |
 | Product interface and interaction design | [`../DESIGN.md`](../DESIGN.md) |
 | Syntax, naming, and formatting | [`../SYNTAX.md`](../SYNTAX.md) |
 | Clean architecture and dependency direction | [`architecture/clean-architecture.md`](architecture/clean-architecture.md) |
@@ -53,6 +54,7 @@ fix both in the same change.
 | Token-efficient AI context and project CARL | [`architecture/ai-context-architecture.md`](architecture/ai-context-architecture.md) |
 | Claude/Codex workspace CLI and MCP | [`architecture/agent-workspace.md`](architecture/agent-workspace.md) |
 | Opt-in cloud MCP relay boundary | [`architecture/remote-agent-relay.md`](architecture/remote-agent-relay.md) |
+| Rotli Web: the required vault, Rotli Helper's vault lane, staying connected, and the no-egress rule | [`architecture/web-vault-connection.md`](architecture/web-vault-connection.md) |
 
 ## Source-of-truth boundaries
 

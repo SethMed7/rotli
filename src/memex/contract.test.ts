@@ -5,6 +5,7 @@
 
 import { describe, expect, test } from "bun:test";
 
+import { summarize } from "../services/webChats";
 import { setChatModel } from "./chatModelFrontmatter";
 import {
   AI_KEYS,
@@ -521,6 +522,9 @@ describe("setChatModel (who answers, in the file)", () => {
     expect(out).toContain("provider: antigravity");
     expect(out).not.toContain("sonnet");
     expect(out.match(/^provider:/gm)?.length).toBe(1);
+    // a discovered id with a context suffix survives the write → reread
+    const wide = setChatModel(out, "opus[1m]", "claude");
+    expect(summarize("t", wide, 0).model).toBe("opus[1m]");
   });
 
   test("an unknown provider writes no provider line, and removes a stale one", () => {

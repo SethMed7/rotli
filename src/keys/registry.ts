@@ -6,9 +6,11 @@
 // Global chords are registered with the OS in Rust; rebinding them round-trips
 // through the set_summon_shortcut invoke.
 
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { emitRebind, setGlobalShortcut } from "../lib/tauri";
 import { resolveChord, useBindingsStore } from "./bindings";
 import { chordFromEvent, normalizeChord, toAccelerator } from "./chords";
+import { EDITOR_ACTION } from "./editorActionIds";
 import { leaderConsumes } from "./leader";
 
 /** Which webview an action belongs to — the dispatcher only fires actions for
@@ -70,11 +72,47 @@ export function dispatch(actionId: string): void {
   actions.get(actionId)?.run();
 }
 
-/** The action's chord right now: override if one exists, else its default. */
+/** Chords Rotli Web keeps: the editor's text formatting (⌘B, ⌘I…), which a
+ * web editor is expected to answer. */
+const WEB_KEPT_CHORDS: ReadonlySet<string> = new Set(Object.values(EDITOR_ACTION));
+
+/** The action's chord right now: override if one exists, else its default.
+ * Where the build withholds app hotkeys (Rotli Web), a modifier chord is none
+ * — nothing dispatches it and no hint shows it — unless it formats text; bare
+ * keys (Esc, Enter) still answer. */
 export function currentChord(actionId: string): string | null {
   const action = actions.get(actionId);
   if (!action) return null;
-  return resolveChord(useBindingsStore.getState().overrides, actionId, action.defaultChord);
+  const chord = resolveChord(useBindingsStore.getState().overrides, actionId, action.defaultChord);
+  return chordInBuild(chord, actionId, LAUNCH_FEATURES.hotkeys);
+}
+
+/** The rule above, pure: a modifier chord is withheld where the build has no
+ * app hotkeys, unless it formats text. */
+export function chordInBuild(chord: string | null, actionId: string, hotkeys: boolean): string | null {
+  if (chord && !hotkeys && chord.includes("+") && !WEB_KEPT_CHORDS.has(actionId)) return null;
+  return chord;
+}
+
+/** A chord the Mac app would claim right now — same surface and `enabled`
+ * rules as claimingAction — that Rotli Web leaves to the browser (⌘[, ⌘]…).
+ * The editor's own keymap steps aside for it, so a web note never
+ * re-purposes a key the app reserves (review of #66: ⌘[ indented), while a
+ * chord the app only claims sometimes (⌘⌫ with a System selection, ⌘⏎ in
+ * setup or capture) still reaches the editor when unclaimed. */
+export function webFreedChord(pressed: string, hotkeys: boolean = LAUNCH_FEATURES.hotkeys): boolean {
+  if (hotkeys) return false;
+  const overrides = useBindingsStore.getState().overrides;
+  for (const action of actions.values()) {
+    if (action.global || WEB_KEPT_CHORDS.has(action.id)) continue;
+    const here =
+      action.shared || action.surface === attachedSurface || action.also?.includes(attachedSurface);
+    if (!here) continue;
+    if (action.enabled && !action.enabled()) continue;
+    const chord = resolveChord(overrides, action.id, action.defaultChord);
+    if (chord && chord.includes("+") && normalizeChord(chord) === pressed) return true;
+  }
+  return false;
 }
 
 /** The other action already holding `chord`, if any (for the quiet inline

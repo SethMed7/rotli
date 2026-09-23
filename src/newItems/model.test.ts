@@ -32,8 +32,9 @@ describe("new item registry", () => {
 });
 
 describe("launch availability", () => {
-  const stable = { sheets: false, mermaidDiagrams: false };
-  const dev = { sheets: true, mermaidDiagrams: true };
+  const stable = { documents: true, sheets: false, mermaidDiagrams: false };
+  const dev = { documents: true, sheets: true, mermaidDiagrams: true };
+  const web = { documents: false, sheets: false, mermaidDiagrams: false };
 
   test("stable keeps Sheet and Mermaid diagram in the chooser as coming soon", () => {
     expect(newItemChoices(stable).map((item) => [item.kind, item.availability])).toEqual([
@@ -56,6 +57,15 @@ describe("launch availability", () => {
     expect(availableNewTabDefault("mermaid", stable)).toBe("markdown");
     expect(availableNewTabDefault("board", stable)).toBe("board");
     expect(availableNewTabDefault("sheet", dev)).toBe("sheet");
-    expect(isNewItemAvailable("sheet", { sheets: false, mermaidDiagrams: true })).toBe(false);
+    expect(isNewItemAvailable("sheet", { documents: true, sheets: false, mermaidDiagrams: true })).toBe(
+      false,
+    );
+  });
+
+  test("the web names Document as coming soon and keeps it out of every creation list", () => {
+    expect(newItemChoices(web).find((item) => item.kind === "document")?.availability).toBe("comingSoon");
+    expect(availableNewItems(web).map((item) => item.kind)).toEqual(["markdown", "board"]);
+    expect(availableNewTabDefault("document", web)).toBe("markdown");
+    expect(isNewItemAvailable("board", web)).toBe(true);
   });
 });

@@ -11,7 +11,7 @@
 //
 // Still Increment 1: one-shot (no streaming), no @-context yet.
 
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   type CSSProperties,
   type ReactNode,
@@ -31,13 +31,7 @@ import { modelIsOnDevice } from "../../ai/guard";
 import { type HostArtifactKind, makeTauriHost } from "../../ai/host";
 import { presetFor, runHybrid } from "../../ai/hybrid";
 import { runAgent } from "../../ai/loop";
-import {
-  PROVIDER_IDS,
-  type ModelGroups,
-  type ProviderId,
-  flattenModels,
-  mergedModels,
-} from "../../ai/models";
+import { type ModelGroups, findModel, flattenModels, mergedModels } from "../../ai/models";
 import type { AgentQuestion, ChatTurn, RunInput } from "../../ai/types";
 import { resolveChatNoteId, syncManagedChatMemory } from "../../chatMemory/composition";
 import {
@@ -62,7 +56,6 @@ import {
   type LocalQueueEntry,
   chatModels,
   cliCancel,
-  cliDetect,
   corpusCreateImageAsset,
   corpusFileBytes,
   corpusFileStat,
@@ -101,6 +94,7 @@ import {
   saveChatFolders,
 } from "../../services/chatFolders";
 import { syncChatModelMeta } from "../../services/chatModelMeta";
+import { useConnectedLanes } from "../../services/connectedModels";
 import { invalidateNotes, useNoteIndex } from "../../services/hooks";
 import { artifactMainFolderName, fileNoteInNamedRootFolder } from "../../services/mainTree";
 import { assignChatToView } from "../../services/viewTree";
@@ -1220,27 +1214,12 @@ export function ChatSurface({
   const providerDefaults = useUiStore((s) => s.providerDefaults);
   const hybridPresets = useUiStore((s) => s.hybridPresets);
   const blockedModels = useUiStore((s) => s.blockedModels);
-  const providerChecks = useQueries({
-    queries: PROVIDER_IDS.map((id) => ({
-      queryKey: ["cli-detect", id],
-      queryFn: () => cliDetect(id),
-      enabled: runtimeAvailable && aiProviders[id],
-      staleTime: 60_000,
-    })),
-  });
-  const providerReady = PROVIDER_IDS.reduce<Record<ProviderId, boolean>>(
-    (out, id, index) => {
-      const detected = providerChecks[index]?.data;
-      out[id] = !!detected?.installed && !!detected.authenticated;
-      return out;
-    },
-    { claude: false, codex: false, cursor: false, antigravity: false },
-  );
-  const providerChecksSettled = PROVIDER_IDS.every(
-    (id, index) => !aiProviders[id] || providerChecks[index]?.isFetched,
-  );
-  const catalogSettled = models.isFetched && providerChecksSettled;
-  const allGroups = mergedModels(models.data ?? [], aiProviders, hybridPresets, blockedModels, providerReady);
+  // each lane's detection, then the model list its client reports (settled =
+  // every enabled lane has answered, so a saved pick is never judged early)
+  const lanes = useConnectedLanes(aiProviders, runtimeAvailable);
+  const catalogSettled = models.isFetched && lanes.settled;
+  const local = models.data ?? [];
+  const allGroups = mergedModels(local, aiProviders, hybridPresets, blockedModels, lanes.ready, lanes.lanes);
   // A secure-note chat never offers a connected or routing model — and neither
   // does a loose chat whose history was fed by a secure-note read (the
   // secureContext taint, audit 2026-07-29 #7). The exact frontmatter is
@@ -1265,7 +1244,7 @@ export function ChatSurface({
   // of the vault on the web, 2026-09-17) — the sidebar mark reads it too
   const fileModel = chats.data?.find((c) => c.slug === chatSlug)?.model || null;
   const chatModelId = chatModelFor(chatModelMap, chatKeyId, fileModel ?? chatModelSeed);
-  const savedPick = modelList.find((m) => m.id === chatModelId);
+  const savedPick = chatModelId ? findModel(modelList, chatModelId) : undefined; // + ids older lists saved
   const fallbackPick = modelList.find((m) => m.isDefault) ?? modelList[0] ?? null;
   // A persisted remote choice must not silently become the local default while
   // its account probe is still resolving on a fresh launch.

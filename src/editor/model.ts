@@ -76,6 +76,31 @@ function setDirty(noteId: string, value: boolean): void {
   for (const fn of dirtySubs) fn();
 }
 
+/** A buffer with edits not yet on disk: its text and the baseline it was
+ * typed against, so a page that unloads mid-save can finish it next boot. */
+export interface UnsavedDraft {
+  noteId: string;
+  body: string;
+  expectedRevision: string;
+  expectedBody: string;
+}
+
+/** Every buffer the dimmed save dot is showing, read synchronously (an
+ * unloading page can't await). Pending Command-T buffers have no file yet. */
+export function unsavedDrafts(): UnsavedDraft[] {
+  const out: UnsavedDraft[] = [];
+  for (const noteId of dirtyIds) {
+    if (pendingDocuments.has(noteId)) continue;
+    const lines = docs.get(noteId);
+    const expectedRevision = revisions.get(noteId);
+    const expectedBody = persistedBodies.get(noteId);
+    if (lines && expectedRevision && expectedBody !== undefined) {
+      out.push({ noteId, body: lines.join("\n"), expectedRevision, expectedBody });
+    }
+  }
+  return out;
+}
+
 /** True while the note has unsaved edits (pending debounce or sync in flight). */
 export function useDocumentDirty(noteId: string): boolean {
   const subscribe = useCallback((fn: () => void) => {

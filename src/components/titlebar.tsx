@@ -13,6 +13,7 @@ import type { MouseEvent } from "react";
 
 import { dispatch } from "../keys/registry";
 import { PLATFORM } from "../lib/featurePolicy";
+import { SHOW_HOTKEYS, hotkeyHint } from "../lib/hotkeyHint";
 import { startWindowDrag, toggleMaximize } from "../lib/tauri";
 import { canBack, canForward, useNavHistory } from "../state/navHistory";
 import { usePanesStore } from "../state/panes";
@@ -89,7 +90,7 @@ export function Titlebar() {
       {!settingsOpen && (
         <IconButton
           className="tb-lead"
-          label={sidebarCollapsed ? "Show sidebar — ⌘0" : "Hide sidebar — ⌘0"}
+          label={`${sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}${hotkeyHint(" — ⌘0")}`}
           hotkey="chrome.toggleSidebars"
           onClick={() => dispatch("chrome.toggleSidebars")}
         >
@@ -119,8 +120,8 @@ export function Titlebar() {
                 <button
                   type="button"
                   className="tb-nav"
-                  aria-label="Back — previous note (⌘[)"
-                  title="Back — previous note ⌘["
+                  aria-label={`Back — previous note${hotkeyHint(" (⌘[)")}`}
+                  title={`Back — previous note${hotkeyHint(" ⌘[")}`}
                   disabled={!navBack}
                   onMouseDown={(event) => event.stopPropagation()}
                   onClick={() => dispatch("nav.back")}
@@ -130,8 +131,8 @@ export function Titlebar() {
                 <button
                   type="button"
                   className="tb-nav"
-                  aria-label="Forward — next note (⌘])"
-                  title="Forward — next note ⌘]"
+                  aria-label={`Forward — next note${hotkeyHint(" (⌘])")}`}
+                  title={`Forward — next note${hotkeyHint(" ⌘]")}`}
                   disabled={!navForward}
                   onMouseDown={(event) => event.stopPropagation()}
                   onClick={() => dispatch("nav.forward")}
@@ -157,7 +158,7 @@ export function Titlebar() {
                 type="button"
                 className="tb-search"
                 data-tour="search"
-                aria-label={breveActive ? "Search Rotli and actions — ⌘K" : "Search notes and actions — ⌘K"}
+                aria-label={`${breveActive ? "Search Rotli and actions" : "Search notes and actions"}${hotkeyHint(" — ⌘K")}`}
                 onMouseDown={(event) => event.stopPropagation()}
                 onDoubleClick={(event) => event.stopPropagation()}
                 onClick={() => dispatch("palette.toggle")}
@@ -166,7 +167,7 @@ export function Titlebar() {
                   <QuokkaMark size={15} />
                 </span>
                 <span className="tb-search-label">{breveActive ? "Search Rotli…" : "Search…"}</span>
-                <kbd className="tb-search-kbd">⌘K</kbd>
+                {SHOW_HOTKEYS && <kbd className="tb-search-kbd">⌘K</kbd>}
               </button>
             )}
           </>
@@ -177,7 +178,7 @@ export function Titlebar() {
         {!settingsOpen && !breveActive && (
           <>
             <IconButton
-              label="New… — ⌘N"
+              label={`New…${hotkeyHint(" — ⌘N")}`}
               hotkey="tabs.newChooser"
               onClick={() => dispatch("tabs.newChooser")}
             >
@@ -186,14 +187,14 @@ export function Titlebar() {
             {/* two distinct split buttons (the maintainer, 2026-06-13): right = vertical
                 divider (columns), down = horizontal divider (rows) */}
             <IconButton
-              label="Split right — ⌘D"
+              label={`Split right${hotkeyHint(" — ⌘D")}`}
               hotkey="panes.splitRight"
               onClick={() => dispatch("panes.splitRight")}
             >
               <SplitRightGlyph size={TB_ICON} />
             </IconButton>
             <IconButton
-              label="Split down — ⌘⇧D"
+              label={`Split down${hotkeyHint(" — ⌘⇧D")}`}
               hotkey="panes.splitDown"
               onClick={() => dispatch("panes.splitDown")}
             >
@@ -213,7 +214,11 @@ export function Titlebar() {
         </IconButton>
         <IconButton
           className="tb-trail"
-          label={updateAvailable ? "Update available — open Settings · ⌘," : "Settings — ⌘,"}
+          label={
+            updateAvailable
+              ? `Update available — open Settings${hotkeyHint(" · ⌘,")}`
+              : `Settings${hotkeyHint(" — ⌘,")}`
+          }
           hotkey="app.settings"
           pressed={settingsOpen}
           onClick={() => dispatch("app.settings")}

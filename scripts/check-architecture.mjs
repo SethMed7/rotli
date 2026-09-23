@@ -312,7 +312,6 @@ const componentAdapterDebt = new Set([
   "src/components/breve/breveWatchlist.tsx",
   "src/components/breve/useBreve.ts",
   "src/components/browserSurface.tsx",
-  "src/components/canvasSurface.tsx",
   "src/components/captureCard.tsx",
   "src/components/chat/chatSurface.tsx",
   "src/components/dashboardSurface.tsx",

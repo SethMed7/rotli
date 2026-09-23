@@ -13,11 +13,15 @@ export interface HelperHealth {
 
 const HEALTH_TIMEOUT_MS = 2_500;
 
-/** Is a helper listening on this port? No credential travels. */
-export async function helperHealth(port: number): Promise<HelperHealth> {
+/** Is a helper listening on this port? No credential travels. A background
+ * probe gives up quickly; pairing, which a person started, passes a long
+ * `timeoutMs` so the browser's own "may this site reach apps on this
+ * device?" question (Firefox and Zen ask before a page's first request to
+ * 127.0.0.1) can be answered before the request is abandoned. */
+export async function helperHealth(port: number, timeoutMs = HEALTH_TIMEOUT_MS): Promise<HelperHealth> {
   const response = await fetch(`${helperBaseUrl(port)}/health`, {
     method: "GET",
-    signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok) throw new Error(`helper answered ${response.status}`);
   return (await response.json()) as HelperHealth;
@@ -37,11 +41,17 @@ export class HelperHttpError extends Error {
 
 /** One command to the helper. A non-2xx answer becomes an Error carrying the
  * helper's own message, so the chat shows the tool's words, not a status. */
-export async function helperRpc<T>(link: HelperLink, cmd: string, args: Record<string, unknown>): Promise<T> {
+export async function helperRpc<T>(
+  link: HelperLink,
+  cmd: string,
+  args: Record<string, unknown>,
+  options: { timeoutMs?: number | undefined } = {},
+): Promise<T> {
   const response = await fetch(`${helperBaseUrl(link.port)}/rpc`, {
     method: "POST",
     headers: { authorization: `Bearer ${link.token}`, "content-type": "application/json" },
     body: JSON.stringify({ cmd, args }),
+    ...(options.timeoutMs ? { signal: AbortSignal.timeout(options.timeoutMs) } : {}),
   });
   const text = await response.text();
   let body: unknown = null;
@@ -61,4 +71,12 @@ export async function helperRpc<T>(link: HelperLink, cmd: string, args: Record<s
   }
   if (body && typeof body === "object" && "result" in body) return (body as { result: T }).result;
   return body as T;
+}
+
+/** Nothing answered: the helper isn't running, or it hung past a deadline.
+ * Every other failure is an answer (a refusal, a tool error) and says so. */
+export function helperUnreachable(error: unknown): boolean {
+  if (error instanceof HelperHttpError) return false;
+  if (error instanceof TypeError) return true; // fetch's "network error"
+  return error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError");
 }

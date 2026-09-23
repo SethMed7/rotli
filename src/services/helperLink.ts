@@ -2,22 +2,19 @@
 // browser vault (this device only); once paired, the AI commands the Mac app
 // sends to Rust ride the helper instead, through the same IPC seam.
 
-import { IndexedDbVaultStore, MemoryVaultStore, type VaultStore } from "../lib/browserVault";
+import { deviceVaultStore } from "../lib/browserVault";
 import { HelperHttpError, helperHealth, helperRpc } from "../lib/helperClient";
-import { HELPER_COMMANDS, type HelperLink, parsePairingCode } from "../lib/helperPairing";
+import { HELPER_COMMANDS, type HelperLink, pairingFromHash, parsePairingCode } from "../lib/helperPairing";
 import { registerWebAiBridge } from "../lib/webAiSeam";
+import { showFileNotice } from "../state/fileNotice";
 import { type HelperProblem, useHelperLink } from "../state/helperLink";
 
 const LINK_KEY = "helper-link";
 
-// The pairing is a DEVICE credential, never vault data: in folder or imported
-// mode the browser vault maps keys to .rotli/ files that travel with an export,
-// so the link lives in this browser's own database whatever the vault mode.
-let deviceStore: VaultStore | null = null;
-function device(): VaultStore {
-  deviceStore ??= typeof indexedDB === "undefined" ? new MemoryVaultStore() : new IndexedDbVaultStore();
-  return deviceStore;
-}
+// The pairing is a DEVICE credential, never vault data: in folder mode the
+// browser vault maps keys to .rotli/ files that travel with the vault, so the
+// link lives in this browser's own database whatever the vault mode.
+const device = deviceVaultStore;
 
 function bridgeFor(link: HelperLink) {
   return (cmd: string, args: Record<string, unknown> | undefined): Promise<unknown> => {
@@ -128,6 +125,17 @@ export async function checkHelper(): Promise<boolean> {
   }
 }
 
+/** How long a Pair press waits for the helper: long enough for a person to
+ * answer the browser's local-network question (Firefox's own prompt times
+ * out after five minutes). */
+const PAIR_TIMEOUT_MS = 120_000;
+
+/** What a Pair press says when nothing answered: the helper may be stopped,
+ * or the browser may be holding the request behind its own question. */
+export function nothingAnswered(port: number): string {
+  return `Nothing answered on port ${port}. If your browser asked whether this page may connect to apps or services on this device, choose Allow (the icon at the left of the address bar shows it again). If it didn’t ask, Rotli Helper isn’t running: run the install line again to start it.`;
+}
+
 /** Pair from the code the helper printed. Refuses a code that does not
  * parse, and a port where nothing answers, before remembering anything. */
 export async function pairHelper(code: string): Promise<void> {
@@ -135,18 +143,18 @@ export async function pairHelper(code: string): Promise<void> {
   if (!link) throw new Error("That is not a pairing code. It looks like 43111:… — copy the whole line.");
   let health;
   try {
-    health = await helperHealth(link.port);
+    health = await helperHealth(link.port, PAIR_TIMEOUT_MS);
   } catch {
-    throw new Error(
-      `Nothing answered on port ${link.port}. Is Rotli Helper running? Its window shows the pairing code.`,
-    );
+    throw new Error(nothingAnswered(link.port));
   }
   if (!health.ok || health.name !== "rotli-helper") throw new Error(`Port ${link.port} is not Rotli Helper.`);
   // the token is proven by one authenticated call before it is kept
-  await helperRpc(link, "chat_models", {});
+  await helperRpc(link, "chat_models", {}, { timeoutMs: PAIR_TIMEOUT_MS });
   await device().set(LINK_KEY, `${link.port}:${link.token}`);
   adopt(link);
-  useHelperLink.getState().setReachable(true);
+  const state = useHelperLink.getState();
+  state.setReachable(true);
+  state.setOfferedCode(null);
 }
 
 /** Forget the pairing on this device. The helper keeps its token. */
@@ -158,4 +166,47 @@ export async function unpairHelper(): Promise<void> {
   }
   adopt(null);
   useHelperLink.getState().setReachable(null);
+}
+
+/** The installer opens Rotli Web with the pairing code in the URL fragment
+ * (`#pair=43111:…`), which no browser sends to any server. It is stripped
+ * from the address bar FIRST — before pairing, before a render — so the
+ * token never sits in history or a bookmark, then OFFERED: setup shows it
+ * filled in, and the person presses Pair (the owner, 2026-09-23). */
+export function adoptPairingFromUrl(): void {
+  if (typeof location === "undefined" || !location.hash.startsWith("#pair=")) return;
+  const code = pairingFromHash(location.hash);
+  history.replaceState(history.state, "", `${location.pathname}${location.search}`);
+  if (code) useHelperLink.getState().setOfferedCode(code);
+}
+
+/** A vault that opened without setup has no Pair button to press: pair with
+ * the offered code in place, and say how it went. */
+export async function pairOfferedCode(): Promise<void> {
+  const code = useHelperLink.getState().offeredCode;
+  if (!code) return;
+  try {
+    await pairHelper(code);
+    showFileNotice("Paired with Rotli Helper. Chat can use the AI tools on this computer.");
+  } catch (error) {
+    useHelperLink.getState().setOfferedCode(null);
+    showFileNotice(
+      `Couldn’t pair with Rotli Helper — ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+/** Another tab (the one the installer opened) may pair while setup waits in
+ * this one: re-read the stored link and adopt it. True once linked. */
+export async function adoptStoredPairing(): Promise<boolean> {
+  try {
+    const raw = await device().get(LINK_KEY);
+    const link = raw ? parsePairingCode(raw) : null;
+    if (!link) return false;
+    const current = useHelperLink.getState().link;
+    if (current?.token !== link.token || current.port !== link.port) adopt(link);
+    return true;
+  } catch {
+    return false;
+  }
 }
