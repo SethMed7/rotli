@@ -61,7 +61,7 @@ import {
 } from "../keys/registry";
 import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 import { feedbackUrl } from "../lib/feedback";
-import { SHOW_HOTKEYS } from "../lib/hotkeyHint";
+import { SHOW_HOTKEYS, hotkeyHint } from "../lib/hotkeyHint";
 import { PRIVATE_BROWSER_SEARCH_ENGINE_PRESENTATIONS } from "../lib/privateBrowser";
 import {
   type ChatModelInfo,
@@ -196,8 +196,10 @@ const NAV: { id: SettingsPane; label: string; glyph: (props: { size?: number }) 
   { id: "about", label: "About Rotli", glyph: QuokkaMark },
 ];
 
-/** Rotli Web has no app hotkeys (featurePolicy `hotkeys`), so no Keybindings pane. */
-const SHOWN_NAV = LAUNCH_FEATURES.hotkeys ? NAV : NAV.filter((pane) => pane.id !== "hotkeys");
+/** Rotli Web has no app hotkeys (featurePolicy `hotkeys`), so no Keybindings
+ * pane, and no private browser, so no Browser pane. */
+const WEB_HIDDEN_PANES: ReadonlySet<SettingsPane> = new Set(["hotkeys", "browser"]);
+const SHOWN_NAV = PLATFORM === "web" ? NAV.filter((pane) => !WEB_HIDDEN_PANES.has(pane.id)) : NAV;
 
 /** A settings pane heading with its quokka character accent (the maintainer, 2026-06-26) —
  * a small, muted line-art quokka at the top-right of each section. This is an
@@ -603,37 +605,42 @@ function GeneralPane() {
   return (
     <>
       <PaneHead title="General" char="base" />
-      <p className="lead">
-        rotli is a visitor by default — summon it, write, dismiss it. Make it a resident when you&rsquo;re
-        living in it.
-      </p>
-      <div className="swgroup">
-        <Toggle
-          on={stayOpen}
-          title="Stay open"
-          desc="Don’t hide when I click away."
-          onChange={() => {
-            const next = !stayOpen;
-            setStayOpen(next);
-            void setHideOnBlur(!next);
-          }}
-        />
-        <Toggle
-          on={showInDock}
-          title="Show in the Dock"
-          desc="Otherwise rotli lives in the menu bar only."
-          onChange={() => {
-            const next = !showInDock;
-            setShowInDock(next);
-            void setDockVisible(next);
-          }}
-        />
-      </div>
-      <p className="setnote">
-        Either way the menu-bar icon stays, {chordLabel(bindingOverrides, "app.toggleWindow")} opens the app,
-        and {chordLabel(bindingOverrides, "capture.summon")} is the one-breath capture — all rebindable in
-        Keybindings.
-      </p>
+      {/* visitor vs resident, the Dock, and the menu bar are the Mac app's */}
+      {PLATFORM === "desktop" && (
+        <>
+          <p className="lead">
+            rotli is a visitor by default — summon it, write, dismiss it. Make it a resident when you&rsquo;re
+            living in it.
+          </p>
+          <div className="swgroup">
+            <Toggle
+              on={stayOpen}
+              title="Stay open"
+              desc="Don’t hide when I click away."
+              onChange={() => {
+                const next = !stayOpen;
+                setStayOpen(next);
+                void setHideOnBlur(!next);
+              }}
+            />
+            <Toggle
+              on={showInDock}
+              title="Show in the Dock"
+              desc="Otherwise rotli lives in the menu bar only."
+              onChange={() => {
+                const next = !showInDock;
+                setShowInDock(next);
+                void setDockVisible(next);
+              }}
+            />
+          </div>
+          <p className="setnote">
+            Either way the menu-bar icon stays, {chordLabel(bindingOverrides, "app.toggleWindow")} opens the
+            app, and {chordLabel(bindingOverrides, "capture.summon")} is the one-breath capture — all
+            rebindable in Keybindings.
+          </p>
+        </>
+      )}
 
       <h4 className="sethead">Your name</h4>
       <p className="lead">
@@ -1417,8 +1424,8 @@ function AppearancePane() {
       <h4 className="sethead">Sidebar</h4>
       <p className="lead">
         Where the sidebar sits, and whether it stays. On hover keeps it out of the way until the pointer
-        reaches the window's edge; ⌘0 still brings it. The sidebar's own right-click menu has the same
-        choices.
+        reaches the window's edge{hotkeyHint("; ⌘0 still brings it")}. The sidebar's own right-click menu has
+        the same choices.
       </p>
       <div className="segfield">
         <span className="seglabel">Side</span>

@@ -78,6 +78,17 @@ test("Rotli Web names no app chord anywhere it can be seen", async ({ page }) =>
     .getByRole("button", { name: /^Settings/ })
     .first()
     .click();
-  await expect(page.getByRole("button", { name: "General" }).first()).toBeVisible();
-  expect(await chordsOnScreen(page)).toEqual([]);
+  // every pane the web offers (review of #66: the first pass only opened General)
+  const panes = page.locator("nav.set-nav button:not(.set-back)");
+  await expect(panes.first()).toBeVisible();
+  const labels = (await panes.allInnerTexts()).map((label) => label.trim());
+  expect(labels.length).toBeGreaterThan(3);
+  for (const label of labels) {
+    await panes.filter({ hasText: label }).first().click();
+    await page.waitForTimeout(150);
+    expect(await chordsOnScreen(page), `Settings → ${label}`).toEqual([]);
+  }
+  // and the Mac-only panes aren't offered at all
+  expect(labels).not.toContain("Keybindings");
+  expect(labels).not.toContain("Browser");
 });
