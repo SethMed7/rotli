@@ -11,14 +11,19 @@ by name for the exact source commit.
 
 | Job | Runner | Proof |
 | --- | --- | --- |
+| Change scope | `ubuntu-24.04` | [`scripts/ci-scope.ts`](../../scripts/ci-scope.ts): whether anything but the site's pages, `docs/`, or root Markdown changed (the app lanes below wait on it) |
+| Repository secret scan | `ubuntu-24.04` | Checksum-pinned Gitleaks over the proposed commits, redacted |
 | Quality and production builds | `ubuntu-24.04` | Script-free isolated frozen installs for app, site, and Breve; lockfile convergence; exact Unknown-license baseline; retained license inventory; `bun run check`; Vite/Rolldown and Astro production builds |
 | Browser E2E | `ubuntu-24.04` | E2E typecheck, Playwright Chromium install, and the browser suite |
 | Dependency vulnerability audit | `ubuntu-24.04` | `bun audit` and RustSec; current accepted transitive findings remain advisory and are tracked in [`security.md`](security.md) |
-| Rust | `macos-15` | `cargo clippy --all-targets -- -D warnings` and `cargo test` against the shipped operating-system branches |
+| Rust (Linux cargo check) | `ubuntu-24.04` | `cargo check --all-targets` over the `cfg(not(target_os = "macos"))` code |
+| Rust (clippy + tests) | `macos-15` | `cargo clippy --all-targets -- -D warnings` and `cargo test` against the shipped operating-system branches |
 
 A **Change scope** job ([`scripts/ci-scope.ts`](../../scripts/ci-scope.ts))
-runs first. When every changed path is under `site/`, under `docs/`, or a root
-Markdown file, Browser E2E, the dependency audit, and both Rust lanes are
+runs alongside Quality and the secret scan, and the app lanes wait for it.
+When every changed path is under `site/` (except the site's `package.json`,
+`bun.lock`, and `bunfig.toml`, which the dependency audit scans), under
+`docs/`, or a root Markdown file, Browser E2E, the dependency audit, and both Rust lanes are
 skipped: a website or docs change proves nothing about the app, and a skipped
 job counts as a passing required check. Quality (which checks and builds the
 site too) and the secret scan run on every change. The gated lanes run unless
@@ -82,7 +87,9 @@ gh workflow run "Regression suite" --repo SethMed7/rotli --ref main
 gh run watch --repo SethMed7/rotli --branch main
 ```
 
-A pull request is green only when all four jobs conclude `success`. The
+A pull request is green only when every job concludes `success` — or, for the
+app lanes on a website- or docs-only change, `skipped`, which GitHub counts as
+passing a required check (see Change scope above). The
 dependency scanners are currently non-blocking because their accepted findings
 have explicit paths and rationale in [`security.md`](security.md); review their
 annotations on every change instead of treating a green advisory job as a clean
