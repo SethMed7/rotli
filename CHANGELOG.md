@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The public site footer now also includes a Featured on Founder.best badge,
+  beside the Launch Llama one.
+
 ## [1.3.0] - 2026-09-21
 
 ### Added
