@@ -49,14 +49,6 @@ impl QuickPlan {
     fn owes_restore(self) -> bool {
         self.ret.tuck_main || self.tuck_chat
     }
-
-    /// Fold restores still owed from an earlier summon into this one.
-    fn merge_owed(self, owed: QuickPlan) -> QuickPlan {
-        let mut plan = self;
-        plan.ret.tuck_main |= owed.ret.tuck_main;
-        plan.tuck_chat |= owed.tuck_chat;
-        plan
-    }
 }
 
 /// What the shell windows looked like at summon time.
@@ -78,21 +70,23 @@ fn quick_return_plan(previous: QuickPlan, shell: ShellState) -> QuickPlan {
     let mut ret = capture_return_plan(shell.main_visible || in_shell, shell.main_focused || in_shell);
     ret.tuck_main |= previous.ret.tuck_main && !shell.main_visible;
     let away = !ret.was_in_main;
-    let tuck_chat = away && (shell.chat_visible || previous.tuck_chat);
+    let tuck_chat = (away && shell.chat_visible) || (previous.tuck_chat && !shell.chat_visible);
     QuickPlan { ret, tuck_chat, return_to: shell.focused_shell }
 }
 
 /// What a close does: step out of rotli (you came from another app), then
 /// order back in whatever is still owed — even when you were in a shell
-/// window, since a restore folded in from an earlier click-away can still be
-/// pending. Pure for tests.
+/// window, since a restore owed by an earlier summon can still be pending.
+/// Pure for tests.
 fn close_steps(plan: QuickPlan) -> (bool, bool) {
     (!plan.ret.was_in_main, plan.owes_restore())
 }
 
 /// The plan and a generation that every summon and close bumps, under ONE
-/// lock. Each step below is one lock hold, so a click-away's take and its
-/// delayed restore can tell when a summon or close has overtaken them.
+/// lock, each step below one lock hold. A click-away never takes the plan up
+/// front: it notes the generation, and after settling takes the plan only if
+/// no summon or close came since. Otherwise that summon or close owns the
+/// windows, and the plan it holds still carries every owed restore.
 #[derive(Default)]
 pub(crate) struct QuickReturn(Mutex<(QuickPlan, u64)>);
 
@@ -112,21 +106,15 @@ impl QuickReturn {
         std::mem::take(&mut current.0)
     }
 
-    /// A click-away takes the plan and notes its generation together.
-    fn take_for_blur(&self) -> (QuickPlan, u64) {
-        let mut current = self.0.lock().unwrap();
-        (std::mem::take(&mut current.0), current.1)
+    /// The generation a click-away dismissed.
+    fn generation(&self) -> u64 {
+        self.0.lock().unwrap().1
     }
 
-    /// The click-away settled: still current → the caller restores (true);
-    /// overtaken → its owed restores fold into the live plan (false).
-    fn settle(&self, generation: u64, owed: QuickPlan) -> bool {
+    /// The click-away settled: take the plan only if nothing came since.
+    fn take_if_current(&self, generation: u64) -> Option<QuickPlan> {
         let mut current = self.0.lock().unwrap();
-        if current.1 == generation {
-            return true;
-        }
-        current.0 = current.0.merge_owed(owed);
-        false
+        (current.1 == generation).then(|| std::mem::take(&mut current.0))
     }
 }
 
@@ -229,25 +217,26 @@ pub(crate) fn close(app: &AppHandle) {
 }
 
 /// Click-away: the panel is a visitor and always hides. Tucked windows come
-/// back once focus settles. Focus left rotli → step out of rotli first, as
-/// `close` does, so nothing pops over the app you clicked. Focus moved to
-/// another rotli window → order them back in behind it and hand focus back to
-/// it. A summon or close in the meantime owns the windows now: the owed
-/// restores fold into its plan instead.
+/// back once focus settles, if no summon or close came in between (those own
+/// the plan then). Focus left rotli → step out of rotli first, as `close`
+/// does, so nothing pops over the app you clicked. Focus moved to another
+/// rotli window → order them back in behind it and hand focus back to it.
+/// Window events and the global-shortcut handler both run on the main event
+/// loop, so a summon cannot land between the focus check and the hide.
 pub(crate) fn on_blur(panel: &tauri::Window) {
-    // a summon already took the panel back: this blur is stale, the plan is its
+    // a summon already took the panel back: this blur is stale
     if panel.is_focused().unwrap_or(false) {
         return;
     }
     let _ = panel.hide();
     let app = panel.app_handle().clone();
-    let (plan, generation) = state(&app).take_for_blur();
-    if !plan.owes_restore() {
-        return;
-    }
+    let generation = state(&app).generation();
     std::thread::spawn(move || {
         std::thread::sleep(BLUR_SETTLE);
-        if !state(&app).settle(generation, plan) {
+        let Some(plan) = state(&app).take_if_current(generation) else {
+            return;
+        };
+        if !plan.owes_restore() {
             return;
         }
         match focused_webview_window(&app) {
@@ -333,10 +322,13 @@ mod tests {
     }
 
     #[test]
-    fn a_visible_main_resets_any_stale_tuck() {
-        // main came back some other way (⌥Space): it is focused now, nothing owed
+    fn a_window_that_came_back_drops_only_its_own_owed_restore() {
+        // main came back some other way (⌥Space): nothing owed for main; the
+        // Chat window is still hidden by us, so its restore is still owed
         let back = quick_return_plan(plan(TUCKED, true, None), shell(true, true, false, Some("main")));
-        assert_eq!(back, plan(IN_MAIN, false, Some("main")));
+        assert_eq!(back, plan(IN_MAIN, true, Some("main")));
+        let both = quick_return_plan(plan(TUCKED, true, None), shell(true, true, true, Some("main")));
+        assert_eq!(both, plan(IN_MAIN, false, Some("main")));
     }
 
     #[test]
@@ -347,13 +339,20 @@ mod tests {
     }
 
     #[test]
-    fn a_close_from_a_shell_window_restores_what_is_owed_and_hands_focus_back() {
-        // click-away owed main a restore, then ⌥Q from the Chat window folded
-        // it into an in-shell plan: closing must not step out, must restore,
-        // and the Chat window you were in gets focus back
-        let hybrid = plan(IN_MAIN, false, Some(chat_window::LABEL)).merge_owed(plan(TUCKED, true, None));
-        assert_eq!(close_steps(hybrid), (false, true));
+    fn a_summon_from_a_shell_window_keeps_restores_still_owed() {
+        // main and Chat were tucked, then ⌥Q from a shell window (main still
+        // hidden): in rotli, so nothing new is tucked — but the owed restores stay
+        let owed = plan(TUCKED, true, None);
+        let hybrid = quick_return_plan(owed, shell(false, false, false, Some(chat_window::LABEL)));
+        assert!(hybrid.ret.was_in_main);
+        assert!(hybrid.ret.tuck_main && hybrid.tuck_chat);
         assert_eq!(hybrid.return_to, Some(chat_window::LABEL));
+    }
+
+    #[test]
+    fn a_close_from_a_shell_window_restores_what_is_owed_and_hands_focus_back() {
+        let hybrid = plan(CaptureReturnPlan { was_in_main: true, tuck_main: true }, true, Some(chat_window::LABEL));
+        assert_eq!(close_steps(hybrid), (false, true));
         assert_eq!(close_steps(plan(IN_MAIN, false, Some("main"))), (false, false));
         assert_eq!(close_steps(plan(TUCKED, false, None)), (true, true));
         assert_eq!(close_steps(plan(AWAY, false, None)), (true, false));
@@ -363,28 +362,29 @@ mod tests {
     fn a_settled_click_away_nobody_overtook_restores() {
         let quick = QuickReturn::default();
         quick.summon(FROM_SAFARI_MAIN_BEHIND);
-        let (owed, generation) = quick.take_for_blur();
-        assert_eq!(owed, plan(TUCKED, false, None));
-        assert!(quick.settle(generation, owed));
+        let generation = quick.generation();
+        assert_eq!(quick.take_if_current(generation), Some(plan(TUCKED, false, None)));
+        assert_eq!(quick.take_for_close(), QuickPlan::default());
     }
 
     #[test]
-    fn a_summon_before_the_click_away_settles_keeps_the_owed_restore() {
+    fn a_summon_before_the_click_away_settles_owns_the_plan_and_its_owed_restore() {
         let quick = QuickReturn::default();
         quick.summon(FROM_SAFARI_MAIN_BEHIND); // main tucked
-        let (owed, generation) = quick.take_for_blur();
-        // ⌥Q again before the blur settled: main reads hidden, so the fresh plan owes nothing
-        assert!(!quick.summon(NOTHING_UP).owes_restore());
-        assert!(!quick.settle(generation, owed)); // overtaken → no restore while the note is up
-        assert_eq!(quick.take_for_close(), plan(TUCKED, false, None)); // …and the close restores it
+        let generation = quick.generation(); // the click-away
+        // ⌥Q again before it settled: main reads hidden, the owed restore carries over
+        assert!(quick.summon(NOTHING_UP).owes_restore());
+        assert_eq!(quick.take_if_current(generation), None); // no restore while the note is up
+        assert_eq!(quick.take_for_close(), plan(TUCKED, false, None)); // the close restores it
     }
 
     #[test]
-    fn a_close_before_the_click_away_settles_owns_the_windows() {
+    fn a_close_before_the_click_away_settles_restores_and_leaves_nothing_behind() {
         let quick = QuickReturn::default();
         quick.summon(FROM_SAFARI_MAIN_BEHIND);
-        let (owed, generation) = quick.take_for_blur();
-        quick.take_for_close();
-        assert!(!quick.settle(generation, owed));
+        let generation = quick.generation();
+        assert_eq!(quick.take_for_close(), plan(TUCKED, false, None));
+        assert_eq!(quick.take_if_current(generation), None);
+        assert_eq!(quick.take_for_close(), QuickPlan::default());
     }
 }
