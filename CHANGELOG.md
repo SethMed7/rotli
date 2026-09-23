@@ -10,29 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.4.0] - 2026-09-23
-
-### Added
-
-- The public site footer now also includes a Featured on Founder.best badge,
-  beside the Launch Llama one.
-- **Boards on Rotli Web.** ⌘N → Board (or ⌘⇧T) makes a named Excalidraw
-  board as a real `.excalidraw` file in your vault folder — the same file, in
-  the same place, Rotli for Mac makes — and your strokes save into it. Boards
-  are listed in Main and All notes, open after a reload, and move to Archive or
-  Trash and back like notes. The canvas's fonts ship with the app, so drawing
-  and writing on a board never reaches the internet. Reveal in Finder stays a
-  Mac-only action.
-- **Chat offers every model your CLI does.** The model picker, Settings, and
-  setup now ask Claude Code, Codex, Cursor, and Antigravity which models they
-  offer and list exactly those — Claude's Default (Opus 5.5 with 1M context),
-  Opus, Fable 5.1, Sonnet 5, and Haiku 4.5; Codex's GPT-6 Astra, Sol, and Luna;
-  Cursor's full list — so a new model shows up without an update to Rotli.
-  Reasoning effort and Fast follow what each client says the model supports.
-  Nothing is sent to a model to find out. Chats saved on a bare `opus` or
-  `fable` open on the matching model. Rotli Web gets the same lists once Rotli
-  Helper is updated; an older helper keeps the built-in list.
-
 ### Changed
 
 - **A new rotli.co.** A simple first screen: the promise, one sentence, and
@@ -65,6 +42,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   beta in preparation", a missing space before "The story behind the name",
   and site copy that still described a browser-storage mode Rotli Web no
   longer has (every note now lives in a folder on your computer).
+- **Launch film sources left the repository.** The film project (the
+  HyperFrames edit, review notes, and render scripts under `marketing/`) is
+  media work and now stays local to the maintainer; `/marketing/` is ignored.
+  The published film in `site/public/media/` is unchanged. The unused hero
+  teaser clip was removed with the old landing page.
+
+## [1.4.0] - 2026-09-23
+
+### Added
+
+- The public site footer now also includes a Featured on Founder.best badge,
+  beside the Launch Llama one.
+- **Boards on Rotli Web.** ⌘N → Board (or ⌘⇧T) makes a named Excalidraw
+  board as a real `.excalidraw` file in your vault folder — the same file, in
+  the same place, Rotli for Mac makes — and your strokes save into it. Boards
+  are listed in Main and All notes, open after a reload, and move to Archive or
+  Trash and back like notes. The canvas's fonts ship with the app, so drawing
+  and writing on a board never reaches the internet. Reveal in Finder stays a
+  Mac-only action.
+- **Chat offers every model your CLI does.** The model picker, Settings, and
+  setup now ask Claude Code, Codex, Cursor, and Antigravity which models they
+  offer and list exactly those — Claude's Default (Opus 5.5 with 1M context),
+  Opus, Fable 5.1, Sonnet 5, and Haiku 4.5; Codex's GPT-6 Astra, Sol, and Luna;
+  Cursor's full list — so a new model shows up without an update to Rotli.
+  Reasoning effort and Fast follow what each client says the model supports.
+  Nothing is sent to a model to find out. Chats saved on a bare `opus` or
+  `fable` open on the matching model. Rotli Web gets the same lists once Rotli
+  Helper is updated; an older helper keeps the built-in list.
+
+### Changed
 
 - **Documents stay on the Mac for now.** On Rotli Web the ⌘N chooser shows
   Document as coming soon, and no menu, command, or chat tool creates one

@@ -47,3 +47,7 @@ test-results/
 /tmp/
 dist-release
 .eval-local-chat/
+
+# Media work (film projects, footage, reviews) stays on the maintainer's Mac,
+# never in this public repository. The published film is site/public/media/.
+/marketing/

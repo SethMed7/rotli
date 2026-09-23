@@ -350,14 +350,13 @@ bun run build:modes                            # full, dev, coming-soon → dist
 docker build -f site/Dockerfile --build-arg SITE_MODE=dev -t rotli-site:dev ..  # from site/
 ```
 
-## Launch films
+## Launch film
 
-Two media slots share `public/media/`:
-
-| Slot | Role | When it renders |
-| --- | --- | --- |
-| Full film | Landing `#film` (after the theme chapter); holding page `#film` | `rotli-promo.mp4` + poster + captions exist |
-| Teaser | Not rendered today (kept for a future slot) | `rotli-teaser.mp4` + poster exist |
+One film lives in `public/media/` and renders on the landing page (`#film`,
+after the theme chapter) and on the holding page, when `rotli-promo.mp4`, its
+poster, and its captions all exist. The film project that produces it (edit,
+footage, reviews) is media work kept on the maintainer's Mac, outside this
+repository; `/marketing/` is ignored so it never comes back.
 
 `PromoFilm.astro` owns the one player on both pages: click-to-play with native
 controls, `preload="none"` (no request until play), `playsinline`, a poster,
@@ -365,17 +364,17 @@ optional captions, and fallback text; no autoplay, no third-party player, no
 cookie. The hero shows a still capture instead, so the film never plays
 twice. The poster is a frame of the film itself (2 s in: "One folder. Your
 vault."); the film's own opening card still reads "Mac beta in preparation"
-and needs a new cut from the film project. A slot renders only when its
+and needs a new cut from the film project. The film renders only when its
 required artifacts exist at build time.
 
 The theme studio previews twelve environments from `public/themes/` (six
 families × light/dark), one row per family with Light and Dark swatches.
 
-| Artifact | Path | Teaser | Full |
-| --- | --- | --- | --- |
-| H.264 MP4, 1920 × 1080 | `public/media/rotli-teaser.mp4` / `rotli-promo.mp4` | required | required |
-| Poster JPEG | `…-poster.jpg` | required | required |
-| WebVTT captions | `….vtt` | optional | required |
+| Artifact | Path |
+| --- | --- |
+| H.264 MP4, 1920 × 1080 | `public/media/rotli-promo.mp4` |
+| Poster JPEG | `public/media/rotli-promo-poster.jpg` |
+| WebVTT captions | `public/media/rotli-promo.vtt` |
 
 All required files must be nonempty. Copy reviewed exports from the film
 project into `public/media/` and rebuild. The captions track is not switched
@@ -406,8 +405,7 @@ and Playground controls. It waits for fonts, hides hover tooltips, verifies
 pixel dimensions, and checks that the tutorial has no files in Main.
 
 [Launch readiness](../docs/architecture/launch-readiness-2026-09-07.md) records
-current promotion gates; [marketing](../marketing/README.md) owns the reusable
-Remotion films. Keep download availability and feature claims tied to verified
+current promotion gates. Keep download availability and feature claims tied to verified
 release capabilities. These source changes do not deploy the site.
 
 ## Rotli Helper installers

@@ -194,7 +194,7 @@ The coming-soon page now has a GitHub development CTA without adding a collectio
 service. Full/dev/coming-soon build policies remain centralized in `site/src/site.ts`.
 Do not enable `SITE_MODE=full` until the intended signed release link is verified.
 
-[Marketing source and instructions](../../marketing/README.md) provide two muted
+Marketing source and instructions (moved out of the repository on 2026-09-23; media work stays local) provide two muted
 18-second Remotion films, landscape 1920×1080 and portrait 1080×1920, plus a poster.
 Both use canonical brand assets and the actual browser capture. Intro/product/end
 frames were visually reviewed; metadata confirmed H.264 and 30fps. Copy is
@@ -375,7 +375,7 @@ generation is not advertised as a functioning development feature. All three
 site modes have a click-to-play film slot and an explicit playback failure state;
 the slot requires nonempty MP4, poster, and VTT artifacts.
 
-The [HyperFrames film record](../../marketing/HYPERFRAMES.md) owns the 44-second
+The HyperFrames film record (outside the repository since 2026-09-23) owns the 44-second
 promo, its Fable/Astra creative workflow, original audio provenance, synthetic
 capture boundary, and the initial unintended Gemini frame-description call.
 The final export uses 2880×1800 source footage and delivers 1080p/30fps H.264
