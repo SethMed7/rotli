@@ -56,6 +56,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The sidebar shows where you are after following a link.** A note Main
+  doesn't hold now highlights the row it lives under — Captures, Library,
+  Assets, Archive, or Trash — instead of leaving nothing (or the note you left)
+  highlighted.
+- **Rotli Web leaves the browser's shortcuts to the browser.** App hotkeys
+  (tabs, history, panes, views, the two-step leaders) no longer fire on the
+  web, where ⌃Tab, ⌘[, ⌘← and friends belong to the browser; bold, italic,
+  and the other formatting keys still work, and no hint names a key that does
+  nothing. Settings has no Keybindings pane on the web.
 - **The caret sits beside an empty task's box.** After typing `[] ` the caret
   floated above and to the right of the new checkbox (most visibly in Zen and
   Firefox); it now sits level with the box, where your text will start.

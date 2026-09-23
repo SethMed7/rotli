@@ -19,6 +19,7 @@ import {
 import { EditorSurface } from "../editor/editorSurface";
 import { evictDocument, pendingNoteDocumentId } from "../editor/model";
 import { dispatch } from "../keys/registry";
+import { SHOW_HOTKEYS } from "../lib/hotkeyHint";
 import {
   MIN_PANE_HEIGHT,
   MIN_PANE_WIDTH,
@@ -53,17 +54,17 @@ function PaneEmptyState() {
       <p className="be-title">All clear</p>
       <p className="be-sub">
         <button type="button" className="pane-empty-act" onClick={() => dispatch("tabs.new")}>
-          <kbd>⌘T</kbd> new tab
+          {SHOW_HOTKEYS && <kbd>⌘T</kbd>} new tab
         </button>
         <button type="button" className="pane-empty-act" onClick={() => dispatch("palette.toggle")}>
-          <kbd>⌘K</kbd> search
+          {SHOW_HOTKEYS && <kbd>⌘K</kbd>} search
         </button>
         <button
           type="button"
           className="pane-empty-act"
           onClick={() => usePanesStore.getState().reopenClosedTab()}
         >
-          <kbd>⌘⌥T</kbd> reopen tab
+          {SHOW_HOTKEYS && <kbd>⌘⌥T</kbd>} reopen tab
         </button>
       </p>
     </div>

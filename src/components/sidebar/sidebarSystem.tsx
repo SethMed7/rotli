@@ -31,6 +31,7 @@ export function SidebarSystem({
   brainEnabled,
   rowProps,
   zoom,
+  here = null,
 }: {
   open: boolean;
   brainCount: number;
@@ -41,6 +42,8 @@ export function SidebarSystem({
    * open, and drop out of it while it is folded, exactly like a folder. */
   rowProps: ReturnType<typeof useRovingList>["rowProps"];
   zoom: number;
+  /** The row the open note lives under when Main doesn't hold it. */
+  here?: string | null;
 }) {
   const setDestExpanded = useUiStore((s) => s.setDestExpanded);
   const contentView = useUiStore((s) => s.contentView);
@@ -66,7 +69,8 @@ export function SidebarSystem({
         <>
           <button
             type="button"
-            className={`frow${contentView === "system" && systemRoot === "Brain" ? " sel" : ""}`}
+            className={`frow${(contentView === "system" && systemRoot === "Brain") || here === "Brain" ? " sel" : ""}`}
+            aria-current={here === "Brain" ? "location" : undefined}
             onClick={() => openSystemRoot("Brain")}
             title={
               brainEnabled
@@ -81,7 +85,7 @@ export function SidebarSystem({
           </button>
           {destRows.map(({ id, label, Glyph }) => {
             const destNotes = notesByDest[id] ?? [];
-            const selected = contentView === "system" && systemRoot === id;
+            const selected = (contentView === "system" && systemRoot === id) || here === id;
             // a piled-up Trash earns the alert badge (the maintainer, 2026-07-31) — the
             // browser's Empty Trash… is one click behind it
             const trashFull = id === DEST.trash && destNotes.length >= TRASH_NUDGE_AT;
@@ -90,6 +94,7 @@ export function SidebarSystem({
                 key={id}
                 type="button"
                 className={`frow${selected ? " sel" : ""}`}
+                aria-current={here === id ? "location" : undefined}
                 title={
                   trashFull ? `${destNotes.length} items — open Trash to review and empty it` : undefined
                 }

@@ -10,6 +10,7 @@
 
 import { type ReactNode, useCallback, useMemo, useState } from "react";
 
+import { SHOW_HOTKEYS } from "../lib/hotkeyHint";
 import { useNoteSearch, useSearchableNotes } from "../services/hooks";
 import { isBodyHit } from "../services/search";
 import { assignedView } from "../services/viewTree";
@@ -126,7 +127,9 @@ export function NoteListSurface({
           <p className="be-title">{notes.length === 0 ? "No notes yet" : "No matches"}</p>
           <p className="be-sub">
             {notes.length === 0
-              ? "Press ⌘T, or your Quick capture shortcut (⌥C), to start one."
+              ? SHOW_HOTKEYS
+                ? "Press ⌘T, or your Quick capture shortcut (⌥C), to start one."
+                : "Use the + in the tab strip to start one."
               : "Try a different search."}
           </p>
         </div>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { hotkeyHint } from "../lib/hotkeyHint";
 import { WELCOME_LESSON_COUNT, openWelcome, welcomeUsesMemory } from "../services/welcome";
 import { startTour } from "../state/tour";
 
@@ -47,7 +48,7 @@ export function WelcomeSettings({ disabled = false }: { disabled?: boolean }) {
       </button>
       <p className="lead">
         The guided tour points at the real controls: New, Main and its view picker, search, Aa, Chat, and
-        Settings. It runs once after setup and any time from here or ⌘K.
+        Settings. It runs once after setup and any time from here{hotkeyHint(" or ⌘K")}.
       </p>
       <button type="button" className="ghostbtn" onClick={startTour}>
         Show me around

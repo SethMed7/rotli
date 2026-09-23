@@ -59,6 +59,20 @@ describe("yieldToRegistry", () => {
     expect(claimed).toEqual(["Mod-i", "Mod-u", "Mod-[", "Mod-]"].map((spec) => registryChordOf(spec)));
   });
 
+  test("a chord the build leaves to the browser (Rotli Web) runs neither side", () => {
+    // review of #66: with nav.back withheld on the web, CM's Mod-[ indented
+    const freed = new Set(["Mod-[", "Mod-]"].map((spec) => registryChordOf(spec)));
+    const yielded = yieldToRegistry(
+      VENDOR_KEYMAP,
+      () => false,
+      (chord) => freed.has(chord),
+    );
+    // false = not handled: CodeMirror leaves the keydown to the browser, and the
+    // fake view (no state) proves the indent command never ran
+    expect(bindingFor(yielded, "Mod-[")?.run?.(view)).toBe(false);
+    expect(bindingFor(yielded, "Mod-]")?.run?.(view)).toBe(false);
+  });
+
   test("an unclaimed chord runs the CodeMirror command, plain and shifted", () => {
     const ran: string[] = [];
     const stub: KeyBinding[] = [
