@@ -2862,6 +2862,11 @@ impl CorpusStore {
     }
 
     fn open_with_mode(root: PathBuf, read_only: bool) -> Result<Self, String> {
+        // A marker another app moved or deleted comes back first, so a vault
+        // never silently reopens as a plain folder (vault_marker.rs).
+        if !read_only {
+            crate::vault_marker::heal_best_effort(&root);
+        }
         // Probe BEFORE create_dir_all so an absent dir reads as "not a memex"
         // (→ legacy first-run), never as a memex over an empty folder.
         if is_memex_root(&root) {
@@ -2909,8 +2914,9 @@ impl CorpusStore {
         store.load_index();
         store.init_search_index();
         // Scaffold the six reserved sidebar destinations every open (idempotent),
-        // so existing corpora gain them too. (the maintainer, 2026-06-13)
-        if !read_only {
+        // so existing corpora gain them too. (the maintainer, 2026-06-13) Never
+        // into a folder that is or was a vault (vault_marker.rs).
+        if !read_only && !crate::vault_marker::refuses_scaffolding(&store.root) {
             store.ensure_reserved_folders()?;
         }
         if fresh && !read_only {

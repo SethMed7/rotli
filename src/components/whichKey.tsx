@@ -28,6 +28,7 @@ const AREAS: { label: string; match: (id: string) => boolean }[] = [
   { label: "Panes", match: (id) => id.startsWith("panes.") },
   { label: "Sidebar", match: (id) => id.startsWith("chrome.") },
   { label: "Editor", match: (id) => id.startsWith("editor.") },
+  { label: "Quick note", match: (id) => id.startsWith("quick.") },
 ];
 
 interface WkRow {
@@ -42,12 +43,19 @@ interface WkArea {
   rows: WkRow[];
 }
 
-export function WhichKey({ onClose: _onClose }: { onClose: () => void }) {
+export function WhichKey({
+  onClose: _onClose,
+  surface = "main",
+}: {
+  onClose: () => void;
+  /** Which window's keys to map — the Quick Note window maps only its own. */
+  surface?: "main" | "quick";
+}) {
   const areas = useMemo<WkArea[]>(() => {
-    // only main-surface, non-global, currently-bound actions — unbound ones are
-    // noise in a "what can I press" map (modules.* / editor.* mostly unbound).
+    // only this surface's non-global, currently-bound actions — unbound ones
+    // are noise in a "what can I press" map (modules.* / editor.* mostly unbound).
     const visible = allActions().filter(
-      (a) => a.surface === "main" && a.global !== true && currentChord(a.id) !== null,
+      (a) => a.surface === surface && a.global !== true && currentChord(a.id) !== null,
     );
 
     const out: WkArea[] = [];
@@ -75,7 +83,7 @@ export function WhichKey({ onClose: _onClose }: { onClose: () => void }) {
       if (rows.length > 0) out.push({ label: area.label, rows });
     }
     return out;
-  }, []);
+  }, [surface]);
 
   return (
     <div className="whichkey" role="presentation" aria-hidden="true">

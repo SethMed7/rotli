@@ -16,10 +16,20 @@ export function vaultRowLabel(inst: Pick<MemexInstance, "label" | "brainEnabled"
   return inst.brainEnabled ? inst.label : `${inst.label} · raw`;
 }
 
-/** The sidebar-header vault name: the corpus instance's label, else a fallback
- * ("rotli" in the browser demo, where no config exists). */
-export function vaultDisplayName(instances: MemexInstance[]): string {
-  return instances.find((i) => i.id === CORPUS_INSTANCE_ID)?.label || "rotli";
+/** The sidebar-header vault name: the corpus instance's label, else the open
+ * plain folder's, else a fallback ("rotli" in the browser demo, where no
+ * config exists). */
+export function vaultDisplayName(instances: MemexInstance[], currentFolder?: MemexInstance | null): string {
+  return (instances.find((i) => i.id === CORPUS_INSTANCE_ID) ?? currentFolder)?.label || "rotli";
+}
+
+/** What Connect vault does with the folder the user picked: an empty folder
+ * becomes a new vault, a vault is linked as a switch target, and any other
+ * folder (Markdown, Obsidian, ZenNotes) opens in place as it is — the same as
+ * onboarding's "Open an existing folder". Nothing is refused. */
+export function connectPlan(kind: "memex" | "markdown" | "empty"): "create" | "link" | "open" {
+  if (kind === "empty") return "create";
+  return kind === "memex" ? "link" : "open";
 }
 
 /** A vault row's overflow menu. Removal is a drill-in so the destructive step
@@ -57,9 +67,14 @@ export function vaultOverflowItems(
   ];
 }
 
-/** Current vault first, then every connected switch target in config order. */
-export function vaultSwitcherItems(instances: MemexInstance[]): VaultSwitcherItem[] {
-  const corpus = instances.find((i) => i.id === CORPUS_INSTANCE_ID) ?? null;
+/** Current vault first, then every connected switch target in config order.
+ * An open plain folder is still the current row — the switcher never shows
+ * an empty list while notes are on screen. */
+export function vaultSwitcherItems(
+  instances: MemexInstance[],
+  currentFolder?: MemexInstance | null,
+): VaultSwitcherItem[] {
+  const corpus = instances.find((i) => i.id === CORPUS_INSTANCE_ID) ?? currentFolder ?? null;
   const others = instances.filter((i) => i.id !== CORPUS_INSTANCE_ID);
   return [
     ...(corpus ? [{ instance: corpus, active: true }] : []),
