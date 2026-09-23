@@ -6,11 +6,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { createCorpusBoardSaver, loadBoard } from "../boards/composition";
+import { boardsAvailable, createCorpusBoardSaver, loadBoard } from "../boards/composition";
 import { type BoardInitialData, BoardCanvas } from "../boards/engine/excalidraw";
 import { type BoardMeta, EMPTY_BOARD_META, EMPTY_SCENE, serializeBoardScene } from "../boards/session";
 import { onQuitFlush } from "../lib/quitFlush";
-import { isTauri } from "../lib/tauri";
 import { boardTabOpen, usePanesStore } from "../state/panes";
 import { useIsDarkTheme } from "../state/theme";
 
@@ -37,7 +36,7 @@ export function BoardEmbed({ boardId }: { boardId: string }) {
   useEffect(() => onQuitFlush(() => saver.flush()), [saver]);
 
   useEffect(() => {
-    if (!isTauri()) {
+    if (!boardsAvailable()) {
       setStatus("error");
       return;
     }
@@ -97,7 +96,7 @@ export function BoardEmbed({ boardId }: { boardId: string }) {
   }, []);
   const onChange = useCallback(
     (elements: readonly unknown[], appState: Record<string, unknown>, files: Record<string, unknown>) => {
-      if (!isTauri() || status !== "ready" || tabOpen) return;
+      if (!boardsAvailable() || status !== "ready" || tabOpen) return;
       sceneRef.current = { elements, appState, files };
       saver.schedule(buildBody);
     },

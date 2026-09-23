@@ -22,6 +22,7 @@ import { NATIVE_IMAGE_EXTS } from "../editor/externalImageDrop";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { BLOCK_MARKERS } from "../services/derive";
 import { DEST } from "../services/destinations";
+import { BOARD_LANE, EMPTY_BOARD_FILE } from "../services/folderBoards";
 import { TEMPLATES_BRAIN_FOLDER } from "../services/templates";
 import { VIEW_FOLDER_FORBIDDEN_CHARS } from "../services/viewTree";
 import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
@@ -67,6 +68,14 @@ describe("parity.json ↔ TS constants", () => {
 
   test("viewFolderForbiddenChars", () => {
     expect<string[]>([...VIEW_FOLDER_FORBIDDEN_CHARS]).toEqual(entries.viewFolderForbiddenChars.value);
+  });
+
+  test("emptyBoardScene", () => {
+    expect(EMPTY_BOARD_FILE).toBe(entries.emptyBoardScene.value);
+  });
+
+  test("boardLane", () => {
+    expect(BOARD_LANE).toBe(entries.boardLane.value);
   });
 
   test("boardLimits", () => {

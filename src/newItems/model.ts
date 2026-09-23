@@ -24,11 +24,13 @@ export function isNameFirstKind(kind: NewItemKind): kind is NameFirstKind {
 export type NewItemAvailability = "available" | "comingSoon";
 
 export interface NewItemFeatures {
+  documents: boolean;
   sheets: boolean;
   mermaidDiagrams: boolean;
 }
 
 export function newItemAvailability(kind: NewItemKind, features: NewItemFeatures): NewItemAvailability {
+  if (kind === "document" && !features.documents) return "comingSoon";
   if (kind === "sheet" && !features.sheets) return "comingSoon";
   if (kind === "mermaid" && !features.mermaidDiagrams) return "comingSoon";
   return "available";

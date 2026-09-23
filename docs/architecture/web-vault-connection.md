@@ -66,6 +66,26 @@ not a silent switch. An empty folder becomes a vault (the Rust spine,
 `wiki/Welcome/`; an existing vault — including a plain folder of Markdown —
 opens as it is.
 
+## Boards are files in the vault here too
+
+A board is the same raw `.excalidraw` file the Mac app writes, id = its
+vault-relative path. `services/boardStore.ts` is the one seam every board
+surface uses: the Rust corpus inside the Mac app, `services/folderBoards.ts`
+over the connected `VaultDir` on the web, and nothing (a "connect a vault"
+placeholder) in a plain browser. `folderBoards.ts` is the TypeScript twin of
+the Rust board rules — a memex board is born in the folder you were in only if
+that is a writable note surface (`wiki/`, `chats/`, the lane itself), else in
+`storage/excalidraw`; a plain vault's reserved rows mean its root; names
+collide as `name-2.excalidraw`; the empty scene is byte-identical
+(`parity.json` pins `emptyBoardScene` and `boardLane`). Saves are
+revision-gated like notes (`${lastModified}:${size}`, then the helper's own
+gate). `FolderNotesService` lists boards by stat alone (they never join the
+note index as notes) and moves them through Archive/Trash like the Mac corpus.
+Excalidraw's fonts load from the build's own base (`/app/fonts`), never a CDN.
+Not on the web: Reveal in Finder (hidden). DOCX documents stay desktop-only —
+`launchFeatures(…, "web").documents` is false, so the chooser shows Document as
+coming soon and every create path refuses it.
+
 ## Rotli Helper's vault lane
 
 `rotli-helper` (a second bin of the crate) serves ONE folder:

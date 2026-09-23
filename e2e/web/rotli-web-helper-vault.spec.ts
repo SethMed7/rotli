@@ -258,6 +258,40 @@ test("a new note is created as a file in the served folder", async ({ context, p
     .toMatch(/^wiki\/_inbox\/.+\.md$/);
 });
 
+test("a board is a file in the served folder, and its strokes save there", async ({ context, page }) => {
+  const helper = fakeHelperVault();
+  await helper.install(context);
+  await withoutFolderApi(context);
+  await connectThroughHelper(page);
+
+  await page.getByRole("button", { name: /Search notes and actions/ }).click();
+  await page.getByPlaceholder("Search notes, files, chats, actions…").fill("choose type");
+  await page.locator(".prow", { hasText: "New tab (choose type)" }).click();
+  await page
+    .locator(".ni-surface")
+    .getByRole("button", { name: /^New Board/ })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Name Excalidraw board" });
+  await dialog.getByRole("textbox", { name: "Board name" }).fill("Helper board");
+  await dialog.getByRole("button", { name: "Create board" }).click();
+
+  const path = "storage/excalidraw/Helper board.excalidraw";
+  await expect.poll(() => helper.files.get(path)?.text ?? "").toContain('"type":"excalidraw"');
+  const canvas = page.locator(".canvas-surface canvas.interactive");
+  await expect(canvas).toBeVisible();
+  await page.locator('label:has([data-testid="toolbar-rectangle"])').click();
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error("the board canvas has no layout");
+  await page.mouse.move(box.x + box.width / 2 - 60, box.y + box.height / 2 - 40);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2 + 40, { steps: 8 });
+  await page.mouse.up();
+  await expect
+    .poll(() => helper.files.get(path)?.text ?? "", { timeout: 10_000 })
+    .toContain('"type":"rectangle"');
+  await expect(page.locator(".canvas-save-err")).toHaveCount(0);
+});
+
 test("a helper that stops answering is waited out: the edit lands when it's back", async ({
   context,
   page,

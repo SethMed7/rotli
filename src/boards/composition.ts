@@ -1,9 +1,10 @@
-// Board composition root — the only board module that joins the Tauri corpus
-// store with the session core. Surfaces get a loader + a debounced saver and
-// never touch corpusReadBoard/corpusWriteBoard themselves.
+// Board composition root — the only board module that joins the board store
+// (the Mac corpus, or Rotli Web's connected vault: services/boardStore.ts)
+// with the session core. Surfaces get a loader + a debounced saver and never
+// touch the store themselves.
 
-import { corpusReadBoard, corpusRevealFile, corpusWriteBoard, isTauri } from "../lib/tauri";
 import { createManagedBoardWithBody } from "../newItems/composition";
+import { boardStore, boardsAvailable } from "../services/boardStore";
 import { usePanesStore } from "../state/panes";
 import { convertMermaidToBoardScene } from "./engine/mermaid";
 import {
@@ -16,22 +17,31 @@ import {
   serializeBoardScene,
 } from "./session";
 
-/** Read a board from the corpus (the *.excalidraw file is the source of truth). */
+/** Whether this session can open boards at all (a plain browser with no vault
+ * can't) — surfaces show a placeholder instead of a canvas when it can't. */
+export { boardsAvailable };
+
+/** Whether "Reveal original" can show the file (the Mac app; not the web). */
+export function canRevealBoards(): boolean {
+  return boardsAvailable() && boardStore().reveal !== null;
+}
+
+/** Read a board from its store (the *.excalidraw file is the source of truth). */
 export async function loadBoard(boardId: string): Promise<LoadedBoard> {
-  const doc = await corpusReadBoard(boardId);
+  const doc = await boardStore().read(boardId);
   return { ...parseBoardBody(doc.body), revision: doc.revision };
 }
 
-/** Outside the Tauri shell the corpus doesn't exist — writes are no-ops. */
+/** With nowhere to keep boards (a plain browser), writes are no-ops. */
 export function createCorpusBoardSaver(
   boardId: string,
   onResult?: (error: string | null) => void,
 ): BoardSaver {
   let revision: string | null = null;
   const saver = createBoardSaver(async (body) => {
-    if (!isTauri()) return;
+    if (!boardsAvailable()) return;
     if (!revision) throw new Error("This board has no save revision. Reload it before editing.");
-    const result = await corpusWriteBoard(boardId, body, revision);
+    const result = await boardStore().write(boardId, body, revision);
     revision = result.revision;
   }, onResult);
   return {
@@ -44,20 +54,23 @@ export function createCorpusBoardSaver(
 }
 
 export async function revealBoardSource(boardId: string): Promise<void> {
-  await corpusRevealFile(boardId);
+  const reveal = boardStore().reveal;
+  if (!reveal) throw new Error("Revealing a file isn’t available in the browser.");
+  await reveal(boardId);
 }
 
 /** Destructive recovery is deliberately separate from load/autosave and may be
  * called only after the UI has obtained explicit confirmation. */
 export async function replaceCorruptBoardWithEmptyScene(boardId: string): Promise<void> {
-  const current = await corpusReadBoard(boardId);
+  const store = boardStore();
+  const current = await store.read(boardId);
   const body = serializeBoardScene({
     elements: EMPTY_SCENE.elements,
     appState: EMPTY_SCENE.appState,
     files: EMPTY_SCENE.files,
     meta: EMPTY_BOARD_META,
   });
-  await corpusWriteBoard(boardId, body, current.revision);
+  await store.write(boardId, body, current.revision);
 }
 
 /** Create an explicit, independently editable board COPY from Mermaid source.
@@ -70,7 +83,7 @@ export async function createEditableBoardFromMermaid(
   definition: string,
   opts: { besideNoteId?: string; open?: boolean; name?: string; rootId?: string } = {},
 ): Promise<string> {
-  if (!isTauri()) throw new Error("Editable board conversion requires the Rotli desktop app.");
+  if (!boardsAvailable()) throw new Error("Editable board conversion needs a vault folder.");
   const source = definition.trim();
   if (!source) throw new Error("Add Mermaid source before creating a board copy.");
 

@@ -1,12 +1,31 @@
 import { describe, expect, test } from "bun:test";
 
-import { activeItemSinkLane, fileLifecycleRows, readFileLifecycle } from "./itemLifecycle";
+import { usePanesStore } from "../state/panes";
+import { activeItemSinkLane, fileLifecycleRows, readFileLifecycle, restoreSinkItem } from "./itemLifecycle";
 
 describe("active item lifecycle routing", () => {
   test("boards use their note-native move lane instead of conventional file capabilities", () => {
     expect(activeItemSinkLane("note")).toBe("note");
     expect(activeItemSinkLane("board")).toBe("note");
     expect(activeItemSinkLane("file")).toBe("file");
+  });
+});
+
+describe("restoring a board outside the Mac app", () => {
+  test("Rotli Web restores a board through its folder service and closes the tab on the old path", async () => {
+    const closed: string[] = [];
+    const original = usePanesStore.getState().closeFileTabs;
+    usePanesStore.setState({ closeFileTabs: (id: string) => void closed.push(id) });
+    const restored: string[] = [];
+    try {
+      await restoreSinkItem({ id: "trash/storage/excalidraw/a.excalidraw", kind: "board" }, async (id) => {
+        restored.push(id);
+      });
+    } finally {
+      usePanesStore.setState({ closeFileTabs: original });
+    }
+    expect(restored).toEqual(["trash/storage/excalidraw/a.excalidraw"]);
+    expect(closed).toEqual(["trash/storage/excalidraw/a.excalidraw"]);
   });
 });
 

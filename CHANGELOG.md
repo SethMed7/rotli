@@ -10,8 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Boards on Rotli Web.** ⌘N → Board (or ⌘⇧T) makes a named Excalidraw
+  board as a real `.excalidraw` file in your vault folder — the same file, in
+  the same place, Rotli for Mac makes — and your strokes save into it. Boards
+  are listed in Main and All notes, open after a reload, and move to Archive or
+  Trash and back like notes. The canvas's fonts ship with the app, so drawing
+  and writing on a board never reaches the internet. Reveal in Finder stays a
+  Mac-only action.
+
 ### Changed
 
+- **Documents stay on the Mac for now.** On Rotli Web the ⌘N chooser shows
+  Document as coming soon, and no menu, command, or chat tool creates one
+  there; Rotli for Mac is unchanged.
 - **Rotli Web needs a vault, and sets one up first.** Nothing opens until a
   vault folder on your computer is connected, so a note can only ever be a real
   file there. Chrome, Edge, and Arc pick the folder directly; Zen, Firefox, and

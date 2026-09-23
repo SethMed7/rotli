@@ -2352,9 +2352,14 @@ pub struct CorpusAiRead {
     pub revision: String,
 }
 
+/// A memex's board lane: where a board is born when the caller's folder isn't a
+/// writable note surface (src/services/folderBoards.ts BOARD_LANE, parity.json).
+pub(crate) const BOARD_LANE: &str = "storage/excalidraw";
+
 /// A minimal, valid empty Excalidraw scene. New boards start here; it opens
-/// blank in excalidraw.com.
-const EMPTY_EXCALIDRAW: &str = "{\"type\":\"excalidraw\",\"version\":2,\"source\":\"rotli\",\"elements\":[],\"appState\":{},\"files\":{}}";
+/// blank in excalidraw.com. Rotli Web writes the same bytes
+/// (src/services/folderBoards.ts EMPTY_BOARD_FILE, parity.json).
+pub(crate) const EMPTY_EXCALIDRAW: &str = "{\"type\":\"excalidraw\",\"version\":2,\"source\":\"rotli\",\"elements\":[],\"appState\":{},\"files\":{}}";
 
 // ─── suppress set (our own writes must not echo back as "external") ─────────
 
@@ -6061,7 +6066,7 @@ impl CorpusStore {
         let folder_id = if self.layout == Layout::Memex
             && !matches!(surfaced(self.layout, folder_id), Surface::NoteRW)
         {
-            "storage/excalidraw"
+            BOARD_LANE
         } else {
             folder_id
         };

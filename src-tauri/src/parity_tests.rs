@@ -94,6 +94,19 @@ fn chat_image_asset_max_bytes_matches_fixture() {
 }
 
 #[test]
+fn empty_board_scene_matches_fixture() {
+    assert_eq!(
+        entry("emptyBoardScene").as_str(),
+        Some(crate::corpus::EMPTY_EXCALIDRAW)
+    );
+}
+
+#[test]
+fn board_lane_matches_fixture() {
+    assert_eq!(entry("boardLane").as_str(), Some(crate::corpus::BOARD_LANE));
+}
+
+#[test]
 fn board_limits_match_fixture() {
     let limits = entry("boardLimits");
     assert_eq!(

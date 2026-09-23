@@ -198,6 +198,14 @@
         ]
       }
     },
+    "emptyBoardScene": {
+      "sourceOfTruth": "src/services/folderBoards.ts EMPTY_BOARD_FILE ↔ src-tauri/src/corpus.rs EMPTY_EXCALIDRAW",
+      "value": "{\"type\":\"excalidraw\",\"version\":2,\"source\":\"rotli\",\"elements\":[],\"appState\":{},\"files\":{}}"
+    },
+    "boardLane": {
+      "sourceOfTruth": "src/services/folderBoards.ts BOARD_LANE ↔ src-tauri/src/corpus.rs BOARD_LANE",
+      "value": "storage/excalidraw"
+    },
     "secureNotesFolder": {
       "sourceOfTruth": "src/security/secureNotes.ts SECURE_NOTES_FOLDER + src/services/destinations.ts DEST.secure ↔ src-tauri/src/corpus.rs SECURE_NOTES_FOLDER",
       "value": "Secure notes"

@@ -1,4 +1,4 @@
-import { corpusRestoreFile } from "../lib/tauri";
+import { corpusRestoreFile, isTauri } from "../lib/tauri";
 import { usePanesStore } from "../state/panes";
 import type { NoteSummary } from "../types";
 import { invalidateNotes } from "./hooks";
@@ -65,7 +65,10 @@ export async function restoreSinkItem(
   restoreNote: (id: string) => Promise<unknown>,
 ): Promise<void> {
   if (item.kind === "file" || item.kind === "board") {
-    await corpusRestoreFile(item.id);
+    // Rotli Web's folder service restores a board by the same prefix strip it
+    // uses for notes; only the Mac corpus has the path-restore command
+    if (item.kind === "board" && !isTauri()) await restoreNote(item.id);
+    else await corpusRestoreFile(item.id);
     usePanesStore.getState().closeFileTabs(item.id);
     await invalidateNotes();
     return;

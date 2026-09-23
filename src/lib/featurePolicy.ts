@@ -22,6 +22,10 @@ export function launchFeatures(development: boolean, platform: Platform = "deskt
     mermaidVisualEditing: development,
     agents: desktop && development,
     sheets: desktop && development,
+    // DOCX editing and creation need the desktop document lane (the managed
+    // storage writer and the Univer editor over corpus bytes); Rotli Web
+    // names Document as coming soon rather than offering a broken create.
+    documents: desktop,
     mermaidDiagrams: development,
     voice: desktop && development,
     // Pull Chat out into its own window: on in every desktop build (the owner,
