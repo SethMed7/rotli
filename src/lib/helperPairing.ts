@@ -13,6 +13,8 @@ export interface HelperLink {
 /** The AI commands the helper serves. Everything else stays in the Mac app. */
 export const HELPER_COMMANDS: ReadonlySet<string> = new Set([
   "cli_detect",
+  // older helpers answer 404 "unknown command": the page keeps its built-in list
+  "cli_models",
   "cli_complete",
   "cli_cancel",
   "chat_models",

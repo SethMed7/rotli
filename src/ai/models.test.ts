@@ -5,7 +5,9 @@
 
 import { describe, expect, test } from "bun:test";
 
+import type { DiscoveredModel } from "../lib/cliModelTypes";
 import type { ChatModelInfo } from "../lib/tauri";
+import type { DiscoveryLanes } from "../state/connectedModels";
 import { parseHybridPresets } from "../state/persist";
 import { budgetFor, contextWindowFor } from "./budget";
 import {
@@ -17,14 +19,20 @@ import {
   type ProviderId,
   STARTER_PRESETS,
   comfortFor,
+  findModel,
   fitLabel,
   flattenModels,
   installableCatalog,
+  isModelIdShape,
   isValidRepo,
   mergedModels,
+  modelLabel,
+  modelProvider,
   nameFromRepo,
   presetModel,
+  providerCatalog,
   providerDefaultModel,
+  resolveLaneModel,
 } from "./models";
 import { adapterFor, frontierAdapter, gemmaAdapter } from "./prompt";
 
@@ -174,19 +182,155 @@ describe("connected catalog policy", () => {
 
   test("reviewed provider defaults are current and stale persisted ids heal", () => {
     expect(DEFAULT_PROVIDER_MODELS).toEqual({
-      claude: "sonnet",
-      codex: "gpt-5.6-sol",
+      claude: "default",
+      codex: "gpt-6-sol",
       cursor: "grok-4.6",
       antigravity: "gemini-3.8-flash-high",
     });
+    // every built-in default is in its own built-in list, marked as the default
+    for (const id of PROVIDER_IDS) {
+      expect(CLI_CATALOG[id].filter((m) => m.isDefault).map((m) => m.id)).toEqual([
+        DEFAULT_PROVIDER_MODELS[id],
+      ]);
+    }
     expect(providerDefaultModel("antigravity", { antigravity: "gemini-3.7-flash-low" })).toBe(
       "gemini-3.7-flash-low",
     );
-    expect(providerDefaultModel("antigravity", { antigravity: "gemini-2.5-pro" })).toBe(
+    // the client could not list (older helper, signed out): the built-in list decides
+    const failed = {
+      antigravity: { status: "error" as const, models: [], at: 0 },
+      cursor: { status: "error" as const, models: [], at: 0 },
+    };
+    expect(providerDefaultModel("antigravity", { antigravity: "gemini-2.5-pro" }, failed)).toBe(
       "gemini-3.8-flash-high",
     );
-    expect(providerDefaultModel("cursor", { cursor: "cursor-auto" })).toBe("cursor-auto");
-    expect(providerDefaultModel("cursor", { cursor: "removed-model" })).toBe("grok-4.6");
+    expect(providerDefaultModel("cursor", { cursor: "cursor-auto" }, failed)).toBe("cursor-auto");
+    expect(providerDefaultModel("cursor", { cursor: "removed-model" }, failed)).toBe("grok-4.6");
+    expect(providerDefaultModel("cursor", { cursor: "--help" }, {})).toBe("grok-4.6");
+  });
+});
+
+const reported = (id: string, label: string, extra: Partial<DiscoveredModel> = {}): DiscoveredModel => ({
+  id,
+  label,
+  efforts: [],
+  fastTier: false,
+  vision: true,
+  isDefault: false,
+  ...extra,
+});
+
+/** What Claude Code, Codex, and Cursor listed on 2026-09-23 (trimmed). */
+const answered: DiscoveryLanes = {
+  claude: {
+    status: "ready",
+    at: 0,
+    models: [
+      reported("default", "Claude Default · Opus 5.5 (1M context)", {
+        isDefault: true,
+        efforts: ["low", "max"],
+      }),
+      reported("opus[1m]", "Claude Opus 5.5 (1M context)", { efforts: ["low", "max"] }),
+      reported("claude-fable-5-1[1m]", "Claude Fable 5.1", { efforts: ["low", "max"] }),
+      reported("sonnet", "Claude Sonnet 5", { efforts: ["low", "max"] }),
+      reported("haiku", "Claude Haiku 4.5"),
+    ],
+  },
+  codex: {
+    status: "ready",
+    at: 0,
+    models: [
+      reported("gpt-6-astra", "GPT-6 Astra", { efforts: ["low", "ultra"], fastTier: true }),
+      reported("gpt-5.5", "GPT-5.5", { efforts: ["low", "xhigh"], fastTier: true }),
+    ],
+  },
+  cursor: {
+    status: "ready",
+    at: 0,
+    models: [
+      reported("cursor-auto", "Auto (default)", { isDefault: true, vision: false }),
+      reported("cursor-grok-4.6-high", "Grok 4.6", { vision: false }),
+      reported("composer-2.5", "Composer 2.5", { vision: false }),
+    ],
+  },
+};
+const allOn = { claude: true, codex: true, cursor: true, antigravity: true };
+
+describe("discovered models (each client's own list)", () => {
+  test("the picker lists exactly what each client reported, one default per lane", () => {
+    const g = mergedModels([], allOn, [], [], allOn, answered);
+    const ids = (p: string) => g.connected.filter((m) => m.provider === p).map((m) => m.id);
+    expect(ids("claude")).toEqual(["default", "opus[1m]", "claude-fable-5-1[1m]", "sonnet", "haiku"]);
+    expect(ids("codex")).toEqual(["gpt-6-astra", "gpt-5.5"]);
+    expect(ids("cursor")).toEqual(["cursor-auto", "cursor-grok-4.6-high", "composer-2.5"]);
+    // antigravity has not answered: the built-in list stands in
+    expect(ids("antigravity")).toEqual(CLI_CATALOG.antigravity.map((m) => m.id));
+    for (const p of PROVIDER_IDS) {
+      expect(g.connected.filter((m) => m.provider === p && m.isDefault)).toHaveLength(1);
+    }
+    expect(g.connected.every((m) => m.endpoint === "" && m.api === "cli")).toBe(true);
+    // Codex flagged no default: the reviewed default when listed, else the first
+    expect(providerCatalog("codex", answered).find((m) => m.isDefault)?.id).toBe("gpt-6-astra");
+  });
+
+  test("labels and lanes resolve for discovered ids and for the ids older lists saved", () => {
+    expect(modelLabel("composer-2.5", [], [], answered)).toBe("Composer 2.5");
+    expect(modelProvider("composer-2.5", [], [], answered)).toBe("cursor");
+    expect(modelLabel("opus", [], [], answered)).toBe("Claude Opus 5.5 (1M context)");
+    const list = providerCatalog("cursor", answered);
+    expect(findModel(list, "grok-4.6")?.id).toBe("cursor-grok-4.6-high"); // retired id, same label
+    expect(findModel(providerCatalog("claude", answered), "fable")?.id).toBe("claude-fable-5-1[1m]");
+    expect(findModel(list, "gone")).toBeUndefined();
+  });
+
+  test("a saved default is kept while its lane loads and heals only after the client answers", () => {
+    const loading = { codex: { status: "loading" as const, models: [], at: 0 } };
+    expect(providerDefaultModel("codex", { codex: "gpt-7-nova" }, loading)).toBe("gpt-7-nova");
+    expect(providerDefaultModel("codex", { codex: "gpt-6-astra" }, answered)).toBe("gpt-6-astra");
+    expect(providerDefaultModel("codex", { codex: "gpt-7-nova" }, answered)).toBe("gpt-6-astra");
+    expect(providerDefaultModel("claude", {}, answered)).toBe("default");
+    expect(providerDefaultModel("cursor", { cursor: "grok-4.6" }, answered)).toBe("cursor-grok-4.6-high");
+    expect(resolveLaneModel("claude", "gpt-6-astra", {})).toBeNull(); // never crosses lanes
+    expect(resolveLaneModel("codex", "opus", {})).toBeNull();
+  });
+
+  test("a vendor model Cursor also lists stays on the vendor's own lane", () => {
+    const overlapping: DiscoveryLanes = {
+      ...answered,
+      cursor: {
+        status: "ready",
+        at: 0,
+        models: [
+          reported("cursor-auto", "Auto (default)", { isDefault: true, vision: false }),
+          reported("gemini-3.8-flash-high", "Gemini 3.8 Flash High", { vision: false }),
+          reported("gpt-5.5", "GPT-5.5", { vision: false }),
+          reported("gemini-3.6-flash-low", "Gemini 3.6 Flash Low", { vision: false }),
+        ],
+      },
+      antigravity: {
+        status: "ready",
+        at: 0,
+        models: [reported("gemini-3.6-flash-low", "Gemini 3.6 Flash (Low)", { isDefault: true })],
+      },
+    };
+    const list = flattenModels(mergedModels([], allOn, [], [], allOn, overlapping));
+    for (const id of ["gemini-3.8-flash-high", "gpt-5.5", "gemini-3.6-flash-low"]) {
+      expect(list.filter((m) => m.id === id).length).toBeLessThanOrEqual(1);
+      expect(list.find((m) => m.id === id)?.provider).not.toBe("cursor");
+    }
+    expect(findModel(list, "gpt-5.5")?.provider).toBe("codex");
+    expect(findModel(list, "gemini-3.6-flash-low")?.provider).toBe("antigravity");
+    expect(providerCatalog("cursor", overlapping).map((m) => m.id)).toEqual(["cursor-auto"]);
+    expect(resolveLaneModel("cursor", "gemini-3.8-flash-high", overlapping)).toBeNull();
+  });
+
+  test("the id shape mirrors the Rust argv gate", () => {
+    for (const ok of ["sonnet", "opus[1m]", "claude-fable-5-1[1m]", "gpt-5.6-sol", "cursor_auto"]) {
+      expect(isModelIdShape(ok)).toBe(true);
+    }
+    for (const bad of ["", "--help", "-m", "a b", "opus[2m]", 'x"y', "a".repeat(97)]) {
+      expect(isModelIdShape(bad)).toBe(false);
+    }
   });
 });
 

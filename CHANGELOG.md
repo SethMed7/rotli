@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Trash and back like notes. The canvas's fonts ship with the app, so drawing
   and writing on a board never reaches the internet. Reveal in Finder stays a
   Mac-only action.
+- **Chat offers every model your CLI does.** The model picker, Settings, and
+  setup now ask Claude Code, Codex, Cursor, and Antigravity which models they
+  offer and list exactly those — Claude's Default (Opus 5.5 with 1M context),
+  Opus, Fable 5.1, Sonnet 5, and Haiku 4.5; Codex's GPT-6 Astra, Sol, and Luna;
+  Cursor's full list — so a new model shows up without an update to Rotli.
+  Reasoning effort and Fast follow what each client says the model supports.
+  Nothing is sent to a model to find out. Chats saved on a bare `opus` or
+  `fable` open on the matching model. Rotli Web gets the same lists once Rotli
+  Helper is updated; an older helper keeps the built-in list.
 
 ### Changed
 

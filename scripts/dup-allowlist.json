@@ -196,6 +196,34 @@
         "src/lib/helperVaultDir.test.ts"
       ],
       "reason": "Deliberate cross-language parity: the page computes the desktop's fnv1a64 content revision in TypeScript, and both suites pin the same known values so the Rust and TS twins cannot drift apart."
+    },
+    {
+      "id": "acp-session-fixture-vocabulary",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/acp.rs",
+        "src-tauri/src/provider_models_tests.rs"
+      ],
+      "reason": "Protocol vocabulary, not a mirror: model discovery (provider_models.rs) reads the same ACP session/new result a chat turn validates against, so its test fixture necessarily spells the configOptions/currentValue shape acp.rs parses. The traversal itself is shared (acp::session_model_options)."
+    },
+    {
+      "id": "claude-initialize-request-reply",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/provider_models.rs",
+        "src-tauri/src/provider_models_fetch.rs"
+      ],
+      "reason": "The initialize control request (fetch) and the parser of its reply (provider_models.rs) name the same Agent SDK envelope fields (request_id, subtype) because one is the other's answer; there is no shared logic to extract."
+    },
+    {
+      "id": "model-allowlist-twin-vectors",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/provider.rs",
+        "src-tauri/src/provider_models_tests.rs",
+        "src/ai/models.test.ts"
+      ],
+      "reason": "Deliberate twin test vectors: the Rust argv gate (provider.rs build_args_for + provider_models::valid_model_id) and its TS mirror (isModelIdShape) are proven against the same refusal ids (--help, opus[2m], …) and the same codex/cursor argv literals, so drift in either side fails a test."
     }
   ]
 }

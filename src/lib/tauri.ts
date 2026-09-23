@@ -49,6 +49,7 @@ export type {
   ModelUsageTokens,
   ModelUsageTotal,
 } from "./modelUsageTypes";
+import type { DiscoveredModel } from "./cliModelTypes";
 import type { ModelUsageRange, ModelUsageSummary } from "./modelUsageTypes";
 import { emptyModelUsage } from "./modelUsageTypes";
 
@@ -600,6 +601,10 @@ export interface CliDetect {
 
 export function cliDetect(provider: string): Promise<CliDetect> {
   return aiInvoke("cli_detect", { provider });
+}
+
+export function cliModels(provider: string, refresh = false): Promise<DiscoveredModel[]> {
+  return aiInvoke("cli_models", { provider, refresh });
 }
 
 /** One constrained completion step on a connected client. Rust owns the binary

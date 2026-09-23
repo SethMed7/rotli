@@ -1,5 +1,5 @@
 import type { ChatModelInfo } from "../lib/tauri";
-import { PROVIDER_LABELS, type ProviderId, providerDefaultModel } from "./models";
+import { PROVIDER_LABELS, type ProviderId, findModel, providerDefaultModel } from "./models";
 
 export type ConsultProvider = ProviderId;
 export type PrimaryProvider = ProviderId | `local:${string}` | `provider:${string}`;
@@ -10,7 +10,7 @@ export type ConsultMention =
   | { kind: "consult"; provider: ConsultProvider; modelId: string | null; prompt: string };
 
 const CONSULT_TAG =
-  /(^|\s)@(claude|gpt|chatgpt|codex|openai|cursor|antigravity|gemini|agy)(?::(?:\{([a-z0-9][a-z0-9._-]*)\}|([a-z0-9][a-z0-9._-]*)))?(?=$|\s|[),.!?;])/gi;
+  /(^|\s)@(claude|gpt|chatgpt|codex|openai|cursor|antigravity|gemini|agy)(?::(?:\{([a-z0-9][a-z0-9._-]*(?:\[1m\])?)\}|([a-z0-9][a-z0-9._-]*(?:\[1m\])?)))?(?=$|\s|[),.!?;])/gi;
 
 function consultProvider(alias: string): ConsultProvider {
   if (/^(gpt|chatgpt|codex|openai)$/i.test(alias)) return "codex";
@@ -93,7 +93,9 @@ export function resolveConsultModel(
     };
   }
   const requestedId = modelId ?? providerDefaultModel(requested, defaults);
-  const model = providerModels.find((entry) => entry.id.toLowerCase() === requestedId.toLowerCase());
+  const model =
+    providerModels.find((entry) => entry.id.toLowerCase() === requestedId.toLowerCase()) ??
+    findModel(providerModels, requestedId);
   if (!model) {
     return {
       ok: false,

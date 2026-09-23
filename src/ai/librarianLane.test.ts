@@ -43,16 +43,42 @@ test("the caption says whether notes leave the Mac", () => {
 
 test("a Librarian model id sticks only inside its lane's catalog, else the chat default answers", () => {
   expect(librarianModelId("local", "opus")).toBeNull();
-  expect(librarianModelId("claude", "opus")).toBe("opus");
+  // the bare alias older versions saved resolves to the entry Claude Code lists
+  expect(librarianModelId("claude", "opus")).toBe("opus[1m]");
+  expect(librarianModelId("claude", "sonnet")).toBe("sonnet");
   expect(librarianModelId("claude", "gemini-3.8-flash-high")).toBeNull();
+  expect(librarianModelId("claude", "--help")).toBeNull();
   expect(librarianModelId("claude", 7)).toBeNull();
-  expect(librarianModelFor("claude", "opus", { claude: "sonnet" })).toBe("opus");
-  expect(librarianModelFor("claude", "nope", { claude: "sonnet" })).toBe("sonnet");
+  expect(librarianModelFor("claude", "opus", { claude: "sonnet" })).toBe("opus[1m]");
+  expect(librarianModelFor("claude", "a b", { claude: "sonnet" })).toBe("sonnet");
   expect(librarianModelFor("antigravity", null, {})).toBe("gemini-3.8-flash-high");
 });
 
+test("an id the client has not listed yet waits for its answer, then heals", () => {
+  // discovery pending: a well-formed id may be one the client is about to report
+  expect(librarianModelId("claude", "claude-opus-6[1m]", {})).toBe("claude-opus-6[1m]");
+  const answered = {
+    claude: {
+      status: "ready" as const,
+      at: 0,
+      models: [
+        {
+          id: "sonnet",
+          label: "Claude Sonnet 5",
+          efforts: [],
+          fastTier: false,
+          vision: true,
+          isDefault: true,
+        },
+      ],
+    },
+  };
+  expect(librarianModelId("claude", "claude-opus-6[1m]", answered)).toBeNull();
+  expect(librarianModelFor("claude", "claude-opus-6[1m]", { claude: "nope" }, answered)).toBe("sonnet");
+});
+
 test("a filed_by value names the lane and model for people", () => {
-  expect(describeFiledBy("claude:opus")).toBe("Claude · Claude Opus");
+  expect(describeFiledBy("claude:opus")).toBe("Claude · Claude Opus 5.5 (1M context)");
   expect(describeFiledBy("antigravity:gemini-3.8-flash-high")).toBe("Gemini · Gemini 3.8 Flash (High)");
   expect(describeFiledBy("claude:unknown-id")).toBe("Claude · unknown-id");
   expect(describeFiledBy("gemma-3-12b-it-qat-4bit")).toBe("gemma-3-12b-it-qat-4bit");

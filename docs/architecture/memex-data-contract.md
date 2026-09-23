@@ -513,6 +513,18 @@ per-chat values are omitted from the next request. The trusted provider adapter
 independently validates the same model/choice pair before constructing CLI
 arguments. These controls are local presentation state, never vault metadata.
 
+The connected model lists are discovered, not shipped. Each client is asked
+which models it offers (`cli_models`, `src-tauri/src/provider_models.rs`; the
+same verb in Rotli Helper) and the chat picker, Settings, onboarding, and the
+Librarian list exactly those, with the efforts and Fast tier the client reported
+for each. `CLI_CATALOG` (`src/ai/models.ts`) is only the offline fallback, used
+while a lane has not answered or cannot list. A saved model id is kept while its
+lane's list is loading and heals to the lane default only once the client
+answers without it; the bare ids older versions saved (`opus`, Cursor's
+`grok-4.6`) resolve to the entry the client now lists. Native execution accepts
+a static id or an id the client itself reported — the webview can choose among
+them but never add one.
+
 Model Mapping 0 builds a fresh, bounded vault table of contents for each model
 request:
 

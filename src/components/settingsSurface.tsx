@@ -21,19 +21,20 @@ import { makeTauriHost } from "../ai/host";
 import { suggestPresets } from "../ai/hybrid";
 import { LIBRARIAN_LABELS, librarianCaption, librarianModelFor, librarianOptions } from "../ai/librarianLane";
 import {
-  CLI_CATALOG,
   type HybridPreset,
   type LocalCatalogEntry,
   PROVIDER_IDS,
   PROVIDER_LABELS,
   type ProviderId,
   STARTER_PRESETS,
+  findModel,
   fitLabel,
   flattenModels,
   installableCatalog,
   isValidRepo,
   mergedModels,
   nameFromRepo,
+  providerCatalog,
   providerDefaultModel,
   scanVerdict,
 } from "../ai/models";
@@ -112,6 +113,7 @@ import {
   useSwitchVault,
 } from "../memex/useMemex";
 import { availableNewItems } from "../newItems/model";
+import { readyFrom, useConnectedCatalog } from "../services/connectedModels";
 import { isChatsPath, isHidden, isVault, isWikiPath } from "../services/destinations";
 import { useFolders } from "../services/hooks";
 import { queryClient } from "../services/query";
@@ -1866,6 +1868,7 @@ function BrainPane() {
   const detections = useSetupDetection((s) => s.detections);
   // the picker offers signed-in clients, so make sure the probes have run
   useEffect(() => startSetupDetection(), []);
+  const { lanes } = useConnectedCatalog(providers, readyFrom(detections));
   const quiet = useUiStore((s) => s.organizerQuietSecs);
   const setQuiet = useUiStore((s) => s.setOrganizerQuietSecs);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
@@ -1959,7 +1962,7 @@ function BrainPane() {
                 value={librarianModelFor(model, modelId, providerDefaults)}
                 onChange={(event) => setModelId(event.currentTarget.value)}
               >
-                {CLI_CATALOG[model].map((entry) => (
+                {providerCatalog(model, lanes).map((entry) => (
                   <option key={entry.id} value={entry.id}>
                     {entry.label}
                   </option>
@@ -2291,14 +2294,16 @@ function ChatPane() {
     queryFn: () => (isTauri() ? chatModels() : Promise.resolve([])),
     staleTime: Infinity,
   });
+  const { lanes } = useConnectedCatalog(aiProviders);
   const available = useMemo(
-    () => flattenModels(mergedModels(local.data ?? [], aiProviders, hybridPresets, blockedModels)),
-    [local.data, aiProviders, hybridPresets, blockedModels],
+    () =>
+      flattenModels(
+        mergedModels(local.data ?? [], aiProviders, hybridPresets, blockedModels, undefined, lanes),
+      ),
+    [local.data, aiProviders, hybridPresets, blockedModels, lanes],
   );
-  const chosen = available.find((m) => m.id === chatModelId);
-  const lane = chosen
-    ? PROVIDER_IDS.find((id) => CLI_CATALOG[id].some((m) => m.id === chosen.id))
-    : undefined;
+  const chosen = chatModelId ? findModel(available, chatModelId) : undefined;
+  const lane = PROVIDER_IDS.find((id) => chosen?.provider === id && chosen.api === "cli");
   const [verify, setVerify] = useState<VerifyState>({ state: "idle" });
   const test = () => {
     if (!chosen) return;
@@ -2406,7 +2411,6 @@ function LaneCard({ id }: { id: ProviderId }) {
   const toggleBlockedModel = useUiStore((s) => s.toggleBlockedModel);
   const providerDefaults = useUiStore((s) => s.providerDefaults);
   const setProviderDefault = useUiStore((s) => s.setProviderDefault);
-  const defaultModel = providerDefaultModel(id, providerDefaults);
   const [verify, setVerify] = useState<VerifyState>({ state: "idle" });
 
   const det = useQuery({
@@ -2417,6 +2421,10 @@ function LaneCard({ id }: { id: ProviderId }) {
   });
   const d = det.data;
   const ready = !!d && d.installed && d.authenticated;
+  // the models this client offers right now (the built-in list until it answers)
+  const { lanes } = useConnectedCatalog({ [id]: enabled }, { [id]: ready });
+  const catalog = providerCatalog(id, lanes);
+  const defaultModel = providerDefaultModel(id, providerDefaults, lanes);
   // "2.1.199 (Claude Code)" / "codex-cli 0.137.0" → "v2.1.199" / "v0.137.0"
   const version = d?.version?.match(/\d+(?:\.\d+)+/)?.[0];
   const status = !isTauri()
@@ -2483,7 +2491,7 @@ function LaneCard({ id }: { id: ProviderId }) {
             aria-label={`Default model for ${PROVIDER_LABELS[id]}`}
             onChange={(event) => setProviderDefault(id, event.currentTarget.value)}
           >
-            {CLI_CATALOG[id]
+            {catalog
               .filter((model) => !blockedModels.includes(model.id) || model.id === defaultModel)
               .map((model) => (
                 <option value={model.id} key={model.id}>
@@ -2514,7 +2522,7 @@ function LaneCard({ id }: { id: ProviderId }) {
           </div>
           <div className="ailane-models">
             <span className="ailane-modelslabel">Models — click one to hide it from the picker:</span>
-            {CLI_CATALOG[id].map((m) => {
+            {catalog.map((m) => {
               const off = blockedModels.includes(m.id);
               const isDefault = m.id === defaultModel;
               return (
@@ -2825,9 +2833,10 @@ function ModelsPane() {
   // minus anything blocked inside a lane. Memoized: this pane re-renders per
   // keystroke in the "what do you use it for" box, and the merge had no reason
   // to run again (perf audit 2026-07-30, finding 24).
+  const { lanes } = useConnectedCatalog(aiProviders);
   const available = useMemo(
-    () => flattenModels(mergedModels(local.data ?? [], aiProviders, [], blockedModels)),
-    [local.data, aiProviders, blockedModels],
+    () => flattenModels(mergedModels(local.data ?? [], aiProviders, [], blockedModels, undefined, lanes)),
+    [local.data, aiProviders, blockedModels, lanes],
   );
 
   const [draft, setDraft] = useState<HybridPreset | null>(null);
