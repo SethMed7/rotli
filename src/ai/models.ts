@@ -244,12 +244,26 @@ export function providerCatalog(
   lanes: DiscoveryLanes = currentDiscovery(),
 ): ChatModelInfo[] {
   const lane = lanes[provider];
-  if (lane?.status !== "ready" || lane.models.length === 0) return CLI_CATALOG[provider];
+  // Cursor also lists vendor models (gpt-5.5, gemini-3.8-flash-high): the
+  // vendor's own lane owns those ids, so a saved chat never changes lanes
+  const owned = provider === "cursor" ? idsOwnedElsewhere(provider, lanes) : new Set<string>();
+  const models = lane?.status === "ready" ? lane.models.filter((model) => !owned.has(model.id)) : [];
+  if (models.length === 0) return CLI_CATALOG[provider];
   const own =
-    lane.models.find((model) => model.isDefault)?.id ??
-    lane.models.find((model) => model.id === DEFAULT_PROVIDER_MODELS[provider])?.id ??
-    lane.models[0]!.id;
-  return lane.models.map((model) => discoveredInfo(provider, model, model.id === own));
+    models.find((model) => model.isDefault)?.id ??
+    models.find((model) => model.id === DEFAULT_PROVIDER_MODELS[provider])?.id ??
+    models[0]!.id;
+  return models.map((model) => discoveredInfo(provider, model, model.id === own));
+}
+
+function idsOwnedElsewhere(provider: ProviderId, lanes: DiscoveryLanes): Set<string> {
+  const others = PROVIDER_IDS.filter((other) => other !== provider);
+  return new Set(
+    others.flatMap((other) => [
+      ...CLI_CATALOG[other].map((model) => model.id),
+      ...(lanes[other]?.status === "ready" ? lanes[other].models.map((model) => model.id) : []),
+    ]),
+  );
 }
 
 /** The client-reported entry for a model, when discovery has one. */

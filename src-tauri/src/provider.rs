@@ -206,9 +206,9 @@ pub(crate) fn build_args_for(
     imgs: Option<&ImageFiles>,
     found: Option<&crate::provider_models::DiscoveredModel>,
 ) -> Result<(Vec<String>, PromptVia), String> {
-    use crate::provider_models::{effort_allowed, fast_tier_allowed, valid_model_id, CLAUDE_DEFAULT_ID};
+    use crate::provider_models::{effort_allowed, fast_tier_allowed, reportable_id, CLAUDE_DEFAULT_ID};
     let s = spec(provider)?;
-    let reported = found.is_some_and(|m| m.id == model) && valid_model_id(model);
+    let reported = found.is_some_and(|m| m.id == model) && reportable_id(provider, model);
     if !s.models.contains(&model) && !reported {
         return Err(format!("model \"{model}\" isn't in the {provider} allowlist"));
     }

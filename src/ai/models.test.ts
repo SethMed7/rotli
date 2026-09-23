@@ -294,6 +294,36 @@ describe("discovered models (each client's own list)", () => {
     expect(resolveLaneModel("codex", "opus", {})).toBeNull();
   });
 
+  test("a vendor model Cursor also lists stays on the vendor's own lane", () => {
+    const overlapping: DiscoveryLanes = {
+      ...answered,
+      cursor: {
+        status: "ready",
+        at: 0,
+        models: [
+          reported("cursor-auto", "Auto (default)", { isDefault: true, vision: false }),
+          reported("gemini-3.8-flash-high", "Gemini 3.8 Flash High", { vision: false }),
+          reported("gpt-5.5", "GPT-5.5", { vision: false }),
+          reported("gemini-3.6-flash-low", "Gemini 3.6 Flash Low", { vision: false }),
+        ],
+      },
+      antigravity: {
+        status: "ready",
+        at: 0,
+        models: [reported("gemini-3.6-flash-low", "Gemini 3.6 Flash (Low)", { isDefault: true })],
+      },
+    };
+    const list = flattenModels(mergedModels([], allOn, [], [], allOn, overlapping));
+    for (const id of ["gemini-3.8-flash-high", "gpt-5.5", "gemini-3.6-flash-low"]) {
+      expect(list.filter((m) => m.id === id).length).toBeLessThanOrEqual(1);
+      expect(list.find((m) => m.id === id)?.provider).not.toBe("cursor");
+    }
+    expect(findModel(list, "gpt-5.5")?.provider).toBe("codex");
+    expect(findModel(list, "gemini-3.6-flash-low")?.provider).toBe("antigravity");
+    expect(providerCatalog("cursor", overlapping).map((m) => m.id)).toEqual(["cursor-auto"]);
+    expect(resolveLaneModel("cursor", "gemini-3.8-flash-high", overlapping)).toBeNull();
+  });
+
   test("the id shape mirrors the Rust argv gate", () => {
     for (const ok of ["sonnet", "opus[1m]", "claude-fable-5-1[1m]", "gpt-5.6-sol", "cursor_auto"]) {
       expect(isModelIdShape(ok)).toBe(true);

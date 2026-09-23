@@ -275,6 +275,19 @@ fn claude_default_runs_without_a_model_flag_and_1m_ids_pass_verbatim() {
 }
 
 #[test]
+fn a_vendor_id_cursor_also_lists_stays_with_its_own_lane() {
+    // Cursor reports these too; they must never run through Cursor
+    for id in ["gemini-3.8-flash-high", "gpt-5.5", "sonnet"] {
+        let entry = reported(id, &[], false);
+        assert!(!reportable_id("cursor", id), "{id}");
+        assert!(build_args_for("cursor", id, None, None, None, Some(&entry)).is_err(), "{id}");
+    }
+    assert!(reportable_id("cursor", "composer-2.5"));
+    assert!(reportable_id("codex", "gpt-5.5"), "the owning lane keeps it");
+    assert!(!ensure_allowed("cursor", "gpt-5.5"));
+}
+
+#[test]
 fn static_effort_and_tier_rules_cover_the_built_in_ids() {
     assert!(effort_allowed("codex", "gpt-6-astra", "ultra", None));
     assert!(!effort_allowed("codex", "gpt-6-luna", "ultra", None));

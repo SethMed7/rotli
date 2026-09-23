@@ -72,6 +72,14 @@ pub(crate) fn valid_model_id(id: &str) -> bool {
         && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
 }
 
+/// May a client-reported id run on this lane: the strict shape, and not an id
+/// another lane owns. Cursor also lists vendor models (`gpt-5.5`,
+/// `gemini-3.8-flash-high`); those stay with the vendor's own lane, so a saved
+/// Codex or Antigravity chat can never be routed through Cursor.
+pub(crate) fn reportable_id(provider: &str, id: &str) -> bool {
+    valid_model_id(id) && !provider::CLIS.iter().any(|other| other.id != provider && other.models.contains(&id))
+}
+
 /// The reasoning-effort policy for one model: what the client reported for
 /// it, else the reviewed rules for the static ids. Never outside `EFFORTS`.
 pub(crate) fn effort_allowed(provider: &str, model: &str, effort: &str, found: Option<&DiscoveredModel>) -> bool {
@@ -485,7 +493,7 @@ pub(crate) fn ensure_allowed(provider: &str, id: &str) -> bool {
     if spec.models.contains(&id) {
         return true;
     }
-    if !valid_model_id(id) {
+    if !reportable_id(provider, id) {
         return false;
     }
     if lookup(provider, id).is_some() {
