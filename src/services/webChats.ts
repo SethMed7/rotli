@@ -6,7 +6,7 @@
 
 import type { VaultStore } from "../lib/browserVault";
 import { BrowserVault, RevisionConflict, browserVault } from "../lib/browserVault";
-import type { MemexChatSummary } from "../lib/tauri";
+import type { MemexChatSummary, MemexContractRaw } from "../lib/tauri";
 import type { WebMemexBridge } from "../lib/webAiSeam";
 import { type VaultDir, freeSiblingPath } from "./vaultDir";
 
@@ -253,8 +253,16 @@ export class FolderChatStore implements ChatStore {
   }
 }
 
-/** The memex commands the web answers itself; the rest stay in the Mac app. */
-export function webMemexBridge(store: ChatStore): WebMemexBridge {
+/** The vault's note writer on the web (FolderNotesService): what the Mac app's
+ * `memex_read_contract` and `memex_write_note` do in Rust. */
+export interface WebNoteWriter {
+  readMemexContract(): Promise<MemexContractRaw>;
+  writeMemexNote(stem: string, contents: string): Promise<string>;
+}
+
+/** The memex commands the web answers itself; the rest stay in the Mac app.
+ * Without a note writer (no vault connected) note creation is refused. */
+export function webMemexBridge(store: ChatStore, notes: WebNoteWriter | null = null): WebMemexBridge {
   const text = (value: unknown, fallback = ""): string => (typeof value === "string" ? value : fallback);
   return (cmd, args) => {
     const a = (args ?? {}) as Record<string, unknown>;
@@ -278,6 +286,12 @@ export function webMemexBridge(store: ChatStore): WebMemexBridge {
         return store.folders();
       case "memex_write_chat_folders":
         return store.writeFolders(text(a.contents), text(a.expectedRevision, "0"));
+      case "memex_read_contract":
+        return notes ? notes.readMemexContract() : Promise.reject(new Error(`${cmd}: no vault is connected`));
+      case "memex_write_note":
+        return notes
+          ? notes.writeMemexNote(text(a.stem), text(a.contents))
+          : Promise.reject(new Error(`${cmd}: no vault is connected`));
       default:
         return Promise.reject(new Error(`${cmd}: not available on the web`));
     }

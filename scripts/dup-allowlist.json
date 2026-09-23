@@ -141,6 +141,16 @@
       "reason": "The Chat window test asserts the hand-off protocol by its message names ('regroup', 'regrouped'). The literals ARE the contract between the two webviews (docs/architecture/window-events.md rotli:chat-window); a test that did not name them could not prove what the other window receives."
     },
     {
+      "id": "board-files-ts-twin",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/corpus.rs",
+        "src/services/folderBoards.ts",
+        "src/services/folderBoards.test.ts"
+      ],
+      "reason": "Deliberate TS twin of the Rust board rules: Rotli Web has no Rust, so services/folderBoards.ts must name, place, and collide boards exactly as corpus.rs board_name_stem / create_board_with_stem / free_name do (Project/Map → Project-Map, name-2.excalidraw, storage/excalidraw). The literals ARE the on-disk contract; the test mirrors the Rust cases so the two cannot drift silently. parity.json pins the empty scene and the lane."
+    },
+    {
       "id": "vault-scaffold-ts-twin",
       "signal": "literal",
       "files": [

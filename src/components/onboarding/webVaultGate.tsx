@@ -113,7 +113,10 @@ async function checkHelper(onProbe: (probe: HelperProbe) => void): Promise<void>
 export function WebVaultGate() {
   const connection = useVaultConnection((s) => s.connection);
   const link = useHelperLink((s) => s.link);
+  const offeredCode = useHelperLink((s) => s.offeredCode);
   const support = browserFolderSupportSync();
+  /** Paired in this tab: a success step, until the person presses Continue. */
+  const [paired, setPaired] = useState(false);
   const [probe, setProbe] = useState<HelperProbe | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -121,7 +124,8 @@ export function WebVaultGate() {
 
   // Rotli Helper: keep asking until it answers, pairs (the installer's tab may
   // pair while this one waits), and serves — then boot again, connected.
-  const waitingOnHelper = stage.kind === "helper" || stage.kind === "vault";
+  // Paused on the success step, so Continue — not a poll — moves on.
+  const waitingOnHelper = (stage.kind === "helper" || stage.kind === "vault") && !paired;
   useEffect(() => {
     if (!waitingOnHelper) return;
     let live = true;
@@ -197,7 +201,8 @@ export function WebVaultGate() {
 
   const primary = (): void => {
     if (busy) return;
-    if (stage.kind === "folder") chooseFolder();
+    if (paired) setPaired(false);
+    else if (stage.kind === "folder") chooseFolder();
     else if (stage.kind === "vault") {
       if (choice === "served" && served) pickServed(served);
       else chooseServed();
@@ -208,8 +213,9 @@ export function WebVaultGate() {
     return () => setSetupHandle(null);
   });
 
-  const action =
-    stage.kind === "folder"
+  const action = paired
+    ? "Continue"
+    : stage.kind === "folder"
       ? stage.pending !== null
         ? `Reconnect “${stage.pending}”`
         : "Choose vault…"
@@ -227,7 +233,7 @@ export function WebVaultGate() {
         <div className="setup-progress">
           <span>Rotli Web</span>
           <span aria-hidden="true">·</span>
-          <span>{stage.kind === "helper" ? "Helper" : "Vault"}</span>
+          <span>{paired || stage.kind === "helper" ? "Helper" : "Vault"}</span>
         </div>
 
         <div className="setup-stage">
@@ -241,9 +247,18 @@ export function WebVaultGate() {
 
           <div className="setup-content">
             <p className="setup-eyebrow">One folder is one vault</p>
-            <h1 id="web-vault-title">{HEADINGS[stage.kind]}</h1>
-            <StageBody stage={stage} support={support} />
-            {stage.kind === "vault" && served && (
+            <h1 id="web-vault-title">{paired ? "Rotli Helper is paired" : HEADINGS[stage.kind]}</h1>
+            {paired ? (
+              <PairedBody />
+            ) : (
+              <StageBody
+                stage={stage}
+                support={support}
+                offeredCode={offeredCode}
+                onPaired={() => setPaired(true)}
+              />
+            )}
+            {!paired && stage.kind === "vault" && served && (
               <SetupChoiceGroup
                 label="Vault"
                 value={vaultChoice}
@@ -277,7 +292,36 @@ export function WebVaultGate() {
   );
 }
 
-function StageBody({ stage, support }: { stage: SetupStage; support: FolderSupport }) {
+/** The step after a Pair press lands: what pairing did, and what it can't do. */
+function PairedBody() {
+  return (
+    <>
+      <p className="setup-lede" role="status">
+        This browser and Rotli Helper on this computer are connected. Next, choose the folder that holds your
+        notes.
+      </p>
+      <div className="web-vault-gate-lines">
+        <p>
+          Rotli Helper reads and writes files in that folder directly on this computer, so every change is
+          saved the moment you make it. The page talks to the helper at 127.0.0.1 only, never to the internet,
+          and the helper never touches anything outside the folder you choose.
+        </p>
+      </div>
+    </>
+  );
+}
+
+function StageBody({
+  stage,
+  support,
+  offeredCode,
+  onPaired,
+}: {
+  stage: SetupStage;
+  support: FolderSupport;
+  offeredCode: string | null;
+  onPaired: () => void;
+}) {
   if (stage.kind === "unsupported") {
     return (
       <p className="setup-lede">
@@ -315,21 +359,25 @@ function StageBody({ stage, support }: { stage: SetupStage; support: FolderSuppo
       </p>
     );
   }
-  return <HelperStep stage={stage} support={support} />;
+  return <HelperStep stage={stage} support={support} offeredCode={offeredCode} onPaired={onPaired} />;
 }
 
 function HelperStep({
   stage,
   support,
+  offeredCode,
+  onPaired,
 }: {
   stage: Extract<SetupStage, { kind: "helper" }>;
   support: FolderSupport;
+  offeredCode: string | null;
+  onPaired: () => void;
 }) {
   const install = helperInstall(guideOs(navigator.platform || navigator.userAgent));
   const browser = support.kind === "import-only" ? support.browser : "This browser";
   const lede =
     stage.problem === "offline"
-      ? `Rotli Helper isn’t answering${stage.vault ? `, so “${stage.vault}” can’t open` : ""}. It starts when you log in; to start it now, run it once.`
+      ? `Rotli Helper isn’t answering${stage.vault ? `, so “${stage.vault}” can’t open` : ""}. It starts when you log in; to start it now, run it once. If your browser asked whether this page may connect to apps on this device, choose Allow.`
       : stage.problem === "refused"
         ? "Rotli Helper has a new pairing code (it was reinstalled). Paste the new code below."
         : stage.problem === "outdated"
@@ -353,9 +401,17 @@ function HelperStep({
         </GuideStep>
         <GuideStep n={2} done={false} title="Pair this browser">
           <span className="guide-step-detail">
-            The installer opens Rotli in a new tab and pairs it for you. This page moves on by itself.
+            {offeredCode
+              ? "The installer filled in this browser’s pairing code. Press Pair."
+              : "The installer opens Rotli in a new tab with the pairing code filled in. Press Pair there."}
           </span>
-          <PairingCodeForm id="web-helper-code" label="Or paste the pairing code the installer printed:" />
+          <PairingCodeForm
+            key={offeredCode ?? ""}
+            id="web-helper-code"
+            label={offeredCode ? "Pairing code:" : "Or paste the pairing code the installer printed:"}
+            initialCode={offeredCode ?? ""}
+            onPaired={onPaired}
+          />
         </GuideStep>
       </ol>
       {support.kind === "brave-off" && (

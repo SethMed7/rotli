@@ -5,7 +5,9 @@
 // the same folder behaves the same in both shells.
 //
 // Markdown files are the truth. Nothing is stored beside them: ids, shelves,
-// and lifecycle all live in the note's own frontmatter.
+// and lifecycle all live in the note's own frontmatter. Boards (`.excalidraw`)
+// are listed and moved here the way the Mac corpus lists them — id = path, no
+// frontmatter, never read to be indexed; their scene I/O is folderBoards.ts.
 
 import { extOf, fileName, fileNameStem, userFileName } from "../lib/fileKind";
 import {
@@ -16,14 +18,23 @@ import {
   withShelf,
   isSecureFrontmatter,
 } from "../lib/frontmatter";
+import type { MemexContractRaw } from "../lib/tauri";
 import { composeNote, noteSlugify, noteStem, today, ulid } from "../memex/contract";
 import type { NoteCreationPolicy } from "../security/secureNotes";
 import type { Folder, Note, NoteSummary, SearchHit } from "../types";
 import { snippetOf, summaryOrder, titleOf } from "./derive";
 import { DEST, isChats, isHidden, isRootMarker, isSink, isTrash, isVault } from "./destinations";
+import { BOARD_LANE, boardTitle, isBoardPath } from "./folderBoards";
+import {
+  assertSafeStem,
+  ignoreInGit,
+  isSecureNote,
+  memexNoteFolder,
+  readMemexContract,
+} from "./folderMemexNotes";
 import type { NotesService } from "./notesPort";
 import { searchMatch, sortHits } from "./search";
-import { type VaultDir, baseName, joinVaultPath, parentPath } from "./vaultDir";
+import { type VaultDir, baseName, freeVaultPath, joinVaultPath, parentPath, vaultIsMemex } from "./vaultDir";
 
 /** Disk roots that hold notes in a memex vault. Everything else — `.rotli/`,
  * dotfiles, `chats/` transcripts, and the `identity/ personality/ history/`
@@ -128,15 +139,23 @@ export class FolderNotesService implements NotesService {
   }
 
   private async rebuildIndex(): Promise<Map<string, string>> {
-    this.isMemex = await this.dir.exists(WIKI);
+    this.isMemex = await vaultIsMemex(this.dir);
     const paths: string[] = [];
     if (this.isMemex) {
       for (const root of MEMEX_NOTE_ROOTS) await this.collect(root, paths);
+      // the board lane lists boards only; the rest of storage/ stays out
+      const lane: string[] = [];
+      await this.collect(BOARD_LANE, lane);
+      paths.push(...lane.filter(isBoardPath));
     } else {
       await this.collect("", paths, true);
     }
     const index = new Map<string, string>();
     for (const path of paths) {
+      if (isBoardPath(path)) {
+        index.set(path, path);
+        continue;
+      }
       const fm = parseNoteDocument(await this.readFile(path)).frontmatter;
       index.set(fm?.id || path, path);
     }
@@ -151,7 +170,7 @@ export class FolderNotesService implements NotesService {
       if (entry.kind === "directory") {
         if (isRoot && SKIPPED_ROOTS.has(entry.name)) continue;
         await this.collect(child, out);
-      } else if (entry.name.toLowerCase().endsWith(".md")) out.push(child);
+      } else if (entry.name.toLowerCase().endsWith(".md") || isBoardPath(entry.name)) out.push(child);
     }
   }
 
@@ -173,6 +192,7 @@ export class FolderNotesService implements NotesService {
   }
 
   private async noteAt(path: string): Promise<Note> {
+    if (isBoardPath(path)) return this.boardAt(path);
     const text = await this.readFile(path);
     const stat = await this.dir.stat(path);
     if (!stat) throw new Error(`unknown note: ${path}`);
@@ -195,6 +215,30 @@ export class FolderNotesService implements NotesService {
       kind: "note",
       secure: frontmatter ? isSecureFrontmatter(frontmatter) : false,
       body,
+      revision: `${stat.lastModified}:${stat.size}`,
+    };
+  }
+
+  /** A board's row. The scene is never read to list it (Rust lists boards by
+   * stat alone), so `body` is empty — board content goes through folderBoards. */
+  private async boardAt(path: string): Promise<Note> {
+    const stat = await this.dir.stat(path);
+    if (!stat) throw new Error(`unknown board: ${path}`);
+    const diskFolderId = parentPath(path);
+    return {
+      id: path,
+      title: boardTitle(path),
+      snippet: "",
+      bodyEmpty: false,
+      aliases: [],
+      folderId: projectVaultFolder(diskFolderId, null, this.isMemex),
+      diskFolderId,
+      createdAt: stat.lastModified,
+      updatedAt: stat.lastModified,
+      pinned: false,
+      kind: "board",
+      secure: false,
+      body: "",
       revision: `${stat.lastModified}:${stat.size}`,
     };
   }
@@ -333,7 +377,7 @@ export class FolderNotesService implements NotesService {
         title: note.title,
         snippet: match.snippet,
         folderId: note.folderId,
-        kind: "note",
+        kind: note.kind ?? "note",
         rank: match.rank,
         matchStart: match.matchStart,
         matchLen: match.matchLen,
@@ -348,7 +392,8 @@ export class FolderNotesService implements NotesService {
     if (!id) return null;
     const index = await this.ensureIndex();
     const path = index.get(id);
-    if (!path || !(await this.dir.exists(path))) return null;
+    // a board is not a note: its scene is read through folderBoards
+    if (!path || isBoardPath(path) || !(await this.dir.exists(path))) return null;
     return this.noteAt(path);
   }
 
@@ -373,22 +418,36 @@ export class FolderNotesService implements NotesService {
     return this.noteAt(path);
   }
 
+  // ─── the memex writer: Rotli Web's `memex_read_contract` / `memex_write_note` ─
+
+  readMemexContract(): Promise<MemexContractRaw> {
+    return readMemexContract(this.dir);
+  }
+
+  /** Rust `write_note_at` (rules in folderMemexNotes.ts): a note composed by
+   * `writeNote` lands under a free `stem (n).md` name; returns its path. */
+  async writeMemexNote(stem: string, contents: string): Promise<string> {
+    assertSafeStem(stem);
+    await this.ensureIndex();
+    const path = await this.freePath(await memexNoteFolder(this.dir, contents, this.isMemex), `${stem}.md`);
+    if (isSecureNote(contents)) await ignoreInGit(this.dir, path);
+    await this.writeFile(path, contents);
+    const id = parseNoteDocument(contents).frontmatter?.id || path;
+    this.reindex(id, id, path);
+    return path;
+  }
+
   /** `name.md`, then `name (2).md`, `name (3).md`, … — existing numbers are
    * never renumbered, matching the Rust staging filename rule. The one place
    * a filename is chosen, so neither creation nor a lifecycle move can land on
    * a sibling that is already there. */
-  private async freePath(dir: string, name: string): Promise<string> {
-    const dot = name.lastIndexOf(".");
-    const stem = dot > 0 ? name.slice(0, dot) : name;
-    const ext = dot > 0 ? name.slice(dot) : "";
-    for (let n = 1; ; n += 1) {
-      const path = joinVaultPath(dir, n === 1 ? `${stem}${ext}` : `${stem} (${n})${ext}`);
-      if (!(await this.dir.exists(path))) return path;
-    }
+  private freePath(dir: string, name: string): Promise<string> {
+    return freeVaultPath(this.dir, dir, name, (stem, ext, n) => `${stem} (${n})${ext}`);
   }
 
   async updateNote(id: string, body: string, expectedRevision: string, expectedBody?: string): Promise<Note> {
     const path = await this.pathOf(id);
+    if (isBoardPath(path)) throw new Error(`not a note: ${id}`);
     const current = await this.noteAt(path);
     if (!expectedRevision || (expectedRevision !== current.revision && expectedBody !== current.body)) {
       throw new Error(
@@ -422,6 +481,7 @@ export class FolderNotesService implements NotesService {
    * is. Only `updateNote` stamps `updated` — a move never does. */
   async moveNote(id: string, targetFolder: string): Promise<Note> {
     const path = await this.pathOf(id);
+    if (isBoardPath(path)) return this.moveFile(id, path, this.targetPath(path, targetFolder));
     const current = await this.noteAt(path);
     const { frontmatter, body } = parseNoteDocument(await this.readFile(path));
     if (!frontmatter) return this.moveFile(id, path, this.targetPath(path, targetFolder));
@@ -491,7 +551,9 @@ export class FolderNotesService implements NotesService {
   }
 
   private async clearOrigin(id: string, path: string): Promise<Note> {
-    const { frontmatter, body } = parseNoteDocument(await this.readFile(path));
+    const { frontmatter, body } = isBoardPath(path)
+      ? { frontmatter: null, body: "" }
+      : parseNoteDocument(await this.readFile(path));
     if (frontmatter && frontmatter.origin !== null) {
       await this.writeFile(path, composeNoteDocument({ ...frontmatter, origin: null }, body));
     }

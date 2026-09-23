@@ -2,12 +2,15 @@
 // the same way EditorSurface is for a note. The board is a real *.excalidraw
 // file in the corpus (id === its corpus-relative path); the file is the source
 // of truth. On mount we read its raw JSON, parse it into a scene, and save back
-// (debounced) on every change. Outside the Tauri shell the corpus doesn't exist,
-// so we render a themed placeholder instead. Kit tokens only (styles/canvas.css).
+// (debounced) on every change — through the Mac corpus, or Rotli Web's
+// connected vault folder. With no vault at all (the plain-browser twin) we
+// render a themed placeholder instead. Kit tokens only (styles/canvas.css).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  boardsAvailable,
+  canRevealBoards,
   createCorpusBoardSaver,
   loadBoard,
   replaceCorruptBoardWithEmptyScene,
@@ -22,7 +25,6 @@ import {
 } from "../boards/engine/excalidraw";
 import { type BoardMeta, EMPTY_BOARD_META, serializeBoardScene } from "../boards/session";
 import { onQuitFlush } from "../lib/quitFlush";
-import { isTauri } from "../lib/tauri";
 import { keepTabsFor } from "../state/panes";
 import { useIsDarkTheme } from "../state/theme";
 
@@ -88,7 +90,7 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
 
   // load the board once per boardId
   useEffect(() => {
-    if (!isTauri()) return;
+    if (!boardsAvailable()) return;
     let cancelled = false;
     setState({ status: "loading", initialData: null });
     setRepairConfirm(false);
@@ -186,7 +188,7 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
       metaRef.current = next;
       setMeta(next);
       const api = apiRef.current;
-      if (!api || !isTauri()) return;
+      if (!api || !boardsAvailable()) return;
       try {
         const body = serializeBoardScene({
           ...(sourceSceneRef.current ? { sourceScene: sourceSceneRef.current } : {}),
@@ -203,7 +205,7 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
     [saver],
   );
 
-  if (!isTauri()) {
+  if (!boardsAvailable()) {
     return (
       <div className="canvas-surface canvas-placeholder">
         <div className="canvas-placeholder-card">
@@ -230,22 +232,28 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
         <div className="canvas-placeholder-card">
           <strong>Couldn’t open this board</strong>
           <span>{state.error}</span>
-          <span>The source file is preserved. You can reveal it for recovery or explicitly replace it.</span>
+          <span>
+            {canRevealBoards()
+              ? "The source file is preserved. You can reveal it for recovery or explicitly replace it."
+              : "The source file is preserved. You can try again or explicitly replace it."}
+          </span>
           <div className="canvas-recovery-actions">
-            <button
-              type="button"
-              onClick={() =>
-                void revealBoardSource(boardId).catch((error: unknown) => {
-                  setState({
-                    status: "error",
-                    initialData: null,
-                    error: error instanceof Error ? error.message : String(error),
-                  });
-                })
-              }
-            >
-              Reveal original
-            </button>
+            {canRevealBoards() && (
+              <button
+                type="button"
+                onClick={() =>
+                  void revealBoardSource(boardId).catch((error: unknown) => {
+                    setState({
+                      status: "error",
+                      initialData: null,
+                      error: error instanceof Error ? error.message : String(error),
+                    });
+                  })
+                }
+              >
+                Reveal original
+              </button>
+            )}
             <button type="button" onClick={() => setLoadVersion((version) => version + 1)}>
               Try again
             </button>

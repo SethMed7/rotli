@@ -66,6 +66,26 @@ not a silent switch. An empty folder becomes a vault (the Rust spine,
 `wiki/Welcome/`; an existing vault — including a plain folder of Markdown —
 opens as it is.
 
+## Boards are files in the vault here too
+
+A board is the same raw `.excalidraw` file the Mac app writes, id = its
+vault-relative path. `services/boardStore.ts` is the one seam every board
+surface uses: the Rust corpus inside the Mac app, `services/folderBoards.ts`
+over the connected `VaultDir` on the web, and nothing (a "connect a vault"
+placeholder) in a plain browser. `folderBoards.ts` is the TypeScript twin of
+the Rust board rules — a memex board is born in the folder you were in only if
+that is a writable note surface (`wiki/`, `chats/`, the lane itself), else in
+`storage/excalidraw`; a plain vault's reserved rows mean its root; names
+collide as `name-2.excalidraw`; the empty scene is byte-identical
+(`parity.json` pins `emptyBoardScene` and `boardLane`). Saves are
+revision-gated like notes (`${lastModified}:${size}`, then the helper's own
+gate). `FolderNotesService` lists boards by stat alone (they never join the
+note index as notes) and moves them through Archive/Trash like the Mac corpus.
+Excalidraw's fonts load from the build's own base (`/app/fonts`), never a CDN.
+Not on the web: Reveal in Finder (hidden). DOCX documents stay desktop-only —
+`launchFeatures(…, "web").documents` is false, so the chooser shows Document as
+coming soon and every create path refuses it.
+
 ## Rotli Helper's vault lane
 
 `rotli-helper` (a second bin of the crate) serves ONE folder:
@@ -129,13 +149,23 @@ opens as it is.
 - **The helper starts at login.** The installers register a LaunchAgent
   (`co.rotli.helper`), a systemd user service, or a Windows Startup shortcut,
   and `--uninstall` / `-Uninstall` removes it (`site/public/helper/`).
-- **Pairing is automatic.** `install.sh … --open <Rotli Web>` (only
+- **Pairing is one press.** `install.sh … --open <Rotli Web>` (only
   `https://rotli.co/app/`, `https://dev.rotli.co/app/`, or the dev server's
   `http://localhost:1437/app/` — the helper's own origins) opens the page
   with `#pair=<port>:<token>`; a fragment never reaches a server, and the page
   strips it before anything else (`services/helperLink.ts`
-  `adoptPairingFromUrl`). A setup tab still waiting picks the pairing up from
-  the device store. `--open` accepts only Rotli's own addresses.
+  `adoptPairingFromUrl`). Setup shows the code filled in; the person presses
+  **Pair**, sees "Rotli Helper is paired" (what the helper can and can't
+  reach), and presses **Continue** to choose the vault. A tab whose vault
+  opens without setup pairs with the offered code in place and says so. A
+  setup tab still waiting picks the pairing up from the device store.
+  `--open` accepts only Rotli's own addresses.
+- **The browser may ask first.** Firefox and Zen ask before a page's first
+  request to `127.0.0.1` ("allow this site to connect to apps on this
+  device", the `loopback-network` permission); Chromium has its own
+  local-network prompt. Background probes give up after 2.5 s, but a Pair
+  press waits up to two minutes and says what to look for, so the question
+  can be answered instead of reading as "nothing answered".
 - **An outage mid-session** holds every write pending — the save dot stays
   dim — behind a "Reconnecting to <vault>…" cover, and replays in order when
   the helper answers; a retried write carries the revision it started from.

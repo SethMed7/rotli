@@ -31,6 +31,23 @@ export async function rememberOpfsVault(page: Page): Promise<void> {
   });
 }
 
+/** The file names directly inside a folder of the connected OPFS vault
+ * ([] when the folder doesn't exist). */
+export function listOpfsFiles(page: Page, folder: string): Promise<string[]> {
+  return page.evaluate(async (target) => {
+    try {
+      let dir = await navigator.storage.getDirectory();
+      for (const part of target.split("/")) dir = await dir.getDirectoryHandle(part);
+      const names: string[] = [];
+      for await (const [name, handle] of dir as unknown as AsyncIterable<[string, FileSystemHandle]>)
+        if (handle.kind === "file") names.push(name);
+      return names.sort();
+    } catch {
+      return [];
+    }
+  }, folder);
+}
+
 /** Read a file from the connected OPFS vault ("" when it doesn't exist). */
 export function readOpfsFile(page: Page, path: string): Promise<string> {
   return page.evaluate(async (target) => {

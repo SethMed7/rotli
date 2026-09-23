@@ -83,6 +83,30 @@ export async function freeSiblingPath(
   }
 }
 
+/** A folder holding `wiki/` is a memex vault (Rust `Layout::Memex`); any other
+ * folder is a plain vault of Markdown. */
+export function vaultIsMemex(dir: Pick<VaultDir, "exists">): Promise<boolean> {
+  return dir.exists("wiki");
+}
+
+/** The first free path for `desired` inside `folder` — the Rust `free_name_with`
+ * twin. The desired name is tried first; after that `collide(stem, ext, n)`
+ * names candidates from n = 2 up. Existing numbers are never renumbered. Notes
+ * collide as "name (2).md", boards as "name-2.excalidraw" (Rust `free_name`). */
+export async function freeVaultPath(
+  dir: Pick<VaultDir, "exists">,
+  folder: string,
+  desired: string,
+  collide: (stem: string, ext: string, n: number) => string,
+): Promise<string> {
+  const dot = desired.lastIndexOf(".");
+  const [stem, ext] = dot > 0 ? [desired.slice(0, dot), desired.slice(dot)] : [desired, ""];
+  for (let n = 1; ; n += 1) {
+    const path = joinVaultPath(folder, n === 1 ? desired : collide(stem, ext, n));
+    if (!(await dir.exists(path))) return path;
+  }
+}
+
 /** The nth labelled sibling of a file: "a.md" → "a (label).md" (n = 1),
  * "a (label 2).md", …. Pure. */
 export function siblingPath(path: string, label: string, n: number): string {

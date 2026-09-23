@@ -58,8 +58,19 @@ function PairHelper() {
 
 /** Paste the code Rotli Helper printed; proven with one call before it is
  * kept. Shared by chat setup and vault setup. */
-export function PairingCodeForm({ id, label }: { id: string; label: string }) {
-  const [code, setCode] = useState("");
+export function PairingCodeForm({
+  id,
+  label,
+  initialCode = "",
+  onPaired,
+}: {
+  id: string;
+  label: string;
+  /** A code the installer handed this tab (`#pair=`): shown filled in. */
+  initialCode?: string;
+  onPaired?: () => void;
+}) {
+  const [code, setCode] = useState(initialCode);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pair = async () => {
@@ -68,6 +79,7 @@ export function PairingCodeForm({ id, label }: { id: string; label: string }) {
     try {
       await pairHelper(code);
       setCode("");
+      onPaired?.();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
@@ -100,6 +112,11 @@ export function PairingCodeForm({ id, label }: { id: string; label: string }) {
           {busy ? "Pairing…" : "Pair"}
         </button>
       </span>
+      {busy && (
+        <span className="guide-step-detail" role="status">
+          If your browser asks whether this page may connect to apps on this device, choose Allow.
+        </span>
+      )}
       {error && (
         <span role="alert" className="guide-step-detail guide-pair-error">
           {error}

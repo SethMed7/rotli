@@ -12,6 +12,7 @@
 import type { EditorState } from "@codemirror/state";
 import { EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 
+import { type BlockMoveTarget, planBlockMove } from "./blockMove";
 import { CHECK_EM } from "./listGeometry";
 
 /** A block = [firstLineNumber, lastLineNumber] (1-based), the maximal run of
@@ -113,28 +114,30 @@ export function deleteBlock(view: EditorView, pos: number): void {
   view.focus();
 }
 
-/** Reorder: move the source block to just before the block at `toPos`. */
-function reorder(view: EditorView, fromPos: number, toPos: number): void {
-  const { state } = view;
-  const src = blockAtLine(state, state.doc.lineAt(fromPos).number);
-  const dst = blockAtLine(state, state.doc.lineAt(toPos).number);
-  if (!src || !dst || src.fromLine === dst.fromLine) return;
-  const text = blockText(state, src);
-  // remove the source block (+ its following blank line) then insert before dst
-  let cutFrom = src.from;
-  let cutTo = src.to;
-  if (cutTo < state.doc.length) cutTo = Math.min(state.doc.length, cutTo + 1);
-  // dst offset must account for the cut if the source was earlier in the doc
-  const insertAt = dst.from;
-  const adjustedInsert = insertAt > cutFrom ? insertAt - (cutTo - cutFrom) : insertAt;
+/** Reorder: move the source block to the target (blockMove.ts plans the text). */
+function reorder(view: EditorView, fromPos: number, target: BlockMoveTarget): void {
+  const plan = planBlockMove(view.state.doc.toString(), fromPos, target);
+  if (!plan) return;
   view.dispatch({
-    changes: [
-      { from: cutFrom, to: cutTo, insert: "" },
-      { from: adjustedInsert, insert: `${text}\n\n` },
-    ],
+    changes: { from: plan.from, to: plan.to, insert: plan.insert },
+    selection: { anchor: plan.movedAt },
     userEvent: "move.block",
   });
   view.focus();
+}
+
+/** Where a block dragged over document offset `pos` would go: before the
+ * hovered block; from a blank line, before the next block down; below the
+ * last block, to the end of the note. */
+function dropTargetAt(state: EditorState, pos: number): BlockMoveTarget {
+  const lineNo = state.doc.lineAt(pos).number;
+  const hovered = blockAtLine(state, lineNo);
+  if (hovered) return { before: hovered.from };
+  for (let n = lineNo + 1; n <= state.doc.lines; n++) {
+    const below = blockAtLine(state, n);
+    if (below) return { before: below.from };
+  }
+  return "end";
 }
 
 /** Callback the gutter handle calls on a plain click (opens the React menu). */
@@ -143,13 +146,15 @@ export type BlockMenuOpener = (view: EditorView, blockPos: number, anchor: DOMRe
 // A single shared drop-line element (position:fixed so it ignores scroll/ancestor
 // math). Shown at the top of the target block while a block is dragged.
 let dropLine: HTMLDivElement | null = null;
-function showDropLine(view: EditorView, targetFrom: number) {
+function showDropLine(view: EditorView, target: BlockMoveTarget) {
   if (!dropLine) {
     dropLine = document.createElement("div");
     dropLine.className = "cm-block-dropline";
     document.body.appendChild(dropLine);
   }
-  const coords = view.coordsAtPos(targetFrom);
+  // the end of the note: just under the last block's last line
+  const last = target === "end" ? lastBlockEnd(view.state) : null;
+  const coords = view.coordsAtPos(target === "end" ? (last ?? view.state.doc.length) : target.before);
   const rect = view.scrollDOM.getBoundingClientRect();
   if (!coords) {
     dropLine.style.display = "none";
@@ -158,7 +163,14 @@ function showDropLine(view: EditorView, targetFrom: number) {
   dropLine.style.display = "block";
   dropLine.style.left = `${rect.left + 8}px`;
   dropLine.style.width = `${rect.width - 16}px`;
-  dropLine.style.top = `${coords.top - 1}px`;
+  dropLine.style.top = `${(target === "end" ? coords.bottom + 4 : coords.top) - 1}px`;
+}
+function lastBlockEnd(state: EditorState): number | null {
+  for (let n = state.doc.lines; n >= 1; n--) {
+    const block = blockAtLine(state, n);
+    if (block) return block.to;
+  }
+  return null;
 }
 function hideDropLine() {
   if (dropLine) dropLine.style.display = "none";
@@ -236,18 +248,20 @@ class HandleView {
       const srcPos = this.blockFrom;
       const startX = e.clientX;
       const startY = e.clientY;
-      let targetFrom: number | null = null;
+      let target: BlockMoveTarget | null = null;
       const onMove = (ev: MouseEvent) => {
         if (!this.dragging && Math.abs(ev.clientY - startY) + Math.abs(ev.clientX - startX) > 4) {
           this.dragging = true;
           view.dom.classList.add("cm-block-dragging");
         }
         if (!this.dragging) return;
+        // past the text, posAtCoords answers null: below the note is its end
         const p = view.posAtCoords({ x: ev.clientX, y: ev.clientY });
-        const b = p == null ? null : blockAtLine(view.state, view.state.doc.lineAt(p).number);
-        if (b) {
-          targetFrom = b.from;
-          showDropLine(view, b.from);
+        const below = p == null && ev.clientY > view.contentDOM.getBoundingClientRect().bottom;
+        const next = p == null ? (below ? "end" : null) : dropTargetAt(view.state, p);
+        if (next) {
+          target = next;
+          showDropLine(view, next);
         }
       };
       const onUp = (ev: MouseEvent) => {
@@ -258,8 +272,9 @@ class HandleView {
         const dragged = this.dragging;
         this.dragging = false;
         if (dragged) {
-          const p = targetFrom ?? view.posAtCoords({ x: ev.clientX, y: ev.clientY });
-          if (p != null) reorder(view, srcPos, p);
+          const p = target ? null : view.posAtCoords({ x: ev.clientX, y: ev.clientY });
+          const drop = target ?? (p == null ? null : dropTargetAt(view.state, p));
+          if (drop) reorder(view, srcPos, drop);
         } else {
           // no move → a click: open the actions menu at the grip
           this.openMenu(view, srcPos, grip.getBoundingClientRect());

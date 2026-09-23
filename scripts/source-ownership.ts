@@ -111,6 +111,8 @@ export const LIB_EFFECTFUL_FILE_OWNERS = {
  * one capability is physically clustered later, this registry moves with it. */
 export const SERVICE_FILE_OWNERS = {
   "boardRename.ts": "boards",
+  "boardStore.ts": "boards",
+  "folderBoards.ts": "boards",
   "brainFiling.ts": "librarian",
   "brainJournal.ts": "librarian",
   "brainJournalComposition.ts": "librarian",
@@ -137,6 +139,7 @@ export const SERVICE_FILE_OWNERS = {
   "externalCorpusChange.ts": "vault lifecycle",
   "folderTrash.ts": "vault lifecycle",
   "fsNotes.ts": "notes adapter",
+  "folderMemexNotes.ts": "notes",
   "folderNotes.ts": "notes",
   "vaultDir.ts": "notes",
   "antigravity.ts": "connected-provider lane management (Antigravity runtime + sign-in)",

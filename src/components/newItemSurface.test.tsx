@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { NewItemSurface, newItemCards } from "./newItemSurface";
 
 test("withheld kinds keep their slot but lose their digit, in both channels", () => {
-  const stable = newItemCards({ sheets: false, mermaidDiagrams: false });
+  const stable = newItemCards({ documents: true, sheets: false, mermaidDiagrams: false });
   expect(stable.map((card) => [card.digit, card.kind, card.comingSoon])).toEqual([
     ["3", "markdown", false],
     ["4", "document", false],
@@ -13,7 +13,12 @@ test("withheld kinds keep their slot but lose their digit, in both channels", ()
     ["6", "board", false],
     ["7", "mermaid", true],
   ]);
-  expect(newItemCards({ sheets: true, mermaidDiagrams: true }).some((card) => card.comingSoon)).toBe(false);
+  expect(
+    newItemCards({ documents: true, sheets: true, mermaidDiagrams: true }).some((card) => card.comingSoon),
+  ).toBe(false);
+  const web = newItemCards({ documents: false, sheets: false, mermaidDiagrams: false });
+  expect(web.find((card) => card.kind === "document")).toMatchObject({ digit: "4", comingSoon: true });
+  expect(web.find((card) => card.kind === "board")).toMatchObject({ digit: "6", comingSoon: false });
 });
 
 test("the stable chooser renders Sheet and Mermaid diagram as disabled coming-soon cards", () => {
