@@ -59,6 +59,34 @@ test("a bound helper vault that can't open names the vault and the fix, never an
   ).toEqual({ kind: "vault", served, expected: "memex" });
 });
 
+test("setup follows the helper's latest answer, not boot's (a first request the browser held)", () => {
+  // boot saw nothing (Zen held the request behind its Allow question)…
+  const boot: VaultConnection = { status: "helper-offline", name: null };
+  expect(setupStage(boot, zen, true, null)).toMatchObject({ kind: "helper", problem: "offline" });
+  // …then Allow, Pair, and setup's own look finds it serving no vault yet
+  expect(setupStage(boot, zen, true, { kind: "serving", info: null })).toEqual({
+    kind: "vault",
+    served: null,
+    expected: null,
+  });
+  // a bound vault keeps its name through whatever the helper says next
+  const bound: VaultConnection = { status: "helper-offline", name: "memex" };
+  expect(setupStage(bound, zen, true, { kind: "outdated" })).toEqual({
+    kind: "helper",
+    problem: "outdated",
+    vault: "memex",
+  });
+  const other = { name: "other", id: "hv_2", empty: false };
+  expect(setupStage(bound, zen, true, { kind: "serving", info: other })).toEqual({
+    kind: "vault",
+    served: other,
+    expected: "memex",
+  });
+  expect(setupStage({ status: "helper-outdated", name: null }, zen, true, { kind: "offline" })).toMatchObject(
+    { problem: "offline" },
+  );
+});
+
 test("Safari and phones are told plainly, with the way forward", () => {
   expect(setupStage({ status: "unsupported", browser: "Safari" }, zen, false, null)).toEqual({
     kind: "unsupported",

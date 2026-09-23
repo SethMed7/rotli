@@ -58,6 +58,23 @@ export function setupStage(
   linked: boolean,
   probe: HelperProbe | null,
 ): SetupStage {
+  // Boot's answer about the helper is a snapshot: once setup has asked again
+  // (paired, then probed), the live answer decides. A first request the
+  // browser held behind its "connect to apps on this device?" question reads
+  // as offline at boot and must not pin setup there after Allow (2026-09-23).
+  const bootHelper =
+    connection.status === "helper-offline" ||
+    connection.status === "helper-refused" ||
+    connection.status === "helper-outdated" ||
+    connection.status === "helper-no-vault";
+  if (bootHelper && linked && probe) {
+    const vault = "name" in connection ? connection.name : null;
+    // serving the bound vault reloads into it (checkHelper); anything else
+    // it serves is another folder, named against the bound one
+    if (probe.kind === "serving")
+      return { kind: "vault", served: probe.info, expected: vault && probe.info ? vault : null };
+    return { kind: "helper", problem: probe.kind, vault };
+  }
   switch (connection.status) {
     case "unsupported":
       return { kind: "unsupported", browser: connection.browser };

@@ -55,6 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pairing waits while the browser asks.** Zen and Firefox ask before a page
   may connect to apps on your computer; pairing gave up before you could
   answer and said nothing was running. It now waits, and says to choose Allow.
+  Setup also follows the helper's latest answer, so after Allow it moves on
+  to choosing your vault instead of still saying the helper isn't answering.
 - **Connecting a vault on Rotli Web no longer bounces you back.** In Zen,
   Firefox, and Safari an empty folder looked exactly like a cancelled picker
   and nothing happened.
