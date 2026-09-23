@@ -51,6 +51,19 @@ function otherModifierDown(modifier: HeldModifier, event: KeyboardEvent): boolea
   );
 }
 
+/** Whether a non-target keydown ends the hold until the target modifier is let
+ * go: only while the target is down, i.e. a chord in progress (⌘N) — so it
+ * cannot re-arm while ⌘ is still held after the chord. A plain keystroke with
+ * the modifier up (typing a note) cancels nothing; the next hold still peeks
+ * (2026-09-23: after typing, holding ⌘ showed nothing until ⌘ was tapped once).
+ * Pure for tests. */
+export function keyCancelsHold(
+  modifier: HeldModifier,
+  event: Pick<KeyboardEvent, "getModifierState">,
+): boolean {
+  return event.getModifierState(modifier);
+}
+
 export function useHeldModifier(opts: HeldModifierOptions): void {
   // keep the latest callbacks/values without re-attaching listeners every render
   const ref = useRef(opts);
@@ -109,7 +122,7 @@ export function useHeldModifier(opts: HeldModifierOptions): void {
       // ANY other keydown (a real key OR a different modifier) while arming or
       // held → the hold is over; if a chord just fired, dismiss the overlay.
       clearTimer();
-      cancelledUntilKeyup = true;
+      if (keyCancelsHold(ref.current.modifier, event)) cancelledUntilKeyup = true;
       if (held) {
         held = false;
         ref.current.onRelease();

@@ -10,6 +10,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-09-23
+
+### Fixed
+
+- **Your vault can stay open in Obsidian and ZenNotes too.** ZenNotes moves
+  files it does not recognize at a folder's top level into `assets/`, and it
+  took the file that marks the folder as a Rotli vault. Rotli then opened your
+  vault as a plain folder, added empty Board, Inbox, Vault, and Secure notes
+  folders to it, and refused to connect it. Rotli now moves those files back
+  when it opens the vault, keeps a hidden backup of the marker, and adds an
+  empty `.obsidian` folder, which ZenNotes treats as another app's vault and
+  leaves alone.
+- **Connect vault takes any folder.** An Obsidian or plain Markdown folder now
+  opens in place instead of failing with "Choose an existing Rotli vault or an
+  empty folder", and the vault menu always lists the folder you have open.
+- **⌥Q opens only the Quick Note.** With Stay open on and the main window (or
+  the Chat window) left behind another app, the Quick Note brought it up too.
+  Those windows now step aside while the note is up and return, behind
+  whatever you are using, when you close it or click away.
+- **No more "Untitled" in the Quick Note.** Its note list leaves out blank
+  notes, a blank open note is titled New note, and ⌘N reuses a blank note
+  instead of making another.
+
+### Added
+
+- Hold ⌘ in the Quick Note to see its shortcuts, like the main window: badges
+  on its buttons, or the shortcut panel, per Settings → Keybindings.
+- Holding ⌘ right after typing now shows the shortcuts at once; before, you
+  had to tap ⌘ once first.
+
 ### Changed
 
 - The Rotli Helper installers now download Rotli Helper 1.4.0, which tells

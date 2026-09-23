@@ -30,6 +30,10 @@ export interface MemexConfig {
   activeId: string | null;
   instances: MemexInstance[];
   developmentReadOnly: boolean;
+  /** The open folder when it is NOT a vault (an adopted Markdown or Obsidian
+   * folder): display-only, for the vault switcher. Never a write target, so it
+   * stays out of `instances`. */
+  currentFolder?: MemexInstance | null;
 }
 
 function baseName(p: string): string {
@@ -68,7 +72,20 @@ export function fromCorpusConfig(v: CorpusConfigView): MemexConfig {
     });
   }
   const activeId = v.corpus.isMemex ? CORPUS_INSTANCE_ID : v.activeBrainId;
-  return { activeId, instances, developmentReadOnly: v.developmentReadOnly };
+  const currentFolder: MemexInstance | null =
+    !v.corpus.isMemex && v.corpus.absPath
+      ? {
+          id: CORPUS_INSTANCE_ID,
+          label: baseName(v.corpus.absPath),
+          root: v.corpus.absPath,
+          role: "corpus",
+          memexId: null,
+          mode: null,
+          perms: "read-only",
+          brainEnabled: v.corpus.brainEnabled ?? true,
+        }
+      : null;
+  return { activeId, instances, developmentReadOnly: v.developmentReadOnly, currentFolder };
 }
 
 export const activeInstance = (c: MemexConfig): MemexInstance | null =>
