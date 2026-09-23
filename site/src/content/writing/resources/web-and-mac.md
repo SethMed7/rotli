@@ -24,8 +24,8 @@ asks for that folder before anything opens.
   one folder you pick.
 - **Safari, phones, and tablets** aren't supported yet: they can't reach a folder on your computer.
 
-The page can't send your notes anywhere. Its security policy only allows it to connect to Rotli Helper,
-and only if you run it on your own computer.
+The page itself never sends your notes to a server: its security policy only allows it to connect to
+Rotli Helper on your own computer. The one way out is a chat you start, below.
 
 ## Chat on the web
 
