@@ -74,6 +74,12 @@ export function activeWebNotesService(fallback: NotesService): NotesService {
   return folderService ?? fallback;
 }
 
+/** The connected vault's note writer (Rotli Web's memex note lane); null
+ * before a vault is connected. */
+export function activeWebNoteWriter(): FolderNotesService | null {
+  return folderService;
+}
+
 /** The vault-relative file behind a note; null before a vault is connected. */
 export async function webNoteFilePath(id: string): Promise<string | null> {
   if (!folderService) return null;

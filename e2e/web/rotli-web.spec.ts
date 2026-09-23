@@ -5,7 +5,7 @@
 
 import { expect, test } from "@playwright/test";
 
-import { APP, readOpfsFile, rememberOpfsVault, startWithVault, vaultGate } from "./support";
+import { APP, listOpfsFiles, readOpfsFile, rememberOpfsVault, startWithVault, vaultGate } from "./support";
 
 test("a first visit is setup: no editor until a vault is connected", async ({ page }) => {
   await page.goto(APP);
@@ -50,6 +50,41 @@ test("an edit is saved into the vault's file and is there after a reload", async
   await expect(page.locator(".main-tree").getByText("Welcome to Rotli", { exact: true })).toHaveCount(1);
 });
 
+test("⌘N → Markdown note creates a file in the vault; the words are there after a reload", async ({
+  page,
+}) => {
+  await startWithVault(page);
+  await page.keyboard.press("ControlOrMeta+n");
+  await page.getByRole("button", { name: /^New Markdown note \(press/ }).click();
+  await expect(page.locator(".row-action-error")).toHaveCount(0);
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Untitled");
+  await page.locator(".pane.focused .cm-content").click();
+  await page.keyboard.type("# Web note\n\nwritten on the web");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Web note");
+  // a Librarian-on vault stages a new note in wiki/_inbox, as the Mac app does
+  await expect
+    .poll(async () => (await listOpfsFiles(page, "wiki/_inbox")).length, { timeout: 10_000 })
+    .toBe(1);
+  const [file] = await listOpfsFiles(page, "wiki/_inbox");
+  await expect.poll(() => readOpfsFile(page, `wiki/_inbox/${file}`)).toContain("written on the web");
+  await page.reload();
+  const row = page.locator(".main-tree [data-main-id]", { hasText: "Web note" });
+  await expect(row).toBeVisible();
+  await row.click();
+  await expect(page.locator(".cm-content").first()).toContainText("written on the web");
+});
+
+test("the tab strip's + makes a note in the vault too", async ({ page }) => {
+  await startWithVault(page);
+  await page.getByRole("button", { name: /^New Markdown note tab/ }).click();
+  await page.keyboard.type("# From the plus");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("From the plus");
+  await expect(page.locator(".row-action-error")).toHaveCount(0);
+  await expect
+    .poll(async () => (await listOpfsFiles(page, "wiki/_inbox")).length, { timeout: 10_000 })
+    .toBe(1);
+});
+
 test("a remembered vault the browser wants to re-ask about is reconnected by name, never replaced", async ({
   page,
 }) => {
@@ -67,7 +102,7 @@ test("a remembered vault the browser wants to re-ask about is reconnected by nam
   await expect(page.locator(".cm-content")).toHaveCount(0);
 });
 
-test("a note created in a fresh folder is there after a reload", async ({ page }) => {
+test("a folder created in Main is there after a reload", async ({ page }) => {
   await startWithVault(page);
   await page.getByRole("button", { name: "New folder in Main" }).click();
   await page.getByRole("textbox", { name: "New folder in Main" }).fill("Kept");

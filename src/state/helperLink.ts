@@ -21,11 +21,15 @@ interface HelperLinkState {
   problem: HelperProblem | null;
   /** The boot (or Check again) verification is in flight. */
   verifying: boolean;
+  /** A pairing code the installer handed this tab (`#pair=`), waiting for the
+   * person to press Pair. Session-only: never stored. */
+  offeredCode: string | null;
   hydrated: boolean;
   setLink: (link: HelperLink | null) => void;
   setReachable: (reachable: boolean | null) => void;
   setProblem: (problem: HelperProblem | null) => void;
   setVerifying: (verifying: boolean) => void;
+  setOfferedCode: (code: string | null) => void;
 }
 
 export const useHelperLink = create<HelperLinkState>((set) => ({
@@ -33,11 +37,13 @@ export const useHelperLink = create<HelperLinkState>((set) => ({
   reachable: null,
   problem: null,
   verifying: false,
+  offeredCode: null,
   hydrated: false,
   setLink: (link) => set({ link, hydrated: true, problem: null }),
   setReachable: (reachable) => set({ reachable }),
   setProblem: (problem) => set({ problem }),
   setVerifying: (verifying) => set({ verifying }),
+  setOfferedCode: (offeredCode) => set({ offeredCode }),
 }));
 
 /** Paired with a helper (whether or not it answered yet). */

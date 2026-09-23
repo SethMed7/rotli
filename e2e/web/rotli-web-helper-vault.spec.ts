@@ -27,6 +27,9 @@ function fakeHelperVault() {
   let clock = 1_700_000_000_000;
   const state = {
     down: false,
+    /** How long /health is held, as a browser holds a request while it asks
+     * whether the page may reach apps on this device (Firefox, Zen). */
+    healthDelayMs: 0,
     served: null as Served | null,
     chooses: { name: "notes", id: "hv_notes" } as Served,
   };
@@ -102,6 +105,7 @@ function fakeHelperVault() {
       if (state.down) return route.abort("connectionrefused");
       if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
       if (new URL(request.url()).pathname === "/health") {
+        if (state.healthDelayMs) await new Promise((resolve) => setTimeout(resolve, state.healthDelayMs));
         const health = { ok: true, name: "rotli-helper", version: "1.3.0" };
         return route.fulfill({ status: 200, headers: cors, body: JSON.stringify(health) });
       }
@@ -147,6 +151,8 @@ async function connectThroughHelper(page: Page): Promise<void> {
   await expect(vaultGate(page)).toHaveText("Set up Rotli Helper");
   await page.getByLabel("Or paste the pairing code the installer printed:").fill(`${PORT}:${TOKEN}`);
   await page.getByRole("button", { name: "Pair" }).click();
+  await expect(vaultGate(page)).toHaveText("Rotli Helper is paired");
+  await page.locator(".setup-button.primary", { hasText: "Continue" }).click();
   await expect(vaultGate(page)).toHaveText("Choose your vault");
   await page.locator(".setup-button.primary", { hasText: "Choose folder…" }).click();
   // a reload plus Welcome seeding: allow a loaded runner its time
@@ -155,7 +161,7 @@ async function connectThroughHelper(page: Page): Promise<void> {
   });
 }
 
-test("the installer's #pair= tab pairs the waiting setup, and an empty folder becomes the vault", async ({
+test("the installer's #pair= tab offers the code, Pair shows success, and the waiting setup moves on", async ({
   context,
   page,
 }) => {
@@ -164,17 +170,24 @@ test("the installer's #pair= tab pairs the waiting setup, and an empty folder be
   await withoutFolderApi(context);
   await page.goto(APP);
   await expect(vaultGate(page)).toHaveText("Set up Rotli Helper");
-  // no way around setup, and the install line opens this page to pair itself
+  // no way around setup, and the install line opens this page with the code
   await expect(page.locator(".cm-content")).toHaveCount(0);
   await expect(page.locator(".guide-cmd code").first()).toContainText("install.sh | sh -s -- --open");
 
-  // the installer's tab: pairs, and the token leaves the address bar at once
+  // the installer's tab: the token leaves the address bar at once, and waits
+  // in the Pair field for the person to press Pair
   const installerTab = await context.newPage();
   await installerTab.goto(`${APP}#pair=${PORT}:${TOKEN}`);
   await expect(installerTab).toHaveURL((url) => !url.hash.includes(TOKEN));
+  await expect(installerTab.getByLabel("Pairing code:")).toHaveValue(`${PORT}:${TOKEN}`);
+  expect(helper.state.served).toBeNull();
+  await installerTab.getByRole("button", { name: "Pair", exact: true }).click();
+  await expect(vaultGate(installerTab)).toHaveText("Rotli Helper is paired");
+  await expect(installerTab.getByText(/never to the internet/)).toBeVisible();
+  await installerTab.locator(".setup-button.primary", { hasText: "Continue" }).click();
+  await expect(vaultGate(installerTab)).toHaveText("Choose your vault", { timeout: 10_000 });
   // the person closes the extra tab (left open, it would connect too and race
   // this one to set up the new vault — harmless, but then either may open it)
-  await expect(vaultGate(installerTab)).toBeVisible();
   await installerTab.close();
 
   // the waiting tab moves on by itself, then the helper's picker chooses
@@ -193,6 +206,21 @@ test("the installer's #pair= tab pairs the waiting setup, and an empty folder be
   await expect(page.locator(".main-tree").getByText("Welcome to Rotli", { exact: true })).toHaveCount(1);
 });
 
+test("Pair waits while the browser asks about reaching this device, then pairs", async ({
+  context,
+  page,
+}) => {
+  const helper = fakeHelperVault();
+  await helper.install(context);
+  await withoutFolderApi(context);
+  // longer than a background probe waits (2.5 s): the person is reading the prompt
+  helper.state.healthDelayMs = 4_000;
+  await page.goto(`${APP}#pair=${PORT}:${TOKEN}`);
+  await page.getByRole("button", { name: "Pair", exact: true }).click();
+  await expect(page.getByText(/may connect to apps on this device, choose Allow/)).toBeVisible();
+  await expect(vaultGate(page)).toHaveText("Rotli Helper is paired", { timeout: 10_000 });
+});
+
 test("an edit is written into the served folder, and survives a reload", async ({ context, page }) => {
   const helper = fakeHelperVault();
   await helper.install(context);
@@ -207,6 +235,27 @@ test("an edit is written into the served folder, and survives a reload", async (
     .toContain("saved-through-the-helper");
   await page.reload();
   await expect(page.locator(".cm-content").first()).toContainText("saved-through-the-helper");
+});
+
+test("a new note is created as a file in the served folder", async ({ context, page }) => {
+  const helper = fakeHelperVault();
+  await helper.install(context);
+  await withoutFolderApi(context);
+  await connectThroughHelper(page);
+  await page.getByRole("button", { name: /^New Markdown note tab/ }).click();
+  await page.keyboard.type("# Made through the helper");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Made through the helper");
+  await expect(page.locator(".row-action-error")).toHaveCount(0);
+  await expect
+    .poll(
+      () =>
+        [...helper.files.entries()].find(
+          ([path, file]) =>
+            path.startsWith("wiki/_inbox/") && file.text.includes("# Made through the helper"),
+        )?.[0] ?? "",
+      { timeout: 10_000 },
+    )
+    .toMatch(/^wiki\/_inbox\/.+\.md$/);
 });
 
 test("a helper that stops answering is waited out: the edit lands when it's back", async ({

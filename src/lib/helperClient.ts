@@ -13,11 +13,15 @@ export interface HelperHealth {
 
 const HEALTH_TIMEOUT_MS = 2_500;
 
-/** Is a helper listening on this port? No credential travels. */
-export async function helperHealth(port: number): Promise<HelperHealth> {
+/** Is a helper listening on this port? No credential travels. A background
+ * probe gives up quickly; pairing, which a person started, passes a long
+ * `timeoutMs` so the browser's own "may this site reach apps on this
+ * device?" question (Firefox and Zen ask before a page's first request to
+ * 127.0.0.1) can be answered before the request is abandoned. */
+export async function helperHealth(port: number, timeoutMs = HEALTH_TIMEOUT_MS): Promise<HelperHealth> {
   const response = await fetch(`${helperBaseUrl(port)}/health`, {
     method: "GET",
-    signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok) throw new Error(`helper answered ${response.status}`);
   return (await response.json()) as HelperHealth;

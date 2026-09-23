@@ -19,10 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of keeping a copy in the browser. An empty folder becomes a new vault
   with the Welcome lessons; an existing vault opens as it is. Safari and phones
   are told plainly that they can't connect a vault yet.
-- **Rotli Helper starts when you log in and pairs itself.** The install line
-  registers it as a login item and opens Rotli Web already paired; `--uninstall`
-  removes it. It serves only the one folder you pick with your computer's own
-  folder picker.
+- **Rotli Helper starts when you log in, and pairing is one press.** The
+  install line registers it as a login item and opens Rotli Web with the
+  pairing code already filled in: press **Pair**, see that it worked, and
+  **Continue** to choose your vault. `--uninstall` removes it. It serves only
+  the one folder you pick with your computer's own folder picker, and the
+  installers now download Rotli Helper 1.3.0, the version that can serve it.
 - **Nothing leaves your computer.** Rotli Web may talk only to Rotli Helper on
   this computer; a new check fails the build if that ever widens, and a test
   proves the app never asks. Notes kept inside the browser by an earlier
@@ -30,6 +32,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **New notes can be created on Rotli Web.** ⌘N and the tab strip's **+** said
+  "Couldn't create"; a new note is now a file in your vault's `wiki/_inbox`
+  (or `wiki/` with the Librarian off), exactly where Rotli for Mac puts it.
+- **Dragging a block by its handle moves it whole.** A block dragged down
+  landed inside the text below it, splitting a word; it now lands where the
+  drop line shows. Dropping below the last line moves it to the end of the
+  note, and a move no longer leaves blank lines behind.
+- **Pairing waits while the browser asks.** Zen and Firefox ask before a page
+  may connect to apps on your computer; pairing gave up before you could
+  answer and said nothing was running. It now waits, and says to choose Allow.
 - **Connecting a vault on Rotli Web no longer bounces you back.** In Zen,
   Firefox, and Safari an empty folder looked exactly like a cancelled picker
   and nothing happened.

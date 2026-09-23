@@ -12,13 +12,14 @@ import { showFileNotice } from "../state/fileNotice";
 import { useHelperLink } from "../state/helperLink";
 import { seedDemoCorpus, seedReservedRoots } from "./demoCorpus";
 import { FsNotesService } from "./fsNotes";
-import { adoptPairingFromUrl, hydrateHelperLink } from "./helperLink";
+import { adoptPairingFromUrl, hydrateHelperLink, pairOfferedCode } from "./helperLink";
 import { InMemoryNotesService } from "./inMemoryNotes";
 import type { NotesService } from "./notesPort";
 import { createWebAiCorpus } from "./webAiCorpus";
 import { chatStoreFor, webMemexBridge } from "./webChats";
 import { createWebFileStore } from "./webFiles";
 import {
+  activeWebNoteWriter,
   activeWebNotesService,
   activeWebVaultDir,
   hydrateWebNotes,
@@ -83,8 +84,10 @@ export let notesService: NotesService = FS_MODE ? new FsNotesService() : svc;
 export async function hydrateWebVault(): Promise<boolean> {
   if (!WEB_MODE) return false;
   await hydrateHelperLink();
-  await adoptPairingFromUrl(); // the installer's `#pair=` handoff, if this tab carries one
+  adoptPairingFromUrl(); // the installer's `#pair=` handoff, if this tab carries one
   const connected = await hydrateWebNotes(useHelperLink.getState().link);
+  // setup offers the code with a Pair button; an open vault has no setup
+  if (connected) void pairOfferedCode();
   notesService = activeWebNotesService(notesService);
   const vault = webVaultKey();
   if (connected && vault && typeof window !== "undefined") {
@@ -103,7 +106,7 @@ export async function hydrateWebVault(): Promise<boolean> {
   }
   // the model's view of this vault, and the helper that runs the model
   registerWebAiCorpus(createWebAiCorpus(() => notesService));
-  registerWebMemexBridge(webMemexBridge(chatStoreFor(activeWebVaultDir())));
+  registerWebMemexBridge(webMemexBridge(chatStoreFor(activeWebVaultDir()), activeWebNoteWriter()));
   registerWebFileStore(createWebFileStore(activeWebVaultDir(), browserVault));
   return connected;
 }

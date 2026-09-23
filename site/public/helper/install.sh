@@ -15,7 +15,7 @@
 #
 #   ... | sh -s -- --uninstall   stops it, removes the login item and the binary
 #
-# ROTLI_HELPER_VERSION=1.2.0 overrides the version; ROTLI_HELPER_DRY_RUN=1
+# ROTLI_HELPER_VERSION=1.3.0 overrides the version; ROTLI_HELPER_DRY_RUN=1
 # prints what would be done and stops.
 set -eu
 
@@ -37,7 +37,7 @@ if [ -n "$OPEN_URL" ] && { [ "$(printf '%s' "$OPEN_URL" | wc -l | tr -d ' ')" !=
   exit 1
 fi
 
-VERSION="${ROTLI_HELPER_VERSION:-1.2.0}"
+VERSION="${ROTLI_HELPER_VERSION:-1.3.0}"
 RELEASES="${ROTLI_HELPER_RELEASES:-https://github.com/SethMed7/rotli-releases/releases/download}"
 DEST_DIR="${ROTLI_HELPER_DIR:-$HOME/.rotli/bin}"
 DEST="$DEST_DIR/rotli-helper"

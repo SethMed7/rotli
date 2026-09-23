@@ -129,13 +129,23 @@ opens as it is.
 - **The helper starts at login.** The installers register a LaunchAgent
   (`co.rotli.helper`), a systemd user service, or a Windows Startup shortcut,
   and `--uninstall` / `-Uninstall` removes it (`site/public/helper/`).
-- **Pairing is automatic.** `install.sh … --open <Rotli Web>` (only
+- **Pairing is one press.** `install.sh … --open <Rotli Web>` (only
   `https://rotli.co/app/`, `https://dev.rotli.co/app/`, or the dev server's
   `http://localhost:1437/app/` — the helper's own origins) opens the page
   with `#pair=<port>:<token>`; a fragment never reaches a server, and the page
   strips it before anything else (`services/helperLink.ts`
-  `adoptPairingFromUrl`). A setup tab still waiting picks the pairing up from
-  the device store. `--open` accepts only Rotli's own addresses.
+  `adoptPairingFromUrl`). Setup shows the code filled in; the person presses
+  **Pair**, sees "Rotli Helper is paired" (what the helper can and can't
+  reach), and presses **Continue** to choose the vault. A tab whose vault
+  opens without setup pairs with the offered code in place and says so. A
+  setup tab still waiting picks the pairing up from the device store.
+  `--open` accepts only Rotli's own addresses.
+- **The browser may ask first.** Firefox and Zen ask before a page's first
+  request to `127.0.0.1` ("allow this site to connect to apps on this
+  device", the `loopback-network` permission); Chromium has its own
+  local-network prompt. Background probes give up after 2.5 s, but a Pair
+  press waits up to two minutes and says what to look for, so the question
+  can be answered instead of reading as "nothing answered".
 - **An outage mid-session** holds every write pending — the save dot stays
   dim — behind a "Reconnecting to <vault>…" cover, and replays in order when
   the helper answers; a retried write carries the revision it started from.
