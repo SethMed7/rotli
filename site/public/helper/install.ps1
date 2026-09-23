@@ -19,7 +19,7 @@ if ($Open -and $Open -cnotmatch '\A(https://(dev\.)?rotli\.co|http://(localhost|
 }
 $startup = Join-Path ([Environment]::GetFolderPath("Startup")) "Rotli Helper.lnk"
 
-$version = if ($env:ROTLI_HELPER_VERSION) { $env:ROTLI_HELPER_VERSION } else { "1.3.0" }
+$version = if ($env:ROTLI_HELPER_VERSION) { $env:ROTLI_HELPER_VERSION } else { "1.4.0" }
 $releases = if ($env:ROTLI_HELPER_RELEASES) { $env:ROTLI_HELPER_RELEASES } else { "https://github.com/SethMed7/rotli-releases/releases/download" }
 $destDir = Join-Path $HOME ".rotli\bin"
 $dest = Join-Path $destDir "rotli-helper.exe"
