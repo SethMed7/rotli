@@ -221,6 +221,26 @@ test("Pair waits while the browser asks about reaching this device, then pairs",
   await expect(vaultGate(page)).toHaveText("Rotli Helper is paired", { timeout: 10_000 });
 });
 
+test("a helper the browser held at boot is found once it answers: setup moves on to the vault", async ({
+  context,
+  page,
+}) => {
+  const helper = fakeHelperVault();
+  await helper.install(context);
+  await withoutFolderApi(context);
+  // paired earlier, no vault chosen yet
+  await page.goto(`${APP}#pair=${PORT}:${TOKEN}`);
+  await page.getByRole("button", { name: "Pair", exact: true }).click();
+  await expect(vaultGate(page)).toHaveText("Rotli Helper is paired");
+  // the next boot's first look gets nothing (Zen holds it behind its question)
+  helper.state.down = true;
+  await page.reload();
+  await expect(page.getByText(/Rotli Helper isn’t answering/)).toBeVisible();
+  // Allow: it answers now, and setup follows without a reload
+  helper.state.down = false;
+  await expect(vaultGate(page)).toHaveText("Choose your vault", { timeout: 10_000 });
+});
+
 test("an edit is written into the served folder, and survives a reload", async ({ context, page }) => {
   const helper = fakeHelperVault();
   await helper.install(context);
