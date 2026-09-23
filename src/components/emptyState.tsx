@@ -8,6 +8,7 @@
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { formatChord } from "../keys/chords";
 import { dispatch, getAction } from "../keys/registry";
+import { SHOW_HOTKEYS } from "../lib/hotkeyHint";
 import { Character } from "./character";
 import { PlusGlyph } from "./glyphs";
 
@@ -23,17 +24,25 @@ export function EmptyState() {
       <Character name="base" size={150} accessorized />
       <div className="et">Your island is ready</div>
       <div className="es">
-        Press <kbd>{formatChord(captureChord ?? "Alt+C")}</kbd> anywhere on your Mac and the first thought
-        lands here — as a plain file, on this Mac, yours.
+        {SHOW_HOTKEYS ? (
+          <>
+            Press <kbd>{formatChord(captureChord ?? "Alt+C")}</kbd> anywhere on your Mac and the first thought
+            lands here — as a plain file, on this Mac, yours.
+          </>
+        ) : (
+          "Your first note lands here — as a plain file in your vault folder, yours."
+        )}
       </div>
       <button type="button" className="btn" onClick={() => dispatch("notes.new")}>
         <PlusGlyph size={14} />
         Write the first note
       </button>
-      <div className="ghost">
-        or just press <kbd>⌘</kbd>
-        <kbd>N</kbd>
-      </div>
+      {SHOW_HOTKEYS && (
+        <div className="ghost">
+          or just press <kbd>⌘</kbd>
+          <kbd>N</kbd>
+        </div>
+      )}
     </div>
   );
 }

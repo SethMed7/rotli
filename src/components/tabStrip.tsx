@@ -35,6 +35,7 @@ import {
 import { newItemInTab } from "../keys/actions";
 import { tabHotkeyAction } from "../keys/tabHotkeys";
 import { fileName, fileNameStem } from "../lib/fileKind";
+import { hotkeyHint } from "../lib/hotkeyHint";
 import {
   privateBrowserTabTitle,
   privateBrowserTitleSnapshot,
@@ -352,7 +353,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
                   <button
                     type="button"
                     className="x"
-                    aria-label="Close tab — ⌘W"
+                    aria-label={`Close tab${hotkeyHint(" — ⌘W")}`}
                     onPointerDown={(event) => event.stopPropagation()}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -370,10 +371,16 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
           })}
         </div>
       </div>
-      <button type="button" className="tabplus" aria-label={`${newTabLabel} — ⌘T`} onClick={newTabHere}>
+      <button
+        type="button"
+        className="tabplus"
+        aria-label={`${newTabLabel}${hotkeyHint(" — ⌘T")}`}
+        onClick={newTabHere}
+      >
         <PlusGlyph size={13} />
         <span className="tip" aria-hidden="true">
-          {newTabLabel} — ⌘T
+          {newTabLabel}
+          {hotkeyHint(" — ⌘T")}
         </span>
       </button>
     </div>

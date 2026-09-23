@@ -59,8 +59,9 @@ import {
   rebind,
   setDispatchSuspended,
 } from "../keys/registry";
-import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 import { feedbackUrl } from "../lib/feedback";
+import { SHOW_HOTKEYS, hotkeyHint } from "../lib/hotkeyHint";
 import { PRIVATE_BROWSER_SEARCH_ENGINE_PRESENTATIONS } from "../lib/privateBrowser";
 import {
   type ChatModelInfo,
@@ -194,6 +195,11 @@ const NAV: { id: SettingsPane; label: string; glyph: (props: { size?: number }) 
   { id: "connections", label: "Connections", glyph: ExternalLinkGlyph },
   { id: "about", label: "About Rotli", glyph: QuokkaMark },
 ];
+
+/** Rotli Web has no app hotkeys (featurePolicy `hotkeys`), so no Keybindings
+ * pane, and no private browser, so no Browser pane. */
+const WEB_HIDDEN_PANES: ReadonlySet<SettingsPane> = new Set(["hotkeys", "browser"]);
+const SHOWN_NAV = PLATFORM === "web" ? NAV.filter((pane) => !WEB_HIDDEN_PANES.has(pane.id)) : NAV;
 
 /** A settings pane heading with its quokka character accent (the maintainer, 2026-06-26) —
  * a small, muted line-art quokka at the top-right of each section. This is an
@@ -599,37 +605,42 @@ function GeneralPane() {
   return (
     <>
       <PaneHead title="General" char="base" />
-      <p className="lead">
-        rotli is a visitor by default — summon it, write, dismiss it. Make it a resident when you&rsquo;re
-        living in it.
-      </p>
-      <div className="swgroup">
-        <Toggle
-          on={stayOpen}
-          title="Stay open"
-          desc="Don’t hide when I click away."
-          onChange={() => {
-            const next = !stayOpen;
-            setStayOpen(next);
-            void setHideOnBlur(!next);
-          }}
-        />
-        <Toggle
-          on={showInDock}
-          title="Show in the Dock"
-          desc="Otherwise rotli lives in the menu bar only."
-          onChange={() => {
-            const next = !showInDock;
-            setShowInDock(next);
-            void setDockVisible(next);
-          }}
-        />
-      </div>
-      <p className="setnote">
-        Either way the menu-bar icon stays, {chordLabel(bindingOverrides, "app.toggleWindow")} opens the app,
-        and {chordLabel(bindingOverrides, "capture.summon")} is the one-breath capture — all rebindable in
-        Keybindings.
-      </p>
+      {/* visitor vs resident, the Dock, and the menu bar are the Mac app's */}
+      {PLATFORM === "desktop" && (
+        <>
+          <p className="lead">
+            rotli is a visitor by default — summon it, write, dismiss it. Make it a resident when you&rsquo;re
+            living in it.
+          </p>
+          <div className="swgroup">
+            <Toggle
+              on={stayOpen}
+              title="Stay open"
+              desc="Don’t hide when I click away."
+              onChange={() => {
+                const next = !stayOpen;
+                setStayOpen(next);
+                void setHideOnBlur(!next);
+              }}
+            />
+            <Toggle
+              on={showInDock}
+              title="Show in the Dock"
+              desc="Otherwise rotli lives in the menu bar only."
+              onChange={() => {
+                const next = !showInDock;
+                setShowInDock(next);
+                void setDockVisible(next);
+              }}
+            />
+          </div>
+          <p className="setnote">
+            Either way the menu-bar icon stays, {chordLabel(bindingOverrides, "app.toggleWindow")} opens the
+            app, and {chordLabel(bindingOverrides, "capture.summon")} is the one-breath capture — all
+            rebindable in Keybindings.
+          </p>
+        </>
+      )}
 
       <h4 className="sethead">Your name</h4>
       <p className="lead">
@@ -746,9 +757,9 @@ function GeneralPane() {
 
       <h4 className="sethead">New tabs</h4>
       <p className="lead">
-        Choose what {chordLabel(bindingOverrides, "tabs.new")} and the tab-strip plus create. The New menu
-        always offers every type. While a private browser is active, both create another private browser tab
-        instead.
+        Choose what {SHOW_HOTKEYS ? `${chordLabel(bindingOverrides, "tabs.new")} and ` : ""}the tab-strip plus
+        create. The New menu always offers every type. While a private browser is active, both create another
+        private browser tab instead.
       </p>
       <label className="setselect-row">
         <span>New tab creates</span>
@@ -783,72 +794,81 @@ function GeneralPane() {
         onPick={setTabLayout}
       />
 
-      <h4 className="sethead">Quick note</h4>
-      <p className="lead">
-        A floating note you summon with {chordLabel(bindingOverrides, "quick.summon")} — open any note in it,
-        star up to five for quick access, cycle those with ⌘] and ⌘[, and ⌘P searches every note to swap one
-        in. A note you create here is a full note filed into Main, never a capture. It always reopens where
-        you left off and closes when you click away.
-      </p>
-      <label className="setselect-row">
-        <span>Destination vault</span>
-        <select
-          className="setselect"
-          aria-label="Quick Note destination vault"
-          value={quickVaultId ?? ""}
-          onChange={(e) => setQuickVaultSynced(e.target.value || null)}
-        >
-          <option value="">Current destination{currentVault ? ` — ${currentVault.label}` : ""}</option>
-          {!hasQuickVault && <option value={quickVaultId ?? ""}>Unavailable vault — {quickVaultId}</option>}
-          {writableVaults.map((vault) => (
-            <option key={vault.id} value={vault.id}>
-              Always {vault.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      {!quickVaultId && (
-        <label className="setselect-row">
-          <span>Folder</span>
-          <select
-            className="setselect"
-            value={quickFolder}
-            onChange={(e) => setQuickFolderSynced(e.target.value)}
-          >
-            {!hasCurrent && <option value={quickFolder}>{quickFolder}</option>}
-            {folderOpts.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      <p className="setnote">A named vault must have write access in Location before it appears here.</p>
-
-      <h4 className="sethead">Quick capture</h4>
-      <p className="lead">
-        One-breath captures can follow the current writable vault or stay pinned to a separate capture vault.
-      </p>
-      <label className="setselect-row">
-        <span>Destination vault</span>
-        <select
-          className="setselect"
-          aria-label="Quick capture destination vault"
-          value={captureVaultId ?? ""}
-          onChange={(e) => setCaptureVaultId(e.target.value || null)}
-        >
-          <option value="">Current destination{currentVault ? ` — ${currentVault.label}` : ""}</option>
-          {!hasCaptureVault && (
-            <option value={captureVaultId ?? ""}>Unavailable vault — {captureVaultId}</option>
+      {/* the Quick window and Quick capture are Mac features (global shortcuts,
+          a floating window); Rotli Web has neither */}
+      {PLATFORM === "desktop" && (
+        <>
+          <h4 className="sethead">Quick note</h4>
+          <p className="lead">
+            A floating note you summon with {chordLabel(bindingOverrides, "quick.summon")} — open any note in
+            it, star up to five for quick access, cycle those with ⌘] and ⌘[, and ⌘P searches every note to
+            swap one in. A note you create here is a full note filed into Main, never a capture. It always
+            reopens where you left off and closes when you click away.
+          </p>
+          <label className="setselect-row">
+            <span>Destination vault</span>
+            <select
+              className="setselect"
+              aria-label="Quick Note destination vault"
+              value={quickVaultId ?? ""}
+              onChange={(e) => setQuickVaultSynced(e.target.value || null)}
+            >
+              <option value="">Current destination{currentVault ? ` — ${currentVault.label}` : ""}</option>
+              {!hasQuickVault && (
+                <option value={quickVaultId ?? ""}>Unavailable vault — {quickVaultId}</option>
+              )}
+              {writableVaults.map((vault) => (
+                <option key={vault.id} value={vault.id}>
+                  Always {vault.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {!quickVaultId && (
+            <label className="setselect-row">
+              <span>Folder</span>
+              <select
+                className="setselect"
+                value={quickFolder}
+                onChange={(e) => setQuickFolderSynced(e.target.value)}
+              >
+                {!hasCurrent && <option value={quickFolder}>{quickFolder}</option>}
+                {folderOpts.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
-          {writableVaults.map((vault) => (
-            <option key={vault.id} value={vault.id}>
-              Always {vault.label}
-            </option>
-          ))}
-        </select>
-      </label>
+          <p className="setnote">A named vault must have write access in Location before it appears here.</p>
+
+          <h4 className="sethead">Quick capture</h4>
+          <p className="lead">
+            One-breath captures can follow the current writable vault or stay pinned to a separate capture
+            vault.
+          </p>
+          <label className="setselect-row">
+            <span>Destination vault</span>
+            <select
+              className="setselect"
+              aria-label="Quick capture destination vault"
+              value={captureVaultId ?? ""}
+              onChange={(e) => setCaptureVaultId(e.target.value || null)}
+            >
+              <option value="">Current destination{currentVault ? ` — ${currentVault.label}` : ""}</option>
+              {!hasCaptureVault && (
+                <option value={captureVaultId ?? ""}>Unavailable vault — {captureVaultId}</option>
+              )}
+              {writableVaults.map((vault) => (
+                <option key={vault.id} value={vault.id}>
+                  Always {vault.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
+      )}
 
       <h4 className="sethead">Writing</h4>
       <p className="lead">How the editor behaves while you type.</p>
@@ -1404,8 +1424,8 @@ function AppearancePane() {
       <h4 className="sethead">Sidebar</h4>
       <p className="lead">
         Where the sidebar sits, and whether it stays. On hover keeps it out of the way until the pointer
-        reaches the window's edge; ⌘0 still brings it. The sidebar's own right-click menu has the same
-        choices.
+        reaches the window's edge{hotkeyHint("; ⌘0 still brings it")}. The sidebar's own right-click menu has
+        the same choices.
       </p>
       <div className="segfield">
         <span className="seglabel">Side</span>
@@ -3272,7 +3292,7 @@ export function SettingsSurface() {
   const paneRequest = useUiStore((s) => s.settingsPaneRequest);
   useEffect(() => {
     if (!paneRequest) return;
-    if (NAV.some((p) => p.id === paneRequest)) setPane(paneRequest as SettingsPane);
+    if (SHOWN_NAV.some((p) => p.id === paneRequest)) setPane(paneRequest as SettingsPane);
     useUiStore.getState().setSettingsPaneRequest(null);
   }, [paneRequest]);
 
@@ -3292,7 +3312,7 @@ export function SettingsSurface() {
           </svg>
           <span className="set-back-label">Back to notes</span>
         </button>
-        {NAV.map(({ id, label, glyph: G }) => (
+        {SHOWN_NAV.map(({ id, label, glyph: G }) => (
           <button
             type="button"
             key={id}

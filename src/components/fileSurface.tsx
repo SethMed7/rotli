@@ -28,6 +28,7 @@ import {
 } from "../documents/kinds";
 import { clamp } from "../lib/clamp";
 import { IMAGE_EXTS, VIDEO_EXTS, extOf, fileName, managedFileNote } from "../lib/fileKind";
+import { hotkeyHint } from "../lib/hotkeyHint";
 import { HTML_PREVIEW_CSP } from "../lib/htmlPreviewPolicy";
 import {
   type FileStat,
@@ -497,7 +498,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
           <button
             type="button"
             className="file-dims"
-            title="Toggle fit ⇄ actual size (⌘0 fit · ⌘1 100% · ⌘± zoom · pinch)"
+            title={`Toggle fit ⇄ actual size${hotkeyHint(" (⌘0 fit · ⌘1 100% · ⌘± zoom · pinch)")}`}
             onClick={() => setImgZoom(imgZoom === "fit" ? 1 : "fit")}
           >
             {imgNat.w}×{imgNat.h} · {Math.round(imgScale * 100)}%

@@ -6,6 +6,7 @@
 
 import type { MouseEvent, ReactNode, RefObject } from "react";
 
+import { SHOW_HOTKEYS } from "../../lib/hotkeyHint";
 import type { MenuSpec } from "../../state/contextMenu";
 import { useUiStore } from "../../state/ui";
 import { useViewsStore } from "../../state/views";
@@ -83,7 +84,7 @@ export function chatViewMenuItems(
   show: (name: string | null) => void,
   numbered = false,
 ) {
-  const slot = (index: number) => (numbered && index < 9 ? { hint: `⌘${index + 1}` } : {});
+  const slot = (index: number) => (numbered && SHOW_HOTKEYS && index < 9 ? { hint: `⌘${index + 1}` } : {});
   const items: MenuSpec[] = [
     {
       kind: "action",
