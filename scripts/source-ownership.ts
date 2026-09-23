@@ -139,6 +139,7 @@ export const SERVICE_FILE_OWNERS = {
   "externalCorpusChange.ts": "vault lifecycle",
   "folderTrash.ts": "vault lifecycle",
   "fsNotes.ts": "notes adapter",
+  "folderMemexNotes.ts": "notes",
   "folderNotes.ts": "notes",
   "vaultDir.ts": "notes",
   "antigravity.ts": "connected-provider lane management (Antigravity runtime + sign-in)",

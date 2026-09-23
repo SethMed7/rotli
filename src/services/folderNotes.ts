@@ -25,6 +25,13 @@ import type { Folder, Note, NoteSummary, SearchHit } from "../types";
 import { snippetOf, summaryOrder, titleOf } from "./derive";
 import { DEST, isChats, isHidden, isRootMarker, isSink, isTrash, isVault } from "./destinations";
 import { BOARD_LANE, boardTitle, isBoardPath } from "./folderBoards";
+import {
+  assertSafeStem,
+  ignoreInGit,
+  isSecureNote,
+  memexNoteFolder,
+  readMemexContract,
+} from "./folderMemexNotes";
 import type { NotesService } from "./notesPort";
 import { searchMatch, sortHits } from "./search";
 import { type VaultDir, baseName, freeVaultPath, joinVaultPath, parentPath, vaultIsMemex } from "./vaultDir";
@@ -41,8 +48,6 @@ const SKIPPED_ROOTS = new Set(["identity", "personality", "history", "node_modul
 const WIKI = "wiki";
 const WIKI_INBOX = "wiki/_inbox";
 const WIKI_SECURE = "wiki/_secure";
-/** The vault's settings file: its `brainEnabled` is the Librarian switch. */
-const SETTINGS_FILE = ".rotli/settings.json";
 /** The disk name of each never-delete sink, in projection order. */
 const SINK_DIRS: { dir: string; dest: string }[] = [
   { dir: "archive", dest: DEST.archive },
@@ -415,59 +420,21 @@ export class FolderNotesService implements NotesService {
 
   // ─── the memex writer: Rotli Web's `memex_read_contract` / `memex_write_note` ─
 
-  /** Rust `memex_read_contract`: the vault's contract files, "" when missing. */
-  async readMemexContract(): Promise<MemexContractRaw> {
-    const read = async (path: string) => ((await this.dir.exists(path)) ? this.dir.readText(path) : "");
-    return {
-      memexJson: await read("memex.json"),
-      usersJson: await read("users.json"),
-      identitiesJson: await read("identities.local.json"),
-    };
+  readMemexContract(): Promise<MemexContractRaw> {
+    return readMemexContract(this.dir);
   }
 
-  /** Rust `write_note_at`: a note composed by `writeNote` (memex/service.ts)
-   * lands in `wiki/_secure` when its frontmatter says `secure: true`, else in
-   * `wiki/_inbox` while the Librarian is on (`.rotli/settings.json`
-   * `brainEnabled`, default on), else at the `wiki/` root — under a free
-   * `stem (n).md` name, a secure one also listed in `.gitignore`. A plain
-   * folder has no `wiki/`, so its notes land at its root. Returns the
-   * vault-relative path. */
+  /** Rust `write_note_at` (rules in folderMemexNotes.ts): a note composed by
+   * `writeNote` lands under a free `stem (n).md` name; returns its path. */
   async writeMemexNote(stem: string, contents: string): Promise<string> {
-    if (!/^[a-z0-9-]{1,80}$/.test(stem)) throw new Error(`unsafe note stem: ${JSON.stringify(stem)}`);
+    assertSafeStem(stem);
     await this.ensureIndex();
-    const { frontmatter } = parseNoteDocument(contents);
-    const secure = frontmatter ? isSecureFrontmatter(frontmatter) : false;
-    const dir = !this.isMemex
-      ? ""
-      : secure
-        ? WIKI_SECURE
-        : (await this.librarianEnabled())
-          ? WIKI_INBOX
-          : WIKI;
-    const path = await this.freePath(dir, `${stem}.md`);
-    if (secure) await this.ignoreInGit(path);
+    const path = await this.freePath(await memexNoteFolder(this.dir, contents, this.isMemex), `${stem}.md`);
+    if (isSecureNote(contents)) await ignoreInGit(this.dir, path);
     await this.writeFile(path, contents);
-    const id = frontmatter?.id || path;
+    const id = parseNoteDocument(contents).frontmatter?.id || path;
     this.reindex(id, id, path);
     return path;
-  }
-
-  private async librarianEnabled(): Promise<boolean> {
-    if (!(await this.dir.exists(SETTINGS_FILE))) return true;
-    try {
-      const value = (JSON.parse(await this.dir.readText(SETTINGS_FILE)) as { brainEnabled?: unknown })
-        .brainEnabled;
-      return typeof value === "boolean" ? value : true;
-    } catch {
-      return true; // malformed settings keep the established default, as in Rust
-    }
-  }
-
-  private async ignoreInGit(path: string): Promise<void> {
-    const existing = (await this.dir.exists(".gitignore")) ? await this.dir.readText(".gitignore") : "";
-    if (existing.split("\n").some((line) => line.trim() === path)) return;
-    const lead = existing && !existing.endsWith("\n") ? "\n" : "";
-    await this.dir.writeText(".gitignore", `${existing}${lead}${path}\n`);
   }
 
   /** `name.md`, then `name (2).md`, `name (3).md`, … — existing numbers are
