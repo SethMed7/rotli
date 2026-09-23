@@ -12,6 +12,7 @@ import { type DiscoveryLanes, setLaneDiscovery, useConnectedModels } from "../st
 
 /** How long an answer stands before a list opening asks again. */
 export const DISCOVERY_FRESH_MS = 5 * 60_000;
+const DISCOVERY_RETRY_MS = 60_000;
 
 const inFlight = new Map<ProviderId, Promise<void>>();
 
@@ -26,7 +27,9 @@ export function discoverConnectedModels(
   const pending = inFlight.get(provider);
   if (pending) return pending;
   const lane = useConnectedModels.getState().lanes[provider];
-  if (!refresh && lane && lane.status !== "loading" && now - lane.at < DISCOVERY_FRESH_MS) {
+  // a lane that couldn't list (signed out, CLI missing) is re-asked sooner
+  const freshFor = lane?.status === "error" ? DISCOVERY_RETRY_MS : DISCOVERY_FRESH_MS;
+  if (!refresh && lane && lane.status !== "loading" && now - lane.at < freshFor) {
     return Promise.resolve();
   }
   if (!lane) setLaneDiscovery(provider, { status: "loading", models: [], at: now });
