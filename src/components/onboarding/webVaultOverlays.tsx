@@ -11,11 +11,14 @@ import {
   type LegacyFile,
   clearLegacyBrowserFiles,
   copyLegacyInto,
-  legacyBrowserFiles,
+  deferLegacyOffer,
+  legacyFilesToCopy,
+  legacyOfferDeferred,
 } from "../../services/legacyBrowserNotes";
 import { activeWebVaultDir } from "../../services/notes";
 import { connectedFolderName, webVaultKey } from "../../services/webNotes";
 import { journalKey, writeJournal } from "../../services/webUnsavedJournal";
+import { useLegacyNotesOffer } from "../../state/legacyNotesOffer";
 import { useVaultConnection } from "../../state/vaultConnection";
 import { WebDialogFrame } from "../webDialogFrame";
 import { WebVaultConnectDialog } from "../webVaultConnectDialog";
@@ -84,13 +87,29 @@ function LegacyNotesOffer() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Settings → General asks again after Not now
+  const requested = useLegacyNotesOffer((s) => s.open);
+  const hideRequest = useLegacyNotesOffer((s) => s.hide);
   useEffect(() => {
-    if (!activeWebVaultDir()) return;
-    void legacyBrowserFiles().then((found) => setFiles(found.length > 0 ? found : null));
-  }, []);
+    const dir = activeWebVaultDir();
+    const key = webVaultKey();
+    if (!dir) return;
+    if (!requested && key && legacyOfferDeferred(window.localStorage, key)) return;
+    // only what the vault doesn't already hold; nothing left clears the browser's copy
+    void legacyFilesToCopy(dir).then((found) => {
+      setDone(null);
+      setFiles(found.length > 0 ? found : null);
+    });
+  }, [requested]);
   if (!files) return null;
   const vault = connectedFolderName() ?? "your vault";
-  const close = () => setFiles(null);
+  const close = () => {
+    // Not now (or ✕) before copying: don't ask again on every visit
+    const key = webVaultKey();
+    if (done === null && key) deferLegacyOffer(window.localStorage, key);
+    setFiles(null);
+    hideRequest();
+  };
   const copy = () => {
     const dir = activeWebVaultDir();
     if (!dir) return;
@@ -140,7 +159,7 @@ function LegacyNotesOffer() {
           An earlier Rotli Web kept {files.length} {files.length === 1 ? "file" : "files"} inside this
           browser. Copy them into “{vault}” so they are real files? Nothing in the vault is overwritten: a
           file that differs lands beside yours, marked “from this browser”. The browser’s copy is removed
-          after it is safely in the vault.
+          after it is safely in the vault. Not now keeps them here; Settings → General can copy them later.
         </p>
       ) : (
         <p className="web-connect-line" role="status">

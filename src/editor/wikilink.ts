@@ -64,6 +64,9 @@ export function resolveWikilink(target: string, index: WikilinkIndex): string | 
   const t = wikilinkTargetOf(target);
   if (!t) return null;
   if (index.byId.has(t)) return t;
+  // a note with no frontmatter id is identified by its path, `.md` included —
+  // the id the picker writes when titles collide; wikilinkTargetOf stripped it
+  if (index.byId.has(`${t}.md`)) return `${t}.md`;
   const lookup = (value: string): string | null => {
     const key = linkKey(value);
     const candidates = [...(index.byTitle.get(key) ?? []), ...(index.byAlias.get(key) ?? [])].filter(

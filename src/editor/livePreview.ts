@@ -895,10 +895,17 @@ function build(view: EditorView): {
           scanInline(content, contentBase, sel, decos, atomics);
           break;
         }
-        case "task":
+        case "task": {
+          // an empty task ("- [ ] " and nothing after) would leave its line with
+          // no text at all, and each engine then invents the caret from the
+          // widget boxes — Gecko drew it floating above-right of the box (the
+          // owner, 2026-09-23). Keep the trailing space as real text in a gap
+          // the width of the box's margin, so the caret sits in text on the
+          // text column; the whole prefix stays atomic.
+          const emptyTask = line.to === prefixEnd && line.text.endsWith(" ");
           decos.push(
             Decoration.line({
-              class: block.state === "done" ? "rotli-task done" : "rotli-task",
+              class: `${block.state === "done" ? "rotli-task done" : "rotli-task"}${emptyTask ? " rotli-task-empty" : ""}`,
               // a checkbox hangs in a wider column than a glyph; an ordered
               // task ("1. [ ]") hangs by its number PLUS the checkbox
               attributes: {
@@ -908,6 +915,11 @@ function build(view: EditorView): {
           );
           if (sel.from < prefixEnd && sel.to > ls) {
             revealablePrefix(ls, prefixEnd, true, decos, atomics);
+          } else if (emptyTask) {
+            const widget = new CheckboxWidget(block.state ?? "open", block.marker ?? null);
+            decos.push(Decoration.replace({ widget }).range(ls, prefixEnd - 1));
+            decos.push(Decoration.mark({ class: "rotli-task-gap" }).range(prefixEnd - 1, prefixEnd));
+            atomics.push(Decoration.mark({}).range(ls, prefixEnd));
           } else {
             hidePrefix(
               ls,
@@ -937,6 +949,7 @@ function build(view: EditorView): {
           if (listItemImage(content, contentBase, line.to, lineTouched, sel, decos, atomics)) break;
           scanInline(content, contentBase, sel, decos, atomics);
           break;
+        }
         case "result": {
           const state = block.resultState ?? "unanswered";
           const answered = (block.resultSelectedIndex ?? -1) >= 0;

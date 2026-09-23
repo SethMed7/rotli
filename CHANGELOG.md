@@ -54,6 +54,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The caret sits beside an empty task's box.** After typing `[] ` the caret
+  floated above and to the right of the new checkbox (most visibly in Zen and
+  Firefox); it now sits level with the box, where your text will start.
+- **The caret sits on the "Write…" line of an empty note** instead of above it
+  (Zen and Firefox).
+- **A link to one of two same-titled notes opens it.** When titles collide
+  the link picker writes the note's path, and on Rotli Web that link read "No
+  note with this name"; it now opens the note it names.
+- **"Notes kept in this browser" asks once.** Rotli Web offers to copy notes an
+  older version kept inside the browser into your vault. Not now is now
+  remembered (Settings → General offers it again), and notes already copied
+  on an earlier visit are cleared from the browser without asking.
 - **New notes can be created on Rotli Web.** ⌘N and the tab strip's **+** said
   "Couldn't create"; a new note is now a file in your vault's `wiki/_inbox`
   (or `wiki/` with the Librarian off), exactly where Rotli for Mac puts it.

@@ -749,8 +749,13 @@
 .rotli-cm-host .cm-content ::selection {
   background: color-mix(in srgb, var(--accent) 26%, transparent);
 }
-.rotli-cm-host .cm-placeholder {
+/* an empty note's hint (emptyPlaceholder.ts): painted behind a plain empty
+   line so the native caret keeps real line metrics in every engine */
+.rotli-cm-host .cm-line.rotli-empty-hint::before {
+  content: attr(data-hint);
+  position: absolute;
   color: var(--text-muted);
+  pointer-events: none;
 }
 
 .editor-scroll-top {
@@ -927,6 +932,18 @@
   font: inherit;
   vertical-align: -0.15em;
   line-height: 1;
+}
+/* an empty task keeps its trailing space as text (livePreview.ts), so the
+   caret is drawn in text, level with the box, in every engine: the space fills
+   the box's 0.5em gap, right-aligned, and the caret sits on the text column */
+.rotli-cm-host .cm-line.rotli-task-empty .rotli-check {
+  margin-right: 0;
+}
+.rotli-task-gap {
+  display: inline-block;
+  width: 0.5em;
+  text-align: right;
+  text-indent: 0;
 }
 .rotli-check-wrap {
   position: relative;

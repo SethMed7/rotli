@@ -9,8 +9,11 @@ import {
   FROM_BROWSER_FOLDER,
   clearLegacyBrowserFiles,
   copyLegacyInto,
+  deferLegacyOffer,
   filesFromBrowserSnapshot,
   legacyBrowserFiles,
+  legacyFilesToCopy,
+  legacyOfferDeferred,
   safeFileName,
 } from "./legacyBrowserNotes";
 import { MemoryVaultDir } from "./vaultDir";
@@ -119,5 +122,35 @@ describe("copying into the connected vault", () => {
   test("Trash in the browser stays out of the vault", async () => {
     const files = await filesFromBrowserSnapshot(await browserSnapshot());
     expect(files.some((f) => f.path.includes(DEST.trash))).toBe(false);
+  });
+});
+
+describe("offering them again", () => {
+  test("only what the vault lacks is offered; when it holds everything, the browser's copy is cleared", async () => {
+    const vault = new BrowserVault(new MemoryVaultStore());
+    await vault.write("notes", await browserSnapshot());
+    const dir = new MemoryVaultDir();
+    await dir.mkdir("wiki");
+    const all = await legacyFilesToCopy(dir, vault);
+    expect(all).toHaveLength(2);
+    // copy one of the two, as an earlier visit might have
+    await copyLegacyInto(dir, [all[0]!]);
+    expect((await legacyFilesToCopy(dir, vault)).map((f) => f.path)).toEqual([all[1]!.path]);
+    // copy the rest: nothing to offer, and the browser forgets its copy
+    await copyLegacyInto(dir, [all[1]!]);
+    expect(await legacyFilesToCopy(dir, vault)).toEqual([]);
+    expect(await legacyBrowserFiles(vault)).toEqual([]);
+  });
+
+  test("Not now is remembered per vault on this browser", () => {
+    const store = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+    };
+    expect(legacyOfferDeferred(storage, "helper:hv_1")).toBe(false);
+    deferLegacyOffer(storage, "helper:hv_1");
+    expect(legacyOfferDeferred(storage, "helper:hv_1")).toBe(true);
+    expect(legacyOfferDeferred(storage, "folder:other")).toBe(false);
   });
 });

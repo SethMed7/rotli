@@ -41,6 +41,26 @@ describe("wikilink", () => {
     expect(resolveWikilink("path/x", index)).toBe("path/x");
   });
 
+  test("a link written with a path id resolves, .md and all (the id a titled-alike note gets)", () => {
+    // 2026-09-23, Rotli Web: two notes titled "AI and privacy"; the picker
+    // wrote the second's id — its path — and the link read as missing
+    const notes = [
+      note("wiki/Welcome/12 AI and privacy.md", "AI and privacy"),
+      note("wiki/From this browser/Welcome/AI and privacy.md", "AI and privacy"),
+    ];
+    const index = buildWikilinkIndex(notes);
+    const written = wikilinkLabel(notes[1]!, buildTitleCounts(notes));
+    expect(resolveWikilink(written, index)).toBe("wiki/From this browser/Welcome/AI and privacy.md");
+    expect(resolveWikilink("wiki/From this browser/Welcome/AI and privacy", index)).toBe(
+      "wiki/From this browser/Welcome/AI and privacy.md",
+    );
+    expect(resolveWikilink("wiki/From this browser/Welcome/AI and privacy.md|Privacy", index)).toBe(
+      "wiki/From this browser/Welcome/AI and privacy.md",
+    );
+    // the bare title stays ambiguous: two notes carry it
+    expect(resolveWikilink("AI and privacy", index)).toBeNull();
+  });
+
   test("resolveWikilink by unique title", () => {
     const index = buildWikilinkIndex([note("path/x", "My Note")]);
     expect(resolveWikilink("My Note", index)).toBe("path/x");
