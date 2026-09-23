@@ -737,7 +737,8 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   root `memex.json` that is not a valid Rotli marker is never replaced — it may
   be another tool's file — so that folder opens plain and the backup stays for
   a manual restore; the plain-folder open never scaffolds its reserved folders
-  into a folder with any `memex.json` or a Rotli backup. Folder inspection
+  into a folder with any `memex.json`, a Rotli backup, or a marker still in a
+  sweep folder, even when the heal before it failed. Folder inspection
   reports a recoverable vault as a vault. Plain Markdown and Obsidian folders
   never get a marker.
 - **Connect vault refuses no folder.** The switcher's Connect creates a vault in
