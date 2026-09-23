@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The public site footer now also includes a Featured on Founder.best badge,
+  beside the Launch Llama one.
 - **Boards on Rotli Web.** ⌘N → Board (or ⌘⇧T) makes a named Excalidraw
   board as a real `.excalidraw` file in your vault folder — the same file, in
   the same place, Rotli for Mac makes — and your strokes save into it. Boards
