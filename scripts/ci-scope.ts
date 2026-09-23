@@ -24,10 +24,17 @@ export function appChanged(paths: readonly string[]): boolean {
 /** Runs `git diff --name-only`; null when it fails. */
 export type DiffRunner = (range: string) => string[] | null;
 
-const gitDiff: DiffRunner = (range) => {
-  const diff = Bun.spawnSync(["git", "diff", "--name-only", range]);
-  return diff.exitCode === 0 ? diff.stdout.toString().split("\n").filter(Boolean) : null;
-};
+/** `git diff` in `cwd`. `--no-renames` lists a moved file's OLD path too:
+ * with rename detection only the destination shows, so moving app code into
+ * `docs/` would read as docs-only and skip the app lanes (review of #67). */
+export function gitDiffIn(cwd?: string): DiffRunner {
+  return (range) => {
+    const diff = Bun.spawnSync(["git", "diff", "--name-only", "--no-renames", range], cwd ? { cwd } : {});
+    return diff.exitCode === 0 ? diff.stdout.toString().split("\n").filter(Boolean) : null;
+  };
+}
+
+const gitDiff = gitDiffIn();
 
 const SHA = /^[0-9a-f]{40}$/;
 

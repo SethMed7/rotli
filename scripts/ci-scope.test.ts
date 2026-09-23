@@ -1,6 +1,9 @@
 import { expect, test } from "bun:test";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import { appChanged, scopeFor } from "./ci-scope";
+import { appChanged, gitDiffIn, scopeFor } from "./ci-scope";
 
 test("a website or docs-only change skips the app lanes", () => {
   expect(appChanged(["site/src/components/SiteFooter.astro", "site/Caddyfile", "CHANGELOG.md"])).toBe(false);
@@ -36,4 +39,30 @@ test("any doubt about the range runs every lane — a broken scope never skips",
   expect(scopeFor(sha, "b".repeat(40), () => null).app).toBe(true); // git diff failed
   expect(scopeFor(sha, "b".repeat(40), () => []).app).toBe(true); // nothing listed
   expect(scopeFor(sha, "b".repeat(40), () => ["site/Caddyfile"]).app).toBe(false);
+});
+
+test("moving app code into docs/ still runs the app lanes (the old path counts)", () => {
+  const repo = mkdtempSync(join(tmpdir(), "ci-scope-"));
+  const git = (...args: string[]) => {
+    const run = Bun.spawnSync(["git", "-c", "user.email=t@t", "-c", "user.name=t", ...args], { cwd: repo });
+    if (run.exitCode !== 0) throw new Error(run.stderr.toString());
+    return run.stdout.toString().trim();
+  };
+  try {
+    git("init", "-q");
+    mkdirSync(join(repo, "src"));
+    writeFileSync(join(repo, "src", "engine.ts"), "export const engine = 1;\n".repeat(20));
+    git("add", ".");
+    git("commit", "-qm", "app code");
+    const base = git("rev-parse", "HEAD");
+    mkdirSync(join(repo, "docs"));
+    git("mv", "src/engine.ts", "docs/engine.md");
+    git("commit", "-qm", "move it into docs");
+    const head = git("rev-parse", "HEAD");
+    const scope = scopeFor(base, head, gitDiffIn(repo));
+    expect(scope.paths).toContain("src/engine.ts");
+    expect(scope.app).toBe(true);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
 });
