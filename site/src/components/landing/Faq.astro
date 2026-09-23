@@ -1,0 +1,120 @@
+---
+// Short answers to the questions a first visit raises. Every answer restates
+// a claim made elsewhere on the site; nothing here may promise more.
+import { site } from '../../site';
+
+const questions = [
+  {
+    q: 'Is rotli free?',
+    a: site.sourcePublic
+      ? 'Yes. It is free, needs no account, and the source is open under the MIT license.'
+      : 'Yes. It is free and needs no account.',
+  },
+  {
+    q: 'Where do my notes live?',
+    a: 'In one folder you choose, as plain Markdown files. rotli keeps its settings and search indexes in a hidden .rotli folder inside it, and can rebuild them at any time.',
+  },
+  {
+    q: 'Does it work offline?',
+    a: 'Yes. Writing, tasks, links, and search need no network. Chat works offline too when you use an on-device model.',
+  },
+  {
+    q: 'Which AI can I use?',
+    a: 'A model that runs on your Mac, or the tools you already use, like Claude Code and Codex, with Cursor for code chat. AI is optional; rotli is a complete workspace without it.',
+  },
+  {
+    q: 'Can I leave?',
+    a: 'Your notes never left. The folder opens in any Markdown editor, and deleting rotli leaves every file where it was.',
+  },
+  {
+    q: 'What about Windows and Linux?',
+    a: site.webAppEnabled
+      ? 'Use Rotli Web in your browser today. Native Windows and Linux apps are planned.'
+      : 'Native Windows and Linux apps are planned.',
+  },
+];
+---
+
+<section class="section faq" id="faq" aria-labelledby="faq-title">
+  <div class="wrap faq-grid">
+    <header>
+      <h2 class="section-title" id="faq-title">Questions, answered.</h2>
+      <p class="section-lede">
+        More in <a href="/resources/">Resources</a>, starting with <a href="/resources/getting-started/">Getting started</a>.
+      </p>
+    </header>
+    <div class="faq-list">
+      {questions.map((item) => (
+        <details>
+          <summary>
+            <span>{item.q}</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14" /></svg>
+          </summary>
+          <p>{item.a}</p>
+        </details>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style>
+  /* The closing invitation follows directly; one section space between them, not two. */
+  .faq {
+    padding-bottom: 0;
+  }
+  .faq-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 2rem clamp(2rem, 6vw, 5rem);
+    align-items: start;
+  }
+  .section-lede a {
+    color: var(--accent-text);
+    text-underline-offset: 0.2em;
+  }
+  .faq-list {
+    border-top: 1px solid var(--border-strong);
+  }
+  details {
+    border-bottom: 1px solid var(--border-strong);
+  }
+  summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 4rem;
+    padding-block: 0.9rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  summary:hover span {
+    color: var(--accent-text);
+  }
+  summary svg {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    color: var(--text-muted);
+    transition: transform 160ms ease-out;
+  }
+  details[open] summary svg {
+    transform: rotate(45deg);
+  }
+  details p {
+    max-width: 40rem;
+    margin: 0 0 1.25rem;
+    color: var(--text-muted);
+    line-height: 1.62;
+  }
+  @media (max-width: 860px) {
+    .faq-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

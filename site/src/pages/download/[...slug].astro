@@ -1,9 +1,10 @@
 ---
-// /download/: every way to get rotli, by device. The site's Download buttons
-// still fetch the Mac DMG directly (DOWNLOAD_HREF in src/site.ts); point that
-// knob here once Windows and Linux builds exist and this page becomes the
-// chooser.
-import WritingList from '../../components/WritingList.astro';
+// /download/: where the header's Download button goes. It leads with the
+// visitor's own system (Base.astro stamps data-os): the Mac download on a
+// Mac; on Windows and Linux, "coming soon" with Rotli Web to use in the
+// meantime. Without script the Mac panel shows. Below, every platform and its
+// status in one list. The hero's "Download for Mac" still fetches the DMG
+// directly (DOWNLOAD_HREF in src/site.ts).
 import WritingPage from '../../components/WritingPage.astro';
 import { DOWNLOAD_URL, RELEASES_URL, WEB_APP_PATH, site } from '../../site';
 
@@ -11,31 +12,26 @@ export function getStaticPaths() {
   return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
 }
 
-const options = [
-  ...(site.downloadsEnabled
+const web = site.webAppEnabled;
+const mac = site.downloadsEnabled;
+
+type Status = 'available' | 'soon';
+const platforms: { name: string; detail: string; status: Status; action?: { href: string; label: string; external?: boolean } }[] = [
+  {
+    name: 'Mac',
+    detail: 'The whole workspace, including on-device AI and the Librarian. Apple silicon, macOS 11 or later.',
+    status: mac ? 'available' : 'soon',
+    action: mac ? { href: DOWNLOAD_URL, label: 'Download .dmg', external: true } : undefined,
+  },
+  { name: 'Windows', detail: 'A native app is planned.', status: 'soon' },
+  { name: 'Linux', detail: 'A native app is planned.', status: 'soon' },
+  ...(web
     ? [
         {
-          href: DOWNLOAD_URL,
-          title: 'Mac',
-          description: 'The full app: the editor, the Librarian, on-device and connected AI, and ⌥Space from anywhere.',
-          meta: 'Download .dmg · Apple silicon · free, no account',
-        },
-      ]
-    : []),
-  ...(site.webAppEnabled
-    ? [
-        {
-          href: WEB_APP_PATH,
-          title: 'Windows, Linux, and everything else',
-          description:
-            'Rotli Web runs in your browser today, with the same editor, folders, tasks, and links. In Chrome, Edge, or Arc it works in a real folder on your computer.',
-          meta: 'Open in your browser · nothing to install',
-        },
-        {
-          href: '/resources/rotli-helper/',
-          title: 'Rotli Helper',
-          description: 'Optional. A small program for Mac, Windows, and Linux that lets Rotli Web chat through the AI tools on your computer.',
-          meta: 'One line in a terminal',
+          name: 'Any browser',
+          detail: 'Rotli Web: the editor, folders, tasks, and links, working in a folder on your computer.',
+          status: 'available' as const,
+          action: { href: WEB_APP_PATH, label: 'Open Rotli Web' },
         },
       ]
     : []),
@@ -44,25 +40,196 @@ const options = [
 
 <WritingPage
   title="Download — rotli"
-  description="Get rotli for your Mac, or open it in any browser on Windows and Linux."
+  description="Get rotli for your Mac, or open it in your browser on Windows and Linux."
   canonicalPath="/download/"
+  section="download"
   heading="Get rotli"
   lede="Free, with no account. Your notes stay in a folder you choose."
+  wide
 >
-  <WritingList items={options} empty="The Mac alpha is in preparation." />
-  {
-    site.downloadsEnabled && (
+  <section class="pick" aria-label="Recommended for your computer">
+    <div class="pick-panel for-mac">
+      <h2>rotli for Mac</h2>
+      <p>Apple silicon · macOS 11 or later · free, no account</p>
+      <div class="pick-actions">
+        {
+          mac ? (
+            <a class="button primary" href={DOWNLOAD_URL} rel="noopener">Download for Mac</a>
+          ) : (
+            <span class="button primary pending" aria-disabled="true">Mac alpha coming soon</span>
+          )
+        }
+        {web && <a class="button secondary" href={WEB_APP_PATH}>Or open it in your browser</a>}
+      </div>
+    </div>
+
+    {
+      (['windows', 'linux', 'other'] as const).map((os) => (
+        <div class={`pick-panel for-${os}`}>
+          <h2>{os === 'windows' ? 'rotli for Windows is coming soon' : os === 'linux' ? 'rotli for Linux is coming soon' : 'rotli runs on your computer'}</h2>
+          <p>
+            {web
+              ? 'In the meantime, Rotli Web runs the same workspace in your browser, with no account and nothing to install.'
+              : 'Native apps for Windows and Linux are planned. Today, rotli is a Mac app.'}
+          </p>
+          <div class="pick-actions">
+            {web && <a class="button primary" href={WEB_APP_PATH}>Open rotli in your browser</a>}
+            {mac && <a class="button secondary" href={DOWNLOAD_URL} rel="noopener">Download for Mac instead</a>}
+          </div>
+          {web && (
+            <p class="pick-note">
+              Using Firefox, Safari, or another browser? <a href="/resources/rotli-helper/">Install Rotli Helper</a>, a
+              small program that lets Rotli Web save into your folder and chat through the AI tools on your computer.
+            </p>
+          )}
+        </div>
+      ))
+    }
+  </section>
+
+  <section class="all" aria-labelledby="all-title">
+    <h2 id="all-title">Every platform</h2>
+    <ul>
+      {platforms.map((platform) => (
+        <li>
+          <div>
+            <h3>{platform.name}</h3>
+            <p>{platform.detail}</p>
+          </div>
+          <span class:list={['status', platform.status]}>{platform.status === 'available' ? 'Available' : 'Coming soon'}</span>
+          <span class="action">
+            {platform.action && (
+              <a href={platform.action.href} rel={platform.action.external ? 'noopener' : undefined}>
+                {platform.action.label} <span aria-hidden="true">→</span>
+              </a>
+            )}
+          </span>
+        </li>
+      ))}
+    </ul>
+    {mac && (
       <p class="after">
-        Native Windows and Linux apps are planned. <a href={RELEASES_URL} rel="noopener">Release notes and older versions</a>.
+        <a href={RELEASES_URL} rel="noopener">Release notes and older versions</a>
       </p>
-    )
-  }
+    )}
+  </section>
 </WritingPage>
 
 <style>
-  .after {
-    margin-top: 1.75rem;
+  /* One panel shows, chosen by data-os. Without script (no data-os), the Mac panel. */
+  .pick-panel {
+    display: none;
+    max-width: 44rem;
+  }
+  :root:not([data-os]) .for-mac,
+  :root[data-os='mac'] .for-mac,
+  :root[data-os='windows'] .for-windows,
+  :root[data-os='linux'] .for-linux,
+  :root[data-os='mobile'] .for-other,
+  :root[data-os='other'] .for-other {
+    display: block;
+  }
+  .pick h2 {
+    margin: 0;
+    font-size: var(--step-h2);
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+  }
+  .pick p {
+    margin: 1rem 0 0;
     color: var(--text-muted);
+    font-size: var(--step-lede);
+    line-height: 1.55;
+  }
+  .pick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.75rem;
+  }
+  .pick .pick-note {
+    margin-top: 1.5rem;
     font-size: 0.95rem;
+  }
+  .pick-note a,
+  .after a {
+    color: var(--accent-text);
+    text-underline-offset: 0.2em;
+  }
+
+  .all {
+    margin-top: var(--section-space);
+  }
+  .all > h2 {
+    margin: 0 0 1.25rem;
+    font-size: var(--step-h3);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .all ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .all li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 8rem 11rem;
+    gap: 0.5rem 2rem;
+    align-items: center;
+    margin: 0;
+    padding: 1.25rem 0;
+    border-top: 1px solid var(--border-strong);
+  }
+  .all li:last-child {
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .all h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+  .all li p {
+    margin: 0.25rem 0 0;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+  .status {
+    justify-self: start;
+    padding: 0.2rem 0.65rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+  .status.available {
+    border-color: var(--accent-text);
+    color: var(--accent-text);
+  }
+  .action a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 44px;
+    color: var(--accent-text);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .action a:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+  .after {
+    margin-top: 1.25rem;
+    font-size: 0.95rem;
+  }
+  @media (max-width: 700px) {
+    .all li {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .all li > div {
+      grid-column: 1 / -1;
+    }
   }
 </style>

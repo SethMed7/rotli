@@ -1,0 +1,431 @@
+---
+// Make it yours: the theme studio (twelve real captures from public/themes/)
+// and the optional quokka companion. Both move only when the visitor asks:
+// no timers, so a background tab does no work and nothing loops beside text.
+import showcaseManifest from '../../assets/characters/showcase/showcase.json';
+
+// Swatch colours read the site swatch layer (Base.astro), which mirrors the
+// app's per-environment ground and accent tokens. They are CSS rules keyed by
+// data-swatch, never inline styles: production's CSP is `style-src 'self'`.
+const families = [
+  { id: 'rotli', name: 'Rotli', light: ['Warm Light', 'rotli-warm-light'], dark: ['Warm Dark', 'rotli-warm-dark'] },
+  { id: 'paper', name: 'Paper & Charcoal', light: ['Paper', 'paper'], dark: ['Charcoal', 'charcoal'] },
+  { id: 'ocean', name: 'Ocean', light: ['Ocean Light', 'ocean-light'], dark: ['Ocean Dark', 'ocean-dark'] },
+  { id: 'grove', name: 'Grove', light: ['Grove Light', 'grove-light'], dark: ['Grove Dark', 'grove-dark'] },
+  { id: 'iris', name: 'Iris', light: ['Iris Light', 'iris-light'], dark: ['Iris Dark', 'iris-dark'] },
+  { id: 'midnight', name: 'Midnight', light: ['Midnight Light', 'midnight-light'], dark: ['Midnight', 'midnight'] },
+] as const;
+
+const stops = families.flatMap((family) =>
+  (['light', 'dark'] as const).map((mode) => ({
+    id: `${family.id}-${mode}`,
+    family: family.name,
+    environment: family[mode][0],
+    screenshot: `/themes/${family[mode][1]}@2x.webp`,
+  })),
+);
+const first = stops[0];
+
+// Companion: real, selectable combinations rendered by
+// scripts/build-companion-showcase.ts with the app's own placement rules.
+const showcaseImages = import.meta.glob<{ default: ImageMetadata }>('../../assets/characters/showcase/*.webp', {
+  eager: true,
+});
+const companions = showcaseManifest.map((entry) => {
+  const image = showcaseImages[`../../assets/characters/showcase/${entry.slug}.webp`];
+  if (!image) throw new Error(`Missing companion render for ${entry.slug}; run bun scripts/build-companion-showcase.ts`);
+  return { ...entry, src: image.default.src };
+});
+---
+
+<section class="section band-warm personal" id="personal" aria-labelledby="personal-title">
+  <div class="wrap">
+    <header class="section-head">
+      <h2 class="section-title" id="personal-title">Make it yours.</h2>
+      <p class="section-lede">
+        Six theme families, each with a tuned light and dark environment. The calm grammar around
+        your notes stays the same in every one.
+      </p>
+    </header>
+
+    <div class="studio" data-reveal>
+      <figure class="studio-shot">
+        <img
+          id="theme-shot"
+          src={first.screenshot}
+          width="2376"
+          height="1485"
+          alt={`The rotli workspace in the ${first.environment} environment`}
+          loading="lazy"
+          decoding="async"
+        />
+        <figcaption>
+          <span id="theme-family">{first.family}</span>
+          <b id="theme-environment">{first.environment}</b>
+        </figcaption>
+      </figure>
+      <div class="studio-picker" role="group" aria-label="Preview a theme environment">
+        <span class="picker-head">Light</span>
+        <span class="picker-head">Dark</span>
+        {families.map((family) => (
+          <>
+            {(['light', 'dark'] as const).map((mode) => {
+              const stop = stops.find((candidate) => candidate.id === `${family.id}-${mode}`)!;
+              return (
+                <button
+                  type="button"
+                  class="swatch-button"
+                  data-stop={stop.id}
+                  data-shot={stop.screenshot}
+                  data-family={stop.family}
+                  data-environment={stop.environment}
+                  aria-pressed={stop.id === first.id ? 'true' : 'false'}
+                  aria-label={stop.environment}
+                  title={stop.environment}
+                >
+                  <span class="swatch" data-swatch={stop.id} aria-hidden="true"></span>
+                </button>
+              );
+            })}
+            <span class="picker-name">{family.id === 'paper' ? 'Paper' : family.name}</span>
+          </>
+        ))}
+      </div>
+    </div>
+
+    <div class="companion" data-reveal>
+      <div class="companion-art">
+        <div class="companion-stage">
+          {companions.map((companion, index) => (
+            <img
+              class:list={['companion-slide', { 'is-active': index === 0, 'is-next': index === 1, 'is-prev': index === companions.length - 1 }]}
+              data-companion={index}
+              src={companion.src}
+              width="400"
+              height="400"
+              alt={index === 0 ? companion.alt : ''}
+              data-alt={companion.alt}
+              data-label={companion.label}
+              loading="lazy"
+              decoding="async"
+            />
+          ))}
+        </div>
+        <div class="companion-controls">
+          <button type="button" class="companion-step" data-step="-1" aria-label="Previous quokka">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 5-7 7 7 7" /></svg>
+          </button>
+          <p id="companion-label" aria-live="polite">
+            <span id="companion-count">1 / {companions.length}</span>
+            <span id="companion-name">{companions[0].label}</span>
+          </p>
+          <button type="button" class="companion-step" data-step="1" aria-label="Next quokka">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7" /></svg>
+          </button>
+        </div>
+      </div>
+      <div class="companion-copy">
+        <h3>A quokka, when you want one.</h3>
+        <p>
+          Pick a body colour, black or white linework, a mood and pose, and glasses or a bucket hat
+          in any colour. Empty states choose a pose that fits. Turn the companion off and it appears
+          only during onboarding.
+        </p>
+        <p class="companion-name">
+          Why a quokka? rotli is short for Rottnest, the island quokkas call home.{' '}
+          <a href="/about/#name">The story behind the name <span aria-hidden="true">→</span></a>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  // Theme studio: a swatch swaps the capture and caption. Nothing cycles.
+  const shot = document.querySelector<HTMLImageElement>('#theme-shot');
+  const family = document.querySelector<HTMLElement>('#theme-family');
+  const environment = document.querySelector<HTMLElement>('#theme-environment');
+  const swatches = [...document.querySelectorAll<HTMLButtonElement>('.swatch-button')];
+  swatches.forEach((button) => {
+    // Warm the cache on intent so the swap is instant.
+    const preload = () => {
+      const image = new Image();
+      image.src = button.dataset.shot ?? '';
+    };
+    button.addEventListener('pointerenter', preload, { once: true });
+    button.addEventListener('focus', preload, { once: true });
+    button.addEventListener('click', () => {
+      if (shot && button.dataset.shot) {
+        shot.src = button.dataset.shot;
+        shot.alt = `The rotli workspace in the ${button.dataset.environment} environment`;
+      }
+      if (family) family.textContent = button.dataset.family ?? '';
+      if (environment) environment.textContent = button.dataset.environment ?? '';
+      swatches.forEach((other) => other.setAttribute('aria-pressed', String(other === button)));
+    });
+  });
+
+  // Companion: previous/next buttons and the neighbouring slides step through
+  // the showcase. Only the active slide carries alt text.
+  const slides = [...document.querySelectorAll<HTMLImageElement>('.companion-slide')];
+  const count = document.querySelector<HTMLElement>('#companion-count');
+  const name = document.querySelector<HTMLElement>('#companion-name');
+  let current = 0;
+  const show = (index: number) => {
+    const total = slides.length;
+    if (!total) return;
+    current = ((index % total) + total) % total;
+    slides.forEach((slide, i) => {
+      slide.classList.toggle('is-active', i === current);
+      slide.classList.toggle('is-prev', total > 1 && i === (current - 1 + total) % total);
+      slide.classList.toggle('is-next', total > 2 && i === (current + 1) % total);
+      slide.alt = i === current ? (slide.dataset.alt ?? '') : '';
+    });
+    if (count) count.textContent = `${current + 1} / ${total}`;
+    if (name) name.textContent = slides[current].dataset.label ?? '';
+  };
+  document.querySelectorAll<HTMLButtonElement>('.companion-step').forEach((button) => {
+    button.addEventListener('click', () => show(current + Number(button.dataset.step)));
+  });
+  slides.forEach((slide, i) => {
+    slide.addEventListener('click', () => {
+      if (slide.classList.contains('is-prev') || slide.classList.contains('is-next')) show(i);
+    });
+  });
+</script>
+
+<style>
+  .studio {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) auto;
+    gap: 2rem clamp(2rem, 5vw, 4rem);
+    align-items: start;
+  }
+  .studio-shot {
+    margin: 0;
+    min-width: 0;
+  }
+  .studio-shot img {
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-frame);
+  }
+  .studio-shot figcaption {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 0.9rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  .studio-shot figcaption b {
+    color: var(--text);
+    font-weight: 600;
+  }
+  /* The orb picker from the first site: Light and Dark per family, the
+     family name beneath. The orbs are the one place the site keeps a lit,
+     rounded swatch (a deliberate exception to the flat rule, kept by
+     request because they read as the themes themselves). */
+  .studio-picker {
+    display: grid;
+    grid-template-columns: repeat(2, 2.75rem);
+    column-gap: 0.9rem;
+    row-gap: 0.3rem;
+    justify-items: center;
+    align-items: center;
+  }
+  .picker-head {
+    margin-bottom: 0.35rem;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .picker-name {
+    grid-column: 1 / -1;
+    margin-bottom: 0.7rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .picker-name:last-child {
+    margin-bottom: 0;
+  }
+  .swatch-button {
+    width: 2.75rem;
+    height: 2.75rem;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+  }
+  .swatch-button:focus-visible {
+    outline-offset: 2px;
+  }
+  .swatch {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--border-strong) 60%, transparent);
+    background:
+      radial-gradient(circle at 32% 28%, color-mix(in srgb, white 45%, var(--swatch-ground)) 0%, transparent 46%),
+      radial-gradient(circle at 70% 74%, var(--swatch-accent) 0%, color-mix(in srgb, var(--swatch-accent) 55%, transparent) 30%, transparent 62%),
+      var(--swatch-ground);
+    box-shadow: inset 0 -6px 10px color-mix(in srgb, var(--deep) 14%, transparent);
+  }
+  .swatch-button[aria-pressed='true'] .swatch {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 3px;
+  }
+  .swatch[data-swatch='rotli-light'] { --swatch-ground: var(--swatch-rotli-light); --swatch-accent: var(--swatch-rotli-light-accent); }
+  .swatch[data-swatch='rotli-dark'] { --swatch-ground: var(--swatch-rotli-dark); --swatch-accent: var(--swatch-rotli-dark-accent); }
+  .swatch[data-swatch='paper-light'] { --swatch-ground: var(--swatch-paper-light); --swatch-accent: var(--swatch-paper-light-accent); }
+  .swatch[data-swatch='paper-dark'] { --swatch-ground: var(--swatch-paper-dark); --swatch-accent: var(--swatch-paper-dark-accent); }
+  .swatch[data-swatch='ocean-light'] { --swatch-ground: var(--swatch-ocean-light); --swatch-accent: var(--swatch-ocean-light-accent); }
+  .swatch[data-swatch='ocean-dark'] { --swatch-ground: var(--swatch-ocean-dark); --swatch-accent: var(--swatch-ocean-dark-accent); }
+  .swatch[data-swatch='grove-light'] { --swatch-ground: var(--swatch-grove-light); --swatch-accent: var(--swatch-grove-light-accent); }
+  .swatch[data-swatch='grove-dark'] { --swatch-ground: var(--swatch-grove-dark); --swatch-accent: var(--swatch-grove-dark-accent); }
+  .swatch[data-swatch='iris-light'] { --swatch-ground: var(--swatch-iris-light); --swatch-accent: var(--swatch-iris-light-accent); }
+  .swatch[data-swatch='iris-dark'] { --swatch-ground: var(--swatch-iris-dark); --swatch-accent: var(--swatch-iris-dark-accent); }
+  .swatch[data-swatch='midnight-light'] { --swatch-ground: var(--swatch-midnight-light); --swatch-accent: var(--swatch-midnight-light-accent); }
+  .swatch[data-swatch='midnight-dark'] { --swatch-ground: var(--swatch-midnight-dark); --swatch-accent: var(--swatch-midnight-dark-accent); }
+
+  .companion {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 2rem clamp(2rem, 6vw, 5rem);
+    align-items: center;
+    margin-top: clamp(4rem, 8vw, 6rem);
+    padding-top: clamp(3rem, 6vw, 4.5rem);
+    border-top: 1px solid var(--border-strong);
+  }
+  .companion-stage {
+    position: relative;
+    aspect-ratio: 5 / 3;
+    overflow: hidden;
+  }
+  .companion-slide {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 58%;
+    height: 100%;
+    object-fit: contain;
+    opacity: 0;
+    transform: translateX(-50%) scale(0.5);
+    transition: opacity 420ms ease, transform 420ms cubic-bezier(0.2, 0.7, 0.2, 1);
+    pointer-events: none;
+  }
+  .companion-slide.is-active {
+    z-index: 2;
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+  .companion-slide.is-prev,
+  .companion-slide.is-next {
+    z-index: 1;
+    opacity: 0.4;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  .companion-slide.is-prev {
+    transform: translateX(-100%) scale(0.6);
+  }
+  .companion-slide.is-next {
+    transform: translateX(0%) scale(0.6);
+  }
+  .companion-slide.is-prev:hover,
+  .companion-slide.is-next:hover {
+    opacity: 0.7;
+  }
+  .companion-controls {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    align-items: center;
+    gap: 0.75rem;
+    max-width: 24rem;
+    margin: 1rem auto 0;
+  }
+  .companion-step {
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .companion-step:hover {
+    background: var(--ground);
+  }
+  .companion-step svg {
+    width: 20px;
+    height: 20px;
+  }
+  #companion-label {
+    display: grid;
+    margin: 0;
+    text-align: center;
+  }
+  #companion-count {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+  #companion-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .companion-copy h3 {
+    margin: 0;
+    font-size: var(--step-h3);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .companion-copy p {
+    margin: 0.8rem 0 0;
+    max-width: 32rem;
+    color: var(--text-muted);
+    line-height: 1.62;
+  }
+  .companion-name a {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    color: var(--accent-text);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .companion-name a:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+
+  @media (max-width: 900px) {
+    .studio,
+    .companion {
+      grid-template-columns: 1fr;
+    }
+    .studio-picker {
+      grid-template-columns: repeat(6, auto);
+      justify-content: start;
+      column-gap: 0.5rem;
+    }
+    .picker-head,
+    .picker-name {
+      display: none;
+    }
+  }
+  @media (max-width: 520px) {
+    .studio-picker {
+      grid-template-columns: repeat(4, auto);
+    }
+  }
+</style>

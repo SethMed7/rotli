@@ -51,11 +51,50 @@ bun run preview  # serve the built dist/ locally
   under review. App enforcement is separate: Breve and Mermaid visual editing
   are disabled in stable builds; conventional file adapters remain available
   pending fidelity review. Site labels do not enforce app access.
-- **Structure and navigation.** `src/nav.ts` is the one navigation policy:
-  the header lists Product · Resources · Blog · About, and the footer's links
-  and tagline default from it. Pages pass only `current`. Below 1080px the
-  sections fold into a Menu disclosure (`<details>`, Escape and outside click
-  close it); below 560px the header actions move into it too.
+- **Structure and navigation.** `src/nav.ts` is the one navigation policy.
+  The header links real pages, never landing anchors: Features · Privacy ·
+  Resources · About, plus Blog once a post is published (an empty index is
+  never linked). On the right sit the GitHub mark (icon only, while the source
+  is public) and one Download button, which opens `/download/`. Download is
+  not also a menu item. The footer's link columns (Product · Learn · Open
+  source, the last only while the source is public) and tagline default from
+  the same file. Pages pass only `current`. The header stays pinned on a solid
+  ground (flat: no blur, no shadow); `[id]` targets carry a matching
+  `scroll-margin-top`. Below 1080px the pages fold into a Menu disclosure
+  (`<details>`; Escape, an outside click, or choosing a link closes it); below
+  560px the GitHub mark and Download move into it too. The footer's closing
+  row holds the maker line and the two directory badges.
+- **The landing page** (`src/components/Landing.astro`) only composes its
+  chapters from `src/components/landing/`: Hero → Features (`compact`: the
+  editor, chat, and Librarian, then a link to `/features/`; the dev-only
+  Experiments follow) → PrivacyBrief (three facts and a link to `/privacy/`)
+  → Everywhere (Rotli Web, only while `WEB_APP_ENABLED`) → Personal (themes +
+  companion) → the film (`PromoFilm.astro`) → Faq → FinalCta. **`/features/`**
+  composes the same chapters in full (Features with every smaller habit,
+  Folder, Everywhere, Personal) under its own page head. Each chapter owns its
+  markup, scoped styles, and script. `Base.astro` owns the tokens, the shared
+  section grammar (`.wrap`, `.section`, `.section-title`, `.section-lede`,
+  `.band-warm`, `.band-deep`, the spacing and type steps), and the one
+  scroll-reveal script. Nothing on the page moves on a timer: the theme studio
+  and companion change only when a visitor picks a swatch or steps the
+  carousel, and scroll reveals fire once and rest. Two-column rows share a
+  top edge so each heading starts level with its picture.
+- **`/privacy/`** is the full privacy policy in plain language: the short
+  version, where notes live, every network connection and when it happens, AI
+  and secure/locked notes (with the access table), Rotli Web and Rotli Helper,
+  this website (no cookies, analytics, or third-party scripts; the two footer
+  badges load from their own hosts), retention, and changes, each with the
+  reason it works that way. `PRIVACY.md` at the repository root stays the
+  product's source of truth: change this page in the same change as
+  `PRIVACY.md` whenever a data class, destination, retention rule, or control
+  changes. Features that are off in released builds (Breve, remote agents)
+  are described as off, not as available.
+- **Subpages** (`WritingPage.astro`) sit on the site grid: breadcrumb, title,
+  and lede line up with the header's brand, a full-width rule divides the head
+  from the body, and long pages pass `toc` for a sticky "On this page" column
+  (resource articles build it from their `##` headings). Resource articles end
+  with "More resources". Index lists (`WritingList.astro`) are plain entries
+  in columns with a hairline above each, never boxes.
 - **Writing.** Resources (evergreen, question-titled) and blog posts are
   Markdown in one content collection, `src/content/writing/{resources,posts}/`
   (schema: `src/content.config.ts`). `src/writing.ts` decides what a build
@@ -65,17 +104,20 @@ bun run preview  # serve the built dist/ locally
   links the `the-creation-of-rotli` post once it is published). Markdown code
   blocks are not syntax-highlighted: Shiki writes inline `style=` attributes,
   which the production CSP drops. Keep article images local.
-- **`/download/`** lists every way in by device: the Mac DMG, Rotli Web for
-  Windows, Linux, and everything else, and Rotli Helper. The header and hero
-  Download buttons still fetch the DMG directly; pointing `DOWNLOAD_HREF` at
-  `/download/` makes this page the chooser once other native builds exist. The
-  Helper guide is `/resources/rotli-helper/`; the 404 page's `/helper` hint
-  links there.
+- **`/download/`** is where the header's Download button goes. It leads with
+  the visitor's own system (`Base.astro` stamps `data-os`: mac, windows,
+  linux, mobile, or other): the Mac download on a Mac; on Windows and Linux,
+  "coming soon" with Rotli Web to use in the meantime and Rotli Helper for
+  browsers without folder access. Without script the Mac panel shows. Below,
+  "Every platform" lists Mac, Windows, Linux, and any browser with their
+  status. The hero's Download for Mac still fetches the DMG directly
+  (`DOWNLOAD_HREF`). The Helper guide is `/resources/rotli-helper/`; the 404
+  page's `/helper` hint links there.
 - **Download and the browser.** `SiteActions.astro` renders the two ways in —
-  Open in browser and Download — in the header, the hero, and the mobile menu.
-  `DOWNLOAD_HREF` in `src/site.ts` is where every Download button goes (today
-  the newest Mac DMG, directly; point it at a download page when Windows and
-  Linux builds exist). `Base.astro` stamps `data-platform` on `<html>`; off a
+  Open in browser and Download — in the hero and the closing invitation (the
+  header has only its Download button to `/download/`). `DOWNLOAD_HREF` in
+  `src/site.ts` is where those Download buttons go (today the newest Mac DMG,
+  directly). `Base.astro` stamps `data-platform` on `<html>`; off a
   Mac (iPads included) the browser action leads and the download reads
   "Download for Mac". Without script the Mac order stays.
 - `WEB_APP_ENABLED` decides whether pages link to **Rotli Web**, the app bundle
@@ -86,7 +128,8 @@ bun run preview  # serve the built dist/ locally
   by the `handle /app/*` block in `site/Caddyfile` under its own headers
   (`connect-src http://127.0.0.1:*` only, for Rotli Helper — held by `check:web-privacy`; inline styles allowed for the editors; `noindex`).
   Design and phases: `docs/design/web-version-and-shell-batch-2026-09-16.md`.
-- **Locally, `/app/` on the site is the web app's dev server.** `astro dev` and
+- **Locally, `/app/` on the site is the web app's dev server** (the proxy key
+  is `/app/` with the slash; a bare `/app` also caught `/apple-touch-icon.png`). `astro dev` and
   `astro preview` have no Caddy and no Docker `app` stage, so they pass `/app/`
   through to `bun run dev:web` (port 1437, run at the repository root). "Open
   in browser" then works on the site's own port, as on rotli.co. With that
@@ -108,10 +151,15 @@ bun run preview  # serve the built dist/ locally
   release page. Do not construct a DMG URL from the app package version: a
   version bump can merge before its signed asset is published.
 - Site tokens in `src/layouts/Base.astro` keep every page in Rotli Light,
-  regardless of OS appearance or previously saved site preferences. Only the
-  hero uses Paper tokens on a plain solid ground (no photographic backdrop).
-  The theme showcase changes its own screenshot and caption; it never recolors
-  the site. Keep tokens aligned with `src/brand/`.
+  regardless of OS appearance or previously saved site preferences. The
+  theme showcase changes its own screenshot and caption; it never recolors
+  the site. The site is flat like the app (DESIGN.md "Flat material"): no
+  shadows, blur, or glows. The one deliberate exception is the theme studio's
+  orb swatches (kept from the first site at the owner's request, 2026-09-23):
+  each orb is lit with radial gradients and an inset shadow so it reads as the
+  environment itself. Keep tokens aligned with `src/brand/`.
+  Every text/background pair measures at least WCAG AA (lowest: muted text on
+  the warm band, 4.90:1).
 - Fonts (General Sans body, Baloo 2 wordmark) are copied into
   `public/fonts/` from `src/brand/fonts/`.
 - The compact mark comes from `src/assets/characters/`. The privacy quokka in
@@ -127,16 +175,49 @@ bun run preview  # serve the built dist/ locally
 - `src/components/SiteHeader.astro` and `SiteFooter.astro` are the only header
   and footer; their shared styles live in
   `src/layouts/Base.astro`. Pages own only their sections.
-- The Rotli Web section shows `public/rotli-web@2x.webp`, a lossless capture
-  of `rotli.co/app/` on a first visit (fresh browser, seeded Welcome folder
-  only) at 1280 × 800 logical, 2× density.
-- The hero and theme studio use lossless 3840 × 2400 browser-demo captures
-  (1280 × 800 logical viewport at 3× density), never a live vault. The Playground
-  uses a 4320 × 2700 capture in Rotli Light. The `@3x.png` filenames replace the
-  old 1× URLs so cached blurry images cannot persist. Do not upscale screenshots.
-- The hero uses a plain Paper ground with no photographic backdrop. Product
-  captures remain fully opaque and sharp. The old coastline blend and grain
-  overlay are not loaded.
+- The ways-in chapter (Mac app, Rotli Web, Rotli Helper) is three plain
+  columns with no screenshot. `public/rotli-web@2x.webp` (a first-visit
+  capture of `rotli.co/app/`) is no longer shown on the landing page.
+- The hero is words only: it fills the first screen on `public/hero-pattern.svg`
+  (the social card's faint note, folder, checklist, and chat icons, masked so
+  they fade out behind the headline) with the filled cocoa waving quokka
+  (`src/assets/characters/filled/cocoa/waving.webp`) peeking up from its
+  bottom edge. The product capture starts right below the fold, so the quokka
+  appears to look over it. That capture, `public/rotli-app-warm-light@3x.png`,
+  and the theme studio's `public/themes/` are lossless browser-demo captures (1280 × 800 logical
+  viewport at 3× and 2× density), never a live vault. The coming-soon page
+  uses the 4320 × 2700 `rotli-playground@3x.png`. The `@3x.png` filenames
+  replace the old 1× URLs so cached blurry images cannot persist. Do not
+  upscale screenshots.
+- **Feature captures** (`public/shots/`) are real app UI on synthetic data,
+  never a live vault, at 2× density:
+  - `render-*`: the stable browser twin (`ROTLI_BUILD_CHANNEL=stable bunx vite
+    --port 1431`), a "Launch week" note typed through the editor with every
+    control trigger from SYNTAX.md, clicked to real states, plus Aa → Raw
+    markdown for `render-raw` and the Tables and code lesson for `render-tables`.
+  - `board`: an Excalidraw board drawn with its own toolbar in Rotli Web
+    (`bun run dev:web`, an origin-private test vault, the same path as
+    `e2e/web/rotli-web-boards.spec.ts`).
+  - `chat` and `lock-menu`: frames of the Mac launch shoot's raw takes
+    (`_review/promo-v5/rec/R5d.mov` at 130.8 s, `R4.mov` at 73.6 s; synthetic
+    Notebook vault), cropped with the cursor painted out.
+  Re-capture rather than hand-edit them. `--capture-ground` in `Base.astro` is
+  the editor paper those captures sit on.
+- **The features area** (`landing/Features.astro`, full on `/features/`,
+  `compact` on the landing page) is organized as you meet the product:
+  RenderShowcase (the same note rendered and as raw Markdown, then tasks,
+  choices, diagrams, tables/code/math with their syntax) → ChatFlow (a real
+  reply; the four steps: asks, keeps "Conversation notes" after every reply,
+  writes notes and files on the Mac, you jump in or Lock it) → Formats
+  (Documents on Univer, Sheets coming soon, Boards on Excalidraw, with status
+  chips from `featurePolicy.ts`, and where Assets live) → the Librarian →
+  ConnectAI (each provider's own CLI installed in Terminal; rotli never signs in,
+  reads login files, or stores credentials; Rotli Helper runs the same tools for
+  Rotli Web; the install lines mirror `src/ai/connectorGuides.ts`) → habits.
+- The landing privacy band is brief and points to `/privacy/`. Its quokka is
+  the canonical line art (`src/assets/characters/stays_local.svg`, drawn in
+  `currentColor`) inlined in the band's light ink, standing on the band's
+  bottom edge at the right: lines only, no fill.
 - The coming-soon page keeps the same Rotli Light foundation and shows the real
   Playground capture. The introduction begins with the coming-soon label. Its
   one call to action is "Follow development on GitHub" when the source is
@@ -242,7 +323,7 @@ launch:
 2. In Railway → `rotli-site` → production service, set `SITE_MODE=full`
    (leave `SITE_URL=https://rotli.co`). Redeploy so the Docker build picks up
    the new build arg.
-3. Check `https://rotli.co/` renders the landing (hero film, Download for
+3. Check `https://rotli.co/` renders the landing (hero capture, Download for
    Mac), `/robots.txt` allows indexing, and `/sitemap-index.xml` exists.
 4. Roll back by setting `SITE_MODE=coming-soon` again and redeploying.
 
@@ -275,23 +356,20 @@ Two media slots share `public/media/`:
 
 | Slot | Role | When it renders |
 | --- | --- | --- |
-| Full film | Landing hero (right column); holding page `#film` | `rotli-promo.mp4` + poster + captions exist |
-| Teaser | Landing hero fallback only | Full cut missing, and `rotli-teaser.mp4` + poster exist |
+| Full film | Landing `#film` (after the theme chapter); holding page `#film` | `rotli-promo.mp4` + poster + captions exist |
+| Teaser | Not rendered today (kept for a future slot) | `rotli-teaser.mp4` + poster exist |
 
-The landing hero prefers the full promo and autoplays it muted with a sound
-toggle. The same clip is not stacked again below the hero. `PromoFilm.astro`
-still owns the click-to-play film block on the holding page.
+`PromoFilm.astro` owns the one player on both pages: click-to-play with native
+controls, `preload="none"` (no request until play), `playsinline`, a poster,
+optional captions, and fallback text; no autoplay, no third-party player, no
+cookie. The hero shows a still capture instead, so the film never plays
+twice. The poster is a frame of the film itself (2 s in: "One folder. Your
+vault."); the film's own opening card still reads "Mac beta in preparation"
+and needs a new cut from the film project. A slot renders only when its
+required artifacts exist at build time.
 
-Players on the holding page are click-to-play with native controls:
-`preload="none"`, `playsinline`, a poster, optional captions, and fallback text.
-The hero clip autoplays muted with an explicit sound toggle (no third-party
-player, no cookie). Reduced-motion visitors keep the poster until they start
-playback. A slot renders only when its required artifacts exist at build time.
-
-Theme studio previews twelve environments from `public/themes/` (six families ×
-light/dark). Fresh captures live beside the family + Light/Dark controls; the
-Organize section tells the Librarian story: work in a view while filing stays
-underneath.
+The theme studio previews twelve environments from `public/themes/` (six
+families × light/dark), one row per family with Light and Dark swatches.
 
 | Artifact | Path | Teaser | Full |
 | --- | --- | --- | --- |
@@ -311,8 +389,10 @@ real files are ready.
 
 ## Playground and launch assets
 
-The full/dev landing page includes `PlaygroundStory.astro` and the reviewed
-`public/rotli-playground@3x.png` capture from a fresh synthetic browser fixture whose Main holds only the seeded Welcome folder.
+The coming-soon page shows the reviewed `public/rotli-playground@3x.png`
+capture from a fresh synthetic browser fixture whose Main holds only the
+seeded Welcome folder; the launch page names the nine Welcome lessons in its
+feature list and closing line instead of a separate section.
 With the app browser twin running at localhost:1430, regenerate site media
 from the repository root:
 

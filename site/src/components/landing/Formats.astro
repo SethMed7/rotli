@@ -1,0 +1,186 @@
+---
+// Beyond Markdown: Word documents (a Rotli-owned DOCX codec with a Univer
+// editor, Mac app), spreadsheets (coming soon; CSV edits in place today),
+// and Excalidraw boards. Then Assets: where pasted images and the files chat
+// makes are kept. Status follows src/lib/featurePolicy.ts and the stable New
+// chooser (captured in public/shots/chooser.webp); the board is a real
+// Excalidraw canvas drawn with its own tools in Rotli Web.
+const formats = [
+  {
+    title: 'Documents',
+    status: 'Mac app',
+    body: 'Open and edit real Word files. rotli saves them back as .docx, keeps the parts it does not touch, and makes a one-time backup first. The editor is built on Univer.',
+  },
+  {
+    title: 'Sheets',
+    status: 'Coming soon',
+    body: 'Excel workbooks are on the way. CSV files already open and edit in place.',
+  },
+  {
+    title: 'Boards',
+    status: 'Mac app',
+    body: 'Sketch on an Excalidraw canvas saved as an ordinary .excalidraw file. Chat can draw one for you from a diagram.',
+  },
+];
+
+const assets = [
+  { path: 'storage/images/', file: 'whiteboard.png', how: 'pasted or dropped into a note' },
+  { path: 'storage/rotli/', file: 'project-brief.docx', how: 'made from a chat' },
+  { path: 'storage/excalidraw/', file: 'launch-map.excalidraw', how: 'drawn on a board' },
+];
+---
+
+<div class="formats" data-reveal>
+  <figure class="frame board">
+    <img
+      src="/shots/board.webp"
+      width="1500"
+      height="470"
+      alt="An Excalidraw board in rotli titled Launch map, with Capture, Note, and Library boxes joined by arrows"
+      loading="lazy"
+      decoding="async"
+    />
+  </figure>
+  <ul class="format-list">
+    {formats.map((format) => (
+      <li>
+        <div class="format-head">
+          <h4>{format.title}</h4>
+          <span class:list={['status', { soon: format.status === 'Coming soon' }]}>{format.status}</span>
+        </div>
+        <p>{format.body}</p>
+      </li>
+    ))}
+  </ul>
+</div>
+
+<div class="assets" data-reveal>
+  <div class="assets-copy">
+    <h3>Assets stay in the folder.</h3>
+    <p>
+      Paste or drop an image and it is saved into your vault, ready to embed in any note. Documents and boards
+      you or your chats create land beside it. Assets is where you browse them all.
+    </p>
+  </div>
+  <ul class="asset-list" aria-label="Where assets are saved in the vault">
+    {assets.map((asset) => (
+      <li>
+        <code><span>{asset.path}</span>{asset.file}</code>
+        <small>{asset.how}</small>
+      </li>
+    ))}
+  </ul>
+</div>
+
+<style>
+  .frame {
+    margin: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-frame);
+    overflow: hidden;
+    background: var(--capture-ground);
+  }
+  .frame img {
+    width: 100%;
+    height: auto;
+  }
+  .formats {
+    display: grid;
+    gap: clamp(2rem, 4vw, 2.75rem);
+  }
+  .format-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2rem clamp(1.5rem, 4vw, 3rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .format-list li {
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--border-strong);
+  }
+  .format-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  h4 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 600;
+  }
+  .status {
+    padding: 0.15rem 0.6rem;
+    border: 1px solid var(--accent-text);
+    border-radius: 999px;
+    color: var(--accent-text);
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .status.soon {
+    border-color: var(--border-strong);
+    color: var(--text-muted);
+  }
+  .format-list p {
+    margin: 0.5rem 0 0;
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+  .assets {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 2rem clamp(2rem, 6vw, 5rem);
+    align-items: start;
+    margin-top: clamp(4rem, 8vw, 6rem);
+  }
+  h3 {
+    margin: 0;
+    font-size: var(--step-h3);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+  .assets-copy p {
+    max-width: 30rem;
+    margin: 0.8rem 0 0;
+    color: var(--text-muted);
+    line-height: 1.62;
+  }
+  .asset-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--border-strong);
+  }
+  .asset-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.25rem 1rem;
+    padding: 0.95rem 0;
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .asset-list code {
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.92rem;
+    font-weight: 600;
+  }
+  .asset-list code span {
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+  .asset-list small {
+    color: var(--text-muted);
+    font-size: 0.86rem;
+  }
+  @media (max-width: 860px) {
+    .format-list,
+    .assets {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

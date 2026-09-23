@@ -1,13 +1,13 @@
 ---
-// The full launch film on the holding page. The landing hero owns the promo
-// cut directly, so this section is not stacked under the landing hero.
+// The full launch film, on the landing page (after the theme chapter) and on
+// the holding page. The hero shows a still capture, so the film plays once here.
 // Renders only when public/media/ has real files, so a build never ships an
 // empty player. Click-to-play with native controls: no autoplay, no
 // third-party player, no cookies, and no network request until play.
 import { site } from '../site';
 
 interface Props {
-  /** `landing` sits between the hero and the proof strip; `soon` follows the holding-page introduction. */
+  /** `landing` sits after the theme chapter on the launch page; `soon` follows the holding-page introduction. */
   variant?: 'landing' | 'soon';
 }
 
@@ -20,18 +20,17 @@ const film = site.promo.full;
     <section class:list={['film', `film-${variant}`]} id="film" aria-labelledby="film-title">
       <div class="film-panel">
         <div class="film-copy">
-          <h2 id="film-title">Rotli, in motion.</h2>
+          <h2 id="film-title">rotli, in motion.</h2>
           <p class="film-lede">
-            A place to write, think with a model, and make yourself at home.
-            See how it feels in 42 seconds.
+            Writing, filing, chat, and secure notes in one short film, recorded from the real app.
           </p>
           <ul class="film-facts" aria-label="Playback details">
             <li>Plays with sound</li>
             <li>{film.captions ? 'Captions available' : 'On-screen captions'}</li>
-            <li>Real Playground footage</li>
+            <li>Real product footage</li>
           </ul>
           <div class="film-start">
-            <button class="film-play" type="button" hidden aria-label="Play the Rotli film">
+            <button class="film-play" type="button" hidden aria-label="Play the rotli film">
               <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
                 <path d="M8 5.5v13l10.5-6.5z" />
               </svg>
@@ -49,7 +48,7 @@ const film = site.promo.full;
             poster={film.poster}
             width="1920"
             height="1080"
-            aria-label="Rotli launch film"
+            aria-label="rotli launch film"
           >
             <source src={film.video} type="video/mp4" />
             {film.captions && (
@@ -106,9 +105,13 @@ const film = site.promo.full;
 
 <style>
   .film {
-    width: min(100% - 3rem, var(--page-max));
+    width: min(100% - 2 * var(--gutter), var(--page-max));
     margin-inline: auto;
     padding-block: clamp(2.5rem, 5vw, 4.5rem);
+  }
+
+  .film-landing {
+    padding-block: var(--section-space) 0;
   }
 
   .film-soon {
@@ -253,10 +256,6 @@ const film = site.promo.full;
   }
 
   @media (max-width: 560px) {
-    .film {
-      width: min(100% - 1.5rem, var(--page-max));
-    }
-
     .film-panel {
       padding: 1rem;
       border-radius: 0.8rem;

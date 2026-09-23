@@ -10,8 +10,8 @@ date: 2026-09-14
 rotli asks for one folder. That folder is your vault: every note you write is a plain Markdown file
 inside it. Choose an empty folder to start fresh, or one that already has Markdown notes in it.
 
-In Rotli Web, Chrome, Edge, and Arc can open a real folder too. Other browsers keep the vault in the
-browser until you export it.
+Rotli Web works the same way: Chrome, Edge, and Arc open the folder directly, and other browsers reach it
+through [Rotli Helper](/resources/rotli-helper/).
 
 ## 2. Try the Welcome folder
 

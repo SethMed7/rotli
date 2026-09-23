@@ -58,8 +58,10 @@ function cspInlineStyleGuard() {
  * output is untouched: this is server config only.
  */
 const WEB_APP_DEV_ORIGIN = "http://localhost:1437";
+// Keyed "/app/" (with the slash): a bare "/app" prefix also matched
+// /apple-touch-icon.png and proxied the icon away.
 const localWebApp = {
-  "/app": {
+  "/app/": {
     target: WEB_APP_DEV_ORIGIN,
     ws: true,
     configure: (proxy) => {

@@ -1,6 +1,7 @@
 ---
 // /about/: what rotli is, the name, who makes it. Kept short on purpose; the
 // longer story is the "creation" post, linked once it is published here.
+import waving from '../../assets/characters/showcase/fern-glasses-waving.webp';
 import WritingPage from '../../components/WritingPage.astro';
 import { site } from '../../site';
 import { publishedWriting, slugOf } from '../../writing';
@@ -27,6 +28,15 @@ const story = posts.find((post) => slugOf(post) === 'the-creation-of-rotli');
     app, including this one.{site.webAppEnabled ? ' It runs on your Mac, and in your browser with Rotli Web.' : ''}
   </p>
 
+  <img
+    class="about-quokka"
+    src={waving.src}
+    width="220"
+    height="220"
+    alt="A fern-green quokka in glasses, waving"
+    loading="lazy"
+    decoding="async"
+  />
   <h2 id="name">Why "rotli"?</h2>
   <p>
     rotli is short for Rottnest, the island off Western Australia where quokkas live. Short, quick to say,
@@ -50,3 +60,20 @@ const story = posts.find((post) => slugOf(post) === 'the-creation-of-rotli');
     }
   </p>
 </WritingPage>
+
+<style>
+  /* One of the companion looks a person can pick in Settings → Companion. */
+  .about-quokka {
+    float: right;
+    width: 220px;
+    height: 220px;
+    margin: 0.5rem 0 1rem 1.5rem;
+    shape-outside: circle(45%);
+  }
+  @media (max-width: 560px) {
+    .about-quokka {
+      float: none;
+      margin: 0 auto;
+    }
+  }
+</style>

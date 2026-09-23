@@ -1,0 +1,65 @@
+---
+// /features/: the whole tour, as its own page rather than a landing anchor.
+// It composes Features in full (rendering, chat, documents and boards, assets,
+// the Librarian, connecting AI tools, the smaller habits), then the folder and
+// the themes. The ways in (Mac, Rotli Web, Helper) stay on the landing page and
+// /download/; the Helper also appears under connecting AI.
+import Base from '../../layouts/Base.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import Experiments from '../../components/landing/Experiments.astro';
+import Features from '../../components/landing/Features.astro';
+import FinalCta from '../../components/landing/FinalCta.astro';
+import Folder from '../../components/landing/Folder.astro';
+import Personal from '../../components/landing/Personal.astro';
+import { site } from '../../site';
+
+export function getStaticPaths() {
+  return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
+}
+---
+
+<Base
+  title="Features — rotli"
+  description="What rotli does: a quiet Markdown editor, tasks that stay text, links and search, chat that reads your notes, a Librarian that files without rewriting, and themes to make it yours."
+  canonicalPath="/features/"
+  noindex={!site.indexable}
+>
+  <SiteHeader current="features" />
+  <main id="content">
+    <header class="wrap page-head">
+      <h1>Everything rotli does, in plain files.</h1>
+      <p>
+        A calm editor, tasks and links that stay Markdown, chat that reads your notes, and a Librarian that
+        keeps them filed. All of it works on one folder you own.
+      </p>
+    </header>
+    <Features />
+    <Experiments />
+    <Folder />
+    <Personal />
+    <FinalCta />
+  </main>
+  <SiteFooter />
+</Base>
+
+<style>
+  .page-head {
+    padding-top: clamp(3rem, 7vw, 5rem);
+  }
+  h1 {
+    max-width: 16ch;
+    margin: 0;
+    font-size: var(--step-display);
+    font-weight: 600;
+    line-height: 0.98;
+    letter-spacing: -0.045em;
+  }
+  p {
+    max-width: 38rem;
+    margin: 1.4rem 0 0;
+    color: var(--text-muted);
+    font-size: var(--step-lede);
+    line-height: 1.55;
+  }
+</style>

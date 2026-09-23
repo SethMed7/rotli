@@ -15,11 +15,13 @@ opens in the other, because both read the same ordinary files.
 
 ## Where Rotli Web keeps your notes
 
-- **Chrome, Edge, or Arc:** choose *Open a folder on this computer* and that folder becomes the vault.
-  Every note is a real file there, the same files the Mac app reads.
-- **Firefox, Safari, and other browsers** can't write to a folder, so the vault lives in the browser's
-  own storage on your device. *Import a folder* brings notes in; *Export vault (.zip)* gives them back.
-  Clearing the site's data removes that copy, so export what you want to keep.
+Every note is a real file in a folder on your computer, the same files the Mac app reads. Rotli Web
+asks for that folder before anything opens.
+
+- **Chrome, Edge, or Arc** open the folder directly.
+- **Firefox, Safari, and other browsers** can't write to a folder themselves, so they use
+  [Rotli Helper](/resources/rotli-helper/), a small program on your computer that reads and writes the
+  one folder you pick.
 
 The page can't send your notes anywhere. Its security policy only allows it to connect to Rotli Helper,
 and only if you run it on your own computer.

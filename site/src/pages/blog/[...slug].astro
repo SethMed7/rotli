@@ -34,6 +34,7 @@ const { Content } = entry ? await render(entry) : { Content: null };
       description={entry.data.description}
       canonicalPath={`/blog/${slugOf(entry)}/`}
       section="blog"
+      crumbs={[{ href: '/blog/', label: 'Blog' }]}
       kicker={entry.data.draft ? 'Draft · dev site only' : formatDate(entry.data.date)}
       heading={entry.data.title}
       lede={entry.data.description}
@@ -48,6 +49,7 @@ const { Content } = entry ? await render(entry) : { Content: null };
       section="blog"
       heading="Blog"
       lede="Notes from building rotli."
+      wide
     >
       <WritingList items={items} empty="The first post is on its way." />
     </WritingPage>
