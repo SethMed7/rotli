@@ -14,9 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The Rotli Helper installers now download Rotli Helper 1.4.0, which tells
   Rotli Web which models your AI tools offer, so the web chat lists them live.
-
-### Changed
-
 - **A new rotli.co.** A simple first screen: the promise, one sentence, and
   the two ways in over a faint pattern of note and folder icons, with the
   waving quokka peeking over the product just below the fold (no autoplaying
