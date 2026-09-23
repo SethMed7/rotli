@@ -1,0 +1,165 @@
+---
+// The landing hero: one promise, one sentence, the two ways in. It fills the
+// first screen on a faint tile of note, folder, and checklist icons (the same
+// pattern as the link preview, public/social-card.svg) that fades out behind
+// the words. The waving quokka peeks over the product capture, which starts
+// right below the fold. The capture is a real browser demo, never a live vault.
+import waving from '../../../../src/assets/characters/filled/cocoa/waving.webp';
+import { site } from '../../site';
+import SiteActions from '../SiteActions.astro';
+
+const promises = [
+  {
+    title: 'Plain files',
+    body: 'Every note is Markdown in a folder you choose. Open it in any editor, back it up any way you like.',
+  },
+  {
+    title: 'No account',
+    body: 'Nothing to sign up for and nothing to sync through. rotli works offline and stays useful without AI.',
+  },
+  {
+    title: 'AI on your terms',
+    body: 'Leave it off, run a model on your Mac, or connect the tools you already use. Secure notes never reach a remote model.',
+  },
+];
+---
+
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero-pattern" aria-hidden="true"></div>
+  <div class="hero-copy">
+    <h1 id="hero-title">Room to think.<br />Files you keep.</h1>
+    <p class="hero-lede">
+      The calm notes app for your Mac. Every note is a plain Markdown file in a folder you own, with
+      AI only when you ask for it.
+    </p>
+    <SiteActions webLabel="Open in your browser" downloadLabel="Download for Mac" />
+    <p class="hero-meta">
+      {site.downloadsEnabled ? 'Free · No account · Works offline' : 'Mac alpha in preparation · Free · No account'}
+    </p>
+  </div>
+  <img class="hero-quokka" src={waving.src} width="512" height="512" alt="" decoding="async" />
+</section>
+
+<div class="wrap below-fold">
+  <figure class="preview">
+    <img
+      src="/rotli-app-warm-light@3x.png"
+      width="3840"
+      height="2400"
+      alt="The rotli workspace in Warm Light: a sidebar with Home, Chat, All notes, Captures, and Tasks beside a Markdown note with a checklist and a quote"
+      loading="lazy"
+      decoding="async"
+    />
+  </figure>
+  <ul class="promises" aria-label="What rotli promises">
+    {promises.map((promise) => (
+      <li>
+        <h2>{promise.title}</h2>
+        <p>{promise.body}</p>
+      </li>
+    ))}
+  </ul>
+</div>
+
+<style>
+  .hero {
+    position: relative;
+    display: grid;
+    place-items: center;
+    min-height: calc(100svh - var(--header-height));
+    padding: clamp(3rem, 8vh, 5rem) var(--gutter) clamp(7.5rem, 16vh, 10rem);
+    overflow: hidden;
+    text-align: center;
+  }
+  /* Decoration only: the faint icon tile, hidden behind the words and
+     strongest toward the edges (a mask, not a light effect). */
+  .hero-pattern {
+    position: absolute;
+    inset: 0;
+    background-image: url('/hero-pattern.svg');
+    background-size: 240px 240px;
+    background-position: center top;
+    mask-image: radial-gradient(ellipse 64% 60% at 50% 42%, transparent 40%, #000 95%);
+  }
+  .hero-copy {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: 1.6rem;
+    max-width: 48rem;
+  }
+  h1 {
+    margin: 0;
+    font-size: var(--step-display);
+    font-weight: 600;
+    line-height: 0.98;
+    letter-spacing: -0.045em;
+    text-wrap: initial;
+  }
+  .hero-lede {
+    max-width: 34rem;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--step-lede);
+    line-height: 1.55;
+  }
+  .hero-copy :global(.site-actions) {
+    justify-content: center;
+    margin-top: 0.4rem;
+  }
+  .hero-meta {
+    margin: -0.4rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  /* Peeks up from the bottom edge; the capture below starts where it is cut. */
+  .hero-quokka {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: clamp(150px, 16vw, 200px);
+    height: auto;
+    transform: translate(-50%, 42%);
+  }
+
+  .preview {
+    margin: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-frame);
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .preview img {
+    width: 100%;
+    height: auto;
+  }
+  .promises {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2rem clamp(1.5rem, 4vw, 3rem);
+    margin: clamp(2.5rem, 5vw, 3.5rem) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .promises li {
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--border-strong);
+  }
+  .promises h2 {
+    margin: 0;
+    font-size: 1.08rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .promises p {
+    margin: 0.4rem 0 0;
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+  @media (max-width: 900px) {
+    .promises {
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+  }
+</style>

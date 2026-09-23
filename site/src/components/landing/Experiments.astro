@@ -1,0 +1,92 @@
+---
+// Features under development. Rendered only on the dev site
+// (site.showsExperiments), always labeled, never on the launch site. Keep the
+// statuses honest; this is marketing policy, not an app feature gate.
+import { site } from '../../site';
+
+const experiments = [
+  { name: 'Local CLI + MCP', status: 'A bounded JSON CLI and local stdio MCP server; being refined before release.', href: '/resources/mcp/' },
+  { name: 'DOCX documents', status: 'An editable surface under review for round-trip fidelity.' },
+  { name: 'Spreadsheets', status: 'XLSX workbooks are in development builds only; CSV editing is in the alpha.' },
+  { name: 'Mermaid diagram tabs', status: 'A Mermaid fence in any note already renders.' },
+  { name: 'Read aloud', status: 'On-device voice for chat replies.' },
+  { name: 'Excalidraw boards', status: 'Boards beside notes; native save and reopen still being verified.' },
+  { name: 'Mermaid visual editing', status: 'A visual editor over the text source. View and Code stay in the alpha.' },
+  { name: 'Breve routines', status: 'Scheduled briefs and watchlists written as vault Markdown, in one managed runtime.' },
+  { name: 'Remote agents', status: 'Cloud MCP clients through a stateless relay you operate; no hosted relay is launched.' },
+];
+---
+
+{
+  site.showsExperiments && (
+    <section class="section experiments" id="beyond-the-app" aria-labelledby="experiments-title">
+      <div class="wrap">
+        <header class="section-head">
+          <p class="tag">Experiment · dev preview</p>
+          <h2 class="section-title" id="experiments-title">Also in development.</h2>
+          <p class="section-lede">
+            Under review and not promised for the Mac alpha. Breve, spreadsheets, Mermaid tabs and
+            visual editing, read-aloud, and agent integrations are restricted to development builds.
+          </p>
+        </header>
+        <ul>
+          {experiments.map((experiment) => (
+            <li>
+              <b>{experiment.name}</b>
+              <span>{experiment.status}</span>
+              {experiment.href && <a href={experiment.href}>Read the guide <span aria-hidden="true">→</span></a>}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  )
+}
+
+<style>
+  .experiments {
+    border-top: 1px dashed var(--border-strong);
+  }
+  .tag {
+    display: inline-block;
+    margin: 0 0 1rem;
+    padding: 0.2rem 0.6rem;
+    border: 1px dashed var(--accent-text);
+    border-radius: 999px;
+    color: var(--accent-text);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  ul {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 2rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  li {
+    display: grid;
+    align-content: start;
+    gap: 0.3rem;
+    padding: 1.1rem 0;
+    border-top: 1px solid var(--border);
+  }
+  li span {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+  li a {
+    color: var(--accent-text);
+    font-weight: 600;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+  @media (max-width: 900px) {
+    ul {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

@@ -15,20 +15,23 @@ opens in the other, because both read the same ordinary files.
 
 ## Where Rotli Web keeps your notes
 
-- **Chrome, Edge, or Arc:** choose *Open a folder on this computer* and that folder becomes the vault.
-  Every note is a real file there, the same files the Mac app reads.
-- **Firefox, Safari, and other browsers** can't write to a folder, so the vault lives in the browser's
-  own storage on your device. *Import a folder* brings notes in; *Export vault (.zip)* gives them back.
-  Clearing the site's data removes that copy, so export what you want to keep.
+Every note is a real file in a folder on your computer, the same files the Mac app reads. Rotli Web
+asks for that folder before anything opens.
 
-The page can't send your notes anywhere. Its security policy only allows it to connect to Rotli Helper,
-and only if you run it on your own computer.
+- **Chrome, Edge, or Arc** open the folder directly.
+- **Firefox, Zen, and Brave** can't write to a folder themselves, so they use
+  [Rotli Helper](/resources/rotli-helper/), a small program on your computer that reads and writes the
+  one folder you pick.
+- **Safari, phones, and tablets** aren't supported yet: they can't reach a folder on your computer.
+
+The page itself never sends your notes to a server: its security policy only allows it to connect to
+Rotli Helper on your own computer. The one way out is a chat you start, below.
 
 ## Chat on the web
 
 Rotli Web chats through **Rotli Helper**, a small program you run on your own computer (Mac, Windows, or
 Linux). It passes your message to AI tools you already have installed, like Claude Code or Codex, with
-your notes as context. Notes in a secure folder, or carrying a secret, never reach a model.
+your notes as context. Notes marked secure, or carrying a secret, never reach a model.
 
 ## What stays in the Mac app
 

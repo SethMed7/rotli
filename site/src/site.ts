@@ -33,9 +33,9 @@ export const RELEASES_URL = 'https://github.com/SethMed7/rotli-releases/releases
 // The newest notarized DMG, downloaded directly. scripts/release.sh publishes a
 // stable-named copy (Rotli.dmg) on every release, so this never needs editing.
 export const DOWNLOAD_URL = `${RELEASES_URL}/download/Rotli.dmg`;
-/** Where every Download button on the site goes. Today that is the newest Mac
- * DMG, fetched directly. When a download page offers Mac, Windows, and Linux,
- * point this at it (e.g. '/download/') and every button follows. */
+/** Where the hero's and closing card's "Download for Mac" buttons go: the
+ * newest Mac DMG, fetched directly. The header's Download button always opens
+ * /download/, which picks by the visitor's system (SiteHeader.astro). */
 export const DOWNLOAD_HREF = DOWNLOAD_URL;
 /** Rotli Web, served from this same origin under /app/ (site/Caddyfile,
  * site/Dockerfile `app` stage). The path is fixed; whether pages link to it is
@@ -46,14 +46,9 @@ export const PRIVACY_URL = `${GITHUB_URL}/blob/main/PRIVACY.md`;
 export const ROADMAP_URL = `${GITHUB_URL}/blob/main/ROADMAP.md`;
 
 /**
- * Launch films. The marketing pipeline exports these into `public/media/` once
- * reviewed. The landing hero prefers the full promo; the teaser is a fallback
- * when the full cut is missing. PromoFilm still powers the holding page.
+ * The launch film. The reviewed export lives in `public/media/`; the landing
+ * page and the holding page play it on request (PromoFilm.astro).
  */
-export const TEASER_VIDEO_PATH = '/media/rotli-teaser.mp4';
-export const TEASER_POSTER_PATH = '/media/rotli-teaser-poster.jpg';
-export const TEASER_CAPTIONS_PATH = '/media/rotli-teaser.vtt';
-
 export const PROMO_VIDEO_PATH = '/media/rotli-promo.mp4';
 export const PROMO_POSTER_PATH = '/media/rotli-promo-poster.jpg';
 export const PROMO_CAPTIONS_PATH = '/media/rotli-promo.vtt';
@@ -121,11 +116,9 @@ function publicFileExists(publicDir: string | null, path: string): boolean {
 }
 
 /**
- * A film slot is included only when its real artifacts exist in `public/media/`
- * at build time. Until then the pages omit the player rather than rendering an
- * empty frame. The full film requires video, poster, and captions. The teaser
- * requires video and poster; captions are optional for short clips that carry
- * on-screen text.
+ * The film is included only when its real artifacts exist in `public/media/`
+ * at build time; until then the pages omit the player rather than rendering an
+ * empty frame. It requires video, poster, and captions.
  */
 function readFilm(options: {
   label: string;
@@ -153,24 +146,16 @@ function readFilm(options: {
 }
 
 function readPromo() {
-  const teaser = readFilm({
-    label: 'Teaser',
-    videoPath: TEASER_VIDEO_PATH,
-    posterPath: TEASER_POSTER_PATH,
-    captionsPath: TEASER_CAPTIONS_PATH,
-    captionsRequired: false,
-  });
   const full = readFilm({
-    label: 'Full film',
+    label: 'Launch film',
     videoPath: PROMO_VIDEO_PATH,
     posterPath: PROMO_POSTER_PATH,
     captionsPath: PROMO_CAPTIONS_PATH,
     captionsRequired: true,
   });
   return {
-    teaser,
     full,
-    /** True when the full film section can render (`#film` anchors). */
+    /** True when the film section can render (`#film` anchors). */
     enabled: full.enabled,
   } as const;
 }
@@ -196,6 +181,6 @@ export const site = {
   sourcePublic: readSourcePublic(),
   /** The hero, navigation, and footer link to Rotli Web at WEB_APP_PATH. */
   webAppEnabled: readWebAppEnabled(),
-  /** Teaser (hero) and full launch film, when their artifacts are present. */
+  /** The launch film, when its artifacts are present. */
   promo: readPromo(),
 } as const;

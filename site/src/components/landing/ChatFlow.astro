@@ -1,0 +1,225 @@
+---
+// Chat: a real reply from the Mac app (a raw take of the launch shoot, synthetic
+// Notebook vault), then what a conversation does to your folder, step by step.
+// Facts (current code): each chat is chats/<slug>.md; after every reply the
+// chat's own model rewrites a "Conversation notes" section in the chat's note
+// (or the note it was started from); the model can create and rewrite notes
+// directly (and, on the Mac, make DOCX documents, PDFs, and boards from a
+// chat); Lock refuses every AI edit, on-device included, in TypeScript and Rust.
+interface Props {
+  /** The landing page shows the conversation and the first two steps only. */
+  compact?: boolean;
+}
+const { compact = false } = Astro.props;
+
+const notesExample = [
+  '### Q4 launch',
+  '- Mac beta shipped; pricing page in progress.',
+  '- Decision: record the demo before launch day.',
+  '- Action: Maya records the demo.',
+  '- Open: who reviews the pricing copy?',
+];
+
+const steps = [
+  {
+    n: '01',
+    title: 'Ask about your notes',
+    body: 'Chat reads the vault you are in, or the note you started it from, and answers from what is actually there.',
+  },
+  {
+    n: '02',
+    title: 'It keeps notes as you go',
+    body: 'After every reply, rotli rewrites a short “Conversation notes” section: decisions, facts worth keeping, action items, open questions. The chat itself is saved as Markdown too.',
+  },
+  {
+    n: '03',
+    title: 'It can write for you',
+    body: 'In the Mac app, ask for a new note or an edit and it makes the change in your folder. It can also make a Word document, a PDF, or a board, filed beside the chat.',
+  },
+  {
+    n: '04',
+    title: 'Jump in, or lock it',
+    body: 'Everything it writes is an ordinary file you can open and keep editing. Want AI to stop touching a note? Lock it. Every model can still read it; none can edit it.',
+  },
+];
+---
+
+<div class="chat-row" data-reveal>
+  <div class="chat-copy">
+    <h3>Chat that works inside your notes.</h3>
+    <p>
+      Ask what shipped, what is left, or what you decided last week, and get an answer grounded in your own
+      files. Use a model on your Mac, or the AI tools you already use.
+    </p>
+  </div>
+  <figure class="frame">
+    <img
+      src="/shots/chat.webp"
+      width="1800"
+      height="850"
+      alt="A rotli chat answering “What did I already ship, and what’s next on my Q4 launch plan?” with shipped, in-progress, and still-to-do lists drawn from the notes"
+      loading="lazy"
+      decoding="async"
+    />
+  </figure>
+</div>
+
+<ol class="steps" data-reveal>
+  {(compact ? steps.slice(0, 2) : steps).map((step) => (
+    <li>
+      <span class="n">{step.n}</span>
+      <h4>{step.title}</h4>
+      <p>{step.body}</p>
+    </li>
+  ))}
+</ol>
+
+{
+  !compact && (
+    <div class="chat-detail" data-reveal>
+      <figure class="notes-sample" aria-label="An example of the Conversation notes section a chat keeps">
+        <figcaption>In the chat’s note · updated after every reply</figcaption>
+        <div class="notes-body">
+          <p class="notes-h2">Conversation notes</p>
+          {notesExample.map((line) =>
+            line.startsWith('###') ? <p class="notes-h3">{line.replace('### ', '')}</p> : <p class="notes-li">{line.replace('- ', '')}</p>,
+          )}
+        </div>
+      </figure>
+      <figure class="frame lock">
+        <img
+          src="/shots/lock-menu.webp"
+          width="800"
+          height="1040"
+          alt="A note’s right-click menu in rotli with “Lock — no AI may edit it” and “Mark secure — block remote AI”"
+          loading="lazy"
+          decoding="async"
+        />
+        <figcaption>Right-click any note: Lock stops every AI edit. Mark secure keeps it from remote models.</figcaption>
+      </figure>
+    </div>
+  )
+}
+
+<style>
+  .frame {
+    margin: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-frame);
+    overflow: hidden;
+    background: var(--capture-ground);
+  }
+  .frame img {
+    width: 100%;
+    height: auto;
+  }
+  .chat-row {
+    display: grid;
+    grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
+    gap: 2rem clamp(2rem, 6vw, 5rem);
+    align-items: start;
+  }
+  h3 {
+    margin: 0;
+    font-size: var(--step-h3);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+  .chat-copy p {
+    max-width: 30rem;
+    margin: 0.8rem 0 0;
+    color: var(--text-muted);
+    line-height: 1.62;
+  }
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 2rem clamp(1.5rem, 3vw, 2.5rem);
+    margin: clamp(2.5rem, 5vw, 3.5rem) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .steps li {
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--border-strong);
+  }
+  .n {
+    color: var(--accent-text);
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+  h4 {
+    margin: 0.35rem 0 0;
+    font-size: 1.08rem;
+    font-weight: 600;
+  }
+  .steps p {
+    margin: 0.4rem 0 0;
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+  .chat-detail {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+    gap: 2rem clamp(1.5rem, 4vw, 3rem);
+    align-items: start;
+    margin-top: clamp(2.5rem, 5vw, 3.5rem);
+  }
+  /* A drawn example of the section, set in the editor's own type scale. */
+  .notes-sample {
+    margin: 0;
+    border-left: 3px solid var(--accent);
+    padding: 0.25rem 0 0.25rem 1.5rem;
+  }
+  .notes-sample figcaption {
+    color: var(--text-muted);
+    font-size: 0.84rem;
+    font-weight: 600;
+  }
+  .notes-body {
+    margin-top: 1rem;
+  }
+  .notes-body p {
+    margin: 0;
+  }
+  .notes-h2 {
+    font-size: 1.35rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+  .notes-body .notes-h3 {
+    margin-top: 0.9rem;
+    font-weight: 600;
+  }
+  .notes-body .notes-li {
+    position: relative;
+    margin-top: 0.35rem;
+    padding-left: 1.1rem;
+    color: var(--text);
+  }
+  .notes-li::before {
+    content: '';
+    position: absolute;
+    left: 0.2rem;
+    top: 0.72em;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--text-muted);
+  }
+  .lock figcaption {
+    padding: 0.8rem 1rem;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    line-height: 1.5;
+  }
+  @media (max-width: 860px) {
+    .chat-row,
+    .chat-detail {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

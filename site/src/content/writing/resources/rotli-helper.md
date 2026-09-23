@@ -50,7 +50,7 @@ The pairing survives restarts.
 - It answers **only pages from rotli.co**, and only a page that has your pairing code.
 - It reads and writes **only the folder you chose**. A change you make in Rotli Web is written straight
   into that folder on your computer; nothing is sent over the internet.
-- A note in a secure folder, or one carrying a secret, **never reaches a model**.
+- A note marked secure, or one carrying a secret, **never reaches a model**.
 - Images aren't sent to chat through it yet. Drop images into a note instead.
 
 ## Browsers

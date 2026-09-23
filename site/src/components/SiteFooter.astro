@@ -1,8 +1,12 @@
 ---
-// The one site footer: brand, a short tagline, and links. Both default to the
-// site-wide policy in src/nav.ts; the holding page passes its own.
+// The one site footer: brand and tagline, link columns from src/nav.ts, and a
+// quiet closing row for the maker line and the two directory badges. The
+// holding page passes its own tagline and an empty link list, which leaves the
+// brand, tagline, and closing row.
 import mark from '../../../src/assets/characters/_logo.svg?raw';
-import { footerLinks, footerTagline } from '../nav';
+import { footerGroups, footerTagline, type FooterGroup } from '../nav';
+import { site } from '../site';
+import { publishedWriting } from '../writing';
 
 interface FooterLink {
   href: string;
@@ -11,23 +15,51 @@ interface FooterLink {
 
 interface Props {
   tagline?: string;
+  /** Replaces the link columns with one flat list (an empty list shows none). */
   links?: FooterLink[];
 }
 
-const { tagline = footerTagline, links = footerLinks() } = Astro.props;
+const { tagline = footerTagline, links } = Astro.props;
+// A coming-soon build has no pages behind the columns; it shows none.
+const groups: FooterGroup[] = !site.showsFullSite
+  ? []
+  : links === undefined
+    ? footerGroups({ hasPosts: (await publishedWriting('post')).length > 0 })
+    : links.length > 0
+      ? [{ title: 'Links', links }]
+      : [];
+const external = (href: string) => href.startsWith('http');
 ---
 
 <footer class="site-footer">
-  <a class="footer-brand" href="/" aria-label="Rotli home"><span set:html={mark} aria-hidden="true"></span><b>rotli</b></a>
-  <p>{tagline}</p>
-  <div class="footer-actions">
-    {links.length > 0 && (
-      <nav aria-label="Footer navigation">
-        {links.map((link) => (
-          <a href={link.href} rel={link.href.startsWith('http') ? 'noopener' : undefined}>{link.label}</a>
-        ))}
-      </nav>
-    )}
+  <div class="footer-top">
+    <div class="footer-lead">
+      <a class="footer-brand" href="/" aria-label="rotli home"><span set:html={mark} aria-hidden="true"></span><b>rotli</b></a>
+      <p>{tagline}</p>
+    </div>
+    {
+      groups.length > 0 && (
+        <nav class="footer-groups" aria-label="Footer navigation">
+          {groups.map((group) => (
+            <div class="footer-group">
+              <h2>{group.title}</h2>
+              <ul>
+                {group.links.map((link) => (
+                  <li>
+                    <a href={link.href} rel={external(link.href) ? 'noopener' : undefined}>
+                      {link.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </nav>
+      )
+    }
+  </div>
+  <div class="footer-bottom">
+    <p>Designed and built by Seth Medina.</p>
     <div class="footer-badges">
       <a
         class="footer-badge"
@@ -40,6 +72,8 @@ const { tagline = footerTagline, links = footerLinks() } = Astro.props;
           alt="Featured on Launch Llama Tools"
           width="200"
           height="52"
+          loading="lazy"
+          decoding="async"
         />
       </a>
       <a
