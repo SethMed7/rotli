@@ -35,7 +35,12 @@ const items = [
       ]
     : []),
 ];
-const { Content } = entry ? await render(entry) : { Content: null };
+const rendered = entry ? await render(entry) : null;
+const Content = rendered?.Content ?? null;
+const toc = (rendered?.headings ?? [])
+  .filter((heading) => heading.depth === 2)
+  .map((heading) => ({ slug: heading.slug, text: heading.text }));
+const more = entry ? items.filter((item) => item.href !== `/resources/${slugOf(entry)}/`) : [];
 ---
 
 {
@@ -45,11 +50,17 @@ const { Content } = entry ? await render(entry) : { Content: null };
       description={entry.data.description}
       canonicalPath={`/resources/${slugOf(entry)}/`}
       section="resources"
-      kicker={entry.data.draft ? 'Resources · draft' : 'Resources'}
+      crumbs={[{ href: '/resources/', label: 'Resources' }]}
+      kicker={entry.data.draft ? 'Draft · dev site only' : undefined}
       heading={entry.data.title}
       lede={entry.data.description}
+      toc={toc}
     >
       <Content />
+      <section slot="after" class="more" aria-labelledby="more-title">
+        <h2 id="more-title">More resources</h2>
+        <WritingList items={more} empty="" />
+      </section>
     </WritingPage>
   ) : (
     <WritingPage
@@ -58,9 +69,24 @@ const { Content } = entry ? await render(entry) : { Content: null };
       canonicalPath="/resources/"
       section="resources"
       heading="Resources"
-      lede="Short answers to the questions people ask about rotli."
+      lede="Short answers to the questions people ask about rotli: why local, where notes live, and how the pieces fit."
+      wide
     >
       <WritingList items={items} empty="Nothing here yet." />
     </WritingPage>
   )
 }
+
+<style>
+  .more {
+    margin-top: var(--section-space);
+    padding-top: 2rem;
+    border-top: 1px solid var(--border-strong);
+  }
+  .more h2 {
+    margin: 0 0 1.5rem;
+    font-size: var(--step-h3);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+</style>

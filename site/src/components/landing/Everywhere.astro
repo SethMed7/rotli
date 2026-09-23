@@ -1,0 +1,100 @@
+---
+// Ways in: the Mac app, Rotli Web, and Rotli Helper, as three plain columns. Rendered only while
+// WEB_APP_ENABLED is on; without Rotli Web the hero's download is the only way in.
+import { DOWNLOAD_HREF, WEB_APP_PATH, site } from '../../site';
+
+const ways = [
+  {
+    title: 'Mac app',
+    body: 'The whole workspace: the editor, chat with on-device or connected AI, the Librarian, and ⌥Space from anywhere.',
+    link: site.downloadsEnabled ? { href: DOWNLOAD_HREF, label: 'Download for Mac', external: true } : null,
+  },
+  {
+    title: 'Rotli Web',
+    body: 'The same editor, folders, tasks, and links in your browser, working in a real folder on your computer. Chrome, Edge, and Arc open the folder directly; Safari and phones aren’t supported yet.',
+    link: { href: WEB_APP_PATH, label: 'Open Rotli Web', external: false },
+  },
+  {
+    title: 'Rotli Helper',
+    body: 'A small program for Mac, Windows, and Linux. It lets Firefox, Zen, and Brave use your folder, and lets Rotli Web chat through the AI tools already on your computer.',
+    link: { href: '/resources/rotli-helper/', label: 'How the Helper works', external: false },
+  },
+];
+---
+
+{
+  site.webAppEnabled && (
+    <section class="section everywhere" id="web" aria-labelledby="web-title">
+      <div class="wrap">
+        <header class="section-head">
+          <h2 class="section-title" id="web-title">On your Mac. In any browser.</h2>
+          <p class="section-lede">
+            No Mac? Open Rotli Web: the same workspace with no account, and your notes stay in your folder unless you connect chat.
+          </p>
+        </header>
+        <ul class="ways" data-reveal>
+          {ways.map((way) => (
+            <li>
+              <h3>{way.title}</h3>
+              <p>{way.body}</p>
+              {way.link && (
+                <a href={way.link.href} rel={way.link.external ? 'noopener' : undefined}>
+                  {way.link.label} <span aria-hidden="true">→</span>
+                </a>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  )
+}
+
+<style>
+  .ways {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2.5rem clamp(2rem, 5vw, 4.5rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .ways li {
+    display: flex;
+    flex-direction: column;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-strong);
+  }
+  h3 {
+    margin: 0;
+    font-size: var(--step-h3);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .ways p {
+    flex: 1;
+    margin: 0.75rem 0 1.25rem;
+    color: var(--text-muted);
+    line-height: 1.62;
+  }
+  .ways a {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 0.3rem;
+    min-height: 44px;
+    color: var(--accent-text);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .ways a:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+  @media (max-width: 860px) {
+    .ways {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+  }
+</style>

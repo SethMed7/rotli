@@ -1,0 +1,269 @@
+---
+// /privacy/: the full privacy policy in plain language: what rotli does with
+// data, what connects to the internet and when, and why it is built that way.
+// PRIVACY.md at the repository root is the source of truth for the product;
+// this page restates it for visitors and adds this website's own practices.
+// When PRIVACY.md changes (a new data class, destination, retention behavior,
+// or control), update this page in the same change.
+import WritingPage from '../../components/WritingPage.astro';
+import { GITHUB_URL, site } from '../../site';
+
+export function getStaticPaths() {
+  return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
+}
+
+const UPDATED = 'September 23, 2026';
+
+const toc = [
+  { slug: 'short-version', text: 'The short version' },
+  { slug: 'your-notes', text: 'Your notes stay yours' },
+  { slug: 'network', text: 'What connects to the internet' },
+  { slug: 'ai', text: 'AI and your notes' },
+  { slug: 'connect', text: 'How rotli connects to AI' },
+  { slug: 'web', text: 'Rotli Web and Rotli Helper' },
+  { slug: 'website', text: 'This website' },
+  { slug: 'retention', text: 'Keeping and deleting' },
+  { slug: 'changes', text: 'Changes to this page' },
+];
+
+type Access = 'full' | 'read' | 'none';
+const access: { kind: string; how: string; onDevice: Access; connected: Access }[] = [
+  { kind: 'Everyday note', how: 'The default', onDevice: 'full', connected: 'full' },
+  { kind: 'Secure note', how: 'Right-click → Mark secure', onDevice: 'full', connected: 'none' },
+  { kind: 'Locked note', how: 'Right-click → Lock', onDevice: 'read', connected: 'read' },
+];
+const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads only', none: 'Never sees it' };
+---
+
+<WritingPage
+  title="Privacy — rotli"
+  description="How rotli handles your notes: no account, no analytics, files on your computer, and AI only on your terms. What connects to the internet, and why."
+  canonicalPath="/privacy/"
+  section="privacy"
+  kicker={`Updated ${UPDATED}`}
+  heading="Privacy"
+  lede="rotli is built so there is nothing about you to collect. This page explains exactly what it does with your data, what connects to the internet, and why it works that way."
+  toc={toc}
+>
+  <h2 id="short-version">The short version</h2>
+  <ul>
+    <li><strong>No account.</strong> There is nothing to sign up for, and no rotli server that holds your notes.</li>
+    <li><strong>No tracking.</strong> No product analytics, no advertising, and no automatic crash reports.</li>
+    <li><strong>Your notes are files.</strong> They live in one folder you choose, on your computer, as plain Markdown.</li>
+    <li><strong>AI is optional and yours to limit.</strong> You choose where it runs and, note by note, what it may read or change.</li>
+    <li><strong>Nothing leaves without a reason you can see.</strong> Updates, a chat you start, or a web search you ask for.</li>
+  </ul>
+
+  <h2 id="your-notes">Your notes stay yours</h2>
+  <p>
+    rotli reads and writes the folder you pick: notes, chats, attachments, and anything else you keep there.
+    Its own settings and search indexes live in a hidden <code>.rotli</code> folder inside it, or in the
+    app's settings on your Mac, and it can rebuild them at any time. Main and named views are arrangements
+    of the same files, not copies. Passwords and keys you give rotli go into the macOS Keychain, never into
+    your notes or settings files.
+  </p>
+  <p>
+    <strong>Why:</strong> a notes app should never be the only way to reach your notes. Because everything is
+    an ordinary file, you can open it in another app, back it up however you already back things up, or
+    delete rotli and keep every word. There is no copy on a server for anyone to lose, leak, or lock you out of.
+  </p>
+
+  <h2 id="network">What connects to the internet, and when</h2>
+  <p>rotli has no analytics or account server to talk to. It goes online only for things you can see:</p>
+  <ul>
+    <li>
+      <strong>Updates.</strong> The Mac app checks rotli's release page on GitHub for a new version shortly
+      after it opens, a few times a day, and when you press Check for updates. The request carries no
+      account, vault, or note data. Nothing downloads until you choose Install, and Settings → General turns
+      the automatic check off.
+    </li>
+    <li>
+      <strong>A chat you start with connected AI.</strong> rotli runs the Claude Code, Codex, or Cursor app you
+      already have signed in on your Mac. That app sends the conversation and the context it needs to its
+      provider, under that provider's terms. rotli never sees or stores your provider login.
+    </li>
+    <li>
+      <strong>A web search or page you ask for.</strong> Only the query or address needed for that request is sent.
+    </li>
+  </ul>
+  <p>
+    Features still in development, such as scheduled briefs and remote agents, are switched off in released
+    builds. When one ships, this page will say what it connects to before it does.
+  </p>
+  <p>
+    <strong>Why:</strong> every connection is a place your data could go, so rotli keeps the list short and
+    tied to something you did. Adding a new destination, telemetry, or an account service is a deliberate,
+    reviewed change, not something that slips in with an update.
+  </p>
+
+  <h2 id="ai">AI and your notes</h2>
+  <p>
+    AI in rotli is a visitor, not the owner of your workspace. You can leave it off entirely. If you use it,
+    an <strong>on-device model</strong> runs on your Mac and works without a network. <strong>Connected AI</strong>
+    means the tools you already use, like Claude Code or Codex, and rotli labels them as remote.
+  </p>
+  <div class="access">
+    <table>
+      <caption>What each kind of AI may do with a note</caption>
+      <thead>
+        <tr>
+          <th scope="col">Note</th>
+          <th scope="col">On-device model</th>
+          <th scope="col">Connected AI</th>
+        </tr>
+      </thead>
+      <tbody>
+        {access.map((row) => (
+          <tr>
+            <th scope="row">
+              <b>{row.kind}</b>
+              <small>{row.how}</small>
+            </th>
+            <td data-access={row.onDevice}>{label[row.onDevice]}</td>
+            <td data-access={row.connected}>{label[row.connected]}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+  <p>
+    <strong>Secure notes</strong> are never sent to a remote model, not even their titles, and the Librarian
+    leaves them alone. An on-device model reads them by default, since it cannot send anything anywhere; you
+    can turn that off for one note from its menu, or for the whole vault in Settings → Security. Nothing
+    turns it on for a remote model.
+  </p>
+  <p>
+    <strong>Locked notes</strong> can be read by any model, and edited by none. Locking protects the words;
+    it doesn't hide them.
+  </p>
+  <p>
+    Secure is an AI access rule, not encryption. A secure note is still a plain file on your disk, protected
+    the way your other files are, by your Mac account and FileVault. Boards don't have a secure setting yet,
+    so keep secrets out of them.
+  </p>
+  <p>
+    <strong>Why:</strong> AI is useful with context and risky with the wrong context. Deciding per note means
+    you can let a model help with your plans without ever handing it your salary review. The rule is enforced
+    in the app itself before anything reaches a model, not left to the model to respect.
+  </p>
+
+  <h2 id="connect">How rotli connects to AI tools</h2>
+  <p>
+    Connected AI works through the command-line tools the AI companies publish: Claude Code from Anthropic,
+    Codex from OpenAI, and Cursor's agent. You install one in Terminal and sign in to it yourself, the way
+    its maker describes. rotli then runs that tool on your Mac and passes it your message, just as you could
+    from Terminal.
+  </p>
+  <p>
+    rotli never signs in on your behalf, never reads the tool's login files, and never stores its
+    credentials. There is no rotli server in between and no shared account. The tool's own company handles
+    the request under its own terms. On-device models skip all of this: they run on your Mac and need no
+    network.
+  </p>
+  <p>
+    <strong>Why:</strong> using each company's own published tool keeps your plan working the way it was
+    sold to you, and keeps rotli out of the middle. rotli can switch between tools without ever holding a key
+    to any of them. The install commands are on the <a href="/features/#connect">Features page</a>.
+  </p>
+
+  <h2 id="web">Rotli Web and Rotli Helper</h2>
+  <p>
+    Rotli Web, at <code>rotli.co/app</code>, keeps every note as a file in a folder on your computer. In
+    Chrome, Edge, or Arc it writes to that folder directly. In Firefox, Zen, or Brave, <strong>Rotli Helper</strong>,
+    a small program you install yourself, reads and writes the one folder you pick with your computer's own
+    folder picker. It listens only on your own computer, starts when you log in, and removes itself with its
+    installer's uninstall option. Safari and phones aren't supported yet: they can't reach a folder on your
+    computer.
+  </p>
+  <p>
+    The page's security policy lets it load only its own files and connect to nothing but Rotli Helper on
+    your computer. Pairing uses a code in the part of the address browsers never send to a server. Unsaved
+    typing is held briefly in your browser so a refresh can't lose it, then written to your folder and
+    cleared. The one way out is a chat you start: the Helper runs your own AI tool, which contacts its
+    provider, and secure notes are refused before it runs.
+  </p>
+  <p>
+    <strong>Why:</strong> a web app usually means your notes live on someone's server. Rotli Web is built the
+    other way around: the page is just the editor, and your folder stays on your computer.
+  </p>
+
+  <h2 id="website">This website</h2>
+  <p>
+    rotli.co sets no cookies and runs no analytics, ads, or third-party scripts. Fonts, images, and the film
+    are served from this site. Two badges in the footer, from Launch Llama and Founder.best, are images loaded
+    from their own servers, so those services see a request from your browser when a page shows them. Our
+    hosting and DNS providers, Railway and Cloudflare, process standard request details such as your IP
+    address to deliver pages.
+  </p>
+  <p>
+    <strong>Why:</strong> a site about keeping your work private shouldn't watch you read it.
+  </p>
+
+  <h2 id="retention">Keeping and deleting</h2>
+  <p>
+    There is no rotli server holding your notes, so there is nothing for us to keep or delete. You decide how
+    long your files exist and where they are backed up. Services you deliberately send something to, like
+    an AI provider or a website you search, keep it under their own policies.
+  </p>
+
+  <h2 id="changes">Changes to this page</h2>
+  <p>
+    This page describes rotli as it works today. It changes whenever a kind of data, a destination, a
+    retention rule, or a control changes, and the product's own record of it is
+    {site.sourcePublic ? (
+      <>
+        {' '}<a href={`${GITHUB_URL}/blob/main/PRIVACY.md`} rel="noopener">PRIVACY.md</a> in the source code, with its full history.
+      </>
+    ) : (
+      ' the PRIVACY.md file kept with the source code.'
+    )}{' '}
+    It is a plain description of how the software works, not legal advice.
+  </p>
+</WritingPage>
+
+<style>
+  .access {
+    margin: 1.5rem 0 1.75rem;
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.98rem;
+  }
+  caption {
+    padding-bottom: 0.75rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    text-align: left;
+  }
+  th,
+  td {
+    padding: 0.9rem 1rem 0.9rem 0;
+    border-bottom: 1px solid var(--border-strong);
+    text-align: left;
+    vertical-align: top;
+  }
+  thead th {
+    color: var(--text-muted);
+    font-size: 0.84rem;
+    font-weight: 600;
+  }
+  tbody th b {
+    display: block;
+    font-weight: 600;
+  }
+  tbody th small {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.84rem;
+    font-weight: 400;
+  }
+  td[data-access='none'] {
+    color: var(--accent-text);
+    font-weight: 600;
+  }
+  td[data-access='read'] {
+    color: var(--text-muted);
+  }
+</style>

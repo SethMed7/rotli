@@ -30,6 +30,6 @@ secure never go to a remote model. A locked note can be read, but no AI can edit
 
 ## And the browser?
 
-Rotli Web follows the same rule. In Chrome, Edge, or Arc you can open a real folder, and every note is a
-file in it. Other browsers keep the vault in their own storage on your device, and you can export it as
-a .zip whenever you like. See [rotli in the browser and on the Mac](/resources/web-and-mac/).
+Rotli Web follows the same rule: every note is a file in a folder on your computer. Chrome, Edge, and Arc
+open the folder directly; Firefox, Zen, and Brave use [Rotli Helper](/resources/rotli-helper/). See
+[rotli in the browser and on the Mac](/resources/web-and-mac/).

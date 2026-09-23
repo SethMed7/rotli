@@ -1,7 +1,9 @@
 ---
-// The frame every resource, post, index, and the About page shares: the site
-// header and footer around one readable column. Rendered Markdown arrives as
-// children, so its typography is styled with :global() inside .prose.
+// The frame every subpage shares: the site header and footer around a page
+// head (breadcrumb, title, lede) and a body, all on the site grid so the
+// title lines up with the header's brand. Long pages pass `toc` and get an
+// "On this page" column beside the body on wide screens. Rendered Markdown
+// arrives as children, so its typography is styled with :global() in .prose.
 import Base from '../layouts/Base.astro';
 import type { NavSection } from '../nav';
 import { site } from '../site';
@@ -14,67 +16,178 @@ interface Props {
   canonicalPath: string;
   /** Which header section to mark current; none for pages outside the nav. */
   section?: NavSection;
-  /** Small line above the headline: a date, "Resource", a draft label. */
+  /** A trail back up, e.g. [{ href: '/resources/', label: 'Resources' }]. */
+  crumbs?: { href: string; label: string }[];
+  /** Small line above the headline: a date or a draft label. */
   kicker?: string;
   heading: string;
   lede?: string;
+  /** Headings for the "On this page" column (depth-2 headings only). */
+  toc?: { slug: string; text: string }[];
+  /** Let the body use the full page width (index pages, choosers). */
+  wide?: boolean;
 }
 
-const { title, description, canonicalPath, section, kicker, heading, lede } = Astro.props;
+const { title, description, canonicalPath, section, crumbs = [], kicker, heading, lede, toc = [], wide = false } =
+  Astro.props;
+const hasToc = toc.length > 1;
 ---
 
 <Base title={title} description={description} canonicalPath={canonicalPath} noindex={!site.indexable}>
   <SiteHeader current={section} />
-  <main id="content" class="writing">
+  <main id="content" class="wrap writing">
     <header class="writing-head">
+      {
+        crumbs.length > 0 && (
+          <nav class="crumbs" aria-label="Breadcrumb">
+            {crumbs.map((crumb) => (
+              <>
+                <a href={crumb.href}>{crumb.label}</a>
+                <span aria-hidden="true">/</span>
+              </>
+            ))}
+          </nav>
+        )
+      }
       {kicker && <p class="kicker">{kicker}</p>}
       <h1>{heading}</h1>
       {lede && <p class="lede">{lede}</p>}
     </header>
-    <div class="prose">
-      <slot />
+    <div class:list={['writing-body', { 'has-toc': hasToc, wide }]}>
+      {
+        hasToc && (
+          <nav class="toc" aria-label="On this page">
+            <p>On this page</p>
+            <ul>
+              {toc.map((item) => (
+                <li>
+                  <a href={`#${item.slug}`}>{item.text}</a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )
+      }
+      <div class="prose">
+        <slot />
+      </div>
     </div>
+    <slot name="after" />
   </main>
   <SiteFooter />
 </Base>
 
 <style>
   .writing {
-    width: min(100% - 3rem, 44rem);
-    margin: 0 auto;
-    padding-block: clamp(3rem, 8vw, 5.5rem) clamp(4rem, 10vw, 7rem);
+    padding-block: clamp(3rem, 7vw, 5rem) var(--section-space);
+  }
+  /* The rule under the head spans the page; the words keep a reading width. */
+  .writing-head > * {
+    max-width: 48rem;
+  }
+  .writing-head {
+    padding-bottom: clamp(2rem, 4vw, 3rem);
+    margin-bottom: clamp(2rem, 4vw, 3rem);
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  .crumbs a {
+    color: var(--text-muted);
+    text-underline-offset: 0.2em;
+  }
+  .crumbs a:hover {
+    color: var(--text);
   }
   .kicker {
     margin: 0 0 0.9rem;
-    color: var(--accent-text);
-    font-size: 0.86rem;
-    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.9rem;
   }
   h1 {
     margin: 0;
-    font-size: clamp(2.3rem, 5vw, 3.4rem);
-    line-height: 1.04;
-    letter-spacing: -0.035em;
+    font-size: clamp(2.4rem, 5vw, 3.75rem);
+    font-weight: 600;
+    line-height: 1.02;
+    letter-spacing: -0.04em;
     text-wrap: balance;
   }
   .lede {
-    margin: 1.2rem 0 0;
+    max-width: 40rem;
+    margin: 1.1rem 0 0;
     color: var(--text-muted);
-    font-size: 1.2rem;
+    font-size: var(--step-lede);
     line-height: 1.55;
     text-wrap: pretty;
   }
+  /* The body sits on the grid's left edge; with a table of contents it gets
+     a narrow first column that stays in view while reading. */
+  .writing-body {
+    display: grid;
+    grid-template-columns: minmax(0, 44rem);
+  }
+  .writing-body.wide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .writing-body.has-toc {
+    grid-template-columns: 13rem minmax(0, 44rem);
+    gap: clamp(2rem, 5vw, 4.5rem);
+  }
+  .toc {
+    position: sticky;
+    top: calc(var(--header-height) + 2rem);
+    align-self: start;
+    font-size: 0.92rem;
+  }
+  .toc p {
+    margin: 0 0 0.6rem;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+  .toc ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-left: 1px solid var(--border-strong);
+  }
+  .toc a {
+    display: block;
+    padding: 0.4rem 0 0.4rem 0.9rem;
+    color: var(--text-muted);
+    line-height: 1.35;
+    text-decoration: none;
+  }
+  .toc a:hover {
+    color: var(--text);
+  }
+  @media (max-width: 900px) {
+    .writing-body.has-toc {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .toc {
+      display: none;
+    }
+  }
   .prose {
-    margin-top: 2.75rem;
     font-size: 1.06rem;
     line-height: 1.7;
   }
+  .prose > :global(:first-child) {
+    margin-top: 0;
+  }
   .prose :global(h2) {
-    margin: 2.6rem 0 0.8rem;
+    margin: 2.8rem 0 0.8rem;
     font-size: 1.45rem;
     line-height: 1.2;
     letter-spacing: -0.02em;
-    scroll-margin-top: 1.5rem;
+    scroll-margin-top: calc(var(--header-height) + 1.5rem);
   }
   .prose :global(h3) {
     margin: 2rem 0 0.6rem;
@@ -89,7 +202,8 @@ const { title, description, canonicalPath, section, kicker, heading, lede } = As
   .prose :global(li + li) {
     margin-top: 0.35rem;
   }
-  .prose :global(a) {
+  /* Buttons and list entries keep their own colours; only running-text links take the accent. */
+  .prose :global(a:not(.button, .plain-link)) {
     color: var(--accent-text);
     text-underline-offset: 0.2em;
   }

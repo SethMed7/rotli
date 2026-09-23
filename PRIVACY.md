@@ -31,8 +31,10 @@ limited to declared product capabilities:
   custom-client protocol in read-only Ask mode;
 - web search/fetch sends the query or URL needed for the explicit web action;
 - user-configured Breve email, Signal, mail, and watch services contact their
-  configured destinations; Breve model generation itself stays on-device; and
-- when the user explicitly connects Remote agents for the current app session,
+  configured destinations; Breve model generation itself stays on-device
+  (Breve is available in development builds only today); and
+- when the user explicitly connects Remote agents for the current app session
+  (development builds only today),
   Rotli sends authenticated MCP request/response frames through the configured
   HTTPS relay. The relay keeps only in-flight frames in memory and stores no
   vault or Markdown; the cloud MCP client receives the non-secure workspace

@@ -14,6 +14,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The Rotli Helper installers now download Rotli Helper 1.4.0, which tells
   Rotli Web which models your AI tools offer, so the web chat lists them live.
+- **A new rotli.co.** A simple first screen: the promise, one sentence, and
+  the two ways in over a faint pattern of note and folder icons, with the
+  waving quokka peeking over the product just below the fold (no autoplaying
+  film). Each feature sits beside a real still or a plain drawing: the
+  Markdown a note is saved as next to how it looks, chat, how the Librarian
+  files notes, and a table of what each kind of AI may do with everyday,
+  secure, and locked notes.
+  New chapters for the ways in (Mac, Rotli Web, Rotli Helper) and common
+  questions; plain-language copy in place of internal terms; a pinned header
+  with Features, Privacy, and Download; a footer with link columns. Download is
+  now a chooser with one clear button per option. Theme and companion previews
+  change only when you pick one (nothing cycles on a timer), the companion
+  steps with full-size buttons, and the film plays on request. The menu now
+  leads to real pages: a new Features page with the whole tour, and a new
+  Privacy page that explains, in plain language, what rotli does with your
+  data, what connects to the internet and when, and why it works that way.
+  The header has one Download button, which opens a download page that leads
+  with your own system (Mac now; Windows and Linux coming soon, with Rotli Web
+  in the meantime). Resources and the other pages line up with the rest of the
+  site, with an "On this page" list on longer articles. The Features page is
+  organized the way you meet rotli, with crisp captures of the real app: one
+  note shown rendered and as the Markdown it is saved as, every kind of block,
+  how chat keeps running notes and can write for you (and how Lock stops it),
+  Word documents, boards, and sheets (coming soon), where assets are kept, and
+  how rotli connects to the AI tools you install yourself in Terminal, with
+  Rotli Helper doing the same for Rotli Web. Fixed: the film
+  section's stale length and wording, the film poster that still said "Mac
+  beta in preparation", a missing space before "The story behind the name",
+  and site copy that still described a browser-storage mode Rotli Web no
+  longer has (every note now lives in a folder on your computer).
+- **Launch film sources left the repository.** The film project (the
+  HyperFrames edit, review notes, and render scripts under `marketing/`) is
+  media work and now stays local to the maintainer; `/marketing/` is ignored.
+  The published film in `site/public/media/` is unchanged. The unused hero
+  teaser clip was removed with the old landing page.
 
 ## [1.4.0] - 2026-09-23
 

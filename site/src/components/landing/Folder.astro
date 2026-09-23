@@ -1,0 +1,196 @@
+---
+// Why local: the vault is an ordinary folder. The tree is illustrative (a
+// synthetic vault), labeled in plain words rather than internal vocabulary.
+import { site } from '../../site';
+
+type Entry = { name: string; note: string; kind: 'folder' | 'file' | 'meta'; depth: 0 | 1 };
+
+const tree: Entry[] = [
+  { name: 'wiki/', note: 'your notes', kind: 'folder', depth: 0 },
+  { name: 'launch-notes.md', note: 'plain Markdown', kind: 'file', depth: 1 },
+  { name: 'reading-list.md', note: 'plain Markdown', kind: 'file', depth: 1 },
+  { name: '_inbox/', note: 'quick captures', kind: 'folder', depth: 0 },
+  ...(site.showsExperiments
+    ? ([
+        { name: 'storage/', note: 'experiments · dev preview', kind: 'folder', depth: 0 },
+        { name: 'project-brief.docx', note: 'Word document', kind: 'file', depth: 1 },
+        { name: 'system-map.excalidraw', note: 'board', kind: 'file', depth: 1 },
+      ] as Entry[])
+    : []),
+  { name: 'chats/', note: 'conversations', kind: 'folder', depth: 0 },
+  { name: 'planning-with-claude.md', note: 'Markdown transcript', kind: 'file', depth: 1 },
+  { name: '.rotli/', note: 'settings and indexes rotli can rebuild', kind: 'meta', depth: 0 },
+];
+
+const promises = [
+  { title: 'Open your work in other apps.', body: 'rotli is never the only door to your notes.' },
+  { title: 'Back up the folder your way.', body: 'Time Machine, a sync service, git. No export ritual.' },
+  { title: 'Turn the AI off.', body: 'A plain folder of Markdown is still a complete workspace.' },
+];
+---
+
+<section class="section band-warm folder" id="why-local" aria-labelledby="folder-title">
+  <div class="wrap folder-grid" data-reveal>
+    <div class="folder-copy">
+      <h2 class="section-title" id="folder-title">One folder. Every way out stays open.</h2>
+      <p class="section-lede">
+        Your vault is an ordinary directory you pick. Notes are Markdown, chats are Markdown, and
+        rotli’s own metadata is rebuildable, never a second copy of your work.
+      </p>
+      <ol class="promises">
+        {promises.map((promise) => (
+          <li>
+            <p><b>{promise.title}</b> {promise.body}</p>
+          </li>
+        ))}
+      </ol>
+    </div>
+
+    <figure class="vault" aria-label="An example rotli vault">
+      <figcaption>
+        <span>~/Documents/Field Notes</span>
+        <span>a folder on your Mac</span>
+      </figcaption>
+      <ul>
+        {tree.map((entry) => (
+          <li class:list={[`kind-${entry.kind}`, { nested: entry.depth === 1 }]}>
+            {entry.kind === 'file' ? (
+              <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2">
+                <path d="M4 1.5h5.5L12.5 4.5v10h-8.5z" />
+                <path d="M9.5 1.5v3h3" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2">
+                <path d="M1.5 3.5h4.5l1.5 1.5h7v8.5h-13z" />
+              </svg>
+            )}
+            <span class="name">{entry.name}</span>
+            <small>{entry.note}</small>
+          </li>
+        ))}
+      </ul>
+      <p class="vault-note">Delete the app and the work still makes sense.</p>
+    </figure>
+  </div>
+</section>
+
+<style>
+  .folder-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 3rem clamp(2rem, 6vw, 5.5rem);
+    align-items: center;
+  }
+  .promises {
+    display: grid;
+    gap: 0;
+    margin: 2.25rem 0 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: promise;
+  }
+  .promises li {
+    counter-increment: promise;
+    display: grid;
+    grid-template-columns: 2.25rem 1fr;
+    padding: 0.95rem 0;
+    border-top: 1px solid var(--border-strong);
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+  .promises li::before {
+    content: counter(promise, decimal-leading-zero);
+    color: var(--accent-text);
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.9;
+  }
+  .promises b {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .promises p {
+    margin: 0;
+  }
+
+  /* The tree sits straight on the band: hairlines and alignment, no box. */
+  .vault {
+    margin: 0;
+  }
+  .vault figcaption {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid var(--text-muted);
+    color: var(--text-muted);
+    font-size: 0.86rem;
+  }
+  .vault figcaption span:first-child {
+    color: var(--text);
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  .vault ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .vault li {
+    display: grid;
+    grid-template-columns: 1rem minmax(0, 1fr) auto;
+    gap: 0.7rem;
+    align-items: center;
+    min-height: 2.9rem;
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .vault li.nested {
+    padding-left: 1.6rem;
+  }
+  .vault svg {
+    width: 1rem;
+    height: 1rem;
+    color: var(--text-muted);
+  }
+  .vault .kind-folder svg {
+    color: var(--accent-text);
+  }
+  .name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+  }
+  .kind-folder .name,
+  .kind-meta .name {
+    font-weight: 600;
+  }
+  .vault small {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    text-align: right;
+  }
+  .vault-note {
+    margin: 1rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  @media (max-width: 900px) {
+    .folder-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  @media (max-width: 420px) {
+    .vault li {
+      grid-template-columns: 1rem minmax(0, 1fr);
+    }
+    .vault small {
+      grid-column: 2;
+      margin-top: -0.6rem;
+      padding-bottom: 0.5rem;
+      text-align: left;
+    }
+  }
+</style>

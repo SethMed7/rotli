@@ -1,0 +1,303 @@
+---
+// Features: what rotli does, organized the way you meet it: how a note
+// renders (and the Markdown it is saved as), chat and what it writes, the
+// formats beyond Markdown and where assets live, the Librarian, how AI tools
+// connect, then the smaller habits. Pictures are captures of the real app
+// (stable browser twin and the Mac launch shoot, synthetic vaults only) or
+// plain drawings where a screenshot would only be a box of small text.
+// The alpha scope only; experiments live in Experiments.astro.
+import ChatFlow from './ChatFlow.astro';
+import ConnectAI from './ConnectAI.astro';
+import Formats from './Formats.astro';
+import RenderShowcase from './RenderShowcase.astro';
+
+interface Props {
+  /** The landing page: the rendering pair and chat, then a link here for the rest. */
+  compact?: boolean;
+}
+const { compact = false } = Astro.props;
+
+// An illustration of one Librarian pass over a synthetic vault (the notes and
+// folders from the launch film): where each new note is filed, and what the
+// Librarian adds around it. The note text itself is never edited.
+const filings = [
+  { note: 'Q4 launch plan', folder: 'Projects', adds: 'tags · a summary · linked to Call with Maya' },
+  { note: 'Call with Maya', folder: 'People', adds: 'tags · a summary' },
+  { note: 'Local-first reading list', folder: 'Research', adds: 'tags · a summary · links to two notes' },
+];
+
+const habits = [
+  { key: '[[ ]]', text: 'Wikilinks connect notes. A link to nothing looks inert, never live.' },
+  { key: '⌘K', text: 'Search titles and text across the whole vault, best match first.' },
+  { key: '⌥Space', text: 'Open or hide rotli from anywhere on your Mac.' },
+  { key: 'Views', text: 'Main and named views arrange the same files without copying them.' },
+  { key: 'Lessons', text: 'Your first vault holds nine short lessons, as ordinary notes you can delete.' },
+];
+---
+
+<section class="section features" id="features" aria-labelledby="features-title">
+  <div class="wrap">
+    <header class="section-head">
+      <h2 class="section-title" id="features-title">Write in Markdown. See it rendered.</h2>
+      <p class="section-lede">
+        Tasks, choices, tables, diagrams, and math draw themselves as you type, and every one of them is plain
+        text on disk.
+      </p>
+    </header>
+    <RenderShowcase compact={compact} />
+  </div>
+</section>
+
+<section class="section band-warm" id="chat" aria-labelledby="chat-title">
+  <div class="wrap">
+    <h2 class="visually-hidden" id="chat-title">Chat</h2>
+    <ChatFlow compact={compact} />
+    {compact && (
+      <p class="all-features">
+        <a class="button secondary" href="/features/">Explore every feature</a>
+      </p>
+    )}
+  </div>
+</section>
+
+{
+  !compact && (
+    <>
+      <section class="section" id="formats" aria-labelledby="formats-title">
+        <div class="wrap">
+          <header class="section-head">
+            <h2 class="section-title" id="formats-title">More than notes.</h2>
+            <p class="section-lede">
+              Word documents and boards open right beside your notes, as the same ordinary files any other app
+              reads. Spreadsheets are next.
+            </p>
+          </header>
+          <Formats />
+        </div>
+      </section>
+
+      <section class="section band-warm" id="organize" aria-labelledby="organize-title">
+        <div class="wrap">
+          <h2 class="visually-hidden" id="organize-title">Organize</h2>
+              <article class="row flip" id="librarian" data-reveal>
+                <div class="row-copy">
+                  <h3>A Librarian that files, never rewrites.</h3>
+                  <p>
+                    Turn it on and new notes get tags, summaries, links, and a place in your Library while you
+                    keep working in Main. It organizes around your writing without editing it. Turn it off and
+                    the folder is still a complete workspace.
+                  </p>
+                </div>
+                <figure class="filing" aria-label="How the Librarian files three new notes">
+                  <div class="filing-head" aria-hidden="true">
+                    <span>New notes</span>
+                    <span>Filed in your Library</span>
+                  </div>
+                  <ol>
+                    {filings.map((filing) => (
+                      <li>
+                        <span class="filing-note">
+                          <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2">
+                            <path d="M4 1.5h5.5L12.5 4.5v10h-8.5z" />
+                            <path d="M9.5 1.5v3h3" />
+                          </svg>
+                          {filing.note}
+                        </span>
+                        <span class="filing-line" aria-hidden="true"></span>
+                        <span class="filing-folder">
+                          <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2">
+                            <path d="M1.5 3.5h4.5l1.5 1.5h7v8.5h-13z" />
+                          </svg>
+                          <span class="visually-hidden">filed in</span> {filing.folder}
+                        </span>
+                        <small>{filing.adds}</small>
+                      </li>
+                    ))}
+                  </ol>
+                  <figcaption>Every note keeps its words exactly as you wrote them.</figcaption>
+                </figure>
+              </article>
+        </div>
+      </section>
+
+      <section class="section" id="connect" aria-labelledby="connect-title">
+        <div class="wrap">
+          <header class="section-head">
+            <h2 class="section-title" id="connect-title">Your AI, connected the honest way.</h2>
+            <p class="section-lede">
+              No accounts to link and no keys to paste. rotli works with the tools you already have installed.
+            </p>
+          </header>
+          <ConnectAI />
+          <ul class="habits" aria-label="Smaller things worth knowing" data-reveal>
+            {habits.map((habit) => (
+              <li>
+                <kbd>{habit.key}</kbd>
+                <p>{habit.text}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+    </>
+  )
+}
+
+<style>
+  h3 {
+    margin: 0;
+    font-size: var(--step-h3);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+  h3 + p {
+    margin: 0.8rem 0 0;
+    color: var(--text-muted);
+    line-height: 1.62;
+  }
+  figure {
+    margin: 0;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+    gap: 2rem clamp(2rem, 6vw, 5rem);
+    align-items: start;
+  }
+  .row.flip .row-copy {
+    order: 2;
+  }
+  .row-copy p {
+    max-width: 30rem;
+  }
+  .all-features {
+    margin: clamp(3rem, 6vw, 4rem) 0 0;
+  }
+  .filing {
+    margin: 0;
+  }
+  .filing-head {
+    display: flex;
+    justify-content: space-between;
+    padding-bottom: 0.75rem;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+  .filing ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--border-strong);
+  }
+  .filing li {
+    display: grid;
+    grid-template-columns: auto minmax(2rem, 1fr) auto;
+    align-items: center;
+    gap: 0.35rem 1rem;
+    padding: 1.15rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .filing-note,
+  .filing-folder {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-weight: 600;
+  }
+  .filing svg {
+    flex: none;
+    width: 1rem;
+    height: 1rem;
+    color: var(--text-muted);
+  }
+  .filing-folder svg {
+    color: var(--accent-text);
+  }
+  /* The path a note takes: a dashed rule ending in an arrowhead. */
+  .filing-line {
+    position: relative;
+    height: 0;
+    border-top: 1px dashed var(--border-strong);
+  }
+  .filing-line::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: -4px;
+    width: 7px;
+    height: 7px;
+    border-top: 1px solid var(--text-muted);
+    border-right: 1px solid var(--text-muted);
+    transform: rotate(45deg);
+  }
+  .filing small {
+    grid-column: 1 / -1;
+    color: var(--text-muted);
+    font-size: 0.86rem;
+    text-align: right;
+  }
+  .filing figcaption {
+    margin-top: 0.9rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .habits {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 1.5rem;
+    margin: clamp(4rem, 8vw, 6rem) 0 0;
+    padding: 1.75rem 0 0;
+    border-top: 1px solid var(--border-strong);
+    list-style: none;
+  }
+  kbd {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.9rem;
+    padding: 0.1rem 0.55rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.45rem;
+    background: var(--surface);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.86rem;
+    font-weight: 600;
+  }
+  .habits p {
+    margin: 0.7rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+  @media (max-width: 1080px) {
+    .habits {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 820px) {
+    .row {
+      grid-template-columns: 1fr;
+    }
+    .row.flip .row-copy {
+      order: 0;
+    }
+    .habits {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 480px) {
+    .habits {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

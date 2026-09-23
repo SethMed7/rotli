@@ -1,0 +1,46 @@
+---
+// The closing invitation: the celebrating quokka, one line, the two ways in.
+import celebrating from '../../assets/characters/cocoa/celebrating.webp';
+import { site } from '../../site';
+import SiteActions from '../SiteActions.astro';
+---
+
+<section class="section final" aria-labelledby="final-title">
+  <div class="wrap final-inner" data-reveal>
+    <img src={celebrating.src} width="176" height="176" alt="" loading="lazy" decoding="async" />
+    <h2 class="section-title" id="final-title">A durable place for the work you want to keep.</h2>
+    <p class="section-lede">Warm enough to return to. Quiet enough to disappear. Local enough to stay yours.</p>
+    <SiteActions webLabel="Open in your browser" downloadLabel="Download for Mac" />
+    <p class="final-meta">
+      Your first vault opens with nine short lessons{site.downloadsEnabled ? '. Free, no account.' : '.'}
+    </p>
+  </div>
+</section>
+
+<style>
+  .final-inner {
+    display: grid;
+    justify-items: center;
+    text-align: center;
+  }
+  img {
+    width: 176px;
+    height: 176px;
+    margin-bottom: 1.5rem;
+  }
+  .section-title {
+    max-width: 16ch;
+  }
+  .section-lede {
+    margin-inline: auto;
+  }
+  .final-inner :global(.site-actions) {
+    justify-content: center;
+    margin-top: 2rem;
+  }
+  .final-meta {
+    margin: 1rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+</style>

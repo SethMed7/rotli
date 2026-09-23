@@ -1,0 +1,164 @@
+---
+// Rendering: one note as rotli shows it beside the Markdown it is saved as,
+// then the kinds of blocks a note can hold. Every picture is a capture of the
+// real editor in the stable browser twin (synthetic in-memory vault, typed
+// through the editor itself), saved at 2× under public/shots/render-*.
+interface Props {
+  /** The landing page shows the side-by-side only. */
+  compact?: boolean;
+}
+const { compact = false } = Astro.props;
+
+const kinds = [
+  {
+    title: 'Tasks, progress, and results',
+    body: 'Done, in progress, and open; colored result buttons; switches. Click one and the file changes.',
+    syntax: '- [x]  - [/]  - [ ]  [True][False]  [|]',
+    image: { src: '/shots/render-tasks.webp', width: 734, height: 404, alt: 'Three tasks in done, in-progress, and open states, a row of True, Draw, and False result buttons, and a switch' },
+  },
+  {
+    title: 'Choices and panels',
+    body: 'One answer or several. A question row turns the options under it into a panel.',
+    syntax: '- [#]  - [##?]  - [##]',
+    image: { src: '/shots/render-choices.webp', width: 993, height: 540, alt: 'A single-choice pair with Friday selected, and a panel asking what ships in the first release with two of three options checked' },
+  },
+  {
+    title: 'Diagrams',
+    body: 'A Mermaid fence draws itself right in the note; the source stays one click away.',
+    syntax: '```mermaid',
+    image: { src: '/shots/render-mermaid.webp', width: 1505, height: 399, alt: 'A flowchart from Capture to Note to Library rendered inside a note' },
+  },
+  {
+    title: 'Tables, code, and math',
+    body: 'Edit tables cell by cell, keep code as code, and write equations that render.',
+    syntax: '| a | b |   ```ts   ```math',
+    image: { src: '/shots/render-tables.webp', width: 1510, height: 1002, alt: 'A three-column table, a TypeScript code block, and a rendered E = mc² equation' },
+  },
+];
+---
+
+<div class="pair" data-reveal>
+  <figure class="frame">
+    <figcaption>How it looks in rotli</figcaption>
+    <img src="/shots/render-note.webp" width="1512" height="1226" alt="A note called Launch week with tasks in three states, result buttons, a switch, a single choice, and a checklist panel" loading="lazy" decoding="async" />
+  </figure>
+  <figure class="frame">
+    <figcaption>What is saved on disk</figcaption>
+    <img src="/shots/render-raw.webp" width="1510" height="1190" alt="The same note in raw Markdown: headings, task brackets, result and choice markers, and a Mermaid fence" loading="lazy" decoding="async" />
+  </figure>
+  <p class="pair-note">
+    Same note, two views. Everything rotli draws is plain Markdown underneath, so it opens in any editor and
+    survives any app, including this one. Aa → Raw markdown switches views in place.
+  </p>
+</div>
+
+{
+  !compact && (
+    <ul class="kinds" data-reveal>
+      {kinds.map((kind) => (
+        <li>
+          <figure class="frame">
+            <img
+              src={kind.image.src}
+              width={kind.image.width}
+              height={kind.image.height}
+              alt={kind.image.alt}
+              loading="lazy"
+              decoding="async"
+            />
+          </figure>
+          <h3>{kind.title}</h3>
+          <p>{kind.body}</p>
+          <code>{kind.syntax}</code>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+<style>
+  .frame {
+    margin: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-frame);
+    overflow: hidden;
+    background: var(--capture-ground);
+  }
+  .frame img {
+    width: 100%;
+    height: auto;
+  }
+  .pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem clamp(1rem, 2.5vw, 1.75rem);
+    align-items: start;
+  }
+  .pair .frame {
+    background: var(--surface);
+  }
+  .pair figcaption {
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.84rem;
+    font-weight: 600;
+  }
+  .pair-note {
+    grid-column: 1 / -1;
+    max-width: 44rem;
+    margin: 0.75rem 0 0;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+  .kinds {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(2.5rem, 5vw, 3.5rem) clamp(1.5rem, 4vw, 3rem);
+    margin: clamp(3.5rem, 7vw, 5rem) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  /* Every tile is the same shape; each capture is shown whole, centered. */
+  .kinds .frame {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 3 / 2;
+    padding: clamp(1rem, 2.5vw, 1.75rem);
+    background: var(--capture-ground);
+  }
+  .kinds .frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  .kinds h3 {
+    margin: 1.1rem 0 0;
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .kinds p {
+    margin: 0.4rem 0 0;
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+  .kinds code {
+    display: inline-block;
+    margin-top: 0.6rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.4rem;
+    background: var(--surface-2);
+    color: var(--text);
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.82rem;
+    white-space: pre-wrap;
+  }
+  @media (max-width: 760px) {
+    .pair,
+    .kinds {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
