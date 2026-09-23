@@ -201,8 +201,9 @@ download, so landing there first costs nothing.
 The site is a static Astro build served by Caddy from a pinned two-stage
 [`Dockerfile`](Dockerfile). [`Caddyfile`](Caddyfile) is the one home for the
 browser-security and cache headers. There is no SSR, adapter, or Worker.
-The footer's Launch Llama badge is the site's one third-party image: `img-src`
-allows only `https://tools.launchllama.co` beyond same-origin and data images,
+The footer's Launch Llama and Founder.best badges are the site's only
+third-party images: `img-src` allows only `https://tools.launchllama.co` and
+`https://www.founder.best` beyond same-origin and data images,
 and `check:security` keeps literal remote `<img>` origins aligned with that
 deployed policy so a local-preview success cannot become a blank production
 badge.
