@@ -11,6 +11,7 @@ import { useNoteMenu } from "../components/useNoteMenu";
 import { dispatch } from "../keys/registry";
 import { relativeLabel } from "../lib/dateLabels";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { hotkeyHint } from "../lib/hotkeyHint";
 import { brainLocationLabel, noteDiskFolder, noteLocationLabel } from "../lib/noteLocation";
 import { corpusNoteAbsolutePath, corpusRawFrontmatter, corpusWriteFrontmatterRaw } from "../lib/tauri";
 import { useNow } from "../lib/useNow";
@@ -85,7 +86,7 @@ function NoteHistoryTrail({ compact }: { compact: boolean }) {
           type="button"
           className="ed-trail-link"
           aria-label={`Back to ${previousTitle}`}
-          title={`Back to ${previousTitle} — ⌘[`}
+          title={`Back to ${previousTitle}${hotkeyHint(" — ⌘[")}`}
           onClick={() => dispatch("nav.back")}
         >
           <ChevronRight size={11} className="ed-trail-back" />
@@ -98,7 +99,7 @@ function NoteHistoryTrail({ compact }: { compact: boolean }) {
           type="button"
           className="ed-trail-link"
           aria-label={`Forward to ${nextTitle}`}
-          title={`Forward to ${nextTitle} — ⌘]`}
+          title={`Forward to ${nextTitle}${hotkeyHint(" — ⌘]")}`}
           onClick={() => dispatch("nav.forward")}
         >
           {!compact && <span>{nextTitle}</span>}

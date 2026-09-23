@@ -56,7 +56,7 @@ import {
   workspaceTakeOpenRequest,
 } from "./lib/tauri";
 import { useNativeFileDrop } from "./editor/nativeFileDrop";
-import { PLATFORM } from "./lib/featurePolicy";
+import { LAUNCH_FEATURES, PLATFORM } from "./lib/featurePolicy";
 import { onQuitFlushFailure } from "./lib/quitFlush";
 import { isOnboardingReview } from "./lib/reviewMode";
 import { fileQuickNoteInMain } from "./newItems/composition";
@@ -189,7 +189,7 @@ function MainShell() {
   useHeldModifier({
     modifier: "Meta",
     delayMs: hotkeyPeekDelay(transientCount > 0 || paletteOpen),
-    enabled: hotkeyPeek !== "off" && !settingsOpen && !setupFront,
+    enabled: LAUNCH_FEATURES.hotkeys && hotkeyPeek !== "off" && !settingsOpen && !setupFront,
     onHold: () => setWhichKey(true),
     onRelease: () => setWhichKey(false),
   });

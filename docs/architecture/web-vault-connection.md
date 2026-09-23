@@ -86,6 +86,16 @@ Not on the web: Reveal in Finder (hidden). DOCX documents stay desktop-only —
 `launchFeatures(…, "web").documents` is false, so the chooser shows Document as
 coming soon and every create path refuses it.
 
+## Keys on the web
+
+Rotli Web has no app hotkeys (`launchFeatures(…, "web").hotkeys` is false,
+2026-09-23): the browser's own shortcuts own ⌃Tab, ⌘[, ⌘←, ⌘W, ⌘1–9 and the
+rest. `keys/registry.ts` `currentChord` answers null for every modifier chord
+except the editor's text formatting (`EDITOR_ACTION` — ⌘B, ⌘I…), so nothing
+dispatches it and no hint names it (`lib/hotkeyHint.ts` for hard-coded hints);
+bare keys (Esc, Enter) still answer. Every action stays in the ⌘K palette —
+reached from the search field — and Settings has no Keybindings pane.
+
 ## Rotli Helper's vault lane
 
 `rotli-helper` (a second bin of the crate) serves ONE folder:

@@ -8,6 +8,7 @@
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { formatChord } from "../keys/chords";
 import { dispatch, getAction } from "../keys/registry";
+import { SHOW_HOTKEYS } from "../lib/hotkeyHint";
 import { Character } from "./character";
 import { PlusGlyph } from "./glyphs";
 
@@ -30,10 +31,12 @@ export function EmptyState() {
         <PlusGlyph size={14} />
         Write the first note
       </button>
-      <div className="ghost">
-        or just press <kbd>⌘</kbd>
-        <kbd>N</kbd>
-      </div>
+      {SHOW_HOTKEYS && (
+        <div className="ghost">
+          or just press <kbd>⌘</kbd>
+          <kbd>N</kbd>
+        </div>
+      )}
     </div>
   );
 }

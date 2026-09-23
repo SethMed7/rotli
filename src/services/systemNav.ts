@@ -33,6 +33,15 @@ function rootOf(folder: string): { id: string; prefix: string } {
   return { id: "Brain", prefix: "wiki" };
 }
 
+/** The sidebar row that shows where a note lives when Main doesn't hold it
+ * (a link can open any note): a capture's Captures row, else the System root
+ * of its disk folder. Null for a chat — the Chat front owns those. */
+export function sidebarHomeOfNote(note: NoteSummary): string | null {
+  if (isChatItem(note)) return null;
+  if (note.folderId === DEST.board) return DEST.board;
+  return rootOf(noteDiskFolder(note)).id;
+}
+
 /** Open the System browser AT a note's folder — Rotli Web's "show me where
  * this file lives" (Finder does it on the Mac). */
 export function revealNoteInSystem(note: NoteSummary): void {

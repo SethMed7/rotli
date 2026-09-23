@@ -6,9 +6,11 @@
 // Global chords are registered with the OS in Rust; rebinding them round-trips
 // through the set_summon_shortcut invoke.
 
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { emitRebind, setGlobalShortcut } from "../lib/tauri";
 import { resolveChord, useBindingsStore } from "./bindings";
 import { chordFromEvent, normalizeChord, toAccelerator } from "./chords";
+import { EDITOR_ACTION } from "./editorActionIds";
 import { leaderConsumes } from "./leader";
 
 /** Which webview an action belongs to — the dispatcher only fires actions for
@@ -70,11 +72,20 @@ export function dispatch(actionId: string): void {
   actions.get(actionId)?.run();
 }
 
-/** The action's chord right now: override if one exists, else its default. */
+/** Chords Rotli Web keeps: the editor's text formatting (⌘B, ⌘I…), which a
+ * web editor is expected to answer. */
+const WEB_KEPT_CHORDS: ReadonlySet<string> = new Set(Object.values(EDITOR_ACTION));
+
+/** The action's chord right now: override if one exists, else its default.
+ * Where the build withholds app hotkeys (Rotli Web), a modifier chord is none
+ * — nothing dispatches it and no hint shows it — unless it formats text; bare
+ * keys (Esc, Enter) still answer. */
 export function currentChord(actionId: string): string | null {
   const action = actions.get(actionId);
   if (!action) return null;
-  return resolveChord(useBindingsStore.getState().overrides, actionId, action.defaultChord);
+  const chord = resolveChord(useBindingsStore.getState().overrides, actionId, action.defaultChord);
+  if (chord && !LAUNCH_FEATURES.hotkeys && chord.includes("+") && !WEB_KEPT_CHORDS.has(actionId)) return null;
+  return chord;
 }
 
 /** The other action already holding `chord`, if any (for the quiet inline

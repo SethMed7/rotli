@@ -54,7 +54,7 @@ import {
   uniqueRootFolderName,
 } from "../../services/mainTree";
 import { buildStorageTree } from "../../services/storageTree";
-import { openSystemRoot } from "../../services/systemNav";
+import { openSystemRoot, sidebarHomeOfNote } from "../../services/systemNav";
 import {
   createNamedView,
   deleteNamedView,
@@ -266,6 +266,14 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   // so the note underneath the dashboard must not keep a second active pill.
   const focusedTab = useFocusedTab();
   const focusedItemId = contentView === "panes" ? sidebarItemId(focusedTab) : null;
+  // A note Main doesn't hold (a link can open any note) still shows where you
+  // are: the row it lives under — Captures, Library, Assets, Archive, Trash —
+  // wears the highlight (the owner, 2026-09-23: "where I am isn't highlighting").
+  const hereRow = useMemo(() => {
+    if (!focusedItemId || mainProjection.notes.some((n) => n.id === focusedItemId)) return null;
+    const note = noteIndex.get(focusedItemId);
+    return note ? sidebarHomeOfNote(note) : null;
+  }, [focusedItemId, mainProjection, noteIndex]);
   // failed row-menu actions (file-to-brain, board rename) land here — the menu
   // that launched them is gone by the time they fail (#11, audit 2026-07)
   const setRowActionError = useUiStore((s) => s.setRowActionError);
@@ -1084,7 +1092,8 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
               content area (an action row, not a roving folder). */}
           <button
             type="button"
-            className={`frow${contentView === "board" ? " sel" : ""}`}
+            className={`frow${contentView === "board" || hereRow === DEST.board ? " sel" : ""}`}
+            aria-current={hereRow === DEST.board ? "location" : undefined}
             onClick={() => dispatch("board.open")}
             {...rowProps({ id: CAPTURES_ROW, kind: "smart" })}
           >
@@ -1272,6 +1281,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
         brainEnabled={brainEnabledUi}
         rowProps={rowProps}
         zoom={zoom}
+        here={hereRow}
       />
     </>
   );

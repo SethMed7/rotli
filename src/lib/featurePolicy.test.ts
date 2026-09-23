@@ -16,6 +16,7 @@ test("public builds keep notes, chat and the Chat window while every experimenta
     agents: false,
     sheets: false,
     documents: true,
+    hotkeys: true,
     mermaidDiagrams: false,
     voice: false,
     chatWindow: true,
@@ -28,6 +29,7 @@ test("public builds keep notes, chat and the Chat window while every experimenta
     agents: true,
     sheets: true,
     documents: true,
+    hotkeys: true,
     mermaidDiagrams: true,
     voice: true,
     chatWindow: true,
@@ -38,6 +40,7 @@ test("the web platform withholds every capability that needs the desktop shell, 
   for (const development of [false, true]) {
     const web = launchFeatures(development, "web");
     expect(web.notes).toBe(true);
+    expect(web.hotkeys).toBe(false);
     expect(web.chat).toBe(false);
     expect(web.breve).toBe(false);
     expect(web.agents).toBe(false);

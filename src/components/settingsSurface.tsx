@@ -195,6 +195,9 @@ const NAV: { id: SettingsPane; label: string; glyph: (props: { size?: number }) 
   { id: "about", label: "About Rotli", glyph: QuokkaMark },
 ];
 
+/** Rotli Web has no app hotkeys (featurePolicy `hotkeys`), so no Keybindings pane. */
+const SHOWN_NAV = LAUNCH_FEATURES.hotkeys ? NAV : NAV.filter((pane) => pane.id !== "hotkeys");
+
 /** A settings pane heading with its quokka character accent (the maintainer, 2026-06-26) —
  * a small, muted line-art quokka at the top-right of each section. This is an
  * ambient section marker, not a companion preview: it keeps semantic line ink
@@ -3272,7 +3275,7 @@ export function SettingsSurface() {
   const paneRequest = useUiStore((s) => s.settingsPaneRequest);
   useEffect(() => {
     if (!paneRequest) return;
-    if (NAV.some((p) => p.id === paneRequest)) setPane(paneRequest as SettingsPane);
+    if (SHOWN_NAV.some((p) => p.id === paneRequest)) setPane(paneRequest as SettingsPane);
     useUiStore.getState().setSettingsPaneRequest(null);
   }, [paneRequest]);
 
@@ -3292,7 +3295,7 @@ export function SettingsSurface() {
           </svg>
           <span className="set-back-label">Back to notes</span>
         </button>
-        {NAV.map(({ id, label, glyph: G }) => (
+        {SHOWN_NAV.map(({ id, label, glyph: G }) => (
           <button
             type="button"
             key={id}
