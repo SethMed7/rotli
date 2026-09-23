@@ -33,9 +33,9 @@ export const RELEASES_URL = 'https://github.com/SethMed7/rotli-releases/releases
 // The newest notarized DMG, downloaded directly. scripts/release.sh publishes a
 // stable-named copy (Rotli.dmg) on every release, so this never needs editing.
 export const DOWNLOAD_URL = `${RELEASES_URL}/download/Rotli.dmg`;
-/** Where every Download button on the site goes. Today that is the newest Mac
- * DMG, fetched directly. When a download page offers Mac, Windows, and Linux,
- * point this at it (e.g. '/download/') and every button follows. */
+/** Where the hero's and closing card's "Download for Mac" buttons go: the
+ * newest Mac DMG, fetched directly. The header's Download button always opens
+ * /download/, which picks by the visitor's system (SiteHeader.astro). */
 export const DOWNLOAD_HREF = DOWNLOAD_URL;
 /** Rotli Web, served from this same origin under /app/ (site/Caddyfile,
  * site/Dockerfile `app` stage). The path is fixed; whether pages link to it is

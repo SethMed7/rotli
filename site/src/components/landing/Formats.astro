@@ -3,7 +3,7 @@
 // editor, Mac app), spreadsheets (coming soon; CSV edits in place today),
 // and Excalidraw boards. Then Assets: where pasted images and the files chat
 // makes are kept. Status follows src/lib/featurePolicy.ts and the stable New
-// chooser (captured in public/shots/chooser.webp); the board is a real
+// chooser; the board is a real
 // Excalidraw canvas drawn with its own tools in Rotli Web.
 const formats = [
   {
@@ -18,8 +18,8 @@ const formats = [
   },
   {
     title: 'Boards',
-    status: 'Mac app',
-    body: 'Sketch on an Excalidraw canvas saved as an ordinary .excalidraw file. Chat can draw one for you from a diagram.',
+    status: 'Mac and web',
+    body: 'Sketch on an Excalidraw canvas saved as an ordinary .excalidraw file, in the Mac app or Rotli Web. On the Mac, chat can draw one for you from a diagram.',
   },
 ];
 
@@ -45,7 +45,7 @@ const assets = [
     {formats.map((format) => (
       <li>
         <div class="format-head">
-          <h4>{format.title}</h4>
+          <h3 class="format-title">{format.title}</h3>
           <span class:list={['status', { soon: format.status === 'Coming soon' }]}>{format.status}</span>
         </div>
         <p>{format.body}</p>
@@ -106,10 +106,11 @@ const assets = [
     justify-content: space-between;
     gap: 1rem;
   }
-  h4 {
+  .format-title {
     margin: 0;
     font-size: 1.15rem;
     font-weight: 600;
+    letter-spacing: 0;
   }
   .status {
     padding: 0.15rem 0.6rem;

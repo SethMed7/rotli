@@ -31,7 +31,7 @@ and only if you run it on your own computer.
 
 Rotli Web chats through **Rotli Helper**, a small program you run on your own computer (Mac, Windows, or
 Linux). It passes your message to AI tools you already have installed, like Claude Code or Codex, with
-your notes as context. Notes in a secure folder, or carrying a secret, never reach a model.
+your notes as context. Notes marked secure, or carrying a secret, never reach a model.
 
 ## What stays in the Mac app
 

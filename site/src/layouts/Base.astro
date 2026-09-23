@@ -199,7 +199,7 @@ const socialImageUrl = new URL(image, siteUrl).href;
       p {
         text-wrap: pretty;
       }
-      :where(a, button):focus-visible {
+      :where(a, button, summary):focus-visible {
         outline: 2px solid var(--accent-text);
         outline-offset: 3px;
       }
