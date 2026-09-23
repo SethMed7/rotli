@@ -4,8 +4,8 @@
 import type { NoteSummary } from "../types";
 
 /** A blank note has nothing to find or switch to: the one you are typing into
- * is already open, and an abandoned one is discarded (the maintainer,
- * 2026-09-23: "Untitled should not be showing"). Pure for tests. */
+ * is already open, and ⌘N reuses it (the maintainer, 2026-09-23: "Untitled
+ * should not be showing"). Pure for tests. */
 export function pickableNotes(notes: NoteSummary[]): NoteSummary[] {
   return notes.filter((n) => n.bodyEmpty !== true);
 }

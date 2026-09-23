@@ -28,9 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   main window now steps aside while the note is up and returns when you close
   it.
 - **No more "Untitled" in the Quick Note.** Its note list leaves out blank
-  notes, a blank open note is titled New note, ⌘N reuses a blank note instead
-  of making another, and a blank note is filed into Main only once you write in
-  it and removed if you switch away first.
+  notes, a blank open note is titled New note, and ⌘N reuses a blank note
+  instead of making another.
 
 ### Added
 

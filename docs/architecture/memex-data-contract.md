@@ -603,11 +603,11 @@ but it must remain rebuildable, optional, and behind the retrieval port.
 - Quick captures and notes created from the Quick Note window are secure at
   birth. The user may deliberately remove protection from the note menu or the
   Quick Note shield control.
-- A Quick Note is a view until you write in it, like a new note in main: the
-  window files it into Main on its first non-empty save, reuses a blank open
-  note instead of creating another, and discards a blank note it created once
-  you switch away (Rust refuses to discard anything with content). Its picker
-  never lists blank notes, and a blank open note is titled "New note".
+- A blank Quick Note is never shown as "Untitled": the window's picker leaves
+  out blank notes (`NoteSummary.bodyEmpty`), a blank open note is titled "New
+  note", and ⌘N reuses a blank open note instead of creating another. The note
+  is still filed into Main at birth, where Main's own blank filter hides it
+  until it has content.
 - A secure quick capture therefore lives in `wiki/_secure/` but keeps the
   capture shelf `Inbox`, and Rust projects it to the reserved `Board` root the
   sidebar reads as **Captures** — the same surface a plain staged capture in

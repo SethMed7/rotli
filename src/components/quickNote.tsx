@@ -10,14 +10,12 @@
 import { type KeyboardEvent, type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { EditorSurface } from "../editor/editorSurface";
-import { evictDocument } from "../editor/model";
 import { quickHandle, setQuickHandle } from "../keys/handles";
 import { hotkeyPeekDelay, useHeldModifier } from "../keys/useHeldModifier";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { useTransientPopover } from "../lib/popover";
 import { pickableNotes, quickNoteTitle } from "../lib/quickNoteList";
 import {
-  corpusDiscardBlank,
   corpusFrontmatter,
   corpusSetSecure,
   emitQuickCreated,
@@ -30,7 +28,6 @@ import { createVaultCapture } from "../services/captureRouting";
 import { createRoutedNote } from "../services/createNote";
 import { isChatsPath, isVault, isWikiPath } from "../services/destinations";
 import { invalidateNotes, useSearchableNotes } from "../services/hooks";
-import { claimClosedNoteDrafts, markNoteDraftChanged, trackNewNoteDraft } from "../services/noteDrafts";
 import { inboxFolderId, notesService } from "../services/notes";
 import { usePanesStore } from "../state/panes";
 import { pruneQuick, setQuickActive, togglePinQuick } from "../state/quick";
@@ -51,18 +48,6 @@ const QUICK_PANE_ID = "quick";
 function onDragRegionMouseDown(event: MouseEvent) {
   if (event.button !== 0 || event.detail > 1) return;
   void startWindowDrag();
-}
-
-/** Leaving a note this window created and never wrote in discards it — the
- * ephemeral-note lifecycle main already follows. Rust re-checks blankness and
- * refuses anything with content, so a refusal just keeps the note. */
-function discardAbandonedDraft(noteId: string): void {
-  for (const id of claimClosedNoteDrafts([noteId], [])) {
-    evictDocument(id);
-    void corpusDiscardBlank(id)
-      .then(() => invalidateNotes())
-      .catch(() => {});
-  }
 }
 
 /** Forgiving subsequence match — instant, no scoring (mirrors the palette). */
@@ -210,13 +195,6 @@ export function QuickNote() {
     onHold: () => setPeek(true),
     onRelease: () => setPeek(false),
   });
-  // the note open before this one — leaving a blank draft discards it
-  const previousActiveRef = useRef(activeId);
-  useEffect(() => {
-    const previous = previousActiveRef.current;
-    previousActiveRef.current = activeId;
-    if (previous && previous !== activeId) discardAbandonedDraft(previous);
-  }, [activeId]);
   // a failed new-note create, surfaced in the window (#6 — never silent)
   const [err, setErr] = useState<string | null>(null);
   // bumped each summon — keys the editor so it REMOUNTS on every show, re-running
@@ -241,7 +219,6 @@ export function QuickNote() {
 
   const toggleSecure = () => {
     if (!activeId || securityBusy) return;
-    markNoteDraftChanged(activeId); // protecting a note is intent to keep it
     const next = !secure;
     setSecurityBusy(true);
     void corpusSetSecure(activeId, next)
@@ -324,14 +301,12 @@ export function QuickNote() {
       .then(async (noteId) => {
         await invalidateNotes();
         setErr(null);
-        // a Quick Note is a FULL note: main files it into Main so it never sits
-        // in Captures — on its first non-empty save, so a blank one never shows
-        // up there (the quick webview cannot write the manifest; in the browser
-        // twin there is no main, so file it here)
-        trackNewNoteDraft(noteId, () => {
-          if (isTauri()) emitQuickCreated({ id: noteId });
-          else fileQuickNoteInMain(noteId);
-        });
+        // a Quick Note is a FULL note: main files it into Main at birth so it
+        // never sits in Captures; Main leaves it out while its body is blank
+        // (the quick webview cannot write the manifest; in the browser twin
+        // there is no main, so file it here)
+        if (isTauri()) emitQuickCreated({ id: noteId });
+        else fileQuickNoteInMain(noteId);
         setQuickActive(noteId); // open it (not pinned — pin deliberately via ★)
         setPickerOpen(false);
       })
@@ -459,10 +434,7 @@ export function QuickNote() {
             setQuickActive(id);
             setPickerOpen(false);
           }}
-          onTogglePin={(id) => {
-            markNoteDraftChanged(id); // pinning a note is intent to keep it
-            togglePinQuick(id);
-          }}
+          onTogglePin={togglePinQuick}
           onClose={() => setPickerOpen(false)}
         />
       )}

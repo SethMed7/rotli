@@ -15,6 +15,7 @@ use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter, Manager};
 
+use crate::chat_window::SHELL_LABELS;
 use crate::{
     capture_return_plan, center_on_cursor_display, focused_webview_window, hide_main, CaptureReturnPlan,
     LastPanelSummon,
@@ -47,12 +48,15 @@ fn quick_return_plan(previous: CaptureReturnPlan, main_visible: bool, main_focus
 }
 
 /// Snapshot the return target BEFORE the panel steals focus, tucking main when
-/// it sits visible behind another app.
+/// it sits visible behind another app. Working in either shell window (main or
+/// the pulled-out Chat window) counts as being in rotli.
 fn remember_return(app: &AppHandle) {
     let (main_visible, main_focused) = app
         .get_webview_window("main")
         .map(|w| (w.is_visible().unwrap_or(false), w.is_focused().unwrap_or(false)))
         .unwrap_or((false, false));
+    let in_shell = focused_webview_window(app).is_some_and(|w| SHELL_LABELS.contains(&w.label()));
+    let (main_visible, main_focused) = (main_visible || in_shell, main_focused || in_shell);
     let state = app.state::<QuickReturn>();
     let mut current = state.0.lock().unwrap();
     let plan = quick_return_plan(*current, main_visible, main_focused);
@@ -112,8 +116,9 @@ pub(crate) fn close(app: &AppHandle) {
 }
 
 /// Click-away: the panel is a visitor and always hides. A tucked main comes
-/// back only when focus left rotli — rotli is then inactive, so ordering main
-/// in keeps it behind the app you clicked. When focus moved to another rotli
+/// back only when focus left rotli, and the same way `close` restores it: step
+/// out of rotli first, then order main in while the app is hidden, so it can
+/// never pop over the app you clicked. When focus moved to another rotli
 /// window, main stays tucked (restoring it would take focus from that window)
 /// and the owed restore waits for the next Quick Note close.
 pub(crate) fn on_blur(panel: &tauri::Window) {
@@ -130,6 +135,8 @@ pub(crate) fn on_blur(panel: &tauri::Window) {
             *app.state::<QuickReturn>().0.lock().unwrap() = plan;
             return;
         }
+        #[cfg(target_os = "macos")]
+        let _ = app.hide();
         if let Some(window) = app.get_webview_window("main") {
             let _ = window.show();
         }

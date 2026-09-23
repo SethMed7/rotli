@@ -5,7 +5,7 @@ import { pickableNotes, quickNoteTitle } from "./quickNoteList";
 
 // The picker and header never show a blank note as "Untitled" (the maintainer,
 // 2026-09-23): the blank note you are typing into is the open "New note", and
-// an abandoned one is discarded rather than listed.
+// ⌘N reuses it rather than making another.
 
 const note = (over: Partial<NoteSummary>): NoteSummary => ({
   id: "n1",
