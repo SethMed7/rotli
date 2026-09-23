@@ -379,7 +379,8 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
       >
         <PlusGlyph size={13} />
         <span className="tip" aria-hidden="true">
-          {newTabLabel} — ⌘T
+          {newTabLabel}
+          {hotkeyHint(" — ⌘T")}
         </span>
       </button>
     </div>

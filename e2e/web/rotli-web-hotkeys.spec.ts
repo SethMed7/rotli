@@ -4,10 +4,11 @@
 // hint names a key that does nothing.
 
 import { expect, test } from "@playwright/test";
+import { type Page } from "@playwright/test";
 
-import { readOpfsFile, startWithVault } from "./support";
+import { startWithVault } from "./support";
 
-test("app chords do nothing on the web; ⌘B still bolds; no Keybindings pane or ⌘K hint", async ({ page }) => {
+test("app chords do nothing on the web, and there is no Keybindings pane or ⌘K hint", async ({ page }) => {
   await startWithVault(page);
   await page.getByRole("button", { name: /^New Markdown note tab/ }).click();
   await page.locator(".pane.focused .cm-content").click();
@@ -32,33 +33,8 @@ test("app chords do nothing on the web; ⌘B still bolds; no Keybindings pane or
   }
   await expect(page.getByRole("tab")).toHaveCount(tabCount);
 
-  // text formatting still answers
-  await page.locator(".pane.focused .cm-content").click();
-  await page.keyboard.press("End");
-  await page.keyboard.press("Shift+Home");
-  await page.keyboard.press("ControlOrMeta+b");
-  await expect
-    .poll(
-      async () => {
-        const files = await page.evaluate(async () => {
-          const out: string[] = [];
-          const dir = await (
-            await navigator.storage.getDirectory()
-          )
-            .getDirectoryHandle("wiki")
-            .then((w) => w.getDirectoryHandle("_inbox"))
-            .catch(() => null);
-          if (!dir) return out;
-          for await (const [name] of dir as unknown as AsyncIterable<[string, FileSystemHandle]>)
-            out.push(name);
-          return out;
-        });
-        const texts = await Promise.all(files.map((f) => readOpfsFile(page, `wiki/_inbox/${f}`)));
-        return texts.some((t) => t.includes("**word**"));
-      },
-      { timeout: 10_000 },
-    )
-    .toBe(true);
+  // (⌘B still formatting on the web is pinned by src/keys/chordInBuild.test.ts:
+  // the Linux runner has no ⌘ key to press)
 
   // no hint for a key that does nothing
   await expect(page.locator(".tb-search-kbd")).toHaveCount(0);
@@ -69,4 +45,39 @@ test("app chords do nothing on the web; ⌘B still bolds; no Keybindings pane or
     .click();
   await expect(page.getByRole("button", { name: "General" }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Keybindings" })).toHaveCount(0);
+});
+
+/** Every chord the screen names outside note text and the format bar (whose
+ * ⌘B/⌘I still work): visible text, hover tips, aria-labels, titles. */
+function chordsOnScreen(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const found: string[] = [];
+    const skip = (el: Element) => el.closest(".cm-content, .fmtbar") !== null;
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const el = node.parentElement;
+      if (el && !skip(el) && /[⌘⌃]/.test(node.textContent ?? ""))
+        found.push(`text: ${node.textContent?.trim()}`);
+    }
+    for (const el of document.querySelectorAll("[aria-label], [title]")) {
+      if (skip(el)) continue;
+      for (const attr of ["aria-label", "title"]) {
+        const value = el.getAttribute(attr) ?? "";
+        if (/[⌘⌃]/.test(value)) found.push(`${attr}: ${value}`);
+      }
+    }
+    return found;
+  });
+}
+
+test("Rotli Web names no app chord anywhere it can be seen", async ({ page }) => {
+  await startWithVault(page);
+  await expect(page.locator(".cm-content").first()).toBeVisible();
+  expect(await chordsOnScreen(page)).toEqual([]);
+  await page
+    .getByRole("button", { name: /^Settings/ })
+    .first()
+    .click();
+  await expect(page.getByRole("button", { name: "General" }).first()).toBeVisible();
+  expect(await chordsOnScreen(page)).toEqual([]);
 });

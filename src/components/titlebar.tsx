@@ -90,7 +90,7 @@ export function Titlebar() {
       {!settingsOpen && (
         <IconButton
           className="tb-lead"
-          label={sidebarCollapsed ? "Show sidebar — ⌘0" : "Hide sidebar — ⌘0"}
+          label={`${sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}${hotkeyHint(" — ⌘0")}`}
           hotkey="chrome.toggleSidebars"
           onClick={() => dispatch("chrome.toggleSidebars")}
         >
@@ -178,7 +178,7 @@ export function Titlebar() {
         {!settingsOpen && !breveActive && (
           <>
             <IconButton
-              label="New… — ⌘N"
+              label={`New…${hotkeyHint(" — ⌘N")}`}
               hotkey="tabs.newChooser"
               onClick={() => dispatch("tabs.newChooser")}
             >
@@ -187,14 +187,14 @@ export function Titlebar() {
             {/* two distinct split buttons (the maintainer, 2026-06-13): right = vertical
                 divider (columns), down = horizontal divider (rows) */}
             <IconButton
-              label="Split right — ⌘D"
+              label={`Split right${hotkeyHint(" — ⌘D")}`}
               hotkey="panes.splitRight"
               onClick={() => dispatch("panes.splitRight")}
             >
               <SplitRightGlyph size={TB_ICON} />
             </IconButton>
             <IconButton
-              label="Split down — ⌘⇧D"
+              label={`Split down${hotkeyHint(" — ⌘⇧D")}`}
               hotkey="panes.splitDown"
               onClick={() => dispatch("panes.splitDown")}
             >
@@ -214,7 +214,11 @@ export function Titlebar() {
         </IconButton>
         <IconButton
           className="tb-trail"
-          label={updateAvailable ? "Update available — open Settings · ⌘," : "Settings — ⌘,"}
+          label={
+            updateAvailable
+              ? `Update available — open Settings${hotkeyHint(" · ⌘,")}`
+              : `Settings${hotkeyHint(" — ⌘,")}`
+          }
           hotkey="app.settings"
           pressed={settingsOpen}
           onClick={() => dispatch("app.settings")}

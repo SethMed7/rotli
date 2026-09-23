@@ -11,6 +11,7 @@ import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, use
 
 import { relativeLabel } from "../lib/dateLabels";
 import { createDragGhost } from "../lib/dragGhost";
+import { SHOW_HOTKEYS } from "../lib/hotkeyHint";
 import { plainSnippet } from "../lib/plainSnippet";
 import { createPointerDragSession } from "../lib/pointerDrag";
 import { rangeBetween } from "../lib/rangeSelect";
@@ -324,8 +325,10 @@ export function BoardSurface() {
           <Character name="listening" size={104} className="be-quokka" />
           <p className="be-title">Nothing captured yet</p>
           <p className="be-sub">
-            Press your Quick capture shortcut (⌥C) from anywhere — each thought lands here as a card. Select a
-            few and merge them into one note.
+            {SHOW_HOTKEYS
+              ? "Press your Quick capture shortcut (⌥C) from anywhere — each thought lands here as a card."
+              : "Quick captures from Rotli for Mac land here as cards."}{" "}
+            Select a few and merge them into one note.
           </p>
         </div>
       ) : (

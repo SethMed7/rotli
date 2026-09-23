@@ -84,8 +84,28 @@ export function currentChord(actionId: string): string | null {
   const action = actions.get(actionId);
   if (!action) return null;
   const chord = resolveChord(useBindingsStore.getState().overrides, actionId, action.defaultChord);
-  if (chord && !LAUNCH_FEATURES.hotkeys && chord.includes("+") && !WEB_KEPT_CHORDS.has(actionId)) return null;
+  return chordInBuild(chord, actionId, LAUNCH_FEATURES.hotkeys);
+}
+
+/** The rule above, pure: a modifier chord is withheld where the build has no
+ * app hotkeys, unless it formats text. */
+export function chordInBuild(chord: string | null, actionId: string, hotkeys: boolean): string | null {
+  if (chord && !hotkeys && chord.includes("+") && !WEB_KEPT_CHORDS.has(actionId)) return null;
   return chord;
+}
+
+/** A chord the Mac app gives an action that Rotli Web leaves to the browser
+ * (⌘[, ⌘]…). The editor's own keymap steps aside for it too, so a web note
+ * never re-purposes a key the app reserves (review of #66: ⌘[ indented). */
+export function webFreedChord(pressed: string): boolean {
+  if (LAUNCH_FEATURES.hotkeys) return false;
+  const overrides = useBindingsStore.getState().overrides;
+  for (const action of actions.values()) {
+    if (action.global || WEB_KEPT_CHORDS.has(action.id)) continue;
+    const chord = resolveChord(overrides, action.id, action.defaultChord);
+    if (chord && chord.includes("+") && normalizeChord(chord) === pressed) return true;
+  }
+  return false;
 }
 
 /** The other action already holding `chord`, if any (for the quiet inline

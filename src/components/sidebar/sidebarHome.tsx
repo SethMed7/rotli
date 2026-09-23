@@ -23,6 +23,7 @@ import {
 
 import { dispatch } from "../../keys/registry";
 import { createDragGhost } from "../../lib/dragGhost";
+import { SHOW_HOTKEYS } from "../../lib/hotkeyHint";
 import { noteDiskFolder, projectNoteToBrain } from "../../lib/noteLocation";
 import { commitPaneDrop } from "../../lib/paneDropDrag";
 import { createPointerDragSession } from "../../lib/pointerDrag";
@@ -1255,8 +1256,16 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
             <p className="main-empty" data-main-id="main:">
               {activeView ? (
                 <>
-                  This view is empty. Press <b>⌘T</b> to create here, or right-click an item and choose{" "}
-                  <b>Move to view → {activeView}</b>. It will still appear in Main.
+                  This view is empty.{" "}
+                  {SHOW_HOTKEYS ? (
+                    <>
+                      Press <b>⌘T</b>
+                    </>
+                  ) : (
+                    "Use the tab strip’s +"
+                  )}{" "}
+                  to create here, or right-click an item and choose <b>Move to view → {activeView}</b>. It
+                  will still appear in Main.
                 </>
               ) : (
                 <>

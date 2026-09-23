@@ -13,7 +13,7 @@
 import { defaultKeymap, historyKeymap } from "@codemirror/commands";
 import type { Command, KeyBinding } from "@codemirror/view";
 
-import { claimingAction } from "../keys/registry";
+import { claimingAction, webFreedChord } from "../keys/registry";
 
 export const VENDOR_KEYMAP: readonly KeyBinding[] = [...defaultKeymap, ...historyKeymap];
 
@@ -59,20 +59,32 @@ export function registryChordOf(spec: string, addShift = false): string | null {
   return [...MOD_ORDER.filter((m) => mods.has(m)), token].join("+");
 }
 
-function yielding(chord: string | null, command: Command, claim: ChordClaim): Command {
+function yielding(
+  chord: string | null,
+  command: Command,
+  claim: ChordClaim,
+  freed: (chord: string) => boolean,
+): Command {
   if (!chord) return command;
-  return (view) => claim(chord) || command(view);
+  // a chord the app reserves but this build leaves to the browser (Rotli Web):
+  // not handled here either, so the browser's own shortcut runs
+  return (view) => claim(chord) || (!freed(chord) && command(view));
 }
 
 /** Every binding with a modifier chord asks `claim` first, for both its plain
- * and Shift variants. Pure given `claim` — the unit-test seam. */
-export function yieldToRegistry(bindings: readonly KeyBinding[], claim: ChordClaim): KeyBinding[] {
+ * and Shift variants, and skips a chord `freed` leaves to the browser. Pure
+ * given `claim` and `freed` — the unit-test seam. */
+export function yieldToRegistry(
+  bindings: readonly KeyBinding[],
+  claim: ChordClaim,
+  freed: (chord: string) => boolean = () => false,
+): KeyBinding[] {
   return bindings.map((binding) => {
     const spec = binding.mac ?? binding.key;
     if (!spec) return binding;
     const next: KeyBinding = { ...binding };
-    if (binding.run) next.run = yielding(registryChordOf(spec), binding.run, claim);
-    if (binding.shift) next.shift = yielding(registryChordOf(spec, true), binding.shift, claim);
+    if (binding.run) next.run = yielding(registryChordOf(spec), binding.run, claim, freed);
+    if (binding.shift) next.shift = yielding(registryChordOf(spec, true), binding.shift, claim, freed);
     return next;
   });
 }
@@ -87,5 +99,5 @@ export const registryClaim: ChordClaim = (chord) => {
 
 /** The vendor keymap the editor installs. */
 export function vendorKeymap(): KeyBinding[] {
-  return yieldToRegistry(VENDOR_KEYMAP, registryClaim);
+  return yieldToRegistry(VENDOR_KEYMAP, registryClaim, webFreedChord);
 }

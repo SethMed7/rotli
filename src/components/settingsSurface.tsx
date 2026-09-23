@@ -59,8 +59,9 @@ import {
   rebind,
   setDispatchSuspended,
 } from "../keys/registry";
-import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 import { feedbackUrl } from "../lib/feedback";
+import { SHOW_HOTKEYS } from "../lib/hotkeyHint";
 import { PRIVATE_BROWSER_SEARCH_ENGINE_PRESENTATIONS } from "../lib/privateBrowser";
 import {
   type ChatModelInfo,
@@ -749,9 +750,9 @@ function GeneralPane() {
 
       <h4 className="sethead">New tabs</h4>
       <p className="lead">
-        Choose what {chordLabel(bindingOverrides, "tabs.new")} and the tab-strip plus create. The New menu
-        always offers every type. While a private browser is active, both create another private browser tab
-        instead.
+        Choose what {SHOW_HOTKEYS ? `${chordLabel(bindingOverrides, "tabs.new")} and ` : ""}the tab-strip plus
+        create. The New menu always offers every type. While a private browser is active, both create another
+        private browser tab instead.
       </p>
       <label className="setselect-row">
         <span>New tab creates</span>
@@ -786,72 +787,81 @@ function GeneralPane() {
         onPick={setTabLayout}
       />
 
-      <h4 className="sethead">Quick note</h4>
-      <p className="lead">
-        A floating note you summon with {chordLabel(bindingOverrides, "quick.summon")} — open any note in it,
-        star up to five for quick access, cycle those with ⌘] and ⌘[, and ⌘P searches every note to swap one
-        in. A note you create here is a full note filed into Main, never a capture. It always reopens where
-        you left off and closes when you click away.
-      </p>
-      <label className="setselect-row">
-        <span>Destination vault</span>
-        <select
-          className="setselect"
-          aria-label="Quick Note destination vault"
-          value={quickVaultId ?? ""}
-          onChange={(e) => setQuickVaultSynced(e.target.value || null)}
-        >
-          <option value="">Current destination{currentVault ? ` — ${currentVault.label}` : ""}</option>
-          {!hasQuickVault && <option value={quickVaultId ?? ""}>Unavailable vault — {quickVaultId}</option>}
-          {writableVaults.map((vault) => (
-            <option key={vault.id} value={vault.id}>
-              Always {vault.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      {!quickVaultId && (
-        <label className="setselect-row">
-          <span>Folder</span>
-          <select
-            className="setselect"
-            value={quickFolder}
-            onChange={(e) => setQuickFolderSynced(e.target.value)}
-          >
-            {!hasCurrent && <option value={quickFolder}>{quickFolder}</option>}
-            {folderOpts.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      <p className="setnote">A named vault must have write access in Location before it appears here.</p>
-
-      <h4 className="sethead">Quick capture</h4>
-      <p className="lead">
-        One-breath captures can follow the current writable vault or stay pinned to a separate capture vault.
-      </p>
-      <label className="setselect-row">
-        <span>Destination vault</span>
-        <select
-          className="setselect"
-          aria-label="Quick capture destination vault"
-          value={captureVaultId ?? ""}
-          onChange={(e) => setCaptureVaultId(e.target.value || null)}
-        >
-          <option value="">Current destination{currentVault ? ` — ${currentVault.label}` : ""}</option>
-          {!hasCaptureVault && (
-            <option value={captureVaultId ?? ""}>Unavailable vault — {captureVaultId}</option>
+      {/* the Quick window and Quick capture are Mac features (global shortcuts,
+          a floating window); Rotli Web has neither */}
+      {PLATFORM === "desktop" && (
+        <>
+          <h4 className="sethead">Quick note</h4>
+          <p className="lead">
+            A floating note you summon with {chordLabel(bindingOverrides, "quick.summon")} — open any note in
+            it, star up to five for quick access, cycle those with ⌘] and ⌘[, and ⌘P searches every note to
+            swap one in. A note you create here is a full note filed into Main, never a capture. It always
+            reopens where you left off and closes when you click away.
+          </p>
+          <label className="setselect-row">
+            <span>Destination vault</span>
+            <select
+              className="setselect"
+              aria-label="Quick Note destination vault"
+              value={quickVaultId ?? ""}
+              onChange={(e) => setQuickVaultSynced(e.target.value || null)}
+            >
+              <option value="">Current destination{currentVault ? ` — ${currentVault.label}` : ""}</option>
+              {!hasQuickVault && (
+                <option value={quickVaultId ?? ""}>Unavailable vault — {quickVaultId}</option>
+              )}
+              {writableVaults.map((vault) => (
+                <option key={vault.id} value={vault.id}>
+                  Always {vault.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {!quickVaultId && (
+            <label className="setselect-row">
+              <span>Folder</span>
+              <select
+                className="setselect"
+                value={quickFolder}
+                onChange={(e) => setQuickFolderSynced(e.target.value)}
+              >
+                {!hasCurrent && <option value={quickFolder}>{quickFolder}</option>}
+                {folderOpts.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
-          {writableVaults.map((vault) => (
-            <option key={vault.id} value={vault.id}>
-              Always {vault.label}
-            </option>
-          ))}
-        </select>
-      </label>
+          <p className="setnote">A named vault must have write access in Location before it appears here.</p>
+
+          <h4 className="sethead">Quick capture</h4>
+          <p className="lead">
+            One-breath captures can follow the current writable vault or stay pinned to a separate capture
+            vault.
+          </p>
+          <label className="setselect-row">
+            <span>Destination vault</span>
+            <select
+              className="setselect"
+              aria-label="Quick capture destination vault"
+              value={captureVaultId ?? ""}
+              onChange={(e) => setCaptureVaultId(e.target.value || null)}
+            >
+              <option value="">Current destination{currentVault ? ` — ${currentVault.label}` : ""}</option>
+              {!hasCaptureVault && (
+                <option value={captureVaultId ?? ""}>Unavailable vault — {captureVaultId}</option>
+              )}
+              {writableVaults.map((vault) => (
+                <option key={vault.id} value={vault.id}>
+                  Always {vault.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
+      )}
 
       <h4 className="sethead">Writing</h4>
       <p className="lead">How the editor behaves while you type.</p>

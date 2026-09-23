@@ -17,7 +17,8 @@ test("the workspace no longer substitutes a virtual welcome surface", () => {
 });
 
 test("titlebar creation and pane controls teach the exact actions they run", () => {
-  expect(titlebarSource).toContain('label="New… — ⌘N"');
+  // the chord is named only where the build answers it (lib/hotkeyHint.ts)
+  expect(titlebarSource).toContain('label={`New…${hotkeyHint(" — ⌘N")}`}');
   expect(titlebarSource).toContain('hotkey="tabs.newChooser"');
   expect(titlebarSource).toContain('hotkey="panes.splitRight"');
   expect(titlebarSource).toContain('hotkey="panes.splitDown"');
