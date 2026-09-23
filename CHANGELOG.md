@@ -23,10 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Connect vault takes any folder.** An Obsidian or plain Markdown folder now
   opens in place instead of failing with "Choose an existing Rotli vault or an
   empty folder", and the vault menu always lists the folder you have open.
-- **⌥Q opens only the Quick Note.** With Stay open on and the main window left
-  behind another app, the Quick Note brought the main window up with it. The
-  main window now steps aside while the note is up and returns when you close
-  it.
+- **⌥Q opens only the Quick Note.** With Stay open on and the main window (or
+  the Chat window) left behind another app, the Quick Note brought it up too.
+  Those windows now step aside while the note is up and return, behind
+  whatever you are using, when you close it or click away.
 - **No more "Untitled" in the Quick Note.** Its note list leaves out blank
   notes, a blank open note is titled New note, and ⌘N reuses a blank note
   instead of making another.

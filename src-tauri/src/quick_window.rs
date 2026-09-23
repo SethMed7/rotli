@@ -10,16 +10,14 @@
 //! too"). The capture card fixed the same bug by tucking main for the duration
 //! (`capture_return_plan`); the Quick Note now follows that plan too.
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::chat_window::SHELL_LABELS;
-use crate::{
-    capture_return_plan, center_on_cursor_display, focused_webview_window, hide_main, CaptureReturnPlan,
-    LastPanelSummon,
-};
+use crate::chat_window::{self, SHELL_LABELS};
+use crate::{capture_return_plan, center_on_cursor_display, focused_webview_window, CaptureReturnPlan, LastPanelSummon};
 
 const LABEL: &str = "quick";
 
@@ -33,41 +31,114 @@ const BLUR_SETTLE: Duration = Duration::from_millis(150);
 /// middle, can't move it" (the maintainer, 2026-06-22).
 pub(crate) struct QuickPlaced(pub(crate) Mutex<bool>);
 
-/// Where closing the Quick Note returns focus, captured at summon time:
-/// `was_in_main` = back to the main window (you were working in it); otherwise
-/// out of rotli. `tuck_main` = main was hidden for the summon and is owed a
-/// restore. Mirrors CaptureReturn.
-pub(crate) struct QuickReturn(pub(crate) Mutex<CaptureReturnPlan>);
-
-/// A re-summon while main is still tucked keeps the owed restore: main reads
-/// as hidden now only because an earlier summon hid it. Pure for tests.
-fn quick_return_plan(previous: CaptureReturnPlan, main_visible: bool, main_focused: bool) -> CaptureReturnPlan {
-    let mut plan = capture_return_plan(main_visible, main_focused);
-    plan.tuck_main |= previous.tuck_main && !main_visible;
-    plan
+/// Where closing the Quick Note returns focus, and which shell windows it hid
+/// for the summon. Activation raises every window the app has ordered in, so
+/// the pulled-out Chat window is tucked exactly like main.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct QuickPlan {
+    /// `was_in_main` = you were working in a shell window (main or Chat): just
+    /// hide the note. `tuck_main` = main was hidden for the summon.
+    ret: CaptureReturnPlan,
+    /// The Chat window was hidden for the summon and is owed a restore.
+    tuck_chat: bool,
 }
 
-/// Snapshot the return target BEFORE the panel steals focus, tucking main when
-/// it sits visible behind another app. Working in either shell window (main or
-/// the pulled-out Chat window) counts as being in rotli.
-fn remember_return(app: &AppHandle) {
+impl QuickPlan {
+    fn owes_restore(self) -> bool {
+        self.ret.tuck_main || self.tuck_chat
+    }
+
+    /// Fold restores still owed from an earlier summon into this one.
+    fn merge_owed(self, owed: QuickPlan) -> QuickPlan {
+        let mut plan = self;
+        plan.ret.tuck_main |= owed.ret.tuck_main;
+        plan.tuck_chat |= owed.tuck_chat;
+        plan
+    }
+}
+
+/// What the shell windows looked like at summon time.
+#[derive(Clone, Copy, Debug, Default)]
+struct ShellState {
+    main_visible: bool,
+    main_focused: bool,
+    chat_visible: bool,
+    /// main or the Chat window held focus: you were working in rotli
+    in_shell: bool,
+}
+
+/// The summon plan. Working in a shell window counts as being in rotli; from
+/// anywhere else every visible shell window is tucked. A re-summon keeps
+/// restores still owed (a window reads as hidden only because we hid it) until
+/// that window is visible again some other way. Pure for tests.
+fn quick_return_plan(previous: QuickPlan, shell: ShellState) -> QuickPlan {
+    let mut ret = capture_return_plan(shell.main_visible || shell.in_shell, shell.main_focused || shell.in_shell);
+    ret.tuck_main |= previous.ret.tuck_main && !shell.main_visible;
+    let away = !ret.was_in_main;
+    let tuck_chat = away && (shell.chat_visible || previous.tuck_chat);
+    QuickPlan { ret, tuck_chat }
+}
+
+/// The plan, plus a generation that every summon and close bumps, so a
+/// click-away's delayed restore can tell it has been overtaken.
+#[derive(Default)]
+pub(crate) struct QuickReturn {
+    plan: Mutex<QuickPlan>,
+    generation: AtomicU64,
+}
+
+fn state(app: &AppHandle) -> tauri::State<'_, QuickReturn> {
+    app.state::<QuickReturn>()
+}
+
+fn shell_state(app: &AppHandle) -> ShellState {
     let (main_visible, main_focused) = app
         .get_webview_window("main")
         .map(|w| (w.is_visible().unwrap_or(false), w.is_focused().unwrap_or(false)))
         .unwrap_or((false, false));
-    let in_shell = focused_webview_window(app).is_some_and(|w| SHELL_LABELS.contains(&w.label()));
-    let (main_visible, main_focused) = (main_visible || in_shell, main_focused || in_shell);
-    let state = app.state::<QuickReturn>();
-    let mut current = state.0.lock().unwrap();
-    let plan = quick_return_plan(*current, main_visible, main_focused);
-    if plan.tuck_main && main_visible {
-        hide_main(app);
+    ShellState {
+        main_visible,
+        main_focused,
+        chat_visible: chat_window::is_open(app),
+        in_shell: focused_webview_window(app).is_some_and(|w| SHELL_LABELS.contains(&w.label())),
+    }
+}
+
+/// Snapshot the return target BEFORE the panel steals focus, tucking the shell
+/// windows that sit visible behind another app.
+fn remember_return(app: &AppHandle) {
+    let shell = shell_state(app);
+    let quick = state(app);
+    quick.generation.fetch_add(1, Ordering::AcqRel);
+    let mut current = quick.plan.lock().unwrap();
+    let plan = quick_return_plan(*current, shell);
+    for (tucked, visible, label) in [
+        (plan.ret.tuck_main, shell.main_visible, "main"),
+        (plan.tuck_chat, shell.chat_visible, chat_window::LABEL),
+    ] {
+        if tucked && visible {
+            if let Some(window) = app.get_webview_window(label) {
+                let _ = window.hide();
+            }
+        }
     }
     *current = plan;
 }
 
-fn take_return(app: &AppHandle) -> CaptureReturnPlan {
-    std::mem::take(&mut *app.state::<QuickReturn>().0.lock().unwrap())
+fn take_return(app: &AppHandle) -> QuickPlan {
+    std::mem::take(&mut *state(app).plan.lock().unwrap())
+}
+
+/// Order the tucked windows back in. Callers make sure this cannot surface
+/// anything over another app (rotli hidden) or steal focus (refocus after).
+fn restore(app: &AppHandle, plan: QuickPlan) {
+    for (tucked, label) in [(plan.ret.tuck_main, "main"), (plan.tuck_chat, chat_window::LABEL)] {
+        if tucked {
+            if let Some(window) = app.get_webview_window(label) {
+                let _ = window.show();
+            }
+        }
+    }
 }
 
 fn show(app: &AppHandle) {
@@ -95,50 +166,55 @@ fn show(app: &AppHandle) {
 }
 
 /// Close via the chord or Esc. Came from another app → step out of rotli
-/// (NSApp hide) so focus returns there, then put a tucked main back while the
-/// app is hidden, where ordering it in cannot surface anything. Working in
-/// main → just hide; main is underneath and regains focus with no forced raise.
+/// (NSApp hide) so focus returns there, then put tucked windows back while the
+/// app is hidden, where ordering them in cannot surface anything. Working in a
+/// shell window → just hide; it is underneath and regains focus with no raise.
 pub(crate) fn close(app: &AppHandle) {
+    state(app).generation.fetch_add(1, Ordering::AcqRel);
     let plan = take_return(app);
     if let Some(panel) = app.get_webview_window(LABEL) {
         let _ = panel.hide();
     }
-    if plan.was_in_main {
+    if plan.ret.was_in_main {
         return;
     }
     #[cfg(target_os = "macos")]
     let _ = app.hide();
-    if plan.tuck_main {
-        if let Some(window) = app.get_webview_window("main") {
-            let _ = window.show();
-        }
-    }
+    restore(app, plan);
 }
 
-/// Click-away: the panel is a visitor and always hides. A tucked main comes
-/// back only when focus left rotli, and the same way `close` restores it: step
-/// out of rotli first, then order main in while the app is hidden, so it can
-/// never pop over the app you clicked. When focus moved to another rotli
-/// window, main stays tucked (restoring it would take focus from that window)
-/// and the owed restore waits for the next Quick Note close.
+/// Click-away: the panel is a visitor and always hides. Tucked windows come
+/// back once focus settles. Focus left rotli → step out of rotli first, as
+/// `close` does, so nothing pops over the app you clicked. Focus moved to
+/// another rotli window → order them back in behind it and hand focus back to
+/// it. A summon or close in the meantime owns the windows now: the owed
+/// restores fold into its plan instead.
 pub(crate) fn on_blur(panel: &tauri::Window) {
     let _ = panel.hide();
-    let app = panel.app_handle();
-    let plan = take_return(app);
-    if !plan.tuck_main {
+    let app = panel.app_handle().clone();
+    let generation = state(&app).generation.load(Ordering::Acquire);
+    let plan = take_return(&app);
+    if !plan.owes_restore() {
         return;
     }
-    let app = app.clone();
     std::thread::spawn(move || {
         std::thread::sleep(BLUR_SETTLE);
-        if focused_webview_window(&app).is_some() {
-            *app.state::<QuickReturn>().0.lock().unwrap() = plan;
+        let quick = state(&app);
+        if quick.generation.load(Ordering::Acquire) != generation {
+            let mut current = quick.plan.lock().unwrap();
+            *current = current.merge_owed(plan);
             return;
         }
-        #[cfg(target_os = "macos")]
-        let _ = app.hide();
-        if let Some(window) = app.get_webview_window("main") {
-            let _ = window.show();
+        match focused_webview_window(&app) {
+            Some(focused) => {
+                restore(&app, plan);
+                let _ = focused.set_focus();
+            }
+            None => {
+                #[cfg(target_os = "macos")]
+                let _ = app.hide();
+                restore(&app, plan);
+            }
         }
     });
 }
@@ -170,31 +246,60 @@ mod tests {
     const TUCKED: CaptureReturnPlan = CaptureReturnPlan { was_in_main: false, tuck_main: true };
     const IN_MAIN: CaptureReturnPlan = CaptureReturnPlan { was_in_main: true, tuck_main: false };
 
+    fn plan(ret: CaptureReturnPlan, tuck_chat: bool) -> QuickPlan {
+        QuickPlan { ret, tuck_chat }
+    }
+
+    fn shell(main_visible: bool, main_focused: bool, chat_visible: bool, in_shell: bool) -> ShellState {
+        ShellState { main_visible, main_focused, chat_visible, in_shell }
+    }
+
     #[test]
     fn main_left_open_behind_another_app_is_tucked_for_the_note() {
         // the reported bug: ⌥Q from another app with Stay-open main behind it
         // raised main along with the note
-        assert_eq!(quick_return_plan(AWAY, true, false), TUCKED);
+        assert_eq!(quick_return_plan(QuickPlan::default(), shell(true, false, false, false)), plan(TUCKED, false));
     }
 
     #[test]
-    fn working_in_main_returns_there_and_leaves_main_alone() {
-        assert_eq!(quick_return_plan(AWAY, true, true), IN_MAIN);
+    fn a_chat_window_left_open_behind_another_app_is_tucked_too() {
+        assert_eq!(quick_return_plan(QuickPlan::default(), shell(false, false, true, false)), plan(AWAY, true));
+        assert_eq!(quick_return_plan(QuickPlan::default(), shell(true, false, true, false)), plan(TUCKED, true));
     }
 
     #[test]
-    fn a_resummon_while_main_is_tucked_keeps_the_owed_restore() {
-        assert_eq!(quick_return_plan(TUCKED, false, false), TUCKED);
+    fn working_in_main_or_the_chat_window_returns_there_and_tucks_nothing() {
+        let in_main = quick_return_plan(QuickPlan::default(), shell(true, true, true, true));
+        assert_eq!(in_main, plan(IN_MAIN, false));
+        // summoned from the Chat window with main behind it: still in rotli
+        let in_chat = quick_return_plan(QuickPlan::default(), shell(true, false, true, true));
+        assert_eq!(in_chat, plan(IN_MAIN, false));
+    }
+
+    #[test]
+    fn a_resummon_while_windows_are_tucked_keeps_the_owed_restores() {
+        let owed = plan(TUCKED, true);
+        assert_eq!(quick_return_plan(owed, shell(false, false, false, false)), owed);
     }
 
     #[test]
     fn a_visible_main_resets_any_stale_tuck() {
         // main came back some other way (⌥Space): it is focused now, nothing owed
-        assert_eq!(quick_return_plan(TUCKED, true, true), IN_MAIN);
+        assert_eq!(quick_return_plan(plan(TUCKED, true), shell(true, true, false, true)), plan(IN_MAIN, false));
     }
 
     #[test]
-    fn main_hidden_with_nothing_owed_stays_away() {
-        assert_eq!(quick_return_plan(AWAY, false, false), AWAY);
+    fn nothing_visible_and_nothing_owed_stays_away() {
+        let away = quick_return_plan(QuickPlan::default(), shell(false, false, false, false));
+        assert_eq!(away, plan(AWAY, false));
+        assert!(!away.owes_restore());
+    }
+
+    #[test]
+    fn an_overtaken_click_away_folds_its_restores_into_the_new_summon() {
+        // blur took the plan, ⌥Q re-summoned before it settled (main still
+        // hidden → the fresh plan owes nothing): the owed restore must survive
+        let fresh = quick_return_plan(QuickPlan::default(), shell(false, false, false, false));
+        assert_eq!(fresh.merge_owed(plan(TUCKED, true)), plan(TUCKED, true));
     }
 }

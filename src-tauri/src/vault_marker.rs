@@ -10,13 +10,20 @@
 //! which it treats as another app's vault and leaves alone. Every app leaves
 //! dot-entries alone.
 //!
-//! So, on every writable open of a folder Rotli has used before:
-//! - a vault gets `.obsidian/` (the guard those sweeps honour; Obsidian fills it
-//!   in when it first opens the folder) and a hidden backup of its marker in
-//!   `.rotli/memex.json`;
-//! - a missing marker is healed — moved back from a sweep folder (with the
-//!   contract files swept alongside it), else restored from the backup — rather
-//!   than the folder silently opening as a plain folder and gaining scaffolding.
+//! So, on every writable open or connect:
+//! - a vault (a valid root marker, including on its first open, before
+//!   `.rotli/` exists) gets `.obsidian/` (the guard those sweeps honour;
+//!   Obsidian fills it in when it first opens the folder) and a hidden backup
+//!   of its marker in `.rotli/memex.json`;
+//! - in a folder Rotli has used (it has `.rotli/`), a MISSING marker is healed
+//!   — moved back from a sweep folder (with the contract files swept alongside
+//!   it), else restored from the backup — rather than the folder silently
+//!   opening as a plain folder and gaining scaffolding. The guard goes in
+//!   first, so a sweep running at the same moment leaves the marker alone.
+//!
+//! A root `memex.json` that is not a valid Rotli marker is never replaced: it
+//! may be another tool's file or the user's own edit. That folder opens as a
+//! plain folder and the backup stays for a manual restore.
 //!
 //! Plain Markdown and Obsidian folders never get a marker: they are adopted in
 //! place without one.
@@ -67,37 +74,39 @@ pub(crate) fn recoverable(root: &Path) -> bool {
 }
 
 /// Heal a displaced marker, then protect it. Never overwrites an existing root
-/// file and never touches a folder Rotli has not used. Best effort: a failure
-/// leaves the folder as it was and the open continues.
+/// file; restores only in a folder Rotli has used; protects only a vault.
+/// Best effort: a failure leaves the folder as it was and the open continues.
 pub(crate) fn heal(root: &Path) -> Result<(), String> {
-    if !used_by_rotli(root) {
-        return Ok(());
+    let swept = if recoverable(root) { swept_marker_dir(root) } else { None };
+    let restore_from_backup = swept.is_none() && recoverable(root);
+    if !marker_at(&root.join(MARKER)) && swept.is_none() && !restore_from_backup {
+        return Ok(()); // a plain folder (or someone else's memex.json): nothing of ours to keep
     }
-    if !root.join(MARKER).exists() {
-        if let Some(dir) = swept_marker_dir(root) {
-            for name in std::iter::once(MARKER).chain(COMPANIONS) {
-                let from = dir.join(name);
-                let to = root.join(name);
-                if fs::symlink_metadata(&from).map(|m| m.is_file()).unwrap_or(false) && !to.exists() {
-                    fs::rename(&from, &to).map_err(|e| format!("restore {name}: {e}"))?;
-                }
+    // the guard first: a sweep that starts now honours it before the marker is back
+    if !root.join(GUARD).exists() {
+        fs::create_dir(root.join(GUARD)).map_err(|e| format!("create {GUARD}: {e}"))?;
+    }
+    if let Some(dir) = swept {
+        for name in std::iter::once(MARKER).chain(COMPANIONS) {
+            let from = dir.join(name);
+            let to = root.join(name);
+            if fs::symlink_metadata(&from).map(|m| m.is_file()).unwrap_or(false) && !to.exists() {
+                fs::rename(&from, &to).map_err(|e| format!("restore {name}: {e}"))?;
             }
-            // the sweep made the folder for our files; leave it only if it holds others
-            let _ = fs::remove_dir(&dir);
-        } else if marker_at(&root.join(BACKUP)) {
-            let text = fs::read_to_string(root.join(BACKUP)).map_err(|e| format!("read marker backup: {e}"))?;
-            crate::fsutil::atomic_write(&root.join(MARKER), &text, ".memex-json-")?;
         }
+        // the sweep made the folder for our files; leave it only if it holds others
+        let _ = fs::remove_dir(&dir);
+    } else if restore_from_backup {
+        let text = fs::read_to_string(root.join(BACKUP)).map_err(|e| format!("read marker backup: {e}"))?;
+        crate::fsutil::atomic_write(&root.join(MARKER), &text, ".memex-json-")?;
     }
     if !marker_at(&root.join(MARKER)) {
         return Ok(());
     }
     let text = fs::read_to_string(root.join(MARKER)).map_err(|e| format!("read {MARKER}: {e}"))?;
     if fs::read_to_string(root.join(BACKUP)).ok().as_deref() != Some(text.as_str()) {
+        fs::create_dir_all(root.join(".rotli")).map_err(|e| format!("create .rotli: {e}"))?;
         crate::fsutil::atomic_write(&root.join(BACKUP), &text, ".memex-json-")?;
-    }
-    if !root.join(GUARD).exists() {
-        fs::create_dir(root.join(GUARD)).map_err(|e| format!("create {GUARD}: {e}"))?;
     }
     Ok(())
 }
@@ -168,6 +177,41 @@ mod tests {
         assert!(recoverable(temp.path()));
         heal(temp.path()).unwrap();
         assert_eq!(fs::read_to_string(temp.path().join(MARKER)).unwrap(), ID);
+    }
+
+    #[test]
+    fn a_vault_opened_for_the_first_time_is_protected_on_that_open() {
+        // a fresh clone: the marker is there, the gitignored .rotli/ is not
+        let temp = tempfile::TempDir::new().unwrap();
+        fs::write(temp.path().join(MARKER), ID).unwrap();
+        heal(temp.path()).unwrap();
+        assert!(temp.path().join(GUARD).is_dir());
+        assert_eq!(fs::read_to_string(temp.path().join(BACKUP)).unwrap(), ID);
+    }
+
+    #[test]
+    fn a_foreign_root_marker_is_never_replaced() {
+        let temp = vault();
+        heal(temp.path()).unwrap();
+        fs::write(temp.path().join(MARKER), r#"{"id":"not-ours"}"#).unwrap();
+        assert!(!recoverable(temp.path()));
+        heal(temp.path()).unwrap();
+        assert_eq!(fs::read_to_string(temp.path().join(MARKER)).unwrap(), r#"{"id":"not-ours"}"#);
+        // the good copy stays in the backup for a manual restore
+        assert_eq!(fs::read_to_string(temp.path().join(BACKUP)).unwrap(), ID);
+    }
+
+    #[test]
+    fn opening_a_swept_vault_opens_it_as_a_vault_with_no_scaffolding() {
+        let temp = vault();
+        sweep_into_assets(temp.path());
+        let store = crate::corpus::CorpusStore::open(temp.path().to_path_buf()).unwrap();
+        assert!(store.is_memex());
+        for scaffold in ["Inbox", "Vault", "Board", "Secure notes"] {
+            assert!(!temp.path().join(scaffold).exists(), "{scaffold} was scaffolded");
+        }
+        assert!(temp.path().join(GUARD).is_dir());
+        assert_eq!(fs::read_to_string(temp.path().join(BACKUP)).unwrap(), ID);
     }
 
     #[test]

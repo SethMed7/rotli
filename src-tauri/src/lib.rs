@@ -2237,7 +2237,7 @@ pub fn run() {
         .manage(HideOnBlur(Mutex::new(true)))
         .manage(CaptureReturn(Mutex::new(CaptureReturnPlan::default())))
         .manage(quick_window::QuickPlaced(Mutex::new(false)))
-        .manage(quick_window::QuickReturn(Mutex::new(CaptureReturnPlan::default())))
+        .manage(quick_window::QuickReturn::default())
         .manage(QuitFlush { status: Mutex::new(QuitFlushStatus::default()), cv: Condvar::new() })
         .manage(corpus::ImportAuthorizations::default())
         .manage(pasteboard::PasteboardGrants::default())

@@ -725,15 +725,19 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   treat root `memex.json` as loose clutter: ZenNotes 2.x moves every visible
   non-Markdown root file into `assets/` on each launch unless the folder has
   `.obsidian/`, and a vault without its marker used to reopen as a plain folder
-  with scaffolding added. So on every writable open or connect of a folder Rotli
-  has used (it has `.rotli/`), `src-tauri/src/vault_marker.rs` first moves a
-  displaced marker back from `assets/`, `attachements/`, or `_assets/`, together
-  with `users.json`, `memex.local.json`, and `identities.local.json` from that
-  folder (never overwriting a root file), else restores it from the hidden
-  backup `.rotli/memex.json`. It then refreshes that backup and creates an empty
-  `.obsidian/`, the guard those sweeps honour; Obsidian fills it in when it
-  first opens the folder. Folder inspection reports a recoverable vault as a
-  vault. Plain Markdown and Obsidian folders never get a marker.
+  with scaffolding added. So on every writable open or connect,
+  `src-tauri/src/vault_marker.rs` gives every vault (a valid root marker, even
+  on its first open) an empty `.obsidian/`, the guard those sweeps honour
+  (Obsidian fills it in when it first opens the folder), and a hidden backup
+  `.rotli/memex.json`. In a folder Rotli has used (it has `.rotli/`) whose
+  marker is missing, it first creates the guard, then moves the marker back
+  from `assets/`, `attachements/`, or `_assets/`, together with `users.json`,
+  `memex.local.json`, and `identities.local.json` from that folder (never
+  overwriting a root file), else restores it from the backup. A root
+  `memex.json` that is not a valid Rotli marker is never replaced — it may be
+  another tool's file — so that folder opens plain and the backup stays for a
+  manual restore. Folder inspection reports a recoverable vault as a vault.
+  Plain Markdown and Obsidian folders never get a marker.
 - **Connect vault refuses no folder.** The switcher's Connect creates a vault in
   an empty folder, links an existing vault as a switch target, and opens any
   other folder (Markdown, Obsidian, ZenNotes) in place without a marker, the
