@@ -10,7 +10,6 @@
 //! too"). The capture card fixed the same bug by tucking main for the duration
 //! (`capture_return_plan`); the Quick Note now follows that plan too.
 
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -79,13 +78,20 @@ fn quick_return_plan(previous: QuickPlan, shell: ShellState) -> QuickPlan {
     QuickPlan { ret, tuck_chat }
 }
 
-/// The plan, plus a generation that every summon and close bumps, so a
-/// click-away's delayed restore can tell it has been overtaken.
-#[derive(Default)]
-pub(crate) struct QuickReturn {
-    plan: Mutex<QuickPlan>,
-    generation: AtomicU64,
+/// What a close does: step out of rotli (you came from another app), then
+/// order back in whatever is still owed — even when you were in a shell
+/// window, since a restore folded in from an earlier click-away can still be
+/// pending. Pure for tests.
+fn close_steps(plan: QuickPlan) -> (bool, bool) {
+    (!plan.ret.was_in_main, plan.owes_restore())
 }
+
+/// The plan and a generation that every summon and close bumps, under ONE
+/// lock: a click-away takes the plan and notes the generation together, so it
+/// can never take a newer summon's plan, and its delayed restore can tell it
+/// has been overtaken.
+#[derive(Default)]
+pub(crate) struct QuickReturn(Mutex<(QuickPlan, u64)>);
 
 fn state(app: &AppHandle) -> tauri::State<'_, QuickReturn> {
     app.state::<QuickReturn>()
@@ -109,9 +115,9 @@ fn shell_state(app: &AppHandle) -> ShellState {
 fn remember_return(app: &AppHandle) {
     let shell = shell_state(app);
     let quick = state(app);
-    quick.generation.fetch_add(1, Ordering::AcqRel);
-    let mut current = quick.plan.lock().unwrap();
-    let plan = quick_return_plan(*current, shell);
+    let mut current = quick.0.lock().unwrap();
+    current.1 += 1;
+    let plan = quick_return_plan(current.0, shell);
     for (tucked, visible, label) in [
         (plan.ret.tuck_main, shell.main_visible, "main"),
         (plan.tuck_chat, shell.chat_visible, chat_window::LABEL),
@@ -122,11 +128,17 @@ fn remember_return(app: &AppHandle) {
             }
         }
     }
-    *current = plan;
+    current.0 = plan;
 }
 
-fn take_return(app: &AppHandle) -> QuickPlan {
-    std::mem::take(&mut *state(app).plan.lock().unwrap())
+/// Take the plan (and bump the generation, when a close takes over).
+fn take_return(app: &AppHandle, bump: bool) -> (QuickPlan, u64) {
+    let quick = state(app);
+    let mut current = quick.0.lock().unwrap();
+    if bump {
+        current.1 += 1;
+    }
+    (std::mem::take(&mut current.0), current.1)
 }
 
 /// Order the tucked windows back in. Callers make sure this cannot surface
@@ -170,17 +182,20 @@ fn show(app: &AppHandle) {
 /// app is hidden, where ordering them in cannot surface anything. Working in a
 /// shell window → just hide; it is underneath and regains focus with no raise.
 pub(crate) fn close(app: &AppHandle) {
-    state(app).generation.fetch_add(1, Ordering::AcqRel);
-    let plan = take_return(app);
+    let (plan, _) = take_return(app, true);
     if let Some(panel) = app.get_webview_window(LABEL) {
         let _ = panel.hide();
     }
-    if plan.ret.was_in_main {
-        return;
-    }
+    let (step_out, owed) = close_steps(plan);
     #[cfg(target_os = "macos")]
-    let _ = app.hide();
-    restore(app, plan);
+    if step_out {
+        let _ = app.hide();
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = step_out;
+    if owed {
+        restore(app, plan);
+    }
 }
 
 /// Click-away: the panel is a visitor and always hides. Tucked windows come
@@ -192,18 +207,19 @@ pub(crate) fn close(app: &AppHandle) {
 pub(crate) fn on_blur(panel: &tauri::Window) {
     let _ = panel.hide();
     let app = panel.app_handle().clone();
-    let generation = state(&app).generation.load(Ordering::Acquire);
-    let plan = take_return(&app);
+    let (plan, generation) = take_return(&app, false);
     if !plan.owes_restore() {
         return;
     }
     std::thread::spawn(move || {
         std::thread::sleep(BLUR_SETTLE);
-        let quick = state(&app);
-        if quick.generation.load(Ordering::Acquire) != generation {
-            let mut current = quick.plan.lock().unwrap();
-            *current = current.merge_owed(plan);
-            return;
+        {
+            let quick = state(&app);
+            let mut current = quick.0.lock().unwrap();
+            if current.1 != generation {
+                current.0 = current.0.merge_owed(plan);
+                return;
+            }
         }
         match focused_webview_window(&app) {
             Some(focused) => {
@@ -293,6 +309,17 @@ mod tests {
         let away = quick_return_plan(QuickPlan::default(), shell(false, false, false, false));
         assert_eq!(away, plan(AWAY, false));
         assert!(!away.owes_restore());
+    }
+
+    #[test]
+    fn a_close_from_a_shell_window_still_restores_what_is_owed() {
+        // click-away owed main a restore, then ⌥Q from the Chat window folded
+        // it into an in-shell plan: closing must not step out, but must restore
+        let hybrid = plan(IN_MAIN, false).merge_owed(plan(TUCKED, true));
+        assert_eq!(close_steps(hybrid), (false, true));
+        assert_eq!(close_steps(plan(IN_MAIN, false)), (false, false));
+        assert_eq!(close_steps(plan(TUCKED, false)), (true, true));
+        assert_eq!(close_steps(plan(AWAY, false)), (true, false));
     }
 
     #[test]

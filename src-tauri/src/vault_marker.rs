@@ -15,15 +15,18 @@
 //!   `.rotli/` exists) gets `.obsidian/` (the guard those sweeps honour;
 //!   Obsidian fills it in when it first opens the folder) and a hidden backup
 //!   of its marker in `.rotli/memex.json`;
-//! - in a folder Rotli has used (it has `.rotli/`), a MISSING marker is healed
-//!   — moved back from a sweep folder (with the contract files swept alongside
-//!   it), else restored from the backup — rather than the folder silently
-//!   opening as a plain folder and gaining scaffolding. The guard goes in
-//!   first, so a sweep running at the same moment leaves the marker alone.
+//! - a MISSING marker is healed — moved back from a sweep folder (a valid `mx_`
+//!   marker there is evidence enough, even if Rotli never opened the folder on
+//!   this machine), with the contract files swept alongside it; else restored
+//!   from the backup — rather than the folder silently opening as a plain
+//!   folder. The guard goes in first, so a sweep running at the same moment
+//!   leaves the marker alone.
 //!
 //! A root `memex.json` that is not a valid Rotli marker is never replaced: it
 //! may be another tool's file or the user's own edit. That folder opens as a
-//! plain folder and the backup stays for a manual restore.
+//! plain folder and the backup stays for a manual restore — and
+//! `refuses_scaffolding` keeps the plain-folder path from adding its reserved
+//! folders to it.
 //!
 //! Plain Markdown and Obsidian folders never get a marker: they are adopted in
 //! place without one.
@@ -69,8 +72,14 @@ fn swept_marker_dir(root: &Path) -> Option<PathBuf> {
 /// inspection uses it so a displaced vault reads as a vault, not a plain folder.
 pub(crate) fn recoverable(root: &Path) -> bool {
     !root.join(MARKER).exists()
-        && used_by_rotli(root)
-        && (swept_marker_dir(root).is_some() || marker_at(&root.join(BACKUP)))
+        && (swept_marker_dir(root).is_some() || (used_by_rotli(root) && marker_at(&root.join(BACKUP))))
+}
+
+/// Read-only: a folder that is or was a vault — any root `memex.json` (ours or
+/// not) or our hidden backup. The plain-folder open never scaffolds its
+/// reserved folders into one (the 2026-09-23 incident's second harm).
+pub(crate) fn refuses_scaffolding(root: &Path) -> bool {
+    root.join(MARKER).exists() || marker_at(&root.join(BACKUP))
 }
 
 /// Heal a displaced marker, then protect it. Never overwrites an existing root
@@ -215,14 +224,38 @@ mod tests {
     }
 
     #[test]
-    fn a_folder_rotli_never_used_is_left_untouched() {
+    fn a_marker_swept_before_rotli_ever_opened_the_folder_still_comes_back() {
+        // a vault cloned here and opened in ZenNotes first: no .rotli/ yet
         let temp = tempfile::TempDir::new().unwrap();
         fs::create_dir(temp.path().join("assets")).unwrap();
         fs::write(temp.path().join("assets").join(MARKER), ID).unwrap();
+        assert!(recoverable(temp.path()));
+        heal(temp.path()).unwrap();
+        assert!(crate::corpus::is_memex_root(temp.path()));
+        assert!(temp.path().join(GUARD).is_dir());
+    }
+
+    #[test]
+    fn a_foreign_marker_in_a_sweep_folder_is_not_ours() {
+        let temp = tempfile::TempDir::new().unwrap();
+        fs::create_dir(temp.path().join("assets")).unwrap();
+        fs::write(temp.path().join("assets").join(MARKER), r#"{"id":"theirs"}"#).unwrap();
         assert!(!recoverable(temp.path()));
         heal(temp.path()).unwrap();
         assert!(!temp.path().join(MARKER).exists());
         assert!(!temp.path().join(GUARD).exists());
+    }
+
+    #[test]
+    fn a_former_vault_behind_a_foreign_marker_opens_plain_without_scaffolding() {
+        let temp = vault();
+        heal(temp.path()).unwrap();
+        fs::write(temp.path().join(MARKER), r#"{"id":"not-ours"}"#).unwrap();
+        let store = crate::corpus::CorpusStore::open(temp.path().to_path_buf()).unwrap();
+        assert!(!store.is_memex());
+        for scaffold in ["Inbox", "Vault", "Board", "Secure notes"] {
+            assert!(!temp.path().join(scaffold).exists(), "{scaffold} was scaffolded");
+        }
     }
 
     #[test]

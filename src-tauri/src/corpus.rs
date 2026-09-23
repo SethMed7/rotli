@@ -2914,8 +2914,9 @@ impl CorpusStore {
         store.load_index();
         store.init_search_index();
         // Scaffold the six reserved sidebar destinations every open (idempotent),
-        // so existing corpora gain them too. (the maintainer, 2026-06-13)
-        if !read_only {
+        // so existing corpora gain them too. (the maintainer, 2026-06-13) Never
+        // into a folder that is or was a vault (vault_marker.rs).
+        if !read_only && !crate::vault_marker::refuses_scaffolding(&store.root) {
             store.ensure_reserved_folders()?;
         }
         if fresh && !read_only {

@@ -729,15 +729,17 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   `src-tauri/src/vault_marker.rs` gives every vault (a valid root marker, even
   on its first open) an empty `.obsidian/`, the guard those sweeps honour
   (Obsidian fills it in when it first opens the folder), and a hidden backup
-  `.rotli/memex.json`. In a folder Rotli has used (it has `.rotli/`) whose
-  marker is missing, it first creates the guard, then moves the marker back
-  from `assets/`, `attachements/`, or `_assets/`, together with `users.json`,
-  `memex.local.json`, and `identities.local.json` from that folder (never
-  overwriting a root file), else restores it from the backup. A root
-  `memex.json` that is not a valid Rotli marker is never replaced — it may be
-  another tool's file — so that folder opens plain and the backup stays for a
-  manual restore. Folder inspection reports a recoverable vault as a vault.
-  Plain Markdown and Obsidian folders never get a marker.
+  `.rotli/memex.json`. When the marker is missing, it first creates the guard,
+  then moves a valid `mx_` marker back from `assets/`, `attachements/`, or
+  `_assets/` (even in a folder Rotli never opened on this machine), together
+  with `users.json`, `memex.local.json`, and `identities.local.json` from that
+  folder (never overwriting a root file), else restores it from the backup. A
+  root `memex.json` that is not a valid Rotli marker is never replaced — it may
+  be another tool's file — so that folder opens plain and the backup stays for
+  a manual restore; the plain-folder open never scaffolds its reserved folders
+  into a folder with any `memex.json` or a Rotli backup. Folder inspection
+  reports a recoverable vault as a vault. Plain Markdown and Obsidian folders
+  never get a marker.
 - **Connect vault refuses no folder.** The switcher's Connect creates a vault in
   an empty folder, links an existing vault as a switch target, and opens any
   other folder (Markdown, Obsidian, ZenNotes) in place without a marker, the
