@@ -50,11 +50,14 @@ test("an edit is saved into the vault's file and is there after a reload", async
   await expect(page.locator(".main-tree").getByText("Welcome to Rotli", { exact: true })).toHaveCount(1);
 });
 
-test("⌘N → Markdown note creates a file in the vault; the words are there after a reload", async ({
+test("New tab → Markdown note creates a file in the vault; the words are there after a reload", async ({
   page,
 }) => {
   await startWithVault(page);
-  await page.keyboard.press("ControlOrMeta+n");
+  // the chooser through real controls (a ⌘-chord differs on the Linux runner)
+  await page.getByRole("button", { name: /Search notes and actions/ }).click();
+  await page.getByPlaceholder("Search notes, files, chats, actions…").fill("choose type");
+  await page.locator(".prow", { hasText: "New tab (choose type)" }).click();
   await page.getByRole("button", { name: /^New Markdown note \(press/ }).click();
   await expect(page.locator(".row-action-error")).toHaveCount(0);
   await expect(page.getByRole("tab", { selected: true })).toContainText("Untitled");
