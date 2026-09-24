@@ -969,6 +969,8 @@ type PreviewEnvironment =
   | "grove-dark"
   | "iris-light"
   | "iris-dark"
+  | "blossom-light"
+  | "blossom-dark"
   | "midnight-light"
   | "midnight-dark";
 

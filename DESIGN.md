@@ -7,8 +7,8 @@ the token implementation; this file owns the product-level design rules.
 
 ## Environments and tokens
 
-Rotli ships six complete theme families: Rotli, Paper & Charcoal, Ocean, Grove,
-Iris, and Midnight. Each family owns a deliberately tuned light and dark
+Rotli ships seven complete theme families: Rotli, Paper & Charcoal, Ocean, Grove,
+Iris, Blossom, and Midnight. Each family owns a deliberately tuned light and dark
 environment; Midnight's dark environment is the deepest neutral workspace.
 Every product surface must work in every supported environment.
 

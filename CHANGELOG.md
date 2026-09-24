@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Blossom, a seventh theme family.** Light pink by day and a deep plum-rose
+  at night, tuned like Iris: soft, never candy, and every text role clears AA
+  contrast. Choose it in Settings → Appearance or cycle to it with the
+  titlebar sun, between Iris and Midnight.
+
 ### Changed
 
 - **rotli.co now tells the story the way the film does.** The landing page

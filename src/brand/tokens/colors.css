@@ -64,6 +64,7 @@
 :root[data-theme="ocean-light"],
 :root[data-theme="grove-light"],
 :root[data-theme="iris-light"],
+:root[data-theme="blossom-light"],
 :root[data-theme="midnight-light"] {
   --failure: #9f3d3d;
 }
@@ -71,6 +72,7 @@
 :root[data-theme="ocean-dark"],
 :root[data-theme="grove-dark"],
 :root[data-theme="iris-dark"],
+:root[data-theme="blossom-dark"],
 :root[data-theme="midnight-dark"] {
   --failure: #e58b8b;
 }

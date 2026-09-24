@@ -112,6 +112,8 @@ test("the switcher reads from semantic tokens in every environment", async ({ pa
     "Grove Dark",
     "Iris Light",
     "Iris Dark",
+    "Blossom Light",
+    "Blossom Dark",
     "Moonlight",
     "Midnight",
   ] as const) {

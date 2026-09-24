@@ -52,10 +52,10 @@ test("every Settings pane keeps its small Rotli accent crisp and theme-safe", as
   const accent = page.locator(".set-panehead .set-paneaccent");
   const themeButton = page.getByRole("button", { name: /^Theme —/ });
 
-  // The titlebar cycles all twelve family/environment pairs. The quiet accent
+  // The titlebar cycles all fourteen family/environment pairs. The quiet accent
   // must keep using the semantic muted ink in every one, not a user-selected
   // black/white line that can disappear against the current surface.
-  for (let index = 0; index < 12; index += 1) {
+  for (let index = 0; index < 14; index += 1) {
     const colors = await accent.evaluate((node) => {
       const probe = document.createElement("span");
       probe.style.cssText = "position:fixed;visibility:hidden;color:var(--text-muted)";
