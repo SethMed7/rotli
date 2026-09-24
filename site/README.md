@@ -155,17 +155,18 @@ bun run preview  # serve the built dist/ locally
   theme showcase changes its own screenshot and caption; it never recolors
   the site. The site is flat like the app (DESIGN.md "Flat material"): no
   shadows, blur, or glows. The one deliberate exception is the theme studio's
-  orb swatches (kept from the first site at the owner's request, 2026-09-23):
+  orb swatches (the owner's call, 2026-09-23):
   each orb is lit with radial gradients and an inset shadow so it reads as the
   environment itself. Keep tokens aligned with `src/brand/`.
   Every text/background pair measures at least WCAG AA (lowest: muted text on
   the warm band, 4.90:1).
 - Fonts (General Sans body, Baloo 2 wordmark) are copied into
   `public/fonts/` from `src/brand/fonts/`.
-- The compact mark comes from `src/assets/characters/`. The privacy quokka in
-  `src/assets/characters/cocoa/` is generated at 1536 × 1536 from the canonical
-  SVGs with the existing fill pipeline (`bun scripts/build-character-fills.mjs
-  --site`); app-sized 512px exports stay unchanged.
+- The compact mark comes from `src/assets/characters/`. The closing card's
+  celebrating quokka in `src/assets/characters/cocoa/` is generated at
+  1536 × 1536 from the canonical SVG with the existing fill pipeline
+  (`bun scripts/build-character-fills.mjs --site`); app-sized 512px exports
+  stay unchanged.
 - The companion carousel reads `src/assets/characters/showcase/` (renders +
   `showcase.json`), produced by `bun scripts/build-companion-showcase.ts`. That
   script composites body preset, accessory, line color, and pose with the same
@@ -176,8 +177,7 @@ bun run preview  # serve the built dist/ locally
   and footer; their shared styles live in
   `src/layouts/Base.astro`. Pages own only their sections.
 - The ways-in chapter (Mac app, Rotli Web, Rotli Helper) is three plain
-  columns with no screenshot. `public/rotli-web@2x.webp` (a first-visit
-  capture of `rotli.co/app/`) is no longer shown on the landing page.
+  columns with no screenshot.
 - The hero is words only: it fills the first screen on `public/hero-pattern.svg`
   (the social card's faint note, folder, checklist, and chat icons, masked so
   they fade out behind the headline) with the filled cocoa waving quokka
@@ -400,8 +400,11 @@ bun scripts/capture-site.mjs http://localhost:1430
 bun scripts/build-character-fills.mjs --site
 ```
 
-The capture script uses fresh browser contexts and actual theme, Settings,
-and Playground controls. It waits for fonts, hides hover tooltips, verifies
+It writes `public/rotli-app-warm-light@3x.png` (the hero and the social card)
+and `public/rotli-playground@3x.png` (the coming-soon page); the theme studio's
+`public/themes/` captures are a separate set it does not touch, and the fill
+script makes only the closing card's celebrating quokka. The capture script
+uses fresh browser contexts and actual theme, Settings, and Playground controls. It waits for fonts, hides hover tooltips, verifies
 pixel dimensions, and checks that the tutorial has no files in Main.
 
 [Launch readiness](../docs/architecture/launch-readiness-2026-09-07.md) records
