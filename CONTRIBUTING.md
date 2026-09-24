@@ -316,8 +316,8 @@ bun run verify rust       # or narrow to one lane while iterating: quality | e2e
 
 `bun run check` alone is not the gate — clippy, Playwright, and the `site/`
 steps sit outside it. Run focused tests while iterating. UI changes require
-human review in the actual desktop app across the six theme families (Rotli,
-Paper & Charcoal, Ocean, Grove, Iris, Midnight) in both their light and dark
+human review in the actual desktop app across the seven theme families (Rotli,
+Paper & Charcoal, Ocean, Grove, Iris, Blossom, Midnight) in both their light and dark
 environments, plus keyboard, empty, loading, error, disabled, and
 narrow-window states.
 

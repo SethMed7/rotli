@@ -28,7 +28,7 @@ Only @SethMed7 currently approves either branch. Use synthetic fixtures and medi
 - [ ] Dependency/release-sensitive changes record provenance, license, vulnerability, and rollback impact
 
 For UI work, attach desktop screenshots for the theme families you touched
-(Rotli, Paper & Charcoal, Ocean, Grove, Iris, Midnight — light and dark) and
+(Rotli, Paper & Charcoal, Ocean, Grove, Iris, Blossom, Midnight — light and dark) and
 note keyboard, empty, loading, error, disabled, and narrow-window checks. For native or Breve work, state what was tested in browser fixtures and
 what was tested in the actual app; do not treat them as interchangeable.
 

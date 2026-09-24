@@ -288,7 +288,7 @@ option is gone, opens every note from the left menu, ticks a task and reads
 the state character through Aa → Raw markdown, proves Settings → Open welcome
 folder is idempotent, and asserts the checkbox/drag-handle overlap and the
 gutter geometry (every checkbox, marker, and control starts on the H1 edge,
-never in the margin) across twelve environments and a 760px window.
+never in the margin) across fourteen environments and a 760px window.
 `e2e/named-views.spec.ts` deletes a non-active view from Main's picker.
 Screenshots are test artifacts. `bun scripts/capture-site.mjs http://localhost:1430`
 creates the reviewed site media separately at 3× density; the Welcome-folder

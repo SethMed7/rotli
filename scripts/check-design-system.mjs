@@ -55,6 +55,8 @@ const themeSelectors = {
   "grove-dark": ':root[data-theme="grove-dark"]',
   "iris-light": ':root[data-theme="iris-light"]',
   "iris-dark": ':root[data-theme="iris-dark"]',
+  "blossom-light": ':root[data-theme="blossom-light"]',
+  "blossom-dark": ':root[data-theme="blossom-dark"]',
   "midnight-light": ':root[data-theme="midnight-light"]',
   "midnight-dark": ':root[data-theme="midnight-dark"]',
 };
@@ -145,6 +147,8 @@ for (const label of [
   "Grove Dark",
   "Iris Light",
   "Iris Dark",
+  "Blossom Light",
+  "Blossom Dark",
   "Moonlight",
   "Midnight",
 ]) {

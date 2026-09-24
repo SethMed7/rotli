@@ -102,8 +102,8 @@ in this release.
 
 ## Six environments, light and dark
 
-The titlebar sun switches between paired light and dark environments in six
-families: **Rotli · Paper & Charcoal · Ocean · Grove · Iris · Midnight**. Every
+The titlebar sun switches between paired light and dark environments in seven
+families: **Rotli · Paper & Charcoal · Ocean · Grove · Iris · Blossom · Midnight**. Every
 first run starts in Rotli Light; below is one environment from each family.
 
 <div align="center">

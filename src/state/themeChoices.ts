@@ -3,7 +3,7 @@
 // blurb, and swatches. Data only; a seam beside ui.ts, which sits at its size
 // ceiling (re-exported there so every importer is unchanged).
 
-export const THEME_FAMILIES = ["warm", "mono", "ocean", "grove", "iris", "midnight"] as const;
+export const THEME_FAMILIES = ["warm", "mono", "ocean", "grove", "iris", "blossom", "midnight"] as const;
 export type ThemeFamily = (typeof THEME_FAMILIES)[number];
 
 /** Solid environments, in the order the titlebar sun cycles them. */
@@ -22,6 +22,8 @@ export const SOLID_THEMES: {
   { family: "grove", mode: "dark", label: "Grove Dark" },
   { family: "iris", mode: "light", label: "Iris Light" },
   { family: "iris", mode: "dark", label: "Iris Dark" },
+  { family: "blossom", mode: "light", label: "Blossom Light" },
+  { family: "blossom", mode: "dark", label: "Blossom Dark" },
   { family: "midnight", mode: "light", label: "Moonlight" },
   { family: "midnight", mode: "dark", label: "Midnight" },
 ];
@@ -69,6 +71,13 @@ export const THEME_FAMILY_PRESENTATIONS: readonly {
     description: "Lavender by day, inked violet at night.",
     lightLabel: "Iris Light",
     darkLabel: "Iris Dark",
+  },
+  {
+    family: "blossom",
+    label: "Blossom",
+    description: "Light pink by day, deep plum-rose at night.",
+    lightLabel: "Blossom Light",
+    darkLabel: "Blossom Dark",
   },
   {
     family: "midnight",

@@ -51,6 +51,7 @@
 :root[data-theme="ocean-dark"],
 :root[data-theme="grove-dark"],
 :root[data-theme="iris-dark"],
+:root[data-theme="blossom-dark"],
 :root[data-theme="midnight-dark"] {
   color-scheme: dark;
   --accent-custom-swatch: oklch(78% 0.13 var(--accent-hue));
@@ -87,6 +88,8 @@
   --swatch-grove-dark: #101814;
   --swatch-iris-light: #e9e4f2;
   --swatch-iris-dark: #15121d;
+  --swatch-blossom-light: #f5e4ea;
+  --swatch-blossom-dark: #1d1217;
   --swatch-midnight-light: #f0f2f5;
   --swatch-midnight-dark: #050607;
 
@@ -200,6 +203,24 @@
   --preview-muted: #b2a8c1;
   --preview-border: #342d42;
   --preview-selected: #30283f;
+}
+.preview-blossom-light {
+  --preview-ground: #f5e4ea;
+  --preview-sidebar: #eed5de;
+  --preview-surface: #fcf6f8;
+  --preview-text: #35232b;
+  --preview-muted: #6e5460;
+  --preview-border: #dcbccb;
+  --preview-selected: #e7c7d3;
+}
+.preview-blossom-dark {
+  --preview-ground: #1d1217;
+  --preview-sidebar: #221620;
+  --preview-surface: #261a20;
+  --preview-text: #f6eaef;
+  --preview-muted: #c5a9b6;
+  --preview-border: #44303b;
+  --preview-selected: #3b2832;
 }
 .preview-midnight-light {
   --preview-ground: #f0f2f5;
@@ -414,6 +435,48 @@
   --scrim: rgba(0, 0, 0, 0.58);
 }
 
+/* — BLOSSOM · light pink by day, deep plum-rose at night; soft, never candy — */
+:root[data-theme="blossom-light"] {
+  --ground: #f5e4ea;
+  --surface: #fcf6f8;
+  --surface-2: #eed5de;
+  --tint: #e7c7d3;
+  --text: #35232b;
+  --text-muted: #6e5460;
+  --border: #dcbccb;
+  --accent: #a8456d;
+  --theme-accent-swatch: #a8456d;
+  --theme-on-accent: #ffffff;
+  --accent-text: #8f3559;
+  --on-accent: #ffffff;
+  --success: #557966;
+  --syntax-blue: #3f628a;
+  --syntax-accent: var(--accent-text);
+  --hov: rgba(53, 35, 43, 0.07);
+  --act: rgba(53, 35, 43, 0.11);
+  --scrim: rgba(29, 18, 23, 0.44);
+}
+:root[data-theme="blossom-dark"] {
+  --ground: #1d1217;
+  --surface: #261a20;
+  --surface-2: #31222a;
+  --tint: #3b2832;
+  --text: #f6eaef;
+  --text-muted: #c5a9b6;
+  --border: #44303b;
+  --accent: #e89ab8;
+  --theme-accent-swatch: #e89ab8;
+  --theme-on-accent: #1d1217;
+  --accent-text: #f0b0c8;
+  --on-accent: #1d1217;
+  --success: #90b8a0;
+  --syntax-blue: #8bb7df;
+  --syntax-accent: var(--accent-text);
+  --hov: rgba(246, 234, 239, 0.08);
+  --act: rgba(246, 234, 239, 0.13);
+  --scrim: rgba(0, 0, 0, 0.58);
+}
+
 /* — MIDNIGHT · cool neutral by day, deliberately deeper than Charcoal at night — */
 :root[data-theme="midnight-light"] {
   --ground: #f0f2f5;
@@ -465,6 +528,8 @@
 :root[data-theme="grove-dark"],
 :root[data-theme="iris-light"],
 :root[data-theme="iris-dark"],
+:root[data-theme="blossom-light"],
+:root[data-theme="blossom-dark"],
 :root[data-theme="midnight-light"],
 :root[data-theme="midnight-dark"] {
   --icon-clay: currentColor;
@@ -490,6 +555,8 @@
 :root[data-theme="grove-dark"],
 :root[data-theme="iris-light"],
 :root[data-theme="iris-dark"],
+:root[data-theme="blossom-light"],
+:root[data-theme="blossom-dark"],
 :root[data-theme="midnight-light"],
 :root[data-theme="midnight-dark"] {
   --quote-bar: color-mix(in srgb, var(--text-muted) 55%, transparent);

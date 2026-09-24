@@ -14,6 +14,7 @@ describe("Univer app-theme mapping", () => {
     expect(univerNeutralForTheme("ocean-dark")).toBe("mono");
     expect(univerNeutralForTheme("grove-light")).toBe("mono");
     expect(univerNeutralForTheme("iris-dark")).toBe("mono");
+    expect(univerNeutralForTheme("blossom-dark")).toBe("mono");
     expect(univerNeutralForTheme("midnight-dark")).toBe("mono");
   });
 

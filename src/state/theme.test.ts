@@ -14,6 +14,8 @@ describe("theme resolution", () => {
     expect(resolveTheme("grove", "dark")).toBe("grove-dark");
     expect(resolveTheme("iris", "light")).toBe("iris-light");
     expect(resolveTheme("iris", "dark")).toBe("iris-dark");
+    expect(resolveTheme("blossom", "light")).toBe("blossom-light");
+    expect(resolveTheme("blossom", "dark")).toBe("blossom-dark");
     expect(resolveTheme("midnight", "light")).toBe("midnight-light");
     expect(resolveTheme("midnight", "dark")).toBe("midnight-dark");
   });
@@ -24,6 +26,8 @@ describe("theme resolution", () => {
     expect(isDarkDataTheme("ocean-dark")).toBe(true);
     expect(isDarkDataTheme("grove-dark")).toBe(true);
     expect(isDarkDataTheme("iris-dark")).toBe(true);
+    expect(isDarkDataTheme("blossom-dark")).toBe(true);
+    expect(isDarkDataTheme("blossom-light")).toBe(false);
     expect(isDarkDataTheme("midnight-dark")).toBe(true);
     expect(isDarkDataTheme("midnight-light")).toBe(false);
   });
