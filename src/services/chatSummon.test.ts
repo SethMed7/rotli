@@ -3,7 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { newestChatSlug } from "./chatSummon";
+import { newestChatSlug, quickNoteChatRaisesMain } from "./chatSummon";
 
 describe("newestChatSlug", () => {
   test("returns null for no chats", () => {
@@ -37,5 +37,15 @@ describe("newestChatSlug", () => {
       ]),
     ).toBe("ok");
     expect(newestChatSlug([{ slug: "only", modifiedMs: 0 }])).toBe("only");
+  });
+});
+
+describe("quickNoteChatRaisesMain", () => {
+  test("a chat that lands in main brings main forward", () => {
+    expect(quickNoteChatRaisesMain({ chatDetached: false })).toBe(true);
+  });
+
+  test("a popped-out Chat window already showed itself; main stays behind it", () => {
+    expect(quickNoteChatRaisesMain({ chatDetached: true })).toBe(false);
   });
 });
