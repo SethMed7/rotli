@@ -17,8 +17,10 @@ Call `carl_recall` with the topic to find the owning source before editing.
 3. **New package scripts** need a row in `docs/development/testing.md`'s command
    map, or `bun run check:docs` fails.
 4. **README media.** The README shows the current app from `docs/media/`:
-   - `bun run capture:site` regenerates the theme captures from the in-memory
-     demo vault into `site/public/themes/`;
+   - the README's theme images are copies of the site's theme-studio captures
+     in `site/public/themes/` (2×, from the in-memory demo vault). No script
+     makes those; re-capture an environment from the browser twin by hand.
+     `bun run capture:site` makes only the hero and Welcome captures;
    - copy them into `docs/media/` under the README's filenames;
    - look at every image before committing: current UI, demo content only.
    - `site/README.md` owns the capture and visual-review procedure.
