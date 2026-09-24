@@ -11,7 +11,7 @@ import { DOWNLOAD_HREF, WEB_APP_PATH, site } from '../site';
 const also = [
   ...(site.downloadsEnabled ? [{ href: DOWNLOAD_HREF, label: 'Download for Mac' }] : []),
   ...(site.webAppEnabled ? [{ href: WEB_APP_PATH, label: 'Open Rotli Web' }] : []),
-  { href: '/resources/', label: 'Resources' },
+  ...(site.showsFullSite ? [{ href: '/resources/', label: 'Resources' }] : []),
 ];
 ---
 
@@ -21,7 +21,7 @@ const also = [
   canonicalPath="/404/"
   noindex
 >
-  <main class="not-found" data-web-app={site.webAppEnabled ? 'on' : 'off'}>
+  <main id="content" class="not-found" data-web-app={site.webAppEnabled ? 'on' : 'off'}>
     <SunsetScene full>
       <div class="lost" data-reveal>
         <a class="brand" href="/" aria-label="rotli home"><span set:html={mark} aria-hidden="true"></span><b>rotli</b></a>
@@ -32,18 +32,30 @@ const also = [
           Rotli Web is not switched on at this address yet. Everything it will do, the Mac app does today.
         </p>
         <p class="hint" data-hint="helper" hidden>
-          Looking for Rotli Helper? <a href="/resources/rotli-helper/">What it is and how to install it</a>.
+          {
+            site.showsFullSite ? (
+              <>
+                Looking for Rotli Helper? <a href="/resources/rotli-helper/">What it is and how to install it</a>.
+              </>
+            ) : (
+              'Rotli Helper is not published at this address yet.'
+            )
+          }
         </p>
         <p class="path"><code data-path></code></p>
         <a class="button primary home" href="/">Take me home</a>
-        <p class="also">
-          {also.map((link, i) => (
-            <>
-              {i > 0 && <span aria-hidden="true"> · </span>}
-              <a href={link.href}>{link.label}</a>
-            </>
-          ))}
-        </p>
+        {
+          also.length > 0 && (
+            <nav class="also" aria-label="Where to go instead">
+              {also.map((link, i) => (
+                <>
+                  {i > 0 && <span aria-hidden="true"> · </span>}
+                  <a href={link.href}>{link.label}</a>
+                </>
+              ))}
+            </nav>
+          )
+        }
       </div>
     </SunsetScene>
   </main>

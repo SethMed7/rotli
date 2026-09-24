@@ -125,7 +125,7 @@ bun run preview  # serve the built dist/ locally
   of other ways in. The missing path and a hint (`/app`, `/helper`) are chosen
   in the browser. `SunsetScene.astro` is also the closing invitation's ground.
 - **The motion studio** lives at `studio.rotli.co` (`STUDIO_URL` in
-  `src/site.ts`): the footer's Open source column links it, and the Caddyfile
+  `src/site.ts`): the footer's Learn column links it whatever the source flag, and the Caddyfile
   sends `/studio` there.
 - **Download and the browser.** `SiteActions.astro` renders the two ways in —
   Open in browser and Download — in the hero and the closing invitation (the
