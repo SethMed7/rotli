@@ -1,23 +1,17 @@
 ---
-// The full launch film, on the landing page (after the theme chapter) and on
-// the holding page. The hero shows a still capture, so the film plays once here.
+// The earlier launch film, on the holding page after its introduction (the
+// launch page plays the studio's story film instead, FilmPlayer.astro).
 // Renders only when public/media/ has real files, so a build never ships an
 // empty player. Click-to-play with native controls: no autoplay, no
 // third-party player, no cookies, and no network request until play.
 import { site } from '../site';
 
-interface Props {
-  /** `landing` sits after the theme chapter on the launch page; `soon` follows the holding-page introduction. */
-  variant?: 'landing' | 'soon';
-}
-
-const { variant = 'landing' } = Astro.props;
 const film = site.promo.full;
 ---
 
 {
   film.enabled && (
-    <section class:list={['film', `film-${variant}`]} id="film" aria-labelledby="film-title">
+    <section class="film film-soon" id="film" aria-labelledby="film-title">
       <div class="film-panel">
         <div class="film-copy">
           <h2 id="film-title">rotli, in motion.</h2>
@@ -108,10 +102,6 @@ const film = site.promo.full;
     width: min(100% - 2 * var(--gutter), var(--page-max));
     margin-inline: auto;
     padding-block: clamp(2.5rem, 5vw, 4.5rem);
-  }
-
-  .film-landing {
-    padding-block: var(--section-space) 0;
   }
 
   .film-soon {

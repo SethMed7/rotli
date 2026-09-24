@@ -75,7 +75,9 @@ bun run preview  # serve the built dist/ locally
   exactly one video. **`/features/`** opens with "Rotli in 30 seconds"
   (`EpisodeShelf.astro`: the eight episodes in one player) and then composes
   the chapters in full (Features with every smaller habit, Folder, Personal)
-  under its own page head. Each chapter owns its
+  under its own page head. On narrow screens the theme studio is a carousel
+  (previous/next and a swipe on the capture), like the quokka companion's.
+  Each chapter owns its
   markup, scoped styles, and script. `Base.astro` owns the tokens, the shared
   section grammar (`.wrap`, `.section`, `.section-title`, `.section-lede`,
   `.band-warm`, `.band-deep`, the spacing and type steps), and the one
@@ -208,8 +210,8 @@ bun run preview  # serve the built dist/ locally
     Notebook vault), cropped with the cursor painted out.
   Re-capture rather than hand-edit them. `--capture-ground` in `Base.astro` is
   the editor paper those captures sit on.
-- **The features area** (`landing/Features.astro`, full on `/features/`,
-  `compact` on the landing page) is organized as you meet the product:
+- **The features area** (`landing/Features.astro`, on `/features/` under the
+  episode player) is organized as you meet the product:
   RenderShowcase (the same note rendered and as raw Markdown, then tasks,
   choices, diagrams, tables/code/math with their syntax) → ChatFlow (a real
   reply; the four steps: asks, keeps "Conversation notes" after every reply,
@@ -424,7 +426,7 @@ bun scripts/capture-site.mjs http://localhost:1430
 bun scripts/build-character-fills.mjs --site
 ```
 
-It writes `public/rotli-app-warm-light@3x.png` (the hero and the social card)
+It writes `public/rotli-app-warm-light@3x.png` (the social card's workspace)
 and `public/rotli-playground@3x.png` (the coming-soon page); the theme studio's
 `public/themes/` captures are a separate set it does not touch, and the fill
 script makes only the closing card's celebrating quokka. The capture script

@@ -3,12 +3,6 @@
 // then the kinds of blocks a note can hold. Every picture is a capture of the
 // real editor in the stable browser twin (synthetic in-memory vault, typed
 // through the editor itself), saved at 2× under public/shots/render-*.
-interface Props {
-  /** The landing page shows the side-by-side only. */
-  compact?: boolean;
-}
-const { compact = false } = Astro.props;
-
 const kinds = [
   {
     title: 'Tasks, progress, and results',
@@ -52,29 +46,25 @@ const kinds = [
   </p>
 </div>
 
-{
-  !compact && (
-    <ul class="kinds" data-stagger>
-      {kinds.map((kind) => (
-        <li>
-          <figure class="frame">
-            <img
-              src={kind.image.src}
-              width={kind.image.width}
-              height={kind.image.height}
-              alt={kind.image.alt}
-              loading="lazy"
-              decoding="async"
-            />
-          </figure>
-          <h3>{kind.title}</h3>
-          <p>{kind.body}</p>
-          <code>{kind.syntax}</code>
-        </li>
-      ))}
-    </ul>
-  )
-}
+<ul class="kinds" data-stagger>
+  {kinds.map((kind) => (
+    <li>
+      <figure class="frame">
+        <img
+          src={kind.image.src}
+          width={kind.image.width}
+          height={kind.image.height}
+          alt={kind.image.alt}
+          loading="lazy"
+          decoding="async"
+        />
+      </figure>
+      <h3>{kind.title}</h3>
+      <p>{kind.body}</p>
+      <code>{kind.syntax}</code>
+    </li>
+  ))}
+</ul>
 
 <style>
   .frame {
