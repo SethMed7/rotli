@@ -1,7 +1,8 @@
 ---
 // "Rotli in 30 seconds": the studio's eight short episodes in one player, with the series
-// listed beside it. Nothing downloads until an episode is chosen; choosing one plays it with
-// sound and native controls. Without script each episode is a plain link to its film.
+// listed beside it. No film downloads until an episode is played (the poster and the
+// thumbnails do load); choosing one plays it with sound and native controls. Without script
+// each episode is a plain link to its film.
 import { episodes } from '../films';
 
 const [first] = episodes;
@@ -59,9 +60,11 @@ const [first] = episodes;
           void video.play();
           return;
         }
+        video.pause();
         video.poster = link.dataset.poster!;
         video.setAttribute('aria-label', link.dataset.label!);
         video.src = src;
+        video.load(); // drop the previous episode's fetch before the next one starts
         video.muted = false;
         void video.play();
       });

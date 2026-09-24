@@ -20,9 +20,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   live in one player at the top of Features, and About and Privacy open with
   scenes from the island. Motion plays once and rests, and reduced motion
   shows everything at rest.
-
-### Changed
-
 - **⌘⇧A opens the Aa panel** (text size, measure, view, blocks, and Secure)
   for the note you are in, in the main window and the Quick Note; press it
   again to close. Archive no longer has a default shortcut. It is still in ⌘K,

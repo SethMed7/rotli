@@ -3,7 +3,8 @@
 // on screen and plays once, then rests on its last frame (the sunset lockup); nothing loops.
 // "Click for sound" restarts it from the top with sound, the way the score was written, and
 // hands over native controls. A pause button is there while it plays muted. It pauses when
-// scrolled away and resumes when back. Without script, under reduced motion, or with
+// scrolled away and, if it was playing, resumes when back. The film itself only downloads
+// once the player first comes into view. Without script, under reduced motion, or with
 // Save-Data on, it is a poster with native controls: nothing plays until asked.
 interface Props {
   src: string;
@@ -78,7 +79,6 @@ const { src, poster, label } = Astro.props;
     const replay = bar.querySelector<HTMLButtonElement>('.player-replay')!;
     video.controls = false;
     video.muted = true;
-    video.preload = 'auto';
     bar.hidden = false;
 
     let userPaused = false;
@@ -106,10 +106,17 @@ const { src, poster, label } = Astro.props;
       else video.pause();
     });
 
-    // Plays while on screen, from a short beat after the page arrives.
+    // Plays while on screen, from a short beat after the page arrives. Leaving the screen
+    // pauses it; coming back resumes it only if it was playing (muted or with sound).
     let visible = false;
+    let started = false;
+    let pausedByScroll = false;
+    let beat: ReturnType<typeof setTimeout> | undefined;
     const autoplay = () => {
-      if (!visible || userPaused || video.ended || !video.muted) return;
+      if (!visible || userPaused || video.ended) return;
+      if (started && !pausedByScroll) return;
+      started = true;
+      pausedByScroll = false;
       void video.play().catch(() => {
         // Autoplay refused (a browser setting): leave the poster and native controls.
         bar.hidden = true;
@@ -119,8 +126,14 @@ const { src, poster, label } = Astro.props;
     new IntersectionObserver(
       ([entry]) => {
         visible = entry.isIntersecting;
-        if (visible) setTimeout(autoplay, 700);
-        else if (!video.paused) video.pause();
+        clearTimeout(beat);
+        if (visible) {
+          video.preload = 'auto'; // only now, on screen, does the film download
+          beat = setTimeout(autoplay, started ? 0 : 700);
+        } else if (!video.paused) {
+          pausedByScroll = true;
+          video.pause();
+        }
       },
       { threshold: 0.35 },
     ).observe(video);

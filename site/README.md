@@ -380,11 +380,13 @@ films (WebP, via `cwebp`).
   through `FilmPlayer.astro`: muted, once, as soon as it is on screen, then it
   rests on its last frame; it never loops. "Click for sound" restarts it from
   the top with sound and native controls; a pause button is there while it
-  plays muted; it pauses when scrolled away. Under reduced motion, Save-Data,
+  plays muted; it pauses when scrolled away and resumes if it was playing, and
+  the film itself downloads only once the player first comes into view. Under reduced motion, Save-Data,
   or without script it is a poster with native controls.
 - **"Rotli in 30 seconds"** (`epNN-*.mp4`, eight episodes) lives in one player
-  on `/features/` (`EpisodeShelf.astro`), `preload="none"`: nothing downloads
-  until an episode is chosen, and choosing one plays it with sound. Without
+  on `/features/` (`EpisodeShelf.astro`), `preload="none"`: no film downloads
+  until an episode is played (the poster and thumbnails do), and choosing one
+  plays it with sound. Without
   script each episode is a plain link to its file.
 
 The earlier launch film still lives in `public/media/` for the holding page:
