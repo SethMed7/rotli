@@ -2,6 +2,8 @@
 // Make it yours: the theme studio (twelve real captures from public/themes/)
 // and the optional quokka companion. Both move only when the visitor asks:
 // no timers, so a background tab does no work and nothing loops beside text.
+// Behind it, faintly, the story film's island by day (IslandScene.astro).
+import IslandScene from '../IslandScene.astro';
 import showcaseManifest from '../../assets/characters/showcase/showcase.json';
 
 // Swatch colours read the site swatch layer (Base.astro), which mirrors the
@@ -39,7 +41,10 @@ const companions = showcaseManifest.map((entry) => {
 ---
 
 <section class="section band-warm personal" id="personal" aria-labelledby="personal-title">
-  <div class="wrap">
+  <div class="backdrop">
+    <IslandScene faint />
+  </div>
+  <div class="wrap personal-inner">
     <header class="section-head">
       <h2 class="section-title" id="personal-title">Make it yours.</h2>
       <p class="section-lede">
@@ -195,6 +200,31 @@ const companions = showcaseManifest.map((entry) => {
 </script>
 
 <style>
+  /* The island sits behind the heading and the top of the theme studio. */
+  .personal {
+    position: relative;
+    overflow: hidden;
+  }
+  .backdrop {
+    position: absolute;
+    top: clamp(1.5rem, 3vw, 2.5rem);
+    right: 0;
+    width: min(42vw, 600px);
+    aspect-ratio: 610 / 244;
+    pointer-events: none;
+    mask-image: linear-gradient(to right, transparent, #000 30%);
+  }
+  .backdrop :global(.island) {
+    height: 100%;
+  }
+  @media (max-width: 760px) {
+    .backdrop {
+      display: none;
+    }
+  }
+  .personal-inner {
+    position: relative;
+  }
   .studio {
     display: grid;
     grid-template-columns: minmax(0, 1.7fr) auto;

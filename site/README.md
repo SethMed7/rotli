@@ -65,13 +65,17 @@ bun run preview  # serve the built dist/ locally
   560px the GitHub mark and Download move into it too. The footer's closing
   row holds the maker line and the two directory badges.
 - **The landing page** (`src/components/Landing.astro`) only composes its
-  chapters from `src/components/landing/`: Hero → Features (`compact`: the
-  editor, chat, and Librarian, then a link to `/features/`; the dev-only
-  Experiments follow) → PrivacyBrief (three facts and a link to `/privacy/`)
-  → Everywhere (Rotli Web, only while `WEB_APP_ENABLED`) → Personal (themes +
-  companion) → the film (`PromoFilm.astro`) → Faq → FinalCta. **`/features/`**
-  composes the same chapters in full (Features with every smaller habit,
-  Folder, Everywhere, Personal) under its own page head. Each chapter owns its
+  chapters from `src/components/landing/`, bookended like the studio's story
+  film: Hero (the story film itself) → Overview (Write. Keep. Ask.: three
+  steps with the app's quokkas, then links to the episodes and `/features/`;
+  the dev-only Experiments follow) → PrivacyBrief (the night scene, three
+  facts, and a link to `/privacy/`) → Everywhere (Rotli Web, only while
+  `WEB_APP_ENABLED`) → Personal (themes + companion, with a faint island
+  vignette) → Faq → FinalCta (the film's sunset). The landing page carries
+  exactly one video. **`/features/`** opens with "Rotli in 30 seconds"
+  (`EpisodeShelf.astro`: the eight episodes in one player) and then composes
+  the chapters in full (Features with every smaller habit, Folder, Personal)
+  under its own page head. Each chapter owns its
   markup, scoped styles, and script. `Base.astro` owns the tokens, the shared
   section grammar (`.wrap`, `.section`, `.section-title`, `.section-lede`,
   `.band-warm`, `.band-deep`, the spacing and type steps), and the one
@@ -178,13 +182,14 @@ bun run preview  # serve the built dist/ locally
   `src/layouts/Base.astro`. Pages own only their sections.
 - The ways-in chapter (Mac app, Rotli Web, Rotli Helper) is three plain
   columns with no screenshot.
-- The hero is words only: it fills the first screen on `public/hero-pattern.svg`
+- The hero is the promise, the two ways in, and the story film right under
+  them (`FilmPlayer.astro`, see "Films" below), on `public/hero-pattern.svg`
   (the social card's faint note, folder, checklist, and chat icons, masked so
-  they fade out behind the headline) with the filled cocoa waving quokka
-  (`src/assets/characters/filled/cocoa/waving.webp`) peeking up from its
-  bottom edge. The product capture starts right below the fold, so the quokka
-  appears to look over it. That capture, `public/rotli-app-warm-light@3x.png`,
-  and the theme studio's `public/themes/` are lossless browser-demo captures (1280 × 800 logical
+  they fade out behind the headline). The words land in one short CSS
+  entrance and the film's clay line (`.inked`, `public/ink-underline.svg`)
+  draws itself under "Files you keep." The landing page shows no capture;
+  the theme studio does. `public/rotli-app-warm-light@3x.png` (the social
+  card) and the theme studio's `public/themes/` are lossless browser-demo captures (1280 × 800 logical
   viewport at 3× and 2× density), never a live vault. The coming-soon page
   uses the 4320 × 2700 `rotli-playground@3x.png`. The `@3x.png` filenames
   replace the old 1× URLs so cached blurry images cannot persist. Do not
@@ -214,10 +219,20 @@ bun run preview  # serve the built dist/ locally
   ConnectAI (each provider's own CLI installed in Terminal; rotli never signs in,
   reads login files, or stores credentials; Rotli Helper runs the same tools for
   Rotli Web; the install lines mirror `src/ai/connectorGuides.ts`) → habits.
-- The landing privacy band is brief and points to `/privacy/`. Its quokka is
-  the canonical line art (`src/assets/characters/stays_local.svg`, drawn in
-  `currentColor`) inlined in the band's light ink, standing on the band's
-  bottom edge at the right: lines only, no fill.
+- **Scenes from the film**, drawn in inline SVG on the film's palette (the
+  `--sunset-*`, `--sea*`, `--sand`, `--olive*`, `--limestone`, `--lake`,
+  `--wood*`, and `--lantern` tokens in `Base.astro`) with the app's own
+  character art. Each plays once when revealed (`[data-reveal]`) and rests;
+  reduced motion shows it at rest. `SecureScene.astro` is the film's "secure
+  stays home" night (the landing privacy band on `public/night-stars.svg`,
+  and the night frame on `/privacy/`); `IslandScene.astro` is the island by
+  day (a faint vignette behind Make it yours, and the framed scene opening
+  `/about/`); the FAQ has the searching quokka among question cards; the
+  closing invitation is the film's sunset in flat bands. `/privacy/` and
+  `/about/` place their scene through `WritingPage`'s `scene` slot; `/about/`
+  uses the centered layout (`center`).
+- The landing privacy band is brief and points to `/privacy/`: the promise and
+  three facts on the left, the night scene on the right.
 - The coming-soon page keeps the same Rotli Light foundation and shows the real
   Playground capture. The introduction begins with the coming-soon label. Its
   one call to action is "Follow development on GitHub" when the source is
@@ -323,7 +338,7 @@ launch:
 2. In Railway → `rotli-site` → production service, set `SITE_MODE=full`
    (leave `SITE_URL=https://rotli.co`). Redeploy so the Docker build picks up
    the new build arg.
-3. Check `https://rotli.co/` renders the landing (hero capture, Download for
+3. Check `https://rotli.co/` renders the landing (the hero film, Download for
    Mac), `/robots.txt` allows indexing, and `/sitemap-index.xml` exists.
 4. Roll back by setting `SITE_MODE=coming-soon` again and redeploying.
 
@@ -350,22 +365,31 @@ bun run build:modes                            # full, dev, coming-soon → dist
 docker build -f site/Dockerfile --build-arg SITE_MODE=dev -t rotli-site:dev ..  # from site/
 ```
 
-## Launch film
+## Films
 
-One film lives in `public/media/` and renders on the landing page (`#film`,
-after the theme chapter) and on the holding page, when `rotli-promo.mp4`, its
-poster, and its captions all exist. The film project that produces it (edit,
-footage, reviews) is media work kept on the maintainer's Mac, outside this
-repository; `/marketing/` is ignored so it never comes back.
+The studio's films (`public/media/story/`, `src/films.ts`) come from the
+motion room kept on the maintainer's Mac (`rotli-studio/motion/out/video`),
+outside this repository, re-encoded for the web: H.264 with `-tune animation`,
+`+faststart`, AAC 96 kbps (the story at CRF 28, about 5.7 MB; each episode at
+CRF 30, about 2.5 to 3.5 MB). Posters and episode thumbnails are frames of the
+films (WebP, via `cwebp`).
 
-`PromoFilm.astro` owns the one player on both pages: click-to-play with native
-controls, `preload="none"` (no request until play), `playsinline`, a poster,
-optional captions, and fallback text; no autoplay, no third-party player, no
-cookie. The hero shows a still capture instead, so the film never plays
-twice. The poster is a frame of the film itself (2 s in: "One folder. Your
-vault."); the film's own opening card still reads "Mac beta in preparation"
-and needs a new cut from the film project. The film renders only when its
-required artifacts exist at build time.
+- **The story film** (`rotli-story.mp4`, 60 s) plays in the landing hero
+  through `FilmPlayer.astro`: muted, once, as soon as it is on screen, then it
+  rests on its last frame; it never loops. "Click for sound" restarts it from
+  the top with sound and native controls; a pause button is there while it
+  plays muted; it pauses when scrolled away. Under reduced motion, Save-Data,
+  or without script it is a poster with native controls.
+- **"Rotli in 30 seconds"** (`epNN-*.mp4`, eight episodes) lives in one player
+  on `/features/` (`EpisodeShelf.astro`), `preload="none"`: nothing downloads
+  until an episode is chosen, and choosing one plays it with sound. Without
+  script each episode is a plain link to its file.
+
+The earlier launch film still lives in `public/media/` for the holding page:
+`PromoFilm.astro` renders it there when `rotli-promo.mp4`, its poster, and its
+captions all exist (click-to-play with native controls, `preload="none"`, no
+autoplay). Its opening card still reads "Mac beta in preparation" and needs a
+new cut before the holding page is used again.
 
 The theme studio previews twelve environments from `public/themes/` (six
 families × light/dark), one row per family with Light and Dark swatches.

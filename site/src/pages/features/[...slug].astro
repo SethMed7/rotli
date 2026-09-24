@@ -1,10 +1,12 @@
 ---
 // /features/: the whole tour, as its own page rather than a landing anchor.
-// It composes Features in full (rendering, chat, documents and boards, assets,
+// "Rotli in 30 seconds" (the studio's eight episodes, one player) opens it; then
+// it composes Features in full (rendering, chat, documents and boards, assets,
 // the Librarian, connecting AI tools, the smaller habits), then the folder and
 // the themes. The ways in (Mac, Rotli Web, Helper) stay on the landing page and
 // /download/; the Helper also appears under connecting AI.
 import Base from '../../layouts/Base.astro';
+import EpisodeShelf from '../../components/EpisodeShelf.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
 import SiteHeader from '../../components/SiteHeader.astro';
 import Experiments from '../../components/landing/Experiments.astro';
@@ -34,6 +36,7 @@ export function getStaticPaths() {
         keeps them filed. All of it works on one folder you own.
       </p>
     </header>
+    <EpisodeShelf />
     <Features />
     <Experiments />
     <Folder />

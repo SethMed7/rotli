@@ -1,79 +1,159 @@
 ---
-// /about/: what rotli is, the name, who makes it. Kept short on purpose; the
-// longer story is the "creation" post, linked once it is published here.
-import waving from '../../assets/characters/showcase/fern-glasses-waving.webp';
+// /about/: what rotli is, where the name comes from, what it believes, and who makes it,
+// opened by the story film's island (IslandScene.astro). Every belief restates a claim the
+// rest of the site makes; the maker section says only what is public. The longer story is
+// the "creation" post, linked once it is published.
+import IslandScene from '../../components/IslandScene.astro';
 import WritingPage from '../../components/WritingPage.astro';
-import { site } from '../../site';
+import { GITHUB_URL, site } from '../../site';
 import { publishedWriting, slugOf } from '../../writing';
 
 export function getStaticPaths() {
   return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
 }
 
+const X_URL = 'https://x.com/iamsethmedina';
+
 const posts = await publishedWriting('post');
 const story = posts.find((post) => slugOf(post) === 'the-creation-of-rotli');
+
+const beliefs = [
+  {
+    title: 'Your files are the product.',
+    body: 'Notes are plain Markdown in one folder you choose. rotli’s own data is rebuildable, never a second copy of your work, and deleting rotli leaves every file where it was.',
+  },
+  {
+    title: 'Calm over clever.',
+    body: 'Nothing asks for your attention. Open it with ⌥Space, write, and put it away; the handful of keys worth learning are the ones you will use every day.',
+  },
+  {
+    title: 'AI is invited in. It does not own the house.',
+    body: 'AI is optional. Run a model on your Mac or connect the tools you already use; secure notes never reach a remote model, and no model can edit a note you lock.',
+  },
+  {
+    title: 'Nothing about you to collect.',
+    body: 'No account, no analytics, no ads, and no crash uploads. There is no rotli server holding your notes.',
+  },
+];
 ---
 
 <WritingPage
   title="About — rotli"
-  description="rotli is a calm, local-first workspace: one folder of ordinary files, on your Mac or in your browser."
+  description="rotli is a calm, local-first workspace: one folder of ordinary files, on your Mac or in your browser. Where the name comes from, what it believes, and who makes it."
   canonicalPath="/about/"
   section="about"
   heading="About rotli"
   lede="A calm place to think, built on one folder of ordinary files you keep."
+  center
 >
+  <figure slot="scene" class="island-frame">
+    <IslandScene />
+    <figcaption>Rottnest Island, where the quokkas live, and where rotli gets its name.</figcaption>
+  </figure>
+
   <p>
-    rotli is a local-first workspace for notes, tasks, links, and optional AI conversations. Everything
-    lives in one folder you choose, as plain Markdown files, so your work opens anywhere and outlasts any
-    app, including this one.{site.webAppEnabled ? ' It runs on your Mac, and in your browser with Rotli Web.' : ''}
+    rotli is a local-first workspace for notes, tasks, links, and optional AI conversations. Everything lives
+    in one folder you choose, as plain Markdown files, so your work opens anywhere and outlasts any app,
+    including this one.{site.webAppEnabled ? ' It runs on your Mac, and in your browser with Rotli Web.' : ''}
   </p>
 
-  <img
-    class="about-quokka"
-    src={waving.src}
-    width="220"
-    height="220"
-    alt="A fern-green quokka in glasses, waving"
-    loading="lazy"
-    decoding="async"
-  />
-  <h2 id="name">Why "rotli"?</h2>
+  <h2 id="name">Why “rotli”?</h2>
   <p>
-    rotli is short for Rottnest, the island off Western Australia where quokkas live. Short, quick to say,
-    easy to remember. The workspace is the island, and you're the quokka.
+    rotli is short for Rottnest, the island off Western Australia where quokkas live. Short, quick to say, easy
+    to remember. The workspace is the island, and you are the quokka.
   </p>
   <p>
-    Quokkas are famous for looking like they can't stop smiling. That's the feeling rotli is built for: a
+    Quokkas are famous for looking like they can’t stop smiling. That is the feeling rotli is built for: a
     workspace that feels good to be in, so getting things done feels good too.
   </p>
 
+  <h2 id="beliefs">What rotli believes</h2>
+  <ol class="beliefs">
+    {
+      beliefs.map((belief) => (
+        <li>
+          <h3>{belief.title}</h3>
+          <p>{belief.body}</p>
+        </li>
+      ))
+    }
+  </ol>
+
   <h2 id="who">Who makes it</h2>
   <p>
-    rotli is designed and built by Seth Medina.
+    rotli is designed and built by Seth Medina, a software engineer in Florida.
     {
       story && (
         <>
-          The story of how it came together is on the blog:{' '}
+          {' '}The story of how it came together is on the blog:{' '}
           <a href={`/blog/${slugOf(story)}/`}>{story.data.title}</a>.
         </>
       )
     }
   </p>
+  <ul class="elsewhere">
+    <li><a href={X_URL} rel="me">Follow along on X · @iamsethmedina</a></li>
+    {site.sourcePublic && <li><a href={GITHUB_URL}>Read the source on GitHub</a></li>}
+    <li><a href="/blog/">Read the blog</a></li>
+  </ul>
 </WritingPage>
 
 <style>
-  /* One of the companion looks a person can pick in Settings → Companion. */
-  .about-quokka {
-    float: right;
-    width: 220px;
-    height: 220px;
-    margin: 0.5rem 0 1rem 1.5rem;
-    shape-outside: circle(45%);
+  .island-frame {
+    margin: 0 0 clamp(2.5rem, 5vw, 4rem);
   }
-  @media (max-width: 560px) {
-    .about-quokka {
-      float: none;
-      margin: 0 auto;
-    }
+  .island-frame :global(.island) {
+    aspect-ratio: 1200 / 420;
+    overflow: hidden;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-frame);
+    background: var(--surface-2);
+  }
+  figcaption {
+    margin-top: 0.85rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  .beliefs {
+    display: grid;
+    gap: 1.4rem;
+    margin: 1.5rem 0 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: belief;
+  }
+  .beliefs li {
+    position: relative;
+    padding-left: 3rem;
+    counter-increment: belief;
+  }
+  .beliefs li::before {
+    position: absolute;
+    left: 0;
+    top: 0.1rem;
+    content: counter(belief, decimal-leading-zero);
+    color: var(--accent-text);
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  .beliefs h3 {
+    margin: 0;
+    font-size: 1.12rem;
+  }
+  .beliefs p {
+    margin: 0.35rem 0 0;
+  }
+  .elsewhere {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.6rem 1.5rem;
+    margin: 1.25rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .elsewhere a {
+    font-weight: 600;
   }
 </style>
