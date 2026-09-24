@@ -11,12 +11,6 @@ import ConnectAI from './ConnectAI.astro';
 import Formats from './Formats.astro';
 import RenderShowcase from './RenderShowcase.astro';
 
-interface Props {
-  /** The landing page: the rendering pair and chat, then a link here for the rest. */
-  compact?: boolean;
-}
-const { compact = false } = Astro.props;
-
 // An illustration of one Librarian pass over a synthetic vault (the notes and
 // folders from the launch film): where each new note is filed, and what the
 // Librarian adds around it. The note text itself is never edited.
@@ -44,104 +38,95 @@ const habits = [
         text on disk.
       </p>
     </header>
-    <RenderShowcase compact={compact} />
+    <RenderShowcase />
   </div>
 </section>
 
 <section class="section band-warm" id="chat" aria-labelledby="chat-title">
   <div class="wrap">
     <h2 class="visually-hidden" id="chat-title">Chat</h2>
-    <ChatFlow compact={compact} />
-    {compact && (
-      <p class="all-features">
-        <a class="button secondary" href="/features/">Explore every feature</a>
-      </p>
-    )}
+    <ChatFlow />
   </div>
 </section>
 
-{
-  !compact && (
-    <>
-      <section class="section" id="formats" aria-labelledby="formats-title">
-        <div class="wrap">
-          <header class="section-head">
-            <h2 class="section-title" id="formats-title">More than notes.</h2>
-            <p class="section-lede">
-              Word documents and boards open right beside your notes, as the same ordinary files any other app
-              reads. Spreadsheets are next.
-            </p>
-          </header>
-          <Formats />
-        </div>
-      </section>
+<>
+  <section class="section" id="formats" aria-labelledby="formats-title">
+    <div class="wrap">
+      <header class="section-head">
+        <h2 class="section-title" id="formats-title">More than notes.</h2>
+        <p class="section-lede">
+          Word documents and boards open right beside your notes, as the same ordinary files any other app
+          reads. Spreadsheets are next.
+        </p>
+      </header>
+      <Formats />
+    </div>
+  </section>
 
-      <section class="section band-warm" id="organize" aria-labelledby="organize-title">
-        <div class="wrap">
-          <h2 class="visually-hidden" id="organize-title">Organize</h2>
-              <article class="row flip" id="librarian" data-reveal>
-                <div class="row-copy">
-                  <h3>A Librarian that files, never rewrites.</h3>
-                  <p>
-                    Turn it on and new notes get tags, summaries, links, and a place in your Library while you
-                    keep working in Main. It organizes around your writing without editing it. Turn it off and
-                    the folder is still a complete workspace.
-                  </p>
-                </div>
-                <figure class="filing" aria-label="How the Librarian files three new notes">
-                  <div class="filing-head" aria-hidden="true">
-                    <span>New notes</span>
-                    <span>Filed in your Library</span>
-                  </div>
-                  <ol>
-                    {filings.map((filing) => (
-                      <li>
-                        <span class="filing-note">
-                          <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2">
-                            <path d="M4 1.5h5.5L12.5 4.5v10h-8.5z" />
-                            <path d="M9.5 1.5v3h3" />
-                          </svg>
-                          {filing.note}
-                        </span>
-                        <span class="filing-line" aria-hidden="true"></span>
-                        <span class="filing-folder">
-                          <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2">
-                            <path d="M1.5 3.5h4.5l1.5 1.5h7v8.5h-13z" />
-                          </svg>
-                          <span class="visually-hidden">filed in</span> {filing.folder}
-                        </span>
-                        <small>{filing.adds}</small>
-                      </li>
-                    ))}
-                  </ol>
-                  <figcaption>Every note keeps its words exactly as you wrote them.</figcaption>
-                </figure>
-              </article>
-        </div>
-      </section>
+  <section class="section band-warm" id="organize" aria-labelledby="organize-title">
+    <div class="wrap">
+      <h2 class="visually-hidden" id="organize-title">Organize</h2>
+          <article class="row flip" id="librarian" data-reveal>
+            <div class="row-copy">
+              <h3>A Librarian that files, never rewrites.</h3>
+              <p>
+                Turn it on and new notes get tags, summaries, links, and a place in your Library while you
+                keep working in Main. It organizes around your writing without editing it. Turn it off and
+                the folder is still a complete workspace.
+              </p>
+            </div>
+            <figure class="filing" aria-label="How the Librarian files three new notes">
+              <div class="filing-head" aria-hidden="true">
+                <span>New notes</span>
+                <span>Filed in your Library</span>
+              </div>
+              <ol>
+                {filings.map((filing) => (
+                  <li>
+                    <span class="filing-note">
+                      <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2">
+                        <path d="M4 1.5h5.5L12.5 4.5v10h-8.5z" />
+                        <path d="M9.5 1.5v3h3" />
+                      </svg>
+                      {filing.note}
+                    </span>
+                    <span class="filing-line" aria-hidden="true"></span>
+                    <span class="filing-folder">
+                      <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2">
+                        <path d="M1.5 3.5h4.5l1.5 1.5h7v8.5h-13z" />
+                      </svg>
+                      <span class="visually-hidden">filed in</span> {filing.folder}
+                    </span>
+                    <small>{filing.adds}</small>
+                  </li>
+                ))}
+              </ol>
+              <figcaption>Every note keeps its words exactly as you wrote them.</figcaption>
+            </figure>
+          </article>
+    </div>
+  </section>
 
-      <section class="section" id="connect" aria-labelledby="connect-title">
-        <div class="wrap">
-          <header class="section-head">
-            <h2 class="section-title" id="connect-title">Your AI, connected the honest way.</h2>
-            <p class="section-lede">
-              No accounts to link and no keys to paste. rotli works with the tools you already have installed.
-            </p>
-          </header>
-          <ConnectAI />
-          <ul class="habits" aria-label="Smaller things worth knowing" data-reveal>
-            {habits.map((habit) => (
-              <li>
-                <kbd>{habit.key}</kbd>
-                <p>{habit.text}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-    </>
-  )
-}
+  <section class="section" id="connect" aria-labelledby="connect-title">
+    <div class="wrap">
+      <header class="section-head">
+        <h2 class="section-title" id="connect-title">Your AI, connected the honest way.</h2>
+        <p class="section-lede">
+          No accounts to link and no keys to paste. rotli works with the tools you already have installed.
+        </p>
+      </header>
+      <ConnectAI />
+      <ul class="habits" aria-label="Smaller things worth knowing" data-stagger>
+        {habits.map((habit) => (
+          <li>
+            <kbd>{habit.key}</kbd>
+            <p>{habit.text}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+</>
 
 <style>
   h3 {
@@ -170,9 +155,6 @@ const habits = [
   }
   .row-copy p {
     max-width: 30rem;
-  }
-  .all-features {
-    margin: clamp(3rem, 6vw, 4rem) 0 0;
   }
   .filing {
     margin: 0;

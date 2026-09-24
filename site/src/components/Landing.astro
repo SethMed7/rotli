@@ -1,21 +1,19 @@
 ---
-// The launch page, composed from its chapters in src/components/landing/.
-// Each chapter owns its markup, scoped styles, and (where it has one) script;
-// Base.astro owns the tokens and the section grammar they share. Order:
-// promise → what it does (the full tour is /features/) → privacy in brief
-// (the policy is /privacy/) → ways in → make it yours → the film → questions →
-// the closing invitation.
+// The launch page, bookended like the studio's story film: the film itself in
+// the hero, a sunset to close on. Between them, in order: what rotli does (three
+// steps, the full tour and the 30-second episodes are /features/), privacy in
+// brief, the ways in, make it yours, and questions. Base.astro owns the tokens
+// and the section grammar.
 import Base from '../layouts/Base.astro';
 import { site } from '../site';
-import PromoFilm from './PromoFilm.astro';
 import SiteFooter from './SiteFooter.astro';
 import SiteHeader from './SiteHeader.astro';
 import Everywhere from './landing/Everywhere.astro';
 import Experiments from './landing/Experiments.astro';
 import Faq from './landing/Faq.astro';
-import Features from './landing/Features.astro';
 import FinalCta from './landing/FinalCta.astro';
 import Hero from './landing/Hero.astro';
+import Overview from './landing/Overview.astro';
 import Personal from './landing/Personal.astro';
 import PrivacyBrief from './landing/PrivacyBrief.astro';
 ---
@@ -24,12 +22,11 @@ import PrivacyBrief from './landing/PrivacyBrief.astro';
   <SiteHeader current="product" />
   <main id="content">
     <Hero />
-    <Features compact />
+    <Overview />
     <Experiments />
     <PrivacyBrief />
     <Everywhere />
     <Personal />
-    <PromoFilm variant="landing" />
     <Faq />
     <FinalCta />
   </main>

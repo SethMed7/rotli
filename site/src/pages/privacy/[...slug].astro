@@ -5,6 +5,9 @@
 // this page restates it for visitors and adds this website's own practices.
 // When PRIVACY.md changes (a new data class, destination, retention behavior,
 // or control), update this page in the same change.
+import aiChat from '../../../../src/assets/characters/filled/cocoa/ai_chat.webp';
+import knowledge from '../../../../src/assets/characters/filled/cocoa/knowledge_system.webp';
+import SecureScene from '../../components/SecureScene.astro';
 import WritingPage from '../../components/WritingPage.astro';
 import { GITHUB_URL, site } from '../../site';
 
@@ -45,6 +48,14 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   lede="rotli is built so there is nothing about you to collect. This page explains exactly what it does with your data, what connects to the internet, and why it works that way."
   toc={toc}
 >
+  <div slot="scene" class="night" data-reveal>
+    <p class="night-caption">
+      <span class="inked">Secure notes stay home.</span> A model on your own Mac may read them. Remote models,
+      the clouds outside, never see them, and no model can edit a note you lock.
+    </p>
+    <SecureScene />
+  </div>
+
   <h2 id="short-version">The short version</h2>
   <ul>
     <li><strong>No account.</strong> There is nothing to sign up for, and no rotli server that holds your notes.</li>
@@ -55,6 +66,7 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   </ul>
 
   <h2 id="your-notes">Your notes stay yours</h2>
+  <img class="spot" src={knowledge.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
   <p>
     rotli reads and writes the folder you pick: notes, chats, attachments, and anything else you keep there.
     Its own settings and search indexes live in a hidden <code>.rotli</code> folder inside it, or in the
@@ -97,6 +109,7 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   </p>
 
   <h2 id="ai">AI and your notes</h2>
+  <img class="spot" src={aiChat.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
   <p>
     AI in rotli is a visitor, not the owner of your workspace. You can leave it off entirely. If you use it,
     an <strong>on-device model</strong> runs on your Mac and works without a network. <strong>Connected AI</strong>
@@ -265,5 +278,49 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   }
   td[data-access='read'] {
     color: var(--text-muted);
+  }
+  /* The story film's night: the dome of "on this Mac", on a starry frame above the policy. */
+  .night {
+    display: grid;
+    gap: 1.5rem 2rem;
+    align-items: end;
+    margin-bottom: clamp(2.5rem, 5vw, 4rem);
+    padding: clamp(1.75rem, 4vw, 3rem) clamp(1.5rem, 4vw, 3rem) 0;
+    overflow: hidden;
+    border-radius: var(--radius-frame);
+    background: var(--deep) url('/night-stars.svg');
+    background-size: 480px 480px;
+    color: var(--deep-text);
+  }
+  .night-caption {
+    max-width: 26rem;
+    margin: 0;
+    padding-bottom: clamp(1.5rem, 4vw, 3rem);
+    color: var(--deep-muted);
+    font-size: var(--step-lede);
+    line-height: 1.5;
+  }
+  .night-caption .inked {
+    color: var(--deep-text);
+    font-weight: 600;
+  }
+  @media (min-width: 900px) {
+    .night {
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    }
+  }
+  /* The companion beside a section, the way the app shows it. */
+  .spot {
+    float: right;
+    width: 132px;
+    height: 132px;
+    margin: 0 0 1rem 1.5rem;
+    shape-outside: circle(48%);
+  }
+  @media (max-width: 560px) {
+    .spot {
+      width: 96px;
+      height: 96px;
+    }
   }
 </style>

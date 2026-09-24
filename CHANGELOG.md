@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **rotli.co now tells the story the way the film does.** The landing page
+  opens with the 60-second quokka film, playing muted with "Click for sound",
+  and walks through what rotli does in three steps: write, keep, ask. The
+  privacy band is a night scene, the questions have room to breathe, and the
+  page closes on the film's sunset. The eight "Rotli in 30 seconds" episodes
+  live in one player at the top of Features, and About and Privacy open with
+  scenes from the island. Motion plays once and rests, and reduced motion
+  shows everything at rest.
+
 ## [1.4.2] - 2026-09-23
 
 ### Added

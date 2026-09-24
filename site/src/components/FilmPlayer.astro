@@ -1,0 +1,232 @@
+---
+// The story film in the landing hero (public/media/story/). It starts muted as soon as it is
+// on screen and plays once, then rests on its last frame (the sunset lockup); nothing loops.
+// "Click for sound" restarts it from the top with sound, the way the score was written, and
+// hands over native controls. A pause button is there while it plays muted. It pauses when
+// scrolled away and, if it was playing, resumes when back. The film itself only downloads
+// once the player first comes into view. Without script, under reduced motion, or with
+// Save-Data on, it is a poster with native controls: nothing plays until asked.
+interface Props {
+  src: string;
+  poster: string;
+  /** What the film shows, for assistive technology. */
+  label: string;
+}
+
+const { src, poster, label } = Astro.props;
+---
+
+<figure class="player" data-player>
+  <video
+    controls
+    muted
+    playsinline
+    preload="metadata"
+    poster={poster}
+    width="1920"
+    height="1080"
+    aria-label={label}
+  >
+    <source src={src} type="video/mp4" />
+    <p class="player-fallback">Your browser cannot play this video. <a href={src}>Download it (MP4)</a>.</p>
+  </video>
+  <div class="player-bar" hidden>
+    <button class="player-chip player-sound" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
+        <path d="M16 9.5l5 5M21 9.5l-5 5" />
+      </svg>
+      <span>Click for sound</span>
+    </button>
+    <button class="player-chip player-pause" type="button" aria-label="Pause the film">
+      <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+        <rect x="6.5" y="5.5" width="3.8" height="13" rx="1" />
+        <rect x="13.7" y="5.5" width="3.8" height="13" rx="1" />
+      </svg>
+      <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+        <path d="M8 5.5v13l10.5-6.5z" />
+      </svg>
+    </button>
+    <button class="player-chip player-replay" type="button" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" />
+        <path d="M4.5 4.5v4h4" />
+      </svg>
+      <span>Watch again with sound</span>
+    </button>
+  </div>
+</figure>
+
+<script>
+  const quiet =
+    matchMedia('(prefers-reduced-motion: reduce)').matches ||
+    (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData === true;
+  const players = [...document.querySelectorAll<HTMLElement>('[data-player]')];
+
+  const withSound = (video: HTMLVideoElement, fromStart: boolean) => {
+    video.muted = false;
+    video.controls = true;
+    if (fromStart) video.currentTime = 0;
+    void video.play();
+  };
+
+  for (const player of players) {
+    const video = player.querySelector('video')!;
+    if (quiet) continue; // a poster with native controls: nothing plays until asked
+    const bar = player.querySelector<HTMLElement>('.player-bar')!;
+    const sound = bar.querySelector<HTMLButtonElement>('.player-sound')!;
+    const pause = bar.querySelector<HTMLButtonElement>('.player-pause')!;
+    const replay = bar.querySelector<HTMLButtonElement>('.player-replay')!;
+    video.controls = false;
+    video.muted = true;
+    bar.hidden = false;
+
+    let userPaused = false;
+    const syncPause = () => {
+      player.classList.toggle('is-paused', video.paused);
+      pause.setAttribute('aria-label', video.paused ? 'Play the film' : 'Pause the film');
+    };
+    video.addEventListener('play', syncPause);
+    video.addEventListener('pause', syncPause);
+    video.addEventListener('ended', () => {
+      // Rest on the last frame; offer the whole film again, with sound.
+      sound.hidden = true;
+      pause.hidden = true;
+      replay.hidden = false;
+    });
+    const handOver = () => {
+      bar.hidden = true;
+      withSound(video, true);
+    };
+    sound.addEventListener('click', handOver);
+    replay.addEventListener('click', handOver);
+    pause.addEventListener('click', () => {
+      userPaused = !video.paused;
+      if (video.paused) void video.play();
+      else video.pause();
+    });
+
+    // Plays while on screen, from a short beat after the page arrives. Leaving the screen
+    // pauses it; coming back resumes it only if it was playing (muted or with sound).
+    let visible = false;
+    let started = false;
+    let pausedByScroll = false;
+    let beat: ReturnType<typeof setTimeout> | undefined;
+    const autoplay = () => {
+      if (!visible || userPaused || video.ended) return;
+      if (started && !pausedByScroll) return;
+      started = true;
+      pausedByScroll = false;
+      void video.play().catch(() => {
+        // Autoplay refused (a browser setting): leave the poster and native controls.
+        bar.hidden = true;
+        video.controls = true;
+      });
+    };
+    new IntersectionObserver(
+      ([entry]) => {
+        visible = entry.isIntersecting;
+        clearTimeout(beat);
+        if (visible) {
+          video.preload = 'auto'; // only now, on screen, does the film download
+          beat = setTimeout(autoplay, started ? 0 : 700);
+        } else if (!video.paused) {
+          pausedByScroll = true;
+          video.pause();
+        }
+      },
+      { threshold: 0.35 },
+    ).observe(video);
+  }
+</script>
+
+<style>
+  .player {
+    position: relative;
+    margin: 0;
+  }
+  video {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-frame);
+    background: var(--surface-2);
+  }
+  .player-fallback {
+    padding: 1rem;
+  }
+  .player-bar {
+    position: absolute;
+    left: clamp(0.6rem, 2vw, 1.1rem);
+    bottom: clamp(0.6rem, 2vw, 1.1rem);
+    display: flex;
+    gap: 0.45rem;
+  }
+  .player-bar[hidden],
+  .player-chip[hidden] {
+    display: none;
+  }
+  .player-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 40px;
+    padding: 0.45rem 0.95rem 0.45rem 0.75rem;
+    border: 0;
+    border-radius: 999px;
+    background: var(--text);
+    color: var(--ground);
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .player-chip:hover {
+    background: var(--accent-text);
+  }
+  .player-chip:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .player-chip svg {
+    width: 20px;
+    height: 20px;
+    flex: none;
+  }
+  .player-pause {
+    width: 40px;
+    padding: 0;
+    justify-content: center;
+  }
+  .player-pause .icon-play,
+  .player:global(.is-paused) .player-pause .icon-pause {
+    display: none;
+  }
+  .player:global(.is-paused) .player-pause .icon-play {
+    display: block;
+  }
+  /* On a phone the chips stay out of the picture's way. */
+  @media (max-width: 600px) {
+    .player-bar {
+      left: 0.5rem;
+      bottom: 0.5rem;
+      gap: 0.35rem;
+    }
+    .player-bar .player-chip {
+      min-height: 32px;
+      padding: 0.3rem 0.7rem 0.3rem 0.55rem;
+      font-size: 0.78rem;
+    }
+    .player-bar .player-chip svg {
+      width: 16px;
+      height: 16px;
+    }
+    .player-bar .player-pause {
+      width: 32px;
+      padding: 0;
+    }
+  }
+</style>

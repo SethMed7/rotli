@@ -37,7 +37,7 @@ const promises = [
         Your vault is an ordinary directory you pick. Notes are Markdown, chats are Markdown, and
         rotli’s own metadata is rebuildable, never a second copy of your work.
       </p>
-      <ol class="promises">
+      <ol class="promises" data-stagger>
         {promises.map((promise) => (
           <li>
             <p><b>{promise.title}</b> {promise.body}</p>
