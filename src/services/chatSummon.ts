@@ -10,6 +10,7 @@ import { showMainWindow } from "../lib/tauri";
 import { activeInstance } from "../memex/config";
 import { listChats, loadConfig } from "../memex/service";
 import { openChatForNoteId } from "../noteChat/composition";
+import { useChatWindowStore } from "../state/chatWindowStore";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 
@@ -23,14 +24,23 @@ export function newestChatSlug(chats: Pick<MemexChatSummary, "slug" | "modifiedM
   return best?.slug ?? null;
 }
 
+/** Whether a chat opened from the Quick Note should bring main forward. When
+ * Chat is popped out, the chat opens in the Chat window, which shows itself;
+ * raising main then would cover it. */
+export function quickNoteChatRaisesMain({ chatDetached }: { chatDetached: boolean }): boolean {
+  return !chatDetached;
+}
+
 /** MAIN: ⌘⇧C in the Quick Note, which cannot host a chat — open that note's
- * chat here and bring this window forward (2026-09-24). */
+ * chat where chats live: here, brought forward, or in the popped-out Chat
+ * window (2026-09-24). */
 export function openNoteChatFromQuickNote(id: string, create: boolean): void {
   void openChatForNoteId(id, { create })
     .then((opened) => {
       // a note that is gone opens nothing: main stays where it was
       if (!opened) return;
       useUiStore.getState().setSettingsOpen(false);
+      if (!quickNoteChatRaisesMain({ chatDetached: useChatWindowStore.getState().detached })) return;
       return showMainWindow();
     })
     .catch((error: unknown) => {

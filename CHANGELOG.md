@@ -33,8 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for the note you are in, in the main window and the Quick Note; press it
   again to close. Archive no longer has a default shortcut. It is still in ⌘K,
   and you can give it one in Settings → Keybindings.
-- **⌘⇧C works in the Quick Note.** It opens the note's chat in the main window
-  and brings the main window forward, the same chat ⌘⇧C opens there.
+- **⌘⇧C works in the Quick Note.** It opens the note's chat where your chats
+  live: in the main window, brought forward, or in the Chat window when you
+  have popped Chat out. It is the same chat ⌘⇧C opens from the main window.
 
 ## [1.4.2] - 2026-09-23
 
