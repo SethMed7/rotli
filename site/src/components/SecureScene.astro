@@ -1,0 +1,298 @@
+---
+// The story film's "secure stays home" shot, drawn for the page: the dome of "on this Mac"
+// with the quokka inside, a locked secure note, the little on-device model that may read it,
+// and two remote-AI clouds that drift in, bump the dome, and back off. It plays once when it
+// comes into view (the site's [data-reveal]); reduced motion shows it at rest. Decoration
+// only: the page text beside it says the same thing in words. Colors are Base.astro tokens,
+// so it sits on any dark ground (the landing band, the privacy page's night frame).
+import staysLocal from '../../../src/assets/characters/filled/cocoa/stays_local.webp';
+---
+
+<div class="scene" data-reveal aria-hidden="true">
+  <svg viewBox="0 0 720 560" role="presentation">
+    <!-- the dome: this Mac -->
+    <g class="dome">
+      <path class="dome-fill" d="M60 540a300 300 0 0 1 600 0z" />
+      <path class="dome-line" d="M60 540a300 300 0 0 1 600 0" />
+      <text class="dome-label" x="360" y="222" text-anchor="middle">on this Mac</text>
+    </g>
+    <line class="ground" x1="0" y1="540" x2="720" y2="540" />
+
+    <!-- a secure note, locked, filed in wiki/_secure/ -->
+    <g class="note">
+      <rect class="note-card" x="104" y="398" width="158" height="98" rx="12" />
+      <text class="note-title" x="122" y="428">passport.md</text>
+      <line class="note-line" x1="122" y1="450" x2="228" y2="450" />
+      <line class="note-line" x1="122" y1="468" x2="200" y2="468" />
+      <g class="lock">
+        <path class="lock-shackle" d="M226 468v-7a9 9 0 0 1 18 0v7" />
+        <rect class="lock-body" x="221" y="466" width="28" height="22" rx="5" />
+      </g>
+    </g>
+
+    <!-- the on-device model: it may read secure notes -->
+    <g class="chip">
+      <g class="chip-pins">
+        <rect x="484" y="410" width="6" height="12" rx="2" />
+        <rect x="502" y="410" width="6" height="12" rx="2" />
+        <rect x="520" y="410" width="6" height="12" rx="2" />
+        <rect x="538" y="410" width="6" height="12" rx="2" />
+        <rect x="484" y="498" width="6" height="12" rx="2" />
+        <rect x="502" y="498" width="6" height="12" rx="2" />
+        <rect x="520" y="498" width="6" height="12" rx="2" />
+        <rect x="538" y="498" width="6" height="12" rx="2" />
+      </g>
+      <rect class="chip-body" x="470" y="420" width="88" height="78" rx="14" />
+      <circle class="chip-eye" cx="498" cy="452" r="5" />
+      <circle class="chip-eye" cx="530" cy="452" r="5" />
+      <path class="chip-smile" d="M503 468q11 10 22 0" />
+      <text class="chip-label" x="514" y="528" text-anchor="middle">on-device model</text>
+    </g>
+
+    <!-- the quokka, at home -->
+    <image class="quokka" href={staysLocal.src} x="238" y="300" width="244" height="244" />
+
+    <!-- remote AI: two clouds that bump the dome and back off -->
+    <g class="cloud cloud-left">
+      <path
+        class="cloud-body"
+        d="M36 148c-16 0-26-12-24-25 2-12 13-19 25-17 4-15 18-24 33-21 13 3 21 13 22 24 12-1 22 8 22 20 0 11-9 19-20 19z"
+      />
+      <path class="cloud-eye" d="M52 124l8 8m0-8l-8 8M78 124l8 8m0-8l-8 8" />
+    </g>
+    <g class="cloud cloud-right">
+      <path
+        class="cloud-body"
+        d="M606 120c-16 0-26-12-24-25 2-12 13-19 25-17 4-15 18-24 33-21 13 3 21 13 22 24 12-1 22 8 22 20 0 11-9 19-20 19z"
+      />
+      <path class="cloud-eye" d="M622 96l8 8m0-8l-8 8M648 96l8 8m0-8l-8 8" />
+      <text class="cloud-label" x="640" y="150" text-anchor="middle">remote AI</text>
+    </g>
+    <g class="bump bump-left">
+      <path d="M150 262l-16-12M160 250l-8-18M146 276l-20-2" />
+    </g>
+    <g class="bump bump-right">
+      <path d="M560 244l14-14M548 232l6-20M572 258l20-6" />
+    </g>
+  </svg>
+</div>
+
+<style>
+  /* The scene sits on the band's bottom edge, like the dome on the ground. */
+  .scene svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+  .dome-fill {
+    fill: color-mix(in srgb, var(--olive-bright) 10%, transparent);
+  }
+  .dome-line {
+    fill: none;
+    stroke: var(--olive-bright);
+    stroke-width: 4;
+    stroke-dasharray: 16 12;
+    stroke-linecap: round;
+  }
+  .dome-label,
+  .chip-label,
+  .cloud-label,
+  .note-title {
+    font-family: var(--font-body);
+    font-weight: 600;
+  }
+  .dome-label {
+    fill: var(--olive-bright);
+    font-size: 22px;
+  }
+  .ground {
+    stroke: var(--deep-border);
+    stroke-width: 2;
+  }
+  .note-card {
+    fill: var(--deep-surface);
+    stroke: var(--deep-border);
+    stroke-width: 2;
+  }
+  .note {
+    transform: rotate(-4deg);
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .note-title {
+    fill: var(--deep-text);
+    font-size: 16px;
+  }
+  .note-line {
+    stroke: var(--deep-muted);
+    stroke-width: 4;
+    stroke-linecap: round;
+    opacity: 0.6;
+  }
+  .lock-body {
+    fill: var(--accent);
+  }
+  .lock-shackle {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 4;
+  }
+  .chip-body {
+    fill: var(--olive);
+    stroke: var(--text);
+    stroke-width: 4;
+  }
+  .chip-pins rect {
+    fill: var(--deep-text);
+  }
+  .chip-eye {
+    fill: var(--text);
+  }
+  .chip-smile {
+    fill: none;
+    stroke: var(--text);
+    stroke-width: 4;
+    stroke-linecap: round;
+  }
+  .chip-label {
+    fill: var(--deep-text);
+    font-size: 15px;
+  }
+  .cloud-body {
+    fill: var(--deep-text);
+    stroke: var(--text);
+    stroke-width: 3;
+  }
+  .cloud-eye {
+    fill: none;
+    stroke: var(--text);
+    stroke-width: 3;
+    stroke-linecap: round;
+  }
+  .cloud-label {
+    fill: var(--deep-muted);
+    font-size: 15px;
+  }
+  .bump path {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 4;
+    stroke-linecap: round;
+  }
+  .bump {
+    opacity: 0;
+  }
+  .cloud,
+  .quokka,
+  .lock-shackle {
+    transform-box: fill-box;
+  }
+
+  /* Once, when the scene comes into view: the quokka hops home, the note slides in and locks,
+     the clouds come for it, bump the dome, and back off. */
+  @media (prefers-reduced-motion: no-preference) {
+    :global(.js) .scene:global(.is-visible) .quokka {
+      transform-origin: 50% 100%;
+      animation: hop-home 800ms cubic-bezier(0.34, 1.5, 0.64, 1) 200ms backwards;
+    }
+    :global(.js) .scene:global(.is-visible) .note {
+      animation: note-in 700ms cubic-bezier(0.2, 0.7, 0.2, 1) 500ms backwards;
+    }
+    :global(.js) .scene:global(.is-visible) .lock-shackle {
+      animation: lock-shut 260ms ease-in 1250ms backwards;
+    }
+    :global(.js) .scene:global(.is-visible) .chip {
+      transform-box: fill-box;
+      transform-origin: 50% 100%;
+      animation: pop 520ms cubic-bezier(0.34, 1.6, 0.64, 1) 900ms backwards;
+    }
+    :global(.js) .scene:global(.is-visible) .cloud-left {
+      animation: bump-left 1900ms cubic-bezier(0.3, 0.6, 0.3, 1) 1300ms backwards;
+    }
+    :global(.js) .scene:global(.is-visible) .cloud-right {
+      animation: bump-right 1900ms cubic-bezier(0.3, 0.6, 0.3, 1) 1500ms backwards;
+    }
+    :global(.js) .scene:global(.is-visible) .bump-left {
+      animation: flash 1900ms linear 1300ms;
+    }
+    :global(.js) .scene:global(.is-visible) .bump-right {
+      animation: flash 1900ms linear 1500ms;
+    }
+  }
+  @keyframes hop-home {
+    0% {
+      transform: translateY(60px) scale(0.92, 1.06);
+      opacity: 0;
+    }
+    55% {
+      transform: translateY(-14px);
+      opacity: 1;
+    }
+    80% {
+      transform: translateY(0) scale(1.05, 0.94);
+    }
+  }
+  @keyframes note-in {
+    from {
+      transform: translateX(-160px) rotate(-14deg);
+      opacity: 0;
+    }
+  }
+  @keyframes lock-shut {
+    from {
+      transform: translateY(-8px);
+    }
+  }
+  @keyframes pop {
+    from {
+      transform: scale(0.4);
+      opacity: 0;
+    }
+  }
+  @keyframes bump-left {
+    0% {
+      transform: translate(-200px, -90px);
+      opacity: 0;
+    }
+    45% {
+      transform: translate(46px, 58px);
+      opacity: 1;
+    }
+    62% {
+      transform: translate(-14px, -10px);
+    }
+    100% {
+      transform: none;
+    }
+  }
+  @keyframes bump-right {
+    0% {
+      transform: translate(200px, -80px);
+      opacity: 0;
+    }
+    45% {
+      transform: translate(-58px, 70px);
+      opacity: 1;
+    }
+    62% {
+      transform: translate(12px, -8px);
+    }
+    100% {
+      transform: none;
+    }
+  }
+  @keyframes flash {
+    0%,
+    42% {
+      opacity: 0;
+    }
+    48% {
+      opacity: 1;
+    }
+    70%,
+    100% {
+      opacity: 0;
+    }
+  }
+</style>

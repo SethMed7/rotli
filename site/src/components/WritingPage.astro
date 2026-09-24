@@ -26,16 +26,29 @@ interface Props {
   toc?: { slug: string; text: string }[];
   /** Let the body use the full page width (index pages, choosers). */
   wide?: boolean;
+  /** Center the head and the reading column on the page (About). */
+  center?: boolean;
 }
 
-const { title, description, canonicalPath, section, crumbs = [], kicker, heading, lede, toc = [], wide = false } =
-  Astro.props;
+const {
+  title,
+  description,
+  canonicalPath,
+  section,
+  crumbs = [],
+  kicker,
+  heading,
+  lede,
+  toc = [],
+  wide = false,
+  center = false,
+} = Astro.props;
 const hasToc = toc.length > 1;
 ---
 
 <Base title={title} description={description} canonicalPath={canonicalPath} noindex={!site.indexable}>
   <SiteHeader current={section} />
-  <main id="content" class="wrap writing">
+  <main id="content" class:list={['wrap writing', { center }]}>
     <header class="writing-head">
       {
         crumbs.length > 0 && (
@@ -53,6 +66,7 @@ const hasToc = toc.length > 1;
       <h1>{heading}</h1>
       {lede && <p class="lede">{lede}</p>}
     </header>
+    <slot name="scene" />
     <div class:list={['writing-body', { 'has-toc': hasToc, wide }]}>
       {
         hasToc && (
@@ -247,5 +261,17 @@ const hasToc = toc.length > 1;
     padding-left: 1.1rem;
     border-left: 3px solid var(--accent);
     color: var(--text-muted);
+  }
+  /* Centered pages: the head, the scene, and one reading column share the page's middle. */
+  .center .writing-head {
+    display: grid;
+    justify-items: center;
+    text-align: center;
+  }
+  .center .writing-head .lede {
+    margin-inline: auto;
+  }
+  .center .writing-body {
+    justify-content: center;
   }
 </style>

@@ -75,16 +75,19 @@
 		@captures path /rotli-app-*.png /rotli-playground*.png
 		header @captures Cache-Control "public, max-age=86400, stale-while-revalidate=86400"
 
-		# The launch film (same-origin only; CSP media-src 'self'). The caddy:alpine
-		# image ships no /etc/mime.types and Go's built-in table knows neither .mp4
-		# nor .vtt, so the types are explicit: with X-Content-Type-Options: nosniff a
-		# captions track that is not text/vtt is refused by browsers. file_server
-		# answers Range requests, which native <video> controls need for seeking.
+		# The films (same-origin only; CSP media-src 'self'): the holding page's
+		# launch film in /media/ and the studio's story film and episodes in
+		# /media/story/. The caddy:alpine image ships no /etc/mime.types; Go's
+		# built-in table knows .mp4 but not .vtt, and with X-Content-Type-Options:
+		# nosniff a captions track that is not text/vtt is refused by browsers, so
+		# both types are explicit. A path matcher's middle `*` never crosses a `/`,
+		# hence one pattern per folder. file_server answers Range requests, which
+		# native <video> controls need for seeking.
 		@media path /media/*
 		header @media Cache-Control "public, max-age=86400, stale-while-revalidate=86400"
-		@mp4 path /media/*.mp4
+		@mp4 path /media/*.mp4 /media/story/*.mp4
 		header @mp4 Content-Type "video/mp4"
-		@vtt path /media/*.vtt
+		@vtt path /media/*.vtt /media/story/*.vtt
 		header @vtt Content-Type "text/vtt; charset=utf-8"
 
 		# The dev site is never indexed; the build already emits noindex meta and a

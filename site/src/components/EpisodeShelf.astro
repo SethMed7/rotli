@@ -1,0 +1,145 @@
+---
+// "Rotli in 30 seconds": the studio's eight short episodes in one player, with the series
+// listed beside it. No film downloads until an episode is played (the poster and the
+// thumbnails do load); choosing one plays it with sound and native controls. Without script
+// each episode is a plain link to its film.
+import { episodes } from '../films';
+
+const [first] = episodes;
+---
+
+<section class="section shelf" id="episodes" aria-labelledby="episodes-title">
+  <div class="wrap">
+    <header class="section-head">
+      <h2 class="section-title" id="episodes-title">Rotli in <span class="inked">30 seconds.</span></h2>
+      <p class="section-lede">Eight short films, one idea each. Pick one.</p>
+    </header>
+    <div class="shelf-grid" data-shelf>
+      <figure class="shelf-player">
+        <video controls playsinline preload="none" poster={first.poster} width="1920" height="1080" aria-label={first.label}>
+          <source src={first.src} type="video/mp4" />
+        </video>
+      </figure>
+      <ol class="shelf-list">
+        {
+          episodes.map((ep, i) => (
+            <li>
+              <a
+                href={ep.src}
+                data-src={ep.src}
+                data-poster={ep.poster}
+                data-label={ep.label}
+                aria-current={i === 0 ? 'true' : undefined}
+              >
+                <img src={ep.thumb} width="480" height="270" alt="" loading="lazy" decoding="async" />
+                <span class="shelf-text">
+                  <span class="shelf-n">Episode {ep.n}</span>
+                  <span class="shelf-title">{ep.title}</span>
+                </span>
+              </a>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </div>
+</section>
+
+<script>
+  const shelf = document.querySelector<HTMLElement>('[data-shelf]');
+  const video = shelf?.querySelector('video');
+  const links = [...(shelf?.querySelectorAll<HTMLAnchorElement>('.shelf-list a') ?? [])];
+  if (shelf && video) {
+    for (const link of links) {
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        links.forEach((other) => other.removeAttribute('aria-current'));
+        link.setAttribute('aria-current', 'true');
+        const src = link.dataset.src!;
+        if (video.currentSrc.endsWith(src) && !video.ended) {
+          void video.play();
+          return;
+        }
+        video.pause();
+        video.poster = link.dataset.poster!;
+        video.setAttribute('aria-label', link.dataset.label!);
+        video.src = src;
+        video.load(); // drop the previous episode's fetch before the next one starts
+        video.muted = false;
+        void video.play();
+      });
+    }
+  }
+</script>
+
+<style>
+  .shelf-grid {
+    display: grid;
+    gap: clamp(1.25rem, 3vw, 2rem);
+    align-items: start;
+  }
+  .shelf-player {
+    margin: 0;
+  }
+  video {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-frame);
+    background: var(--surface-2);
+  }
+  .shelf-list {
+    display: grid;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .shelf-list a {
+    display: grid;
+    grid-template-columns: 104px 1fr;
+    gap: 0.85rem;
+    align-items: center;
+    padding: 0.4rem;
+    border-radius: 12px;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .shelf-list a:hover {
+    background: var(--surface-2);
+  }
+  /* The episode on the player: a tinted row, not a checkmark. */
+  .shelf-list a[aria-current='true'] {
+    background: var(--tint);
+  }
+  .shelf-list a:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .shelf-list img {
+    width: 104px;
+    height: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .shelf-text {
+    display: grid;
+    gap: 0.1rem;
+  }
+  .shelf-n {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+  .shelf-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  @media (min-width: 1000px) {
+    .shelf-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(17rem, 22rem);
+    }
+  }
+</style>
