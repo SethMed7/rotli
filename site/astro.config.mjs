@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -38,9 +38,19 @@ function cspInlineStyleGuard() {
           }
         };
         walk(root);
+        // A `:global(...)` that survives into the built CSS was never transformed (Astro does
+        // not rewrite it inside `:has()` and similar), so the browser drops the whole rule.
+        const cssDir = join(root, "_astro");
+        if (existsSync(cssDir)) {
+          for (const name of readdirSync(cssDir)) {
+            if (name.endsWith(".css") && readFileSync(join(cssDir, name), "utf8").includes(":global(")) {
+              offenders.push(`_astro/${name}: a literal :global( survived the build (move the rule into <style is:global>)`);
+            }
+          }
+        }
         if (offenders.length > 0) {
           throw new Error(
-            `Inline styles would be blocked by the production Content-Security-Policy (style-src 'self'):\n  ${offenders.join("\n  ")}\nMove them into component <style> rules (Astro extracts those into a stylesheet).`,
+            `Built styles would break in production:\n  ${offenders.join("\n  ")}\nInline styles are blocked by the Content-Security-Policy (style-src 'self'): move them into component <style> rules. A literal :global( left in built CSS is dropped by the browser: move that rule into <style is:global>.`,
           );
         }
       },
