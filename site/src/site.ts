@@ -44,6 +44,8 @@ export const WEB_APP_PATH = '/app/';
 export const LICENSE_URL = `${GITHUB_URL}/blob/main/LICENSE`;
 export const PRIVACY_URL = `${GITHUB_URL}/blob/main/PRIVACY.md`;
 export const ROADMAP_URL = `${GITHUB_URL}/blob/main/ROADMAP.md`;
+/** The open motion studio: the films and posts behind this site, made in code. */
+export const STUDIO_URL = 'https://studio.rotli.co/';
 
 /**
  * The earlier launch film. The reviewed export lives in `public/media/`; the
