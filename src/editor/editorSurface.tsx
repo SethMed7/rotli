@@ -42,6 +42,7 @@ import {
   useDocumentSaveError,
   useDocumentLines,
 } from "./model";
+import { scrollTopClashes } from "./scrollTopLane";
 
 /** Below this pane width the format bar collapses its end groups into ⋯. */
 const FORMAT_BAR_COLLAPSE_PX = 440;
@@ -157,6 +158,7 @@ export function EditorSurface({
   const [restoring, setRestoring] = useState(false);
   const [chatBusy, setChatBusy] = useState(false);
   const [narrow, setNarrow] = useState(false);
+  const [liftScrollTop, setLiftScrollTop] = useState(false);
   const [headerCompact, setHeaderCompact] = useState(false);
   // the caret's line + column, reported by CmEditor — the format bar's active
   // states read it (bold-on, heading level, list-on)
@@ -343,16 +345,23 @@ export function EditorSurface({
     [noteId],
   );
 
+  // the note body (and with it the bar) mounts after the first render
+  const noteReady = !!note;
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
       setNarrow(el.clientWidth < FORMAT_BAR_COLLAPSE_PX);
       setHeaderCompact(el.clientWidth < 760);
+      const bar = el.querySelector<HTMLElement>(".fmtbar");
+      setLiftScrollTop(scrollTopClashes(el.clientWidth, bar?.offsetWidth ?? 0));
     });
     ro.observe(el);
+    // the bar changes width on its own (collapsing to ⋯), so watch it too
+    const bar = el.querySelector(".fmtbar");
+    if (bar) ro.observe(bar);
     return () => ro.disconnect();
-  }, []);
+  }, [formatBarVisible, noteReady]);
 
   if (!note) return <div className="editor" ref={rootRef} />;
 
@@ -379,7 +388,12 @@ export function EditorSurface({
   const shelfLocation = brainLocationLabel(note.folderId);
 
   return (
-    <div className="editor" ref={rootRef} style={{ "--cm-measure": `${measureWidth}px` } as CSSProperties}>
+    <div
+      className="editor"
+      ref={rootRef}
+      data-lift-scroll-top={liftScrollTop || undefined}
+      style={{ "--cm-measure": `${measureWidth}px` } as CSSProperties}
+    >
       {/* right-click the header chrome (never the text body — that keeps
           selection/spellcheck) → the note's lifecycle/security menu. Gated to
           the main editor: the Quick window
