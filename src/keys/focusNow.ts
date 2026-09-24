@@ -8,7 +8,7 @@ import { useUiStore } from "../state/ui";
  * this pane id, and "the focused note" there is the note it has open. */
 export const QUICK_PANE_ID = "quick";
 
-const inQuickWindow = (): boolean => usePanesStore.getState().focusedPaneId === QUICK_PANE_ID;
+export const inQuickWindow = (): boolean => usePanesStore.getState().focusedPaneId === QUICK_PANE_ID;
 
 /** Note chords stand down while Breve owns the content area (main only —
  * the Quick Note window is always a note). */

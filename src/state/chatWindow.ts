@@ -109,9 +109,13 @@ export function regroupChat(): void {
 
 /** Attach this webview's half of the protocol. Returns the teardown.
  * `fileIntoMain` is main's writer for additions a non-main window computed
- * (state/main.ts addFragmentToMain) — passed in, so this module never loads the
- * Main store. */
-export function attachChatWindow(fileIntoMain: (fragment: MainNode[]) => void): () => void {
+ * (state/main.ts addFragmentToMain), and `openNoteChat` answers the Quick
+ * Note's ⌘⇧C — both passed in, so this module never loads the Main store or
+ * the chat composition. */
+export function attachChatWindow(
+  fileIntoMain: (fragment: MainNode[]) => void,
+  openNoteChat: (id: string, create: boolean) => void,
+): () => void {
   const surface = windowSurface();
   if (surface === "main") {
     const offMessages = onChatWindow((message) => {
@@ -120,6 +124,7 @@ export function attachChatWindow(fileIntoMain: (fragment: MainNode[]) => void): 
       if (message.kind === "tabs") {
         if (store.detached) store.setRefs(message.refs);
       } else if (message.kind === "file-into-main") fileIntoMain(message.tree);
+      else if (message.kind === "note-chat") openNoteChat(message.id, message.create);
       else if (message.kind === "regrouped") {
         store.setDetached(false);
         openRefs(message.refs);

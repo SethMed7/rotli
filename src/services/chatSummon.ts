@@ -9,6 +9,7 @@ import type { MemexChatSummary } from "../lib/tauri";
 import { showMainWindow } from "../lib/tauri";
 import { activeInstance } from "../memex/config";
 import { listChats, loadConfig } from "../memex/service";
+import { openChatForNoteId } from "../noteChat/composition";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 
@@ -20,6 +21,21 @@ export function newestChatSlug(chats: Pick<MemexChatSummary, "slug" | "modifiedM
     if (!best || c.modifiedMs > best.modifiedMs) best = c;
   }
   return best?.slug ?? null;
+}
+
+/** MAIN: ⌘⇧C in the Quick Note, which cannot host a chat — open that note's
+ * chat here and bring this window forward (2026-09-24). */
+export function openNoteChatFromQuickNote(id: string, create: boolean): void {
+  useUiStore.getState().setSettingsOpen(false);
+  void openChatForNoteId(id, { create })
+    .then(showMainWindow)
+    .catch((error: unknown) =>
+      useUiStore
+        .getState()
+        .setRowActionError(
+          `Couldn’t open a chat — ${error instanceof Error ? error.message : String(error)}`,
+        ),
+    );
 }
 
 /** `here`: the summon was routed to THIS window (the Chat window while Chat
