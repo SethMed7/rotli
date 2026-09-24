@@ -9,6 +9,7 @@ import type { MemexInstance } from "../memex/config";
 import { listChats, loadConfig, setChatAttachedTo, writeChat } from "../memex/service";
 import { invalidateMemex } from "../memex/useMemex";
 import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
+import { notesService } from "../services/notes";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
@@ -72,6 +73,16 @@ function showChat(slug: string, noteId: string, vaultId?: string): void {
 /** Open a SPECIFIC chat of this note (a picker row). */
 export function openNoteChat(note: NoteSummary, slug: string): void {
   showChat(slug, note.id);
+}
+
+/** Open a note's chat by id — for callers that hold only the id (a chord, or
+ * the Quick Note's request to main). A note that is gone opens nothing and
+ * answers false. */
+export async function openChatForNoteId(id: string, opts?: { create?: boolean }): Promise<boolean> {
+  const note = (await notesService.listNotes()).find((n) => n.id === id);
+  if (!note) return false;
+  await openChatForNote(note, opts);
+  return true;
 }
 
 export async function openChatForNote(note: NoteSummary, opts?: { create?: boolean }): Promise<void> {

@@ -6,6 +6,8 @@
 
 import { expect, test } from "@playwright/test";
 
+import { gotoApp } from "./support";
+
 test("a blank quick note is a New note, never an Untitled row, and ⌘ shows its keys", async ({ page }) => {
   await page.goto("/?window=quick");
   const win = page.locator(".quick-window");
@@ -76,4 +78,29 @@ test("in the Quick Note, ⌘1–⌘9 and ⌘⇧1–⌘⇧9 open picker rows", as
   // with the picker closed the number chords do nothing
   await page.keyboard.press("Meta+3");
   await expect(title).toHaveText(tenth);
+});
+
+test("⌘⇧A opens and closes the Aa panel, in the Quick Note and in main", async ({ page }) => {
+  await page.goto("/?window=quick");
+  await page.locator(".quick-window").getByRole("button", { name: "New note" }).click();
+  await page.locator(".cm-content").click();
+  await page.keyboard.type("Text size, please");
+  const panel = page.getByRole("dialog", { name: "Typography" });
+  await page.keyboard.press("Meta+Shift+A");
+  await expect(panel).toBeVisible();
+  await page.keyboard.press("Meta+Shift+A");
+  await expect(panel).toHaveCount(0);
+
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  await page.locator(".cm-content").last().click();
+  await page.keyboard.type("And in main");
+  await page.keyboard.press("Meta+Shift+A");
+  await expect(panel).toBeVisible();
+  await page.keyboard.press("Meta+Shift+A");
+  await expect(panel).toHaveCount(0);
+  // held ⌘ badges the Aa chip with its chord
+  await page.keyboard.down("Meta");
+  await expect(page.locator(".hkbadge", { hasText: /^(⌘⇧|⇧⌘)A$/ })).toBeVisible();
+  await page.keyboard.up("Meta");
 });

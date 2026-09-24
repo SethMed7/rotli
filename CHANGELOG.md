@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-24
+
+### Added
+
+- **Blossom, a seventh theme family.** Light pink by day and a deep plum-rose
+  at night, tuned like Iris: soft, never candy, and every text role clears AA
+  contrast. Choose it in Settings → Appearance or cycle to it with the
+  titlebar sun, between Iris and Midnight.
+
 ### Changed
 
 - **rotli.co now tells the story the way the film does.** The landing page
@@ -20,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   live in one player at the top of Features, and About and Privacy open with
   scenes from the island. Motion plays once and rests, and reduced motion
   shows everything at rest.
+- **⌘⇧A opens the Aa panel** (text size, measure, view, blocks, and Secure)
+  for the note you are in, in the main window and the Quick Note; press it
+  again to close. Archive no longer has a default shortcut. It is still in ⌘K,
+  and you can give it one in Settings → Keybindings.
+- **⌘⇧C works in the Quick Note.** It opens the note's chat where your chats
+  live: in the main window, brought forward, or in the Chat window when you
+  have popped Chat out. It is the same chat ⌘⇧C opens from the main window.
 
 ## [1.4.2] - 2026-09-23
 

@@ -27,6 +27,7 @@ describe("theme presentation", () => {
       "Ocean",
       "Grove",
       "Iris",
+      "Blossom",
       "Midnight",
     ]);
     expect(

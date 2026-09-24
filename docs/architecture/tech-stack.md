@@ -39,7 +39,7 @@ MCP adapters (`src-tauri/src/workspace.rs`).
 | Async data | TanStack React Query 5 | `src/` |
 | Styling | Plain CSS per surface on semantic tokens. No Tailwind, no CSS-in-JS, no UI component library | `src/styles/`, tokens in `src/brand/tokens/` |
 | Typography | Satoshi, General Sans, Baloo 2 embedded as local fonts | `src/brand/fonts/` |
-| Themes | Six families, each tuned light and dark, as CSS custom properties | `src/styles/themes.css` |
+| Themes | Seven families, each tuned light and dark, as CSS custom properties | `src/styles/themes.css` |
 
 Brand implementation detail is [`../../src/brand/README.md`](../../src/brand/README.md).
 Interaction and visual law is [`../../DESIGN.md`](../../DESIGN.md).

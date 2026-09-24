@@ -11,8 +11,8 @@ if (!["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname) || origin.use
   throw new Error("Site captures must use a local browser twin.");
 const output = join(import.meta.dir, "../site/public");
 await mkdir(output, { recursive: true });
-// The hero and the social card use Warm Light; the theme studio's twelve
-// environments are the separate public/themes/ captures.
+// The social card uses Warm Light; the theme studio's environments are the
+// separate public/themes/ captures.
 const targets = new Map([["Warm Light", "warm-light"]]);
 const browser = await chromium.launch();
 try {
@@ -43,7 +43,7 @@ try {
     console.log(`${filename}: ${metadata.width} × ${metadata.height}`);
   }
   const captured = new Set();
-  for (let step = 0; step < 12; step++) {
+  for (let step = 0; step < 14; step++) {
     const name = (await theme.getAttribute("aria-label")).replace("Theme — ", "");
     if (targets.has(name)) {
       await capture(`rotli-app-${targets.get(name)}@3x.png`, 1280, 800);

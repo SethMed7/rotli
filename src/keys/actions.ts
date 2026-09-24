@@ -7,6 +7,7 @@ import {
 // listeners elsewhere. The dispatcher routes by surface; Settings lists
 // only capabilities enabled in this build.
 import { type BlockToggle, type HeadingLevel, type InlineMark, activeEditor } from "../editor/commands";
+import { sendChatWindow } from "../lib/chatWindowBridge";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import {
   corpusFrontmatter,
@@ -24,13 +25,14 @@ import {
   requestNamedItemCreation,
 } from "../newItems/composition";
 import { type NewItemKind, isNameFirstKind, isNewItemAvailable } from "../newItems/model";
-import { openChatForNote } from "../noteChat/composition";
+import { openChatForNoteId } from "../noteChat/composition";
 import { summonChat } from "../services/chatSummon";
 import { focusChatWindow } from "../services/chatWindowShell";
 import { invalidateNotes, lifecycleError } from "../services/hooks";
 import { archiveNoteWithImages, trashNoteWithImages } from "../services/noteLifecycle";
 import { notesService } from "../services/notes";
 import { trashSystemSelection } from "../services/systemTrash";
+import { toggleAaPanel } from "../state/aaPanel";
 import { reconnectActiveVault } from "../state/activeVault";
 import { useChatWindowStore } from "../state/chatWindowStore";
 import { chatRuntimeEnabled } from "../state/helperLink";
@@ -44,7 +46,7 @@ import { registerAppLinkActions } from "./appLinkActions";
 import { registerCaptureActions } from "./captureActions";
 import { registerChatWindowActions } from "./chatWindowActions";
 import { EDITOR_ACTION } from "./editorActionIds";
-import { focusedNoteIdNow, notesWorkspaceActive } from "./focusNow";
+import { focusedNoteIdNow, inQuickWindow, notesWorkspaceActive } from "./focusNow";
 import { captureHandle, setupHandle } from "./handles";
 import { registerLeaderActions } from "./leaderActions";
 import { registerNavArrowActions } from "./navArrows";
@@ -286,6 +288,14 @@ export function registerDefaultActions(): void {
     },
   });
   registerAction({
+    id: "editor.typography",
+    title: "Text & view settings (Aa)",
+    defaultChord: "Meta+Shift+A",
+    run: () => {
+      if (notesWorkspaceActive() && focusedNoteIdNow()) toggleAaPanel(usePanesStore.getState().focusedPaneId);
+    },
+  });
+  registerAction({
     id: "editor.toggleMetadata",
     title: "Toggle file metadata",
     defaultChord: "Meta+Shift+M",
@@ -382,7 +392,9 @@ export function registerDefaultActions(): void {
   registerAction({
     id: "notes.archive",
     title: "Archive note",
-    defaultChord: "Meta+Shift+A",
+    // ⌘⇧A opens the Aa panel since 2026-09-24 (the owner's call); Archive
+    // stays in ⌘K and rebindable, like Trash
+    defaultChord: null,
     run: () => {
       if (!notesWorkspaceActive()) return;
       const id = focusedNoteIdNow();
@@ -768,19 +780,15 @@ export function registerDefaultActions(): void {
     if (!notesWorkspaceActive()) return;
     const id = focusedNoteIdNow();
     if (!id) return;
-    void notesService
-      .listNotes()
-      .then((all) => {
-        const note = all.find((n) => n.id === id);
-        if (note) return openChatForNote(note, { create });
-      })
-      .catch((error) =>
-        useUiStore
-          .getState()
-          .setRowActionError(
-            `Couldn’t open a chat — ${error instanceof Error ? error.message : String(error)}`,
-          ),
-      );
+    // the Quick Note cannot host a chat: main opens it and comes forward
+    if (inQuickWindow()) return sendChatWindow({ kind: "note-chat", id, create });
+    void openChatForNoteId(id, { create }).catch((error) =>
+      useUiStore
+        .getState()
+        .setRowActionError(
+          `Couldn’t open a chat — ${error instanceof Error ? error.message : String(error)}`,
+        ),
+    );
   };
   registerAction({
     enabled: chatRuntimeEnabled,

@@ -12,9 +12,14 @@ const realBridge = { ...liveBridge };
 
 let sent: Array<{ kind: string; refs?: unknown }> = [];
 let shown = 0;
+let onMessage: ((message: liveBridge.ChatWindowMessage) => void) | null = null;
 void mock.module("../lib/chatWindowBridge", () => ({
   ...realBridge,
   sendChatWindow: (message: { kind: string }) => sent.push(message),
+  onChatWindow: (cb: typeof onMessage) => {
+    onMessage = cb;
+    return () => {};
+  },
   showChatWindow: async () => {
     shown += 1;
   },
@@ -100,9 +105,32 @@ describe("pulling Chat out of main", () => {
   });
 });
 
+describe("main answering the Quick Note", () => {
+  test("⌘⇧C there reaches main's chat opener with the note and whether to start another", () => {
+    const opened: Array<[string, boolean]> = [];
+    const detach = attachChatWindow(
+      () => {},
+      (id, create) => opened.push([id, create]),
+    );
+    try {
+      onMessage?.({ kind: "note-chat", id: "groceries", create: false });
+      onMessage?.({ kind: "note-chat", id: "groceries", create: true });
+      expect(opened).toEqual([
+        ["groceries", false],
+        ["groceries", true],
+      ]);
+    } finally {
+      detach();
+    }
+  });
+});
+
 describe("main while Chat is out", () => {
   test("a chat tab that turns up in main anyway (⌘⇧T, a split) moves to the window", () => {
-    const detach = attachChatWindow(() => {});
+    const detach = attachChatWindow(
+      () => {},
+      () => {},
+    );
     try {
       expect(popOutChat()).toBeNull();
       sent = [];

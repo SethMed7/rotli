@@ -28,7 +28,11 @@ export type ChatWindowMessage =
   /** any window that is not main → main: file these into Main. A window that is
    * not main never hydrates Main, so any tree it computes is purely additions
    * (a chat's artifact under its folder); main merges them into the real tree. */
-  | { kind: "file-into-main"; tree: MainNode[] };
+  | { kind: "file-into-main"; tree: MainNode[] }
+  /** Quick Note → main (⌘⇧C): open this note's chat and come forward — the
+   * Quick Note shows one editor and cannot host a chat. `create` starts
+   * another chat rather than continuing the latest. */
+  | { kind: "note-chat"; id: string; create: boolean };
 
 export function sendChatWindow(message: ChatWindowMessage): void {
   if (isTauri()) void emit("rotli:chat-window", message);

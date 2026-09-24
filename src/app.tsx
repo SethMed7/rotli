@@ -61,7 +61,7 @@ import { onQuitFlushFailure } from "./lib/quitFlush";
 import { isOnboardingReview } from "./lib/reviewMode";
 import { fileQuickNoteInMain } from "./newItems/composition";
 import { createVaultCapture } from "./services/captureRouting";
-import { summonChat } from "./services/chatSummon";
+import { openNoteChatFromQuickNote, summonChat } from "./services/chatSummon";
 import { DEST } from "./services/destinations";
 import { invalidateFolders, invalidateJournal, invalidateNotes } from "./services/hooks";
 import { adoptPendingAtOrganize } from "./services/librarianAutoAdopt";
@@ -549,7 +549,7 @@ export default function App() {
   }, [surface]);
 
   // Chat in its own window: main records, the chat window reports (state/chatWindow.ts)
-  useEffect(() => attachChatWindow(addFragmentToMain), []);
+  useEffect(() => attachChatWindow(addFragmentToMain, openNoteChatFromQuickNote), []);
   // A vault switch rebinds the live Rust default store. Keep all native windows
   // alive and replace only their vault-scoped caches/projections.
   useEffect(

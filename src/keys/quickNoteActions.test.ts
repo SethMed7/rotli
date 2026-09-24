@@ -1,14 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
+import { useAaPanelRequest } from "../state/aaPanel";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { registerDefaultActions } from "./actions";
-import { normalizeChord } from "./chords";
+import { formatChord, normalizeChord } from "./chords";
 import { QUICK_PANE_ID, focusedNoteIdNow, notesWorkspaceActive } from "./focusNow";
 import { setQuickHandle } from "./handles";
 import { TOGGLE_SECURE_ACTION } from "./noteProtectionActions";
 import { QUICK_PICK_ROWS, quickPickChord } from "./quickNoteActions";
-import { attachDispatcher, claimingAction, dispatch } from "./registry";
+import { attachDispatcher, claimingAction, currentChord, dispatch } from "./registry";
 
 registerDefaultActions();
 
@@ -47,6 +48,37 @@ describe("the Quick Note's own keys", () => {
     expect(opened).toEqual([1, 9]);
     on("main");
     expect(claimingAction(quickPickChord(1))?.id).toBe("tabs.jump2");
+  });
+});
+
+describe("Archive", () => {
+  test("gave ⌘⇧A up to the Aa panel and ships with no chord", () => {
+    expect(currentChord("notes.archive")).toBeNull();
+  });
+});
+
+describe("⌘⇧A opens Aa and ⌘⇧C opens the note's chat (2026-09-24)", () => {
+  test("⌘⇧A is the Aa panel, in main and in the Quick Note", () => {
+    const chord = currentChord("editor.typography") ?? "";
+    expect(formatChord(chord)).toBe("⌘⇧A");
+    expect(claimingAction(normalizeChord(chord))?.id).toBe("editor.typography");
+    on("quick");
+    expect(claimingAction(normalizeChord(chord))?.id).toBe("editor.typography");
+  });
+
+  test("⌘⇧C, the note's chat, is live in the Quick Note", () => {
+    const chord = currentChord("note.chat") ?? "";
+    expect(formatChord(chord)).toBe("⌘⇧C");
+    on("quick");
+    expect(claimingAction(normalizeChord(chord))?.id).toBe("note.chat");
+  });
+
+  test("⌘⇧A asks the focused pane's editor — the Quick Note's own — to toggle its panel", () => {
+    usePanesStore.setState({ focusedPaneId: QUICK_PANE_ID });
+    useUiStore.setState({ quickActiveId: "quick-note-1" });
+    const before = useAaPanelRequest.getState().request?.nonce ?? 0;
+    dispatch("editor.typography");
+    expect(useAaPanelRequest.getState().request).toEqual({ paneId: QUICK_PANE_ID, nonce: before + 1 });
   });
 });
 
