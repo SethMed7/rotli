@@ -216,9 +216,15 @@ export function QuickNote() {
   // in-flight guard so a burst of summons can't spawn duplicate blank notes (QN-1)
   const creatingRef = useRef(false);
 
+  // the note the shield last showed: only a different note starts from off; a
+  // notes-list refresh (after ⌘⇧L) re-reads without blanking the shield
+  const shieldNoteRef = useRef<string | null>(null);
   useEffect(() => {
     let cancelled = false;
-    setSecure(false);
+    if (shieldNoteRef.current !== activeId) {
+      shieldNoteRef.current = activeId;
+      setSecure(false);
+    }
     if (!activeId) return;
     void corpusFrontmatter(activeId).then((fm) => {
       if (!cancelled) setSecure(fm?.secure ?? false);

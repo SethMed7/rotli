@@ -14,7 +14,43 @@
 import { useMemo } from "react";
 
 import { formatChord } from "../keys/chords";
-import { allActions, currentChord } from "../keys/registry";
+import { type KeyAction, type Surface, allActions, currentChord } from "../keys/registry";
+
+/** Whether this map lists an action: the same surfaces its dispatcher fires
+ * it on — its own, opted in (`also`: ⌘⇧L in the Quick Note), or `shared`
+ * (the editor's format chords). Global chords are OS-side. Pure for tests. */
+export function mapsOn(
+  action: Pick<KeyAction, "surface" | "also" | "shared" | "global">,
+  surface: Surface,
+): boolean {
+  if (action.global === true) return false;
+  return action.shared === true || action.surface === surface || (action.also?.includes(surface) ?? false);
+}
+
+/** The picker's row jumps collapse to one line per half (⌘1–⌘9, ⌘⇧1–⌘⇧9)
+ * only while all nine are bound; after any rebinding each bound jump shows
+ * on its own, so none disappears from the map. */
+export function pickRangeRows(bound: (row: number) => string | null): {
+  ranges: { key: string; title: string; chord: string }[];
+  singles: number[];
+} {
+  const ranges: { key: string; title: string; chord: string }[] = [];
+  const singles: number[] = [];
+  for (const [key, title, from, to] of [
+    ["quick.pick.low", "Picker — open row 1–9", 1, 9],
+    ["quick.pick.high", "Picker — open row 10–18", 10, 18],
+  ] as const) {
+    const rows = Array.from({ length: to - from + 1 }, (_unused, index) => from + index);
+    const first = bound(from);
+    const last = bound(to);
+    if (first && last && rows.every((row) => bound(row))) {
+      ranges.push({ key, title, chord: `${first}–${last}` });
+    } else {
+      singles.push(...rows.filter((row) => bound(row)));
+    }
+  }
+  return { ranges, singles };
+}
 
 /** The friendly area cards, in display order, each matched by id prefix. The
  * representative tab-jump row collapses tabs.jump1…8 into one line. */
@@ -54,9 +90,7 @@ export function WhichKey({
   const areas = useMemo<WkArea[]>(() => {
     // only this surface's non-global, currently-bound actions — unbound ones
     // are noise in a "what can I press" map (modules.* / editor.* mostly unbound).
-    const visible = allActions().filter(
-      (a) => a.surface === surface && a.global !== true && currentChord(a.id) !== null,
-    );
+    const visible = allActions().filter((a) => mapsOn(a, surface) && currentChord(a.id) !== null);
 
     const out: WkArea[] = [];
     for (const area of AREAS) {
@@ -81,14 +115,15 @@ export function WhichKey({
         const range = first && last ? `${formatChord(first)}–${formatChord(last)}` : "⌘1–⌘8";
         rows.push({ key: "tabs.jump", title: "Go to tab 1–8", chord: range });
       }
-      for (const [key, title, from, to] of [
-        ["quick.pick.low", "Picker — open row 1–9", 1, 9],
-        ["quick.pick.high", "Picker — open row 10–18", 10, 18],
-      ] as const) {
-        const first = currentChord(`quick.pick${from}`);
-        const last = currentChord(`quick.pick${to}`);
-        if (picks.length > 0 && first && last) {
-          rows.push({ key, title, chord: `${formatChord(first)}–${formatChord(last)}` });
+      if (picks.length > 0) {
+        const bound = (row: number) => {
+          const chord = currentChord(`quick.pick${row}`);
+          return chord ? formatChord(chord) : null;
+        };
+        const { ranges, singles } = pickRangeRows(bound);
+        rows.push(...ranges);
+        for (const row of singles) {
+          rows.push({ key: `quick.pick${row}`, title: `Picker — open row ${row}`, chord: bound(row) ?? "" });
         }
       }
 
