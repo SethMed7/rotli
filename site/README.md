@@ -286,7 +286,10 @@ silently). Two guards and one rehearsal cover this:
 
 - The Astro build fails if any generated page carries an inline style
   (`astro.config.mjs`, `rotli-csp-inline-style-guard`), and stylesheets are
-  never inlined (`build.inlineStylesheets: 'never'`). This runs in `bun run
+  never inlined (`build.inlineStylesheets: 'never'`). The same build step fails if a literal
+  `:global(` survives into the built CSS (Astro leaves it untransformed inside
+  `:has()`, and the browser then drops the whole rule); such rules belong in a
+  `<style is:global>` block. This runs in `bun run
   verify quality`, in CI, and inside the Railway image build.
 - To rehearse the exact production image, headers included, build and run the
   site's own Dockerfile from the repository root (no version bump, no deploy):
