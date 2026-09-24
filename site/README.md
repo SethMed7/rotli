@@ -400,8 +400,11 @@ bun scripts/capture-site.mjs http://localhost:1430
 bun scripts/build-character-fills.mjs --site
 ```
 
-The capture script uses fresh browser contexts and actual theme, Settings,
-and Playground controls. It waits for fonts, hides hover tooltips, verifies
+It writes `public/rotli-app-warm-light@3x.png` (the hero and the social card)
+and `public/rotli-playground@3x.png` (the coming-soon page); the theme studio's
+`public/themes/` captures are a separate set it does not touch, and the fill
+script makes only the closing card's celebrating quokka. The capture script
+uses fresh browser contexts and actual theme, Settings, and Playground controls. It waits for fonts, hides hover tooltips, verifies
 pixel dimensions, and checks that the tutorial has no files in Main.
 
 [Launch readiness](../docs/architecture/launch-readiness-2026-09-07.md) records
