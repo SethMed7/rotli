@@ -11,14 +11,9 @@ if (!["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname) || origin.use
   throw new Error("Site captures must use a local browser twin.");
 const output = join(import.meta.dir, "../site/public");
 await mkdir(output, { recursive: true });
-const targets = new Map([
-  ["Warm Light", "warm-light"],
-  ["Paper", "paper"],
-  ["Ocean Light", "ocean-light"],
-  ["Grove Dark", "grove-dark"],
-  ["Iris Light", "iris-light"],
-  ["Midnight", "midnight"],
-]);
+// The hero and the social card use Warm Light; the theme studio's twelve
+// environments are the separate public/themes/ captures.
+const targets = new Map([["Warm Light", "warm-light"]]);
 const browser = await chromium.launch();
 try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 3 });
