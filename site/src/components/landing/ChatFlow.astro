@@ -6,12 +6,6 @@
 // (or the note it was started from); the model can create and rewrite notes
 // directly (and, on the Mac, make DOCX documents, PDFs, and boards from a
 // chat); Lock refuses every AI edit, on-device included, in TypeScript and Rust.
-interface Props {
-  /** The landing page shows the conversation and the first two steps only. */
-  compact?: boolean;
-}
-const { compact = false } = Astro.props;
-
 const notesExample = [
   '### Q4 launch',
   '- Mac beta shipped; pricing page in progress.',
@@ -64,8 +58,8 @@ const steps = [
   </figure>
 </div>
 
-<ol class="steps" data-reveal>
-  {(compact ? steps.slice(0, 2) : steps).map((step) => (
+<ol class="steps" data-stagger>
+  {steps.map((step) => (
     <li>
       <span class="n">{step.n}</span>
       <h4>{step.title}</h4>
@@ -74,32 +68,28 @@ const steps = [
   ))}
 </ol>
 
-{
-  !compact && (
-    <div class="chat-detail" data-reveal>
-      <figure class="notes-sample" aria-label="An example of the Conversation notes section a chat keeps">
-        <figcaption>In the chat’s note · updated after every reply</figcaption>
-        <div class="notes-body">
-          <p class="notes-h2">Conversation notes</p>
-          {notesExample.map((line) =>
-            line.startsWith('###') ? <p class="notes-h3">{line.replace('### ', '')}</p> : <p class="notes-li">{line.replace('- ', '')}</p>,
-          )}
-        </div>
-      </figure>
-      <figure class="frame lock">
-        <img
-          src="/shots/lock-menu.webp"
-          width="800"
-          height="1040"
-          alt="A note’s right-click menu in rotli with “Lock — no AI may edit it” and “Mark secure — block remote AI”"
-          loading="lazy"
-          decoding="async"
-        />
-        <figcaption>Right-click any note: Lock stops every AI edit. Mark secure keeps it from remote models.</figcaption>
-      </figure>
+<div class="chat-detail" data-reveal>
+  <figure class="notes-sample" aria-label="An example of the Conversation notes section a chat keeps">
+    <figcaption>In the chat’s note · updated after every reply</figcaption>
+    <div class="notes-body">
+      <p class="notes-h2">Conversation notes</p>
+      {notesExample.map((line) =>
+        line.startsWith('###') ? <p class="notes-h3">{line.replace('### ', '')}</p> : <p class="notes-li">{line.replace('- ', '')}</p>,
+      )}
     </div>
-  )
-}
+  </figure>
+  <figure class="frame lock">
+    <img
+      src="/shots/lock-menu.webp"
+      width="800"
+      height="1040"
+      alt="A note’s right-click menu in rotli with “Lock — no AI may edit it” and “Mark secure — block remote AI”"
+      loading="lazy"
+      decoding="async"
+    />
+    <figcaption>Right-click any note: Lock stops every AI edit. Mark secure keeps it from remote models.</figcaption>
+  </figure>
+</div>
 
 <style>
   .frame {

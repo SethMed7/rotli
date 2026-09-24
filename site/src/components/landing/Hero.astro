@@ -2,32 +2,27 @@
 // The landing hero: one promise, one sentence, the two ways in. It fills the
 // first screen on a faint tile of note, folder, and checklist icons (the same
 // pattern as the link preview, public/social-card.svg) that fades out behind
-// the words. The waving quokka peeks over the product capture, which starts
-// right below the fold. The capture is a real browser demo, never a live vault.
-import waving from '../../../../src/assets/characters/filled/cocoa/waving.webp';
+// the words. Right below them the story film plays (FilmPlayer.astro): muted and once, with
+// "Click for sound" to watch it from the top with its score. The app itself is shown by the
+// episodes further down and the theme preview, so the hero carries no capture.
+//
+// Motion: on arrival the page lands in one short sequence (header and pattern
+// fade in, the two headline lines slide up out of a mask, the rest rises in
+// turn, and the film's clay line inks itself under "Files you keep."). As the visitor
+// scrolls, the film settles into place. Everything plays once and rests,
+// is plain CSS (no script, no inline style, so the production CSP allows it),
+// and reduced motion shows the finished state at once.
 import { site } from '../../site';
 import SiteActions from '../SiteActions.astro';
+import { story } from '../../films';
+import FilmPlayer from '../FilmPlayer.astro';
 
-const promises = [
-  {
-    title: 'Plain files',
-    body: 'Every note is Markdown in a folder you choose. Open it in any editor, back it up any way you like.',
-  },
-  {
-    title: 'No account',
-    body: 'Nothing to sign up for and nothing to sync through. rotli works offline and stays useful without AI.',
-  },
-  {
-    title: 'AI on your terms',
-    body: 'Leave it off, run a model on your Mac, or connect the tools you already use. Secure notes never reach a remote model.',
-  },
-];
 ---
 
 <section class="hero" aria-labelledby="hero-title">
   <div class="hero-pattern" aria-hidden="true"></div>
   <div class="hero-copy">
-    <h1 id="hero-title">Room to think.<br />Files you keep.</h1>
+    <h1 id="hero-title"><span class="line"><span>Room to think.</span></span> <span class="line"><span><span class="inked">Files you keep.</span></span></span></h1>
     <p class="hero-lede">
       The calm notes app for your Mac. Every note is a plain Markdown file in a folder you own, with
       AI only when you ask for it.
@@ -37,28 +32,12 @@ const promises = [
       {site.downloadsEnabled ? 'Free · No account · Works offline' : 'Mac alpha in preparation · Free · No account'}
     </p>
   </div>
-  <img class="hero-quokka" src={waving.src} width="512" height="512" alt="" decoding="async" />
 </section>
 
 <div class="wrap below-fold">
-  <figure class="preview">
-    <img
-      src="/rotli-app-warm-light@3x.png"
-      width="3840"
-      height="2400"
-      alt="The rotli workspace in Warm Light: a sidebar with Home, Chat, All notes, Captures, and Tasks beside a Markdown note with a checklist and a quote"
-      loading="lazy"
-      decoding="async"
-    />
-  </figure>
-  <ul class="promises" aria-label="What rotli promises">
-    {promises.map((promise) => (
-      <li>
-        <h2>{promise.title}</h2>
-        <p>{promise.body}</p>
-      </li>
-    ))}
-  </ul>
+  <div class="hero-film">
+    <FilmPlayer src={story.src} poster={story.poster} label={story.label} />
+  </div>
 </div>
 
 <style>
@@ -66,8 +45,8 @@ const promises = [
     position: relative;
     display: grid;
     place-items: center;
-    min-height: calc(100svh - var(--header-height));
-    padding: clamp(3rem, 8vh, 5rem) var(--gutter) clamp(7.5rem, 16vh, 10rem);
+    min-height: calc(62svh - var(--header-height));
+    padding: clamp(3rem, 8vh, 5rem) var(--gutter) clamp(2rem, 6vh, 4rem);
     overflow: hidden;
     text-align: center;
   }
@@ -112,54 +91,83 @@ const promises = [
     color: var(--text-muted);
     font-size: 0.9rem;
   }
-  /* Peeks up from the bottom edge; the capture below starts where it is cut. */
-  .hero-quokka {
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    width: clamp(150px, 16vw, 200px);
-    height: auto;
-    transform: translate(-50%, 42%);
-  }
 
-  .preview {
-    margin: 0;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-frame);
+  /* The entrance. Every animation fills backwards only, so once it ends the
+     element rests on its ordinary styles. */
+  h1 .line {
+    display: block;
     overflow: hidden;
-    background: var(--surface);
+    /* Room for descenders inside the mask, given back below. */
+    padding-bottom: 0.12em;
+    margin-bottom: -0.12em;
   }
-  .preview img {
-    width: 100%;
-    height: auto;
+  h1 .line > span {
+    display: block;
   }
-  .promises {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 2rem clamp(1.5rem, 4vw, 3rem);
-    margin: clamp(2.5rem, 5vw, 3.5rem) 0 0;
-    padding: 0;
-    list-style: none;
-  }
-  .promises li {
-    padding-top: 1.1rem;
-    border-top: 1px solid var(--border-strong);
-  }
-  .promises h2 {
-    margin: 0;
-    font-size: 1.08rem;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-  }
-  .promises p {
-    margin: 0.4rem 0 0;
-    color: var(--text-muted);
-    line-height: 1.55;
-  }
-  @media (max-width: 900px) {
-    .promises {
-      grid-template-columns: 1fr;
-      gap: 1.5rem;
+  @media (prefers-reduced-motion: no-preference) {
+    :global(.site-header-bar) {
+      animation: hero-fade 600ms ease-out backwards;
+    }
+    .hero-pattern {
+      animation: hero-fade 1400ms ease-out 150ms backwards;
+    }
+    h1 .line > span {
+      animation: hero-line 1000ms cubic-bezier(0.16, 1, 0.3, 1) 120ms backwards;
+    }
+    h1 .line + .line > span {
+      animation-delay: 220ms;
+    }
+    .hero-lede {
+      animation: hero-rise 900ms cubic-bezier(0.16, 1, 0.3, 1) 480ms backwards;
+    }
+    .hero-copy :global(.site-actions) {
+      animation: hero-rise 900ms cubic-bezier(0.16, 1, 0.3, 1) 600ms backwards;
+    }
+    .hero-meta {
+      animation: hero-fade 900ms ease-out 760ms backwards;
+    }
+    h1 .inked {
+      animation: ink-draw 900ms cubic-bezier(0.65, 0, 0.25, 1) 1000ms backwards;
     }
   }
+  @keyframes ink-draw {
+    from {
+      background-size: 0% 0.2em;
+    }
+  }
+  @keyframes hero-fade {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes hero-line {
+    from {
+      transform: translateY(108%);
+    }
+  }
+  @keyframes hero-rise {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+  }
+
+  /* Scrolling down: the film rises and settles as it comes into view.
+     Scroll-driven where the browser supports it; elsewhere it simply sits. */
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .hero-film {
+        animation: film-settle linear both;
+        animation-timeline: view();
+        animation-range: entry 0% cover 35%;
+      }
+    }
+  }
+  @keyframes film-settle {
+    from {
+      opacity: 0.4;
+      transform: translateY(56px) scale(0.965);
+    }
+  }
+
 </style>

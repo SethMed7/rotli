@@ -1,6 +1,7 @@
 ---
 // Short answers to the questions a first visit raises. Every answer restates
 // a claim made elsewhere on the site; nothing here may promise more.
+import searching from '../../../../src/assets/characters/filled/cocoa/searching.webp';
 import { site } from '../../site';
 
 const questions = [
@@ -42,6 +43,26 @@ const questions = [
       <p class="section-lede">
         More in <a href="/resources/">Resources</a>, starting with <a href="/resources/getting-started/">Getting started</a>.
       </p>
+      <!-- The quokka with its magnifying glass, and the questions it is looking into. Plays once. -->
+      <div class="faq-scene" data-reveal aria-hidden="true">
+        <svg viewBox="0 0 440 300" role="presentation">
+          <g class="card k1">
+            <rect x="26" y="40" width="96" height="70" rx="10" />
+            <text x="74" y="90" text-anchor="middle">?</text>
+          </g>
+          <g class="card k2">
+            <rect x="300" y="18" width="96" height="70" rx="10" />
+            <text x="348" y="68" text-anchor="middle">?</text>
+          </g>
+          <g class="card k3">
+            <rect x="318" y="150" width="84" height="62" rx="10" />
+            <text x="360" y="194" text-anchor="middle">!</text>
+          </g>
+          <path class="trail" d="M122 96q40 30 70 70M300 72q-40 20-60 60" />
+          <ellipse class="shadow" cx="215" cy="286" rx="70" ry="8" />
+          <image class="quokka" href={searching.src} x="120" y="94" width="196" height="196" />
+        </svg>
+      </div>
     </header>
     <div class="faq-list">
       {questions.map((item) => (
@@ -58,15 +79,73 @@ const questions = [
 </section>
 
 <style>
-  /* The closing invitation follows directly; one section space between them, not two. */
-  .faq {
-    padding-bottom: 0;
-  }
+  /* The sunset band follows, so the questions keep a full section of room below them. */
   .faq-grid {
     display: grid;
     grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-    gap: 2rem clamp(2rem, 6vw, 5rem);
+    gap: 2.5rem clamp(3rem, 8vw, 7rem);
     align-items: start;
+  }
+  .faq-scene {
+    max-width: 26rem;
+    margin-top: clamp(2rem, 4vw, 3rem);
+  }
+  .faq-scene svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .card rect {
+    fill: var(--surface);
+    stroke: var(--text);
+    stroke-width: 2.5;
+  }
+  .card text {
+    fill: var(--accent-text);
+    font-family: var(--font-body);
+    font-size: 40px;
+    font-weight: 600;
+  }
+  .card {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .k1 {
+    transform: rotate(-8deg);
+  }
+  .k2 {
+    transform: rotate(7deg);
+  }
+  .k3 {
+    transform: rotate(-4deg);
+  }
+  .trail {
+    fill: none;
+    stroke: var(--border-strong);
+    stroke-width: 2.5;
+    stroke-dasharray: 6 8;
+    stroke-linecap: round;
+  }
+  .shadow {
+    fill: var(--border);
+  }
+  /* Once: the question cards float in, the answer last. */
+  @media (prefers-reduced-motion: no-preference) {
+    :global(.js) .faq-scene:global(.is-visible) .card {
+      animation: float-in 900ms cubic-bezier(0.34, 1.4, 0.64, 1) 300ms backwards;
+    }
+    :global(.js) .faq-scene:global(.is-visible) .k2 {
+      animation-delay: 480ms;
+    }
+    :global(.js) .faq-scene:global(.is-visible) .k3 {
+      animation-delay: 900ms;
+    }
+  }
+  @keyframes float-in {
+    from {
+      opacity: 0;
+      transform: translateY(-24px) scale(0.8);
+    }
   }
   .section-lede a {
     color: var(--accent-text);
@@ -83,9 +162,9 @@ const questions = [
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    min-height: 4rem;
-    padding-block: 0.9rem;
-    font-size: 1.1rem;
+    min-height: 4.75rem;
+    padding-block: 1.35rem;
+    font-size: 1.15rem;
     font-weight: 600;
     cursor: pointer;
     list-style: none;
@@ -107,14 +186,17 @@ const questions = [
     transform: rotate(45deg);
   }
   details p {
-    max-width: 40rem;
-    margin: 0 0 1.25rem;
+    max-width: 38rem;
+    margin: -0.35rem 2.5rem 1.6rem 0;
     color: var(--text-muted);
     line-height: 1.62;
   }
   @media (max-width: 860px) {
     .faq-grid {
       grid-template-columns: 1fr;
+    }
+    .faq-scene {
+      max-width: 20rem;
     }
   }
 </style>

@@ -46,8 +46,9 @@ export const PRIVACY_URL = `${GITHUB_URL}/blob/main/PRIVACY.md`;
 export const ROADMAP_URL = `${GITHUB_URL}/blob/main/ROADMAP.md`;
 
 /**
- * The launch film. The reviewed export lives in `public/media/`; the landing
- * page and the holding page play it on request (PromoFilm.astro).
+ * The earlier launch film. The reviewed export lives in `public/media/`; the
+ * holding page plays it on request (PromoFilm.astro). The launch page plays the
+ * studio's story film instead (src/films.ts).
  */
 export const PROMO_VIDEO_PATH = '/media/rotli-promo.mp4';
 export const PROMO_POSTER_PATH = '/media/rotli-promo-poster.jpg';

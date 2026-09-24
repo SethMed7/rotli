@@ -1,0 +1,227 @@
+---
+// The story film's island by day, drawn for the page: clouds, the limestone hill with the
+// Wadjemup lighthouse, the bay, the jetty, the pink salt lake, and the sand. Optionally the
+// quokka stands on the beach and waves. Two ways to use it:
+//
+// - `faint`: a quiet vignette behind a section's heading: two clouds, the hill with its
+//   lighthouse, and the bay's edge (no jetty, beach, or quokka), in low contrast.
+// - default: a full scene in a frame, which plays once when it comes into view (clouds
+//   drift in, the quokka hops ashore); reduced motion shows it at rest.
+//
+// Decoration only. Colors are Base.astro tokens (the film's palette).
+import waving from '../../../src/assets/characters/filled/cocoa/waving.webp';
+
+interface Props {
+  faint?: boolean;
+  quokka?: boolean;
+}
+
+const { faint = false, quokka = !faint } = Astro.props;
+---
+
+<div class:list={['island', { faint }]} data-reveal={faint ? undefined : ''} aria-hidden="true">
+  <svg
+    viewBox={faint ? '600 20 610 244' : '0 0 1200 420'}
+    preserveAspectRatio={faint ? 'xMaxYMax meet' : 'xMidYMax slice'}
+    role="presentation"
+  >
+    <g class="clouds">
+      <g class="cloud c1">
+        <ellipse cx="190" cy="92" rx="70" ry="20" />
+        <ellipse cx="150" cy="96" rx="40" ry="16" />
+        <ellipse cx="222" cy="82" rx="44" ry="20" />
+        <path class="rim" d="M112 106q60 10 164 2" />
+      </g>
+      <g class="cloud c2">
+        <ellipse cx="820" cy="62" rx="62" ry="18" />
+        <ellipse cx="786" cy="66" rx="34" ry="14" />
+        <ellipse cx="850" cy="54" rx="38" ry="17" />
+        <path class="rim" d="M752 76q56 9 150 1" />
+      </g>
+      <g class="cloud c3">
+        <ellipse cx="1080" cy="132" rx="52" ry="15" />
+        <ellipse cx="1052" cy="136" rx="30" ry="12" />
+        <ellipse cx="1104" cy="126" rx="32" ry="14" />
+        <path class="rim" d="M1020 144q48 8 128 1" />
+      </g>
+    </g>
+
+    <!-- the far island: limestone, bush, and the lighthouse -->
+    <path class="hill" d="M640 252C720 222 820 176 900 172S1080 178 1210 232V256H640Z" />
+    <g class="bush">
+      <ellipse cx="760" cy="226" rx="26" ry="10" />
+      <ellipse cx="800" cy="214" rx="20" ry="9" />
+      <ellipse cx="960" cy="200" rx="24" ry="10" />
+      <ellipse cx="1000" cy="208" rx="18" ry="8" />
+      <ellipse cx="1110" cy="226" rx="24" ry="9" />
+    </g>
+    <g class="lighthouse">
+      <path class="tower" d="M884 174l6-86h20l6 86z" />
+      <rect class="gallery" x="880" y="82" width="40" height="7" />
+      <rect class="lantern" x="889" y="60" width="22" height="22" />
+      <path class="cap" d="M886 60q14-18 28 0z" />
+      <rect class="door" x="896" y="152" width="8" height="14" />
+    </g>
+
+    <!-- the bay -->
+    <rect class="sea" x="-10" y="250" width="1220" height="180" />
+    <rect class="sea-edge" x="-10" y="250" width="1220" height="14" />
+    <g class="waves">
+      <path d="M60 300q12-6 24 0M210 330q14-7 28 0M380 290q12-6 24 0M120 372q14-7 28 0M300 398q12-6 24 0M470 356q12-6 24 0" />
+      <path d="M560 280q12-6 24 0M640 312q10-5 20 0" />
+    </g>
+
+    {!faint && (
+      <>
+    <!-- the jetty -->
+    <g class="jetty">
+      <rect class="deck" x="100" y="318" width="430" height="10" />
+      <rect class="post" x="130" y="328" width="8" height="70" />
+      <rect class="post" x="230" y="328" width="8" height="70" />
+      <rect class="post" x="330" y="328" width="8" height="70" />
+      <rect class="post" x="430" y="328" width="8" height="70" />
+    </g>
+
+    <!-- the beach and the pink salt lake -->
+    <path class="sand" d="M500 430C530 350 600 310 760 296L1210 282V430Z" />
+    <path class="shore" d="M500 430C530 350 600 310 760 296L1210 282" />
+    <ellipse class="lake" cx="1010" cy="322" rx="140" ry="15" />
+      </>
+    )}
+
+    {
+      quokka && (
+        <image class="quokka" href={waving.src} x="690" y="232" width="170" height="170" />
+      )
+    }
+  </svg>
+</div>
+
+<style>
+  .island svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .cloud ellipse {
+    fill: var(--surface);
+  }
+  .rim {
+    fill: none;
+    stroke: var(--text-muted);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    opacity: 0.45;
+  }
+  .hill {
+    fill: var(--limestone);
+    stroke: var(--text);
+    stroke-width: 3;
+  }
+  .bush ellipse {
+    fill: var(--olive);
+  }
+  .tower,
+  .gallery,
+  .lantern,
+  .cap {
+    stroke: var(--text);
+    stroke-width: 3;
+    stroke-linejoin: round;
+  }
+  .tower {
+    fill: var(--surface);
+  }
+  .gallery,
+  .cap {
+    fill: var(--text);
+  }
+  .lantern {
+    fill: var(--lantern);
+  }
+  .door {
+    fill: var(--accent);
+  }
+  .sea {
+    fill: var(--sea);
+  }
+  .sea-edge {
+    fill: var(--sea-deep);
+  }
+  .waves path {
+    fill: none;
+    stroke: var(--sea-line);
+    stroke-width: 3;
+    stroke-linecap: round;
+  }
+  .deck {
+    fill: var(--wood);
+    stroke: var(--text);
+    stroke-width: 2.5;
+  }
+  .post {
+    fill: var(--wood-dark);
+  }
+  .sand {
+    fill: var(--sand);
+  }
+  .shore {
+    fill: none;
+    stroke: var(--text);
+    stroke-width: 3;
+  }
+  .lake {
+    fill: var(--lake);
+  }
+
+  /* Behind a section: the same island, quiet enough to read over. */
+  .faint {
+    opacity: 0.38;
+  }
+
+  /* Once, when the scene comes into view: the clouds drift in and the quokka hops ashore. */
+  .cloud,
+  .quokka {
+    transform-box: fill-box;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    :global(.js) .island:global(.is-visible) .cloud {
+      animation: drift 2400ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+    }
+    :global(.js) .island:global(.is-visible) .c2 {
+      animation-delay: 150ms;
+    }
+    :global(.js) .island:global(.is-visible) .c3 {
+      animation-delay: 300ms;
+    }
+    :global(.js) .island:global(.is-visible) .quokka {
+      transform-origin: 50% 100%;
+      animation: hop-ashore 1100ms cubic-bezier(0.34, 1.4, 0.64, 1) 400ms backwards;
+    }
+  }
+  @keyframes drift {
+    from {
+      transform: translateX(-60px);
+      opacity: 0;
+    }
+  }
+  @keyframes hop-ashore {
+    0% {
+      transform: translate(-260px, 40px);
+      opacity: 0;
+    }
+    30% {
+      transform: translate(-170px, -70px);
+      opacity: 1;
+    }
+    55% {
+      transform: translate(-80px, 0) scale(1.06, 0.92);
+    }
+    75% {
+      transform: translate(-30px, -40px);
+    }
+    92% {
+      transform: translate(0, 0) scale(1.05, 0.94);
+    }
+  }
+</style>

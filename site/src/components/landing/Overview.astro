@@ -1,0 +1,159 @@
+---
+// What rotli does, in the three steps the story film takes: write it down, keep it in your
+// folder, ask it anything. Each step is one line and three facts the rest of the site
+// already states; the full tour, and the eight 30-second episodes, live on /features/.
+// The quokkas are the app's own character art, and hop in once when the steps are revealed.
+import aiChat from '../../../../src/assets/characters/filled/cocoa/ai_chat.webp';
+import knowledge from '../../../../src/assets/characters/filled/cocoa/knowledge_system.webp';
+import notes from '../../../../src/assets/characters/filled/cocoa/notes.webp';
+
+const steps = [
+  {
+    art: notes,
+    title: 'Write.',
+    body: 'Press ⌥Space from anywhere and start typing. Markdown renders as you go.',
+    facts: [
+      'Tasks, choices, tables, diagrams, and math',
+      'Aa shows the plain Markdown underneath',
+      '[[Wikilinks]] and ⌘K search across the vault',
+    ],
+  },
+  {
+    art: knowledge,
+    title: 'Keep.',
+    body: 'Every note is a plain file in one folder you choose, and it stays yours.',
+    facts: [
+      'Opens in any editor; back it up your way',
+      'A Librarian files, tags, and links, never rewrites',
+      'Main and named views arrange without copying',
+    ],
+  },
+  {
+    art: aiChat,
+    title: 'Ask.',
+    body: 'Chat answers from your own notes, with a model on your Mac or the tools you already use.',
+    facts: [
+      'Conversation notes kept after every reply',
+      'Secure notes never reach a remote model',
+      'Lock a note and no AI can edit it',
+    ],
+  },
+];
+---
+
+<section class="section overview" id="features" aria-labelledby="overview-title">
+  <div class="wrap">
+    <header class="section-head" data-reveal>
+      <h2 class="section-title" id="overview-title">From a thought to <span class="inked">a file you keep.</span></h2>
+      <p class="section-lede">Three steps, the same ones the quokka takes in the film.</p>
+    </header>
+    <ol class="steps" data-stagger>
+      {
+        steps.map((step) => (
+          <li>
+            <img src={step.art.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
+            <h3>{step.title}</h3>
+            <p>{step.body}</p>
+            <ul>
+              {step.facts.map((fact) => (
+                <li>{fact}</li>
+              ))}
+            </ul>
+          </li>
+        ))
+      }
+    </ol>
+    <p class="overview-more">
+      <a class="button secondary" href="/features/#episodes">Watch the 30-second episodes</a>
+      <a class="text-link" href="/features/">See every feature <span aria-hidden="true">→</span></a>
+    </p>
+  </div>
+</section>
+
+<style>
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2.5rem clamp(1.5rem, 4vw, 3.5rem);
+    margin: clamp(2.5rem, 5vw, 3.5rem) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .steps > li {
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-strong);
+  }
+  img {
+    width: 112px;
+    height: 112px;
+    margin: 0 0 0.75rem -0.5rem;
+  }
+  h3 {
+    margin: 0;
+    font-size: var(--step-h3);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .steps p {
+    margin: 0.5rem 0 0;
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+  .steps ul {
+    display: grid;
+    gap: 0.5rem;
+    margin: 1.1rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .steps ul li {
+    padding-left: 0.9rem;
+    border-left: 2px solid var(--accent);
+    font-size: 0.95rem;
+    line-height: 1.4;
+  }
+  .overview-more {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem 1.75rem;
+    margin: clamp(2.5rem, 5vw, 3.5rem) 0 0;
+  }
+  .text-link {
+    color: var(--accent-text);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .text-link:hover {
+    text-decoration: underline;
+  }
+  /* The film's hop: each quokka lands with a small squash as its step comes in. */
+  @media (prefers-reduced-motion: no-preference) {
+    :global(.js) .steps:global(.is-visible) img {
+      animation: hop 760ms cubic-bezier(0.34, 1.5, 0.64, 1) backwards;
+      transform-origin: 50% 100%;
+    }
+    :global(.js) .steps:global(.is-visible) > li:nth-child(2) img {
+      animation-delay: 90ms;
+    }
+    :global(.js) .steps:global(.is-visible) > li:nth-child(3) img {
+      animation-delay: 180ms;
+    }
+  }
+  @keyframes hop {
+    0% {
+      transform: translateY(28px) scale(0.9, 1.08);
+    }
+    60% {
+      transform: translateY(-6px) scale(1, 1);
+    }
+    80% {
+      transform: translateY(0) scale(1.06, 0.93);
+    }
+  }
+  @media (max-width: 900px) {
+    .steps {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

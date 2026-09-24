@@ -2,6 +2,8 @@
 // Make it yours: the theme studio (twelve real captures from public/themes/)
 // and the optional quokka companion. Both move only when the visitor asks:
 // no timers, so a background tab does no work and nothing loops beside text.
+// Behind it, faintly, the story film's island by day (IslandScene.astro).
+import IslandScene from '../IslandScene.astro';
 import showcaseManifest from '../../assets/characters/showcase/showcase.json';
 
 // Swatch colours read the site swatch layer (Base.astro), which mirrors the
@@ -39,7 +41,10 @@ const companions = showcaseManifest.map((entry) => {
 ---
 
 <section class="section band-warm personal" id="personal" aria-labelledby="personal-title">
-  <div class="wrap">
+  <div class="backdrop">
+    <IslandScene faint />
+  </div>
+  <div class="wrap personal-inner">
     <header class="section-head">
       <h2 class="section-title" id="personal-title">Make it yours.</h2>
       <p class="section-lede">
@@ -52,6 +57,7 @@ const companions = showcaseManifest.map((entry) => {
       <figure class="studio-shot">
         <img
           id="theme-shot"
+          draggable="false"
           src={first.screenshot}
           width="2376"
           height="1485"
@@ -64,6 +70,19 @@ const companions = showcaseManifest.map((entry) => {
           <b id="theme-environment">{first.environment}</b>
         </figcaption>
       </figure>
+      <!-- Narrow screens: the same twelve environments as a carousel, like the quokkas below. -->
+      <div class="studio-steps">
+        <button type="button" class="carousel-step" data-theme-step="-1" aria-label="Previous theme">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 5-7 7 7 7" /></svg>
+        </button>
+        <p class="carousel-label" aria-live="polite">
+          <span class="carousel-count" id="theme-count">1 / {stops.length}</span>
+          <span class="carousel-name" id="theme-name">{first.family} · {first.environment}</span>
+        </p>
+        <button type="button" class="carousel-step" data-theme-step="1" aria-label="Next theme">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7" /></svg>
+        </button>
+      </div>
       <div class="studio-picker" role="group" aria-label="Preview a theme environment">
         <span class="picker-head">Light</span>
         <span class="picker-head">Dark</span>
@@ -112,14 +131,14 @@ const companions = showcaseManifest.map((entry) => {
           ))}
         </div>
         <div class="companion-controls">
-          <button type="button" class="companion-step" data-step="-1" aria-label="Previous quokka">
+          <button type="button" class="carousel-step companion-step" data-step="-1" aria-label="Previous quokka">
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 5-7 7 7 7" /></svg>
           </button>
-          <p id="companion-label" aria-live="polite">
-            <span id="companion-count">1 / {companions.length}</span>
-            <span id="companion-name">{companions[0].label}</span>
+          <p class="carousel-label" id="companion-label" aria-live="polite">
+            <span class="carousel-count" id="companion-count">1 / {companions.length}</span>
+            <span class="carousel-name" id="companion-name">{companions[0].label}</span>
           </p>
-          <button type="button" class="companion-step" data-step="1" aria-label="Next quokka">
+          <button type="button" class="carousel-step companion-step" data-step="1" aria-label="Next quokka">
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7" /></svg>
           </button>
         </div>
@@ -141,28 +160,52 @@ const companions = showcaseManifest.map((entry) => {
 </section>
 
 <script>
-  // Theme studio: a swatch swaps the capture and caption. Nothing cycles.
+  // Theme studio: a swatch (wide screens) or the carousel (narrow screens, with a swipe on
+  // the capture) swaps the capture and caption. Nothing cycles on its own.
   const shot = document.querySelector<HTMLImageElement>('#theme-shot');
   const family = document.querySelector<HTMLElement>('#theme-family');
   const environment = document.querySelector<HTMLElement>('#theme-environment');
+  const themeCount = document.querySelector<HTMLElement>('#theme-count');
+  const themeName = document.querySelector<HTMLElement>('#theme-name');
   const swatches = [...document.querySelectorAll<HTMLButtonElement>('.swatch-button')];
-  swatches.forEach((button) => {
+  const warm = (button: HTMLButtonElement | undefined) => {
+    if (!button?.dataset.shot) return;
+    const image = new Image();
+    image.src = button.dataset.shot;
+  };
+  let theme = 0;
+  const selectTheme = (index: number) => {
+    const total = swatches.length;
+    if (!total) return;
+    theme = ((index % total) + total) % total;
+    const button = swatches[theme];
+    if (shot && button.dataset.shot) {
+      shot.src = button.dataset.shot;
+      shot.alt = `The rotli workspace in the ${button.dataset.environment} environment`;
+    }
+    if (family) family.textContent = button.dataset.family ?? '';
+    if (environment) environment.textContent = button.dataset.environment ?? '';
+    if (themeCount) themeCount.textContent = `${theme + 1} / ${total}`;
+    if (themeName) themeName.textContent = `${button.dataset.family} · ${button.dataset.environment}`;
+    swatches.forEach((other) => other.setAttribute('aria-pressed', String(other === button)));
+    warm(swatches[(theme + 1) % total]); // the next one is ready before it is asked for
+  };
+  swatches.forEach((button, index) => {
     // Warm the cache on intent so the swap is instant.
-    const preload = () => {
-      const image = new Image();
-      image.src = button.dataset.shot ?? '';
-    };
-    button.addEventListener('pointerenter', preload, { once: true });
-    button.addEventListener('focus', preload, { once: true });
-    button.addEventListener('click', () => {
-      if (shot && button.dataset.shot) {
-        shot.src = button.dataset.shot;
-        shot.alt = `The rotli workspace in the ${button.dataset.environment} environment`;
-      }
-      if (family) family.textContent = button.dataset.family ?? '';
-      if (environment) environment.textContent = button.dataset.environment ?? '';
-      swatches.forEach((other) => other.setAttribute('aria-pressed', String(other === button)));
-    });
+    button.addEventListener('pointerenter', () => warm(button), { once: true });
+    button.addEventListener('focus', () => warm(button), { once: true });
+    button.addEventListener('click', () => selectTheme(index));
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-theme-step]').forEach((button) => {
+    button.addEventListener('click', () => selectTheme(theme + Number(button.dataset.themeStep)));
+  });
+  let swipeFrom: number | null = null;
+  shot?.addEventListener('pointerdown', (event) => (swipeFrom = event.clientX));
+  shot?.addEventListener('pointerup', (event) => {
+    if (swipeFrom === null) return;
+    const dx = event.clientX - swipeFrom;
+    swipeFrom = null;
+    if (Math.abs(dx) > 40 && matchMedia('(max-width: 900px)').matches) selectTheme(theme + (dx < 0 ? 1 : -1));
   });
 
   // Companion: previous/next buttons and the neighbouring slides step through
@@ -195,6 +238,31 @@ const companions = showcaseManifest.map((entry) => {
 </script>
 
 <style>
+  /* The island sits behind the heading and the top of the theme studio. */
+  .personal {
+    position: relative;
+    overflow: hidden;
+  }
+  .backdrop {
+    position: absolute;
+    top: clamp(1.5rem, 3vw, 2.5rem);
+    right: 0;
+    width: min(42vw, 600px);
+    aspect-ratio: 610 / 244;
+    pointer-events: none;
+    mask-image: linear-gradient(to right, transparent, #000 30%);
+  }
+  .backdrop :global(.island) {
+    height: 100%;
+  }
+  @media (max-width: 760px) {
+    .backdrop {
+      display: none;
+    }
+  }
+  .personal-inner {
+    position: relative;
+  }
   .studio {
     display: grid;
     grid-template-columns: minmax(0, 1.7fr) auto;
@@ -343,7 +411,8 @@ const companions = showcaseManifest.map((entry) => {
   .companion-slide.is-next:hover {
     opacity: 0.7;
   }
-  .companion-controls {
+  .companion-controls,
+  .studio-steps {
     display: grid;
     grid-template-columns: 44px minmax(0, 1fr) 44px;
     align-items: center;
@@ -351,7 +420,7 @@ const companions = showcaseManifest.map((entry) => {
     max-width: 24rem;
     margin: 1rem auto 0;
   }
-  .companion-step {
+  .carousel-step {
     width: 44px;
     height: 44px;
     display: grid;
@@ -363,23 +432,23 @@ const companions = showcaseManifest.map((entry) => {
     color: var(--text);
     cursor: pointer;
   }
-  .companion-step:hover {
+  .carousel-step:hover {
     background: var(--ground);
   }
-  .companion-step svg {
+  .carousel-step svg {
     width: 20px;
     height: 20px;
   }
-  #companion-label {
+  .carousel-label {
     display: grid;
     margin: 0;
     text-align: center;
   }
-  #companion-count {
+  .carousel-count {
     color: var(--text-muted);
     font-size: 0.8rem;
   }
-  #companion-name {
+  .carousel-name {
     font-size: 0.95rem;
     font-weight: 600;
   }
@@ -408,24 +477,27 @@ const companions = showcaseManifest.map((entry) => {
     text-underline-offset: 0.25em;
   }
 
+  /* The theme carousel shows only where the orb picker would crowd the capture. */
+  .studio-steps {
+    display: none;
+  }
   @media (max-width: 900px) {
     .studio,
     .companion {
       grid-template-columns: 1fr;
     }
-    .studio-picker {
-      grid-template-columns: repeat(6, auto);
-      justify-content: start;
-      column-gap: 0.5rem;
+    .studio {
+      gap: 0;
     }
-    .picker-head,
-    .picker-name {
+    .studio-picker,
+    .studio-shot figcaption {
       display: none;
     }
-  }
-  @media (max-width: 520px) {
-    .studio-picker {
-      grid-template-columns: repeat(4, auto);
+    .studio-steps {
+      display: grid;
+    }
+    .studio-shot img {
+      touch-action: pan-y;
     }
   }
 </style>
