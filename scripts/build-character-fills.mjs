@@ -23,9 +23,10 @@ const variants = [
   { name: "green", fill: [111, 166, 139] },
 ];
 
-// Plain fills the marketing site uses directly. The companion carousel is
-// rendered separately by build-companion-showcase.ts with accessories.
-const sitePoses = ["stays_local.svg", "celebrating.svg"];
+// Plain fills the marketing site uses directly (the closing card's
+// celebrating quokka). The companion carousel is rendered separately by
+// build-companion-showcase.ts with accessories.
+const sitePoses = ["celebrating.svg"];
 
 const sources = (await readdir(sourceDir))
   .filter((name) => name.endsWith(".svg") && !name.startsWith("_"))
