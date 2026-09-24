@@ -21,7 +21,7 @@ import { invalidateNotes, useNote, useNoteIndex, useRestoreNote } from "../servi
 import { restoreSinkItem } from "../services/itemLifecycle";
 import { mainHasNote } from "../services/mainTree";
 import { markNoteDraftChanged } from "../services/noteDrafts";
-import { useAaPanelRequest } from "../state/aaPanel";
+import { aaRequestStep, useAaPanelRequest } from "../state/aaPanel";
 import { useChatSetupGuide } from "../state/chatSetupGuide";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useHelperLink } from "../state/helperLink";
@@ -167,15 +167,18 @@ export function EditorSurface({
 
   const rootRef = useRef<HTMLDivElement>(null);
   const aaChipRef = useRef<HTMLButtonElement>(null);
-  // ⌘⇧A (editor.typography) toggles the Aa panel of the focused pane's editor;
-  // a request from before this editor mounted is never replayed
+  // ⌘⇧A (editor.typography) toggles the Aa panel of the focused pane's editor.
+  // A request from before this editor mounted is never replayed; one that
+  // lands while the note is still loading waits for the chip (aaRequestStep).
   const aaRequest = useAaPanelRequest((s) => s.request);
   const aaSeenRef = useRef(aaRequest?.nonce ?? 0);
+  const noteLoaded = !!note;
   useEffect(() => {
-    if (!aaRequest || aaRequest.nonce <= aaSeenRef.current) return;
-    aaSeenRef.current = aaRequest.nonce;
-    if (aaRequest.paneId === paneId && aaChipRef.current) setAaOpen((open) => !open);
-  }, [aaRequest, paneId]);
+    const step = aaRequestStep(aaRequest, aaSeenRef.current, paneId, noteLoaded && !!aaChipRef.current);
+    if (step === "ignore" || step === "wait") return;
+    aaSeenRef.current = aaRequest?.nonce ?? aaSeenRef.current;
+    if (step === "toggle") setAaOpen((open) => !open);
+  }, [aaRequest, paneId, noteLoaded]);
   const chatChipRef = useRef<HTMLButtonElement>(null);
   // Rotli Web: paired with Rotli Helper, the chip opens chats like the app
   const chatReady = useHelperLink((s) => LAUNCH_FEATURES.chat || s.link !== null);

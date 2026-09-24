@@ -76,10 +76,13 @@ export function openNoteChat(note: NoteSummary, slug: string): void {
 }
 
 /** Open a note's chat by id — for callers that hold only the id (a chord, or
- * the Quick Note's request to main). A note that is gone opens nothing. */
-export async function openChatForNoteId(id: string, opts?: { create?: boolean }): Promise<void> {
+ * the Quick Note's request to main). A note that is gone opens nothing and
+ * answers false. */
+export async function openChatForNoteId(id: string, opts?: { create?: boolean }): Promise<boolean> {
   const note = (await notesService.listNotes()).find((n) => n.id === id);
-  if (note) await openChatForNote(note, opts);
+  if (!note) return false;
+  await openChatForNote(note, opts);
+  return true;
 }
 
 export async function openChatForNote(note: NoteSummary, opts?: { create?: boolean }): Promise<void> {

@@ -1,6 +1,7 @@
 // What an action run is aimed at, read imperatively (the hook forms are for
 // components). Shared by ./actions.ts and the seams beside it.
 
+import { windowSurface } from "../state/chatWindowStore";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 
@@ -8,7 +9,10 @@ import { useUiStore } from "../state/ui";
  * this pane id, and "the focused note" there is the note it has open. */
 export const QUICK_PANE_ID = "quick";
 
-export const inQuickWindow = (): boolean => usePanesStore.getState().focusedPaneId === QUICK_PANE_ID;
+/** This webview is the Quick Note window — read from the window itself, with
+ * the pinned pane id as the fallback. */
+export const inQuickWindow = (): boolean =>
+  windowSurface() === "quick" || usePanesStore.getState().focusedPaneId === QUICK_PANE_ID;
 
 /** Note chords stand down while Breve owns the content area (main only —
  * the Quick Note window is always a note). */

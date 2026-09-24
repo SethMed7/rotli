@@ -26,16 +26,22 @@ export function newestChatSlug(chats: Pick<MemexChatSummary, "slug" | "modifiedM
 /** MAIN: ⌘⇧C in the Quick Note, which cannot host a chat — open that note's
  * chat here and bring this window forward (2026-09-24). */
 export function openNoteChatFromQuickNote(id: string, create: boolean): void {
-  useUiStore.getState().setSettingsOpen(false);
   void openChatForNoteId(id, { create })
-    .then(showMainWindow)
-    .catch((error: unknown) =>
+    .then((opened) => {
+      // a note that is gone opens nothing: main stays where it was
+      if (!opened) return;
+      useUiStore.getState().setSettingsOpen(false);
+      return showMainWindow();
+    })
+    .catch((error: unknown) => {
+      // the error shows in main, so main comes forward to say it
       useUiStore
         .getState()
         .setRowActionError(
           `Couldn’t open a chat — ${error instanceof Error ? error.message : String(error)}`,
-        ),
-    );
+        );
+      void showMainWindow();
+    });
 }
 
 /** `here`: the summon was routed to THIS window (the Chat window while Chat
