@@ -50,7 +50,7 @@ function cspInlineStyleGuard() {
         }
         if (offenders.length > 0) {
           throw new Error(
-            `Inline styles would be blocked by the production Content-Security-Policy (style-src 'self'):\n  ${offenders.join("\n  ")}\nMove them into component <style> rules (Astro extracts those into a stylesheet).`,
+            `Built styles would break in production:\n  ${offenders.join("\n  ")}\nInline styles are blocked by the Content-Security-Policy (style-src 'self'): move them into component <style> rules. A literal :global( left in built CSS is dropped by the browser: move that rule into <style is:global>.`,
           );
         }
       },
