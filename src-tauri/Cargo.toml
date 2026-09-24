@@ -1,6 +1,6 @@
 [package]
 name = "rotli"
-version = "1.4.1"
+version = "1.4.2"
 description = "rotli — warm, local-first, hotkey-driven notes for the Mac menu bar"
 authors = ["Rotli contributors"]
 edition = "2021"
