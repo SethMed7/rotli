@@ -5,6 +5,7 @@ import {
   LICENSE_URL,
   RELEASES_URL,
   ROADMAP_URL,
+  STUDIO_URL,
   WEB_APP_PATH,
   site,
 } from './site';
@@ -69,6 +70,7 @@ export function footerGroups(options: { hasPosts: boolean }): FooterGroup[] {
       links: [
         { href: GITHUB_URL, label: 'GitHub' },
         { href: ROADMAP_URL, label: 'Roadmap' },
+        { href: STUDIO_URL, label: 'Rotli Studio' },
         { href: LICENSE_URL, label: 'MIT license' },
       ],
     });

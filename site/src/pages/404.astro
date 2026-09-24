@@ -1,22 +1,17 @@
 ---
 import Base from '../layouts/Base.astro';
 import mark from '../../../src/assets/characters/_logo.svg?raw';
-import SiteFooter from '../components/SiteFooter.astro';
-import SiteHeader from '../components/SiteHeader.astro';
-import { DOWNLOAD_HREF, ROADMAP_URL, WEB_APP_PATH, site } from '../site';
+import SunsetScene from '../components/SunsetScene.astro';
+import { DOWNLOAD_HREF, WEB_APP_PATH, site } from '../site';
 
-// One page for every missing path. The hint under the headline is chosen in
-// the browser from the path itself: /app when Rotli Web is not switched on
-// here, /helper for the helper's pages, else the plain truth.
-const links = [
-  { href: '/', label: 'Home', note: 'The site, from the top.' },
-  ...(site.downloadsEnabled
-    ? [{ href: DOWNLOAD_HREF, label: 'Download Rotli', note: 'The Mac app, a .dmg.' }]
-    : []),
-  ...(site.webAppEnabled
-    ? [{ href: WEB_APP_PATH, label: 'Rotli Web', note: 'Your vault, in a browser.' }]
-    : []),
-  ...(site.sourcePublic ? [{ href: ROADMAP_URL, label: 'Roadmap', note: 'What is next.' }] : []),
+// One page for every missing path, set where the story film ends: the sunset fills the
+// window, no header or footer, one way home. The hint under the headline is chosen in the
+// browser from the path itself: /app when Rotli Web is not switched on here, /helper for the
+// helper's pages, else the plain truth.
+const also = [
+  ...(site.downloadsEnabled ? [{ href: DOWNLOAD_HREF, label: 'Download for Mac' }] : []),
+  ...(site.webAppEnabled ? [{ href: WEB_APP_PATH, label: 'Open Rotli Web' }] : []),
+  { href: '/resources/', label: 'Resources' },
 ];
 ---
 
@@ -26,31 +21,32 @@ const links = [
   canonicalPath="/404/"
   noindex
 >
-  <SiteHeader />
   <main class="not-found" data-web-app={site.webAppEnabled ? 'on' : 'off'}>
-    <div class="mark" aria-hidden="true" set:html={mark} />
-    <p class="code">404</p>
-    <h1>This note wandered off.</h1>
-    <p class="hint" data-hint="default">The page you followed is not here, but rotli still is.</p>
-    <p class="hint" data-hint="app" hidden>
-      Rotli Web is not switched on at this address yet. Everything it will do, the Mac app does today.
-    </p>
-    <p class="hint" data-hint="helper" hidden>
-      Looking for Rotli Helper? <a href="/resources/rotli-helper/">What it is and how to install it</a>.
-    </p>
-    <p class="path"><code data-path></code></p>
-    <nav class="ways" aria-label="Where to go instead">
-      {
-        links.map((link) => (
-          <a href={link.href}>
-            <strong>{link.label}</strong>
-            <span>{link.note}</span>
-          </a>
-        ))
-      }
-    </nav>
+    <SunsetScene full>
+      <div class="lost" data-reveal>
+        <a class="brand" href="/" aria-label="rotli home"><span set:html={mark} aria-hidden="true"></span><b>rotli</b></a>
+        <p class="code">404</p>
+        <h1>This note <span class="inked">wandered off.</span></h1>
+        <p class="hint" data-hint="default">The page you followed is not here, but rotli still is.</p>
+        <p class="hint" data-hint="app" hidden>
+          Rotli Web is not switched on at this address yet. Everything it will do, the Mac app does today.
+        </p>
+        <p class="hint" data-hint="helper" hidden>
+          Looking for Rotli Helper? <a href="/resources/rotli-helper/">What it is and how to install it</a>.
+        </p>
+        <p class="path"><code data-path></code></p>
+        <a class="button primary home" href="/">Take me home</a>
+        <p class="also">
+          {also.map((link, i) => (
+            <>
+              {i > 0 && <span aria-hidden="true"> · </span>}
+              <a href={link.href}>{link.label}</a>
+            </>
+          ))}
+        </p>
+      </div>
+    </SunsetScene>
   </main>
-  <SiteFooter />
 
   <script>
     const main = document.querySelector<HTMLElement>('.not-found');
@@ -62,87 +58,73 @@ const links = [
   </script>
 
   <style>
-    .not-found {
-      min-height: calc(100vh - 12rem);
+    .lost {
       display: grid;
-      place-content: center;
       justify-items: center;
       gap: 0.6rem;
-      padding: 4rem 1.5rem 5rem;
+      padding: 0 var(--gutter);
       text-align: center;
     }
-    .mark {
-      width: 84px;
-      height: 84px;
-      margin-bottom: 0.5rem;
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: clamp(1.5rem, 5vh, 3rem);
       color: var(--text);
-      opacity: 0.85;
+      font-family: var(--font-wordmark);
+      font-size: 1.5rem;
+      text-decoration: none;
     }
-    .mark :global(svg) {
-      width: 100%;
-      height: 100%;
+    .brand :global(svg) {
+      width: 30px;
+      height: 30px;
     }
     .code {
       margin: 0;
-      color: var(--accent-text);
+      color: var(--text);
       font-weight: 600;
       letter-spacing: 0.12em;
       font-size: 0.85rem;
     }
     h1 {
       margin: 0;
-      font-family: var(--font-display);
-      font-size: clamp(2rem, 7vw, 3.6rem);
-      line-height: 1.08;
-      letter-spacing: -0.01em;
+      font-size: var(--step-display);
+      font-weight: 600;
+      line-height: 1;
+      letter-spacing: -0.045em;
+      text-wrap: balance;
     }
+    /* Muted ink is too faint on the sky; the sunset reads in the page's ink. */
     .hint {
       max-width: 34rem;
-      margin: 0.4rem 0 0;
-      color: var(--text-muted);
-      font-size: 1.05rem;
+      margin: 0.6rem 0 0;
+      color: var(--text);
+      font-size: var(--step-lede);
       line-height: 1.5;
+    }
+    .hint a,
+    .also a {
+      color: var(--text);
+      font-weight: 600;
+      text-underline-offset: 0.2em;
     }
     .path {
       margin: 0;
       min-height: 1.4em;
-      color: var(--text-muted);
-      font-size: 0.85rem;
+      color: var(--text);
+      font-size: 0.9rem;
+      opacity: 0.8;
     }
     .path code:empty {
       display: none;
     }
-    .ways {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-      gap: 0.6rem;
-      width: min(100%, 44rem);
-      margin-top: 1.6rem;
+    .home {
+      margin-top: 1.25rem;
     }
-    .ways a {
-      display: grid;
-      gap: 0.2rem;
-      padding: 0.9rem 1rem;
-      border: 1px solid var(--border);
-      border-radius: 0.9rem;
-      background: var(--surface);
+    .also {
+      margin: 0.75rem 0 0;
       color: var(--text);
-      text-decoration: none;
-      text-align: left;
-      transition: border-color 120ms ease, background-color 120ms ease;
-    }
-    .ways a:hover,
-    .ways a:focus-visible {
-      border-color: var(--accent-text);
-      background: color-mix(in srgb, var(--accent-text) 8%, var(--surface));
-      outline: none;
-    }
-    .ways strong {
-      font-weight: 600;
-    }
-    .ways span {
-      color: var(--text-muted);
-      font-size: 0.9rem;
+      font-size: 0.92rem;
     }
   </style>
 </Base>

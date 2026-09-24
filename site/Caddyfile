@@ -62,6 +62,9 @@
 	# The MCP guide moved under Resources on 2026-09-18; old links keep working.
 	redir /mcp /resources/mcp/ permanent
 	redir /mcp/ /resources/mcp/ permanent
+	# The motion studio lives on its own subdomain; people type the path.
+	redir /studio https://studio.rotli.co/ permanent
+	redir /studio/ https://studio.rotli.co/ permanent
 
 	handle {
 		import security
