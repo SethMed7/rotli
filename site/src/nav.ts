@@ -5,6 +5,7 @@ import {
   LICENSE_URL,
   RELEASES_URL,
   ROADMAP_URL,
+  STUDIO_URL,
   WEB_APP_PATH,
   site,
 } from './site';
@@ -59,6 +60,8 @@ export function footerGroups(options: { hasPosts: boolean }): FooterGroup[] {
         { href: '/resources/getting-started/', label: 'Getting started' },
         ...(options.hasPosts ? [{ href: '/blog/', label: 'Blog' }] : []),
         { href: '/about/', label: 'About' },
+        // The open motion studio; not gated on the source flag, it is its own site.
+        { href: STUDIO_URL, label: 'Rotli Studio' },
         { href: '/privacy/', label: 'Privacy' },
       ],
     },

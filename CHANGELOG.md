@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **rotli.co's 404 page is a sunset.** A missing page now fills the window with
+  the film's sunset and the waving quokka, with one button home and no header
+  or footer. The footer links the open motion studio at studio.rotli.co, and
+  rotli.co/studio goes there.
+
 ## [1.5.0] - 2026-09-24
 
 ### Added

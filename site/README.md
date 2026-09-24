@@ -119,6 +119,14 @@ bun run preview  # serve the built dist/ locally
   status. The hero's Download for Mac still fetches the DMG directly
   (`DOWNLOAD_HREF`). The Helper guide is `/resources/rotli-helper/`; the 404
   page's `/helper` hint links there.
+- **The 404 page** (`src/pages/404.astro`) is set where the story film ends:
+  `SunsetScene.astro` (`full`) fills the window with the sunset, there is no
+  header or footer, and one "Take me home" button leads back with a quiet line
+  of other ways in. The missing path and a hint (`/app`, `/helper`) are chosen
+  in the browser. `SunsetScene.astro` is also the closing invitation's ground.
+- **The motion studio** lives at `studio.rotli.co` (`STUDIO_URL` in
+  `src/site.ts`): the footer's Learn column links it whatever the source flag, and the Caddyfile
+  sends `/studio` there.
 - **Download and the browser.** `SiteActions.astro` renders the two ways in —
   Open in browser and Download — in the hero and the closing invitation (the
   header has only its Download button to `/download/`). `DOWNLOAD_HREF` in
@@ -278,7 +286,10 @@ silently). Two guards and one rehearsal cover this:
 
 - The Astro build fails if any generated page carries an inline style
   (`astro.config.mjs`, `rotli-csp-inline-style-guard`), and stylesheets are
-  never inlined (`build.inlineStylesheets: 'never'`). This runs in `bun run
+  never inlined (`build.inlineStylesheets: 'never'`). The same build step fails if a literal
+  `:global(` survives into the built CSS (Astro leaves it untransformed inside
+  `:has()`, and the browser then drops the whole rule); such rules belong in a
+  `<style is:global>` block. This runs in `bun run
   verify quality`, in CI, and inside the Railway image build.
 - To rehearse the exact production image, headers included, build and run the
   site's own Dockerfile from the repository root (no version bump, no deploy):
