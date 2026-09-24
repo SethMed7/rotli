@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-09-23
+
+### Added
+
+- **Jump through the Quick Note's note list by number.** With the list open
+  (⌘P), ⌘1–⌘9 opens rows 1–9 and ⌘⇧1–⌘⇧9 opens rows 10–18; hold ⌘ to see each
+  row's number. All of them can be changed in Settings → Keybindings.
+
+### Fixed
+
+- **⌘⇧L works in the Quick Note.** It marks the open note secure (or not), the
+  same as in the main window, and the shield in the Quick Note follows it.
+- **The scroll-to-top arrow no longer overlaps the format bar** in a narrow
+  window or Quick Note; it moves up above the bar when they would meet.
+
 ## [1.4.1] - 2026-09-23
 
 ### Fixed

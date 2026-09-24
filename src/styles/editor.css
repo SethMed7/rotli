@@ -777,6 +777,12 @@
 .editor-scroll-top:hover {
   background-image: linear-gradient(var(--hov), var(--hov));
 }
+/* A narrow editor: the centered format bar reaches the arrow's corner, so the
+   arrow rises above the bar (16px slot inset + 42px bar + 8px gap) —
+   scrollTopLane.ts decides. */
+.editor[data-lift-scroll-top] .editor-scroll-top {
+  bottom: 66px;
+}
 
 /* Raw Markdown is an intentional source editor, not an unstyled fallback.
    Structure uses two semantic roles: the active Rotli accent for punctuation
