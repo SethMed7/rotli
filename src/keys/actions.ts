@@ -12,7 +12,6 @@ import {
   corpusFrontmatter,
   corpusSetPinned,
   hideMainWindow,
-  hideQuickWindow,
   isTauri,
   openUrl,
   summon,
@@ -38,7 +37,6 @@ import { chatRuntimeEnabled } from "../state/helperLink";
 import { navigate } from "../state/navHistory";
 import { DEFAULT_NOTE_STYLE, useNoteStyleStore } from "../state/noteStyle";
 import { activeTabOf, findLeaf, leaves, openNavTarget, usePanesStore } from "../state/panes";
-import { cycleQuick, removeQuickNote } from "../state/quick";
 import { toggleSettings } from "../state/settingsToggle";
 import { startTour } from "../state/tour";
 import { SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
@@ -47,10 +45,11 @@ import { registerCaptureActions } from "./captureActions";
 import { registerChatWindowActions } from "./chatWindowActions";
 import { EDITOR_ACTION } from "./editorActionIds";
 import { focusedNoteIdNow, notesWorkspaceActive } from "./focusNow";
-import { captureHandle, quickHandle, setupHandle } from "./handles";
+import { captureHandle, setupHandle } from "./handles";
 import { registerLeaderActions } from "./leaderActions";
 import { registerNavArrowActions } from "./navArrows";
 import { registerNoteProtectionActions } from "./noteProtectionActions";
+import { registerQuickNoteActions } from "./quickNoteActions";
 import { registerAction } from "./registry";
 import { runSurfaceFind } from "./surfaceFind";
 
@@ -836,58 +835,7 @@ export function registerDefaultActions(): void {
     run: () => captureHandle()?.dismiss(),
   });
 
-  // — the Quick Note window's own keys (surface: quick). new/search reach the
-  //   mounted component through quickHandle; cycle/remove act on the set store;
-  //   dismiss unwinds a transient (the search overlay) before hiding the window. —
-  registerAction({
-    id: "quick.new",
-    title: "Quick note — new",
-    defaultChord: "Meta+N",
-    surface: "quick",
-    run: () => quickHandle()?.newNote(),
-  });
-  registerAction({
-    id: "quick.search",
-    title: "Quick note — switch / pin notes",
-    defaultChord: "Meta+P",
-    surface: "quick",
-    run: () => quickHandle()?.openSearch(),
-  });
-  registerAction({
-    id: "quick.next",
-    title: "Quick note — next",
-    defaultChord: "Meta+BracketRight",
-    surface: "quick",
-    run: () => cycleQuick(1),
-  });
-  registerAction({
-    id: "quick.prev",
-    title: "Quick note — previous",
-    defaultChord: "Meta+BracketLeft",
-    surface: "quick",
-    run: () => cycleQuick(-1),
-  });
-  registerAction({
-    id: "quick.remove",
-    title: "Quick note — remove from set",
-    defaultChord: null,
-    surface: "quick",
-    run: () => {
-      const id = useUiStore.getState().quickActiveId;
-      if (id) removeQuickNote(id);
-    },
-  });
-  registerAction({
-    id: "quick.dismiss",
-    title: "Quick note — dismiss",
-    defaultChord: "Esc",
-    surface: "quick",
-    run: () => {
-      // unwind a transient (the search overlay / a popover) before the window
-      if (useUiStore.getState().closeTopTransient()) return;
-      void hideQuickWindow();
-    },
-  });
+  registerQuickNoteActions();
   // LAST: it opts already-registered tab/pane/chat actions into the Chat window
   registerChatWindowActions();
 }

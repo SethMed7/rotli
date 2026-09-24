@@ -64,9 +64,11 @@ export function WhichKey({
       if (inArea.length === 0) continue;
 
       const rows: WkRow[] = [];
-      // collapse the eight tab-jumps into ONE representative row
+      // collapse the eight tab-jumps into ONE representative row, and the
+      // Quick Note picker's eighteen row jumps into two
       const jumps = inArea.filter((a) => /^tabs\.jump[1-8]$/.test(a.id));
-      const rest = inArea.filter((a) => !/^tabs\.jump[1-8]$/.test(a.id));
+      const picks = inArea.filter((a) => /^quick\.pick\d+$/.test(a.id));
+      const rest = inArea.filter((a) => !/^tabs\.jump[1-8]$/.test(a.id) && !picks.includes(a));
 
       for (const a of rest) {
         const chord = currentChord(a.id);
@@ -78,6 +80,16 @@ export function WhichKey({
         const last = currentChord(`tabs.jump${jumps.length}`);
         const range = first && last ? `${formatChord(first)}–${formatChord(last)}` : "⌘1–⌘8";
         rows.push({ key: "tabs.jump", title: "Go to tab 1–8", chord: range });
+      }
+      for (const [key, title, from, to] of [
+        ["quick.pick.low", "Picker — open row 1–9", 1, 9],
+        ["quick.pick.high", "Picker — open row 10–18", 10, 18],
+      ] as const) {
+        const first = currentChord(`quick.pick${from}`);
+        const last = currentChord(`quick.pick${to}`);
+        if (picks.length > 0 && first && last) {
+          rows.push({ key, title, chord: `${formatChord(first)}–${formatChord(last)}` });
+        }
       }
 
       if (rows.length > 0) out.push({ label: area.label, rows });

@@ -224,6 +224,15 @@
         "src/ai/models.test.ts"
       ],
       "reason": "Deliberate twin test vectors: the Rust argv gate (provider.rs build_args_for + provider_models::valid_model_id) and its TS mirror (isModelIdShape) are proven against the same refusal ids (--help, opus[2m], …) and the same codex/cursor argv literals, so drift in either side fails a test."
+    },
+    {
+      "id": "quick-note-cycle-shares-main-history-chords",
+      "signal": "literal",
+      "files": [
+        "src/keys/actions.ts",
+        "src/keys/quickNoteActions.ts"
+      ],
+      "reason": "Same gesture, two keyboard surfaces: ⌘[ / ⌘] are main's Back/Forward and the Quick Note window's previous/next note. Each surface's dispatcher fires only its own actions, so the shared default chords are deliberate, not a copy to extract."
     }
   ]
 }

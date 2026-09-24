@@ -41,3 +41,39 @@ test("a blank quick note is a New note, never an Untitled row, and ⌘ shows its
   await page.keyboard.up("Meta");
   await expect(page.locator(".hkbadge")).toHaveCount(0);
 });
+
+// ⌘⇧L reaching the open note is unit-tested (quickNoteActions.test.ts): the
+// browser twin has no Secure lane to flip.
+test("in the Quick Note, ⌘1–⌘9 and ⌘⇧1–⌘⇧9 open picker rows", async ({ page }) => {
+  await page.goto("/?window=quick");
+  const win = page.locator(".quick-window");
+  await win.getByRole("button", { name: "New note" }).click();
+  await page.locator(".cm-content").click();
+  await page.keyboard.type("Keys from the Quick Note");
+
+  // the picker: held ⌘ badges rows with their chords; ⌘2 opens row 2
+  const title = win.locator(".quick-pick-name");
+  const picker = page.getByRole("dialog", { name: "Switch or pin a note" });
+  const rows = picker.locator(".qsopen .qslabel");
+  await page.keyboard.press("Meta+P");
+  await expect(rows.nth(9)).toBeVisible();
+  await page.keyboard.down("Meta");
+  await expect(page.locator(".hkbadge", { hasText: "⌘2" })).toBeVisible();
+  await page.keyboard.up("Meta");
+  const second = (await rows.nth(1).textContent()) ?? "";
+  await page.keyboard.press("Meta+2");
+  await expect(picker).toHaveCount(0);
+  await expect(title).toHaveText(second);
+
+  // ⌘⇧1 opens row 10
+  await page.keyboard.press("Meta+P");
+  await expect(rows.nth(9)).toBeVisible();
+  const tenth = (await rows.nth(9).textContent()) ?? "";
+  await page.keyboard.press("Meta+Shift+1");
+  await expect(picker).toHaveCount(0);
+  await expect(title).toHaveText(tenth);
+
+  // with the picker closed the number chords do nothing
+  await page.keyboard.press("Meta+3");
+  await expect(title).toHaveText(tenth);
+});

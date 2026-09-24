@@ -14,6 +14,9 @@ export interface QuickHandle {
   newNote(): void;
   /** Open the search-and-swap overlay. */
   openSearch(): void;
+  /** With the overlay open, open its row at this 0-based index (⌘1–⌘9,
+   * ⌘⇧1–⌘⇧9); does nothing while it is closed. */
+  openRow(index: number): void;
 }
 
 export interface SetupHandle {

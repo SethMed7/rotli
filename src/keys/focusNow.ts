@@ -4,12 +4,22 @@
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 
-/** Note chords stand down while Breve owns the content area. */
-export const notesWorkspaceActive = (): boolean => useUiStore.getState().sidebarMode !== "breve";
+/** The Quick Note window has no pane tree: its one editor registers under
+ * this pane id, and "the focused note" there is the note it has open. */
+export const QUICK_PANE_ID = "quick";
 
-/** The focused pane's active tab noteId. null when the pane has no resolvable
- * tab (the maintainer, 2026-06-13: the lifecycle chords target this note). */
+const inQuickWindow = (): boolean => usePanesStore.getState().focusedPaneId === QUICK_PANE_ID;
+
+/** Note chords stand down while Breve owns the content area (main only —
+ * the Quick Note window is always a note). */
+export const notesWorkspaceActive = (): boolean =>
+  inQuickWindow() || useUiStore.getState().sidebarMode !== "breve";
+
+/** The focused pane's active tab noteId — or, in the Quick Note window, its
+ * open note. null when there is no resolvable note (the maintainer,
+ * 2026-06-13: the lifecycle chords target this note). */
 export function focusedNoteIdNow(): string | null {
+  if (inQuickWindow()) return useUiStore.getState().quickActiveId;
   const { root, focusedPaneId } = usePanesStore.getState();
   const leaf = findLeaf(root, focusedPaneId) ?? leaves(root)[0];
   if (!leaf) return null;

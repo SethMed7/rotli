@@ -7,22 +7,26 @@
 // live in the ui store (state/quick.ts), synced to the main window which
 // persists them. Renders standalone in a plain browser for review.
 
-import { type KeyboardEvent, type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  type MouseEvent,
+  type RefObject,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { EditorSurface } from "../editor/editorSurface";
+import { QUICK_PANE_ID } from "../keys/focusNow";
 import { quickHandle, setQuickHandle } from "../keys/handles";
+import { toggleNoteSecure } from "../keys/noteProtectionActions";
+import { QUICK_PICK_ROWS } from "../keys/quickNoteActions";
 import { hotkeyPeekDelay, useHeldModifier } from "../keys/useHeldModifier";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { useTransientPopover } from "../lib/popover";
 import { pickableNotes, quickNoteTitle } from "../lib/quickNoteList";
-import {
-  corpusFrontmatter,
-  corpusSetSecure,
-  emitQuickCreated,
-  isTauri,
-  onQuickShow,
-  startWindowDrag,
-} from "../lib/tauri";
+import { corpusFrontmatter, emitQuickCreated, isTauri, onQuickShow, startWindowDrag } from "../lib/tauri";
 import { fileQuickNoteInMain } from "../newItems/composition";
 import { createVaultCapture } from "../services/captureRouting";
 import { createRoutedNote } from "../services/createNote";
@@ -38,11 +42,6 @@ import { PlusGlyph, SearchGlyph, ShieldGlyph, glyphForNote } from "./glyphs";
 import { HotkeyBadges } from "./hotkeyBadges";
 import { IconButton } from "./iconButton";
 import { WhichKey } from "./whichKey";
-
-/** activeEditor() resolves through the panes store's focusedPaneId; the quick
- * webview has no pane tree, so we pin it to this id and register the editor
- * under it — that keeps ⌘B / headings / lists working here. */
-const QUICK_PANE_ID = "quick";
 
 /** Manual drag (never data-tauri-drag-region) so double-click can't zoom. */
 function onDragRegionMouseDown(event: MouseEvent) {
@@ -89,6 +88,7 @@ function NotePicker({
   onOpen,
   onTogglePin,
   onClose,
+  rowsRef,
 }: {
   notes: NoteSummary[];
   pinned: Set<string>;
@@ -96,6 +96,8 @@ function NotePicker({
   onOpen: (id: string) => void;
   onTogglePin: (id: string) => void;
   onClose: () => void;
+  /** The rows on screen, for the ⌘1–⌘9 / ⌘⇧1–⌘⇧9 jumps. */
+  rowsRef: RefObject<NoteSummary[]>;
 }) {
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
@@ -112,6 +114,9 @@ function NotePicker({
     return [...fav, ...rest].slice(0, 60);
   }, [notes, query, pinned]);
   const sel = Math.min(index, Math.max(0, results.length - 1));
+  useEffect(() => {
+    rowsRef.current = results;
+  }, [results, rowsRef]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "ArrowDown") {
@@ -150,7 +155,13 @@ function NotePicker({
           const isPinned = pinned.has(n.id);
           return (
             <div key={n.id} className={i === sel ? "qsrow sel" : "qsrow"} onMouseEnter={() => setIndex(i)}>
-              <button type="button" className="qsopen" onClick={() => onOpen(n.id)}>
+              <button
+                type="button"
+                className="qsopen"
+                // held ⌘ badges the row with the chord that opens it
+                data-hotkey={i < QUICK_PICK_ROWS ? `quick.pick${i + 1}` : undefined}
+                onClick={() => onOpen(n.id)}
+              >
                 {glyphForNote(n, { size: 14 })}
                 <span className="qslabel">{n.title || "Untitled"}</span>
                 {n.id === activeId && <span className="qstag">open</span>}
@@ -215,17 +226,14 @@ export function QuickNote() {
     return () => {
       cancelled = true;
     };
-  }, [activeId]);
+    // the notes list refreshes after ⌘⇧L flips the flag: re-read it then too
+  }, [activeId, universe.notes]);
 
   const toggleSecure = () => {
     if (!activeId || securityBusy) return;
-    const next = !secure;
     setSecurityBusy(true);
-    void corpusSetSecure(activeId, next)
-      .then(() => {
-        setSecure(next);
-        return invalidateNotes();
-      })
+    void toggleNoteSecure(activeId)
+      .then(setSecure)
       .catch((e: unknown) => setErr((e as Error)?.message ?? "couldn't update note security"))
       .finally(() => setSecurityBusy(false));
   };
@@ -318,10 +326,17 @@ export function QuickNote() {
       });
   };
   const openPicker = () => setPickerOpen(true);
+  const pickerRowsRef = useRef<NoteSummary[]>([]);
+  const openRow = (index: number) => {
+    const note = pickerOpen ? pickerRowsRef.current[index] : undefined;
+    if (!note) return;
+    setQuickActive(note.id);
+    setPickerOpen(false);
+  };
 
   // route the quick.new / quick.search(picker) chords to this live component
   useEffect(() => {
-    setQuickHandle({ newNote, openSearch: openPicker });
+    setQuickHandle({ newNote, openSearch: openPicker, openRow });
     return () => setQuickHandle(null);
   });
 
@@ -435,6 +450,7 @@ export function QuickNote() {
             setPickerOpen(false);
           }}
           onTogglePin={togglePinQuick}
+          rowsRef={pickerRowsRef}
           onClose={() => setPickerOpen(false)}
         />
       )}
