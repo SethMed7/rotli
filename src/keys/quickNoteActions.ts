@@ -21,8 +21,9 @@ export function quickPickChord(row: number): string {
 }
 
 /** main's note commands that also belong to the Quick Note: they act on the
- * note it has open (focusNow.ts resolves it there). */
-const ALSO_IN_QUICK_NOTE = [TOGGLE_SECURE_ACTION];
+ * note it has open (focusNow.ts resolves it there). ⌘⇧C asks main to open the
+ * chat (the `note-chat` message, lib/chatWindowBridge.ts) — the Quick Note cannot host one. */
+const ALSO_IN_QUICK_NOTE = [TOGGLE_SECURE_ACTION, "editor.typography", "note.chat", "note.chatNew"];
 
 export function registerQuickNoteActions(): void {
   registerAction({

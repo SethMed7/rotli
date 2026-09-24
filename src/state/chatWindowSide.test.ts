@@ -68,7 +68,10 @@ beforeEach(() => {
   useChatRuns.setState({ runs: {} });
   useUiStore.getState().setRowActionError(null);
   resetPanesForVaultSwitch();
-  detach = attachChatWindow(() => {});
+  detach = attachChatWindow(
+    () => {},
+    () => {},
+  );
 });
 
 describe("the Chat window", () => {
