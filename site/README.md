@@ -257,17 +257,21 @@ bun run preview  # serve the built dist/ locally
   integrations left production until refined. The remote route (Grok Bot, the
   relay, self-hosting) sits inside that same dev-only guide. Do not publish a hosted relay URL there until that
   deployment has been verified.
-- `public/social-card.svg` is the editable source for the link preview: the
-  wordmark, the hero line, a faint file-icon pattern that fades out behind
-  the headline, the Warm Light app capture tilted in from the right, and the
-  line-art quokka waving up from the bottom edge (a ground-colored silhouette
-  from `src/assets/characters/masks/` keeps the pattern out of it). Run
+- `public/social-card.svg` is the editable source for the link preview, set on
+  the story film's island by day: the wordmark and the hero line over a faint
+  file-icon pattern that fades out before the bay, the lighthouse on its hill,
+  the bay and a beach along the bottom, the Warm Light app capture tilted in
+  from the right, and the quokka waving from the sand (its line art over the
+  silhouette in `src/assets/characters/masks/`, filled with the film's cocoa).
+  Colors are the film's palette (the site's `--sea`, `--sand`, `--limestone`
+  tokens), written out because the card renders outside the site. Run
   `bun run build:social-card` from the repository root to render it with the
   bundled fonts and every `href="asset:<repo path>"` raster inlined, with no
   external requests. The
   results are `public/social-card.png` (1200×630, what iMessage, Slack,
   LinkedIn, X, and Discord show for a rotli.co link) and
-  `public/social-card-github.png` (1280×640, the 2:1 image GitHub wants for
+  `public/social-card-github.png` (1280×640: the card scaled to cover 2:1 and
+  trimmed 16 px top and bottom, so the scenery still runs to the edges; the image GitHub wants for
   the repository's Settings → Social preview, which has no API and is uploaded
   by hand). Keep the copy and palette aligned with the current hero before
   rendering. `layouts/Base.astro` publishes the card with explicit

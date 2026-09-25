@@ -38,15 +38,19 @@ const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 640 }, deviceScaleFactor: 1 });
   await page.route("**/*", (route) => route.abort());
-  // The GitHub export centres the 1200×630 card on a 1280×640 ground of the same paper.
-  await page.setContent(
-    `<style>body{margin:0;background:#f8f2e9;width:1280px;height:640px;display:grid;place-items:center}</style>${svg}`,
-  );
+  await page.setContent(`<style>body{margin:0}</style>${svg}`);
   await page.evaluate(() => document.fonts.ready);
   await page
     .locator("svg")
     .first()
     .screenshot({ path: out("social-card.png") });
+  // The GitHub export (2:1) scales the card to cover 1280 wide and trims 16 px from the top
+  // and bottom, so the scenery that runs to the card's edges (the bay, the beach) still does.
+  await page.setContent(
+    `<style>body{margin:0;overflow:hidden;width:1280px;height:640px;position:relative}` +
+      `body>svg{position:absolute;left:0;top:-16px;width:1280px;height:672px}</style>${svg}`,
+  );
+  await page.evaluate(() => document.fonts.ready);
   await page.screenshot({
     path: out("social-card-github.png"),
     clip: { x: 0, y: 0, width: 1280, height: 640 },
