@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title description">
   <title id="title">Rotli — room to think, files you keep</title>
-  <desc id="description">The rotli wordmark and "Room to think. Files you keep." over a faint pattern of file icons, the app tilted in from the right, and the line-art quokka waving up from the bottom edge.</desc>
+  <desc id="description">The rotli card on Rottnest by day: the headline over a faint file pattern, the lighthouse on its hill, the bay along the bottom, the app tilted in from the right, and the cocoa quokka waving from the sand.</desc>
   <!-- Rendered by scripts/build-social-card.mjs: fonts/ and asset: references are inlined, the network is off. -->
   <style>@font-face { font-family: "General Sans"; src: url("fonts/GeneralSans-Semibold.woff2"); font-weight: 700; } @font-face { font-family: "Baloo 2"; src: url("fonts/Baloo2-600.ttf"); font-weight: 600; }</style>
   <defs>
@@ -24,11 +24,25 @@
     <mask id="quokka-mask" maskUnits="userSpaceOnUse" x="150" y="432" width="330" height="330">
       <image href="asset:src/assets/characters/masks/waving.webp" x="150" y="432" width="330" height="330"/>
     </mask>
+      <linearGradient id="sky-fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0.62" stop-color="#fff"/><stop offset="0.8" stop-color="#000"/></linearGradient>
+    <mask id="sky-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="1200" height="630"><rect width="1200" height="630" fill="url(#sky-fade)"/></mask>
   </defs>
-
   <rect width="1200" height="630" fill="#f8f2e9"/>
-  <rect width="1200" height="630" fill="url(#files)" mask="url(#files-mask)"/>
-
+  <g mask="url(#sky-mask)"><rect width="1200" height="630" fill="url(#files)" mask="url(#files-mask)"/></g>
+  <g transform="translate(560 108) scale(0.9)"><ellipse cx="0" cy="0" rx="56" ry="16" fill="#fffaf2"/><ellipse cx="-34" cy="4" rx="30" ry="13" fill="#fffaf2"/><ellipse cx="26" cy="-9" rx="32" ry="15" fill="#fffaf2"/><path d="M-66 12q50 9 128 1" fill="none" stroke="#6e6155" stroke-opacity="0.45" stroke-width="2.5" stroke-linecap="round"/></g>
+  <path d="M430 520C508.0 490 565.0 432 625.0 432S751.75 494 820 520Z" fill="#e6d3ad" stroke="#2b231d" stroke-width="3"/><ellipse cx="535.0" cy="472" rx="22" ry="9" fill="#8d9a76"/><ellipse cx="565.0" cy="462" rx="18" ry="8" fill="#6d7a58"/><ellipse cx="680.0" cy="460" rx="20" ry="8" fill="#8d9a76"/><ellipse cx="720.0" cy="476" rx="24" ry="9" fill="#6d7a58"/><g transform="translate(625.0 436) scale(0.95)" stroke="#2b231d" stroke-width="3" stroke-linejoin="round">
+      <path d="M-17 0l5-92h24l5 92z" fill="#fffaf2"/>
+      <path d="M-15 -30h30M-16 -60h32" stroke-opacity="0.35"/>
+      <rect x="-17" y="-98" width="34" height="6" fill="#2b231d"/>
+      <rect x="-10" y="-118" width="20" height="20" fill="#8fb9c9"/>
+      <path d="M-13 -118q13-16 26 0z" fill="#2b231d"/>
+      <rect x="-4" y="-20" width="8" height="14" fill="#c97e62" stroke="none"/>
+    </g>
+  <rect x="0" y="518" width="1200" height="112" fill="#7fcfc6"/>
+    <rect x="0" y="518" width="1200" height="9" fill="#3fa3a6"/>
+    <g fill="none" stroke="#e9fbf6" stroke-width="3" stroke-linecap="round"><path d="M40 552q10-6 20 0" /><path d="M210 576q10-6 20 0" /><path d="M360 558q10-6 20 0" /><path d="M520 588q10-6 20 0" /><path d="M640 554q10-6 20 0" /><path d="M90 602q10-6 20 0" /><path d="M300 614q10-6 20 0" /><path d="M720 606q10-6 20 0" /><path d="M880 568q10-6 20 0" /><path d="M1010 594q10-6 20 0" /><path d="M1120 558q10-6 20 0" /></g>
+  <path d="M0 630V574C140 560 320 562 470 590C510 600 540 614 552 630Z" fill="#f1e3c4"/>
+    <path d="M0 574C140 560 320 562 470 590C510 600 540 614 552 630" fill="none" stroke="#2b231d" stroke-width="3"/>
   <text x="72" y="100" fill="#3a3028" font-family="'Baloo 2', sans-serif" font-size="40" font-weight="600" letter-spacing="-0.5">rotli</text>
   <g font-family="'General Sans', Arial, sans-serif" font-size="78" font-weight="700" letter-spacing="-3.5" fill="#3a3028">
     <text x="68" y="219">Room to think.</text>
@@ -43,7 +57,7 @@
   </g>
 
   <!-- The quokka, waving up from the bottom edge (src/assets/characters/waving.svg). -->
-  <rect x="150" y="432" width="330" height="330" fill="#f8f2e9" mask="url(#quokka-mask)"/>
+  <rect x="150" y="432" width="330" height="330" fill="#c6845f" mask="url(#quokka-mask)"/>
   <svg x="150" y="432" width="330" height="330" viewBox="0 0 1024 1024" aria-hidden="true">
 <g transform="translate(0.000000,1024.000000) scale(0.100000,-0.100000)"
 fill="#3A3028" stroke="none">
