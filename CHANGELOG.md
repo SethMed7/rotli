@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A rotli.co link now shows the island.** The link preview in iMessage,
+  Slack, X, and Discord keeps its headline and app window, and adds the film's
+  Rottnest: the lighthouse on its hill, the bay, and the quokka waving from the
+  sand.
 - **rotli.co's 404 page is a sunset.** A missing page now fills the window with
   the film's sunset and the waving quokka, with one button home and no header
   or footer. The footer links the open motion studio at studio.rotli.co, and
