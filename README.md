@@ -1,13 +1,11 @@
-<div align="center">
-
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/media/quokka-waving.inv.svg">
-  <img src="docs/media/quokka-waving.svg" alt="The Rotli quokka, waving hello" width="140">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/media/readme-banner-night.webp">
+  <img src="docs/media/readme-banner.webp" alt="Rotli: Room to think. Files you keep. The quokka waves from a beach on Rottnest Island, below a lighthouse, beside the Rotli window.">
 </picture>
 
-# Rotli
+<div align="center">
 
-### Room to think. Files you keep.
+# Rotli
 
 A calm, local-first workspace for your Mac. One folder is your vault, the
 Librarian keeps it organized, and every note stays a plain file you own.
