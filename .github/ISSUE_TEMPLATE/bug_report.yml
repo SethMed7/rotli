@@ -1,0 +1,56 @@
+name: Bug report
+description: Something in Rotli does not work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Use **synthetic** notes only: never paste real note content, vault paths,
+        `.rotli/` state, raw logs, screenshots with private titles, or credentials.
+        A security problem goes to **Security → Report a vulnerability**, not here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Start from a new, empty vault if you can.
+      placeholder: |
+        1. Create a note…
+        2. Press…
+        3. See…
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Rotli version
+      description: Settings → About Rotli.
+      placeholder: "1.5.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where
+      options:
+        - Mac app
+        - Rotli Web (browser)
+        - CLI or MCP (rotli agent / rotli mcp)
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: macOS or browser version
+      placeholder: "macOS 26.1, or Chrome 141"
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: A sanitized error message, or a screenshot of synthetic content.

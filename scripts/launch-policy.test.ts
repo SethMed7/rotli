@@ -30,3 +30,27 @@ test("main and dev keep mandatory CI without any bypass; only the owner role can
   expect(review.rules[0].parameters.require_code_owner_review).toBe(true);
   expect(review.rules[0].parameters.dismiss_stale_reviews_on_push).toBe(true);
 });
+
+test("only the owner role can delete or rewrite any branch or tag, and Dependabot keeps its own branches", () => {
+  const owner = [{ actor_id: 5, actor_type: "RepositoryRole", bypass_mode: "always" }];
+  const read = (name: string) => JSON.parse(readFileSync(`.github/rulesets/${name}.json`, "utf8"));
+  const branches = read("all-branches");
+  const tags = read("tags");
+  const pushes = read("owner-only-pushes");
+  for (const policy of [branches, tags, pushes]) {
+    expect(policy.enforcement).toBe("active");
+    expect(policy.bypass_actors).toEqual(owner);
+  }
+  expect(branches.conditions.ref_name).toEqual({ include: ["~ALL"], exclude: ["refs/heads/dependabot/**"] });
+  expect(branches.rules.map((rule: { type: string }) => rule.type)).toEqual(["deletion", "non_fast_forward"]);
+  expect(tags.target).toBe("tag");
+  expect(tags.conditions.ref_name.include).toEqual(["~ALL"]);
+  expect(tags.rules.map((rule: { type: string }) => rule.type)).toEqual([
+    "deletion",
+    "update",
+    "non_fast_forward",
+  ]);
+  expect(pushes.conditions.ref_name.include).toEqual(
+    expect.arrayContaining(["refs/heads/main", "refs/heads/dev"]),
+  );
+});

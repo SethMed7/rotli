@@ -5,7 +5,7 @@ const repository = "SethMed7/rotli";
 const arguments_ = process.argv.slice(2);
 if (arguments_.some((value) => value !== "--apply"))
   throw new Error("Usage: bun run security:protect [--apply]");
-const plans = ["integrity", "owner-review"].map((name) =>
+const plans = ["integrity", "owner-review", "owner-only-pushes", "all-branches", "tags"].map((name) =>
   JSON.parse(readFileSync(new URL(`../.github/rulesets/${name}.json`, import.meta.url), "utf8")),
 );
 if (!arguments_.includes("--apply")) {

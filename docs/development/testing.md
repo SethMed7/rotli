@@ -8,7 +8,7 @@ direction, runtime wiring, and owning documentation must agree.
 
 | Command | Purpose |
 |---|---|
-| `bun run security:protect` | Print the owner-only main/dev ruleset plan; explicit `--apply` checks the owner and applies/read-backs the two policies when GitHub supports private-repository protection |
+| `bun run security:protect` | Print the five repository rulesets (main/dev, all branches, tags); explicit `--apply` checks the owner, then creates or updates and reads back each one |
 | `bun run security:secrets` | Redacted Gitleaks 8.30.1 scan of tracked/unignored working-tree files; separate from verify, fails on findings/errors; the external binary is intentionally listed in knip's tool allowlist |
 | `bun run security:working` | Scan proposed tracked/untracked worktree text with pinned Gitleaks without printing values; included in the required verify secrets lane alongside a latest-commit scan. Full history remains a separate publication gate |
 | `bun run security:bundle <candidate.app>` | Inspect actual release resources and binary strings for prohibited files, embedded home paths, and symlinks escaping the bundle; required before Apple uploads |
