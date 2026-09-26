@@ -749,6 +749,17 @@
 .rotli-cm-host .cm-content ::selection {
   background: color-mix(in srgb, var(--accent) 26%, transparent);
 }
+/* "Find in this file" (findHighlight.ts): every match is washed, the current
+   one is solid and ringed, so it reads as "here" in every theme; the accent
+   keeps it apart from the peach ==highlight== tint */
+.rotli-cm-host .cm-find-match {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border-radius: var(--r-inner);
+}
+.rotli-cm-host .cm-find-current {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  outline: 1px solid var(--accent);
+}
 /* an empty note's hint (emptyPlaceholder.ts): painted behind a plain empty
    line so the native caret keeps real line metrics in every engine */
 .rotli-cm-host .cm-line.rotli-empty-hint::before {

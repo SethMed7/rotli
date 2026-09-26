@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Find in this file shows what it matched.** Every match is marked on the
+  page and the current one stands out, the way find works everywhere else.
+  Before, the match was selected but did not show while you typed in the find
+  box.
+- **Moving a note to Trash closes its tab**, in every pane, the way trashing a
+  file already did. A trashed board's tab closes too.
+- **"Untitled" no longer ends up in a note's metadata.** A new note's
+  placeholder name and each half-typed title ("Round", "Round Three -") were
+  saved as aliases while you typed. Now only a real rename keeps the old name,
+  so links to it still work, and a rename clears old "Untitled" entries.
+
 ### Changed
 
 - **A rotli.co link now shows the island.** The link preview in iMessage,

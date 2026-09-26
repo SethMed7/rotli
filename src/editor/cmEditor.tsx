@@ -43,6 +43,7 @@ import { copyHandlers } from "./copyHandlers";
 import { emptyPlaceholder } from "./emptyPlaceholder";
 import { importImagePathsAtPosition, isEmbeddablePath } from "./externalImageDrop";
 import { findTextMatches, nextFindMatch } from "./find";
+import { findHighlight, setFindMarks } from "./findHighlight";
 import { fmBlock } from "./fmBlock";
 import { focusDim } from "./focusMode";
 import { headingFolding, toggleHeadingFold } from "./headingFold";
@@ -541,6 +542,7 @@ function CmEditorImpl({
       extensions: [
         history(),
         listNumbering,
+        findHighlight,
         // the slash menu owns ↑/↓/Enter/Esc while open — highest precedence so
         // it wins before the keymaps; stops propagation so Esc closes the menu
         // and never also hides the window (the old stopImmediatePropagation)
@@ -663,6 +665,16 @@ function CmEditorImpl({
     // a mid-document anchor.
     viewRef.current?.scrollDOM.scrollTo({ top: 0, behavior: "auto" });
   }, [scrollToTopSignal]);
+
+  // paint the find matches (findHighlight.ts): focus stays in the find box, so
+  // the moved selection alone never shows; closing the bar clears the marks
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: setFindMarks.of(
+        findOpen ? { matches: findMatches, current: findIndex } : { matches: [], current: -1 },
+      ),
+    });
+  }, [findOpen, findMatches, findIndex]);
 
   // live spell-check toggle (default on; a Settings switch)
   useEffect(() => {
