@@ -79,8 +79,6 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
   library in, links and images included.
 - **Backlinks panel** · M — every note that links to this one, plus places that
   mention it without a link.
-- **Templates via slash** · S — `/template meeting` drops in a saved note
-  layout.
 - **Actionable checklists as a family** · L — `/email:send` is the first one.
   The same pattern for `/remind`, `/event`, and `/open`, so a checkbox can carry
   an action.
@@ -96,12 +94,33 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
 - **Due dates on tasks** · M — write `due friday` on a task, and the Tasks page
   gets a Today group. Pairs with actionable checklists.
 - **Task board view** · M — the Tasks page as columns: open, in progress, done.
-  The in-progress `[/]` state already exists, so it is one more view over the
-  same notes.
+  The in-progress `[/]` state already exists in notes; the Tasks list needs to
+  carry it (today it folds `[/]` into open), then this is one more view over
+  the same notes.
 - **Librarian weekly digest** · M — what you wrote this week, notes nothing
   links to, and stale tasks, delivered through Breve.
 - **Tags browser** · M — a place to see every tag and the notes under it. Tags
   already exist in note metadata.
+- **Freeform canvas** · XL — drop notes, sheets, PDFs, and images on one
+  board, connect them, group them into frames, and present the frames as
+  slides, like AFFiNE's Edgeless. Built inside Excalidraw. First slice (M–L, no
+  contract change): real-size images on boards, drops onto a board, frames +
+  Present. File cards and connectors need two
+  owner calls: whether a connector is a link, and what a card may show
+  ([evaluation](docs/design/canvas-tasks-logseq-eval-2026-09-23.md)).
+- **Query fence** · M–L — a `query` code block that shows a live table of
+  tasks or notes (`tag:`, `area:`, state, due), using the grammar
+  `rotli notes query` already has. With **Export to .xlsx** (S–M) it gives a
+  task table that opens in Excel while tasks stay in notes.
+- **Daily journal** · S–M — a Journal folder, a "Today" command that opens or
+  creates today's note, and Quick Note can land there. Logseq's best-loved
+  habit.
+- **Sheet templates** · M — "New from template": task tracker, weekly planner,
+  habit tracker, with status dropdowns, colours, and a frozen header, saved as
+  real .xlsx. Needs Sheets released, and dropdowns and colour rules carried
+  through the grid first.
+- **Block references** · L — point at one paragraph with `^id` and show it
+  elsewhere with `![[note#^id]]`, in the same syntax Obsidian reads.
 
 ## 4. Known bugs
 
@@ -117,6 +136,18 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
   not line up with the pointer. Needs a reproduction first.
 - **Image tags show up in the chat name** · S — a chat that starts with an
   image gets the raw image tag as its name.
+- **Big images do not save on a board** · S/M — an image over about 75 KB goes
+  over a board's 100k-character string limit, so the save fails. The board
+  validator rejects a 110 KB image (`src/boards/validation.ts`; Rust twin in
+  `src-tauri/src/board.rs`); not yet reproduced in the app. Fix S: let image
+  data past the per-string limit (files still open in Excalidraw). Fix M:
+  images as vault assets (smaller boards, but other apps show broken images).
+- **A file dropped on a board lands somewhere else** · S — on the Mac a Finder
+  drop onto a focused board has no board branch and falls through to another
+  note or Assets. Suspected, not yet reproduced.
+- **A typed `[[Board]]` link may open the board as a note** · S — the `[[`
+  picker leaves boards out, but a typed link still resolves and opens as a note
+  tab. Suspected, not yet reproduced.
 
 ## 5. Small enhancements
 
@@ -130,8 +161,6 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
   notes in the sidebar so 1–9 stay put.
 - **Two-step hotkeys** · M — needed first by the two hotkeys above. ⌘1–9
   already jump tabs, and Rotli has no "press one chord, then another" yet.
-- **Wikilink hover preview** · S/M — hover a `[[link]]` and see the top of that
-  note without opening it.
 - **Send feedback in-app** · S — a button that opens a prefilled GitHub issue.
 
 ## 6. Keeping the web version in sync

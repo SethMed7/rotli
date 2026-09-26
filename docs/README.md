@@ -33,6 +33,7 @@ fix both in the same change.
 | Bun 1.4 architecture audit and promotion record | [`architecture/bun-1.4-audit-2026-08-21.md`](architecture/bun-1.4-audit-2026-08-21.md) |
 | Egress threat model (can secure content reach a remote model?) | [`architecture/egress-threat-model.md`](architecture/egress-threat-model.md) |
 | Code organization audit | [`architecture/code-audit.md`](architecture/code-audit.md) |
+| Quality guards (oxc, checks, ratchets) and agent-skill proposals | [`architecture/quality-guards-and-agent-tooling-audit-2026-09-23.md`](architecture/quality-guards-and-agent-tooling-audit-2026-09-23.md) |
 | Managed Breve runtime | [`../breve-runtime/README.md`](../breve-runtime/README.md) |
 | Brand implementation | [`../src/brand/README.md`](../src/brand/README.md) |
 | AI-assisted development workflow | [`development/ai-workflow.md`](development/ai-workflow.md) |
@@ -45,6 +46,7 @@ fix both in the same change.
 | Local-model output quality, speed, and heat — the measured plan | [`design/local-model-quality-and-performance.md`](design/local-model-quality-and-performance.md) |
 | Why rotli stays on Tauri, and how idle cost is kept honest | [`design/shell-runtime-decision.md`](design/shell-runtime-decision.md) |
 | rotli.co structure: nav, Resources/Blog/About, download + web actions, link card | [`design/site-ia-and-link-card-2026-09-18.md`](design/site-ia-and-link-card-2026-09-18.md) |
+| Freeform canvas, task tables, and Logseq lessons — evaluation | [`design/canvas-tasks-logseq-eval-2026-09-23.md`](design/canvas-tasks-logseq-eval-2026-09-23.md) |
 | Durable schemas, compatibility, migrations, and downgrade behavior | [`architecture/compatibility-and-migrations.md`](architecture/compatibility-and-migrations.md) |
 | Repository privacy, main/dev protection, reviewers, and PR flow | [`operations/repository-access.md`](operations/repository-access.md) |
 | Release integrity, provenance, SBOM, keys, and rollback | [`operations/release-and-supply-chain.md`](operations/release-and-supply-chain.md) |
