@@ -21,14 +21,14 @@ be active. The first two cover **both** `main` and `dev`:
   GitHub does not allow authors to approve their own PRs. The independent
   integrity ruleset still enforces CI and prevents direct pushes.
 - `owner-only-pushes.json`: only the admin role creates, updates, or deletes
-  `main`, `dev`, `dev/**`, and `release*` branches.
+  `main`, `dev`, `dev/**`, `release*`, and `release/**` branches.
 - `all-branches.json`: only the admin role deletes or force-pushes **any**
   branch. `dependabot/**` is excluded because Dependabot rebases and deletes its
   own branches.
-- `tags.json`: only the admin role deletes or moves **any** tag, so a published
-  `v*` or `helper-v*` tag always names the commit it was released from. Creating
-  a tag stays open to writers because `helper-release.yml` creates its tag
-  through Actions.
+- `tags.json`: only the admin role creates, moves, or deletes **any** tag, so a
+  published `v*` or `helper-v*` tag always names the commit it was released
+  from. `scripts/release.sh` creates release tags as the owner; Actions creates
+  none here (`helper-release.yml` publishes to `SethMed7/rotli-releases`).
 
 GitHub rulesets cannot name "the person who created a branch", so no rule can
 say "only its author may change it". The fork flow below provides that instead:
@@ -37,11 +37,13 @@ owner, if they allow maintainer edits on the PR) can change it. A future
 collaborator with write access could push to another person's branch here, but
 could not delete or rewrite it.
 
-Inspect the exact payloads with `bun run security:protect`. Apply them with
+Inspect the exact payloads with `bun run security:protect`; compare them with
+GitHub, read-only, with `bun run security:protect --check`. Apply them with
 `bun run security:protect --apply` (rulesets require a public repository or a
 paid plan). The helper checks the authenticated owner, creates or updates only
-its five named rulesets, and reads them back. A partial application must be
-repaired before treating either branch as protected. Re-run after a required
+its five named rulesets, and reads each back against the plan's conditions,
+bypass actors, and rules. If it stops partway it names the rulesets already
+verified; repair the rest before treating either branch as protected. Re-run after a required
 job name or GitHub App changes. Existing unrelated rules are retained.
 
 Before publication (2026-09-09) GitHub returned HTTP 403 for rulesets on the

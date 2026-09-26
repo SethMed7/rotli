@@ -9,7 +9,7 @@
       "exclude": []
     }
   },
-  "name": "Tags: owner-only delete and move",
+  "name": "Tags: owner-only create, move and delete",
   "bypass_actors": [
     {
       "actor_id": 5,
@@ -18,6 +18,9 @@
     }
   ],
   "rules": [
+    {
+      "type": "creation"
+    },
     {
       "type": "deletion"
     },

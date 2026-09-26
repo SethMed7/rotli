@@ -16,9 +16,9 @@ pull request; the owner reviews it and merges it.
    [issue templates](https://github.com/SethMed7/rotli/issues/new/choose). A
    security problem is reported privately (see [`SECURITY.md`](SECURITY.md)),
    never in an issue.
-2. **Fork** `SethMed7/rotli` and clone your fork. Nobody outside the owner can
-   push branches to this repository; your branch lives in your fork, so only
-   you can change it.
+2. **Fork** `SethMed7/rotli` and clone your fork. Outside contributors don't
+   have write access here, so your branch lives in your fork, where only you
+   can change it.
 3. **Branch from `dev`** with a short descriptive name (`fix-sidebar-crash`,
    `docs-sync-guide`), make the change, and run `bun run verify`.
 4. **Open a pull request into `dev`** and fill in the template. Write "Fixes
