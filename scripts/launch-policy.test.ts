@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 test("every Breve IPC command refuses before any body work in a disabled build", () => {
   let commands = 0;
@@ -29,4 +29,43 @@ test("main and dev keep mandatory CI without any bypass; only the owner role can
   ]);
   expect(review.rules[0].parameters.require_code_owner_review).toBe(true);
   expect(review.rules[0].parameters.dismiss_stale_reviews_on_push).toBe(true);
+});
+
+test("only the owner role can delete or rewrite any branch or tag, and Dependabot keeps its own branches", () => {
+  const owner = [{ actor_id: 5, actor_type: "RepositoryRole", bypass_mode: "always" }];
+  const read = (name: string) => JSON.parse(readFileSync(`.github/rulesets/${name}.json`, "utf8"));
+  const types = (policy: { rules: { type: string }[] }) => policy.rules.map((rule) => rule.type);
+  const branches = read("all-branches");
+  const tags = read("tags");
+  const pushes = read("owner-only-pushes");
+  for (const policy of [branches, tags, pushes]) {
+    expect(policy.enforcement).toBe("active");
+    expect(policy.bypass_actors).toEqual(owner);
+  }
+  expect(branches.conditions.ref_name).toEqual({ include: ["~ALL"], exclude: ["refs/heads/dependabot/**"] });
+  expect(types(branches)).toEqual(["deletion", "non_fast_forward"]);
+  expect(tags.target).toBe("tag");
+  expect(tags.conditions.ref_name).toEqual({ include: ["~ALL"], exclude: [] });
+  expect(types(tags)).toEqual(["creation", "deletion", "update", "non_fast_forward"]);
+  expect(types(pushes)).toEqual(["creation", "update", "deletion", "non_fast_forward"]);
+  expect(pushes.conditions.ref_name).toEqual({
+    include: [
+      "refs/heads/main",
+      "refs/heads/dev",
+      "refs/heads/dev/**",
+      "refs/heads/release*",
+      "refs/heads/release/**",
+    ],
+    exclude: [],
+  });
+});
+
+test("security:protect applies every tracked ruleset", () => {
+  const source = readFileSync("scripts/repository-protection.mjs", "utf8");
+  const names = /const plans = \[([^\]]*)\]/
+    .exec(source)?.[1]
+    ?.match(/"[^"]+"/g)
+    ?.map((name) => name.slice(1, -1));
+  const tracked = readdirSync(".github/rulesets").map((file) => file.replace(/\.json$/, ""));
+  expect([...(names ?? [])].sort()).toEqual([...tracked].sort());
 });

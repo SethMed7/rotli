@@ -258,7 +258,7 @@ revocation, replacement, and already-shipped client behavior are understood.
 
 Before calling the delivery process production-ready:
 
-- enforce both main/dev rulesets from [repository access](repository-access.md);
+- enforce the branch and tag rulesets from [repository access](repository-access.md);
 - eliminate dirty-tree publication and silent tag failures;
 - extend the generated evidence with an SBOM, signed provenance, retained
   reviewed notary records, and a maintainer-controlled archive;

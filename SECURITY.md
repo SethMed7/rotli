@@ -8,12 +8,10 @@ product boundaries, not optional hardening.
 Do not open a public issue for a suspected vulnerability or include private
 notes, credentials, absolute memex paths, or exploit details in a public thread.
 
-During the current private beta, report security concerns directly to the
-repository owner through the existing private project channel. Before public
-distribution or outside contribution, Rotli must enable GitHub private
-vulnerability reporting. Once enabled, use the repository's **Security →
-Advisories → Report a vulnerability** flow; never put a suspected vulnerability
-in a public issue.
+Report it privately through GitHub private vulnerability reporting: the
+repository's **Security → Report a vulnerability** form
+(<https://github.com/SethMed7/rotli/security/advisories/new>). Only the owner
+sees the report.
 
 Include only what is necessary:
 
@@ -47,11 +45,11 @@ The executable egress inventory and current accepted findings are in
 
 ## Supported versions
 
-Rotli is pre-1.0 beta software. Security fixes target the current main branch and
-the newest signed release. Older beta releases may not receive backports; users
-should update to the newest signed build after reviewing its release notes.
+Security fixes target the current `main` branch and the newest signed release.
+Older releases do not receive backports; update to the newest signed build after
+reviewing its release notes.
 
-No response-time or remediation SLA is promised during the private beta. A
+No response-time or remediation SLA is promised; Rotli is maintained by one person. A
 confirmed issue is prioritized by user-data exposure, integrity impact,
 reachability, and exploitability.
 
