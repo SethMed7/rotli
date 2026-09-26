@@ -2220,8 +2220,16 @@ fn preserve_rename_aliases(
         push_unique_alias(&mut aliases, slugify(old_title));
     }
     let current_stem = filename_stem(rel);
-    // the file name only mirrored the half-typed title: part of the same trail
-    let stem_is_trail = typing && current_stem == slugify(old_title);
+    // the file name only mirrored the half-typed title — as `slug`, or as
+    // `slug (2)` when that title collided with a sibling: part of the same trail
+    let old_slug = slugify(old_title);
+    let stem_mirrors_old_title = current_stem == old_slug
+        || current_stem
+            .strip_prefix(old_slug.as_str())
+            .and_then(|rest| rest.strip_prefix(" ("))
+            .and_then(|rest| rest.strip_suffix(')'))
+            .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()));
+    let stem_is_trail = typing && stem_mirrors_old_title;
     if !stem_is_trail && !is_placeholder_alias(&current_stem) {
         push_unique_alias(&mut aliases, current_stem);
     }
@@ -10194,6 +10202,18 @@ mod tests {
             aliases_on_disk(&mut store, &meta.id),
             "aliases: [\"Round Three - Rotli\",\"round-three-rotli\"]"
         );
+    }
+
+    #[test]
+    fn typing_through_a_colliding_title_records_no_aliases() {
+        let (_dir, mut store) = bare();
+        store.create("Notes", "# Round Three\n\nTaken.\n").unwrap(); // round-three.md
+        let meta = store.create("Notes", "").unwrap();
+        for typed in ["# Round", "# Round Three", "# Round Three -", "# Round Three - Rotli"] {
+            store.write(&meta.id, &format!("{typed}\n\nBody.\n")).unwrap();
+        }
+        // "Round Three" landed in "round-three (2).md" on the way: still the trail
+        assert_eq!(aliases_on_disk(&mut store, &meta.id), "aliases: []");
     }
 
     #[test]

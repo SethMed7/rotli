@@ -53,6 +53,18 @@ test("find marks follow edits and clear when the query empties", async ({ page }
   const marks = page.locator(".cm-content .cm-find-match");
   await expect(marks).toHaveCount(2);
 
+  // edit the note with find still open: a new match gains a mark…
+  const editor = page.locator(".cm-content").last();
+  await editor.click();
+  await page.keyboard.press("End");
+  await page.keyboard.insertText(" kiwi");
+  await expect(marks).toHaveCount(3);
+  await expect(page.locator(".editor-find-count")).toHaveText(/\/3$/);
+  // …and a deleted one loses it
+  for (let i = 0; i < " kiwi".length; i += 1) await page.keyboard.press("Backspace");
+  await expect(marks).toHaveCount(2);
+
+  // an emptied query clears every mark
   await input.fill("");
   await expect(marks).toHaveCount(0);
   await expect(page.locator(".editor-find-count")).toHaveText("0");
