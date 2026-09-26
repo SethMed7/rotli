@@ -4,6 +4,38 @@ Rotli is a local-first Tauri application. Contributions must preserve user file
 ownership, security boundaries, native macOS behavior, and the four application
 environments. AI-assisted contributors must also follow `AGENTS.md`.
 
+Everyone who takes part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## How a contribution works
+
+You do not need permission to contribute. You work in your own fork and send a
+pull request; the owner reviews it and merges it.
+
+1. **Start with an issue** for anything bigger than a small fix, so we can agree
+   on the approach before you build it. Bugs and ideas use the
+   [issue templates](https://github.com/SethMed7/rotli/issues/new/choose). A
+   security problem is reported privately (see [`SECURITY.md`](SECURITY.md)),
+   never in an issue.
+2. **Fork** `SethMed7/rotli` and clone your fork. Outside contributors don't
+   have write access here, so your branch lives in your fork, where only you
+   can change it.
+3. **Branch from `dev`** with a short descriptive name (`fix-sidebar-crash`,
+   `docs-sync-guide`), make the change, and run `bun run verify`.
+4. **Open a pull request into `dev`** and fill in the template. Write "Fixes
+   #123" to close the matching issue on merge. Keep "Allow edits by
+   maintainers" ticked if you are happy for the owner to push small fixes to
+   your branch.
+5. **CI runs** after the owner approves it for a first-time contributor.
+   Fork PRs never receive repository secrets.
+6. **Review:** answer comments on the thread and push fixes to the same branch.
+   The PR merges once required checks pass, every thread is resolved, and the
+   owner approves. It lands as one squashed commit credited to you.
+7. **Release:** `dev` is promoted to `main` and shipped in the next signed
+   release, listed in [`CHANGELOG.md`](CHANGELOG.md).
+
+Small, focused PRs are reviewed fastest. Use synthetic notes in tests,
+screenshots, and logs; never attach a real vault or anything from `.rotli/`.
+
 ## Prerequisites
 
 - macOS on Apple Silicon for the complete desktop workflow
@@ -73,9 +105,9 @@ only after the repository is trusted.
 ## Pull requests and protected branches
 
 Changes branch from and target `dev`; promotion to `main` uses a separate PR.
-Only @SethMed7 currently approves either branch. The exact controls, owner-authored
-PR exception, private-repository plan blocker, and privacy-safe submission flow
-live in [repository access](docs/operations/repository-access.md). Neither bot
+Only @SethMed7 currently approves either branch. The exact branch and tag
+rules, owner-authored PR exception, and privacy-safe submission flow live in
+[repository access](docs/operations/repository-access.md). Neither bot
 approval nor a green check authorizes a release. Before attaching screenshots,
 logs, or fixtures, review them for personal data and use synthetic content.
 

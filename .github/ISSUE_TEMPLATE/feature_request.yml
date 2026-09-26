@@ -1,0 +1,29 @@
+name: Idea or request
+description: Suggest something Rotli could do better.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Rotli is local-first: your files are the truth and nothing leaves your Mac unless you choose it.
+        Ideas that keep that promise are the easiest to take.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to do, and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+      description: How you imagine it working. Sketches welcome.
+    validations:
+      required: true
+  - type: checkboxes
+    id: pr
+    attributes:
+      label: Contributing
+      options:
+        - label: I would like to open a pull request for this.
