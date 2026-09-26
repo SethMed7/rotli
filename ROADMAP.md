@@ -24,18 +24,18 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
   ([contract](docs/architecture/agent-workspace.md)). Includes a custom Grok Bot
   that manages Rotli: create, file, search, and organize notes.
 - **Read aloud** · M — select text and have it read to you, on-device.
+- **Hand to AI** · M — turn the open note into a prompt for Claude Code or
+  another agent. Built: "Hand to AI…" in the palette and a note's menu writes
+  the prompt from the note itself (goal, open and finished tasks, the note as
+  context, what "done" means), editable, with Copy; a secure note, or one that
+  looks like it holds a secret, is refused. Left: "Open in chat" to send it on
+  in Rotli, and a model-written version on the model you pick from your
+  connected providers (a secure note only ever to an on-device model).
 - **Breve in public builds** · M — the morning brief and routines. Runs in
   development builds today.
 
 ## 2. Planned
 
-- **Hand to AI** · S–M — one command that reads the open note and writes a
-  prompt you can paste into Claude Code or another agent: the goal, the
-  context, the open tasks, what "done" looks like. Opens in a small window with
-  Copy, and "Open in chat" to send it on in Rotli. You pick the model from the
-  providers you have connected. A secure note only goes to an on-device model,
-  never a remote one. First slice (S): the prompt is built from the note
-  itself, with no model; the model-written version comes next.
 - **Talk to the Librarian (`/librarian`)** · L — type `/librarian` and the
   format bar at the bottom turns into a small Librarian chat, like the chat
   bubble on a website; one click opens the same conversation full size in

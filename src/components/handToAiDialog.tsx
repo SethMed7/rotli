@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { type HandToAi, handToAiFor } from "../services/handToAi";
 import { useUiStore } from "../state/ui";
+import { WebDialogFrame } from "./webDialogFrame";
 
 type View = { kind: "loading" } | { kind: "error"; message: string } | HandToAi;
 
@@ -19,20 +20,20 @@ const REFUSAL: Record<Exclude<HandToAi["kind"], "ready">, string> = {
 
 export function HandToAiDialog() {
   const noteId = useUiStore((s) => s.handToAiNoteId);
+  // keyed by note: another note opens a fresh card, never a stale prompt
+  return noteId ? <HandToAiCard key={noteId} noteId={noteId} /> : null;
+}
+
+function HandToAiCard({ noteId }: { noteId: string }) {
   const close = useUiStore((s) => s.setHandToAiNoteId);
   const [view, setView] = useState<View>({ kind: "loading" });
   const [draft, setDraft] = useState("");
-  const [copy, setCopy] = useState<{ state: "idle" | "copied" | "failed"; error?: string }>({
-    state: "idle",
-  });
+  const [copy, setCopy] = useState<"idle" | "copied" | "failed">("idle");
   const promptRef = useRef<HTMLTextAreaElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
-    if (!noteId) return;
     let live = true;
-    setView({ kind: "loading" });
-    setCopy({ state: "idle" });
     handToAiFor(noteId)
       .then((result) => {
         if (!live) return;
@@ -48,73 +49,34 @@ export function HandToAiDialog() {
     };
   }, [noteId]);
 
-  if (!noteId) return null;
   const dismiss = () => close(null);
   const ready = view.kind === "ready";
 
   const copyPrompt = async () => {
     try {
-      if (!navigator.clipboard) throw new Error("the clipboard is unavailable");
+      if (!navigator.clipboard) throw new Error("no clipboard");
       await navigator.clipboard.writeText(draft);
-      setCopy({ state: "copied" });
-    } catch (error) {
-      setCopy({ state: "failed", error: error instanceof Error ? error.message : String(error) });
+      setCopy("copied");
+    } catch {
+      setCopy("failed");
     }
   };
 
   return (
-    <div className="rename-overlay" onMouseDown={dismiss}>
-      <div
-        className="rename-card hand-to-ai-card"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="hand-to-ai-title"
-        aria-busy={view.kind === "loading"}
-        onMouseDown={(event) => event.stopPropagation()}
-        onKeyDown={(event) => {
-          if (event.key !== "Escape") return;
-          event.preventDefault();
-          event.stopPropagation();
-          dismiss();
-        }}
-      >
-        <h2 id="hand-to-ai-title" className="rename-label">
-          Hand to AI
-        </h2>
-        {view.kind === "loading" && <p className="hand-to-ai-note">Reading the note…</p>}
-        {view.kind === "error" && (
-          <p role="alert" className="rename-error">
-            Couldn’t build a prompt — {view.message}
-          </p>
-        )}
-        {(view.kind === "secure" || view.kind === "secret" || view.kind === "empty") && (
-          <p className="hand-to-ai-note">{REFUSAL[view.kind]}</p>
-        )}
-        {view.kind === "ready" && (
-          <>
-            <p className="hand-to-ai-note">
-              A prompt built from “{view.title}” for Claude Code or another agent. Edit it here, then copy it.
-            </p>
-            <textarea
-              ref={promptRef}
-              className="hand-to-ai-prompt"
-              aria-label="Prompt"
-              spellCheck={false}
-              value={draft}
-              onChange={(event) => {
-                setDraft(event.target.value);
-                setCopy({ state: "idle" });
-              }}
-            />
-          </>
-        )}
-        <div className="rename-actions">
+    <WebDialogFrame
+      id="hand-to-ai"
+      title="Hand to AI"
+      busy={view.kind === "loading"}
+      className="hand-to-ai-card"
+      onClose={dismiss}
+      actions={
+        <>
           <span className="hand-to-ai-status" role="status">
-            {copy.state === "copied" ? "Copied. Paste it into your agent." : ""}
+            {copy === "copied" ? "Copied. Paste it into your agent." : ""}
           </span>
-          {copy.state === "failed" && (
+          {copy === "failed" && (
             <span role="alert" className="rename-error">
-              Couldn’t copy — {copy.error}
+              Couldn’t copy. Select the prompt and press ⌘C instead.
             </span>
           )}
           <button ref={closeRef} type="button" className="rename-btn" onClick={dismiss}>
@@ -130,8 +92,36 @@ export function HandToAiDialog() {
               Copy prompt
             </button>
           )}
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      {view.kind === "loading" && <p className="hand-to-ai-note">Reading the note…</p>}
+      {view.kind === "error" && (
+        <p role="alert" className="rename-error">
+          Couldn’t build a prompt — {view.message}
+        </p>
+      )}
+      {(view.kind === "secure" || view.kind === "secret" || view.kind === "empty") && (
+        <p className="hand-to-ai-note">{REFUSAL[view.kind]}</p>
+      )}
+      {view.kind === "ready" && (
+        <>
+          <p className="hand-to-ai-note">
+            A prompt built from “{view.title}” for Claude Code or another agent. Edit it here, then copy it.
+          </p>
+          <textarea
+            ref={promptRef}
+            className="hand-to-ai-prompt"
+            aria-label="Prompt"
+            spellCheck={false}
+            value={draft}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              setCopy("idle");
+            }}
+          />
+        </>
+      )}
+    </WebDialogFrame>
   );
 }

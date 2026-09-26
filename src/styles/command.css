@@ -3317,11 +3317,17 @@
 .rename-btn.primary:hover {
   background: color-mix(in srgb, var(--on-accent) 12%, var(--accent));
 }
-/* Hand to AI (handToAiDialog.tsx): the rename card, wide enough to read and
-   edit a prompt; the prompt box scrolls, never the card */
+/* Hand to AI (handToAiDialog.tsx): the shared dialog frame, wide enough to
+   read and edit a prompt; the prompt box scrolls, never the card */
 .rename-card.hand-to-ai-card {
   width: min(44rem, calc(100vw - 32px));
+  max-width: none;
   max-height: min(86vh, 760px);
+}
+.hand-to-ai-card .web-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 .hand-to-ai-note {
   margin: 0;

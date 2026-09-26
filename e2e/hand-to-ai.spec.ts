@@ -59,3 +59,20 @@ test("a note's menu offers Hand to AI and Escape closes it", async ({ page }) =>
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
 });
+
+test("a refused clipboard says how to copy by hand", async ({ page, context }) => {
+  await context.clearPermissions();
+  await gotoApp(page);
+  await newNote(page, "Clipboard check\n\nCopy me.");
+  await page.getByRole("button", { name: /Search notes and actions/ }).click();
+  await page.getByPlaceholder("Search notes, files, chats, actions…").fill("Hand to AI");
+  await page.locator(".prow", { hasText: "Hand to AI…" }).first().click();
+  const dialog = page.getByRole("dialog", { name: "Hand to AI" });
+  await page.evaluate(() => {
+    navigator.clipboard.writeText = () => Promise.reject(new Error("denied"));
+  });
+  await dialog.getByRole("button", { name: "Copy prompt" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "Couldn’t copy. Select the prompt and press ⌘C instead.",
+  );
+});

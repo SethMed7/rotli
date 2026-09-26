@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Hand to AI.** Choose "Hand to AI…" from the palette or a note's menu and
+  Rotli turns the note into a prompt for Claude Code or another agent: the
+  goal, the open tasks (and what's already done), the note as context, and
+  what "done" means. Edit it, then copy it. It is built from the note alone;
+  no model runs. A secure note, or one that looks like it holds a secret, is
+  never turned into a prompt, and the window says why.
+
 ### Fixed
 
 - **Find in this file shows what it matched.** Every match is marked on the
