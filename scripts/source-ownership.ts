@@ -123,6 +123,8 @@ export const SERVICE_FILE_OWNERS = {
   "chatImages.ts": "chat",
   "chatModelMeta.ts": "chat",
   "chatRename.ts": "chat",
+  "handToAi.ts": "notes",
+  "notePathCopy.ts": "notes",
   "chatAutoTitle.ts": "chat",
   "chatSummon.ts": "chat",
   "chatWindowShell.ts": "chat (the Chat window's native side, for presentation)",

@@ -18,6 +18,7 @@ import { BoardSurface } from "./boardSurface";
 import { DashboardSurface } from "./dashboardSurface";
 import { EmptyState } from "./emptyState";
 import { ClockGlyph } from "./glyphs";
+import { HandToAiDialog } from "./handToAiDialog";
 import { NoteListSurface } from "./noteListSurface";
 import { PaneTree } from "./paneTree";
 import { Sidebar } from "./sidebar";
@@ -155,6 +156,7 @@ export function NotesSurface() {
       ) : (
         <PaneTree />
       )}
+      <HandToAiDialog />
       {/* collapsed → no warm-edge sliver (the maintainer, 2026-06-15: it was an unclear,
           disliked line). The titlebar's always-visible sidebar toggle is the
           clear reopen now. */}

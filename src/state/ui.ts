@@ -507,6 +507,10 @@ interface UiState {
   renameTarget: { id: string; current: string; lane?: "title" | "file" | "board" } | null;
   setRenameTarget: (t: { id: string; current: string; lane?: "title" | "file" | "board" } | null) => void;
 
+  /** The note whose Hand to AI prompt dialog is open, or null (Round Three). */
+  handToAiNoteId: string | null;
+  setHandToAiNoteId: (id: string | null) => void;
+
   /** A failed row-menu action (file-to-brain, board rename …) surfaced as an
    * inline note in the sidebar — the menu that launched the action is gone by
    * the time it fails, so this is its error home (#11, audit 2026-07). Not
@@ -935,6 +939,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setSystemRoot: (id) => set({ systemRoot: id }),
   renameTarget: null,
   setRenameTarget: (t) => set({ renameTarget: t }),
+  handToAiNoteId: null,
+  setHandToAiNoteId: (id) => set({ handToAiNoteId: id }),
 
   renamingBoardId: null,
   setRenamingBoardId: (id) => set({ renamingBoardId: id }),
