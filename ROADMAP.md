@@ -29,6 +29,58 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
 
 ## 2. Planned
 
+- **Hand to AI** · S–M — one command that reads the open note and writes a
+  prompt you can paste into Claude Code or another agent: the goal, the
+  context, the open tasks, what "done" looks like. Opens in a small window with
+  Copy, and "Open in chat" to send it on in Rotli. You pick the model from the
+  providers you have connected. A secure note only goes to an on-device model,
+  never a remote one. First slice (S): the prompt is built from the note
+  itself, with no model; the model-written version comes next.
+- **Talk to the Librarian (`/librarian`)** · L — type `/librarian` and the
+  format bar at the bottom turns into a small Librarian chat, like the chat
+  bubble on a website; one click opens the same conversation full size in
+  Chat. Highlight part of the note and say what you want: "mark this so I can
+  find it", "file this note under Projects", "this is my cousin Ana". The
+  Librarian proposes what it will do, and nothing happens until you apply it.
+  Applied actions are journaled and can be undone. You pick its model from the
+  providers you have connected.
+  - It never rewrites the note you wrote. It changes only its own metadata and
+    where the note lives, or it writes a new note, such as a people note for a
+    name you highlighted.
+  - "Mark this" saves a pointer to that exact passage in the note's metadata
+    (the words plus a little of what surrounds them), so the passage is easy
+    to find again without changing the text. That pointer is a new field the
+    Librarian may write, so it is added to the data contract first.
+  - People notes go in a People folder, created if there is none, unless a
+    Librarian rule says where they go.
+  - A locked note is off limits: the Librarian does not touch it and does not
+    create a note that would clash with it. If you ask for something that
+    would change a locked note, it tells you instead.
+  - With the Librarian turned off, `/librarian` says to turn it on in Settings.
+  - Slice 1: the bar, the highlight, pointers, and filing. Slice 2: new notes
+    from a highlight, and opening the conversation in Chat. Mac first; on web
+    it says "In the Mac app" until the Librarian runs there.
+- **Librarian rules** · M–L — tell the Librarian how you want things kept, in
+  plain settings, not code: which folder a kind of note goes to, and how the
+  people section is split (acquaintances, friends, family; one simple list; or
+  your own groups). Today the Librarian's instructions are fixed and its areas
+  are just the folders under the Library. Secure notes are separate; see
+  "Secure note rules" in §8.
+- **The Librarian writes people notes and folder indexes** · L — by default the
+  Librarian may write in the people section (never a locked note) and keeps an
+  `index.md` table of contents in each folder. Today it only fills metadata and
+  a generated index for each top-level area. This changes the Librarian's
+  contract, which says it only touches metadata and location, so the contract
+  is decided first. Your own notes stay yours: it still never rewrites a note
+  you wrote unless you ask.
+- **Links that survive a rename** · M — a `[[link]]` keeps pointing at the same
+  note when that note's title or file name changes, without you retitling
+  anything to keep it working. Renaming a note in Rotli already rewrites its
+  top title, and the file name follows, the way Markdown files work. What's
+  missing is the link side: today a link finds its note by the old name saved
+  in `aliases`, and nothing updates the notes that link to it. Decide between
+  updating those links on an explicit rename (what Obsidian does) and links
+  that carry the note's stable id.
 - **Add-ons system** · L — one way for the user to install and manage add-ons
   locally. Email providers, drive providers, and the Grok Bot all plug into it
   instead of each being a one-off. Comes before email and drive sync, because
@@ -121,6 +173,16 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
   through the grid first.
 - **Block references** · L — point at one paragraph with `^id` and show it
   elsewhere with `![[note#^id]]`, in the same syntax Obsidian reads.
+- **Librarian questions** · L — a switch in the bottom right. When it is on,
+  the Librarian marks a note it has a question about with a small dot. Click the
+  dot and it highlights the text in question and asks, for example "who is
+  Ana?". Your answer goes where `/librarian` would put it. Builds on Talk to the
+  Librarian.
+- **Chat as a work surface** · XL — an evaluation first: which tools Chat can
+  use, and which results it can show inline, so Chat works like Claude Cowork
+  for work that isn't code. Example: ask for a video, have a video tool you
+  connected make it, and watch it in the chat. The model drives the tool; it
+  does not make the video itself.
 
 ## 4. Known bugs
 
@@ -204,3 +266,8 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
 - **Calendar integration** — cal.diy base; Apple, Google, and Proton providers.
 - **Secure organization** — needs its own session with injection evals before
   any build.
+- **Secure note rules** — your own keywords that make a note secure, matched
+  only on its title or file name, never read by a model. That is what keeps it
+  clear of Secure organization's model risk. Owner call first: you asked to
+  choose where secure notes go, but today they all live in one protected folder
+  that is kept out of Git; a folder you pick would need the same protection.

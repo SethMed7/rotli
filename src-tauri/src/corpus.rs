@@ -2181,6 +2181,30 @@ fn note_aliases(rel: &str, title: &str, id: &str, fm: &Frontmatter) -> Vec<Strin
     aliases
 }
 
+/// A fresh note's placeholder name: the title "Untitled" or its file stem
+/// "untitled" / "untitled (2)". Nothing links to it, so it is never an alias
+/// (Round Three, 2026-09-26). The TS twin is `isPlaceholderAlias`.
+fn is_placeholder_alias(value: &str) -> bool {
+    let value = value.trim().to_lowercase();
+    let Some(rest) = value.strip_prefix("untitled") else {
+        return false;
+    };
+    rest.is_empty()
+        || rest
+            .strip_prefix(" (")
+            .and_then(|n| n.strip_suffix(')'))
+            .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+}
+
+/// Autosave runs while a title is still being typed, so consecutive saves see
+/// "Round", "Round Three", "Round Three -". When one title extends the other
+/// the change is that typing trail, not a rename anyone could link to.
+/// The TS twin is `isTitleTypingTrail`.
+fn is_title_typing_trail(old_title: &str, new_title: &str) -> bool {
+    let (old, new) = (old_title.trim().to_lowercase(), new_title.trim().to_lowercase());
+    !old.is_empty() && !new.is_empty() && (new.starts_with(&old) || old.starts_with(&new))
+}
+
 fn preserve_rename_aliases(
     fm: &mut Frontmatter,
     rel: &str,
@@ -2189,12 +2213,18 @@ fn preserve_rename_aliases(
     id: &str,
 ) -> Result<(), String> {
     let mut aliases = alias_values(fm);
-    if old_title != new_title {
+    aliases.retain(|alias| !is_placeholder_alias(alias));
+    let typing = old_title != new_title && is_title_typing_trail(old_title, new_title);
+    if old_title != new_title && !typing && !is_placeholder_alias(old_title) {
         push_unique_alias(&mut aliases, old_title);
         push_unique_alias(&mut aliases, slugify(old_title));
     }
     let current_stem = filename_stem(rel);
-    push_unique_alias(&mut aliases, current_stem);
+    // the file name only mirrored the half-typed title: part of the same trail
+    let stem_is_trail = typing && current_stem == slugify(old_title);
+    if !stem_is_trail && !is_placeholder_alias(&current_stem) {
+        push_unique_alias(&mut aliases, current_stem);
+    }
     if let Some(legacy) = legacy_filename_stem(rel, id) {
         push_unique_alias(&mut aliases, legacy);
     }
@@ -10129,6 +10159,60 @@ mod tests {
         // id↔path index stays authoritative: read by the same id still works
         let doc = store.read(&meta.id).unwrap();
         assert_eq!(doc.body, "# Second title\n\nBody.\n");
+    }
+
+    // Round Three (2026-09-26): autosave runs while a title is still being
+    // typed, so every save used to record the previous save's title as an
+    // alias — "Untitled", "untitled (7)", "Round", "Round Three -". A fresh
+    // note's placeholder and a half-typed title are not names anyone links to.
+    fn aliases_on_disk(store: &mut CorpusStore, id: &str) -> String {
+        let rel = store.path_of(id).unwrap();
+        let text = fs::read_to_string(store.root().join(rel)).unwrap();
+        text.lines()
+            .find(|line| line.starts_with("aliases:"))
+            .unwrap_or("aliases: []")
+            .to_string()
+    }
+
+    #[test]
+    fn typing_a_new_notes_title_records_no_aliases() {
+        let (_dir, mut store) = bare();
+        store.create("Notes", "").unwrap(); // untitled.md is taken
+        let meta = store.create("Notes", "").unwrap(); // → "untitled (2)"
+        for typed in ["# R", "# Round", "# Round Three", "# Round Three -", "# Round Three - Rotli"] {
+            store.write(&meta.id, &format!("{typed}\n\nBody.\n")).unwrap();
+        }
+        assert_eq!(aliases_on_disk(&mut store, &meta.id), "aliases: []");
+        assert!(store
+            .path_of(&meta.id)
+            .unwrap()
+            .ends_with("round-three-rotli.md"));
+
+        // a real rename still leaves the old name behind for links
+        store.write(&meta.id, "# Q3 plan\n\nBody.\n").unwrap();
+        assert_eq!(
+            aliases_on_disk(&mut store, &meta.id),
+            "aliases: [\"Round Three - Rotli\",\"round-three-rotli\"]"
+        );
+    }
+
+    #[test]
+    fn a_rename_drops_placeholder_aliases_already_on_disk() {
+        let (_dir, mut store) = bare();
+        let meta = store.create("Notes", "# Kept title\n\nBody.\n").unwrap();
+        let rel = store.path_of(&meta.id).unwrap();
+        let path = store.root().join(&rel);
+        let text = fs::read_to_string(&path).unwrap().replacen(
+            "---\n",
+            "---\naliases: [\"Untitled\",\"untitled (7)\",\"kept-link\"]\n",
+            1,
+        );
+        fs::write(&path, text).unwrap();
+        store.write(&meta.id, "# Other title\n\nBody.\n").unwrap();
+        assert_eq!(
+            aliases_on_disk(&mut store, &meta.id),
+            "aliases: [\"kept-link\",\"Kept title\",\"kept-title\"]"
+        );
     }
 
     #[test]

@@ -9,6 +9,7 @@
 // works again.
 
 import { corpusMoveFileToSink, corpusSearch, isTauri, rootIdOf } from "../lib/tauri";
+import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import type { Note } from "../types";
 import { imageSrcToRel } from "./imageRepair";
@@ -82,6 +83,8 @@ async function noteBodySafe(id: string): Promise<string> {
 export async function trashNoteWithImages(id: string): Promise<Note> {
   const body = await noteBodySafe(id);
   const note = await notesService.trashNote(id);
+  // its tabs close with it, in every pane (Round Three, 2026-09-26)
+  usePanesStore.getState().closeNoteTabs(id);
   if (body) void cascadeImages(id, body, "Trash");
   return note;
 }

@@ -441,7 +441,11 @@ The Rust corpus boundary independently validates every write.
 - `aliases` is a human-editable string list with Rotli-maintained rename
   history. A title/file rename appends the prior title and useful filename stem
   without deleting existing entries. A filename-only normalization retains the
-  exact prior stem without redundantly adding the unchanged title. Current
+  exact prior stem without redundantly adding the unchanged title. Two names
+  are never aliases (2026-09-26): a fresh note's placeholder (`Untitled`,
+  `untitled`, `untitled (2)`), which a rename also drops from the list, and a
+  half-typed title — autosave sees the title mid-typing, so a change where one
+  title extends the other (`Round` → `Round Three`) records nothing. Current
   title, current filename stem, canonical title slug, and aliases all resolve
   local wikilinks and CLI note selectors; ambiguity fails closed and requires
   the stable `id`. Wikilink targets are normalized before resolution
