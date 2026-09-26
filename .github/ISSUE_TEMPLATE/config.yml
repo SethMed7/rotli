@@ -1,0 +1,9 @@
+# Blank issues stay on: the app's Send feedback opens a prefilled blank issue (src/lib/feedback.ts).
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/SethMed7/rotli/security/advisories/new
+    about: Report privately. Never open a public issue for a vulnerability or a leaked secret.
+  - name: Setup, sync, and other questions
+    url: https://github.com/SethMed7/rotli/blob/main/SUPPORT.md
+    about: What support covers, how to sync a vault, and what makes a useful report.
