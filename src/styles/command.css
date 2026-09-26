@@ -3317,6 +3317,43 @@
 .rename-btn.primary:hover {
   background: color-mix(in srgb, var(--on-accent) 12%, var(--accent));
 }
+/* Hand to AI (handToAiDialog.tsx): the rename card, wide enough to read and
+   edit a prompt; the prompt box scrolls, never the card */
+.rename-card.hand-to-ai-card {
+  width: min(44rem, calc(100vw - 32px));
+  max-height: min(86vh, 760px);
+}
+.hand-to-ai-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.hand-to-ai-prompt {
+  min-height: 12rem;
+  height: 22rem;
+  max-height: 100%;
+  flex: 1 1 auto;
+  resize: vertical;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+}
+.hand-to-ai-prompt:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent-text) 45%, var(--border));
+}
+.hand-to-ai-status {
+  margin-inline-end: auto;
+  align-self: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
 
 /* — hotkey BADGES (the maintainer, 2026-08-04): the alternative to the whichkey panel —
    each chord pinned to the control it drives, so the eye never leaves the UI.

@@ -791,6 +791,16 @@ export function registerDefaultActions(): void {
     );
   };
   registerAction({
+    id: "note.handToAi",
+    title: "Hand to AI…",
+    defaultChord: null,
+    run: () => {
+      if (!notesWorkspaceActive()) return;
+      const id = focusedNoteIdNow();
+      if (id) useUiStore.getState().setHandToAiNoteId(id);
+    },
+  });
+  registerAction({
     enabled: chatRuntimeEnabled,
     id: "note.chat",
     title: "Chat with this note",
