@@ -123,8 +123,9 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
 
 - **Per-note version history** · L — local snapshots of a note with a diff
   view, so nothing typed is ever lost.
-- **Import from Obsidian, Notion, and Apple Notes** · L — bring an existing
-  library in, links and images included.
+- **Import from Notion and Apple Notes** · L — bring an existing library in,
+  links and images included. An Obsidian or plain Markdown folder already opens
+  as a vault as it is.
 - **Backlinks panel** · M — every note that links to this one, plus places that
   mention it without a link.
 - **Actionable checklists as a family** · L — `/email:send` is the first one.
@@ -192,13 +193,8 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
 
 ## 5. Small enhancements
 
-- **Hotkey to switch views** · M — ⌘⇧W opens the views, then ⌘number picks one.
-- **Hotkey to jump into the sidebar** · M — ⌘⇧S enters the sidebar, then
-  ⌘number opens one of the top 9 notes in the current view. Reorder and pin
-  notes in the sidebar so 1–9 stay put.
-- **Two-step hotkeys** · M — needed first by the two hotkeys above. ⌘1–9
-  already jump tabs, and Rotli has no "press one chord, then another" yet.
-- **Send feedback in-app** · S — a button that opens a prefilled GitHub issue.
+Nothing open right now. The last four (⌘⇧W views, ⌘⇧S top notes, two-step
+hotkeys, and Send feedback) shipped in 1.3.
 
 ## 6. Keeping the web version in sync
 
