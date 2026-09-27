@@ -147,6 +147,7 @@ import {
   reasoningChoices,
   serviceTierChoices,
 } from "./chatReasoningModel";
+import { ChatReplyMedia } from "./chatReplyMedia";
 import { ChatSetupGuide } from "./chatSetupGuide";
 import { CHAT_MESSAGE_WINDOW, recentChatThread } from "./chatThreadModel";
 import {
@@ -961,7 +962,7 @@ function renderStructuredLines(lines: readonly string[], key: number): ReactNode
  * ```mermaid → the rendered diagram, GFM tables → real tables, every other
  * line via the editor's inline renderer (bold/italic/code/links), blank lines
  * kept as gaps. Source-of-truth stays the .md; this is display only. */
-function renderMessage(text: string): ReactNode {
+function renderMessage(text: string, mediaRoot = ""): ReactNode {
   return splitMessageBlocks(text).map((block, key) => {
     switch (block.kind) {
       case "code":
@@ -993,6 +994,8 @@ function renderMessage(text: string): ReactNode {
         );
       case "lines":
         return renderStructuredLines(block.lines, key);
+      case "media":
+        return <ChatReplyMedia key={key} alt={block.alt} path={block.path} rootPrefix={mediaRoot} />;
     }
   });
 }
@@ -1015,6 +1018,7 @@ const ChatMessage = memo(function ChatMessage({
   images = [],
   artifacts = [],
   onOpenArtifact,
+  mediaRoot = "",
 }: {
   text: string;
   you: boolean;
@@ -1033,6 +1037,8 @@ const ChatMessage = memo(function ChatMessage({
   /** Files created by the completed assistant turn stay attached to that turn. */
   artifacts?: ChatArtifact[];
   onOpenArtifact?: (artifact: ChatArtifact) => void;
+  /** The chat's vault as a wire-id prefix, for images and video in replies. */
+  mediaRoot?: string;
 }) {
   const timeFormat = useUiStore((state) => state.timeFormat);
   const timeLabel = formatChatTime(at, timeFormat);
@@ -1040,7 +1046,7 @@ const ChatMessage = memo(function ChatMessage({
     <div className={you ? "cmsg you" : "cmsg ai"} data-chat-message-index={index}>
       <div className="cmsg-bubble">
         {you && images.length > 0 && <ChatAttachedImages images={images} />}
-        {you ? <UserMessageText text={text} /> : renderMessage(text)}
+        {you ? <UserMessageText text={text} /> : renderMessage(text, mediaRoot)}
       </div>
       {!you && onOpenArtifact && <ChatArtifactButtons artifacts={artifacts} onOpen={onOpenArtifact} />}
       <div className={endMark ? "cmsg-footer has-endmark" : "cmsg-footer"}>
@@ -1172,6 +1178,7 @@ export function ChatSurface({
       ? (cfg.data.instances.find((instance) => instance.id === vaultId) ?? null)
       : activeInstance(cfg.data)
     : null;
+  const mediaRoot = active && active.id !== CORPUS_INSTANCE_ID ? `${active.id}:` : "";
   const chats = useInstanceChats(active);
   const write = useWriteChat();
   const updateTitle = useUpdateChatTitle();
@@ -2553,6 +2560,7 @@ export function ChatSurface({
                       {...(m.at ? { at: m.at } : {})}
                       {...(m.images ? { images: m.images } : {})}
                       endMark={!busy && idx === messages.length - 1 && m.speaker !== "you"}
+                      mediaRoot={mediaRoot}
                       {...(!busy && m.artifacts?.length
                         ? {
                             artifacts: m.artifacts,
@@ -2567,7 +2575,7 @@ export function ChatSurface({
                     // the on-device answer, forming token-by-token — a live
                     // assistant row that grows until the settled message replaces it
                     <div className="cmsg ai">
-                      <div className="cmsg-bubble">{renderMessage(streamingText)}</div>
+                      <div className="cmsg-bubble">{renderMessage(streamingText, mediaRoot)}</div>
                     </div>
                   )}
                 {working && !streamingText && (

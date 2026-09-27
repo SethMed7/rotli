@@ -90,7 +90,10 @@ async function plantFolderFiles(page: Page, extra: Record<string, string> = {}):
         for (const part of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(part, { create: true });
         const file = await dir.getFileHandle(parts[parts.length - 1]!, { create: true });
         const writable = await file.createWritable();
-        await writable.write(text);
+        // a "base64:" value is binary (an image), written as bytes
+        await writable.write(
+          text.startsWith("base64:") ? Uint8Array.from(atob(text.slice(7)), (c) => c.charCodeAt(0)) : text,
+        );
         await writable.close();
       }
       await new Promise<void>((resolve, reject) => {
@@ -322,4 +325,37 @@ test("an empty connected folder becomes a vault and gets the Welcome folder", as
   await expect(page.getByRole("tab", { selected: true })).toBeVisible();
   await expect(page.getByRole("tab", { selected: true })).not.toHaveAttribute("title", "Untitled");
   await expect(page.locator(".main-tree").getByText("Welcome to Rotli", { exact: true })).toHaveCount(1);
+});
+
+// 2026-09-27 (Chat as a work surface, step 1): a reply line that is only an
+// image link to a vault file shows the file itself. Rotli Web shows the
+// folder's image; a video there (the Mac app plays it) keeps its name; a
+// remote image address is never loaded.
+test("a chat reply shows a vault image and keeps a video's name on the web", async ({ page }) => {
+  await fakeHelper(page);
+  // a 1×1 PNG
+  const png =
+    "base64:iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+  const reply = [
+    "Here is the chart:",
+    "![Sales chart](storage:chats/media-chat/chart.png)",
+    "![Launch clip](storage:chats/media-chat/clip.mp4)",
+    "![tracker](https://example.com/pixel.png)",
+  ].join("\n");
+  await plantFolder(page, {
+    "chats/media-chat.md": `${chatFile("Media chat", "2026-09-16")}\n**sonnet** · 2026-09-16T10:00:05Z — ${reply}\n`,
+    "storage/chats/media-chat/chart.png": png,
+  });
+  await page.reload();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Hello");
+  await pairAndOpenChat(page);
+  await page.locator('.sb-chatrow[data-chat-slug="media-chat"]').first().click();
+
+  const bubble = page.locator(".cmsg.ai .cmsg-bubble").last();
+  const image = bubble.getByRole("img", { name: "Sales chart" });
+  await expect(image).toBeVisible();
+  await expect(image).toHaveAttribute("src", /^blob:/);
+  await expect(bubble.locator(".cmsg-media-missing")).toHaveText("Launch clip");
+  await expect(bubble).toContainText("![tracker](https://example.com/pixel.png)");
+  await expect(bubble.locator('img[src^="https:"]')).toHaveCount(0);
 });

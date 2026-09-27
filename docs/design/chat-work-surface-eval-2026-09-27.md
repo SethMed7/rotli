@@ -57,7 +57,7 @@ names video as a preview-only surface, so showing it inline breaks no law.
 
 | Step | Size | Notes |
 |---|---|---|
-| 1. Show images and video inline in replies; a `video` artifact type and chip | S–M | No policy change |
+| 1. Show images and video inline in replies; a `video` artifact type and chip | S–M | No policy change. **Built 2026-09-27** (inline media; the rail's `video` type is still owed) |
 | 2. Accept video dropped into a chat (TS list + Rust twin) | S–M | No policy change |
 | 3. A `generate_video` tool that writes into `storage/chats/<slug>/` | M | Must join the egress tool list, the secret and secure-note checks, and `check:security` (its tool scan reads only `WEB_TOOLS` / `IMAGE_TOOLS` arrays) |
 | 4. Long-running jobs: progress, cancel, survive a restart | M–L | Today every step is synchronous and capped |

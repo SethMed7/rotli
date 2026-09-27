@@ -8,7 +8,10 @@ export type MessageBlock =
   | { kind: "lines"; lines: string[] }
   | { kind: "code"; lang: string; code: string }
   | { kind: "mermaid"; code: string }
-  | { kind: "table"; header: string[]; rows: string[][] };
+  | { kind: "table"; header: string[]; rows: string[][] }
+  /** A line that is only an image-style link to a vault file: shown as the
+   * image or video itself. `path` is under `storage/`, decoded. */
+  | { kind: "media"; alt: string; path: string };
 
 export type StructuredMessageLine =
   | { kind: "heading"; level: number; text: string }
@@ -115,6 +118,21 @@ function isTableDelimiter(line: string): boolean {
 
 const isTableRow = (line: string): boolean => line.trim().startsWith("|");
 
+// only `storage:` (a vault file): a remote address would load from outside the Mac
+const MEDIA_LINE = /^\s*!\[([^\]]*)\]\(storage:([^)\s]+)\)\s*$/;
+
+function mediaLine(line: string): MessageBlock | null {
+  const match = MEDIA_LINE.exec(line);
+  if (!match) return null;
+  let path = match[2] ?? "";
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    // a malformed escape keeps the raw path
+  }
+  return { kind: "media", alt: match[1] ?? "", path };
+}
+
 /** Split a message into renderable blocks. Fences close on the next ``` line
  * (an unclosed fence runs to the end — the streaming case); a table needs the
  * GFM header + delimiter pair, then eats every following `|` row. */
@@ -158,6 +176,13 @@ export function splitMessageBlocks(text: string): MessageBlock[] {
         i++;
       }
       out.push({ kind: "table", header, rows });
+      continue;
+    }
+    const media = mediaLine(line);
+    if (media) {
+      flushPlain();
+      out.push(media);
+      i++;
       continue;
     }
     plain.push(line);
