@@ -47,6 +47,7 @@ fix both in the same change.
 | Why rotli stays on Tauri, and how idle cost is kept honest | [`design/shell-runtime-decision.md`](design/shell-runtime-decision.md) |
 | rotli.co structure: nav, Resources/Blog/About, download + web actions, link card | [`design/site-ia-and-link-card-2026-09-18.md`](design/site-ia-and-link-card-2026-09-18.md) |
 | Freeform canvas, task tables, and Logseq lessons — evaluation | [`design/canvas-tasks-logseq-eval-2026-09-23.md`](design/canvas-tasks-logseq-eval-2026-09-23.md) |
+| Chat as a work surface — tools, rendering, and the path to media (evaluation) | [`design/chat-work-surface-eval-2026-09-27.md`](design/chat-work-surface-eval-2026-09-27.md) |
 | Durable schemas, compatibility, migrations, and downgrade behavior | [`architecture/compatibility-and-migrations.md`](architecture/compatibility-and-migrations.md) |
 | Repository privacy, main/dev protection, reviewers, and PR flow | [`operations/repository-access.md`](operations/repository-access.md) |
 | Release integrity, provenance, SBOM, keys, and rollback | [`operations/release-and-supply-chain.md`](operations/release-and-supply-chain.md) |

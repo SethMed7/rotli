@@ -174,14 +174,15 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
   dot and it highlights the text in question and asks, for example "who is
   Ana?". Your answer goes where `/librarian` would put it. Builds on Talk to the
   Librarian.
-- **Chat as a work surface** · XL — an evaluation first: which tools Chat can
-  use, and which results it can show inline, so Chat works like Claude Cowork
-  for work that isn't code. Example: ask for a video, have a video tool you
-  connected make it, and watch it in the chat. The model drives the tool; it
-  does not make the video itself.
-
-## 4. Known bugs
-
+- **Chat as a work surface** · XL — Chat working like Claude Cowork for work
+  that isn't code: ask for a video, have a video tool you connected make it,
+  and watch it in the chat. The model drives the tool; it does not make the
+  video itself. Evaluated 2026-09-27
+  ([evaluation](docs/design/chat-work-surface-eval-2026-09-27.md)): first show
+  images and video inline in replies and accept dropped video (S–M each, no
+  policy change); then a video tool, background jobs, and the provider behind
+  Add-ons (M to XL, owner call on the source). The connected CLIs stay
+  tool-less.
 - **First drag and drop lands too high** · M — on the first drag, the drop does
   not line up with the pointer. Needs a reproduction first.
 - **A file dropped on a board lands somewhere else** · S — on the Mac a Finder
