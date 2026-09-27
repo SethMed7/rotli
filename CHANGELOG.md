@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Big images save on a board.** An image over about 75 KB made a board
+  refuse to save, because an image is kept inside the board as one long
+  string and every string had a 100,000-character cap. An image's data is now
+  exempt from that cap; every other string keeps it, and a whole board is
+  still limited to 8 MB.
+- **A `[[link]]` to a board opens the board.** It used to open the board as a
+  note.
 - **Find in this file shows what it matched.** Every match is marked on the
   page and the current one stands out, the way find works everywhere else.
   Before, the match was selected but did not show while you typed in the find

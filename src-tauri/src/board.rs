@@ -54,11 +54,34 @@ pub(crate) fn validate_scene(raw: &str) -> Result<Value, String> {
         }
     }
     let mut nodes = 0;
-    validate_value(&value, 0, &mut nodes)?;
+    validate_value(&value, 0, &mut nodes, Place::Root)?;
     Ok(value)
 }
 
-fn validate_value(value: &Value, depth: usize, nodes: &mut usize) -> Result<(), String> {
+/// Where a value sits: an embedded file's `dataURL` is image bytes as a
+/// `data:` URL, the one string allowed past the per-string cap (a 75 KB image
+/// outgrew it). `BOARD_MAX_BYTES` still bounds it. TS twin:
+/// src/boards/validation.ts `Place`.
+#[derive(Clone, Copy, PartialEq)]
+enum Place {
+    Root,
+    Files,
+    File,
+    Other,
+}
+
+fn is_file_data_url(place: Place, key: &str, child: &Value) -> bool {
+    place == Place::File
+        && key == "dataURL"
+        && child.as_str().is_some_and(|text| text.starts_with("data:"))
+}
+
+fn validate_value(
+    value: &Value,
+    depth: usize,
+    nodes: &mut usize,
+    place: Place,
+) -> Result<(), String> {
     if depth > BOARD_MAX_DEPTH {
         return Err("board data is nested too deeply".into());
     }
@@ -72,7 +95,7 @@ fn validate_value(value: &Value, depth: usize, nodes: &mut usize) -> Result<(), 
         }
         Value::Array(values) => {
             for child in values {
-                validate_value(child, depth + 1, nodes)?;
+                validate_value(child, depth + 1, nodes, Place::Other)?;
             }
         }
         Value::Object(values) => {
@@ -92,7 +115,16 @@ fn validate_value(value: &Value, depth: usize, nodes: &mut usize) -> Result<(), 
                 if key == "points" {
                     validate_points(child)?;
                 }
-                validate_value(child, depth + 1, nodes)?;
+                if is_file_data_url(place, key, child) {
+                    *nodes += 1;
+                    continue;
+                }
+                let next = match (place, key.as_str()) {
+                    (Place::Root, "files") => Place::Files,
+                    (Place::Files, _) => Place::File,
+                    _ => Place::Other,
+                };
+                validate_value(child, depth + 1, nodes, next)?;
             }
         }
         _ => {}
@@ -140,6 +172,31 @@ mod tests {
         .is_err());
         assert!(validate_scene(
             &json!({"type":"excalidraw","elements":[{"text": "x".repeat(BOARD_MAX_STRING_CHARS + 1)}]}).to_string()
+        )
+        .is_err());
+    }
+
+    // Round Three (2026-09-26): an embedded image is a data: URL string; the
+    // per-string cap refused any image over ~75 KB. Only files.<id>.dataURL
+    // with a data: prefix is exempt; the 8 MB board limit still bounds it.
+    #[test]
+    fn an_embedded_image_past_the_string_cap_is_accepted_only_as_a_file_data_url() {
+        let big = format!("data:image/png;base64,{}", "A".repeat(150_000));
+        assert!(validate_scene(
+            &json!({"type":"excalidraw","elements":[],"files":{"img1":{"id":"img1","mimeType":"image/png","dataURL": big}}}).to_string()
+        )
+        .is_ok());
+        let long = "x".repeat(BOARD_MAX_STRING_CHARS + 1);
+        assert!(validate_scene(
+            &json!({"type":"excalidraw","elements":[],"files":{"img1":{"dataURL": long}}}).to_string()
+        )
+        .is_err());
+        assert!(validate_scene(
+            &json!({"type":"excalidraw","elements":[],"files":{"img1":{"mimeType": long, "dataURL": "data:image/png;base64,AA"}}}).to_string()
+        )
+        .is_err());
+        assert!(validate_scene(
+            &json!({"type":"excalidraw","elements":[{"dataURL": big}]}).to_string()
         )
         .is_err());
     }

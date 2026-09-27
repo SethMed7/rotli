@@ -121,10 +121,6 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
 
 ## 3. Ideas
 
-- **Pull Chat out into its own window** · L — hold and drag "Chat" out of the
-  Home | Chat switch into an independent window that shows only what belongs to
-  it; even its tabs are only chat tabs. An icon groups it back into its original
-  place. Home can never be pulled out: the main app is where Home lives.
 - **Per-note version history** · L — local snapshots of a note with a diff
   view, so nothing typed is ever lost.
 - **Import from Obsidian, Notion, and Apple Notes** · L — bring an existing
@@ -186,37 +182,14 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
 
 ## 4. Known bugs
 
-- **Confusing errors when files move** — these are just files moving; no one
-  will know what these messages mean, so they should never show.
-  - Part 1 · S: a view folder name can be typed with `/` or `:`, which Rotli
-    then refuses on save. Fix: stop it when the folder is named, with a plain
-    message.
-  - Part 2 · M: when something else (the CLI or the Librarian) changes Main
-    while the app holds an older copy, a raw revision conflict shows. Fix:
-    re-read, merge, and retry quietly; plain wording if it ever still shows.
 - **First drag and drop lands too high** · M — on the first drag, the drop does
   not line up with the pointer. Needs a reproduction first.
-- **Image tags show up in the chat name** · S — a chat that starts with an
-  image gets the raw image tag as its name.
-- **Big images do not save on a board** · S/M — an image over about 75 KB goes
-  over a board's 100k-character string limit, so the save fails. The board
-  validator rejects a 110 KB image (`src/boards/validation.ts`; Rust twin in
-  `src-tauri/src/board.rs`); not yet reproduced in the app. Fix S: let image
-  data past the per-string limit (files still open in Excalidraw). Fix M:
-  images as vault assets (smaller boards, but other apps show broken images).
 - **A file dropped on a board lands somewhere else** · S — on the Mac a Finder
   drop onto a focused board has no board branch and falls through to another
   note or Assets. Suspected, not yet reproduced.
-- **A typed `[[Board]]` link may open the board as a note** · S — the `[[`
-  picker leaves boards out, but a typed link still resolves and opens as a note
-  tab. Suspected, not yet reproduced.
 
 ## 5. Small enhancements
 
-- **Remove the count on "Chat"** · S — the number in the Home | Chat switch. It
-  will not hold up at 1k chats.
-- **Name chats by meaning** · M — name a chat from the purpose of the first
-  prompt, not its first few words.
 - **Hotkey to switch views** · M — ⌘⇧W opens the views, then ⌘number picks one.
 - **Hotkey to jump into the sidebar** · M — ⌘⇧S enters the sidebar, then
   ⌘number opens one of the top 9 notes in the current view. Reorder and pin

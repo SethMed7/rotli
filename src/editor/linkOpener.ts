@@ -49,9 +49,10 @@ function tryOpenWikilinkAt(lineText: string, col: number): boolean {
   const note = span ? resolveWikilinkNote(span.target) : null;
   if (!note) return false;
   // a linked CHAT opens as the conversation — the transcript file is what the
-  // Library shows; a link in a note is a way back into the chat itself
+  // Library shows; a link in a note is a way back into the chat itself. Any
+  // other item opens by kind: a board on its canvas, never as a note
   if (isChatItem(note)) usePanesStore.getState().openChat(chatSlugOf(note));
-  else usePanesStore.getState().openNote(note.id);
+  else usePanesStore.getState().openSummary(note);
   return true;
 }
 

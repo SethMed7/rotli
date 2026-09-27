@@ -55,6 +55,32 @@ describe("parseBoardBody", () => {
     ).toThrow("coordinate outside");
   });
 
+  // Round Three (2026-09-26): an embedded image is a data: URL string, so the
+  // per-string cap refused any image over about 75 KB and the board never
+  // saved. An image's dataURL is exempt; every other string keeps the cap,
+  // and the 8 MB whole-board limit still bounds it.
+  test("an embedded image larger than the string cap still saves", () => {
+    const dataURL = `data:image/png;base64,${"A".repeat(150_000)}`;
+    const files = { img1: { id: "img1", mimeType: "image/png", dataURL, created: 1 } };
+    expect(() => parseBoardBody(JSON.stringify({ ...EMPTY_SCENE, files }))).not.toThrow();
+  });
+
+  test("only a file's data: URL is exempt from the string cap", () => {
+    const long = "x".repeat(100_001);
+    const notData = { img1: { id: "img1", mimeType: "image/png", dataURL: long } };
+    expect(() => parseBoardBody(JSON.stringify({ ...EMPTY_SCENE, files: notData }))).toThrow(
+      "string that is too long",
+    );
+    const otherField = { img1: { id: "img1", mimeType: long, dataURL: "data:image/png;base64,AA" } };
+    expect(() => parseBoardBody(JSON.stringify({ ...EMPTY_SCENE, files: otherField }))).toThrow(
+      "string that is too long",
+    );
+    const elsewhere = [{ type: "text", dataURL: `data:image/png;base64,${"A".repeat(100_001)}` }];
+    expect(() => parseBoardBody(JSON.stringify({ ...EMPTY_SCENE, elements: elsewhere }))).toThrow(
+      "string that is too long",
+    );
+  });
+
   test("validates element and Rotli metadata shapes", () => {
     expect(() => parseBoardBody(JSON.stringify({ ...EMPTY_SCENE, elements: ["not-an-element"] }))).toThrow(
       "elements must be objects",
