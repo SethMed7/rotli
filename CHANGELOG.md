@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   picture, or a video you can play, instead of the link's text. Only files in
   your vault are shown; an image at a web address is never loaded. On Rotli
   Web a video keeps its name; the Mac app plays it.
+- **A video a chat made shows as a video** in the chat's list of files, with
+  its own mark and "Video · MP4", instead of as an unnamed file.
 - **Hand to AI.** Choose "Hand to AI…" from the palette or a note's menu and
   Rotli turns the note into a prompt for Claude Code or another agent: the
   goal, the open tasks (and what's already done), the note as context, and

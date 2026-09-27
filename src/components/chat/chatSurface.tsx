@@ -39,7 +39,6 @@ import {
   buildChatNotesPrompt,
   type MemoryTurn,
 } from "../../chatMemory/model";
-import { DOCUMENT_EXTS, WORD_EXTS } from "../../documents/kinds";
 import { renderMermaidElement } from "../../editor/mermaidRender";
 import { renderInline } from "../../editor/render";
 import {
@@ -50,7 +49,7 @@ import {
   visibleChatText,
 } from "../../lib/chatWork";
 import { PLATFORM } from "../../lib/featurePolicy";
-import { extOf, fileName, IMAGE_EXTS, imageMimeOf } from "../../lib/fileKind";
+import { extOf, fileName, imageMimeOf } from "../../lib/fileKind";
 import { useAnchoredPopoverBox, useTransientPopover } from "../../lib/popover";
 import {
   type LocalQueueEntry,
@@ -61,7 +60,6 @@ import {
   corpusFileStat,
   corpusFrontmatter,
   corpusImportFile,
-  fileAssetUrl,
   isTauri,
   localQueueCancel,
   localQueuePrioritize,
@@ -121,17 +119,15 @@ import { Character, QuokkaMark } from "../character";
 import {
   CheckGlyph,
   CopyGlyph,
-  BoardGlyph,
   DocumentGlyph,
-  ImageGlyph,
   NotesStackGlyph,
   SearchGlyph,
   SpeakerGlyph,
   SquareGlyph,
-  WordGlyph,
   XGlyph,
 } from "../glyphs";
 import { WebDialogFrame } from "../webDialogFrame";
+import { ArtifactItem, ChatArtifactButtons } from "./chatArtifactItems";
 import { ChatAttachedImages } from "./chatAttachedImages";
 import { ChatClarificationBar } from "./chatClarificationBar";
 import { copyChatSelection } from "./chatCopy";
@@ -377,119 +373,6 @@ function AssetsGlyph() {
       <circle cx="5.6" cy="6.4" r="1.1" />
       <path d="M2.5 12 6.7 8.2l2.6 2.4 2.3-2 1.9 1.7" />
     </svg>
-  );
-}
-
-function artifactType(artifact: ChatArtifact): "image" | "word" | "document" | "note" | "board" | "file" {
-  if (artifact.kind === "note") return "note";
-  if (artifact.kind === "canvas") return "board";
-  const extension = extOf(artifact.id);
-  if (IMAGE_EXTS.has(extension)) return "image";
-  if (WORD_EXTS.has(extension)) return "word";
-  if (DOCUMENT_EXTS.has(extension)) return "document";
-  return "file";
-}
-
-function artifactName(artifact: ChatArtifact): string {
-  return artifact.label ?? fileName(artifact.id).replace(/-\d{13}(?=\.[^.]+$)/, "");
-}
-
-/** One chat-created artifact. Images carry a real thumbnail; conventional
- * files use the same quiet format marks as tabs and the System browser. */
-function ArtifactItem({ artifact, onOpen }: { artifact: ChatArtifact; onOpen: () => void }) {
-  const type = artifactType(artifact);
-  const url = useQuery({
-    queryKey: ["asset-url", artifact.id],
-    queryFn: () => fileAssetUrl(artifact.id),
-    enabled: type === "image",
-  });
-  const name = fileName(artifact.id);
-  return (
-    <button type="button" className="chat-artifact" title={`Open ${name}`} onClick={onOpen}>
-      <span className={`chat-artifact-preview ${type}`}>
-        {type === "image" && url.data ? (
-          <img src={url.data} alt="" />
-        ) : type === "image" ? (
-          <ImageGlyph size={18} />
-        ) : type === "word" ? (
-          <WordGlyph size={22} />
-        ) : type === "document" ? (
-          <DocumentGlyph size={18} />
-        ) : type === "note" ? (
-          <DocumentGlyph size={18} />
-        ) : type === "board" ? (
-          <BoardGlyph size={18} />
-        ) : (
-          <DocumentGlyph size={18} />
-        )}
-      </span>
-      <span className="chat-artifact-copy">
-        <strong>{artifactName(artifact)}</strong>
-        <small>
-          {type === "word"
-            ? `Microsoft Word · ${extOf(name).toUpperCase()}`
-            : type === "note"
-              ? "Editable Markdown source"
-              : type === "board"
-                ? "Board"
-                : extOf(name).toUpperCase() || "File"}
-        </small>
-      </span>
-    </button>
-  );
-}
-
-/** Conventional files remain visible in the transcript itself as ordinary
- * click targets. The rail is the complete artifact browser; this compact row
- * keeps the file promised by the assistant next to the conversation that made
- * it without forcing the file open. */
-function ChatArtifactButtons({
-  artifacts,
-  onOpen,
-}: {
-  artifacts: ChatArtifact[];
-  onOpen: (artifact: ChatArtifact) => void;
-}) {
-  const files = artifacts
-    .filter((artifact) => {
-      const type = artifactType(artifact);
-      return type === "word" || type === "document" || type === "note";
-    })
-    .reverse();
-  if (files.length === 0) return null;
-  return (
-    <div className="chat-inline-artifacts" aria-label="Documents created in this chat">
-      {files.map((artifact) => {
-        const type = artifactType(artifact);
-        const name = artifactName(artifact);
-        return (
-          <button
-            key={`${artifact.kind}:${artifact.id}`}
-            type="button"
-            className={`chat-inline-artifact ${type}`}
-            title={`Open ${name}`}
-            onClick={() => onOpen(artifact)}
-          >
-            <span className="chat-inline-artifact-icon">
-              {type === "word" ? <WordGlyph size={22} /> : <DocumentGlyph size={19} />}
-            </span>
-            <span className="chat-inline-artifact-copy">
-              <strong>{name}</strong>
-              <small>
-                {type === "word"
-                  ? "Microsoft Word document"
-                  : type === "note"
-                    ? "Editable Markdown source"
-                    : "Document"}
-              </small>
-            </span>
-            <span className="chat-inline-artifact-open" aria-hidden="true">
-              Open
-            </span>
-          </button>
-        );
-      })}
-    </div>
   );
 }
 

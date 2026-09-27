@@ -57,8 +57,8 @@ names video as a preview-only surface, so showing it inline breaks no law.
 
 | Step | Size | Notes |
 |---|---|---|
-| 1. Show images and video inline in replies; a `video` artifact type and chip | S–M | No policy change. **Built 2026-09-27** (inline media; the rail's `video` type is still owed) |
-| 2. Accept video dropped into a chat (TS list + Rust twin) | S–M | No policy change |
+| 1. Show images and video inline in replies; a `video` artifact type and chip | S–M | No policy change. **Built 2026-09-27** (inline media, and the rail's `video` type) |
+| 2. Accept video dropped into a chat (TS list + Rust twin) | S–M | No policy change. **Deferred (2026-09-27):** the chat's drop lane feeds the model's vision, and nothing can use a video yet; a dropped video already lands in Assets. Build it with the video tool (3) |
 | 3. A `generate_video` tool that writes into `storage/chats/<slug>/` | M | Must join the egress tool list, the secret and secure-note checks, and `check:security` (its tool scan reads only `WEB_TOOLS` / `IMAGE_TOOLS` arrays) |
 | 4. Long-running jobs: progress, cancel, survive a restart | M–L | Today every step is synchronous and capped |
 | 5. The video provider itself, behind a Rust adapter with a Keychain credential | L–XL | Needs the Add-ons system and an owner call on provider policy. A fully local renderer (for example ffmpeg or Remotion with no network) avoids the terms-of-service question that retired subscription-routed image generation |

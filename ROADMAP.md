@@ -179,10 +179,11 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
   and watch it in the chat. The model drives the tool; it does not make the
   video itself. Evaluated 2026-09-27
   ([evaluation](docs/design/chat-work-surface-eval-2026-09-27.md)). Built:
-  replies show images and video from the vault. Next: accept dropped video
-  (S–M, no policy change); then a video tool, background jobs, and the
-  provider behind Add-ons (M to XL, owner call on the source). The connected
-  CLIs stay tool-less.
+  replies show images and video from the vault, and a video shows as a video
+  in the chat's files. Next: a video tool, background jobs, and the provider
+  behind Add-ons (M to XL, owner call on the source); dropping a video into a
+  chat comes with the tool, since nothing can use one before it. The
+  connected CLIs stay tool-less.
 - **First drag and drop lands too high** · M — on the first drag, the drop does
   not line up with the pointer. Needs a reproduction first.
 - **A file dropped on a board lands somewhere else** · S — on the Mac a Finder
