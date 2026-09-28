@@ -161,6 +161,7 @@ import { ConnectorGuide } from "./settings/connectorGuide";
 import { LibrarianRulesSettings } from "./settings/librarianRulesSettings";
 import { Seg } from "./settings/seg";
 import { SwitchKnob, Toggle } from "./settings/toggle";
+import { VisibilitySettings } from "./settings/visibilitySettings";
 import { VoiceSettings } from "./settings/voiceSettings";
 import { WebVaultSettings } from "./settings/webVaultSettings";
 import { WelcomeSettings } from "./welcomeSettings";
@@ -1415,6 +1416,8 @@ function AppearancePane() {
           onPick={setSidebarReveal}
         />
       </div>
+
+      <VisibilitySettings />
 
       <h4 className="sethead">New chat welcome</h4>
       <p className="lead">

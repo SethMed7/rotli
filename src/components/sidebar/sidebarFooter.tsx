@@ -19,6 +19,7 @@ import { chatSlugOf } from "../../services/systemBrowser";
 import { openSystemRoot, revealNoteInSystem } from "../../services/systemNav";
 import { webNoteFilePath } from "../../services/webNotes";
 import { showFileNotice } from "../../state/fileNotice";
+import { useHidden } from "../../state/hidden";
 import { librarianQuestions, showLibrarianChat, useLibrarianBar } from "../../state/librarianBar";
 import { useOrganizerLive } from "../../state/organizerLive";
 import { useFocusedChatSlug, useFocusedNoteId, usePanesStore } from "../../state/panes";
@@ -28,6 +29,8 @@ import { Icon } from "../icon";
 
 export function SidebarFooter() {
   const updateAvailable = useUiStore((state) => state.updateAvailable);
+  // buttons the person hid (Settings → Appearance → Show in Rotli); Settings stays
+  const hidden = useHidden((s) => s.hidden);
   // unreviewed daemon proposals — the badge on the Librarian link (§4.4.2);
   // sensitive-data decisions waiting on the user wear the RED variant instead
   // (the maintainer, 2026-07-31: "or I will never know")
@@ -77,77 +80,83 @@ export function SidebarFooter() {
   };
   return (
     <div className="sb-foot">
-      <button
-        type="button"
-        className="sb-footbtn"
-        aria-label="Files"
-        title={
-          isTauri() ? "Open the vault folder in Finder" : "Show this file in Finder through the Rotli app"
-        }
-        onClick={showFiles}
-      >
-        <FolderGlyph size={14} />
-        <span className="fname">Files</span>
-      </button>
-      <button
-        type="button"
-        className="sb-footbtn"
-        aria-label={
-          secureConfirms > 0
-            ? `Librarian — ${secureConfirms} waiting`
-            : questions > 0
-              ? `Librarian — ${questions} ${questions === 1 ? "question" : "questions"} for you`
-              : pendingProposals > 0
-                ? `Librarian — ${pendingProposals} suggestions`
-                : "Librarian"
-        }
-        title={
-          organizerWorking
-            ? `Organizing${organizerCurrent ? ` — looking at “${organizerCurrent}”` : "…"}`
-            : secureConfirms > 0
-              ? `${secureConfirms} sensitive-data ${secureConfirms === 1 ? "decision waits" : "decisions wait"} for you`
+      {!hidden.files && (
+        <button
+          type="button"
+          className="sb-footbtn"
+          aria-label="Files"
+          title={
+            isTauri() ? "Open the vault folder in Finder" : "Show this file in Finder through the Rotli app"
+          }
+          onClick={showFiles}
+        >
+          <FolderGlyph size={14} />
+          <span className="fname">Files</span>
+        </button>
+      )}
+      {!hidden.librarian && (
+        <button
+          type="button"
+          className="sb-footbtn"
+          aria-label={
+            secureConfirms > 0
+              ? `Librarian — ${secureConfirms} waiting`
               : questions > 0
-                ? `The Librarian has ${questions === 1 ? "a question" : `${questions} questions`} for you`
+                ? `Librarian — ${questions} ${questions === 1 ? "question" : "questions"} for you`
                 : pendingProposals > 0
-                  ? `${pendingProposals} ${pendingProposals === 1 ? "suggestion waits" : "suggestions wait"} for your approval`
-                  : brainEnabled
-                    ? "See and undo the Librarian's work"
-                    : "The Librarian's journal"
-        }
-        onClick={() => (questions > 0 ? showLibrarianChat() : usePanesStore.getState().openActivity())}
-      >
-        {/* badges sit on the icon, never beside the label: a count used to
-            squeeze "Librarian" to "Libra…" (audit 2026-09-28) */}
-        <span className="sb-footicon">
-          <ActivityGlyph size={14} />
-          {/* the ambient working dot (the maintainer, 2026-07-31): the Librarian's
-              work is visible from anywhere — pulses while a cycle or an
-              adopt batch runs, from the SAME narration the surface shows */}
-          {organizerWorking && <span className="sb-work-dot" aria-hidden="true" />}
-          {/* RED = a sensitive-data decision waits (never auto-resolved);
-              otherwise the pending-approval count so Suggest mode is
-              never a silent queue */}
-          {secureConfirms > 0 ? (
-            <span className="count alert">{badgeCount(secureConfirms)}</span>
-          ) : questions > 0 ? (
-            <span className="count ask">{badgeCount(questions)}</span>
-          ) : (
-            pendingProposals > 0 && <span className="count pill">{badgeCount(pendingProposals)}</span>
-          )}
-        </span>
-        <span className="fname">Librarian</span>
-      </button>
+                  ? `Librarian — ${pendingProposals} suggestions`
+                  : "Librarian"
+          }
+          title={
+            organizerWorking
+              ? `Organizing${organizerCurrent ? ` — looking at “${organizerCurrent}”` : "…"}`
+              : secureConfirms > 0
+                ? `${secureConfirms} sensitive-data ${secureConfirms === 1 ? "decision waits" : "decisions wait"} for you`
+                : questions > 0
+                  ? `The Librarian has ${questions === 1 ? "a question" : `${questions} questions`} for you`
+                  : pendingProposals > 0
+                    ? `${pendingProposals} ${pendingProposals === 1 ? "suggestion waits" : "suggestions wait"} for your approval`
+                    : brainEnabled
+                      ? "See and undo the Librarian's work"
+                      : "The Librarian's journal"
+          }
+          onClick={() => (questions > 0 ? showLibrarianChat() : usePanesStore.getState().openActivity())}
+        >
+          {/* badges sit on the icon, never beside the label: a count used to
+              squeeze "Librarian" to "Libra…" (audit 2026-09-28) */}
+          <span className="sb-footicon">
+            <ActivityGlyph size={14} />
+            {/* the ambient working dot (the maintainer, 2026-07-31): the Librarian's
+                work is visible from anywhere — pulses while a cycle or an
+                adopt batch runs, from the SAME narration the surface shows */}
+            {organizerWorking && <span className="sb-work-dot" aria-hidden="true" />}
+            {/* RED = a sensitive-data decision waits (never auto-resolved);
+                otherwise the pending-approval count so Suggest mode is
+                never a silent queue */}
+            {secureConfirms > 0 ? (
+              <span className="count alert">{badgeCount(secureConfirms)}</span>
+            ) : questions > 0 ? (
+              <span className="count ask">{badgeCount(questions)}</span>
+            ) : (
+              pendingProposals > 0 && <span className="count pill">{badgeCount(pendingProposals)}</span>
+            )}
+          </span>
+          <span className="fname">Librarian</span>
+        </button>
+      )}
       <SettingsFootButton updateAvailable={updateAvailable} />
-      <button
-        type="button"
-        className="sb-footbtn"
-        aria-label="Feedback"
-        title="Send feedback — opens a new issue on GitHub"
-        onClick={() => dispatch("app.feedback")}
-      >
-        <FeedbackGlyph />
-        <span className="fname">Feedback</span>
-      </button>
+      {!hidden.feedback && (
+        <button
+          type="button"
+          className="sb-footbtn"
+          aria-label="Feedback"
+          title="Send feedback — opens a new issue on GitHub"
+          onClick={() => dispatch("app.feedback")}
+        >
+          <FeedbackGlyph />
+          <span className="fname">Feedback</span>
+        </button>
+      )}
     </div>
   );
 }

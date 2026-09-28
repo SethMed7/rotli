@@ -50,6 +50,7 @@ fix both in the same change.
 | Talk to the Librarian (`/librarian`) — slice 1 plan and the `anchors` key | [`design/librarian-bar.md`](design/librarian-bar.md) |
 | Librarian rules — secure keywords, People groups, filing sentences | [`design/librarian-rules.md`](design/librarian-rules.md) |
 | Ambient audio and the sidebar player — tab media, the studio's tracks | [`design/ambient-audio.md`](design/ambient-audio.md) |
+| Show in Rotli — hiding parts of the title bar, sidebar and tabs | [`design/show-in-rotli.md`](design/show-in-rotli.md) |
 | Chat as a work surface — tools, rendering, and the path to media (evaluation) | [`design/chat-work-surface-eval-2026-09-27.md`](design/chat-work-surface-eval-2026-09-27.md) |
 | Quokka emotions — moods from existing art, and new expressions to draw | [`design/quokka-emotions.md`](design/quokka-emotions.md) |
 | Rotli Web experience review — what a fresh vault walk found and fixed | [`design/web-experience-review-2026-09-27.md`](design/web-experience-review-2026-09-27.md) |

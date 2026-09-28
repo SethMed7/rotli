@@ -53,6 +53,7 @@ import { renameLane } from "../services/itemRename";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
 import { useTabMedia } from "../state/ambient";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
+import { useIsHidden } from "../state/hidden";
 import { useMainStore } from "../state/main";
 import { activeTabOf, usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
@@ -106,6 +107,7 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
   );
   // which browser tabs are playing (services/ambient polls WebKit for it)
   const tabMedia = useTabMedia((s) => s.media);
+  const hideTabPlus = useIsHidden("tabPlus");
   const newTabDefault = useUiStore((s) => s.newTabDefault);
   const tabLayout = useUiStore((s) => s.tabLayout);
   const activateTab = usePanesStore((s) => s.activateTab);
@@ -391,18 +393,20 @@ export function TabStrip({ pane }: { pane: LeafNode }) {
           })}
         </div>
       </div>
-      <button
-        type="button"
-        className="tabplus"
-        aria-label={`${newTabLabel}${hotkeyHint(" — ⌘T")}`}
-        onClick={newTabHere}
-      >
-        <PlusGlyph size={13} />
-        <span className="tip" aria-hidden="true">
-          {newTabLabel}
-          {hotkeyHint(" — ⌘T")}
-        </span>
-      </button>
+      {!hideTabPlus && (
+        <button
+          type="button"
+          className="tabplus"
+          aria-label={`${newTabLabel}${hotkeyHint(" — ⌘T")}`}
+          onClick={newTabHere}
+        >
+          <PlusGlyph size={13} />
+          <span className="tip" aria-hidden="true">
+            {newTabLabel}
+            {hotkeyHint(" — ⌘T")}
+          </span>
+        </button>
+      )}
     </div>
   );
 }

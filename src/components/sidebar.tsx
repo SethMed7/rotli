@@ -37,6 +37,7 @@ import {
 } from "../services/vaultSwitcher";
 import { activateCreatedVault, reconnectActiveVault } from "../state/activeVault";
 import { useContextMenu } from "../state/contextMenu";
+import { useIsHidden } from "../state/hidden";
 import { useFocusedTab } from "../state/panes";
 import { flushSettingsNow } from "../state/persist";
 import { useUiStore } from "../state/ui";
@@ -75,6 +76,9 @@ function FoldGlyph({ size = 16 }: { size?: number }) {
 
 export function Sidebar() {
   const sidebarMode = useUiStore((s) => s.sidebarMode);
+  // hidden Breve keeps its switch while Breve is open, so the way back shows
+  const hideBreve = useIsHidden("breve");
+  const showBreve = LAUNCH_FEATURES.breve && (!hideBreve || sidebarMode === "breve");
   const sidebarView = useUiStore((s) => s.sidebarView);
   const setSidebarView = useUiStore((s) => s.setSidebarView);
   const sidebarZoom = useUiStore((s) => s.sidebarZoom);
@@ -408,7 +412,7 @@ export function Sidebar() {
         value={sidebarMode === "breve" ? null : sidebarFrontSelection(sidebarView, contentView)}
         onPick={pickSidebarView}
         breveActive={sidebarMode === "breve"}
-        onBreve={LAUNCH_FEATURES.breve ? () => dispatch("view.breve") : undefined}
+        onBreve={showBreve ? () => dispatch("view.breve") : undefined}
       />
 
       {/* a failed row-menu action (file-to-brain, board rename) says so HERE —

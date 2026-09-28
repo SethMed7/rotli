@@ -1,14 +1,8 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
 import { DEFAULT_AMBIENT } from "../lib/ambient";
-import {
-  forgetTabMedia,
-  hydrateAmbient,
-  setInAppMedia,
-  setTabMedia,
-  useAmbient,
-  useTabMedia,
-} from "./ambient";
+import { forgetTabMedia, setInAppMedia, setTabMedia, useAmbient, useTabMedia } from "./ambient";
+import { hydrateAppExtras } from "./appExtras";
 
 beforeEach(() => {
   useTabMedia.setState({ media: {}, recent: null, inApp: false });
@@ -46,9 +40,9 @@ describe("what the tabs are playing", () => {
 
 describe("the saved preference", () => {
   test("loaded from the app settings file's text, tolerantly", () => {
-    hydrateAmbient(JSON.stringify({ v: 1, ambient: { enabled: true, track: "dusk", playing: true } }));
+    hydrateAppExtras(JSON.stringify({ v: 1, ambient: { enabled: true, track: "dusk", playing: true } }));
     expect(useAmbient.getState().prefs).toEqual({ enabled: true, track: "dusk", playing: true });
-    hydrateAmbient("not json");
+    hydrateAppExtras("not json");
     expect(useAmbient.getState().prefs).toEqual(DEFAULT_AMBIENT);
     useAmbient.getState().setPrefs({ track: "tide" });
     expect(useAmbient.getState().prefs.track).toBe("tide");

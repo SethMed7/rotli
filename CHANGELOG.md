@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Hide what you don't use.** Settings → Appearance → Show in Rotli has a
+  switch for each part of the title bar, sidebar and tab strip you might not
+  want: the activity overview cards, the Browser, Theme, New and Split
+  buttons, back and forward, the search field, All notes, Captures, Tasks,
+  Breve, the Files, Librarian and Feedback buttons, and the tabs' +. Nothing
+  goes away: each switch says how to reach it without the button, and ⌘K now
+  opens the activity dashboard, Tasks, All notes and a private browser tab.
+  Show everything brings it all back.
+
 - **Ambient audio.** Turn it on in Settings → General and quiet music from the
   Rotli studio plays from a small player above the sidebar's footer, one track
   per theme (Linen, Graphite, Tide, Canopy, Dusk, Lamplight), with previous,

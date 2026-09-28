@@ -26,6 +26,7 @@ import { useChatRename } from "../../services/chatRename";
 import { assignChatToView, chatAssignedView, viewChats } from "../../services/viewTree";
 import { useChatRuns } from "../../state/chatRuns";
 import { useContextMenu } from "../../state/contextMenu";
+import { useIsHidden } from "../../state/hidden";
 import { useFocusedChatSlug, usePanesStore } from "../../state/panes";
 import { chatKey, useUiStore } from "../../state/ui";
 import { useViewsStore } from "../../state/views";
@@ -36,6 +37,7 @@ import { chatFileMenuItems } from "./chatFileActions";
 import { chatMark } from "./chatMark";
 import { ChatViewPicker } from "./chatViewPicker";
 import { ModelLogo } from "./modelLogo";
+import { OverviewCard } from "./overviewCard";
 import { relativeChatAge, visibleSidebarChats } from "./sidebarChatProjection";
 import { type SidebarChatData, chatFolderKey } from "./useChatFolders";
 
@@ -48,6 +50,7 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   const contentView = useUiStore((s) => s.contentView);
   const setContentView = useUiStore((s) => s.setContentView);
   const dashboardSection = useUiStore((s) => s.dashboardSection);
+  const hideOverview = useIsHidden("overview");
   const setDashboardSection = useUiStore((s) => s.setDashboardSection);
   const expandedDests = useUiStore((s) => s.expandedDests);
   const setDestExpanded = useUiStore((s) => s.setDestExpanded);
@@ -435,35 +438,34 @@ export function SidebarChat({ chats, zoom }: { chats: SidebarChatData; zoom: num
   return (
     <div className="sb-rows" aria-label="Chat" style={{ zoom }}>
       <div className="sb-chat">
-        <button
-          type="button"
-          className={`sb-home-dashboard sb-model-dashboard${contentView === "dashboard" && dashboardSection === "models" ? " sel" : ""}`}
-          aria-label="Open model usage dashboard"
-          aria-current={contentView === "dashboard" && dashboardSection === "models" ? "page" : undefined}
-          onClick={() => {
-            setDashboardSection("models");
-            setContentView("dashboard");
-          }}
-        >
-          <div className="sb-home-dashboard-head">
-            <span>7 days</span>
-            <span>Model usage&nbsp; ↗</span>
-          </div>
-          <div className="sb-home-dashboard-row">
-            <strong>Usage</strong>
-            <span>
-              {localUsage.isLoading ? "Reading…" : `${compactUsageNumber(usageSnapshot.tokens)} tokens`}
-            </span>
-          </div>
-          <div className="sb-home-dashboard-row chat">
-            <strong>Top</strong>
-            <span className="sb-model-favorite" title={usageFavorite?.model ?? "No local usage yet"}>
-              {usageFavoriteMark?.logo ? <ModelLogo logo={usageFavoriteMark.logo} /> : null}
-              <span>{usageFavorite?.model ?? (localUsage.isError ? "Unavailable" : "No usage yet")}</span>
-            </span>
-            <span>{usageSnapshot.sessions.toLocaleString()} sessions</span>
-          </div>
-        </button>
+        {!hideOverview && (
+          <OverviewCard
+            variant="sb-model-dashboard"
+            label="Open model usage dashboard"
+            current={contentView === "dashboard" && dashboardSection === "models"}
+            onOpen={() => {
+              setDashboardSection("models");
+              setContentView("dashboard");
+            }}
+            head={["7 days", "Model usage"]}
+            rows={[
+              <>
+                <strong>Usage</strong>
+                <span>
+                  {localUsage.isLoading ? "Reading…" : `${compactUsageNumber(usageSnapshot.tokens)} tokens`}
+                </span>
+              </>,
+              <>
+                <strong>Top</strong>
+                <span className="sb-model-favorite" title={usageFavorite?.model ?? "No local usage yet"}>
+                  {usageFavoriteMark?.logo ? <ModelLogo logo={usageFavoriteMark.logo} /> : null}
+                  <span>{usageFavorite?.model ?? (localUsage.isError ? "Unavailable" : "No usage yet")}</span>
+                </span>
+                <span>{usageSnapshot.sessions.toLocaleString()} sessions</span>
+              </>,
+            ]}
+          />
+        )}
         <button
           type="button"
           className="sb-chatnew"

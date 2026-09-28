@@ -22,9 +22,9 @@ test("Breve is a labelled segment of the front switcher, not a header icon", () 
   // the switcher carries the segment; e2e/breve-lens.spec.ts proves the
   // switcher and footer survive the trip into Breve and back
   expect(sidebarSource).toContain('breveActive={sidebarMode === "breve"}');
-  expect(sidebarSource).toContain(
-    'onBreve={LAUNCH_FEATURES.breve ? () => dispatch("view.breve") : undefined}',
-  );
+  expect(sidebarSource).toContain('onBreve={showBreve ? () => dispatch("view.breve") : undefined}');
+  // Breve can be hidden (Settings → Show in Rotli) but keeps its switch while open
+  expect(sidebarSource).toContain('LAUNCH_FEATURES.breve && (!hideBreve || sidebarMode === "breve")');
 });
 
 test("System stays Library, Assets, Archive, and Trash for every active vault", () => {
