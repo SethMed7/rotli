@@ -268,6 +268,20 @@
         "/",
         ":"
       ]
+    },
+    "aiKeys": {
+      "sourceOfTruth": "src/memex/contract.ts AI_KEYS ↔ src-tauri/src/corpus.rs AI_KEYS (the Librarian-owned metadata keys)",
+      "value": [
+        "area",
+        "summary",
+        "tags",
+        "links",
+        "suggested_area",
+        "area_confidence",
+        "filed_by",
+        "filed_at",
+        "anchors"
+      ]
     }
   }
 }

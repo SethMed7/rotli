@@ -1,6 +1,7 @@
 # Talk to the Librarian (`/librarian`) — slice 1 plan
 
-Status: proposed (2026-09-26), awaiting the owner's go. Owner decisions from Round
+Status: building (2026-09-28, the owner: "I wanted everything in this branch").
+Slice 1's contract and logic are PR A; the bar is PR B. Owner decisions from Round
 Three are recorded in [ROADMAP.md](../../ROADMAP.md) under "Talk to the
 Librarian". This document is the build plan for slice 1 and the contract
 changes it needs; the owning contracts stay

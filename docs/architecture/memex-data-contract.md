@@ -474,7 +474,16 @@ The Rust corpus boundary independently validates every write.
   pins it off. It is written only on a secure note.
 - The Librarian owns only its declared fields (`AI_KEYS`, Rust and TS): the
   enrichment fields `area`, `summary`, `tags`, and `links`, and its filing
-  record `suggested_area`, `area_confidence`, `filed_by`, and `filed_at`.
+  record `suggested_area`, `area_confidence`, `filed_by`, and `filed_at`,
+  and `anchors` (2026-09-28): pointers to passages, written only when the
+  person applies a `/librarian` "mark" (the organizer never writes it). Its
+  value is one line of JSON, a list of `{"exact","prefix","suffix","label"?}`:
+  the passage's words (up to 280 characters), up to 32 characters on each
+  side, and an optional name (up to 80). At most 20 per note, oldest dropped
+  first. A pointer never changes the note's text; it finds the passage by
+  `prefix + exact + suffix`, then by `exact` alone, and reports "moved" rather
+  than guessing when those words appear more than once
+  (`src/lib/librarianActions.ts`).
 - Unknown frontmatter is preserved byte-for-byte. Reserved provenance cannot be
   forged through the raw metadata editor.
 - Boards and binary files never receive Markdown frontmatter.

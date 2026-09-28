@@ -1,0 +1,145 @@
+import { describe, expect, test } from "bun:test";
+
+import type { FrontmatterView } from "../lib/tauri";
+import {
+  applyLibrarian,
+  LIBRARIAN_REFUSALS,
+  type LibrarianDeps,
+  librarianRefusal,
+  proposeLibrarian,
+} from "./librarianBar";
+
+function view(fields: string[], extra: Partial<FrontmatterView> = {}): FrontmatterView {
+  return {
+    id: "01NOTE",
+    created: "",
+    updated: "",
+    locked: false,
+    secure: false,
+    localAiAllowed: false,
+    pinned: false,
+    fields,
+    ...extra,
+  };
+}
+
+function fakeDeps(fm: FrontmatterView | null, rel = "wiki/_inbox/maya.md") {
+  const calls: string[] = [];
+  const deps: LibrarianDeps = {
+    frontmatter: async () => fm,
+    notePath: async () => rel,
+    setAiField: async (_id, key, value) => {
+      calls.push(`set ${key} ${value}`);
+    },
+    log: async (row) => {
+      calls.push(`log ${row.field} ${row.before} -> ${row.after}`);
+    },
+    learnField: async (_note, key) => {
+      calls.push(`learn ${key}`);
+    },
+    fileNote: async (_id, area) => {
+      calls.push(`file ${area}`);
+      return `wiki/${area}/maya.md`;
+    },
+    refresh: async () => {
+      calls.push("refresh");
+    },
+  };
+  return { deps, calls };
+}
+
+describe("who may ask", () => {
+  const on = { native: true, librarianOn: true };
+  test("each refusal says why, before any model call", async () => {
+    const { deps } = fakeDeps(view([]));
+    expect(await librarianRefusal("n", { native: false, librarianOn: true }, deps)).toBe(
+      LIBRARIAN_REFUSALS.web,
+    );
+    expect(await librarianRefusal("n", { native: true, librarianOn: false }, deps)).toBe(
+      LIBRARIAN_REFUSALS.off,
+    );
+    expect(await librarianRefusal("n", on, fakeDeps(view([], { locked: true })).deps)).toBe(
+      LIBRARIAN_REFUSALS.locked,
+    );
+    expect(await librarianRefusal("n", on, fakeDeps(view([], { secure: true })).deps)).toBe(
+      LIBRARIAN_REFUSALS.secure,
+    );
+    expect(await librarianRefusal("n", on, fakeDeps(view([]), "chats/x.md").deps)).toBe(
+      LIBRARIAN_REFUSALS.library,
+    );
+    expect(await librarianRefusal("n", on, fakeDeps(view([]), "wiki/_secure/x.md").deps)).toBe(
+      LIBRARIAN_REFUSALS.library,
+    );
+    expect(await librarianRefusal("n", on, deps)).toBeNull();
+  });
+
+  test("metadata that can't be read counts as locked", async () => {
+    expect(await librarianRefusal("n", on, fakeDeps(null).deps)).toBe(LIBRARIAN_REFUSALS.locked);
+  });
+});
+
+describe("asking", () => {
+  const ask = {
+    title: "Maya",
+    request: "tag this",
+    highlight: null,
+    doc: "Met Maya at the meetup.",
+    areas: ["Projects"],
+    tags: [],
+  };
+
+  test("secret-shaped text never reaches the model", async () => {
+    let called = false;
+    const host = {
+      complete: async () => {
+        called = true;
+        return "{}";
+      },
+    };
+    const secret = { ...ask, doc: "api key sk-ant-abcdefghijklmnopqrstuvwx" };
+    expect(await proposeLibrarian(secret, host)).toEqual({ kind: "secret" });
+    expect(called).toBe(false);
+  });
+
+  test("the reply comes back as actions within the grammar", async () => {
+    const host = { complete: async () => '{"actions":[{"type":"tag","tags":["person"]}]}' };
+    expect(await proposeLibrarian(ask, host)).toEqual({
+      kind: "actions",
+      actions: [{ type: "tag", tags: ["person"] }],
+    });
+  });
+});
+
+describe("applying", () => {
+  test("tags and a mark are written and journaled with their before; filing goes last", async () => {
+    const { deps, calls } = fakeDeps(view(["tags: [ai]"]));
+    const count = await applyLibrarian(
+      [
+        { type: "file", area: "People", create: true },
+        { type: "tag", tags: ["person"] },
+        { type: "mark", anchor: { exact: "Maya", prefix: "Met ", suffix: " at" } },
+      ],
+      { id: "01NOTE", title: "Maya", model: "opus" },
+      deps,
+    );
+    expect(count).toBe(3);
+    expect(calls).toEqual([
+      "set tags [ai, person]",
+      "log tags [ai] -> [ai, person]",
+      "learn tags",
+      'set anchors [{"exact":"Maya","prefix":"Met ","suffix":" at"}]',
+      'log anchors  -> [{"exact":"Maya","prefix":"Met ","suffix":" at"}]',
+      "learn anchors",
+      "file People",
+      "refresh",
+    ]);
+  });
+
+  test("a tag the note already has writes nothing", async () => {
+    const { deps, calls } = fakeDeps(view(["tags: [person]"]));
+    expect(
+      await applyLibrarian([{ type: "tag", tags: ["Person"] }], { id: "n", title: "", model: "" }, deps),
+    ).toBe(0);
+    expect(calls).toEqual(["refresh"]);
+  });
+});

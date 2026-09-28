@@ -1394,7 +1394,7 @@ const RESERVED_KEYS: [&str; 12] = [
 /// `set_ai_field` / `file_note`; the Filer refuses everything NOT in this set, and
 /// these stay disjoint from RESERVED_KEYS (Rust) and the user's `{shelf, reach}` —
 /// two actors, two gates, disjoint territories (the maintainer, 2026-07-01).
-const AI_KEYS: [&str; 8] = [
+pub(crate) const AI_KEYS: [&str; 9] = [
     "area",
     "summary",
     "tags",
@@ -1403,6 +1403,9 @@ const AI_KEYS: [&str; 8] = [
     "area_confidence",
     "filed_by",
     "filed_at",
+    // text-quote pointers to passages (/librarian, 2026-09-28): the organizer
+    // never writes them; only an applied Librarian-bar "mark" does
+    "anchors",
 ];
 
 /// A frontmatter line setting the per-note SECURE flag. Only literal `false`
@@ -11056,6 +11059,11 @@ mod tests {
         assert!(store
             .set_ai_field(&rel, "summary", "the Alazan 84 land deal")
             .is_ok());
+        // a passage pointer (/librarian): one line of JSON in `anchors`
+        let anchors = r#"[{"exact":"land deal","prefix":"Alazan 84 ","suffix":" notes"}]"#;
+        assert!(store.set_ai_field(&rel, "anchors", anchors).is_ok());
+        let text = fs::read_to_string(store.abs(&rel)).unwrap();
+        assert!(text.contains(&format!("anchors: {anchors}")) && text.contains("land deal notes"));
         // the allowlist refuses a USER key, a RESERVED key, and junk.
         assert!(store.set_ai_field(&rel, "shelf", "Inbox").is_err());
         assert!(store.set_ai_field(&rel, "locked", "true").is_err());

@@ -267,3 +267,8 @@ fn secure_overlap() {
         );
     }
 }
+
+#[test]
+fn ai_keys_match_fixture() {
+    assert_eq!(string_list(&entry("aiKeys")), crate::corpus::AI_KEYS.to_vec());
+}

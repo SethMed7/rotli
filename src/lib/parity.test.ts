@@ -19,6 +19,7 @@ import { containsPrivateDataOverlap, endpointIsLocal } from "../ai/guard";
 import { BOARD_LIMITS } from "../boards/validation";
 import { DOCUMENT_CONVERTIBLE_EXTS } from "../documents/kinds";
 import { NATIVE_IMAGE_EXTS } from "../editor/externalImageDrop";
+import { AI_KEYS } from "../memex/contract";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { BLOCK_MARKERS } from "../services/derive";
 import { DEST } from "../services/destinations";
@@ -60,6 +61,10 @@ describe("parity.json ↔ TS constants", () => {
 
   test("templatesBrainFolder", () => {
     expect<string>(TEMPLATES_BRAIN_FOLDER).toBe(entries.templatesBrainFolder.value);
+  });
+
+  test("aiKeys", () => {
+    expect<string[]>([...AI_KEYS]).toEqual(entries.aiKeys.value);
   });
 
   test("videoExts", () => {

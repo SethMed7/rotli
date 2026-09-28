@@ -125,6 +125,7 @@ export const SERVICE_FILE_OWNERS = {
   "chatModelMeta.ts": "chat",
   "chatRename.ts": "chat",
   "handToAi.ts": "notes",
+  "librarianBar.ts": "librarian (the /librarian bar: gate, one model call, journaled apply)",
   "notePathCopy.ts": "notes",
   "thanksShare.ts": "onboarding (the thank-you card: links, saving and copying the banner)",
   "chatAutoTitle.ts": "chat",
