@@ -52,6 +52,7 @@ fix both in the same change.
 | Ambient audio and the sidebar player — tab media, the studio's tracks | [`design/ambient-audio.md`](design/ambient-audio.md) |
 | Show in Rotli — hiding parts of the title bar, sidebar and tabs | [`design/show-in-rotli.md`](design/show-in-rotli.md) |
 | Chat as a work surface — tools, rendering, and the path to media (evaluation) | [`design/chat-work-surface-eval-2026-09-27.md`](design/chat-work-surface-eval-2026-09-27.md) |
+| Chat: live HTML previews and videos made from them (evaluation) | [`design/chat-live-html-video-eval-2026-09-28.md`](design/chat-live-html-video-eval-2026-09-28.md) |
 | Quokka emotions — moods from existing art, and new expressions to draw | [`design/quokka-emotions.md`](design/quokka-emotions.md) |
 | Rotli Web experience review — what a fresh vault walk found and fixed | [`design/web-experience-review-2026-09-27.md`](design/web-experience-review-2026-09-27.md) |
 | Durable schemas, compatibility, migrations, and downgrade behavior | [`architecture/compatibility-and-migrations.md`](architecture/compatibility-and-migrations.md) |
