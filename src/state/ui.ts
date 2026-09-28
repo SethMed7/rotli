@@ -732,7 +732,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   setThemeFamily: (family) => set({ themeFamily: family }),
 
   syntaxPalette: "rotli",
-  boardBackground: "theme",
+  boardBackground: DEFAULT_APPEARANCE.boardBackground,
   setSyntaxPalette: (palette) => set({ syntaxPalette: palette }),
   accentColor: "default",
   setAccentColor: (accent) => set({ accentColor: accent }),
