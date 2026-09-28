@@ -107,10 +107,12 @@ function ThanksCard() {
 
   const shareOnX = async () => {
     if (banner.kind !== "ready") return;
-    const copied = copyBannerImage(banner.blob); // inside the click: the clipboard needs it
+    // copy first, inside the click, and open X only once the write settles:
+    // WebKit refuses a clipboard write whose window has lost focus
+    const copied = await copyBannerImage(banner.blob);
     void openLink(shareOnXUrl());
     setStatus(
-      (await copied)
+      copied
         ? "Your banner is copied. Paste it into the post with ⌘V."
         : "Opening X. Save the banner to add it to your post.",
     );
