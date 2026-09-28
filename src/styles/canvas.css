@@ -32,6 +32,12 @@
   --color-primary-hover: color-mix(in srgb, var(--accent) 88%, var(--ground));
   --color-primary-light: color-mix(in srgb, var(--accent) 18%, var(--ground));
   --color-primary-light-darker: color-mix(in srgb, var(--accent) 28%, var(--ground));
+  /* the selected tool and active controls (2026-09-28): these were still the
+     vendor's violet in both modes */
+  --color-surface-primary-container: color-mix(in srgb, var(--accent) 22%, var(--surface));
+  --color-on-primary-container: var(--text);
+  --color-brand-hover: color-mix(in srgb, var(--accent) 88%, var(--ground));
+  --color-brand-active: color-mix(in srgb, var(--accent) 80%, var(--text));
   --island-bg-color: var(--surface);
   --default-bg-color: var(--ground);
 }
@@ -59,6 +65,8 @@
    and live in the eager render.css so a sheet is styled without a board chunk. */
 .rotli-embed-board-inner {
   position: relative;
+  /* Match theme: a board in a note shows the same ground as the board tab */
+  background: var(--ground);
 }
 
 /* The browser (no-shell) + loading/error placeholders — quiet, centered, warm. */

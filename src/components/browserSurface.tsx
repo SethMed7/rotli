@@ -2,7 +2,9 @@ import { type SyntheticEvent, useCallback, useEffect, useRef, useState } from "r
 
 import {
   PRIVATE_BROWSER_SEARCH_ENGINE_PRESENTATIONS,
+  adoptPrivateBrowserTab,
   forgetPrivateBrowserTab,
+  isPrivateBrowserTabRetained,
   normalizePrivateBrowserInput,
   privateBrowserInitialUrl,
   privateBrowserTabTitle,
@@ -119,6 +121,13 @@ export function BrowserSurface({
             const host = hostRef.current;
             if (!host || disposed) return;
             webviewCreated.current = true;
+            // back from the player: the page is alive and playing — show it, don't reload
+            if (adoptPrivateBrowserTab(tabId)) {
+              void privateBrowserSetVisible(tabId, activeRef.current).then(() => {
+                if (!disposed && activeRef.current) syncBounds();
+              });
+              return;
+            }
             void privateBrowserCreate(tabId, initialUrl, boundsOf(host))
               .then(() => {
                 if (disposed) return privateBrowserClose(tabId);
@@ -137,9 +146,11 @@ export function BrowserSurface({
       if (frame !== null) cancelAnimationFrame(frame);
       void unlistenState.then((unlisten) => unlisten());
       void unlistenWindow.then((unlisten) => unlisten());
-      if (webviewCreated.current) void privateBrowserClose(tabId).catch(() => {});
+      // a tab tucked into the player keeps its page (and its title and address)
+      const keep = isPrivateBrowserTabRetained(tabId);
+      if (webviewCreated.current && !keep) void privateBrowserClose(tabId).catch(() => {});
       webviewCreated.current = false;
-      forgetPrivateBrowserTab(tabId);
+      if (!keep) forgetPrivateBrowserTab(tabId);
     };
   }, [initialUrl, native, paneId, syncBounds, tabId]);
 

@@ -119,3 +119,22 @@ export function forgetPrivateBrowserTab(tabId: string): void {
   initialUrls.delete(tabId);
   if (tabTitles.delete(tabId)) publishPrivateBrowserTitle();
 }
+
+/** Tabs whose page outlives their surface (2026-09-28): a tab tucked into the
+ * sidebar player keeps playing with no pane showing it. Its surface skips the
+ * close on unmount, and when the tab comes back the new surface adopts the
+ * living page instead of loading it again. */
+const retained = new Set<string>();
+
+export function retainPrivateBrowserTab(tabId: string): void {
+  retained.add(tabId);
+}
+
+export function isPrivateBrowserTabRetained(tabId: string): boolean {
+  return retained.has(tabId);
+}
+
+/** Hand a retained page to the surface now showing it; true if it was retained. */
+export function adoptPrivateBrowserTab(tabId: string): boolean {
+  return retained.delete(tabId);
+}

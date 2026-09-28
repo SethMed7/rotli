@@ -10,8 +10,207 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Hide what you don't use.** Settings → Appearance → Show in Rotli has a
+  switch for each part of the title bar, sidebar and tab strip you might not
+  want: the activity overview cards, the Browser, Theme, New and Split
+  buttons, back and forward, the search field, All notes, Captures, Tasks,
+  Breve, the Files, Librarian and Feedback buttons, and the tabs' +. Nothing
+  goes away: each switch says how to reach it without the button, and ⌘K now
+  opens the activity dashboard, Tasks, All notes and a private browser tab.
+  Show everything brings it all back.
+
+- **Music in setup.** First-run setup has a Sound step: stay quiet, play the
+  studio track that matches the theme you just picked, or Claude FM (Mac).
+  It starts playing as you choose, and the sidebar player takes it from there.
+- **Ambient audio.** Turn it on in Settings → General and quiet music from the
+  Rotli studio plays from a small player above the sidebar's footer, one track
+  per theme (Linen, Graphite, Tide, Canopy, Dusk, Lamplight), with previous,
+  play/pause, stop and next. Play a video in a tab and it takes over: the
+  music pauses and waits as a toggle on the player's left (click it to pause
+  the video and bring the music back). Pause the video or close its tab and the
+  music comes back. The tracks ship with the app, so nothing is downloaded.
+  Mac app for tab playback; the tracks were composed in code at the studio
+  (MIT).
+- **Tabs that play sound show it.** A browser tab playing audio wears a
+  speaker (click it to pause), and the sidebar player controls it: previous,
+  play/pause, stop, next (YouTube's own buttons on YouTube), and open the tab.
+  With Ambient audio off, the player appears only while a tab has something
+  playing. Mac app, macOS 12 or later.
+- **The player answers at once.** Play, pause and stop show their result the
+  moment you press them, ambient fades out in about a tenth of a second
+  instead of half a second, a tab's sound is noticed within half a second,
+  and the chosen track is loaded before you press play.
+- **Stop all sound.** ⌘K → Stop all sound silences whatever the player can
+  reach: the ambient track, Claude FM, and every browser tab. Sound from
+  Rotli can no longer keep playing with nothing showing where it comes from.
+- **Pick the ambient sound from the player.** Click the title ("Ambient ·
+  Tide") for the list: the six tracks, and **Claude FM**, Anthropic's live
+  lo-fi stream. Claude FM plays in a private browser page you never see, so
+  it needs the internet; Open Claude FM in a tab shows it as an ordinary tab.
+  The player always names what's playing. Settings → General lists it too.
+  Mac app.
+- **Tuck a playing tab into the player.** A browser tab playing sound can
+  leave the tab bar and keep playing in the sidebar player. Open the tab brings
+  it back where you are, still playing, without reloading; Close ends it. One
+  tab at a time. Mac app.
+
+- **The Librarian lives in the corner.** A Librarian pill now sits in every
+  note's bottom-right corner, just left of the scroll-to-top arrow, and the
+  conversation opens right out of it; click it again to tuck it away. After
+  you apply its suggestions, the chat lists exactly what changed ("Tagged:
+  …", "Filed in …"), and a line under the box says what it's for: it only
+  organizes; for anything else, Open in Chat. Mac app.
+- **Tell the Librarian how things are.** In `/librarian`, say something like
+  "Ana and Leo are work people; so was Sam, but not anymore". The Librarian
+  adds a filing rule, makes a note for each person you haven't written about
+  yet (their name and what you said, filed in People › Work), and asks you
+  before changing anyone who already has a note, with Yes and No, and then
+  only their tags and folder, never their words. Every new note shows in
+  Librarian Activity with Undo. Mac app.
+- **A badge when the Librarian asks.** Whenever the Librarian has a question
+  for you, its button in the sidebar shows how many; click it to go back to
+  the conversation.
+- **Your rules for the Librarian.** Settings → Librarian → Your rules tells the
+  Librarian how you want things kept, in plain settings:
+  - **Secure keywords**: a note whose title or file name has one of these words
+    (bank, passport, tax return…) becomes secure when it's saved and moves into
+    your protected Secure folder. Only the name is checked, never what the
+    note says, and never by a model; "bank" matches "Bank login", not
+    "Riverbank". **Secure matching notes now** protects notes already named
+    that way.
+  - **People**: split into Family, Friends, Work and Acquaintances (rename,
+    remove or add your own), or keep one People list. A person is filed into
+    People › Friends and so on; a group's folder is made when its first note
+    is filed.
+  - **Filing rules**: plain sentences ("Recipes go to Cooking") the Librarian
+    follows when it files a note on its own and when you ask it with
+    `/librarian`.
+
+  The rules are kept with the vault's settings on this Mac. Mac app.
+- **The Librarian, as a chat.** After your first ask, the Librarian pops out
+  into the bottom-right corner of the pane you're in, like the chat on a
+  website, and the format bar comes back. Keep talking with the model you
+  picked. It is still the Librarian, not a second Chat: it organizes this note
+  (tags, marked passages, filing), asks what you mean when it needs to, and
+  lists what it would change for you to tick and apply, right in the
+  conversation. Ask it for anything else (an answer, a draft, research) and it
+  says so in one line and offers **Take this to Chat**, which opens a new chat
+  about the note with your question already typed; **Open in Chat** is always
+  in its header. Quick asks ("Suggest tags", "File this note", "Mark the
+  highlighted passage") sit above the box. Each question carries the passage
+  you had highlighted. The Librarian's corner button shows only once you've
+  run `/librarian` in that note, so notes you haven't asked about stay clear.
+  The model picker is now the searchable one from Chat, grouped by provider.
+  The passage you highlight stays highlighted while you type to the Librarian
+  (it used to vanish as soon as you clicked into the bar). Escape or − tucks
+  the chat into a button in the same corner; × ends the conversation. The
+  conversation lasts while the app is open and is never saved to your vault.
+  Mac app.
+- **Talk to the Librarian from a note.** Type `/librarian` and the format bar
+  becomes a small Librarian bar: pick a model, highlight a passage if you like,
+  and ask ("tag this", "mark this passage", "file it with People"). The
+  Librarian proposes; nothing changes until you tick what you want and press
+  Apply. It can tag the note, mark a passage (a pointer saved in the note's
+  metadata that finds the words again; the note's text is never edited), and
+  file the note into a Library area, creating People if you don't have it
+  yet. Every change shows in Librarian Activity with Undo, and the bar lists
+  the note's marked passages so you can jump back to them. Locked and secure
+  notes, notes outside the Library, and text that looks like a secret are
+  refused before anything is sent. Escape brings the format bar back. Mac app.
+- **Clean up leftover note names.** Older notes could carry names they never
+  really had in their metadata: "Untitled", "untitled (7)", or a title caught
+  half-typed ("Round", "Round Three -"). Settings → General → Leftover note
+  names counts them across your vault and removes them in one click. A name
+  that a link still uses is kept, so no link breaks. Mac app.
+- **Three more moods for your quokka.** Settings → Appearance → Idle mood now
+  has Friendly (waving), Inquisitive (looking into things), and Adventurous
+  (off exploring) beside the original five, each wearing your accessory.
+- **A thank-you at the end of setup.** Before the guided tour, a small card
+  thanks you and shows a banner made from your choices: your quokka (its
+  color and what it's wearing) on your theme, with your name if you gave one.
+  Star Rotli on GitHub, copy an invite for a friend, share on X, or save the
+  banner to your vault's Assets. Share on X opens a post with a standard caption and a link to
+  rotli.co and puts your banner on the clipboard to paste in; nothing about
+  you goes into the link. Closing the card starts the tour.
+- **What's new, after an update.** The first launch after an update opens a
+  small card with the release's top changes — once, and never on a fresh
+  install. A change that is only in the Mac app or only on Rotli Web says so.
+  "See everything new" opens the full changelog, now on rotli.co (linked from
+  the site's footer), and the palette's "What's new in Rotli" brings the card
+  back any time.
+- **Feedback in the sidebar.** The sidebar's footer gains a Feedback button
+  beside Files, Librarian, and Settings; it opens the same prefilled GitHub
+  issue as Settings → About. When the sidebar is too narrow for the labels, the
+  footer shows its icons alone instead of cutting the names short, and the
+  Librarian's count and the update dot sit on their icons, so a label is never
+  squeezed.
+- **Boards match your theme.** A board you haven't colored yourself is your
+  theme's own color, in all fourteen environments, and changes the moment you
+  change themes. A color you pick on a board stays that board's (plain white
+  counts as no color). Settings → Appearance → Board background → White keeps
+  boards and their tools light, like paper, instead. Only a color you chose is
+  saved into the board file. A board inside a note matches too.
+- **Chat replies show images and video from your vault.** When a reply links
+  an image or a video in your vault on a line of its own, the chat shows the
+  picture, or a video you can play, instead of the link's text. Only files in
+  your vault are shown; an image at a web address is never loaded. On Rotli
+  Web a video shows its name instead of a player.
+- **A video a chat made shows as a video** in the chat's list of files, with
+  its own mark and "Video · MP4", instead of as an unnamed file.
+- **Hand to AI.** Choose "Hand to AI…" from the palette or a note's menu and
+  Rotli turns the note into a prompt for Claude Code or another agent: the
+  goal, the open tasks (and what's already done), the note as context, and
+  what "done" means. Edit it, then copy it. It is built from the note alone;
+  no model runs. A secure note, or one that looks like it holds a secret, is
+  never turned into a prompt, and the window says why.
+  Type `/hand to AI` in a note for the same window, or search ⌘K for "send to
+  AI".
+
 ### Fixed
 
+- **Rotli Web: ambient music plays.** The tracks were asked for at the wrong
+  address on the web, so the player stayed silent.
+- **Rotli Web: the search button can't be hidden.** On the web it is the only
+  way into the palette, so Show in Rotli no longer offers to hide it (or the
+  Browser button, which the web doesn't have). `/librarian` is left out of the
+  web's slash menu, and What's new marks the Mac-only items.
+- **`/librarian` is ready to type in.** Choosing `/librarian` puts the cursor
+  in its box right away, so you can start typing without clicking it first.
+
+- **Bold over a selection that spans lines.** Selecting a whole line and
+  pressing Bold used to leave it plain and put `****` in front of the next
+  line, breaking its bullet. Bold, italic, and the other marks now format each
+  selected line's text and leave list, task, heading, and quote markers alone;
+  if every selected line is already bold, Bold takes it off all of them.
+  Selecting text that is only partly bold (a bold word and the plain words
+  after it) and pressing Bold now makes it one bold span instead of adding
+  stray stars; selecting part of a bold span unbolds just that part. Strike,
+  highlight, and underline work the same way.
+- **A file dropped from Finder onto an open board no longer lands in another
+  note.** Boards don't take dropped files yet, so the file is saved to Assets
+  and a notice says so. Mac app.
+- **Boards use your accent color.** The selected tool and active controls were
+  still Excalidraw's own violet in both light and dark.
+- **A remote-agent relay on `http://[::1]` is accepted for development**, like
+  `127.0.0.1` and `localhost` already were: an IPv6 host arrives in brackets,
+  so the loopback check never matched it.
+- **A new web vault's Tasks page and This week card are right at once.** The
+  Tasks page read "Nothing open" and the sidebar's This week card "0 new"
+  until a reload, though the Welcome lessons had just arrived with thirty open
+  tasks.
+- **Rotli Web says what the web can do.** A note's header says "In your
+  folder", not "On this Mac", and the new-tab chooser shows the private
+  Browser as "In the Mac app" instead of offering a tab that could only fail.
+- **Settings tells a screen reader which pane is open.**
+- **Big images save on a board.** An image over about 75 KB made a board
+  refuse to save, because an image is kept inside the board as one long
+  string and every string had a 100,000-character cap. An image's data is now
+  exempt from that cap; every other string keeps it, and a whole board is
+  still limited to 8 MB.
+- **A `[[link]]` to a board opens the board.** It used to open the board as a
+  note.
 - **Find in this file shows what it matched.** Every match is marked on the
   page and the current one stands out, the way find works everywhere else.
   Before, the match was selected but did not show while you typed in the find

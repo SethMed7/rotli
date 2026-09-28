@@ -98,6 +98,12 @@
     {
       "files": ["src/editor/embedSizeMemory.ts"],
       "rules": { "no-restricted-globals": "off" }
+    },
+    {
+      // not UI state: the id of a tucked tab's native page, kept for this
+      // window session only so a reload can close the page it orphaned
+      "files": ["src/services/mediaDock.ts"],
+      "rules": { "no-restricted-globals": "off" }
     }
   ]
 }

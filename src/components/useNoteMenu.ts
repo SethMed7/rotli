@@ -14,7 +14,6 @@ import {
   corpusFileStat,
   corpusFrontmatter,
   corpusMoveFileToSink,
-  corpusNoteAbsolutePath,
   corpusRevealFile,
   corpusSetLocalAiAccess,
   corpusSetLocked,
@@ -38,6 +37,7 @@ import { renameLane } from "../services/itemRename";
 import { isEmptyNote } from "../services/mainDismiss";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
 import { markNoteDraftChanged } from "../services/noteDrafts";
+import { copyFilePath } from "../services/notePathCopy";
 import { notesService } from "../services/notes";
 import { assignItemToView, assignedView, projectionMenuAction } from "../services/viewTree";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
@@ -84,18 +84,6 @@ export function copyBody(body: string): string {
     return lines.join("\n");
   }
   return body;
-}
-
-async function copyFilePath(id: string): Promise<void> {
-  try {
-    const path = await corpusNoteAbsolutePath(id);
-    if (!navigator.clipboard) throw new Error("the clipboard is unavailable");
-    await navigator.clipboard.writeText(path);
-  } catch (err) {
-    useUiStore
-      .getState()
-      .setRowActionError(`Couldn’t copy the file path — ${err instanceof Error ? err.message : String(err)}`);
-  }
 }
 
 export function useNoteMenu() {
@@ -497,6 +485,13 @@ export function useNoteMenu() {
         const renameVia = renameLane(note);
         if (renameVia) {
           items.push({ kind: "sep" as const });
+          if (renameVia === "title") {
+            items.push({
+              kind: "action" as const,
+              label: "Hand to AI…",
+              onClick: () => useUiStore.getState().setHandToAiNoteId(note.id),
+            });
+          }
           items.push({
             kind: "action" as const,
             label: "Rename…",

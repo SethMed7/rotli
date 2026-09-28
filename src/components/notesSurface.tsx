@@ -18,12 +18,15 @@ import { BoardSurface } from "./boardSurface";
 import { DashboardSurface } from "./dashboardSurface";
 import { EmptyState } from "./emptyState";
 import { ClockGlyph } from "./glyphs";
+import { HandToAiDialog } from "./handToAiDialog";
 import { NoteListSurface } from "./noteListSurface";
 import { PaneTree } from "./paneTree";
 import { Sidebar } from "./sidebar";
 import { SidebarHoverRail } from "./sidebar/sidebarHoverRail";
 import { SystemSurface } from "./systemSurface";
 import { TasksSurface } from "./tasksSurface";
+import { ThanksDialog } from "./thanksDialog";
+import { WhatsNewDialog } from "./whatsNewDialog";
 
 // Breve is a whole product surface most note sessions never enter — split it
 // off the entry chunk like paneTree's CanvasSurface (perf audit 2026-07-30, #18)
@@ -155,6 +158,9 @@ export function NotesSurface() {
       ) : (
         <PaneTree />
       )}
+      <HandToAiDialog />
+      <WhatsNewDialog />
+      <ThanksDialog />
       {/* collapsed → no warm-edge sliver (the maintainer, 2026-06-15: it was an unclear,
           disliked line). The titlebar's always-visible sidebar toggle is the
           clear reopen now. */}

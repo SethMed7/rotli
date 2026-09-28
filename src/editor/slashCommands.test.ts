@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { NoteSummary } from "../types";
 import { imageGenMarkdown, readyImageEngines } from "./imageGenPopover";
-import { pickerFence, slashInsertion, templateInsertion } from "./slashActions";
+import { opensFlow, pickerFence, slashInsertion, templateInsertion } from "./slashActions";
 import {
   adaptSlashInsertion,
   filterSlashItems,
@@ -43,6 +43,8 @@ describe("slash command catalog", () => {
       "Mermaid",
       "Attach image",
       "Generate image",
+      "Talk to the Librarian",
+      "Hand to AI",
       "Template",
       "Link note",
       "Link chat",
@@ -51,8 +53,8 @@ describe("slash command catalog", () => {
       "Document",
     ]);
     for (const item of SLASH_ITEMS) {
-      // picker + image commands open a native/popover flow first — no scaffold
-      if (item.op.kind === "picker" || item.op.kind === "attachImage" || item.op.kind === "imageGen") {
+      // picker, image, and Librarian commands open a flow first — no scaffold
+      if (opensFlow(item.op)) {
         continue;
       }
       const insertion = slashInsertion(item.op);
@@ -120,6 +122,10 @@ describe("slash command catalog", () => {
     expect(filterSlashItems("word").map((item) => item.label)).toEqual(["Document"]);
     expect(filterSlashItems("docx").map((item) => item.label)).toEqual(["Document"]);
     expect(filterSlashItems("rtf")).toEqual([]);
+    expect(filterSlashItems("librarian", { sheets: false, librarian: false })).toEqual([]);
+    expect(filterSlashItems("librarian", { sheets: false }).map((item) => item.label)).toEqual([
+      "Talk to the Librarian",
+    ]);
   });
 });
 

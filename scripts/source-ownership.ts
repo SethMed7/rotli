@@ -103,6 +103,7 @@ export const LIB_EFFECTFUL_FILE_OWNERS = {
   "quitFlush.ts": "native quit lifecycle adapter",
   "tabDrag.ts": "cross-surface tab drag workflow",
   "tauri.ts": "typed native-host adapter facade",
+  "vaultRepair.ts": "native vault repair passes (secure intake, leftover note names)",
   "useNow.ts": "shared React wall-clock subscription for presentation projections",
 } as const;
 
@@ -123,6 +124,14 @@ export const SERVICE_FILE_OWNERS = {
   "chatImages.ts": "chat",
   "chatModelMeta.ts": "chat",
   "chatRename.ts": "chat",
+  "handToAi.ts": "notes",
+  "ambient.ts": "ambient audio + the sidebar player (tab media polling, the ambient track)",
+  "mediaDock.ts": "ambient (a browser tab tucked into the sidebar player)",
+  "mainWindowWork.ts": "app shell (the main window's lifelong background work)",
+  "librarianBar.ts": "librarian (the /librarian bar: gate, one model call, journaled apply)",
+  "librarianPeople.ts": "librarian (statements: rules, People groups, new people notes, journaled)",
+  "notePathCopy.ts": "notes",
+  "thanksShare.ts": "onboarding (the thank-you card: links, saving and copying the banner)",
   "chatAutoTitle.ts": "chat",
   "chatSummon.ts": "chat",
   "chatWindowShell.ts": "chat (the Chat window's native side, for presentation)",

@@ -855,6 +855,19 @@ export function privateBrowserClose(tabId: string): Promise<void> {
   return invoke<void>("private_browser_close", { tabId });
 }
 
+export type TabMediaState = "none" | "playing" | "paused" | "suspended";
+export type TabMediaAction = "play" | "pause" | "stop" | "next" | "previous";
+/** WebKit's own playback state for a browser tab (private_browser_media.rs). */
+export function privateBrowserMediaState(tabId: string): Promise<TabMediaState> {
+  if (!isTauri()) return Promise.resolve("none");
+  return invoke<TabMediaState>("private_browser_media_state", { tabId });
+}
+
+export function privateBrowserMedia(tabId: string, action: TabMediaAction): Promise<void> {
+  if (!isTauri()) return Promise.resolve();
+  return invoke<void>("private_browser_media", { tabId, action });
+}
+
 export function onPrivateBrowserState(
   handler: (event: PrivateBrowserStateEvent) => void,
 ): Promise<() => void> {
@@ -1369,19 +1382,6 @@ export async function corpusTasks(): Promise<TaskItem[]> {
 export async function corpusToggleTask(id: string, line: number, expect: string): Promise<void> {
   if (!isTauri()) return;
   await invoke("corpus_toggle_task", { id, line, expect });
-}
-
-/** Preview legacy secure-intake state in the default memex (read-only). */
-export async function secureRepairScan(): Promise<SecureRepairCandidate[]> {
-  if (!isTauri()) return [];
-  return invoke<SecureRepairCandidate[]>("corpus_secure_repair_scan");
-}
-
-/** Repair every current candidate — Rust re-validates each note on disk, moves
- * it into the protected lane ignore-first, and journals it content-free. */
-export async function secureRepairApply(): Promise<SecureRepairReport> {
-  if (!isTauri()) return { repaired: 0, failed: [] };
-  return invoke<SecureRepairReport>("corpus_secure_repair_apply");
 }
 
 /** The brain's memory lanes as AI-retrievable metas (identity/, personality/,

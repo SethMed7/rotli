@@ -463,6 +463,15 @@
   color: var(--accent-text);
   font-weight: 600;
 }
+/* the Librarian is asking (2026-09-28): a question in its conversation waits
+   for an answer — solid, so it reads as "your turn", not as a queue */
+.count.ask {
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
 /* per-section "+" pair (new note · new folder): ALWAYS visible on folder rows
    (the maintainer, 2026-07-25, from the Zen reference: "the icons are always there, not
    only on hover — it's just cleaner"). Whisper-quiet at rest (calm pass,
@@ -2187,6 +2196,24 @@
 /* The 2px accent top edge that marked the focused pane's active tab is GONE
    (the maintainer, 2026-07-30: "I don't like the blue line on top of the active tab").
    Pane focus still reads from the active tab merging into its editor. */
+/* a browser tab playing sound (2026-09-28): the speaker, before the close
+   button; clicking it pauses the tab. Not a span, so the .tab span rules
+   never stretch it */
+.tab .tab-audio {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--control-hit-min);
+  height: var(--control-hit-min);
+  border: none;
+  border-radius: var(--r-inner);
+  background: none;
+  color: var(--accent-text);
+  cursor: pointer;
+}
+.tab .tab-audio:hover {
+  background: var(--surface-2);
+}
 .tab .x {
   margin-left: auto;
   width: var(--control-hit-min);
@@ -2487,8 +2514,11 @@
 .sb-foot {
   flex: 0 0 auto;
   position: relative;
+  container-type: inline-size;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* one equal column per shown button (some can be hidden in Settings) */
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 4px;
   padding: 9px 12px 10px;
   border-top: 0;
@@ -2529,15 +2559,147 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sb-footbtn .count {
-  font-size: 10px;
+/* a narrower sidebar shows the icons alone, never a truncated "Fi…"
+   (2026-09-28): the four labels need about this much room to read whole */
+@container (max-width: 379px) {
+  .sb-footbtn .fname {
+    display: none;
+  }
+}
+/* — the sidebar player (2026-09-28), right above the footer: a tab's media,
+   or the ambient track; ambient steps aside to the small toggle on the left
+   while a tab has media — */
+.sb-player {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 12px 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  font-size: 12px;
   color: var(--text-muted);
+  container-type: inline-size;
+}
+.sb-player-ambient {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.sb-player-ambient.on {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent-text);
+}
+.sb-player-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sb-player-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+}
+.sb-player-title svg {
+  flex: 0 0 auto;
+  color: var(--accent-text);
+}
+.sb-player-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* the ambient title is also the source picker (a menu of the tracks and
+   Claude FM): a quiet button that reads as the title until hovered */
+.sb-player-source {
+  border: none;
+  background: none;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  font: inherit;
+  text-align: left;
+  border-radius: var(--r-control);
+  cursor: pointer;
+}
+.sb-player-source:hover {
+  background: color-mix(in srgb, var(--hov) 62%, transparent);
+}
+.sb-player-controls {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+.sb-player-btn {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.sb-player-btn:hover,
+.sb-player-ambient:hover {
+  background: color-mix(in srgb, var(--hov) 62%, transparent);
+  color: var(--text);
+}
+/* only a very narrow sidebar lets the title go: at the usual width the
+   player is ~220px, and the name of what's playing must show (the owner,
+   2026-09-28: "I need to see what is chosen") */
+@container (max-width: 150px) {
+  .sb-player-title span {
+    display: none;
+  }
+}
+
+/* the icon carries the button's badges, so a count or a dot never takes room
+   from the label (2026-09-28) */
+.sb-footicon {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+.sb-footicon .count {
+  position: absolute;
+  top: -8px;
+  /* anchored by its right edge: a wider count grows over the icon, never
+     into the label beside it */
+  right: -5px;
+  min-width: 14px;
+  padding: 0 4px;
+  font-size: 9px;
+  line-height: 14px;
+  text-align: center;
+  outline: 2px solid var(--ground);
+}
+.sb-footicon .sb-work-dot,
+.sb-footicon .sb-update-dot {
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  outline: 2px solid var(--ground);
 }
 /* "update available" on the footer's Settings button — the titlebar dot's twin
-   (.tb-update-dot): a warm clay dot in the row's flow, never a red badge, and
-   static (a hidden window must not composite) */
+   (.tb-update-dot): a warm clay dot, never a red badge, and static (a hidden
+   window must not composite) */
 .sb-footbtn .sb-update-dot {
-  flex: 0 0 auto;
   width: 7px;
   height: 7px;
   border-radius: 50%;

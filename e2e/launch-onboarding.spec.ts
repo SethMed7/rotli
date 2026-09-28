@@ -34,6 +34,10 @@ async function onboard(page: Page) {
     page.getByRole("group", { name: "Librarian model" }).getByRole("button", { name: "On this Mac" }),
   ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Skip model setup" }).click();
+  await page
+    .getByRole("dialog", { name: "Thank you for trying Rotli" })
+    .getByRole("button", { name: "Take the tour" })
+    .click();
   await page.getByRole("button", { name: "Skip tour" }).click();
   await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
   const folder = welcomeFolder(page);
@@ -91,11 +95,30 @@ test("first-time setup opens in Rotli Light with a quokka wearing nothing", asyn
   await expect(page.locator("html")).toHaveAttribute("data-theme", "midnight-dark");
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Choose where notes live" }).click();
   await expect(page.getByRole("button", { name: "Choose an empty folder" })).toBeVisible();
   await page.getByRole("button", { name: "Back" }).click();
   await expect(page.getByRole("button", { name: "Choose where notes live" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "midnight-dark");
+});
+
+test("setup's Sound step offers quiet, the theme's studio track, or Claude FM", async ({ page }) => {
+  await page.goto("/?onboarding");
+  await page.getByRole("button", { name: "Get started" }).click();
+  await page.getByRole("radiogroup", { name: "Theme" }).getByRole("radio", { name: /Ocean/ }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { name: "Music while you write?" })).toBeVisible();
+  const music = page.getByRole("radiogroup", { name: "Music" });
+  await expect(music.getByRole("radio", { name: /^Quiet/ })).toHaveAttribute("aria-checked", "true");
+  await expect(music.getByRole("radio", { name: /^Claude FM/ })).toBeVisible();
+  await music.getByRole("radio", { name: /^Studio music · Tide/ }).click();
+  await expect(music.getByRole("radio", { name: /^Studio music/ })).toHaveAttribute("aria-checked", "true");
+  // Back and forth keeps the pick
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(music.getByRole("radio", { name: /^Studio music/ })).toHaveAttribute("aria-checked", "true");
 });
 
 test("the guided tour follows setup, spotlights real controls, skips missing ones, and reopens from Settings", async ({
@@ -110,6 +133,10 @@ test("the guided tour follows setup, spotlights real controls, skips missing one
   await page.getByRole("button", { name: "Use empty folder", exact: true }).click();
   await page.getByRole("button", { name: /^Create vault/ }).click();
   await page.getByRole("button", { name: "Skip model setup" }).click();
+  await page
+    .getByRole("dialog", { name: "Thank you for trying Rotli" })
+    .getByRole("button", { name: "Take the tour" })
+    .click();
   const tour = page.getByRole("region", { name: "Guided tour" });
   await expect(tour).toBeVisible();
   await expect(tour).toHaveAttribute("data-step", "new");

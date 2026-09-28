@@ -8,7 +8,8 @@ test("Settings is plain until an update is on the feed", () => {
   const markup = renderToStaticMarkup(<SettingsFootButton updateAvailable={false} />);
   expect(markup).toContain('title="Settings"');
   expect(markup).not.toContain("sb-update-dot");
-  expect(markup).not.toContain("aria-label");
+  // named even when a narrow footer hides its label (2026-09-28)
+  expect(markup).toContain('aria-label="Settings"');
 });
 
 test("an available update marks Settings with a dot and says so in words", () => {

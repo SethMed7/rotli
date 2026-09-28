@@ -40,8 +40,9 @@ describe("Home dashboard projection", () => {
   });
 
   test("clock-skewed future notes do not inflate the week", () => {
-    const now = 1_000_000;
-    expect(homeDashboardSnapshot([note("future", now + 1, now + 1)], {}, [], now)).toEqual({
+    const now = 10_000_000;
+    const hourAhead = now + 3_600_000;
+    expect(homeDashboardSnapshot([note("future", hourAhead, hourAhead)], {}, [], now)).toEqual({
       notes: { newInRange: 0, updatedInRange: 0, total: 1 },
       chat: { activeInRange: 0, total: 0, modelsUsed: 0, favoriteModelId: null },
     });
@@ -68,5 +69,21 @@ describe("Home dashboard projection", () => {
       notes: { newInRange: 1, updatedInRange: 1, total: 2 },
       chat: { activeInRange: 1, total: 2 },
     });
+  });
+
+  // 2026-09-27: `now` is a clock that ticks, so a note created a moment after
+  // its last tick (a new vault's Welcome lessons) read as "0 new" until the next
+  // tick. Anything since the window opened counts, however recent.
+  test("a note or chat from after the clock's last tick still counts", () => {
+    const now = Date.UTC(2026, 8, 27);
+    const snap = homeDashboardSnapshot(
+      [note("just-made", now + 1_500, now + 1_500)],
+      {},
+      [{ slug: "just-chatted", modifiedMs: now + 900 }],
+      now,
+    );
+    expect(snap.notes.newInRange).toBe(1);
+    expect(snap.notes.updatedInRange).toBe(1);
+    expect(snap.chat.activeInRange).toBe(1);
   });
 });

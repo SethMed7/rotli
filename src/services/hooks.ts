@@ -12,8 +12,8 @@ import {
   isTauri,
   organizerSecureHints,
   organizerStatus,
-  secureRepairScan,
 } from "../lib/tauri";
+import { secureRepairScan } from "../lib/vaultRepair";
 import { useUiStore } from "../state/ui";
 import type { Note, NoteSummary } from "../types";
 import { readJournal } from "./brainJournalStore";
@@ -287,6 +287,12 @@ export async function invalidateNotes(): Promise<void> {
  * for a blank note nobody has typed into yet (Command-T lag, 2026-09-01). */
 export async function invalidateNoteLists(): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: ["notes"] });
+}
+
+/** New notes that arrive WITH tasks (the Welcome lessons): refetch the Tasks
+ * projection too, which invalidateNoteLists deliberately leaves alone. */
+export async function invalidateTasks(): Promise<void> {
+  await queryClient.invalidateQueries({ queryKey: keys.tasks });
 }
 
 /** Scoped cache refresh after ONE note's body sync — the editor's 400ms tick.

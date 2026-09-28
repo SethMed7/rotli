@@ -39,7 +39,6 @@ import {
   buildChatNotesPrompt,
   type MemoryTurn,
 } from "../../chatMemory/model";
-import { DOCUMENT_EXTS, WORD_EXTS } from "../../documents/kinds";
 import { renderMermaidElement } from "../../editor/mermaidRender";
 import { renderInline } from "../../editor/render";
 import {
@@ -50,7 +49,7 @@ import {
   visibleChatText,
 } from "../../lib/chatWork";
 import { PLATFORM } from "../../lib/featurePolicy";
-import { extOf, fileName, IMAGE_EXTS, imageMimeOf } from "../../lib/fileKind";
+import { extOf, fileName, imageMimeOf } from "../../lib/fileKind";
 import { useAnchoredPopoverBox, useTransientPopover } from "../../lib/popover";
 import {
   type LocalQueueEntry,
@@ -61,7 +60,6 @@ import {
   corpusFileStat,
   corpusFrontmatter,
   corpusImportFile,
-  fileAssetUrl,
   isTauri,
   localQueueCancel,
   localQueuePrioritize,
@@ -121,17 +119,15 @@ import { Character, QuokkaMark } from "../character";
 import {
   CheckGlyph,
   CopyGlyph,
-  BoardGlyph,
   DocumentGlyph,
-  ImageGlyph,
   NotesStackGlyph,
   SearchGlyph,
   SpeakerGlyph,
   SquareGlyph,
-  WordGlyph,
   XGlyph,
 } from "../glyphs";
 import { WebDialogFrame } from "../webDialogFrame";
+import { ArtifactItem, ChatArtifactButtons } from "./chatArtifactItems";
 import { ChatAttachedImages } from "./chatAttachedImages";
 import { ChatClarificationBar } from "./chatClarificationBar";
 import { copyChatSelection } from "./chatCopy";
@@ -147,6 +143,7 @@ import {
   reasoningChoices,
   serviceTierChoices,
 } from "./chatReasoningModel";
+import { ChatReplyMedia } from "./chatReplyMedia";
 import { ChatSetupGuide } from "./chatSetupGuide";
 import { CHAT_MESSAGE_WINDOW, recentChatThread } from "./chatThreadModel";
 import {
@@ -376,119 +373,6 @@ function AssetsGlyph() {
       <circle cx="5.6" cy="6.4" r="1.1" />
       <path d="M2.5 12 6.7 8.2l2.6 2.4 2.3-2 1.9 1.7" />
     </svg>
-  );
-}
-
-function artifactType(artifact: ChatArtifact): "image" | "word" | "document" | "note" | "board" | "file" {
-  if (artifact.kind === "note") return "note";
-  if (artifact.kind === "canvas") return "board";
-  const extension = extOf(artifact.id);
-  if (IMAGE_EXTS.has(extension)) return "image";
-  if (WORD_EXTS.has(extension)) return "word";
-  if (DOCUMENT_EXTS.has(extension)) return "document";
-  return "file";
-}
-
-function artifactName(artifact: ChatArtifact): string {
-  return artifact.label ?? fileName(artifact.id).replace(/-\d{13}(?=\.[^.]+$)/, "");
-}
-
-/** One chat-created artifact. Images carry a real thumbnail; conventional
- * files use the same quiet format marks as tabs and the System browser. */
-function ArtifactItem({ artifact, onOpen }: { artifact: ChatArtifact; onOpen: () => void }) {
-  const type = artifactType(artifact);
-  const url = useQuery({
-    queryKey: ["asset-url", artifact.id],
-    queryFn: () => fileAssetUrl(artifact.id),
-    enabled: type === "image",
-  });
-  const name = fileName(artifact.id);
-  return (
-    <button type="button" className="chat-artifact" title={`Open ${name}`} onClick={onOpen}>
-      <span className={`chat-artifact-preview ${type}`}>
-        {type === "image" && url.data ? (
-          <img src={url.data} alt="" />
-        ) : type === "image" ? (
-          <ImageGlyph size={18} />
-        ) : type === "word" ? (
-          <WordGlyph size={22} />
-        ) : type === "document" ? (
-          <DocumentGlyph size={18} />
-        ) : type === "note" ? (
-          <DocumentGlyph size={18} />
-        ) : type === "board" ? (
-          <BoardGlyph size={18} />
-        ) : (
-          <DocumentGlyph size={18} />
-        )}
-      </span>
-      <span className="chat-artifact-copy">
-        <strong>{artifactName(artifact)}</strong>
-        <small>
-          {type === "word"
-            ? `Microsoft Word · ${extOf(name).toUpperCase()}`
-            : type === "note"
-              ? "Editable Markdown source"
-              : type === "board"
-                ? "Board"
-                : extOf(name).toUpperCase() || "File"}
-        </small>
-      </span>
-    </button>
-  );
-}
-
-/** Conventional files remain visible in the transcript itself as ordinary
- * click targets. The rail is the complete artifact browser; this compact row
- * keeps the file promised by the assistant next to the conversation that made
- * it without forcing the file open. */
-function ChatArtifactButtons({
-  artifacts,
-  onOpen,
-}: {
-  artifacts: ChatArtifact[];
-  onOpen: (artifact: ChatArtifact) => void;
-}) {
-  const files = artifacts
-    .filter((artifact) => {
-      const type = artifactType(artifact);
-      return type === "word" || type === "document" || type === "note";
-    })
-    .reverse();
-  if (files.length === 0) return null;
-  return (
-    <div className="chat-inline-artifacts" aria-label="Documents created in this chat">
-      {files.map((artifact) => {
-        const type = artifactType(artifact);
-        const name = artifactName(artifact);
-        return (
-          <button
-            key={`${artifact.kind}:${artifact.id}`}
-            type="button"
-            className={`chat-inline-artifact ${type}`}
-            title={`Open ${name}`}
-            onClick={() => onOpen(artifact)}
-          >
-            <span className="chat-inline-artifact-icon">
-              {type === "word" ? <WordGlyph size={22} /> : <DocumentGlyph size={19} />}
-            </span>
-            <span className="chat-inline-artifact-copy">
-              <strong>{name}</strong>
-              <small>
-                {type === "word"
-                  ? "Microsoft Word document"
-                  : type === "note"
-                    ? "Editable Markdown source"
-                    : "Document"}
-              </small>
-            </span>
-            <span className="chat-inline-artifact-open" aria-hidden="true">
-              Open
-            </span>
-          </button>
-        );
-      })}
-    </div>
   );
 }
 
@@ -961,7 +845,7 @@ function renderStructuredLines(lines: readonly string[], key: number): ReactNode
  * ```mermaid → the rendered diagram, GFM tables → real tables, every other
  * line via the editor's inline renderer (bold/italic/code/links), blank lines
  * kept as gaps. Source-of-truth stays the .md; this is display only. */
-function renderMessage(text: string): ReactNode {
+function renderMessage(text: string, mediaRoot = ""): ReactNode {
   return splitMessageBlocks(text).map((block, key) => {
     switch (block.kind) {
       case "code":
@@ -993,6 +877,8 @@ function renderMessage(text: string): ReactNode {
         );
       case "lines":
         return renderStructuredLines(block.lines, key);
+      case "media":
+        return <ChatReplyMedia key={key} alt={block.alt} path={block.path} rootPrefix={mediaRoot} />;
     }
   });
 }
@@ -1015,6 +901,7 @@ const ChatMessage = memo(function ChatMessage({
   images = [],
   artifacts = [],
   onOpenArtifact,
+  mediaRoot = "",
 }: {
   text: string;
   you: boolean;
@@ -1033,6 +920,8 @@ const ChatMessage = memo(function ChatMessage({
   /** Files created by the completed assistant turn stay attached to that turn. */
   artifacts?: ChatArtifact[];
   onOpenArtifact?: (artifact: ChatArtifact) => void;
+  /** The chat's vault as a wire-id prefix, for images and video in replies. */
+  mediaRoot?: string;
 }) {
   const timeFormat = useUiStore((state) => state.timeFormat);
   const timeLabel = formatChatTime(at, timeFormat);
@@ -1040,7 +929,7 @@ const ChatMessage = memo(function ChatMessage({
     <div className={you ? "cmsg you" : "cmsg ai"} data-chat-message-index={index}>
       <div className="cmsg-bubble">
         {you && images.length > 0 && <ChatAttachedImages images={images} />}
-        {you ? <UserMessageText text={text} /> : renderMessage(text)}
+        {you ? <UserMessageText text={text} /> : renderMessage(text, mediaRoot)}
       </div>
       {!you && onOpenArtifact && <ChatArtifactButtons artifacts={artifacts} onOpen={onOpenArtifact} />}
       <div className={endMark ? "cmsg-footer has-endmark" : "cmsg-footer"}>
@@ -1172,6 +1061,7 @@ export function ChatSurface({
       ? (cfg.data.instances.find((instance) => instance.id === vaultId) ?? null)
       : activeInstance(cfg.data)
     : null;
+  const mediaRoot = active && active.id !== CORPUS_INSTANCE_ID ? `${active.id}:` : "";
   const chats = useInstanceChats(active);
   const write = useWriteChat();
   const updateTitle = useUpdateChatTitle();
@@ -2553,6 +2443,7 @@ export function ChatSurface({
                       {...(m.at ? { at: m.at } : {})}
                       {...(m.images ? { images: m.images } : {})}
                       endMark={!busy && idx === messages.length - 1 && m.speaker !== "you"}
+                      mediaRoot={mediaRoot}
                       {...(!busy && m.artifacts?.length
                         ? {
                             artifacts: m.artifacts,
@@ -2567,7 +2458,7 @@ export function ChatSurface({
                     // the on-device answer, forming token-by-token — a live
                     // assistant row that grows until the settled message replaces it
                     <div className="cmsg ai">
-                      <div className="cmsg-bubble">{renderMessage(streamingText)}</div>
+                      <div className="cmsg-bubble">{renderMessage(streamingText, mediaRoot)}</div>
                     </div>
                   )}
                 {working && !streamingText && (

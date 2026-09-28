@@ -14,9 +14,9 @@
 import type { ReactNode } from "react";
 
 import { DOCUMENT_SEARCH_KEYWORDS } from "../documents/kinds";
-import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 import type { BlockToggle } from "./commands";
-import { bulletGlyph, checklistGlyph, codeGlyph, numberedGlyph, quoteGlyph } from "./formatGlyphs";
+import { Gl, bulletGlyph, checklistGlyph, codeGlyph, numberedGlyph, quoteGlyph } from "./formatGlyphs";
 import { parseBlock } from "./render";
 import { RESULT_REASON_SEPARATOR, resultTextParts } from "./resultState";
 
@@ -49,7 +49,11 @@ export type SlashOp =
   /** Opens Finder and inserts copied vault image assets at this position. */
   | { kind: "attachImage" }
   /** Opens the AI image popover (engine + prompt) — the maintainer, 2026-08-04. */
-  | { kind: "imageGen" };
+  | { kind: "imageGen" }
+  /** Swaps the format bar for the Librarian bar (2026-09-28). */
+  | { kind: "librarian" }
+  /** Opens Hand to AI's prompt for this note (2026-09-28). */
+  | { kind: "handToAi" };
 
 export interface SlashItem {
   label: string;
@@ -65,35 +69,16 @@ export interface SlashItem {
 
 // a minimal grid mark for Table + a thin rule for Divider (the shared Gl voice)
 const tableGlyph = (
-  <svg
-    viewBox="0 0 24 24"
-    width={15}
-    height={15}
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={1.7}
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
+  <Gl>
     <rect x="3" y="4" width="18" height="16" rx="2" />
     <path d="M3 9.5h18M9.5 9.5V20M15.5 9.5V20" />
-  </svg>
+  </Gl>
 );
 const dividerGlyph = (
-  <svg
-    viewBox="0 0 24 24"
-    width={15}
-    height={15}
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={1.7}
-    strokeLinecap="round"
-    aria-hidden="true"
-  >
+  <Gl>
     <path d="M3 12h18" />
     <path d="M7 5h10M7 19h10" opacity="0.35" />
-  </svg>
+  </Gl>
 );
 const mathGlyph = <span className="slashglyph-h">∑</span>;
 const mermaidGlyph = (
@@ -344,6 +329,22 @@ export const SLASH_ITEMS: SlashItem[] = [
     keywords: ["image-gen", "imagegen", "image", "ai", "picture", "photo", "generate"],
   },
   {
+    label: "Talk to the Librarian",
+    group: "Insert",
+    hint: "Tag, mark a passage, or file this note",
+    glyph: imageGenGlyph,
+    op: { kind: "librarian" },
+    keywords: ["librarian", "tag", "file", "organize", "mark", "ai"],
+  },
+  {
+    label: "Hand to AI",
+    group: "Insert",
+    hint: "This note as a prompt for Claude Code or another agent",
+    glyph: imageGenGlyph,
+    op: { kind: "handToAi" },
+    keywords: ["hand", "send to ai", "agent", "prompt", "claude"],
+  },
+  {
     label: "Template",
     group: "Insert",
     hint: "Insert a saved note layout",
@@ -409,15 +410,18 @@ export function slashPlacement(
 }
 
 /** Filter by label or optional keywords (case-insensitive). The spreadsheet
- * embed is withheld from builds without the sheets capability. */
+ * embed is withheld from builds without the sheets capability, and /librarian
+ * from Rotli Web (the Librarian runs in the Mac app). */
 export function filterSlashItems(
   query: string,
-  features: { sheets: boolean } = LAUNCH_FEATURES,
+  features: { sheets: boolean; librarian?: boolean } = { ...LAUNCH_FEATURES, librarian: PLATFORM !== "web" },
 ): SlashItem[] {
   const q = query.trim().toLowerCase();
-  const items = features.sheets
-    ? SLASH_ITEMS
-    : SLASH_ITEMS.filter((it) => !(it.op.kind === "picker" && it.op.mode === "embedSheet"));
+  const items = SLASH_ITEMS.filter(
+    (it) =>
+      (features.sheets || !(it.op.kind === "picker" && it.op.mode === "embedSheet")) &&
+      (features.librarian !== false || it.op.kind !== "librarian"),
+  );
   if (q === "") return items;
   return items.filter((it) => it.label.toLowerCase().includes(q) || it.keywords?.some((k) => k.includes(q)));
 }

@@ -15,3 +15,9 @@ test("the arrow rises once the centered bar would reach its corner", () => {
 test("no bar, no clash", () => {
   expect(scrollTopClashes(300, 0)).toBe(false);
 });
+
+test("with the Librarian pill beside the arrow, the lane is wider and rises sooner", () => {
+  expect(scrollTopClashes(900, 400, true)).toBe(false);
+  expect(scrollTopClashes(700, 400, true)).toBe(true);
+  expect(scrollTopClashes(700, 400, false)).toBe(false);
+});

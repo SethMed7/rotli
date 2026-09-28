@@ -138,7 +138,14 @@ exception.
   strip can distinguish tabs without writing browsing data to viewstate. The
   browser twin renders the themed start page and surrounding toolbar, then an
   honest native-only state instead of pretending an iframe can host arbitrary
-  sites. Breve citations use this same private tab.
+  sites. Breve citations use this same private tab. Whether a tab's page is
+  playing sound is asked of WebKit once a second and kept in memory only; a
+  playing tab wears a speaker, and the sidebar player above the footer
+  controls it (docs/design/ambient-audio.md).
+- Settings → Appearance → Show in Rotli hides parts of the title bar, sidebar
+  and tab strip the person doesn't use; every hidden part keeps another way in
+  (a shortcut or ⌘K), and Settings itself never hides
+  (docs/design/show-in-rotli.md).
 - The sidebar has one front switcher and one body. A two-segment pill under the
   vault header picks the active front — Home (the notes world: All notes,
   Captures, Tasks, the Main/named-view tree) or Chat (New chat, All chats, chat

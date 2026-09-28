@@ -24,18 +24,18 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
   ([contract](docs/architecture/agent-workspace.md)). Includes a custom Grok Bot
   that manages Rotli: create, file, search, and organize notes.
 - **Read aloud** · M — select text and have it read to you, on-device.
+- **Hand to AI** · M — turn the open note into a prompt for Claude Code or
+  another agent. Built: "Hand to AI…" in the palette and a note's menu writes
+  the prompt from the note itself (goal, open and finished tasks, the note as
+  context, what "done" means), editable, with Copy; a secure note, or one that
+  looks like it holds a secret, is refused. Left: "Open in chat" to send it on
+  in Rotli, and a model-written version on the model you pick from your
+  connected providers (a secure note only ever to an on-device model).
 - **Breve in public builds** · M — the morning brief and routines. Runs in
   development builds today.
 
 ## 2. Planned
 
-- **Hand to AI** · S–M — one command that reads the open note and writes a
-  prompt you can paste into Claude Code or another agent: the goal, the
-  context, the open tasks, what "done" looks like. Opens in a small window with
-  Copy, and "Open in chat" to send it on in Rotli. You pick the model from the
-  providers you have connected. A secure note only goes to an on-device model,
-  never a remote one. First slice (S): the prompt is built from the note
-  itself, with no model; the model-written version comes next.
 - **Talk to the Librarian (`/librarian`)** · L — type `/librarian` and the
   format bar at the bottom turns into a small Librarian chat, like the chat
   bubble on a website; one click opens the same conversation full size in
@@ -43,7 +43,14 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
   find it", "file this note under Projects", "this is my cousin Ana". The
   Librarian proposes what it will do, and nothing happens until you apply it.
   Applied actions are journaled and can be undone. You pick its model from the
-  providers you have connected.
+  providers you have connected. **Slice 1 built (2026-09-28, #121–#122):** the
+  bar, tag, mark a passage (with jump-back), and file (creating People).
+  **The conversation built (2026-09-28):** after the first ask the bar pops out
+  into a chat in the pane's corner, multi-turn, with proposals applied from
+  inside it, scoped to organizing (anything else is offered "Take this to
+  Chat", which opens a new chat about the note with the question typed); the
+  searchable model picker; the highlight kept painted. Still to
+  come: new notes from a highlight, and "Open in Chat".
   - It never rewrites the note you wrote. It changes only its own metadata and
     where the note lives, or it writes a new note, such as a people note for a
     name you highlighted.
@@ -63,15 +70,18 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
 - **Librarian rules** · M–L — tell the Librarian how you want things kept, in
   plain settings, not code: which folder a kind of note goes to, and how the
   people section is split (acquaintances, friends, family; one simple list; or
-  your own groups). Today the Librarian's instructions are fixed and its areas
-  are just the folders under the Library. Secure notes are separate; see
-  "Secure note rules" in §8.
+  your own groups). **Built (2026-09-28):** Settings → Librarian → Your rules —
+  filing sentences the organizer and `/librarian` follow, People split into
+  groups (Family, Friends, Work, Acquaintances by default, editable) or one
+  list, and secure keywords (see "Secure note rules" in §8). Kept in the
+  vault's `.rotli/settings.json`, on this Mac.
 - **The Librarian writes people notes and folder indexes** · L — by default the
   Librarian may write in the people section (never a locked note) and keeps an
   `index.md` table of contents in each folder. Today it only fills metadata and
-  a generated index for each top-level area. This changes the Librarian's
-  contract, which says it only touches metadata and location, so the contract
-  is decided first. Your own notes stay yours: it still never rewrites a note
+  a generated index for each top-level area, and (2026-09-28) new people notes
+  when you tell it about someone in `/librarian`. Writing into existing people
+  notes changes the Librarian's contract, which says it only touches metadata
+  and location, so the contract is decided first. Your own notes stay yours: it still never rewrites a note
   you wrote unless you ask.
 - **Links that survive a rename** · M — a `[[link]]` keeps pointing at the same
   note when that note's title or file name changes, without you retitling
@@ -121,14 +131,11 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
 
 ## 3. Ideas
 
-- **Pull Chat out into its own window** · L — hold and drag "Chat" out of the
-  Home | Chat switch into an independent window that shows only what belongs to
-  it; even its tabs are only chat tabs. An icon groups it back into its original
-  place. Home can never be pulled out: the main app is where Home lives.
 - **Per-note version history** · L — local snapshots of a note with a diff
   view, so nothing typed is ever lost.
-- **Import from Obsidian, Notion, and Apple Notes** · L — bring an existing
-  library in, links and images included.
+- **Import from Notion and Apple Notes** · L — bring an existing library in,
+  links and images included. An Obsidian or plain Markdown folder already opens
+  as a vault.
 - **Backlinks panel** · M — every note that links to this one, plus places that
   mention it without a link.
 - **Actionable checklists as a family** · L — `/email:send` is the first one.
@@ -178,52 +185,26 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
   dot and it highlights the text in question and asks, for example "who is
   Ana?". Your answer goes where `/librarian` would put it. Builds on Talk to the
   Librarian.
-- **Chat as a work surface** · XL — an evaluation first: which tools Chat can
-  use, and which results it can show inline, so Chat works like Claude Cowork
-  for work that isn't code. Example: ask for a video, have a video tool you
-  connected make it, and watch it in the chat. The model drives the tool; it
-  does not make the video itself.
+- **Chat as a work surface** · XL — Chat working like Claude Cowork for work
+  that isn't code: ask for a video, have a video tool you connected make it,
+  and watch it in the chat. The model drives the tool; it does not make the
+  video itself. Evaluated 2026-09-27
+  ([evaluation](docs/design/chat-work-surface-eval-2026-09-27.md)). Built:
+  replies show images and video from the vault, and a video shows as a video
+  in the chat's files. Next: a video tool, background jobs, and the provider
+  behind Add-ons (M to XL, owner call on the source); dropping a video into a
+  chat comes with the tool, since nothing can use one before it. The
+  connected CLIs stay tool-less.
 
 ## 4. Known bugs
 
-- **Confusing errors when files move** — these are just files moving; no one
-  will know what these messages mean, so they should never show.
-  - Part 1 · S: a view folder name can be typed with `/` or `:`, which Rotli
-    then refuses on save. Fix: stop it when the folder is named, with a plain
-    message.
-  - Part 2 · M: when something else (the CLI or the Librarian) changes Main
-    while the app holds an older copy, a raw revision conflict shows. Fix:
-    re-read, merge, and retry quietly; plain wording if it ever still shows.
 - **First drag and drop lands too high** · M — on the first drag, the drop does
   not line up with the pointer. Needs a reproduction first.
-- **Image tags show up in the chat name** · S — a chat that starts with an
-  image gets the raw image tag as its name.
-- **Big images do not save on a board** · S/M — an image over about 75 KB goes
-  over a board's 100k-character string limit, so the save fails. The board
-  validator rejects a 110 KB image (`src/boards/validation.ts`; Rust twin in
-  `src-tauri/src/board.rs`); not yet reproduced in the app. Fix S: let image
-  data past the per-string limit (files still open in Excalidraw). Fix M:
-  images as vault assets (smaller boards, but other apps show broken images).
-- **A file dropped on a board lands somewhere else** · S — on the Mac a Finder
-  drop onto a focused board has no board branch and falls through to another
-  note or Assets. Suspected, not yet reproduced.
-- **A typed `[[Board]]` link may open the board as a note** · S — the `[[`
-  picker leaves boards out, but a typed link still resolves and opens as a note
-  tab. Suspected, not yet reproduced.
 
 ## 5. Small enhancements
 
-- **Remove the count on "Chat"** · S — the number in the Home | Chat switch. It
-  will not hold up at 1k chats.
-- **Name chats by meaning** · M — name a chat from the purpose of the first
-  prompt, not its first few words.
-- **Hotkey to switch views** · M — ⌘⇧W opens the views, then ⌘number picks one.
-- **Hotkey to jump into the sidebar** · M — ⌘⇧S enters the sidebar, then
-  ⌘number opens one of the top 9 notes in the current view. Reorder and pin
-  notes in the sidebar so 1–9 stay put.
-- **Two-step hotkeys** · M — needed first by the two hotkeys above. ⌘1–9
-  already jump tabs, and Rotli has no "press one chord, then another" yet.
-- **Send feedback in-app** · S — a button that opens a prefilled GitHub issue.
+Nothing open right now. The last four (⌘⇧W views, ⌘⇧S top notes, two-step
+hotkeys, and Send feedback) shipped in 1.3.
 
 ## 6. Keeping the web version in sync
 
@@ -268,6 +249,7 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
   any build.
 - **Secure note rules** — your own keywords that make a note secure, matched
   only on its title or file name, never read by a model. That is what keeps it
-  clear of Secure organization's model risk. Owner call first: you asked to
-  choose where secure notes go, but today they all live in one protected folder
-  that is kept out of Git; a folder you pick would need the same protection.
+  clear of Secure organization's model risk. **Built (2026-09-28), with the
+  owner's call: one protected folder** — a matching note moves into
+  `wiki/_secure/` like any secure note; choosing other folders stays future
+  work, since each would need the same Git and model protection.

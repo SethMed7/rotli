@@ -14,7 +14,9 @@ never invent alternative commands.
 1. **Focused loop** while iterating: `bun test <file>` plus the relevant
    `check:*` script, and `bun run verify <lane>` to narrow —
    `secrets` (redacted proposed-diff and commit scan), `quality` (check + production build + `site/`), `e2e` (`check:e2e-types` +
-   Playwright), `rust` (`cargo clippy -D warnings` + `cargo test`).
+   Playwright, then the Rotli Web lane), `rust` (`cargo clippy -D warnings` + `cargo test`).
+   Unit tests run isolated (`bun run test:unit`); a plain `bun test src` can
+   show failures that are only modules leaking between files.
 2. **Completion proof**: `bun run verify` — all four lanes, in CI's order. It
    refuses to skip a lane it cannot run rather than reporting a false green.
 

@@ -16,7 +16,9 @@ import { resolveChord, useBindingsStore } from "../../keys/bindings";
 import { chordFromEvent, formatChord, toAccelerator } from "../../keys/chords";
 import { setSetupHandle } from "../../keys/handles";
 import { allActions, conflictFor, getAction, rebind, setDispatchSuspended } from "../../keys/registry";
+import { DEFAULT_AMBIENT } from "../../lib/ambient";
 import { setGlobalShortcut } from "../../lib/tauri";
+import { useAmbient } from "../../state/ambient";
 import { DEFAULT_APPEARANCE } from "../../state/appearanceDefaults";
 import {
   ONBOARDING_STEP_NUMBER,
@@ -34,8 +36,9 @@ const ACCESSORY_HUE_CHOICES = [38, 225, 195, 145, 280, 340, 10] as const;
 import { AccentRow } from "../settingsSurface";
 import { setupChoiceIndex, SetupBack, SetupChoiceGroup, SetupPrimary } from "./setupControls";
 import { SetupSideFriends } from "./setupSideFriends";
+import { SetupSound } from "./setupSound";
 
-const STEPS = ["welcome", "appearance", "behavior", "shortcuts"] as const;
+const STEPS = ["welcome", "appearance", "behavior", "sound", "shortcuts"] as const;
 type Step = (typeof STEPS)[number];
 
 const HOTKEYS = [
@@ -218,6 +221,7 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
       quokkaIdlePose: "base",
       ...windowBehaviorOnSkip(ui.onboarded, ui.onboardingVersion),
     });
+    useAmbient.setState({ prefs: { ...DEFAULT_AMBIENT } });
     onDone();
   };
 
@@ -225,6 +229,7 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
     welcome: "Welcome",
     appearance: "Appearance",
     behavior: "Window",
+    sound: "Sound",
     shortcuts: "Shortcuts",
   };
 
@@ -468,6 +473,8 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
                 </p>
               </>
             )}
+
+            {step === "sound" && <SetupSound />}
 
             {step === "shortcuts" && (
               <>

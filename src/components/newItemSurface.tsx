@@ -11,7 +11,7 @@
 import { useEffect, useRef } from "react";
 
 import { dispatch } from "../keys/registry";
-import { COMING_SOON_CAPTION, LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { COMING_SOON_CAPTION, LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 import { createManagedItem, requestNamedItemCreation } from "../newItems/composition";
 import { type NewItemFeatures, type NewItemKind, isNameFirstKind, newItemChoices } from "../newItems/model";
 import { usePanesStore } from "../state/panes";
@@ -33,6 +33,8 @@ interface ChooserEntry {
   run: () => void;
   /** Named but withheld by this build: shown disabled, no digit, never runs. */
   comingSoon?: boolean;
+  /** Why it is withheld, when it isn't "coming soon" (a Mac-only surface on the web). */
+  caption?: string;
 }
 
 /** Item cards keep their slot numbers in every build (Chat 1, Browser 2, then
@@ -85,6 +87,8 @@ export function NewItemSurface({ paneId, tabId }: { paneId: string; tabId: strin
       label: "Browser",
       description: "Browse in-app without keeping cookies or history.",
       glyph: <BrowserGlyph size={22} />,
+      // the private browser is a native window: on the web it could only fail
+      ...(PLATFORM === "web" ? { comingSoon: true, caption: "In the Mac app" } : {}),
       run: () => {
         close();
         usePanesStore.getState().openBrowser();
@@ -126,12 +130,12 @@ export function NewItemSurface({ paneId, tabId }: { paneId: string; tabId: strin
                   type="button"
                   className="ni-card ni-card-soon"
                   aria-disabled="true"
-                  aria-label={`New ${entry.label} — ${COMING_SOON_CAPTION}`}
+                  aria-label={`New ${entry.label} — ${entry.caption ?? COMING_SOON_CAPTION}`}
                 >
                   {entry.glyph}
                   <span className="ni-label">{entry.label}</span>
                   <span className="ni-desc">{entry.description}</span>
-                  <span className="ni-soon">{COMING_SOON_CAPTION}</span>
+                  <span className="ni-soon">{entry.caption ?? COMING_SOON_CAPTION}</span>
                 </button>
               ) : (
                 <button

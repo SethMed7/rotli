@@ -1,6 +1,14 @@
+import { NOW_TICK_MS } from "../../lib/useNow";
 import type { NoteSummary } from "../../types";
 
 export const WEEK_MS = 7 * 24 * 60 * 60 * 1_000;
+
+/** In the window [since, now]. `nowMs` is a ticking clock, so anything up to one
+ * tick past it (a new vault's Welcome lessons, made just after the tick) is
+ * "now"; a timestamp further ahead is clock skew and stays out. */
+export function inWindow(ts: number, since: number, nowMs: number): boolean {
+  return ts >= since && ts <= nowMs + NOW_TICK_MS;
+}
 
 /** A truthful snapshot from fields Rotli already owns. These are note counts,
  * not invented word/authorship telemetry; the corpus does not yet record
@@ -31,12 +39,12 @@ export function homeDashboardSnapshot(
   }
   return {
     notes: {
-      newInRange: notes.filter((note) => note.createdAt >= since && note.createdAt <= nowMs).length,
-      updatedInRange: notes.filter((note) => note.updatedAt >= since && note.updatedAt <= nowMs).length,
+      newInRange: notes.filter((note) => inWindow(note.createdAt, since, nowMs)).length,
+      updatedInRange: notes.filter((note) => inWindow(note.updatedAt, since, nowMs)).length,
       total: notes.length,
     },
     chat: {
-      activeInRange: chats.filter((chat) => chat.modifiedMs >= since && chat.modifiedMs <= nowMs).length,
+      activeInRange: chats.filter((chat) => inWindow(chat.modifiedMs, since, nowMs)).length,
       total: chats.length,
       modelsUsed: new Set(modelIds).size,
       favoriteModelId,

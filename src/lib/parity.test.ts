@@ -19,6 +19,7 @@ import { containsPrivateDataOverlap, endpointIsLocal } from "../ai/guard";
 import { BOARD_LIMITS } from "../boards/validation";
 import { DOCUMENT_CONVERTIBLE_EXTS } from "../documents/kinds";
 import { NATIVE_IMAGE_EXTS } from "../editor/externalImageDrop";
+import { AI_KEYS } from "../memex/contract";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
 import { BLOCK_MARKERS } from "../services/derive";
 import { DEST } from "../services/destinations";
@@ -28,6 +29,8 @@ import { VIEW_FOLDER_FORBIDDEN_CHARS } from "../services/viewTree";
 import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
 import { CHAT_IMAGE_ASSET_EXTS, CHAT_IMAGE_ASSET_MAX_BYTES } from "./chatWork";
 import { VIDEO_EXTS } from "./fileKind";
+import { PEOPLE_AREA } from "./librarianActions";
+import { DEFAULT_PEOPLE_GROUPS, secureByName } from "./librarianRules";
 import { type FrontmatterView, type MemexPerms, SECRET_BRAVE_SEARCH_API_KEY } from "./tauri";
 
 const entries = fixture.entries;
@@ -45,6 +48,20 @@ describe("parity.json ↔ TS constants", () => {
     expect(CHAT_IMAGE_ASSET_MAX_BYTES).toBe(entries.chatImageAssetMaxBytes.value);
   });
 
+  test("peopleArea", () => {
+    expect<string>(PEOPLE_AREA).toBe(entries.peopleArea.value);
+  });
+
+  test("defaultPeopleGroups", () => {
+    expect<string[]>([...DEFAULT_PEOPLE_GROUPS]).toEqual(entries.defaultPeopleGroups.value);
+  });
+
+  test("secureByNameCases", () => {
+    for (const c of entries.secureByNameCases.value) {
+      expect(secureByName(c.title, c.rel, c.keywords)).toBe(c.secure);
+    }
+  });
+
   test("secureNotesFolder", () => {
     expect<string>(SECURE_NOTES_FOLDER).toBe(entries.secureNotesFolder.value);
     expect<string>(DEST.secure).toBe(entries.secureNotesFolder.value);
@@ -60,6 +77,10 @@ describe("parity.json ↔ TS constants", () => {
 
   test("templatesBrainFolder", () => {
     expect<string>(TEMPLATES_BRAIN_FOLDER).toBe(entries.templatesBrainFolder.value);
+  });
+
+  test("aiKeys", () => {
+    expect<string[]>([...AI_KEYS]).toEqual(entries.aiKeys.value);
   });
 
   test("videoExts", () => {

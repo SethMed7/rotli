@@ -1,7 +1,7 @@
 import { create } from "zustand";
-// UI state only (the Zustand law). Data lives behind src/services/.
 
 import type { OrganizerModel } from "../ai/librarianLane";
+// UI state only (the Zustand law). Data lives behind src/services/.
 import { DEFAULT_PROVIDER_MODELS, type HybridPreset, type ProviderId } from "../ai/models";
 import { DEFAULT_WEB_SEARCH_PROVIDER, type WebSearchProvider } from "../ai/searchProvider";
 import {
@@ -26,6 +26,7 @@ import type { NoteSummary } from "../types";
 import { DEFAULT_VOICE } from "../voice/speech";
 import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
 import type { Measure } from "./noteStyle";
+import type { SidebarReveal, SidebarSide } from "./sidebarPlacement";
 import { systemPrefersDark } from "./systemScheme";
 import { SOLID_THEMES, type ThemeFamily } from "./themeChoices";
 
@@ -48,18 +49,13 @@ export type AccentColor = (typeof ACCENT_COLORS)[number];
  * overview; this preference changes only the small trail beside the thread. */
 export const CHAT_NAVIGATOR_STYLES = ["lines", "dots", "paws", "ears"] as const;
 export type ChatNavigatorStyle = (typeof CHAT_NAVIGATOR_STYLES)[number];
-/** Which edge the ONE sidebar lives on (the owner, 2026-09-17). */
-export const SIDEBAR_SIDES = ["left", "right"] as const;
-export type SidebarSide = (typeof SIDEBAR_SIDES)[number];
-/** Pinned in the flow, or out of the way until the pointer reaches the edge. */
-export const SIDEBAR_REVEALS = ["pinned", "hover"] as const;
-export type SidebarReveal = (typeof SIDEBAR_REVEALS)[number];
+export { SIDEBAR_REVEALS, SIDEBAR_SIDES, type SidebarReveal, type SidebarSide } from "./sidebarPlacement";
 
 export { SOLID_THEMES, THEME_FAMILY_PRESENTATIONS } from "./themeChoices";
 
 /** The organizer daemon's §4.3 trust ladder, monotonic in risk. Off = dormant ·
- * Suggest (default) = journal proposals only · Tidy = applies annotations +
- * files brand-new captures · Organize = applies everything, fully journaled. */
+ * Suggest = journal proposals only · Tidy = applies annotations + files
+ * brand-new captures · Organize (default) = applies everything, journaled. */
 export type OrganizerTrust = "off" | "suggest" | "tidy" | "organize";
 /** The macOS Dock/app icon variants (Settings → Appearance → App icon). */
 export type AppIcon = "default" | "warm" | "paper" | "charcoal" | "clay";
@@ -251,6 +247,7 @@ interface UiState {
   /** Raw Markdown syntax colors. Rotli is the calm blue + active accent
    * default; Mono keeps the grammar but renders it in the environment ink. */
   syntaxPalette: SyntaxPalette;
+  boardBackground: "theme" | "white"; // an unchosen board canvas (brand/boardBackground)
   setSyntaxPalette: (palette: SyntaxPalette) => void;
   /** The primary color — see ACCENT_COLORS. "default" = the theme's own. */
   accentColor: AccentColor;
@@ -323,6 +320,7 @@ interface UiState {
    * gate re-onboards on every 0.x update, then freezes post-1.0. */
   onboardingVersion: string;
   setOnboardingVersion: (v: string) => void;
+  lastSeenVersion: string; // the What's new window's "seen" mark (lib/whatsNew)
   /** Durable first-run checkpoint. Vault selection may relaunch the native app,
    * so the next launch must resume at model setup instead of starting over. */
   onboardingPhase: OnboardingPhase;
@@ -506,6 +504,10 @@ interface UiState {
    * rename dialog, or null. `current` seeds the input (the maintainer, 2026-07-01). */
   renameTarget: { id: string; current: string; lane?: "title" | "file" | "board" } | null;
   setRenameTarget: (t: { id: string; current: string; lane?: "title" | "file" | "board" } | null) => void;
+
+  /** The note whose Hand to AI prompt dialog is open, or null (Round Three). */
+  handToAiNoteId: string | null;
+  setHandToAiNoteId: (id: string | null) => void;
 
   /** A failed row-menu action (file-to-brain, board rename …) surfaced as an
    * inline note in the sidebar — the menu that launched the action is gone by
@@ -731,6 +733,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   setThemeFamily: (family) => set({ themeFamily: family }),
 
   syntaxPalette: "rotli",
+  boardBackground: DEFAULT_APPEARANCE.boardBackground,
   setSyntaxPalette: (palette) => set({ syntaxPalette: palette }),
   accentColor: "default",
   setAccentColor: (accent) => set({ accentColor: accent }),
@@ -782,6 +785,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   setOnboarded: (done) => set({ onboarded: done }),
   onboardingVersion: "",
   setOnboardingVersion: (v) => set({ onboardingVersion: v }),
+  lastSeenVersion: "",
   onboardingPhase: "preferences",
   setOnboardingPhase: (phase) => set({ onboardingPhase: phase }),
   quickNoteIds: [],
@@ -935,6 +939,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   setSystemRoot: (id) => set({ systemRoot: id }),
   renameTarget: null,
   setRenameTarget: (t) => set({ renameTarget: t }),
+  handToAiNoteId: null,
+  setHandToAiNoteId: (id) => set({ handToAiNoteId: id }),
 
   renamingBoardId: null,
   setRenamingBoardId: (id) => set({ renamingBoardId: id }),

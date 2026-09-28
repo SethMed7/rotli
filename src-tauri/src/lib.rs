@@ -33,6 +33,7 @@ mod helper_vault;
 mod helper_token;
 mod keychain;
 mod loopback_http;
+mod librarian_rules;
 mod localmodel;
 mod memex;
 mod memex_query; mod native_drag; mod pasteboard; mod remote_agent_url; mod welcome_lessons; mod acp_images;
@@ -44,6 +45,7 @@ mod organizer_knobs;
 #[cfg(test)]
 mod parity_tests;
 mod private_browser;
+mod private_browser_media;
 mod quick_window;
 mod vault_marker;
 mod provider;
@@ -2363,6 +2365,8 @@ pub fn run() {
             corpus::corpus_move,
             corpus::corpus_rename_board,
             corpus::file_rename::corpus_rename_managed_file,
+            corpus::alias_cleanup::corpus_alias_cleanup,
+            corpus::rules_store::corpus_secure_by_keywords,
             breve::breve_snapshot,
             breve::breve_import_legacy,
             breve::breve_write_config,
@@ -2425,6 +2429,8 @@ pub fn run() {
             private_browser::private_browser_forward,
             private_browser::private_browser_reload,
             private_browser::private_browser_close,
+            private_browser_media::private_browser_media_state,
+            private_browser_media::private_browser_media,
             corpus::corpus_create_folder,
             corpus::corpus_read_board,
             corpus::corpus_write_board,

@@ -134,7 +134,7 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
     });
     const actionRow = (a: KeyAction, label?: string): Row => ({
       key: `action:${a.id}`,
-      score: paletteMatchScore(q, label ?? a.title, ""),
+      score: paletteMatchScore(q, label ?? a.title, a.keywords?.join(" · ") ?? ""),
       label: label ?? a.title,
       icon: actionIcon(a.id),
       hint: kbdHint(a),
@@ -288,7 +288,9 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
     // capture-surface actions live in the other webview — their handle is
     // null here and dispatching them would silently no-op
     const actionRows = allActions()
-      .filter((a) => a.surface === "main" && fuzzy(q, a.title))
+      .filter(
+        (a) => a.surface === "main" && (fuzzy(q, a.title) || (a.keywords ?? []).some((k) => fuzzy(q, k))),
+      )
       .map((a) => actionRow(a));
     const section = (name: string, rows: Row[], limit: number): Group | null => {
       const ranked = rankSearchGroups(rows).slice(0, limit);

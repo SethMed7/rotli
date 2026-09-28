@@ -1,0 +1,215 @@
+// Talk to the Librarian (`/librarian`, 2026-09-28; plan:
+// docs/design/librarian-bar.md). The bar that takes the format bar's place:
+// pick a model, highlight a passage (or not), say what you want. The first ask
+// pops the conversation out into the pane's corner (librarianChat.tsx) and
+// gives the format bar back; the model proposes, nothing changes until Apply,
+// and every applied change shows in Librarian Activity with Undo. The note's
+// words are never edited. The input is ready to type in the moment the bar
+// opens (the owner, 2026-09-28: no extra click); asking waits for the note's
+// check.
+
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+
+import { ModelPicker } from "../components/chat/chatModelPicker";
+import { parseAnchors, resolveAnchor } from "../lib/librarianActions";
+import { corpusFrontmatter, isTauri } from "../lib/tauri";
+import { useFolders } from "../services/hooks";
+import { librarianRefusal } from "../services/librarianBar";
+import {
+  closeLibrarianBar,
+  startLibrarianChat,
+  updateLibrarianChat,
+  useLibrarianBar,
+} from "../state/librarianBar";
+import { useLibrarianRules } from "../state/librarianRules";
+import { useUiStore } from "../state/ui";
+import { editorFor } from "./commands";
+import {
+  useEscapeCloses,
+  clip,
+  librarianContext,
+  libraryAreas,
+  noteTitle,
+  onEscapeHere,
+  sendToLibrarian,
+  useLibrarianModels,
+  usePassage,
+  usePeopleNotes,
+} from "./librarianSession";
+
+type Phase = { kind: "checking" } | { kind: "refused"; message: string } | { kind: "ready" };
+
+export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: string }) {
+  const librarianOn = useUiStore((s) => s.brainEnabled);
+  const folders = useFolders();
+  const { groups, models, preferred } = useLibrarianModels();
+  const known = usePeopleNotes();
+  const [picked, setPicked] = useState<string | null>(null);
+  const model = models.find((m) => m.id === (picked ?? preferred)) ?? models[0] ?? null;
+  const [phase, setPhase] = useState<Phase>({ kind: "checking" });
+  const [request, setRequest] = useState("");
+  const [notice, setNotice] = useState("");
+  const passage = usePassage(paneId);
+  const input = useRef<HTMLInputElement | null>(null);
+
+  // typing starts right away, while the note is still being checked
+  useEffect(() => {
+    input.current?.focus();
+  }, [noteId, paneId]);
+
+  // who may ask, before anything else
+  useEffect(() => {
+    let live = true;
+    const title = noteTitle(editorFor(paneId)?.getSelection?.()?.doc ?? "");
+    const { secureKeywords } = useLibrarianRules.getState().rules;
+    void librarianRefusal(noteId, { native: isTauri(), librarianOn, secureKeywords, title }).then(
+      (message) => {
+        if (!live) return;
+        setPhase(message ? { kind: "refused", message } : { kind: "ready" });
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [noteId, paneId, librarianOn]);
+
+  const anchors = useQuery({
+    queryKey: ["librarian-anchors", noteId],
+    queryFn: async () => {
+      const fm = await corpusFrontmatter(noteId);
+      const line = fm?.fields.find((field) => field.startsWith("anchors:")) ?? "";
+      return parseAnchors(line.slice("anchors:".length).trim());
+    },
+    enabled: phase.kind === "ready",
+  });
+
+  // back to the note, its selection as it was
+  const close = () => {
+    closeLibrarianBar();
+    const editor = editorFor(paneId);
+    const current = editor?.getSelection?.();
+    if (current) editor?.selectRange?.(current.from, current.to);
+  };
+  useEscapeCloses(close);
+
+  // the first ask pops the conversation out; asking again here continues it
+  const ask = () => {
+    const text = request.trim();
+    if (!text || !model || phase.kind !== "ready") return;
+    const existing = useLibrarianBar.getState().chat;
+    const chatId =
+      existing?.noteId === noteId && existing.paneId === paneId ? existing.id : crypto.randomUUID();
+    if (chatId === existing?.id) {
+      closeLibrarianBar();
+      updateLibrarianChat(chatId, () => ({ minimized: false }));
+    } else {
+      startLibrarianChat({
+        id: chatId,
+        paneId,
+        noteId,
+        modelId: model.id,
+        turns: [],
+        status: "idle",
+        error: null,
+        minimized: false,
+      });
+    }
+    const areas = libraryAreas((folders.data ?? []).map((folder) => folder.id));
+    void sendToLibrarian(chatId, { text, highlight: passage.anchor() }, model, () =>
+      librarianContext(noteId, paneId, areas, known),
+    );
+  };
+
+  const jump = (index: number) => {
+    const anchor = anchors.data?.[index];
+    const editor = editorFor(paneId);
+    const doc = editor?.getSelection?.()?.doc;
+    if (!anchor || !editor || doc === undefined) return;
+    const where = resolveAnchor(doc, anchor);
+    if (where.kind === "found") editor.selectRange?.(where.from, where.to);
+    else
+      setNotice(
+        where.kind === "moved"
+          ? "That passage’s words now appear more than once, so the Librarian won’t guess which."
+          : "That passage isn’t in the note anymore.",
+      );
+  };
+
+  return (
+    <div
+      className="libbar"
+      role="region"
+      aria-label="Librarian"
+      onKeyDown={(event) => onEscapeHere(event, () => close())}
+    >
+      <div className="libbar-head">
+        <strong>Librarian</strong>
+        {phase.kind === "ready" &&
+          (models.length > 0 ? (
+            <ModelPicker groups={groups} picked={model} onPick={setPicked} />
+          ) : (
+            <span className="libbar-note">No models connected</span>
+          ))}
+        <span className="libbar-chip" title={passage.text || undefined}>
+          {passage.text ? `“${clip(passage.text)}”` : "Highlight a passage to ask about it"}
+        </span>
+        <button type="button" className="libbar-close" aria-label="Close the Librarian" onClick={close}>
+          ×
+        </button>
+      </div>
+
+      {phase.kind === "refused" && (
+        <p className="libbar-note" role="status">
+          {phase.message}
+        </p>
+      )}
+
+      {phase.kind !== "refused" && (
+        <form
+          className="libbar-ask"
+          onSubmit={(event) => {
+            event.preventDefault();
+            ask();
+          }}
+        >
+          <input
+            ref={input}
+            className="libbar-input"
+            aria-label="Ask the Librarian"
+            placeholder="Tag or file this note, or tell me about people…"
+            value={request}
+            onChange={(event) => setRequest(event.currentTarget.value)}
+          />
+          <button
+            type="submit"
+            className="rename-btn primary"
+            disabled={!request.trim() || !model || phase.kind !== "ready"}
+          >
+            Ask
+          </button>
+        </form>
+      )}
+      {notice && (
+        <p className="libbar-note" role="status">
+          {notice}
+        </p>
+      )}
+
+      {(anchors.data?.length ?? 0) > 0 && (
+        <details className="libbar-marks">
+          <summary>Marked passages ({anchors.data!.length})</summary>
+          <ul>
+            {anchors.data!.map((anchor, index) => (
+              <li key={`${anchor.prefix}${anchor.exact}`}>
+                <button type="button" className="libbar-link" onClick={() => jump(index)}>
+                  {anchor.label ? `${anchor.label}: ` : ""}“{clip(anchor.exact)}”
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}

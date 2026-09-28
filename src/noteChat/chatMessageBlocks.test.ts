@@ -128,4 +128,32 @@ describe("structureMessageLines", () => {
       },
     ]);
   });
+
+  // 2026-09-27 (Chat as a work surface, step 1): a reply line that is only an
+  // image-style link to a vault file shows the file — an image, or a video.
+  // Only `storage:` files: a remote address would load from outside the Mac.
+  test("a line that is only an image link to a vault file is a media block", () => {
+    expect(splitMessageBlocks("Here it is:\n![Launch clip](storage:chats/demo/clip.mp4)\nEnjoy.")).toEqual([
+      { kind: "lines", lines: ["Here it is:"] },
+      { kind: "media", alt: "Launch clip", path: "chats/demo/clip.mp4" },
+      { kind: "lines", lines: ["Enjoy."] },
+    ]);
+    expect(splitMessageBlocks("  ![](storage:chart%20one.png)  ")).toEqual([
+      { kind: "media", alt: "", path: "chart one.png" },
+    ]);
+  });
+
+  test("remote images, inline images, and fenced ones stay text", () => {
+    for (const text of [
+      "![tracker](https://example.com/pixel.png)",
+      "see ![chart](storage:chart.png) inline",
+      "```md\n![chart](storage:chart.png)\n```",
+      // a vault link that isn't a picture or a video keeps its Markdown
+      "![plan](storage:wiki/plan.md)",
+      "![logo](storage:brand/logo.svg)",
+      "![report](storage:report.pdf)",
+    ]) {
+      expect(splitMessageBlocks(text).some((block) => block.kind === "media")).toBe(false);
+    }
+  });
 });

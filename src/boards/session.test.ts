@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { EXCALIDRAW_DEFAULT_BACKGROUND } from "../brand/boardBackground";
 import {
   EMPTY_BOARD_META,
   EMPTY_SCENE,
@@ -55,6 +56,36 @@ describe("parseBoardBody", () => {
     ).toThrow("coordinate outside");
   });
 
+  // Round Three (2026-09-26): an embedded image is a data: URL string, so the
+  // per-string cap refused any image over about 75 KB and the board never
+  // saved. An image's dataURL is exempt; every other string keeps the cap,
+  // and the 8 MB whole-board limit still bounds it.
+  test("an embedded image larger than the string cap still saves", () => {
+    const dataURL = `data:image/png;base64,${"A".repeat(150_000)}`;
+    const files = { img1: { id: "img1", mimeType: "image/png", dataURL, created: 1 } };
+    expect(() => parseBoardBody(JSON.stringify({ ...EMPTY_SCENE, files }))).not.toThrow();
+  });
+
+  test("only a file's data:image/ URL is exempt from the string cap", () => {
+    const long = "x".repeat(100_001);
+    const page = { img1: { id: "img1", mimeType: "image/png", dataURL: `data:text/html,${long}` } };
+    expect(() => parseBoardBody(JSON.stringify({ ...EMPTY_SCENE, files: page }))).toThrow(
+      "string that is too long",
+    );
+    const notData = { img1: { id: "img1", mimeType: "image/png", dataURL: long } };
+    expect(() => parseBoardBody(JSON.stringify({ ...EMPTY_SCENE, files: notData }))).toThrow(
+      "string that is too long",
+    );
+    const otherField = { img1: { id: "img1", mimeType: long, dataURL: "data:image/png;base64,AA" } };
+    expect(() => parseBoardBody(JSON.stringify({ ...EMPTY_SCENE, files: otherField }))).toThrow(
+      "string that is too long",
+    );
+    const elsewhere = [{ type: "text", dataURL: `data:image/png;base64,${"A".repeat(100_001)}` }];
+    expect(() => parseBoardBody(JSON.stringify({ ...EMPTY_SCENE, elements: elsewhere }))).toThrow(
+      "string that is too long",
+    );
+  });
+
   test("validates element and Rotli metadata shapes", () => {
     expect(() => parseBoardBody(JSON.stringify({ ...EMPTY_SCENE, elements: ["not-an-element"] }))).toThrow(
       "elements must be objects",
@@ -99,6 +130,25 @@ describe("serializeBoardScene", () => {
     });
     const appState = (JSON.parse(body) as { appState: Record<string, unknown> }).appState;
     expect(appState).toEqual({ viewBackgroundColor: "linen", gridSize: 20, gridModeEnabled: true });
+  });
+
+  // 2026-09-27: an unchosen background follows the app (brand/boardBackground),
+  // so it is never written; the default white from older saves heals away.
+  test("writes a background only when the person chose one", () => {
+    const saved = (viewBackgroundColor: string) =>
+      (
+        JSON.parse(
+          serializeBoardScene({
+            elements: [],
+            appState: { viewBackgroundColor, gridSize: 20 },
+            files: {},
+            meta: { description: "", tags: "" },
+          }),
+        ) as { appState: Record<string, unknown> }
+      ).appState;
+    expect(saved("transparent")).toEqual({ gridSize: 20 });
+    expect(saved(EXCALIDRAW_DEFAULT_BACKGROUND)).toEqual({ gridSize: 20 });
+    expect(saved("linen")).toEqual({ viewBackgroundColor: "linen", gridSize: 20 });
   });
 
   test("round-trips meta through parseBoardBody", () => {
