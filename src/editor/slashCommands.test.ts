@@ -43,6 +43,7 @@ describe("slash command catalog", () => {
       "Mermaid",
       "Attach image",
       "Generate image",
+      "Talk to the Librarian",
       "Template",
       "Link note",
       "Link chat",
@@ -51,8 +52,9 @@ describe("slash command catalog", () => {
       "Document",
     ]);
     for (const item of SLASH_ITEMS) {
-      // picker + image commands open a native/popover flow first — no scaffold
-      if (item.op.kind === "picker" || item.op.kind === "attachImage" || item.op.kind === "imageGen") {
+      // picker, image, and Librarian commands open a flow first — no scaffold
+      const opens = ["picker", "attachImage", "imageGen", "librarian"];
+      if (opens.includes(item.op.kind)) {
         continue;
       }
       const insertion = slashInsertion(item.op);

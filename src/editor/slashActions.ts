@@ -14,7 +14,8 @@ export const MERMAID_STARTER = `flowchart LR
  * image attachment/generation — which open a picker/popover first —
  * intentionally return null. */
 export function slashInsertion(op: SlashOp): SlashInsertion | null {
-  if (op.kind === "picker" || op.kind === "attachImage" || op.kind === "imageGen") return null;
+  if (op.kind === "picker" || op.kind === "attachImage" || op.kind === "imageGen" || op.kind === "librarian")
+    return null;
   if (op.kind === "code") return { insert: "``", caret: 1 };
   if (op.kind === "table") {
     const insert = insertTableText(3, 2);

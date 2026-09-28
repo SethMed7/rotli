@@ -24,6 +24,10 @@ export interface EditorHandle {
   /** Fold/unfold the section the caret sits in (2026-08-04). Optional so a
    * surface without folding (the Quick Note window) simply doesn't offer it. */
   toggleFold?(): void;
+  /** The document and its live selection (the Librarian bar reads it). */
+  getSelection?(): { doc: string; from: number; to: number } | null;
+  /** Select a range and scroll it into view (a passage pointer's jump). */
+  selectRange?(from: number, to: number): void;
 }
 
 // Every mounted editor surface registers its handle under its pane id; the
@@ -38,6 +42,11 @@ export function registerEditor(paneId: string, handle: EditorHandle): void {
 
 export function unregisterEditor(paneId: string, handle: EditorHandle): void {
   if (handles.get(paneId) === handle) handles.delete(paneId);
+}
+
+/** The editor in one pane (the Librarian bar reads its own pane's editor). */
+export function editorFor(paneId: string): EditorHandle | null {
+  return handles.get(paneId) ?? null;
 }
 
 export function activeEditor(): EditorHandle | null {

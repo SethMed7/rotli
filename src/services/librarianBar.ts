@@ -87,6 +87,20 @@ export async function librarianRefusal(
   return inLibrary ? null : LIBRARIAN_REFUSALS.library;
 }
 
+/** The note's current tags, for the prompt. */
+export async function currentTags(
+  noteId: string,
+  deps: Pick<LibrarianDeps, "frontmatter"> = liveLibrarianDeps,
+): Promise<string[]> {
+  const fm = await deps.frontmatter(noteId).catch(() => null);
+  const value = fm ? fieldValue(fm, "tags") : "";
+  return value
+    .replace(/^\[|\]$/g, "")
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
 export type Proposal = { kind: "secret" } | { kind: "actions"; actions: LibrarianAction[] };
 
 /** Ask the model once. The secret check reads exactly what would be sent. */

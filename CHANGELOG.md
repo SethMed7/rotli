@@ -12,6 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Talk to the Librarian from a note.** Type `/librarian` and the format bar
+  becomes a small Librarian bar: pick a model, highlight a passage if you like,
+  and ask ("tag this", "mark this passage", "file it with People"). The
+  Librarian proposes; nothing changes until you tick what you want and press
+  Apply. It can tag the note, mark a passage (a pointer saved in the note's
+  metadata that finds the words again; the note's text is never edited), and
+  file the note into a Library area, creating People if you don't have it
+  yet. Every change shows in Librarian Activity with Undo, and the bar lists
+  the note's marked passages so you can jump back to them. Locked and secure
+  notes, notes outside the Library, and text that looks like a secret are
+  refused before anything is sent. Escape brings the format bar back. Mac app.
 - **Clean up leftover note names.** Older notes could carry names they never
   really had in their metadata: "Untitled", "untitled (7)", or a title caught
   half-typed ("Round", "Round Three -"). Settings → General → Leftover note

@@ -2454,3 +2454,120 @@
   white-space: nowrap;
   max-width: 45%;
 }
+/* The Librarian bar (librarianBar.tsx): the format bar's slot, wider, with a
+   model picker, the live highlight, a request, and proposals to apply */
+.libbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(36rem, calc(100vw - 48px));
+  padding: 10px 12px;
+  background: var(--ground);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+}
+.libbar-head,
+.libbar-ask,
+.libbar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.libbar-row {
+  justify-content: flex-end;
+}
+.libbar-head strong {
+  font-size: 13px;
+  color: var(--text);
+}
+.libbar-model {
+  max-width: 11rem;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  padding: 2px 6px;
+}
+.libbar-chip {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.libbar-close {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--r-control);
+  padding: 2px 6px;
+}
+.libbar-close:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.libbar-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  padding: 6px 8px;
+}
+.libbar-input:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent-text) 45%, var(--border));
+}
+.libbar-note {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.libbar-note.err {
+  color: var(--danger);
+}
+.libbar-proposals ul,
+.libbar-marks ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.libbar-proposals label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+.libbar-link {
+  border: none;
+  background: none;
+  padding: 0 0 0 6px;
+  font: inherit;
+  color: var(--accent-text);
+  cursor: pointer;
+  text-align: left;
+}
+.libbar-link:hover {
+  text-decoration: underline;
+}
+.libbar-marks summary {
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+}

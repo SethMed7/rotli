@@ -20,6 +20,7 @@ import { clamp } from "../lib/clamp";
 import { corpusImportFile, corpusPickImages, rootIdOf } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
+import { openLibrarianBar } from "../state/librarianBar";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import { autoPair } from "./autoPairInput";
@@ -297,6 +298,15 @@ function CmEditorImpl({
         findInputRef.current?.select();
       });
     },
+    getSelection: () => {
+      const state = viewRef.current?.state;
+      const { from, to } = state?.selection.main ?? { from: 0, to: 0 };
+      return state ? { doc: state.doc.toString(), from, to } : null;
+    },
+    selectRange: (from, to) => {
+      viewRef.current?.dispatch({ selection: EditorSelection.range(from, to), scrollIntoView: true });
+      viewRef.current?.focus();
+    },
     toggleFold: () => {
       const view = viewRef.current;
       if (view) {
@@ -419,7 +429,8 @@ function CmEditorImpl({
       // where the command's content begins once the span is cleared — on a
       // result row's reason that is the fresh continuation line beneath it
       const contentFrom = spanFrom + span.lead.length;
-      if (item.op.kind === "picker" || item.op.kind === "attachImage" || item.op.kind === "imageGen") {
+      const opensUi = item.op.kind === "picker" || item.op.kind === "attachImage";
+      if (opensUi || item.op.kind === "imageGen" || item.op.kind === "librarian") {
         view.dispatch({
           changes: { from: spanFrom, to: line.to, insert: span.lead },
           selection: EditorSelection.cursor(contentFrom),
@@ -456,12 +467,18 @@ function CmEditorImpl({
             });
           return;
         }
+        if (item.op.kind === "librarian") {
+          setSlash((s) => ({ ...s, open: false }));
+          openLibrarianBar(paneId);
+          return;
+        }
         if (item.op.kind === "imageGen") {
           setSlash((s) => ({ ...s, open: false }));
           setImageGen({ insertAt: contentFrom, continuation: span.continuation, left, top, up });
           return;
         }
-        openPicker(item.op.mode, contentFrom, span.continuation, left, top, up);
+        if (item.op.kind === "picker")
+          openPicker(item.op.mode, contentFrom, span.continuation, left, top, up);
         return;
       }
       const insertion = slashInsertion(item.op);
@@ -474,7 +491,7 @@ function CmEditorImpl({
       setSlash((s) => ({ ...s, open: false }));
       view.focus();
     },
-    [noteId, openPicker],
+    [noteId, openPicker, paneId],
   );
 
   // create the view ONCE per note/pane

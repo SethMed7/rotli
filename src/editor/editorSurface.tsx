@@ -30,6 +30,7 @@ import { aaRequestStep, useAaPanelRequest } from "../state/aaPanel";
 import { useChatSetupGuide } from "../state/chatSetupGuide";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useHelperLink } from "../state/helperLink";
+import { useLibrarianBar } from "../state/librarianBar";
 import { useMainStore } from "../state/main";
 import { backId, forwardId, useNavHistory } from "../state/navHistory";
 import { MEASURE_MAX_WIDTH, useNoteStyle } from "../state/noteStyle";
@@ -40,6 +41,7 @@ import { AaPanel } from "./aaPanel";
 import { BottomSlot } from "./bottomSlot";
 import { CmEditor } from "./cmEditor";
 import { FormatBar } from "./formatBar";
+import { LibrarianBar } from "./librarianBar";
 import {
   ensureDocument,
   flushNoteAfterPaint,
@@ -236,6 +238,7 @@ export function EditorSurface({
 
   const style = useNoteStyle(noteId);
   const formatBarVisible = useUiStore((s) => s.formatBarVisible);
+  const librarianOpen = useLibrarianBar((s) => s.paneId === paneId);
   const focusMode = useUiStore((s) => s.focusMode);
   const setFileMetadata = useUiStore((s) => s.setFileMetadata);
   const revealFocusedNote = useUiStore((s) => s.revealFocusedNote);
@@ -542,10 +545,16 @@ export function EditorSurface({
         onFmRead={onFmRead}
       />
       {focusMode && <FocusWordCount noteId={noteId} fallbackBody={note.body} />}
-      {formatBarVisible && (
+      {librarianOpen ? (
         <BottomSlot>
-          <FormatBar ctx={ctx} narrow={narrow} />
+          <LibrarianBar key={noteId} noteId={noteId} paneId={paneId} />
         </BottomSlot>
+      ) : (
+        formatBarVisible && (
+          <BottomSlot>
+            <FormatBar ctx={ctx} narrow={narrow} />
+          </BottomSlot>
+        )
       )}
     </div>
   );

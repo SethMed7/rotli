@@ -49,7 +49,9 @@ export type SlashOp =
   /** Opens Finder and inserts copied vault image assets at this position. */
   | { kind: "attachImage" }
   /** Opens the AI image popover (engine + prompt) — the maintainer, 2026-08-04. */
-  | { kind: "imageGen" };
+  | { kind: "imageGen" }
+  /** Swaps the format bar for the Librarian bar (2026-09-28). */
+  | { kind: "librarian" };
 
 export interface SlashItem {
   label: string;
@@ -342,6 +344,14 @@ export const SLASH_ITEMS: SlashItem[] = [
     glyph: imageGenGlyph,
     op: { kind: "imageGen" },
     keywords: ["image-gen", "imagegen", "image", "ai", "picture", "photo", "generate"],
+  },
+  {
+    label: "Talk to the Librarian",
+    group: "Insert",
+    hint: "Tag, mark a passage, or file this note",
+    glyph: imageGenGlyph,
+    op: { kind: "librarian" },
+    keywords: ["librarian", "tag", "file", "organize", "mark", "ai"],
   },
   {
     label: "Template",
