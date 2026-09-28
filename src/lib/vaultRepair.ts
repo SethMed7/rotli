@@ -33,3 +33,11 @@ export async function aliasCleanup(apply: boolean): Promise<AliasCleanupReport> 
   if (!isTauri()) return { notes: 0, aliases: 0, keptLinked: 0 };
   return invoke<AliasCleanupReport>("corpus_alias_cleanup", { apply });
 }
+
+/** Protect every note already named with a secure keyword (the Librarian
+ * rules): Rust scans titles and file names only and moves each into the
+ * protected folder, ignore first. Returns how many it protected. */
+export async function secureByKeywords(): Promise<number> {
+  if (!isTauri()) return 0;
+  return invoke<number>("corpus_secure_by_keywords");
+}

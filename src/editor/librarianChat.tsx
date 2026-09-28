@@ -31,6 +31,7 @@ import {
   librarianContext,
   libraryAreas,
   noteTitle,
+  onEscapeHere,
   sendToLibrarian,
   takeToChat,
   tauriHostFor,
@@ -137,14 +138,7 @@ export function ChatPanel({
       className={place}
       role="dialog"
       aria-label="Librarian chat"
-      onKeyDown={(event) => {
-        // the model picker is portaled: its own Escape (it closes the list) bubbles here too
-        if (event.key !== "Escape" || event.defaultPrevented) return;
-        if (!event.currentTarget.contains(event.target as Node)) return;
-        event.preventDefault();
-        event.stopPropagation();
-        setMinimized(true);
-      }}
+      onKeyDown={(event) => onEscapeHere(event, () => setMinimized(true))}
     >
       <header className="libchat-head">
         <ActivityGlyph size={15} />

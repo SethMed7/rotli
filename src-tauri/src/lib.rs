@@ -33,6 +33,7 @@ mod helper_vault;
 mod helper_token;
 mod keychain;
 mod loopback_http;
+mod librarian_rules;
 mod localmodel;
 mod memex;
 mod memex_query; mod native_drag; mod pasteboard; mod remote_agent_url; mod welcome_lessons; mod acp_images;
@@ -2364,6 +2365,7 @@ pub fn run() {
             corpus::corpus_rename_board,
             corpus::file_rename::corpus_rename_managed_file,
             corpus::alias_cleanup::corpus_alias_cleanup,
+            corpus::rules_store::corpus_secure_by_keywords,
             breve::breve_snapshot,
             breve::breve_import_legacy,
             breve::breve_write_config,

@@ -52,6 +52,8 @@ pub(crate) struct Knobs {
     pub(crate) threshold: f64,
     pub(crate) quiet: Duration,
     pub(crate) model: OrgModel,
+    /// The person's Librarian rules (People groups, filing sentences).
+    pub(crate) rules: crate::librarian_rules::LibrarianRules,
 }
 
 pub(crate) fn parse_knobs(settings_json: &str) -> Knobs {
@@ -82,6 +84,7 @@ pub(crate) fn parse_knobs(settings_json: &str) -> Knobs {
             .and_then(|m| m.as_str())
             .map(OrgModel::parse)
             .unwrap_or(OrgModel::Local),
+        rules: crate::librarian_rules::parse_rules(settings_json),
     }
 }
 

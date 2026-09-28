@@ -3419,13 +3419,16 @@ impl CorpusStore {
         let mut fm = fm_opt.unwrap_or_default();
         let locked = fm.foreign.iter().any(|l| locked_field(l) == Some(true));
         let mut secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true));
-        // auto-flag: secrets detected + not yet marked → set secure:true + gitignore.
+        // auto-flag: secrets detected (or a secure keyword in the note's name, the
+        // Librarian rules) + not yet marked → set secure:true + gitignore + move.
         // The detector is the regex pass today; the local LLM refines it later.
         // BEST-EFFORT on this READ path: persist + gitignore, but a write/gitignore
         // hiccup must NEVER break reading the metadata — that left the panel stuck on
         // "Reading…" (the maintainer, 2026-06-30). We still report secure=true (the safe
         // direction); the explicit set_secure path keeps hard-failing for the user.
-        if !secure && looks_secure(body) {
+        if !secure
+            && (looks_secure(body) || self.secure_by_name(&title_of(editor_body(body)), &rel))
+        {
             fm.foreign.push("secure: true".to_string());
             if self.mutation_allowed().is_ok() {
                 if let Err(e) = self.set_secure(&rel, true) {
@@ -3726,10 +3729,12 @@ impl CorpusStore {
         self.mutation_allowed()?;
         let rel = self.resolve_note_rel(id_or_rel)?;
         let path = self.abs(&rel);
-        crate::fsutil::with_file_lock(&path, || self.set_secure_resolved(&rel, secure))
+        crate::fsutil::with_file_lock(&path, || self.set_secure_resolved(&rel, secure).map(|_| ()))
     }
 
-    fn set_secure_resolved(&mut self, rel: &str, secure: bool) -> Result<(), String> {
+    /// Returns the note's new meta when making it secure moved it into the
+    /// protected folder (None when it was already there, or when unsecuring).
+    fn set_secure_resolved(&mut self, rel: &str, secure: bool) -> Result<Option<NoteMeta>, String> {
         let path = self.abs(rel);
         let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
         let (fm, body) = parse_document(&text);
@@ -3769,9 +3774,9 @@ impl CorpusStore {
             self.suppress.mark(&path);
             atomic_write(&path, &compose_document(&fm, body))?;
             if !in_secure_home {
-                self.relocate(&note_id, rel, secure_home)?;
+                return self.relocate(&note_id, rel, secure_home).map(Some);
             }
-            return Ok(());
+            return Ok(None);
         }
 
         // Move while the secure flag + ignore are still active; only then drop
@@ -3804,7 +3809,7 @@ impl CorpusStore {
         self.suppress.mark(&final_path);
         atomic_write(&final_path, &compose_document(&final_fm, final_body))?;
         self.gitignore_remove(&final_rel)?;
-        Ok(())
+        Ok(None)
     }
 
     /// Scan Brain intake for LEGACY secure state (decision 2026-07-22): a note
@@ -3994,7 +3999,8 @@ impl CorpusStore {
                 .foreign
                 .iter()
                 .any(|l| secure_context_field(l) == Some(true))
-            || looks_secure(body);
+            || looks_secure(body)
+            || self.secure_by_name(&title_of(editor_body(body)), rel);
         if secure {
             // remote FIRST and unconditionally — the refusal must never depend
             // on, or leak the state of, a local-visibility knob
@@ -5129,6 +5135,9 @@ impl CorpusStore {
         // the worse failure). A pre-added line for a rename that then fails is
         // a harmless stale entry.
         let is_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true));
+        // the Librarian rules: a save that gives the note a secure keyword in its
+        // title or file name protects it now, not at the next metadata read
+        let name_secure = !is_secure && self.secure_by_name(&title, &target_rel);
         if target_abs != abs && is_secure {
             self.gitignore_add(&target_rel)?;
         }
@@ -5149,6 +5158,15 @@ impl CorpusStore {
         self.index.insert(id.to_string(), target_rel.clone());
         self.persist_index();
 
+        if name_secure {
+            // best effort like the read-path auto-flag: the save itself landed;
+            // until the move succeeds, read_for_ai still refuses it by name
+            match self.set_secure_resolved(&target_rel, true) {
+                Ok(Some(moved)) => return Ok(moved),
+                Ok(None) => {}
+                Err(e) => eprintln!("secure keyword protection failed for {target_rel}: {e}"),
+            }
+        }
         Ok(NoteMeta {
             id: id.to_string(),
             title,
@@ -5566,7 +5584,14 @@ impl CorpusStore {
             })
             .filter(|a| !a.is_empty())
             .ok_or("note has no `area` to file into")?;
-        if area.contains('/') || area.contains("..") {
+        // one nesting only: People/<group>, for a group the Librarian rules name
+        let area = if area.contains('/') {
+            crate::librarian_rules::people_group_area(&area, &self.librarian_rules())
+                .ok_or_else(|| format!("invalid area: {area}"))?
+        } else {
+            area
+        };
+        if area.contains("..") {
             return Err(format!("invalid area: {area}"));
         }
         self.filer_move(rel, &format!("wiki/{area}"))
@@ -5914,8 +5939,10 @@ impl CorpusStore {
         body: &str,
         secure: bool,
     ) -> Result<NoteMeta, String> {
-        let secure =
-            secure || folder_id == "Secure notes" || folder_id.starts_with("Secure notes/");
+        let secure = secure
+            || folder_id == "Secure notes"
+            || folder_id.starts_with("Secure notes/")
+            || self.secure_by_name(&title_of(body), "");
         let disk_folder = if secure {
             match self.layout {
                 Layout::Memex => "wiki/_secure",
@@ -8695,6 +8722,9 @@ pub mod file_rename;
 /// Leftover-alias cleanup (placeholders, typing trails) — a child module.
 #[path = "corpus_alias_cleanup.rs"]
 pub mod alias_cleanup;
+/// The Librarian rules' store side (secure keywords, the batch) — a child module.
+#[path = "corpus_rules.rs"]
+pub mod rules_store;
 
 // ─── tests ───────────────────────────────────────────────────────────────────
 
@@ -8708,6 +8738,7 @@ mod injection_evals;
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use std::sync::atomic::{AtomicUsize, Ordering};
     use tempfile::TempDir;
 

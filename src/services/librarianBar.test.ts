@@ -73,13 +73,31 @@ describe("who may ask", () => {
     expect(await librarianRefusal("n", on, deps)).toBeNull();
   });
 
+  test("a note named with a secure keyword is refused before anything is sent", async () => {
+    const { deps } = fakeDeps(view([]), "wiki/_inbox/salary-2026.md");
+    const keywords = { ...on, secureKeywords: ["salary"] };
+    expect(await librarianRefusal("n", keywords, deps)).toBe(LIBRARIAN_REFUSALS.secure);
+    const titled = fakeDeps(view([]), "wiki/_inbox/x.md").deps;
+    expect(await librarianRefusal("n", { ...keywords, title: "Salary review" }, titled)).toBe(
+      LIBRARIAN_REFUSALS.secure,
+    );
+    expect(await librarianRefusal("n", { ...keywords, title: "Salaryman films" }, titled)).toBeNull();
+  });
+
   test("metadata that can't be read counts as locked", async () => {
     expect(await librarianRefusal("n", on, fakeDeps(null).deps)).toBe(LIBRARIAN_REFUSALS.locked);
   });
 });
 
 describe("asking", () => {
-  const ctx = { title: "Maya", doc: "Met Maya at the meetup.", areas: ["Projects"], tags: [] };
+  const ctx = {
+    title: "Maya",
+    doc: "Met Maya at the meetup.",
+    areas: ["Projects"],
+    tags: [],
+    people: ["People"],
+    filing: [],
+  };
   const first = [{ role: "user" as const, text: "tag this", highlight: null }];
 
   test("secret-shaped text never reaches the model, wherever it sits in the conversation", async () => {

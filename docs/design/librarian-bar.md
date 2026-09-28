@@ -95,9 +95,10 @@ conversation (`HISTORY_TURNS`), so the context stays bounded; there is no
 - `mark`: `exact` is required and must occur in the note. `prefix`, `suffix`,
   and `label` are optional. The model's `exact` is only trusted when it matches
   the highlight; otherwise the anchor is rebuilt from the user's own selection.
-- `file`: `area` is required and must name an existing Library area. A
-  missing People area is the one exception: it is created, unless a rule says
-  people go elsewhere.
+- `file`: `area` is required and must name an existing Library area, or one
+  of the People areas the Librarian rules give (`People/<group>` for each
+  group, or `People` in the one-list mode), which is created when missing.
+  The chat's rules carry those People areas and the person's filing sentences.
 - Unknown `type`s, unknown fields, and actions missing a required field are
   dropped silently. At most one `file` action counts (the first).
 

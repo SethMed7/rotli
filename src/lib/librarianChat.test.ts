@@ -12,7 +12,14 @@ import {
 
 const NOTE =
   "# Maya Chen\n\nMet Maya at the design meetup. She runs research at Northwind.\n\nFollow up in March.";
-const CTX: LibrarianContext = { title: "Maya Chen", doc: NOTE, areas: ["people", "projects"], tags: ["q3"] };
+const CTX: LibrarianContext = {
+  title: "Maya Chen",
+  doc: NOTE,
+  areas: ["people", "projects"],
+  tags: ["q3"],
+  people: ["People/Family", "People/Friends"],
+  filing: ["Recipes go to Cooking"],
+};
 const at = NOTE.indexOf("runs research");
 const HIGHLIGHT = anchorFromSelection(NOTE, at, at + "runs research".length);
 
@@ -30,6 +37,11 @@ describe("the messages a turn sends", () => {
     expect(messages[0]?.content).toContain("Current tags: q3");
     expect(messages[0]?.content).toContain("Library areas: people, projects");
     expect(messages[0]?.content).toContain("She runs research at Northwind.");
+    // the Librarian rules ride along: the People groups and the person's own filing rules
+    expect(messages[0]?.content).toContain("People areas: People/Family, People/Friends");
+    expect(messages[0]?.content).toContain(
+      "filing rules (follow them when they apply):\n- Recipes go to Cooking",
+    );
     // a question about a highlight carries the passage with it
     expect(messages[3]?.content).toBe('Highlighted passage: """runs research"""\n\nMark her job');
     expect(messages[1]?.content).toBe("Who is this?");
@@ -102,6 +114,16 @@ describe("a reply, split into what is said and what is proposed", () => {
   test("actions outside the grammar are dropped, never guessed at", () => {
     const reply = 'Done.\n{"actions":[{"type":"rewrite","text":"x"},{"type":"file","area":"nowhere"}]}';
     expect(splitLibrarianReply(reply, context)).toEqual({ prose: "Done.", actions: [], handoff: false });
+  });
+
+  test("a person is filed into a People group the rules name, created when missing", () => {
+    const people = { ...context, people: ["People/Family", "People/Friends"] };
+    expect(
+      splitLibrarianReply('{"actions":[{"type":"file","area":"people/friends"}]}', people).actions,
+    ).toEqual([{ type: "file", area: "People/Friends", create: true }]);
+    expect(
+      splitLibrarianReply('{"actions":[{"type":"file","area":"People/Strangers"}]}', people).actions,
+    ).toEqual([]);
   });
 
   test("a request that isn't about organizing comes back flagged for Chat", () => {

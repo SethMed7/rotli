@@ -19,7 +19,14 @@ const MODEL: ChatModelInfo = {
   isDefault: false,
 };
 const NOTE = "# Maya Chen\n\nMet Maya at the design meetup.";
-const context = async () => ({ title: "Maya Chen", doc: NOTE, areas: ["people"], tags: [] });
+const context = async () => ({
+  title: "Maya Chen",
+  doc: NOTE,
+  areas: ["people"],
+  tags: [],
+  people: ["People"],
+  filing: [],
+});
 const HIGHLIGHT = { exact: "design meetup", prefix: "Met Maya at the ", suffix: "." };
 
 function start(id = "chat-1") {

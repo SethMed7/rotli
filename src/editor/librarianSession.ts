@@ -5,7 +5,7 @@
 // state/librarianBar.ts, so it outlives the bar that started it.
 
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { type KeyboardEvent, useEffect, useState } from "react";
 
 import { makeTauriHost } from "../ai/host";
 import { librarianModelFor } from "../ai/librarianLane";
@@ -13,6 +13,7 @@ import { mergedModels } from "../ai/models";
 import type { Host } from "../ai/types";
 import { type Anchor, anchorFromSelection, type LibrarianAction } from "../lib/librarianActions";
 import type { LibrarianContext } from "../lib/librarianChat";
+import { peopleAreas } from "../lib/librarianRules";
 import { type ChatModelInfo, chatModels, isTauri } from "../lib/tauri";
 import { openChatForNoteId } from "../noteChat/composition";
 import { useConnectedLanes } from "../services/connectedModels";
@@ -24,10 +25,21 @@ import {
   updateLibrarianChat,
   useLibrarianBar,
 } from "../state/librarianBar";
+import { useLibrarianRules } from "../state/librarianRules";
 import { usePanesStore } from "../state/panes";
 import { findLeaf } from "../state/paneTree";
 import { useUiStore } from "../state/ui";
 import { editorFor } from "./commands";
+
+/** Escape inside the bar or the chat (not in the portaled model picker, whose
+ * own Escape closes only its list): claim it and run `then`. */
+export function onEscapeHere(event: KeyboardEvent<HTMLElement>, then: () => void): void {
+  if (event.key !== "Escape" || event.defaultPrevented) return;
+  if (!event.currentTarget.contains(event.target as Node)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  then();
+}
 
 /** A passage shortened for a chip. */
 export const clip = (text: string, max = 48) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
@@ -111,7 +123,15 @@ export async function librarianContext(
   areas: readonly string[],
 ): Promise<LibrarianContext> {
   const doc = editorFor(paneId)?.getSelection?.()?.doc ?? "";
-  return { title: noteTitle(doc), doc, areas, tags: await currentTags(noteId) };
+  const { rules } = useLibrarianRules.getState();
+  return {
+    title: noteTitle(doc),
+    doc,
+    areas,
+    tags: await currentTags(noteId),
+    people: peopleAreas(rules),
+    filing: rules.filing,
+  };
 }
 
 export type HostFor = (model: ChatModelInfo) => Pick<Host, "complete">;

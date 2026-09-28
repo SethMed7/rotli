@@ -157,6 +157,7 @@ import { AboutPane } from "./settings/aboutPane";
 import { AliasCleanupSettings } from "./settings/aliasCleanupSettings";
 import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { ConnectorGuide } from "./settings/connectorGuide";
+import { LibrarianRulesSettings } from "./settings/librarianRulesSettings";
 import { Seg } from "./settings/seg";
 import { VoiceSettings } from "./settings/voiceSettings";
 import { WebVaultSettings } from "./settings/webVaultSettings";
@@ -2058,6 +2059,7 @@ function BrainPane() {
             View activity
           </button>
           {ranNote && <p className={ranNote.err ? "setnote err" : "setnote"}>{ranNote.text}</p>}
+          <LibrarianRulesSettings native={isTauri()} />
         </>
       )}
     </>

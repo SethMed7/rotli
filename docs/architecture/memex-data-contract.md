@@ -484,6 +484,13 @@ The Rust corpus boundary independently validates every write.
   `prefix + exact + suffix`, then by `exact` alone, and reports "moved" rather
   than guessing when those words appear more than once
   (`src/lib/librarianActions.ts`).
+- `area` names a top-level Library area, with one exception (2026-09-28, the
+  Librarian rules): `People/<group>` for a group the vault's rules name, so
+  a person can be filed into People/Friends. Nothing else may nest, and Rust
+  (`file_note`) refuses an unconfigured group, a deeper path, and `..`. The
+  group's folder is made when its first note is filed. The contract version
+  does not move: an older Rotli refuses to file a nested area rather than
+  misfiling it.
 - Unknown frontmatter is preserved byte-for-byte. Reserved provenance cannot be
   forged through the raw metadata editor.
 - Boards and binary files never receive Markdown frontmatter.
@@ -625,6 +632,18 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   before either path changes. Removing protection moves it back before dropping
   the ignore rule. The organizer's Rust gate refuses this lane independently of
   the remote-model read gate.
+- **Secure keywords (2026-09-28, the Librarian rules).** The vault's rules
+  (`librarianRules.secureKeywords` in `.rotli/settings.json`) list words that
+  make a note secure when they appear in its **title or file name** as whole
+  words, in any case — never its body, and never judged by a model
+  (`src-tauri/src/librarian_rules.rs`, with the TS twin and shared cases in
+  `scripts/fixtures/parity.json`). A matching note is secure at birth, is made
+  secure on the save that names it, and on the metadata read, through the same
+  ignore-before-move flow into `wiki/_secure/` (the owner's call: one
+  protected folder). Until then it is refused to remote models and skipped by
+  the organizer by name alone. **Secure matching notes now** (Settings →
+  Librarian) protects notes named that way before the keyword was added.
+  Writer policy: the contract version does not move.
 - Quick captures and notes created from the Quick Note window are secure at
   birth. The user may deliberately remove protection from the note menu or the
   Quick Note shield control.

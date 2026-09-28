@@ -165,8 +165,16 @@ export function actionsBlock(
  * anything outside it is dropped, never guessed at. */
 export function parseLibrarianReply(
   reply: string,
-  context: { doc: string; highlight: Anchor | null; areas: readonly string[] },
+  context: {
+    doc: string;
+    highlight: Anchor | null;
+    areas: readonly string[];
+    /** Where a note about a person may go (the Librarian rules' People
+     * groups); created when missing. Default: the one People area. */
+    people?: readonly string[];
+  },
 ): LibrarianAction[] {
+  const people = context.people ?? [PEOPLE_AREA];
   const raw = actionsBlock(reply)?.actions ?? [];
   const actions: LibrarianAction[] = [];
   let filed = false;
@@ -199,11 +207,12 @@ export function parseLibrarianReply(
     } else if (action.type === "file" && typeof action.area === "string" && !filed) {
       const wanted = action.area.trim().replace(/^wiki\//, "");
       const area = context.areas.find((name) => name.toLowerCase() === wanted.toLowerCase());
+      const person = people.find((name) => name.toLowerCase() === wanted.toLowerCase());
       if (area) {
         actions.push({ type: "file", area, create: false });
         filed = true;
-      } else if (wanted.toLowerCase() === PEOPLE_AREA.toLowerCase()) {
-        actions.push({ type: "file", area: PEOPLE_AREA, create: true });
+      } else if (person) {
+        actions.push({ type: "file", area: person, create: true });
         filed = true;
       }
     }

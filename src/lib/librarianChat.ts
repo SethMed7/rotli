@@ -14,7 +14,6 @@ import {
   type Anchor,
   EXCERPT_MAX,
   type LibrarianAction,
-  PEOPLE_AREA,
   parseLibrarianReply,
 } from "./librarianActions";
 
@@ -31,6 +30,10 @@ export interface LibrarianContext {
   doc: string;
   areas: readonly string[];
   tags: readonly string[];
+  /** Where a note about a person goes (the Librarian rules' People groups). */
+  people: readonly string[];
+  /** The person's own filing rules, plain sentences. */
+  filing: readonly string[];
 }
 
 const SYSTEM = `You are the Librarian of a personal notes vault. You organize the note the person has open: its tags, pointers to its passages, and where it is filed. You never rewrite notes, and you are not a general assistant: the app has a separate Chat for that.
@@ -39,7 +42,7 @@ Reply in one or two short sentences.
 {"actions":[{"type":"tag","tags":["..."]},{"type":"mark","exact":"...","label":"..."},{"type":"file","area":"..."}]}
   - "tag": short lowercase tags for the whole note.
   - "mark": point at a passage. "exact" must be words copied from the note; "label" is a short optional name.
-  - "file": move the note into one of the listed areas (or "${PEOPLE_AREA}" for a note about a person).
+  - "file": move the note into one of the listed areas, or, for a note about a person, one of the listed People areas.
 - When you need to know which passage, which area, or who someone is, ask one short question and leave the JSON out.
 - When the person asks for anything else (answering or explaining something, writing, research, a conversation), do not do it: say in one sentence that this belongs in Chat, and end with {"actions":[],"handoff":"chat"}.
 Nothing changes until the person applies what you propose.`;
@@ -49,6 +52,13 @@ function noteContext(ctx: LibrarianContext): string {
     `Note title: ${ctx.title}`,
     `Current tags: ${ctx.tags.join(", ") || "(none)"}`,
     `Library areas: ${ctx.areas.join(", ") || "(none)"}`,
+    `People areas: ${ctx.people.join(", ")}`,
+    ...(ctx.filing.length > 0
+      ? [
+          "The person's own filing rules (follow them when they apply):",
+          ...ctx.filing.map((rule) => `- ${rule}`),
+        ]
+      : []),
     "",
     "The note:",
     ctx.doc.slice(0, EXCERPT_MAX),
@@ -96,7 +106,7 @@ export function latestHighlight(turns: readonly LibrarianTurn[]): Anchor | null 
  * Librarian says the request belongs in Chat instead. */
 export function splitLibrarianReply(
   reply: string,
-  context: { doc: string; highlight: Anchor | null; areas: readonly string[] },
+  context: { doc: string; highlight: Anchor | null; areas: readonly string[]; people?: readonly string[] },
 ): { prose: string; actions: LibrarianAction[]; handoff: boolean } {
   const block = actionsBlock(reply);
   const prose = block

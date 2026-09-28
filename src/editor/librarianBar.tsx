@@ -20,12 +20,15 @@ import {
   updateLibrarianChat,
   useLibrarianBar,
 } from "../state/librarianBar";
+import { useLibrarianRules } from "../state/librarianRules";
 import { useUiStore } from "../state/ui";
 import { editorFor } from "./commands";
 import {
   clip,
   librarianContext,
   libraryAreas,
+  noteTitle,
+  onEscapeHere,
   sendToLibrarian,
   useLibrarianModels,
   usePassage,
@@ -48,15 +51,19 @@ export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: strin
   // who may ask, before anything else
   useEffect(() => {
     let live = true;
-    void librarianRefusal(noteId, { native: isTauri(), librarianOn }).then((message) => {
-      if (!live) return;
-      setPhase(message ? { kind: "refused", message } : { kind: "ready" });
-      if (!message) input.current?.focus();
-    });
+    const title = noteTitle(editorFor(paneId)?.getSelection?.()?.doc ?? "");
+    const { secureKeywords } = useLibrarianRules.getState().rules;
+    void librarianRefusal(noteId, { native: isTauri(), librarianOn, secureKeywords, title }).then(
+      (message) => {
+        if (!live) return;
+        setPhase(message ? { kind: "refused", message } : { kind: "ready" });
+        if (!message) input.current?.focus();
+      },
+    );
     return () => {
       live = false;
     };
-  }, [noteId, librarianOn]);
+  }, [noteId, paneId, librarianOn]);
 
   const anchors = useQuery({
     queryKey: ["librarian-anchors", noteId],
@@ -124,14 +131,7 @@ export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: strin
       className="libbar"
       role="region"
       aria-label="Librarian"
-      onKeyDown={(event) => {
-        // the model picker is portaled: its own Escape (it closes the list) bubbles here too
-        if (event.key !== "Escape" || event.defaultPrevented) return;
-        if (!event.currentTarget.contains(event.target as Node)) return;
-        event.preventDefault();
-        event.stopPropagation();
-        close();
-      }}
+      onKeyDown={(event) => onEscapeHere(event, () => close())}
     >
       <div className="libbar-head">
         <strong>Librarian</strong>

@@ -40,6 +40,7 @@ import { allActions } from "../keys/registry";
 // instantly instead of riding out the Rust-side hold (#4).
 import { createDebouncedTask } from "../lib/debouncedTask";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { type LibrarianRules, parseLibrarianRules } from "../lib/librarianRules";
 import {
   DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE,
   PRIVATE_BROWSER_SEARCH_ENGINES,
@@ -73,6 +74,7 @@ import { persistableChatMap, rescopeChatMapKeys } from "./chatMapKeys";
 import { useChatWindowStore } from "./chatWindowStore";
 import { withDetachedChats } from "./chatWindowTabs";
 import { helperLinked } from "./helperLink";
+import { useLibrarianRules } from "./librarianRules";
 import { hydrateMain, useMainStore } from "./main";
 import { MRU_CAP, touchItemActivity, touchMru, useMruStore } from "./mru";
 import {
@@ -320,6 +322,8 @@ interface PersistedSettings {
   /** Idle delay (seconds) before the organizer scans a just-touched note. The
    * Rust daemon's `organizerQuietSecs` knob; default 300 (5 min). */
   organizerQuietSecs: number;
+  /** The Librarian rules (src/lib/librarianRules.ts); Rust reads them too. */
+  librarianRules: LibrarianRules;
   /** The Librarian's first-visit explainer was shown (2026-07-31). */
   librarianIntroSeen: boolean;
   /** First-run onboarding gate — false until the flow is finished/skipped. */
@@ -634,6 +638,7 @@ export function parseSettings(raw: string): PersistedSettings {
       data.organizerQuietSecs >= 0
         ? data.organizerQuietSecs
         : 300,
+    librarianRules: parseLibrarianRules(data.librarianRules),
     librarianIntroSeen: asBool(data.librarianIntroSeen, false),
     // a fresh install reads an empty config ("{}"); an upgrade has prior keys but
     // not this one — treat that as already-onboarded so we don't re-run first-run
@@ -792,6 +797,7 @@ function applySettings(s: PersistedSettings): void {
   });
   useBindingsStore.setState({ overrides: s.bindings });
   useNoteStyleStore.setState({ styles: s.noteStyles });
+  useLibrarianRules.setState({ rules: s.librarianRules });
   useTableWidthsStore.setState({
     widths: s.tableWidths,
     heights: s.tableHeights,
@@ -1504,6 +1510,7 @@ function settingsSnapshot(): string {
     organizerModel: ui.organizerModel,
     organizerModelId: ui.organizerModelId,
     organizerQuietSecs: ui.organizerQuietSecs,
+    librarianRules: useLibrarianRules.getState().rules,
     librarianIntroSeen: ui.librarianIntroSeen,
     onboarded: ui.onboarded,
     onboardingVersion: ui.onboardingVersion,
@@ -1637,6 +1644,7 @@ export function attachPersistence(): () => void {
     useBindingsStore.subscribe(schedule),
     useNoteStyleStore.subscribe(schedule),
     useTableWidthsStore.subscribe(schedule),
+    useLibrarianRules.subscribe(schedule),
     usePanesStore.subscribe(schedule),
     useChatWindowStore.subscribe(schedule),
     useMruStore.subscribe(schedule),

@@ -70,9 +70,11 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
 - **Librarian rules** · M–L — tell the Librarian how you want things kept, in
   plain settings, not code: which folder a kind of note goes to, and how the
   people section is split (acquaintances, friends, family; one simple list; or
-  your own groups). Today the Librarian's instructions are fixed and its areas
-  are just the folders under the Library. Secure notes are separate; see
-  "Secure note rules" in §8.
+  your own groups). **Built (2026-09-28):** Settings → Librarian → Your rules —
+  filing sentences the organizer and `/librarian` follow, People split into
+  groups (Family, Friends, Work, Acquaintances by default, editable) or one
+  list, and secure keywords (see "Secure note rules" in §8). Kept in the
+  vault's `.rotli/settings.json`, on this Mac.
 - **The Librarian writes people notes and folder indexes** · L — by default the
   Librarian may write in the people section (never a locked note) and keeps an
   `index.md` table of contents in each folder. Today it only fills metadata and
@@ -246,6 +248,7 @@ hotkeys, and Send feedback) shipped in 1.3.
   any build.
 - **Secure note rules** — your own keywords that make a note secure, matched
   only on its title or file name, never read by a model. That is what keeps it
-  clear of Secure organization's model risk. Owner call first: you asked to
-  choose where secure notes go, but today they all live in one protected folder
-  that is kept out of Git; a folder you pick would need the same protection.
+  clear of Secure organization's model risk. **Built (2026-09-28), with the
+  owner's call: one protected folder** — a matching note moves into
+  `wiki/_secure/` like any secure note; choosing other folders stays future
+  work, since each would need the same Git and model protection.

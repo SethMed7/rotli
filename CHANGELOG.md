@@ -12,6 +12,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Your rules for the Librarian.** Settings → Librarian → Your rules tells the
+  Librarian how you want things kept, in plain settings:
+  - **Secure keywords**: a note whose title or file name has one of these words
+    (bank, passport, tax return…) becomes secure when it's saved and moves into
+    your protected Secure folder. Only the name is checked, never what the
+    note says, and never by a model; "bank" matches "Bank login", not
+    "Riverbank". **Secure matching notes now** protects notes already named
+    that way.
+  - **People**: split into Family, Friends, Work and Acquaintances (rename,
+    remove or add your own), or keep one People list. A person is filed into
+    People › Friends and so on; a group's folder is made when its first note
+    is filed.
+  - **Filing rules**: plain sentences ("Recipes go to Cooking") the Librarian
+    follows when it files a note on its own and when you ask it with
+    `/librarian`.
+
+  The rules are kept with the vault's settings on this Mac. Mac app.
 - **The Librarian, as a chat.** After your first ask, the Librarian pops out
   into the bottom-right corner of the pane you're in, like the chat on a
   website, and the format bar comes back. Keep talking with the model you

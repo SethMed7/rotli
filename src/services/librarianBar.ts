@@ -15,6 +15,7 @@ import {
   type LibrarianTurn,
   splitLibrarianReply,
 } from "../lib/librarianChat";
+import { secureByName } from "../lib/librarianRules";
 import {
   corpusFrontmatter,
   corpusNotePath,
@@ -73,7 +74,7 @@ function fieldValue(fm: FrontmatterView, key: string): string {
  * before any prompt exists; unknown state counts as locked. */
 export async function librarianRefusal(
   noteId: string,
-  where: { native: boolean; librarianOn: boolean },
+  where: { native: boolean; librarianOn: boolean; secureKeywords?: readonly string[]; title?: string },
   deps: Pick<LibrarianDeps, "frontmatter" | "notePath"> = liveLibrarianDeps,
 ): Promise<string | null> {
   if (!where.native) return LIBRARIAN_REFUSALS.web;
@@ -82,6 +83,9 @@ export async function librarianRefusal(
   if (!fm || fm.locked) return LIBRARIAN_REFUSALS.locked;
   if (fm.secure) return LIBRARIAN_REFUSALS.secure;
   const rel = await deps.notePath(noteId).catch(() => "");
+  // a secure keyword in its name makes it secure too (the Librarian rules);
+  // Rust protects it independently — this refuses before any prompt exists
+  if (secureByName(where.title ?? "", rel, where.secureKeywords ?? [])) return LIBRARIAN_REFUSALS.secure;
   const inLibrary = rel.startsWith("wiki/") && !rel.startsWith("wiki/_secure");
   return inLibrary ? null : LIBRARIAN_REFUSALS.library;
 }
@@ -118,6 +122,7 @@ export async function converseLibrarian(
     doc: ctx.doc,
     highlight: latestHighlight(turns),
     areas: ctx.areas,
+    people: ctx.people,
   });
   return { kind: "reply", prose, actions, handoff, raw };
 }

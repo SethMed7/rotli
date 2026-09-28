@@ -48,6 +48,7 @@ fix both in the same change.
 | rotli.co structure: nav, Resources/Blog/About, download + web actions, link card | [`design/site-ia-and-link-card-2026-09-18.md`](design/site-ia-and-link-card-2026-09-18.md) |
 | Freeform canvas, task tables, and Logseq lessons — evaluation | [`design/canvas-tasks-logseq-eval-2026-09-23.md`](design/canvas-tasks-logseq-eval-2026-09-23.md) |
 | Talk to the Librarian (`/librarian`) — slice 1 plan and the `anchors` key | [`design/librarian-bar.md`](design/librarian-bar.md) |
+| Librarian rules — secure keywords, People groups, filing sentences | [`design/librarian-rules.md`](design/librarian-rules.md) |
 | Chat as a work surface — tools, rendering, and the path to media (evaluation) | [`design/chat-work-surface-eval-2026-09-27.md`](design/chat-work-surface-eval-2026-09-27.md) |
 | Quokka emotions — moods from existing art, and new expressions to draw | [`design/quokka-emotions.md`](design/quokka-emotions.md) |
 | Rotli Web experience review — what a fresh vault walk found and fixed | [`design/web-experience-review-2026-09-27.md`](design/web-experience-review-2026-09-27.md) |

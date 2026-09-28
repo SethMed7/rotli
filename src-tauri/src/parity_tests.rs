@@ -272,3 +272,35 @@ fn secure_overlap() {
 fn ai_keys_match_fixture() {
     assert_eq!(string_list(&entry("aiKeys")), crate::corpus::AI_KEYS.to_vec());
 }
+
+#[test]
+fn people_area_matches_fixture() {
+    assert_eq!(
+        entry("peopleArea").as_str(),
+        Some(crate::librarian_rules::PEOPLE_AREA)
+    );
+}
+
+#[test]
+fn default_people_groups_match_fixture() {
+    assert_eq!(
+        string_list(&entry("defaultPeopleGroups")),
+        crate::librarian_rules::DEFAULT_PEOPLE_GROUPS
+    );
+}
+
+#[test]
+fn secure_by_name_cases_match_fixture() {
+    for case in entry("secureByNameCases").as_array().expect("cases") {
+        let keywords = string_list(&case["keywords"]);
+        assert_eq!(
+            crate::librarian_rules::secure_by_name(
+                case["title"].as_str().unwrap(),
+                case["rel"].as_str().unwrap(),
+                &keywords
+            ),
+            case["secure"].as_bool().unwrap(),
+            "{case}"
+        );
+    }
+}
