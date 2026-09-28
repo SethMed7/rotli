@@ -13,7 +13,12 @@ import { relativeLabel } from "../lib/dateLabels";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { hotkeyHint } from "../lib/hotkeyHint";
 import { brainLocationLabel, noteDiskFolder, noteLocationLabel } from "../lib/noteLocation";
-import { corpusNoteAbsolutePath, corpusRawFrontmatter, corpusWriteFrontmatterRaw } from "../lib/tauri";
+import {
+  corpusNoteAbsolutePath,
+  corpusRawFrontmatter,
+  corpusWriteFrontmatterRaw,
+  isTauri,
+} from "../lib/tauri";
 import { useNow } from "../lib/useNow";
 import { listChatsForNote, openChatForNote, openNoteChat } from "../noteChat/composition";
 import { isSink } from "../services/destinations";
@@ -429,7 +434,7 @@ export function EditorSurface({
             <span className="sep" />
             <UpdatedAt ts={note.updatedAt} />
             <span className="sep" />
-            On this Mac
+            {isTauri() ? "On this Mac" : "In your folder"}
             <span className="sep" />
             {/* where this note lives — click to reveal + scroll to it in the
                 sidebar (the maintainer, 2026-07-03). ★ Main shows when it's in Main. */}

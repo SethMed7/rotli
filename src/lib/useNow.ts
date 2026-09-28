@@ -4,7 +4,9 @@
 
 import { useSyncExternalStore } from "react";
 
-const TICK_MS = 30_000;
+/** How often `useNow` advances; a timestamp up to one tick ahead is "now". */
+export const NOW_TICK_MS = 30_000;
+const TICK_MS = NOW_TICK_MS;
 const listeners = new Set<() => void>();
 let snapshot = Date.now();
 let timer: number | null = null;

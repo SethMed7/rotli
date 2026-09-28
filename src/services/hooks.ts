@@ -289,6 +289,12 @@ export async function invalidateNoteLists(): Promise<void> {
   await queryClient.invalidateQueries({ queryKey: ["notes"] });
 }
 
+/** New notes that arrive WITH tasks (the Welcome lessons): refetch the Tasks
+ * projection too, which invalidateNoteLists deliberately leaves alone. */
+export async function invalidateTasks(): Promise<void> {
+  await queryClient.invalidateQueries({ queryKey: keys.tasks });
+}
+
 /** Scoped cache refresh after ONE note's body sync — the editor's 400ms tick.
  * invalidateNotes() here fanned into ~9 uncached full-vault walks per tick
  * (perf audit 2026-07-30, #1): with staleTime ∞, invalidating ["notes"]

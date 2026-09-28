@@ -33,6 +33,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A new web vault's Tasks page and This week card are right at once.** The
+  Tasks page read "Nothing open" and the sidebar's This week card "0 new"
+  until a reload, though the Welcome lessons had just arrived with thirty open
+  tasks.
+- **Rotli Web says what the web can do.** A note's header says "In your
+  folder", not "On this Mac", and the new-tab chooser shows the private
+  Browser as "In the Mac app" instead of offering a tab that could only fail.
+- **Settings tells a screen reader which pane is open.**
 - **Big images save on a board.** An image over about 75 KB made a board
   refuse to save, because an image is kept inside the board as one long
   string and every string had a 100,000-character cap. An image's data is now

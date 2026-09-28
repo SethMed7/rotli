@@ -3335,6 +3335,7 @@ export function SettingsSurface() {
             type="button"
             key={id}
             className={pane === id ? "frow sel" : "frow"}
+            aria-current={pane === id ? "page" : undefined}
             onClick={() => setPane(id)}
           >
             <G size={14.5} />
