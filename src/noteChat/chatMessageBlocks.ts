@@ -4,6 +4,8 @@
 // truth stays the transcript markdown — this is display only, so anything the
 // splitter doesn't recognize falls through as plain lines.
 
+import { extOf, IMAGE_EXTS, VIDEO_EXTS } from "../lib/fileKind";
+
 export type MessageBlock =
   | { kind: "lines"; lines: string[] }
   | { kind: "code"; lang: string; code: string }
@@ -118,7 +120,9 @@ function isTableDelimiter(line: string): boolean {
 
 const isTableRow = (line: string): boolean => line.trim().startsWith("|");
 
-// only `storage:` (a vault file): a remote address would load from outside the Mac
+// only `storage:` (a vault file): a remote address would load from outside the Mac.
+// Only pictures and video: any other vault link (a note, a PDF, an SVG) stays
+// its Markdown text rather than turning into a "missing file" label.
 const MEDIA_LINE = /^\s*!\[([^\]]*)\]\(storage:([^)\s]+)\)\s*$/;
 
 function mediaLine(line: string): MessageBlock | null {
@@ -130,6 +134,8 @@ function mediaLine(line: string): MessageBlock | null {
   } catch {
     // a malformed escape keeps the raw path
   }
+  const extension = extOf(path);
+  if (!IMAGE_EXTS.has(extension) && !VIDEO_EXTS.has(extension)) return null;
   return { kind: "media", alt: match[1] ?? "", path };
 }
 

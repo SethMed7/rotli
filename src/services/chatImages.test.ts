@@ -1,6 +1,11 @@
 import { expect, test } from "bun:test";
 
-import { attachedImageUrl } from "./chatImages";
+import { attachedImageUrl, replyMediaRootId } from "./chatImages";
+
+test("a reply's media resolves in the chat's own vault", () => {
+  expect(replyMediaRootId("")).toBe("default");
+  expect(replyMediaRootId("work:")).toBe("work");
+});
 
 test("data, blob, http(s), and asset sources pass through untouched", async () => {
   for (const source of [

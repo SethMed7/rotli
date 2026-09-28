@@ -345,6 +345,8 @@ test("a chat reply shows a vault image and keeps a video's name on the web", asy
   await plantFolder(page, {
     "chats/media-chat.md": `${chatFile("Media chat", "2026-09-16")}\n**sonnet** · 2026-09-16T10:00:05Z — ${reply}\n`,
     "storage/chats/media-chat/chart.png": png,
+    // a real (tiny) file, so the name below is the web's choice, not a missing file
+    "storage/chats/media-chat/clip.mp4": "base64:AAAAGGZ0eXBtcDQyAAAAAG1wNDJpc29t",
   });
   await page.reload();
   await expect(page.getByRole("tab", { selected: true })).toContainText("Hello");
@@ -356,6 +358,7 @@ test("a chat reply shows a vault image and keeps a video's name on the web", asy
   await expect(image).toBeVisible();
   await expect(image).toHaveAttribute("src", /^blob:/);
   await expect(bubble.locator(".cmsg-media-missing")).toHaveText("Launch clip");
+  await expect(bubble.locator("video")).toHaveCount(0);
   await expect(bubble).toContainText("![tracker](https://example.com/pixel.png)");
   await expect(bubble.locator('img[src^="https:"]')).toHaveCount(0);
 });
