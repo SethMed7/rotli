@@ -19,6 +19,7 @@ import { chatSlugOf } from "../../services/systemBrowser";
 import { openSystemRoot, revealNoteInSystem } from "../../services/systemNav";
 import { webNoteFilePath } from "../../services/webNotes";
 import { showFileNotice } from "../../state/fileNotice";
+import { librarianQuestions, showLibrarianChat, useLibrarianBar } from "../../state/librarianBar";
 import { useOrganizerLive } from "../../state/organizerLive";
 import { useFocusedChatSlug, useFocusedNoteId, usePanesStore } from "../../state/panes";
 import { useUiStore } from "../../state/ui";
@@ -36,6 +37,10 @@ export function SidebarFooter() {
   // DISK SCAN poll too — repair only feeds the leftover line, not this badge
   // (review F7; perf-audit family #12-14)
   const secureConfirms = (useSecureHints().data ?? []).filter((h) => !h.flagged).length;
+  // the Librarian's open questions in a /librarian conversation (the owner,
+  // 2026-09-28: "Anytime the librarian has a question we should see a
+  // badge"); a click brings that conversation back into view
+  const questions = useLibrarianBar((s) => librarianQuestions(s.chat));
   // the ambient Librarian working signal — pulses the footer dot (2026-07-31)
   const organizerWorking = useOrganizerLive((s) => s.active);
   const organizerCurrent = useOrganizerLive((s) => s.current);
@@ -90,22 +95,26 @@ export function SidebarFooter() {
         aria-label={
           secureConfirms > 0
             ? `Librarian — ${secureConfirms} waiting`
-            : pendingProposals > 0
-              ? `Librarian — ${pendingProposals} suggestions`
-              : "Librarian"
+            : questions > 0
+              ? `Librarian — ${questions} ${questions === 1 ? "question" : "questions"} for you`
+              : pendingProposals > 0
+                ? `Librarian — ${pendingProposals} suggestions`
+                : "Librarian"
         }
         title={
           organizerWorking
             ? `Organizing${organizerCurrent ? ` — looking at “${organizerCurrent}”` : "…"}`
             : secureConfirms > 0
               ? `${secureConfirms} sensitive-data ${secureConfirms === 1 ? "decision waits" : "decisions wait"} for you`
-              : pendingProposals > 0
-                ? `${pendingProposals} ${pendingProposals === 1 ? "suggestion waits" : "suggestions wait"} for your approval`
-                : brainEnabled
-                  ? "See and undo the Librarian's work"
-                  : "The Librarian's journal"
+              : questions > 0
+                ? `The Librarian has ${questions === 1 ? "a question" : `${questions} questions`} for you`
+                : pendingProposals > 0
+                  ? `${pendingProposals} ${pendingProposals === 1 ? "suggestion waits" : "suggestions wait"} for your approval`
+                  : brainEnabled
+                    ? "See and undo the Librarian's work"
+                    : "The Librarian's journal"
         }
-        onClick={() => usePanesStore.getState().openActivity()}
+        onClick={() => (questions > 0 ? showLibrarianChat() : usePanesStore.getState().openActivity())}
       >
         {/* badges sit on the icon, never beside the label: a count used to
             squeeze "Librarian" to "Libra…" (audit 2026-09-28) */}
@@ -120,6 +129,8 @@ export function SidebarFooter() {
               never a silent queue */}
           {secureConfirms > 0 ? (
             <span className="count alert">{badgeCount(secureConfirms)}</span>
+          ) : questions > 0 ? (
+            <span className="count ask">{badgeCount(questions)}</span>
           ) : (
             pendingProposals > 0 && <span className="count pill">{badgeCount(pendingProposals)}</span>
           )}

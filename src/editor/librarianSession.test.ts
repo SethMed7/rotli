@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
 import type { CompleteReq } from "../ai/types";
+import { DEFAULT_LIBRARIAN_RULES } from "../lib/librarianRules";
 import type { ChatModelInfo } from "../lib/tauri";
 import { LIBRARIAN_REFUSALS } from "../services/librarianBar";
 import { useChatDrafts } from "../state/chatDrafts";
@@ -26,6 +27,8 @@ const context = async () => ({
   tags: [],
   people: ["People"],
   filing: [],
+  rules: structuredClone(DEFAULT_LIBRARIAN_RULES),
+  known: [],
 });
 const HIGHLIGHT = { exact: "design meetup", prefix: "Met Maya at the ", suffix: "." };
 

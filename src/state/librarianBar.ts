@@ -1,11 +1,16 @@
 // Talk to the Librarian (/librarian, 2026-09-28): which pane's editor shows the
 // Librarian bar in place of its format bar, and the conversation the bar pops
 // out into after the first ask. Session state only: nothing here is written to
-// the vault, and the conversation lasts as long as the app is open.
+// the vault, and the conversation lasts as long as the app is open. It also
+// counts the Librarian's open questions, for the badge on the sidebar's
+// Librarian button (the owner, 2026-09-28: "Anytime the librarian has a
+// question we should see a badge").
 
 import { create } from "zustand";
 
 import type { LibrarianTurn } from "../lib/librarianChat";
+import type { KeptLine } from "../lib/librarianPeople";
+import { usePanesStore } from "./panes";
 
 /** What happened to a reply's proposals: waiting, being applied, or settled. */
 export type ProposalState =
@@ -14,9 +19,20 @@ export type ProposalState =
   | { kind: "applied"; message: string }
   | { kind: "dismissed" };
 
+/** A question about someone who already has a note: waiting, being
+ * applied, or answered. */
+export type AskState =
+  | { kind: "open" }
+  | { kind: "applying" }
+  | { kind: "answered"; yes: boolean; message: string };
+
 export type ChatTurn = LibrarianTurn & {
   id: string;
   proposal?: ProposalState;
+  /** What the reply's vault additions came to (rules, groups, new people). */
+  kept?: { kind: "keeping" } | { kind: "kept"; lines: KeptLine[] };
+  /** One per `update` in the reply's vault actions, in order. */
+  asks?: AskState[];
   /** "Take this to Chat" was used on this reply (it opens one chat, once). */
   handedOff?: boolean;
 };
@@ -56,10 +72,54 @@ export function updateLibrarianChat(
   if (chat?.id === id) useLibrarianBar.setState({ chat: { ...chat, ...change(chat) } });
 }
 
+/** Change one turn of the open conversation (same rule: only if it's still
+ * the conversation `id` names). */
+export function updateLibrarianTurn(
+  id: string,
+  turnId: string,
+  change: (turn: ChatTurn) => Partial<ChatTurn>,
+): void {
+  updateLibrarianChat(id, (chat) => ({
+    turns: chat.turns.map((turn) => (turn.id === turnId ? ({ ...turn, ...change(turn) } as ChatTurn) : turn)),
+  }));
+}
+
 export function startLibrarianChat(chat: LibrarianChat): void {
   useLibrarianBar.setState({ paneId: null, chat });
 }
 
 export function closeLibrarianChat(): void {
   useLibrarianBar.setState({ chat: null });
+}
+
+/** The Librarian's open questions in a conversation: proposals and
+ * questions about people waiting for an answer, and a reply that ends by
+ * asking something the person hasn't answered yet. */
+export function librarianQuestions(chat: LibrarianChat | null): number {
+  if (!chat) return 0;
+  let open = 0;
+  for (const turn of chat.turns) {
+    if (turn.proposal?.kind === "open") open++;
+    open += (turn.asks ?? []).filter((ask) => ask.kind === "open").length;
+  }
+  const last = chat.turns.at(-1);
+  const asking =
+    chat.status === "idle" &&
+    last?.role === "librarian" &&
+    last.proposal?.kind !== "open" &&
+    !(last.asks ?? []).some((ask) => ask.kind === "open") &&
+    last.text.trim().endsWith("?");
+  return open + (asking ? 1 : 0);
+}
+
+/** Bring the conversation back into view: its note in its pane (or the
+ * focused one, if that pane has closed), the chat open. */
+export function showLibrarianChat(): void {
+  const chat = useLibrarianBar.getState().chat;
+  if (!chat) return;
+  const panes = usePanesStore.getState();
+  panes.focusPane(chat.paneId);
+  panes.openNote(chat.noteId);
+  const paneId = usePanesStore.getState().focusedPaneId;
+  updateLibrarianChat(chat.id, () => ({ paneId, minimized: false }));
 }

@@ -5,7 +5,7 @@
 // state/librarianBar.ts, so it outlives the bar that started it.
 
 import { useQuery } from "@tanstack/react-query";
-import { type KeyboardEvent, useEffect, useState } from "react";
+import { type KeyboardEvent, useEffect, useMemo, useState } from "react";
 
 import { makeTauriHost } from "../ai/host";
 import { librarianModelFor } from "../ai/librarianLane";
@@ -13,16 +13,19 @@ import { mergedModels } from "../ai/models";
 import type { Host } from "../ai/types";
 import { type Anchor, anchorFromSelection, type LibrarianAction } from "../lib/librarianActions";
 import type { LibrarianContext } from "../lib/librarianChat";
+import { type PersonNote, peopleNotes } from "../lib/librarianPeople";
 import { peopleAreas } from "../lib/librarianRules";
 import { type ChatModelInfo, chatModels, isTauri } from "../lib/tauri";
 import { openChatForNoteId } from "../noteChat/composition";
 import { useConnectedLanes } from "../services/connectedModels";
+import { useNoteIndex } from "../services/hooks";
 import { applyLibrarian, converseLibrarian, currentTags, LIBRARIAN_REFUSALS } from "../services/librarianBar";
 import { useChatDrafts } from "../state/chatDrafts";
 import {
   type ChatTurn,
   type ProposalState,
   updateLibrarianChat,
+  updateLibrarianTurn,
   useLibrarianBar,
 } from "../state/librarianBar";
 import { useLibrarianRules } from "../state/librarianRules";
@@ -30,6 +33,7 @@ import { usePanesStore } from "../state/panes";
 import { findLeaf } from "../state/paneTree";
 import { useUiStore } from "../state/ui";
 import { editorFor } from "./commands";
+import { settleVault } from "./librarianKeep";
 
 /** Escape inside the bar or the chat (not in the portaled model picker, whose
  * own Escape closes only its list): claim it and run `then`. */
@@ -79,6 +83,13 @@ export function useLibrarianModels() {
   return { groups, models, preferred };
 }
 
+/** The people the vault already has notes for (what a statement is checked
+ * against, so someone known is asked about rather than added twice). */
+export function usePeopleNotes(): PersonNote[] {
+  const index = useNoteIndex();
+  return useMemo(() => peopleNotes(index.values()), [index]);
+}
+
 export interface Passage {
   /** The highlighted words ("" when nothing is highlighted). */
   text: string;
@@ -121,6 +132,7 @@ export async function librarianContext(
   noteId: string,
   paneId: string,
   areas: readonly string[],
+  known: readonly PersonNote[] = [],
 ): Promise<LibrarianContext> {
   const doc = editorFor(paneId)?.getSelection?.()?.doc ?? "";
   const { rules } = useLibrarianRules.getState();
@@ -131,6 +143,8 @@ export async function librarianContext(
     tags: await currentTags(noteId),
     people: peopleAreas(rules),
     filing: rules.filing,
+    rules,
+    known,
   };
 }
 
@@ -167,7 +181,7 @@ export async function sendToLibrarian(
       role: "librarian",
       text:
         reply.prose ||
-        (reply.actions.length > 0
+        (reply.actions.length > 0 || reply.vault.length > 0
           ? "Here’s what I’d change:"
           : reply.handoff
             ? "That’s one for Chat. I only organize this note."
@@ -178,8 +192,10 @@ export async function sendToLibrarian(
       ...(reply.actions.length > 0 && {
         proposal: { kind: "open" as const, picked: reply.actions.map(() => true) },
       }),
+      ...(reply.vault.length > 0 && { vault: reply.vault }),
     };
     updateLibrarianChat(chatId, (now) => ({ turns: [...now.turns, answer], status: "idle" }));
+    await settleVault(chatId, answer.id, reply.vault, model.id);
   } catch (error) {
     updateLibrarianChat(chatId, () => ({
       status: "idle",
@@ -197,10 +213,7 @@ export async function applyProposal(
   note: { id: string; title: string; model: string },
   apply: typeof applyLibrarian = applyLibrarian,
 ): Promise<void> {
-  const setProposal = (proposal: ProposalState) =>
-    updateLibrarianChat(chatId, (chat) => ({
-      turns: chat.turns.map((turn) => (turn.id === turnId ? { ...turn, proposal } : turn)),
-    }));
+  const setProposal = (proposal: ProposalState) => updateLibrarianTurn(chatId, turnId, () => ({ proposal }));
   const before = useLibrarianBar.getState().chat?.turns.find((turn) => turn.id === turnId)?.proposal;
   setProposal({ kind: "applying" });
   try {

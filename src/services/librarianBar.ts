@@ -15,6 +15,7 @@ import {
   type LibrarianTurn,
   splitLibrarianReply,
 } from "../lib/librarianChat";
+import type { VaultAction } from "../lib/librarianPeople";
 import { secureByName } from "../lib/librarianRules";
 import {
   corpusFrontmatter,
@@ -106,7 +107,14 @@ export async function currentTags(
 
 export type LibrarianReply =
   | { kind: "secret" }
-  | { kind: "reply"; prose: string; actions: LibrarianAction[]; handoff: boolean; raw: string };
+  | {
+      kind: "reply";
+      prose: string;
+      actions: LibrarianAction[];
+      vault: VaultAction[];
+      handoff: boolean;
+      raw: string;
+    };
 
 /** One turn of the conversation. The secret check reads exactly what would be
  * sent — the rules, the note, and every turn so far — on every turn. */
@@ -118,13 +126,15 @@ export async function converseLibrarian(
   const messages = librarianChatMessages(ctx, turns);
   if (looksSecret(messages.map((message) => message.content).join("\n"))) return { kind: "secret" };
   const raw = await host.complete({ messages });
-  const { prose, actions, handoff } = splitLibrarianReply(raw, {
+  const { prose, actions, vault, handoff } = splitLibrarianReply(raw, {
     doc: ctx.doc,
     highlight: latestHighlight(turns),
     areas: ctx.areas,
     people: ctx.people,
+    rules: ctx.rules,
+    known: ctx.known,
   });
-  return { kind: "reply", prose, actions, handoff, raw };
+  return { kind: "reply", prose, actions, vault, handoff, raw };
 }
 
 /** Apply accepted actions: tags and passage marks first, filing last (a

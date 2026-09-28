@@ -4,7 +4,9 @@
 // pops the conversation out into the pane's corner (librarianChat.tsx) and
 // gives the format bar back; the model proposes, nothing changes until Apply,
 // and every applied change shows in Librarian Activity with Undo. The note's
-// words are never edited.
+// words are never edited. The input is ready to type in the moment the bar
+// opens (the owner, 2026-09-28: no extra click); asking waits for the note's
+// check.
 
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -32,6 +34,7 @@ import {
   sendToLibrarian,
   useLibrarianModels,
   usePassage,
+  usePeopleNotes,
 } from "./librarianSession";
 
 type Phase = { kind: "checking" } | { kind: "refused"; message: string } | { kind: "ready" };
@@ -40,6 +43,7 @@ export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: strin
   const librarianOn = useUiStore((s) => s.brainEnabled);
   const folders = useFolders();
   const { groups, models, preferred } = useLibrarianModels();
+  const known = usePeopleNotes();
   const [picked, setPicked] = useState<string | null>(null);
   const model = models.find((m) => m.id === (picked ?? preferred)) ?? models[0] ?? null;
   const [phase, setPhase] = useState<Phase>({ kind: "checking" });
@@ -47,6 +51,11 @@ export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: strin
   const [notice, setNotice] = useState("");
   const passage = usePassage(paneId);
   const input = useRef<HTMLInputElement | null>(null);
+
+  // typing starts right away, while the note is still being checked
+  useEffect(() => {
+    input.current?.focus();
+  }, [noteId, paneId]);
 
   // who may ask, before anything else
   useEffect(() => {
@@ -57,7 +66,6 @@ export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: strin
       (message) => {
         if (!live) return;
         setPhase(message ? { kind: "refused", message } : { kind: "ready" });
-        if (!message) input.current?.focus();
       },
     );
     return () => {
@@ -86,7 +94,7 @@ export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: strin
   // the first ask pops the conversation out; asking again here continues it
   const ask = () => {
     const text = request.trim();
-    if (!text || !model) return;
+    if (!text || !model || phase.kind !== "ready") return;
     const existing = useLibrarianBar.getState().chat;
     const chatId =
       existing?.noteId === noteId && existing.paneId === paneId ? existing.id : crypto.randomUUID();
@@ -107,7 +115,7 @@ export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: strin
     }
     const areas = libraryAreas((folders.data ?? []).map((folder) => folder.id));
     void sendToLibrarian(chatId, { text, highlight: passage.anchor() }, model, () =>
-      librarianContext(noteId, paneId, areas),
+      librarianContext(noteId, paneId, areas, known),
     );
   };
 
@@ -149,14 +157,13 @@ export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: strin
         </button>
       </div>
 
-      {phase.kind === "checking" && <p className="libbar-note">Checking this note…</p>}
       {phase.kind === "refused" && (
         <p className="libbar-note" role="status">
           {phase.message}
         </p>
       )}
 
-      {phase.kind === "ready" && (
+      {phase.kind !== "refused" && (
         <form
           className="libbar-ask"
           onSubmit={(event) => {
@@ -168,11 +175,15 @@ export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: strin
             ref={input}
             className="libbar-input"
             aria-label="Ask the Librarian"
-            placeholder="Tag this note, mark a passage, file it with People…"
+            placeholder="Tag or file this note, or tell me about people…"
             value={request}
             onChange={(event) => setRequest(event.currentTarget.value)}
           />
-          <button type="submit" className="rename-btn primary" disabled={!request.trim() || !model}>
+          <button
+            type="submit"
+            className="rename-btn primary"
+            disabled={!request.trim() || !model || phase.kind !== "ready"}
+          >
             Ask
           </button>
         </form>

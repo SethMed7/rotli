@@ -19,6 +19,12 @@ const CTX: LibrarianContext = {
   tags: ["q3"],
   people: ["People/Family", "People/Friends"],
   filing: ["Recipes go to Cooking"],
+  rules: {
+    secureKeywords: [],
+    people: { mode: "groups", groups: ["Family", "Friends"] },
+    filing: ["Recipes go to Cooking"],
+  },
+  known: [{ id: "01MAYA", title: "Maya Chen", area: "people/friends" }],
 };
 const at = NOTE.indexOf("runs research");
 const HIGHLIGHT = anchorFromSelection(NOTE, at, at + "runs research".length);
@@ -44,6 +50,10 @@ describe("the messages a turn sends", () => {
     );
     // a question about a highlight carries the passage with it
     expect(messages[3]?.content).toBe('Highlighted passage: """runs research"""\n\nMark her job');
+    // the people the vault knows, so a statement about them asks instead of adding twice
+    expect(messages[0]?.content).toContain("People groups: Family, Friends");
+    expect(messages[0]?.content).toContain("People notes: Maya Chen (people/friends)");
+    expect(messages[0]?.content).toContain('{"type":"person"');
     expect(messages[1]?.content).toBe("Who is this?");
   });
 
@@ -89,6 +99,7 @@ describe("a reply, split into what is said and what is proposed", () => {
     expect(splitLibrarianReply("  Maya runs research at Northwind.  ", context)).toEqual({
       prose: "Maya runs research at Northwind.",
       actions: [],
+      vault: [],
       handoff: false,
     });
   });
@@ -102,18 +113,25 @@ describe("a reply, split into what is said and what is proposed", () => {
         { type: "tag", tags: ["person"] },
         { type: "file", area: "people", create: false },
       ],
+      vault: [],
       handoff: false,
     });
     expect(splitLibrarianReply('{"actions":[{"type":"tag","tags":["a"]}]}', context)).toEqual({
       prose: "",
       actions: [{ type: "tag", tags: ["a"] }],
+      vault: [],
       handoff: false,
     });
   });
 
   test("actions outside the grammar are dropped, never guessed at", () => {
     const reply = 'Done.\n{"actions":[{"type":"rewrite","text":"x"},{"type":"file","area":"nowhere"}]}';
-    expect(splitLibrarianReply(reply, context)).toEqual({ prose: "Done.", actions: [], handoff: false });
+    expect(splitLibrarianReply(reply, context)).toEqual({
+      prose: "Done.",
+      actions: [],
+      vault: [],
+      handoff: false,
+    });
   });
 
   test("a person is filed into a People group the rules name, created when missing", () => {
@@ -126,11 +144,33 @@ describe("a reply, split into what is said and what is proposed", () => {
     ).toEqual([]);
   });
 
+  test("a statement about people comes back as vault actions, checked against the rules", () => {
+    const reply =
+      'Adding Ana to Work; Maya already has a note.\n{"actions":[{"type":"person","name":"Ana","group":"Work"},{"type":"person","name":"Maya Chen","group":"Family"}],"handoff":"chat"}';
+    const split = splitLibrarianReply(reply, { ...context, rules: CTX.rules, known: CTX.known });
+    expect(split.vault).toEqual([
+      { type: "person", name: "Ana", area: null, about: "", tags: [] },
+      {
+        type: "update",
+        noteId: "01MAYA",
+        name: "Maya Chen",
+        from: "people/friends",
+        area: "People/Family",
+        tags: [],
+      },
+    ]);
+    // keeping the vault is the Librarian's job, never one for Chat
+    expect(split.handoff).toBe(false);
+    // without the rules, a reply carries no vault actions
+    expect(splitLibrarianReply(reply, context).vault).toEqual([]);
+  });
+
   test("a request that isn't about organizing comes back flagged for Chat", () => {
     const reply = 'That belongs in Chat; I only organize this note.\n{"actions":[],"handoff":"chat"}';
     expect(splitLibrarianReply(reply, context)).toEqual({
       prose: "That belongs in Chat; I only organize this note.",
       actions: [],
+      vault: [],
       handoff: true,
     });
     // a reply that proposes changes is organizing, whatever else it says

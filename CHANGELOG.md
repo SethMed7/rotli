@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Tell the Librarian how things are.** In `/librarian`, say something like
+  "Ana and Leo are work people; so was Sam, but not anymore". The Librarian
+  adds a filing rule, makes a note for each person you haven't written about
+  yet (their name and what you said, filed in People › Work), and asks you
+  before changing anyone who already has a note, with Yes and No, and then
+  only their tags and folder, never their words. Every new note shows in
+  Librarian Activity with Undo. Mac app.
+- **A badge when the Librarian asks.** Whenever the Librarian has a question
+  for you, its button in the sidebar shows how many; click it to go back to
+  the conversation.
 - **Your rules for the Librarian.** Settings → Librarian → Your rules tells the
   Librarian how you want things kept, in plain settings:
   - **Secure keywords**: a note whose title or file name has one of these words
@@ -106,6 +116,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   never turned into a prompt, and the window says why.
 
 ### Fixed
+
+- **`/librarian` is ready to type in.** Choosing `/librarian` puts the cursor
+  in its box right away, so you can start typing without clicking it first.
 
 - **Bold over a selection that spans lines.** Selecting a whole line and
   pressing Bold used to leave it plain and put `****` in front of the next

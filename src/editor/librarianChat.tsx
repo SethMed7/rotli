@@ -19,11 +19,14 @@ import {
   closeLibrarianChat,
   type LibrarianChat as Chat,
   updateLibrarianChat,
+  updateLibrarianTurn,
   useLibrarianBar,
 } from "../state/librarianBar";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { editorFor } from "./commands";
+import { answerAsk } from "./librarianKeep";
+import { KeptCards } from "./librarianKeepCards";
 import {
   applyProposal,
   clip,
@@ -37,6 +40,7 @@ import {
   tauriHostFor,
   useLibrarianModels,
   usePassage,
+  usePeopleNotes,
 } from "./librarianSession";
 
 /** Quick asks that keep the Librarian to its job. */
@@ -69,6 +73,7 @@ export function ChatPanel({
   const formatBar = useUiStore((s) => s.formatBarVisible);
   const folders = useFolders();
   const { groups, models } = useLibrarianModels();
+  const known = usePeopleNotes();
   const model = models.find((m) => m.id === chat.modelId) ?? null;
   const passage = usePassage(paneId, !chat.minimized && !barHere);
   const [draft, setDraft] = useState("");
@@ -110,7 +115,7 @@ export function ChatPanel({
       chat.id,
       { text, highlight: passage.anchor() },
       model,
-      () => librarianContext(noteId, paneId, areas),
+      () => librarianContext(noteId, paneId, areas, known),
       hostFor,
     );
   };
@@ -126,10 +131,7 @@ export function ChatPanel({
   const toChat = (asked: ChatTurn | null, from?: string) => {
     const message = asked?.role === "user" ? { text: asked.text, highlight: asked.highlight } : null;
     void takeToChat(noteId, message).then((opened) => {
-      if (opened && from)
-        updateLibrarianChat(chat.id, (now) => ({
-          turns: now.turns.map((t) => (t.id === from ? { ...t, handedOff: true } : t)),
-        }));
+      if (opened && from) updateLibrarianTurn(chat.id, from, () => ({ handedOff: true }));
     });
   };
 
@@ -178,19 +180,12 @@ export function ChatPanel({
             turn={turn}
             onTakeToChat={() => toChat(askedBefore(index), turn.id)}
             onPick={(picked) =>
-              updateLibrarianChat(chat.id, (now) => ({
-                turns: now.turns.map((t) =>
-                  t.id === turn.id ? { ...t, proposal: { kind: "open", picked } } : t,
-                ),
-              }))
+              updateLibrarianTurn(chat.id, turn.id, () => ({ proposal: { kind: "open", picked } }))
             }
             onDismiss={() =>
-              updateLibrarianChat(chat.id, (now) => ({
-                turns: now.turns.map((t) =>
-                  t.id === turn.id ? { ...t, proposal: { kind: "dismissed" } } : t,
-                ),
-              }))
+              updateLibrarianTurn(chat.id, turn.id, () => ({ proposal: { kind: "dismissed" } }))
             }
+            onAnswer={(index, yes) => void answerAsk(chat.id, turn.id, index, yes, apply && { apply })}
             onApply={(actions) =>
               void applyProposal(
                 chat.id,
@@ -252,7 +247,9 @@ export function ChatPanel({
             ref={box}
             className="libbar-input libchat-input"
             aria-label="Message the Librarian"
-            placeholder={model ? "Tag, mark or file this note…" : "Connect a model in Settings"}
+            placeholder={
+              model ? "Tag or file this note, or tell me about people…" : "Connect a model in Settings"
+            }
             rows={Math.min(5, Math.max(1, draft.split("\n").length))}
             value={draft}
             onChange={(event) => setDraft(event.currentTarget.value)}
@@ -282,12 +279,14 @@ function Turn({
   onPick,
   onDismiss,
   onApply,
+  onAnswer,
 }: {
   turn: ChatTurn;
   onTakeToChat: () => void;
   onPick: (picked: boolean[]) => void;
   onDismiss: () => void;
   onApply: (actions: LibrarianAction[]) => void;
+  onAnswer: (index: number, yes: boolean) => void;
 }) {
   if (turn.role === "user")
     return (
@@ -360,6 +359,7 @@ function Turn({
           )}
         </div>
       )}
+      <KeptCards turn={turn} onAnswer={onAnswer} />
     </li>
   );
 }

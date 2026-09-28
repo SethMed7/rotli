@@ -100,6 +100,19 @@ function cleanTag(tag: string): string {
   return tag.replace(/[,[\]]/g, "").trim();
 }
 
+/** A model's tag list, cleaned: strings only, no commas or brackets, no
+ * duplicates, none too long. */
+export function cleanTags(list: unknown): string[] {
+  const seen = new Set<string>();
+  return (Array.isArray(list) ? list : []).flatMap((tag): string[] => {
+    if (typeof tag !== "string") return [];
+    const clean = cleanTag(tag);
+    if (!clean || clean.length > TAG_MAX || seen.has(clean.toLowerCase())) return [];
+    seen.add(clean.toLowerCase());
+    return [clean];
+  });
+}
+
 /** The tags in a `tags` field value (`[a, b]`, or a bare list). */
 export function parseTags(value: string): string[] {
   const inner = value.trim().replace(/^\[/, "").replace(/\]$/, "");
@@ -181,15 +194,8 @@ export function parseLibrarianReply(
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
     const action = item as Record<string, unknown>;
-    if (action.type === "tag" && Array.isArray(action.tags)) {
-      const seen = new Set<string>();
-      const tags = action.tags.flatMap((tag): string[] => {
-        if (typeof tag !== "string") return [];
-        const clean = cleanTag(tag);
-        if (!clean || clean.length > TAG_MAX || seen.has(clean.toLowerCase())) return [];
-        seen.add(clean.toLowerCase());
-        return [clean];
-      });
+    if (action.type === "tag") {
+      const tags = cleanTags(action.tags);
       if (tags.length > 0) actions.push({ type: "tag", tags });
     } else if (action.type === "mark" && typeof action.exact === "string" && action.exact.trim()) {
       const label = typeof action.label === "string" ? action.label : undefined;

@@ -78,9 +78,10 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
 - **The Librarian writes people notes and folder indexes** · L — by default the
   Librarian may write in the people section (never a locked note) and keeps an
   `index.md` table of contents in each folder. Today it only fills metadata and
-  a generated index for each top-level area. This changes the Librarian's
-  contract, which says it only touches metadata and location, so the contract
-  is decided first. Your own notes stay yours: it still never rewrites a note
+  a generated index for each top-level area, and (2026-09-28) new people notes
+  when you tell it about someone in `/librarian`. Writing into existing people
+  notes changes the Librarian's contract, which says it only touches metadata
+  and location, so the contract is decided first. Your own notes stay yours: it still never rewrites a note
   you wrote unless you ask.
 - **Links that survive a rename** · M — a `[[link]]` keeps pointing at the same
   note when that note's title or file name changes, without you retitling

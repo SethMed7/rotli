@@ -491,6 +491,16 @@ The Rust corpus boundary independently validates every write.
   group's folder is made when its first note is filed. The contract version
   does not move: an older Rotli refuses to file a nested area rather than
   misfiling it.
+- The Librarian may create a note about a person (2026-09-28, the owner's
+  Round Three rule: it "can create a new note and fill it in"), only when the
+  person tells it about someone through `/librarian` and the vault has no
+  People note with that title. The note is an ordinary Library note written to
+  the intake: `# Name` and one sentence of what was said, then tagged and filed
+  into their People group like any other filing. Its brain-journal row has
+  `"action":"create"` (`before` "", `after` the path it was written to), and
+  Undo moves it to the Trash. A person who already has a note is never changed
+  without the person's yes, and then only in its tags and where it is filed;
+  its words are never edited.
 - Unknown frontmatter is preserved byte-for-byte. Reserved provenance cannot be
   forged through the raw metadata editor.
 - Boards and binary files never receive Markdown frontmatter.

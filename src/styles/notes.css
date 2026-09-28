@@ -463,6 +463,15 @@
   color: var(--accent-text);
   font-weight: 600;
 }
+/* the Librarian is asking (2026-09-28): a question in its conversation waits
+   for an answer — solid, so it reads as "your turn", not as a queue */
+.count.ask {
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
 /* per-section "+" pair (new note · new folder): ALWAYS visible on folder rows
    (the maintainer, 2026-07-25, from the Zen reference: "the icons are always there, not
    only on hover — it's just cleaner"). Whisper-quiet at rest (calm pass,

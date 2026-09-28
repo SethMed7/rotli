@@ -31,10 +31,10 @@ selects and scrolls to the passage in the editor (the same selection path Find
 uses). A pointer whose words are gone says so instead of guessing.
 
 Slice 2, part one (built 2026-09-28, see "The conversation" below): after the
-first ask the bar pops out into a multi-turn chat in the pane's corner. Still
-to come: new notes from a highlight (people notes, a People folder created
-when missing unless a rule says otherwise), and "Open in Chat" to continue full
-size.
+first ask the bar pops out into a multi-turn chat in the pane's corner. Part
+two (built 2026-09-28, see "Statements: keeping the vault" below): the person
+can tell the Librarian how things are, and it keeps the rules and People
+notes to match. Still to come: new notes from a highlight.
 
 ## Who may use it — checked before any model call
 
@@ -101,6 +101,7 @@ conversation (`HISTORY_TURNS`), so the context stays bounded; there is no
   The chat's rules carry those People areas and the person's filing sentences.
 - Unknown `type`s, unknown fields, and actions missing a required field are
   dropped silently. At most one `file` action counts (the first).
+- The vault actions (`person`, `rule`, `group`) are the next section's.
 
 ## Contract change: `anchors`
 
@@ -164,6 +165,68 @@ Escape or − tucks the chat into a button in the same corner; × ends the
 conversation. The conversation lives in memory for the app session and is
 never written to the vault.
 
+## Statements: keeping the vault
+
+The owner, 2026-09-28: "/librarian Whenever I mention Kunal or Dhaval those
+are work people, they both work for MSD, so did Madhav, Jim, Vaishnavi and
+Rohini but they no longer work with us — this should update the rules, add any
+missing people, and for the people it has, if it needs to make changes it
+should ask me." So a reply may also carry vault actions
+(`src/lib/librarianPeople.ts`, parsed from the same JSON object):
+
+```json
+{ "actions": [
+  { "type": "person", "name": "Ana", "group": "Work", "about": "Works at Northwind.", "tags": ["northwind"] },
+  { "type": "rule",   "text": "Notes about Ana or Leo go to People/Work" },
+  { "type": "group",  "name": "Neighbors" }
+] }
+```
+
+Each turn's rules list the People groups and the People notes the vault
+already has (titles and where they're filed, newest 200, never a secure note).
+The parser checks every action against them:
+
+- `group`: a valid group name (the rules' own check) not already listed, in
+  the groups mode only, within the 20-group limit. Groups are read first, so a
+  person can be filed into a group added in the same reply.
+- `rule`: a sentence up to 200 characters, not already a rule, within the
+  20-rule limit.
+- `person`: a plain name (no `/`, up to 80 characters, once per reply, 20 at
+  most). Their area is `People/<group>` for a listed group (any case), `People`
+  in the one-list mode, or none for an unknown group (the note stays in the
+  intake for the organizer). `about` is cut at 280 characters; tags are
+  cleaned like `tag`'s.
+- A `person` whose name is the title of a People note already there (any
+  case) becomes an **update** of that note instead: its new group (when it
+  differs) and tags. An update with nothing to change is dropped.
+
+What happens to them differs on purpose, as the owner asked:
+
+- **Additions happen when the reply lands** (`src/editor/librarianKeep.ts`,
+  `src/services/librarianPeople.ts`): new groups and rules join the Librarian
+  rules and are saved (`flushSettingsNow`) before anything is filed, because
+  Rust reads the same settings; then each new person gets a note (`# Name` and
+  the `about` sentence) written to the intake, journaled as a `create` row, and
+  tagged and filed through `applyLibrarian`. The reply lists what was added,
+  with a link to Librarian Activity, where each note's Undo moves it to the
+  Trash. One person failing (a secure keyword in their name, say) is reported
+  on its line and doesn't stop the rest.
+- **Changes to someone who has a note wait for a yes.** Each update is a
+  question under the reply, with Yes and No. Yes applies its tags and filing
+  through `applyLibrarian` (journaled, undoable); No leaves the note as it is.
+  The note's words are never edited, so "no longer works with us" reaches a
+  new person's note but not an existing one.
+- The open note is untouched by a statement about other people; its own tag,
+  mark and file proposals still wait for Apply.
+
+**The badge.** The sidebar's Librarian button counts the Librarian's open
+questions (`librarianQuestions`): proposals and people questions not yet
+answered, and a reply that ends with a question the person hasn't answered.
+It shows in the accent color, after the red sensitive-data badge and before
+the pending-proposals count. With questions open, the button brings the
+conversation back (its note in its pane, the chat open) instead of opening
+Activity.
+
 ## Order of operations
 
 1. Gate (web, off, locked, secure, not in the Library) before any prompt.
@@ -216,6 +279,11 @@ component and driver tests with a fake model):
 - The model picker's search finds a model, Escape in its search closes only
   the list, and a picked model answers the next message.
 - Escape (or −) tucks the chat into its corner button; × ends it.
+- `/librarian` then Enter puts the cursor in the bar's input straight away.
+- A statement ("Ana and Leo are work people…") adds the rule, the missing
+  people (each in Librarian Activity with Undo to the Trash), and asks Yes or
+  No about anyone who already has a note; the sidebar's Librarian button shows
+  the open questions and brings the chat back when clicked.
 - An on-device model: the chat asks for prose plus a trailing JSON object,
   without the `formatJson` coercion the one-shot bar used, so a small local
   model may drop the object and read as "nothing to apply". Worth checking with

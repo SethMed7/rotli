@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { DEFAULT_LIBRARIAN_RULES } from "../lib/librarianRules";
 import type { FrontmatterView } from "../lib/tauri";
 import {
   applyLibrarian,
@@ -97,6 +98,8 @@ describe("asking", () => {
     tags: [],
     people: ["People"],
     filing: [],
+    rules: structuredClone(DEFAULT_LIBRARIAN_RULES),
+    known: [],
   };
   const first = [{ role: "user" as const, text: "tag this", highlight: null }];
 
@@ -130,6 +133,7 @@ describe("asking", () => {
       kind: "reply",
       prose: "Tagging it as a person.",
       actions: [{ type: "tag", tags: ["person"] }],
+      vault: [],
       handoff: false,
       raw: 'Tagging it as a person.\n{"actions":[{"type":"tag","tags":["person"]}]}',
     });

@@ -100,6 +100,7 @@ function groupPending(pending: BrainAction[]): PendingGroup[] {
 function fieldWord(a: BrainAction): string {
   if (a.action === "file") return "file it";
   if (a.action === "index") return "area overview";
+  if (a.action === "create") return "new note";
   return a.field === "suggested_area" ? "area" : (a.field ?? "field");
 }
 
@@ -903,6 +904,10 @@ export function ActivitySurface() {
                           ) : a.action === "index" ? (
                             <div className="act-diff-move">
                               the area&rsquo;s overview page was regenerated from its members
+                            </div>
+                          ) : a.action === "create" ? (
+                            <div className="act-diff-move">
+                              written to <code>{a.after || "?"}</code>; Undo moves it to the Trash
                             </div>
                           ) : (
                             <div className="act-diff-move">a one-time repair</div>

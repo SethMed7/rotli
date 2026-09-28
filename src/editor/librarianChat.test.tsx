@@ -26,6 +26,41 @@ const base: Chat = {
 };
 
 describe("the Librarian chat", () => {
+  test("what a statement kept shows under the reply, and a question about someone known asks Yes or No", () => {
+    const markup = render({
+      ...base,
+      turns: [
+        {
+          id: "t1",
+          role: "librarian",
+          text: "Added Ana. Sam already has a note.",
+          raw: "",
+          actions: [],
+          vault: [
+            { type: "person", name: "Ana", area: "People/Work", about: "", tags: [] },
+            {
+              type: "update",
+              noteId: "01SAM",
+              name: "Sam",
+              from: "people/friends",
+              area: "People/Work",
+              tags: [],
+            },
+          ],
+          kept: { kind: "kept", lines: [{ text: "Added Ana to People/Work", noteId: "01ANA" }] },
+          asks: [{ kind: "open" }],
+        },
+      ],
+    });
+    expect(markup).toContain("<li>Added Ana to People/Work</li>");
+    expect(markup).toContain("See or undo in Librarian Activity");
+    expect(markup).toContain(
+      "Sam already has a note in people/friends. Move it from people/friends to People/Work?",
+    );
+    expect(markup).toContain(">No</button>");
+    expect(markup).toContain(">Yes</button>");
+  });
+
   test("only the pane showing the conversation's note shows it", () => {
     expect(chatShownIn(base, "p1", "n1")).toBe(true);
     expect(chatShownIn(base, "p2", "n1")).toBe(false);
