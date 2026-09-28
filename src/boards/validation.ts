@@ -23,13 +23,15 @@ function assertObject(value: unknown, message: string): asserts value is Record<
 }
 
 /** Where a value sits: an embedded file's `dataURL` is image bytes as a
- * `data:` URL, the one string allowed past the per-string cap (a 75 KB image
+ * `data:image/` URL, the one string allowed past the per-string cap (a 75 KB image
  * outgrew it). The whole-board byte limit still bounds it. Rust twin:
  * board.rs `Place`. */
 type Place = "root" | "files" | "file" | "other";
 
 function isFileDataUrl(place: Place, key: string, child: unknown): boolean {
-  return place === "file" && key === "dataURL" && typeof child === "string" && child.startsWith("data:");
+  return (
+    place === "file" && key === "dataURL" && typeof child === "string" && child.startsWith("data:image/")
+  );
 }
 
 function validateValue(

@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an image or a video in your vault on a line of its own, the chat shows the
   picture, or a video you can play, instead of the link's text. Only files in
   your vault are shown; an image at a web address is never loaded. On Rotli
-  Web a video keeps its name; the Mac app plays it.
+  Web a video shows its name instead of a player.
 - **A video a chat made shows as a video** in the chat's list of files, with
   its own mark and "Video · MP4", instead of as an unnamed file.
 - **Hand to AI.** Choose "Hand to AI…" from the palette or a note's menu and

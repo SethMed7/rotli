@@ -65,8 +65,12 @@ describe("parseBoardBody", () => {
     expect(() => parseBoardBody(JSON.stringify({ ...EMPTY_SCENE, files }))).not.toThrow();
   });
 
-  test("only a file's data: URL is exempt from the string cap", () => {
+  test("only a file's data:image/ URL is exempt from the string cap", () => {
     const long = "x".repeat(100_001);
+    const page = { img1: { id: "img1", mimeType: "image/png", dataURL: `data:text/html,${long}` } };
+    expect(() => parseBoardBody(JSON.stringify({ ...EMPTY_SCENE, files: page }))).toThrow(
+      "string that is too long",
+    );
     const notData = { img1: { id: "img1", mimeType: "image/png", dataURL: long } };
     expect(() => parseBoardBody(JSON.stringify({ ...EMPTY_SCENE, files: notData }))).toThrow(
       "string that is too long",

@@ -25,7 +25,8 @@ Two layers:
 2. **Rotli's own tool loop runs on top, for every lane.** Each step is one
    tool-less CLI call; the model answers in a JSON protocol and Rotli runs the
    tool (`src/ai/loop.ts`, `src/ai/tools.ts`, `src/ai/host.ts`). Steps are
-   synchronous, 180 s by default (600 s cap).
+   synchronous, 180 s by default (600 s cap; `DEFAULT_TIMEOUT_MS` and
+   `MAX_TIMEOUT_MS` in `src-tauri/src/provider.rs`).
 
 ## What Chat can do today
 
@@ -51,7 +52,8 @@ Two layers:
 Video playback already exists in the file viewer, the preview window, and note
 embeds (an image-style link to a `storage:` video), and the content policy
 allows it. AGENTS.md
-names video as a preview-only surface, so showing it inline breaks no law.
+already treats video as a preview-only surface, so showing it inline breaks
+no AGENTS.md rule.
 
 ## The path to "make a video and watch it here"
 
