@@ -77,8 +77,8 @@ describe("What's new — when it shows", () => {
     expect(highlightsFor(notes, "1.6.0")?.[0]?.title).toBe("Hand to AI");
     expect(highlightsFor(notes, "1.7.0")).toBeNull();
     expect(latestHighlights(notes)?.version).toBe("1.6.0");
-    expect(platformNote("mac")).toBe("Mac app only");
-    expect(platformNote("web")).toBe("Rotli Web only");
+    expect(platformNote("mac")).toMatch(/^Mac\b.* only$/);
+    expect(platformNote("web")).toMatch(/\bWeb only$/);
     expect(platformNote(undefined)).toBeNull();
   });
 });

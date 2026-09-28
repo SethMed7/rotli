@@ -88,7 +88,7 @@ import { flushSettingsNow, runAutoRetentionMaintenance } from "./state/persist";
 import { applyQuickState } from "./state/quick";
 import { useAppearanceSync } from "./state/appearanceSync";
 import { applyAccent, applySyntaxPalette, applyTheme } from "./state/theme";
-import { startTour } from "./state/tour";
+import { useOnboardingThanks } from "./state/onboardingThanks";
 import { useUiStore } from "./state/ui";
 import { useVaultStore } from "./state/vault";
 import { hydrateViews } from "./state/views";
@@ -470,7 +470,7 @@ function MainShell() {
             onDone={() => {
               setOnboarded(true);
               openSeededWelcome();
-              startTour();
+              useOnboardingThanks.getState().show(); // the thank-you card, then the tour
               setOnboardingVersion(APP_VERSION);
               setOnboardingPhase("preferences");
               const ui = useUiStore.getState();

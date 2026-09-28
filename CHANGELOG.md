@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A thank-you at the end of setup.** Before the guided tour, a small card
+  thanks you and shows a banner made from your choices: your quokka (its
+  color and what it's wearing) on your theme, with your name if you gave one.
+  Star Rotli on GitHub, copy an invite for a friend, share on X, or keep the
+  banner (the Mac app saves it to your vault's Assets; a browser downloads
+  it). Share on X opens a post with a standard caption and a link to
+  rotli.co and puts your banner on the clipboard to paste in; nothing about
+  you goes into the link. Closing the card starts the tour.
 - **What's new, after an update.** The first launch after an update opens a
   small card with the release's top changes — once, and never on a fresh
   install. A change that is only in the Mac app or only on Rotli Web says so.

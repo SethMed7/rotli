@@ -25,6 +25,7 @@ import { Sidebar } from "./sidebar";
 import { SidebarHoverRail } from "./sidebar/sidebarHoverRail";
 import { SystemSurface } from "./systemSurface";
 import { TasksSurface } from "./tasksSurface";
+import { ThanksDialog } from "./thanksDialog";
 import { WhatsNewDialog } from "./whatsNewDialog";
 
 // Breve is a whole product surface most note sessions never enter — split it
@@ -159,6 +160,7 @@ export function NotesSurface() {
       )}
       <HandToAiDialog />
       <WhatsNewDialog />
+      <ThanksDialog />
       {/* collapsed → no warm-edge sliver (the maintainer, 2026-06-15: it was an unclear,
           disliked line). The titlebar's always-visible sidebar toggle is the
           clear reopen now. */}
