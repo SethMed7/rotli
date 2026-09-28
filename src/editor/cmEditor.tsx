@@ -36,7 +36,6 @@ import {
   applyBlockToggleAll,
   applyHeading,
   registerEditor,
-  toggleInlineMark,
   unregisterEditor,
 } from "./commands";
 import { copyHandlers } from "./copyHandlers";
@@ -51,6 +50,7 @@ import { ImageGenPopover } from "./imageGenPopover";
 import { linkOpener } from "./linkOpener";
 import { listNumbering } from "./listNumbers";
 import { livePreview, noteIdFacet } from "./livePreview";
+import { markSelectionSpec } from "./markSelection";
 import { ensureDocument, getDocumentText, onDocumentChange, setDocumentText } from "./model";
 import { rawMarkdown } from "./rawMarkdown";
 import { pickerFence, slashInsertion } from "./slashActions";
@@ -307,16 +307,8 @@ function CmEditorImpl({
     toggleMark: (mark) => {
       const view = viewRef.current;
       if (!view) return;
-      const r = view.state.selection.main;
-      const line = view.state.doc.lineAt(r.head);
-      const from = Math.max(r.from, line.from);
-      const to = Math.min(r.to, line.to);
-      const res = toggleInlineMark(line.text, from - line.from, to - line.from, mark);
-      view.dispatch({
-        changes: { from: line.from, to: line.to, insert: res.line },
-        selection: EditorSelection.range(line.from + res.selStart, line.from + res.selEnd),
-        scrollIntoView: true,
-      });
+      const spec = markSelectionSpec(view.state, mark);
+      if (spec) view.dispatch({ ...spec, scrollIntoView: true });
       view.focus();
     },
     setHeading: (level) => {

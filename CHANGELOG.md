@@ -56,6 +56,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Bold over a selection that spans lines.** Selecting a whole line and
+  pressing Bold used to leave it plain and put `****` in front of the next
+  line, breaking its bullet. Bold, italic, and the other marks now format each
+  selected line's text and leave list, task, heading, and quote markers alone;
+  if every selected line is already bold, Bold takes it off all of them.
 - **A file dropped from Finder onto an open board no longer lands in another
   note.** Boards don't take dropped files yet, so the file is saved to Assets
   and a notice says so. Mac app.

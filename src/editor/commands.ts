@@ -272,3 +272,53 @@ export function applyBlockToggleAll(lines: string[], kind: BlockToggle): (string
     return applyBlockToggle(t, kind).line;
   });
 }
+
+// ——— inline marks over a selection that spans lines ———
+
+/** Where a line's text starts: after its indent and any heading or block
+ * marker, so a mark never lands in front of `- ` or `# ` and breaks it. */
+export function lineContentStart(line: string): number {
+  const indent = /^\s*/.exec(line)?.[0].length ?? 0;
+  const rest = line.slice(indent);
+  const heading = ANY_HEADING_RE.exec(rest)?.[0].length ?? 0;
+  return indent + (heading || (ANY_BLOCK_PREFIX.exec(rest)?.[0].length ?? 0));
+}
+
+/** The selected part of one line, as columns into `text`. */
+export interface LineSpan {
+  text: string;
+  start: number;
+  end: number;
+}
+
+export interface LineMarkEdit extends LineEdit {
+  /** Which span (index into the input) this edit replaces. */
+  index: number;
+}
+
+/** A non-empty selection's mark, line by line (a reader's report, 2026-09-28:
+ * selecting a line and pressing ⌘B inserted `****` before the next line's
+ * `- `, because the old command only saw the empty tail on the next line).
+ * Each line's selected text — trimmed, and never its marker — is one span;
+ * spans with no text are skipped. If every span already carries the mark it
+ * comes off all of them; otherwise the unmarked ones gain it. A link takes
+ * only the first span. Returns nothing when there is no text to mark. */
+export function toggleInlineMarkLines(spans: readonly LineSpan[], mark: InlineMark): LineMarkEdit[] {
+  const targets = spans.flatMap((span, index) => {
+    let a = Math.max(span.start, lineContentStart(span.text));
+    let b = span.end;
+    while (a < b && /\s/.test(span.text[a] ?? "")) a++;
+    while (b > a && /\s/.test(span.text[b - 1] ?? "")) b--;
+    return a < b ? [{ index, text: span.text, a, b }] : [];
+  });
+  if (mark === "link") targets.splice(1);
+  const edits = targets.map((t) => {
+    const edit = toggleInlineMark(t.text, t.a, t.b, mark);
+    // unwrapping is the only toggle that shortens a line
+    return { index: t.index, ...edit, unwraps: edit.line.length < t.text.length };
+  });
+  const allOn = edits.every((edit) => edit.unwraps);
+  return edits
+    .filter((edit) => allOn || !edit.unwraps)
+    .map(({ index, line, selStart, selEnd }) => ({ index, line, selStart, selEnd }));
+}
