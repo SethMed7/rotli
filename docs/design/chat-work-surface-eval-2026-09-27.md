@@ -25,7 +25,8 @@ Two layers:
 2. **Rotli's own tool loop runs on top, for every lane.** Each step is one
    tool-less CLI call; the model answers in a JSON protocol and Rotli runs the
    tool (`src/ai/loop.ts`, `src/ai/tools.ts`, `src/ai/host.ts`). Steps are
-   synchronous, 180 s by default (600 s cap).
+   synchronous, 180 s by default (600 s cap; `DEFAULT_TIMEOUT_MS` and
+   `MAX_TIMEOUT_MS` in `src-tauri/src/provider.rs`).
 
 ## What Chat can do today
 
@@ -51,7 +52,8 @@ Two layers:
 Video playback already exists in the file viewer, the preview window, and note
 embeds (an image-style link to a `storage:` video), and the content policy
 allows it. AGENTS.md
-names video as a preview-only surface, so showing it inline breaks no law.
+already treats video as a preview-only surface, so showing it inline breaks
+no AGENTS.md rule.
 
 ## The path to "make a video and watch it here"
 
@@ -65,10 +67,10 @@ names video as a preview-only surface, so showing it inline breaks no law.
 | 6. A general MCP client, so a video MCP server can be used | L | Probably through Add-ons; every MCP tool is off-device and must pass the same gates |
 | Letting the CLIs use their own tools and MCP | XL | Not recommended: it reverses the security posture that keeps secure notes and secrets inside Rotli |
 
-**Recommendation:** do 1 and 2 first (small, no policy change, and useful now:
-a model that writes a chart image or a clip into the chat folder becomes
-visible). Then decide the provider question (5) together with the Add-ons
-system, and build 3–4 on top of it. Keep the CLIs tool-less.
+**Recommendation:** step 1 is built and useful now: a model that writes a
+chart image or a clip into the chat folder becomes visible. Step 2 waits for
+the video tool. Next, decide the provider question (5) together with the
+Add-ons system, then build 2–4 on top of it. Keep the CLIs tool-less.
 
 ## Owner decisions
 

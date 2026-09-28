@@ -20,14 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   squeezed.
 - **Boards match your theme.** A board you haven't colored yourself is your
   theme's own color, in all fourteen environments, and changes the moment you
-  change themes. A color you pick on a board stays that board's. Settings →
-  Appearance → Board background → White keeps boards light, like paper,
-  instead. Only a color you chose is saved into the board file.
+  change themes. A color you pick on a board stays that board's (plain white
+  counts as no color). Settings → Appearance → Board background → White keeps
+  boards and their tools light, like paper, instead. Only a color you chose is
+  saved into the board file. A board inside a note matches too.
 - **Chat replies show images and video from your vault.** When a reply links
   an image or a video in your vault on a line of its own, the chat shows the
   picture, or a video you can play, instead of the link's text. Only files in
   your vault are shown; an image at a web address is never loaded. On Rotli
-  Web a video keeps its name; the Mac app plays it.
+  Web a video shows its name instead of a player.
 - **A video a chat made shows as a video** in the chat's list of files, with
   its own mark and "Video · MP4", instead of as an unnamed file.
 - **Hand to AI.** Choose "Hand to AI…" from the palette or a note's menu and

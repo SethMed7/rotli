@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
-import { boardCanvasLook, durableBoardBackground, isUnchosenBoardBackground } from "./boardBackground";
+import {
+  boardCanvasLook,
+  boardRepaint,
+  durableBoardBackground,
+  isUnchosenBoardBackground,
+} from "./boardBackground";
 
 // 2026-09-27: a board's canvas follows the Rotli theme unless the person chose
 // its background; Settings can instead keep every unchosen board white.
@@ -33,5 +38,13 @@ describe("board background", () => {
     expect(durableBoardBackground("transparent")).toBeUndefined();
     expect(durableBoardBackground("#ffffff")).toBeUndefined();
     expect(durableBoardBackground("#f5e6c8")).toBe("#f5e6c8");
+  });
+
+  test("an open board repaints only while its color is unchosen", () => {
+    expect(boardRepaint("transparent", "#ffffff")).toBe("#ffffff"); // Match → White
+    expect(boardRepaint("#ffffff", "transparent")).toBe("transparent"); // White → Match
+    expect(boardRepaint("#ffc9c9", "transparent")).toBeNull(); // picked in the canvas: theirs
+    expect(boardRepaint("transparent", "transparent")).toBeNull();
+    expect(boardRepaint(undefined, "#ffffff")).toBeNull(); // no canvas yet
   });
 });

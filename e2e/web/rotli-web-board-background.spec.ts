@@ -102,18 +102,40 @@ test("Board background → White keeps an uncolored board white and light, even 
 });
 
 // 2026-09-28: the selected tool and active controls were still Excalidraw's
-// own violet; they take Rotli's accent in every mode.
+// own violet; each of Excalidraw's accent variables resolves to Rotli's
+// accent mix, in light and in dark.
+const ACCENT_MAP: Record<string, string> = {
+  "--color-surface-primary-container": "color-mix(in srgb, var(--accent) 22%, var(--surface))",
+  "--color-on-primary-container": "var(--text)",
+  "--color-brand-hover": "color-mix(in srgb, var(--accent) 88%, var(--ground))",
+  "--color-brand-active": "color-mix(in srgb, var(--accent) 80%, var(--text))",
+};
+
+/** Each Excalidraw variable and Rotli's expected value, both resolved to rgb. */
+function accentVars(page: Page) {
+  return page.evaluate((map) => {
+    const root = document.querySelector(".canvas-surface .excalidraw") as HTMLElement;
+    const resolve = (value: string) => {
+      const probe = document.createElement("span");
+      probe.style.color = value;
+      root.append(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    };
+    return Object.entries(map).map(([name, expected]) => ({
+      name,
+      actual: resolve(`var(${name})`),
+      expected: resolve(expected),
+    }));
+  }, ACCENT_MAP);
+}
+
 test("a board's selected tool uses Rotli's accent, not Excalidraw's violet", async ({ page }) => {
   await startWithVault(page);
   await newBoard(page, "Accent board");
-  const vendorViolet = ["#e0dfff", "#403e6a", "#030064", "#e0dfff"];
-  const selectedTool = () =>
-    page.evaluate(() => {
-      const root = document.querySelector(".canvas-surface .excalidraw") as HTMLElement;
-      return getComputedStyle(root).getPropertyValue("--color-surface-primary-container").trim();
-    });
-  expect(vendorViolet).not.toContain(await selectedTool());
+  for (const { name, actual, expected } of await accentVars(page)) expect(actual, name).toBe(expected);
   await darkTheme(page);
   await expect.poll(async () => (await canvasLook(page)).dark).toBe(true);
-  expect(vendorViolet).not.toContain(await selectedTool());
+  for (const { name, actual, expected } of await accentVars(page)) expect(actual, name).toBe(expected);
 });
