@@ -20,8 +20,10 @@ needs the owner's explicit request (AGENTS.md).
    skill). Update the owning contract and `CHANGELOG.md` for user-visible changes.
 3. **Commit by path** with a message that explains why. Never commit `_review/`,
    vault content, local settings, screenshots of real notes, or credentials.
-4. **Open the PR into `dev`** with what changed, how it was proved, and anything
-   unproven (native behavior, scheduler, real delivery).
+4. **Open the PR into `dev`** — or, when the work builds on an unmerged PR,
+   into the tip of that stack (see stack-and-merge-down) — with what changed,
+   how it was proved, and anything unproven (native behavior, scheduler, real
+   delivery).
 5. **Wait for CI on the exact head commit.** A job that fails before running any
    steps is runner allocation, not a test result. A known flake gets one rerun of
    the failed job, reported as such.
@@ -32,15 +34,15 @@ needs the owner's explicit request (AGENTS.md).
 Never push a local branch created before 2026-09-15: those branches carry the
 pre-publication history that was rewritten out of the public repository.
 
-When work builds on an unmerged PR, keep a straight chain and merge it down:
-the stack-and-merge-down skill. A merge also needs every review thread
+A merge also needs every review thread
 resolved (the `dev` ruleset blocks otherwise) — reply on each, then resolve.
 
 ## macOS shell traps
 
 - `sed -i ''` (BSD). A `sed` script that fails still exits the pipe: never
   pipe a transform into `gh pr edit --body-file` without checking it.
-- `head` on this machine is a Perl HTTP tool: use `/usr/bin/head` or `sed -n`.
+- If `which head` is not `/usr/bin/head` (some PATHs put a Perl HTTP tool
+  first), use `/usr/bin/head` or `sed -n`.
 - zsh treats a bare `====` as `=` expansion; quote it.
 - Never pipe a gate into `tail` to decide pass/fail: `tail` hides the exit
   code. Capture the log, then `echo exit=$?`.
