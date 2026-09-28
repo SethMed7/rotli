@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Feedback in the sidebar.** The sidebar's footer gains a Feedback button
+  beside Files, Librarian, and Settings; it opens the same prefilled GitHub
+  issue as Settings → About. When the sidebar is too narrow for the labels, the
+  footer shows its icons alone instead of cutting the names short.
 - **Boards match your theme.** A board you haven't colored yourself is your
   theme's own color, in all fourteen environments, and changes the moment you
   change themes. A color you pick on a board stays that board's. Settings →

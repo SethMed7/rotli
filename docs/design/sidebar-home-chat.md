@@ -31,7 +31,7 @@ Now the sidebar has **one top switcher and one body**:
 │  Library · Assets · Archive  │
 │  · Trash                     │
 ├──────────────────────────────┤
-│  Files · Librarian · Settings│  utility footer (unchanged)
+│  Files · Librarian · Settings · Feedback │  utility footer
 └──────────────────────────────┘
 ```
 
@@ -76,8 +76,10 @@ Now the sidebar has **one top switcher and one body**:
 - **System** (Library · Assets · Archive · Trash, plus any added external
   folders) keeps its pinned bottom zone but its header is now a disclosure:
   one click folds the whole zone away.
-- The utility footer (Files · Librarian · Settings) is unchanged and shows in
+- The utility footer (Files · Librarian · Settings · Feedback, 2026-09-28) shows in
   **both** views — it is app-level, not view-level.
+  Its labels show only when all four fit; a narrower sidebar shows the icons
+  alone (a container query), each still named for screen readers.
 
 ## Why Home owns System, and Chat does not
 

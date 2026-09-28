@@ -1,5 +1,8 @@
 // The utility footer (the maintainer, 2026-07-28, from the Obsidian reference): Files ·
-// Librarian · Settings share one quiet row at the very bottom. It is APP-level,
+// Librarian · Settings · Feedback share one quiet row at the very bottom.
+// Labels show only when all four fit; a narrower sidebar shows the icons alone
+// (a container query in notes.css), never a truncated "Fi…". Each button keeps
+// its name for screen readers either way (2026-09-28). It is APP-level,
 // not front-level, so it shows under Home and Chat alike (the maintainer, 2026-08-01:
 // "the utility footer stays as is").
 //
@@ -72,6 +75,7 @@ export function SidebarFooter() {
       <button
         type="button"
         className="sb-footbtn"
+        aria-label="Files"
         title={
           isTauri() ? "Open the vault folder in Finder" : "Show this file in Finder through the Rotli app"
         }
@@ -83,6 +87,13 @@ export function SidebarFooter() {
       <button
         type="button"
         className="sb-footbtn"
+        aria-label={
+          secureConfirms > 0
+            ? `Librarian — ${secureConfirms} waiting`
+            : pendingProposals > 0
+              ? `Librarian — ${pendingProposals} suggestions`
+              : "Librarian"
+        }
         title={
           organizerWorking
             ? `Organizing${organizerCurrent ? ` — looking at “${organizerCurrent}”` : "…"}`
@@ -112,6 +123,16 @@ export function SidebarFooter() {
         )}
       </button>
       <SettingsFootButton updateAvailable={updateAvailable} />
+      <button
+        type="button"
+        className="sb-footbtn"
+        aria-label="Feedback"
+        title="Send feedback — opens a new issue on GitHub"
+        onClick={() => dispatch("app.feedback")}
+      >
+        <FeedbackGlyph />
+        <span className="fname">Feedback</span>
+      </button>
     </div>
   );
 }
@@ -125,7 +146,7 @@ export function SettingsFootButton({ updateAvailable }: { updateAvailable: boole
       type="button"
       className="sb-footbtn"
       title={updateAvailable ? "Update available — open Settings" : "Settings"}
-      aria-label={updateAvailable ? "Settings — update available" : undefined}
+      aria-label={updateAvailable ? "Settings — update available" : "Settings"}
       data-tour="settings"
       data-hotkey="app.settings"
       onClick={() => dispatch("app.settings")}
@@ -134,5 +155,25 @@ export function SettingsFootButton({ updateAvailable }: { updateAvailable: boole
       <span className="fname">Settings</span>
       {updateAvailable && <span className="sb-update-dot" aria-hidden="true" />}
     </button>
+  );
+}
+
+/** A speech bubble with a small heart: "tell us". */
+function FeedbackGlyph() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 5.5h16v10.5H9.5L5 19.5V16H4z" />
+      <path d="M12 13.2l-2.1-2a1.3 1.3 0 0 1 2.1-1.6 1.3 1.3 0 0 1 2.1 1.6z" />
+    </svg>
   );
 }

@@ -2487,8 +2487,9 @@
 .sb-foot {
   flex: 0 0 auto;
   position: relative;
+  container-type: inline-size;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
   padding: 9px 12px 10px;
   border-top: 0;
@@ -2528,6 +2529,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* a narrower sidebar shows the icons alone, never a truncated "Fi…"
+   (2026-09-28): the four labels need about this much room to read whole */
+@container (max-width: 379px) {
+  .sb-footbtn .fname {
+    display: none;
+  }
 }
 .sb-footbtn .count {
   font-size: 10px;
