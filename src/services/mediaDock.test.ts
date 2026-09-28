@@ -4,7 +4,7 @@ import { isPrivateBrowserTabRetained } from "../lib/privateBrowser";
 import { useMediaDock } from "../state/mediaDock";
 import { usePanesStore } from "../state/panes";
 import { leaves } from "../state/paneTree";
-import { bringBackTab, closeTuckedTab, tuckTab } from "./mediaDock";
+import { bringBackTab, closeOrphanedTuck, closeTuckedTab, tuckTab } from "./mediaDock";
 
 function browserTab(): string | undefined {
   return leaves(usePanesStore.getState().root)
@@ -39,4 +39,28 @@ test("one tab at a time, and closing a tucked tab lets its page go", () => {
   closeTuckedTab();
   expect(useMediaDock.getState().tabId).toBeNull();
   expect(isPrivateBrowserTabRetained(id)).toBe(false);
+});
+
+test("a tab tucked before a reload is closed on the next start; one the player still holds is kept", () => {
+  const stored = new Map<string, string>();
+  const fake = {
+    getItem: (key: string) => stored.get(key) ?? null,
+    setItem: (key: string, value: string) => void stored.set(key, value),
+    removeItem: (key: string) => void stored.delete(key),
+  };
+  const real = Object.getOwnPropertyDescriptor(globalThis, "sessionStorage");
+  Object.defineProperty(globalThis, "sessionStorage", { value: fake, configurable: true });
+  try {
+    const id = browserTab()!;
+    tuckTab(id);
+    expect(stored.get("rotli.tuckedTab")).toBe(id);
+    closeOrphanedTuck(); // a hot reload: the player still holds it
+    expect(stored.get("rotli.tuckedTab")).toBe(id);
+    useMediaDock.setState({ tabId: null }); // a full reload: the player forgot it
+    closeOrphanedTuck();
+    expect(stored.has("rotli.tuckedTab")).toBe(false);
+  } finally {
+    if (real) Object.defineProperty(globalThis, "sessionStorage", real);
+    else delete (globalThis as { sessionStorage?: unknown }).sessionStorage;
+  }
 });

@@ -45,3 +45,26 @@ test("/librarian swaps the format bar for the Librarian bar, and Escape brings i
   await expect(formatBar).toBeVisible();
   await expect(passage).toHaveCount(0);
 });
+
+test("Escape closes the Librarian with the caret back in the note, not only from inside the bar", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.keyboard.press("Meta+T");
+  const editor = page.locator(".pane.focused .cm-content");
+  await editor.click();
+  await page.keyboard.insertText("# Escape test\n\nA line to click back into.\n\n");
+  await page.keyboard.type("/librarian");
+  await page
+    .getByRole("menu", { name: "Insert block" })
+    .getByRole("menuitem", { name: /Talk to the Librarian/ })
+    .click();
+  const bar = page.getByRole("region", { name: "Librarian" });
+  await expect(bar).toBeVisible();
+
+  await page.locator(".cm-line", { hasText: "A line to click back into." }).click();
+  await expect(editor).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(bar).toHaveCount(0);
+  await expect(page.getByRole("toolbar", { name: "Formatting" })).toBeVisible();
+});

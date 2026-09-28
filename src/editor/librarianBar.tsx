@@ -26,6 +26,7 @@ import { useLibrarianRules } from "../state/librarianRules";
 import { useUiStore } from "../state/ui";
 import { editorFor } from "./commands";
 import {
+  useEscapeCloses,
   clip,
   librarianContext,
   libraryAreas,
@@ -90,6 +91,7 @@ export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: strin
     const current = editor?.getSelection?.();
     if (current) editor?.selectRange?.(current.from, current.to);
   };
+  useEscapeCloses(close);
 
   // the first ask pops the conversation out; asking again here continues it
   const ask = () => {

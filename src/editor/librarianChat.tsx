@@ -41,6 +41,7 @@ import { editorFor } from "./commands";
 import { answerAsk } from "./librarianKeep";
 import { KeptCards } from "./librarianKeepCards";
 import {
+  useEscapeCloses,
   applyProposal,
   clip,
   type HostFor,
@@ -155,6 +156,7 @@ export function ChatPanel({
   }, [chat.minimized]);
 
   const setMinimized = (minimized: boolean) => updateLibrarianChat(chat.id, () => ({ minimized }));
+  useEscapeCloses(() => setMinimized(true));
 
   const send = (typed = draft) => {
     const text = typed.trim();

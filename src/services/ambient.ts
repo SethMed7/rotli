@@ -28,6 +28,7 @@ import { useMediaDock } from "../state/mediaDock";
 import { usePanesStore } from "../state/panes";
 import { leaves } from "../state/paneTree";
 import { useUiStore } from "../state/ui";
+import { closeOrphanedTuck } from "./mediaDock";
 
 /** How often tabs are asked: quickly while something has media, else rarely. */
 const POLL_BUSY_MS = 400;
@@ -212,6 +213,7 @@ function forceCloseFm(): void {
 export function startAmbient(): () => void {
   // nothing from a previous run keeps sounding unseen
   forceCloseFm();
+  closeOrphanedTuck();
   if (audio && !useAmbient.getState().prefs.playing) audio.pause();
   const unsubscribe = [useAmbient.subscribe(applyAmbient), useTabMedia.subscribe(applyAmbient)];
   const events = ["play", "pause", "ended", "emptied", "volumechange"] as const;

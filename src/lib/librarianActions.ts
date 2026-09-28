@@ -206,7 +206,9 @@ export function parseLibrarianReply(
         const name = label?.trim().slice(0, ANCHOR_LIMITS.label);
         if (name) anchor.label = name;
       } else {
-        const at = context.doc.indexOf(action.exact);
+        // words that appear more than once would be a guess, as resolveAnchor says
+        const found = occurrences(context.doc, action.exact);
+        const at = found.length === 1 ? found[0]! : -1;
         if (at >= 0) anchor = anchorFromSelection(context.doc, at, at + action.exact.length, label);
       }
       if (anchor) actions.push({ type: "mark", anchor });

@@ -90,6 +90,14 @@ describe("the reply grammar", () => {
     expect(actions[2]).toEqual({ type: "file", area: "Projects", create: false });
   });
 
+  test("without a highlight, words that appear twice are never pinned to the first", () => {
+    const doc = "Call Ana on Friday.\nNotes.\nCall Ana on Friday.";
+    const reply = JSON.stringify({ actions: [{ type: "mark", exact: "Call Ana on Friday" }] });
+    expect(parseLibrarianReply(reply, { ...context, doc })).toEqual([]);
+    const once = "Call Ana on Friday.\nNotes.";
+    expect(parseLibrarianReply(reply, { ...context, doc: once })).toHaveLength(1);
+  });
+
   test("anything outside the grammar is dropped, never guessed", () => {
     const reply = JSON.stringify({
       actions: [

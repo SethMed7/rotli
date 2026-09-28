@@ -122,7 +122,9 @@ rather than guessing. The organizer never writes it
 ## Editor details
 
 - The bar opens on `/librarian` even when the format bar is hidden
-  (`formatBarVisible` off); Escape returns whatever the slot held before.
+  (`formatBarVisible` off); Escape returns whatever the slot held before,
+  from the bar or from the note (the bar registers as a transient, so
+  app.hide's Escape closes it before it would hide the window).
 - The bar shows a live chip of the highlighted text and snapshots the
   selection when the user sends, so a later click cannot change what was asked
   about. CodeMirror keeps its selection when focus moves into the bar, but the
@@ -292,7 +294,10 @@ component and driver tests with a fake model):
   unsent; the button then reads "Opened in Chat".
 - The model picker's search finds a model, Escape in its search closes only
   the list, and a picked model answers the next message.
-- Escape (or −) tucks the chat into its corner button; × ends it.
+- Escape (or −) tucks the chat into its corner button, with the caret in the
+  chat or back in the note; × ends it.
+- Without a highlight, a mark whose words appear more than once in the note
+  is dropped, never pinned to the first (the same rule `resolveAnchor` keeps).
 - `/librarian` then Enter puts the cursor in the bar's input straight away.
 - A statement ("Ana and Leo are work people…") adds the rule, the missing
   people (each in Librarian Activity with Undo to the Trash), and asks Yes or

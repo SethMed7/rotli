@@ -5,7 +5,7 @@
 // state/librarianBar.ts, so it outlives the bar that started it.
 
 import { useQuery } from "@tanstack/react-query";
-import { type KeyboardEvent, useEffect, useMemo, useState } from "react";
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { makeTauriHost } from "../ai/host";
 import { librarianModelFor } from "../ai/librarianLane";
@@ -43,6 +43,18 @@ export function onEscapeHere(event: KeyboardEvent<HTMLElement>, then: () => void
   event.preventDefault();
   event.stopPropagation();
   then();
+}
+
+/** While the bar or the chat is open, Escape closes it even with the caret
+ * back in the note: app.hide unwinds the topmost transient before it hides
+ * the window. */
+export function useEscapeCloses(close: () => void): void {
+  const registerTransient = useUiStore((s) => s.registerTransient);
+  const latest = useRef(close);
+  useEffect(() => {
+    latest.current = close;
+  });
+  useEffect(() => registerTransient(() => latest.current()), [registerTransient]);
 }
 
 /** A passage shortened for a chip. */

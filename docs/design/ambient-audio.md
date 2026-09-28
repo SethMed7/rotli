@@ -110,6 +110,9 @@ playing and pausing is extremely laggy".
   unmount, and it keeps being asked "are you playing?". "Open the tab" puts
   the same tab id back in the focused pane, whose new surface adopts the
   living page (shows it, no reload). "Close the tab" ends it. One at a time.
+  The tucked tab's id is kept in session storage, so if the window reloads
+  (the player forgets it, the native page plays on) the next start closes
+  that page, the way it closes a leftover Claude FM page.
 - **Responsiveness.** A button's result shows at once (the expected state is
   set before WebKit answers, then two quick polls confirm it); ambient fades
   out over ~0.1 s and starts audible, ramping over ~0.3 s; tabs are asked every
