@@ -1132,6 +1132,7 @@ function AppearancePane() {
   const sidebarReveal = useUiStore((s) => s.sidebarReveal);
   const setSidebarReveal = useUiStore((s) => s.setSidebarReveal);
   const syntaxPalette = useUiStore((s) => s.syntaxPalette);
+  const boardBackground = useUiStore((s) => s.boardBackground);
   const setSyntaxPalette = useUiStore((s) => s.setSyntaxPalette);
   const chatWelcomeStyle = useUiStore((s) => s.chatWelcomeStyle);
   const setChatWelcomeStyle = useUiStore((s) => s.setChatWelcomeStyle);
@@ -1464,6 +1465,21 @@ function AppearancePane() {
           ["lively", "Lively"],
         ]}
         onPick={setChatWelcomeStyle}
+      />
+
+      <h4 className="sethead">Board background</h4>
+      <p className="lead">
+        A board you haven’t colored yourself takes this background. Match theme follows your theme and changes
+        with it; White keeps boards light, like paper, in every theme. A color you pick on a board always
+        stays.
+      </p>
+      <Seg
+        value={boardBackground}
+        options={[
+          ["theme", "Match theme"],
+          ["white", "White"],
+        ]}
+        onPick={(value) => useUiStore.setState({ boardBackground: value })}
       />
 
       <h4 className="sethead">Markdown source</h4>

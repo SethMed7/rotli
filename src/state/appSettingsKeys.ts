@@ -12,6 +12,7 @@ export const APP_SETTINGS_KEYS = new Set([
   "matchLightFamily",
   "matchDarkFamily",
   "syntaxPalette",
+  "boardBackground",
   "accentColor",
   "accentHue",
   "quokkaCompanionEnabled",

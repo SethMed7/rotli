@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Boards match your theme.** A board you haven't colored yourself is your
+  theme's own color, in all fourteen environments, and changes the moment you
+  change themes. A color you pick on a board stays that board's. Settings →
+  Appearance → Board background → White keeps boards light, like paper,
+  instead. Only a color you chose is saved into the board file.
 - **Chat replies show images and video from your vault.** When a reply links
   an image or a video in your vault on a line of its own, the chat shows the
   picture, or a video you can play, instead of the link's text. Only files in

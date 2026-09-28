@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { EXCALIDRAW_DEFAULT_BACKGROUND } from "../brand/boardBackground";
 import {
   EMPTY_BOARD_META,
   EMPTY_SCENE,
@@ -125,6 +126,25 @@ describe("serializeBoardScene", () => {
     });
     const appState = (JSON.parse(body) as { appState: Record<string, unknown> }).appState;
     expect(appState).toEqual({ viewBackgroundColor: "linen", gridSize: 20, gridModeEnabled: true });
+  });
+
+  // 2026-09-27: an unchosen background follows the app (brand/boardBackground),
+  // so it is never written; the default white from older saves heals away.
+  test("writes a background only when the person chose one", () => {
+    const saved = (viewBackgroundColor: string) =>
+      (
+        JSON.parse(
+          serializeBoardScene({
+            elements: [],
+            appState: { viewBackgroundColor, gridSize: 20 },
+            files: {},
+            meta: { description: "", tags: "" },
+          }),
+        ) as { appState: Record<string, unknown> }
+      ).appState;
+    expect(saved("transparent")).toEqual({ gridSize: 20 });
+    expect(saved(EXCALIDRAW_DEFAULT_BACKGROUND)).toEqual({ gridSize: 20 });
+    expect(saved("linen")).toEqual({ viewBackgroundColor: "linen", gridSize: 20 });
   });
 
   test("round-trips meta through parseBoardBody", () => {

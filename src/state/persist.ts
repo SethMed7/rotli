@@ -19,6 +19,7 @@
 import { librarianModelId } from "../ai/librarianLane";
 import { type HybridPreset, PROVIDER_IDS, type ProviderId, providerDefaultModel } from "../ai/models";
 import { parseWebSearchProvider, type WebSearchProvider } from "../ai/searchProvider";
+import { BOARD_BACKGROUND_MODES, type BoardBackgroundMode } from "../brand/boardBackground";
 import {
   QUOKKA_IDLE_POSES,
   QUOKKA_ACCESSORIES,
@@ -68,6 +69,7 @@ import type { PaneNode, Tab } from "../types";
 import { DEFAULT_VOICE, VOICES } from "../voice/speech";
 import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
 import { APP_SETTINGS_KEYS } from "./appSettingsKeys";
+import { persistableChatMap, rescopeChatMapKeys } from "./chatMapKeys";
 import { useChatWindowStore } from "./chatWindowStore";
 import { withDetachedChats } from "./chatWindowTabs";
 import { helperLinked } from "./helperLink";
@@ -86,6 +88,8 @@ import { findLeaf, leaves, usePanesStore } from "./panes";
 import { QUICK_MAX } from "./quick";
 import { MIN_TABLE_COL_PX, MIN_TABLE_ROW_PX, noteIdOfWidthKey, useTableWidthsStore } from "./tableWidths";
 import { applyAccent, applySyntaxPalette, applyTheme } from "./theme";
+
+export { rescopeChatMapKeys } from "./chatMapKeys";
 import {
   ALL_NOTES,
   type BreveView,
@@ -162,40 +166,6 @@ const THEME_SETTINGS: readonly ThemeSetting[] = ["light", "dark", "system"];
 const SYNTAX_PALETTES: readonly SyntaxPalette[] = ["rotli", "mono"];
 const MEASURES: readonly Measure[] = ["narrow", "comfort", "wide"];
 
-/** Drop the session-scoped per-chat keys — an unsaved chat's choice (globe,
- * measure) belongs to its pane for this session only, never to settings.json
- * (#7). Shared by the parse (heals a poisoned config) and the snapshot (never
- * writes one again). */
-function persistableChatMap<T>(m: Record<string, T>): Record<string, T> {
-  return Object.fromEntries(Object.entries(m).filter(([k]) => k !== "" && !k.startsWith("unsaved:")));
-}
-
-/** One-time migration of pre-vault-scoping chat-map keys (2026-08-03): a bare
- * slug re-homes to `<instanceId>:<slug>` when exactly ONE configured instance
- * has that slug. An ambiguous slug (two vaults, same name — the very collision
- * the scoping fixes) or an unknown one is left for the prune to drop; a
- * composite key already claimed keeps its value. Exported for tests. */
-export function rescopeChatMapKeys<T>(
-  m: Record<string, T>,
-  owners: ReadonlyMap<string, readonly string[]>,
-): Record<string, T> {
-  let changed = false;
-  const out: Record<string, T> = {};
-  for (const [k, v] of Object.entries(m)) {
-    if (k.startsWith("unsaved:") || k.includes(":")) {
-      out[k] = v;
-      continue;
-    }
-    const own = owners.get(k);
-    if (own?.length === 1) {
-      const scoped = `${own[0]}:${k}`;
-      if (!(scoped in out) && !(scoped in m)) out[scoped] = v;
-    }
-    changed = true;
-  }
-  return changed ? out : m;
-}
-
 /** Shape-validate the persisted hybrid presets — a hand-edited or future-build
  * entry that doesn't parse is DROPPED, never half-loaded. Exported for tests. */
 export function parseHybridPresets(raw: unknown): HybridPreset[] {
@@ -233,6 +203,7 @@ interface PersistedSettings {
   theme: ThemeSetting;
   themeFamily: ThemeFamily;
   syntaxPalette: SyntaxPalette;
+  boardBackground: BoardBackgroundMode;
   accentColor: AccentColor;
   accentHue: number;
   quokkaCompanionEnabled: boolean;
@@ -500,6 +471,7 @@ export function parseSettings(raw: string): PersistedSettings {
     theme: asEnum(data.theme, THEME_SETTINGS, "light"),
     themeFamily: asEnum(data.themeFamily, THEME_FAMILIES, "warm"),
     syntaxPalette: asEnum(data.syntaxPalette, SYNTAX_PALETTES, "rotli"),
+    boardBackground: asEnum(data.boardBackground, BOARD_BACKGROUND_MODES, "theme"),
     accentColor: asEnum(data.accentColor, ACCENT_COLORS, "default"),
     accentHue:
       typeof data.accentHue === "number" &&
@@ -737,6 +709,7 @@ function applySettings(s: PersistedSettings): void {
     theme: s.theme,
     themeFamily: s.themeFamily,
     syntaxPalette: s.syntaxPalette,
+    boardBackground: s.boardBackground,
     accentColor: s.accentColor,
     accentHue: s.accentHue,
     quokkaCompanionEnabled: s.quokkaCompanionEnabled,
@@ -829,6 +802,7 @@ function applyAppSettings(s: PersistedSettings): void {
     theme: s.theme,
     themeFamily: s.themeFamily,
     syntaxPalette: s.syntaxPalette,
+    boardBackground: s.boardBackground,
     accentColor: s.accentColor,
     accentHue: s.accentHue,
     quokkaCompanionEnabled: s.quokkaCompanionEnabled,
@@ -867,6 +841,7 @@ function withAppSettings(vault: PersistedSettings, app: PersistedSettings): Pers
     theme: app.theme,
     themeFamily: app.themeFamily,
     syntaxPalette: app.syntaxPalette,
+    boardBackground: app.boardBackground,
     accentColor: app.accentColor,
     accentHue: app.accentHue,
     quokkaCompanionEnabled: app.quokkaCompanionEnabled,
@@ -1423,6 +1398,7 @@ function appSettingsSnapshot(): string {
     theme: ui.theme,
     themeFamily: ui.themeFamily,
     syntaxPalette: ui.syntaxPalette,
+    boardBackground: ui.boardBackground,
     accentColor: ui.accentColor,
     accentHue: ui.accentHue,
     quokkaCompanionEnabled: ui.quokkaCompanionEnabled,
@@ -1462,6 +1438,7 @@ function settingsSnapshot(): string {
     theme: ui.theme,
     themeFamily: ui.themeFamily,
     syntaxPalette: ui.syntaxPalette,
+    boardBackground: ui.boardBackground,
     accentColor: ui.accentColor,
     accentHue: ui.accentHue,
     quokkaCompanionEnabled: ui.quokkaCompanionEnabled,

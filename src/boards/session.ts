@@ -4,6 +4,7 @@
 // Engine-agnostic and Tauri-free: it knows the scene JSON shape only;
 // composition.ts injects the corpus writer.
 
+import { durableBoardBackground } from "../brand/boardBackground";
 import { createDebouncedTask } from "../lib/debouncedTask";
 import { parseAndValidateBoard } from "./validation";
 
@@ -57,7 +58,12 @@ const DURABLE_APP_STATE = ["viewBackgroundColor", "gridSize", "gridModeEnabled",
 function durableAppState(appState: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const key of DURABLE_APP_STATE) {
-    if (appState[key] !== undefined) out[key] = appState[key];
+    const value =
+      key === "viewBackgroundColor"
+        ? // only a chosen color; an unchosen one follows the app (brand/boardBackground)
+          durableBoardBackground(typeof appState[key] === "string" ? appState[key] : undefined)
+        : appState[key];
+    if (value !== undefined) out[key] = value;
   }
   return out;
 }

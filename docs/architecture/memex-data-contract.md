@@ -108,6 +108,11 @@ second user-visible product or storage location.
   Ordinary user creation collects a nonblank name before writing anything, then
   creates the collision-safe final filename atomically; cancelling the prompt
   leaves no `untitled.excalidraw` placeholder behind.
+  A board's `appState.viewBackgroundColor` is written only when the person
+  chose a color (2026-09-27). No color, Excalidraw's default white, and
+  `transparent` mean "not chosen", and such a board follows Settings →
+  Appearance → Board background: Match theme (transparent over the theme's
+  ground) or White (`src/brand/boardBackground.ts`).
 - A populated item adds its one stable id/path to Main after durable creation
   and identity refresh; presentation may precede that structural work. A new
   plain Markdown note is the deliberate exception: its durable corpus file and

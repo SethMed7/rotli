@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { useBoardLook } from "../boards/boardLook";
 import {
   boardsAvailable,
   canRevealBoards,
@@ -26,7 +27,6 @@ import {
 import { type BoardMeta, EMPTY_BOARD_META, serializeBoardScene } from "../boards/session";
 import { onQuitFlush } from "../lib/quitFlush";
 import { keepTabsFor } from "../state/panes";
-import { useIsDarkTheme } from "../state/theme";
 
 /** The slice of Excalidraw's imperative API we use to re-serialize the scene on a
  * metadata save (a metadata edit isn't an Excalidraw change, so we rebuild it). */
@@ -57,9 +57,10 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
   // Excalidraw's `theme` prop follows the rotli theme (the maintainer, 2026-06-26).
   // the applied data-theme, live — a System-mode OS flip re-themes an open
   // board too (it used to read matchMedia once and go stale)
-  const excaliTheme: "dark" | "light" = useIsDarkTheme() ? "dark" : "light";
-
   const [state, setState] = useState<CanvasState>({ status: "loading", initialData: null });
+  // theme and background follow the app unless this board's background was
+  // chosen (boards/boardLook.ts, 2026-09-27)
+  const look = useBoardLook(state.initialData);
   const [loadVersion, setLoadVersion] = useState(0);
   const [repairConfirm, setRepairConfirm] = useState(false);
   const [repairBusy, setRepairBusy] = useState(false);
@@ -296,14 +297,15 @@ export function CanvasSurface({ paneId, boardId }: { paneId: string; boardId: st
   return (
     <div className="canvas-surface">
       <BoardCanvas
-        initialData={state.initialData}
+        initialData={look.initialData}
         onChange={onChange}
-        theme={excaliTheme}
+        theme={look.theme}
         // the titlebar sun is the ONE theme owner — the vendor's own toggle
         // was a second authority fighting it (boards slice 2026-07-28)
         UIOptions={{ canvasActions: { toggleTheme: false } }}
         excalidrawAPI={(api) => {
           apiRef.current = api as unknown as ExcaliApi;
+          look.bindApi(api);
         }}
       />
       {saveErr && (
