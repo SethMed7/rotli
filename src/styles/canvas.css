@@ -65,6 +65,8 @@
    and live in the eager render.css so a sheet is styled without a board chunk. */
 .rotli-embed-board-inner {
   position: relative;
+  /* Match theme: a board in a note shows the same ground as the board tab */
+  background: var(--ground);
 }
 
 /* The browser (no-shell) + loading/error placeholders — quiet, centered, warm. */
