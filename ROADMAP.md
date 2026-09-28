@@ -187,9 +187,6 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
   connected CLIs stay tool-less.
 - **First drag and drop lands too high** · M — on the first drag, the drop does
   not line up with the pointer. Needs a reproduction first.
-- **A file dropped on a board lands somewhere else** · S — on the Mac a Finder
-  drop onto a focused board has no board branch and falls through to another
-  note or Assets. Suspected, not yet reproduced.
 
 ## 5. Small enhancements
 

@@ -33,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A file dropped from Finder onto an open board no longer lands in another
+  note.** Boards don't take dropped files yet, so the file is saved to Assets
+  and a notice says so. Mac app.
+- **Boards use your accent color.** The selected tool and active controls were
+  still Excalidraw's own violet in both light and dark.
 - **A remote-agent relay on `http://[::1]` is accepted for development**, like
   `127.0.0.1` and `localhost` already were: an IPv6 host arrives in brackets,
   so the loopback check never matched it.

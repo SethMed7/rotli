@@ -100,3 +100,20 @@ test("Board background → White keeps an uncolored board white and light, even 
   await expect.poll(async () => (await canvasLook(page)).pixel).toEqual([255, 255, 255, 255]);
   expect((await canvasLook(page)).dark).toBe(false);
 });
+
+// 2026-09-28: the selected tool and active controls were still Excalidraw's
+// own violet; they take Rotli's accent in every mode.
+test("a board's selected tool uses Rotli's accent, not Excalidraw's violet", async ({ page }) => {
+  await startWithVault(page);
+  await newBoard(page, "Accent board");
+  const vendorViolet = ["#e0dfff", "#403e6a", "#030064", "#e0dfff"];
+  const selectedTool = () =>
+    page.evaluate(() => {
+      const root = document.querySelector(".canvas-surface .excalidraw") as HTMLElement;
+      return getComputedStyle(root).getPropertyValue("--color-surface-primary-container").trim();
+    });
+  expect(vendorViolet).not.toContain(await selectedTool());
+  await darkTheme(page);
+  await expect.poll(async () => (await canvasLook(page)).dark).toBe(true);
+  expect(vendorViolet).not.toContain(await selectedTool());
+});

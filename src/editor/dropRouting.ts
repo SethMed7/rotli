@@ -57,6 +57,15 @@ export function firstTarget<E extends Closest, T>(
   return null;
 }
 
+/** A board under the pointer (2026-09-28). Finder files never reach the
+ * canvas itself, so the drop goes to Assets with BOARD_DROP_NOTICE — never
+ * into a note in another pane, which is where it used to fall through. */
+export function dropIsOnBoard<E extends Closest>(candidates: readonly DropCandidate<E>[]): boolean {
+  return firstTarget(candidates, (element) => (element.closest(".canvas-surface") ? true : null)) !== null;
+}
+
+export const BOARD_DROP_NOTICE = "Saved to Assets — boards don’t take dropped files yet";
+
 export type DropSurface = "chat" | "editor" | "none";
 
 /** A file paste the host granted nothing for. If the pasteboard no longer holds
