@@ -148,6 +148,10 @@ describe("structureMessageLines", () => {
       "![tracker](https://example.com/pixel.png)",
       "see ![chart](storage:chart.png) inline",
       "```md\n![chart](storage:chart.png)\n```",
+      // a vault link that isn't a picture or a video keeps its Markdown
+      "![plan](storage:wiki/plan.md)",
+      "![logo](storage:brand/logo.svg)",
+      "![report](storage:report.pdf)",
     ]) {
       expect(splitMessageBlocks(text).some((block) => block.kind === "media")).toBe(false);
     }
