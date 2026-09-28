@@ -185,6 +185,9 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
   behind Add-ons (M to XL, owner call on the source); dropping a video into a
   chat comes with the tool, since nothing can use one before it. The
   connected CLIs stay tool-less.
+
+## 4. Known bugs
+
 - **First drag and drop lands too high** · M — on the first drag, the drop does
   not line up with the pointer. Needs a reproduction first.
 - **A file dropped on a board lands somewhere else** · S — on the Mac a Finder

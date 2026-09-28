@@ -21,6 +21,8 @@ export function ChatReplyMedia({ alt, path, rootPrefix }: { alt: string; path: s
     staleTime: Infinity,
   });
   const label = alt.trim() || fileName(path);
+  // the splitter only makes media blocks for pictures and video, so `kind` is
+  // null only if that ever drifts; the name is still better than raw Markdown
   if (kind === null || url.isError || (url.isSuccess && !url.data)) {
     return <p className="cmsg-media-missing">{label}</p>;
   }
