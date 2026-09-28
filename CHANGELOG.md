@@ -18,9 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A thank-you at the end of setup.** Before the guided tour, a small card
   thanks you and shows a banner made from your choices: your quokka (its
   color and what it's wearing) on your theme, with your name if you gave one.
-  Star Rotli on GitHub, copy an invite for a friend, share on X, or keep the
-  banner (the Mac app saves it to your vault's Assets; a browser downloads
-  it). Share on X opens a post with a standard caption and a link to
+  Star Rotli on GitHub, copy an invite for a friend, share on X, or save the
+  banner to your vault's Assets. Share on X opens a post with a standard caption and a link to
   rotli.co and puts your banner on the clipboard to paste in; nothing about
   you goes into the link. Closing the card starts the tour.
 - **What's new, after an update.** The first launch after an update opens a
@@ -32,17 +31,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Feedback in the sidebar.** The sidebar's footer gains a Feedback button
   beside Files, Librarian, and Settings; it opens the same prefilled GitHub
   issue as Settings → About. When the sidebar is too narrow for the labels, the
-  footer shows its icons alone instead of cutting the names short.
+  footer shows its icons alone instead of cutting the names short, and the
+  Librarian's count and the update dot sit on their icons, so a label is never
+  squeezed.
 - **Boards match your theme.** A board you haven't colored yourself is your
   theme's own color, in all fourteen environments, and changes the moment you
-  change themes. A color you pick on a board stays that board's. Settings →
-  Appearance → Board background → White keeps boards light, like paper,
-  instead. Only a color you chose is saved into the board file.
+  change themes. A color you pick on a board stays that board's (plain white
+  counts as no color). Settings → Appearance → Board background → White keeps
+  boards and their tools light, like paper, instead. Only a color you chose is
+  saved into the board file. A board inside a note matches too.
 - **Chat replies show images and video from your vault.** When a reply links
   an image or a video in your vault on a line of its own, the chat shows the
   picture, or a video you can play, instead of the link's text. Only files in
   your vault are shown; an image at a web address is never loaded. On Rotli
-  Web a video keeps its name; the Mac app plays it.
+  Web a video shows its name instead of a player.
 - **A video a chat made shows as a video** in the chat's list of files, with
   its own mark and "Video · MP4", instead of as an unnamed file.
 - **Hand to AI.** Choose "Hand to AI…" from the palette or a note's menu and

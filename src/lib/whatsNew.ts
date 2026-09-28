@@ -69,19 +69,35 @@ export function platformNote(platform: Platform | undefined): string | null {
   return null;
 }
 
-/** Show once after an update; never on a fresh install's first run. `record`
- * means "remember this version as seen" (on close when it shows). */
+/** The newest release with highlights after `since`, up to and including
+ * `current`: an update from 1.5.0 straight to a 1.6.1 hotfix still shows
+ * 1.6.0's card. */
+export function unseenRelease(notes: WhatsNew, since: string, current: string): string | null {
+  return (
+    Object.keys(notes)
+      .filter((version) => (notes[version]?.length ?? 0) > 0)
+      .filter((version) => compareVersions(version, since) > 0 && compareVersions(version, current) <= 0)
+      .sort(compareVersions)
+      .at(-1) ?? null
+  );
+}
+
+/** Show once after an update; never on a fresh install's first run. `version`
+ * is the release whose card to show (null: none); `record` means "remember
+ * this build as seen" — done as the card shows, so opening the changelog and
+ * quitting never brings the same card back. */
 export function whatsNewDecision(input: {
   current: string;
   lastSeen: string;
   onboarded: boolean;
   onboardingVersion: string;
   notes: WhatsNew;
-}): { show: boolean; record: boolean } {
-  const has = highlightsFor(input.notes, input.current) !== null;
+}): { version: string | null; record: boolean } {
   if (input.lastSeen) {
-    const newer = compareVersions(input.lastSeen, input.current) < 0;
-    return { show: has && newer, record: input.lastSeen !== input.current };
+    return {
+      version: unseenRelease(input.notes, input.lastSeen, input.current),
+      record: input.lastSeen !== input.current,
+    };
   }
   // never recorded: an update only for someone set up on an older build; a
   // first run, or settings that never kept a version, record it quietly
@@ -89,5 +105,8 @@ export function whatsNewDecision(input: {
     input.onboarded &&
     !!input.onboardingVersion &&
     compareVersions(input.onboardingVersion, input.current) < 0;
-  return { show: has && upgraded, record: true };
+  return {
+    version: upgraded ? unseenRelease(input.notes, input.onboardingVersion, input.current) : null,
+    record: true,
+  };
 }

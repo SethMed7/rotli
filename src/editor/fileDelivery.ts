@@ -16,6 +16,7 @@ export type FileTarget =
   | { kind: "chat"; attach: (paths: readonly string[]) => void }
   /** `at` is resolved BEFORE any file I/O: layout may move while importing. */
   | { kind: "editor"; view: EditorView; at: number }
+  | { kind: "board" }
   | { kind: "none" };
 
 /** Import granted OS paths into `target`: a chat attaches its images, a note

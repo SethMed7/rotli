@@ -34,8 +34,12 @@ export async function saveBanner(blob: Blob): Promise<"assets" | "download"> {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = BANNER_FILE_NAME;
+  // attached and kept a while, as downloadVaultZip does: some browsers read
+  // the URL after the click returns
+  document.body.append(anchor);
   anchor.click();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
   return "download";
 }
 

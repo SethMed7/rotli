@@ -10,7 +10,12 @@ import { readOpfsFile, startWithFolder } from "./support";
 
 const version = (JSON.parse(readFileSync("package.json", "utf8")) as { version: string }).version;
 const notes = JSON.parse(readFileSync("src/assets/whats-new.json", "utf8")) as Record<string, unknown[]>;
-const hasHighlights = (notes[version]?.length ?? 0) > 0;
+const newer = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true }) > 0;
+// the card shows the newest highlighted release after 1.0.0, up to this build
+const shown = Object.keys(notes)
+  .filter((key) => (notes[key]?.length ?? 0) > 0 && newer(key, "1.0.0") && !newer(key, version))
+  .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  .at(-1);
 
 test("an older seen version opens this release's card once, then records it", async ({ page }) => {
   await startWithFolder(page, {
@@ -22,8 +27,9 @@ test("an older seen version opens this release's card once, then records it", as
     timeout: 20_000,
   });
 
-  const dialog = page.getByRole("dialog", { name: `What’s new in Rotli ${version}` });
-  if (hasHighlights) {
+  const dialog = page.getByRole("dialog", { name: /What’s new in Rotli/ });
+  if (shown) {
+    await expect(dialog).toHaveAccessibleName(`What’s new in Rotli ${shown}`);
     await expect(dialog).toBeVisible();
     await dialog.getByRole("button", { name: "Got it" }).click();
   }

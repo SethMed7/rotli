@@ -7,6 +7,8 @@ import { defineCollection } from 'astro:content';
 import { glob } from 'astro/loaders';
 import { z } from 'astro/zod';
 
+import { GITHUB_URL, site } from './site';
+
 const writing = defineCollection({
   loader: glob({ pattern: '**/*.md', base: './src/content/writing' }),
   schema: z.object({
@@ -22,6 +24,16 @@ const writing = defineCollection({
   }),
 });
 
+/** A link to a file in the repository (`docs/…`) would 404 on the site: it
+ * points at the file on GitHub when the source is public, and is plain text
+ * when it is not. */
+function repoLinks(markdown: string): string {
+  return markdown.replace(
+    /\[([^\]]+)\]\((?![a-z][a-z0-9+.-]*:|#|\/)([^)\s]+)\)/gi,
+    (_, text: string, path: string) => (site.sourcePublic ? `[${text}](${GITHUB_URL}/blob/main/${path})` : text),
+  );
+}
+
 /** The product changelog at the repository root, from its first shipped
  * release heading on (the file's title, preamble, and [Unreleased] work belong
  * to the repo, not the page), rendered by Astro's own Markdown pipeline. One entry. The Dockerfile
@@ -32,7 +44,7 @@ const changelog = defineCollection({
     load: async ({ store, renderMarkdown }) => {
       const raw = await readFile(new URL('../../CHANGELOG.md', import.meta.url), 'utf8');
       const start = raw.search(/\n## \[\d/);
-      const body = start >= 0 ? raw.slice(start + 1) : raw;
+      const body = repoLinks(start >= 0 ? raw.slice(start + 1) : raw);
       store.clear();
       store.set({ id: 'changelog', data: {}, body, rendered: await renderMarkdown(body) });
     },

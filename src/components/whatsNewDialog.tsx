@@ -14,20 +14,22 @@ import { WebDialogFrame } from "./webDialogFrame";
 declare const __APP_VERSION__: string;
 const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.0.0";
 
-/** The launch check, once per mount: show after an update, else quietly note
- * the version as seen (a fresh install never gets a list of "new" things). */
+/** The launch check, once per mount: note this build as seen, and show the
+ * newest unseen release's card after an update (a fresh install never gets a
+ * list of "new" things). */
 function useWhatsNewOnLaunch(): void {
   useEffect(() => {
     const ui = useUiStore.getState();
-    const { show, record } = whatsNewDecision({
+    const { version, record } = whatsNewDecision({
       current: APP_VERSION,
       lastSeen: ui.lastSeenVersion,
       onboarded: ui.onboarded,
       onboardingVersion: ui.onboardingVersion,
       notes: NOTES,
     });
-    if (show) showWhatsNew(APP_VERSION);
-    else if (record) useUiStore.setState({ lastSeenVersion: APP_VERSION });
+    // seen as it shows: opening the changelog and quitting never repeats it
+    if (record) useUiStore.setState({ lastSeenVersion: APP_VERSION });
+    if (version) showWhatsNew(version);
   }, []);
 }
 
@@ -37,11 +39,7 @@ export function WhatsNewDialog() {
   const items = version ? highlightsFor(NOTES, version) : null;
   if (!version || !items) return null;
 
-  const close = () => {
-    hideWhatsNew();
-    if (useUiStore.getState().lastSeenVersion !== APP_VERSION)
-      useUiStore.setState({ lastSeenVersion: APP_VERSION });
-  };
+  const close = hideWhatsNew;
 
   return (
     <WebDialogFrame
