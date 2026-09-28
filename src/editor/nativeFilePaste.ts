@@ -26,7 +26,7 @@ import { noteIdFacet } from "./livePreview";
 
 const COPY_AGAIN = "Couldn’t paste the copied file — copy it again in Finder, then paste";
 
-type PasteTarget = Exclude<FileTarget, { kind: "none" }>;
+type PasteTarget = Exclude<FileTarget, { kind: "none" } | { kind: "board" }>;
 
 /** A chat composer or a note body; any other field keeps its ordinary paste. */
 function pasteTarget(element: Element): PasteTarget | null {
