@@ -31,3 +31,17 @@ needs the owner's explicit request (AGENTS.md).
 
 Never push a local branch created before 2026-09-15: those branches carry the
 pre-publication history that was rewritten out of the public repository.
+
+When work builds on an unmerged PR, keep a straight chain and merge it down:
+the stack-and-merge-down skill. A merge also needs every review thread
+resolved (the `dev` ruleset blocks otherwise) — reply on each, then resolve.
+
+## macOS shell traps
+
+- `sed -i ''` (BSD). A `sed` script that fails still exits the pipe: never
+  pipe a transform into `gh pr edit --body-file` without checking it.
+- `head` on this machine is a Perl HTTP tool: use `/usr/bin/head` or `sed -n`.
+- zsh treats a bare `====` as `=` expansion; quote it.
+- Never pipe a gate into `tail` to decide pass/fail: `tail` hides the exit
+  code. Capture the log, then `echo exit=$?`.
+
