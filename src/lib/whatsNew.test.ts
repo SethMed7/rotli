@@ -24,8 +24,8 @@ describe("What's new — when it shows", () => {
 
   test("once after an update, then never again for that version", () => {
     const base = { current: "1.6.0", onboarded: true, onboardingVersion: "1.2.0", notes };
-    expect(whatsNewDecision({ ...base, lastSeen: "1.5.0" })).toEqual({ show: true, record: true });
-    expect(whatsNewDecision({ ...base, lastSeen: "1.6.0" })).toEqual({ show: false, record: false });
+    expect(whatsNewDecision({ ...base, lastSeen: "1.5.0" })).toEqual({ version: "1.6.0", record: true });
+    expect(whatsNewDecision({ ...base, lastSeen: "1.6.0" })).toEqual({ version: null, record: false });
   });
 
   test("a fresh install records the version quietly; it never opens on first run", () => {
@@ -37,10 +37,10 @@ describe("What's new — when it shows", () => {
         onboardingVersion: "1.6.0",
         notes,
       }),
-    ).toEqual({ show: false, record: true });
+    ).toEqual({ version: null, record: true });
     expect(
       whatsNewDecision({ current: "1.6.0", lastSeen: "", onboarded: false, onboardingVersion: "", notes }),
-    ).toEqual({ show: false, record: true });
+    ).toEqual({ version: null, record: true });
   });
 
   test("someone set up on an older build sees it on their first updated launch", () => {
@@ -52,13 +52,23 @@ describe("What's new — when it shows", () => {
         onboardingVersion: "1.5.0",
         notes,
       }),
-    ).toEqual({ show: true, record: true });
+    ).toEqual({ version: "1.6.0", record: true });
+  });
+
+  test("a hotfix after a highlighted release still shows that release's card", () => {
+    const base = { onboarded: true, onboardingVersion: "1.2.0", notes };
+    expect(whatsNewDecision({ ...base, current: "1.6.1", lastSeen: "1.5.0" })).toEqual({
+      version: "1.6.0",
+      record: true,
+    });
+    // already seen at 1.6.0: the hotfix shows nothing new
+    expect(whatsNewDecision({ ...base, current: "1.6.1", lastSeen: "1.6.0" }).version).toBeNull();
   });
 
   test("settings that never kept a version record it quietly (no guessing)", () => {
     expect(
       whatsNewDecision({ current: "1.6.0", lastSeen: "", onboarded: true, onboardingVersion: "", notes }),
-    ).toEqual({ show: false, record: true });
+    ).toEqual({ version: null, record: true });
   });
 
   test("a version without highlights never opens, but is still recorded", () => {
@@ -70,7 +80,7 @@ describe("What's new — when it shows", () => {
         onboardingVersion: "1.2.0",
         notes,
       }),
-    ).toEqual({ show: false, record: true });
+    ).toEqual({ version: null, record: true });
   });
 
   test("the highlights for a version, the newest ones, and the platform words", () => {
