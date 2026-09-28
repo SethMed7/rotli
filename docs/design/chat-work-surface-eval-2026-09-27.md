@@ -65,10 +65,10 @@ names video as a preview-only surface, so showing it inline breaks no law.
 | 6. A general MCP client, so a video MCP server can be used | L | Probably through Add-ons; every MCP tool is off-device and must pass the same gates |
 | Letting the CLIs use their own tools and MCP | XL | Not recommended: it reverses the security posture that keeps secure notes and secrets inside Rotli |
 
-**Recommendation:** do 1 and 2 first (small, no policy change, and useful now:
-a model that writes a chart image or a clip into the chat folder becomes
-visible). Then decide the provider question (5) together with the Add-ons
-system, and build 3–4 on top of it. Keep the CLIs tool-less.
+**Recommendation:** step 1 is built and useful now: a model that writes a
+chart image or a clip into the chat folder becomes visible. Step 2 waits for
+the video tool. Next, decide the provider question (5) together with the
+Add-ons system, then build 2–4 on top of it. Keep the CLIs tool-less.
 
 ## Owner decisions
 
