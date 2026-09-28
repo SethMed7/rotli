@@ -7,6 +7,7 @@ import { usePanesStore } from "../state/panes";
 import { CHOICE_MARK } from "./choiceState";
 import { parseChoiceControlLine, parseToggleLine } from "./controlState";
 import { ORDERED_MARKER_SOURCE } from "./listMarkers";
+import { markCoverage, toggleMarkRun } from "./markRuns";
 import { parseResultLine, RESULT_MARK } from "./resultState";
 import { MARK } from "./taskState";
 
@@ -44,6 +45,9 @@ export function activeEditor(): EditorHandle | null {
 }
 
 // ——— inline marks ———
+
+/** Marks whose delimiters can't be confused with another mark's. */
+const RUN_MARKS = new Set<InlineMark>(["bold", "strike", "highlight", "underline"]);
 
 const MARKS: Record<Exclude<InlineMark, "link">, { open: string; close: string }> = {
   bold: { open: "**", close: "**" },
@@ -120,6 +124,10 @@ export function toggleInlineMark(line: string, selStart: number, selEnd: number,
     selEnd > selStart;
   const a = inCode ? selStart - 1 : selStart;
   const b = inCode ? selEnd + 1 : selEnd;
+  // a real selection of text, partly marked or not: read as marked
+  // characters (markRuns.ts), so ⌘B over bold + plain makes one bold span
+  if (!inCode && selEnd > selStart && RUN_MARKS.has(mark))
+    return toggleMarkRun(line, selStart, selEnd, MARKS[mark]);
   // unwrap: the mark sits around the selection, possibly outside other marks
   const layer = enclosingLayer(line, a, b, mark);
   if (layer) {
@@ -314,8 +322,12 @@ export function toggleInlineMarkLines(spans: readonly LineSpan[], mark: InlineMa
   if (mark === "link") targets.splice(1);
   const edits = targets.map((t) => {
     const edit = toggleInlineMark(t.text, t.a, t.b, mark);
-    // unwrapping is the only toggle that shortens a line
-    return { index: t.index, ...edit, unwraps: edit.line.length < t.text.length };
+    // already marked: all of the selected text carries the mark (for the
+    // wrap-only marks, unwrapping is the only toggle that shortens a line)
+    const unwraps = RUN_MARKS.has(mark)
+      ? markCoverage(t.text, t.a, t.b, MARKS[mark as "bold"]) === "all"
+      : edit.line.length < t.text.length;
+    return { index: t.index, ...edit, unwraps };
   });
   const allOn = edits.every((edit) => edit.unwraps);
   return edits

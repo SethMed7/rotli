@@ -61,6 +61,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   line, breaking its bullet. Bold, italic, and the other marks now format each
   selected line's text and leave list, task, heading, and quote markers alone;
   if every selected line is already bold, Bold takes it off all of them.
+  Selecting text that is only partly bold (a bold word and the plain words
+  after it) and pressing Bold now makes it one bold span instead of adding
+  stray stars; selecting part of a bold span unbolds just that part. Strike,
+  highlight, and underline work the same way.
 - **A file dropped from Finder onto an open board no longer lands in another
   note.** Boards don't take dropped files yet, so the file is saved to Assets
   and a notice says so. Mac app.

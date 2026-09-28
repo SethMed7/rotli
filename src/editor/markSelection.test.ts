@@ -52,6 +52,9 @@ describe("bold over a selection", () => {
   test("a mixed selection bolds the lines that aren't bold yet", () => {
     const doc = "**One**\n- two";
     expect(bold(doc, 0, doc.length).doc).toBe("**One**\n- **two**");
+    // a line that is only partly bold counts as not bold: it becomes one span
+    const partly = "**One** more\n- two";
+    expect(bold(partly, 0, partly.length).doc).toBe("**One more**\n- **two**");
   });
 
   test("a selection that starts inside a marker or a heading bolds only the text", () => {

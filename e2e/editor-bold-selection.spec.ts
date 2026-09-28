@@ -71,3 +71,23 @@ test("a selection across lines bolds every line's text and keeps each bullet", a
   const raw = await rawText(page);
   expect(raw).toContain("**Budgets & Purchasing Process**\n- **$50 to $100**\n- **need proof of results**");
 });
+
+// The same reader, a minute later: bold a word, keep typing plain text after
+// it, select the whole line, Bold. That added stray stars
+// (`****hello** okay world**`); now the line becomes one bold span.
+test("bolding a line that is already partly bold makes it one bold span", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /^New note in / }).click();
+  await page.locator(".cm-content").last().click();
+  await page.keyboard.insertText("Draft\n\nhello");
+  await page.locator(".cm-line", { hasText: "hello" }).dblclick();
+  await boldButton(page).click();
+  await page.keyboard.press("End");
+  await page.keyboard.insertText(" okay world whayt is");
+  await page.locator(".cm-line", { hasText: "okay world" }).click({ clickCount: 3 });
+  await boldButton(page).click();
+
+  const raw = await rawText(page);
+  expect(raw).toContain("**hello okay world whayt is**");
+  expect(raw).not.toContain("***");
+});
