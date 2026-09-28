@@ -1371,19 +1371,6 @@ export async function corpusToggleTask(id: string, line: number, expect: string)
   await invoke("corpus_toggle_task", { id, line, expect });
 }
 
-/** Preview legacy secure-intake state in the default memex (read-only). */
-export async function secureRepairScan(): Promise<SecureRepairCandidate[]> {
-  if (!isTauri()) return [];
-  return invoke<SecureRepairCandidate[]>("corpus_secure_repair_scan");
-}
-
-/** Repair every current candidate — Rust re-validates each note on disk, moves
- * it into the protected lane ignore-first, and journals it content-free. */
-export async function secureRepairApply(): Promise<SecureRepairReport> {
-  if (!isTauri()) return { repaired: 0, failed: [] };
-  return invoke<SecureRepairReport>("corpus_secure_repair_apply");
-}
-
 /** The brain's memory lanes as AI-retrievable metas (identity/, personality/,
  * history/, MAP.md, inbox.md) — never part of corpusList, so no user surface can
  * accidentally show them. Metas only; per-note readability is still the Rust

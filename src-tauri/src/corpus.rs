@@ -8689,6 +8689,10 @@ pub fn corpus_views_write(
 #[path = "corpus_file_rename.rs"]
 pub mod file_rename;
 
+/// Leftover-alias cleanup (placeholders, typing trails) — a child module.
+#[path = "corpus_alias_cleanup.rs"]
+pub mod alias_cleanup;
+
 // ─── tests ───────────────────────────────────────────────────────────────────
 
 /// The prompt-injection evals — a fully cooperating, fully compromised caller

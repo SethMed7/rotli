@@ -12,8 +12,8 @@ import {
   isTauri,
   organizerSecureHints,
   organizerStatus,
-  secureRepairScan,
 } from "../lib/tauri";
+import { secureRepairScan } from "../lib/vaultRepair";
 import { useUiStore } from "../state/ui";
 import type { Note, NoteSummary } from "../types";
 import { readJournal } from "./brainJournalStore";

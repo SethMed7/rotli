@@ -452,7 +452,11 @@ The Rust corpus boundary independently validates every write.
   `untitled`, `untitled (2)`), and a half-typed title — autosave sees the
   title mid-typing, so a change where one title extends the other (`Round` →
   `Round Three`) records nothing, including a `round (2)` file name taken on
-  the way when that title collided with a sibling. Current
+  the way when that title collided with a sibling. Entries written before
+  that rule are removed only on the person's go-ahead (Settings → General →
+  Leftover note names, 2026-09-28): a placeholder, or an alias that is the
+  start of the current title, title slug, or filename stem, is dropped unless
+  some note's `[[link]]` (body or frontmatter) targets it. Current
   title, current filename stem, canonical title slug, and aliases all resolve
   local wikilinks and CLI note selectors; ambiguity fails closed and requires
   the stable `id`. Wikilink targets are normalized before resolution

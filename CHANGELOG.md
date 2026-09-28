@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Clean up leftover note names.** Older notes could carry names they never
+  really had in their metadata: "Untitled", "untitled (7)", or a title caught
+  half-typed ("Round", "Round Three -"). Settings → General → Leftover note
+  names counts them across your vault and removes them in one click. A name
+  that a link still uses is kept, so no link breaks. Mac app.
 - **Three more moods for your quokka.** Settings → Appearance → Idle mood now
   has Friendly (waving), Inquisitive (looking into things), and Adventurous
   (off exploring) beside the original five, each wearing your accessory.

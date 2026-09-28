@@ -2363,6 +2363,7 @@ pub fn run() {
             corpus::corpus_move,
             corpus::corpus_rename_board,
             corpus::file_rename::corpus_rename_managed_file,
+            corpus::alias_cleanup::corpus_alias_cleanup,
             breve::breve_snapshot,
             breve::breve_import_legacy,
             breve::breve_write_config,

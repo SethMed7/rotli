@@ -154,6 +154,7 @@ import {
   SunGlyph,
 } from "./glyphs";
 import { AboutPane } from "./settings/aboutPane";
+import { AliasCleanupSettings } from "./settings/aliasCleanupSettings";
 import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { ConnectorGuide } from "./settings/connectorGuide";
 import { Seg } from "./settings/seg";
@@ -919,6 +920,7 @@ function GeneralPane() {
 
       <WebVaultSettings />
       <WelcomeSettings disabled={memexConfig.data?.developmentReadOnly ?? import.meta.env.DEV} />
+      <AliasCleanupSettings native={isTauri()} />
       <UpdatesSection />
 
       <h4 className="sethead">Demo mode</h4>

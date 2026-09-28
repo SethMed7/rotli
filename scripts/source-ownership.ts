@@ -103,6 +103,7 @@ export const LIB_EFFECTFUL_FILE_OWNERS = {
   "quitFlush.ts": "native quit lifecycle adapter",
   "tabDrag.ts": "cross-surface tab drag workflow",
   "tauri.ts": "typed native-host adapter facade",
+  "vaultRepair.ts": "native vault repair passes (secure intake, leftover note names)",
   "useNow.ts": "shared React wall-clock subscription for presentation projections",
 } as const;
 

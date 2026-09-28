@@ -23,9 +23,9 @@ import {
   organizerDismissSecure,
   organizerRunOnce,
   organizerStop,
-  secureRepairApply,
 } from "../lib/tauri";
 import { toggledSet } from "../lib/toggledSet";
+import { secureRepairApply } from "../lib/vaultRepair";
 import { type BrainAction, canUndo, deriveJournal, describeAction } from "../services/brainJournal";
 import { approveProposal, dismissProposal, undoAction } from "../services/brainJournalComposition";
 import {

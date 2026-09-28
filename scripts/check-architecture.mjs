@@ -231,6 +231,7 @@ const tauriAllowlist = new Set([
   "src/lib/nativeDrag.ts",
   "src/lib/quitFlush.ts",
   "src/lib/tauri.ts",
+  "src/lib/vaultRepair.ts",
 ]);
 function walkSource(dir) {
   for (const name of readdirSync(dir)) {
