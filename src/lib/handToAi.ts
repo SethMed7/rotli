@@ -14,14 +14,14 @@ interface Tasks {
   done: string[];
 }
 
-/** The body minus its title line: the first H1, or else a plain first line
- * that is the title (Rotli's legacy title form). */
+/** The body minus its title line. Only the first line can be the title: an
+ * H1, or plain text equal to the title (Rotli's legacy title form). A `#`
+ * further down (a later heading, a shell comment in a code block) stays. */
 function withoutTitle(body: string, title: string): string[] {
   const lines = body.split("\n");
-  const h1 = lines.findIndex((line) => H1.test(line));
   const first = lines.findIndex((line) => line.trim() !== "");
-  const at = h1 >= 0 ? h1 : lines[first]?.trim() === title.trim() ? first : -1;
-  if (at >= 0) lines.splice(at, 1);
+  const line = lines[first];
+  if (line !== undefined && (H1.test(line) || line.trim() === title.trim())) lines.splice(first, 1);
   while (lines.length && !lines[0]?.trim()) lines.shift();
   while (lines.length && !lines[lines.length - 1]?.trim()) lines.pop();
   return lines;
