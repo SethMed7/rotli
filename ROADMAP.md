@@ -183,6 +183,9 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
   policy change); then a video tool, background jobs, and the provider behind
   Add-ons (M to XL, owner call on the source). The connected CLIs stay
   tool-less.
+
+## 4. Known bugs
+
 - **First drag and drop lands too high** · M — on the first drag, the drop does
   not line up with the pointer. Needs a reproduction first.
 - **A file dropped on a board lands somewhere else** · S — on the Mac a Finder
