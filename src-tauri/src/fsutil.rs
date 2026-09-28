@@ -199,3 +199,59 @@ pub(crate) fn atomic_write_bytes(path: &Path, contents: &[u8], prefix: &str) -> 
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod lock_tests {
+    use super::{with_file_lock_attempts, LOCK_STALE};
+    use std::path::Path;
+    use std::time::{Duration, SystemTime};
+
+    // 2026-09-27: the lock guards every corpus write and had no direct test.
+    fn plant_lock(target: &Path, pid: u32, age: Duration) -> std::path::PathBuf {
+        let lock = std::path::PathBuf::from(format!("{}.lock", target.display()));
+        std::fs::write(&lock, format!("{pid}\n")).unwrap();
+        let file = std::fs::File::options().write(true).open(&lock).unwrap();
+        file.set_modified(SystemTime::now() - age).unwrap();
+        lock
+    }
+
+    const GONE_PID: u32 = 4_000_000; // above any real PID: never alive
+
+    #[test]
+    fn a_stale_lock_whose_owner_is_gone_is_taken_over_and_released() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("note.md");
+        let lock = plant_lock(&target, GONE_PID, LOCK_STALE + Duration::from_secs(5));
+        let ran = with_file_lock_attempts(&target, 3, || Ok::<_, String>(true)).unwrap();
+        assert!(ran);
+        assert!(!lock.exists(), "the guard removes the lock when the work is done");
+    }
+
+    #[test]
+    fn a_stale_lock_whose_owner_is_alive_is_never_stolen() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("note.md");
+        let lock = plant_lock(&target, std::process::id(), LOCK_STALE + Duration::from_secs(5));
+        let error = with_file_lock_attempts(&target, 2, || Ok::<_, String>(())).unwrap_err();
+        assert!(error.contains("another writer"), "{error}");
+        assert!(lock.exists(), "a live writer keeps its lock");
+    }
+
+    #[test]
+    fn a_fresh_lock_is_waited_on_not_stolen() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("note.md");
+        let lock = plant_lock(&target, GONE_PID, Duration::ZERO);
+        assert!(with_file_lock_attempts(&target, 2, || Ok::<_, String>(())).is_err());
+        assert!(lock.exists());
+    }
+
+    #[test]
+    fn the_lock_is_released_even_when_the_work_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("note.md");
+        let error = with_file_lock_attempts(&target, 1, || Err::<(), _>("disk full".to_string())).unwrap_err();
+        assert_eq!(error, "disk full");
+        assert!(!std::path::PathBuf::from(format!("{}.lock", target.display())).exists());
+    }
+}

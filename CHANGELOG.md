@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A remote-agent relay on `http://[::1]` is accepted for development**, like
+  `127.0.0.1` and `localhost` already were: an IPv6 host arrives in brackets,
+  so the loopback check never matched it.
 - **A new web vault's Tasks page and This week card are right at once.** The
   Tasks page read "Nothing open" and the sidebar's This week card "0 new"
   until a reload, though the Welcome lessons had just arrived with thirty open
