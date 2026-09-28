@@ -3,7 +3,14 @@
 // playing a video (or any sound) takes over, and ambient comes back when it
 // stops (src/lib/ambient.ts).
 
-import { AMBIENT_TRACKS, type AmbientPrefs, DEFAULT_AMBIENT, trackForFamily } from "../../lib/ambient";
+import {
+  AMBIENT_SOURCES,
+  type AmbientPrefs,
+  DEFAULT_AMBIENT,
+  isStream,
+  trackForFamily,
+} from "../../lib/ambient";
+import { PLATFORM } from "../../lib/featurePolicy";
 import { useAmbient } from "../../state/ambient";
 import { useUiStore } from "../../state/ui";
 import { Seg } from "./seg";
@@ -50,9 +57,17 @@ export function AmbientSection({
       {prefs.enabled && (
         <Seg<string>
           value={prefs.track}
-          options={AMBIENT_TRACKS.map((track) => [track.id, track.title])}
+          options={AMBIENT_SOURCES.filter((source) => PLATFORM !== "web" || !isStream(source.id)).map(
+            (source) => [source.id, source.title],
+          )}
           onPick={(track) => setPrefs({ track })}
         />
+      )}
+      {prefs.enabled && isStream(prefs.track) && (
+        <p className="setnote">
+          Claude FM is Anthropic’s live lo-fi stream on YouTube. It plays in a private browser page you don’t
+          see, so it needs the internet; the six tracks play offline.
+        </p>
       )}
     </>
   );

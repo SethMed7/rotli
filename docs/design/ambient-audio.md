@@ -77,12 +77,46 @@ samples, MIT), one per theme family: Linen (warm), Graphite (mono), Tide
 They are copied byte for byte from the studio's `sound/web/`; the studio
 records the placement in its `publish/placements.json`.
 
+## Picking the sound, tucking a tab, Claude FM (2026-09-28, later)
+
+The owner: "choose my ambient song in the media player"; "collapse one audio
+tab … into the media tab"; "allow Claude FM to be the source … in a private
+browser that is collapsed into the media player"; and "all of the audio
+playing and pausing is extremely laggy".
+
+- **The source menu.** The ambient title in the player is a button that opens
+  the sources: the six tracks, then Claude FM (`AMBIENT_SOURCES`), the current
+  one highlighted. Choosing one starts it. Settings lists the same. Rotli Web
+  hides Claude FM (no private browser there).
+- **Claude FM** (`CLAUDE_FM` in `lib/ambient.ts`): Anthropic's 24/7 lo-fi
+  stream on YouTube, at the address Claude Code's `/radio` opens. As the
+  ambient source it plays in a private browser page with a fixed id
+  (`ambient-claude-fm`), 1×1 and hidden, never a tab. The service keeps it
+  matching the rules: when ambient should sound and the page isn't playing
+  (it may still be loading), it asks the page to play again every 2.5 s, and
+  the same for pause. It pauses when a tab plays, like the tracks; switching
+  to a track or turning ambient off closes the page. If WebKit won't start it
+  without a click, open Claude FM as an ordinary tab once, press play, and
+  tuck it in instead.
+- **Tucking a tab** (`services/mediaDock.ts`): the player offers "Tuck into
+  the player" for the tab it controls. The tab leaves its pane; its page is
+  marked retained (`lib/privateBrowser.ts`), so its surface skips the close on
+  unmount, and it keeps being asked "are you playing?". "Open the tab" puts
+  the same tab id back in the focused pane, whose new surface adopts the
+  living page (shows it, no reload). "Close the tab" ends it. One at a time.
+- **Responsiveness.** A button's result shows at once (the expected state is
+  set before WebKit answers, then two quick polls confirm it); ambient fades
+  out over ~0.1 s and starts audible, ramping over ~0.3 s; tabs are asked every
+  0.4 s while anything has media (1.5 s otherwise), one round at a time so
+  slow answers never pile up; the chosen track loads at launch.
+
 ## Known limits
 
 - A browser tab's page is destroyed, not hidden, when its surface unmounts:
   opening Settings, switching to Board or another full view, Breve mode, or
   dragging the tab to another pane. Its sound stops and the player lets it go.
-  So "watch a video, then open Settings" ends the video.
+  So "watch a video, then open Settings" ends the video — unless it is
+  tucked into the player first, which keeps its page alive.
 - Whether WebKit keeps a hidden (inactive) tab's sound playing is WebKit's
   behavior; Rotli only hides the view.
 

@@ -1,13 +1,17 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  AMBIENT_SOURCES,
   AMBIENT_TRACKS,
   ambientSrc,
+  CLAUDE_FM,
   DEFAULT_AMBIENT,
+  isStream,
   parseAmbient,
   playerView,
   stepTrack,
   trackForFamily,
+  trackTitle,
 } from "./ambient";
 
 const on = { enabled: true, track: "tide", playing: true };
@@ -45,7 +49,21 @@ describe("the ambient preference", () => {
     expect(stepTrack("linen", 1)).toBe("graphite");
     expect(stepTrack("linen", -1)).toBe("lamplight");
     expect(stepTrack("lamplight", 1)).toBe("linen");
-    expect(stepTrack("unknown", 1)).toBe("graphite");
+    // from Claude FM (a live stream), Next is the first track, Previous the last
+    expect(stepTrack(CLAUDE_FM.id, 1)).toBe("linen");
+    expect(stepTrack(CLAUDE_FM.id, -1)).toBe("lamplight");
+  });
+
+  test("Claude FM is a source the preference keeps and the menu offers, last", () => {
+    expect(parseAmbient({ enabled: true, track: "claude-fm", playing: true }).track).toBe("claude-fm");
+    expect(trackTitle("claude-fm")).toBe("Claude FM");
+    expect(isStream("claude-fm")).toBe(true);
+    expect(isStream("tide")).toBe(false);
+    expect(AMBIENT_SOURCES.map((source) => source.id)).toEqual([
+      ...AMBIENT_TRACKS.map((track) => track.id),
+      "claude-fm",
+    ]);
+    expect(CLAUDE_FM.url).toBe("https://clau.de/radio");
   });
 });
 

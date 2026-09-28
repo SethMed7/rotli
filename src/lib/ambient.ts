@@ -31,6 +31,20 @@ export const AMBIENT_TRACKS: readonly AmbientTrack[] = [
 
 export const ambientSrc = (id: string) => `/ambient/${id}.m4a`;
 
+/** Claude FM (the owner, 2026-09-28): Anthropic's 24/7 lo-fi stream on
+ * YouTube, the one Claude Code's /radio opens. Chosen as the ambient source,
+ * it plays in a private browser page that never shows, kept behind the
+ * player; it needs the network, unlike the tracks. */
+export const CLAUDE_FM = { id: "claude-fm", title: "Claude FM", url: "https://clau.de/radio" } as const;
+
+export const isStream = (id: string): boolean => id === CLAUDE_FM.id;
+
+/** Everything the player's menu offers: the tracks, then Claude FM. */
+export const AMBIENT_SOURCES: readonly { id: string; title: string }[] = [
+  ...AMBIENT_TRACKS,
+  { id: CLAUDE_FM.id, title: CLAUDE_FM.title },
+];
+
 export interface AmbientPrefs {
   enabled: boolean;
   track: string;
@@ -41,7 +55,7 @@ export interface AmbientPrefs {
 
 export const DEFAULT_AMBIENT: AmbientPrefs = { enabled: false, track: "linen", playing: false };
 
-const known = (id: unknown): id is string => AMBIENT_TRACKS.some((track) => track.id === id);
+const known = (id: unknown): id is string => AMBIENT_SOURCES.some((source) => source.id === id);
 
 /** The preference read tolerantly: anything missing or malformed is the default. */
 export function parseAmbient(value: unknown): AmbientPrefs {
@@ -60,15 +74,15 @@ export function trackForFamily(family: string): string {
 }
 
 export function trackTitle(id: string): string {
-  return AMBIENT_TRACKS.find((track) => track.id === id)?.title ?? id;
+  return AMBIENT_SOURCES.find((source) => source.id === id)?.title ?? id;
 }
 
-/** The track before or after `id`, wrapping around. */
+/** The track before or after `id`, wrapping around. From Claude FM (a live
+ * stream, nothing to skip), Next goes to the first track and Previous to the
+ * last. */
 export function stepTrack(id: string, step: 1 | -1): string {
-  const at = Math.max(
-    0,
-    AMBIENT_TRACKS.findIndex((track) => track.id === id),
-  );
+  const at = AMBIENT_TRACKS.findIndex((track) => track.id === id);
+  if (at < 0) return AMBIENT_TRACKS[step === 1 ? 0 : AMBIENT_TRACKS.length - 1]!.id;
   const next = (at + step + AMBIENT_TRACKS.length) % AMBIENT_TRACKS.length;
   return AMBIENT_TRACKS[next]!.id;
 }

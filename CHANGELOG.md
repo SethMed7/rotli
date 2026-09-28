@@ -35,6 +35,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   play/pause, stop, next (YouTube's own buttons on YouTube), and open the tab.
   With Ambient audio off, the player appears only while a tab has something
   playing. Mac app, macOS 12 or later.
+- **The player answers at once.** Play, pause and stop show their result the
+  moment you press them, ambient fades out in about a tenth of a second
+  instead of half a second, a tab's sound is noticed within half a second,
+  and the chosen track is loaded before you press play.
+- **Pick the ambient sound from the player.** Click the title ("Ambient ·
+  Tide") for the list: the six tracks, and **Claude FM**, Anthropic's live
+  lo-fi stream. Claude FM plays in a private browser page you never see, so
+  it needs the internet; Settings → General lists it too. Mac app.
+- **Tuck a playing tab into the player.** A browser tab playing sound can
+  leave the tab bar and keep playing in the sidebar player. Open the tab brings
+  it back where you are, still playing, without reloading; Close ends it. One
+  tab at a time. Mac app.
 
 - **Tell the Librarian how things are.** In `/librarian`, say something like
   "Ana and Leo are work people; so was Sam, but not anymore". The Librarian

@@ -34,3 +34,33 @@ test("Ambient audio: turned on in Settings, the player sits above the footer", a
   ]);
   expect(playerBox && footerBox && playerBox.y + playerBox.height <= footerBox.y + 1).toBe(true);
 });
+
+// 2026-09-28, the owner: "choose my ambient song in the media player".
+test("the player's title picks the ambient sound: any track, or Claude FM", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("switch", { name: /Ambient audio/ }).click();
+  await page.getByRole("button", { name: "Back to notes", exact: true }).click();
+
+  const player = page.getByRole("region", { name: "Now playing" });
+  await player.getByRole("button", { name: /^Choose the ambient sound/ }).click();
+  const menu = page.getByRole("menu");
+  // the six tracks, then Claude FM; the one playing is the highlighted row
+  await expect(menu.getByRole("menuitemcheckbox")).toHaveText([
+    "Linen",
+    "Graphite",
+    "Tide",
+    "Canopy",
+    "Dusk",
+    "Lamplight",
+    "Claude FM",
+  ]);
+  await expect(menu.getByRole("menuitemcheckbox", { name: "Linen" })).toHaveAttribute("aria-checked", "true");
+  await menu.getByRole("menuitemcheckbox", { name: "Canopy" }).click();
+  await expect(player).toContainText("Ambient · Canopy");
+  // (choosing also starts it — services/ambient.test.ts; this browser can't play AAC)
+
+  await player.getByRole("button", { name: /^Choose the ambient sound/ }).click();
+  await page.getByRole("menu").getByRole("menuitemcheckbox", { name: "Claude FM" }).click();
+  await expect(player).toContainText("Ambient · Claude FM");
+});

@@ -4,7 +4,15 @@ import { DEFAULT_AMBIENT } from "../lib/ambient";
 import { setTabMedia, useAmbient, useTabMedia } from "../state/ambient";
 import { activeTabOf, usePanesStore } from "../state/panes";
 import { leaves } from "../state/paneTree";
-import { openMediaTab, pollTabMedia, stepAmbient, stopAmbient, toggleAmbient } from "./ambient";
+import {
+  chooseAmbient,
+  openMediaTab,
+  pollTabMedia,
+  stepAmbient,
+  stopAmbient,
+  tabMediaAction,
+  toggleAmbient,
+} from "./ambient";
 
 beforeEach(() => {
   useTabMedia.setState({ media: {}, recent: null, inApp: false });
@@ -34,6 +42,21 @@ describe("the player's buttons", () => {
     stepAmbient(-1);
     stepAmbient(-1);
     expect(useAmbient.getState().prefs.track).toBe("lamplight");
+  });
+
+  test("a tab's button shows its result at once, before the page answers", () => {
+    setTabMedia("t1", "playing");
+    tabMediaAction("t1", "pause");
+    expect(useTabMedia.getState().media.t1).toBe("paused");
+    tabMediaAction("t1", "play");
+    expect(useTabMedia.getState().media.t1).toBe("playing");
+  });
+
+  test("the menu picks a track or Claude FM, and starts it", () => {
+    chooseAmbient("claude-fm");
+    expect(useAmbient.getState().prefs).toMatchObject({ track: "claude-fm", playing: true });
+    chooseAmbient("dusk");
+    expect(useAmbient.getState().prefs.track).toBe("dusk");
   });
 
   test("open the tab: its pane shows it", () => {

@@ -126,6 +126,7 @@ export const SERVICE_FILE_OWNERS = {
   "chatRename.ts": "chat",
   "handToAi.ts": "notes",
   "ambient.ts": "ambient audio + the sidebar player (tab media polling, the ambient track)",
+  "mediaDock.ts": "ambient (a browser tab tucked into the sidebar player)",
   "mainWindowWork.ts": "app shell (the main window's lifelong background work)",
   "librarianBar.ts": "librarian (the /librarian bar: gate, one model call, journaled apply)",
   "librarianPeople.ts": "librarian (statements: rules, People groups, new people notes, journaled)",

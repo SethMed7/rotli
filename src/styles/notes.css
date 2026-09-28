@@ -2624,6 +2624,21 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* the ambient title is also the source picker (a menu of the tracks and
+   Claude FM): a quiet button that reads as the title until hovered */
+.sb-player-source {
+  border: none;
+  background: none;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  font: inherit;
+  text-align: left;
+  border-radius: var(--r-control);
+  cursor: pointer;
+}
+.sb-player-source:hover {
+  background: color-mix(in srgb, var(--hov) 62%, transparent);
+}
 .sb-player-controls {
   flex: 0 0 auto;
   display: flex;

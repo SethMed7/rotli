@@ -8,20 +8,25 @@
 import type { ReactNode } from "react";
 import { useSyncExternalStore } from "react";
 
-import { type PlayerView, playerView, trackTitle } from "../../lib/ambient";
+import { AMBIENT_SOURCES, isStream, type PlayerView, playerView, trackTitle } from "../../lib/ambient";
+import { PLATFORM } from "../../lib/featurePolicy";
 import {
   privateBrowserTabTitle,
   privateBrowserTitleSnapshot,
   subscribePrivateBrowserTitles,
 } from "../../lib/privateBrowser";
 import {
+  chooseAmbient,
   openMediaTab,
   stepAmbient,
   stopAmbient,
   tabMediaAction,
   toggleAmbient,
 } from "../../services/ambient";
+import { bringBackTab, closeTuckedTab, tuckTab } from "../../services/mediaDock";
 import { useAmbient, useTabMedia } from "../../state/ambient";
+import { useContextMenu } from "../../state/contextMenu";
+import { useMediaDock } from "../../state/mediaDock";
 import { ExternalLinkGlyph, SquareGlyph } from "../glyphs";
 
 function Svg({ children }: { children: ReactNode }) {
@@ -67,7 +72,45 @@ export const AmbientGlyph = () => (
 );
 
 /** The other buttons' names (tests read them from here too). */
-export const LABELS = { play: "Play", pause: "Pause", stop: "Stop", open: "Open the tab" } as const;
+export const LABELS = {
+  play: "Play",
+  pause: "Pause",
+  stop: "Stop",
+  open: "Open the tab",
+  tuck: "Tuck into the player",
+  close: "Close the tab",
+  choose: "Choose the ambient sound",
+} as const;
+
+/** A tab folding down into a bar: tuck it into the player. */
+const TuckGlyph = () => (
+  <Svg>
+    <path d="M11 4h2v8.2l3.3-3.3 1.4 1.4L12 16l-5.7-5.7 1.4-1.4 3.3 3.3zM5 18h14v2H5z" />
+  </Svg>
+);
+const CloseGlyph = () => (
+  <Svg>
+    <path d="M7.4 6 12 10.6 16.6 6 18 7.4 13.4 12l4.6 4.6-1.4 1.4-4.6-4.6L7.4 18 6 16.6l4.6-4.6L6 7.4z" />
+  </Svg>
+);
+
+/** The ambient sources as a menu under the player's title; the one playing
+ * is the highlighted row. */
+function openSourceMenu(anchor: HTMLElement, current: string): void {
+  const rect = anchor.getBoundingClientRect();
+  useContextMenu.getState().open(
+    rect.left,
+    rect.bottom + 4,
+    // Claude FM plays in the Mac app's private browser, which Rotli Web hasn't
+    AMBIENT_SOURCES.filter((source) => PLATFORM !== "web" || !isStream(source.id)).map((source) => ({
+      kind: "action" as const,
+      label: source.title,
+      checked: source.id === current,
+      checkedMark: "highlight" as const,
+      onClick: () => chooseAmbient(source.id),
+    })),
+  );
+}
 
 /** The skip buttons, for a tab's media and for the ambient tracks. */
 export const SKIP = {
@@ -89,6 +132,7 @@ export function MediaPlayer() {
   const media = useTabMedia((s) => s.media);
   const recent = useTabMedia((s) => s.recent);
   const inApp = useTabMedia((s) => s.inApp);
+  const docked = useMediaDock((s) => s.tabId);
   useSyncExternalStore(subscribePrivateBrowserTitles, privateBrowserTitleSnapshot);
   const view = playerView(prefs, media, recent, inApp);
   if (!view.visible) return null;
@@ -99,6 +143,9 @@ export function MediaPlayer() {
       ambientTitle={trackTitle(prefs.track)}
       ambientWanted={prefs.playing}
       onAmbientPlay={() => setPrefs({ playing: !prefs.playing })}
+      tucked={!!view.tab && view.tab === docked}
+      canTuck={!docked}
+      onChooseSource={(anchor) => openSourceMenu(anchor, prefs.track)}
     />
   );
 }
@@ -110,12 +157,20 @@ export function Player({
   ambientTitle,
   ambientWanted,
   onAmbientPlay,
+  tucked = false,
+  canTuck = true,
+  onChooseSource,
 }: {
   view: PlayerView;
   title: string;
   ambientTitle: string;
   ambientWanted: boolean;
   onAmbientPlay: () => void;
+  /** The tab is tucked into the player (no pane shows it). */
+  tucked?: boolean;
+  /** No tab is tucked yet, so this one may be. */
+  canTuck?: boolean;
+  onChooseSource?: (anchor: HTMLElement) => void;
 }) {
   const tab = view.tab;
   return (
@@ -133,10 +188,24 @@ export function Player({
         </button>
       )}
       <div className="sb-player-main">
-        <span className="sb-player-title" title={title}>
-          {!tab && <AmbientGlyph />}
-          <span>{title}</span>
-        </span>
+        {tab || !onChooseSource ? (
+          <span className="sb-player-title" title={title}>
+            {!tab && <AmbientGlyph />}
+            <span>{title}</span>
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="sb-player-title sb-player-source"
+            title={LABELS.choose}
+            aria-label={`${LABELS.choose}: ${ambientTitle}`}
+            aria-haspopup="menu"
+            onClick={(event) => onChooseSource(event.currentTarget)}
+          >
+            <AmbientGlyph />
+            <span>{title}</span>
+          </button>
+        )}
         {tab ? (
           <div className="sb-player-controls">
             <Control label={SKIP.back.tab} onClick={() => tabMediaAction(tab, SKIP.back.action)}>
@@ -154,9 +223,20 @@ export function Player({
             <Control label={SKIP.ahead.tab} onClick={() => tabMediaAction(tab, SKIP.ahead.action)}>
               <SkipGlyph />
             </Control>
-            <Control label={LABELS.open} onClick={() => openMediaTab(tab)}>
+            <Control label={LABELS.open} onClick={() => (tucked ? bringBackTab() : openMediaTab(tab))}>
               <ExternalLinkGlyph size={13} />
             </Control>
+            {tucked ? (
+              <Control label={LABELS.close} onClick={closeTuckedTab}>
+                <CloseGlyph />
+              </Control>
+            ) : (
+              canTuck && (
+                <Control label={LABELS.tuck} onClick={() => void tuckTab(tab)}>
+                  <TuckGlyph />
+                </Control>
+              )
+            )}
           </div>
         ) : (
           <div className="sb-player-controls">
