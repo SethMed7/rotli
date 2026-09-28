@@ -61,4 +61,12 @@ describe("Hand to AI prompt", () => {
     expect(prompt).toContain("None are written as tasks");
     expect(prompt).toContain("- [ ] not a task\n```\n</note>");
   });
+
+  test("only the first line can be the title: a # comment in a code block stays", () => {
+    const body = "Deploy\n\nRun the script.\n\n```sh\n# build first\nbun run build\n```\n";
+    const prompt = buildHandToAiPrompt({ title: "Deploy", body });
+    expect(prompt).toContain("## Goal\n\nRun the script.");
+    expect(prompt).toContain("```sh\n# build first\nbun run build");
+    expect(prompt).not.toContain("<note>\nDeploy");
+  });
 });
