@@ -59,7 +59,7 @@ pub(crate) fn validate_scene(raw: &str) -> Result<Value, String> {
 }
 
 /// Where a value sits: an embedded file's `dataURL` is image bytes as a
-/// `data:` URL, the one string allowed past the per-string cap (a 75 KB image
+/// `data:image/` URL, the one string allowed past the per-string cap (a 75 KB image
 /// outgrew it). `BOARD_MAX_BYTES` still bounds it. TS twin:
 /// src/boards/validation.ts `Place`.
 #[derive(Clone, Copy, PartialEq)]
@@ -73,7 +73,7 @@ enum Place {
 fn is_file_data_url(place: Place, key: &str, child: &Value) -> bool {
     place == Place::File
         && key == "dataURL"
-        && child.as_str().is_some_and(|text| text.starts_with("data:"))
+        && child.as_str().is_some_and(|text| text.starts_with("data:image/"))
 }
 
 fn validate_value(
@@ -178,7 +178,7 @@ mod tests {
 
     // Round Three (2026-09-26): an embedded image is a data: URL string; the
     // per-string cap refused any image over ~75 KB. Only files.<id>.dataURL
-    // with a data: prefix is exempt; the 8 MB board limit still bounds it.
+    // with a data:image/ prefix is exempt; the 8 MB board limit still bounds it.
     #[test]
     fn an_embedded_image_past_the_string_cap_is_accepted_only_as_a_file_data_url() {
         let big = format!("data:image/png;base64,{}", "A".repeat(150_000));
@@ -197,6 +197,12 @@ mod tests {
         .is_err());
         assert!(validate_scene(
             &json!({"type":"excalidraw","elements":[{"dataURL": big}]}).to_string()
+        )
+        .is_err());
+        // an image, not any data: payload (audit 2026-09-28)
+        let page = format!("data:text/html,{}", "A".repeat(150_000));
+        assert!(validate_scene(
+            &json!({"type":"excalidraw","elements":[],"files":{"img1":{"dataURL": page}}}).to_string()
         )
         .is_err());
     }

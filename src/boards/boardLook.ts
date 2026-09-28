@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
-import { boardCanvasLook, isUnchosenBoardBackground } from "../brand/boardBackground";
+import { boardCanvasLook, boardRepaint } from "../brand/boardBackground";
 import { useIsDarkTheme } from "../state/theme";
 import { useUiStore } from "../state/ui";
 
@@ -35,10 +35,8 @@ export function useBoardLook<T>(initialData: T) {
     api.current = next as BoardLookApi;
   }, []);
   useEffect(() => {
-    const current = api.current?.getAppState().viewBackgroundColor;
-    if (typeof current !== "string" || !isUnchosenBoardBackground(current) || current === look.background)
-      return;
-    api.current?.updateScene({ appState: { viewBackgroundColor: look.background } });
+    const next = boardRepaint(api.current?.getAppState().viewBackgroundColor, look.background);
+    if (next !== null) api.current?.updateScene({ appState: { viewBackgroundColor: next } });
   }, [look.background]);
   return { theme: look.theme, initialData: data, bindApi };
 }
