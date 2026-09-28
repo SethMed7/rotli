@@ -1,9 +1,7 @@
 // Talk to the Librarian (`/librarian`, 2026-09-28; plan: docs/design/librarian-bar.md).
-// The pure half: the prompt, the reply grammar, and the metadata it writes —
+// The pure half: the reply grammar and the metadata it writes —
 // tags merged into `tags`, and text-quote pointers to passages in `anchors`.
 // Nothing here calls a model or touches a file.
-
-import type { CompleteReq } from "../ai/types";
 
 /** A pointer to a passage: its words, a little text on each side, and an
  * optional short name. It finds the passage again without changing the note. */
@@ -16,7 +14,7 @@ export interface Anchor {
 
 export const ANCHOR_LIMITS = { exact: 280, context: 32, label: 80, perNote: 20 } as const;
 const TAG_MAX = 40;
-const EXCERPT_MAX = 4000;
+export const EXCERPT_MAX = 4000;
 /** The one area filing may create when it's missing (the owner, Round Three). */
 export const PEOPLE_AREA = "People";
 
@@ -128,54 +126,14 @@ export function mergeTags(value: string, add: readonly string[]): string {
   return `[${tags.join(", ")}]`;
 }
 
-// ── the prompt ───────────────────────────────────────────────────────────────
-
-export interface LibrarianAsk {
-  title: string;
-  request: string;
-  /** The highlighted passage, when there is one. */
-  highlight: Anchor | null;
-  /** The note's text (trimmed to an excerpt for the prompt). */
-  doc: string;
-  /** The Library's areas, for filing. */
-  areas: readonly string[];
-  tags: readonly string[];
-}
-
-const SYSTEM = `You are the Librarian of a personal notes vault. You organize notes; you never rewrite them.
-Reply with ONE JSON object and nothing else, in this shape:
-{"actions":[{"type":"tag","tags":["..."]},{"type":"mark","exact":"...","label":"..."},{"type":"file","area":"..."}]}
-- "tag": short lowercase tags for the whole note.
-- "mark": point at a passage. "exact" must be words copied from the note; "label" is a short optional name.
-- "file": move the note into one of the listed areas (or "${PEOPLE_AREA}" for a note about a person).
-Use only the actions the request calls for. If nothing fits, reply {"actions":[]}.`;
-
-/** Everything the prompt sends, as one text — what the secret check reads. */
-export function librarianPromptText(ask: LibrarianAsk): string {
-  const lines = [
-    `Note title: ${ask.title}`,
-    `Current tags: ${ask.tags.join(", ") || "(none)"}`,
-    `Library areas: ${ask.areas.join(", ") || "(none)"}`,
-  ];
-  if (ask.highlight) {
-    lines.push(`Highlighted passage: """${ask.highlight.exact}"""`);
-  }
-  lines.push(`Request: ${ask.request}`, "", "The note:", ask.doc.slice(0, EXCERPT_MAX));
-  return lines.join("\n");
-}
-
-export function librarianMessages(ask: LibrarianAsk): CompleteReq["messages"] {
-  return [
-    { role: "system", content: SYSTEM },
-    { role: "user", content: librarianPromptText(ask) },
-  ];
-}
-
 // ── the reply ────────────────────────────────────────────────────────────────
 
 /** The first JSON object in `text` that has an `actions` array (the reply may
- * be wrapped in prose or a code fence). */
-function actionsObject(text: string): unknown[] | null {
+ * be wrapped in prose or a code fence), and where it sits, so a conversation
+ * can show the prose around it. */
+export function actionsBlock(
+  text: string,
+): { actions: unknown[]; handoff?: unknown; start: number; end: number } | null {
   for (let start = text.indexOf("{"); start >= 0; start = text.indexOf("{", start + 1)) {
     let depth = 0;
     let inString = false;
@@ -190,8 +148,9 @@ function actionsObject(text: string): unknown[] | null {
       else if (ch === "{") depth++;
       else if (ch === "}" && --depth === 0) {
         try {
-          const parsed = JSON.parse(text.slice(start, i + 1)) as { actions?: unknown };
-          if (Array.isArray(parsed.actions)) return parsed.actions;
+          const parsed = JSON.parse(text.slice(start, i + 1)) as { actions?: unknown; handoff?: unknown };
+          if (Array.isArray(parsed.actions))
+            return { actions: parsed.actions, handoff: parsed.handoff, start, end: i + 1 };
         } catch {
           // not JSON — try the next opening brace
         }
@@ -208,7 +167,7 @@ export function parseLibrarianReply(
   reply: string,
   context: { doc: string; highlight: Anchor | null; areas: readonly string[] },
 ): LibrarianAction[] {
-  const raw = actionsObject(reply) ?? [];
+  const raw = actionsBlock(reply)?.actions ?? [];
   const actions: LibrarianAction[] = [];
   let filed = false;
   for (const item of raw) {

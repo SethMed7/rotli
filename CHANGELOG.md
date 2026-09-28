@@ -12,6 +12,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The Librarian, as a chat.** After your first ask, the Librarian pops out
+  into the bottom-right corner of the pane you're in, like the chat on a
+  website, and the format bar comes back. Keep talking with the model you
+  picked. It is still the Librarian, not a second Chat: it organizes this note
+  (tags, marked passages, filing), asks what you mean when it needs to, and
+  lists what it would change for you to tick and apply, right in the
+  conversation. Ask it for anything else (an answer, a draft, research) and it
+  says so in one line and offers **Take this to Chat**, which opens a new chat
+  about the note with your question already typed; **Open in Chat** is always
+  in its header. Quick asks ("Suggest tags", "File this note", "Mark the
+  highlighted passage") sit above the box. Each question carries the passage
+  you had highlighted.
+  The model picker is now the searchable one from Chat, grouped by provider.
+  The passage you highlight stays highlighted while you type to the Librarian
+  (it used to vanish as soon as you clicked into the bar). Escape or − tucks
+  the chat into a button in the same corner; × ends the conversation. The
+  conversation lasts while the app is open and is never saved to your vault.
+  Mac app.
 - **Talk to the Librarian from a note.** Type `/librarian` and the format bar
   becomes a small Librarian bar: pick a model, highlight a passage if you like,
   and ask ("tag this", "mark this passage", "file it with People"). The

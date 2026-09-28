@@ -28,6 +28,8 @@ export interface EditorHandle {
   getSelection?(): { doc: string; from: number; to: number } | null;
   /** Select a range and scroll it into view (a passage pointer's jump). */
   selectRange?(from: number, to: number): void;
+  /** Keep a passage painted while focus is elsewhere (the Librarian), or clear it. */
+  markPassage?(range: { from: number; to: number } | null): void;
 }
 
 // Every mounted editor surface registers its handle under its pane id; the

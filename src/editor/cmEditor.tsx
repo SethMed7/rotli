@@ -43,7 +43,7 @@ import { copyHandlers } from "./copyHandlers";
 import { emptyPlaceholder } from "./emptyPlaceholder";
 import { importImagePathsAtPosition, isEmbeddablePath } from "./externalImageDrop";
 import { findTextMatches, nextFindMatch } from "./find";
-import { findHighlight, setFindMarks } from "./findHighlight";
+import { findHighlight, passageHighlight, setFindMarks, setPassageMark } from "./findHighlight";
 import { fmBlock } from "./fmBlock";
 import { focusDim } from "./focusMode";
 import { headingFolding, toggleHeadingFold } from "./headingFold";
@@ -303,6 +303,7 @@ function CmEditorImpl({
       const { from, to } = state?.selection.main ?? { from: 0, to: 0 };
       return state ? { doc: state.doc.toString(), from, to } : null;
     },
+    markPassage: (range) => viewRef.current?.dispatch({ effects: setPassageMark.of(range) }),
     selectRange: (from, to) => {
       viewRef.current?.dispatch({ selection: EditorSelection.range(from, to), scrollIntoView: true });
       viewRef.current?.focus();
@@ -552,6 +553,7 @@ function CmEditorImpl({
         history(),
         listNumbering,
         findHighlight,
+        passageHighlight,
         // the slash menu owns ↑/↓/Enter/Esc while open — highest precedence so
         // it wins before the keymaps; stops propagation so Esc closes the menu
         // and never also hides the window (the old stopImmediatePropagation)

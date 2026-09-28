@@ -1,6 +1,6 @@
 // Talk to the Librarian (`/librarian`, 2026-09-28): the slash command swaps the
-// format bar for the Librarian bar in this pane, and Escape puts the format
-// bar back. The model call and the metadata writes are Mac-only (proved by
+// format bar for the Librarian bar in this pane, the highlighted passage stays
+// painted while focus is in the bar, and Escape puts the format bar back. The model call and the metadata writes are Mac-only (proved by
 // src/services/librarianBar.test.ts and a native check); outside the Mac app
 // the bar says so in one sentence and offers nothing else.
 
@@ -32,10 +32,16 @@ test("/librarian swaps the format bar for the Librarian bar, and Escape brings i
 
   // the live highlight chip follows the note's selection
   await page.locator(".cm-line", { hasText: "design meetup" }).dblclick({ position: { x: 5, y: 5 } });
-  await expect(bar.locator(".libbar-chip")).not.toHaveText("Highlight a passage to mark it");
+  await expect(bar.locator(".libbar-chip")).not.toHaveText("Highlight a passage to ask about it");
 
+  // focus moves into the Librarian, and the highlighted passage stays painted
   await bar.getByRole("button", { name: "Close the Librarian" }).focus();
+  const passage = page.locator(".cm-librarian-passage");
+  await expect(passage).toHaveCount(1);
+  await expect(passage).toHaveText("Met");
+
   await page.keyboard.press("Escape");
   await expect(bar).toHaveCount(0);
   await expect(formatBar).toBeVisible();
+  await expect(passage).toHaveCount(0);
 });

@@ -1,4 +1,5 @@
-// Paints "Find in this file" matches into the document (2026-09-26). The find
+// Paints "Find in this file" matches (2026-09-26) and the Librarian's passage
+// into the document. The find
 // bar moves the editor's selection to the current match, but a selection only
 // paints while the editor has focus — and focus stays in the find box — so the
 // matches are drawn as marks instead: every match, and the current one more
@@ -36,6 +37,29 @@ export const findHighlight = StateField.define<DecorationSet>({
     let next = value.map(tr.changes);
     for (const effect of tr.effects) {
       if (effect.is(setFindMarks)) next = build(effect.value, tr.newDoc.length);
+    }
+    return next;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
+// The Librarian's passage (2026-09-28): the same problem as Find — focus sits
+// in the Librarian's box, so the highlighted passage would stop painting the
+// moment the person starts typing. It is drawn as a mark while the Librarian
+// is open, and follows edits like the find marks do.
+export const setPassageMark = StateEffect.define<{ from: number; to: number } | null>();
+
+const passageMark = Decoration.mark({ class: "cm-librarian-passage" });
+
+export const passageHighlight = StateField.define<DecorationSet>({
+  create: () => Decoration.none,
+  update(value, tr) {
+    let next = value.map(tr.changes);
+    for (const effect of tr.effects) {
+      if (!effect.is(setPassageMark)) continue;
+      const range = effect.value;
+      const valid = range && range.from < range.to && range.to <= tr.newDoc.length;
+      next = valid ? Decoration.set([passageMark.range(range.from, range.to)]) : Decoration.none;
     }
     return next;
   },

@@ -1,7 +1,8 @@
-# Talk to the Librarian (`/librarian`) — slice 1 plan
+# Talk to the Librarian (`/librarian`) — slice 1 plan, and the conversation
 
 Status: building (2026-09-28, the owner: "I wanted everything in this branch").
-Slice 1's contract and logic are PR A; the bar is PR B. Owner decisions from Round
+Slice 1's contract and logic are PR A; the bar is PR B; the conversation (slice 2,
+part one) is PR C, on `feat/librarian-chat`. Owner decisions from Round
 Three are recorded in [ROADMAP.md](../../ROADMAP.md) under "Talk to the
 Librarian". This document is the build plan for slice 1 and the contract
 changes it needs; the owning contracts stay
@@ -29,9 +30,11 @@ feature: the note's metadata panel lists its marked passages, and clicking one
 selects and scrolls to the passage in the editor (the same selection path Find
 uses). A pointer whose words are gone says so instead of guessing.
 
-Slice 2 (not here): new notes from a highlight (people notes, a People folder
-created when missing unless a rule says otherwise), multi-turn conversation,
-and "Open in Chat" to continue full size.
+Slice 2, part one (built 2026-09-28, see "The conversation" below): after the
+first ask the bar pops out into a multi-turn chat in the pane's corner. Still
+to come: new notes from a highlight (people notes, a People folder created
+when missing unless a rule says otherwise), and "Open in Chat" to continue full
+size.
 
 ## Who may use it — checked before any model call
 
@@ -60,13 +63,20 @@ Unknown frontmatter state counts as locked and secure.
 
 ## Model
 
-A compact picker in the bar lists the models the user has connected (the chat
-picker's source, `mergedModels` without hybrid presets). It defaults to the
+The bar and the chat use the chat composer's picker (`ModelPicker`,
+searchable and grouped by provider) over the models the user has connected
+(`mergedModels` without hybrid presets). It defaults to the
 Librarian's own choice (`organizerModel` / `organizerModelId`, only when that
-provider is switched on), else the on-device default. One call through
+provider is switched on), else the on-device default. One call per turn through
 `makeTauriHost(model).complete`, with `isSecureContext` wired as a backstop.
-The reply is JSON parsed tolerantly against this grammar (the unit tests pin
-it):
+Each turn sends the rules and the note as it is now (title, tags, areas, an
+excerpt), then the conversation so far, the person's messages carrying the
+passage highlighted when they sent them (`src/lib/librarianChat.ts`). The
+reply is prose, and when the person asks to organize, it ends with one JSON
+object; the prose is shown, and the object is parsed tolerantly against this
+grammar (the unit tests pin it). A turn carries the latest 12 turns of the
+conversation (`HISTORY_TURNS`), so the context stays bounded; there is no
+`formatJson` coercion, since the reply is prose first:
 
 ```json
 { "actions": [
@@ -77,7 +87,8 @@ it):
 ```
 
 - The reply may be wrapped in prose or a code fence; the first JSON object
-  with an `actions` array is taken. Anything else is "no proposal".
+  with an `actions` array is taken, and lifted out of what the chat shows.
+  Anything else is a reply with nothing to apply.
 - `tag`: `tags` is required, a non-empty list of strings. Each tag is trimmed
   and loses `,`, `[`, and `]`. Empty and duplicate tags are dropped, and a tag
   over 40 characters is dropped.
@@ -110,11 +121,47 @@ rather than guessing. The organizer never writes it
 
 - The bar opens on `/librarian` even when the format bar is hidden
   (`formatBarVisible` off); Escape returns whatever the slot held before.
-- The bar shows a live chip of the highlighted text (CodeMirror keeps its
-  selection when focus moves into the bar) and snapshots the selection when
-  the user sends, so a later click cannot change what was asked about.
+- The bar shows a live chip of the highlighted text and snapshots the
+  selection when the user sends, so a later click cannot change what was asked
+  about. CodeMirror keeps its selection when focus moves into the bar, but the
+  browser stops painting it, so while the Librarian is open the passage is
+  painted as a mark (`passageHighlight` in `findHighlight.ts`, the same pattern
+  as Find), following edits and cleared when the Librarian closes.
 - `LibrarianBar` lives in its own file; `cmEditor.tsx`, `editorSurface.tsx`,
   and `slashMenu.tsx` only gain the seam (size ceilings).
+
+## The conversation
+
+The first ask pops the bar out: the conversation moves into a chat in the
+pane's bottom-right corner (`src/editor/librarianChat.tsx`), above the format
+bar when it shows, and the format bar comes back.
+
+It is the Librarian, not a chatbot (the owner, 2026-09-28: "/librarian is here
+to help organize things like metadata, not to replace chat"). Its header says
+"organizes this note", its quick asks are organizing asks, and its rules tell
+the model to organize only. A request for anything else (answering or
+explaining, writing, research, conversation) gets one sentence and
+`{"actions":[],"handoff":"chat"}`; that reply offers **Take this to Chat**,
+which opens a new chat about the note (`openChatForNoteId`, a new tab) with the
+question, and the passage it was about, typed into its composer, never sent.
+A reply that proposes changes is organizing, so a `handoff` beside actions is
+ignored. **Open in Chat** in the header does the same for the latest question
+at any time. It holds one conversation,
+about one note, in one pane (`state/librarianBar.ts`); another note in that
+pane hides it, and `/librarian` again continues it. Every turn:
+
+1. The same refusals as the bar gate the first ask; every turn runs the secret
+   check on the whole outgoing conversation before the call.
+2. The reply's prose joins the conversation. Its proposals (if any) show as a
+   checklist inside that reply, with Not now and Apply; applying goes through
+   the same journaled `applyLibrarian`, and the reply then says how many
+   changes were made and links to Librarian Activity for Undo.
+3. One message at a time; a reply that lands after the chat was closed or
+   restarted is dropped.
+
+Escape or − tucks the chat into a button in the same corner; × ends the
+conversation. The conversation lives in memory for the app session and is
+never written to the vault.
 
 ## Order of operations
 
@@ -154,3 +201,21 @@ Stacking: PR A targets `feat/hand-to-ai` (#101) until that merges; then
 Browser tests cannot write Librarian metadata (the web build has no filer
 lane), so the Mac app needs a hand check: tag, mark, and file a Library note;
 see each in Librarian Activity; Undo each; a locked and a secure note refuse.
+
+The conversation adds its own (the web build refuses the Librarian before any
+of it, so no browser test reaches it; the chat's states are proved by
+component and driver tests with a fake model):
+
+- The first ask pops the chat out in the pane's corner and the format bar
+  comes back; a second message's reply shows the model had the first.
+- A proposal applied from its card shows in Librarian Activity with Undo.
+- An off-topic ask ("write her an email") gets one line and **Take this to
+  Chat**, which opens a new chat about the note with the question typed and
+  unsent; the button then reads "Opened in Chat".
+- The model picker's search finds a model, Escape in its search closes only
+  the list, and a picked model answers the next message.
+- Escape (or −) tucks the chat into its corner button; × ends it.
+- An on-device model: the chat asks for prose plus a trailing JSON object,
+  without the `formatJson` coercion the one-shot bar used, so a small local
+  model may drop the object and read as "nothing to apply". Worth checking with
+  the Librarian's default local model.

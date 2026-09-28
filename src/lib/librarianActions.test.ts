@@ -5,7 +5,6 @@ import {
   anchorFromSelection,
   ANCHOR_LIMITS,
   describeLibrarianAction,
-  librarianPromptText,
   mergeTags,
   parseAnchors,
   parseLibrarianReply,
@@ -125,19 +124,4 @@ describe("the reply grammar", () => {
       "File it in People (a new area)",
     );
   });
-});
-
-test("the prompt text carries the title, the highlight, the request, and the note", () => {
-  const text = librarianPromptText({
-    title: "Maya Chen",
-    request: "file this under people",
-    highlight: { exact: "runs research", prefix: "", suffix: "" },
-    doc: NOTE,
-    areas: ["Projects"],
-    tags: [],
-  });
-  expect(text).toContain("Note title: Maya Chen");
-  expect(text).toContain('Highlighted passage: """runs research"""');
-  expect(text).toContain("Request: file this under people");
-  expect(text).toContain("Follow up in March.");
 });

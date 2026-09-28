@@ -5,8 +5,8 @@ import {
   applyLibrarian,
   LIBRARIAN_REFUSALS,
   type LibrarianDeps,
+  converseLibrarian,
   librarianRefusal,
-  proposeLibrarian,
 } from "./librarianBar";
 
 function view(fields: string[], extra: Partial<FrontmatterView> = {}): FrontmatterView {
@@ -79,16 +79,10 @@ describe("who may ask", () => {
 });
 
 describe("asking", () => {
-  const ask = {
-    title: "Maya",
-    request: "tag this",
-    highlight: null,
-    doc: "Met Maya at the meetup.",
-    areas: ["Projects"],
-    tags: [],
-  };
+  const ctx = { title: "Maya", doc: "Met Maya at the meetup.", areas: ["Projects"], tags: [] };
+  const first = [{ role: "user" as const, text: "tag this", highlight: null }];
 
-  test("secret-shaped text never reaches the model", async () => {
+  test("secret-shaped text never reaches the model, wherever it sits in the conversation", async () => {
     let called = false;
     const host = {
       complete: async () => {
@@ -96,17 +90,32 @@ describe("asking", () => {
         return "{}";
       },
     };
-    const secret = { ...ask, doc: "api key sk-ant-abcdefghijklmnopqrstuvwx" };
-    expect(await proposeLibrarian(secret, host)).toEqual({ kind: "secret" });
+    const secret = { ...ctx, doc: "api key sk-ant-abcdefghijklmnopqrstuvwx" };
+    expect(await converseLibrarian(secret, first, host)).toEqual({ kind: "secret" });
+    const later = [
+      ...first,
+      { role: "user" as const, text: "sk-ant-abcdefghijklmnopqrstuvwx", highlight: null },
+    ];
+    expect(await converseLibrarian(ctx, later, host)).toEqual({ kind: "secret" });
     expect(called).toBe(false);
   });
 
-  test("the reply comes back as actions within the grammar", async () => {
-    const host = { complete: async () => '{"actions":[{"type":"tag","tags":["person"]}]}' };
-    expect(await proposeLibrarian(ask, host)).toEqual({
-      kind: "actions",
+  test("a reply comes back as prose and the actions within the grammar", async () => {
+    let sent: { role: string }[] = [];
+    const host = {
+      complete: async ({ messages }: { messages: { role: string }[] }) => {
+        sent = messages;
+        return 'Tagging it as a person.\n{"actions":[{"type":"tag","tags":["person"]}]}';
+      },
+    };
+    expect(await converseLibrarian(ctx, first, host)).toEqual({
+      kind: "reply",
+      prose: "Tagging it as a person.",
       actions: [{ type: "tag", tags: ["person"] }],
+      handoff: false,
+      raw: 'Tagging it as a person.\n{"actions":[{"type":"tag","tags":["person"]}]}',
     });
+    expect(sent.map((message) => message.role)).toEqual(["system", "user"]);
   });
 });
 

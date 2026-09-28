@@ -1,5 +1,5 @@
 // Talk to the Librarian (`/librarian`, 2026-09-28; plan:
-// docs/design/librarian-bar.md) — the effectful half: who may ask, the one
+// docs/design/librarian-bar.md) — the effectful half: who may ask, each turn's
 // model call, and applying what the person accepts. Every write rides the
 // Librarian's own gates (Rust re-refuses locked, secure, and out-of-Library
 // notes) and is journaled with its `before`, so Librarian Activity can undo
@@ -7,15 +7,14 @@
 
 import { looksSecret } from "../ai/guard";
 import type { Host } from "../ai/types";
+import { addAnchor, type LibrarianAction, mergeTags } from "../lib/librarianActions";
 import {
-  addAnchor,
-  type LibrarianAction,
-  type LibrarianAsk,
-  librarianMessages,
-  librarianPromptText,
-  mergeTags,
-  parseLibrarianReply,
-} from "../lib/librarianActions";
+  latestHighlight,
+  type LibrarianContext,
+  librarianChatMessages,
+  type LibrarianTurn,
+  splitLibrarianReply,
+} from "../lib/librarianChat";
 import {
   corpusFrontmatter,
   corpusNotePath,
@@ -101,16 +100,26 @@ export async function currentTags(
     .filter(Boolean);
 }
 
-export type Proposal = { kind: "secret" } | { kind: "actions"; actions: LibrarianAction[] };
+export type LibrarianReply =
+  | { kind: "secret" }
+  | { kind: "reply"; prose: string; actions: LibrarianAction[]; handoff: boolean; raw: string };
 
-/** Ask the model once. The secret check reads exactly what would be sent. */
-export async function proposeLibrarian(ask: LibrarianAsk, host: Pick<Host, "complete">): Promise<Proposal> {
-  if (looksSecret(librarianPromptText(ask))) return { kind: "secret" };
-  const reply = await host.complete({ messages: librarianMessages(ask), formatJson: true });
-  return {
-    kind: "actions",
-    actions: parseLibrarianReply(reply, { doc: ask.doc, highlight: ask.highlight, areas: ask.areas }),
-  };
+/** One turn of the conversation. The secret check reads exactly what would be
+ * sent — the rules, the note, and every turn so far — on every turn. */
+export async function converseLibrarian(
+  ctx: LibrarianContext,
+  turns: readonly LibrarianTurn[],
+  host: Pick<Host, "complete">,
+): Promise<LibrarianReply> {
+  const messages = librarianChatMessages(ctx, turns);
+  if (looksSecret(messages.map((message) => message.content).join("\n"))) return { kind: "secret" };
+  const raw = await host.complete({ messages });
+  const { prose, actions, handoff } = splitLibrarianReply(raw, {
+    doc: ctx.doc,
+    highlight: latestHighlight(turns),
+    areas: ctx.areas,
+  });
+  return { kind: "reply", prose, actions, handoff, raw };
 }
 
 /** Apply accepted actions: tags and passage marks first, filing last (a

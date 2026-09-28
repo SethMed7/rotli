@@ -44,9 +44,13 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
   Librarian proposes what it will do, and nothing happens until you apply it.
   Applied actions are journaled and can be undone. You pick its model from the
   providers you have connected. **Slice 1 built (2026-09-28, #121–#122):** the
-  bar, tag, mark a passage (with jump-back), and file (creating People). Still
-  to come: new notes from a highlight, a multi-turn conversation, and "Open in
-  Chat".
+  bar, tag, mark a passage (with jump-back), and file (creating People).
+  **The conversation built (2026-09-28):** after the first ask the bar pops out
+  into a chat in the pane's corner, multi-turn, with proposals applied from
+  inside it, scoped to organizing (anything else is offered "Take this to
+  Chat", which opens a new chat about the note with the question typed); the
+  searchable model picker; the highlight kept painted. Still to
+  come: new notes from a highlight, and "Open in Chat".
   - It never rewrites the note you wrote. It changes only its own metadata and
     where the note lives, or it writes a new note, such as a people note for a
     name you highlighted.

@@ -42,6 +42,7 @@ import { BottomSlot } from "./bottomSlot";
 import { CmEditor } from "./cmEditor";
 import { FormatBar } from "./formatBar";
 import { LibrarianBar } from "./librarianBar";
+import { LibrarianChat } from "./librarianChat";
 import {
   ensureDocument,
   flushNoteAfterPaint,
@@ -545,6 +546,7 @@ export function EditorSurface({
         onFmRead={onFmRead}
       />
       {focusMode && <FocusWordCount noteId={noteId} fallbackBody={note.body} />}
+      <LibrarianChat noteId={noteId} paneId={paneId} />
       {librarianOpen ? (
         <BottomSlot>
           <LibrarianBar key={noteId} noteId={noteId} paneId={paneId} />
