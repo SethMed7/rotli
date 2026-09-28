@@ -15,5 +15,10 @@ export function attachedImageUrl(source: string): Promise<string> {
  * as a URL: the asset protocol on the Mac; on Rotli Web the connected
  * folder's image (a video there resolves to "" and shows its name). */
 export function replyMediaUrl(rootPrefix: string, path: string): Promise<string> {
-  return resolveImageSrc(`storage:${path}`, rootPrefix ? rootPrefix.slice(0, -1) : "default");
+  return resolveImageSrc(`storage:${path}`, replyMediaRootId(rootPrefix));
+}
+
+/** A chat's wire-id prefix ("<root>:", or "" for the default vault) as a root id. */
+export function replyMediaRootId(rootPrefix: string): string {
+  return rootPrefix.endsWith(":") ? rootPrefix.slice(0, -1) : rootPrefix || "default";
 }
