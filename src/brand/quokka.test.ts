@@ -4,6 +4,8 @@ import {
   DEFAULT_QUOKKA_ACCESSORY_HUE,
   DEFAULT_QUOKKA_CUSTOM_HUE,
   QUOKKA_ACCESSORIES,
+  QUOKKA_IDLE_POSE_PRESENTATIONS,
+  QUOKKA_IDLE_POSES,
   QUOKKA_POSES,
   normalizeQuokkaAccessoryHue,
   normalizeQuokkaCustomHue,
@@ -83,5 +85,14 @@ describe("quokka appearance", () => {
 
   test("keeps the retired scarf out of the accessory catalog", () => {
     expect(QUOKKA_ACCESSORIES).toEqual(["none", "glasses", "bucket-hat", "goggles"]);
+  });
+
+  test("every mood is a drawn pose with its own name, and none is an alarm", () => {
+    expect(QUOKKA_IDLE_POSE_PRESENTATIONS.map((choice) => choice.pose)).toEqual([...QUOKKA_IDLE_POSES]);
+    for (const pose of QUOKKA_IDLE_POSES) expect(QUOKKA_POSES).toContain(pose);
+    const labels = QUOKKA_IDLE_POSE_PRESENTATIONS.map((choice) => choice.label);
+    expect(new Set(labels).size).toBe(labels.length);
+    // "attention" is the worried face errors use; a resting mood never borrows it
+    expect(QUOKKA_IDLE_POSES).not.toContain("attention" as never);
   });
 });

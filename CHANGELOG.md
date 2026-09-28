@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Three more moods for your quokka.** Settings → Appearance → Idle mood now
+  has Friendly (waving), Inquisitive (looking into things), and Adventurous
+  (off exploring) beside the original five, each wearing your accessory.
 - **A thank-you at the end of setup.** Before the guided tour, a small card
   thanks you and shows a banner made from your choices: your quokka (its
   color and what it's wearing) on your theme, with your name if you gave one.

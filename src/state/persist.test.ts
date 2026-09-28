@@ -118,6 +118,7 @@ describe("appearance personality", () => {
     expect(settings.quokkaAccessory).toBe("bucket-hat");
     expect(settings.quokkaAccessoryHue).toBe(128);
     expect(settings.quokkaIdlePose).toBe("thoughtful");
+    expect(parseSettings('{"quokkaIdlePose":"walking"}').quokkaIdlePose).toBe("walking");
     expect(settings.chatNavigatorStyle).toBe("dots");
     expect(parseSettings('{"quokkaStyle":"redrawn","chatNavigatorStyle":"runes"}').quokkaStyle).toBe("cocoa");
     expect(
