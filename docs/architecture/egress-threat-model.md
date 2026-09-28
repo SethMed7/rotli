@@ -49,14 +49,14 @@ Re-derived at every seam, never accepted from a caller:
 
 ## Provider-account execution policy (2026-09-01)
 
-Interactive connected chat has exactly three executable official-client adapters:
+Interactive connected chat has exactly four executable official-client adapters:
 
 | Lane | Execution boundary | Account boundary |
 |---|---|---|
 | Claude Code | Native allowlist resolves the official local `claude` executable and invokes print mode with `--safe-mode`, no ambient tools for text turns, a bounded model allowlist, and no session persistence | The user authenticates in the official client outside Rotli. Rotli presents no Claude login and never reads or stores Claude credentials |
 | Codex | Native allowlist resolves the official local `codex` executable and invokes `codex exec` with a read-only sandbox, shell tool disabled, ephemeral state, and a bounded model allowlist | The user authenticates in the official client outside Rotli. Rotli presents no OpenAI login and never reads or stores OpenAI credentials |
 | Cursor · Code chat | Native allowlist resolves the official local `agent`/`cursor-agent` executable and speaks Cursor's documented ACP custom-client protocol. The process starts in read-only Ask mode from an empty temporary workspace; Rotli advertises no filesystem/terminal capability, supplies no MCP servers, rejects every permission request, and passes only an allowlisted model id (`grok-4.6` by default, or Cursor Auto) | The user runs `agent login` outside Rotli. Rotli presents no Cursor login and never reads or stores Cursor credentials. The lane is labeled for software work and never participates in Breve, organizer, image, or background execution |
-| Antigravity | **Unavailable** before spec or binary lookup; no launcher, argv builder, retry, sandbox, image, detection, Keychain, or Breve resolver implementation remains | No Google subscription credential is requested, inspected, or used |
+| Antigravity | Google's official Antigravity **ACP agent** from the Agent Client Protocol registry, downloaded to a private folder only after its pinned SHA-256 and size verify, run with a private profile and host Google variables stripped, over ACP with no file-system or terminal capability and every permission request refused ([decision](../decisions/2026-09-03-antigravity-official-acp-lane.md)). The IDE's `agy` command and its login are never used | The agent's own Google sign-in, stored in the agent's private profile; Rotli never sees or stores a token, and sign-out deletes that profile |
 | Direct Gemini API | **Not implemented.** Google documents AI Studio API keys and Vertex AI as authorized, separately billed routes; Rotli has neither transport nor credential slot | No Gemini API key is requested, read, or stored |
 
 Each lane's "bounded model allowlist" is its static `CliSpec.models` plus the
@@ -64,11 +64,12 @@ ids that client itself reports as selectable (`provider_models.rs`, 2026-09-23).
 Discovery carries no vault content — no prompt is ever sent — and every
 reported id must match the strict argv id shape before it can run.
 
-Google&rsquo;s Antigravity FAQ explicitly says third-party access through an
-Antigravity login violates its terms and may lead to suspension or termination;
-it directs third-party coding agents to a
-[Vertex or AI Studio API key](https://www.antigravity.google/docs/faq/). That is
-why there is no subscription-lane workaround here.
+Google&rsquo;s Antigravity FAQ says third-party access through an Antigravity
+login violates its terms, which is why Rotli never reuses the IDE&rsquo;s login
+or its `agy` command. The lane that ships uses Google&rsquo;s own published ACP
+agent with its own sign-in instead; the reasoning, including the FAQ text,
+is recorded in the
+[2026-09-03 decision](../decisions/2026-09-03-antigravity-official-acp-lane.md).
 
 This is an implementation and release boundary, not a claim that copying
 another application's architecture grants provider approval. OpenAI explicitly
@@ -170,7 +171,7 @@ way a compromised loop would.
 |---|---|---|---|
 | 1 | `chat_messages` → loopback model | SAFE | destination clamp (`endpoint_permitted`), then the local lane is unrestricted by design |
 | 2 | `chat_messages` → remote HTTP / Gemini | **RETIRED** | `endpoint_permitted` now accepts only registered on-device loopback destinations; the remote HTTP compatibility transport was removed |
-| 3 | `cli_complete` → `claude` / `codex` / `cursor` | **GAP → FIXED** | native policy permits only the three official local clients before spec/binary lookup, then `blocked_for_remote`, binary/model allowlists, and inert argv/protocol fields apply; Cursor additionally uses ACP Ask mode in an empty scratch workspace and denies permissions; AGY/Gemini are refused |
+| 3 | `cli_complete` → `claude` / `codex` / `cursor` | **GAP → FIXED** | native policy permits only the four official local clients before spec/binary lookup, then `blocked_for_remote`, binary/model allowlists, and inert argv/protocol fields apply; Cursor and Antigravity speak ACP with no file-system or terminal capability and deny permissions; the IDE `agy` command and a direct Gemini API are refused |
 | 4 | `generate_image` → any provider | **RETIRED** | the stable IPC command returns a native unavailable error before root/path resolution, credential lookup, or process spawn |
 | 5 | Organizer → connected client | **OPT-IN** (2026-09-12, [ADR](../decisions/2026-09-12-librarian-connected-lane.md)) | `organizer_knobs::connected_lane` yields a lane only when `organizerModel` names claude/codex/antigravity AND `aiProviders[lane]` is true; the call rides `provider_lane::complete_blocking`, the same seam as route 3 (policy, `blocked_for_remote`, binary and model allowlists, child registry). Secure and locked notes are skipped before any prompt exists; legacy ids and Cursor parse to local |
 | 6 | Organizer → local MLX | SAFE | `complete_local` is loopback by construction |

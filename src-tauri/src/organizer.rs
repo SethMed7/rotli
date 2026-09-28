@@ -12,7 +12,7 @@
 //!     the secure line probe + `looks_secure`), never via `read_frontmatter`,
 //!     which WRITES on read and would break "Suggest is provably write-free".
 //!   • LOCKED is never touched; the Filer gates re-read it fresh at apply time.
-//!   • At trust Suggest (the shipped default) the only disk sinks are the
+//!   • At trust Suggest (opt-in; Organize is the default) the only disk sinks are the
 //!     `.rotli/` sidecars (journal + organizer.json) — journal PROPOSALS only.
 //!   • Reads are lock-free off the root; every write rides a SHORT
 //!     `CorpusState::route()` and no lock is ever held across a model call.

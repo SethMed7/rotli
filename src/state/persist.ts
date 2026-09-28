@@ -341,7 +341,8 @@ interface PersistedSettings {
    * regardless, always. Missing ⇒ true (docs/design/ai-visibility-matrix.md). */
   secureLocalAi: boolean;
   /** The organizer daemon's §4.3 trust rung; the Rust daemon re-reads this file
-   * each cycle, so persisting here IS the durable knob. Default: suggest. */
+   * each cycle, so persisting here IS the durable knob. Default: organize
+   * (the maintainer, 2026-07-02; organizer.rs `Trust::Organize`). */
   organizerTrust: OrganizerTrust;
   /** Which model the organizer runs. Remote choices remain opt-in. */
   organizerModel: OrganizerModel;

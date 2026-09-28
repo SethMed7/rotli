@@ -463,8 +463,9 @@ The Rust corpus boundary independently validates every write.
   provider-owned field. It is TRI-STATE since 2026-08-01: absent means "follow
   the vault's `secureLocalAi` default", `true` pins on-device access on, `false`
   pins it off. It is written only on a secure note.
-- The Librarian owns only its declared enrichment fields: `area`, `summary`,
-  `tags`, and `links`.
+- The Librarian owns only its declared fields (`AI_KEYS`, Rust and TS): the
+  enrichment fields `area`, `summary`, `tags`, and `links`, and its filing
+  record `suggested_area`, `area_confidence`, `filed_by`, and `filed_at`.
 - Unknown frontmatter is preserved byte-for-byte. Reserved provenance cannot be
   forged through the raw metadata editor.
 - Boards and binary files never receive Markdown frontmatter.
