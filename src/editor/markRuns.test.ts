@@ -41,7 +41,7 @@ describe("bold over text that is partly bold", () => {
   });
 
   test("italic and other marks keep their place around the bold", () => {
-    expect(bold("***x***", 3, 4).line).toBe("*x*");
+    expect(bold("***yes***", 3, 6).line).toBe("*yes*");
     expect(bold("*hi* there").line).toBe("***hi* there**");
   });
 
