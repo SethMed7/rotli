@@ -36,7 +36,9 @@ this Mac, never in Git). TS parses it in `src/lib/librarianRules.ts`, Rust in
   read (the existing auto-flag), in `read_for_ai` (remote refused by name before
   any move), and in the organizer's snapshot (skipped). The two "is the target
   secure" write checks are deliberately unchanged: a keyword note not yet
-  moved must not receive protected prose. **Secure matching notes now**
+  moved must not receive protected prose. A note a remote agent creates with a
+  keyword title is created secure (it already authored the words), where a
+  body secret refuses the creation outright. **Secure matching notes now**
   (`corpus_secure_by_keywords`) protects notes named that way earlier. TS
   refuses such a note in `/librarian` before any prompt exists.
 - **People groups** become areas `People/<group>`: the organizer's Classify

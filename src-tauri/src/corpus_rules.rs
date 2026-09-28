@@ -151,6 +151,28 @@ mod tests {
             .contains(&rel));
         assert!(store.read_for_ai(&plain.id, false).is_err());
 
+        // the editor's save path (revision-checked, under the file lock) moves it
+        // too, and hands back the moved file's revision for the next save
+        let draft = store.create("wiki/_inbox", "# Draft\n\nnumbers").unwrap();
+        let draft_rel = store.path_of(&draft.id).unwrap();
+        let bytes = fs::read(store.abs(&draft_rel)).unwrap();
+        let revision = crate::fsutil::revision(&bytes);
+        let result = store
+            .write_if_revision_with_body_base(
+                &draft.id,
+                "# Bank PIN reset\n\nnumbers",
+                &revision,
+                Some("# Draft\n\nnumbers"),
+            )
+            .unwrap();
+        assert_eq!(result.meta.disk_folder_id, "wiki/_secure");
+        let moved = store.path_of(&draft.id).unwrap();
+        assert!(moved.starts_with("wiki/_secure/"), "{moved}");
+        assert_eq!(
+            result.revision,
+            crate::fsutil::revision(&fs::read(store.abs(&moved)).unwrap())
+        );
+
         // whole words of the name only: never "Riverbank", never the body
         let river = store
             .create(
