@@ -50,3 +50,37 @@ test("Feedback opens a prefilled GitHub issue", async ({ page, context }) => {
   expect(issue.url()).toContain("github.com/SethMed7/rotli/issues/new");
   expect(decodeURIComponent(issue.url())).toContain("Rotli");
 });
+
+// Audit 2026-09-28: a Librarian count and the Settings update dot used to sit
+// beside their labels and cut "Librarian" to "Libra…" at every width. They
+// sit on the icons now; with badges, at the narrowest width that shows labels,
+// every label is still whole.
+test("badges sit on the icons and never cut a label short", async ({ page }) => {
+  await gotoApp(page);
+  // labels appear once the footer's content box reaches 380px (about a 410px sidebar)
+  await setSidebarWidth(page, 420);
+  await expect(labels(page)).toHaveText(["Files", "Librarian", "Settings", "Feedback"]);
+  for (const label of await labels(page).all()) await expect(label).toBeVisible();
+  // the twin has no Librarian queue or update feed: place the badges the
+  // component renders, where it renders them
+  await page.evaluate(() => {
+    const icons = document.querySelectorAll(".sb-foot .sb-footicon");
+    const pill = document.createElement("span");
+    pill.className = "count pill";
+    pill.textContent = "99+";
+    icons[0]?.append(pill);
+    const dot = document.createElement("span");
+    dot.className = "sb-update-dot";
+    icons[1]?.append(dot);
+  });
+  for (const label of await labels(page).all()) {
+    const [scroll, client] = await label.evaluate((node) => [node.scrollWidth, node.clientWidth]);
+    expect(scroll).toBeLessThanOrEqual(client);
+  }
+  const pill = footer(page).locator(".count.pill");
+  const button = footer(page).getByRole("button", { name: "Librarian", exact: true });
+  const name = button.locator(".fname");
+  const [p, b, n] = [await pill.boundingBox(), await button.boundingBox(), await name.boundingBox()];
+  expect(p!.x).toBeGreaterThanOrEqual(b!.x); // inside its button
+  expect(p!.x + p!.width).toBeLessThanOrEqual(n!.x); // and clear of the label
+});
