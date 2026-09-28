@@ -855,6 +855,19 @@ export function privateBrowserClose(tabId: string): Promise<void> {
   return invoke<void>("private_browser_close", { tabId });
 }
 
+export type TabMediaState = "none" | "playing" | "paused" | "suspended";
+export type TabMediaAction = "play" | "pause" | "stop" | "next" | "previous";
+/** WebKit's own playback state for a browser tab (private_browser_media.rs). */
+export function privateBrowserMediaState(tabId: string): Promise<TabMediaState> {
+  if (!isTauri()) return Promise.resolve("none");
+  return invoke<TabMediaState>("private_browser_media_state", { tabId });
+}
+
+export function privateBrowserMedia(tabId: string, action: TabMediaAction): Promise<void> {
+  if (!isTauri()) return Promise.resolve();
+  return invoke<void>("private_browser_media", { tabId, action });
+}
+
 export function onPrivateBrowserState(
   handler: (event: PrivateBrowserStateEvent) => void,
 ): Promise<() => void> {

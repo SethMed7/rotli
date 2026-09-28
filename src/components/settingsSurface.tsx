@@ -155,10 +155,12 @@ import {
 } from "./glyphs";
 import { AboutPane } from "./settings/aboutPane";
 import { AliasCleanupSettings } from "./settings/aliasCleanupSettings";
+import { AmbientSettings } from "./settings/ambientSettings";
 import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { ConnectorGuide } from "./settings/connectorGuide";
 import { LibrarianRulesSettings } from "./settings/librarianRulesSettings";
 import { Seg } from "./settings/seg";
+import { SwitchKnob, Toggle } from "./settings/toggle";
 import { VoiceSettings } from "./settings/voiceSettings";
 import { WebVaultSettings } from "./settings/webVaultSettings";
 import { WelcomeSettings } from "./welcomeSettings";
@@ -217,50 +219,6 @@ function PaneHead({ title, char }: { title: string; char: CharacterName }) {
 }
 
 // ——— shared settings controls (the maintainer, 2026-06-15) ———
-
-/** The sliding track + knob every switch shares — state comes from the parent's
- * .on class (`.swrow`/`.ailane-sw`), so this stays a dumb visual. */
-function SwitchKnob() {
-  return (
-    <span className="sw" aria-hidden="true">
-      <span className="swknob" />
-    </span>
-  );
-}
-
-/** A real on/off switch — label + description on the left, a sliding track on
- * the right. Replaces the old ambiguous dot-in-a-box "sysrow". */
-function Toggle({
-  on,
-  onChange,
-  title,
-  desc,
-  disabled,
-}: {
-  on: boolean;
-  onChange: () => void;
-  title: string;
-  desc?: string;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      aria-disabled={disabled}
-      disabled={disabled}
-      className={`${on ? "swrow on" : "swrow"}${disabled ? " disabled" : ""}`}
-      onClick={disabled ? undefined : onChange}
-    >
-      <span className="swtext">
-        <span className="swt">{title}</span>
-        {desc && <span className="swd">{desc}</span>}
-      </span>
-      <SwitchKnob />
-    </button>
-  );
-}
 
 // ——— Hotkeys: every registry action, grouped by area + searchable ———
 
@@ -871,6 +829,8 @@ function GeneralPane() {
           </label>
         </>
       )}
+
+      <AmbientSettings />
 
       <h4 className="sethead">Writing</h4>
       <p className="lead">How the editor behaves while you type.</p>

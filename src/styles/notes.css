@@ -2196,6 +2196,24 @@
 /* The 2px accent top edge that marked the focused pane's active tab is GONE
    (the maintainer, 2026-07-30: "I don't like the blue line on top of the active tab").
    Pane focus still reads from the active tab merging into its editor. */
+/* a browser tab playing sound (2026-09-28): the speaker, before the close
+   button; clicking it pauses the tab. Not a span, so the .tab span rules
+   never stretch it */
+.tab .tab-audio {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--control-hit-min);
+  height: var(--control-hit-min);
+  border: none;
+  border-radius: var(--r-inner);
+  background: none;
+  color: var(--accent-text);
+  cursor: pointer;
+}
+.tab .tab-audio:hover {
+  background: var(--surface-2);
+}
 .tab .x {
   margin-left: auto;
   width: var(--control-hit-min);
@@ -2546,6 +2564,92 @@
     display: none;
   }
 }
+/* — the sidebar player (2026-09-28), right above the footer: a tab's media,
+   or the ambient track; ambient steps aside to the small toggle on the left
+   while a tab has media — */
+.sb-player {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 12px 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--text-muted);
+  container-type: inline-size;
+}
+.sb-player-ambient {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.sb-player-ambient.on {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent-text);
+}
+.sb-player-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sb-player-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+}
+.sb-player-title svg {
+  flex: 0 0 auto;
+  color: var(--accent-text);
+}
+.sb-player-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb-player-controls {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+.sb-player-btn {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.sb-player-btn:hover,
+.sb-player-ambient:hover {
+  background: color-mix(in srgb, var(--hov) 62%, transparent);
+  color: var(--text);
+}
+/* a narrow sidebar keeps the buttons and lets the title go */
+@container (max-width: 220px) {
+  .sb-player-title span {
+    display: none;
+  }
+}
+
 /* the icon carries the button's badges, so a count or a dot never takes room
    from the label (2026-09-28) */
 .sb-footicon {

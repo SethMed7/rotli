@@ -45,6 +45,7 @@ mod organizer_knobs;
 #[cfg(test)]
 mod parity_tests;
 mod private_browser;
+mod private_browser_media;
 mod quick_window;
 mod vault_marker;
 mod provider;
@@ -2428,6 +2429,8 @@ pub fn run() {
             private_browser::private_browser_forward,
             private_browser::private_browser_reload,
             private_browser::private_browser_close,
+            private_browser_media::private_browser_media_state,
+            private_browser_media::private_browser_media,
             corpus::corpus_create_folder,
             corpus::corpus_read_board,
             corpus::corpus_write_board,

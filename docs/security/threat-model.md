@@ -68,6 +68,8 @@ as an encrypted vault.
 - **The private-browser guest** is fully untrusted remote content. It runs in a
   separate non-persistent child webview and matches no Tauri capability; only
   the app-owned `main`, `capture`, and `quick` labels receive IPC permissions.
+  The sidebar player asks WebKit whether it plays sound and runs only fixed
+  media scripts in it; the guest still has no way to message Rotli.
 - **Imported content** is untrusted, including Markdown, DOCX packages, sheets,
   Excalidraw scenes, PDFs, fetched web pages, email, and chat memory.
 - **Local models** are untrusted interpreters running on loopback. Locality

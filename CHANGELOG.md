@@ -12,6 +12,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Ambient audio.** Turn it on in Settings → General and quiet music from the
+  Rotli studio plays from a small player above the sidebar's footer, one track
+  per theme (Linen, Graphite, Tide, Canopy, Dusk, Lamplight), with previous,
+  play/pause, stop and next. Play a video in a tab and it takes over: the
+  music pauses and waits as a toggle on the player's left (click it to pause
+  the video and bring the music back). Pause the video or close its tab and the
+  music comes back. The tracks ship with the app, so nothing is downloaded.
+  Mac app for tab playback; the tracks were composed in code at the studio
+  (MIT).
+- **Tabs that play sound show it.** A browser tab playing audio wears a
+  speaker (click it to pause), and the sidebar player controls it: previous,
+  play/pause, stop, next (YouTube's own buttons on YouTube), and open the tab.
+  With Ambient audio off, the player appears only while a tab has something
+  playing. Mac app, macOS 12 or later.
+
 - **Tell the Librarian how things are.** In `/librarian`, say something like
   "Ana and Leo are work people; so was Sam, but not anymore". The Librarian
   adds a filing rule, makes a note for each person you haven't written about

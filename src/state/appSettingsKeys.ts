@@ -46,4 +46,6 @@ export const APP_SETTINGS_KEYS = new Set([
   "lastSeenVersion",
   "onboardingPhase",
   "bindings",
+  // Ambient audio (src/lib/ambient.ts): on or off, the track, playing or not.
+  "ambient",
 ]);

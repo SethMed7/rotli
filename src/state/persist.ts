@@ -68,6 +68,7 @@ import { isRetentionEligible, parseRetentionDays } from "../services/retentionPo
 import { DEFAULT_TASK_ARCHIVE_AGE, TASK_ARCHIVE_AGES, type TaskArchiveAge } from "../services/tasksView";
 import type { PaneNode, Tab } from "../types";
 import { DEFAULT_VOICE, VOICES } from "../voice/speech";
+import { hydrateAmbient, useAmbient } from "./ambient";
 import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
 import { APP_SETTINGS_KEYS } from "./appSettingsKeys";
 import { persistableChatMap, rescopeChatMapKeys } from "./chatMapKeys";
@@ -1324,6 +1325,7 @@ export async function hydratePersistedState(): Promise<void> {
     appSettingsPassthrough = unknownAppSettingsKeys(appRaw);
     appSettingsNeedsWrite = !appSettingsPresent;
     appSettings = parseSettings(appRaw);
+    hydrateAmbient(appRaw);
     shellSettings = appSettings;
     if (appSettingsPresent) applyAppSettings(appSettings);
   } catch {
@@ -1406,6 +1408,7 @@ function appSettingsSnapshot(): string {
   return JSON.stringify({
     ...appSettingsPassthrough,
     v: 1,
+    ambient: useAmbient.getState().prefs,
     theme: ui.theme,
     themeFamily: ui.themeFamily,
     syntaxPalette: ui.syntaxPalette,
@@ -1645,6 +1648,7 @@ export function attachPersistence(): () => void {
     useNoteStyleStore.subscribe(schedule),
     useTableWidthsStore.subscribe(schedule),
     useLibrarianRules.subscribe(schedule),
+    useAmbient.subscribe(schedule),
     usePanesStore.subscribe(schedule),
     useChatWindowStore.subscribe(schedule),
     useMruStore.subscribe(schedule),

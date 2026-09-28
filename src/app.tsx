@@ -57,7 +57,6 @@ import {
 } from "./lib/tauri";
 import { useNativeFileDrop } from "./editor/nativeFileDrop";
 import { LAUNCH_FEATURES, PLATFORM } from "./lib/featurePolicy";
-import { onQuitFlushFailure } from "./lib/quitFlush";
 import { isOnboardingReview } from "./lib/reviewMode";
 import { fileQuickNoteInMain } from "./newItems/composition";
 import { createVaultCapture } from "./services/captureRouting";
@@ -67,7 +66,7 @@ import { invalidateFolders, invalidateJournal, invalidateNotes } from "./service
 import { adoptPendingAtOrganize } from "./services/librarianAutoAdopt";
 import { notesService } from "./services/notes";
 import { isWebVault } from "./lib/browserVault";
-import { startRoutineUpdateCheck } from "./services/updateCheck";
+import { useMainWindowWork } from "./services/mainWindowWork";
 import { openSeededWelcome } from "./services/welcome";
 import {
   WebVaultGateHost,
@@ -560,21 +559,7 @@ export default function App() {
     [],
   );
 
-  // the routine update check (services/updateCheck): main only, packaged
-  // builds only, behind its Settings switch — it lights the Settings dot
-  useEffect(() => {
-    if (surface !== "main") return;
-    return startRoutineUpdateCheck();
-  }, [surface]);
-
-  useEffect(() => {
-    if (surface !== "main") return;
-    return onQuitFlushFailure((message) => {
-      useUiStore
-        .getState()
-        .setRowActionError(`Rotli stayed open because some changes could not be saved — ${message}`);
-    });
-  }, [surface]);
+  useMainWindowWork(surface);
 
   // apply the persisted Dock/app icon on startup (macOS; no-op elsewhere) —
   // main only: the quick/capture webviews would each repeat the same

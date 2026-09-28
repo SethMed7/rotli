@@ -44,6 +44,7 @@ import { requestVaultFolder } from "../state/vaultFolderBrowser";
 import { useWebVaultConnect } from "../state/webVaultConnect";
 import { BreveSidebar } from "./breve/breveSidebar";
 import { ChevronRight, MoreGlyph, NewFileGlyph, NewFolderGlyph, RefreshGlyph, VaultGlyph } from "./glyphs";
+import { MediaPlayer } from "./sidebar/mediaPlayer";
 import { SidebarChat } from "./sidebar/sidebarChat";
 import { SidebarFooter } from "./sidebar/sidebarFooter";
 import { SidebarHome } from "./sidebar/sidebarHome";
@@ -438,6 +439,9 @@ export function Sidebar() {
           Chat, and Breve alike (the maintainer, 2026-08-01: "the utility footer
           stays as is"; Breve joined 2026-09-02 so Settings and the Librarian
           never vanish while reading a brief) */}
+      {/* the player sits right above the footer (2026-09-28): a tab's media,
+          and the ambient track when Ambient audio is on */}
+      <MediaPlayer />
       <SidebarFooter />
     </aside>
   );
