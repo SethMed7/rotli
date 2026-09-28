@@ -76,3 +76,11 @@ test("a refused clipboard says how to copy by hand", async ({ page, context }) =
     "Couldn’t copy. Select the prompt and press ⌘C instead.",
   );
 });
+
+// 2026-09-28, the owner looked for it as "send to AI": ⌘K finds it by that too.
+test("⌘K finds Hand to AI when you search for “send to AI”", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /Search notes and actions/ }).click();
+  await page.getByPlaceholder("Search notes, files, chats, actions…").fill("send to ai");
+  await expect(page.locator(".prow", { hasText: "Hand to AI…" }).first()).toBeVisible();
+});

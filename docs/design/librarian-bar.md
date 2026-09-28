@@ -135,12 +135,26 @@ rather than guessing. The organizer never writes it
 ## The conversation
 
 The first ask pops the bar out: the conversation moves into a chat in the
-pane's bottom-right corner (`src/editor/librarianChat.tsx`), above the format
-bar when it shows, and the format bar comes back.
+pane's bottom-right corner (`src/editor/librarianChat.tsx`), and the format
+bar comes back.
+
+The **Librarian pill** (2026-09-28, the owner: "it needs to look like it is
+coming out of something … show the whole time … in line with the arrow, to
+the left of it") is always in a note's corner while the Librarian is on: the
+same height as the scroll-to-top arrow, 8px to its left, rising with it when
+the centered format bar would reach the corner (`scrollTopLane.ts` widens the
+lane for it). The conversation opens just above the pill, right-aligned to
+it, with a small pointer down at it, growing out of it (no motion under
+reduced motion). The pill opens and closes the panel, and starts a
+conversation when there is none; the panel then runs the same refusals as
+the bar (web, off, locked, secure, outside the Library) before anything can
+be sent. An applied reply lists exactly what changed ("Tagged: …", "Filed in
+…"), not just a count. Under the composer: "The Librarian only organizes …
+It doesn't chat."
 
 It is the Librarian, not a chatbot (the owner, 2026-09-28: "/librarian is here
 to help organize things like metadata, not to replace chat"). Its header says
-"organizes this note", its quick asks are organizing asks, and its rules tell
+"only organizes … it doesn't chat" under the composer, its quick asks are organizing asks, and its rules tell
 the model to organize only. A request for anything else (answering or
 explaining, writing, research, conversation) gets one sentence and
 `{"actions":[],"handoff":"chat"}`; that reply offers **Take this to Chat**,

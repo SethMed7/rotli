@@ -810,6 +810,7 @@ export function registerDefaultActions(): void {
   registerAction({
     id: "note.handToAi",
     title: "Hand to AI…",
+    keywords: ["send to AI", "send to Claude", "prompt for an agent", "copy as prompt"],
     defaultChord: null,
     run: () => {
       if (!notesWorkspaceActive()) return;

@@ -165,7 +165,12 @@ describe("applying a reply's proposals", () => {
       },
     );
     expect(applied).toEqual([{ type: "tag", tags: ["person"] }]);
-    expect(chat().turns[1]?.proposal).toEqual({ kind: "applied", message: "1 change made." });
+    // the card keeps exactly what was applied, to list it in the chat
+    expect(chat().turns[1]?.proposal).toEqual({
+      kind: "applied",
+      message: "1 change made.",
+      done: [{ type: "tag", tags: ["person"] }],
+    });
   });
 
   test("a refused apply keeps the choices and says why", async () => {

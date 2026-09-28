@@ -6,22 +6,35 @@
 // offered to Chat ("Take this to Chat", and "Open in Chat" in the header). The
 // note's words are never edited. Escape (or −) tucks it into a button in the
 // same corner; × ends the conversation.
+//
+// The Librarian pill (2026-09-28, the owner: "it needs to look like it is
+// coming out of something … show the whole time … to the left of the
+// arrow"): always in the corner beside the scroll-to-top arrow, it opens the
+// panel, which grows out of it, and starts a conversation when there is none.
 
 import { useEffect, useRef, useState } from "react";
 
 import { ModelPicker } from "../components/chat/chatModelPicker";
 import { ActivityGlyph } from "../components/glyphs";
-import { describeLibrarianAction, type LibrarianAction } from "../lib/librarianActions";
+import {
+  describeAppliedAction,
+  describeLibrarianAction,
+  type LibrarianAction,
+} from "../lib/librarianActions";
+import { isTauri } from "../lib/tauri";
 import { useFolders } from "../services/hooks";
-import type { applyLibrarian } from "../services/librarianBar";
+import { type applyLibrarian, librarianRefusal } from "../services/librarianBar";
 import {
   type ChatTurn,
   closeLibrarianChat,
   type LibrarianChat as Chat,
+  librarianQuestions,
+  startLibrarianChat,
   updateLibrarianChat,
   updateLibrarianTurn,
   useLibrarianBar,
 } from "../state/librarianBar";
+import { useLibrarianRules } from "../state/librarianRules";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { editorFor } from "./commands";
@@ -50,9 +63,82 @@ const SUGGESTIONS = ["Suggest tags", "File this note"] as const;
 export const chatShownIn = (chat: Chat | null, paneId: string, noteId: string): chat is Chat =>
   !!chat && chat.paneId === paneId && chat.noteId === noteId;
 
+/** Whether the corner lane holds the Librarian pill (scrollTopLane.ts). */
+export const librarianLane = (): boolean => useUiStore.getState().brainEnabled;
+
 export function LibrarianChat({ noteId, paneId }: { noteId: string; paneId: string }) {
   const chat = useLibrarianBar((s) => s.chat);
-  return chatShownIn(chat, paneId, noteId) ? <ChatPanel chat={chat} noteId={noteId} paneId={paneId} /> : null;
+  const librarianOn = useUiStore((s) => s.brainEnabled);
+  if (!librarianOn) return null;
+  return (
+    <LibrarianCorner here={chatShownIn(chat, paneId, noteId) ? chat : null} noteId={noteId} paneId={paneId} />
+  );
+}
+
+/** The corner for one moment: the pill, and the panel above it when open
+ * (tests render it directly). */
+export function LibrarianCorner({
+  here,
+  noteId,
+  paneId,
+}: {
+  here: Chat | null;
+  noteId: string;
+  paneId: string;
+}) {
+  const { preferred, models } = useLibrarianModels();
+  const open = !!here && !here.minimized;
+  const waiting = librarianQuestions(here);
+  // the pill opens and closes the panel, and starts a conversation if none
+  const toggle = () => {
+    if (here) return updateLibrarianChat(here.id, () => ({ minimized: open }));
+    startLibrarianChat({
+      id: crypto.randomUUID(),
+      paneId,
+      noteId,
+      modelId: preferred ?? models[0]?.id ?? "",
+      turns: [],
+      status: "idle",
+      error: null,
+      minimized: false,
+    });
+  };
+  return (
+    <>
+      {open && <ChatPanel chat={here} noteId={noteId} paneId={paneId} />}
+      <button
+        type="button"
+        className={open ? "libchat-launch open" : "libchat-launch"}
+        aria-label={open ? "Hide the Librarian" : "Open the Librarian"}
+        aria-expanded={open}
+        title="The Librarian organizes this note: tags, marked passages, filing, people"
+        onClick={toggle}
+      >
+        <ActivityGlyph size={15} />
+        <span>Librarian</span>
+        {(here?.status === "thinking" || waiting > 0) && <span className="libchat-dot" aria-hidden="true" />}
+      </button>
+    </>
+  );
+}
+
+/** Why the Librarian can't take this note (web, off, locked, secure, outside
+ * the Library), or null — checked before anything can be sent. */
+function useRefusal(noteId: string, paneId: string): string | null {
+  const librarianOn = useUiStore((s) => s.brainEnabled);
+  const [refusal, setRefusal] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    const title = noteTitle(editorFor(paneId)?.getSelection?.()?.doc ?? "");
+    const { secureKeywords } = useLibrarianRules.getState().rules;
+    void librarianRefusal(noteId, { native: isTauri(), librarianOn, secureKeywords, title }).then(
+      (message) => live && setRefusal(message),
+    );
+    return () => {
+      live = false;
+    };
+  }, [noteId, paneId, librarianOn]);
+  return refusal;
 }
 
 /** The chat itself, for one conversation. Tests pass a fake model and apply. */
@@ -70,7 +156,7 @@ export function ChatPanel({
   apply?: typeof applyLibrarian;
 }) {
   const barHere = useLibrarianBar((s) => s.paneId === paneId);
-  const formatBar = useUiStore((s) => s.formatBarVisible);
+  const refusal = useRefusal(noteId, paneId);
   const folders = useFolders();
   const { groups, models } = useLibrarianModels();
   const known = usePeopleNotes();
@@ -90,25 +176,10 @@ export function ChatPanel({
   }, [chat.minimized]);
 
   const setMinimized = (minimized: boolean) => updateLibrarianChat(chat.id, () => ({ minimized }));
-  const place = barHere || formatBar ? "libchat above" : "libchat";
-
-  if (chat.minimized)
-    return (
-      <button
-        type="button"
-        className={`${place} libchat-launch`}
-        aria-label="Open the Librarian chat"
-        onClick={() => setMinimized(false)}
-      >
-        <ActivityGlyph size={15} />
-        <span>Librarian</span>
-        {thinking && <span className="libchat-dot" aria-hidden="true" />}
-      </button>
-    );
 
   const send = (typed = draft) => {
     const text = typed.trim();
-    if (!text || !model || thinking) return;
+    if (!text || !model || thinking || refusal) return;
     if (typed === draft) setDraft("");
     const areas = libraryAreas((folders.data ?? []).map((folder) => folder.id));
     void sendToLibrarian(
@@ -137,7 +208,7 @@ export function ChatPanel({
 
   return (
     <section
-      className={place}
+      className="libchat"
       role="dialog"
       aria-label="Librarian chat"
       onKeyDown={(event) => onEscapeHere(event, () => setMinimized(true))}
@@ -145,7 +216,6 @@ export function ChatPanel({
       <header className="libchat-head">
         <ActivityGlyph size={15} />
         <strong>Librarian</strong>
-        <span className="libchat-role">organizes this note</span>
         <span className="libchat-grow" />
         <button
           type="button"
@@ -174,6 +244,19 @@ export function ChatPanel({
       </header>
 
       <ol className="libchat-log" ref={log} aria-live="polite">
+        {refusal && (
+          <li className="libchat-turn lib" role="status">
+            <p>{refusal}</p>
+          </li>
+        )}
+        {!refusal && chat.turns.length === 0 && (
+          <li className="libchat-turn lib libchat-hello">
+            <p>
+              Tell me how to organize this note: tag it, mark a passage, file it, or tell me about the people
+              in it.
+            </p>
+          </li>
+        )}
         {chat.turns.map((turn, index) => (
           <Turn
             key={turn.id}
@@ -216,20 +299,21 @@ export function ChatPanel({
       )}
 
       <form
-        className="libchat-compose"
+        className={refusal ? "libchat-compose off" : "libchat-compose"}
+        aria-disabled={!!refusal}
         onSubmit={(event) => {
           event.preventDefault();
           send();
         }}
       >
-        {!thinking && (
+        {!thinking && !refusal && (
           <div className="libchat-suggest" role="group" aria-label="Quick asks">
             {[...SUGGESTIONS, ...(passage.text ? ["Mark the highlighted passage"] : [])].map((ask) => (
               <button
                 key={ask}
                 type="button"
                 className="libchat-pill"
-                disabled={!model}
+                disabled={!model || !!refusal}
                 onClick={() => send(ask)}
               >
                 {ask}
@@ -237,11 +321,6 @@ export function ChatPanel({
             ))}
           </div>
         )}
-        <span className="libchat-about" title={passage.text || undefined}>
-          {passage.text
-            ? `About “${clip(passage.text)}”`
-            : "About the whole note · highlight a passage to ask about it"}
-        </span>
         <div className="libchat-row">
           <textarea
             ref={box}
@@ -252,6 +331,7 @@ export function ChatPanel({
             }
             rows={Math.min(5, Math.max(1, draft.split("\n").length))}
             value={draft}
+            disabled={!!refusal}
             onChange={(event) => setDraft(event.currentTarget.value)}
             onKeyDown={(event) => {
               if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
@@ -259,15 +339,26 @@ export function ChatPanel({
               send();
             }}
           />
-          <button type="submit" className="rename-btn primary" disabled={!draft.trim() || !model || thinking}>
+          <button
+            type="submit"
+            className="rename-btn primary"
+            disabled={!draft.trim() || !model || thinking || !!refusal}
+          >
             Send
           </button>
         </div>
-        {models.length > 0 && (
-          <div className="libchat-model">
-            <ModelPicker groups={groups} picked={model} onPick={pick} />
-          </div>
-        )}
+        <div className="libchat-meta">
+          <span className="libchat-about" title={passage.text || undefined}>
+            {passage.text
+              ? `About “${clip(passage.text)}”`
+              : "About the whole note · highlight to ask about a passage"}
+          </span>
+          {models.length > 0 && <ModelPicker groups={groups} picked={model} onPick={pick} />}
+        </div>
+        <p className="libchat-note">
+          The Librarian only organizes: tags, marked passages, filing, and people. It doesn’t chat. For
+          anything else, use Open in Chat.
+        </p>
       </form>
     </section>
   );
@@ -345,6 +436,13 @@ function Turn({
             </>
           )}
           {proposal.kind === "applying" && <p className="libbar-note">Applying…</p>}
+          {proposal.kind === "applied" && (proposal.done?.length ?? 0) > 0 && (
+            <ul className="libchat-done" aria-label="What changed">
+              {proposal.done!.map((action) => (
+                <li key={describeAppliedAction(action)}>{describeAppliedAction(action)}</li>
+              ))}
+            </ul>
+          )}
           {proposal.kind === "applied" && (
             <p className="libbar-note" role="status">
               {proposal.message}

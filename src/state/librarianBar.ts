@@ -8,6 +8,7 @@
 
 import { create } from "zustand";
 
+import type { LibrarianAction } from "../lib/librarianActions";
 import type { LibrarianTurn } from "../lib/librarianChat";
 import type { KeptLine } from "../lib/librarianPeople";
 import { usePanesStore } from "./panes";
@@ -16,7 +17,9 @@ import { usePanesStore } from "./panes";
 export type ProposalState =
   | { kind: "open"; picked: boolean[] }
   | { kind: "applying" }
-  | { kind: "applied"; message: string }
+  /** `done`: exactly what was applied, shown in the chat (the owner,
+   * 2026-09-28: "show me the changes here in the chat") */
+  | { kind: "applied"; message: string; done?: LibrarianAction[] }
   | { kind: "dismissed" };
 
 /** A question about someone who already has a note: waiting, being

@@ -222,6 +222,7 @@ export async function applyProposal(
       kind: "applied",
       message:
         count === 0 ? "Nothing needed changing." : `${count === 1 ? "1 change" : `${count} changes`} made.`,
+      done: count === 0 ? [] : [...actions],
     });
   } catch (error) {
     if (before) setProposal(before);

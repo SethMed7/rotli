@@ -53,6 +53,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it back where you are, still playing, without reloading; Close ends it. One
   tab at a time. Mac app.
 
+- **The Librarian lives in the corner.** A Librarian pill now sits in every
+  note's bottom-right corner, just left of the scroll-to-top arrow, and the
+  conversation opens right out of it; click it again to tuck it away. After
+  you apply its suggestions, the chat lists exactly what changed ("Tagged:
+  …", "Filed in …"), and a line under the box says what it's for: it only
+  organizes; for anything else, Open in Chat. Mac app.
 - **Tell the Librarian how things are.** In `/librarian`, say something like
   "Ana and Leo are work people; so was Sam, but not anymore". The Librarian
   adds a filing rule, makes a note for each person you haven't written about

@@ -42,7 +42,7 @@ import { BottomSlot } from "./bottomSlot";
 import { CmEditor } from "./cmEditor";
 import { FormatBar } from "./formatBar";
 import { LibrarianBar } from "./librarianBar";
-import { LibrarianChat } from "./librarianChat";
+import { LibrarianChat, librarianLane } from "./librarianChat";
 import {
   ensureDocument,
   flushNoteAfterPaint,
@@ -376,7 +376,7 @@ export function EditorSurface({
       setNarrow(el.clientWidth < FORMAT_BAR_COLLAPSE_PX);
       setHeaderCompact(el.clientWidth < 760);
       const bar = el.querySelector<HTMLElement>(".fmtbar");
-      setLiftScrollTop(scrollTopClashes(el.clientWidth, bar?.offsetWidth ?? 0));
+      setLiftScrollTop(scrollTopClashes(el.clientWidth, bar?.offsetWidth ?? 0, librarianLane()));
     });
     ro.observe(el);
     // the bar changes width on its own (collapsing to ⋯), so watch it too

@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import type { LibrarianChat as Chat } from "../state/librarianBar";
-import { ChatPanel, chatShownIn } from "./librarianChat";
+import { ChatPanel, chatShownIn, LibrarianCorner } from "./librarianChat";
 
 function render(chat: Chat) {
   return renderToStaticMarkup(
@@ -138,7 +138,9 @@ describe("the Librarian chat", () => {
         },
       ],
     });
-    expect(markup).toContain("organizes this note");
+    // under the composer: what the Librarian is for, and isn't
+    expect(markup).toContain("The Librarian only organizes");
+    expect(markup).toContain("It doesn’t chat.");
     expect(markup).toContain(">Open in Chat</button>");
     expect(markup).toContain(">Take this to Chat</button>");
     // the quick asks keep it to its job
@@ -182,9 +184,54 @@ describe("the Librarian chat", () => {
     expect(markup).not.toContain("Take this to Chat");
   });
 
-  test("minimized, it is a button in the same corner", () => {
-    const markup = render({ ...base, minimized: true });
-    expect(markup).toContain('aria-label="Open the Librarian chat"');
-    expect(markup).not.toContain('aria-label="Librarian chat"');
+  test("the pill is there the whole time: no chat, minimized, or open above it", () => {
+    const corner = (here: Chat | null) =>
+      renderToStaticMarkup(
+        <QueryClientProvider client={new QueryClient()}>
+          <LibrarianCorner here={here} noteId="n1" paneId="p1" />
+        </QueryClientProvider>,
+      );
+    expect(corner(null)).toContain('aria-label="Open the Librarian"');
+    const tucked = corner({ ...base, minimized: true });
+    expect(tucked).toContain('aria-label="Open the Librarian"');
+    expect(tucked).not.toContain('aria-label="Librarian chat"');
+    const open = corner(base);
+    expect(open).toContain('aria-label="Librarian chat"');
+    expect(open).toContain('aria-label="Hide the Librarian"');
+    expect(open).toContain('aria-expanded="true"');
+  });
+
+  test("an applied reply lists exactly what changed", () => {
+    const markup = render({
+      ...base,
+      turns: [
+        { id: "t1", role: "user", text: "tag and file it", highlight: null },
+        {
+          id: "t2",
+          role: "librarian",
+          text: "Done.",
+          raw: "",
+          actions: [
+            { type: "tag", tags: ["rotli", "bugs"] },
+            { type: "file", area: "Projects", create: false },
+          ],
+          proposal: {
+            kind: "applied",
+            message: "2 changes made.",
+            done: [
+              { type: "tag", tags: ["rotli", "bugs"] },
+              { type: "file", area: "Projects", create: false },
+            ],
+          },
+        },
+      ],
+    });
+    expect(markup).toContain('aria-label="What changed"');
+    expect(markup).toContain("Tagged: rotli, bugs");
+    expect(markup).toContain("Filed in Projects");
+  });
+
+  test("before anything is asked, it says what it can do", () => {
+    expect(render(base)).toContain("Tell me how to organize this note");
   });
 });

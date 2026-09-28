@@ -226,6 +226,17 @@ export function parseLibrarianReply(
   return actions;
 }
 
+/** One line per APPLIED action, for the chat's record of what changed. */
+export function describeAppliedAction(action: LibrarianAction): string {
+  if (action.type === "tag") return `Tagged: ${action.tags.join(", ")}`;
+  if (action.type === "mark") {
+    const words =
+      action.anchor.exact.length > 60 ? `${action.anchor.exact.slice(0, 57)}…` : action.anchor.exact;
+    return action.anchor.label ? `Marked “${words}” as ${action.anchor.label}` : `Marked “${words}”`;
+  }
+  return action.create ? `Filed in ${action.area} (a new area)` : `Filed in ${action.area}`;
+}
+
 /** One line per proposed action, for the bar's list. */
 export function describeLibrarianAction(action: LibrarianAction): string {
   if (action.type === "tag") return `Tag the note: ${action.tags.join(", ")}`;

@@ -36,6 +36,8 @@ export interface KeyAction {
    * `shared`, which would fire in Quick and Capture too: the Chat window wants
    * main's tab and pane chords and none of its note commands. */
   also?: Surface[];
+  /** Other words ⌘K finds it by ("send to AI" for Hand to AI, 2026-09-28). */
+  keywords?: readonly string[];
   /** Runtime availability for transient surfaces such as first-run setup. */
   enabled?: () => boolean;
   /** Registered for dispatch but omitted from Settings/⌘K/shortcut maps. */

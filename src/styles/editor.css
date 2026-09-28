@@ -2570,25 +2570,81 @@
   cursor: pointer;
 }
 
-/* The Librarian chat (librarianChat.tsx): after the first ask, the conversation
-   pops out into the pane's bottom-right corner, like a site's help chat. Flat,
-   like every surface: a hairline, no shadow. It sits above the format bar when
-   the bar is showing, and tucks into a small button in the same corner. */
+/* The Librarian (librarianChat.tsx, 2026-09-28): a pill that lives in the
+   pane's bottom-right corner beside the scroll-to-top arrow (same height,
+   8px to its left), always there. The conversation grows out of it: the panel
+   opens just above, right-aligned to the pill, with a small pointer down at
+   it. Flat, like every surface: a hairline, no shadow. Both rise with the
+   arrow when the centered format bar would reach the corner. */
+.libchat-launch {
+  position: absolute;
+  right: 66px;
+  bottom: 16px;
+  z-index: 7;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--ground);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.libchat-launch:hover {
+  background-image: linear-gradient(var(--hov), var(--hov));
+}
+.libchat-launch.open {
+  border-color: color-mix(in srgb, var(--accent-text) 45%, var(--border));
+  background-image: linear-gradient(var(--tint), var(--tint));
+}
 .libchat {
   position: absolute;
-  right: 16px;
-  bottom: 16px;
+  right: 66px;
+  bottom: 68px;
   z-index: 7;
   display: flex;
   flex-direction: column;
-  width: min(24rem, calc(100% - 32px));
+  width: min(24rem, calc(100% - 82px));
   max-height: min(34rem, calc(100% - 120px));
   background: var(--ground);
   border: 1px solid var(--border);
   border-radius: var(--r-card);
+  transform-origin: calc(100% - 46px) 100%;
+  animation: libchat-open var(--motion-enter, 160ms) var(--motion-ease, ease-out);
 }
-.libchat.above {
-  bottom: 84px;
+/* the pointer down at the pill: a square turned on its point, two hairlines */
+.libchat::after {
+  content: "";
+  position: absolute;
+  right: 40px;
+  bottom: -6px;
+  width: 10px;
+  height: 10px;
+  background: var(--ground);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  transform: rotate(45deg);
+}
+@keyframes libchat-open {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .libchat {
+    animation: none;
+  }
+}
+.editor[data-lift-scroll-top] .libchat-launch {
+  bottom: 66px;
+}
+.editor[data-lift-scroll-top] .libchat {
+  bottom: 118px;
 }
 .libchat-head {
   display: flex;
@@ -2601,11 +2657,6 @@
 }
 .libchat-head strong {
   font-size: 13px;
-}
-.libchat-role {
-  font-size: 12px;
-  color: var(--text-muted);
-  white-space: nowrap;
 }
 .libchat-grow {
   flex: 1 1 auto;
@@ -2640,10 +2691,6 @@
 .libchat-pill:disabled {
   opacity: 0.55;
   cursor: default;
-}
-.libchat-model {
-  display: flex;
-  justify-content: flex-start;
 }
 .libchat-log {
   flex: 1 1 auto;
@@ -2755,21 +2802,38 @@
   resize: none;
   line-height: 1.45;
 }
-.libchat.libchat-launch {
-  flex-direction: row;
+/* the composer's last lines: what the ask is about and the model on one
+   row, then what the Librarian is (and isn't) for */
+.libchat-meta {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  width: auto;
-  max-height: none;
-  padding: 7px 12px;
-  font: inherit;
-  font-size: 13px;
-  color: var(--text);
-  cursor: pointer;
-  border-radius: 999px;
+  gap: 8px;
+  min-width: 0;
 }
-.libchat.libchat-launch:hover {
-  background: var(--hov);
+.libchat-note {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.libchat-compose.off .libchat-row,
+.libchat-compose.off .libchat-meta {
+  opacity: 0.55;
+}
+/* what an Apply changed, listed in the reply */
+.libchat-done {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.libchat-done li::before {
+  content: "✓ ";
+  color: var(--accent-text);
 }
 .libchat-dot {
   width: 6px;
