@@ -2537,15 +2537,37 @@
     display: none;
   }
 }
-.sb-footbtn .count {
-  font-size: 10px;
-  color: var(--text-muted);
+/* the icon carries the button's badges, so a count or a dot never takes room
+   from the label (2026-09-28) */
+.sb-footicon {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+.sb-footicon .count {
+  position: absolute;
+  top: -8px;
+  /* anchored by its right edge: a wider count grows over the icon, never
+     into the label beside it */
+  right: -5px;
+  min-width: 14px;
+  padding: 0 4px;
+  font-size: 9px;
+  line-height: 14px;
+  text-align: center;
+  outline: 2px solid var(--ground);
+}
+.sb-footicon .sb-work-dot,
+.sb-footicon .sb-update-dot {
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  outline: 2px solid var(--ground);
 }
 /* "update available" on the footer's Settings button — the titlebar dot's twin
-   (.tb-update-dot): a warm clay dot in the row's flow, never a red badge, and
-   static (a hidden window must not composite) */
+   (.tb-update-dot): a warm clay dot, never a red badge, and static (a hidden
+   window must not composite) */
 .sb-footbtn .sb-update-dot {
-  flex: 0 0 auto;
   width: 7px;
   height: 7px;
   border-radius: 50%;

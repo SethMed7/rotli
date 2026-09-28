@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  BOARD_DROP_NOTICE,
   emptyPasteOutcome,
   dropIsBlocked,
   dropIsOnBoard,
@@ -120,6 +121,13 @@ describe("the drop plan", () => {
     });
     expect(planDrop(["/a/one.pdf", "/a/two.zip"], "none").notice).toBe("Saved 2 files to Assets");
     expect(planDrop([], "none").notice).toBeNull();
+    // a board: everything to Assets, and only the board's own notice
+    expect(planDrop(["/a/shot.png", "/a/report.pdf"], "board")).toEqual({
+      attach: [],
+      embed: [],
+      store: ["/a/shot.png", "/a/report.pdf"],
+      notice: BOARD_DROP_NOTICE,
+    });
   });
 });
 

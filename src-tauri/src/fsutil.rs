@@ -215,7 +215,8 @@ mod lock_tests {
         lock
     }
 
-    const GONE_PID: u32 = 4_000_000; // above any real PID: never alive
+    // above every PID limit (macOS 99_999; Linux at most 2^22): never alive
+    const GONE_PID: u32 = i32::MAX as u32;
 
     #[test]
     fn a_stale_lock_whose_owner_is_gone_is_taken_over_and_released() {

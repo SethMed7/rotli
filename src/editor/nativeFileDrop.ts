@@ -43,13 +43,7 @@ import { loadConfig } from "../memex/service";
 import { invalidateNotes } from "../services/hooks";
 import { showFileNotice } from "../state/fileNotice";
 import { usePanesStore } from "../state/panes";
-import {
-  BOARD_DROP_NOTICE,
-  type DropCandidate,
-  dropIsBlocked,
-  dropIsOnBoard,
-  firstTarget,
-} from "./dropRouting";
+import { type DropCandidate, dropIsBlocked, dropIsOnBoard, firstTarget } from "./dropRouting";
 import {
   type DropPoint,
   dropEditorHost,
@@ -177,10 +171,7 @@ export function useNativeFileDrop(): void {
       if (chat) return deliverFiles(paths, { kind: "chat", attach: chat.target });
       const row = firstTarget(candidates, sidebarDropTargetAt);
       if (row) return dropOnSidebarRow(row.target, paths);
-      if (dropIsOnBoard(candidates)) {
-        await deliverFiles(paths, { kind: "none" });
-        return showFileNotice(BOARD_DROP_NOTICE);
-      }
+      if (dropIsOnBoard(candidates)) return deliverFiles(paths, { kind: "board" });
       const target =
         editorAt(candidates) ?? (hovered?.view.dom.isConnected ? hovered : null) ?? caretTarget();
       if (!target) return deliverFiles(paths, { kind: "none" });
