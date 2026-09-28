@@ -116,6 +116,15 @@ playing and pausing is extremely laggy".
   0.4 s while anything has media (1.5 s otherwise), one round at a time so
   slow answers never pile up; the chosen track loads at launch.
 
+## In setup (2026-09-28, later)
+
+The owner: "have the music part be part of the onboarding for the app
+experience." Setup gains a **Sound** step between Window and Shortcuts
+(`src/components/onboarding/setupSound.tsx`, now step 4 of 7): Quiet, Studio
+music (the chosen theme's track, named on the card), or Claude FM (Mac only).
+Picking plays it at once, so the person hears the choice; Back and forth keeps
+it. Skip app setup returns ambient to its default, off, like the rest of setup.
+
 ## Known limits
 
 - A browser tab's page is destroyed, not hidden, when its surface unmounts:

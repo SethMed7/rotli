@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { NoteSummary } from "../types";
 import { imageGenMarkdown, readyImageEngines } from "./imageGenPopover";
-import { pickerFence, slashInsertion, templateInsertion } from "./slashActions";
+import { opensFlow, pickerFence, slashInsertion, templateInsertion } from "./slashActions";
 import {
   adaptSlashInsertion,
   filterSlashItems,
@@ -44,6 +44,7 @@ describe("slash command catalog", () => {
       "Attach image",
       "Generate image",
       "Talk to the Librarian",
+      "Hand to AI",
       "Template",
       "Link note",
       "Link chat",
@@ -53,8 +54,7 @@ describe("slash command catalog", () => {
     ]);
     for (const item of SLASH_ITEMS) {
       // picker, image, and Librarian commands open a flow first — no scaffold
-      const opens = ["picker", "attachImage", "imageGen", "librarian"];
-      if (opens.includes(item.op.kind)) {
+      if (opensFlow(item.op)) {
         continue;
       }
       const insertion = slashInsertion(item.op);

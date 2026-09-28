@@ -8,9 +8,10 @@
 // same corner; × ends the conversation.
 //
 // The Librarian pill (2026-09-28, the owner: "it needs to look like it is
-// coming out of something … show the whole time … to the left of the
-// arrow"): always in the corner beside the scroll-to-top arrow, it opens the
-// panel, which grows out of it, and starts a conversation when there is none.
+// coming out of something … to the left of the arrow"; then "only show if the
+// user runs /librarian"): once a conversation exists it sits in the corner
+// beside the scroll-to-top arrow and opens and closes the panel, which grows
+// out of it.
 
 import { useEffect, useRef, useState } from "react";
 
@@ -29,7 +30,6 @@ import {
   closeLibrarianChat,
   type LibrarianChat as Chat,
   librarianQuestions,
-  startLibrarianChat,
   updateLibrarianChat,
   updateLibrarianTurn,
   useLibrarianBar,
@@ -63,46 +63,25 @@ const SUGGESTIONS = ["Suggest tags", "File this note"] as const;
 export const chatShownIn = (chat: Chat | null, paneId: string, noteId: string): chat is Chat =>
   !!chat && chat.paneId === paneId && chat.noteId === noteId;
 
-/** Whether the corner lane holds the Librarian pill (scrollTopLane.ts). */
-export const librarianLane = (): boolean => useUiStore.getState().brainEnabled;
+/** Whether the corner lane holds the Librarian pill (scrollTopLane.ts): only
+ * while a /librarian conversation is open somewhere. */
+export const librarianLane = (): boolean =>
+  useUiStore.getState().brainEnabled && !!useLibrarianBar.getState().chat;
 
 export function LibrarianChat({ noteId, paneId }: { noteId: string; paneId: string }) {
   const chat = useLibrarianBar((s) => s.chat);
   const librarianOn = useUiStore((s) => s.brainEnabled);
-  if (!librarianOn) return null;
-  return (
-    <LibrarianCorner here={chatShownIn(chat, paneId, noteId) ? chat : null} noteId={noteId} paneId={paneId} />
-  );
+  const here = chatShownIn(chat, paneId, noteId) ? chat : null;
+  // only once the person has run /librarian here (the owner, 2026-09-28)
+  if (!librarianOn || !here) return null;
+  return <LibrarianCorner here={here} noteId={noteId} paneId={paneId} />;
 }
 
-/** The corner for one moment: the pill, and the panel above it when open
- * (tests render it directly). */
-export function LibrarianCorner({
-  here,
-  noteId,
-  paneId,
-}: {
-  here: Chat | null;
-  noteId: string;
-  paneId: string;
-}) {
-  const { preferred, models } = useLibrarianModels();
-  const open = !!here && !here.minimized;
+/** The corner for one conversation: the pill, and the panel above it when
+ * open (tests render it directly). */
+export function LibrarianCorner({ here, noteId, paneId }: { here: Chat; noteId: string; paneId: string }) {
+  const open = !here.minimized;
   const waiting = librarianQuestions(here);
-  // the pill opens and closes the panel, and starts a conversation if none
-  const toggle = () => {
-    if (here) return updateLibrarianChat(here.id, () => ({ minimized: open }));
-    startLibrarianChat({
-      id: crypto.randomUUID(),
-      paneId,
-      noteId,
-      modelId: preferred ?? models[0]?.id ?? "",
-      turns: [],
-      status: "idle",
-      error: null,
-      minimized: false,
-    });
-  };
   return (
     <>
       {open && <ChatPanel chat={here} noteId={noteId} paneId={paneId} />}
@@ -112,11 +91,11 @@ export function LibrarianCorner({
         aria-label={open ? "Hide the Librarian" : "Open the Librarian"}
         aria-expanded={open}
         title="The Librarian organizes this note: tags, marked passages, filing, people"
-        onClick={toggle}
+        onClick={() => updateLibrarianChat(here.id, () => ({ minimized: open }))}
       >
         <ActivityGlyph size={15} />
         <span>Librarian</span>
-        {(here?.status === "thinking" || waiting > 0) && <span className="libchat-dot" aria-hidden="true" />}
+        {(here.status === "thinking" || waiting > 0) && <span className="libchat-dot" aria-hidden="true" />}
       </button>
     </>
   );

@@ -117,6 +117,7 @@ test("the banner wears their choices: a Grove Dark ground and the bucket hat the
     .click();
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Choose where notes live" }).click();
   await page.getByRole("button", { name: "Choose an empty folder" }).click();
   await page.getByRole("button", { name: "New folder", exact: true }).click();

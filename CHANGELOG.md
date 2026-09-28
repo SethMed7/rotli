@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   opens the activity dashboard, Tasks, All notes and a private browser tab.
   Show everything brings it all back.
 
+- **Music in setup.** First-run setup has a Sound step: stay quiet, play the
+  studio track that matches the theme you just picked, or Claude FM (Mac).
+  It starts playing as you choose, and the sidebar player takes it from there.
 - **Ambient audio.** Turn it on in Settings → General and quiet music from the
   Rotli studio plays from a small player above the sidebar's footer, one track
   per theme (Linen, Graphite, Tide, Canopy, Dusk, Lamplight), with previous,
@@ -97,7 +100,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   about the note with your question already typed; **Open in Chat** is always
   in its header. Quick asks ("Suggest tags", "File this note", "Mark the
   highlighted passage") sit above the box. Each question carries the passage
-  you had highlighted.
+  you had highlighted. The Librarian's corner button shows only once you've
+  run `/librarian` in that note, so notes you haven't asked about stay clear.
   The model picker is now the searchable one from Chat, grouped by provider.
   The passage you highlight stays highlighted while you type to the Librarian
   (it used to vanish as soon as you clicked into the bar). Escape or − tucks
@@ -161,6 +165,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   what "done" means. Edit it, then copy it. It is built from the note alone;
   no model runs. A secure note, or one that looks like it holds a secret, is
   never turned into a prompt, and the window says why.
+  Type `/hand to AI` in a note for the same window, or search ⌘K for "send to
+  AI".
 
 ### Fixed
 

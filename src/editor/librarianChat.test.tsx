@@ -184,14 +184,13 @@ describe("the Librarian chat", () => {
     expect(markup).not.toContain("Take this to Chat");
   });
 
-  test("the pill is there the whole time: no chat, minimized, or open above it", () => {
-    const corner = (here: Chat | null) =>
+  test("the pill comes with a /librarian conversation: tucked, or open above it", () => {
+    const corner = (here: Chat) =>
       renderToStaticMarkup(
         <QueryClientProvider client={new QueryClient()}>
           <LibrarianCorner here={here} noteId="n1" paneId="p1" />
         </QueryClientProvider>,
       );
-    expect(corner(null)).toContain('aria-label="Open the Librarian"');
     const tucked = corner({ ...base, minimized: true });
     expect(tucked).toContain('aria-label="Open the Librarian"');
     expect(tucked).not.toContain('aria-label="Librarian chat"');

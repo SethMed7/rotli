@@ -20,7 +20,6 @@ import { clamp } from "../lib/clamp";
 import { corpusImportFile, corpusPickImages, rootIdOf } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
-import { openLibrarianBar } from "../state/librarianBar";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import { autoPair } from "./autoPairInput";
@@ -54,7 +53,7 @@ import { livePreview, noteIdFacet } from "./livePreview";
 import { markSelectionSpec } from "./markSelection";
 import { ensureDocument, getDocumentText, onDocumentChange, setDocumentText } from "./model";
 import { rawMarkdown } from "./rawMarkdown";
-import { pickerFence, slashInsertion } from "./slashActions";
+import { opensFlow, pickerFence, slashInsertion } from "./slashActions";
 import {
   adaptSlashInsertion,
   filterSlashItems,
@@ -65,6 +64,7 @@ import {
   type SlashItem,
   type SlashPickerMode,
 } from "./slashMenu";
+import { openSlashPanel } from "./slashPanels";
 import { SlashPicker } from "./slashPicker";
 import { tableRender } from "./tableRender";
 import { insertTemplateFromPicker } from "./templateInsert";
@@ -430,8 +430,7 @@ function CmEditorImpl({
       // where the command's content begins once the span is cleared — on a
       // result row's reason that is the fresh continuation line beneath it
       const contentFrom = spanFrom + span.lead.length;
-      const opensUi = item.op.kind === "picker" || item.op.kind === "attachImage";
-      if (opensUi || item.op.kind === "imageGen" || item.op.kind === "librarian") {
+      if (opensFlow(item.op)) {
         view.dispatch({
           changes: { from: spanFrom, to: line.to, insert: span.lead },
           selection: EditorSelection.cursor(contentFrom),
@@ -468,9 +467,9 @@ function CmEditorImpl({
             });
           return;
         }
-        if (item.op.kind === "librarian") {
+        if (item.op.kind === "librarian" || item.op.kind === "handToAi") {
           setSlash((s) => ({ ...s, open: false }));
-          openLibrarianBar(paneId);
+          openSlashPanel(item.op.kind, paneId, noteId);
           return;
         }
         if (item.op.kind === "imageGen") {

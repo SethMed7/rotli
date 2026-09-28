@@ -84,3 +84,15 @@ test("⌘K finds Hand to AI when you search for “send to AI”", async ({ page
   await page.getByPlaceholder("Search notes, files, chats, actions…").fill("send to ai");
   await expect(page.locator(".prow", { hasText: "Hand to AI…" }).first()).toBeVisible();
 });
+
+// 2026-09-28, the owner: "let me do hand to ai via a slash command".
+test("/hand to AI opens Hand to AI for the note, and the slash text goes", async ({ page }) => {
+  await gotoApp(page);
+  await newNote(page, "Launch checklist\n\nGet the beta out on Friday.\n\n");
+  await page.keyboard.type("/hand");
+  const menu = page.getByRole("menu", { name: "Insert block" });
+  await menu.getByRole("menuitem", { name: /Hand to AI/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Hand to AI" });
+  await expect(dialog.getByRole("textbox", { name: "Prompt" })).toHaveValue(/Get the beta out on Friday\./);
+  await expect(page.locator(".cm-content").last()).not.toContainText("/hand");
+});

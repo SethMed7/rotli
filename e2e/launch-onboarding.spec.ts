@@ -95,11 +95,30 @@ test("first-time setup opens in Rotli Light with a quokka wearing nothing", asyn
   await expect(page.locator("html")).toHaveAttribute("data-theme", "midnight-dark");
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Choose where notes live" }).click();
   await expect(page.getByRole("button", { name: "Choose an empty folder" })).toBeVisible();
   await page.getByRole("button", { name: "Back" }).click();
   await expect(page.getByRole("button", { name: "Choose where notes live" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "midnight-dark");
+});
+
+test("setup's Sound step offers quiet, the theme's studio track, or Claude FM", async ({ page }) => {
+  await page.goto("/?onboarding");
+  await page.getByRole("button", { name: "Get started" }).click();
+  await page.getByRole("radiogroup", { name: "Theme" }).getByRole("radio", { name: /Ocean/ }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { name: "Music while you write?" })).toBeVisible();
+  const music = page.getByRole("radiogroup", { name: "Music" });
+  await expect(music.getByRole("radio", { name: /^Quiet/ })).toHaveAttribute("aria-checked", "true");
+  await expect(music.getByRole("radio", { name: /^Claude FM/ })).toBeVisible();
+  await music.getByRole("radio", { name: /^Studio music · Tide/ }).click();
+  await expect(music.getByRole("radio", { name: /^Studio music/ })).toHaveAttribute("aria-checked", "true");
+  // Back and forth keeps the pick
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(music.getByRole("radio", { name: /^Studio music/ })).toHaveAttribute("aria-checked", "true");
 });
 
 test("the guided tour follows setup, spotlights real controls, skips missing ones, and reopens from Settings", async ({

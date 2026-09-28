@@ -10,12 +10,19 @@ export interface SlashInsertion {
 export const MERMAID_STARTER = `flowchart LR
   Start[Start] --> Next[Next step]`;
 
+/** Commands that open something (a picker, a popover, a panel) instead of
+ * inserting text: their `/word` is cleared and the flow takes over. */
+type FlowOp = Extract<SlashOp, { kind: "picker" | "attachImage" | "imageGen" | "librarian" | "handToAi" }>;
+
+export function opensFlow(op: SlashOp): op is FlowOp {
+  return ["picker", "attachImage", "imageGen", "librarian", "handToAi"].includes(op.kind);
+}
+
 /** Canonical scaffold for every immediate slash command. Picker commands — and
  * image attachment/generation — which open a picker/popover first —
  * intentionally return null. */
 export function slashInsertion(op: SlashOp): SlashInsertion | null {
-  if (op.kind === "picker" || op.kind === "attachImage" || op.kind === "imageGen" || op.kind === "librarian")
-    return null;
+  if (opensFlow(op)) return null;
   if (op.kind === "code") return { insert: "``", caret: 1 };
   if (op.kind === "table") {
     const insert = insertTableText(3, 2);
