@@ -45,7 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pick the ambient sound from the player.** Click the title ("Ambient ·
   Tide") for the list: the six tracks, and **Claude FM**, Anthropic's live
   lo-fi stream. Claude FM plays in a private browser page you never see, so
-  it needs the internet; Settings → General lists it too. Mac app.
+  it needs the internet; Open Claude FM in a tab shows it as an ordinary tab.
+  The player always names what's playing. Settings → General lists it too.
+  Mac app.
 - **Tuck a playing tab into the player.** A browser tab playing sound can
   leave the tab bar and keep playing in the sidebar player. Open the tab brings
   it back where you are, still playing, without reloading; Close ends it. One

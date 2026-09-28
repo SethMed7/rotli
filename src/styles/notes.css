@@ -2660,8 +2660,10 @@
   background: color-mix(in srgb, var(--hov) 62%, transparent);
   color: var(--text);
 }
-/* a narrow sidebar keeps the buttons and lets the title go */
-@container (max-width: 220px) {
+/* only a very narrow sidebar lets the title go: at the usual width the
+   player is ~220px, and the name of what's playing must show (the owner,
+   2026-09-28: "I need to see what is chosen") */
+@container (max-width: 150px) {
   .sb-player-title span {
     display: none;
   }

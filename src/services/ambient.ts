@@ -282,6 +282,16 @@ export function stepAmbient(step: 1 | -1): void {
   setPrefs({ track: stepTrack(prefs.track, step) });
 }
 
+/** Claude FM out of hiding (the owner, 2026-09-28: "a way for me to open
+ * that tab in browser since it's coming from YouTube"): an ordinary browser
+ * tab on the stream, and ambient steps back so the two never both play. The
+ * stream is live, so starting it fresh loses nothing. */
+export function openClaudeFmTab(): void {
+  useAmbient.getState().setPrefs({ playing: false });
+  closeFm();
+  usePanesStore.getState().openBrowser(CLAUDE_FM.url);
+}
+
 /** Pick what ambient plays (the player's menu): a track or Claude FM. */
 export function chooseAmbient(id: string): void {
   useAmbient.getState().setPrefs({ track: id, playing: true });

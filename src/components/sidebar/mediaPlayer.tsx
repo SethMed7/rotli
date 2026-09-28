@@ -17,6 +17,7 @@ import {
 } from "../../lib/privateBrowser";
 import {
   chooseAmbient,
+  openClaudeFmTab,
   openMediaTab,
   stepAmbient,
   stopAmbient,
@@ -80,6 +81,7 @@ export const LABELS = {
   tuck: "Tuck into the player",
   close: "Close the tab",
   choose: "Choose the ambient sound",
+  openStream: "Open Claude FM in a tab",
 } as const;
 
 /** A tab folding down into a bar: tuck it into the player. */
@@ -139,12 +141,13 @@ export function MediaPlayer() {
   return (
     <Player
       view={view}
-      title={view.tab ? privateBrowserTabTitle(view.tab) : `Ambient · ${trackTitle(prefs.track)}`}
+      title={view.tab ? privateBrowserTabTitle(view.tab) : trackTitle(prefs.track)}
       ambientTitle={trackTitle(prefs.track)}
       ambientWanted={prefs.playing}
       onAmbientPlay={() => setPrefs({ playing: !prefs.playing })}
       tucked={!!view.tab && view.tab === docked}
       canTuck={!docked}
+      stream={isStream(prefs.track)}
       onChooseSource={(anchor) => openSourceMenu(anchor, prefs.track)}
     />
   );
@@ -160,6 +163,7 @@ export function Player({
   tucked = false,
   canTuck = true,
   onChooseSource,
+  stream = false,
 }: {
   view: PlayerView;
   title: string;
@@ -171,6 +175,8 @@ export function Player({
   /** No tab is tucked yet, so this one may be. */
   canTuck?: boolean;
   onChooseSource?: (anchor: HTMLElement) => void;
+  /** Ambient is Claude FM: offer its page as a tab. */
+  stream?: boolean;
 }) {
   const tab = view.tab;
   return (
@@ -246,12 +252,20 @@ export function Player({
             <Control label={ambientWanted ? LABELS.pause : LABELS.play} onClick={onAmbientPlay}>
               {ambientWanted ? <PauseGlyph /> : <PlayGlyph />}
             </Control>
-            <Control label={LABELS.stop} onClick={stopAmbient}>
-              <SquareGlyph size={13} />
-            </Control>
+            {/* a live stream has nothing to rewind: Pause is its stop */}
+            {!stream && (
+              <Control label={LABELS.stop} onClick={stopAmbient}>
+                <SquareGlyph size={13} />
+              </Control>
+            )}
             <Control label={SKIP.ahead.ambient} onClick={() => stepAmbient(SKIP.ahead.step)}>
               <SkipGlyph />
             </Control>
+            {stream && (
+              <Control label={LABELS.openStream} onClick={openClaudeFmTab}>
+                <ExternalLinkGlyph size={13} />
+              </Control>
+            )}
           </div>
         )}
       </div>

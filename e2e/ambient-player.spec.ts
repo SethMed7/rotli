@@ -21,9 +21,12 @@ test("Ambient audio: turned on in Settings, the player sits above the footer", a
   await page.getByRole("button", { name: "Back to notes", exact: true }).click();
 
   const player = page.getByRole("region", { name: "Now playing" });
-  await expect(player).toContainText("Ambient · Dusk");
+  // the chosen sound's name shows at the sidebar's usual width
+  const chosen = player.locator(".sb-player-source span");
+  await expect(chosen).toBeVisible();
+  await expect(chosen).toHaveText("Dusk");
   await player.getByRole("button", { name: "Next track" }).click();
-  await expect(player).toContainText("Ambient · Lamplight");
+  await expect(chosen).toHaveText("Lamplight");
   // nothing in a tab: no tab to open, no ambient toggle waiting on the left
   await expect(player.getByRole("button", { name: "Open the tab" })).toHaveCount(0);
 
@@ -57,12 +60,16 @@ test("the player's title picks the ambient sound: any track, or Claude FM", asyn
   ]);
   await expect(menu.getByRole("menuitemcheckbox", { name: "Linen" })).toHaveAttribute("aria-checked", "true");
   await menu.getByRole("menuitemcheckbox", { name: "Canopy" }).click();
-  await expect(player).toContainText("Ambient · Canopy");
+  await expect(player.locator(".sb-player-source span")).toHaveText("Canopy");
   // (choosing also starts it — services/ambient.test.ts; this browser can't play AAC)
 
   await player.getByRole("button", { name: /^Choose the ambient sound/ }).click();
   await page.getByRole("menu").getByRole("menuitemcheckbox", { name: "Claude FM" }).click();
-  await expect(player).toContainText("Ambient · Claude FM");
+  await expect(player.locator(".sb-player-source span")).toHaveText("Claude FM");
+  // Claude FM comes from YouTube: it can open as an ordinary tab to watch
+  await player.getByRole("button", { name: "Open Claude FM in a tab" }).click();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Private browser");
+  await expect(player.getByRole("button", { name: "Play", exact: true })).toBeVisible();
 });
 
 // 2026-09-28, the owner: "I hear the music but have no idea where it is coming

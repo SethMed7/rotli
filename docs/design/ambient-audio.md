@@ -84,6 +84,12 @@ tab … into the media tab"; "allow Claude FM to be the source … in a private
 browser that is collapsed into the media player"; and "all of the audio
 playing and pausing is extremely laggy".
 
+- **What's chosen shows.** The player names the sound ("Tide", "Claude
+  FM"; the note glyph says it's ambient), and the title only gives way in a
+  sidebar under 150px (it used to at 220px, the usual width, so the choice
+  was never visible). Claude FM has no Stop (a live stream's stop is Pause)
+  and an **Open Claude FM in a tab** button: an ordinary tab on the stream,
+  with ambient stepping back so the two never both play.
 - **The source menu.** The ambient title in the player is a button that opens
   the sources: the six tracks, then Claude FM (`AMBIENT_SOURCES`), the current
   one highlighted. Choosing one starts it. Settings lists the same. Rotli Web
