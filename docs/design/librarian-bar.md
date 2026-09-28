@@ -42,7 +42,14 @@ The bar says why, in one plain sentence, and offers nothing else when:
 | Librarian off (`brainEnabled` false) | The Librarian is off for this vault. Turn it on in Settings → Librarian. |
 | Locked note | This note is locked, so the Librarian won't touch it. |
 | Secure note | The Librarian doesn't organize secure notes. |
+| Secret-shaped text in what would be sent (a key, token, card or ID number) | This note looks like it holds a secret, so the Librarian won't send it to a model. Remove it, or make the note secure. |
 | Not in the Library (plain vault, or outside `wiki/`) | The Librarian only organizes notes in the Library. |
+
+The secret refusal is the same `looksSecret` gate (`src/ai/guard.ts`) that
+Hand to AI and chat egress use. It runs on the exact prompt text: the note's
+title, the highlighted passage and its prefix/suffix, and the note body excerpt
+the prompt carries. It runs before `makeTauriHost(model).complete`, whatever
+model is chosen, and Rust's egress ledger still backstops it.
 
 Secure is refused outright in slice 1 (not "on-device only"): the filer write
 lane already refuses secure notes in Rust, and the organizer skips them, so a
@@ -57,19 +64,45 @@ picker's source, `mergedModels` without hybrid presets). It defaults to the
 Librarian's own choice (`organizerModel` / `organizerModelId`, only when that
 provider is switched on), else the on-device default. One call through
 `makeTauriHost(model).complete`, with `isSecureContext` wired as a backstop.
-The reply is JSON parsed tolerantly; anything not in the action grammar is
-dropped, a `file` action must name an existing Library area, and tags lose
-`, [ ]`.
+The reply is JSON parsed tolerantly against this grammar (the unit tests pin
+it):
+
+```json
+{ "actions": [
+  { "type": "tag",  "tags": ["person", "q3"] },
+  { "type": "mark", "exact": "…", "prefix": "…", "suffix": "…", "label": "…" },
+  { "type": "file", "area": "people" }
+] }
+```
+
+- The reply may be wrapped in prose or a code fence; the first JSON object
+  with an `actions` array is taken. Anything else is "no proposal".
+- `tag`: `tags` is required, a non-empty list of strings. Each tag is trimmed
+  and loses `,`, `[`, and `]`. Empty and duplicate tags are dropped, and a tag
+  over 40 characters is dropped.
+- `mark`: `exact` is required and must occur in the note. `prefix`, `suffix`,
+  and `label` are optional. The model's `exact` is only trusted when it matches
+  the highlight; otherwise the anchor is rebuilt from the user's own selection.
+- `file`: `area` is required and must name an existing Library area. A
+  missing People area is the one exception: it is created, unless a rule says
+  people go elsewhere.
+- Unknown `type`s, unknown fields, and actions missing a required field are
+  dropped silently. At most one `file` action counts (the first).
 
 ## Contract change: `anchors`
 
 `anchors` joins the Librarian-owned metadata keys (`AI_KEYS`, Rust and TS,
 pinned by a parity fixture). Value: one line of JSON, a list of
-`{"exact","prefix","suffix","label"?}` (prefix and suffix up to 32 characters;
-`label` optional, so a later "name this passage" needs no second contract
-change). It is a
-text-quote pointer: it finds the passage again without changing the text, and
-survives edits elsewhere in the note. The organizer never writes it
+`{"exact","prefix","suffix","label"?}`. `exact` is capped at 280 characters
+(a longer highlight keeps its first 280 and still finds the passage with its
+prefix). Prefix and suffix are up to 32 characters each, and `label` up to 80,
+optional, so a later "name this passage" needs no second contract change. At
+most 20 anchors per note; the oldest drops first. It is a text-quote pointer:
+it finds the passage again without changing the text, and survives edits
+elsewhere in the note. Jump-to resolves `prefix + exact + suffix` first. If
+that is gone, it falls back to `exact` alone, and a quote that now matches more
+than once is shown as "this passage moved" and jumps to none of the matches,
+rather than guessing. The organizer never writes it
 (`ENRICH_FIELDS` unchanged).
 
 ## Editor details
@@ -103,8 +136,10 @@ survives edits elsewhere in the note. The organizer never writes it
    No user-visible surface; the CHANGELOG notes the new metadata key.
 2. **PR B — the bar**: `/librarian` slash item; `EditorHandle.getSelection`;
    `EditorSurface` swaps `FormatBar` for `LibrarianBar` in the bottom slot;
-   states: needs-highlight, ready, thinking, proposals, applied, error, and
-   every refusal above; Escape returns the format bar; keyboard-only path.
+   states: ready, thinking, proposals, applied, error, and every refusal
+   above. Only a mark needs a highlight: with no selection, the bar still
+   offers tagging and filing for the whole note, and "mark a passage" asks for a
+   highlight first (the needs-highlight hint); Escape returns the format bar; keyboard-only path.
    Playwright covers the bar, the swap, Escape, and the web message; unit
    tests cover apply; a native checklist covers the Mac-only write path. Also
    the metadata panel's list of marked passages, with jump-to.

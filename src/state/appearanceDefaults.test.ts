@@ -11,4 +11,6 @@ test("the appearance default is Rotli Light and the store boots from it", () => 
   const initial = useUiStore.getInitialState();
   expect(initial.theme).toBe(DEFAULT_APPEARANCE.theme);
   expect(initial.themeFamily).toBe(DEFAULT_APPEARANCE.themeFamily);
+  // Reset & re-onboard puts boards back on the theme too
+  expect(initial.boardBackground).toBe(DEFAULT_APPEARANCE.boardBackground);
 });
