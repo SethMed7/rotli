@@ -6,6 +6,7 @@ import { guideOs } from "../ai/connectorGuides";
 import { feedbackUrl } from "../lib/feedback";
 import { appVersion, openUrl } from "../lib/tauri";
 import { CHANGELOG_URL, latestHighlights, WHATS_NEW } from "../lib/whatsNew";
+import { stopAllSound } from "../services/ambient";
 import { showWhatsNew } from "../state/whatsNew";
 import { registerAction } from "./registry";
 
@@ -35,5 +36,12 @@ export function registerAppLinkActions(): void {
     title: "Open the full changelog",
     defaultChord: null,
     run: () => void openUrl(CHANGELOG_URL),
+  });
+  // the safety valve: whatever is sounding, from wherever, stops (2026-09-28)
+  registerAction({
+    id: "app.stopSound",
+    title: "Stop all sound",
+    defaultChord: null,
+    run: stopAllSound,
   });
 }

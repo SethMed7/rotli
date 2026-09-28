@@ -39,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   moment you press them, ambient fades out in about a tenth of a second
   instead of half a second, a tab's sound is noticed within half a second,
   and the chosen track is loaded before you press play.
+- **Stop all sound.** ⌘K → Stop all sound silences whatever the player can
+  reach: the ambient track, Claude FM, and every browser tab. Sound from
+  Rotli can no longer keep playing with nothing showing where it comes from.
 - **Pick the ambient sound from the player.** Click the title ("Ambient ·
   Tide") for the list: the six tracks, and **Claude FM**, Anthropic's live
   lo-fi stream. Claude FM plays in a private browser page you never see, so

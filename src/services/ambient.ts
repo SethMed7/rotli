@@ -42,11 +42,17 @@ const FM_PAGE = "ambient-claude-fm";
 /** Ask Claude FM to play or pause at most this often while it disagrees. */
 const FM_NUDGE_MS = 2500;
 
-let audio: HTMLAudioElement | null = null;
+// The one ambient element lives on the window, not in this module: a reloaded
+// module (a development hot update, the owner 2026-09-28: "I hear the music
+// but have no idea where it is coming from") picks up the element the old copy
+// was playing instead of losing it, still sounding, with no control on it.
+const shared = globalThis as { __rotliAmbientAudio?: HTMLAudioElement };
+let audio: HTMLAudioElement | null = shared.__rotliAmbientAudio ?? null;
 let fading: ReturnType<typeof setInterval> | null = null;
 
 function trackElement(track: string): HTMLAudioElement {
   audio ??= Object.assign(new Audio(), { loop: true, preload: "auto", volume: 0 });
+  shared.__rotliAmbientAudio = audio;
   const src = ambientSrc(track);
   if (!audio.src.endsWith(src)) audio.src = src;
   return audio;
@@ -183,8 +189,30 @@ function busy(): boolean {
   return fmOpen || Object.keys(useTabMedia.getState().media).length > 0 || !!useMediaDock.getState().tabId;
 }
 
+/** Silence everything the player can reach: the ambient track, Claude FM's
+ * page, a tucked tab, and every browser tab (⌘K → Stop all sound). */
+export function stopAllSound(): void {
+  useAmbient.getState().setPrefs({ playing: false });
+  if (fading) clearInterval(fading);
+  fading = null;
+  audio?.pause();
+  forceCloseFm();
+  for (const id of browserTabIds()) tabMediaAction(id, "pause");
+}
+
+/** Close Claude FM's page whether or not this copy opened it (a page left
+ * from before a reload is still a native view, still playing). */
+function forceCloseFm(): void {
+  fmOpen = false;
+  fmState = "none";
+  void privateBrowserClose(FM_PAGE).catch(() => {});
+}
+
 /** Start the player's machinery (main window, once). */
 export function startAmbient(): () => void {
+  // nothing from a previous run keeps sounding unseen
+  forceCloseFm();
+  if (audio && !useAmbient.getState().prefs.playing) audio.pause();
   const unsubscribe = [useAmbient.subscribe(applyAmbient), useTabMedia.subscribe(applyAmbient)];
   const events = ["play", "pause", "ended", "emptied", "volumechange"] as const;
   for (const name of events) document.addEventListener(name, checkInApp, true);
@@ -266,4 +294,13 @@ export function openMediaTab(tabId: string): void {
   useUiStore.getState().setSidebarMode("notes");
   if (useUiStore.getState().sidebarMode !== "notes") return;
   usePanesStore.getState().activateTab(leaf.id, tabId);
+}
+
+// a development hot update replaces this module: stop what the old copy runs
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    if (fading) clearInterval(fading);
+    audio?.pause();
+    forceCloseFm();
+  });
 }

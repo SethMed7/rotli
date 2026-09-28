@@ -64,3 +64,28 @@ test("the player's title picks the ambient sound: any track, or Claude FM", asyn
   await page.getByRole("menu").getByRole("menuitemcheckbox", { name: "Claude FM" }).click();
   await expect(player).toContainText("Ambient · Claude FM");
 });
+
+// 2026-09-28, the owner: "I hear the music but have no idea where it is coming
+// from". The ambient element lives on the window (a reloaded module finds it
+// again), and ⌘K → Stop all sound silences everything the player can reach.
+test("the ambient element can't be orphaned, and Stop all sound silences it", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("switch", { name: /Ambient audio/ }).click();
+  await page.getByRole("button", { name: "Back to notes", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Now playing" })).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => !!(window as { __rotliAmbientAudio?: unknown }).__rotliAmbientAudio))
+    .toBe(true);
+
+  await page.getByRole("button", { name: /Search notes and actions/ }).click();
+  await page.getByPlaceholder("Search notes, files, chats, actions…").fill("Stop all sound");
+  await page.locator(".prow", { hasText: "Stop all sound" }).first().click();
+  const player = page.getByRole("region", { name: "Now playing" });
+  await expect(player.getByRole("button", { name: "Play", exact: true })).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => (window as { __rotliAmbientAudio?: HTMLAudioElement }).__rotliAmbientAudio?.paused,
+    ),
+  ).toBe(true);
+});

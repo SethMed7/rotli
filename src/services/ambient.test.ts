@@ -9,6 +9,7 @@ import {
   openMediaTab,
   pollTabMedia,
   stepAmbient,
+  stopAllSound,
   stopAmbient,
   tabMediaAction,
   toggleAmbient,
@@ -81,3 +82,17 @@ describe("the player's buttons", () => {
 function findLeafById(id: string) {
   return leaves(usePanesStore.getState().root).find((leaf) => leaf.id === id)!;
 }
+
+describe("sound that can't hide", () => {
+  test("Stop all sound stops ambient and pauses every open tab at once", () => {
+    useAmbient.setState({ prefs: { ...DEFAULT_AMBIENT, enabled: true, playing: true } });
+    usePanesStore.getState().openBrowser("https://example.com/music");
+    const tab = leaves(usePanesStore.getState().root)
+      .flatMap((leaf) => leaf.tabs)
+      .find((t) => t.surfaceKind === "browser")!;
+    setTabMedia(tab.id, "playing");
+    stopAllSound();
+    expect(useAmbient.getState().prefs.playing).toBe(false);
+    expect(useTabMedia.getState().media[tab.id]).toBe("paused");
+  });
+});
