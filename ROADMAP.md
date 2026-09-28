@@ -125,7 +125,7 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
   view, so nothing typed is ever lost.
 - **Import from Notion and Apple Notes** · L — bring an existing library in,
   links and images included. An Obsidian or plain Markdown folder already opens
-  as a vault as it is.
+  as a vault.
 - **Backlinks panel** · M — every note that links to this one, plus places that
   mention it without a link.
 - **Actionable checklists as a family** · L — `/email:send` is the first one.
