@@ -43,6 +43,7 @@ describe("the ambient preference", () => {
     expect(trackForFamily("midnight")).toBe("lamplight");
     expect(trackForFamily("blossom")).toBe("linen");
     expect(ambientSrc("tide")).toBe("/ambient/tide.m4a");
+    expect(ambientSrc("tide", "/app/")).toBe("/app/ambient/tide.m4a");
   });
 
   test("skipping wraps around the list", () => {

@@ -3,7 +3,7 @@
 // chrome in src/lib/hideable.ts, grouped by where it sits. Each description
 // says how to reach it without the button, so hiding never removes anything.
 
-import { LAUNCH_FEATURES } from "../../lib/featurePolicy";
+import { LAUNCH_FEATURES, PLATFORM } from "../../lib/featurePolicy";
 import { HIDEABLE, type HideId, type Hidden, hideDescription } from "../../lib/hideable";
 import { SHOW_HOTKEYS } from "../../lib/hotkeyHint";
 import { showEverything, useHidden } from "../../state/hidden";
@@ -11,8 +11,18 @@ import { Toggle } from "./toggle";
 
 type Item = (typeof HIDEABLE)[number];
 
+/** Rotli Web never shows the Browser button, and its search button is the only
+ * way into the palette (⌘K belongs to the browser there), so neither is offered. */
+const WEB_KEEPS: readonly HideId[] = ["browserButton", "search"];
+
 /** The items this build has (Breve only where it ships). */
-const ITEMS: readonly Item[] = HIDEABLE.filter((item) => item.id !== "breve" || LAUNCH_FEATURES.breve);
+export function visibilityItems(platform = PLATFORM, breve = LAUNCH_FEATURES.breve): readonly Item[] {
+  return HIDEABLE.filter(
+    (item) => (item.id !== "breve" || breve) && (platform !== "web" || !WEB_KEEPS.includes(item.id)),
+  );
+}
+
+const ITEMS = visibilityItems();
 
 export function VisibilitySettings() {
   const hidden = useHidden((s) => s.hidden);

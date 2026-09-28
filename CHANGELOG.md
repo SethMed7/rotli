@@ -170,6 +170,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Rotli Web: ambient music plays.** The tracks were asked for at the wrong
+  address on the web, so the player stayed silent.
+- **Rotli Web: the search button can't be hidden.** On the web it is the only
+  way into the palette, so Show in Rotli no longer offers to hide it (or the
+  Browser button, which the web doesn't have). `/librarian` is left out of the
+  web's slash menu, and What's new marks the Mac-only items.
 - **`/librarian` is ready to type in.** Choosing `/librarian` puts the cursor
   in its box right away, so you can start typing without clicking it first.
 

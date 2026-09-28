@@ -122,6 +122,10 @@ describe("slash command catalog", () => {
     expect(filterSlashItems("word").map((item) => item.label)).toEqual(["Document"]);
     expect(filterSlashItems("docx").map((item) => item.label)).toEqual(["Document"]);
     expect(filterSlashItems("rtf")).toEqual([]);
+    expect(filterSlashItems("librarian", { sheets: false, librarian: false })).toEqual([]);
+    expect(filterSlashItems("librarian", { sheets: false }).map((item) => item.label)).toEqual([
+      "Talk to the Librarian",
+    ]);
   });
 });
 

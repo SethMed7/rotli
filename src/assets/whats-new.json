@@ -10,11 +10,13 @@
     },
     {
       "title": "Chat shows pictures and video",
-      "body": "When a reply links an image or a video in your vault, you see it right in the thread."
+      "body": "When a reply links an image or a video in your vault, you see it right in the thread.",
+      "platform": "mac"
     },
     {
       "title": "Find lights up every match",
-      "body": "⌘F now marks every match on the page, and the current one stands out."
+      "body": "⌘F now marks every match on the page, and the current one stands out.",
+      "platform": "mac"
     },
     {
       "title": "A new web vault is ready at once",

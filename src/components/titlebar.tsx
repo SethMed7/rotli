@@ -157,7 +157,8 @@ export function Titlebar() {
                 <Palette breveActive={breveActive} onClose={() => setPaletteOpen(false)} />
               </>
             ) : (
-              !hidden.search && (
+              // on the web the button is the only way into the palette: never hidden
+              (WEB || !hidden.search) && (
                 <button
                   type="button"
                   className="tb-search"

@@ -14,7 +14,7 @@
 import type { ReactNode } from "react";
 
 import { DOCUMENT_SEARCH_KEYWORDS } from "../documents/kinds";
-import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 import type { BlockToggle } from "./commands";
 import { Gl, bulletGlyph, checklistGlyph, codeGlyph, numberedGlyph, quoteGlyph } from "./formatGlyphs";
 import { parseBlock } from "./render";
@@ -410,15 +410,18 @@ export function slashPlacement(
 }
 
 /** Filter by label or optional keywords (case-insensitive). The spreadsheet
- * embed is withheld from builds without the sheets capability. */
+ * embed is withheld from builds without the sheets capability, and /librarian
+ * from Rotli Web (the Librarian runs in the Mac app). */
 export function filterSlashItems(
   query: string,
-  features: { sheets: boolean } = LAUNCH_FEATURES,
+  features: { sheets: boolean; librarian?: boolean } = { ...LAUNCH_FEATURES, librarian: PLATFORM !== "web" },
 ): SlashItem[] {
   const q = query.trim().toLowerCase();
-  const items = features.sheets
-    ? SLASH_ITEMS
-    : SLASH_ITEMS.filter((it) => !(it.op.kind === "picker" && it.op.mode === "embedSheet"));
+  const items = SLASH_ITEMS.filter(
+    (it) =>
+      (features.sheets || !(it.op.kind === "picker" && it.op.mode === "embedSheet")) &&
+      (features.librarian !== false || it.op.kind !== "librarian"),
+  );
   if (q === "") return items;
   return items.filter((it) => it.label.toLowerCase().includes(q) || it.keywords?.some((k) => k.includes(q)));
 }

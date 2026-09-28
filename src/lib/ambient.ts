@@ -29,7 +29,11 @@ export const AMBIENT_TRACKS: readonly AmbientTrack[] = [
   { id: "lamplight", title: "Lamplight", family: "midnight" },
 ];
 
-export const ambientSrc = (id: string) => `/ambient/${id}.m4a`;
+// The build's base: "/" in the Mac app, "/app/" for Rotli Web, which the site
+// serves under /app/ (a bare /ambient/ would ask the marketing site).
+const BASE: string = import.meta.env?.BASE_URL ?? "/";
+
+export const ambientSrc = (id: string, base = BASE) => `${base}ambient/${id}.m4a`;
 
 /** Claude FM (the owner, 2026-09-28): Anthropic's 24/7 lo-fi stream on
  * YouTube, the one Claude Code's /radio opens. Chosen as the ambient source,
