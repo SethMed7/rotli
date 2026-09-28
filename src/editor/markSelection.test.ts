@@ -10,22 +10,32 @@ import { markSelectionSpec } from "./markSelection";
 
 const NOTE = "Budgets & Purchasing Process\n- $50 to $100\n- need proof of results";
 
+function press(state: EditorState): EditorState {
+  const spec = markSelectionSpec(state, "bold");
+  return spec ? state.update(spec).state : state;
+}
+
 function bold(doc: string, anchor: number, head = anchor) {
   const state = EditorState.create({ doc, selection: EditorSelection.single(anchor, head) });
-  const spec = markSelectionSpec(state, "bold");
-  if (!spec) return { doc, selected: null };
-  const next = state.update(spec).state;
+  if (!markSelectionSpec(state, "bold")) return { doc, selected: null };
+  const next = press(state);
   const { from, to } = next.selection.main;
-  return { doc: next.doc.toString(), selected: next.sliceDoc(from, to) };
+  return { doc: next.doc.toString(), selected: next.sliceDoc(from, to), next };
+}
+
+/** Bold, then Bold again with the selection the first press left. */
+function boldTwice(doc: string, anchor: number, head: number): string {
+  return press(bold(doc, anchor, head).next!).doc.toString();
 }
 
 describe("bold over a selection", () => {
   test("a whole line picked up to the next line's start bolds that line only", () => {
     const end = NOTE.indexOf("- $50"); // the selection ends at column 0 of line 2
-    expect(bold(NOTE, 0, end)).toEqual({
+    expect(bold(NOTE, 0, end)).toMatchObject({
       doc: "**Budgets & Purchasing Process**\n- $50 to $100\n- need proof of results",
       selected: "Budgets & Purchasing Process",
     });
+    expect(boldTwice(NOTE, 0, end)).toBe(NOTE); // and the second press takes it off
   });
 
   test("several lines: each line's text is bolded and every bullet survives", () => {
@@ -33,11 +43,10 @@ describe("bold over a selection", () => {
     expect(result.doc).toBe(
       "**Budgets & Purchasing Process**\n- **$50 to $100**\n- **need proof of results**",
     );
-    // the selection still runs from the first word to the last
-    expect(result.selected?.startsWith("Budgets")).toBe(true);
-    expect(result.selected?.endsWith("results")).toBe(true);
-    // and pressing it again takes the bold off every line
-    expect(bold(result.doc, 0, result.doc.length).doc).toBe(NOTE);
+    // the selection keeps every line, marks included
+    expect(result.selected).toBe(result.doc);
+    // so pressing it again, as it stands, takes the bold off every line
+    expect(boldTwice(NOTE, 0, NOTE.length)).toBe(NOTE);
   });
 
   test("a mixed selection bolds the lines that aren't bold yet", () => {
@@ -54,13 +63,14 @@ describe("bold over a selection", () => {
   test("a selection across two lines' middles bolds each part", () => {
     const doc = "alpha beta\ngamma delta";
     expect(bold(doc, 6, 16).doc).toBe("alpha **beta**\n**gamma** delta");
+    expect(boldTwice(doc, 6, 16)).toBe(doc);
   });
 
   test("markers and blank space alone change nothing", () => {
-    expect(bold("- \n\n- ", 0, 6)).toEqual({ doc: "- \n\n- ", selected: null });
+    expect(bold("- \n\n- ", 0, 6)).toMatchObject({ doc: "- \n\n- ", selected: null });
   });
 
   test("a caret still opens an empty pair to type into, as before", () => {
-    expect(bold("write ", 6)).toEqual({ doc: "write ****", selected: "" });
+    expect(bold("write ", 6)).toMatchObject({ doc: "write ****", selected: "" });
   });
 });

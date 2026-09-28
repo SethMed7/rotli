@@ -29,22 +29,31 @@ export function markSelectionSpec(state: EditorState, mark: InlineMark): Transac
     end: Math.min(r.to, line.to) - line.from,
   }));
   const edits = toggleInlineMarkLines(spans, mark);
-  const first = edits[0];
-  const last = edits.at(-1);
-  if (!first || !last) return null; // nothing but markers and blank space selected
-  // where each edited line starts in the new document
-  let shift = 0;
-  const starts = edits.map((edit) => {
-    const line = lines[edit.index]!;
-    const at = line.from + shift;
-    shift += edit.line.length - line.length;
-    return at;
-  });
-  return {
-    changes: edits.map((edit) => {
-      const line = lines[edit.index]!;
-      return { from: line.from, to: line.to, insert: edit.line };
-    }),
-    selection: EditorSelection.range(starts[0]! + first.selStart, starts.at(-1)! + last.selEnd),
-  };
+  const only = edits.length === 1 ? edits[0] : undefined;
+  if (edits.length === 0) return null; // nothing but markers and blank space selected
+  const changes = state.changes(edits.map((edit) => narrowChange(lines[edit.index]!, edit.line)));
+  if (only) {
+    // one line: select its text inside the marks, as a caret-line toggle does
+    const at = changes.mapPos(lines[only.index]!.from, -1);
+    return { changes, selection: EditorSelection.range(at + only.selStart, at + only.selEnd) };
+  }
+  // several lines: keep the whole selection, marks included, so pressing the
+  // same mark again finds every line wrapped and takes it off (PR 119 review, 2026-09-28)
+  return { changes, selection: EditorSelection.range(changes.mapPos(r.from, -1), changes.mapPos(r.to, 1)) };
+}
+
+/** A line's rewrite as only the part that changed (the shared start and end
+ * trimmed), so a position beside a new mark maps to the right side of it. */
+function narrowChange(line: Line, next: string): { from: number; to: number; insert: string } {
+  const old = line.text;
+  let head = 0;
+  while (head < old.length && head < next.length && old[head] === next[head]) head++;
+  let tail = 0;
+  while (
+    tail < old.length - head &&
+    tail < next.length - head &&
+    old[old.length - 1 - tail] === next[next.length - 1 - tail]
+  )
+    tail++;
+  return { from: line.from + head, to: line.to - tail, insert: next.slice(head, next.length - tail) };
 }

@@ -38,6 +38,25 @@ test("a triple-clicked line bolds itself, and the bullet below stays a bullet", 
   expect(raw).not.toContain("****");
 });
 
+test("Bold twice across lines puts every line back as it was", async ({ page }) => {
+  await newNote(page);
+  const first = page.locator(".cm-line", { hasText: "Budgets & Purchasing Process" });
+  const last = page.locator(".cm-line", { hasText: "need proof of results" });
+  const [a, b] = [await first.boundingBox(), await last.boundingBox()];
+  await page.mouse.move(a!.x + 2, a!.y + a!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(b!.x + b!.width - 2, b!.y + b!.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await boldButton(page).click();
+  await expect(boldButton(page)).toBeVisible();
+  // Bold again, on the selection the first press left: every line comes back
+  await boldButton(page).click();
+
+  const raw = await rawText(page);
+  expect(raw).toContain("Budgets & Purchasing Process\n- $50 to $100\n- need proof of results");
+  expect(raw).not.toContain("**");
+});
+
 test("a selection across lines bolds every line's text and keeps each bullet", async ({ page }) => {
   await newNote(page);
   const first = page.locator(".cm-line", { hasText: "Budgets & Purchasing Process" });
