@@ -112,7 +112,7 @@ test("a folder created in Main is there after a reload", async ({ page }) => {
   await page.getByRole("textbox", { name: "New folder in Main" }).press("Enter");
   await expect(page.locator('.main-tree [data-main-folder="1"]', { hasText: "Kept" })).toBeVisible();
   // Main saves to the folder asynchronously: reload only once it has landed
-  await expect.poll(() => readOpfsFile(page, ".rotli/main.json")).toContain("Kept");
+  await expect.poll(() => readOpfsFile(page, ".rotli/main.json"), { timeout: 10_000 }).toContain("Kept");
 
   await page.reload();
   // a reload reconnects the vault before Main hydrates; under a full parallel

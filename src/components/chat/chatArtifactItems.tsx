@@ -8,7 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { DOCUMENT_EXTS, WORD_EXTS } from "../../documents/kinds";
 import { extOf, fileName, IMAGE_EXTS, VIDEO_EXTS } from "../../lib/fileKind";
 import type { ChatArtifact } from "../../memex/contract";
-import { attachedImageUrl } from "../../services/chatImages";
+import { artifactThumbUrl } from "../../services/chatImages";
 import { BoardGlyph, DocumentGlyph, ImageGlyph, WordGlyph } from "../glyphs";
 
 /** A film frame with a play mark (glyphs.tsx sits at its size ceiling). */
@@ -26,7 +26,7 @@ function VideoGlyph() {
       aria-hidden="true"
     >
       <rect x="3" y="5" width="18" height="14" rx="2" />
-      <path d="M10 9.5v5l4.2-2.5z" />
+      <path d="M10 9.5v5l4.2-2.5z" fill="currentColor" />
     </svg>
   );
 }
@@ -44,6 +44,28 @@ export function artifactType(artifact: ChatArtifact): ArtifactType {
   return "file";
 }
 
+/** The line under an artifact's name in the rail. */
+export function artifactCaption(artifact: ChatArtifact): string {
+  const type = artifactType(artifact);
+  const extension = extOf(fileName(artifact.id)).toUpperCase();
+  if (type === "word") return `Microsoft Word · ${extension}`;
+  if (type === "note") return "Editable Markdown source";
+  if (type === "board") return "Board";
+  if (type === "video") return `Video · ${extension}`;
+  return extension || "File";
+}
+
+/** The documents a reply shows inline, newest first. Pictures and video
+ * live in the rail (a reply shows them itself), so they are not repeated. */
+export function inlineArtifacts(artifacts: readonly ChatArtifact[]): ChatArtifact[] {
+  return artifacts
+    .filter((artifact) => {
+      const type = artifactType(artifact);
+      return type === "word" || type === "document" || type === "note";
+    })
+    .reverse();
+}
+
 function artifactName(artifact: ChatArtifact): string {
   return artifact.label ?? fileName(artifact.id).replace(/-\d{13}(?=\.[^.]+$)/, "");
 }
@@ -54,7 +76,7 @@ export function ArtifactItem({ artifact, onOpen }: { artifact: ChatArtifact; onO
   const type = artifactType(artifact);
   const url = useQuery({
     queryKey: ["asset-url", artifact.id],
-    queryFn: () => attachedImageUrl(artifact.id),
+    queryFn: () => artifactThumbUrl(artifact.id),
     enabled: type === "image",
   });
   const name = fileName(artifact.id);
@@ -81,17 +103,7 @@ export function ArtifactItem({ artifact, onOpen }: { artifact: ChatArtifact; onO
       </span>
       <span className="chat-artifact-copy">
         <strong>{artifactName(artifact)}</strong>
-        <small>
-          {type === "word"
-            ? `Microsoft Word · ${extOf(name).toUpperCase()}`
-            : type === "note"
-              ? "Editable Markdown source"
-              : type === "board"
-                ? "Board"
-                : type === "video"
-                  ? `Video · ${extOf(name).toUpperCase()}`
-                  : extOf(name).toUpperCase() || "File"}
-        </small>
+        <small>{artifactCaption(artifact)}</small>
       </span>
     </button>
   );
@@ -108,12 +120,7 @@ export function ChatArtifactButtons({
   artifacts: ChatArtifact[];
   onOpen: (artifact: ChatArtifact) => void;
 }) {
-  const files = artifacts
-    .filter((artifact) => {
-      const type = artifactType(artifact);
-      return type === "word" || type === "document" || type === "note";
-    })
-    .reverse();
+  const files = inlineArtifacts(artifacts);
   if (files.length === 0) return null;
   return (
     <div className="chat-inline-artifacts" aria-label="Documents created in this chat">

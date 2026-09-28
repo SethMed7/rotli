@@ -107,20 +107,24 @@ export function SidebarFooter() {
         }
         onClick={() => usePanesStore.getState().openActivity()}
       >
-        <ActivityGlyph size={14} />
+        {/* badges sit on the icon, never beside the label: a count used to
+            squeeze "Librarian" to "Libra…" (audit 2026-09-28) */}
+        <span className="sb-footicon">
+          <ActivityGlyph size={14} />
+          {/* the ambient working dot (the maintainer, 2026-07-31): the Librarian's
+              work is visible from anywhere — pulses while a cycle or an
+              adopt batch runs, from the SAME narration the surface shows */}
+          {organizerWorking && <span className="sb-work-dot" aria-hidden="true" />}
+          {/* RED = a sensitive-data decision waits (never auto-resolved);
+              otherwise the pending-approval count so Suggest mode is
+              never a silent queue */}
+          {secureConfirms > 0 ? (
+            <span className="count alert">{badgeCount(secureConfirms)}</span>
+          ) : (
+            pendingProposals > 0 && <span className="count pill">{badgeCount(pendingProposals)}</span>
+          )}
+        </span>
         <span className="fname">Librarian</span>
-        {/* the ambient working dot (the maintainer, 2026-07-31): the Librarian's
-            work is visible from anywhere — pulses while a cycle or an
-            adopt batch runs, from the SAME narration the surface shows */}
-        {organizerWorking && <span className="sb-work-dot" aria-hidden="true" />}
-        {/* RED = a sensitive-data decision waits (never auto-resolved);
-            otherwise the pending-approval count so Suggest mode is
-            never a silent queue */}
-        {secureConfirms > 0 ? (
-          <span className="count alert">{secureConfirms}</span>
-        ) : (
-          pendingProposals > 0 && <span className="count pill">{pendingProposals}</span>
-        )}
       </button>
       <SettingsFootButton updateAvailable={updateAvailable} />
       <button
@@ -137,6 +141,11 @@ export function SidebarFooter() {
   );
 }
 
+/** A badge's number, short enough to sit on an icon. */
+export function badgeCount(count: number): string {
+  return count > 99 ? "99+" : String(count);
+}
+
 /** Settings, wearing the same quiet clay dot as the titlebar's Settings button
  * when a newer build is on the feed (the routine check, services/updateCheck).
  * The dot is decoration; the button's name says it in words. */
@@ -151,9 +160,11 @@ export function SettingsFootButton({ updateAvailable }: { updateAvailable: boole
       data-hotkey="app.settings"
       onClick={() => dispatch("app.settings")}
     >
-      <Icon name="rotli-settings" size={14} />
+      <span className="sb-footicon">
+        <Icon name="rotli-settings" size={14} />
+        {updateAvailable && <span className="sb-update-dot" aria-hidden="true" />}
+      </span>
       <span className="fname">Settings</span>
-      {updateAvailable && <span className="sb-update-dot" aria-hidden="true" />}
     </button>
   );
 }

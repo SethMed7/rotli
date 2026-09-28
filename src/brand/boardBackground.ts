@@ -38,6 +38,14 @@ export function boardCanvasLook(
   return { theme, background: mode === "white" ? WHITE : "transparent" };
 }
 
+/** The background an open board should switch to when the setting or theme
+ * changes (another window's appearance sync), or null to leave it: a color
+ * the person picked in the canvas this session is theirs. */
+export function boardRepaint(current: unknown, next: string): string | null {
+  if (typeof current !== "string" || !isUnchosenBoardBackground(current) || current === next) return null;
+  return next;
+}
+
 /** What a save writes as `viewBackgroundColor`: the chosen color, or nothing. */
 export function durableBoardBackground(color: string | undefined): string | undefined {
   return isUnchosenBoardBackground(color) ? undefined : (color ?? "").trim();

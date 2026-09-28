@@ -27,7 +27,8 @@ Use with the ship-a-change skill, which owns the PR rules themselves.
 1. Merge the bottom PR into `dev` (squash) only after its CI is green on the
    exact head and every review thread is resolved.
 2. The next branch now carries commits `dev` squashed: run
-   `git merge origin/dev` on it, keep the branch side of any conflict
-   (it has everything), push, and `gh pr edit <n> --base dev`.
+   `git merge origin/dev` on it, keep the branch side of any code conflict
+   (it has everything), but keep both sides' new entries in `CHANGELOG.md`
+   and `ROADMAP.md`, then push and `gh pr edit <n> --base dev`.
 3. Wait for its CI, then repeat up the chain.
 4. Confirm `state == MERGED` before deleting a merged branch.

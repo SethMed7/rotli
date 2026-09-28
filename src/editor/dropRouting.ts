@@ -66,7 +66,7 @@ export function dropIsOnBoard<E extends Closest>(candidates: readonly DropCandid
 
 export const BOARD_DROP_NOTICE = "Saved to Assets — boards don’t take dropped files yet";
 
-export type DropSurface = "chat" | "editor" | "none";
+export type DropSurface = "chat" | "editor" | "board" | "none";
 
 /** A file paste the host granted nothing for. If the pasteboard no longer holds
  * file references, the focus-time check was stale (Rotli itself copied text
@@ -156,6 +156,15 @@ export function planDrop(paths: readonly string[], surface: DropSurface): DropPl
       embed: paths.filter(isEmbeddablePath),
       store,
       notice: storedNotice(store, "a note embeds images and video"),
+    };
+  }
+  if (surface === "board") {
+    // a board takes no dropped files yet: all to Assets, with the one notice
+    return {
+      attach: [],
+      embed: [],
+      store: [...paths],
+      notice: paths.length === 0 ? null : BOARD_DROP_NOTICE,
     };
   }
   const media = paths.some(isEmbeddablePath);
