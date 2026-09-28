@@ -18,6 +18,8 @@ COPY site/package.json site/bun.lock site/bunfig.toml ./
 RUN bun ci
 
 COPY src/assets/characters /repo/src/assets/characters
+# the /changelog/ page reads the product changelog (src/content.config.ts)
+COPY CHANGELOG.md /repo/CHANGELOG.md
 COPY site ./
 RUN bun run build
 

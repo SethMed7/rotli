@@ -3,7 +3,6 @@
 import {
   GITHUB_URL,
   LICENSE_URL,
-  RELEASES_URL,
   ROADMAP_URL,
   STUDIO_URL,
   WEB_APP_PATH,
@@ -50,7 +49,7 @@ export function footerGroups(options: { hasPosts: boolean }): FooterGroup[] {
         { href: '/features/', label: 'Features' },
         { href: '/download/', label: 'Download' },
         ...(site.webAppEnabled ? [{ href: WEB_APP_PATH, label: 'Rotli Web' }] : []),
-        ...(site.downloadsEnabled ? [{ href: RELEASES_URL, label: 'Release notes' }] : []),
+        { href: '/changelog/', label: 'Changelog' },
       ],
     },
     {

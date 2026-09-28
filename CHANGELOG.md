@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **What's new, after an update.** The first launch after an update opens a
+  small card with the release's top changes — once, and never on a fresh
+  install. A change that is only in the Mac app or only on Rotli Web says so.
+  "See everything new" opens the full changelog, now on rotli.co (linked from
+  the site's footer), and the palette's "What's new in Rotli" brings the card
+  back any time.
 - **Feedback in the sidebar.** The sidebar's footer gains a Feedback button
   beside Files, Librarian, and Settings; it opens the same prefilled GitHub
   issue as Settings → About. When the sidebar is too narrow for the labels, the

@@ -1,0 +1,25 @@
+{
+  "1.6.0": [
+    {
+      "title": "Hand a note to your AI",
+      "body": "Hand to AI turns the note you're in into a ready prompt for Claude Code or another agent: the goal, the open tasks, and what done means."
+    },
+    {
+      "title": "Boards wear your theme",
+      "body": "A board you haven't colored takes your theme's own color and changes with it. Prefer paper? Settings → Appearance → Board background → White."
+    },
+    {
+      "title": "Chat shows pictures and video",
+      "body": "When a reply links an image or a video in your vault, you see it right in the thread."
+    },
+    {
+      "title": "Find lights up every match",
+      "body": "⌘F now marks every match on the page, and the current one stands out."
+    },
+    {
+      "title": "A new web vault is ready at once",
+      "body": "Tasks and your weekly counts include the Welcome lessons the moment your folder connects.",
+      "platform": "web"
+    }
+  ]
+}

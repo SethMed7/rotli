@@ -3569,3 +3569,51 @@
   font-size: 13px;
   line-height: 1.5;
 }
+/* What's new (whatsNewDialog.tsx): the shared dialog frame with the
+   celebrating quokka over a short list; the list scrolls, never the card */
+.rename-card.whats-new-card {
+  width: min(32rem, calc(100vw - 32px));
+  max-width: none;
+  max-height: min(86vh, 680px);
+}
+.whats-new-card .web-dialog-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-height: 0;
+}
+.whats-new-list {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+.whats-new-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.whats-new-platform {
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: var(--accent-text);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  font-size: 11px;
+  font-weight: 500;
+}
+.whats-new-body {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}

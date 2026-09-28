@@ -320,6 +320,7 @@ interface UiState {
    * gate re-onboards on every 0.x update, then freezes post-1.0. */
   onboardingVersion: string;
   setOnboardingVersion: (v: string) => void;
+  lastSeenVersion: string; // the What's new window's "seen" mark (lib/whatsNew)
   /** Durable first-run checkpoint. Vault selection may relaunch the native app,
    * so the next launch must resume at model setup instead of starting over. */
   onboardingPhase: OnboardingPhase;
@@ -784,6 +785,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   setOnboarded: (done) => set({ onboarded: done }),
   onboardingVersion: "",
   setOnboardingVersion: (v) => set({ onboardingVersion: v }),
+  lastSeenVersion: "",
   onboardingPhase: "preferences",
   setOnboardingPhase: (phase) => set({ onboardingPhase: phase }),
   quickNoteIds: [],

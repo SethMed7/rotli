@@ -43,6 +43,7 @@ export const APP_SETTINGS_KEYS = new Set([
   "appIcon",
   "onboarded",
   "onboardingVersion",
+  "lastSeenVersion",
   "onboardingPhase",
   "bindings",
 ]);

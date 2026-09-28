@@ -12,7 +12,11 @@ instruction; a merge never authorizes signing, notarization, or publication.
 1. **Version everywhere, once.** Bump `package.json`, `src-tauri/tauri.conf.json`,
    `src-tauri/Cargo.toml`, and the `rotli` entry in `src-tauri/Cargo.lock`. Close
    `## [Unreleased]` in `CHANGELOG.md` into a dated section. A major version
-   bump needs `--launch`; the script refuses it otherwise.
+   bump needs `--launch`; the script refuses it otherwise. Key the release's
+   three to five highlights in `src/assets/whats-new.json` to the exact new
+   version (a `platform` of `mac` or `web` only for a one-platform change):
+   that is the card an updated app shows once, and a version without an entry
+   shows nothing.
 2. **Land it.** Release PR into `dev` (see `ship-a-change`), then the
    `dev` → `main` promotion PR as a merge commit.
 3. **Wait for CI on `main`'s exact commit.** The script checks that conclusion

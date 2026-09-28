@@ -326,6 +326,8 @@ interface PersistedSettings {
   onboarded: boolean;
   /** The app version onboarding last completed at (the onboardingVersion gate). */
   onboardingVersion: string;
+  /** The version whose What's new the user has seen (lib/whatsNew). */
+  lastSeenVersion: string;
   /** First-run checkpoint that survives a vault-selection relaunch. */
   onboardingPhase: "preferences" | "vault" | "models";
   /** The Quick Note window's capped set, remembered note, and new-note folder
@@ -638,6 +640,7 @@ export function parseSettings(raw: string): PersistedSettings {
     // onboarding on existing users (same migration shape as expandedDests above)
     onboarded: typeof data.onboarded === "boolean" ? data.onboarded : Object.keys(data).length > 0,
     onboardingVersion: typeof data.onboardingVersion === "string" ? data.onboardingVersion : "",
+    lastSeenVersion: typeof data.lastSeenVersion === "string" ? data.lastSeenVersion : "",
     onboardingPhase:
       data.onboardingPhase === "vault" || data.onboardingPhase === "models"
         ? data.onboardingPhase
@@ -771,6 +774,7 @@ function applySettings(s: PersistedSettings): void {
     librarianIntroSeen: s.librarianIntroSeen,
     onboarded: s.onboarded,
     onboardingVersion: s.onboardingVersion,
+    lastSeenVersion: s.lastSeenVersion,
     onboardingPhase: s.onboardingPhase,
     quickNoteIds: s.quickNoteIds,
     captureOrder: s.captureOrder,
@@ -829,6 +833,7 @@ function applyAppSettings(s: PersistedSettings): void {
     appIcon: s.appIcon,
     onboarded: s.onboarded,
     onboardingVersion: s.onboardingVersion,
+    lastSeenVersion: s.lastSeenVersion,
     onboardingPhase: s.onboardingPhase,
   });
   useBindingsStore.setState({ overrides: s.bindings });
@@ -868,6 +873,7 @@ function withAppSettings(vault: PersistedSettings, app: PersistedSettings): Pers
     appIcon: app.appIcon,
     onboarded: app.onboarded,
     onboardingVersion: app.onboardingVersion,
+    lastSeenVersion: app.lastSeenVersion,
     onboardingPhase: app.onboardingPhase,
     bindings: app.bindings,
   };
@@ -1425,6 +1431,7 @@ function appSettingsSnapshot(): string {
     appIcon: ui.appIcon,
     onboarded: ui.onboarded,
     onboardingVersion: ui.onboardingVersion,
+    lastSeenVersion: ui.lastSeenVersion,
     onboardingPhase: ui.onboardingPhase,
     bindings: useBindingsStore.getState().overrides,
   });
@@ -1500,6 +1507,7 @@ function settingsSnapshot(): string {
     librarianIntroSeen: ui.librarianIntroSeen,
     onboarded: ui.onboarded,
     onboardingVersion: ui.onboardingVersion,
+    lastSeenVersion: ui.lastSeenVersion,
     onboardingPhase: ui.onboardingPhase,
     quickNoteIds: ui.quickNoteIds,
     captureOrder: ui.captureOrder,
