@@ -20,6 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Rename dialog. Renaming a folder used to hide everything inside it while you
   typed.
 
+### Fixed
+
+- **Claude models show their names again.** The model picker listed Claude
+  Code's models by their descriptions ("For complex work and everyday tasks",
+  "For your toughest challenges") instead of their names, because the current
+  Claude Code reports each model's name in a different place. They read
+  "Claude Opus 5.5", "Claude Fable 5.1", "Claude Haiku 4.5" again, and older
+  Claude Code versions still work. Rotli Web gets the fix with the next Rotli
+  Helper.
+
 ## [1.6.0] - 2026-09-28
 
 ### Added
