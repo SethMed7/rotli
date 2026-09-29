@@ -169,6 +169,7 @@ export const SERVICE_FILE_OWNERS = {
   "mainTree.ts": "Main projection",
   "noteDrafts.ts": "note editor",
   "noteLifecycle.ts": "vault lifecycle",
+  "linkedNotes.ts": "notes",
   "notes.ts": "notes adapter",
   "remoteAgent.ts": "remote-agent relay adapter seam (development builds only)",
   "updateCheck.ts": "app updates (the routine, switchable check of the signed release feed)",

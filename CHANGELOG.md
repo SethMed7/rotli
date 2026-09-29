@@ -12,6 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Dates from the slash menu.** Type `/today`, `/yesterday`, or `/tomorrow`
+  to write the date into a note, even in the middle of a sentence. In a
+  template, the same commands leave a placeholder, so a daily template shows
+  the day you use it rather than the day you wrote it.
+- **Continue a project list.** A new Function command: pick a note that holds
+  a project's tasks, such as "Bug fixes". While any of its tasks is open, Rotli
+  links that note. Once they are all done, it starts the next note in the
+  series ("Bug fixes 4"), linked back to the last one and filed beside it, and
+  links that instead.
+- **Link note can make the note.** Type a title that doesn't exist yet and
+  choose **Create** to make that note and link it in one step.
+
 - **Settings comes alive.** Every Settings pane now opens on a banner in your
   theme's scenery with your quokka in it, holding something for that pane: a
   signpost for General, keycaps for Keybindings, a palette and easel for
@@ -62,6 +74,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of its text.
 
 ### Fixed
+
+- The slash menu and its pickers now scroll with the arrow keys, so the
+  highlighted row never sits out of sight. Pickers have a × to close them,
+  and closing one with Esc or the × puts your cursor back in the note.
 
 - **A new tab's note stays in the folder you're in.** With a note from a Main
   folder open, ⌘T (or the tab strip's +) used to file the new note at the top

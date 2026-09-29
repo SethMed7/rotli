@@ -81,8 +81,25 @@ imports.
   there is no inline `/template name` form. Into an empty note the template
   comes whole, so its leading `# Heading` names the new note; into a note that
   already has content that leading H1 is left out, because a note's first H1
-  is its title. A template is plain Markdown: there is no placeholder or
-  variable syntax.
+  is its title. A template is plain Markdown with one placeholder family: a
+  date token, `{{today}}` (also `{{date}}`, `{{yesterday}}`, `{{tomorrow}}`,
+  any case), becomes that day's date — the day the template is used, not the
+  day it was written — when the template is inserted.
+- **Today**, **Yesterday**, and **Tomorrow** insert the date as words
+  (`September 29, 2026`), in place in a sentence. Typed in a note that lives in
+  the Templates folder they insert the `{{today}}`-style token instead, so the
+  template fills in its date each time it is used.
+- **Link note** also makes the note you type: when no note has that title, the
+  picker's last row is **Create "title"**, which makes a note whose first line
+  is `# title`, files it beside the note you are writing in Main, and links it.
+  Every slash picker closes on Esc, on its ×, or on a click elsewhere, and its
+  list scrolls with the arrow keys, as the slash menu's does.
+- **Continue a project list** (the Function group) picks a note that holds a
+  project's tasks. While any of its tasks is open (`[ ]` or `[/]`) it links that
+  note. When every task is done it starts the next note in the series —
+  `Bug fixes 3` → `Bug fixes 4`, `Round Four` → `Round Five`, otherwise
+  `Title 2` — beginning `Continues [[previous]].` and an empty task, files it
+  beside the previous one, and links the new note.
 - A video file (`mp4`, `mov`, `webm`, `m4v`, `ogv`) dropped on a note or chosen
   through **Attach image** uses the same portable `storage:` image source as
   a picture. Rotli renders it as a playable embed with native
