@@ -3431,8 +3431,9 @@ impl CorpusStore {
         {
             fm.foreign.push("secure: true".to_string());
             if self.mutation_allowed().is_ok() {
-                if let Err(e) = self.set_secure(&rel, true) {
-                    eprintln!("auto-secure-flag (read) failed for {rel}: {e}");
+                // not the error: it can carry the path, and a secure note's name is private
+                if self.set_secure(&rel, true).is_err() {
+                    eprintln!("auto-secure-flag (read) failed; the note is still refused to AI by its name");
                 }
             }
             secure = true;
@@ -5164,7 +5165,8 @@ impl CorpusStore {
             match self.set_secure_resolved(&target_rel, true) {
                 Ok(Some(moved)) => return Ok(moved),
                 Ok(None) => {}
-                Err(e) => eprintln!("secure keyword protection failed for {target_rel}: {e}"),
+                // the error can carry the path, and a secure note's name is private
+                Err(_) => eprintln!("secure keyword protection failed; the note is still refused to AI by its name"),
             }
         }
         Ok(NoteMeta {

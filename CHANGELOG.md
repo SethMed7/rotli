@@ -172,6 +172,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A secure note's name stays out of Rotli's logs.** When making a note
+  secure by its name failed, the log line named the note's path; it now says
+  only what failed.
 - **Escape closes the Librarian from the note too.** With the caret back in
   the note, Escape used to hide the window instead; it now closes the
   Librarian bar or tucks its chat away first.

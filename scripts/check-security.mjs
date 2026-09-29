@@ -371,6 +371,27 @@ function stripComments(src) {
   }
 }
 
+// ── (d2) a secure note's name never reaches a log ───────────────────────────
+//
+// A note becomes secure by its name (a keyword in its title), so its path or
+// title is private too. CodeQL flagged a log line writing the path of a note
+// being made secure (PR 125, 2026-09-28); this keeps the whole class out: a
+// Rust log statement that talks about secure notes may not interpolate a
+// path or title.
+{
+  const logRe = /\b(?:println!|eprintln!)\s*\(([^;\n]*)/g;
+  const nameRe = /\{(?:rel|target_rel|abs|target_abs|path|title|name)\b/;
+  for (const rel of listFiles("src-tauri/src", /\.rs$/)) {
+    for (const m of stripComments(read(rel)).matchAll(logRe)) {
+      if (/secure/i.test(m[1]) && nameRe.test(m[1])) {
+        failures.push(
+          `${rel}: a log line about secure notes includes a note's path or title — a secure note's name is private; log what failed without it (${m[1].trim().slice(0, 60)}…).`,
+        );
+      }
+    }
+  }
+}
+
 // ── (e) update checks have exactly two owners ────────────────────────────────
 //
 // Local-first also describes network behavior. The updater feed may be queried
