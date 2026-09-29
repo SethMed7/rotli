@@ -150,7 +150,10 @@ it, with a small pointer down at it, growing out of it (no motion under
 reduced motion). The pill opens and closes the panel, and starts a
 conversation when there is none; the panel then runs the same refusals as
 the bar (web, off, locked, secure, outside the Library) before anything can
-be sent. An applied reply lists exactly what changed ("Tagged: …", "Filed in
+be sent: nothing is sendable while that first check runs, and every send
+asks again (`refusalNow`, awaited inside `sendToLibrarian` before any model
+call, a failed check counting as a refusal), so a note made secure, locked,
+or given a secure keyword mid-conversation is never sent. An applied reply lists exactly what changed ("Tagged: …", "Filed in
 …"), not just a count. Under the composer: "The Librarian only organizes …
 It doesn't chat."
 
@@ -168,8 +171,9 @@ at any time. It holds one conversation,
 about one note, in one pane (`state/librarianBar.ts`); another note in that
 pane hides it, and `/librarian` again continues it. Every turn:
 
-1. The same refusals as the bar gate the first ask; every turn runs the secret
-   check on the whole outgoing conversation before the call.
+1. The same refusals as the bar gate every turn, asked again at each send;
+   every turn also runs the secret check on the whole outgoing conversation
+   before the call.
 2. The reply's prose joins the conversation. Its proposals (if any) show as a
    checklist inside that reply, with Not now and Apply; applying goes through
    the same journaled `applyLibrarian`, and the reply then says how many

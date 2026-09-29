@@ -60,6 +60,7 @@ function fakeModel(reply: string | (() => Promise<string>)) {
 }
 
 const chat = () => useLibrarianBar.getState().chat!;
+const allow = async () => null;
 
 beforeEach(() => closeLibrarianChat());
 
@@ -72,6 +73,7 @@ describe("a conversation with the Librarian", () => {
       { text: "Who is this?", highlight: HIGHLIGHT },
       MODEL,
       context,
+      allow,
       model.hostFor,
     );
     expect(chat().status).toBe("idle");
@@ -90,8 +92,15 @@ describe("a conversation with the Librarian", () => {
   test("every turn sends the conversation so far", async () => {
     start();
     const model = fakeModel("Noted.");
-    await sendToLibrarian("chat-1", { text: "First", highlight: null }, MODEL, context, model.hostFor);
-    await sendToLibrarian("chat-1", { text: "Second", highlight: null }, MODEL, context, model.hostFor);
+    await sendToLibrarian("chat-1", { text: "First", highlight: null }, MODEL, context, allow, model.hostFor);
+    await sendToLibrarian(
+      "chat-1",
+      { text: "Second", highlight: null },
+      MODEL,
+      context,
+      allow,
+      model.hostFor,
+    );
     expect(model.sent[1]?.map((message) => [message.role, message.content])).toEqual([
       ["system", expect.stringContaining("Met Maya at the design meetup.")],
       ["user", "First"],
@@ -102,6 +111,39 @@ describe("a conversation with the Librarian", () => {
     expect(chat().turns[1]?.proposal).toBeUndefined();
   });
 
+  test("every send asks again: a note made secure mid-conversation is never sent", async () => {
+    start();
+    const model = fakeModel("never");
+    await sendToLibrarian(
+      "chat-1",
+      { text: "Tag it", highlight: null },
+      MODEL,
+      context,
+      async () => "The Librarian doesn’t read secure notes.",
+      model.hostFor,
+    );
+    expect(model.sent).toHaveLength(0);
+    expect(chat().status).toBe("idle");
+    expect(chat().error).toBe("The Librarian doesn’t read secure notes.");
+  });
+
+  test("a refusal check that fails counts as a refusal", async () => {
+    start();
+    const model = fakeModel("never");
+    await sendToLibrarian(
+      "chat-1",
+      { text: "Tag it", highlight: null },
+      MODEL,
+      context,
+      async () => {
+        throw new Error("frontmatter unreadable");
+      },
+      model.hostFor,
+    );
+    expect(model.sent).toHaveLength(0);
+    expect(chat().error).not.toBeNull();
+  });
+
   test("a secret in the conversation is refused before anything is sent", async () => {
     start();
     const model = fakeModel("never");
@@ -110,6 +152,7 @@ describe("a conversation with the Librarian", () => {
       { text: "my key is sk-ant-abcdefghijklmnopqrstuvwx", highlight: null },
       MODEL,
       context,
+      allow,
       model.hostFor,
     );
     expect(model.sent).toHaveLength(0);
@@ -120,7 +163,14 @@ describe("a conversation with the Librarian", () => {
   test("a failed call says why, and the chat can go on", async () => {
     start();
     const model = fakeModel(() => Promise.reject(new Error("The Claude lane is signed out.")));
-    await sendToLibrarian("chat-1", { text: "Tag it", highlight: null }, MODEL, context, model.hostFor);
+    await sendToLibrarian(
+      "chat-1",
+      { text: "Tag it", highlight: null },
+      MODEL,
+      context,
+      allow,
+      model.hostFor,
+    );
     expect(chat()).toMatchObject({ status: "idle", error: "The Claude lane is signed out." });
   });
 
@@ -128,10 +178,18 @@ describe("a conversation with the Librarian", () => {
     start();
     let answer: (text: string) => void = () => undefined;
     const model = fakeModel(() => new Promise<string>((resolve) => (answer = resolve)));
-    const first = sendToLibrarian("chat-1", { text: "One", highlight: null }, MODEL, context, model.hostFor);
-    await Promise.resolve();
+    const first = sendToLibrarian(
+      "chat-1",
+      { text: "One", highlight: null },
+      MODEL,
+      context,
+      allow,
+      model.hostFor,
+    );
+    // the send asks for the refusal first; wait until the model has the question
+    while (model.sent.length === 0) await new Promise((resolve) => setTimeout(resolve, 0));
     expect(chat().status).toBe("thinking");
-    await sendToLibrarian("chat-1", { text: "Two", highlight: null }, MODEL, context, model.hostFor);
+    await sendToLibrarian("chat-1", { text: "Two", highlight: null }, MODEL, context, allow, model.hostFor);
     expect(chat().turns).toHaveLength(1);
     closeLibrarianChat();
     start("chat-2");
@@ -147,7 +205,14 @@ describe("applying a reply's proposals", () => {
     const model = fakeModel(
       'Done.\n{"actions":[{"type":"tag","tags":["person"]},{"type":"file","area":"people"}]}',
     );
-    await sendToLibrarian("chat-1", { text: "Tag and file", highlight: null }, MODEL, context, model.hostFor);
+    await sendToLibrarian(
+      "chat-1",
+      { text: "Tag and file", highlight: null },
+      MODEL,
+      context,
+      allow,
+      model.hostFor,
+    );
     return chat().turns[1]!;
   }
 
@@ -193,7 +258,14 @@ describe("taking a request to Chat", () => {
   test("a request that isn't about organizing comes back offering Chat", async () => {
     start();
     const model = fakeModel('{"actions":[],"handoff":"chat"}');
-    await sendToLibrarian("chat-1", { text: "Write a poem", highlight: null }, MODEL, context, model.hostFor);
+    await sendToLibrarian(
+      "chat-1",
+      { text: "Write a poem", highlight: null },
+      MODEL,
+      context,
+      allow,
+      model.hostFor,
+    );
     expect(chat().turns[1]).toMatchObject({
       role: "librarian",
       text: "That’s one for Chat. I only organize this note.",

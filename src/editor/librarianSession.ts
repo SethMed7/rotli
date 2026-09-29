@@ -19,7 +19,13 @@ import { type ChatModelInfo, chatModels, isTauri } from "../lib/tauri";
 import { openChatForNoteId } from "../noteChat/composition";
 import { useConnectedLanes } from "../services/connectedModels";
 import { useNoteIndex } from "../services/hooks";
-import { applyLibrarian, converseLibrarian, currentTags, LIBRARIAN_REFUSALS } from "../services/librarianBar";
+import {
+  applyLibrarian,
+  converseLibrarian,
+  currentTags,
+  LIBRARIAN_REFUSALS,
+  librarianRefusal,
+} from "../services/librarianBar";
 import { useChatDrafts } from "../state/chatDrafts";
 import {
   type ChatTurn,
@@ -162,8 +168,19 @@ export async function librarianContext(
 
 export type HostFor = (model: ChatModelInfo) => Pick<Host, "complete">;
 
-/** Remote lanes are refused secure content before this is ever called (the
- * Librarian refuses secure notes outright); the flag is a backstop. */
+/** Why the Librarian can't take this note as of right now, or null. Every
+ * send asks again, so a note made secure, locked, or given a secure keyword
+ * in its name mid-conversation is never sent. */
+export function refusalNow(noteId: string, paneId: string): Promise<string | null> {
+  const title = noteTitle(editorFor(paneId)?.getSelection?.()?.doc ?? "");
+  const { secureKeywords } = useLibrarianRules.getState().rules;
+  const librarianOn = useUiStore.getState().brainEnabled;
+  return librarianRefusal(noteId, { native: isTauri(), librarianOn, secureKeywords, title });
+}
+
+/** Remote lanes never see secure content: `sendToLibrarian` re-runs the
+ * refusal (secure, secure by name, locked) before every model call, so no
+ * secure note reaches this host; the flag is a backstop. */
 export const tauriHostFor: HostFor = (model) => makeTauriHost(model, { isSecureContext: () => false });
 
 const newTurnId = () => crypto.randomUUID();
@@ -176,6 +193,7 @@ export async function sendToLibrarian(
   message: { text: string; highlight: Anchor | null },
   model: ChatModelInfo,
   context: () => Promise<LibrarianContext>,
+  refusal: () => Promise<string | null>,
   hostFor: HostFor = tauriHostFor,
 ): Promise<void> {
   const chat = useLibrarianBar.getState().chat;
@@ -183,6 +201,12 @@ export async function sendToLibrarian(
   const turns: ChatTurn[] = [...chat.turns, { id: newTurnId(), role: "user", ...message }];
   updateLibrarianChat(chatId, () => ({ turns, status: "thinking", error: null, modelId: model.id }));
   try {
+    // asked again on every send, before any prompt exists (fail closed)
+    const refused = await refusal().catch(() => LIBRARIAN_REFUSALS.locked);
+    if (refused) {
+      updateLibrarianChat(chatId, () => ({ status: "idle", error: refused }));
+      return;
+    }
     const reply = await converseLibrarian(await context(), turns, hostFor(model));
     if (reply.kind === "secret") {
       updateLibrarianChat(chatId, () => ({ status: "idle", error: LIBRARIAN_REFUSALS.secret }));

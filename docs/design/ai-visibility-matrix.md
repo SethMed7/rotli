@@ -53,8 +53,12 @@ remote. Headless workspace agents (`rotli` CLI, `rotli-workspace` MCP) are
 treated as remote for content policy even when their process is local.
 
 **Hand to AI** (2026-09-26) builds a prompt the user pastes into an outside
-agent, so that agent counts as remote too: a secure note, or one whose text
-trips the secret detector, gets no prompt (`src/services/handToAi.ts`). The
+agent, so that agent counts as remote too: a secure note, one named with a
+secure keyword (the Librarian rules' `secureByName`, even before a save has
+flagged it; in the Mac app a file name that can't be read counts as secure,
+and on Rotli Web, which has no path lookup, the title alone is checked), or
+one whose text trips the secret detector, gets no prompt
+(`src/services/handToAi.ts`). The
 prompt is built from the note alone; no model runs in Rotli.
 
 ### What changed on 2026-08-01
