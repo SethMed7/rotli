@@ -172,6 +172,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The Librarian checks again before every message.** Its chat decided once,
+  when it opened, whether it could read the note; a note made secure, locked,
+  or given a secure keyword in its name mid-conversation could still be sent.
+  It now asks before each message, and nothing sends until that answer is in.
+- **Hand to AI respects secure keywords.** A note named with one of your
+  secure keywords is refused a prompt right away, as the Librarian refuses it,
+  even before a save has marked it secure.
 - **A secure note's name stays out of Rotli's logs.** When making a note
   secure by its name failed, the log line named the note's path; it now says
   only what failed.

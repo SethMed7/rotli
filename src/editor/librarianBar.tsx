@@ -26,6 +26,7 @@ import { useLibrarianRules } from "../state/librarianRules";
 import { useUiStore } from "../state/ui";
 import { editorFor } from "./commands";
 import {
+  refusalNow,
   useEscapeCloses,
   clip,
   librarianContext,
@@ -116,8 +117,12 @@ export function LibrarianBar({ noteId, paneId }: { noteId: string; paneId: strin
       });
     }
     const areas = libraryAreas((folders.data ?? []).map((folder) => folder.id));
-    void sendToLibrarian(chatId, { text, highlight: passage.anchor() }, model, () =>
-      librarianContext(noteId, paneId, areas, known),
+    void sendToLibrarian(
+      chatId,
+      { text, highlight: passage.anchor() },
+      model,
+      () => librarianContext(noteId, paneId, areas, known),
+      () => refusalNow(noteId, paneId),
     );
   };
 
