@@ -12,6 +12,39 @@ const CLAUDE_INIT: &str = r#"{"type":"control_response","response":{"subtype":"s
 {"value":"--dangerously-skip-permissions","displayName":"Evil","description":"x"}
 ]}}}"#;
 
+/// The shape Claude Code 2.1.284 answers with: the versioned name is the
+/// `displayName`, and the `description` is only a pitch (the default entry's
+/// still starts with its model). A pitch must never become a row's name.
+const CLAUDE_INIT_2_1_284: &str = r#"{"type":"control_response","response":{"subtype":"success","request_id":"rq-2","response":{"models":[
+{"value":"default","displayName":"Default (recommended)","description":"Opus 5.5 · Best for everyday, complex tasks"},
+{"value":"opus","displayName":"Opus 5.5","description":"For complex work and everyday tasks"},
+{"value":"claude-fable-5-1","displayName":"Fable 5.1","description":"For your toughest challenges"},
+{"value":"haiku","displayName":"Haiku 4.5","description":"Fastest for quick answers"},
+{"value":"claude-opus-4-8","displayName":"Opus 4.8","description":"Best for everyday, complex tasks"}
+]}}}"#;
+
+#[test]
+fn current_claude_code_names_its_models_in_display_name_not_the_pitch() {
+    let models = parse_claude_initialize(CLAUDE_INIT_2_1_284, "rq-2").unwrap().unwrap();
+    let labels: Vec<&str> = models.iter().map(|m| m.label.as_str()).collect();
+    assert_eq!(
+        labels,
+        [
+            "Claude Default · Opus 5.5",
+            "Claude Opus 5.5",
+            "Claude Fable 5.1",
+            "Claude Haiku 4.5",
+            "Claude Opus 4.8",
+        ]
+    );
+}
+
+#[test]
+fn a_default_entry_without_a_named_model_is_just_claude_default() {
+    assert_eq!(claude_label("default", "Default (recommended)", "Best for everyday tasks"), "Claude Default");
+    assert_eq!(claude_label("opus", "", "For complex work"), "opus", "a pitch is never a name");
+}
+
 #[test]
 fn claude_initialize_lists_the_accounts_models_with_readable_labels() {
     assert!(parse_claude_initialize(r#"{"type":"system","subtype":"hook_started"}"#, "rq-1").is_none());
