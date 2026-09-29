@@ -147,6 +147,11 @@ runs in the `lint` chain (`bun run check:security` to run it alone). It enforces
   in an egress-adjacent file whose argument names a body/secret/prompt-shaped
   variable. **Limit:** a renamed variable or an interpolated helper slips it —
   this catches the obvious regression, it does not prove the absence of a leak.
+- **(d2) A secure note's name never reaches a log.** A note can be secure by
+  its title, so its path and title are private. In `src-tauri/src/*.rs`, a
+  `println!`/`eprintln!` that mentions "secure" may not interpolate `{rel}`,
+  `{target_rel}`, `{abs}`, `{path}`, `{title}` or `{name}`. Added after CodeQL
+  flagged a log line naming a note being made secure (2026-09-28).
 
 Adjacent, pre-existing guards this layer builds on (run by `bun run check`):
 `check:secret-parity` (guard.ts ↔ secret.rs detector parity), `check:parity`
