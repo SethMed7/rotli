@@ -18,8 +18,6 @@ import {
 
 import { EditorSurface } from "../editor/editorSurface";
 import { evictDocument, pendingNoteDocumentId } from "../editor/model";
-import { dispatch } from "../keys/registry";
-import { SHOW_HOTKEYS } from "../lib/hotkeyHint";
 import {
   MIN_PANE_HEIGHT,
   MIN_PANE_WIDTH,
@@ -33,43 +31,16 @@ import { isWarmSurface, nextWarmSurfaceIds } from "../state/paneWarmth";
 import type { LeafNode, PaneNode, SplitNode } from "../types";
 import { ActivitySurface } from "./activitySurface";
 import { BrowserSurface } from "./browserSurface";
-import { Character } from "./character";
 import { ChatSurface } from "./chat/chatSurface";
 import { FileSurface } from "./fileSurface";
 import { NewItemSurface } from "./newItemSurface";
+import { PaneEmptyState } from "./paneEmptyState";
 import { TabStrip } from "./tabStrip";
 
 // Excalidraw is heavy (~3.5MB with its mermaid/katex deps) and most sessions
 // never open a board — code-split it so it loads only when a canvas tab mounts,
 // keeping the main bundle lean (the maintainer, 2026-06-24).
 const CanvasSurface = lazy(() => import("./canvasSurface").then((m) => ({ default: m.CanvasSurface })));
-
-/** All tabs closed (only possible in the lone pane) — the quokka rest state
- * (the maintainer, 2026-07-28: "close all tabs and have an empty state"). Quiet, with
- * the three ways back in. */
-function PaneEmptyState() {
-  return (
-    <div className="list-empty pane-empty">
-      <Character name="base" size={120} className="be-quokka" accessorized />
-      <p className="be-title">All clear</p>
-      <p className="be-sub">
-        <button type="button" className="pane-empty-act" onClick={() => dispatch("tabs.new")}>
-          {SHOW_HOTKEYS && <kbd>⌘T</kbd>} new tab
-        </button>
-        <button type="button" className="pane-empty-act" onClick={() => dispatch("palette.toggle")}>
-          {SHOW_HOTKEYS && <kbd>⌘K</kbd>} search
-        </button>
-        <button
-          type="button"
-          className="pane-empty-act"
-          onClick={() => usePanesStore.getState().reopenClosedTab()}
-        >
-          {SHOW_HOTKEYS && <kbd>⌘⌥T</kbd>} reopen tab
-        </button>
-      </p>
-    </div>
-  );
-}
 
 function PendingNoteSurface({ paneId, tabId }: { paneId: string; tabId: string }) {
   const noteId = pendingNoteDocumentId(tabId);

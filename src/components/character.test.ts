@@ -9,7 +9,7 @@ const setupSideFriendsSource = readFileSync(
   "utf8",
 );
 const chatSource = readFileSync(new URL("chat/chatSurface.tsx", import.meta.url), "utf8");
-const paneSource = readFileSync(new URL("paneTree.tsx", import.meta.url), "utf8");
+const paneSource = readFileSync(new URL("paneEmptyState.tsx", import.meta.url), "utf8");
 const bucketHatFrontInk = readFileSync(
   new URL("../assets/characters/accessories/bucket-hat-ink.svg", import.meta.url),
   "utf8",
@@ -69,7 +69,9 @@ describe("quokka personalization", () => {
     // Calm = the preferred idle pose; Lively keeps chatWelcomeCharacter's
     // time-of-day pose (personalIdle used to override it, 2026-09-01)
     expect(chatSource).toContain('personalIdle={pristineChat && chatWelcomeStyle === "calm"}');
-    expect(paneSource).toContain('className="be-quokka" accessorized');
+    // the empty pane's scene always shows the person's own quokka (2026-09-29)
+    expect(paneSource).toContain('className="be-quokka pane-scene-quokka"');
+    expect(paneSource).toMatch(/pane-scene-quokka"\s+accessorized\s+alwaysVisible/);
   });
 
   test("small ambient characters use one crisp semantic line presentation", () => {
