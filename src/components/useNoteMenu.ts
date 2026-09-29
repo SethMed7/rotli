@@ -8,7 +8,6 @@
 import { useCallback } from "react";
 
 import { discardBlankNote } from "../documents/draftComposition";
-import { fileNameStem } from "../lib/fileKind";
 import { noteDiskFolder } from "../lib/noteLocation";
 import {
   corpusFileStat,
@@ -33,7 +32,7 @@ import {
   readFileLifecycle,
   restoreSinkItem,
 } from "../services/itemLifecycle";
-import { renameLane } from "../services/itemRename";
+import { renameLane, renameTargetFor } from "../services/itemRename";
 import { isEmptyNote } from "../services/mainDismiss";
 import { addNoteToMain, mainHasNote, removeFromMain } from "../services/mainTree";
 import { markNoteDraftChanged } from "../services/noteDrafts";
@@ -64,6 +63,9 @@ export interface NoteMenuOptions {
    * this set; otherwise the menu remains a single-item menu. */
   selectedItems?: readonly NoteSummary[];
   trashSelection?: (items: readonly NoteSummary[]) => void;
+  /** Rename… edits this row in place (a sidebar row, the owner's "like an
+   * IDE"); without it, where no row is visible, the Rename dialog opens. */
+  renameInline?: () => void;
 }
 
 /** A duplicate's body: the title line gains " copy". The title is the first
@@ -496,9 +498,7 @@ export function useNoteMenu() {
             kind: "action" as const,
             label: "Rename…",
             onClick: () =>
-              renameVia === "title"
-                ? setRenameTarget({ id: note.id, current: note.title })
-                : setRenameTarget({ id: note.id, current: fileNameStem(note.id), lane: renameVia }),
+              opts?.renameInline ? opts.renameInline() : setRenameTarget(renameTargetFor(note)),
           });
         }
         items.push({ kind: "sep" as const });

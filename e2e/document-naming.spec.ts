@@ -69,26 +69,34 @@ test("a document renames from its Main row and its tab, keeping .docx", async ({
   await expect(row).toBeVisible();
   await expect(page.getByRole("tab", { selected: true })).toContainText("untitled-1789390512692.docx");
 
+  // the Main row renames in place (no dialog), seeded with the name only; a
+  // taken name keeps the field open with what was typed and the reason
+  await seedDocumentInMain(page, "storage/rotli/Taken.docx");
   await row.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Rename…" }).click();
+  const inline = page.locator(".main-tree").getByRole("textbox", { name: "Rename document" });
+  await expect(inline).toBeFocused();
+  await expect(inline).toHaveValue("untitled-1789390512692");
+  await expect(page.getByRole("dialog", { name: "Rename document" })).toHaveCount(0);
+  await inline.fill("Taken");
+  await inline.press("Enter");
+  await expect(page.locator(".main-tree").getByRole("alert")).toContainText("already exists");
+  await expect(inline).toHaveValue("Taken");
+  await inline.fill("Quarterly plan");
+  await inline.press("Enter");
+
+  await expect(inline).toHaveCount(0);
+  await expect(page.locator(".main-tree .main-row", { hasText: "Quarterly plan.docx" })).toBeVisible();
+  await expect(page.locator(".main-tree .main-row", { hasText: "untitled-1789390512692" })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: /Quarterly plan\.docx/ })).toBeVisible();
+
+  // the tab's own menu renames too; a taken name is refused with a reason
+  // (the tab has no row to edit, so its Rename… keeps the dialog)
+  await page.getByRole("tab", { name: /Quarterly plan\.docx/ }).click({ button: "right" });
   await page.getByRole("menuitem", { name: "Rename…" }).click();
   const dialog = page.getByRole("dialog", { name: "Rename document" });
   const input = dialog.getByRole("textbox", { name: "Document name" });
-  await expect(input).toBeFocused();
-  // seeded with the name, not the extension
-  await expect(input).toHaveValue("untitled-1789390512692");
-  await input.fill("Quarterly plan");
-  await input.press("Enter");
-
-  await expect(dialog).toHaveCount(0);
-  await expect(page.locator(".main-tree .main-row", { hasText: "Quarterly plan.docx" })).toBeVisible();
-  await expect(page.locator(".main-tree .main-row", { hasText: "untitled-1789390512692" })).toHaveCount(0);
-  const tab = page.getByRole("tab", { selected: true });
-  await expect(tab).toContainText("Quarterly plan.docx");
-
-  // the tab's own menu renames too; a taken name is refused with a reason
-  await seedDocumentInMain(page, "storage/rotli/Taken.docx");
-  await page.getByRole("tab", { name: /Quarterly plan\.docx/ }).click({ button: "right" });
-  await page.getByRole("menuitem", { name: "Rename…" }).click();
+  await expect(input).toHaveValue("Quarterly plan");
   await input.fill("Taken");
   await dialog.getByRole("button", { name: "Rename" }).click();
   await expect(dialog.getByRole("alert")).toContainText("already exists");
@@ -132,8 +140,7 @@ test("a board whose tab is closed renames from its Main row", async ({ page }) =
   await expect(page.getByRole("tab", { name: /Rename Board/ })).toHaveCount(0);
   await row.click({ button: "right" });
   await page.getByRole("menuitem", { name: "Rename…" }).click();
-  const dialog = page.getByRole("dialog", { name: "Rename board" });
-  const input = dialog.getByRole("textbox", { name: "Board name" });
+  const input = page.locator(".main-tree").getByRole("textbox", { name: "Rename board" });
   await expect(input).toBeFocused();
   await expect(input).toHaveValue("Rename Board");
 });
