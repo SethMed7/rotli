@@ -8,7 +8,7 @@ import { looksSecret } from "../ai/guard";
 import { flushNote } from "../editor/model";
 import { buildHandToAiPrompt } from "../lib/handToAi";
 import { secureByName } from "../lib/librarianRules";
-import { corpusFrontmatter, corpusNotePath } from "../lib/tauri";
+import { corpusFrontmatter, corpusNotePath, isTauri } from "../lib/tauri";
 import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
 import { useLibrarianRules } from "../state/librarianRules";
 import type { Note } from "../types";
@@ -19,6 +19,16 @@ export type HandToAi =
   | { kind: "secure"; title: string }
   | { kind: "secret"; title: string }
   | { kind: "empty"; title: string };
+
+/** A file name Rotli couldn't read counts as secure: fail closed, like the
+ * frontmatter check (a keyword could be in the name it couldn't see). */
+export function secureByNameOrUnknown(
+  title: string,
+  rel: string | null,
+  keywords: readonly string[],
+): boolean {
+  return rel === null || secureByName(title, rel, keywords);
+}
 
 async function isSecure(note: Note): Promise<boolean> {
   if (note.secure === true) return true;
@@ -31,8 +41,10 @@ async function isSecure(note: Note): Promise<boolean> {
   // Librarian treats it, even before a save has flagged it
   const { secureKeywords } = useLibrarianRules.getState().rules;
   if (secureKeywords.length === 0) return false;
-  const rel = await corpusNotePath(note.id).catch(() => "");
-  return secureByName(note.title, rel, secureKeywords);
+  // Rotli Web has no path lookup (the title still counts there); in the Mac
+  // app a failed lookup is unknown, and unknown is secure
+  const rel = isTauri() ? await corpusNotePath(note.id).catch(() => null) : "";
+  return secureByNameOrUnknown(note.title, rel, secureKeywords);
 }
 
 export async function handToAiFor(noteId: string): Promise<HandToAi> {
