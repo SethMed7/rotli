@@ -63,6 +63,7 @@ mod usage;
 mod vault_browser;
 mod vault_location;
 mod web;
+mod web_page;
 mod web_search;
 mod workspace;
 mod workspace_help;
