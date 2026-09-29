@@ -22,9 +22,8 @@ import {
   describeLibrarianAction,
   type LibrarianAction,
 } from "../lib/librarianActions";
-import { isTauri } from "../lib/tauri";
 import { useFolders } from "../services/hooks";
-import { type applyLibrarian, librarianRefusal } from "../services/librarianBar";
+import { type applyLibrarian, LIBRARIAN_REFUSALS } from "../services/librarianBar";
 import {
   type ChatTurn,
   closeLibrarianChat,
@@ -34,7 +33,6 @@ import {
   updateLibrarianTurn,
   useLibrarianBar,
 } from "../state/librarianBar";
-import { useLibrarianRules } from "../state/librarianRules";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import { editorFor } from "./commands";
@@ -49,6 +47,7 @@ import {
   libraryAreas,
   noteTitle,
   onEscapeHere,
+  refusalNow,
   sendToLibrarian,
   takeToChat,
   tauriHostFor,
@@ -103,21 +102,21 @@ export function LibrarianCorner({ here, noteId, paneId }: { here: Chat; noteId: 
 }
 
 /** Why the Librarian can't take this note (web, off, locked, secure, outside
- * the Library), or null — checked before anything can be sent. */
-function useRefusal(noteId: string, paneId: string): string | null {
+ * the Library), null when it can, or undefined while that is still being
+ * checked (nothing can be sent until it is known). Each send asks again. */
+function useRefusal(noteId: string, paneId: string, turns: number): string | null | undefined {
   const librarianOn = useUiStore((s) => s.brainEnabled);
-  const [refusal, setRefusal] = useState<string | null>(null);
+  const [refusal, setRefusal] = useState<string | null | undefined>(undefined);
   useEffect(() => {
     let live = true;
-    const title = noteTitle(editorFor(paneId)?.getSelection?.()?.doc ?? "");
-    const { secureKeywords } = useLibrarianRules.getState().rules;
-    void librarianRefusal(noteId, { native: isTauri(), librarianOn, secureKeywords, title }).then(
+    void refusalNow(noteId, paneId).then(
       (message) => live && setRefusal(message),
+      () => live && setRefusal(LIBRARIAN_REFUSALS.locked),
     );
     return () => {
       live = false;
     };
-  }, [noteId, paneId, librarianOn]);
+  }, [noteId, paneId, librarianOn, turns]);
   return refusal;
 }
 
@@ -136,7 +135,9 @@ export function ChatPanel({
   apply?: typeof applyLibrarian;
 }) {
   const barHere = useLibrarianBar((s) => s.paneId === paneId);
-  const refusal = useRefusal(noteId, paneId);
+  const refusal = useRefusal(noteId, paneId, chat.turns.length);
+  // undefined while the check runs: nothing is sendable until it is known
+  const blocked = refusal !== null;
   const folders = useFolders();
   const { groups, models } = useLibrarianModels();
   const known = usePeopleNotes();
@@ -160,7 +161,7 @@ export function ChatPanel({
 
   const send = (typed = draft) => {
     const text = typed.trim();
-    if (!text || !model || thinking || refusal) return;
+    if (!text || !model || thinking || blocked) return;
     if (typed === draft) setDraft("");
     const areas = libraryAreas((folders.data ?? []).map((folder) => folder.id));
     void sendToLibrarian(
@@ -168,6 +169,7 @@ export function ChatPanel({
       { text, highlight: passage.anchor() },
       model,
       () => librarianContext(noteId, paneId, areas, known),
+      () => refusalNow(noteId, paneId),
       hostFor,
     );
   };
@@ -280,8 +282,8 @@ export function ChatPanel({
       )}
 
       <form
-        className={refusal ? "libchat-compose off" : "libchat-compose"}
-        aria-disabled={!!refusal}
+        className={blocked ? "libchat-compose off" : "libchat-compose"}
+        aria-disabled={blocked}
         onSubmit={(event) => {
           event.preventDefault();
           send();
@@ -294,7 +296,7 @@ export function ChatPanel({
                 key={ask}
                 type="button"
                 className="libchat-pill"
-                disabled={!model || !!refusal}
+                disabled={!model || blocked}
                 onClick={() => send(ask)}
               >
                 {ask}
@@ -312,7 +314,7 @@ export function ChatPanel({
             }
             rows={Math.min(5, Math.max(1, draft.split("\n").length))}
             value={draft}
-            disabled={!!refusal}
+            disabled={blocked}
             onChange={(event) => setDraft(event.currentTarget.value)}
             onKeyDown={(event) => {
               if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
@@ -323,7 +325,7 @@ export function ChatPanel({
           <button
             type="submit"
             className="rename-btn primary"
-            disabled={!draft.trim() || !model || thinking || !!refusal}
+            disabled={!draft.trim() || !model || thinking || blocked}
           >
             Send
           </button>

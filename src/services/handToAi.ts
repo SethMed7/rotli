@@ -7,8 +7,10 @@
 import { looksSecret } from "../ai/guard";
 import { flushNote } from "../editor/model";
 import { buildHandToAiPrompt } from "../lib/handToAi";
-import { corpusFrontmatter } from "../lib/tauri";
+import { secureByName } from "../lib/librarianRules";
+import { corpusFrontmatter, corpusNotePath } from "../lib/tauri";
 import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
+import { useLibrarianRules } from "../state/librarianRules";
 import type { Note } from "../types";
 import { notesService } from "./notes";
 
@@ -24,7 +26,13 @@ async function isSecure(note: Note): Promise<boolean> {
   if (folders.some((folder) => isSecureNotesFolder(folder) || isSecureBrainFolder(folder))) return true;
   // the Rust adapter keeps `secure` in frontmatter; an unreadable answer is secure
   const frontmatter = await corpusFrontmatter(note.id).catch(() => ({ secure: true }));
-  return frontmatter?.secure === true;
+  if (frontmatter?.secure === true) return true;
+  // a secure keyword in its title or file name makes it secure too, as the
+  // Librarian treats it, even before a save has flagged it
+  const { secureKeywords } = useLibrarianRules.getState().rules;
+  if (secureKeywords.length === 0) return false;
+  const rel = await corpusNotePath(note.id).catch(() => "");
+  return secureByName(note.title, rel, secureKeywords);
 }
 
 export async function handToAiFor(noteId: string): Promise<HandToAi> {
