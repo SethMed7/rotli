@@ -99,7 +99,8 @@ second user-visible product or storage location.
   document's filename is its name: ordinary user creation collects the name
   first (like a board) and writes `<name>.docx`; only a nameless embed target
   falls back to `untitled-<timestamp>.docx`. Rename… on a document or sheet row
-  or tab renames the file in its folder, keeps the extension, refuses a name
+  (edited in place in the sidebar, the name without its extension) or tab
+  (a dialog) renames the file in its folder, keeps the extension, refuses a name
   another file already holds, saves any unsaved edits first, and retargets open
   tabs plus Main and named-view references (`corpus_rename_managed_file`,
   `services/itemRename.ts` owns which items are renamable).

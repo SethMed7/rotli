@@ -292,6 +292,7 @@ new IA — each piece owns one front or one zone.
 | `src/components/sidebar/sidebarSwitcher.tsx` | The two-segment pill (presentational)                                                                                                         |
 | `src/components/sidebar/sidebarHome.tsx`     | The Home body: smart rows, view switcher + editors, the Main tree with its pointer-drag and multi-select, the roving list, the reveal effects |
 | `src/components/sidebar/sidebarChat.tsx`     | The Chat body: New chat, All chats, chat folders, chat rows, chat drag + rename                                                               |
+| `src/components/sidebar/sidebarRenameRows.tsx` | Rename in place: a Main folder's or note's row becomes a same-size field (the folder's contents stay in view); Enter saves, Esc cancels. The note menu's `renameInline` option picks this over the Rename dialog, which stays for tabs and search |
 | `src/components/sidebar/sidebarSystem.tsx`   | The invariant System zone: its disclosure header and Library · Assets · Archive · Trash rows                                                |
 | `src/components/sidebar/sidebarFooter.tsx`   | Files · Librarian · Settings, and the Librarian's badges + working dot                                                                        |
 | `src/components/sidebar/useChatFolders.ts`   | The chat-folder query + read-modify-write helper, shared by the Chat body and the shell's collapse-all                                        |

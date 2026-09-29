@@ -9,14 +9,33 @@ import { useEffect, useRef, useState } from "react";
 import { extOf } from "../lib/fileKind";
 import { renameBoardItem } from "../services/boardRename";
 import { useRenameNote } from "../services/hooks";
+import type { RenameTarget } from "../services/itemRename";
 import { renameManagedFile } from "../services/itemRenameComposition";
 import { useUiStore } from "../state/ui";
 import { NameFieldDialog } from "./nameFieldDialog";
 
+/** Save a rename, from this dialog or a sidebar row renamed in place. A note's
+ * title saves in the background; a board or file whose name is refused throws
+ * the reason, and its old name stays. */
+export function useCommitRename(): (
+  target: Pick<RenameTarget, "id" | "current"> & { lane?: RenameTarget["lane"] },
+  value: string,
+) => Promise<void> {
+  const rename = useRenameNote();
+  return async (target, value) => {
+    const t = value.trim();
+    const lane = target.lane ?? "title";
+    if (lane === "title") {
+      if (t && t !== target.current) rename.mutate({ id: target.id, title: t });
+    } else if (lane === "board") await renameBoardItem(target.id, t);
+    else await renameManagedFile(target.id, t);
+  };
+}
+
 export function RenameDialog() {
   const target = useUiStore((s) => s.renameTarget);
   const setTarget = useUiStore((s) => s.setRenameTarget);
-  const rename = useRenameNote();
+  const commitRename = useCommitRename();
   const [draft, setDraft] = useState({ value: "", error: "", busy: false });
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -49,15 +68,14 @@ export function RenameDialog() {
   const commit = async () => {
     const t = draft.value.trim();
     if (!file) {
-      if (t && t !== target.current) rename.mutate({ id: target.id, title: t });
+      void commitRename(target, t);
       setTarget(null);
       return;
     }
     if (draft.busy) return;
     setDraft({ ...draft, error: "", busy: true });
     try {
-      if (lane === "board") await renameBoardItem(target.id, t);
-      else await renameManagedFile(target.id, t);
+      await commitRename(target, t);
       setTarget(null);
     } catch (cause) {
       const reason = cause instanceof Error ? cause.message : String(cause);
