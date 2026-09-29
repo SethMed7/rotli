@@ -36,3 +36,14 @@ describe("artifact format clarification", () => {
     expect(artifactClarification("Explain TanStack in chat", { documentTool: true })).toBeNull();
   });
 });
+
+// 2026-09-29: "write me a new bio" plus a Google Docs link asked which format
+// to use — the words "docs" and "document" were inside the URL, not the ask.
+test("a document word inside a link is not a request for a document", () => {
+  expect(
+    artifactClarification(
+      "Review this ebook - https://docs.google.com/document/d/abc/edit - and then write me a new bio",
+      { documentTool: true },
+    ),
+  ).toBeNull();
+});

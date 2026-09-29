@@ -12,8 +12,9 @@ import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { artifactClarification } from "./artifactIntent";
 import { budgetFor } from "./budget";
 import { containsPrivateDataOverlap, looksSecret } from "./guard";
+import { modelErrorText } from "./modelError";
 import { extractJsonObject, parseAction } from "./parse";
-import { adapterFor, trimHistory } from "./prompt";
+import { adapterFor, answeredHistory, trimHistory } from "./prompt";
 import { localSourceRoute } from "./sourceRouting";
 import { type FinalExtractor, makeFinalExtractor } from "./stream";
 import { pruneScratch, runTool, statusFor } from "./tools";
@@ -120,7 +121,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
 
   // history is capped to the model's budget (#65) — newest turns win, so a
   // long-running chat degrades to "recent context" instead of a blown window
-  const history = trimHistory(input.history, budget.maxHistoryChars);
+  const history = trimHistory(answeredHistory(input.history), budget.maxHistoryChars);
 
   const scratch: ScratchStep[] = [];
   if (input.noteId) {
@@ -161,7 +162,9 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
       ...(input.userName ? { userName: input.userName } : {}),
     });
 
-    const imgs = step === 1 ? input.images : undefined;
+    // every step is a fresh, stateless call: the turn's images ride each one,
+    // or a model that fetched a page first answers blind (2026-09-29)
+    const imgs = input.images;
     const message =
       imgs && imgs.length > 0
         ? { role: "user" as const, content: prompt, images: imgs }
@@ -180,7 +183,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
       raw = out.raw;
       extractor = out.extractor;
     } catch (e) {
-      yield { type: "final", text: `⚠ ${errMsg(e, "couldn't reach the model")}` };
+      yield { type: "final", text: `⚠ ${modelErrorText(errMsg(e, "couldn't reach the model"))}` };
       return;
     }
 
@@ -363,7 +366,7 @@ async function* forceFinal(
     }
     return groundForcedFinal(raw, webEvidence);
   } catch (e) {
-    return `⚠ ${errMsg(e, "couldn't reach the model")}`;
+    return `⚠ ${modelErrorText(errMsg(e, "couldn't reach the model"))}`;
   }
 }
 

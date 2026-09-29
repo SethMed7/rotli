@@ -28,6 +28,7 @@ import {
   memexWriteChat,
   memexWriteNote,
 } from "../lib/tauri";
+import { isRevisionConflict } from "../lib/trackedWrite";
 import { titleOf } from "../services/derive";
 import { setChatModel } from "./chatModelFrontmatter";
 import { type MemexConfig, type MemexInstance, type Perms, fromCorpusConfig } from "./config";
@@ -55,6 +56,9 @@ import {
 } from "./contract";
 
 export type { DetectedMemex } from "../lib/tauri";
+
+/** Re-reads a lost append race gets before the error surfaces. */
+const CHAT_APPEND_ATTEMPTS = 3;
 
 // ── the Location config (corpus + connected brains) ───────────────────────────
 
@@ -125,26 +129,35 @@ export async function writeChat(input: WriteChatInput): Promise<{ slug: string; 
   // semantics without relying on presentation code to remember it.
   const sentAt = new Date().toISOString();
   const messages = input.messages.map((message) => ({ ...message, at: message.at ?? sentAt }));
-  let contents: string;
-  let expectedRevision: string | null = null;
   if (input.existingSlug) {
-    const existing = await memexReadChat(instance.root, slug);
-    expectedRevision = existing.revision;
-    contents = appendMessages(existing.contents, messages, date);
-  } else {
-    contents = composeNewChat(
-      {
-        title: input.title,
-        source: ROTLI_SOURCE,
-        slug,
-        ...(input.attachedTo ? { attachedTo: input.attachedTo } : {}),
-      },
-      messages,
-      date,
-    ).contents;
+    // Appending a turn is safe to redo: a conflict means another writer (a new
+    // chat's model/provider frontmatter, its note link) landed first, and our
+    // write did not. Re-read and append over theirs — a message never drops
+    // on a race (2026-09-29).
+    for (let attempt = 1; ; attempt++) {
+      const existing = await memexReadChat(instance.root, slug);
+      let contents = appendMessages(existing.contents, messages, date);
+      if (input.secureContext) contents = setChatSecureContext(contents);
+      try {
+        const path = await memexWriteChat(instance.root, slug, contents, existing.revision);
+        return { slug, path };
+      } catch (error) {
+        if (attempt >= CHAT_APPEND_ATTEMPTS || !isRevisionConflict(error)) throw error;
+      }
+    }
   }
+  let contents = composeNewChat(
+    {
+      title: input.title,
+      source: ROTLI_SOURCE,
+      slug,
+      ...(input.attachedTo ? { attachedTo: input.attachedTo } : {}),
+    },
+    messages,
+    date,
+  ).contents;
   if (input.secureContext) contents = setChatSecureContext(contents);
-  const path = await memexWriteChat(instance.root, slug, contents, expectedRevision);
+  const path = await memexWriteChat(instance.root, slug, contents, null);
   return { slug, path };
 }
 

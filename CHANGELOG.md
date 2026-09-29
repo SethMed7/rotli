@@ -10,6 +10,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Claude stops refusing ordinary chats.** Rotli asked connected models to
+  write their reasoning into every reply and then fed it back on the next step,
+  the pattern Claude's safeguards flag as reasoning extraction. Claude, Codex
+  and the other connected models now get only the tools, the rules and what
+  each step found; they reason on their own. The on-device model keeps its
+  short checkpoints. A reply that failed (a ⚠ notice) and the message it
+  answered are no longer sent back to the model, so one blocked turn can't
+  keep blocking the rest of the chat. When Claude's safety filter does block
+  a reply, the chat says so in one plain sentence instead of the raw API
+  error, and Rotli doesn't retry on its own, because a blocked request still
+  counts toward your plan.
+- **An attached image stays in view for the whole reply.** A model that
+  looked something up first used to lose the picture and answer "I couldn't
+  see the image"; the image now rides every step of the turn.
+- **A link no longer makes Rotli ask which format you want.** "Write me a
+  bio" next to a Google Docs link used to trigger the Word-or-Markdown
+  question, because "document" appeared in the URL.
+- **Chat messages no longer disappear.** An error reply now stays in the chat
+  after a reload instead of living only on screen. A reply that arrived while
+  Rotli was still saving a new chat's details could lose the race and vanish;
+  it now re-reads the chat and saves again.
+
 ## [1.6.0] - 2026-09-28
 
 ### Added
