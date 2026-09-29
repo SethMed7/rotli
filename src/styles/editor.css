@@ -799,6 +799,23 @@
 .editor[data-lift-scroll-top] .editor-scroll-top {
   bottom: 66px;
 }
+/* the Quick Note's small window: a compact arrow tucked in the corner beside
+   the bar (scrollTopLane.ts QUICK_LANE_PX), not a big box over the text */
+.quick-window .editor-scroll-top {
+  right: 10px;
+  bottom: 22px;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-control);
+  color: var(--text-muted);
+}
+.quick-window .editor-scroll-top svg {
+  width: 13px;
+  height: 13px;
+}
+.quick-window .editor[data-lift-scroll-top] .editor-scroll-top {
+  bottom: 58px;
+}
 
 /* Raw Markdown is an intentional source editor, not an unstyled fallback.
    Structure uses two semantic roles: the active Rotli accent for punctuation

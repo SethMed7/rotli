@@ -376,7 +376,7 @@ export function EditorSurface({
       setNarrow(el.clientWidth < FORMAT_BAR_COLLAPSE_PX);
       setHeaderCompact(el.clientWidth < 760);
       const bar = el.querySelector<HTMLElement>(".fmtbar");
-      setLiftScrollTop(scrollTopClashes(el.clientWidth, bar?.offsetWidth ?? 0, librarianLane()));
+      setLiftScrollTop(scrollTopClashes(el.clientWidth, bar?.offsetWidth ?? 0, librarianLane(), el));
     });
     ro.observe(el);
     // the bar changes width on its own (collapsing to ⋯), so watch it too

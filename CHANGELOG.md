@@ -53,6 +53,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A new tab's note stays in the folder you're in.** With a note from a Main
+  folder open, ⌘T (or the tab strip's +) used to file the new note at the top
+  of Main, because the new tab had already taken focus when Rotli looked for
+  the folder. It now lands in the same folder as the note you were in.
+- **The Quick Note's scroll-to-top arrow is small and out of the way.** In the
+  Quick Note window the big arrow rose over your text beside the format bar;
+  it's now a compact button tucked into the corner beside the bar.
 - **Claude models show their names again.** The model picker listed Claude
   Code's models by their descriptions ("For complex work and everyday tasks",
   "For your toughest challenges") instead of their names, because the current
