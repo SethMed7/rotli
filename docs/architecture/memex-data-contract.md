@@ -44,8 +44,9 @@ second user-visible product or storage location.
   `.rotli/settings.json` stores only `webSearchProvider` (`duckduckgo` by
   default, or `brave`); it never stores an API key. The per-chat globe remains
   the consent bit for whether that chat may use the network and is not a
-  provider selector. It stays offered for every lane: frontier CLIs run
-  tool-less inside Rotli, so the globe is their only web path, and a chat never
+  provider selector. It stays offered for every lane: frontier CLIs have no
+  tools of their own inside Rotli (Claude calls only Rotli's tools), so the
+  globe is their only web path, and a chat never
   turns it on by itself. With it off, a frontier lane still answers general
   questions from the model's own knowledge and mentions the globe only when an
   answer depends on live data; the on-device lane says it can't confirm

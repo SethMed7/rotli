@@ -51,6 +51,9 @@ mod quick_window;
 mod vault_marker;
 mod provider;
 mod provider_lane; mod provider_models;
+mod child_run;
+mod claude_protocol;
+mod claude_session;
 mod remote_agent;
 mod routines;
 mod search_index; mod search_match;
@@ -2247,6 +2250,7 @@ pub fn run() {
         .manage(memex::FolderAuthorizations::default())
         .manage(vault_browser::VaultBrowserState::default())
         .manage(provider::ProviderState::default())
+        .manage(claude_session::SessionState::default())
         .manage(localmodel::LocalModelState::default())
         .manage(compute::ComputeState::default())
         .manage(remote_agent::RemoteAgentState::default())
@@ -2391,6 +2395,8 @@ pub fn run() {
             provider::cli_detect, provider_models::cli_models,
             provider::cli_complete,
             provider::cli_cancel,
+            claude_session::claude_session_run,
+            claude_session::claude_session_tool_result,
             provider::antigravity::antigravity_manage,
             provider::generate_image,
             usage::model_usage,

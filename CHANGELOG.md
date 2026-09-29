@@ -27,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Claude chat talks to Claude Code the way T3 Code and the Agent SDK do.**
+  A Claude turn is now one Claude Code session that calls Rotli's tools
+  directly, instead of a new process per step that wrote its tool calls as
+  JSON text. Rotli still decides every tool call: Claude Code's own tools stay
+  off, and each tool's input and output pass the same secret and secure-note
+  checks as before. Image turns, presets, and the other models work as they
+  did. ([ADR](docs/decisions/2026-09-28-claude-native-agent-protocol.md))
 - **Rename in place.** Rename… on a folder or note in the sidebar now edits
   its row where it sits, the way a code editor renames a file: the field is
   the row's own size, a folder's notes stay in view below it, Enter saves and
@@ -78,6 +85,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after a reload instead of living only on screen. A reply that arrived while
   Rotli was still saving a new chat's details could lose the race and vanish;
   it now re-reads the chat and saves again.
+- **Chat says when a web page couldn't be read.** Some pages draw everything
+  with JavaScript, so a fetch only gets an empty shell ("Loading…"). When
+  neither the page nor its #-route yields more than that shell, the model is
+  told so and says it couldn't read the page instead of reviewing a blank one.
 
 ## [1.6.0] - 2026-09-28
 

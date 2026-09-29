@@ -105,6 +105,7 @@ export const LIB_EFFECTFUL_FILE_OWNERS = {
   "popover.ts": "shared transient-popover hook backed by UI state",
   "chatWindowBridge.ts": "native Chat window adapter: show/hide and the two shell windows' messages",
   "noteProtection.ts": "native per-note protection controls (lock, secure, on-device access, AI edit grant)",
+  "claudeSession.ts": "native Claude agent-protocol adapter: the tool-call Channel and its answers",
   "quitFlush.ts": "native quit lifecycle adapter",
   "tabDrag.ts": "cross-surface tab drag workflow",
   "tauri.ts": "typed native-host adapter facade",

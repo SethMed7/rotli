@@ -10,7 +10,7 @@
 
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { artifactClarification } from "./artifactIntent";
-import { budgetFor } from "./budget";
+import { type Budget, budgetFor } from "./budget";
 import { containsPrivateDataOverlap, looksSecret } from "./guard";
 import { modelErrorText } from "./modelError";
 import { extractJsonObject, parseAction } from "./parse";
@@ -51,6 +51,81 @@ const BOARD_TOOLS: ToolName[] = ["draw_board"];
 // every tool whose ARGS leave the device — the secret guard covers them all
 // (an image prompt ships to a remote engine exactly like a web query)
 const EGRESS_TOOLS: ToolName[] = [...WEB_TOOLS, ...IMAGE_TOOLS];
+
+export const DUPLICATE_CALL_RESULT = "(already requested above — use that result, or give your final answer)";
+
+/** The tools a turn may call — one rule for every transport (the JSON loop
+ * here and Claude's native protocol in nativeLoop.ts). */
+export function allowedTools(input: RunInput, webStrategy: "research" | "primitives"): ReadonlySet<ToolName> {
+  return new Set<ToolName>([
+    ...NOTE_TOOLS,
+    ...(input.documentTool ? DOCUMENT_TOOLS : []),
+    ...(input.artifactTool ? ARTIFACT_TOOLS : []),
+    ...(input.web ? (webStrategy === "research" ? WEB_RESEARCH_TOOLS : WEB_PRIMITIVE_TOOLS) : []),
+    ...(input.imageTool ? IMAGE_TOOLS : []),
+    ...(input.boardTool ? BOARD_TOOLS : []),
+  ]);
+}
+
+/** The egress guard (mirror of the Rust backstop), shared by every transport:
+ * no secret, and no private prose already read from the vault, rides a tool
+ * whose args leave the device. Keyed off EGRESS_TOOLS so a future one can't be
+ * added past it (audit). Returns the refusal the model sees, or null. */
+export function egressBlock(
+  tool: ToolName,
+  args: Record<string, unknown>,
+  knowledge: string,
+  scratch: ScratchStep[],
+): string | null {
+  if (!EGRESS_TOOLS.includes(tool)) return null;
+  const text = JSON.stringify(args);
+  if (looksSecret(text))
+    return "blocked: that input looks like it contains a secret — it wasn't sent off-device.";
+  if (containsPrivateDataOverlap(text, privateScratch(knowledge, scratch))) {
+    return "blocked: that off-device action repeats private text retrieved from your vault. Rephrase without private prose or perform the network action yourself.";
+  }
+  return null;
+}
+
+export const READING_ATTACHED = "reading the attached note…";
+
+/** The knowledge map, or "" when it can't be built — the model then runs
+ * without an index rather than not at all. */
+export async function loadKnowledge(host: Host, maxChars: number): Promise<string> {
+  try {
+    return await host.knowledgeMap(maxChars);
+  } catch (e) {
+    console.warn("knowledgeMap failed — the model runs without a knowledge index", e);
+    return "";
+  }
+}
+
+/** The chat's attached note as a scratch step. It goes through Host.readNote,
+ * which independently enforces local vs remote access and secure-note
+ * permission before returning any bytes; a refusal becomes the step's result. */
+export async function readAttached(host: Host, noteId: string): Promise<ScratchStep> {
+  let result: string;
+  try {
+    result = await host.readNote(noteId);
+  } catch (e) {
+    result = `error: ${errMsg(e, "couldn't read the attached note")}`;
+  }
+  return { action: `read_note ${JSON.stringify({ id: noteId })}`, result };
+}
+
+/** Run one tool; a thrown failure becomes the result the model reads. */
+export async function runToolSafely(
+  host: Host,
+  tool: ToolName,
+  args: Record<string, unknown>,
+  budget: Budget,
+): Promise<string> {
+  try {
+    return await runTool(host, tool, args, budget);
+  } catch (e) {
+    return `error: ${errMsg(e, "tool failed")}`;
+  }
+}
 
 /** One generation, streamed through the final-answer extractor when the host
  * supports it. Yields `delta` events for the confirmed final answer as it
@@ -97,27 +172,13 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
   // models). The hybrid layer opts out (input.stream === false) so an inner
   // leg's tokens don't surface as the turn's answer.
   const useStream = input.stream !== false;
-  const enabledWebTools = adapter.webStrategy === "research" ? WEB_RESEARCH_TOOLS : WEB_PRIMITIVE_TOOLS;
   const sourceRoute =
     input.web && adapter.webStrategy === "research"
       ? localSourceRoute(input.userText, input.noteId !== undefined)
       : "ambiguous";
-  const allowed: ReadonlySet<ToolName> = new Set<ToolName>([
-    ...NOTE_TOOLS,
-    ...(input.documentTool ? DOCUMENT_TOOLS : []),
-    ...(input.artifactTool ? ARTIFACT_TOOLS : []),
-    ...(input.web ? enabledWebTools : []),
-    ...(input.imageTool ? IMAGE_TOOLS : []),
-    ...(input.boardTool ? BOARD_TOOLS : []),
-  ]);
+  const allowed = allowedTools(input, adapter.webStrategy);
 
-  let knowledge = "";
-  try {
-    knowledge = await host.knowledgeMap(budget.maxIndexChars);
-  } catch (e) {
-    console.warn("knowledgeMap failed — the model runs without a knowledge index", e);
-    knowledge = "";
-  }
+  const knowledge = await loadKnowledge(host, budget.maxIndexChars);
 
   // history is capped to the model's budget (#65) — newest turns win, so a
   // long-running chat degrades to "recent context" instead of a blown window
@@ -125,19 +186,8 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
 
   const scratch: ScratchStep[] = [];
   if (input.noteId) {
-    yield { type: "status", text: "reading the attached note…" };
-    let result: string;
-    try {
-      // This goes through Host.readNote, which independently enforces local vs
-      // remote access and secure-note permission before returning any bytes.
-      result = await host.readNote(input.noteId);
-    } catch (e) {
-      result = `error: ${errMsg(e, "couldn't read the attached note")}`;
-    }
-    scratch.push({
-      action: `read_note ${JSON.stringify({ id: input.noteId })}`,
-      result,
-    });
+    yield { type: "status", text: READING_ATTACHED };
+    scratch.push(await readAttached(host, input.noteId));
   }
   let consecutiveBad = 0;
   let researchAttempted = false;
@@ -248,7 +298,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
       consecutiveBad += 1;
       scratch.push({
         action: sig,
-        result: "(already requested above — use that result, or give your final answer)",
+        result: DUPLICATE_CALL_RESULT,
       });
       if (consecutiveBad >= 2) break; // looping → force a final
       continue;
@@ -270,29 +320,11 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
       continue;
     }
 
-    // egress guard (mirror of the Rust backstop): no secret ever rides a tool
-    // whose args leave the device. Keyed off EGRESS_TOOLS so a future one
-    // can't be added past the guard (audit).
-    if (EGRESS_TOOLS.includes(parsed.tool) && looksSecret(JSON.stringify(parsed.args))) {
+    const blocked = egressBlock(parsed.tool, parsed.args, knowledge, scratch);
+    if (blocked) {
       consecutiveBad += 1;
-      scratch.push({
-        action: sig,
-        result: "blocked: that input looks like it contains a secret — it wasn't sent off-device.",
-      });
+      scratch.push({ action: sig, result: blocked });
       if (consecutiveBad >= 2) break; // insisting on the blocked call → force a final
-      continue;
-    }
-    if (
-      EGRESS_TOOLS.includes(parsed.tool) &&
-      containsPrivateDataOverlap(JSON.stringify(parsed.args), privateScratch(knowledge, scratch))
-    ) {
-      consecutiveBad += 1;
-      scratch.push({
-        action: sig,
-        result:
-          "blocked: that off-device action repeats private text retrieved from your vault. Rephrase without private prose or perform the network action yourself.",
-      });
-      if (consecutiveBad >= 2) break;
       continue;
     }
     consecutiveBad = 0; // a genuinely NEW, allowed call — the model is working
@@ -300,12 +332,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
     yield { type: "tool", tool: parsed.tool, args: parsed.args };
     yield { type: "status", text: statusFor(parsed.tool, parsed.args) };
 
-    let result: string;
-    try {
-      result = await runTool(host, parsed.tool, parsed.args, budget);
-    } catch (e) {
-      result = `error: ${errMsg(e, "tool failed")}`;
-    }
+    let result = await runToolSafely(host, parsed.tool, parsed.args, budget);
     if (parsed.tool === "research_web") {
       researchAttempted = true;
       const numbered = renumberResearchEvidence(result, nextWebSourceNumber);
@@ -398,7 +425,7 @@ function privateScratch(knowledge: string, scratch: ScratchStep[]): string[] {
   return [knowledge, ...scratch.filter((s) => !fromWeb(s.action)).map((s) => s.result)];
 }
 
-function errMsg(e: unknown, fallback: string): string {
+export function errMsg(e: unknown, fallback: string): string {
   if (e instanceof Error) return e.message;
   return typeof e === "string" ? e : fallback;
 }

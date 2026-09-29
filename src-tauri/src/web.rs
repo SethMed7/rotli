@@ -192,14 +192,14 @@ fn web_fetch_blocking(url: &str, max_chars: Option<usize>) -> Result<String, Str
         return Err("blocked: that URL looks like it contains a secret — not fetching it.".into());
     }
     let cap = max_chars.unwrap_or(8000).clamp(500, 20_000);
-    let text = fetch_text(url)?;
+    let (text, notice) = fetch_text(url)?;
     // A hash-routed app (`https://site/#/piece/x`) never sends its route to
     // the server, so the fetch above sees only the app's empty shell. Try the
     // same route as a path on the same site; a site that serves a real page
     // there (a static per-route export, server rendering) becomes readable.
     // The longer text wins, so a site without such pages loses nothing.
     if let Some(page) = vet_fetch_url(url).ok().and_then(|u| hash_route_page(&u)) {
-        if let Ok(routed) = fetch_text(page.as_str()) {
+        if let Ok((routed, _)) = fetch_text(page.as_str()) {
             if routed.chars().count() > text.chars().count() {
                 return Ok(truncate_chars(
                     &format!("(read from {page}, the page this link's #-route names)\n{routed}"),
@@ -208,11 +208,17 @@ fn web_fetch_blocking(url: &str, max_chars: Option<usize>) -> Result<String, Str
             }
         }
     }
-    Ok(truncate_chars(&text, cap))
+    // the shell is what the model gets: say so, so it doesn't review a page it never saw
+    let text = truncate_chars(&text, cap);
+    Ok(match notice {
+        Some(notice) => format!("{notice}\n\n{text}"),
+        None => text,
+    })
 }
 
-/// One vetted GET (SSRF-checked, redirect-capped, size-capped) as readable text.
-fn fetch_text(url: &str) -> Result<String, String> {
+/// One vetted GET (SSRF-checked, redirect-capped, size-capped) as readable
+/// text, plus a notice when the page is only a script-drawn shell.
+fn fetch_text(url: &str) -> Result<(String, Option<String>), String> {
     let mut current = vet_fetch_url(url)?;
     let first_host = current.host_str().unwrap_or_default().to_ascii_lowercase();
     let mut hops = 0u32;
@@ -237,7 +243,10 @@ fn fetch_text(url: &str) -> Result<String, String> {
         current = vet_redirect(&current, &loc, &first_host)?;
     };
     let buf = read_capped(resp.into_reader())?;
-    Ok(html_to_text(&String::from_utf8_lossy(&buf)))
+    let html = String::from_utf8_lossy(&buf);
+    let text = html_to_text(&html);
+    let notice = script_shell_notice(url, &html, &text);
+    Ok((text, notice))
 }
 
 /// `https://site/#/piece/x` (or `#!/piece/x`) → `https://site/piece/x` on the
@@ -258,6 +267,25 @@ fn hash_route_page(url: &Url) -> Option<Url> {
     page.set_query(None);
     page.set_path(&format!("/{route}"));
     Some(page)
+}
+
+/// A page whose content is drawn by JavaScript reaches us as its bare shell
+/// ("Loading…"). Say so, so the model reports it could not read the page
+/// instead of reviewing the shell as if it were the content.
+fn script_shell_notice(url: &str, html: &str, text: &str) -> Option<String> {
+    const THIN_CHARS: usize = 400;
+    let chars = text.chars().count();
+    if chars >= THIN_CHARS || !html.to_ascii_lowercase().contains("<script") {
+        return None;
+    }
+    let route = if url.contains("#/") || url.contains("#!") {
+        " The part of the link after \"#\" is read by the page's script and never reaches the server."
+    } else {
+        ""
+    };
+    Some(format!(
+        "NOTE: this page builds its content with JavaScript, which web_fetch does not run — only its {chars}-character shell was read.{route} Tell the user you couldn't read what the page shows; don't describe or review content you didn't see."
+    ))
 }
 
 // ── HTML → text ───────────────────────────────────────────────────────────────
@@ -427,6 +455,22 @@ mod tests {
     fn egress_fixtures() -> serde_json::Value {
         serde_json::from_str(include_str!("../../scripts/fixtures/egress-fixtures.json"))
             .expect("egress-fixtures.json parses")
+    }
+
+    #[test]
+    fn a_script_drawn_page_is_flagged_as_a_shell() {
+        let shell = r#"<html><head><title>rotli studio</title><script type="module" src="/app.js"></script></head><body><p>Loading the studio…</p></body></html>"#;
+        let text = html_to_text(shell);
+        let notice = script_shell_notice("https://studio.example/#/piece/a", shell, &text).unwrap();
+        assert!(notice.contains("JavaScript") && notice.contains("after \"#\""), "got: {notice}");
+        // no hash route → no fragment sentence
+        let plain = script_shell_notice("https://studio.example/", shell, &text).unwrap();
+        assert!(!plain.contains("after \"#\""));
+        // a real article, or a thin page with no script, reads as-is
+        let article = format!("<script>x()</script><p>{}</p>", "word ".repeat(200));
+        assert!(script_shell_notice("https://a.example/", &article, &html_to_text(&article)).is_none());
+        let thin = "<p>Short static page.</p>";
+        assert!(script_shell_notice("https://a.example/", thin, &html_to_text(thin)).is_none());
     }
 
     #[test]
