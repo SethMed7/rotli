@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Connected models always have the web.** Claude, Codex, Cursor and
+  Antigravity can search and read the web in every chat, the way they can in
+  a terminal, with no globe to turn on. The globe now matters only for the
+  on-device model. A secure chat still has no web for any model, and searches
+  still go through the provider you chose in Settings → Connections.
 - **Claude chat talks to Claude Code the way T3 Code and the Agent SDK do.**
   A Claude turn is now one Claude Code session that calls Rotli's tools
   directly, instead of a new process per step that wrote its tool calls as
@@ -57,6 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   folder open, ⌘T (or the tab strip's +) used to file the new note at the top
   of Main, because the new tab had already taken focus when Rotli looked for
   the folder. It now lands in the same folder as the note you were in.
+- **A slash command's panel closes when you click away.** After choosing an
+  Insert item that opens a panel (Link note, Link chat, Template, Board,
+  Sheet, Document, Generate image), clicking back into the note or pressing
+  Escape now closes it; before, it stayed on screen.
 - **The Quick Note's scroll-to-top arrow is small and out of the way.** In the
   Quick Note window the big arrow rose over your text beside the format bar;
   it's now a compact button tucked into the corner beside the bar.

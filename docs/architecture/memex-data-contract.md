@@ -42,15 +42,12 @@ second user-visible product or storage location.
   filter. A chat created while a view is active joins it.
 - **Web-search destination is an explicit vault setting.**
   `.rotli/settings.json` stores only `webSearchProvider` (`duckduckgo` by
-  default, or `brave`); it never stores an API key. The per-chat globe remains
-  the consent bit for whether that chat may use the network and is not a
-  provider selector. It stays offered for every lane: frontier CLIs have no
-  tools of their own inside Rotli (Claude calls only Rotli's tools), so the
-  globe is their only web path, and a chat never
-  turns it on by itself. With it off, a frontier lane still answers general
-  questions from the model's own knowledge and mentions the globe only when an
-  answer depends on live data; the on-device lane says it can't confirm
-  outside-world facts. Brave credentials live under Rotli's allowlisted macOS
+  default, or `brave`); it never stores an API key. Connected models (Claude,
+  Codex, Cursor, Antigravity) always have Rotli's web tools, as they would in
+  a terminal (the owner, 2026-09-29). The per-chat globe is the on-device
+  model's switch alone: with it off, the on-device lane says it can't confirm
+  outside-world facts. It is not a provider selector, and a secure chat (or a
+  turn with secure content attached) has no web for any model. Brave credentials live under Rotli's allowlisted macOS
   Keychain account, while search execution and provider failure policy remain
   application/adapter concerns outside the vault contract.
 - **Breve stays inside the active vault.** Its portable routine configuration

@@ -27,7 +27,7 @@ import {
 import { createPortal } from "react-dom";
 
 import { attributedConsultReply, parseConsultMention, resolveConsultModel } from "../../ai/chatProvider";
-import { modelIsOnDevice } from "../../ai/guard";
+import { modelIsOnDevice, webForTurn } from "../../ai/guard";
 import { type HostArtifactKind, makeTauriHost } from "../../ai/host";
 import { presetFor, runHybrid } from "../../ai/hybrid";
 import { runAgent } from "../../ai/loop";
@@ -576,6 +576,7 @@ function ReasoningPicker({
 function ComposerAddMenu({
   web,
   webDisabled,
+  webIsAChoice,
   hasImages,
   canVision,
   onAttach,
@@ -583,6 +584,8 @@ function ComposerAddMenu({
 }: {
   web: boolean;
   webDisabled: boolean;
+  /** Only an on-device model's web is a switch; connected models always have it. */
+  webIsAChoice: boolean;
   hasImages: boolean;
   canVision: boolean;
   onAttach: () => void;
@@ -607,7 +610,11 @@ function ComposerAddMenu({
       <button
         ref={anchorRef}
         type="button"
-        className={open || web || hasImages ? "chat-tool chat-add-trigger on" : "chat-tool chat-add-trigger"}
+        className={
+          open || (web && webIsAChoice) || hasImages
+            ? "chat-tool chat-add-trigger on"
+            : "chat-tool chat-add-trigger"
+        }
         aria-label="Add files or web search"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -668,7 +675,7 @@ function ComposerAddMenu({
               type="button"
               role="menuitemcheckbox"
               aria-checked={web}
-              disabled={webDisabled}
+              disabled={webDisabled || !webIsAChoice}
               onClick={() => {
                 setOpen(false);
                 onToggleWeb();
@@ -679,7 +686,11 @@ function ComposerAddMenu({
               </span>
               <span>
                 <strong>Web search</strong>
-                {webDisabled && <small>Unavailable after secure content enters the chat</small>}
+                {webDisabled ? (
+                  <small>Unavailable after secure content enters the chat</small>
+                ) : (
+                  !webIsAChoice && <small>Always on for connected models</small>
+                )}
               </span>
               {web && <CheckGlyph size={14} />}
             </button>
@@ -1323,6 +1334,11 @@ export function ChatSurface({
   // The model map above rides the very same key.
   const webKey = chatKeyId;
   const globeOn = secureChat ? false : (chatWeb[webKey] ?? false);
+  // Connected models reach the web as they would in a terminal (the owner,
+  // 2026-09-29): the globe is the on-device model's switch alone. A secure
+  // chat still has no web for anyone.
+  const pickedOnDevice = picked ? modelIsOnDevice(picked) : false;
+  const webOn = webForTurn({ secure: secureChat, onDevice: pickedOnDevice, globe: globeOn });
   // per-chat measure rides the same key; missing = the tuned comfort column
   const measure: Measure = chatMeasure[webKey] ?? "comfort";
   // image attach is gated on the picked model's vision capability
@@ -1690,7 +1706,11 @@ export function ChatSurface({
     const runInput: RunInput = {
       history,
       userText: providerUserText,
-      web: attachedSecure ? false : globeOn,
+      web: webForTurn({
+        secure: attachedSecure || secureChat,
+        onDevice: modelIsOnDevice(turnModel),
+        globe: globeOn,
+      }),
       model,
       ...(attachedNoteId ? { noteId: attachedNoteId } : {}),
       ...(imgs.length > 0 ? { images: imgs.map((image) => image.src) } : {}),
@@ -2669,8 +2689,9 @@ export function ChatSurface({
                       />
                       <div className="chat-box-foot">
                         <ComposerAddMenu
-                          web={globeOn}
+                          web={webOn}
                           webDisabled={secureChat}
+                          webIsAChoice={pickedOnDevice}
                           hasImages={images.length > 0}
                           canVision={canVision}
                           onAttach={onAttachClick}

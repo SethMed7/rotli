@@ -1,10 +1,11 @@
 // Picker sub-mode for slash ops that need a note/board/sheet target before insert.
 
-import { type KeyboardEvent, useEffect, useMemo, useState } from "react";
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { PlusGlyph, glyphForNote } from "../components/glyphs";
 import { DOCX_EDITABLE } from "../documents/kinds";
 import { extOf, fileName } from "../lib/fileKind";
+import { useTransientPopover } from "../lib/popover";
 import { corpusManagedFileCreationAvailable, isTauri } from "../lib/tauri";
 import { createManagedItem } from "../newItems/composition";
 import { DEST } from "../services/destinations";
@@ -83,6 +84,10 @@ export function SlashPicker({
   onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
+  // clicking back into the note (or anywhere else) or pressing Escape closes
+  // it, as every other popover does (tester feedback, 2026-09-29)
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useTransientPopover([rootRef], true, onClose);
   const [creationAvailable, setCreationAvailable] = useState<boolean | null>(null);
   const [createError, setCreateError] = useState("");
   const searchable = useSearchableNotes();
@@ -184,7 +189,7 @@ export function SlashPicker({
   };
 
   return (
-    <div className="slashmenu slashpicker" role="menu" aria-label={MODE_LABEL[mode]}>
+    <div className="slashmenu slashpicker" role="menu" aria-label={MODE_LABEL[mode]} ref={rootRef}>
       <input
         className="slashpicker-input"
         type="search"
