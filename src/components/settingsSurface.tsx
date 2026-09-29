@@ -160,6 +160,8 @@ import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { ConnectorGuide } from "./settings/connectorGuide";
 import { LibrarianRulesSettings } from "./settings/librarianRulesSettings";
 import { Seg } from "./settings/seg";
+import { SettingsBanner } from "./settings/settingsBanner";
+import type { BannerMotif } from "./settings/settingsBannerArt";
 import { SwitchKnob, Toggle } from "./settings/toggle";
 import { VisibilitySettings } from "./settings/visibilitySettings";
 import { VoiceSettings } from "./settings/voiceSettings";
@@ -206,17 +208,11 @@ const NAV: { id: SettingsPane; label: string; glyph: (props: { size?: number }) 
 const WEB_HIDDEN_PANES: ReadonlySet<SettingsPane> = new Set(["hotkeys", "browser"]);
 const SHOWN_NAV = PLATFORM === "web" ? NAV.filter((pane) => !WEB_HIDDEN_PANES.has(pane.id)) : NAV;
 
-/** A settings pane heading with its quokka character accent (the maintainer, 2026-06-26) —
- * a small, muted line-art quokka at the top-right of each section. This is an
- * ambient section marker, not a companion preview: it keeps semantic line ink
- * instead of shrinking and fading the user's fill and accessory layers. */
-function PaneHead({ title, char }: { title: string; char: CharacterName }) {
-  return (
-    <div className="set-panehead">
-      <h3>{title}</h3>
-      <Character name={char} size={56} className="set-paneaccent" appearance="quiet-line" />
-    </div>
-  );
+/** A settings pane heading: since 2026-09-29 a banner with the theme's
+ * scenery, the pane's own motif, and the person's quokka in it
+ * (settings/settingsBanner.tsx). */
+function PaneHead({ title, char, motif }: { title: string; char: CharacterName; motif: BannerMotif }) {
+  return <SettingsBanner title={title} pose={char} motif={motif} />;
 }
 
 // ——— shared settings controls (the maintainer, 2026-06-15) ———
@@ -348,7 +344,7 @@ function HotkeysPane() {
 
   return (
     <>
-      <PaneHead title="Keybindings" char="notes" />
+      <PaneHead title="Keybindings" char="notes" motif="hotkeys" />
       <p className="lead">Every shortcut in rotli is yours to rebind. Click a chord, press the new keys.</p>
       <section className="hksection">
         <div className="hkhead">Hold ⌘</div>
@@ -565,7 +561,7 @@ function GeneralPane() {
   const hasCaptureVault = !captureVaultId || writableVaults.some((vault) => vault.id === captureVaultId);
   return (
     <>
-      <PaneHead title="General" char="base" />
+      <PaneHead title="General" char="base" motif="general" />
       {/* visitor vs resident, the Dock, and the menu bar are the Mac app's */}
       {PLATFORM === "desktop" && (
         <>
@@ -1106,7 +1102,7 @@ function AppearancePane() {
   const pickMode = (mode: ThemeSetting) => setTheme(mode);
   return (
     <>
-      <PaneHead title="Appearance" char="board" />
+      <PaneHead title="Appearance" char="board" motif="appearance" />
       <p className="appearance-intro">
         Shape Rotli into a workspace that feels like yours. Every family is tuned for readable light and dark
         work.
@@ -1653,7 +1649,7 @@ function LocationPane() {
   if (!isTauri()) {
     return (
       <>
-        <PaneHead title="Location" char="local" />
+        <PaneHead title="Location" char="local" motif="location" />
         <p className="lead">
           Your notes folder lives on disk — this connects in the app, not the browser preview.
         </p>
@@ -1663,7 +1659,7 @@ function LocationPane() {
 
   return (
     <>
-      <PaneHead title="Location" char="local" />
+      <PaneHead title="Location" char="local" motif="location" />
       <p className="lead">
         Your <b>vault</b> is one folder of plain Markdown and conventional files on this Mac. Rotli adds its
         organization and retrieval layer without taking ownership; you choose whether the on-device Librarian
@@ -1902,7 +1898,7 @@ function BrainPane() {
   };
   return (
     <>
-      <PaneHead title="The Librarian" char="knowledge" />
+      <PaneHead title="The Librarian" char="knowledge" motif="librarian" />
       <p className="lead">
         Your vault is just a folder of plain files — complete without any AI. The <b>Librarian</b> is the
         optional caretaker on top: a quiet helper that files your notes into the Library&rsquo;s areas and
@@ -2328,7 +2324,7 @@ function ChatPane() {
   };
   return (
     <>
-      <PaneHead title="Chat" char="chat" />
+      <PaneHead title="Chat" char="chat" motif="chat" />
       <h4 className="sethead">New chats start on</h4>
       <p className="lead">
         The model every new chat opens with. A chat can still switch models on its own, and keeps the one it
@@ -2902,7 +2898,7 @@ function ModelsPane() {
 
   return (
     <>
-      <PaneHead title="AI Models" char="knowledge" />
+      <PaneHead title="AI Models" char="knowledge" motif="models" />
       <section className="aisection provider-transparency" aria-labelledby="provider-transparency-title">
         <p className="settings-eyebrow">Transparency &amp; account safety</p>
         <h4 className="set-subhead" id="provider-transparency-title">
@@ -3130,7 +3126,7 @@ function SecurityPane() {
   const setSecureLocalAi = useUiStore((s) => s.setSecureLocalAi);
   return (
     <>
-      <PaneHead title="Security" char="local" />
+      <PaneHead title="Security" char="local" motif="security" />
       <p className="lead">
         A <b>secure note</b> is one rotli treats as private from AI. Some notes become secure on their own —
         quick captures (<b>⌥C</b>) are secure at birth, and a note that looks like it holds a secret (an API
@@ -3195,7 +3191,7 @@ function BrowserPane() {
 
   return (
     <>
-      <PaneHead title="Browser" char="searching" />
+      <PaneHead title="Browser" char="searching" motif="browser" />
       <p className="lead">
         Open links and run quick searches inside Rotli. The browser chrome and start page follow your current
         light or dark environment; websites still control their own appearance. Each page is a normal Rotli
@@ -3250,7 +3246,7 @@ function BrowserPane() {
 function ConnectionsPane() {
   return (
     <>
-      <PaneHead title="Connections" char="chat" />
+      <PaneHead title="Connections" char="chat" motif="connections" />
       <ConnectionsSettings agents={LAUNCH_FEATURES.agents} braveKeyRow={<BraveKeyRow />} />
     </>
   );
@@ -3260,7 +3256,7 @@ function AboutRotliPane() {
   const version = useAppVersion();
   return (
     <>
-      <PaneHead title="About Rotli" char="waving" />
+      <PaneHead title="About Rotli" char="waving" motif="about" />
       <AboutPane
         version={version}
         feedbackUrl={feedbackUrl(version, guideOs(navigator.platform || navigator.userAgent))}
