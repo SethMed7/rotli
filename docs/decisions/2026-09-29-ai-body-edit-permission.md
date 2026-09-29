@@ -48,8 +48,10 @@ or was written by the person. On 2026-09-29 the owner decided:
 3. Rust enforces the policy inside both AI body-write seams,
    `write_for_ai_if_revision` (chat and chat memory) and
    `write_for_remote_agent_if_revision` (CLI/MCP). TypeScript fails fast with
-   the same words in `host.updateNote` and `updateNoteAsAi`. Rotli Web has no
-   Rust gate, so it runs the twin on the web write path, fail-closed.
+   the same verdict in `host.updateNote` and `updateNoteAsAi`, worded for the
+   chat to relay (Rust's text is the backstop error; only the verdicts are
+   parity-pinned). Rotli Web has no Rust gate, so its AI corpus runs the twin
+   on every AI write (`webAiCorpus.write`), fail-closed.
    `FrontmatterView.aiBodyEdit` carries the verdict to the UI.
 4. When the chat's attached note is not AI-editable, chat memory reads that
    note's existing notes section and writes a chat-made note of its own. The

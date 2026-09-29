@@ -77,4 +77,21 @@ describe("the web AI write", () => {
       corpus.write(chat.id, "# Keys\n\nsk-ant-api03-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", chat.revision),
     ).rejects.toThrow();
   });
+
+  test("a locked note and a note the person switched off are refused", async () => {
+    const svc = new InMemoryNotesService();
+    const locked = await svc.createNote("Inbox", "# Locked\n\nx", { createdBy: "chat" });
+    const off = await svc.createNote("Inbox", "# Off\n\ny", { createdBy: "chat" });
+    const lockedNote = await svc.getNote(locked.id);
+    const offNote = await svc.getNote(off.id);
+    if (!lockedNote || !offNote) throw new Error("notes were not created");
+    lockedNote.locked = true;
+    offNote.aiBodyEdit = "revoked";
+    const corpus = createWebAiCorpus(() => svc);
+    await expect(corpus.write(locked.id, "# Locked\n\nchanged", locked.revision)).rejects.toThrow("locked");
+    await expect(corpus.write(off.id, "# Off\n\nchanged", off.revision)).rejects.toThrow(
+      "turned off AI editing",
+    );
+    expect((await svc.getNote(off.id))?.body).toBe("# Off\n\ny");
+  });
 });

@@ -14,7 +14,13 @@ import { titleOf } from "../services/derive";
 import { isChatsPath } from "../services/destinations";
 import { invalidateNotes } from "../services/hooks";
 import { inboxFolderId, notesService } from "../services/notes";
-import { type AttachedNoteCandidate, attachedNoteMatches, type MemoryTurn, pickChatNote } from "./model";
+import {
+  type AttachedNoteCandidate,
+  attachedNoteMatches,
+  type MemoryTurn,
+  pickChatNote,
+  pickMemoryNote,
+} from "./model";
 import { syncChatMemory, type ChatMemoryNote, type ComposeChatNotes } from "./workflow";
 
 export interface ManagedChatMemoryInput {
@@ -113,7 +119,26 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
     },
     async findMemoryNote(): Promise<ChatMemoryNote | null> {
       const stem = await readChatMemoryNoteStem(input.instance, input.chatSlug).catch(() => null);
-      return stem ? repository.findByStem(stem) : null;
+      if (!stem) return null;
+      // the stem can also match an older note titled the same: resolve by
+      // what the chat may write, never by recency alone (pickMemoryNote)
+      const summaries = await notesService.listNotes(prefix || undefined);
+      const matches = await Promise.all(
+        attachedNoteMatches(
+          stem,
+          summaries.filter((note) => !isChatsPath(note.folderId)),
+        ).map(async (match) => ({
+          id: match.id,
+          ...(match.updatedAt === undefined ? {} : { updatedAt: match.updatedAt }),
+          verdict:
+            (await corpusFrontmatter(match.id).catch(() => null))?.aiBodyEdit ?? ("person-written" as const),
+        })),
+      );
+      const id = pickMemoryNote(matches);
+      const note = id ? await notesService.getNote(id) : null;
+      if (!id || !note) return null;
+      const verdict = matches.find((match) => match.id === id)?.verdict;
+      return { id, stem, body: note.body, revision: note.revision, aiEditable: verdict === "allowed" };
     },
     setMemoryNote: (stem: string) => setChatMemoryNoteStem(input.instance, input.chatSlug, stem),
     async create(body: string): Promise<ChatMemoryNote> {
@@ -124,7 +149,8 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
         const note = await notesService.createNote(inboxFolderId, body, { createdBy: "chat" });
         return {
           id: note.id,
-          stem: noteSlugify(titleOf(body)) || "note",
+          // the adapter's real filename stem comes first in aliases
+          stem: note.aliases?.[0] || noteSlugify(titleOf(body)) || "note",
           body,
           revision: note.revision,
           aiEditable: true,

@@ -241,7 +241,9 @@ fn fetch_text(url: &str) -> Result<String, String> {
 }
 
 /// `https://site/#/piece/x` (or `#!/piece/x`) → `https://site/piece/x` on the
-/// same origin; `None` when the fragment is not a route.
+/// same origin; `None` when the fragment is not a route. The route replaces
+/// the whole path, which fits an app served at `/` (rotli studio); an app
+/// hosted under a subpath simply keeps its original, longer-text answer.
 fn hash_route_page(url: &Url) -> Option<Url> {
     let fragment = url.fragment()?;
     let route = fragment
