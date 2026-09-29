@@ -233,6 +233,15 @@
         "src/keys/quickNoteActions.ts"
       ],
       "reason": "Same gesture, two keyboard surfaces: ⌘[ / ⌘] are main's Back/Forward and the Quick Note window's previous/next note. Each surface's dispatcher fires only its own actions, so the shared default chords are deliberate, not a copy to extract."
+    },
+    {
+      "id": "claude-cli-argv-vocabulary",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/claude_session.rs",
+        "src-tauri/src/provider.rs"
+      ],
+      "reason": "Not a mirror: both lanes spawn the same Claude Code binary, so each names the CLI's own flags (--output-format, --effort, ...). The policy is already shared — session_args calls provider::build_args_tuned and copies its model/effort flags, so one model and effort allowlist gates both the one-shot lane and the native session."
     }
   ]
 }

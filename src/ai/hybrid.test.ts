@@ -181,6 +181,25 @@ describe("runHybrid", () => {
     expect(statuses).toContain("falling back to Claude Sonnet…");
   });
 
+  // the pull-request review (2026-09-29): a provider safety block is billed and repeats on the same
+  // content, so it is surfaced for the person to act on — never retried on
+  // the fallback model behind their back
+  test("a safety block is surfaced, not retried on the fallback", async () => {
+    const blocked = () => {
+      throw new Error(
+        "API Error: Opus 5.5's safeguards flagged this message. Details: [reasoning_extraction]",
+      );
+    };
+    const { makeHost } = makeHosts({
+      "gemma-3": ['{"route":2}'],
+      "gpt-5.5": [blocked],
+      sonnet: ['{"final":"should never run"}'],
+    });
+    const { final, statuses } = await collect(runHybrid(PRESET, MODELS, INPUT, makeHost));
+    expect(final).toStartWith("⚠ Claude's safety filter blocked this reply (reasoning_extraction)");
+    expect(statuses).not.toContain("falling back to Claude Sonnet…");
+  });
+
   test("a failing fallback surfaces the error as the final", async () => {
     const boom = () => {
       throw new Error("everything down");

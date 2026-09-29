@@ -14,14 +14,13 @@
 
 use std::collections::HashMap;
 use std::ffi::OsString;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use super::{with_stderr_tail, Running, NEXT_TOKEN};
+use super::{with_stderr_tail, Running};
 
 /// The plain-text line Google's agent prints on stdout when `authenticate`
 /// needs a browser. It is not JSON-RPC; the reader recognizes it by prefix.
@@ -347,31 +346,8 @@ pub(crate) fn run_acp_registered(
         .stdout
         .take()
         .ok_or_else(|| format!("{label} ACP did not open stdout"))?;
-    let mut stderr = child.stderr.take();
-
-    let token = NEXT_TOKEN.fetch_add(1, Ordering::Relaxed);
-    children
-        .lock()
-        .unwrap()
-        .insert(request_id.to_string(), Running { token, child });
-    let map = Arc::clone(children);
-    let id_for_watchdog = request_id.to_string();
-    std::thread::spawn(move || {
-        std::thread::sleep(timeout);
-        if let Some(r) = map.lock().unwrap().get_mut(&id_for_watchdog) {
-            if r.token == token {
-                let _ = r.child.kill();
-            }
-        }
-    });
-
-    let err_thread = std::thread::spawn(move || {
-        let mut text = String::new();
-        if let Some(pipe) = stderr.as_mut() {
-            let _ = pipe.read_to_string(&mut text);
-        }
-        text
-    });
+    let err_thread = crate::child_run::collect_stderr(child.stderr.take());
+    let token = crate::child_run::register(children, request_id, child, timeout);
     let mut reader = BufReader::new(stdout);
     let mut assistant = String::new();
     // a chat turn never signs in: the agent asking for a browser is a refusal
@@ -430,14 +406,7 @@ pub(crate) fn run_acp_registered(
     })();
 
     drop(stdin);
-    let reaped = {
-        let mut map = children.lock().unwrap();
-        match map.get(request_id) {
-            Some(r) if r.token == token => map.remove(request_id),
-            _ => None,
-        }
-    };
-    if let Some(mut running) = reaped {
+    if let Some(mut running) = crate::child_run::reap(children, request_id, token) {
         let _ = running.child.kill();
         let _ = running.child.wait();
     }

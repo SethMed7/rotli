@@ -79,10 +79,9 @@ try {
   const folder = page.locator('.main-tree [data-main-folder="1"]', { hasText: "Welcome" });
   if ((await folder.getAttribute("aria-expanded")) !== "true") await folder.click();
   const lessons = page.locator(".main-tree button[data-main-id][data-note-id]", {
-    hasText:
-      /^(Welcome to Rotli|Writing and formatting|Tasks and progress|Choices and toggles|Tables and code|Links and finding|Main and named views|Files and attachments|AI and privacy|Your launch checklist)$/,
+    hasText: /^(Welcome to Rotli|Writing|Organizing and finding|AI and privacy)$/,
   });
-  await expect(lessons).toHaveCount(10);
+  await expect(lessons).toHaveCount(4);
   const rawToggle = async (mode) => {
     await page.getByRole("button", { name: "Aa", exact: true }).click();
     await page.getByRole("dialog", { name: "Typography" }).getByRole("button", { name: mode }).click();
@@ -92,8 +91,8 @@ try {
   recording = true;
   frameLoop = recordFrames();
   await hold("main-welcome");
-  await lessons.nth(2).click();
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Tasks and progress");
+  await lessons.nth(1).click();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Writing");
   await hold("tasks-before");
   await page.getByRole("checkbox", { name: "Not started", exact: true }).click();
   await hold("tasks-done");

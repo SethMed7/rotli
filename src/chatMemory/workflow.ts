@@ -11,6 +11,8 @@ export interface ChatMemoryNote {
   stem: string;
   body: string;
   revision: string;
+  /** May the chat's model rewrite this note (src/lib/aiEditPolicy.ts)? */
+  aiEditable: boolean;
 }
 
 export interface ChatMemoryRepository {
@@ -18,6 +20,9 @@ export interface ChatMemoryRepository {
   create(body: string): Promise<ChatMemoryNote>;
   update(id: string, body: string, expectedRevision: string): Promise<void>;
   attach(stem: string): Promise<void>;
+  /** The chat's own notes note, kept apart from a person's attached note. */
+  findMemoryNote(): Promise<ChatMemoryNote | null>;
+  setMemoryNote(stem: string): Promise<void>;
 }
 
 /** Writes the notes section's content — usually a model rewriting the whole
@@ -49,7 +54,20 @@ export async function syncChatMemory(
   // duplicate every turn and never attached it (2026-09-17). The pointer
   // stays; the chat's note button self-heals when the user asks for the note.
   if (!note && input.attachedStem) return null;
-  const currentNotes = note ? extractChatNotes(note.body) : null;
+  // A note the chat may not rewrite (a person wrote it, or AI editing is off)
+  // is READ for its notes but never written: the chat keeps its own
+  // chat-made note beside it (2026-09-29). `attachedTo` stays on the person's
+  // note, so the note still lists this chat.
+  let separate = false;
+  let seedNotes: string | null = null;
+  if (note && !note.aiEditable) {
+    seedNotes = extractChatNotes(note.body);
+    const own = await repository.findMemoryNote();
+    if (own && !own.aiEditable) return null; // the person turned it off there too
+    note = own;
+    separate = !own;
+  }
+  const currentNotes = note ? extractChatNotes(note.body) : seedNotes;
 
   let notes: string | null = null;
   if (input.composeNotes) {
@@ -64,7 +82,11 @@ export async function syncChatMemory(
   if (!note) {
     const body = mergeChatMemory("", input.title, input.chatSlug, content);
     note = await repository.create(body);
-    // Only an unattached chat reaches here, and it adopts its memory note.
+    if (separate) {
+      await repository.setMemoryNote(note.stem);
+      return note;
+    }
+    // Otherwise only an unattached chat reaches here, and it adopts its memory note.
     // `attachedTo` is the note→chats link the editor's chat chip lists from;
     // re-pointing an attached chat at a fresh note orphaned it from the note
     // it was opened on (2026-08-01), which is why the attached-but-missing

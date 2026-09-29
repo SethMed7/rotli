@@ -21,3 +21,16 @@ test("with the Librarian pill beside the arrow, the lane is wider and rises soon
   expect(scrollTopClashes(700, 400, true)).toBe(true);
   expect(scrollTopClashes(700, 400, false)).toBe(false);
 });
+
+test("in the Quick Note the compact arrow keeps to its corner beside the bar", () => {
+  const quick = { closest: (selector: string) => (selector === ".quick-window" ? ({} as Element) : null) };
+  const main = { closest: () => null };
+  // 100px either side of a 400px bar: the big arrow's 66px lane fits too
+  expect(scrollTopClashes(600, 400, false, quick)).toBe(false);
+  // 50px either side: the main window's arrow would rise over the text; the
+  // Quick Note's 44px lane still fits beside the bar
+  expect(scrollTopClashes(500, 400, false, main)).toBe(true);
+  expect(scrollTopClashes(500, 400, false, quick)).toBe(false);
+  // narrower still, even the compact arrow rises
+  expect(scrollTopClashes(480, 400, false, quick)).toBe(true);
+});

@@ -12,6 +12,7 @@ import {
   mergeChatMemory,
   pickChatNote,
   sanitizeChatNotes,
+  pickMemoryNote,
 } from "./model";
 
 describe("chat notes model", () => {
@@ -141,5 +142,33 @@ describe("a chat's note among same-title notes (2026-09-17)", () => {
       ]),
     ).toBe("b");
     expect(pickChatNote([])).toBeNull();
+  });
+});
+
+// the pull-request review (2026-09-29): a chat's memoryNote stem can also
+// match an older note titled the same; picking by recency alone let the older
+// person-owned note win on turn 2 and memory stalled for good
+describe("pickMemoryNote", () => {
+  test("the chat's writable note wins even when an older same-titled note is newer", () => {
+    expect(
+      pickMemoryNote([
+        { id: "older-person-note", updatedAt: 200, verdict: "person-written" },
+        { id: "chat-note", updatedAt: 100, verdict: "allowed" },
+      ]),
+    ).toBe("chat-note");
+  });
+
+  test("a chat note turned off stays the answer, so the person's off holds", () => {
+    expect(
+      pickMemoryNote([
+        { id: "older-person-note", updatedAt: 200, verdict: "person-written" },
+        { id: "chat-note", updatedAt: 100, verdict: "revoked" },
+      ]),
+    ).toBe("chat-note");
+  });
+
+  test("a note the person wrote is never the chat's memory note", () => {
+    expect(pickMemoryNote([{ id: "mine", updatedAt: 1, verdict: "person-written" }])).toBeNull();
+    expect(pickMemoryNote([])).toBeNull();
   });
 });

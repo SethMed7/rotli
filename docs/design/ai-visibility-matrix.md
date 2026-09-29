@@ -40,7 +40,9 @@ before. Nothing preloads the whole vault.
 
 | Note class | Frontier / API model | On-device (open-weight) model | The Librarian (organizer) |
 |---|---|---|---|
-| Ordinary note | see + edit | see + edit | may re-file / enrich metadata |
+| Ordinary note an AI made (`created_by: chat\|agent\|librarian`) | see + edit | see + edit | may re-file / enrich metadata |
+| Ordinary note a person wrote (no `created_by`, or any note from before 2026-09-29) | see; edit **only with `ai_edit: true`** | see; edit **only with `ai_edit: true`** | may re-file / enrich metadata (never the text) |
+| `ai_edit: false` on any note | see, **never edit** | see, **never edit** | may re-file / enrich metadata |
 | **Locked** (`locked: true`) | see, **never edit** | see, **never edit** | **always skipped** |
 | **Secure** (`secure: true`) | **never see** (title, snippet, body, hit) | **see** by default; edit allowed unless also locked | **always skipped** |
 | Secure **and** locked | never see | see, never edit | always skipped |
@@ -133,12 +135,12 @@ other is removed, bypassed, or compromised.
 | Search | `corpus_search_ai` | the reference lane only when asked, then **`read_for_ai` per hit, in Rust** — the AI never receives an unfiltered hit list (hardened 2026-08-01) |
 | Map | `corpus_notes_ai` | Notes tree + reference metas, filtered by the same gate before they cross the boundary |
 | Ledger | `secret::remember_secure_text` (fed by the corpus walk) | every secure note's verbatim prose, so an egress seam can refuse it even after the frontmatter was stripped |
-| **AI write** | `corpus_write_ai` → `write_for_ai` | the read gate first, then **locked refusal**, then the ordinary write |
-| Agent write | `write_for_remote_agent` / `move_for_remote_agent` | read gate as remote + locked refusal (unchanged) |
+| **AI write** | `corpus_write_ai` → `write_for_ai_if_revision` | the read gate first, then **locked refusal**, then the **body-edit policy** (`ai_edit_policy.rs`: grant, else AI provenance), then the ordinary write |
+| Agent write | `write_for_remote_agent_if_revision` / `move_for_remote_agent` | read gate as remote + locked refusal + the body-edit policy for text edits; moves stay metadata |
 | Filer write | `filer_writable` | locked + secure refusal (unchanged) |
 | Organizer | `snapshot_note` / `auto_applies` | skips secure and locked (unchanged) |
 | Send | `chat::egress_allowed` | a non-local endpoint refuses secret-shaped, secure-marked, or secure-ECHOING transcripts |
-| CLI send | `provider::cli_complete` | native policy permits only official local Claude Code, Codex, Cursor, and Antigravity (ACP agent) clients, then applies `blocked_for_remote`; provider ids are allowlisted and a model id must be a static `CliSpec.models` entry or one the client itself reported through model discovery (`provider_models.rs`, strict id shape, never a flag), and Cursor additionally uses ACP Ask mode in an empty scratch workspace with client permissions denied; every other provider id is refused before binary lookup |
+| CLI send | `provider::cli_complete` | native policy permits only official local Claude Code, Codex, Cursor, and Antigravity (ACP agent) clients, then applies `blocked_for_remote`; provider ids are allowlisted and a model id must be a static `CliSpec.models` entry or one the client itself reported through model discovery (`provider_models.rs`, strict id shape, never a flag), and Cursor additionally uses ACP Ask mode in an empty scratch workspace with client permissions denied; every other provider id is refused before binary lookup. A desktop Claude chat turn (`claude_session.rs`) applies the same gate to its prompt and then to every tool call's arguments and result, since results no longer re-enter a rescanned prompt |
 | Image send | `provider::generate_image` | provider-backed image generation is unavailable before path, credential, or process work |
 | Organizer send | local MLX by default; opt-in connected lane via `provider_lane::complete_blocking` | a connected Librarian needs two consents, the lane choice and the provider switch, re-derived by Rust every cycle; it rides the same seam and gates as a chat turn, and secure and locked notes are skipped before any prompt exists ([decision](../decisions/2026-09-12-librarian-connected-lane.md)) |
 | Web | `web.rs` `blocked_for_remote` | search queries, fetch URLs, **and `open_url`** never carry protected content |
@@ -158,7 +160,7 @@ gaps it found, and the ones deliberately left open — is
 |---|---|---|
 | Retrieval filter | `aiReadableHits` (`src/ai/host.ts`) | drops any hit the Rust probe did not permit; a failed probe = **nothing readable** |
 | Read | `readNote` / `readMemory` | routes through `corpus_read_ai`; marks the chat's secure taint |
-| Write | `updateNote` (`src/ai/host.ts`) | read gate → **locked refusal** → secure-context laundering rule → strip frontmatter → write |
+| Write | `updateNote` (`src/ai/host.ts`) | read gate → **locked refusal** → **body-edit policy** (`aiBodyEdit`) → secure-context laundering rule → strip frontmatter → write |
 | Chat memory | `syncManagedChatMemory` (`src/chatMemory/composition.ts`) | **locked refusal** before the per-turn note rewrite |
 | Chat memory | `chatSurface.tsx` | a tainted loose chat writes NO memory note |
 | Prior chats | `searchMemory` / `readMemory` | remote models never receive a secret-shaped or `secureContext`-marked transcript |

@@ -190,6 +190,8 @@ fn the_stolen_prose_cannot_leave_by_any_outbound_lane() {
 #[test]
 fn the_stolen_prose_cannot_be_laundered_into_an_open_note() {
     let mut v = hostile_vault();
+    // even with the person's grant, the LAUNDERING rule refuses
+    v.store.set_ai_edit(&v.open_id, true).unwrap();
 
     let err = v
         .store

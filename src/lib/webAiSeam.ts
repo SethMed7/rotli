@@ -18,14 +18,16 @@ export function currentWebAiBridge(): WebAiBridge | null {
 /** The model-facing view of the browser-side vault, with the secure-note law
  * applied by services/webAiCorpus (Rust's job in the app). The wire shapes
  * are lib/tauri's; this seam stays shape-agnostic so it never imports it. */
-export interface WebAiCorpusShape<Meta, Hit, Read, Frontmatter> {
+export interface WebAiCorpusShape<Meta, Hit, Read, Frontmatter, Written> {
   list(): Promise<Meta[]>;
   search(query: string, limit: number | undefined): Promise<Hit[]>;
   read(id: string): Promise<Read>;
   readableIds(ids: string[]): Promise<string[]>;
   frontmatter(id: string): Promise<Frontmatter | null>;
+  /** An AI body write, gated like Rust's corpus_write_ai (2026-09-29). */
+  write(id: string, body: string, expectedRevision: string): Promise<Written>;
 }
-type AnyWebAiCorpus = WebAiCorpusShape<unknown, unknown, unknown, unknown>;
+type AnyWebAiCorpus = WebAiCorpusShape<unknown, unknown, unknown, unknown, unknown>;
 let webAiCorpus: AnyWebAiCorpus | null = null;
 export function registerWebAiCorpus(corpus: AnyWebAiCorpus | null): void {
   webAiCorpus = corpus;

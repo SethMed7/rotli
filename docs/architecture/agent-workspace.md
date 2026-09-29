@@ -66,6 +66,10 @@ maintaining separate file-manipulation implementations.
   frontmatter, and uses the corpus write path so the physical filename follows
   the new title. Prior human selectors remain in `aliases`; note-list results
   expose those aliases while stable `id` remains authoritative.
+- External-agent text edits (`update`, `patch`, `rename`) refuse a note a
+  person wrote unless they turned on "Let AI edit the text"; notes an agent
+  creates carry `created_by: agent` and stay editable (2026-09-29,
+  `docs/decisions/2026-09-29-ai-body-edit-permission.md`).
 - External-agent updates and moves refuse secure and locked notes. Explicit
   user-directed calls may edit or file non-secure `wiki/**` notes through the
   existing filer ownership gate; this is distinct from autonomous organizer

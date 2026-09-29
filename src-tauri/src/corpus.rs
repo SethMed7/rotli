@@ -1375,7 +1375,9 @@ pub(crate) fn field_key(line: &str) -> Option<&str> {
 /// Keys rotli owns directly — the metadata-panel editor touches only OTHER
 /// (foreign) keys; `locked` goes through set_locked, the rest are derived.
 /// v3.7: `owner` promoted to RESERVED (provenance, immutable — not user-editable).
-const RESERVED_KEYS: [&str; 12] = [
+/// 2026-09-29: `created_by` (who made the note) and `ai_edit` (the person's
+/// grant) decide AI body edits — ai_edit_policy.rs; both are Rotli's alone.
+const RESERVED_KEYS: [&str; 14] = [
     "id",
     "created",
     "updated",
@@ -1388,6 +1390,8 @@ const RESERVED_KEYS: [&str; 12] = [
     "local_ai_allowed",
     "owner",
     "view_tag",
+    "created_by",
+    "ai_edit",
 ];
 
 /// The metadata keys the AI FILER owns (contract v3.7). Written ONLY via
@@ -1474,6 +1478,9 @@ pub struct FrontmatterView {
     /// The typed pin fact — floats the note to the top of every list (the list
     /// sort is pinned → updated → id). Toggled from the row menu / a hotkey.
     pub pinned: bool,
+    /// May an AI rewrite this note's text? The ai_edit_policy verdict:
+    /// "allowed" | "locked" | "person-written" | "revoked".
+    pub ai_body_edit: &'static str,
     pub fields: Vec<String>,
 }
 
@@ -1557,7 +1564,15 @@ pub fn raw_frontmatter_block(text: &str) -> &str {
 /// contract v3.7: provenance plus the local-AI permission are not raw-editable.
 /// The permission must flow through its explicit command. Everything else in
 /// the typed block (updated/pinned/locked/secure/shelf/tags/…) lands as typed.
-const RAW_IMMUTABLE_KEYS: [&str; 5] = ["id", "created", "owner", "local_ai_allowed", "view_tag"];
+const RAW_IMMUTABLE_KEYS: [&str; 7] = [
+    "id",
+    "created",
+    "owner",
+    "local_ai_allowed",
+    "view_tag",
+    "created_by",
+    "ai_edit",
+];
 
 /// Rebuild a document from a user-typed raw frontmatter block (the "Show file
 /// metadata" editor). The submitted text is taken VERBATIM — line order,
@@ -3463,6 +3478,7 @@ impl CorpusStore {
             secure,
             local_ai_allowed,
             pinned: fm.pinned.unwrap_or(false),
+            ai_body_edit: crate::ai_edit_policy::body_edit(&fm.foreign).as_str(),
             fields,
         })
     }
@@ -4081,6 +4097,9 @@ impl CorpusStore {
                     .into(),
             );
         }
+        if let Some(refusal) = crate::ai_edit_policy::body_edit(&fm.foreign).refusal() {
+            return Err(refusal.into());
+        }
         // THE LAUNDERING RULE, in Rust (docs/design/ai-visibility-matrix.md T2:
         // "secure content flows only into secure containers"). The TS host has
         // enforced this since PR #4 by tracking the CHAT's secure taint — but a
@@ -4125,6 +4144,9 @@ impl CorpusStore {
                         .into(),
                 );
             }
+            if let Some(refusal) = crate::ai_edit_policy::body_edit(&fm.foreign).refusal() {
+                return Err(refusal.into());
+            }
             let target_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true))
                 || looks_secure(target_body);
             if !target_secure && crate::secret::blocked_for_remote(body) {
@@ -4165,6 +4187,9 @@ impl CorpusStore {
         {
             return Err("note is locked — an external agent may not edit it".into());
         }
+        if let Some(refusal) = crate::ai_edit_policy::body_edit(&fm.foreign).refusal() {
+            return Err(refusal.into());
+        }
         if self.layout == Layout::Memex && (rel == "wiki" || rel.starts_with("wiki/")) {
             self.filer_writable(&rel)?;
         } else {
@@ -4195,6 +4220,9 @@ impl CorpusStore {
                 .any(|line| locked_field(line) == Some(true))
             {
                 return Err("note is locked — an external agent may not edit it".into());
+            }
+            if let Some(refusal) = crate::ai_edit_policy::body_edit(&fm.foreign).refusal() {
+                return Err(refusal.into());
             }
             crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
             let meta = self.write_resolved(id, body, rel.clone())?;
@@ -4275,7 +4303,12 @@ impl CorpusStore {
                 "the new note looks sensitive — a remote agent may not create or retain it".into(),
             );
         }
-        self.create(folder_id, body)
+        self.create_as(
+            folder_id,
+            body,
+            false,
+            Some(crate::ai_edit_policy::Creator::Agent),
+        )
     }
 
     /// First run: the corpus is born with Inbox and ONE warm welcome note.
@@ -5306,6 +5339,7 @@ impl CorpusStore {
         let abs = self.abs(rel);
         let text = fs::read_to_string(&abs).map_err(|e| format!("read {rel}: {e}"))?;
         let (fm, raw) = parse_document(&text);
+        let had_frontmatter = fm.is_some();
         let body = match &fm {
             Some(_) => editor_body(raw),
             None => raw,
@@ -5378,7 +5412,14 @@ impl CorpusStore {
             origin: origin.clone(),
             foreign: old_fm.foreign,
         };
-        let out = compose_document(&fm, &format!("\n{body}"));
+        // A move is metadata-only: everything after the frontmatter fence lands
+        // byte-for-byte as it was (2026-09-29). Only a note that had no
+        // frontmatter gains the one separator line the new block needs.
+        let out = if had_frontmatter {
+            compose_document(&fm, raw)
+        } else {
+            compose_document(&fm, &format!("\n{raw}"))
+        };
 
         // #1 (audit 2026-07, CRITICAL): a SECURE note's `.gitignore` line is its
         // PATH — every move (user move, archive/trash, filer file/undo) must
@@ -5941,6 +5982,19 @@ impl CorpusStore {
         body: &str,
         secure: bool,
     ) -> Result<NoteMeta, String> {
+        self.create_as(folder_id, body, secure, None)
+    }
+
+    /// Create a note, recording which AI made it (`created_by`). `None` is a
+    /// person — the note carries no provenance line and no AI may rewrite its
+    /// body without the person's grant (ai_edit_policy.rs).
+    pub(crate) fn create_as(
+        &mut self,
+        folder_id: &str,
+        body: &str,
+        secure: bool,
+        creator: Option<crate::ai_edit_policy::Creator>,
+    ) -> Result<NoteMeta, String> {
         let secure = secure
             || folder_id == "Secure notes"
             || folder_id.starts_with("Secure notes/")
@@ -5989,6 +6043,9 @@ impl CorpusStore {
         }
         if secure {
             foreign.push("secure: true".to_string());
+        }
+        if let Some(creator) = creator {
+            foreign.push(creator.line());
         }
         let fm = Frontmatter {
             id: Some(id.clone()),
@@ -7987,6 +8044,17 @@ pub fn corpus_set_locked(
     state.route(&root, |s| s.set_locked(&rel, locked))
 }
 
+/// The person's per-note grant for AI body edits (`ai_edit: true|false`).
+#[tauri::command]
+pub fn corpus_set_ai_edit(
+    state: tauri::State<'_, CorpusState>,
+    id: String,
+    allowed: bool,
+) -> Result<(), String> {
+    let (root, rel) = split_root_id(&id);
+    state.route(&root, |s| s.set_ai_edit(&rel, allowed))
+}
+
 /// Toggle the per-note PIN (the typed `pinned` frontmatter fact) — floats the
 /// note to the top of every list. Does not bump `updated`.
 #[tauri::command]
@@ -8354,11 +8422,20 @@ pub fn corpus_create(
     folder_id: String,
     body: String,
     secure: Option<bool>,
+    // "chat" | "agent" | "librarian" when an AI makes the note; absent for a person
+    created_by: Option<String>,
 ) -> Result<NoteMeta, String> {
+    let creator = match created_by.as_deref() {
+        None => None,
+        Some(value) => Some(
+            crate::ai_edit_policy::Creator::parse(value)
+                .ok_or_else(|| format!("unknown note creator \"{value}\""))?,
+        ),
+    };
     let (root, rel) = split_root_id(&folder_id);
     state
         .route(&root, |s| {
-            s.create_with_policy(&rel, &body, secure.unwrap_or(false))
+            s.create_as(&rel, &body, secure.unwrap_or(false), creator)
         })
         .map(|mut m| {
             m = prefix_meta(&root, m);
@@ -8733,9 +8810,19 @@ pub mod rules_store;
 /// The prompt-injection evals — a fully cooperating, fully compromised caller
 /// driven against the real gates. Kept in its own file because it is a
 /// deliverable, not a unit test (docs/architecture/egress-threat-model.md).
+/// The AI edit control on the store: the person's grant (2026-09-29).
+#[path = "corpus_ai_edit.rs"]
+mod ai_edit;
+
 #[cfg(test)]
 #[path = "injection_evals.rs"]
 mod injection_evals;
+
+/// The AI write lane's guarantees (who may rewrite a note's text, LOCKED,
+/// laundering, filing as a metadata-only move) — its own file, 2026-09-29.
+#[cfg(test)]
+#[path = "corpus_ai_write_tests.rs"]
+mod ai_write_tests;
 
 #[cfg(test)]
 mod tests {
@@ -10953,7 +11040,7 @@ mod tests {
 
     /// Write a minimal-but-valid memex.json (a real `mx_` id) at `root`, plus the
     /// spine dirs + control files the scope tests probe.
-    fn seed_memex(root: &Path) {
+    pub(super) fn seed_memex(root: &Path) {
         fs::create_dir_all(root).unwrap();
         fs::write(
             root.join("memex.json"),
@@ -11569,7 +11656,13 @@ mod tests {
 
         // the AGENT edit surface is a VAULT feature, not a Brain feature
         // (pressure-test 2026-07-26: the broad filer_writable gate broke it) —
-        // CLI/MCP edits keep working in a raw vault
+        // CLI/MCP edits keep working in a raw vault — on a person-written
+        // note, once the person grants AI edits (2026-09-29)
+        let refused = store
+            .write_for_remote_agent(&note.id, "# Draft\n\nagent words\n")
+            .unwrap_err();
+        assert!(refused.contains("written by the person"), "{refused}");
+        store.set_ai_edit(&note.id, true).unwrap();
         store
             .write_for_remote_agent(&note.id, "# Draft\n\nagent words\n")
             .unwrap();
@@ -12005,40 +12098,6 @@ mod tests {
         assert!(store.read_for_ai(&open.id, false).is_ok());
     }
 
-    /// LOCKED is an EDIT control, not a visibility one: every class SEES a
-    /// locked note and no class edits it. The user's own write lane is
-    /// untouched — locking protects a note from models, not from its author.
-    #[test]
-    fn locked_notes_are_readable_by_every_model_and_editable_by_none() {
-        let tmp = TempDir::new().unwrap();
-        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
-        store.os_trash = false;
-        let note = store.create("Inbox", "# Plan\n\noriginal body").unwrap();
-        store.set_locked(&note.id, true).unwrap();
-
-        // SEE: both classes
-        assert!(store.read_for_ai(&note.id, true).is_ok());
-        assert!(store.read_for_ai(&note.id, false).is_ok());
-        // EDIT: neither class
-        for local in [true, false] {
-            let err = store
-                .write_for_ai(&note.id, "# Plan\n\nrewritten", local)
-                .unwrap_err();
-            assert!(err.contains("locked"), "{err}");
-        }
-        let rel = store.path_of(&note.id).unwrap();
-        assert!(fs::read_to_string(store.abs(&rel))
-            .unwrap()
-            .contains("original body"));
-        // the human's own save still works
-        assert!(store.write(&note.id, "# Plan\n\nmy own edit").is_ok());
-        // unlocked, an AI write lands
-        store.set_locked(&note.id, false).unwrap();
-        assert!(store
-            .write_for_ai(&note.id, "# Plan\n\nAI edit", true)
-            .is_ok());
-    }
-
     /// AUDIT 2026-08-01, GAP 2 — the compromised-loop shape. The agent loop can
     /// call ANY command: it does not have to use `corpus_read_ai`, whose result
     /// still carries the `secure: true` marker the egress detector looks for.
@@ -12125,48 +12184,6 @@ mod tests {
             store.read_for_ai(&chat.id, true).is_ok(),
             "on-device still reads it"
         );
-    }
-
-    /// AUDIT 2026-08-01, GAP 9 — the laundering rule, in Rust. The TS host has
-    /// enforced "secure content flows only into secure containers" by tracking
-    /// the CHAT's taint, but a chat id is a webview assertion. Rust cannot see
-    /// chats; it CAN see that the incoming body is protected content.
-    #[test]
-    fn write_for_ai_refuses_to_launder_secure_prose_into_an_open_note() {
-        let tmp = TempDir::new().unwrap();
-        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
-        store.os_trash = false;
-        let secret = store
-            .create_with_policy(
-                "Secure notes",
-                "# Wardship\n\nThe wardship stipend renews each Candlemas quarter.",
-                true,
-            )
-            .unwrap();
-        let open = store
-            .create("Inbox", "# Open\n\nnothing sensitive here")
-            .unwrap();
-        store.list().unwrap(); // the walk teaches the ledger
-
-        let laundered = "# Open\n\nThe wardship stipend renews each Candlemas quarter.";
-        // the compromised shape: read secure on-device, write it into an OPEN note
-        let err = store.write_for_ai(&open.id, laundered, true).unwrap_err();
-        assert!(err.contains("secure"), "{err}");
-        let rel = store.path_of(&open.id).unwrap();
-        assert!(
-            fs::read_to_string(store.abs(&rel))
-                .unwrap()
-                .contains("nothing sensitive"),
-            "the open note must be untouched"
-        );
-
-        // the SAME text into a SECURE container is fine — that is the rule, not
-        // a blanket refusal
-        assert!(store.write_for_ai(&secret.id, laundered, true).is_ok());
-        // and an ordinary edit to the open note still lands
-        assert!(store
-            .write_for_ai(&open.id, "# Open\n\nbuy more oats", true)
-            .is_ok());
     }
 
     /// AUDIT 2026-08-01, GAP 7 — a view tag REWRITES frontmatter, so it is an AI
@@ -12257,24 +12274,6 @@ mod tests {
         assert!(crate::secret::blocked_for_remote(
             "the wexford escrow releases on the feast of saint swithin"
         ));
-    }
-
-    /// A secure note is EDITABLE by the class that can see it (secure gates
-    /// visibility, not authorship) and refused to the class that cannot.
-    #[test]
-    fn write_for_ai_follows_the_same_read_gate() {
-        let tmp = TempDir::new().unwrap();
-        let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
-        store.os_trash = false;
-        let note = store
-            .create_with_policy("Secure notes", "# Private\n\nbody", true)
-            .unwrap();
-        assert!(store
-            .write_for_ai(&note.id, "# Private\n\nremote edit", false)
-            .is_err());
-        assert!(store
-            .write_for_ai(&note.id, "# Private\n\nlocal edit", true)
-            .is_ok());
     }
 
     /// #22 (audit 2026-07): set_field is the USER lane — it must refuse the AI

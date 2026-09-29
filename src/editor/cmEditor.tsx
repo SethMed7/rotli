@@ -38,6 +38,7 @@ import {
   registerEditor,
   unregisterEditor,
 } from "./commands";
+import { continueListFromPicker } from "./continueList";
 import { copyHandlers } from "./copyHandlers";
 import { emptyPlaceholder } from "./emptyPlaceholder";
 import { importImagePathsAtPosition, isEmbeddablePath } from "./externalImageDrop";
@@ -67,7 +68,7 @@ import {
 import { openSlashPanel } from "./slashPanels";
 import { SlashPicker } from "./slashPicker";
 import { tableRender } from "./tableRender";
-import { insertTemplateFromPicker } from "./templateInsert";
+import { insertTemplateFromPicker, noteIsTemplateNow } from "./templateInsert";
 import { useWikilinkIndex } from "./useWikilinkIndex";
 import { vendorKeymap } from "./vendorKeymap";
 import { buildTitleCounts, wikilinkLabel } from "./wikilink";
@@ -383,17 +384,12 @@ function CmEditorImpl({
       if (!view || picker == null) return;
       const at = picker.insertAt;
       if (mode === "insertTemplate") return insertTemplateFromPicker(view, note.id, picker, setPicker);
-      let insert: string;
-      let caret: number;
-      if (mode === "linkNote" || mode === "linkChat") {
-        const label = wikilinkLabel(note, buildTitleCounts(linkable));
-        insert = `[[${label}]]`;
-        caret = insert.length;
-      } else {
-        insert = pickerFence(mode, note.id);
-        caret = insert.length;
-      }
-      ({ insert, caret } = adaptSlashInsertion(insert, caret, picker.continuation));
+      if (mode === "continueList") return continueListFromPicker(view, note, picker, setPicker);
+      const text =
+        mode === "linkNote" || mode === "linkChat"
+          ? `[[${wikilinkLabel(note, buildTitleCounts(linkable))}]]`
+          : pickerFence(mode, note.id);
+      const { insert, caret } = adaptSlashInsertion(text, text.length, picker.continuation);
       view.dispatch({
         changes: { from: at, to: at, insert },
         selection: EditorSelection.cursor(at + caret),
@@ -481,7 +477,7 @@ function CmEditorImpl({
           openPicker(item.op.mode, contentFrom, span.continuation, left, top, up);
         return;
       }
-      const insertion = slashInsertion(item.op);
+      const insertion = slashInsertion(item.op, { template: noteIsTemplateNow(noteId) });
       if (!insertion) return;
       const adapted = adaptSlashInsertion(insertion.insert, insertion.caret, span.continuation);
       view.dispatch({
@@ -857,7 +853,11 @@ function CmEditorImpl({
             selectedIndex={picker.index}
             onHover={(i) => setPicker((p) => (p ? { ...p, index: i } : p))}
             onPick={(note) => pickPicker(picker.mode, note)}
-            onClose={() => setPicker(null)}
+            onClose={(refocus) => {
+              setPicker(null);
+              if (refocus) viewRef.current?.focus();
+            }}
+            hostNoteId={noteId}
           />
         </div>
       )}

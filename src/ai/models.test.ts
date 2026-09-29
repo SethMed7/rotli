@@ -409,7 +409,7 @@ describe("the frontier/local split (budget + adapter)", () => {
       scratch: [],
       maxSteps: 8,
     });
-    expect(prompt).toContain('{"thought":"…","tool":"search_notes"');
+    expect(prompt).toContain('{"tool":"search_notes"');
     expect(prompt).toContain("EXACTLY ONE JSON object");
     expect(prompt).toContain("The web is OFF");
     expect(prompt).not.toContain("web_search"); // web off ⇒ the tools aren't offered

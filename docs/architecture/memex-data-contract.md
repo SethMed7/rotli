@@ -42,14 +42,12 @@ second user-visible product or storage location.
   filter. A chat created while a view is active joins it.
 - **Web-search destination is an explicit vault setting.**
   `.rotli/settings.json` stores only `webSearchProvider` (`duckduckgo` by
-  default, or `brave`); it never stores an API key. The per-chat globe remains
-  the consent bit for whether that chat may use the network and is not a
-  provider selector. It stays offered for every lane: frontier CLIs run
-  tool-less inside Rotli, so the globe is their only web path, and a chat never
-  turns it on by itself. With it off, a frontier lane still answers general
-  questions from the model's own knowledge and mentions the globe only when an
-  answer depends on live data; the on-device lane says it can't confirm
-  outside-world facts. Brave credentials live under Rotli's allowlisted macOS
+  default, or `brave`); it never stores an API key. Connected models (Claude,
+  Codex, Cursor, Antigravity) always have Rotli's web tools, as they would in
+  a terminal (the owner, 2026-09-29). The per-chat globe is the on-device
+  model's switch alone: with it off, the on-device lane says it can't confirm
+  outside-world facts. It is not a provider selector, and a secure chat (or a
+  turn with secure content attached) has no web for any model. Brave credentials live under Rotli's allowlisted macOS
   Keychain account, while search execution and provider failure policy remain
   application/adapter concerns outside the vault contract.
 - **Breve stays inside the active vault.** Its portable routine configuration
@@ -362,7 +360,8 @@ second user-visible product or storage location.
   there; the folder name is pinned TS↔Rust in `scripts/fixtures/parity.json`.
   Agents reach templates as ordinary notes; there is no template verb.
 - Every new vault starts with a **Welcome** folder in Main: the root welcome
-  note first, then nine lessons. `src/assets/welcome.json` is the one catalog;
+  note first, then three lessons (Writing; Organizing and finding; AI and
+  privacy — nine until 2026-09-29). `src/assets/welcome.json` is the one catalog;
   its first entry is the welcome note body the scaffold writes, and the rest
   are ordinary Markdown notes in the vault (`wiki/Welcome/` in a memex layout,
   `Welcome/` in a plain notes folder). They open from the left menu in the
@@ -502,8 +501,20 @@ The Rust corpus boundary independently validates every write.
   Undo moves it to the Trash. A person who already has a note is never changed
   without the person's yes, and then only in its tags and where it is filed;
   its words are never edited.
-- Unknown frontmatter is preserved byte-for-byte. Reserved provenance cannot be
-  forged through the raw metadata editor.
+- **Who may rewrite a note's text (2026-09-29,
+  `docs/decisions/2026-09-29-ai-body-edit-permission.md`).** Rotli stamps
+  `created_by: chat | agent | librarian` once when an AI makes a note; a note
+  a person writes carries no such line, and neither does any note from before
+  this rule. `ai_edit: true | false` is the person's grant, written only from
+  the note menu. An AI may rewrite a note's body only when the note is not
+  locked and either the grant is `true` or, with no grant, `created_by` names
+  an AI. Rust enforces it at every AI body-write seam; `ai_edit_policy.rs` and
+  `src/lib/aiEditPolicy.ts` are twins pinned by the parity fixture. Metadata
+  and filing are not body edits: filing moves the file and writes every byte
+  after the frontmatter fence unchanged.
+- Unknown frontmatter is preserved byte-for-byte. Reserved provenance
+  (including `created_by`) and the `ai_edit` grant cannot be forged through
+  the raw metadata editor.
 - Boards and binary files never receive Markdown frontmatter.
 - The metadata surface derives and displays the canonical absolute file path
   from the corpus router. Paths are never copied into editable frontmatter,
@@ -702,6 +713,12 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   `local_ai_allowed` line overrides the vault knob in either direction. No knob
   exists, or will exist, that opens a secure note to a remote model. A frontier
   provider behind a localhost proxy still fails this gate.
+- **A person's note refuses AI body edits without their grant** (2026-09-29):
+  the same seams as `locked` below, in both layers, with Rotli Web running the
+  TypeScript twin itself. A chat attached to such a note keeps its
+  conversation notes in a chat-made note of its own (`memoryNote:` on the
+  chat file) and only reads the person's note. A memory note from before
+  provenance existed is treated the same way; Rotli never claims one.
 - **`locked: true` refuses every AI edit** — interactive chat (`update_note`),
   the per-turn chat-memory sync, the headless workspace agents, and the
   organizer. Both layers enforce it: TypeScript fails fast and Rust refuses

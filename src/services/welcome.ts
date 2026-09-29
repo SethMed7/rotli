@@ -1,6 +1,6 @@
 import { WELCOME_CATALOG, WELCOME_LESSONS } from "../editor/welcomeLessons";
 // The Welcome folder: a preseeded folder in Main holding the root welcome note
-// and nine lessons as ordinary notes ("a preseeded folder, that's it — it uses
+// and three lessons as ordinary notes ("a preseeded folder, that's it — it uses
 // the left menu and is in main view"). Seeding happens only when a vault is
 // created and on the explicit Settings action; opening an existing vault never
 // writes.

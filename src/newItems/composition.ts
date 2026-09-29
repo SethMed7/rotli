@@ -178,7 +178,14 @@ const presenter: NewItemPresenter = {
 
 export async function createManagedItem(
   kind: NewItemKind,
-  options: { newTab?: boolean; open?: boolean; name?: string; pendingTabId?: string } = {},
+  options: {
+    newTab?: boolean;
+    open?: boolean;
+    name?: string;
+    pendingTabId?: string;
+    /** Where it files in Main, read before the caller changed the focused tab. */
+    filing?: FilingContext;
+  } = {},
 ): Promise<CreatedItem> {
   refuseWithheldKind(kind);
   const name = options.name?.trim() ?? "";
@@ -199,7 +206,7 @@ export async function createManagedItem(
             },
           }
         : creator;
-  const filingContext = currentFilingContext();
+  const filingContext = options.filing ?? currentFilingContext();
   let pendingNotePrepared = false;
   let abandonedBlankMarkdown = false;
   let deferBlankMarkdownFiling = false;
@@ -346,6 +353,10 @@ export function refuseWithheldKind(kind: NewItemKind): void {
  * start the durable creator. Resolution retargets that exact tab; refresh and
  * Main/view filing remain background work. */
 export function createManagedItemInTabOptimistically(kind: Exclude<NewItemKind, NameFirstKind>): void {
+  // read where the note belongs BEFORE its placeholder tab takes focus: the
+  // note that was open decides the Main folder (the owner, 2026-09-29: "cmd+t
+  // should keep the file inside the folder I am in")
+  const filing = currentFilingContext();
   const panes = usePanesStore.getState();
   const pendingNote = kind === "markdown" || kind === "mermaid";
   const pending = panes.openPendingItemTab(
@@ -355,7 +366,7 @@ export function createManagedItemInTabOptimistically(kind: Exclude<NewItemKind, 
   if (pendingNote) {
     ensurePendingDocument(pendingNoteDocumentId(pending.tabId), initialMarkdownBody(kind));
   }
-  void createManagedItem(kind, { newTab: true, pendingTabId: pending.tabId }).catch((error) => {
+  void createManagedItem(kind, { newTab: true, pendingTabId: pending.tabId, filing }).catch((error) => {
     // Remove only the placeholder this operation owns, wherever a tab drag may
     // have moved it. If the user already closed it, there is nothing to do.
     const latest = usePanesStore.getState();

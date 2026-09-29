@@ -12,6 +12,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Dates from the slash menu.** Type `/today`, `/yesterday`, or `/tomorrow`
+  to write the date into a note, even in the middle of a sentence. In a
+  template, the same commands leave a placeholder, so a daily template shows
+  the day you use it rather than the day you wrote it.
+- **Continue a project list.** A new Function command: pick a note that holds
+  a project's tasks, such as "Bug fixes". While any of its tasks is open, Rotli
+  links that note. Once they are all done, it starts the next note in the
+  series ("Bug fixes 4"), linked back to the last one and filed beside it, and
+  links that instead.
+- **Link note can make the note.** Type a title that doesn't exist yet and
+  choose **Create** to make that note and link it in one step.
+
+- **Settings comes alive.** Every Settings pane now opens on a banner in your
+  theme's scenery with your quokka in it, holding something for that pane: a
+  signpost for General, keycaps for Keybindings, a palette and easel for
+  Appearance, books for the Librarian, a shield for Security, sparkles for AI
+  Models, the lighthouse for About, and more. It changes with your theme,
+  light and dark.
 - **A scene when every tab is closed.** The empty pane now shows a small scene
   that matches your theme, with your own quokka in it: Rottnest's lighthouse
   at golden hour, a writing desk, low tide, the gum trees, an iris field at
@@ -21,6 +39,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A shorter Welcome tutorial.** A new vault's Welcome folder now holds three
+  lessons instead of nine: **Writing** (formatting, tasks, results, choices,
+  switches, tables, code), **Organizing and finding** (links, views, files),
+  and **AI and privacy**, with the launch checklist folded into the welcome
+  note. A vault that already has the old lessons keeps them.
+- **Connected models always have the web.** Claude, Codex, Cursor and
+  Antigravity can search and read the web in every chat, the way they can in
+  a terminal, with no globe to turn on. The globe now matters only for the
+  on-device model. A secure chat still has no web for any model, and searches
+  still go through the provider you chose in Settings → Connections.
+- **Claude chat talks to Claude Code the way T3 Code and the Agent SDK do.**
+  A Claude turn is now one Claude Code session that calls Rotli's tools
+  directly, instead of a new process per step that wrote its tool calls as
+  JSON text. Rotli still decides every tool call: Claude Code's own tools stay
+  off, and each tool's input and output pass the same secret and secure-note
+  checks as before. Image turns, presets, and the other models work as they
+  did. ([ADR](docs/decisions/2026-09-28-claude-native-agent-protocol.md))
 - **Rename in place.** Rename… on a folder or note in the sidebar now edits
   its row where it sits, the way a code editor renames a file: the field is
   the row's own size, a folder's notes stay in view below it, Enter saves and
@@ -29,8 +64,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Rename dialog. Renaming a folder used to hide everything inside it while you
   typed.
 
+- **AI no longer rewrites notes you wrote.** Chat, agents and the Librarian
+  may change the text of a note an AI made, but a note you wrote (every
+  note from before this release included) stays yours until you turn on
+  **Let AI edit the text** in its menu. Lock still blocks everything. Rotli
+  now records which AI made a note, and a chat attached to one of your notes
+  keeps its conversation notes in a note of its own instead of writing into
+  yours. Filing a note moves it into its area without changing a character
+  of its text.
+
 ### Fixed
 
+- The slash menu and its pickers now scroll with the arrow keys, so the
+  highlighted row never sits out of sight. Pickers have a × to close them,
+  and closing one with Esc or the × puts your cursor back in the note.
+
+- **A new tab's note stays in the folder you're in.** With a note from a Main
+  folder open, ⌘T (or the tab strip's +) used to file the new note at the top
+  of Main, because the new tab had already taken focus when Rotli looked for
+  the folder. It now lands in the same folder as the note you were in.
+- **A slash command's panel closes when you click away.** After choosing an
+  Insert item that opens a panel (Link note, Link chat, Template, Board,
+  Sheet, Document, Generate image), clicking back into the note or pressing
+  Escape now closes it; before, it stayed on screen.
+- **The Quick Note's scroll-to-top arrow is small and out of the way.** In the
+  Quick Note window the big arrow rose over your text beside the format bar;
+  it's now a compact button tucked into the corner beside the bar.
 - **Claude models show their names again.** The model picker listed Claude
   Code's models by their descriptions ("For complex work and everyday tasks",
   "For your toughest challenges") instead of their names, because the current
@@ -38,6 +97,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Claude Opus 5.5", "Claude Fable 5.1", "Claude Haiku 4.5" again, and older
   Claude Code versions still work. Rotli Web gets the fix with the next Rotli
   Helper.
+- **Claude stops refusing ordinary chats.** Rotli asked connected models to
+  write their reasoning into every reply and then fed it back on the next step,
+  the pattern Claude's safeguards flag as reasoning extraction. Claude, Codex
+  and the other connected models now get only the tools, the rules and what
+  each step found; they reason on their own. The on-device model keeps its
+  short checkpoints. A reply that failed (a ⚠ notice) and the message it
+  answered are no longer sent back to the model, so one blocked turn can't
+  keep blocking the rest of the chat. When Claude's safety filter does block
+  a reply, the chat says so in one plain sentence instead of the raw API
+  error, and Rotli doesn't retry on its own, because a blocked request still
+  counts toward your plan.
+- **Chat can read links into apps that route after "#".** A link like
+  studio.rotli.co/#/piece/… only ever fetched the app's empty "Loading…"
+  page, because nothing after "#" reaches the server. Rotli now also tries
+  that route as a page on the same site and reads whichever says more.
+- **An attached image stays in view for the whole reply.** A model that
+  looked something up first used to lose the picture and answer "I couldn't
+  see the image"; the image now rides every step of the turn.
+- **A link no longer makes Rotli ask which format you want.** "Write me a
+  bio" next to a Google Docs link used to trigger the Word-or-Markdown
+  question, because "document" appeared in the URL.
+- **Chat messages no longer disappear.** An error reply now stays in the chat
+  after a reload instead of living only on screen. A reply that arrived while
+  Rotli was still saving a new chat's details could lose the race and vanish;
+  it now re-reads the chat and saves again.
+- **Chat says when a web page couldn't be read.** Some pages draw everything
+  with JavaScript, so a fetch only gets an empty shell ("Loading…"). When
+  neither the page nor its #-route yields more than that shell, the model is
+  told so and says it couldn't read the page instead of reviewing a blank one.
 
 ## [1.6.0] - 2026-09-28
 

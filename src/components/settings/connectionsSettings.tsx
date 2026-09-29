@@ -44,7 +44,8 @@ function WebResearchSection({ braveKeyRow }: { braveKeyRow: ReactNode }) {
     <section className="aisection">
       <h4 className="set-subhead">Web research</h4>
       <p className="setnote">
-        The globe turns web access on for a chat. This setting picks where its searches go.
+        Connected models always have web access; for the on-device model, the globe turns it on for a chat.
+        This setting picks where searches go.
       </p>
       <fieldset className="websearch-options">
         <legend className="websearch-legend">Search provider</legend>

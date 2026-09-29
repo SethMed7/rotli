@@ -2,8 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { gotoApp } from "./support";
 
-const ROW =
-  /^(Welcome to Rotli|Writing and formatting|Tasks and progress|Choices and toggles|Tables and code|Links and finding|Main and named views|Files and attachments|AI and privacy|Your launch checklist)$/;
+const ROW = /^(Welcome to Rotli|Writing|Organizing and finding|AI and privacy)$/;
 
 test("Settings → Open welcome folder seeds one Welcome folder in Main and opens the welcome note", async ({
   page,
@@ -20,7 +19,7 @@ test("Settings → Open welcome folder seeds one Welcome folder in Main and open
   await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
   await expect(folder).toHaveCount(1);
   if ((await folder.getAttribute("aria-expanded")) !== "true") await folder.click();
-  await expect(rows).toHaveCount(10);
+  await expect(rows).toHaveCount(4);
   await expect(rows.first()).toHaveText("Welcome to Rotli");
 
   // a second run adds nothing and duplicates nothing
@@ -28,7 +27,7 @@ test("Settings → Open welcome folder seeds one Welcome folder in Main and open
   await page.getByRole("button", { name: "Open welcome folder", exact: true }).click();
   await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
   await expect(folder).toHaveCount(1);
-  await expect(rows).toHaveCount(10);
+  await expect(rows).toHaveCount(4);
 
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Location", exact: true }).click();

@@ -133,12 +133,15 @@ describe("listChatsForNote", () => {
           stem: "chat-about-fish-audio-vs-elevenlabs",
           body,
           revision: "r1",
+          aiEditable: true,
         }),
         update: async () => {},
         attach: async (stem) => {
           const chat = chats.find((c) => c.slug === slug);
           if (chat) chat.attachedTo = stem;
         },
+        findMemoryNote: async () => null,
+        setMemoryNote: async () => {},
       },
       {
         title: "Chat about Fish Audio vs ElevenLabs",

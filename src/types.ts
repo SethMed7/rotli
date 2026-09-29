@@ -1,3 +1,5 @@
+import type { AiBodyEdit } from "./lib/aiEditPolicy";
+
 // Core domain + layout types for the notes surface.
 // Tabs are typed from day one (r2 chat-on-note locks): panes host *surfaces*,
 // and the surfaceKind union grows ('chat', …) without touching the pane tree.
@@ -46,6 +48,12 @@ export interface NoteSummary {
    * shown to a remote model. Set by adapters that read the file themselves
    * (folder mode, the in-memory twin); the Rust adapter enforces it in Rust. */
   secure?: boolean;
+  /** `locked: true` in the file's frontmatter — set by adapters that read the
+   * file themselves (Rotli Web); the Rust adapter enforces it in Rust. */
+  locked?: boolean;
+  /** May an AI rewrite this note's text (src/lib/aiEditPolicy.ts)? Set by the
+   * same self-reading adapters; absent reads as person-written. */
+  aiBodyEdit?: AiBodyEdit;
 }
 
 export interface Note extends NoteSummary {

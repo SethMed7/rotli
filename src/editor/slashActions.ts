@@ -1,5 +1,6 @@
+import { dateFor, dateToken, expandDateTokens, noteDateText } from "../lib/noteDates";
 import { applyBlockToggle, applyHeading } from "./commands";
-import type { SlashOp, SlashPickerMode } from "./slashMenu";
+import type { SlashOp, SlashPickerMode } from "./slashTypes";
 import { cellSpansOf, insertTableText } from "./tables";
 
 export interface SlashInsertion {
@@ -21,8 +22,18 @@ export function opensFlow(op: SlashOp): op is FlowOp {
 /** Canonical scaffold for every immediate slash command. Picker commands — and
  * image attachment/generation — which open a picker/popover first —
  * intentionally return null. */
-export function slashInsertion(op: SlashOp): SlashInsertion | null {
+export function slashInsertion(
+  op: SlashOp,
+  context: { template?: boolean; now?: Date } = {},
+): SlashInsertion | null {
   if (opensFlow(op)) return null;
+  if (op.kind === "date") {
+    // in a template, a placeholder: the date is the day the template is used
+    const insert = context.template
+      ? dateToken(op.word)
+      : noteDateText(dateFor(op.word, context.now ?? new Date()));
+    return { insert, caret: insert.length };
+  }
   if (op.kind === "code") return { insert: "``", caret: 1 };
   if (op.kind === "table") {
     const insert = insertTableText(3, 2);
@@ -49,7 +60,7 @@ export function slashInsertion(op: SlashOp): SlashInsertion | null {
 }
 
 export function pickerFence(
-  mode: Exclude<SlashPickerMode, "linkNote" | "linkChat" | "insertTemplate">,
+  mode: Exclude<SlashPickerMode, "linkNote" | "linkChat" | "insertTemplate" | "continueList">,
   fileId: string,
 ): string {
   const lang = mode === "embedBoard" ? "board" : mode === "embedSheet" ? "sheet" : "document";
@@ -63,8 +74,9 @@ export function pickerFence(
  * its title, so carrying it in could retitle and rename the host. Bodies
  * arrive frontmatter-free from every adapter; a stray leading fence is skipped
  * anyway, because frontmatter is Rotli's to own. */
-export function templateInsertion(body: string, hostIsEmpty: boolean): string {
+export function templateInsertion(body: string, hostIsEmpty: boolean, now: Date = new Date()): string {
   let text = body.replace(/^\uFEFF?---\n[\s\S]*?\n---\n?/, "");
   if (!hostIsEmpty) text = text.replace(/^\s*# [^\n]*(?:\n|$)/, "");
-  return text.trim();
+  // {{today}} and friends become the dates of the day the template is used
+  return expandDateTokens(text.trim(), now);
 }

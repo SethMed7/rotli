@@ -27,11 +27,14 @@ import {
 import { createPortal } from "react-dom";
 
 import { attributedConsultReply, parseConsultMention, resolveConsultModel } from "../../ai/chatProvider";
-import { modelIsOnDevice } from "../../ai/guard";
+import { modelIsOnDevice, webForTurn } from "../../ai/guard";
 import { type HostArtifactKind, makeTauriHost } from "../../ai/host";
 import { presetFor, runHybrid } from "../../ai/hybrid";
 import { runAgent } from "../../ai/loop";
+import { modelErrorText } from "../../ai/modelError";
 import { type ModelGroups, findModel, flattenModels, mergedModels } from "../../ai/models";
+import { runNativeAgent } from "../../ai/nativeLoop";
+import { withoutFailedExchanges } from "../../ai/prompt";
 import type { AgentQuestion, ChatTurn, RunInput } from "../../ai/types";
 import { resolveChatNoteId, syncManagedChatMemory } from "../../chatMemory/composition";
 import {
@@ -48,6 +51,7 @@ import {
   projectChatWorkItems,
   visibleChatText,
 } from "../../lib/chatWork";
+import { claudeSession } from "../../lib/claudeSession";
 import { PLATFORM } from "../../lib/featurePolicy";
 import { extOf, fileName, imageMimeOf } from "../../lib/fileKind";
 import { useAnchoredPopoverBox, useTransientPopover } from "../../lib/popover";
@@ -572,6 +576,7 @@ function ReasoningPicker({
 function ComposerAddMenu({
   web,
   webDisabled,
+  webIsAChoice,
   hasImages,
   canVision,
   onAttach,
@@ -579,6 +584,8 @@ function ComposerAddMenu({
 }: {
   web: boolean;
   webDisabled: boolean;
+  /** Only an on-device model's web is a switch; connected models always have it. */
+  webIsAChoice: boolean;
   hasImages: boolean;
   canVision: boolean;
   onAttach: () => void;
@@ -603,7 +610,11 @@ function ComposerAddMenu({
       <button
         ref={anchorRef}
         type="button"
-        className={open || web || hasImages ? "chat-tool chat-add-trigger on" : "chat-tool chat-add-trigger"}
+        className={
+          open || (web && webIsAChoice) || hasImages
+            ? "chat-tool chat-add-trigger on"
+            : "chat-tool chat-add-trigger"
+        }
         aria-label="Add files or web search"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -664,7 +675,7 @@ function ComposerAddMenu({
               type="button"
               role="menuitemcheckbox"
               aria-checked={web}
-              disabled={webDisabled}
+              disabled={webDisabled || !webIsAChoice}
               onClick={() => {
                 setOpen(false);
                 onToggleWeb();
@@ -675,7 +686,11 @@ function ComposerAddMenu({
               </span>
               <span>
                 <strong>Web search</strong>
-                {webDisabled && <small>Unavailable after secure content enters the chat</small>}
+                {webDisabled ? (
+                  <small>Unavailable after secure content enters the chat</small>
+                ) : (
+                  !webIsAChoice && <small>Always on for connected models</small>
+                )}
               </span>
               {web && <CheckGlyph size={14} />}
             </button>
@@ -1319,6 +1334,11 @@ export function ChatSurface({
   // The model map above rides the very same key.
   const webKey = chatKeyId;
   const globeOn = secureChat ? false : (chatWeb[webKey] ?? false);
+  // Connected models reach the web as they would in a terminal (the owner,
+  // 2026-09-29): the globe is the on-device model's switch alone. A secure
+  // chat still has no web for anyone.
+  const pickedOnDevice = picked ? modelIsOnDevice(picked) : false;
+  const webOn = webForTurn({ secure: secureChat, onDevice: pickedOnDevice, globe: globeOn });
   // per-chat measure rides the same key; missing = the tuned comfort column
   const measure: Measure = chatMeasure[webKey] ?? "comfort";
   // image attach is gated on the picked model's vision capability
@@ -1686,7 +1706,11 @@ export function ChatSurface({
     const runInput: RunInput = {
       history,
       userText: providerUserText,
-      web: attachedSecure ? false : globeOn,
+      web: webForTurn({
+        secure: attachedSecure || secureChat,
+        onDevice: modelIsOnDevice(turnModel),
+        globe: globeOn,
+      }),
       model,
       ...(attachedNoteId ? { noteId: attachedNoteId } : {}),
       ...(imgs.length > 0 ? { images: imgs.map((image) => image.src) } : {}),
@@ -1749,9 +1773,18 @@ export function ChatSurface({
       },
     };
     const hostOpts = baseOpts;
+    // Claude on the desktop speaks its native agent protocol (nativeLoop.ts);
+    // image turns, presets, and every other lane keep the JSON loop
+    const native = !preset && isTauri() && turnModel.provider === "claude" && imgs.length === 0;
     const events = preset
       ? runHybrid(preset, modelList, runInput, (m, o) => makeTauriHost(m, { ...hostOpts, ...o }), requestId)
-      : runAgent(makeTauriHost(turnModel, hostOpts), runInput);
+      : native
+        ? runNativeAgent(makeTauriHost(turnModel, hostOpts), claudeSession(requestId), runInput, {
+            modelId: turnModel.id,
+            ...(baseOpts.reasoningEffort ? { reasoningEffort: baseOpts.reasoningEffort } : {}),
+            isSecureContext,
+          })
+        : runAgent(makeTauriHost(turnModel, hostOpts), runInput);
 
     let reply = "";
     let questionAfterRun: AgentQuestion | null = null;
@@ -1772,7 +1805,7 @@ export function ChatSurface({
         } else if (ev.type === "final") reply = ev.text;
       }
     } catch (e) {
-      reply = `⚠ ${(e as Error)?.message ?? "the model failed"}`;
+      reply = `⚠ ${modelErrorText((e as Error)?.message ?? "the model failed")}`;
     }
     if (runSeq.current !== myRun) return; // stopped mid-generation — the reply lands nowhere
     requestRef.current = null;
@@ -1803,10 +1836,33 @@ export function ChatSurface({
     }
     // the answer is IN — settle the sidebar signal now (not after the slower
     // persistence + note-memory pass): watched clears, unwatched flips unread.
-    // A failed turn always clears — its ⚠ only lives in this mounted session,
-    // so an unread badge would point at nothing.
+    // A failed turn always clears: an unread badge for an error helps no one.
     useChatRuns.getState().settleRun(runKey, failed || aliveRef.current);
-    if (failed) return; // a failed REPLY isn't persisted (the sent user turn already is)
+    if (failed) {
+      // A failed reply is still a message — it persists like any other turn so
+      // nothing vanishes on reload (2026-09-29), but it never feeds the memory
+      // note or chat naming, and answeredHistory keeps it from the model.
+      if (!sentSlug) return; // the send-time create failed; saveErr already says so
+      try {
+        await write.mutateAsync({
+          instance: active,
+          existingSlug: sentSlug,
+          title: chats.data?.find((c) => c.slug === sentSlug)?.title ?? sentTitle,
+          messages: sentPersisted
+            ? [{ speaker: "rotli", text: reply, at: assistantAt }]
+            : [
+                { speaker: "you", text: userText, at: userAt },
+                { speaker: "rotli", text: reply, at: assistantAt },
+              ],
+          secureContext: secureReadRef.current || attachedSecure,
+        });
+        ownPersistRef.current = useChatRuns.getState().markPersisted(runKey);
+        setSaveErr(null);
+      } catch (e) {
+        setSaveErr(e instanceof Error ? e.message : String(e));
+      }
+      return;
+    }
 
     // persist the assistant turn to chats/<slug>.md (the user turn landed at
     // send time; when THAT write failed, this fallback writes both)
@@ -1815,7 +1871,9 @@ export function ChatSurface({
       { speaker: "rotli", text: reply, at: assistantAt },
     ];
     const diskTurn: Msg[] = sentPersisted ? [{ speaker: "rotli", text: reply, at: assistantAt }] : turn;
-    const memoryTurns = [...messages, ...turn];
+    // a failed exchange (the ⚠ notice AND the turn it answered) never reaches
+    // the notes model — a replayed safeguard error re-trips the safeguard
+    const memoryTurns = withoutFailedExchanges([...messages, ...turn], (m) => m.speaker === "rotli");
     // the notes-keeping model: the same pick as the chat rewrites the attached
     // note's "Conversation notes" each turn (a preset routes per-leg, so it
     // falls back to the deterministic topics digest instead)
@@ -2631,8 +2689,9 @@ export function ChatSurface({
                       />
                       <div className="chat-box-foot">
                         <ComposerAddMenu
-                          web={globeOn}
+                          web={webOn}
                           webDisabled={secureChat}
+                          webIsAChoice={pickedOnDevice}
                           hasImages={images.length > 0}
                           canVision={canVision}
                           onAttach={onAttachClick}
