@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Settings comes alive.** Every Settings pane now opens on a banner in your
+  theme's scenery with your quokka in it, holding something for that pane: a
+  signpost for General, keycaps for Keybindings, a palette and easel for
+  Appearance, books for the Librarian, a shield for Security, sparkles for AI
+  Models, the lighthouse for About, and more. It changes with your theme,
+  light and dark.
 - **A scene when every tab is closed.** The empty pane now shows a small scene
   that matches your theme, with your own quokka in it: Rottnest's lighthouse
   at golden hour, a writing desk, low tide, the gum trees, an iris field at

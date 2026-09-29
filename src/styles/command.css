@@ -571,11 +571,59 @@
   flex-direction: column;
   gap: 1px;
 }
+/* the Settings page is one scene (2026-09-29): a wash of the theme's sky
+   at the top fading to the surface, the scenery (settings/settingsBanner.tsx
+   SettingsScenery) pinned behind, and the scrolling rows over it */
+.set-stage {
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--accent) 7%, var(--surface)) 0,
+    var(--surface) 55%
+  );
+}
+.set-scenery {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+/* a few ambient marks in the page's right margin, mid-height, where they
+   never meet the banner or the rows (wide windows only) */
+.set-scenery-sky {
+  position: absolute;
+  top: 34%;
+  right: 0;
+  width: 220px;
+  height: auto;
+  opacity: 0.6;
+}
+@media (max-width: 1100px) {
+  .set-scenery-sky {
+    display: none;
+  }
+}
+.set-scenery-horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 150px;
+  opacity: 0.32;
+  /* the scenery rises out of the page instead of starting at a line */
+  mask-image: linear-gradient(to bottom, transparent, black 60%);
+}
 .set-main {
+  position: relative;
   flex: 1;
   min-width: 0;
-  background: var(--surface);
-  padding: 30px 38px;
+  background: transparent;
+  padding: 30px 38px 150px;
   overflow-y: auto;
 }
 .set-main h3 {
@@ -584,23 +632,54 @@
   font-size: 19px;
   margin-bottom: 4px;
 }
-/* a settings pane heading with its quokka character accent (the maintainer, 2026-06-26):
-   the title on the left, a small semantic line-art quokka at the top-right — a
-   quiet flourish with full-strength muted ink, never a faded multi-layer image. */
-.set-panehead {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+/* a settings pane's heading banner (settings/settingsBanner.tsx, 2026-09-29):
+   the theme's scenery and the pane's motif (the `.sc-*` scene classes in
+   app.css), the person's quokka standing at 62%, the title on the calm left.
+   The sky is a breath of the theme's accent so the scene's own surfaces read. */
+.set-banner {
+  position: relative;
+  width: 100%;
+  /* the Settings content measure: the banner is as wide as the rows below */
+  max-width: 640px;
+  aspect-ratio: 640 / 120;
+  min-height: 92px;
+  margin-bottom: 16px;
+  /* no box: the banner is the top of the page's own scene, so its art
+     fades out at the sides and into the rows below */
+  overflow: visible;
 }
-.set-panehead h3 {
-  margin-bottom: 4px;
+.set-banner-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  mask-image:
+    linear-gradient(to right, transparent, black 18%, black 82%, transparent),
+    linear-gradient(to bottom, black 55%, transparent);
+  mask-composite: intersect;
 }
-.set-paneaccent {
-  color: var(--text-muted);
-  flex: 0 0 auto;
-  margin-top: -10px;
-  margin-right: -4px;
+/* the page's own sky and horizon carry the ground; the banner keeps its scene */
+.set-banner .sc-ground,
+.set-banner .sc-sand {
+  display: none;
+}
+.set-banner .set-banner-quokka {
+  position: absolute;
+  left: 62%;
+  bottom: 12%;
+  width: 13%;
+  min-width: 56px;
+  height: auto;
+  transform: translateX(-50%);
+}
+.set-main h3.set-banner-title {
+  position: absolute;
+  left: 22px;
+  /* in the sky, which every backdrop keeps calm on the left */
+  top: 30%;
+  margin: 0;
+  font-size: 22px;
+  color: var(--text);
 }
 .set-main .lead {
   font-size: 13px;

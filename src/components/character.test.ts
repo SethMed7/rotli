@@ -78,7 +78,6 @@ describe("quokka personalization", () => {
     expect(characterSource).toContain('appearance?: "personalized" | "quiet-line"');
     expect(characterSource).toContain('quietLine ? "line"');
     expect(characterSource).toContain('quietLine ? "none"');
-    expect(settingsSource).toContain('className="set-paneaccent" appearance="quiet-line"');
     expect(setupSideFriendsSource.match(/appearance="quiet-line"/g)).toHaveLength(4);
   });
 

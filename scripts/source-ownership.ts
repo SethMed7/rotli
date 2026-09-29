@@ -78,6 +78,7 @@ export const COMPONENT_ROOT_FILE_OWNERS = {
   "paneEmptyState.tsx":
     "application-shell empty pane: the theme's scene, the person's quokka, the ways back in",
   "paneEmptyScenes.tsx": "the empty pane's per-theme scene art (token-painted SVG)",
+  "sceneParts.tsx": "shared pieces of the drawn scenes (empty pane, Settings banners): cloud and star",
   "remoteAgentsSection.tsx": "Settings → Connections remote-agent relay pairing (development builds only)",
   "welcomeSettings.tsx": "Settings Welcome folder action (seed the notes into Main, open the welcome note)",
   "previewModal.tsx": "shared media preview overlay",
