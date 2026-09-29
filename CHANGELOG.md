@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A scene when every tab is closed.** The empty pane now shows a small scene
+  that matches your theme, with your own quokka in it: Rottnest's lighthouse
+  at golden hour, a writing desk, low tide, the gum trees, an iris field at
+  dusk, a blossom branch, or stargazing on a Midnight night. It follows light
+  and dark, moves gently (not with Reduce motion on), and quietly links to
+  rotli.co and Rotli's source.
+
 ### Changed
 
 - **Rename in place.** Rename… on a folder or note in the sidebar now edits
