@@ -75,6 +75,9 @@ export const COMPONENT_ROOT_FILE_OWNERS = {
   "palette.tsx": "application-shell command palette overlay",
   "paletteModel.ts": "command palette presentation projection",
   "paneTree.tsx": "application-shell pane composition",
+  "paneEmptyState.tsx":
+    "application-shell empty pane: the theme's scene, the person's quokka, the ways back in",
+  "paneEmptyScenes.tsx": "the empty pane's per-theme scene art (token-painted SVG)",
   "remoteAgentsSection.tsx": "Settings → Connections remote-agent relay pairing (development builds only)",
   "welcomeSettings.tsx": "Settings Welcome folder action (seed the notes into Main, open the welcome note)",
   "previewModal.tsx": "shared media preview overlay",

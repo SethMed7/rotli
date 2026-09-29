@@ -715,6 +715,111 @@ body[data-surface="capture"] {
   color: var(--text);
 }
 
+/* — the empty pane's scene (paneEmptyScenes.tsx, 2026-09-29): one small stage
+   per theme family, painted only with the theme's own tokens so it follows
+   light and dark; the person's quokka stands on the shared ground line
+   (y 170 of 200). Motion is slow, CSS-only (base.css pauses it when the
+   window is put away) and off under reduced motion. — */
+.pane-scene {
+  position: relative;
+  flex: 0 1 auto;
+  width: min(100%, 440px);
+  aspect-ratio: 440 / 200;
+  min-height: 0;
+  margin-bottom: 6px;
+}
+.pane-scene-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* the scene fades into the page at its sides instead of ending in a box */
+  mask-image: linear-gradient(90deg, transparent, black 14%, black 86%, transparent);
+}
+.pane-scene .pane-scene-quokka {
+  position: absolute;
+  left: 50%;
+  bottom: 13%;
+  width: 22%;
+  height: auto;
+  transform: translateX(-50%);
+}
+.sc-ground { fill: var(--surface-2); }
+.sc-hill { fill: var(--tint); }
+.sc-far { fill: var(--surface-2); opacity: 0.8; }
+.sc-cloud { fill: var(--surface); opacity: 0.9; }
+.sc-sun { fill: var(--accent); opacity: 0.22; }
+.sc-moon { fill: var(--accent); opacity: 0.5; }
+.sc-light { fill: var(--accent); opacity: 0.18; }
+.sc-bush,
+.sc-canopy { fill: var(--tint); stroke: var(--border); stroke-width: 1.2; }
+.sc-object { fill: var(--surface); stroke: var(--text-muted); stroke-width: 1.4; stroke-linejoin: round; }
+.sc-paper { fill: var(--surface); stroke: var(--border); stroke-width: 1.2; }
+.sc-line { fill: none; stroke: var(--text-muted); stroke-width: 1.4; stroke-linecap: round; opacity: 0.55; }
+.sc-accent-fill { fill: var(--accent); opacity: 0.75; }
+.sc-accent-stroke { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; }
+.sc-sea { fill: var(--tint); }
+.sc-sand { fill: var(--surface-2); }
+.sc-wave { fill: none; stroke: var(--accent); stroke-width: 1.4; opacity: 0.35; }
+.sc-branch { fill: none; stroke: var(--text-muted); stroke-width: 3; stroke-linecap: round; opacity: 0.7; }
+.sc-blossom { fill: var(--accent); opacity: 0.45; }
+.sc-petal { fill: var(--accent); opacity: 0.5; }
+.sc-star,
+.sc-firefly { fill: var(--accent); opacity: 0.7; }
+@media (prefers-reduced-motion: no-preference) {
+  .sc-star,
+  .sc-firefly {
+    animation: sc-twinkle 4.8s ease-in-out infinite;
+  }
+  .sc-petal {
+    animation: sc-drift 9s ease-in-out infinite;
+  }
+  .sc-bob {
+    animation: sc-bob 6s ease-in-out infinite;
+  }
+}
+@keyframes sc-twinkle {
+  0%,
+  100% { opacity: 0.25; }
+  50% { opacity: 0.85; }
+}
+@keyframes sc-drift {
+  0% { transform: translate(0, 0); opacity: 0; }
+  15% { opacity: 0.6; }
+  85% { opacity: 0.6; }
+  100% { transform: translate(-18px, 60px); opacity: 0; }
+}
+@keyframes sc-bob {
+  0%,
+  100% { transform: translateY(0); }
+  50% { transform: translateY(2px); }
+}
+/* where Rotli lives — present, never loud */
+.pane-empty-links {
+  display: flex;
+  gap: 6px;
+  margin: 18px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+.pane-empty-links:hover,
+.pane-empty-links:focus-within {
+  opacity: 1;
+}
+.pane-empty-links button {
+  border: 0;
+  background: transparent;
+  padding: 2px 4px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--r-control);
+}
+.pane-empty-links button:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
 /* — the ⌘N chooser tab (the maintainer, 2026-07-29): pick what this tab becomes — */
 .ni-surface {
   height: 100%;
