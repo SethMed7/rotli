@@ -1,8 +1,30 @@
 {
   "1.6.0": [
     {
+      "title": "Talk to the Librarian",
+      "body": "Type /librarian in a note and ask it to tag the note, mark a passage, or file it. It proposes; nothing changes until you tick what you want and apply.",
+      "platform": "mac"
+    },
+    {
       "title": "Hand a note to your AI",
-      "body": "Hand to AI turns the note you're in into a ready prompt for Claude Code or another agent: the goal, the open tasks, and what done means."
+      "body": "Hand to AI turns the note you're in into a ready prompt for Claude Code or another agent: the goal, the open tasks, and what done means. Type /hand to AI, or search for \"send to AI\"."
+    },
+    {
+      "title": "Music while you write",
+      "body": "Setup now asks about sound, and Settings → General → Ambient audio plays a studio track for your theme from a small player above the sidebar's footer. A video in a tab takes over, and the music comes back when it stops."
+    },
+    {
+      "title": "Claude FM and tucked tabs",
+      "body": "Pick Claude FM, Anthropic's live lo-fi stream, as your ambient sound, and tuck a tab that's playing into the player to keep it going out of the way.",
+      "platform": "mac"
+    },
+    {
+      "title": "Show only what you use",
+      "body": "Settings → Appearance → Show in Rotli hides the parts of the title bar, sidebar and tabs you don't need. Each switch says how to reach it without the button."
+    },
+    {
+      "title": "Bold that behaves",
+      "body": "Bold, italic and the other marks now work across several lines and over text that's only partly bold, with no stray stars left behind."
     },
     {
       "title": "Boards wear your theme",
@@ -17,6 +39,15 @@
       "title": "Find lights up every match",
       "body": "⌘F now marks every match on the page, and the current one stands out.",
       "platform": "mac"
+    },
+    {
+      "title": "Tidier note names",
+      "body": "Settings → General → Leftover note names clears old \"Untitled\" placeholders and half-typed titles from your notes' metadata in one click, and keeps any name a link still uses.",
+      "platform": "mac"
+    },
+    {
+      "title": "Three new quokka moods",
+      "body": "Friendly, Inquisitive and Adventurous join the idle moods in Settings → Appearance."
     },
     {
       "title": "A new web vault is ready at once",
