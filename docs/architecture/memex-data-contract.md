@@ -360,7 +360,8 @@ second user-visible product or storage location.
   there; the folder name is pinned TS↔Rust in `scripts/fixtures/parity.json`.
   Agents reach templates as ordinary notes; there is no template verb.
 - Every new vault starts with a **Welcome** folder in Main: the root welcome
-  note first, then nine lessons. `src/assets/welcome.json` is the one catalog;
+  note first, then three lessons (Writing; Organizing and finding; AI and
+  privacy — nine until 2026-09-29). `src/assets/welcome.json` is the one catalog;
   its first entry is the welcome note body the scaffold writes, and the rest
   are ordinary Markdown notes in the vault (`wiki/Welcome/` in a memex layout,
   `Welcome/` in a plain notes folder). They open from the left menu in the

@@ -15,8 +15,8 @@ reach it through [Rotli Helper](/resources/rotli-helper/). Safari and phones are
 
 ## 2. Try the Welcome folder
 
-A new vault opens with a **Welcome** folder: nine short lessons on writing, tasks, tables, links,
-views, files, and AI. Each one is an ordinary note, so edit them freely and delete the folder when
+A new vault opens with a **Welcome** folder: three short lessons on writing (tasks, choices,
+tables), organizing (links, views, files), and AI and privacy. Each one is an ordinary note, so edit them freely and delete the folder when
 you're done. **Settings → General → Show me around** runs a short guided tour.
 
 ## 3. Learn six keys

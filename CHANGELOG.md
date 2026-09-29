@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A shorter Welcome tutorial.** A new vault's Welcome folder now holds three
+  lessons instead of nine: **Writing** (formatting, tasks, results, choices,
+  switches, tables, code), **Organizing and finding** (links, views, files),
+  and **AI and privacy**, with the launch checklist folded into the welcome
+  note. A vault that already has the old lessons keeps them.
 - **Connected models always have the web.** Claude, Codex, Cursor and
   Antigravity can search and read the web in every chat, the way they can in
   a terminal, with no globe to turn on. The globe now matters only for the

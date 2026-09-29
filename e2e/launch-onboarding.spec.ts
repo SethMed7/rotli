@@ -2,13 +2,12 @@ import { expect, test, type Page } from "@playwright/test";
 
 // Fresh-vault onboarding (development-only `?onboarding` route, empty in-memory
 // corpus). Every new vault gets a Welcome folder in Main: the welcome note and
-// nine lessons as ordinary notes, opened from the left menu, edited in the
+// three lessons as ordinary notes, opened from the left menu, edited in the
 // ordinary editor ("a preseeded folder, that's it — it uses the left menu").
 
 const welcomeFolder = (page: Page) =>
   page.locator('.main-tree [data-main-folder="1"]', { hasText: "Welcome" });
-const LESSON_ROW =
-  /^(Welcome to Rotli|Writing and formatting|Tasks and progress|Choices and toggles|Tables and code|Links and finding|Main and named views|Files and attachments|AI and privacy|Your launch checklist)$/;
+const LESSON_ROW = /^(Welcome to Rotli|Writing|Organizing and finding|AI and privacy)$/;
 const lessonRows = (page: Page) =>
   page.locator(".main-tree button[data-main-id][data-note-id]", { hasText: LESSON_ROW });
 const rawToggle = async (page: Page, mode: "Raw markdown" | "Beautified") => {
@@ -43,7 +42,7 @@ async function onboard(page: Page) {
   const folder = welcomeFolder(page);
   await expect(folder).toBeVisible();
   if ((await folder.getAttribute("aria-expanded")) !== "true") await folder.click();
-  await expect(lessonRows(page)).toHaveCount(10);
+  await expect(lessonRows(page)).toHaveCount(4);
 }
 
 /** Left offset (px) of every list control and the H1's text from the editor's
@@ -58,7 +57,11 @@ async function gutterOffsets(page: Page) {
       const range = document.createRange();
       if (h1) range.selectNodeContents(h1);
       const rows = Array.from(
-        content.querySelectorAll(".rotli-check, .rotli-result, .rotli-marker, .rotli-choice, .rotli-toggle"),
+        // a multi-choice question renders as a panel (placed left, center, or
+        // right), not a list row, so it isn't held to the H1 edge
+        content.querySelectorAll(
+          ".rotli-check, .rotli-result, .rotli-marker, .rotli-choice:not(.rotli-choice--multi), .rotli-toggle",
+        ),
       ).map((el) => ({ control: el.className.toString(), left: el.getBoundingClientRect().left - edge }));
       return { h1: h1 ? range.getBoundingClientRect().left - edge : null, rows };
     });
@@ -183,15 +186,23 @@ test("fresh onboarding seeds a Welcome folder in Main and opens the welcome note
   await onboard(page);
   const rows = lessonRows(page);
   await expect(rows.first()).toHaveText("Welcome to Rotli");
-  await expect(rows.nth(2)).toHaveText("Tasks and progress");
-  await expect(rows.last()).toHaveText("Your launch checklist");
+  await expect(rows.nth(1)).toHaveText("Writing");
+  await expect(rows.last()).toHaveText("AI and privacy");
   await expect(page.locator(".cm-content")).toContainText("Guided lessons");
 
   // the left menu opens a lesson like any other note
-  await rows.nth(2).click();
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Tasks and progress");
-  await page.locator(".rotli-task").first().hover();
-  await expect(page.locator(".cm-block-handle.on")).toBeVisible();
+  await rows.nth(1).click();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Writing");
+  // the tasks sit below the fold in Writing: scroll to them first
+  const task = page.locator(".rotli-task").first();
+  await task.scrollIntoViewIfNeeded();
+  // the note may still settle its scroll, which hides the handle: hover again
+  // until it shows
+  await expect(async () => {
+    await page.mouse.move(0, 0);
+    await task.hover();
+    await expect(page.locator(".cm-block-handle.on")).toBeVisible({ timeout: 500 });
+  }).toPass();
   const handle = await page.locator(".cm-block-handle.on").boundingBox();
   const checkbox = page.getByRole("checkbox", { name: "Not started", exact: true });
   const box = await checkbox.boundingBox();
@@ -206,20 +217,20 @@ test("fresh onboarding seeds a Welcome folder in Main and opens the welcome note
   await rawToggle(page, "Beautified");
   // the lesson ships one done task; the tick adds a second
   await expect(page.getByRole("checkbox", { name: "Done", exact: true })).toHaveCount(2);
-  await expect(rows).toHaveCount(10);
+  await expect(rows).toHaveCount(4);
 
   // Settings → Open welcome folder is idempotent and lands on the welcome note again
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Open welcome folder", exact: true }).click();
   await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
   await expect(welcomeFolder(page)).toHaveCount(1);
-  await expect(rows).toHaveCount(10);
+  await expect(rows).toHaveCount(4);
 });
 
 test("every Welcome note opens from Main as an ordinary note and the practice-vault option is gone", async ({
   page,
 }) => {
-  // ten note opens re-render the Main tree each time; the hosted runner needs
+  // four note opens re-render the Main tree each time; the hosted runner needs
   // the slow budget, and the taller viewport keeps every row inside the sidebar
   test.slow();
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -229,7 +240,7 @@ test("every Welcome note opens from Main as an ordinary note and the practice-va
   await expect(page.getByText(/practice vault/i)).toHaveCount(0);
   await onboard(page);
   const rows = lessonRows(page);
-  for (let index = 0; index < 10; index++) {
+  for (let index = 0; index < 4; index++) {
     const title = (await rows.nth(index).textContent())!.trim();
     await rows.nth(index).scrollIntoViewIfNeeded();
     await rows.nth(index).click();
@@ -247,8 +258,8 @@ test("checkboxes and list markers align with the H1 in every environment and a n
   test.slow();
   await page.setViewportSize({ width: 1440, height: 900 });
   await onboard(page);
-  await lessonRows(page).nth(2).click();
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Tasks and progress");
+  await lessonRows(page).nth(1).click();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Writing");
   const theme = page.getByRole("button", { name: /^Theme —/ });
   const environments = new Set<string>();
   const assertAligned = async (label: string) => {

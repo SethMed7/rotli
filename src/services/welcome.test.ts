@@ -13,7 +13,7 @@ afterEach(resetWelcome);
 const idsInMain = () =>
   mainItemIdsInFolder(useMainStore.getState().manifest.tree, `${MAIN_ROOT}${WELCOME_FOLDER}`);
 
-test("seeding creates the welcome note and nine lessons once, filed in Main in catalog order", async () => {
+test("seeding creates the welcome note and three lessons once, filed in Main in catalog order", async () => {
   const before = (await notesService.listAll()).length;
   const first = await ensureWelcome();
   expect(first.created).toBe(true);
@@ -21,7 +21,7 @@ test("seeding creates the welcome note and nine lessons once, filed in Main in c
   expect((await notesService.listAll()).length).toBe(before + WELCOME_CATALOG.length);
   expect(idsInMain()).toEqual(first.noteIds);
   expect((await notesService.getNote(first.noteIds[0]!))?.title).toBe("Welcome to Rotli");
-  expect((await notesService.getNote(first.noteIds[2]!))?.title).toBe("Tasks and progress");
+  expect((await notesService.getNote(first.noteIds[1]!))?.title).toBe("Writing");
 
   const again = await ensureWelcome();
   expect(again.created).toBe(false);

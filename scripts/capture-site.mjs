@@ -60,12 +60,11 @@ try {
   const folder = page.locator('.main-tree [data-main-folder="1"]', { hasText: "Welcome" });
   if ((await folder.getAttribute("aria-expanded")) !== "true") await folder.click();
   const lessons = page.locator(".main-tree button[data-main-id][data-note-id]", {
-    hasText:
-      /^(Welcome to Rotli|Writing and formatting|Tasks and progress|Choices and toggles|Tables and code|Links and finding|Main and named views|Files and attachments|AI and privacy|Your launch checklist)$/,
+    hasText: /^(Welcome to Rotli|Writing|Organizing and finding|AI and privacy)$/,
   });
-  await expect(lessons).toHaveCount(10);
-  await lessons.nth(2).click();
-  await expect(page.getByRole("tab", { selected: true })).toContainText("Tasks and progress");
+  await expect(lessons).toHaveCount(4);
+  await lessons.nth(1).click();
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Writing");
   await expect(theme).toHaveAccessibleName("Theme — Warm Light");
   await page.setViewportSize({ width: 1440, height: 900 });
   await capture("rotli-playground@3x.png", 1440, 900);
