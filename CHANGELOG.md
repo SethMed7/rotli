@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Rename in place.** Rename… on a folder or note in the sidebar now edits
+  its row where it sits, the way a code editor renames a file: the field is
+  the row's own size, a folder's notes stay in view below it, Enter saves and
+  Escape keeps the old name. A document, sheet, or board's field holds its
+  name without the extension. Renaming from a tab still opens the small
+  Rename dialog. Renaming a folder used to hide everything inside it while you
+  typed.
+
 ## [1.6.0] - 2026-09-28
 
 ### Added

@@ -85,13 +85,13 @@ import {
   TrashGlyph,
   glyphForNote,
 } from "../glyphs";
-import { InlineRenameInput } from "../inlineRenameInput";
 import { useNoteMenu } from "../useNoteMenu";
 import { ViewSectionHeader } from "./chatViewPicker";
 import { homeDashboardSnapshot } from "./homeDashboardModel";
 import { HomeShortcuts, shownShortcuts } from "./homeShortcuts";
 import { mainFolderMenuItems } from "./mainFolderMenu";
 import { noteDisplayTitle } from "./noteDisplayTitle";
+import { FolderRenameRow, NoteRenameRow } from "./sidebarRenameRows";
 import { SidebarSystem, type SystemDestRow } from "./sidebarSystem";
 import { useActiveTree } from "./useActiveTree";
 import type { SidebarChatData } from "./useChatFolders";
@@ -303,6 +303,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   //   turns that folder's row into an inline input (the board-row pattern);
   //   mainNewFolder is the name-first input at the Main root. —
   const [renamingMainId, setRenamingMainId] = useState<string | null>(null);
+  const [renamingNoteId, setRenamingNoteId] = useState<string | null>(null);
   // "New folder…" from a note's menu: the folder exists, now name it here
   const mainRenameRequest = useUiStore((s) => s.mainRenameRequest);
   useEffect(() => {
@@ -549,6 +550,16 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
           const slot = parentId === MAIN_ROOT && noteIndex < 9 ? noteIndex + 1 : undefined;
           const parentFolderName = mainProjection.folders.find((folder) => folder.id === parentId)?.name;
           const displayTitle = noteDisplayTitle(n.title, parentFolderName) || "Empty note";
+          if (renamingNoteId === n.id) {
+            return (
+              <NoteRenameRow
+                key={`main:${n.id}`}
+                note={n}
+                style={rowInset(contentPad, contentPad - ROW_INSET_LEAD)}
+                onDone={() => setRenamingNoteId(null)}
+              />
+            );
+          }
           return (
             <button
               key={`main:${n.id}`}
@@ -622,6 +633,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
                 if (!mainSel.has(n.id)) setMainSel(new Set([n.id]));
                 openNoteMenu(e, n, {
                   selectedItems,
+                  renameInline: () => setRenamingNoteId(n.id),
                   trashSelection: (items) => {
                     trashItems.mutate([...items], {
                       // their Main slots stay (2026-09-16): the projection
@@ -647,69 +659,67 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
         })}
         {childFolders.map((f) => {
           const open = expandedDests[f.id] ?? true;
-          // inline rename (#16): the context menu's Rename… turns the row into a
-          // text input — Enter commits (sibling-uniquified), Esc/click-away cancels
-          // (the CompactBoardRow grammar).
-          if (renamingMainId === f.id) {
-            return (
-              <div key={f.id} className="sb-newfolder" style={{ paddingLeft: contentPad }}>
-                <FolderGlyph size={14} />
-                <InlineRenameInput
-                  defaultValue={f.name}
-                  placeholder="Folder name…"
-                  ariaLabel="Rename Main folder"
-                  onCommit={(value) => {
-                    // an emptied input is a cancel (renameFolderInMain no-ops);
-                    // anything else obeys the one folder-name rule in Main and
-                    // in views alike, so a name can never be refused later
-                    const error = value.trim() ? viewFolderNameError(value) : null;
-                    if (error) {
-                      setRowActionError(`Couldn’t rename folder — ${error}`);
-                      return;
-                    }
-                    setRenamingMainId(null);
-                    setActiveTree(renameFolderInMain(activeTree, f.id, value), liveIds);
-                  }}
-                  onCancel={() => setRenamingMainId(null)}
-                />
-              </div>
-            );
-          }
+          // Rename… swaps only the row for a field of the same size (the
+          // owner, 2026-09-28): the folder's contents stay open below it.
+          // Enter commits (sibling-uniquified), Esc/click-away cancels.
+          const renaming = renamingMainId === f.id;
+          const commitFolderName = (value: string) => {
+            // an emptied input is a cancel (renameFolderInMain no-ops);
+            // anything else obeys the one folder-name rule in Main and
+            // in views alike, so a name can never be refused later
+            const error = value.trim() ? viewFolderNameError(value) : null;
+            if (error) {
+              setRowActionError(`Couldn’t rename folder — ${error}`);
+              return;
+            }
+            setRenamingMainId(null);
+            setActiveTree(renameFolderInMain(activeTree, f.id, value), liveIds);
+          };
           return (
             <div key={f.id} className="main-branch">
-              <button
-                type="button"
-                data-main-id={f.id}
-                data-main-folder="1"
-                aria-expanded={open}
-                className={`frow child main-row${dropCls(f.id)}${mainDragId === f.id ? " dragging" : ""}`}
-                style={rowInset(rowPad, rowPad - ROW_INSET_LEAD / 2)}
-                onPointerDown={(e) => startMainDrag(e, f.id, f.name)}
-                onClick={() => {
-                  // toggle against the OPEN default (?? true) — toggleDestExpanded
-                  // assumes closed, so the first click on a fresh folder no-oped
-                  if (!didMainDragRef.current) {
-                    setSelectedFolderId(f.id);
-                    setDestExpanded(f.id, !open);
-                  }
-                }}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  openMainFolderMenu(e.clientX, e.clientY, f.id);
-                }}
-                {...rp({ id: f.id, kind: "folder" })}
-              >
-                <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
-                  <ChevronRight size={10} />
-                </span>
-                <FolderGlyph size={14} />
-                <span className="fname">{f.name}</span>
-                {/* NO inline remove-× here: it rendered unstyled mid-row on .frow
+              {renaming ? (
+                <FolderRenameRow
+                  name={f.name}
+                  open={open}
+                  style={rowInset(rowPad, rowPad - ROW_INSET_LEAD / 2)}
+                  onCommit={commitFolderName}
+                  onCancel={() => setRenamingMainId(null)}
+                />
+              ) : (
+                <button
+                  type="button"
+                  data-main-id={f.id}
+                  data-main-folder="1"
+                  aria-expanded={open}
+                  className={`frow child main-row${dropCls(f.id)}${mainDragId === f.id ? " dragging" : ""}`}
+                  style={rowInset(rowPad, rowPad - ROW_INSET_LEAD / 2)}
+                  onPointerDown={(e) => startMainDrag(e, f.id, f.name)}
+                  onClick={() => {
+                    // toggle against the OPEN default (?? true) — toggleDestExpanded
+                    // assumes closed, so the first click on a fresh folder no-oped
+                    if (!didMainDragRef.current) {
+                      setSelectedFolderId(f.id);
+                      setDestExpanded(f.id, !open);
+                    }
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openMainFolderMenu(e.clientX, e.clientY, f.id);
+                  }}
+                  {...rp({ id: f.id, kind: "folder" })}
+                >
+                  <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
+                    <ChevronRight size={10} />
+                  </span>
+                  <FolderGlyph size={14} />
+                  <span className="fname">{f.name}</span>
+                  {/* NO inline remove-× here: it rendered unstyled mid-row on .frow
                     (the .snactbtn hover/size grammar is .snrow-scoped), so
                     "clicking the folder" silently deleted it from Main. Removal
                     lives in the right-click menu, like note rows (2026-07-09). */}
-              </button>
+                </button>
+              )}
               {open && (
                 <div
                   className="main-branch-children"

@@ -2850,3 +2850,24 @@
 .sb-switch-seg.desktop-only:hover {
   opacity: 0.8;
 }
+
+/* Rename in place (sidebarRenameRows.tsx): the row keeps its size, chevron and
+   glyph; only the name becomes a field, the way an IDE renames a file */
+.main-row.renaming {
+  cursor: text;
+}
+.sb-rename-input {
+  flex: 1;
+  min-width: 0;
+  margin: -2px 0;
+  padding: 1px 5px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+}
+.sb-rename-input:focus-visible {
+  outline: none;
+}

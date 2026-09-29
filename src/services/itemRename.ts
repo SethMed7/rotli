@@ -18,6 +18,20 @@ export function renameLane(item: Pick<NoteSummary, "id" | "kind">): RenameLane |
   return RENAMABLE_FILE_EXTS.has(extOf(fileName(item.id))) ? "file" : null;
 }
 
+/** What Rename edits for an item: a note's title, or a board's/file's name
+ * without its extension (so selecting it all selects just the name). */
+export interface RenameTarget {
+  id: string;
+  current: string;
+  lane: RenameLane;
+}
+
+export function renameTargetFor(item: Pick<NoteSummary, "id" | "kind" | "title">): RenameTarget | null {
+  const lane = renameLane(item);
+  if (!lane) return null;
+  return { id: item.id, current: lane === "title" ? item.title : fileNameStem(item.id), lane };
+}
+
 export interface FileRenamePorts {
   /** Save every dirty open document, so no pending save targets the old path. */
   flushDocuments(): Promise<void>;
