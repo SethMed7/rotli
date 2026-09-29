@@ -229,6 +229,7 @@ const tauriAllowlist = new Set([
   "src/lib/chatWindowBridge.ts",
   "src/lib/clipboard.ts",
   "src/lib/nativeDrag.ts",
+  "src/lib/noteProtection.ts",
   "src/lib/quitFlush.ts",
   "src/lib/tauri.ts",
   "src/lib/vaultRepair.ts",

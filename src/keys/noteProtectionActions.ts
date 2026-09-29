@@ -2,7 +2,8 @@
 // kept here so actions.ts stays under its size ceiling and the secure/locked
 // verbs have one home as they grow.
 
-import { corpusFrontmatter, corpusSetSecure } from "../lib/tauri";
+import { corpusSetSecure } from "../lib/noteProtection";
+import { corpusFrontmatter } from "../lib/tauri";
 import { invalidateNotes, lifecycleError } from "../services/hooks";
 import { markNoteDraftChanged } from "../services/noteDrafts";
 import { focusedNoteIdNow, notesWorkspaceActive } from "./focusNow";

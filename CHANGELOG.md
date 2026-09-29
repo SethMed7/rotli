@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **AI no longer rewrites notes you wrote.** Chat, agents and the Librarian
+  may change the text of a note an AI made, but a note you wrote (every
+  note from before this release included) stays yours until you turn on
+  **Let AI edit the text** in its menu. Lock still blocks everything. Rotli
+  now records which AI made a note, and a chat attached to one of your notes
+  keeps its conversation notes in a note of its own instead of writing into
+  yours. Filing a note moves it into its area without changing a character
+  of its text.
+
 ## [1.6.0] - 2026-09-28
 
 ### Added

@@ -14,11 +14,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { filedStamp, LIBRARIAN_LABELS } from "../ai/librarianLane";
 import { daysSinceMidnight, relativeLabel } from "../lib/dateLabels";
+import { corpusSetSecure } from "../lib/noteProtection";
 import { useTransientPopover } from "../lib/popover";
 import {
   corpusJournalPrune,
   corpusResolveRef,
-  corpusSetSecure,
   onOrganizerProgress,
   organizerDismissSecure,
   organizerRunOnce,

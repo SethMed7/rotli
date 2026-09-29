@@ -1,7 +1,15 @@
+import { bodyEditRefusal } from "../lib/aiEditPolicy";
+import { corpusClaimChatMemory } from "../lib/noteProtection";
 import { type ChatModelInfo, corpusFrontmatter, corpusWriteAi, isTauri } from "../lib/tauri";
 import { CORPUS_INSTANCE_ID, type MemexInstance } from "../memex/config";
 import { noteSlugify } from "../memex/contract";
-import { listChats, setChatAttachedTo, writeNote } from "../memex/service";
+import {
+  listChats,
+  readChatMemoryNoteStem,
+  setChatAttachedTo,
+  setChatMemoryNoteStem,
+  writeNote,
+} from "../memex/service";
 import { invalidateMemex } from "../memex/useMemex";
 import { titleOf } from "../services/derive";
 import { isChatsPath } from "../services/destinations";
@@ -44,6 +52,8 @@ export async function updateNoteAsAi(
   if (frontmatter.locked) {
     throw new Error("This note is locked — no AI may edit it, so the chat left it alone.");
   }
+  const refusal = bodyEditRefusal(frontmatter.aiBodyEdit);
+  if (refusal) throw new Error(refusal);
   // no model ⇒ treat the write as REMOTE, the fail-closed direction
   if (!expectedRevision) throw new Error("This note has no save revision. Read it again before editing.");
   await corpusWriteAi(id, body, model ?? { id: "", endpoint: "" }, expectedRevision);
@@ -80,6 +90,9 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
       .find((chat) => chat.slug === input.chatSlug)
       ?.attachedTo.replace(/^\[\[|\]\]$/g, "")
       .trim();
+  /** May the chat's model rewrite this note? Unknowable reads as no. */
+  const aiEditable = async (id: string): Promise<boolean> =>
+    (await corpusFrontmatter(id).catch(() => null))?.aiBodyEdit === "allowed";
   const repository = {
     async findByStem(stem: string): Promise<ChatMemoryNote | null> {
       // Scope the lookup to THIS brain's root. The unscoped "All notes" listing
@@ -95,28 +108,47 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
       );
       if (!id) return null;
       const note = await notesService.getNote(id);
-      return note ? { id, stem, body: note.body, revision: note.revision } : null;
+      return note
+        ? { id, stem, body: note.body, revision: note.revision, aiEditable: await aiEditable(id) }
+        : null;
     },
+    async findMemoryNote(): Promise<ChatMemoryNote | null> {
+      const stem = await readChatMemoryNoteStem(input.instance, input.chatSlug).catch(() => null);
+      return stem ? repository.findByStem(stem) : null;
+    },
+    setMemoryNote: (stem: string) => setChatMemoryNoteStem(input.instance, input.chatSlug, stem),
+    claim: (id: string) => corpusClaimChatMemory(id, input.chatSlug).catch(() => false),
     async create(body: string): Promise<ChatMemoryNote> {
       // Rotli Web: the notes service IS the vault (no memex note command), and
       // the note's slug alias is the stem the chat attaches to. It is a note,
       // not a capture, so it is born in the Inbox folder, never on the board.
       if (!isTauri()) {
-        const note = await notesService.createNote(inboxFolderId, body);
-        return { id: note.id, stem: noteSlugify(titleOf(body)) || "note", body, revision: note.revision };
+        const note = await notesService.createNote(inboxFolderId, body, { createdBy: "chat" });
+        return {
+          id: note.id,
+          stem: noteSlugify(titleOf(body)) || "note",
+          body,
+          revision: note.revision,
+          aiEditable: true,
+        };
       }
       // no shelf: a chat's note is a background note, not a capture — it
       // projects to where it lives (staging, then the area the Librarian files
       // it under), never to the Captures board (the owner, 2026-09-17)
-      const created = await writeNote({ instance: input.instance, body, shelf: [] });
+      const created = await writeNote({ instance: input.instance, body, shelf: [], createdBy: "chat" });
       const id = `${prefix}${created.id}`;
       const note = await notesService.getNote(id);
       if (!note) throw new Error("The new conversation note could not be read back after creation.");
-      return { id, stem: created.stem, body, revision: note.revision };
+      return { id, stem: created.stem, body, revision: note.revision, aiEditable: true };
     },
     // browser mode has no corpus, so the twin keeps the in-memory service
     update: async (id: string, body: string, expectedRevision: string) => {
       if (!isTauri()) {
+        // the web has no Rust gate: the same policy runs here, fail-closed
+        const refusal = bodyEditRefusal(
+          (await corpusFrontmatter(id).catch(() => null))?.aiBodyEdit ?? "person-written",
+        );
+        if (refusal) throw new Error(refusal);
         await notesService.updateNote(id, body, expectedRevision);
         return;
       }

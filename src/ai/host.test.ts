@@ -16,6 +16,7 @@
 
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
+import type { AiBodyEdit } from "../lib/aiEditPolicy";
 import * as realTauri from "../lib/tauri";
 import type { ChatModelInfo, CorpusNoteMeta, FrontmatterView } from "../lib/tauri";
 import type { SearchHit } from "../types";
@@ -57,6 +58,7 @@ interface Row {
   secure?: boolean;
   locked?: boolean;
   reference?: boolean;
+  aiBodyEdit?: AiBodyEdit;
 }
 
 let rows: Row[] = [];
@@ -161,6 +163,8 @@ void mock.module("../lib/tauri", () => ({
       secure: !!row.secure,
       localAiAllowed: true,
       pinned: false,
+      // these rows default to AI-made; a row names `aiBodyEdit` to say otherwise
+      aiBodyEdit: row.locked ? "locked" : (row.aiBodyEdit ?? "allowed"),
       fields: [],
     };
   },
@@ -233,6 +237,13 @@ beforeEach(() => {
       body: "a kelpie charter",
       folderId: "Inbox",
       locked: true,
+    },
+    {
+      id: "n-mine",
+      title: "Kelpie diary",
+      body: "my own kelpie diary",
+      folderId: "Inbox",
+      aiBodyEdit: "person-written",
     },
     {
       id: "identity/00-identity.md",
@@ -345,6 +356,20 @@ describe("the brain's memory lanes are retrievable by BOTH classes", () => {
 
   test("read_note opens a reference note by its path id", async () => {
     expect(await makeTauriHost(FRONTIER).readNote("identity/00-identity.md")).toContain("quokkanaut");
+  });
+});
+
+// 2026-09-29: a note a PERSON wrote is theirs — no class rewrites it without
+// their grant, and the refusal says how to grant it
+describe("a person's note is closed to AI edits until they grant it", () => {
+  test("no class edits a person-written note, and nothing is written", async () => {
+    for (const model of [LOCAL, FRONTIER]) {
+      const out = await updateVia(makeTauriHost(model), "n-mine", "# Kelpie diary\n\nrewritten");
+      expect(out).toMatch(/^blocked: the user wrote this note themselves/);
+      expect(out).toContain("Let AI edit the text");
+    }
+    expect(rows.find((r) => r.id === "n-mine")?.body).toBe("my own kelpie diary");
+    expect(writes).toEqual([]);
   });
 });
 

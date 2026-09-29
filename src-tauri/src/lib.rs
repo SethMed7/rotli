@@ -12,6 +12,7 @@
 // set_summon_shortcut, and click-away hiding is a setting (set_hide_on_blur)
 // so heavy use can keep the window resident.
 
+mod ai_edit_policy;
 mod app_settings;
 mod board;
 mod breve;
@@ -2335,6 +2336,8 @@ pub fn run() {
             corpus::corpus_raw_frontmatter,
             corpus::corpus_write_frontmatter_raw,
             corpus::corpus_set_locked,
+            corpus::corpus_set_ai_edit,
+            corpus::ai_edit::corpus_claim_chat_memory,
             corpus::corpus_set_pinned,
             corpus::corpus_set_field,
             corpus::corpus_set_ai_field,
