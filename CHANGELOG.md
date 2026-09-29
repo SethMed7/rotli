@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A Claude safety-filter refusal reads as one plain sentence.** When
+  Claude's filter declines a message, the chat now says so and suggests
+  rewording it or picking another model. Before, it showed Claude Code's raw
+  "API Error: … safeguards flagged this message" text.
+- **Chat says when a web page couldn't be read.** Some pages draw everything
+  with JavaScript, so a fetch only gets an empty shell ("Loading…"). The model
+  is now told that, and says it couldn't read the page instead of reviewing a
+  blank one. Links like `site/#/piece/…` get the same note.
 - **Find in this file shows what it matched.** Every match is marked on the
   page and the current one stands out, the way find works everywhere else.
   Before, the match was selected but did not show while you typed in the find
@@ -25,6 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Claude chat talks to Claude Code the way T3 Code and the Agent SDK do.**
+  A Claude turn is now one Claude Code session that calls Rotli's tools
+  directly, instead of a new process per step that wrote its tool calls as
+  JSON text. Rotli still decides every tool call: Claude Code's own tools stay
+  off, and each tool's input and output pass the same secret and secure-note
+  checks as before. Image turns, presets, and the other models work as they
+  did. ([ADR](docs/decisions/2026-09-28-claude-native-agent-protocol.md))
 - **A rotli.co link now shows the island.** The link preview in iMessage,
   Slack, X, and Discord keeps its headline and app window, and adds the film's
   Rottnest: the lighthouse on its hill, the bay, and the quokka waving from the

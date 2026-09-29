@@ -32,6 +32,7 @@ import { type HostArtifactKind, makeTauriHost } from "../../ai/host";
 import { presetFor, runHybrid } from "../../ai/hybrid";
 import { runAgent } from "../../ai/loop";
 import { type ModelGroups, findModel, flattenModels, mergedModels } from "../../ai/models";
+import { runNativeAgent } from "../../ai/nativeLoop";
 import type { AgentQuestion, ChatTurn, RunInput } from "../../ai/types";
 import { resolveChatNoteId, syncManagedChatMemory } from "../../chatMemory/composition";
 import {
@@ -49,6 +50,7 @@ import {
   projectChatWorkItems,
   visibleChatText,
 } from "../../lib/chatWork";
+import { claudeSession } from "../../lib/claudeSession";
 import { PLATFORM } from "../../lib/featurePolicy";
 import { extOf, fileName, IMAGE_EXTS, imageMimeOf } from "../../lib/fileKind";
 import { useAnchoredPopoverBox, useTransientPopover } from "../../lib/popover";
@@ -1859,9 +1861,18 @@ export function ChatSurface({
       },
     };
     const hostOpts = baseOpts;
+    // Claude on the desktop speaks its native agent protocol (nativeLoop.ts);
+    // image turns, presets, and every other lane keep the JSON loop
+    const native = !preset && isTauri() && turnModel.provider === "claude" && imgs.length === 0;
     const events = preset
       ? runHybrid(preset, modelList, runInput, (m, o) => makeTauriHost(m, { ...hostOpts, ...o }), requestId)
-      : runAgent(makeTauriHost(turnModel, hostOpts), runInput);
+      : native
+        ? runNativeAgent(makeTauriHost(turnModel, hostOpts), claudeSession(requestId), runInput, {
+            modelId: turnModel.id,
+            ...(baseOpts.reasoningEffort ? { reasoningEffort: baseOpts.reasoningEffort } : {}),
+            isSecureContext,
+          })
+        : runAgent(makeTauriHost(turnModel, hostOpts), runInput);
 
     let reply = "";
     let questionAfterRun: AgentQuestion | null = null;

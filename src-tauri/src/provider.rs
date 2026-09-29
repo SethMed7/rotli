@@ -50,8 +50,8 @@ fn refuse_cloud_image_generation<T>() -> Result<T, String> {
 
 /// Default per-step deadline. Frontier models think long; the watchdog is the
 /// backstop, not the norm. The caller may pass a longer one (image jobs).
-const DEFAULT_TIMEOUT_MS: u64 = 180_000;
-const MAX_TIMEOUT_MS: u64 = 600_000;
+pub(crate) const DEFAULT_TIMEOUT_MS: u64 = 180_000;
+pub(crate) const MAX_TIMEOUT_MS: u64 = 600_000;
 
 pub(crate) struct Running {
     pub(crate) token: u64,

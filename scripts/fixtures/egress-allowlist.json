@@ -43,6 +43,12 @@
       ],
       "src-tauri/src/provider_lane.rs": [
         "complete_blocking"
+      ],
+      "src-tauri/src/claude_session.rs": [
+        "claude_session_run"
+      ],
+      "src-tauri/src/claude_protocol.rs": [
+        "tool_call"
       ]
     }
   },
@@ -134,6 +140,8 @@
       "src-tauri/src/web_search.rs",
       "src-tauri/src/chat.rs",
       "src-tauri/src/provider.rs",
+      "src-tauri/src/claude_protocol.rs",
+      "src-tauri/src/claude_session.rs",
       "src-tauri/src/helper.rs",
       "src-tauri/src/breve.rs",
       "src-tauri/src/private_browser.rs",
@@ -141,6 +149,8 @@
       "services/rotli-mcp-relay/server.ts",
       "src/ai/host.ts",
       "src/ai/loop.ts",
+      "src/lib/claudeSession.ts",
+      "src/ai/nativeLoop.ts",
       "breve-runtime/scripts/llm.ts",
       "breve-runtime/scripts/safe-fetch.ts"
     ],

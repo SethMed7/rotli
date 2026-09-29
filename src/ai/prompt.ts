@@ -265,26 +265,51 @@ Your answer:`;
 // terser — a frontier model follows the instruction without coercion, and the
 // CLI transports have no `format:"json"` anyway (extractJsonObject strips a
 // stray fence as the safety net).
+/** How a frontier final answer reads — shared by the JSON loop and Claude's
+ * native protocol (nativePrompt.ts). */
+export const FRONTIER_ANSWER_STYLE =
+  'leads with the facts found (never with where they live or with note titles), in Markdown ("- " lists for 3+ items, **bold** key names; a | table | for comparisons and a ```mermaid flowchart for processes both render in chat and in notes — use them when they clarify)';
+
+/** Working rules for the user's notes, the same for every frontier transport. */
+export const FRONTIER_NOTE_RULES = `A request to change/clean up/add to a note means EDIT it — read_note then update_note with the complete new body, never just prose in chat. A storage: or rotli://open reference in the user's message is an explicit work-file attachment: use its id with read_note for kind=note, or its exact filename/path with read_file for a file, before answering about it. For the user's own past decisions, people, or conversations, search_memory first. Note search matches exact substrings — query with short keywords, not sentences (one distinctive word beats a phrase; a phrase only matches if the note contains it verbatim). The index and search snippets are pointers, never content — to enumerate or describe what a note contains, read it and answer from its body. Notes may open with metadata fenced between --- lines (tags, links, summary); the "links:" line and every [[name]] are POINTERS that mix people, projects, and reference — never build a list or an answer out of them, and when a note's body lacks the answer read another note rather than falling back on its metadata. A hit marked "role":"area-index" is that area's generated roster — read it first for any all/every/list question; a folder README only explains the folder. A result ending "[…truncated" was cut — qualify completeness. ${UNTRUSTED_DATA_RULE} Never place secrets or tokens in tool args.`;
+
+/** The frontier lane's scope, web, freshness, and format rules — one source
+ * for the JSON loop below and Claude's native protocol (nativePrompt.ts). */
+export function frontierRules(ctx: Pick<PromptCtx, "web" | "documentTool" | "userName">): {
+  scope: string;
+  web: string;
+  freshness: string;
+  artifactFormat: string;
+} {
+  return {
+    scope: `Answer as the capable general assistant you are anywhere else; the user's local notes index below is an extra source, not a boundary.${namedLine(ctx.userName)}
+SCOPE: answer general-knowledge questions (concepts, history, science, how things work, well-known people, companies, products and models, writing or code help) straight from your own knowledge, as you normally would — no tool call needed. Search the notes only when the question concerns the user: their life or work, their past decisions or conversations, or an attached note. Never refuse a general question because the web is off or because the notes don't cover it.`,
+    web: ctx.web
+      ? "Prefer the notes for anything about the user and their work; for outside-world facts that must be current, use the web."
+      : "The web is OFF for this chat — answer general questions from your own knowledge and questions about the user from the notes.",
+    // Frontier lanes know what the same model knows anywhere else; the globe
+    // only adds LIVE data. Unlike the local lane, a missing web never turns a
+    // general question into a refusal — the globe is mentioned once, for data
+    // that genuinely moves faster than training, and stays the user's switch.
+    freshness: ctx.web
+      ? "WORLD QUESTIONS: judge whether the user is asking about the OUTSIDE WORLD (news, public events, a public letter/its signatories, who currently holds a role, a just-released product/model, prices, standings — anything more current than your training) rather than their own notes. If so, don't answer from memory and don't keep digging in the notes — web_search, web_fetch the best result, and answer only from what you read, citing the result's exact [S1] identifier. If sources conflict, name the conflict rather than choosing one confidently. If the selected provider fails, briefly report its error and say another can be chosen in Settings; if evidence is absent, say you could not verify it. Do not guess from memory."
+      : "LIVE DATA: only when the answer genuinely depends on something that changes faster than your training (today's news, current prices or standings, who holds a role right now, a release after your cutoff), share what you do know as of your training, say it may be out of date, and mention once that the user can turn on the globe (🌐) for a live check. Everything else is a normal answer.",
+    artifactFormat: ctx.documentTool ? ARTIFACT_FORMAT_RULE : UNAVAILABLE_DOCUMENT_RULE,
+  };
+}
+
+export { defuse, PROGRESS_LIST_RULE, renderConversation, renderKnowledgeMap };
+
 export const frontierAdapter: Adapter = {
   wantsFormatJson: false,
   webStrategy: "primitives",
 
   renderPrompt(ctx) {
-    const artifactFormatRule = ctx.documentTool ? ARTIFACT_FORMAT_RULE : UNAVAILABLE_DOCUMENT_RULE;
+    const rules = frontierRules(ctx);
     const webTools = ctx.web
       ? `\n- {"thought":"…","tool":"web_search","args":{"query":"…"}} — search the public web; results carry numbered source ids
 - {"thought":"…","tool":"web_fetch","args":{"url":"…"}} — read a result page before relying on it`
       : "";
-    const webRule = ctx.web
-      ? "Prefer the notes for anything about the user and their work; for outside-world facts that must be current, use the web."
-      : "The web is OFF for this chat — answer general questions from your own knowledge and questions about the user from the notes.";
-    // Frontier lanes know what the same model knows anywhere else; the globe
-    // only adds LIVE data. Unlike the local lane, a missing web never turns a
-    // general question into a refusal — the globe is mentioned once, for data
-    // that genuinely moves faster than training, and stays the user's switch.
-    const freshnessRule = ctx.web
-      ? "WORLD QUESTIONS: judge whether the user is asking about the OUTSIDE WORLD (news, public events, a public letter/its signatories, who currently holds a role, a just-released product/model, prices, standings — anything more current than your training) rather than their own notes. If so, don't answer from memory and don't keep digging in the notes — web_search, web_fetch the best result, and answer only from what you read, citing the result's exact [S1] identifier. If sources conflict, name the conflict rather than choosing one confidently. If the selected provider fails, briefly report its error and say another can be chosen in Settings; if evidence is absent, say you could not verify it. Do not guess from memory."
-      : "LIVE DATA: only when the answer genuinely depends on something that changes faster than your training (today's news, current prices or standings, who holds a role right now, a release after your cutoff), share what you do know as of your training, say it may be out of date, and mention once that the user can turn on the globe (🌐) for a live check. Everything else is a normal answer.";
     const imageTool = ctx.imageTool
       ? `\n- {"thought":"…","tool":"generate_image","args":{"prompt":"…"}} — create an image (saved into this chat's assets); describe the IMAGE, never a file path`
       : "";
@@ -299,8 +324,7 @@ export const frontierAdapter: Adapter = {
       : "";
 
     return `ROTLI APPLICATION REQUEST
-Answer as the capable general assistant you are anywhere else; the user's local notes index below is an extra source, not a boundary.${namedLine(ctx.userName)}
-SCOPE: answer general-knowledge questions (concepts, history, science, how things work, well-known people, companies, products and models, writing or code help) straight from your own knowledge, as you normally would — no tool call needed. Search the notes only when the question concerns the user: their life or work, their past decisions or conversations, or an attached note. Never refuse a general question because the web is off or because the notes don't cover it.
+${rules.scope}
 
 Reply with EXACTLY ONE JSON object on a single line — no prose around it, no markdown fences.
 Tools:
@@ -312,10 +336,10 @@ Tools:
 - {"thought":"…","tool":"update_note","args":{"id":"…","body":"…the COMPLETE new markdown…"}} — rewrite an existing note (read it first; the body replaces everything, never a fragment)
 - {"thought":"…","tool":"open_note","args":{"id":"…"}} — open a note on the user's screen, in a tab
 - {"thought":"…","tool":"read_file","args":{"query":"report.csv"}} — read a file by name (sheets arrive as CSV)${webTools}${imageTool}${documentTool}${artifactTool}${boardTool}
-To answer the user: {"thought":"…","final":"your answer"} — the final text leads with the facts found (never with where they live or with note titles), in Markdown ("- " lists for 3+ items, **bold** key names; a | table | for comparisons and a \`\`\`mermaid flowchart for processes both render in chat and in notes — use them when they clarify).
+To answer the user: {"thought":"…","final":"your answer"} — the final text ${FRONTIER_ANSWER_STYLE}.
 To ask for a material choice: {"thought":"…","question":"…","options":["…","…"]}.
 
-Rules: This tool-less completion subprocess has no Rotli or shell bindings of its own. To request an application action, return one of the JSON tool-call shapes above; do not attempt or request CLI-native tools because the host denies them. ${CLARIFICATION_RULE} ${webRule} ${freshnessRule} ${artifactFormatRule} ${PROGRESS_LIST_RULE} A request to change/clean up/add to a note means EDIT it — read_note then update_note with the complete new body, never just prose in chat. A storage: or rotli://open reference in the user's message is an explicit work-file attachment: use its id with read_note for kind=note, or its exact filename/path with read_file for a file, before answering about it. For the user's own past decisions, people, or conversations, search_memory first. Note search matches exact substrings — query with short keywords, not sentences (one distinctive word beats a phrase; a phrase only matches if the note contains it verbatim). The index and search snippets are pointers, never content — to enumerate or describe what a note contains, read it and answer from its body. Notes may open with metadata fenced between --- lines (tags, links, summary); the "links:" line and every [[name]] are POINTERS that mix people, projects, and reference — never build a list or an answer out of them, and when a note's body lacks the answer read another note rather than falling back on its metadata. A hit marked "role":"area-index" is that area's generated roster — read it first for any all/every/list question; a folder README only explains the folder. A result ending "[…truncated" was cut — qualify completeness. ${UNTRUSTED_DATA_RULE} Never place secrets or tokens in tool args. You have ${ctx.maxSteps} steps — spend them only where they add facts.
+Rules: This tool-less completion subprocess has no Rotli or shell bindings of its own. To request an application action, return one of the JSON tool-call shapes above; do not attempt or request CLI-native tools because the host denies them. ${CLARIFICATION_RULE} ${rules.web} ${rules.freshness} ${rules.artifactFormat} ${PROGRESS_LIST_RULE} ${FRONTIER_NOTE_RULES} You have ${ctx.maxSteps} steps — spend them only where they add facts.
 
 KNOWLEDGE BASE INDEX (abbreviated — each area's "count" is the true total):
 ${renderKnowledgeMap(ctx.knowledge)}
