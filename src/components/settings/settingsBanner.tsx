@@ -4,6 +4,7 @@
 
 import { useUiStore } from "../../state/ui";
 import { Character, type CharacterName } from "../character";
+import { SETTINGS_BACKDROPS } from "./settingsBackdropArt";
 import { BANNER_BACKDROPS, BANNER_MOTIFS, type BannerMotif } from "./settingsBannerArt";
 
 export function SettingsBanner({
@@ -24,6 +25,28 @@ export function SettingsBanner({
       </svg>
       <Character name={pose} size={84} className="set-banner-quokka" accessorized alwaysVisible />
       <h3 className="set-banner-title">{title}</h3>
+    </div>
+  );
+}
+
+/** The page behind every pane: the theme's sky in the top corner and its
+ * horizon along the bottom, pinned while the rows scroll over them. */
+export function SettingsScenery() {
+  const family = useUiStore((s) => s.themeFamily);
+  const scenery = SETTINGS_BACKDROPS[family] ?? SETTINGS_BACKDROPS.warm;
+  return (
+    <div className="set-scenery" data-scenery={family} aria-hidden="true">
+      <svg className="set-scenery-sky" viewBox="0 0 320 200" focusable="false">
+        {scenery.sky}
+      </svg>
+      <svg
+        className="set-scenery-horizon"
+        viewBox="0 0 1200 150"
+        preserveAspectRatio="xMidYMax slice"
+        focusable="false"
+      >
+        {scenery.horizon}
+      </svg>
     </div>
   );
 }

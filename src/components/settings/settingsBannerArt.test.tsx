@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { THEME_FAMILIES } from "../../state/ui";
+import { SETTINGS_BACKDROPS } from "./settingsBackdropArt";
 import { BANNER_BACKDROPS, BANNER_MOTIFS } from "./settingsBannerArt";
 
 const noOwnColor = (markup: string) => {
@@ -25,6 +26,16 @@ describe("Settings banners", () => {
       const markup = renderToStaticMarkup(<svg>{art}</svg>);
       expect(markup.length, motif).toBeGreaterThan(40);
       noOwnColor(markup);
+    }
+  });
+
+  test("every theme family has page scenery, a sky and a horizon, with no color of its own", () => {
+    for (const family of THEME_FAMILIES) {
+      const { sky, horizon } = SETTINGS_BACKDROPS[family];
+      noOwnColor(renderToStaticMarkup(<svg>{sky}</svg>));
+      const floor = renderToStaticMarkup(<svg>{horizon}</svg>);
+      expect(floor).toMatch(/sc-(ground|sand)/);
+      noOwnColor(floor);
     }
   });
 });

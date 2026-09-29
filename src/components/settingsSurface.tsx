@@ -160,7 +160,7 @@ import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { ConnectorGuide } from "./settings/connectorGuide";
 import { LibrarianRulesSettings } from "./settings/librarianRulesSettings";
 import { Seg } from "./settings/seg";
-import { SettingsBanner } from "./settings/settingsBanner";
+import { SettingsBanner, SettingsScenery } from "./settings/settingsBanner";
 import type { BannerMotif } from "./settings/settingsBannerArt";
 import { SwitchKnob, Toggle } from "./settings/toggle";
 import { VisibilitySettings } from "./settings/visibilitySettings";
@@ -3306,19 +3306,22 @@ export function SettingsSurface() {
           </button>
         ))}
       </nav>
-      <div className="set-main">
-        <div className="set-body">
-          {pane === "general" && <GeneralPane />}
-          {pane === "hotkeys" && <HotkeysPane />}
-          {pane === "appearance" && <AppearancePane />}
-          {pane === "browser" && <BrowserPane />}
-          {pane === "brain" && <BrainPane />}
-          {pane === "security" && <SecurityPane />}
-          {pane === "models" && <ModelsPane />}
-          {pane === "chat" && <ChatPane />}
-          {pane === "location" && <LocationPane />}
-          {pane === "connections" && <ConnectionsPane />}
-          {pane === "about" && <AboutRotliPane />}
+      <div className="set-stage">
+        <SettingsScenery />
+        <div className="set-main">
+          <div className="set-body">
+            {pane === "general" && <GeneralPane />}
+            {pane === "hotkeys" && <HotkeysPane />}
+            {pane === "appearance" && <AppearancePane />}
+            {pane === "browser" && <BrowserPane />}
+            {pane === "brain" && <BrainPane />}
+            {pane === "security" && <SecurityPane />}
+            {pane === "models" && <ModelsPane />}
+            {pane === "chat" && <ChatPane />}
+            {pane === "location" && <LocationPane />}
+            {pane === "connections" && <ConnectionsPane />}
+            {pane === "about" && <AboutRotliPane />}
+          </div>
         </div>
       </div>
     </div>

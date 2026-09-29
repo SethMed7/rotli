@@ -49,9 +49,8 @@ export const BANNER_BACKDROPS: Record<ThemeFamily, ReactNode> = {
   mono: (
     <>
       {[28, 52, 76].map((y) => (
-        <path key={y} className="sc-line" d={`M20 ${y}h600`} strokeDasharray="2 6" />
+        <path key={y} className="sc-line" d={`M450 ${y}h180`} strokeDasharray="2 6" />
       ))}
-      <path className="sc-line" d="M300 14v90" />
       {ground}
     </>
   ),
@@ -100,7 +99,7 @@ export const BANNER_BACKDROPS: Record<ThemeFamily, ReactNode> = {
       {star(262, 12, 1, 1.4)}
       {star(470, 20, 1.3, 2.6)}
       <path className="sc-far" d="M200 104c50-22 120-32 190-28s140 16 250 28z" />
-      {[260, 290, 616].map((x, i) => (
+      {[250, 282].map((x, i) => (
         <g key={x} transform={`translate(${x} ${86 - (i % 2) * 5})`}>
           <path className="sc-line" d="M0 18V0" />
           <path className="sc-accent-fill" d="M0 0q-7-5-4-12q4 3 4 7q0-4 4-7q3 7-4 12z" />
@@ -113,15 +112,15 @@ export const BANNER_BACKDROPS: Record<ThemeFamily, ReactNode> = {
   ),
   blossom: (
     <>
-      <path className="sc-branch" d="M640 8q-80 4-130 24t-80 14M560 18q-6 14 2 28" />
+      <path className="sc-branch" d="M640 4q-90 2-140 12t-90 12M520 12q-6 8 0 16" />
       <g className="sc-blossom">
         {[
-          [620, 12],
-          [590, 20],
-          [562, 44],
-          [540, 26],
-          [500, 38],
-          [460, 44],
+          [622, 6],
+          [592, 10],
+          [560, 14],
+          [520, 28],
+          [490, 20],
+          [440, 26],
         ].map(([x, y]) => (
           <circle key={`${x}-${y}`} cx={x} cy={y} r="5" />
         ))}
@@ -136,7 +135,7 @@ export const BANNER_BACKDROPS: Record<ThemeFamily, ReactNode> = {
   ),
   midnight: (
     <>
-      <circle className="sc-moon" cx="320" cy="36" r="14" />
+      <path className="sc-moon" d="M318 22a14 14 0 1 0 12 22a11 11 0 1 1-12-22z" />
       {star(200, 20, 1.2, 0)}
       {star(250, 46, 1, 1.1)}
       {star(390, 16, 1.5, 2)}
