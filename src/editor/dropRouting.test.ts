@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  BOARD_DROP_NOTICE,
   emptyPasteOutcome,
   dropIsBlocked,
+  dropIsOnBoard,
   classifyPaste,
   type DropCandidate,
   firstTarget,
@@ -119,6 +121,13 @@ describe("the drop plan", () => {
     });
     expect(planDrop(["/a/one.pdf", "/a/two.zip"], "none").notice).toBe("Saved 2 files to Assets");
     expect(planDrop([], "none").notice).toBeNull();
+    // a board: everything to Assets, and only the board's own notice
+    expect(planDrop(["/a/shot.png", "/a/report.pdf"], "board")).toEqual({
+      attach: [],
+      embed: [],
+      store: ["/a/shot.png", "/a/report.pdf"],
+      notice: BOARD_DROP_NOTICE,
+    });
   });
 });
 
@@ -165,4 +174,21 @@ test("a refused-chat modal and its backdrop block caret and Assets fallbacks", (
   expect(dropIsBlocked([at(dialog, chat, body)])).toBe(true);
   expect(dropIsBlocked([at(backdrop, editor, pane, body)])).toBe(true);
   expect(dropIsBlocked([at(overlay, editor, pane, body)])).toBe(false);
+});
+
+// 2026-09-28: a Finder file dropped on an open board fell through to another
+// pane's note (the router had no board branch). A board under the pointer now
+// claims the drop, so it can go to Assets with a notice instead.
+test("a board under the pointer claims the drop; an editor or chat does not", () => {
+  const board = new FakeElement(
+    "canvas",
+    ["excalidraw__canvas"],
+    {},
+    new FakeElement("surface", ["canvas-surface"], {}, pane),
+  );
+  expect(dropIsOnBoard([at(board, pane, body)])).toBe(true);
+  expect(dropIsOnBoard([at(editor, pane, body)])).toBe(false);
+  expect(dropIsOnBoard([at(chat, body)])).toBe(false);
+  // a dialog above the board still owns the drop
+  expect(dropIsOnBoard([at(dialog, board, body)])).toBe(false);
 });

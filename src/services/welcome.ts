@@ -10,7 +10,7 @@ import { useMainStore } from "../state/main";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import type { WelcomeSeed } from "../types";
-import { invalidateFolders, invalidateNoteLists } from "./hooks";
+import { invalidateFolders, invalidateNoteLists, invalidateTasks } from "./hooks";
 import { fileNoteInNamedRootFolder, mainHasNote } from "./mainTree";
 import { activeWebVaultDir, notesService } from "./notes";
 
@@ -80,7 +80,8 @@ export async function ensureWelcome(): Promise<WelcomeSeed> {
   const stale = () => new Error("The vault changed while the Welcome folder was being prepared. Try again.");
   const seed = isTauri() ? await corpusSeedWelcome() : await seedInMemory();
   if (owner !== generation) throw stale();
-  await Promise.all([invalidateNoteLists(), invalidateFolders()]);
+  // the lessons carry checkboxes: the Tasks page must see them at once
+  await Promise.all([invalidateNoteLists(), invalidateFolders(), invalidateTasks()]);
   if (owner !== generation) throw stale();
   const main = useMainStore.getState();
   let tree = main.manifest.tree;

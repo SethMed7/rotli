@@ -569,6 +569,7 @@ export const AI_KEYS = [
   "area_confidence",
   "filed_by",
   "filed_at",
+  "anchors", // passage pointers from /librarian (2026-09-28): lib/librarianActions.ts
 ] as const;
 
 /** Keys the USER owns on a note — disjoint from AI_KEYS and the Rust-reserved

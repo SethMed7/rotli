@@ -3317,6 +3317,49 @@
 .rename-btn.primary:hover {
   background: color-mix(in srgb, var(--on-accent) 12%, var(--accent));
 }
+/* Hand to AI (handToAiDialog.tsx): the shared dialog frame, wide enough to
+   read and edit a prompt; the prompt box scrolls, never the card */
+.rename-card.hand-to-ai-card {
+  width: min(44rem, calc(100vw - 32px));
+  max-width: none;
+  max-height: min(86vh, 760px);
+}
+.hand-to-ai-card .web-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.hand-to-ai-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.hand-to-ai-prompt {
+  min-height: 12rem;
+  height: 22rem;
+  max-height: 100%;
+  flex: 1 1 auto;
+  resize: vertical;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+}
+.hand-to-ai-prompt:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent-text) 45%, var(--border));
+}
+.hand-to-ai-status {
+  margin-inline-end: auto;
+  align-self: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
 
 /* — hotkey BADGES (the maintainer, 2026-08-04): the alternative to the whichkey panel —
    each chord pinned to the control it drives, so the eye never leaves the UI.
@@ -3525,4 +3568,153 @@
   color: var(--text-muted);
   font-size: 13px;
   line-height: 1.5;
+}
+/* What's new (whatsNewDialog.tsx): the shared dialog frame with the
+   celebrating quokka over a short list; the list scrolls, never the card */
+.rename-card.whats-new-card {
+  width: min(32rem, calc(100vw - 32px));
+  max-width: none;
+  max-height: min(86vh, 680px);
+}
+.whats-new-card .web-dialog-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-height: 0;
+}
+.whats-new-list {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+.whats-new-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.whats-new-platform {
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: var(--accent-text);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  font-size: 11px;
+  font-weight: 500;
+}
+.whats-new-body {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Settings → Librarian → Your rules (librarianRulesSettings.tsx): short lists the
+   person edits — words as chips, filing sentences as rows — each with an add box */
+.rules {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 20px;
+}
+.rules .mplabel {
+  width: auto;
+  margin-top: 8px;
+}
+.rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 34rem;
+}
+.rules-chips,
+.rules-rows {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  gap: 6px;
+}
+.rules-chips {
+  flex-wrap: wrap;
+}
+.rules-rows {
+  flex-direction: column;
+}
+.rules-chips li,
+.rules-rows li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--text);
+  background: var(--surface-2);
+}
+.rules-chips li {
+  padding: 3px 4px 3px 10px;
+  border-radius: var(--r-pill);
+}
+.rules-rows li {
+  justify-content: space-between;
+  padding: 6px 6px 6px 10px;
+  border-radius: var(--r-control);
+}
+.rules-rows li span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.rules-remove {
+  flex: none;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+}
+.rules-remove:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.rules-add {
+  display: flex;
+  gap: 8px;
+}
+.rules-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  padding: 6px 10px;
+}
+.rules-input:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent-text) 45%, var(--border));
+}
+.rules-reset {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent-text);
+  cursor: pointer;
+}
+.rules-reset:hover {
+  text-decoration: underline;
 }

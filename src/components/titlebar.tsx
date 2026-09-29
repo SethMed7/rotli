@@ -15,6 +15,7 @@ import { dispatch } from "../keys/registry";
 import { PLATFORM } from "../lib/featurePolicy";
 import { SHOW_HOTKEYS, hotkeyHint } from "../lib/hotkeyHint";
 import { startWindowDrag, toggleMaximize } from "../lib/tauri";
+import { useHidden } from "../state/hidden";
 import { canBack, canForward, useNavHistory } from "../state/navHistory";
 import { usePanesStore } from "../state/panes";
 import { SOLID_THEMES, useUiStore } from "../state/ui";
@@ -54,6 +55,8 @@ function onDragRegionDoubleClick() {
 
 export function Titlebar() {
   const settingsOpen = useUiStore((s) => s.settingsOpen);
+  // what the person hid (Settings → Appearance → Show in Rotli)
+  const hidden = useHidden((s) => s.hidden);
   // Back/Forward over opened notes (the maintainer #14) — ‹ › beside the search field
   const navBack = useNavHistory(canBack);
   const navForward = useNavHistory(canForward);
@@ -115,7 +118,7 @@ export function Titlebar() {
         {!settingsOpen && (
           <>
             {/* ‹ › — walk the opened-notes trail (the maintainer #14; ⌘[ / ⌘]) */}
-            {!breveActive && (
+            {!breveActive && !hidden.history && (
               <>
                 <button
                   type="button"
@@ -154,64 +157,75 @@ export function Titlebar() {
                 <Palette breveActive={breveActive} onClose={() => setPaletteOpen(false)} />
               </>
             ) : (
-              <button
-                type="button"
-                className="tb-search"
-                data-tour="search"
-                aria-label={`${breveActive ? "Search Rotli and actions" : "Search notes and actions"}${hotkeyHint(" — ⌘K")}`}
-                onMouseDown={(event) => event.stopPropagation()}
-                onDoubleClick={(event) => event.stopPropagation()}
-                onClick={() => dispatch("palette.toggle")}
-              >
-                <span className="tb-search-mark" aria-hidden="true">
-                  <QuokkaMark size={15} />
-                </span>
-                <span className="tb-search-label">{breveActive ? "Search Rotli…" : "Search…"}</span>
-                {SHOW_HOTKEYS && <kbd className="tb-search-kbd">⌘K</kbd>}
-              </button>
+              // on the web the button is the only way into the palette: never hidden
+              (WEB || !hidden.search) && (
+                <button
+                  type="button"
+                  className="tb-search"
+                  data-tour="search"
+                  aria-label={`${breveActive ? "Search Rotli and actions" : "Search notes and actions"}${hotkeyHint(" — ⌘K")}`}
+                  onMouseDown={(event) => event.stopPropagation()}
+                  onDoubleClick={(event) => event.stopPropagation()}
+                  onClick={() => dispatch("palette.toggle")}
+                >
+                  <span className="tb-search-mark" aria-hidden="true">
+                    <QuokkaMark size={15} />
+                  </span>
+                  <span className="tb-search-label">{breveActive ? "Search Rotli…" : "Search…"}</span>
+                  {SHOW_HOTKEYS && <kbd className="tb-search-kbd">⌘K</kbd>}
+                </button>
+              )
             )}
           </>
         )}
       </div>
       <div className="tb-actions">
         {/* panes & tabs, visible (the maintainer 2026-06-12: keyboard-only is not discoverable) */}
-        {!settingsOpen && !breveActive && (
+        {!settingsOpen && !breveActive && !(hidden.newButton && hidden.splitButtons) && (
           <>
-            <IconButton
-              label={`New…${hotkeyHint(" — ⌘N")}`}
-              hotkey="tabs.newChooser"
-              onClick={() => dispatch("tabs.newChooser")}
-            >
-              <PlusGlyph size={TB_ICON} />
-            </IconButton>
+            {!hidden.newButton && (
+              <IconButton
+                label={`New…${hotkeyHint(" — ⌘N")}`}
+                hotkey="tabs.newChooser"
+                onClick={() => dispatch("tabs.newChooser")}
+              >
+                <PlusGlyph size={TB_ICON} />
+              </IconButton>
+            )}
             {/* two distinct split buttons (the maintainer, 2026-06-13): right = vertical
                 divider (columns), down = horizontal divider (rows) */}
-            <IconButton
-              label={`Split right${hotkeyHint(" — ⌘D")}`}
-              hotkey="panes.splitRight"
-              onClick={() => dispatch("panes.splitRight")}
-            >
-              <SplitRightGlyph size={TB_ICON} />
-            </IconButton>
-            <IconButton
-              label={`Split down${hotkeyHint(" — ⌘⇧D")}`}
-              hotkey="panes.splitDown"
-              onClick={() => dispatch("panes.splitDown")}
-            >
-              <SplitDownGlyph size={TB_ICON} />
-            </IconButton>
+            {!hidden.splitButtons && (
+              <>
+                <IconButton
+                  label={`Split right${hotkeyHint(" — ⌘D")}`}
+                  hotkey="panes.splitRight"
+                  onClick={() => dispatch("panes.splitRight")}
+                >
+                  <SplitRightGlyph size={TB_ICON} />
+                </IconButton>
+                <IconButton
+                  label={`Split down${hotkeyHint(" — ⌘⇧D")}`}
+                  hotkey="panes.splitDown"
+                  onClick={() => dispatch("panes.splitDown")}
+                >
+                  <SplitDownGlyph size={TB_ICON} />
+                </IconButton>
+              </>
+            )}
             <span className="tb-sep" aria-hidden="true" />
           </>
         )}
-        {!settingsOpen && !WEB && (
+        {!settingsOpen && !WEB && !hidden.browserButton && (
           <IconButton label="New private browser" onClick={() => usePanesStore.getState().openBrowser()}>
             <BrowserGlyph size={TB_ICON} />
           </IconButton>
         )}
         {/* The sun cycles the four intentional work environments. */}
-        <IconButton label={`Theme — ${themeLabel}`} onClick={() => dispatch("theme.cycle")}>
-          <SunGlyph size={TB_ICON} />
-        </IconButton>
+        {!hidden.themeButton && (
+          <IconButton label={`Theme — ${themeLabel}`} onClick={() => dispatch("theme.cycle")}>
+            <SunGlyph size={TB_ICON} />
+          </IconButton>
+        )}
         <IconButton
           className="tb-trail"
           label={

@@ -57,7 +57,16 @@ export function firstTarget<E extends Closest, T>(
   return null;
 }
 
-export type DropSurface = "chat" | "editor" | "none";
+/** A board under the pointer (2026-09-28). Finder files never reach the
+ * canvas itself, so the drop goes to Assets with BOARD_DROP_NOTICE — never
+ * into a note in another pane, which is where it used to fall through. */
+export function dropIsOnBoard<E extends Closest>(candidates: readonly DropCandidate<E>[]): boolean {
+  return firstTarget(candidates, (element) => (element.closest(".canvas-surface") ? true : null)) !== null;
+}
+
+export const BOARD_DROP_NOTICE = "Saved to Assets — boards don’t take dropped files yet";
+
+export type DropSurface = "chat" | "editor" | "board" | "none";
 
 /** A file paste the host granted nothing for. If the pasteboard no longer holds
  * file references, the focus-time check was stale (Rotli itself copied text
@@ -147,6 +156,15 @@ export function planDrop(paths: readonly string[], surface: DropSurface): DropPl
       embed: paths.filter(isEmbeddablePath),
       store,
       notice: storedNotice(store, "a note embeds images and video"),
+    };
+  }
+  if (surface === "board") {
+    // a board takes no dropped files yet: all to Assets, with the one notice
+    return {
+      attach: [],
+      embed: [],
+      store: [...paths],
+      notice: paths.length === 0 ? null : BOARD_DROP_NOTICE,
     };
   }
   const media = paths.some(isEmbeddablePath);

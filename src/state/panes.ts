@@ -38,7 +38,10 @@ import {
   makeNewItemTab,
   makeBrowserTab,
 } from "./paneTabs";
+import { activeTabOf, findLeaf, leaves, mapAllTabs, updateLeaf } from "./paneTree";
 import { canOpenVaultInPanes, contentVaultId } from "./paneVaults";
+
+export { activeTabOf, findLeaf, leaves } from "./paneTree";
 import { useUiStore } from "./ui";
 
 export const MIN_PANE_WIDTH = 320;
@@ -223,40 +226,7 @@ function placeTab(
   return { ...l, tabs: [...l.tabs, tab], activeTabId: tab.id };
 }
 
-// ——— pure tree helpers ———
-
-export function findLeaf(node: PaneNode, id: string): LeafNode | null {
-  if (node.kind === "leaf") return node.id === id ? node : null;
-  for (const child of node.children) {
-    const found = findLeaf(child, id);
-    if (found) return found;
-  }
-  return null;
-}
-
-export function leaves(node: PaneNode, out: LeafNode[] = []): LeafNode[] {
-  if (node.kind === "leaf") out.push(node);
-  else for (const child of node.children) leaves(child, out);
-  return out;
-}
-
-/** The leaf's active tab — null ONLY for the lone pane after its last tab
- * closed (the quokka empty state; every other leaf always holds tabs). */
-export function activeTabOf(leaf: LeafNode): Tab | null {
-  return leaf.tabs.find((t) => t.id === leaf.activeTabId) ?? leaf.tabs[0] ?? null;
-}
-
-function updateLeaf(node: PaneNode, id: string, fn: (leaf: LeafNode) => LeafNode): PaneNode {
-  if (node.kind === "leaf") return node.id === id ? fn(node) : node;
-  return { ...node, children: node.children.map((c) => updateLeaf(c, id, fn)) };
-}
-
-/** Map EVERY tab in the tree (all leaves) — for a global retarget like a board
- *  rename, where any open canvas tab's boardId must follow the renamed file. */
-function mapAllTabs(node: PaneNode, fn: (t: Tab) => Tab): PaneNode {
-  if (node.kind === "leaf") return { ...node, tabs: node.tabs.map(fn) };
-  return { ...node, children: node.children.map((c) => mapAllTabs(c, fn)) };
-}
+// ——— pure tree helpers (the leaf walks live in paneTree.ts) ———
 
 /** Replace the leaf with a split (or insert a sibling if the parent already
  * splits in the same direction — keeps the tree flat). `before` puts the new
@@ -474,6 +444,8 @@ interface PanesState {
    * Move to Trash). The last remaining tab becomes the pristine note placeholder
    * so the pane-tree invariant — every leaf owns at least one tab — still holds. */
   closeFileTabs: (fileId: string) => void;
+  /** Close every tab showing this note or board, in every pane (it went to Trash). */
+  closeNoteTabs: (noteId: string) => void;
   /** Open the Brain Activity view (the AI-Filer change journal). Singleton per pane. */
   openActivity: () => void;
   /** ⌘N — a blank NEW TAB with the type chooser (the maintainer, 2026-07-29). */
@@ -622,6 +594,33 @@ export const usePanesStore = create<PanesState>((set, get) => {
       if (neighbor) return neighbor;
     }
     return null;
+  };
+
+  /** Close every tab matching `match` in every pane, keeping the window's
+   * last tab as a pristine placeholder. Nothing enters ⌘⇧T's reopen stack:
+   * the item left where it was. */
+  const closeTabsWhere = (match: (tab: Tab) => boolean) => {
+    // Snapshot identities first: closeTabById can collapse leaves, so walking
+    // and mutating the live tree in one pass would skip tabs after a collapse.
+    const targets = leaves(get().root).flatMap((leaf) =>
+      leaf.tabs.filter(match).map((tab) => ({ paneId: leaf.id, tabId: tab.id })),
+    );
+    for (const target of targets) {
+      const leaf = findLeaf(get().root, target.paneId);
+      if (!leaf?.tabs.some((tab) => tab.id === target.tabId)) continue;
+      if (leaves(get().root).length === 1 && leaf.tabs.length === 1) {
+        const placeholder = makeTab("");
+        set({
+          root: updateLeaf(get().root, leaf.id, (current) => ({
+            ...current,
+            tabs: [placeholder],
+            activeTabId: placeholder.id,
+          })),
+        });
+      } else {
+        get().closeTabById(target.paneId, target.tabId, { record: false });
+      }
+    }
   };
 
   return {
@@ -776,29 +775,19 @@ export const usePanesStore = create<PanesState>((set, get) => {
 
     closeFileTabs: (fileId) => {
       dropNavEntry(navEntry("file", fileId)); // the file left the corpus — Forward must not chase it
-      // Snapshot identities first: closeTabById can collapse leaves, so walking
-      // and mutating the live tree in one pass would skip tabs after a collapse.
-      const targets = leaves(get().root).flatMap((leaf) =>
-        leaf.tabs
-          .filter((tab) => tab.surfaceKind === "file" && tab.fileId === fileId)
-          .map((tab) => ({ paneId: leaf.id, tabId: tab.id })),
+      closeTabsWhere((tab) => tab.surfaceKind === "file" && tab.fileId === fileId);
+    },
+
+    closeNoteTabs: (noteId) => {
+      // a trashed note keeps its id, so its tab would keep resolving; a trashed
+      // board gets a new id, so its tab would point at nothing (Round Three)
+      dropNavEntry(noteId);
+      dropNavEntry(navEntry("canvas", noteId));
+      closeTabsWhere(
+        (tab) =>
+          (tab.surfaceKind === "note" && tab.noteId === noteId) ||
+          (tab.surfaceKind === "canvas" && tab.boardId === noteId),
       );
-      for (const target of targets) {
-        const leaf = findLeaf(get().root, target.paneId);
-        if (!leaf?.tabs.some((tab) => tab.id === target.tabId)) continue;
-        if (leaves(get().root).length === 1 && leaf.tabs.length === 1) {
-          const placeholder = makeTab("");
-          set({
-            root: updateLeaf(get().root, leaf.id, (current) => ({
-              ...current,
-              tabs: [placeholder],
-              activeTabId: placeholder.id,
-            })),
-          });
-        } else {
-          get().closeTabById(target.paneId, target.tabId, { record: false });
-        }
-      }
     },
 
     openActivity: () => openAppSurface("activity"),

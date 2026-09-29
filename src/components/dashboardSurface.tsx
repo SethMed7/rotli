@@ -18,7 +18,7 @@ import {
   usageTokenTotal,
 } from "./modelUsageSummary";
 import { chatMark } from "./sidebar/chatMark";
-import { homeDashboardSnapshot } from "./sidebar/homeDashboardModel";
+import { homeDashboardSnapshot, inWindow } from "./sidebar/homeDashboardModel";
 import { ModelLogo } from "./sidebar/modelLogo";
 import { useChatFolders } from "./sidebar/useChatFolders";
 
@@ -82,13 +82,13 @@ function RotliActivity() {
   const recentNotes = useMemo(
     () =>
       notes
-        .filter((note) => note.updatedAt >= sinceMs && note.updatedAt <= nowMs)
+        .filter((note) => inWindow(note.updatedAt, sinceMs, nowMs))
         .sort((a, b) => b.updatedAt - a.updatedAt)
         .slice(0, 6),
     [notes, nowMs, sinceMs],
   );
   const recentChats = useMemo(
-    () => chats.chatList.filter((chat) => chat.modifiedMs >= sinceMs && chat.modifiedMs <= nowMs).slice(0, 6),
+    () => chats.chatList.filter((chat) => inWindow(chat.modifiedMs, sinceMs, nowMs)).slice(0, 6),
     [chats.chatList, nowMs, sinceMs],
   );
 

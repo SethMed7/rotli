@@ -749,6 +749,22 @@
 .rotli-cm-host .cm-content ::selection {
   background: color-mix(in srgb, var(--accent) 26%, transparent);
 }
+/* The Librarian's passage (findHighlight.ts): focus sits in the Librarian's box,
+   so the highlighted passage is painted as a mark, in the selection's own wash */
+.rotli-cm-host .cm-librarian-passage {
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+}
+/* "Find in this file" (findHighlight.ts): every match is washed, the current
+   one is solid and ringed, so it reads as "here" in every theme; the accent
+   keeps it apart from the peach ==highlight== tint */
+.rotli-cm-host .cm-find-match {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border-radius: var(--r-inner);
+}
+.rotli-cm-host .cm-find-current {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  outline: 1px solid var(--accent);
+}
 /* an empty note's hint (emptyPlaceholder.ts): painted behind a plain empty
    line so the native caret keeps real line metrics in every engine */
 .rotli-cm-host .cm-line.rotli-empty-hint::before {
@@ -2442,4 +2458,386 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 45%;
+}
+/* The Librarian bar (librarianBar.tsx): the format bar's slot, wider, with a
+   model picker, the live highlight, a request, and proposals to apply */
+.libbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(36rem, calc(100vw - 48px));
+  padding: 10px 12px;
+  background: var(--ground);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+}
+.libbar-head,
+.libbar-ask,
+.libbar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.libbar-row {
+  justify-content: flex-end;
+}
+.libbar-head strong {
+  font-size: 13px;
+  color: var(--text);
+}
+.libbar-chip,
+.libchat-about {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.libbar-close,
+.libchat-icon {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--r-control);
+  padding: 2px 6px;
+}
+.libbar-close:hover,
+.libchat-icon:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.libbar-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  padding: 6px 8px;
+}
+.libbar-input:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent-text) 45%, var(--border));
+}
+.libbar-note {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.libbar-note.err {
+  color: var(--danger);
+}
+.libchat-card ul,
+.libbar-marks ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.libchat-card label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+.libbar-link {
+  border: none;
+  background: none;
+  padding: 0 0 0 6px;
+  font: inherit;
+  color: var(--accent-text);
+  cursor: pointer;
+  text-align: left;
+}
+.libbar-link:hover {
+  text-decoration: underline;
+}
+.libbar-marks summary {
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+/* The Librarian (librarianChat.tsx, 2026-09-28): a pill that lives in the
+   pane's bottom-right corner beside the scroll-to-top arrow (same height,
+   8px to its left), always there. The conversation grows out of it: the panel
+   opens just above, right-aligned to the pill, with a small pointer down at
+   it. Flat, like every surface: a hairline, no shadow. Both rise with the
+   arrow when the centered format bar would reach the corner. */
+.libchat-launch {
+  position: absolute;
+  right: 66px;
+  bottom: 16px;
+  z-index: 7;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--ground);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.libchat-launch:hover {
+  background-image: linear-gradient(var(--hov), var(--hov));
+}
+.libchat-launch.open {
+  border-color: color-mix(in srgb, var(--accent-text) 45%, var(--border));
+  background-image: linear-gradient(var(--tint), var(--tint));
+}
+.libchat {
+  position: absolute;
+  right: 66px;
+  bottom: 68px;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  width: min(24rem, calc(100% - 82px));
+  max-height: min(34rem, calc(100% - 120px));
+  background: var(--ground);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  transform-origin: calc(100% - 46px) 100%;
+  animation: libchat-open var(--motion-enter, 160ms) var(--motion-ease, ease-out);
+}
+/* the pointer down at the pill: a square turned on its point, two hairlines */
+.libchat::after {
+  content: "";
+  position: absolute;
+  right: 40px;
+  bottom: -6px;
+  width: 10px;
+  height: 10px;
+  background: var(--ground);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  transform: rotate(45deg);
+}
+@keyframes libchat-open {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .libchat {
+    animation: none;
+  }
+}
+.editor[data-lift-scroll-top] .libchat-launch {
+  bottom: 66px;
+}
+.editor[data-lift-scroll-top] .libchat {
+  bottom: 118px;
+}
+.libchat-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px 8px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+.libchat-head strong {
+  font-size: 13px;
+}
+.libchat-grow {
+  flex: 1 1 auto;
+}
+.libchat-tochat {
+  padding: 0 4px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.libchat-handoff {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+.libchat-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.libchat-pill {
+  padding: 3px 9px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.libchat-pill:hover:not(:disabled) {
+  background: var(--hov);
+}
+.libchat-pill:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.libchat-log {
+  flex: 1 1 auto;
+  min-height: 5rem;
+  margin: 0;
+  padding: 12px;
+  list-style: none;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.libchat-turn {
+  max-width: 88%;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.libchat-turn p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.libchat-turn p + p {
+  margin-top: 6px;
+}
+.libchat-turn.you {
+  align-self: flex-end;
+  padding: 7px 10px;
+  background: var(--tint);
+  border-radius: var(--r-card);
+}
+.libchat-turn.lib {
+  align-self: flex-start;
+  padding: 7px 10px;
+  background: var(--surface-2);
+  border-radius: var(--r-card);
+}
+.libchat-quote {
+  display: block;
+  margin-bottom: 4px;
+  padding-left: 6px;
+  border-left: 2px solid var(--accent);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.libchat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--ground);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+}
+.libchat-card input[type="checkbox"] {
+  accent-color: var(--accent-text);
+}
+.libchat-thinking {
+  display: flex;
+  gap: 4px;
+  padding: 11px 12px;
+}
+.libchat-thinking span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: libchat-typing 1.2s ease-in-out infinite;
+}
+.libchat-thinking span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.libchat-thinking span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes libchat-typing {
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .libchat-thinking span {
+    animation: none;
+  }
+}
+.libchat-error {
+  padding: 0 12px 8px;
+}
+.libchat-compose {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--border);
+}
+.libchat-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.libchat-input {
+  resize: none;
+  line-height: 1.45;
+}
+/* the composer's last lines: what the ask is about and the model on one
+   row, then what the Librarian is (and isn't) for */
+.libchat-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.libchat-note {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.libchat-compose.off .libchat-row,
+.libchat-compose.off .libchat-meta {
+  opacity: 0.55;
+}
+/* what an Apply changed, listed in the reply */
+.libchat-done {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.libchat-done li::before {
+  content: "✓ ";
+  color: var(--accent-text);
+}
+.libchat-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
 }

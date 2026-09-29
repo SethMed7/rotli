@@ -294,7 +294,16 @@ export const DEFAULT_QUOKKA_ACCESSORY_HUE = 38;
 
 /** Personal placements use this preferred mood. Semantic empty states keep
  * choosing their own pose so the illustration still communicates state. */
-export const QUOKKA_IDLE_POSES = ["base", "rest", "thoughtful", "listening", "celebrating"] as const;
+export const QUOKKA_IDLE_POSES = [
+  "base",
+  "rest",
+  "thoughtful",
+  "listening",
+  "celebrating",
+  "waving",
+  "searching",
+  "walking",
+] as const;
 
 export type QuokkaIdlePose = (typeof QUOKKA_IDLE_POSES)[number];
 
@@ -308,6 +317,11 @@ export const QUOKKA_IDLE_POSE_PRESENTATIONS: readonly {
   { pose: "thoughtful", label: "Thoughtful", description: "Quietly curious" },
   { pose: "listening", label: "Attentive", description: "Ready to listen" },
   { pose: "celebrating", label: "Cheerful", description: "A little brighter" },
+  // 2026-09-28: three more moods from poses already drawn (and already
+  // fitted for every accessory), before any new art
+  { pose: "waving", label: "Friendly", description: "Always says hello" },
+  { pose: "searching", label: "Inquisitive", description: "Looking into things" },
+  { pose: "walking", label: "Adventurous", description: "Off exploring" },
 ];
 
 export const QUOKKA_STYLE_PRESENTATIONS: readonly {

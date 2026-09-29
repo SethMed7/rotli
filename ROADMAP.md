@@ -24,11 +24,73 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
   ([contract](docs/architecture/agent-workspace.md)). Includes a custom Grok Bot
   that manages Rotli: create, file, search, and organize notes.
 - **Read aloud** · M — select text and have it read to you, on-device.
+- **Hand to AI** · M — turn the open note into a prompt for Claude Code or
+  another agent. Built: "Hand to AI…" in the palette and a note's menu writes
+  the prompt from the note itself (goal, open and finished tasks, the note as
+  context, what "done" means), editable, with Copy; a secure note, or one that
+  looks like it holds a secret, is refused. Left: "Open in chat" to send it on
+  in Rotli, and a model-written version on the model you pick from your
+  connected providers (a secure note only ever to an on-device model).
 - **Breve in public builds** · M — the morning brief and routines. Runs in
   development builds today.
 
 ## 2. Planned
 
+- **Talk to the Librarian (`/librarian`)** · L — type `/librarian` and the
+  format bar at the bottom turns into a small Librarian chat, like the chat
+  bubble on a website; one click opens the same conversation full size in
+  Chat. Highlight part of the note and say what you want: "mark this so I can
+  find it", "file this note under Projects", "this is my cousin Ana". The
+  Librarian proposes what it will do, and nothing happens until you apply it.
+  Applied actions are journaled and can be undone. You pick its model from the
+  providers you have connected. **Slice 1 built (2026-09-28, #121–#122):** the
+  bar, tag, mark a passage (with jump-back), and file (creating People).
+  **The conversation built (2026-09-28):** after the first ask the bar pops out
+  into a chat in the pane's corner, multi-turn, with proposals applied from
+  inside it, scoped to organizing (anything else is offered "Take this to
+  Chat", which opens a new chat about the note with the question typed); the
+  searchable model picker; the highlight kept painted. Still to
+  come: new notes from a highlight, and "Open in Chat".
+  - It never rewrites the note you wrote. It changes only its own metadata and
+    where the note lives, or it writes a new note, such as a people note for a
+    name you highlighted.
+  - "Mark this" saves a pointer to that exact passage in the note's metadata
+    (the words plus a little of what surrounds them), so the passage is easy
+    to find again without changing the text. That pointer is a new field the
+    Librarian may write, so it is added to the data contract first.
+  - People notes go in a People folder, created if there is none, unless a
+    Librarian rule says where they go.
+  - A locked note is off limits: the Librarian does not touch it and does not
+    create a note that would clash with it. If you ask for something that
+    would change a locked note, it tells you instead.
+  - With the Librarian turned off, `/librarian` says to turn it on in Settings.
+  - Slice 1: the bar, the highlight, pointers, and filing. Slice 2: new notes
+    from a highlight, and opening the conversation in Chat. Mac first; on web
+    it says "In the Mac app" until the Librarian runs there.
+- **Librarian rules** · M–L — tell the Librarian how you want things kept, in
+  plain settings, not code: which folder a kind of note goes to, and how the
+  people section is split (acquaintances, friends, family; one simple list; or
+  your own groups). **Built (2026-09-28):** Settings → Librarian → Your rules —
+  filing sentences the organizer and `/librarian` follow, People split into
+  groups (Family, Friends, Work, Acquaintances by default, editable) or one
+  list, and secure keywords (see "Secure note rules" in §8). Kept in the
+  vault's `.rotli/settings.json`, on this Mac.
+- **The Librarian writes people notes and folder indexes** · L — by default the
+  Librarian may write in the people section (never a locked note) and keeps an
+  `index.md` table of contents in each folder. Today it only fills metadata and
+  a generated index for each top-level area, and (2026-09-28) new people notes
+  when you tell it about someone in `/librarian`. Writing into existing people
+  notes changes the Librarian's contract, which says it only touches metadata
+  and location, so the contract is decided first. Your own notes stay yours: it still never rewrites a note
+  you wrote unless you ask.
+- **Links that survive a rename** · M — a `[[link]]` keeps pointing at the same
+  note when that note's title or file name changes, without you retitling
+  anything to keep it working. Renaming a note in Rotli already rewrites its
+  top title, and the file name follows, the way Markdown files work. What's
+  missing is the link side: today a link finds its note by the old name saved
+  in `aliases`, and nothing updates the notes that link to it. Decide between
+  updating those links on an explicit rename (what Obsidian does) and links
+  that carry the note's stable id.
 - **Add-ons system** · L — one way for the user to install and manage add-ons
   locally. Email providers, drive providers, and the Grok Bot all plug into it
   instead of each being a one-off. Comes before email and drive sync, because
@@ -69,18 +131,13 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
 
 ## 3. Ideas
 
-- **Pull Chat out into its own window** · L — hold and drag "Chat" out of the
-  Home | Chat switch into an independent window that shows only what belongs to
-  it; even its tabs are only chat tabs. An icon groups it back into its original
-  place. Home can never be pulled out: the main app is where Home lives.
 - **Per-note version history** · L — local snapshots of a note with a diff
   view, so nothing typed is ever lost.
-- **Import from Obsidian, Notion, and Apple Notes** · L — bring an existing
-  library in, links and images included.
+- **Import from Notion and Apple Notes** · L — bring an existing library in,
+  links and images included. An Obsidian or plain Markdown folder already opens
+  as a vault.
 - **Backlinks panel** · M — every note that links to this one, plus places that
   mention it without a link.
-- **Templates via slash** · S — `/template meeting` drops in a saved note
-  layout.
 - **Actionable checklists as a family** · L — `/email:send` is the first one.
   The same pattern for `/remind`, `/event`, and `/open`, so a checkbox can carry
   an action.
@@ -96,43 +153,58 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
 - **Due dates on tasks** · M — write `due friday` on a task, and the Tasks page
   gets a Today group. Pairs with actionable checklists.
 - **Task board view** · M — the Tasks page as columns: open, in progress, done.
-  The in-progress `[/]` state already exists, so it is one more view over the
-  same notes.
+  The in-progress `[/]` state already exists in notes; the Tasks list needs to
+  carry it (today it folds `[/]` into open), then this is one more view over
+  the same notes.
 - **Librarian weekly digest** · M — what you wrote this week, notes nothing
   links to, and stale tasks, delivered through Breve.
 - **Tags browser** · M — a place to see every tag and the notes under it. Tags
   already exist in note metadata.
+- **Freeform canvas** · XL — drop notes, sheets, PDFs, and images on one
+  board, connect them, group them into frames, and present the frames as
+  slides, like AFFiNE's Edgeless. Built inside Excalidraw. First slice (M–L, no
+  contract change): real-size images on boards, drops onto a board, frames +
+  Present. File cards and connectors need two
+  owner calls: whether a connector is a link, and what a card may show
+  ([evaluation](docs/design/canvas-tasks-logseq-eval-2026-09-23.md)).
+- **Query fence** · M–L — a `query` code block that shows a live table of
+  tasks or notes (`tag:`, `area:`, state, due), using the grammar
+  `rotli notes query` already has. With **Export to .xlsx** (S–M) it gives a
+  task table that opens in Excel while tasks stay in notes.
+- **Daily journal** · S–M — a Journal folder, a "Today" command that opens or
+  creates today's note, and Quick Note can land there. Logseq's best-loved
+  habit.
+- **Sheet templates** · M — "New from template": task tracker, weekly planner,
+  habit tracker, with status dropdowns, colours, and a frozen header, saved as
+  real .xlsx. Needs Sheets released, and dropdowns and colour rules carried
+  through the grid first.
+- **Block references** · L — point at one paragraph with `^id` and show it
+  elsewhere with `![[note#^id]]`, in the same syntax Obsidian reads.
+- **Librarian questions** · L — a switch in the bottom right. When it is on,
+  the Librarian marks a note it has a question about with a small dot. Click the
+  dot and it highlights the text in question and asks, for example "who is
+  Ana?". Your answer goes where `/librarian` would put it. Builds on Talk to the
+  Librarian.
+- **Chat as a work surface** · XL — Chat working like Claude Cowork for work
+  that isn't code: ask for a video, have a video tool you connected make it,
+  and watch it in the chat. The model drives the tool; it does not make the
+  video itself. Evaluated 2026-09-27
+  ([evaluation](docs/design/chat-work-surface-eval-2026-09-27.md)). Built:
+  replies show images and video from the vault, and a video shows as a video
+  in the chat's files. Next: a video tool, background jobs, and the provider
+  behind Add-ons (M to XL, owner call on the source); dropping a video into a
+  chat comes with the tool, since nothing can use one before it. The
+  connected CLIs stay tool-less.
 
 ## 4. Known bugs
 
-- **Confusing errors when files move** — these are just files moving; no one
-  will know what these messages mean, so they should never show.
-  - Part 1 · S: a view folder name can be typed with `/` or `:`, which Rotli
-    then refuses on save. Fix: stop it when the folder is named, with a plain
-    message.
-  - Part 2 · M: when something else (the CLI or the Librarian) changes Main
-    while the app holds an older copy, a raw revision conflict shows. Fix:
-    re-read, merge, and retry quietly; plain wording if it ever still shows.
 - **First drag and drop lands too high** · M — on the first drag, the drop does
   not line up with the pointer. Needs a reproduction first.
-- **Image tags show up in the chat name** · S — a chat that starts with an
-  image gets the raw image tag as its name.
 
 ## 5. Small enhancements
 
-- **Remove the count on "Chat"** · S — the number in the Home | Chat switch. It
-  will not hold up at 1k chats.
-- **Name chats by meaning** · M — name a chat from the purpose of the first
-  prompt, not its first few words.
-- **Hotkey to switch views** · M — ⌘⇧W opens the views, then ⌘number picks one.
-- **Hotkey to jump into the sidebar** · M — ⌘⇧S enters the sidebar, then
-  ⌘number opens one of the top 9 notes in the current view. Reorder and pin
-  notes in the sidebar so 1–9 stay put.
-- **Two-step hotkeys** · M — needed first by the two hotkeys above. ⌘1–9
-  already jump tabs, and Rotli has no "press one chord, then another" yet.
-- **Wikilink hover preview** · S/M — hover a `[[link]]` and see the top of that
-  note without opening it.
-- **Send feedback in-app** · S — a button that opens a prefilled GitHub issue.
+Nothing open right now. The last four (⌘⇧W views, ⌘⇧S top notes, two-step
+hotkeys, and Send feedback) shipped in 1.3.
 
 ## 6. Keeping the web version in sync
 
@@ -175,3 +247,9 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
 - **Calendar integration** — cal.diy base; Apple, Google, and Proton providers.
 - **Secure organization** — needs its own session with injection evals before
   any build.
+- **Secure note rules** — your own keywords that make a note secure, matched
+  only on its title or file name, never read by a model. That is what keeps it
+  clear of Secure organization's model risk. **Built (2026-09-28), with the
+  owner's call: one protected folder** — a matching note moves into
+  `wiki/_secure/` like any secure note; choosing other folders stays future
+  work, since each would need the same Git and model protection.

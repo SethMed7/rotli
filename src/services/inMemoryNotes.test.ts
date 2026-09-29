@@ -48,3 +48,29 @@ describe("in-memory notes snapshots", () => {
     expect(isNotesSnapshot(base)).toBe(true);
   });
 });
+
+// Round Three (2026-09-26): the twin of corpus.rs's alias rules. Autosave sees
+// a half-typed title on every save; neither that trail nor a fresh note's
+// "Untitled" is a name anyone links to.
+describe("rename aliases", () => {
+  async function typeTitles(svc: InMemoryNotesService, titles: string[]) {
+    let note = await svc.createNote(DEST.inbox, "");
+    for (const title of titles) {
+      note = await svc.updateNote(note.id, `# ${title}\n\nBody.`, note.revision ?? "");
+    }
+    return note;
+  }
+
+  test("typing a new note's title keeps only its current slug", async () => {
+    const svc = freshService();
+    const note = await typeTitles(svc, ["R", "Round", "Round Three", "Round Three -", "Round Three - Rotli"]);
+    // the web twin has no file name: the current slug stands in for it
+    expect(note.aliases).toEqual(["round-three-rotli"]);
+  });
+
+  test("a real rename keeps the old name for links", async () => {
+    const svc = freshService();
+    const note = await typeTitles(svc, ["Round Three", "Q3 plan"]);
+    expect(note.aliases).toEqual(["round-three", "Round Three", "q3-plan"]);
+  });
+});

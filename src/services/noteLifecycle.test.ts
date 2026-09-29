@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { noteImageRels, referencedElsewhere } from "./noteLifecycle";
+import { usePanesStore } from "../state/panes";
+import { DEST } from "./destinations";
+import { noteImageRels, referencedElsewhere, trashNoteWithImages } from "./noteLifecycle";
+import { notesService } from "./notes";
 
 describe("image cascade (images follow their note into Archive/Trash)", () => {
   test("extracts rel image srcs, normalizes storage:, dedupes, skips remote", () => {
@@ -30,5 +33,36 @@ describe("image cascade (images follow their note into Archive/Trash)", () => {
       throw new Error("search down");
     };
     expect(await referencedElsewhere("storage/pic.png", "01ME", boom)).toBe(true);
+  });
+});
+
+// Round Three (2026-09-26): a trashed note keeps its id, so its tab kept
+// resolving. Trash closes the note's tabs once the move has landed.
+describe("trash closes the note's tabs", () => {
+  async function withClosedTabs(run: (closed: string[]) => Promise<void>) {
+    const closed: string[] = [];
+    const original = usePanesStore.getState().closeNoteTabs;
+    usePanesStore.setState({ closeNoteTabs: (id: string) => void closed.push(id) });
+    try {
+      await run(closed);
+    } finally {
+      usePanesStore.setState({ closeNoteTabs: original });
+    }
+  }
+
+  test("closes the tabs after the note lands in Trash", async () => {
+    const note = await notesService.createNote(DEST.inbox, "# Old plan\n\nDone with it.");
+    await withClosedTabs(async (closed) => {
+      const trashed = await trashNoteWithImages(note.id);
+      expect(trashed.folderId).toBe(DEST.trash);
+      expect(closed).toEqual([note.id]);
+    });
+  });
+
+  test("a failed trash leaves the tabs open", async () => {
+    await withClosedTabs(async (closed) => {
+      await expect(trashNoteWithImages("01MISSINGNOTE0000000000000")).rejects.toThrow();
+      expect(closed).toEqual([]);
+    });
   });
 });

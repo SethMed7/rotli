@@ -36,13 +36,13 @@ import {
   applyBlockToggleAll,
   applyHeading,
   registerEditor,
-  toggleInlineMark,
   unregisterEditor,
 } from "./commands";
 import { copyHandlers } from "./copyHandlers";
 import { emptyPlaceholder } from "./emptyPlaceholder";
 import { importImagePathsAtPosition, isEmbeddablePath } from "./externalImageDrop";
 import { findTextMatches, nextFindMatch } from "./find";
+import { findHighlight, passageHighlight, setFindMarks, setPassageMark } from "./findHighlight";
 import { fmBlock } from "./fmBlock";
 import { focusDim } from "./focusMode";
 import { headingFolding, toggleHeadingFold } from "./headingFold";
@@ -50,9 +50,10 @@ import { ImageGenPopover } from "./imageGenPopover";
 import { linkOpener } from "./linkOpener";
 import { listNumbering } from "./listNumbers";
 import { livePreview, noteIdFacet } from "./livePreview";
+import { markSelectionSpec } from "./markSelection";
 import { ensureDocument, getDocumentText, onDocumentChange, setDocumentText } from "./model";
 import { rawMarkdown } from "./rawMarkdown";
-import { pickerFence, slashInsertion } from "./slashActions";
+import { opensFlow, pickerFence, slashInsertion } from "./slashActions";
 import {
   adaptSlashInsertion,
   filterSlashItems,
@@ -63,6 +64,7 @@ import {
   type SlashItem,
   type SlashPickerMode,
 } from "./slashMenu";
+import { openSlashPanel } from "./slashPanels";
 import { SlashPicker } from "./slashPicker";
 import { tableRender } from "./tableRender";
 import { insertTemplateFromPicker } from "./templateInsert";
@@ -296,6 +298,16 @@ function CmEditorImpl({
         findInputRef.current?.select();
       });
     },
+    getSelection: () => {
+      const state = viewRef.current?.state;
+      const { from, to } = state?.selection.main ?? { from: 0, to: 0 };
+      return state ? { doc: state.doc.toString(), from, to } : null;
+    },
+    markPassage: (range) => viewRef.current?.dispatch({ effects: setPassageMark.of(range) }),
+    selectRange: (from, to) => {
+      viewRef.current?.dispatch({ selection: EditorSelection.range(from, to), scrollIntoView: true });
+      viewRef.current?.focus();
+    },
     toggleFold: () => {
       const view = viewRef.current;
       if (view) {
@@ -306,16 +318,8 @@ function CmEditorImpl({
     toggleMark: (mark) => {
       const view = viewRef.current;
       if (!view) return;
-      const r = view.state.selection.main;
-      const line = view.state.doc.lineAt(r.head);
-      const from = Math.max(r.from, line.from);
-      const to = Math.min(r.to, line.to);
-      const res = toggleInlineMark(line.text, from - line.from, to - line.from, mark);
-      view.dispatch({
-        changes: { from: line.from, to: line.to, insert: res.line },
-        selection: EditorSelection.range(line.from + res.selStart, line.from + res.selEnd),
-        scrollIntoView: true,
-      });
+      const spec = markSelectionSpec(view.state, mark);
+      if (spec) view.dispatch({ ...spec, scrollIntoView: true });
       view.focus();
     },
     setHeading: (level) => {
@@ -426,7 +430,7 @@ function CmEditorImpl({
       // where the command's content begins once the span is cleared — on a
       // result row's reason that is the fresh continuation line beneath it
       const contentFrom = spanFrom + span.lead.length;
-      if (item.op.kind === "picker" || item.op.kind === "attachImage" || item.op.kind === "imageGen") {
+      if (opensFlow(item.op)) {
         view.dispatch({
           changes: { from: spanFrom, to: line.to, insert: span.lead },
           selection: EditorSelection.cursor(contentFrom),
@@ -463,12 +467,18 @@ function CmEditorImpl({
             });
           return;
         }
+        if (item.op.kind === "librarian" || item.op.kind === "handToAi") {
+          setSlash((s) => ({ ...s, open: false }));
+          openSlashPanel(item.op.kind, paneId, noteId);
+          return;
+        }
         if (item.op.kind === "imageGen") {
           setSlash((s) => ({ ...s, open: false }));
           setImageGen({ insertAt: contentFrom, continuation: span.continuation, left, top, up });
           return;
         }
-        openPicker(item.op.mode, contentFrom, span.continuation, left, top, up);
+        if (item.op.kind === "picker")
+          openPicker(item.op.mode, contentFrom, span.continuation, left, top, up);
         return;
       }
       const insertion = slashInsertion(item.op);
@@ -481,7 +491,7 @@ function CmEditorImpl({
       setSlash((s) => ({ ...s, open: false }));
       view.focus();
     },
-    [noteId, openPicker],
+    [noteId, openPicker, paneId],
   );
 
   // create the view ONCE per note/pane
@@ -541,6 +551,8 @@ function CmEditorImpl({
       extensions: [
         history(),
         listNumbering,
+        findHighlight,
+        passageHighlight,
         // the slash menu owns ↑/↓/Enter/Esc while open — highest precedence so
         // it wins before the keymaps; stops propagation so Esc closes the menu
         // and never also hides the window (the old stopImmediatePropagation)
@@ -663,6 +675,16 @@ function CmEditorImpl({
     // a mid-document anchor.
     viewRef.current?.scrollDOM.scrollTo({ top: 0, behavior: "auto" });
   }, [scrollToTopSignal]);
+
+  // paint the find matches (findHighlight.ts): focus stays in the find box, so
+  // the moved selection alone never shows; closing the bar clears the marks
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: setFindMarks.of(
+        findOpen ? { matches: findMatches, current: findIndex } : { matches: [], current: -1 },
+      ),
+    });
+  }, [findOpen, findMatches, findIndex]);
 
   // live spell-check toggle (default on; a Settings switch)
   useEffect(() => {

@@ -111,9 +111,16 @@ test("a folder created in Main is there after a reload", async ({ page }) => {
   await page.getByRole("textbox", { name: "New folder in Main" }).fill("Kept");
   await page.getByRole("textbox", { name: "New folder in Main" }).press("Enter");
   await expect(page.locator('.main-tree [data-main-folder="1"]', { hasText: "Kept" })).toBeVisible();
+  // Main saves to the folder asynchronously: reload only once it has landed
+  await expect.poll(() => readOpfsFile(page, ".rotli/main.json"), { timeout: 10_000 }).toContain("Kept");
 
   await page.reload();
-  await expect(page.locator('.main-tree [data-main-folder="1"]', { hasText: "Kept" })).toBeVisible();
+  // a reload reconnects the vault before Main hydrates; under a full parallel
+  // suite that took past the 5 s default (flaky twice, 2026-09-26/27; a
+  // 60-run stress showed the file was always saved and a run took 7.2 s)
+  await expect(page.locator('.main-tree [data-main-folder="1"]', { hasText: "Kept" })).toBeVisible({
+    timeout: 20_000,
+  });
 });
 
 test("the web build keeps Chat visible; clicking it walks through the helper and the tool sign-in", async ({

@@ -66,6 +66,7 @@ import {
   viewPickerItems,
 } from "../../services/viewTree";
 import { useContextMenu } from "../../state/contextMenu";
+import { useHidden } from "../../state/hidden";
 import { useMainStore } from "../../state/main";
 import { type DropPreview, sidebarItemId, useFocusedTab, usePanesStore } from "../../state/panes";
 import { QUICK_MAX, togglePinQuick } from "../../state/quick";
@@ -75,14 +76,12 @@ import type { NoteSummary } from "../../types";
 import {
   ArchiveGlyph,
   ChevronRight,
-  FileGlyph,
   FolderGlyph,
   NewFileGlyph,
   NewFolderGlyph,
   PinGlyph,
   StarGlyph,
   StorageGlyph,
-  TaskGlyph,
   TrashGlyph,
   glyphForNote,
 } from "../glyphs";
@@ -90,6 +89,7 @@ import { InlineRenameInput } from "../inlineRenameInput";
 import { useNoteMenu } from "../useNoteMenu";
 import { ViewSectionHeader } from "./chatViewPicker";
 import { homeDashboardSnapshot } from "./homeDashboardModel";
+import { HomeShortcuts, shownShortcuts } from "./homeShortcuts";
 import { mainFolderMenuItems } from "./mainFolderMenu";
 import { noteDisplayTitle } from "./noteDisplayTitle";
 import { SidebarSystem, type SystemDestRow } from "./sidebarSystem";
@@ -97,30 +97,6 @@ import { useActiveTree } from "./useActiveTree";
 import type { SidebarChatData } from "./useChatFolders";
 import { MainSlotHint, useHomeLeader } from "./useHomeLeader";
 import { type RovingRow, useRovingList } from "./useRovingList";
-
-/** Capture-board glyph — a 2×2 grid of cards (the quick-capture Board button).
- * Named distinctly from the imported CanvasItemGlyph (the .excalidraw board icon)
- * so the two never get crossed. Same stroke/viewBox grammar as the family. */
-function CaptureBoardGlyph({ size = 16 }: { size?: number }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width={size}
-      height={size}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.7}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" />
-    </svg>
-  );
-}
 
 /** The fixed System destinations after Library. Switching vaults changes only
  * their contents and counts; it never adds, removes, or renames these rows. */
@@ -165,8 +141,6 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     () => homeDashboardSnapshot(searchableNotes, dashboardModels, chats.chatList, now),
     [searchableNotes, dashboardModels, chats.chatList, now],
   );
-  const dashboardSection = useUiStore((s) => s.dashboardSection);
-  const setDashboardSection = useUiStore((s) => s.setDashboardSection);
   // the reserved queries — all served from the one cached corpus_list, so
   // these hooks are cache reads, not fetches
   const secureNotes = useNotes(DEST.secure).data ?? [];
@@ -806,6 +780,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   // roving id for the one ACTION row (opens a surface, never a selection) —
   // a distinct sentinel so it can't collide with folder/dest ids.
   const CAPTURES_ROW = "row:captures";
+  const hidden = useHidden((st) => st.hidden);
   const mainRovingRows = (parentId: string): RovingRow[] => [
     // filtered by matches() exactly like renderMainTree — the roving cursor
     // must never point at a row the live filter hid
@@ -827,9 +802,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   // MUST mirror the rendered order exactly — a skipped visual row makes the
   // cursor teleport. Chat rows are plain buttons, outside the listbox.
   const rows: RovingRow[] = [
-    { id: ALL_NOTES, kind: "smart" },
-    { id: CAPTURES_ROW, kind: "smart" },
-    { id: TASKS, kind: "smart" },
+    ...shownShortcuts(hidden, CAPTURES_ROW),
     // Main — always visible; its header only switches views (2026-07-28)
     ...mainRovingRows(MAIN_ROOT),
     ...(systemOpen
@@ -1051,72 +1024,13 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
         {/* This wrapper is the roving listbox: Tab enters at the one tabIndex=0
             row, j/k walk it; the keyboard highlight is :focus-visible. */}
         <div className="sb-notes-tree" role="listbox" aria-label="Notes tree">
-          <button
-            type="button"
-            className={`sb-home-dashboard${contentView === "dashboard" && dashboardSection === "rotli" ? " sel" : ""}`}
-            aria-label="Open Rotli activity dashboard"
-            aria-current={contentView === "dashboard" && dashboardSection === "rotli" ? "page" : undefined}
-            onClick={() => {
-              setDashboardSection("rotli");
-              setContentView("dashboard");
-            }}
-          >
-            <div className="sb-home-dashboard-head">
-              <span>This week</span>
-              <span>Rotli activity&nbsp; ↗</span>
-            </div>
-            <div className="sb-home-dashboard-row">
-              <strong>Notes</strong>
-              <span>{dashboard.notes.newInRange} new</span>
-              <span>{dashboard.notes.updatedInRange} updated</span>
-            </div>
-            <div className="sb-home-dashboard-row chat">
-              <strong>Chats</strong>
-              <span>{dashboard.chat.activeInRange} active</span>
-              <span>{dashboard.chat.total} saved</span>
-            </div>
-          </button>
-          <button
-            type="button"
-            className={`frow${contentView === "allNotes" ? " sel" : ""}`}
-            onClick={() => {
-              setSelectedFolderId(ALL_NOTES);
-              setContentView("allNotes");
-            }}
-            {...rowProps({ id: ALL_NOTES, kind: "smart" })}
-          >
-            <FileGlyph size={14.5} />
-            <span className="fname">All notes</span>
-            {searchableCount > 0 && <span className="count">{searchableCount}</span>}
-          </button>
-          {/* Captures — quick captures collected as cards; opens its grid in the
-              content area (an action row, not a roving folder). */}
-          <button
-            type="button"
-            className={`frow${contentView === "board" || hereRow === DEST.board ? " sel" : ""}`}
-            aria-current={hereRow === DEST.board ? "location" : undefined}
-            onClick={() => dispatch("board.open")}
-            {...rowProps({ id: CAPTURES_ROW, kind: "smart" })}
-          >
-            <CaptureBoardGlyph size={14.5} />
-            <span className="fname">Captures</span>
-            {captureCount > 0 && <span className="count">{captureCount}</span>}
-          </button>
-          {/* Tasks — every open checkbox across your notes, one view
-              (decision 2026-07-25). The count is OPEN tasks, not notes. */}
-          <button
-            type="button"
-            className={`frow${contentView === "tasks" ? " sel" : ""}`}
-            onClick={() => {
-              setSelectedFolderId(TASKS);
-              setContentView("tasks");
-            }}
-            {...rowProps({ id: TASKS, kind: "smart" })}
-          >
-            <TaskGlyph size={14.5} />
-            <span className="fname">Tasks</span>
-            {openTaskCount > 0 && <span className="count">{openTaskCount}</span>}
-          </button>
+          <HomeShortcuts
+            dashboard={dashboard}
+            counts={{ allNotes: searchableCount, captures: captureCount, tasks: openTaskCount }}
+            here={hereRow}
+            capturesRow={CAPTURES_ROW}
+            rowFor={rowProps}
+          />
 
           {/* — MAIN: your hand-picked notes, arranged your way. Star a row (★) to
               put it in Quick access — the capped set the ⌥ Quick window cycles

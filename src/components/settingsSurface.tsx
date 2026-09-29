@@ -154,9 +154,14 @@ import {
   SunGlyph,
 } from "./glyphs";
 import { AboutPane } from "./settings/aboutPane";
+import { AliasCleanupSettings } from "./settings/aliasCleanupSettings";
+import { AmbientSettings } from "./settings/ambientSettings";
 import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { ConnectorGuide } from "./settings/connectorGuide";
+import { LibrarianRulesSettings } from "./settings/librarianRulesSettings";
 import { Seg } from "./settings/seg";
+import { SwitchKnob, Toggle } from "./settings/toggle";
+import { VisibilitySettings } from "./settings/visibilitySettings";
 import { VoiceSettings } from "./settings/voiceSettings";
 import { WebVaultSettings } from "./settings/webVaultSettings";
 import { WelcomeSettings } from "./welcomeSettings";
@@ -215,50 +220,6 @@ function PaneHead({ title, char }: { title: string; char: CharacterName }) {
 }
 
 // ——— shared settings controls (the maintainer, 2026-06-15) ———
-
-/** The sliding track + knob every switch shares — state comes from the parent's
- * .on class (`.swrow`/`.ailane-sw`), so this stays a dumb visual. */
-function SwitchKnob() {
-  return (
-    <span className="sw" aria-hidden="true">
-      <span className="swknob" />
-    </span>
-  );
-}
-
-/** A real on/off switch — label + description on the left, a sliding track on
- * the right. Replaces the old ambiguous dot-in-a-box "sysrow". */
-function Toggle({
-  on,
-  onChange,
-  title,
-  desc,
-  disabled,
-}: {
-  on: boolean;
-  onChange: () => void;
-  title: string;
-  desc?: string;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      aria-disabled={disabled}
-      disabled={disabled}
-      className={`${on ? "swrow on" : "swrow"}${disabled ? " disabled" : ""}`}
-      onClick={disabled ? undefined : onChange}
-    >
-      <span className="swtext">
-        <span className="swt">{title}</span>
-        {desc && <span className="swd">{desc}</span>}
-      </span>
-      <SwitchKnob />
-    </button>
-  );
-}
 
 // ——— Hotkeys: every registry action, grouped by area + searchable ———
 
@@ -870,6 +831,8 @@ function GeneralPane() {
         </>
       )}
 
+      <AmbientSettings />
+
       <h4 className="sethead">Writing</h4>
       <p className="lead">How the editor behaves while you type.</p>
       <div className="swgroup">
@@ -919,6 +882,7 @@ function GeneralPane() {
 
       <WebVaultSettings />
       <WelcomeSettings disabled={memexConfig.data?.developmentReadOnly ?? import.meta.env.DEV} />
+      <AliasCleanupSettings native={isTauri()} />
       <UpdatesSection />
 
       <h4 className="sethead">Demo mode</h4>
@@ -1132,6 +1096,7 @@ function AppearancePane() {
   const sidebarReveal = useUiStore((s) => s.sidebarReveal);
   const setSidebarReveal = useUiStore((s) => s.setSidebarReveal);
   const syntaxPalette = useUiStore((s) => s.syntaxPalette);
+  const boardBackground = useUiStore((s) => s.boardBackground);
   const setSyntaxPalette = useUiStore((s) => s.setSyntaxPalette);
   const chatWelcomeStyle = useUiStore((s) => s.chatWelcomeStyle);
   const setChatWelcomeStyle = useUiStore((s) => s.setChatWelcomeStyle);
@@ -1452,6 +1417,8 @@ function AppearancePane() {
         />
       </div>
 
+      <VisibilitySettings />
+
       <h4 className="sethead">New chat welcome</h4>
       <p className="lead">
         Calm keeps the companion still. Lively adds one restrained arrival hop without a decorative scene or
@@ -1464,6 +1431,21 @@ function AppearancePane() {
           ["lively", "Lively"],
         ]}
         onPick={setChatWelcomeStyle}
+      />
+
+      <h4 className="sethead">Board background</h4>
+      <p className="lead">
+        A board you haven’t colored yourself takes this background. Match theme follows your theme and changes
+        with it; White keeps boards and their tools light, like paper, in every theme. A color you pick on a
+        board stays; plain white counts as no color.
+      </p>
+      <Seg
+        value={boardBackground}
+        options={[
+          ["theme", "Match theme"],
+          ["white", "White"],
+        ]}
+        onPick={(value) => useUiStore.setState({ boardBackground: value })}
       />
 
       <h4 className="sethead">Markdown source</h4>
@@ -2040,6 +2022,7 @@ function BrainPane() {
             View activity
           </button>
           {ranNote && <p className={ranNote.err ? "setnote err" : "setnote"}>{ranNote.text}</p>}
+          <LibrarianRulesSettings native={isTauri()} />
         </>
       )}
     </>
@@ -3319,6 +3302,7 @@ export function SettingsSurface() {
             type="button"
             key={id}
             className={pane === id ? "frow sel" : "frow"}
+            aria-current={pane === id ? "page" : undefined}
             onClick={() => setPane(id)}
           >
             <G size={14.5} />

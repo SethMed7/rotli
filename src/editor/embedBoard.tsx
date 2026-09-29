@@ -6,19 +6,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { useBoardLook } from "../boards/boardLook";
 import { boardsAvailable, createCorpusBoardSaver, loadBoard } from "../boards/composition";
 import { type BoardInitialData, BoardCanvas } from "../boards/engine/excalidraw";
 import { type BoardMeta, EMPTY_BOARD_META, EMPTY_SCENE, serializeBoardScene } from "../boards/session";
 import { onQuitFlush } from "../lib/quitFlush";
 import { boardTabOpen, usePanesStore } from "../state/panes";
-import { useIsDarkTheme } from "../state/theme";
 
 type ExcalidrawInitialData = BoardInitialData;
 
 export function BoardEmbed({ boardId }: { boardId: string }) {
-  const excaliTheme: "dark" | "light" = useIsDarkTheme() ? "dark" : "light";
-
   const [initialData, setInitialData] = useState<ExcalidrawInitialData>(null);
+  // the same app-following look as the board tab (boards/boardLook.ts)
+  const look = useBoardLook(initialData);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [saveErr, setSaveErr] = useState<string | null>(null);
   // carry the board's AI description/tags through embed edits — an embed save
@@ -115,8 +115,9 @@ export function BoardEmbed({ boardId }: { boardId: string }) {
   return (
     <div className="rotli-embed-board-inner">
       <BoardCanvas
-        initialData={initialData ?? EMPTY_SCENE}
-        theme={excaliTheme}
+        initialData={look.initialData ?? EMPTY_SCENE}
+        theme={look.theme}
+        excalidrawAPI={look.bindApi}
         viewModeEnabled={tabOpen}
         onChange={(els, state, fls) =>
           onChange(els, state as unknown as Record<string, unknown>, fls as Record<string, unknown>)

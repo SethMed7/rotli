@@ -12,8 +12,8 @@ import {
 import { useUiStore } from "./ui";
 
 test("first run has one canonical six-step progress map", () => {
-  expect(ONBOARDING_TOTAL_STEPS).toBe(6);
-  expect(Object.values(ONBOARDING_STEP_NUMBER)).toEqual([1, 2, 3, 4, 5, 6]);
+  expect(ONBOARDING_TOTAL_STEPS).toBe(7);
+  expect(Object.values(ONBOARDING_STEP_NUMBER)).toEqual([1, 2, 3, 4, 5, 6, 7]);
 });
 
 test("native development receives onboarding while the browser twin does not", () => {

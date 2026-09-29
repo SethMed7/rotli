@@ -95,7 +95,7 @@ fn set_bounds(webview: &tauri::Webview, bounds: PrivateBrowserBounds) -> Result<
         .map_err(|error| error.to_string())
 }
 
-fn browser_webview(app: &AppHandle, tab_id: &str) -> Result<tauri::Webview, String> {
+pub(crate) fn browser_webview(app: &AppHandle, tab_id: &str) -> Result<tauri::Webview, String> {
     let label = webview_label(tab_id)?;
     app.get_webview(&label)
         .ok_or_else(|| "private browser is not available".to_string())

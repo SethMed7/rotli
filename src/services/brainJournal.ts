@@ -12,8 +12,10 @@ export interface BrainAction {
   /** "repair" = the legacy secure-intake repair (decision 2026-07-22): Rust
    * moved an explicitly flagged secure note from intake into the protected
    * lane after the user's confirm. Its rows are CONTENT-FREE by contract —
-   * empty `noteTitle`, ULID `noteId` — and always written already-`applied`. */
-  action: "file" | "field" | "index" | "repair";
+   * empty `noteTitle`, ULID `noteId` — and always written already-`applied`.
+   * "create" = the Librarian made a new note (a person the owner told it
+   * about, 2026-09-28): `after` is where it was written; undo trashes it. */
+  action: "file" | "field" | "index" | "repair" | "create";
   /** The note's rel path AS OF the row's write — display + the [Open] target.
    * A rel pins a moment: a sibling filing or a title rename strands it, so
    * apply/undo resolve through `noteUlid` when present. For an "index" row:
@@ -48,6 +50,7 @@ export function describeAction(a: BrainAction, proposed: boolean): string {
     // destination is the same for every repair
     return "Moved a secure note into Secure notes — it was left in intake by an older version";
   }
+  if (a.action === "create") return `Added a note for “${a.noteTitle}”`;
   const verb =
     a.action === "file"
       ? `File “${a.noteTitle}” → ${(a.area ?? a.after).replace(/^wiki\//, "")}`
@@ -113,6 +116,8 @@ export interface JournalDeps {
   /** Teach the daemon an approved field value (#28) — best-effort; the caller
    * swallows a failure (the field stays user-owned until the next Approve). */
   learnField: (note: string, key: string, value: string) => Promise<void>;
+  /** Move a note the Librarian created to the Trash (a "create" row's undo). */
+  trashNote: (id: string) => Promise<unknown>;
 }
 
 /** The stable handle for a row's note: the ULID when the daemon recorded one
@@ -221,6 +226,8 @@ export async function undoAction(a: BrainAction, deps: JournalDeps): Promise<voi
     await deps.setAiField(handleOf(a), a.field, a.before);
   } else if (a.action === "index" && a.area) {
     await deps.writeIndex(a.area, a.before);
+  } else if (a.action === "create") {
+    await deps.trashNote(handleOf(a));
   }
   await deps.append(JSON.stringify({ ...a, status: "reverted", ts: Date.now() }));
 }

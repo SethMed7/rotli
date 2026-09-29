@@ -1,6 +1,6 @@
 [package]
 name = "rotli"
-version = "1.5.0"
+version = "1.6.0"
 description = "rotli — warm, local-first, hotkey-driven notes for the Mac menu bar"
 authors = ["Rotli contributors"]
 edition = "2021"
@@ -74,6 +74,9 @@ objc2 = "0.6"
 objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSBitmapImageRep", "NSFilePromiseReceiver", "NSImage", "NSImageRep", "NSPasteboard", "NSPasteboardItem", "NSResponder", "NSWindow", "block2"] }
 objc2-foundation = { version = "0.3", features = ["NSArray", "NSData", "NSDictionary", "NSError", "NSOperation", "NSString", "NSURL"] }
 block2 = "0.6"                                                   # the promised-file reader block (already transitive; named here because we write one)
+# WKWebView's media playback state + pause (private_browser_media.rs): the tab
+# audio indicator and the sidebar player. Already in the tree through wry.
+objc2-web-kit = { version = "0.3", features = ["WKWebView", "block2"] }
 
 # Size diet (2026-07-31): the release binary embeds the whole frontend dist, and
 # without a profile the code portion shipped 16 codegen units, no LTO, and 51k

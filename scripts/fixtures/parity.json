@@ -268,6 +268,108 @@
         "/",
         ":"
       ]
+    },
+    "aiKeys": {
+      "sourceOfTruth": "src/memex/contract.ts AI_KEYS ↔ src-tauri/src/corpus.rs AI_KEYS (the Librarian-owned metadata keys)",
+      "value": [
+        "area",
+        "summary",
+        "tags",
+        "links",
+        "suggested_area",
+        "area_confidence",
+        "filed_by",
+        "filed_at",
+        "anchors"
+      ]
+    },
+    "peopleArea": {
+      "sourceOfTruth": "src/lib/librarianActions.ts PEOPLE_AREA ↔ src-tauri/src/librarian_rules.rs PEOPLE_AREA",
+      "value": "People"
+    },
+    "defaultPeopleGroups": {
+      "sourceOfTruth": "src/lib/librarianRules.ts DEFAULT_PEOPLE_GROUPS ↔ src-tauri/src/librarian_rules.rs DEFAULT_PEOPLE_GROUPS",
+      "value": [
+        "Family",
+        "Friends",
+        "Work",
+        "Acquaintances"
+      ]
+    },
+    "secureByNameCases": {
+      "sourceOfTruth": "src/lib/librarianRules.ts secureByName ↔ src-tauri/src/librarian_rules.rs secure_by_name (behavioral: both run these cases through their own implementation)",
+      "value": [
+        {
+          "title": "Bank login",
+          "rel": "wiki/_inbox/bank-login.md",
+          "keywords": [
+            "bank"
+          ],
+          "secure": true
+        },
+        {
+          "title": "Notes",
+          "rel": "wiki/_inbox/my-bank-3f9k2a.md",
+          "keywords": [
+            "bank"
+          ],
+          "secure": true
+        },
+        {
+          "title": "2025 Tax Return",
+          "rel": "wiki/x.md",
+          "keywords": [
+            "tax return"
+          ],
+          "secure": true
+        },
+        {
+          "title": "BANK",
+          "rel": "wiki/x.md",
+          "keywords": [
+            "Bank"
+          ],
+          "secure": true
+        },
+        {
+          "title": "Riverbank walk",
+          "rel": "wiki/_inbox/riverbank-walk.md",
+          "keywords": [
+            "bank"
+          ],
+          "secure": false
+        },
+        {
+          "title": "Return the tax forms",
+          "rel": "wiki/x.md",
+          "keywords": [
+            "tax return"
+          ],
+          "secure": false
+        },
+        {
+          "title": "Groceries",
+          "rel": "wiki/bank/groceries.md",
+          "keywords": [
+            "bank"
+          ],
+          "secure": false
+        },
+        {
+          "title": "Bank login",
+          "rel": "wiki/x.md",
+          "keywords": [],
+          "secure": false
+        },
+        {
+          "title": "Café crème",
+          "rel": "wiki/x.md",
+          "keywords": [
+            "crème"
+          ],
+          "secure": true
+        }
+      ]
     }
   }
 }

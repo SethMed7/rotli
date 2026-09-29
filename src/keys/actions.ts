@@ -41,7 +41,7 @@ import { DEFAULT_NOTE_STYLE, useNoteStyleStore } from "../state/noteStyle";
 import { activeTabOf, findLeaf, leaves, openNavTarget, usePanesStore } from "../state/panes";
 import { toggleSettings } from "../state/settingsToggle";
 import { startTour } from "../state/tour";
-import { SIDEBAR_ZOOM_STEP, useUiStore } from "../state/ui";
+import { ALL_NOTES, SIDEBAR_ZOOM_STEP, TASKS, useUiStore } from "../state/ui";
 import { registerAppLinkActions } from "./appLinkActions";
 import { registerCaptureActions } from "./captureActions";
 import { registerChatWindowActions } from "./chatWindowActions";
@@ -772,6 +772,23 @@ export function registerDefaultActions(): void {
     defaultChord: "Alt+T",
     run: () => void openUrl("https://www.google.com/"),
   });
+  // what a hidden button or row opened stays one ⌘K away (Settings →
+  // Appearance → Show in Rotli, src/lib/hideable.ts)
+  const openView = (view: "tasks" | "allNotes" | "dashboard", folder?: string) => {
+    const ui = useUiStore.getState();
+    ui.setSettingsOpen(false);
+    ui.setSidebarMode("notes");
+    if (folder) ui.setSelectedFolderId(folder);
+    if (view === "dashboard") ui.setDashboardSection("rotli");
+    ui.setContentView(view);
+  };
+  const views = [
+    ["view.dashboard", "Rotli activity dashboard", () => openView("dashboard")],
+    ["view.tasks", "Tasks", () => openView("tasks", TASKS)],
+    ["view.allNotes", "All notes", () => openView("allNotes", ALL_NOTES)],
+    ["browser.private", "Open a private browser", () => usePanesStore.getState().openBrowser()],
+  ] as const;
+  for (const [id, title, run] of views) registerAction({ id, title, defaultChord: null, run });
   // — note ↔ chat: a note owns MANY chats (the maintainer, 2026-07-30). ⌘⇧C continues
   //   the most recently touched one (creating the first when none exists);
   //   the New variant always adds another. The editor's chat chip is the
@@ -790,6 +807,17 @@ export function registerDefaultActions(): void {
         ),
     );
   };
+  registerAction({
+    id: "note.handToAi",
+    title: "Hand to AI…",
+    keywords: ["send to AI", "send to Claude", "prompt for an agent", "copy as prompt"],
+    defaultChord: null,
+    run: () => {
+      if (!notesWorkspaceActive()) return;
+      const id = focusedNoteIdNow();
+      if (id) useUiStore.getState().setHandToAiNoteId(id);
+    },
+  });
   registerAction({
     enabled: chatRuntimeEnabled,
     id: "note.chat",

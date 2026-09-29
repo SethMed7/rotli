@@ -12,7 +12,7 @@
 //!     the secure line probe + `looks_secure`), never via `read_frontmatter`,
 //!     which WRITES on read and would break "Suggest is provably write-free".
 //!   • LOCKED is never touched; the Filer gates re-read it fresh at apply time.
-//!   • At trust Suggest (the shipped default) the only disk sinks are the
+//!   • At trust Suggest (opt-in; Organize is the default) the only disk sinks are the
 //!     `.rotli/` sidecars (journal + organizer.json) — journal PROPOSALS only.
 //!   • Reads are lock-free off the root; every write rides a SHORT
 //!     `CorpusState::route()` and no lock is ever held across a model call.
@@ -530,10 +530,22 @@ fn snapshot_note(root: &Path, rel: &str) -> Result<NoteSnapshot, String> {
     if !secure && crate::secret::looks_secure(&text) {
         secure = true;
     }
+    let title = corpus::title_of(body);
+    // the Librarian rules: a secure keyword in the note's name protects it too
+    // (name only — never the body, never a model)
+    if !secure
+        && crate::librarian_rules::secure_by_name(
+            &title,
+            rel,
+            &crate::librarian_rules::secure_keywords(root),
+        )
+    {
+        secure = true;
+    }
     Ok(NoteSnapshot {
         rel: rel.to_string(),
         id: fm.id.filter(|i| !i.is_empty()),
-        title: corpus::title_of(body),
+        title,
         body: body.to_string(),
         body_hash: fnv1a64(body.as_bytes()),
         text_hash: fnv1a64(text.as_bytes()),
@@ -639,7 +651,8 @@ fn area_vocab(root: &Path) -> Vec<(String, String)> {
 
 /// Job A prompt — single-shot, JSON-instructed, meant for temp 0. The body is
 /// truncated to a budget; classify needs the gist, not the whole document.
-fn classify_prompt(s: &NoteSnapshot, vocab: &[(String, String)]) -> String {
+/// `filing` is the person's own rules (plain sentences), followed when they apply.
+fn classify_prompt(s: &NoteSnapshot, vocab: &[(String, String)], filing: &[String]) -> String {
     let mut p = String::from(
         "You file notes in a personal knowledge base. Pick the ONE best area for this note.\n\nAreas:\n",
     );
@@ -650,6 +663,7 @@ fn classify_prompt(s: &NoteSnapshot, vocab: &[(String, String)]) -> String {
             p.push_str(&format!("- {name}: {desc}\n"));
         }
     }
+    p.push_str(&crate::librarian_rules::filing_prompt(filing));
     p.push_str(
         "\nAnswer with ONLY a JSON object, no prose:\n{\"area\": \"<one area name above, or none>\", \"confidence\": <number 0 to 1>}\n",
     );
@@ -1365,10 +1379,12 @@ pub(crate) fn run_cycle(
 
         // ── Job A — Classify (`wiki/_inbox` staging only) ─────────────────────
         if rel.starts_with("wiki/_inbox/") && !classify_covered(&snap, &state) {
-            let vocab = vocab.get_or_insert_with(|| area_vocab(root));
+            let vocab = vocab.get_or_insert_with(|| {
+                crate::librarian_rules::with_people_groups(area_vocab(root), &knobs.rules)
+            });
             // no areas yet ⇒ nothing to classify into — Enrich still runs below
             if !vocab.is_empty() {
-                let prompt = classify_prompt(&snap, vocab);
+                let prompt = classify_prompt(&snap, vocab, &knobs.rules.filing);
                 // the model call — NO lock held (chat must never wait on the daemon)
                 let raw = match transport(&prompt) {
                     Ok(r) => r,

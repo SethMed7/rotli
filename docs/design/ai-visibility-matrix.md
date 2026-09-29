@@ -52,6 +52,15 @@ flag the webview asserts. A frontier provider behind a localhost proxy is
 remote. Headless workspace agents (`rotli` CLI, `rotli-workspace` MCP) are
 treated as remote for content policy even when their process is local.
 
+**Hand to AI** (2026-09-26) builds a prompt the user pastes into an outside
+agent, so that agent counts as remote too: a secure note, one named with a
+secure keyword (the Librarian rules' `secureByName`, even before a save has
+flagged it; in the Mac app a file name that can't be read counts as secure,
+and on Rotli Web, which has no path lookup, the title alone is checked), or
+one whose text trips the secret detector, gets no prompt
+(`src/services/handToAi.ts`). The
+prompt is built from the note alone; no model runs in Rotli.
+
 ### What changed on 2026-08-01
 
 1. **Secure notes are visible to on-device models by default.** Previously they
@@ -129,9 +138,9 @@ other is removed, bypassed, or compromised.
 | Filer write | `filer_writable` | locked + secure refusal (unchanged) |
 | Organizer | `snapshot_note` / `auto_applies` | skips secure and locked (unchanged) |
 | Send | `chat::egress_allowed` | a non-local endpoint refuses secret-shaped, secure-marked, or secure-ECHOING transcripts |
-| CLI send | `provider::cli_complete` | native policy permits only official local Claude Code, Codex, and Cursor clients, then applies `blocked_for_remote`; provider ids are allowlisted and a model id must be a static `CliSpec.models` entry or one the client itself reported through model discovery (`provider_models.rs`, strict id shape, never a flag), and Cursor additionally uses ACP Ask mode in an empty scratch workspace with client permissions denied; every other provider id is refused before binary lookup |
+| CLI send | `provider::cli_complete` | native policy permits only official local Claude Code, Codex, Cursor, and Antigravity (ACP agent) clients, then applies `blocked_for_remote`; provider ids are allowlisted and a model id must be a static `CliSpec.models` entry or one the client itself reported through model discovery (`provider_models.rs`, strict id shape, never a flag), and Cursor additionally uses ACP Ask mode in an empty scratch workspace with client permissions denied; every other provider id is refused before binary lookup |
 | Image send | `provider::generate_image` | provider-backed image generation is unavailable before path, credential, or process work |
-| Organizer send | local MLX transport only | legacy remote organizer settings normalize to local; no remote organizer transport exists |
+| Organizer send | local MLX by default; opt-in connected lane via `provider_lane::complete_blocking` | a connected Librarian needs two consents, the lane choice and the provider switch, re-derived by Rust every cycle; it rides the same seam and gates as a chat turn, and secure and locked notes are skipped before any prompt exists ([decision](../decisions/2026-09-12-librarian-connected-lane.md)) |
 | Web | `web.rs` `blocked_for_remote` | search queries, fetch URLs, **and `open_url`** never carry protected content |
 | Agent list | `agent_listable` | files and folders a remote agent may not see are not offered |
 | Agent tag | `agent_frontmatter_writable` | a view tag is an AI write, so it takes the AI write gate |

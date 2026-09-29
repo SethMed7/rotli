@@ -108,6 +108,11 @@ second user-visible product or storage location.
   Ordinary user creation collects a nonblank name before writing anything, then
   creates the collision-safe final filename atomically; cancelling the prompt
   leaves no `untitled.excalidraw` placeholder behind.
+  A board's `appState.viewBackgroundColor` is written only when the person
+  chose a color (2026-09-27). No color, Excalidraw's default white, and
+  `transparent` mean "not chosen", and such a board follows Settings →
+  Appearance → Board background: Match theme (transparent over the theme's
+  ground) or White (`src/brand/boardBackground.ts`).
 - A populated item adds its one stable id/path to Main after durable creation
   and identity refresh; presentation may precede that structural work. A new
   plain Markdown note is the deliberate exception: its durable corpus file and
@@ -439,9 +444,19 @@ The Rust corpus boundary independently validates every write.
   `pinned`. `id` is the primary key and never changes; paths, filenames, titles,
   and aliases are selectors rather than identity.
 - `aliases` is a human-editable string list with Rotli-maintained rename
-  history. A title/file rename appends the prior title and useful filename stem
-  without deleting existing entries. A filename-only normalization retains the
-  exact prior stem without redundantly adding the unchanged title. Current
+  history. A title/file rename appends the prior title and useful filename
+  stem; the list is append-only, except that a rename strips placeholder
+  entries (below). A filename-only normalization retains the
+  exact prior stem without redundantly adding the unchanged title. Two names
+  are never aliases (2026-09-26): a fresh note's placeholder (`Untitled`,
+  `untitled`, `untitled (2)`), and a half-typed title — autosave sees the
+  title mid-typing, so a change where one title extends the other (`Round` →
+  `Round Three`) records nothing, including a `round (2)` file name taken on
+  the way when that title collided with a sibling. Entries written before
+  that rule are removed only on the person's go-ahead (Settings → General →
+  Leftover note names, 2026-09-28): a placeholder, or an alias that is the
+  start of the current title, title slug, or filename stem, is dropped unless
+  some note's `[[link]]` (body or frontmatter) targets it. Current
   title, current filename stem, canonical title slug, and aliases all resolve
   local wikilinks and CLI note selectors; ambiguity fails closed and requires
   the stable `id`. Wikilink targets are normalized before resolution
@@ -457,8 +472,35 @@ The Rust corpus boundary independently validates every write.
   provider-owned field. It is TRI-STATE since 2026-08-01: absent means "follow
   the vault's `secureLocalAi` default", `true` pins on-device access on, `false`
   pins it off. It is written only on a secure note.
-- The Librarian owns only its declared enrichment fields: `area`, `summary`,
-  `tags`, and `links`.
+- The Librarian owns only its declared fields (`AI_KEYS`, Rust and TS): the
+  enrichment fields `area`, `summary`, `tags`, and `links`, and its filing
+  record `suggested_area`, `area_confidence`, `filed_by`, and `filed_at`,
+  and `anchors` (2026-09-28): pointers to passages, written only when the
+  person applies a `/librarian` "mark" (the organizer never writes it). Its
+  value is one line of JSON, a list of `{"exact","prefix","suffix","label"?}`:
+  the passage's words (up to 280 characters), up to 32 characters on each
+  side, and an optional name (up to 80). At most 20 per note, oldest dropped
+  first. A pointer never changes the note's text; it finds the passage by
+  `prefix + exact + suffix`, then by `exact` alone, and reports "moved" rather
+  than guessing when those words appear more than once
+  (`src/lib/librarianActions.ts`).
+- `area` names a top-level Library area, with one exception (2026-09-28, the
+  Librarian rules): `People/<group>` for a group the vault's rules name, so
+  a person can be filed into People/Friends. Nothing else may nest, and Rust
+  (`file_note`) refuses an unconfigured group, a deeper path, and `..`. The
+  group's folder is made when its first note is filed. The contract version
+  does not move: an older Rotli refuses to file a nested area rather than
+  misfiling it.
+- The Librarian may create a note about a person (2026-09-28, the owner's
+  Round Three rule: it "can create a new note and fill it in"), only when the
+  person tells it about someone through `/librarian` and the vault has no
+  People note with that title. The note is an ordinary Library note written to
+  the intake: `# Name` and one sentence of what was said, then tagged and filed
+  into their People group like any other filing. Its brain-journal row has
+  `"action":"create"` (`before` "", `after` the path it was written to), and
+  Undo moves it to the Trash. A person who already has a note is never changed
+  without the person's yes, and then only in its tags and where it is filed;
+  its words are never edited.
 - Unknown frontmatter is preserved byte-for-byte. Reserved provenance cannot be
   forged through the raw metadata editor.
 - Boards and binary files never receive Markdown frontmatter.
@@ -600,6 +642,18 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   before either path changes. Removing protection moves it back before dropping
   the ignore rule. The organizer's Rust gate refuses this lane independently of
   the remote-model read gate.
+- **Secure keywords (2026-09-28, the Librarian rules).** The vault's rules
+  (`librarianRules.secureKeywords` in `.rotli/settings.json`) list words that
+  make a note secure when they appear in its **title or file name** as whole
+  words, in any case — never its body, and never judged by a model
+  (`src-tauri/src/librarian_rules.rs`, with the TS twin and shared cases in
+  `scripts/fixtures/parity.json`). A matching note is secure at birth, is made
+  secure on the save that names it, and on the metadata read, through the same
+  ignore-before-move flow into `wiki/_secure/` (the owner's call: one
+  protected folder). Until then it is refused to remote models and skipped by
+  the organizer by name alone. **Secure matching notes now** (Settings →
+  Librarian) protects notes named that way before the keyword was added.
+  Writer policy: the contract version does not move.
 - Quick captures and notes created from the Quick Note window are secure at
   birth. The user may deliberately remove protection from the note menu or the
   Quick Note shield control.

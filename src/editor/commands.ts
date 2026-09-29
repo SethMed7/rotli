@@ -7,6 +7,7 @@ import { usePanesStore } from "../state/panes";
 import { CHOICE_MARK } from "./choiceState";
 import { parseChoiceControlLine, parseToggleLine } from "./controlState";
 import { ORDERED_MARKER_SOURCE } from "./listMarkers";
+import { markCoverage, toggleMarkRun } from "./markRuns";
 import { parseResultLine, RESULT_MARK } from "./resultState";
 import { MARK } from "./taskState";
 
@@ -23,6 +24,12 @@ export interface EditorHandle {
   /** Fold/unfold the section the caret sits in (2026-08-04). Optional so a
    * surface without folding (the Quick Note window) simply doesn't offer it. */
   toggleFold?(): void;
+  /** The document and its live selection (the Librarian bar reads it). */
+  getSelection?(): { doc: string; from: number; to: number } | null;
+  /** Select a range and scroll it into view (a passage pointer's jump). */
+  selectRange?(from: number, to: number): void;
+  /** Keep a passage painted while focus is elsewhere (the Librarian), or clear it. */
+  markPassage?(range: { from: number; to: number } | null): void;
 }
 
 // Every mounted editor surface registers its handle under its pane id; the
@@ -39,11 +46,19 @@ export function unregisterEditor(paneId: string, handle: EditorHandle): void {
   if (handles.get(paneId) === handle) handles.delete(paneId);
 }
 
+/** The editor in one pane (the Librarian bar reads its own pane's editor). */
+export function editorFor(paneId: string): EditorHandle | null {
+  return handles.get(paneId) ?? null;
+}
+
 export function activeEditor(): EditorHandle | null {
   return handles.get(usePanesStore.getState().focusedPaneId) ?? null;
 }
 
 // ——— inline marks ———
+
+/** Marks whose delimiters can't be confused with another mark's. */
+const RUN_MARKS = new Set<InlineMark>(["bold", "strike", "highlight", "underline"]);
 
 const MARKS: Record<Exclude<InlineMark, "link">, { open: string; close: string }> = {
   bold: { open: "**", close: "**" },
@@ -120,6 +135,10 @@ export function toggleInlineMark(line: string, selStart: number, selEnd: number,
     selEnd > selStart;
   const a = inCode ? selStart - 1 : selStart;
   const b = inCode ? selEnd + 1 : selEnd;
+  // a real selection of text, partly marked or not: read as marked
+  // characters (markRuns.ts), so ⌘B over bold + plain makes one bold span
+  if (!inCode && selEnd > selStart && RUN_MARKS.has(mark))
+    return toggleMarkRun(line, selStart, selEnd, MARKS[mark]);
   // unwrap: the mark sits around the selection, possibly outside other marks
   const layer = enclosingLayer(line, a, b, mark);
   if (layer) {
@@ -271,4 +290,58 @@ export function applyBlockToggleAll(lines: string[], kind: BlockToggle): (string
     if (!allOn && blockToggleActive(t, kind)) return null;
     return applyBlockToggle(t, kind).line;
   });
+}
+
+// ——— inline marks over a selection that spans lines ———
+
+/** Where a line's text starts: after its indent and any heading or block
+ * marker, so a mark never lands in front of `- ` or `# ` and breaks it. */
+export function lineContentStart(line: string): number {
+  const indent = /^\s*/.exec(line)?.[0].length ?? 0;
+  const rest = line.slice(indent);
+  const heading = ANY_HEADING_RE.exec(rest)?.[0].length ?? 0;
+  return indent + (heading || (ANY_BLOCK_PREFIX.exec(rest)?.[0].length ?? 0));
+}
+
+/** The selected part of one line, as columns into `text`. */
+export interface LineSpan {
+  text: string;
+  start: number;
+  end: number;
+}
+
+export interface LineMarkEdit extends LineEdit {
+  /** Which span (index into the input) this edit replaces. */
+  index: number;
+}
+
+/** A non-empty selection's mark, line by line (a reader's report, 2026-09-28:
+ * selecting a line and pressing ⌘B inserted `****` before the next line's
+ * `- `, because the old command only saw the empty tail on the next line).
+ * Each line's selected text — trimmed, and never its marker — is one span;
+ * spans with no text are skipped. If every span already carries the mark it
+ * comes off all of them; otherwise the unmarked ones gain it. A link takes
+ * only the first span. Returns nothing when there is no text to mark. */
+export function toggleInlineMarkLines(spans: readonly LineSpan[], mark: InlineMark): LineMarkEdit[] {
+  const targets = spans.flatMap((span, index) => {
+    let a = Math.max(span.start, lineContentStart(span.text));
+    let b = span.end;
+    while (a < b && /\s/.test(span.text[a] ?? "")) a++;
+    while (b > a && /\s/.test(span.text[b - 1] ?? "")) b--;
+    return a < b ? [{ index, text: span.text, a, b }] : [];
+  });
+  if (mark === "link") targets.splice(1);
+  const edits = targets.map((t) => {
+    const edit = toggleInlineMark(t.text, t.a, t.b, mark);
+    // already marked: all of the selected text carries the mark (for the
+    // wrap-only marks, unwrapping is the only toggle that shortens a line)
+    const unwraps = RUN_MARKS.has(mark)
+      ? markCoverage(t.text, t.a, t.b, MARKS[mark as "bold"]) === "all"
+      : edit.line.length < t.text.length;
+    return { index: t.index, ...edit, unwraps };
+  });
+  const allOn = edits.every((edit) => edit.unwraps);
+  return edits
+    .filter((edit) => allOn || !edit.unwraps)
+    .map(({ index, line, selStart, selEnd }) => ({ index, line, selStart, selEnd }));
 }

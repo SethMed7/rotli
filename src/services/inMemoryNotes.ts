@@ -5,6 +5,7 @@
 // the same off-disk. ./notes.ts owns the switch between this and the disk.
 
 import { extOf, fileName, userFileName } from "../lib/fileKind";
+import { isPlaceholderAlias, isTitleTypingTrail } from "../memex/aliases";
 import { noteSlugify, ulid } from "../memex/contract";
 import type { NoteCreationPolicy } from "../security/secureNotes";
 import type { Folder, Note, NoteSummary, SearchHit } from "../types";
@@ -204,10 +205,25 @@ export class InMemoryNotesService implements NotesService {
       );
     }
     const title = titleOf(body);
-    const aliases = [...(existing.aliases ?? [])];
+    // the corpus.rs rename-alias rules: a placeholder name or a half-typed
+    // title is never an alias; a real rename keeps the old name for links.
+    // Aliases here also stand in for the file name, so the current title's
+    // slug is kept and replaced as the title changes, never piled up.
+    const aliases = (existing.aliases ?? []).filter((alias) => !isPlaceholderAlias(alias));
     if (existing.title !== title) {
-      for (const alias of [existing.title, noteSlugify(existing.title), noteSlugify(title)]) {
-        if (alias && !aliases.some((value) => value.toLocaleLowerCase() === alias.toLocaleLowerCase())) {
+      const renamed = !isPlaceholderAlias(existing.title) && !isTitleTypingTrail(existing.title, title);
+      const oldSlug = noteSlugify(existing.title);
+      if (!renamed) {
+        const at = aliases.findIndex((value) => value.toLocaleLowerCase() === oldSlug.toLocaleLowerCase());
+        if (at >= 0) aliases.splice(at, 1);
+      }
+      const added = renamed ? [existing.title, oldSlug, noteSlugify(title)] : [noteSlugify(title)];
+      for (const alias of added) {
+        if (
+          alias &&
+          !isPlaceholderAlias(alias) &&
+          !aliases.some((value) => value.toLocaleLowerCase() === alias.toLocaleLowerCase())
+        ) {
           aliases.push(alias);
         }
       }

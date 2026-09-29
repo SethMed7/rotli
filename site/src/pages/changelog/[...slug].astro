@@ -1,0 +1,28 @@
+---
+// /changelog/: every Rotli release, newest first, straight from CHANGELOG.md at
+// the repository root (the content collection in src/content.config.ts). The
+// app's "What's new" window links here for the full story, and the footer does
+// too. Each release heading keeps its own anchor.
+import { getEntry, render } from 'astro:content';
+
+import WritingPage from '../../components/WritingPage.astro';
+import { site } from '../../site';
+
+export function getStaticPaths() {
+  return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
+}
+
+const entry = await getEntry('changelog', 'changelog');
+const { Content } = entry ? await render(entry) : { Content: null };
+---
+
+<WritingPage
+  title="Changelog — rotli"
+  description="Everything new in rotli, release by release: what was added, changed, and fixed, and which features are Mac or web only."
+  canonicalPath="/changelog/"
+  kicker="Release notes"
+  heading="What's new in rotli"
+  lede="Every release, newest first. When something works only in the Mac app or only on the web, its note says so."
+>
+  {Content ? <Content /> : <p>The changelog is not available in this build.</p>}
+</WritingPage>

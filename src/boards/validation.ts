@@ -22,7 +22,24 @@ function assertObject(value: unknown, message: string): asserts value is Record<
   }
 }
 
-function validateValue(value: unknown, depth: number, budget: { nodes: number }): void {
+/** Where a value sits: an embedded file's `dataURL` is image bytes as a
+ * `data:image/` URL, the one string allowed past the per-string cap (a 75 KB image
+ * outgrew it). The whole-board byte limit still bounds it. Rust twin:
+ * board.rs `Place`. */
+type Place = "root" | "files" | "file" | "other";
+
+function isFileDataUrl(place: Place, key: string, child: unknown): boolean {
+  return (
+    place === "file" && key === "dataURL" && typeof child === "string" && child.startsWith("data:image/")
+  );
+}
+
+function validateValue(
+  value: unknown,
+  depth: number,
+  budget: { nodes: number },
+  place: Place = "root",
+): void {
   if (depth > BOARD_LIMITS.maxDepth) throw new BoardValidationError("Board data is nested too deeply");
   budget.nodes += 1;
   if (budget.nodes > BOARD_LIMITS.maxNodes) throw new BoardValidationError("Board has too much nested data");
@@ -30,7 +47,7 @@ function validateValue(value: unknown, depth: number, budget: { nodes: number })
     throw new BoardValidationError("Board contains a string that is too long");
   }
   if (Array.isArray(value)) {
-    for (const child of value) validateValue(child, depth + 1, budget);
+    for (const child of value) validateValue(child, depth + 1, budget, "other");
   } else if (typeof value === "object" && value !== null) {
     for (const [key, child] of Object.entries(value)) {
       if ([...key].length > 256) throw new BoardValidationError("Board contains an invalid field name");
@@ -40,7 +57,13 @@ function validateValue(value: unknown, depth: number, budget: { nodes: number })
         }
       }
       if (key === "points" && Array.isArray(child)) validatePoints(child);
-      validateValue(child, depth + 1, budget);
+      if (isFileDataUrl(place, key, child)) {
+        budget.nodes += 1;
+        continue;
+      }
+      const next: Place =
+        place === "root" && key === "files" ? "files" : place === "files" ? "file" : "other";
+      validateValue(child, depth + 1, budget, next);
     }
   }
 }

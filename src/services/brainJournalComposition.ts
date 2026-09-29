@@ -16,6 +16,7 @@ import {
   dismissProposal as dismissWithDeps,
   undoAction as undoWithDeps,
 } from "./brainJournal";
+import { trashNoteWithImages } from "./noteLifecycle";
 
 const liveJournalDeps: JournalDeps = {
   fileNote: fileNoteToArea,
@@ -27,6 +28,7 @@ const liveJournalDeps: JournalDeps = {
   append: corpusJournalAppend,
   readIndex: (area) => corpusFileText(`wiki/${area}/_index.md`).catch(() => ""),
   learnField: organizerLearnField,
+  trashNote: trashNoteWithImages,
 };
 
 export const approveProposal = (action: BrainAction): Promise<void> =>

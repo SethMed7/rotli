@@ -12,4 +12,5 @@ export const DEFAULT_APPEARANCE = {
   syntaxPalette: "rotli",
   accentColor: "default",
   accentHue: DEFAULT_ACCENT_HUE,
+  boardBackground: "theme",
 } as const;

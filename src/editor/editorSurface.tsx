@@ -13,7 +13,12 @@ import { relativeLabel } from "../lib/dateLabels";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { hotkeyHint } from "../lib/hotkeyHint";
 import { brainLocationLabel, noteDiskFolder, noteLocationLabel } from "../lib/noteLocation";
-import { corpusNoteAbsolutePath, corpusRawFrontmatter, corpusWriteFrontmatterRaw } from "../lib/tauri";
+import {
+  corpusNoteAbsolutePath,
+  corpusRawFrontmatter,
+  corpusWriteFrontmatterRaw,
+  isTauri,
+} from "../lib/tauri";
 import { useNow } from "../lib/useNow";
 import { listChatsForNote, openChatForNote, openNoteChat } from "../noteChat/composition";
 import { isSink } from "../services/destinations";
@@ -25,6 +30,7 @@ import { aaRequestStep, useAaPanelRequest } from "../state/aaPanel";
 import { useChatSetupGuide } from "../state/chatSetupGuide";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
 import { useHelperLink } from "../state/helperLink";
+import { useLibrarianBar } from "../state/librarianBar";
 import { useMainStore } from "../state/main";
 import { backId, forwardId, useNavHistory } from "../state/navHistory";
 import { MEASURE_MAX_WIDTH, useNoteStyle } from "../state/noteStyle";
@@ -35,6 +41,8 @@ import { AaPanel } from "./aaPanel";
 import { BottomSlot } from "./bottomSlot";
 import { CmEditor } from "./cmEditor";
 import { FormatBar } from "./formatBar";
+import { LibrarianBar } from "./librarianBar";
+import { LibrarianChat, librarianLane } from "./librarianChat";
 import {
   ensureDocument,
   flushNoteAfterPaint,
@@ -231,6 +239,7 @@ export function EditorSurface({
 
   const style = useNoteStyle(noteId);
   const formatBarVisible = useUiStore((s) => s.formatBarVisible);
+  const librarianOpen = useLibrarianBar((s) => s.paneId === paneId);
   const focusMode = useUiStore((s) => s.focusMode);
   const setFileMetadata = useUiStore((s) => s.setFileMetadata);
   const revealFocusedNote = useUiStore((s) => s.revealFocusedNote);
@@ -367,7 +376,7 @@ export function EditorSurface({
       setNarrow(el.clientWidth < FORMAT_BAR_COLLAPSE_PX);
       setHeaderCompact(el.clientWidth < 760);
       const bar = el.querySelector<HTMLElement>(".fmtbar");
-      setLiftScrollTop(scrollTopClashes(el.clientWidth, bar?.offsetWidth ?? 0));
+      setLiftScrollTop(scrollTopClashes(el.clientWidth, bar?.offsetWidth ?? 0, librarianLane()));
     });
     ro.observe(el);
     // the bar changes width on its own (collapsing to ⋯), so watch it too
@@ -429,7 +438,7 @@ export function EditorSurface({
             <span className="sep" />
             <UpdatedAt ts={note.updatedAt} />
             <span className="sep" />
-            On this Mac
+            {isTauri() ? "On this Mac" : "In your folder"}
             <span className="sep" />
             {/* where this note lives — click to reveal + scroll to it in the
                 sidebar (the maintainer, 2026-07-03). ★ Main shows when it's in Main. */}
@@ -537,10 +546,17 @@ export function EditorSurface({
         onFmRead={onFmRead}
       />
       {focusMode && <FocusWordCount noteId={noteId} fallbackBody={note.body} />}
-      {formatBarVisible && (
+      <LibrarianChat noteId={noteId} paneId={paneId} />
+      {librarianOpen ? (
         <BottomSlot>
-          <FormatBar ctx={ctx} narrow={narrow} />
+          <LibrarianBar key={noteId} noteId={noteId} paneId={paneId} />
         </BottomSlot>
+      ) : (
+        formatBarVisible && (
+          <BottomSlot>
+            <FormatBar ctx={ctx} narrow={narrow} />
+          </BottomSlot>
+        )
       )}
     </div>
   );

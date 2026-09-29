@@ -19,9 +19,10 @@ export const ONBOARDING_STEP_NUMBER = {
   welcome: 1,
   appearance: 2,
   behavior: 3,
-  shortcuts: 4,
-  vault: 5,
-  models: 6,
+  sound: 4,
+  shortcuts: 5,
+  vault: 6,
+  models: 7,
 } as const;
 
 export const ONBOARDING_TOTAL_STEPS = Object.keys(ONBOARDING_STEP_NUMBER).length;

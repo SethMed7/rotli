@@ -120,6 +120,7 @@ interface Calls {
   writeIndex: [string, string][];
   filerMove: [string, string][];
   learned: [string, string, string][];
+  trashed: string[];
 }
 
 /** Fake corpus: the note lives at `rel`, with `fields` frontmatter lines. */
@@ -131,6 +132,7 @@ function fakeDeps(rel: string, fields: string[] = [], over: Partial<JournalDeps>
     writeIndex: [],
     filerMove: [],
     learned: [],
+    trashed: [],
   };
   const fm: FrontmatterView = {
     id: "01ULID",
@@ -165,6 +167,9 @@ function fakeDeps(rel: string, fields: string[] = [], over: Partial<JournalDeps>
     readIndex: async () => "", // no overview on disk (a first proposal's `before`)
     learnField: async (note, key, value) => {
       calls.learned.push([note, key, value]);
+    },
+    trashNote: async (id) => {
+      calls.trashed.push(id);
     },
     ...over,
   };
@@ -397,6 +402,26 @@ describe("dismissProposal / undoAction — same-id re-appends", () => {
     await undoAction(a, deps);
     expect(calls.writeIndex).toEqual([["Projects", ""]]);
     expect(calls.appended[0]?.status).toBe("reverted");
+  });
+
+  test("a note the Librarian created is undone by moving it to the Trash", async () => {
+    const a = row({
+      id: "01JMADE",
+      action: "create",
+      status: "applied",
+      noteId: "wiki/_inbox/kunal-a1b2c3.md",
+      noteUlid: "01JKUNAL",
+      noteTitle: "Kunal",
+      before: "",
+      after: "wiki/_inbox/kunal-a1b2c3.md",
+    });
+    expect(describeAction(a, false)).toBe("Added a note for “Kunal”");
+    expect(canUndo(a)).toBe(true);
+    const { deps, calls } = fakeDeps("wiki/_inbox/kunal-a1b2c3.md");
+    await undoAction(a, deps);
+    expect(calls.trashed).toEqual(["01JKUNAL"]);
+    expect(calls.filerMove).toEqual([]);
+    expect(calls.appended.map((x) => [x.id, x.status])).toEqual([["01JMADE", "reverted"]]);
   });
 });
 

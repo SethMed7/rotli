@@ -19,6 +19,7 @@
 import { librarianModelId } from "../ai/librarianLane";
 import { type HybridPreset, PROVIDER_IDS, type ProviderId, providerDefaultModel } from "../ai/models";
 import { parseWebSearchProvider, type WebSearchProvider } from "../ai/searchProvider";
+import { BOARD_BACKGROUND_MODES, type BoardBackgroundMode } from "../brand/boardBackground";
 import {
   QUOKKA_IDLE_POSES,
   QUOKKA_ACCESSORIES,
@@ -39,6 +40,7 @@ import { allActions } from "../keys/registry";
 // instantly instead of riding out the Rust-side hold (#4).
 import { createDebouncedTask } from "../lib/debouncedTask";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { type LibrarianRules, parseLibrarianRules } from "../lib/librarianRules";
 import {
   DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE,
   PRIVATE_BROWSER_SEARCH_ENGINES,
@@ -67,10 +69,13 @@ import { DEFAULT_TASK_ARCHIVE_AGE, TASK_ARCHIVE_AGES, type TaskArchiveAge } from
 import type { PaneNode, Tab } from "../types";
 import { DEFAULT_VOICE, VOICES } from "../voice/speech";
 import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
+import { appExtrasSnapshot, hydrateAppExtras, subscribeAppExtras } from "./appExtras";
 import { APP_SETTINGS_KEYS } from "./appSettingsKeys";
+import { persistableChatMap, rescopeChatMapKeys } from "./chatMapKeys";
 import { useChatWindowStore } from "./chatWindowStore";
 import { withDetachedChats } from "./chatWindowTabs";
 import { helperLinked } from "./helperLink";
+import { useLibrarianRules } from "./librarianRules";
 import { hydrateMain, useMainStore } from "./main";
 import { MRU_CAP, touchItemActivity, touchMru, useMruStore } from "./mru";
 import {
@@ -86,6 +91,8 @@ import { findLeaf, leaves, usePanesStore } from "./panes";
 import { QUICK_MAX } from "./quick";
 import { MIN_TABLE_COL_PX, MIN_TABLE_ROW_PX, noteIdOfWidthKey, useTableWidthsStore } from "./tableWidths";
 import { applyAccent, applySyntaxPalette, applyTheme } from "./theme";
+
+export { rescopeChatMapKeys } from "./chatMapKeys";
 import {
   ALL_NOTES,
   type BreveView,
@@ -162,40 +169,6 @@ const THEME_SETTINGS: readonly ThemeSetting[] = ["light", "dark", "system"];
 const SYNTAX_PALETTES: readonly SyntaxPalette[] = ["rotli", "mono"];
 const MEASURES: readonly Measure[] = ["narrow", "comfort", "wide"];
 
-/** Drop the session-scoped per-chat keys — an unsaved chat's choice (globe,
- * measure) belongs to its pane for this session only, never to settings.json
- * (#7). Shared by the parse (heals a poisoned config) and the snapshot (never
- * writes one again). */
-function persistableChatMap<T>(m: Record<string, T>): Record<string, T> {
-  return Object.fromEntries(Object.entries(m).filter(([k]) => k !== "" && !k.startsWith("unsaved:")));
-}
-
-/** One-time migration of pre-vault-scoping chat-map keys (2026-08-03): a bare
- * slug re-homes to `<instanceId>:<slug>` when exactly ONE configured instance
- * has that slug. An ambiguous slug (two vaults, same name — the very collision
- * the scoping fixes) or an unknown one is left for the prune to drop; a
- * composite key already claimed keeps its value. Exported for tests. */
-export function rescopeChatMapKeys<T>(
-  m: Record<string, T>,
-  owners: ReadonlyMap<string, readonly string[]>,
-): Record<string, T> {
-  let changed = false;
-  const out: Record<string, T> = {};
-  for (const [k, v] of Object.entries(m)) {
-    if (k.startsWith("unsaved:") || k.includes(":")) {
-      out[k] = v;
-      continue;
-    }
-    const own = owners.get(k);
-    if (own?.length === 1) {
-      const scoped = `${own[0]}:${k}`;
-      if (!(scoped in out) && !(scoped in m)) out[scoped] = v;
-    }
-    changed = true;
-  }
-  return changed ? out : m;
-}
-
 /** Shape-validate the persisted hybrid presets — a hand-edited or future-build
  * entry that doesn't parse is DROPPED, never half-loaded. Exported for tests. */
 export function parseHybridPresets(raw: unknown): HybridPreset[] {
@@ -233,6 +206,7 @@ interface PersistedSettings {
   theme: ThemeSetting;
   themeFamily: ThemeFamily;
   syntaxPalette: SyntaxPalette;
+  boardBackground: BoardBackgroundMode;
   accentColor: AccentColor;
   accentHue: number;
   quokkaCompanionEnabled: boolean;
@@ -341,7 +315,7 @@ interface PersistedSettings {
    * regardless, always. Missing ⇒ true (docs/design/ai-visibility-matrix.md). */
   secureLocalAi: boolean;
   /** The organizer daemon's §4.3 trust rung; the Rust daemon re-reads this file
-   * each cycle, so persisting here IS the durable knob. Default: suggest. */
+   * each cycle, so persisting here IS the durable knob. Default: organize. */
   organizerTrust: OrganizerTrust;
   /** Which model the organizer runs. Remote choices remain opt-in. */
   organizerModel: OrganizerModel;
@@ -349,12 +323,16 @@ interface PersistedSettings {
   /** Idle delay (seconds) before the organizer scans a just-touched note. The
    * Rust daemon's `organizerQuietSecs` knob; default 300 (5 min). */
   organizerQuietSecs: number;
+  /** The Librarian rules (src/lib/librarianRules.ts); Rust reads them too. */
+  librarianRules: LibrarianRules;
   /** The Librarian's first-visit explainer was shown (2026-07-31). */
   librarianIntroSeen: boolean;
   /** First-run onboarding gate — false until the flow is finished/skipped. */
   onboarded: boolean;
   /** The app version onboarding last completed at (the onboardingVersion gate). */
   onboardingVersion: string;
+  /** The version whose What's new the user has seen (lib/whatsNew). */
+  lastSeenVersion: string;
   /** First-run checkpoint that survives a vault-selection relaunch. */
   onboardingPhase: "preferences" | "vault" | "models";
   /** The Quick Note window's capped set, remembered note, and new-note folder
@@ -499,6 +477,7 @@ export function parseSettings(raw: string): PersistedSettings {
     theme: asEnum(data.theme, THEME_SETTINGS, "light"),
     themeFamily: asEnum(data.themeFamily, THEME_FAMILIES, "warm"),
     syntaxPalette: asEnum(data.syntaxPalette, SYNTAX_PALETTES, "rotli"),
+    boardBackground: asEnum(data.boardBackground, BOARD_BACKGROUND_MODES, "theme"),
     accentColor: asEnum(data.accentColor, ACCENT_COLORS, "default"),
     accentHue:
       typeof data.accentHue === "number" &&
@@ -660,12 +639,14 @@ export function parseSettings(raw: string): PersistedSettings {
       data.organizerQuietSecs >= 0
         ? data.organizerQuietSecs
         : 300,
+    librarianRules: parseLibrarianRules(data.librarianRules),
     librarianIntroSeen: asBool(data.librarianIntroSeen, false),
     // a fresh install reads an empty config ("{}"); an upgrade has prior keys but
     // not this one — treat that as already-onboarded so we don't re-run first-run
     // onboarding on existing users (same migration shape as expandedDests above)
     onboarded: typeof data.onboarded === "boolean" ? data.onboarded : Object.keys(data).length > 0,
     onboardingVersion: typeof data.onboardingVersion === "string" ? data.onboardingVersion : "",
+    lastSeenVersion: typeof data.lastSeenVersion === "string" ? data.lastSeenVersion : "",
     onboardingPhase:
       data.onboardingPhase === "vault" || data.onboardingPhase === "models"
         ? data.onboardingPhase
@@ -736,6 +717,7 @@ function applySettings(s: PersistedSettings): void {
     theme: s.theme,
     themeFamily: s.themeFamily,
     syntaxPalette: s.syntaxPalette,
+    boardBackground: s.boardBackground,
     accentColor: s.accentColor,
     accentHue: s.accentHue,
     quokkaCompanionEnabled: s.quokkaCompanionEnabled,
@@ -798,6 +780,7 @@ function applySettings(s: PersistedSettings): void {
     librarianIntroSeen: s.librarianIntroSeen,
     onboarded: s.onboarded,
     onboardingVersion: s.onboardingVersion,
+    lastSeenVersion: s.lastSeenVersion,
     onboardingPhase: s.onboardingPhase,
     quickNoteIds: s.quickNoteIds,
     captureOrder: s.captureOrder,
@@ -815,6 +798,7 @@ function applySettings(s: PersistedSettings): void {
   });
   useBindingsStore.setState({ overrides: s.bindings });
   useNoteStyleStore.setState({ styles: s.noteStyles });
+  useLibrarianRules.setState({ rules: s.librarianRules });
   useTableWidthsStore.setState({
     widths: s.tableWidths,
     heights: s.tableHeights,
@@ -828,6 +812,7 @@ function applyAppSettings(s: PersistedSettings): void {
     theme: s.theme,
     themeFamily: s.themeFamily,
     syntaxPalette: s.syntaxPalette,
+    boardBackground: s.boardBackground,
     accentColor: s.accentColor,
     accentHue: s.accentHue,
     quokkaCompanionEnabled: s.quokkaCompanionEnabled,
@@ -855,6 +840,7 @@ function applyAppSettings(s: PersistedSettings): void {
     appIcon: s.appIcon,
     onboarded: s.onboarded,
     onboardingVersion: s.onboardingVersion,
+    lastSeenVersion: s.lastSeenVersion,
     onboardingPhase: s.onboardingPhase,
   });
   useBindingsStore.setState({ overrides: s.bindings });
@@ -866,6 +852,7 @@ function withAppSettings(vault: PersistedSettings, app: PersistedSettings): Pers
     theme: app.theme,
     themeFamily: app.themeFamily,
     syntaxPalette: app.syntaxPalette,
+    boardBackground: app.boardBackground,
     accentColor: app.accentColor,
     accentHue: app.accentHue,
     quokkaCompanionEnabled: app.quokkaCompanionEnabled,
@@ -893,6 +880,7 @@ function withAppSettings(vault: PersistedSettings, app: PersistedSettings): Pers
     appIcon: app.appIcon,
     onboarded: app.onboarded,
     onboardingVersion: app.onboardingVersion,
+    lastSeenVersion: app.lastSeenVersion,
     onboardingPhase: app.onboardingPhase,
     bindings: app.bindings,
   };
@@ -1337,6 +1325,7 @@ export async function hydratePersistedState(): Promise<void> {
     appSettingsPassthrough = unknownAppSettingsKeys(appRaw);
     appSettingsNeedsWrite = !appSettingsPresent;
     appSettings = parseSettings(appRaw);
+    hydrateAppExtras(appRaw);
     shellSettings = appSettings;
     if (appSettingsPresent) applyAppSettings(appSettings);
   } catch {
@@ -1419,9 +1408,11 @@ function appSettingsSnapshot(): string {
   return JSON.stringify({
     ...appSettingsPassthrough,
     v: 1,
+    ...appExtrasSnapshot(),
     theme: ui.theme,
     themeFamily: ui.themeFamily,
     syntaxPalette: ui.syntaxPalette,
+    boardBackground: ui.boardBackground,
     accentColor: ui.accentColor,
     accentHue: ui.accentHue,
     quokkaCompanionEnabled: ui.quokkaCompanionEnabled,
@@ -1449,6 +1440,7 @@ function appSettingsSnapshot(): string {
     appIcon: ui.appIcon,
     onboarded: ui.onboarded,
     onboardingVersion: ui.onboardingVersion,
+    lastSeenVersion: ui.lastSeenVersion,
     onboardingPhase: ui.onboardingPhase,
     bindings: useBindingsStore.getState().overrides,
   });
@@ -1461,6 +1453,7 @@ function settingsSnapshot(): string {
     theme: ui.theme,
     themeFamily: ui.themeFamily,
     syntaxPalette: ui.syntaxPalette,
+    boardBackground: ui.boardBackground,
     accentColor: ui.accentColor,
     accentHue: ui.accentHue,
     quokkaCompanionEnabled: ui.quokkaCompanionEnabled,
@@ -1520,9 +1513,11 @@ function settingsSnapshot(): string {
     organizerModel: ui.organizerModel,
     organizerModelId: ui.organizerModelId,
     organizerQuietSecs: ui.organizerQuietSecs,
+    librarianRules: useLibrarianRules.getState().rules,
     librarianIntroSeen: ui.librarianIntroSeen,
     onboarded: ui.onboarded,
     onboardingVersion: ui.onboardingVersion,
+    lastSeenVersion: ui.lastSeenVersion,
     onboardingPhase: ui.onboardingPhase,
     quickNoteIds: ui.quickNoteIds,
     captureOrder: ui.captureOrder,
@@ -1652,6 +1647,8 @@ export function attachPersistence(): () => void {
     useBindingsStore.subscribe(schedule),
     useNoteStyleStore.subscribe(schedule),
     useTableWidthsStore.subscribe(schedule),
+    useLibrarianRules.subscribe(schedule),
+    subscribeAppExtras(schedule),
     usePanesStore.subscribe(schedule),
     useChatWindowStore.subscribe(schedule),
     useMruStore.subscribe(schedule),
