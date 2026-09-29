@@ -4,11 +4,10 @@
 // are, Enter saves, Esc or clicking away keeps the old name, and a file's
 // field holds its name without the extension.
 
-import type { CSSProperties } from "react";
+import { type CSSProperties, useState } from "react";
 
 import { extOf } from "../../lib/fileKind";
 import { renameTargetFor } from "../../services/itemRename";
-import { useUiStore } from "../../state/ui";
 import type { NoteSummary } from "../../types";
 import { ChevronRight, FolderGlyph, glyphForNote } from "../glyphs";
 import { InlineRenameInput } from "../inlineRenameInput";
@@ -55,6 +54,7 @@ export function NoteRenameRow({
   onDone: () => void;
 }) {
   const commit = useCommitRename();
+  const [state, setState] = useState({ busy: false, error: "" });
   const target = renameTargetFor(note);
   if (!target) return null;
   const noun =
@@ -65,26 +65,40 @@ export function NoteRenameRow({
         : extOf(target.id) === "xlsx"
           ? "sheet"
           : "document";
+  // the row closes only once the name is saved; a refused name keeps the
+  // field open with what was typed and the reason under it, as the dialog does
+  const save = async (value: string) => {
+    const name = value.trim();
+    if (!name || name === target.current) return onDone();
+    if (state.busy) return;
+    setState({ busy: true, error: "" });
+    try {
+      await commit(target, name);
+      onDone();
+    } catch (cause) {
+      const reason = cause instanceof Error ? cause.message : String(cause);
+      setState({ busy: false, error: `Couldn’t rename the ${noun} — ${reason}` });
+    }
+  };
   return (
-    <div className="snrow main-row renaming" style={style}>
-      {glyphForNote(note, { size: 14, className: "snicon" })}
-      <InlineRenameInput
-        className="sb-rename-input"
-        defaultValue={target.current}
-        ariaLabel={`Rename ${noun}`}
-        onCommit={async (value) => {
-          onDone();
-          const name = value.trim();
-          if (!name || name === target.current) return;
-          try {
-            await commit(target, name);
-          } catch (cause) {
-            const reason = cause instanceof Error ? cause.message : String(cause);
-            useUiStore.getState().setRowActionError(`Couldn’t rename the ${noun} — ${reason}`);
-          }
-        }}
-        onCancel={onDone}
-      />
-    </div>
+    <>
+      <div className="snrow main-row renaming" style={style}>
+        {glyphForNote(note, { size: 14, className: "snicon" })}
+        <InlineRenameInput
+          className="sb-rename-input"
+          defaultValue={target.current}
+          ariaLabel={`Rename ${noun}`}
+          onCommit={save}
+          onCancel={() => {
+            if (!state.busy) onDone();
+          }}
+        />
+      </div>
+      {state.error && (
+        <p className="sb-rename-error" role="alert" style={style}>
+          {state.error}
+        </p>
+      )}
+    </>
   );
 }

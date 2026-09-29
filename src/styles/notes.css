@@ -2871,3 +2871,9 @@
 .sb-rename-input:focus-visible {
   outline: none;
 }
+.sb-rename-error {
+  margin: 0 0 4px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--failure);
+}
