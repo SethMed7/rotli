@@ -1123,7 +1123,13 @@ export interface FrontmatterView {
 }
 
 /** Read a note's frontmatter for the metadata panel (display + lock state). */
-export type WebAiCorpus = WebAiCorpusShape<CorpusNoteMeta, SearchHit, CorpusAiRead, FrontmatterView>;
+export type WebAiCorpus = WebAiCorpusShape<
+  CorpusNoteMeta,
+  SearchHit,
+  CorpusAiRead,
+  FrontmatterView,
+  CorpusWriteResult
+>;
 const webCorpus = (): WebAiCorpus | null => currentWebAiCorpus<WebAiCorpus>();
 export async function corpusFrontmatter(id: string): Promise<FrontmatterView | null> {
   if (!isTauri()) return webCorpus()?.frontmatter(id) ?? null;
@@ -1383,6 +1389,11 @@ export function corpusWriteAi(
   model: Pick<ChatModelInfo, "id" | "endpoint">,
   expectedRevision: string,
 ): Promise<CorpusWriteResult> {
+  // Rotli Web has no Rust gate: its AI corpus runs the same policy itself
+  if (!isTauri()) {
+    const web = webCorpus();
+    return web ? web.write(id, body, expectedRevision) : Promise.reject(new Error("No vault is open."));
+  }
   return corpusInvoke("corpus_write_ai", {
     id,
     body,

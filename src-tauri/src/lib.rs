@@ -2337,7 +2337,6 @@ pub fn run() {
             corpus::corpus_write_frontmatter_raw,
             corpus::corpus_set_locked,
             corpus::corpus_set_ai_edit,
-            corpus::ai_edit::corpus_claim_chat_memory,
             corpus::corpus_set_pinned,
             corpus::corpus_set_field,
             corpus::corpus_set_ai_field,

@@ -55,12 +55,9 @@ or was written by the person. On 2026-09-29 the owner decided:
    note's existing notes section and writes a chat-made note of its own. The
    chat file records it as `memoryNote: [[stem]]`, and `attachedTo` stays on
    the person's note. A memory note Rotli wrote before this rule has no
-   provenance, so first `corpus_claim_chat_memory` checks, in Rust, whether
-   its text is exactly Rotli's memory-note shape for this chat. That shape is
-   `# Title`, `Notes from [[slug]].`, then only the managed section. If it
-   matches and the note carries no grant or lock, the claim stamps
-   `created_by: chat`. Anything a person added or changed fails the match,
-   and the note is treated as theirs.
+   provenance and is treated the same way. A shape check cannot tell Rotli's
+   bullets from ones a person edited inside the section, and Rotli never
+   recorded what it last wrote, so no older note is claimed.
 5. Filing (`relocate`) writes every byte after the frontmatter fence
    unchanged. Main references Markdown notes by `id`, so a move never changes
    their place or name in Main.
@@ -69,10 +66,9 @@ or was written by the person. On 2026-09-29 the owner decided:
 
 ## Consequences
 
-- An existing chat keeps its own memory note: the claim covers the notes Rotli
-  wrote untouched. A chat attached to a note the person wrote or edited starts
-  a new chat-made memory note on its next turn, and their note stays
-  untouched.
+- An existing chat attached to a person's note, or to a memory note from
+  before this rule, starts a new chat-made memory note on its next turn,
+  seeded from the old note's notes section. The old note stays untouched.
 - A chat or agent asked to rewrite a person's note gets a refusal that names
   the menu switch, and can create a new note instead.
 - An older Rotli preserves both keys as unknown lines but does not enforce

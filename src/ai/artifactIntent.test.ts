@@ -47,3 +47,15 @@ test("a document word inside a link is not a request for a document", () => {
     ),
   ).toBeNull();
 });
+
+test("a scheme-less link is not a request for a document either", () => {
+  expect(
+    artifactClarification("Read docs.google.com/document/d/abc/edit and write me a new bio", {
+      documentTool: true,
+    }),
+  ).toBeNull();
+  // a real request for a document still asks
+  expect(
+    artifactClarification("Write me a document about docs.google.com", { documentTool: true })?.kind,
+  ).toBe("question");
+});

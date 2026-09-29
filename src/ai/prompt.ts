@@ -78,10 +78,20 @@ function renderConversation(history: ChatTurn[], userText: string): string {
  * reply. Replaying either re-triggers a provider safeguard that blocked the
  * turn — Claude's classifiers read the whole conversation (2026-09-29). */
 export function answeredHistory(history: ChatTurn[]): ChatTurn[] {
-  const kept: ChatTurn[] = [];
-  for (const turn of history) {
-    if (turn.role === "assistant" && turn.text.startsWith("⚠")) {
-      if (kept.at(-1)?.role === "user") kept.pop();
+  return withoutFailedExchanges(history, (turn) => turn.role === "assistant");
+}
+
+/** The same rule over any turn shape (the chat surface's `speaker` turns feed
+ * the memory note): a "⚠" reply and the one turn it answered both go. */
+export function withoutFailedExchanges<T extends { text: string }>(
+  turns: readonly T[],
+  isReply: (turn: T) => boolean,
+): T[] {
+  const kept: T[] = [];
+  for (const turn of turns) {
+    if (isReply(turn) && turn.text.startsWith("⚠")) {
+      const last = kept.at(-1);
+      if (last && !isReply(last)) kept.pop();
       continue;
     }
     kept.push(turn);

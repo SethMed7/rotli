@@ -31,7 +31,9 @@ import { modelIsOnDevice } from "../../ai/guard";
 import { type HostArtifactKind, makeTauriHost } from "../../ai/host";
 import { presetFor, runHybrid } from "../../ai/hybrid";
 import { runAgent } from "../../ai/loop";
+import { modelErrorText } from "../../ai/modelError";
 import { type ModelGroups, findModel, flattenModels, mergedModels } from "../../ai/models";
+import { withoutFailedExchanges } from "../../ai/prompt";
 import type { AgentQuestion, ChatTurn, RunInput } from "../../ai/types";
 import { resolveChatNoteId, syncManagedChatMemory } from "../../chatMemory/composition";
 import {
@@ -1772,7 +1774,7 @@ export function ChatSurface({
         } else if (ev.type === "final") reply = ev.text;
       }
     } catch (e) {
-      reply = `⚠ ${(e as Error)?.message ?? "the model failed"}`;
+      reply = `⚠ ${modelErrorText((e as Error)?.message ?? "the model failed")}`;
     }
     if (runSeq.current !== myRun) return; // stopped mid-generation — the reply lands nowhere
     requestRef.current = null;
@@ -1838,11 +1840,9 @@ export function ChatSurface({
       { speaker: "rotli", text: reply, at: assistantAt },
     ];
     const diskTurn: Msg[] = sentPersisted ? [{ speaker: "rotli", text: reply, at: assistantAt }] : turn;
-    // ⚠ notices are Rotli's, not the conversation's: the notes model never
-    // sees them (a replayed safeguard error re-trips the safeguard)
-    const memoryTurns = [...messages, ...turn].filter(
-      (m) => !(m.speaker === "rotli" && m.text.startsWith("⚠")),
-    );
+    // a failed exchange (the ⚠ notice AND the turn it answered) never reaches
+    // the notes model — a replayed safeguard error re-trips the safeguard
+    const memoryTurns = withoutFailedExchanges([...messages, ...turn], (m) => m.speaker === "rotli");
     // the notes-keeping model: the same pick as the chat rewrites the attached
     // note's "Conversation notes" each turn (a preset routes per-leg, so it
     // falls back to the deterministic topics digest instead)

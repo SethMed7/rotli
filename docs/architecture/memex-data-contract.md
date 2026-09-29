@@ -718,9 +718,8 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   the same seams as `locked` below, in both layers, with Rotli Web running the
   TypeScript twin itself. A chat attached to such a note keeps its
   conversation notes in a chat-made note of its own (`memoryNote:` on the
-  chat file) and only reads the person's note. A memory note Rotli wrote
-  before provenance existed is claimed for its chat (`created_by: chat`)
-  only when Rust finds its text exactly in Rotli's memory-note shape.
+  chat file) and only reads the person's note. A memory note from before
+  provenance existed is treated the same way; Rotli never claims one.
 - **`locked: true` refuses every AI edit** — interactive chat (`update_note`),
   the per-turn chat-memory sync, the headless workspace agents, and the
   organizer. Both layers enforce it: TypeScript fails fast and Rust refuses

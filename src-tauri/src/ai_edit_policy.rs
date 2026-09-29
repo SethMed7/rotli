@@ -123,25 +123,6 @@ pub(crate) fn body_edit<S: AsRef<str>>(foreign: &[S]) -> BodyEdit {
     }
 }
 
-/// Is this editor body exactly a chat-memory note Rotli wrote for
-/// `chat_slug` (src/chatMemory/model.ts mergeChatMemory on an empty note)?
-/// `# Title`, a blank line, `Notes from [[slug]].`, a blank line, then the
-/// managed `## Conversation notes` section running to the end. Anything a
-/// person added — another section, a changed line — fails the match.
-pub(crate) fn is_chat_memory_shape(body: &str, chat_slug: &str) -> bool {
-    let Some(rest) = body.strip_prefix("# ") else {
-        return false;
-    };
-    let Some((title, rest)) = rest.split_once('\n') else {
-        return false;
-    };
-    let expected = format!("\nNotes from [[{chat_slug}]].\n\n## Conversation notes");
-    match rest.strip_prefix(expected.as_str()) {
-        Some(section) => !title.trim().is_empty() && !section.contains("\n## "),
-        None => false,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,18 +161,6 @@ mod tests {
             body_edit(&["created_by: someone-else"]),
             BodyEdit::PersonWritten
         );
-    }
-
-    #[test]
-    fn only_rotlis_exact_memory_note_shape_matches() {
-        let memory = "# Plan\n\nNotes from [[plan-chat]].\n\n## Conversation notes\n\n### Decisions\n- ship\n";
-        assert!(is_chat_memory_shape(memory, "plan-chat"));
-        assert!(!is_chat_memory_shape(memory, "another-chat"));
-        let added = format!("{memory}\n## My own section\nmine\n");
-        assert!(!is_chat_memory_shape(&added, "plan-chat"));
-        let edited = memory.replace("# Plan\n\n", "# Plan\n\nMy intro.\n\n");
-        assert!(!is_chat_memory_shape(&edited, "plan-chat"));
-        assert!(!is_chat_memory_shape("# \n\nNotes from [[c]].\n\n## Conversation notes\n", "c"));
     }
 
     #[test]

@@ -140,7 +140,6 @@ describe("listChatsForNote", () => {
           const chat = chats.find((c) => c.slug === slug);
           if (chat) chat.attachedTo = stem;
         },
-        claim: async () => false,
         findMemoryNote: async () => null,
         setMemoryNote: async () => {},
       },

@@ -325,7 +325,7 @@ export async function* runAgent(host: Host, input: RunInput): AsyncGenerator<Age
   yield { type: "status", text: "wrapping up…" };
   const forced = yield* forceFinal(
     host,
-    input,
+    { ...input, history },
     pruneScratch(scratch, budget.maxScratchChars),
     useStream && !researchAttempted,
     webEvidence,
@@ -350,7 +350,13 @@ async function* forceFinal(
     ...(input.userName ? { userName: input.userName } : {}),
   });
   try {
-    const out = yield* generate(host, { messages: [{ role: "user", content: prompt }] }, useStream, true);
+    // the wrap-up sees what every step saw: the cleaned history (the caller
+    // passes it) and the turn's images
+    const message =
+      input.images && input.images.length > 0
+        ? { role: "user" as const, content: prompt, images: input.images }
+        : { role: "user" as const, content: prompt };
+    const out = yield* generate(host, { messages: [message] }, useStream, true);
     if (out.extractor && out.extractor.mode === "final") {
       return groundForcedFinal(out.extractor.finalText, webEvidence);
     }

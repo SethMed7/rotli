@@ -4,7 +4,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { answeredHistory, frontierAdapter, gemmaAdapter } from "./prompt";
+import { answeredHistory, frontierAdapter, gemmaAdapter, withoutFailedExchanges } from "./prompt";
 
 const base = {
   web: false,
@@ -469,5 +469,26 @@ describe("answeredHistory", () => {
 
   test("a leading notice with no user turn before it is simply dropped", () => {
     expect(answeredHistory([{ role: "assistant", text: "⚠ No on-device model is set up" }])).toEqual([]);
+  });
+});
+
+// the pull-request review (2026-09-29): the chat-memory notes model got the orphaned user turn of a
+// failed exchange; the same rule now runs over the chat surface's turns
+describe("withoutFailedExchanges over chat-surface turns", () => {
+  test("drops the ⚠ reply and the turn it answered, keeping the rest in order", () => {
+    const turns = [
+      { speaker: "you", text: "plan my week" },
+      { speaker: "rotli", text: "Here's the plan." },
+      { speaker: "you", text: "and the weekend?" },
+      { speaker: "rotli", text: "⚠ Claude's safety filter blocked this reply." },
+      { speaker: "you", text: "and the weekend, please" },
+      { speaker: "rotli", text: "Saturday: rest." },
+    ];
+    expect(withoutFailedExchanges(turns, (t) => t.speaker === "rotli").map((t) => t.text)).toEqual([
+      "plan my week",
+      "Here's the plan.",
+      "and the weekend, please",
+      "Saturday: rest.",
+    ]);
   });
 });

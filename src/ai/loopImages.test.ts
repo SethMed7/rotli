@@ -52,3 +52,33 @@ describe("attached images", () => {
     for (const req of requests) expect(req.messages[0]?.images).toEqual([SCREENSHOT]);
   });
 });
+
+// the pull-request review (2026-09-29): the step-budget wrap-up (forceFinal) rendered the raw
+// history and dropped the images, so a failed ⚠ exchange came back into the
+// prompt and a vision turn that ran out of steps answered blind.
+describe("the forced final answer", () => {
+  test("sees the same cleaned history and the turn's images", async () => {
+    const { host, requests } = scriptedHost([
+      '{"tool":"web_fetch","args":{"url":"https://example.org/about"}}',
+      "Here is your bio.",
+    ]);
+    for await (const ev of runAgent(host, {
+      history: [
+        { role: "user", text: "first try" },
+        { role: "assistant", text: "⚠ Claude's safety filter blocked this reply (reasoning_extraction)." },
+      ],
+      userText: "[Image #1] write me a new bio",
+      web: true,
+      model: { id: "default", api: "cli" },
+      images: [SCREENSHOT],
+      maxSteps: 1,
+    })) {
+      void ev;
+    }
+    const forced = requests.at(-1)!;
+    expect(requests).toHaveLength(2);
+    expect(forced.messages[0]?.content).not.toContain("safety filter blocked");
+    expect(forced.messages[0]?.content).not.toContain("first try");
+    expect(forced.messages[0]?.images).toEqual([SCREENSHOT]);
+  });
+});

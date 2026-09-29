@@ -57,7 +57,7 @@ afterAll(() => {
   void mock.module("../lib/tauri", () => realTauri);
 });
 
-const { setChatAttachedTo, setChatMemoryNoteStem, writeChat } = await import("./service");
+const { setChatAttachedTo, setChatMemoryNoteStem, setChatModelMeta, writeChat } = await import("./service");
 
 beforeEach(() => {
   disk = BASE;
@@ -102,5 +102,14 @@ describe("a chat turn survives a concurrent writer", () => {
     expect(writes).toBe(2);
     expect(disk).toContain("provider: claude");
     expect(disk).toContain("Which format do you want?");
+  });
+});
+
+describe("a chat's model record survives a concurrent writer", () => {
+  test("setChatModelMeta re-reads and writes again after a lost race", async () => {
+    raceOnce = true;
+    await setChatModelMeta(INSTANCE, "plan", "sonnet", "claude");
+    expect(writes).toBe(2);
+    expect(disk).toContain("model: sonnet");
   });
 });

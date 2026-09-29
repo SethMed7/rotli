@@ -31,11 +31,3 @@ export async function corpusSetLocalAiAccess(id: string, allowed: boolean): Prom
   if (!isTauri()) return;
   await invoke("corpus_set_local_ai_access", { id, allowed });
 }
-
-/** Claim one of Rotli's own pre-provenance chat-memory notes for its chat
- * (`created_by: chat`). Rust checks the text is exactly that shape; true when
- * the note is now the chat's to write. Rotli Web never claims. */
-export async function corpusClaimChatMemory(id: string, chatSlug: string): Promise<boolean> {
-  if (!isTauri()) return false;
-  return invoke<boolean>("corpus_claim_chat_memory", { id, chatSlug });
-}

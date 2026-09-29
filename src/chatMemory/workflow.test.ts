@@ -14,7 +14,6 @@ describe("syncChatMemory", () => {
       ),
       update: async () => void calls.push("update"),
       attach: async () => void calls.push("attach"),
-      claim: async () => false,
       findMemoryNote: async () => null,
       setMemoryNote: async () => void calls.push("setMemoryNote"),
     };
@@ -38,7 +37,6 @@ describe("syncChatMemory", () => {
       ),
       update: async () => void calls.push("update"),
       attach: async () => void calls.push("attach"),
-      claim: async () => false,
       findMemoryNote: async () => null,
       setMemoryNote: async () => void calls.push("setMemoryNote"),
     };
@@ -69,7 +67,6 @@ describe("syncChatMemory", () => {
         updates += 1;
       },
       attach: async () => {},
-      claim: async () => false,
       findMemoryNote: async () => null,
       setMemoryNote: async () => {},
     };
@@ -90,7 +87,6 @@ describe("syncChatMemory", () => {
       create: async (body) => ({ id: "n", stem: "s", body, revision: "r1", aiEditable: true }),
       update: async () => {},
       attach: async () => {},
-      claim: async () => false,
       findMemoryNote: async () => null,
       setMemoryNote: async () => {},
     };
@@ -119,7 +115,6 @@ describe("syncChatMemory", () => {
         body = next;
       },
       attach: async () => {},
-      claim: async () => false,
       findMemoryNote: async () => null,
       setMemoryNote: async () => {},
     };
@@ -163,7 +158,6 @@ describe("syncChatMemory", () => {
       ),
       update: async (id) => void calls.push(`update ${id}`),
       attach: async () => void calls.push("attach"),
-      claim: async () => false,
       findMemoryNote: async () => null,
       setMemoryNote: async (stem) => void calls.push(`setMemoryNote ${stem}`),
     };
@@ -193,7 +187,6 @@ describe("syncChatMemory", () => {
       },
       update: async (id) => void calls.push(`update ${id}`),
       attach: async () => void calls.push("attach"),
-      claim: async () => false,
       findMemoryNote: async () => ({
         id: "m",
         stem: "chat-notes",
@@ -228,7 +221,6 @@ describe("syncChatMemory", () => {
       ),
       update: async (id) => void calls.push(`update ${id}`),
       attach: async () => void calls.push("attach"),
-      claim: async () => false,
       findMemoryNote: async () => ({
         id: "m",
         stem: "chat-notes",
@@ -249,34 +241,31 @@ describe("syncChatMemory", () => {
   });
 });
 
-describe("claiming Rotli's own older memory notes", () => {
-  test("a claimed note stays the chat's note and is updated in place", async () => {
+// the pull-request review (2026-09-29): a memory note from before provenance can carry the person's
+// own edits inside the notes section, which no shape check can tell apart, so
+// it is read for its notes and never written.
+describe("an older memory note a person edited", () => {
+  test("is read, never written; the chat starts its own note", async () => {
+    const edited = `# Plan\n\nNotes from [[plan]].\n\n${CHAT_NOTES_HEADING}\n\n- ship it (my own wording)\n`;
     const calls: string[] = [];
     const repository: ChatMemoryRepository = {
-      findByStem: async () => ({
-        id: "old",
-        stem: "plan",
-        body: "# Plan\n",
-        revision: "r1",
-        aiEditable: false,
-      }),
-      create: async () => {
-        throw new Error("should not create");
-      },
+      findByStem: async () => ({ id: "old", stem: "plan", body: edited, revision: "r1", aiEditable: false }),
+      create: async (body) => (
+        calls.push("create"),
+        { id: "new", stem: "plan-notes", body, revision: "r1", aiEditable: true }
+      ),
       update: async (id) => void calls.push(`update ${id}`),
       attach: async () => void calls.push("attach"),
-      claim: async (id) => (calls.push(`claim ${id}`), true),
-      findMemoryNote: async () => {
-        throw new Error("a claimed note needs no separate note");
-      },
-      setMemoryNote: async () => void calls.push("setMemoryNote"),
+      findMemoryNote: async () => null,
+      setMemoryNote: async (stem) => void calls.push(`setMemoryNote ${stem}`),
     };
-    await syncChatMemory(repository, {
+    const note = await syncChatMemory(repository, {
       title: "Plan",
       chatSlug: "plan",
       attachedStem: "plan",
       turns: [{ speaker: "you", text: "turn" }],
     });
-    expect(calls).toEqual(["claim old", "update old"]);
+    expect(calls).toEqual(["create", "setMemoryNote plan-notes"]);
+    expect(note?.body).toContain("- ship it (my own wording)");
   });
 });

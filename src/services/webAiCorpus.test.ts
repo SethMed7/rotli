@@ -51,3 +51,30 @@ describe("web AI corpus", () => {
     expect(hits.map((h) => h.id)).toEqual([ids.Inbox!]);
   });
 });
+
+// the pull-request review (2026-09-29): Rotli Web's update_note had no working write; the seam now
+// runs the body-edit policy twin (and the secure/secret rules) itself
+describe("the web AI write", () => {
+  test("a note the person wrote is refused; a chat-made note is written", async () => {
+    const svc = new InMemoryNotesService();
+    const mine = await svc.createNote("Inbox", "# Mine\n\nmy words");
+    const chat = await svc.createNote("Inbox", "# From chat\n\nchat words", { createdBy: "chat" });
+    const corpus = createWebAiCorpus(() => svc);
+    await expect(corpus.write(mine.id, "# Mine\n\nrewritten", mine.revision)).rejects.toThrow(
+      "the user wrote this note themselves",
+    );
+    expect((await svc.getNote(mine.id))?.body).toBe("# Mine\n\nmy words");
+    const written = await corpus.write(chat.id, "# From chat\n\nrevised", chat.revision);
+    expect(written.revision).not.toBe(chat.revision);
+    expect((await svc.getNote(chat.id))?.body).toBe("# From chat\n\nrevised");
+  });
+
+  test("secret-shaped text never lands in an open note", async () => {
+    const svc = new InMemoryNotesService();
+    const chat = await svc.createNote("Inbox", "# Keys\n\nnothing yet", { createdBy: "chat" });
+    const corpus = createWebAiCorpus(() => svc);
+    await expect(
+      corpus.write(chat.id, "# Keys\n\nsk-ant-api03-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", chat.revision),
+    ).rejects.toThrow();
+  });
+});

@@ -205,33 +205,3 @@ fn write_for_ai_follows_the_same_read_gate() {
         .write_for_ai(&note.id, "# Private\n\nlocal edit", true)
         .is_ok());
 }
-
-/// Rotli's own pre-provenance chat-memory notes are claimed for their chat —
-/// only when the text is exactly Rotli's shape, never a note a person shaped
-/// or edited, and never twice (2026-09-29).
-#[test]
-fn only_rotlis_own_memory_notes_are_claimed_for_their_chat() {
-    let tmp = TempDir::new().unwrap();
-    let mut store = CorpusStore::open(tmp.path().join("corpus")).unwrap();
-    store.os_trash = false;
-    let memory = store
-        .create("Inbox", "# Plan\n\nNotes from [[plan-chat]].\n\n## Conversation notes\n\n- ship it\n")
-        .unwrap();
-    let mine = store
-        .create("Inbox", "# Plan\n\nMy own words.\n\n## Conversation notes\n\n- mine\n")
-        .unwrap();
-    assert!(!store.claim_chat_memory(&memory.id, "other-chat").unwrap());
-    assert!(!store.claim_chat_memory(&mine.id, "plan-chat").unwrap());
-    assert_eq!(store.read_frontmatter(&mine.id).unwrap().ai_body_edit, "person-written");
-
-    assert!(store.claim_chat_memory(&memory.id, "plan-chat").unwrap());
-    assert_eq!(store.read_frontmatter(&memory.id).unwrap().ai_body_edit, "allowed");
-    assert!(!store.claim_chat_memory(&memory.id, "plan-chat").unwrap(), "claimed once");
-
-    // a person's explicit "off" is a decision the claim never overrides
-    let revoked = store
-        .create("Inbox", "# Trip\n\nNotes from [[trip-chat]].\n\n## Conversation notes\n\n- x\n")
-        .unwrap();
-    store.set_ai_edit(&revoked.id, false).unwrap();
-    assert!(!store.claim_chat_memory(&revoked.id, "trip-chat").unwrap());
-}

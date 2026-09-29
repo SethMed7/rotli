@@ -8810,10 +8810,9 @@ pub mod rules_store;
 /// The prompt-injection evals — a fully cooperating, fully compromised caller
 /// driven against the real gates. Kept in its own file because it is a
 /// deliverable, not a unit test (docs/architecture/egress-threat-model.md).
-/// The AI edit controls on the store: the person's grant and the one-time
-/// claim of Rotli's own chat-memory notes (2026-09-29).
+/// The AI edit control on the store: the person's grant (2026-09-29).
 #[path = "corpus_ai_edit.rs"]
-pub(crate) mod ai_edit;
+mod ai_edit;
 
 #[cfg(test)]
 #[path = "injection_evals.rs"]

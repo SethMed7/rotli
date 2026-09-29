@@ -20,9 +20,6 @@ export interface ChatMemoryRepository {
   create(body: string): Promise<ChatMemoryNote>;
   update(id: string, body: string, expectedRevision: string): Promise<void>;
   attach(stem: string): Promise<void>;
-  /** Claim a note Rotli wrote as this chat's memory before provenance
-   * existed; true when it is now the chat's to write. */
-  claim(id: string): Promise<boolean>;
   /** The chat's own notes note, kept apart from a person's attached note. */
   findMemoryNote(): Promise<ChatMemoryNote | null>;
   setMemoryNote(stem: string): Promise<void>;
@@ -63,7 +60,6 @@ export async function syncChatMemory(
   // note, so the note still lists this chat.
   let separate = false;
   let seedNotes: string | null = null;
-  if (note && !note.aiEditable && (await repository.claim(note.id))) note = { ...note, aiEditable: true };
   if (note && !note.aiEditable) {
     seedNotes = extractChatNotes(note.body);
     const own = await repository.findMemoryNote();

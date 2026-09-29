@@ -6,9 +6,16 @@
 
 const SAFEGUARD = /safeguards flagged this message/i;
 const CATEGORY = /\[([a-z][a-z_]*)\]/;
+const BLOCKED = "Claude's safety filter blocked this reply";
 
 export function modelErrorText(message: string): string {
   if (!SAFEGUARD.test(message)) return message;
   const category = CATEGORY.exec(message)?.[1];
-  return `Claude's safety filter blocked this reply${category ? ` (${category})` : ""}. It sometimes flags ordinary requests. Edit your message and send it again, or switch model. Rotli doesn't retry on its own, because a blocked request still counts toward your plan.`;
+  return `${BLOCKED}${category ? ` (${category})` : ""}. It sometimes flags ordinary requests. Edit your message and send it again, or switch model. Rotli doesn't retry on its own, because a blocked request still counts toward your plan.`;
+}
+
+/** Is this error (raw, or already worded by modelErrorText) a provider safety
+ * block? Callers never retry one on their own. */
+export function isSafeguardBlock(message: string): boolean {
+  return SAFEGUARD.test(message) || message.includes(BLOCKED);
 }

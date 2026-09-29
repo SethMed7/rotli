@@ -219,11 +219,7 @@ export async function setChatModelMeta(
 ): Promise<void> {
   const rel = `chats/${slug}.md`;
   if (!canWrite(rel, instance.perms)) return; // a read-only vault keeps its files as they are
-  const existing = await memexReadChat(instance.root, slug);
-  const next = setChatModel(existing.contents, model, provider);
-  if (next !== existing.contents) {
-    await memexWriteChat(instance.root, slug, next, existing.revision);
-  }
+  await rewriteChat(instance, slug, (contents) => setChatModel(contents, model, provider));
 }
 
 export const listChats = (instance: MemexInstance): Promise<MemexChatSummary[]> =>

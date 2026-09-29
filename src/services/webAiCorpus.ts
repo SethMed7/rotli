@@ -8,7 +8,8 @@
 // local-class exception to enforce.
 
 import { looksSecret } from "../ai/guard";
-import type { CorpusNoteMeta, FrontmatterView, WebAiCorpus } from "../lib/tauri";
+import { bodyEditRefusal } from "../lib/aiEditPolicy";
+import type { CorpusNoteMeta, CorpusWriteResult, FrontmatterView, WebAiCorpus } from "../lib/tauri";
 import { isSecureBrainFolder, isSecureNotesFolder } from "../security/secureNotes";
 import type { NoteSummary, SearchHit } from "../types";
 import type { NotesService } from "./notesPort";
@@ -63,6 +64,21 @@ export function createWebAiCorpus(notes: () => NotesService): WebAiCorpus {
     },
     async readableIds(ids: string[]): Promise<string[]> {
       return (await readableOnly(ids.map((id) => ({ id })))).map((item) => item.id);
+    },
+    async write(id: string, body: string, expectedRevision: string): Promise<CorpusWriteResult> {
+      // the web twin of corpus_write_ai: read gate, then who may rewrite the
+      // text (locked, the grant, provenance), then no secret into an open note
+      if (await secure(id)) throw new Error("This note is secure and never leaves this computer.");
+      const note = await notes().getNote(id);
+      if (!note) throw new Error("unknown note");
+      const refusal = bodyEditRefusal(
+        note.locked === true ? "locked" : (note.aiBodyEdit ?? "person-written"),
+      );
+      if (refusal) throw new Error(refusal);
+      if (looksSecret(body))
+        throw new Error("This text looks like it holds a secret, so it can't be written into an open note.");
+      const saved = await notes().updateNote(id, body, expectedRevision);
+      return { ...meta(saved), revision: saved.revision };
     },
     async frontmatter(id: string): Promise<FrontmatterView | null> {
       const note = await notes().getNote(id);

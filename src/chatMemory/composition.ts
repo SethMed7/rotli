@@ -1,5 +1,4 @@
 import { bodyEditRefusal } from "../lib/aiEditPolicy";
-import { corpusClaimChatMemory } from "../lib/noteProtection";
 import { type ChatModelInfo, corpusFrontmatter, corpusWriteAi, isTauri } from "../lib/tauri";
 import { CORPUS_INSTANCE_ID, type MemexInstance } from "../memex/config";
 import { noteSlugify } from "../memex/contract";
@@ -117,7 +116,6 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
       return stem ? repository.findByStem(stem) : null;
     },
     setMemoryNote: (stem: string) => setChatMemoryNoteStem(input.instance, input.chatSlug, stem),
-    claim: (id: string) => corpusClaimChatMemory(id, input.chatSlug).catch(() => false),
     async create(body: string): Promise<ChatMemoryNote> {
       // Rotli Web: the notes service IS the vault (no memex note command), and
       // the note's slug alias is the stem the chat attaches to. It is a note,
@@ -141,17 +139,9 @@ export async function syncManagedChatMemory(input: ManagedChatMemoryInput): Prom
       if (!note) throw new Error("The new conversation note could not be read back after creation.");
       return { id, stem: created.stem, body, revision: note.revision, aiEditable: true };
     },
-    // browser mode has no corpus, so the twin keeps the in-memory service
+    // one gated write on both platforms: Rust on the Mac, the web AI corpus's
+    // twin of it in Rotli Web (webAiCorpus.write)
     update: async (id: string, body: string, expectedRevision: string) => {
-      if (!isTauri()) {
-        // the web has no Rust gate: the same policy runs here, fail-closed
-        const refusal = bodyEditRefusal(
-          (await corpusFrontmatter(id).catch(() => null))?.aiBodyEdit ?? "person-written",
-        );
-        if (refusal) throw new Error(refusal);
-        await notesService.updateNote(id, body, expectedRevision);
-        return;
-      }
       await updateNoteAsAi(id, body, input.model, expectedRevision);
     },
     attach: (stem: string) => setChatAttachedTo(input.instance, input.chatSlug, stem),
