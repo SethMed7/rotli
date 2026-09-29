@@ -182,6 +182,7 @@ fn frontmatter_view_matches_fixture() {
         secure: false,
         local_ai_allowed: false,
         pinned: false,
+        ai_body_edit: "allowed",
         fields: Vec::new(),
     };
     let json = serde_json::to_value(&sample).expect("FrontmatterView serializes");
@@ -300,6 +301,26 @@ fn secure_by_name_cases_match_fixture() {
                 &keywords
             ),
             case["secure"].as_bool().unwrap(),
+            "{case}"
+        );
+    }
+}
+
+#[test]
+fn ai_creators_match_fixture() {
+    assert_eq!(
+        string_list(&entry("aiCreators")),
+        crate::ai_edit_policy::AI_CREATORS
+    );
+}
+
+#[test]
+fn ai_body_edit_cases_match_fixture() {
+    for case in entry("aiBodyEditCases").as_array().expect("cases") {
+        let fields = string_list(&case["fields"]);
+        assert_eq!(
+            crate::ai_edit_policy::body_edit(&fields).as_str(),
+            case["verdict"].as_str().unwrap(),
             "{case}"
         );
     }

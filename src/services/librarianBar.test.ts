@@ -19,6 +19,7 @@ function view(fields: string[], extra: Partial<FrontmatterView> = {}): Frontmatt
     secure: false,
     localAiAllowed: false,
     pinned: false,
+    aiBodyEdit: "person-written",
     fields,
     ...extra,
   };

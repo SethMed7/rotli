@@ -14,10 +14,7 @@ import {
   corpusFrontmatter,
   corpusMoveFileToSink,
   corpusRevealFile,
-  corpusSetLocalAiAccess,
-  corpusSetLocked,
   corpusSetPinned,
-  corpusSetSecure,
   isTauri,
 } from "../lib/tauri";
 import { openChatForNote } from "../noteChat/composition";
@@ -47,6 +44,7 @@ import { useUiStore } from "../state/ui";
 import { useViewsStore } from "../state/views";
 import type { NoteSummary } from "../types";
 import { addToFolderMenu } from "./sidebar/addToFolderMenu";
+import { noteProtectionItems } from "./sidebar/noteProtectionItems";
 
 /** What the opener hands us — a real MouseEvent qualifies, and a keyboard
  * opener passes a plain {clientX, clientY} built from its row's rect. */
@@ -447,42 +445,7 @@ export function useNoteMenu() {
             checked: !!fm?.pinned,
             onClick: () => runFm("pin", corpusSetPinned(note.id, !fm?.pinned)),
           });
-          items.push({
-            kind: "action" as const,
-            // LOCKED is an EDIT control — every model still READS a locked note
-            // (the maintainer, 2026-08-01; docs/design/ai-visibility-matrix.md)
-            label: fm?.locked ? "Unlock — let the AI edit it" : "Lock — no AI may edit it",
-            checked: !!fm?.locked,
-            // protection states wear the LOCK, not the star (the maintainer, 2026-07-29)
-            checkedMark: "lock" as const,
-            onClick: () => runFm("lock", corpusSetLocked(note.id, !fm?.locked)),
-          });
-          items.push({
-            kind: "action" as const,
-            label: fm?.secure ? "Remove secure protection" : "Mark secure — block remote AI",
-            checked: !!fm?.secure,
-            checkedMark: "lock" as const,
-            onClick: () => runFm("mark secure", corpusSetSecure(note.id, !fm?.secure)),
-          });
-          if (fm?.secure && !secureAtHome) {
-            items.push({
-              kind: "action" as const,
-              label: "Move into Library › Secure notes",
-              onClick: () => runFm("move to Secure notes", corpusSetSecure(note.id, true)),
-            });
-          }
-          if (fm?.secure) {
-            // `localAiAllowed` is the EFFECTIVE verdict Rust resolved (note
-            // override → the vault knob → allow). On-device access is the
-            // default since 2026-08-01, so the common verb here is now HIDE.
-            items.push({
-              kind: "action" as const,
-              label: fm.localAiAllowed ? "Hide from on-device AI too" : "Let on-device AI read it",
-              checked: fm.localAiAllowed,
-              onClick: () =>
-                runFm("change Local AI access", corpusSetLocalAiAccess(note.id, !fm.localAiAllowed)),
-            });
-          }
+          items.push(...noteProtectionItems(note.id, fm, secureAtHome, runFm));
         }
         const renameVia = renameLane(note);
         if (renameVia) {

@@ -36,7 +36,14 @@ export const liveKeepDeps: KeepDeps = {
   setRules: (rules) => useLibrarianRules.getState().setRules(rules),
   saveRules: flushSettingsNow,
   // no folder picked: a Library note, written to the intake and filed from there
-  createNote: (body) => createRoutedNote({ selectedFolderId: "", isSmart: true, localFallback: "", body }),
+  createNote: (body) =>
+    createRoutedNote({
+      selectedFolderId: "",
+      isSmart: true,
+      localFallback: "",
+      body,
+      createdBy: "librarian",
+    }),
   notePath: corpusNotePath,
   log: logAction,
   apply: (actions, note) => applyLibrarian(actions, note),

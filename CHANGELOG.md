@@ -20,6 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Rename dialog. Renaming a folder used to hide everything inside it while you
   typed.
 
+- **AI no longer rewrites notes you wrote.** Chat, agents and the Librarian
+  may change the text of a note an AI made, but a note you wrote (every
+  note from before this release included) stays yours until you turn on
+  **Let AI edit the text** in its menu. Lock still blocks everything. Rotli
+  now records which AI made a note, and a chat attached to one of your notes
+  keeps its conversation notes in a note of its own instead of writing into
+  yours. Filing a note moves it into its area without changing a character
+  of its text.
+
 ### Fixed
 
 - **Claude models show their names again.** The model picker listed Claude
@@ -29,6 +38,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Claude Opus 5.5", "Claude Fable 5.1", "Claude Haiku 4.5" again, and older
   Claude Code versions still work. Rotli Web gets the fix with the next Rotli
   Helper.
+- **Claude stops refusing ordinary chats.** Rotli asked connected models to
+  write their reasoning into every reply and then fed it back on the next step,
+  the pattern Claude's safeguards flag as reasoning extraction. Claude, Codex
+  and the other connected models now get only the tools, the rules and what
+  each step found; they reason on their own. The on-device model keeps its
+  short checkpoints. A reply that failed (a ⚠ notice) and the message it
+  answered are no longer sent back to the model, so one blocked turn can't
+  keep blocking the rest of the chat. When Claude's safety filter does block
+  a reply, the chat says so in one plain sentence instead of the raw API
+  error, and Rotli doesn't retry on its own, because a blocked request still
+  counts toward your plan.
+- **Chat can read links into apps that route after "#".** A link like
+  studio.rotli.co/#/piece/… only ever fetched the app's empty "Loading…"
+  page, because nothing after "#" reaches the server. Rotli now also tries
+  that route as a page on the same site and reads whichever says more.
+- **An attached image stays in view for the whole reply.** A model that
+  looked something up first used to lose the picture and answer "I couldn't
+  see the image"; the image now rides every step of the turn.
+- **A link no longer makes Rotli ask which format you want.** "Write me a
+  bio" next to a Google Docs link used to trigger the Word-or-Markdown
+  question, because "document" appeared in the URL.
+- **Chat messages no longer disappear.** An error reply now stays in the chat
+  after a reload instead of living only on screen. A reply that arrived while
+  Rotli was still saving a new chat's details could lose the race and vanish;
+  it now re-reads the chat and saves again.
 
 ## [1.6.0] - 2026-09-28
 

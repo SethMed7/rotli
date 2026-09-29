@@ -72,10 +72,12 @@ export function createWebAiCorpus(notes: () => NotesService): WebAiCorpus {
         id: note.id,
         created: new Date(note.createdAt).toISOString(),
         updated: new Date(note.updatedAt).toISOString(),
-        locked: false,
+        locked: note.locked === true,
         secure: isSecure,
         localAiAllowed: false,
         pinned: note.pinned,
+        // an adapter that doesn't read provenance answers fail-closed
+        aiBodyEdit: note.locked === true ? "locked" : (note.aiBodyEdit ?? "person-written"),
         fields: [],
       };
     },

@@ -14,6 +14,7 @@ import type {
   BreveDeliverySettings,
 } from "../routines/breveTypes";
 import type { SearchHit, WelcomeSeed } from "../types";
+import type { AiBodyEdit, NoteCreator } from "./aiEditPolicy";
 import { browserVault, isWebVault, webVaultName } from "./browserVault";
 import {
   type VaultBrowserView,
@@ -374,12 +375,13 @@ export function corpusWrite(
 export function corpusCreate(
   folderId: string,
   body: string,
-  policy?: { secure?: boolean },
+  policy?: { secure?: boolean; createdBy?: NoteCreator },
 ): Promise<CorpusNoteMeta> {
   return corpusInvoke("corpus_create", {
     folderId,
     body,
     secure: policy?.secure ?? false,
+    ...(policy?.createdBy ? { createdBy: policy.createdBy } : {}),
   });
 }
 
@@ -1114,6 +1116,8 @@ export interface FrontmatterView {
   localAiAllowed: boolean;
   /** Pinned to the top of every list (pinned → updated → id sort). */
   pinned: boolean;
+  /** May an AI rewrite this note's text? Rust's ai_edit_policy verdict. */
+  aiBodyEdit: AiBodyEdit;
   /** the foreign frontmatter lines (shelf/reach/area/summary/tags/links/…). */
   fields: string[];
 }
@@ -1124,12 +1128,6 @@ const webCorpus = (): WebAiCorpus | null => currentWebAiCorpus<WebAiCorpus>();
 export async function corpusFrontmatter(id: string): Promise<FrontmatterView | null> {
   if (!isTauri()) return webCorpus()?.frontmatter(id) ?? null;
   return invoke<FrontmatterView>("corpus_frontmatter", { id });
-}
-
-/** Toggle the per-note AI lock (writes/removes a `locked: true` frontmatter line). */
-export async function corpusSetLocked(id: string, locked: boolean): Promise<void> {
-  if (!isTauri()) return;
-  await invoke("corpus_set_locked", { id, locked });
 }
 
 /** Toggle the per-note PIN (the typed `pinned` frontmatter fact) — floats the
@@ -1332,19 +1330,6 @@ export async function corpusPurge(id: string): Promise<void> {
 export async function corpusResolveRef(target: string): Promise<string> {
   if (!isTauri()) return target;
   return invoke<string>("corpus_resolve_ref", { target });
-}
-
-/** Toggle the per-note SECURE flag (secrets → never sent remote, gitignored). */
-export async function corpusSetSecure(id: string, secure: boolean): Promise<void> {
-  if (!isTauri()) return;
-  await invoke("corpus_set_secure", { id, secure });
-}
-
-/** Permit loopback-local AI to read a secure note. Remote providers remain
- * categorically blocked regardless of this value. */
-export async function corpusSetLocalAiAccess(id: string, allowed: boolean): Promise<void> {
-  if (!isTauri()) return;
-  await invoke("corpus_set_local_ai_access", { id, allowed });
 }
 
 /** One legacy secure-intake note (decision 2026-07-22): flagged `secure: true`

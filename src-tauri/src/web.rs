@@ -192,6 +192,27 @@ fn web_fetch_blocking(url: &str, max_chars: Option<usize>) -> Result<String, Str
         return Err("blocked: that URL looks like it contains a secret — not fetching it.".into());
     }
     let cap = max_chars.unwrap_or(8000).clamp(500, 20_000);
+    let text = fetch_text(url)?;
+    // A hash-routed app (`https://site/#/piece/x`) never sends its route to
+    // the server, so the fetch above sees only the app's empty shell. Try the
+    // same route as a path on the same site; a site that serves a real page
+    // there (a static per-route export, server rendering) becomes readable.
+    // The longer text wins, so a site without such pages loses nothing.
+    if let Some(page) = vet_fetch_url(url).ok().and_then(|u| hash_route_page(&u)) {
+        if let Ok(routed) = fetch_text(page.as_str()) {
+            if routed.chars().count() > text.chars().count() {
+                return Ok(truncate_chars(
+                    &format!("(read from {page}, the page this link's #-route names)\n{routed}"),
+                    cap,
+                ));
+            }
+        }
+    }
+    Ok(truncate_chars(&text, cap))
+}
+
+/// One vetted GET (SSRF-checked, redirect-capped, size-capped) as readable text.
+fn fetch_text(url: &str) -> Result<String, String> {
     let mut current = vet_fetch_url(url)?;
     let first_host = current.host_str().unwrap_or_default().to_ascii_lowercase();
     let mut hops = 0u32;
@@ -216,8 +237,25 @@ fn web_fetch_blocking(url: &str, max_chars: Option<usize>) -> Result<String, Str
         current = vet_redirect(&current, &loc, &first_host)?;
     };
     let buf = read_capped(resp.into_reader())?;
-    let text = html_to_text(&String::from_utf8_lossy(&buf));
-    Ok(truncate_chars(&text, cap))
+    Ok(html_to_text(&String::from_utf8_lossy(&buf)))
+}
+
+/// `https://site/#/piece/x` (or `#!/piece/x`) → `https://site/piece/x` on the
+/// same origin; `None` when the fragment is not a route.
+fn hash_route_page(url: &Url) -> Option<Url> {
+    let fragment = url.fragment()?;
+    let route = fragment
+        .strip_prefix("!/")
+        .or_else(|| fragment.strip_prefix('/'))?;
+    let route = route.split(['?', '#']).next()?.trim_end_matches('/');
+    if route.is_empty() {
+        return None;
+    }
+    let mut page = url.clone();
+    page.set_fragment(None);
+    page.set_query(None);
+    page.set_path(&format!("/{route}"));
+    Some(page)
 }
 
 // ── HTML → text ───────────────────────────────────────────────────────────────
@@ -357,6 +395,20 @@ pub fn open_url(url: String) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_hash_route_names_the_same_page_as_a_path() {
+        let page = |raw: &str| hash_route_page(&Url::parse(raw).unwrap()).map(|u| u.to_string());
+        assert_eq!(
+            page("https://studio.rotli.co/#/piece/s01e02PlainWords").as_deref(),
+            Some("https://studio.rotli.co/piece/s01e02PlainWords")
+        );
+        assert_eq!(page("https://x.test/app#!/a/b/?tab=2").as_deref(), Some("https://x.test/a/b"));
+        // an in-page anchor or an empty route is not a route
+        assert_eq!(page("https://x.test/docs#install"), None);
+        assert_eq!(page("https://x.test/#/"), None);
+        assert_eq!(page("https://x.test/page"), None);
+    }
+
     use super::*;
 
     #[test]

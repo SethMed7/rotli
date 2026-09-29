@@ -1803,10 +1803,33 @@ export function ChatSurface({
     }
     // the answer is IN — settle the sidebar signal now (not after the slower
     // persistence + note-memory pass): watched clears, unwatched flips unread.
-    // A failed turn always clears — its ⚠ only lives in this mounted session,
-    // so an unread badge would point at nothing.
+    // A failed turn always clears: an unread badge for an error helps no one.
     useChatRuns.getState().settleRun(runKey, failed || aliveRef.current);
-    if (failed) return; // a failed REPLY isn't persisted (the sent user turn already is)
+    if (failed) {
+      // A failed reply is still a message — it persists like any other turn so
+      // nothing vanishes on reload (2026-09-29), but it never feeds the memory
+      // note or chat naming, and answeredHistory keeps it from the model.
+      if (!sentSlug) return; // the send-time create failed; saveErr already says so
+      try {
+        await write.mutateAsync({
+          instance: active,
+          existingSlug: sentSlug,
+          title: chats.data?.find((c) => c.slug === sentSlug)?.title ?? sentTitle,
+          messages: sentPersisted
+            ? [{ speaker: "rotli", text: reply, at: assistantAt }]
+            : [
+                { speaker: "you", text: userText, at: userAt },
+                { speaker: "rotli", text: reply, at: assistantAt },
+              ],
+          secureContext: secureReadRef.current || attachedSecure,
+        });
+        ownPersistRef.current = useChatRuns.getState().markPersisted(runKey);
+        setSaveErr(null);
+      } catch (e) {
+        setSaveErr(e instanceof Error ? e.message : String(e));
+      }
+      return;
+    }
 
     // persist the assistant turn to chats/<slug>.md (the user turn landed at
     // send time; when THAT write failed, this fallback writes both)
@@ -1815,7 +1838,11 @@ export function ChatSurface({
       { speaker: "rotli", text: reply, at: assistantAt },
     ];
     const diskTurn: Msg[] = sentPersisted ? [{ speaker: "rotli", text: reply, at: assistantAt }] : turn;
-    const memoryTurns = [...messages, ...turn];
+    // ⚠ notices are Rotli's, not the conversation's: the notes model never
+    // sees them (a replayed safeguard error re-trips the safeguard)
+    const memoryTurns = [...messages, ...turn].filter(
+      (m) => !(m.speaker === "rotli" && m.text.startsWith("⚠")),
+    );
     // the notes-keeping model: the same pick as the chat rewrites the attached
     // note's "Conversation notes" each turn (a preset routes per-leg, so it
     // falls back to the deterministic topics digest instead)

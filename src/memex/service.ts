@@ -28,8 +28,10 @@ import {
   memexWriteChat,
   memexWriteNote,
 } from "../lib/tauri";
+import { isRevisionConflict } from "../lib/trackedWrite";
 import { titleOf } from "../services/derive";
 import { setChatModel } from "./chatModelFrontmatter";
+import { chatMemoryNote, setChatMemoryNote } from "./chatNotePointers";
 import { type MemexConfig, type MemexInstance, type Perms, fromCorpusConfig } from "./config";
 import {
   addChatArtifact,
@@ -55,6 +57,9 @@ import {
 } from "./contract";
 
 export type { DetectedMemex } from "../lib/tauri";
+
+/** Re-reads a lost chat-file revision race gets before the error surfaces. */
+const CHAT_WRITE_ATTEMPTS = 3;
 
 // ── the Location config (corpus + connected brains) ───────────────────────────
 
@@ -125,27 +130,50 @@ export async function writeChat(input: WriteChatInput): Promise<{ slug: string; 
   // semantics without relying on presentation code to remember it.
   const sentAt = new Date().toISOString();
   const messages = input.messages.map((message) => ({ ...message, at: message.at ?? sentAt }));
-  let contents: string;
-  let expectedRevision: string | null = null;
   if (input.existingSlug) {
-    const existing = await memexReadChat(instance.root, slug);
-    expectedRevision = existing.revision;
-    contents = appendMessages(existing.contents, messages, date);
-  } else {
-    contents = composeNewChat(
-      {
-        title: input.title,
-        source: ROTLI_SOURCE,
-        slug,
-        ...(input.attachedTo ? { attachedTo: input.attachedTo } : {}),
-      },
-      messages,
-      date,
-    ).contents;
+    // Appending a turn is safe to redo: a conflict means another writer (a new
+    // chat's model/provider frontmatter, its note link) landed first, and our
+    // write did not — a message never drops on a race (2026-09-29).
+    const path = await rewriteChat(instance, slug, (existing) => {
+      const next = appendMessages(existing, messages, date);
+      return input.secureContext ? setChatSecureContext(next) : next;
+    });
+    return { slug, path: path ?? `${instance.root}/${rel}` };
   }
+  let contents = composeNewChat(
+    {
+      title: input.title,
+      source: ROTLI_SOURCE,
+      slug,
+      ...(input.attachedTo ? { attachedTo: input.attachedTo } : {}),
+    },
+    messages,
+    date,
+  ).contents;
   if (input.secureContext) contents = setChatSecureContext(contents);
-  const path = await memexWriteChat(instance.root, slug, contents, expectedRevision);
+  const path = await memexWriteChat(instance.root, slug, contents, null);
   return { slug, path };
+}
+
+/** Point an EXISTING chat at the chat-made note that holds its conversation
+ * notes, when the note it is attached to is the person's (contract.ts
+ * setChatMemoryNote). */
+export async function setChatMemoryNoteStem(
+  instance: MemexInstance,
+  slug: string,
+  stem: string,
+): Promise<void> {
+  const rel = `chats/${slug}.md`;
+  if (!canWrite(rel, instance.perms)) {
+    throw new Error("This vault is read-only for rotli — connect it with write access first.");
+  }
+  await rewriteChat(instance, slug, (contents) => setChatMemoryNote(contents, stem));
+}
+
+/** The chat's own conversation-notes note, when it has one apart from the
+ * note it is attached to. */
+export async function readChatMemoryNoteStem(instance: MemexInstance, slug: string): Promise<string | null> {
+  return chatMemoryNote((await memexReadChat(instance.root, slug)).contents);
 }
 
 /** Point an EXISTING chat at its attached note (`attachedTo: [[<stem>]]`) —
@@ -155,10 +183,28 @@ export async function setChatAttachedTo(instance: MemexInstance, slug: string, s
   if (!canWrite(rel, instance.perms)) {
     throw new Error("This vault is read-only for rotli — connect it with write access first.");
   }
-  const existing = await memexReadChat(instance.root, slug);
-  const next = setAttachedTo(existing.contents, stem);
-  if (next !== existing.contents) {
-    await memexWriteChat(instance.root, slug, next, existing.revision);
+  await rewriteChat(instance, slug, (contents) => setAttachedTo(contents, stem));
+}
+
+/** Rewrite one existing chat file through a pure edit. Another writer may land
+ * first (a new chat's model/provider frontmatter is written in the
+ * background); a lost revision race re-reads and applies the edit again
+ * instead of dropping it (2026-09-29). An edit that changes nothing writes
+ * nothing and returns null; otherwise the written path. */
+async function rewriteChat(
+  instance: MemexInstance,
+  slug: string,
+  edit: (contents: string) => string,
+): Promise<string | null> {
+  for (let attempt = 1; ; attempt++) {
+    const existing = await memexReadChat(instance.root, slug);
+    const next = edit(existing.contents);
+    if (next === existing.contents) return null;
+    try {
+      return await memexWriteChat(instance.root, slug, next, existing.revision);
+    } catch (error) {
+      if (attempt >= CHAT_WRITE_ATTEMPTS || !isRevisionConflict(error)) throw error;
+    }
   }
 }
 
@@ -313,6 +359,8 @@ export interface WriteNoteInput {
   reach?: string[];
   /** Mark the file secure at birth; local-AI access remains denied by default. */
   secure?: boolean;
+  /** Which AI made the note; absent for a person (NoteMeta.createdBy). */
+  createdBy?: NoteMeta["createdBy"];
 }
 
 /** Write a brand-new note through the active memex's creation policy: `wiki/_inbox/`
@@ -343,6 +391,7 @@ export async function writeNote(input: WriteNoteInput): Promise<{ id: string; st
     shelf: input.shelf,
     reach,
     ...(input.secure ? { secure: true } : {}),
+    ...(input.createdBy ? { createdBy: input.createdBy } : {}),
   };
   const contents = composeNote(meta, input.body, today());
   const path = await memexWriteNote(instance.root, stem, contents);

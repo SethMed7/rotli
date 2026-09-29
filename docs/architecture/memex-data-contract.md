@@ -502,8 +502,20 @@ The Rust corpus boundary independently validates every write.
   Undo moves it to the Trash. A person who already has a note is never changed
   without the person's yes, and then only in its tags and where it is filed;
   its words are never edited.
-- Unknown frontmatter is preserved byte-for-byte. Reserved provenance cannot be
-  forged through the raw metadata editor.
+- **Who may rewrite a note's text (2026-09-29,
+  `docs/decisions/2026-09-29-ai-body-edit-permission.md`).** Rotli stamps
+  `created_by: chat | agent | librarian` once when an AI makes a note; a note
+  a person writes carries no such line, and neither does any note from before
+  this rule. `ai_edit: true | false` is the person's grant, written only from
+  the note menu. An AI may rewrite a note's body only when the note is not
+  locked and either the grant is `true` or, with no grant, `created_by` names
+  an AI. Rust enforces it at every AI body-write seam; `ai_edit_policy.rs` and
+  `src/lib/aiEditPolicy.ts` are twins pinned by the parity fixture. Metadata
+  and filing are not body edits: filing moves the file and writes every byte
+  after the frontmatter fence unchanged.
+- Unknown frontmatter is preserved byte-for-byte. Reserved provenance
+  (including `created_by`) and the `ai_edit` grant cannot be forged through
+  the raw metadata editor.
 - Boards and binary files never receive Markdown frontmatter.
 - The metadata surface derives and displays the canonical absolute file path
   from the corpus router. Paths are never copied into editable frontmatter,
@@ -702,6 +714,13 @@ but it must remain rebuildable, optional, and behind the retrieval port.
   `local_ai_allowed` line overrides the vault knob in either direction. No knob
   exists, or will exist, that opens a secure note to a remote model. A frontier
   provider behind a localhost proxy still fails this gate.
+- **A person's note refuses AI body edits without their grant** (2026-09-29):
+  the same seams as `locked` below, in both layers, with Rotli Web running the
+  TypeScript twin itself. A chat attached to such a note keeps its
+  conversation notes in a chat-made note of its own (`memoryNote:` on the
+  chat file) and only reads the person's note. A memory note Rotli wrote
+  before provenance existed is claimed for its chat (`created_by: chat`)
+  only when Rust finds its text exactly in Rotli's memory-note shape.
 - **`locked: true` refuses every AI edit** — interactive chat (`update_note`),
   the per-turn chat-memory sync, the headless workspace agents, and the
   organizer. Both layers enforce it: TypeScript fails fast and Rust refuses

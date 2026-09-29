@@ -142,6 +142,7 @@ function fakeDeps(rel: string, fields: string[] = [], over: Partial<JournalDeps>
     secure: false,
     localAiAllowed: false,
     pinned: false,
+    aiBodyEdit: "person-written",
     fields,
   };
   const deps: JournalDeps = {
