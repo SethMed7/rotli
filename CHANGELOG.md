@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-09-28
+
 ### Added
 
 - **Hide what you don't use.** Settings → Appearance → Show in Rotli has a
@@ -56,9 +58,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it back where you are, still playing, without reloading; Close ends it. One
   tab at a time. Mac app.
 
-- **The Librarian lives in the corner.** A Librarian pill now sits in every
-  note's bottom-right corner, just left of the scroll-to-top arrow, and the
-  conversation opens right out of it; click it again to tuck it away. After
+- **The Librarian lives in the corner.** Once you've run `/librarian` in a
+  note, a Librarian pill sits in its bottom-right corner, just left of the
+  scroll-to-top arrow, and the conversation opens right out of it; click it again to tuck it away. After
   you apply its suggestions, the chat lists exactly what changed ("Tagged:
   …", "Filed in …"), and a line under the box says what it's for: it only
   organizes; for anything else, Open in Chat. Mac app.
@@ -170,6 +172,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Escape closes the Librarian from the note too.** With the caret back in
+  the note, Escape used to hide the window instead; it now closes the
+  Librarian bar or tucks its chat away first.
+- **The Librarian never marks the wrong passage.** Asked to mark words that
+  appear more than once in the note, with nothing highlighted, it used to
+  pin the first; it now leaves the mark out rather than guess.
+- **A tab tucked into the player stops with the window.** If the window
+  reloaded while a tab was tucked into the player, its page kept playing with
+  nothing to stop it; the next start now closes it.
 - **Rotli Web: ambient music plays.** The tracks were asked for at the wrong
   address on the web, so the player stayed silent.
 - **Rotli Web: the search button can't be hidden.** On the web it is the only

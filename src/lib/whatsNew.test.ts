@@ -94,13 +94,15 @@ describe("What's new — when it shows", () => {
 });
 
 describe("the bundled highlights", () => {
-  test("every release lists three to five well-formed changes", () => {
+  // up to twelve (the owner, 2026-09-28: the 1.6.0 card covers the whole
+  // Round Three batch); the card's list scrolls, never the card
+  test("every release lists three to twelve well-formed changes", () => {
     const releases = Object.entries(WHATS_NEW);
     expect(releases.length).toBeGreaterThan(0);
     for (const [version, items] of releases) {
       expect(version).toMatch(/^\d+\.\d+\.\d+$/);
       expect(items.length).toBeGreaterThanOrEqual(3);
-      expect(items.length).toBeLessThanOrEqual(5);
+      expect(items.length).toBeLessThanOrEqual(12);
       expect(new Set(items.map((item) => item.title)).size).toBe(items.length);
     }
   });
