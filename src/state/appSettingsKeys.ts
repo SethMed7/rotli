@@ -52,4 +52,6 @@ export const APP_SETTINGS_KEYS = new Set([
   "hidden",
   // Which sidebar fronts are on and where Rotli opens (src/lib/sidebarFronts.ts).
   "sidebarFronts",
+  // The sidebar shows the vault's folders as on disk (services/vaultTree.ts).
+  "vaultView",
 ]);

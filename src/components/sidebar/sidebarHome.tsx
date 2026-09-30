@@ -71,6 +71,7 @@ import { useMainStore } from "../../state/main";
 import { type DropPreview, sidebarItemId, useFocusedTab, usePanesStore } from "../../state/panes";
 import { QUICK_MAX, togglePinQuick } from "../../state/quick";
 import { ALL_NOTES, SEC_SYSTEM, TASKS, useUiStore } from "../../state/ui";
+import { useVaultView } from "../../state/vaultView";
 import { useViewsStore } from "../../state/views";
 import type { NoteSummary } from "../../types";
 import {
@@ -97,6 +98,7 @@ import { useActiveTree } from "./useActiveTree";
 import type { SidebarChatData } from "./useChatFolders";
 import { MainSlotHint, useHomeLeader } from "./useHomeLeader";
 import { type RovingRow, useRovingList } from "./useRovingList";
+import { useVaultVisibility } from "./useVaultVisibility";
 
 /** The fixed System destinations after Library. Switching vaults changes only
  * their contents and counts; it never adds, removes, or renames these rows. */
@@ -199,7 +201,12 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   const activeView = useUiStore((s) => s.activeView);
   const setActiveView = useUiStore((s) => s.setActiveView);
   const activeTree = useActiveTree();
+  // the Vault view (services/vaultTree.ts) is read-only: it IS the disk
+  const vaultOn = useVaultView((s) => s.on);
+  const setVaultOn = useVaultView((s) => s.setOn);
+  useVaultVisibility(vaultOn); // the Librarian leaves what's on screen here
   const setActiveTree = (tree: typeof activeTree, ids?: Set<string>) => {
+    if (vaultOn) return;
     if (activeView) {
       setViewsManifest(setNamedViewTree(viewsManifest, activeView, tree, ids));
     } else {
@@ -363,7 +370,10 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
       activeView,
       viewsWritable,
       {
-        show: setActiveView,
+        show: (name) => {
+          setVaultOn(false);
+          setActiveView(name);
+        },
         create: () => {
           setEditingView("create");
           setViewInputError(null);
@@ -375,6 +385,13 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
         remove: setDeletingView,
       },
       numbered,
+      {
+        on: vaultOn,
+        show: () => {
+          setActiveView(null);
+          setVaultOn(true);
+        },
+      },
     );
   // the view menu by pointer, and numbered for ⌘⇧W; ⌘⇧S numbers the root notes
   const { viewsButtonRef, openViewMenu } = useHomeLeader(viewMenuItems, setActiveView);
@@ -399,6 +416,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
   // from another surface is NOT this gesture — lib/mainAddDrag.ts owns that, and
   // the browser rows call it directly (its twin here was dead code).
   const startMainDrag = (e: ReactPointerEvent, id: string, label: string) => {
+    if (vaultOn) return; // the Vault view is the disk as it is: no arranging
     // button guard BEFORE the ref reset — a right-click must not clear the
     // last drag's click suppression (the session guards again internally)
     if (e.button !== 0) return;
@@ -658,7 +676,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
           );
         })}
         {childFolders.map((f) => {
-          const open = expandedDests[f.id] ?? true;
+          const open = expandedDests[f.id] ?? !vaultOn;
           // Rename… swaps only the row for a field of the same size (the
           // owner, 2026-09-28): the folder's contents stay open below it.
           // Enter commits (sibling-uniquified), Esc/click-away cancels.
@@ -802,7 +820,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
       .filter((f) => f.parentId === parentId)
       .flatMap((f) => {
         const row: RovingRow = { id: f.id, kind: "folder" };
-        return (expandedDests[f.id] ?? true) ? [row, ...mainRovingRows(f.id)] : [row];
+        return (expandedDests[f.id] ?? !vaultOn) ? [row, ...mainRovingRows(f.id)] : [row];
       }),
   ];
 
@@ -851,7 +869,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
       // not toggleDestExpanded's closed default (first press must collapse)
       if (row.id.startsWith(MAIN_ROOT)) {
         setSelectedFolderId(row.id);
-        setDestExpanded(row.id, !(expandedDests[row.id] ?? true));
+        setDestExpanded(row.id, !(expandedDests[row.id] ?? !vaultOn));
         return;
       }
       // the action row: it opens its surface, never becomes a selection
@@ -878,7 +896,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
     onCollapseOrOut: (row) => {
       if (row.kind === "note") return false;
       const open = row.id.startsWith(MAIN_ROOT)
-        ? (expandedDests[row.id] ?? true) // Main folders default open
+        ? (expandedDests[row.id] ?? !vaultOn) // Main folders default open
         : expandedDests[row.id];
       if (open) {
         setDestExpanded(row.id, false);
@@ -1048,21 +1066,21 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
               The header (reworked 2026-07-28, the maintainer: "not collapsible — just a way
               to change the views"): the label + ▾ are ONE view switcher. — */}
           <ViewSectionHeader
-            current={activeView ?? "Main"}
+            current={vaultOn ? "Vault" : (activeView ?? "Main")}
             viewRef={viewsButtonRef}
             onPickView={openViewMenu}
             tour
             actions={[
               {
-                label: `New note in ${activeView ?? "Main"}`,
+                label: vaultOn ? "New note" : `New note in ${activeView ?? "Main"}`,
                 glyph: <NewFileGlyph size={13} />,
                 onClick: () => dispatch("notes.new"),
                 tour: "new",
               },
               {
-                label: `New folder in ${activeView ?? "Main"}`,
+                label: vaultOn ? "New folder" : `New folder in ${activeView ?? "Main"}`,
                 glyph: <NewFolderGlyph size={13} />,
-                disabled: !!activeView && !viewsWritable,
+                disabled: vaultOn || (!!activeView && !viewsWritable),
                 // name-FIRST (#16): open the inline input instead of minting a
                 // permanent "New folder 2" the old flow could never rename
                 onClick: () => setMainNewFolder(true),

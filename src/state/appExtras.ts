@@ -9,6 +9,7 @@ import { parseFronts } from "../lib/sidebarFronts";
 import { useAmbient } from "./ambient";
 import { useFronts } from "./fronts";
 import { useHidden } from "./hidden";
+import { useVaultView } from "./vaultView";
 
 /** Load every extra from the app settings file's text. */
 export function hydrateAppExtras(appSettings: string): void {
@@ -22,19 +23,26 @@ export function hydrateAppExtras(appSettings: string): void {
   useAmbient.setState({ prefs: parseAmbient(data.ambient) });
   useHidden.setState({ hidden: parseHidden(data.hidden) });
   useFronts.setState({ prefs: parseFronts(data.sidebarFronts) });
+  useVaultView.setState({ on: data.vaultView === true });
 }
 
 /** The extras' keys, for the app settings file. */
-export function appExtrasSnapshot(): { ambient: unknown; hidden: unknown; sidebarFronts: unknown } {
+export function appExtrasSnapshot(): {
+  ambient: unknown;
+  hidden: unknown;
+  sidebarFronts: unknown;
+  vaultView: unknown;
+} {
   return {
     ambient: useAmbient.getState().prefs,
     hidden: useHidden.getState().hidden,
     sidebarFronts: useFronts.getState().prefs,
+    vaultView: useVaultView.getState().on,
   };
 }
 
 /** Save when any extra changes. */
 export function subscribeAppExtras(save: () => void): () => void {
-  const stops = [useAmbient.subscribe(save), useHidden.subscribe(save), useFronts.subscribe(save)];
+  const stops = [useAmbient, useHidden, useFronts, useVaultView].map((store) => store.subscribe(save));
   return () => stops.forEach((stop) => stop());
 }

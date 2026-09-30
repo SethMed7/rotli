@@ -1295,6 +1295,10 @@ export async function organizerSetTrust(level: string): Promise<void> {
   await invoke("organizer_set_trust", { level });
 }
 
+/** Vault view: the note ids on screen, which the Librarian leaves in place. */
+export const organizerSetVisible = (ids: string[]): Promise<void> =>
+  isTauri() ? invoke<void>("organizer_set_visible", { ids }) : Promise.resolve();
+
 /** Teach the daemon a field value the user just APPROVED (#28, audit 2026-07):
  * records it as daemon-owned in `.rotli/organizer.json` so the never-clobber
  * baseline keeps maintaining the field instead of freezing it as a user edit.

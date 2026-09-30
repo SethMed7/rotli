@@ -26,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   you picked, the theme cards show each theme as a pair of lit orbs, like
   rotli.co's picker, now with Blossom's, and the small headings above each
   step's title are gone.
+- **A Vault view: your folders as they are on disk.** The view picker above
+  Main now offers Vault, which shows the vault's own folders and files the way
+  Finder does, instead of an arrangement you make. It's off unless you pick it.
+  While it's showing, the Librarian leaves any note you can see where it is,
+  and files it once it's out of sight, so nothing moves under your eyes.
 - **Turn off what you don't use in the sidebar.** Settings → Appearance →
   Sidebar has a switch for Notes, Chat, and Breve, and a choice of which one
   Rotli opens on (Notes unless you pick another). At least one stays on, and
