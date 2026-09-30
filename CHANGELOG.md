@@ -12,15 +12,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Music volume, and a pause during setup.** The studio music has a volume
-  slider in Settings → Ambient audio. Setup's Sound step has a small pause
-  button and the same slider, so you can keep music on without hearing it right
-  now, or turn it down.
+- **Music volume, and a player that comes with you through setup.** The
+  studio music has a volume slider in Settings → Ambient audio. Once you turn
+  music on during setup, a small player sits in the top corner for the rest of
+  it: previous, pause, next, and volume.
 - **First run comes alive.** Setup opens on a short island intro: Rottnest
   rises out of the sea, the lighthouse turns, and your quokka hops onto the
   sand. Any key or click skips it, and it doesn't play with Reduce motion on.
   Welcome shows the island. Once you pick a theme, every step after it,
   through choosing where your notes live, wears that theme's scenery.
+  Clouds drift and birds cross the sky (a paper plane in Paper & Charcoal,
+  petals in Blossom, stars in Midnight). Your quokka on each step wears what
+  you picked, the theme cards show each theme as a pair of lit orbs, like
+  rotli.co's picker, now with Blossom's, and the small headings above each
+  step's title are gone.
+- **Settings feels more connected.** Each choice is now one joined control
+  instead of separate buttons, dropdowns match it, and clouds and birds drift
+  in the page's side margins.
 
 - **Dates from the slash menu.** Type `/today`, `/yesterday`, or `/tomorrow`
   to write the date into a note, even in the middle of a sentence. In a

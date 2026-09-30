@@ -36,8 +36,8 @@ const ACCESSORY_HUE_CHOICES = [38, 225, 195, 145, 280, 340, 10] as const;
 import { AccentRow } from "../settingsSurface";
 import { OnboardingIntro, OnboardingScenery, introWanted } from "./onboardingScenery";
 import { setupChoiceIndex, SetupBack, SetupChoiceGroup, SetupPrimary } from "./setupControls";
+import { SetupPlayer } from "./setupPlayer";
 import { SetupScrollCue, useStageScrollCue } from "./setupScrollCue";
-import { SetupSideFriends } from "./setupSideFriends";
 import { SetupSound } from "./setupSound";
 
 const STEPS = ["welcome", "appearance", "behavior", "sound", "shortcuts"] as const;
@@ -253,8 +253,6 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
           <span>{titles[step]}</span>
         </div>
 
-        <SetupSideFriends />
-
         <div
           className={stageScrolls ? "setup-stage is-scrolling" : "setup-stage"}
           data-step={step}
@@ -273,7 +271,6 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
                       : "listening"
               }
               size={152}
-              accessorized={false}
               alwaysVisible
             />
             <p>
@@ -286,7 +283,6 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
           <div className="setup-content">
             {step === "welcome" && (
               <>
-                <p className="setup-eyebrow">Local-first notes for your Mac</p>
                 <h1 id="setup-title">Make Rotli feel like yours.</h1>
                 <p className="setup-lede">
                   Pick a look, choose how the window behaves, and meet the three shortcuts worth remembering.
@@ -318,7 +314,6 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
 
             {step === "appearance" && (
               <>
-                <p className="setup-eyebrow">Start somewhere comfortable</p>
                 <h1 id="setup-title">Choose a theme.</h1>
                 <p className="setup-lede">Pick its character, then choose Light, Dark, or follow your Mac.</p>
                 <SetupChoiceGroup
@@ -326,14 +321,14 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
                   value={family}
                   onChange={pickFamily}
                   options={THEME_FAMILY_PRESENTATIONS.map(
-                    ({ family: optionFamily, label, description, lightLabel, darkLabel }) => ({
+                    ({ family: optionFamily, label, lightLabel, darkLabel }) => ({
                       value: optionFamily,
                       title: label,
-                      description,
+                      // the site's lit orbs, Light and Dark (the owner, 2026-09-30)
                       detail: (
                         <span className="setup-theme-pair" aria-hidden="true">
-                          <span className={`setup-theme-dot ${optionFamily}-light`} title={lightLabel} />
-                          <span className={`setup-theme-dot ${optionFamily}-dark`} title={darkLabel} />
+                          <span className="setup-orb" data-orb={`${optionFamily}-light`} title={lightLabel} />
+                          <span className="setup-orb" data-orb={`${optionFamily}-dark`} title={darkLabel} />
                         </span>
                       ),
                     }),
@@ -452,7 +447,6 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
 
             {step === "behavior" && (
               <>
-                <p className="setup-eyebrow">Choose a rhythm</p>
                 <h1 id="setup-title">How should the window live?</h1>
                 <p className="setup-lede">
                   The menu-bar icon is always available. This controls the Dock and what happens when you
@@ -491,7 +485,6 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
 
             {step === "shortcuts" && (
               <>
-                <p className="setup-eyebrow">Call Rotli from anywhere</p>
                 <h1 id="setup-title">Three shortcuts, right where they act.</h1>
                 <p className="setup-lede">Keep these defaults or click a shortcut to record your own.</p>
                 <div className="setup-shortcuts">
@@ -522,6 +515,8 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
           </div>
         </footer>
       </section>
+      {/* the music player joins at the Sound step and stays */}
+      {index >= STEPS.indexOf("sound") && <SetupPlayer />}
       {intro && <OnboardingIntro onDone={endIntro} />}
     </div>
   );

@@ -7,8 +7,6 @@ import { type AmbientPrefs, CLAUDE_FM, isStream, trackForFamily, trackTitle } fr
 import { PLATFORM } from "../../lib/featurePolicy";
 import { useAmbient } from "../../state/ambient";
 import { useUiStore } from "../../state/ui";
-import { AmbientVolume } from "../settings/ambientSettings";
-import { PauseGlyph, PlayGlyph } from "../sidebar/mediaPlayer";
 import { type SetupOption, SetupChoiceGroup } from "./setupControls";
 
 export type SetupSoundChoice = "off" | "studio" | "claude-fm";
@@ -54,11 +52,11 @@ export function SetupSound() {
   }
   return (
     <>
-      <p className="setup-eyebrow">Set the mood</p>
       <h1 id="setup-title">Music while you write?</h1>
       <p className="setup-lede">
-        It plays from the player above the sidebar’s footer, where you can pause it or pick another track. A
-        video in a tab takes over, and the music comes back when it stops.
+        While you finish setting up, pause it or turn it down from the small player in the corner. After that
+        it plays from the player above the sidebar’s footer. A video in a tab takes over, and the music comes
+        back when it stops.
       </p>
       <SetupChoiceGroup
         label="Music"
@@ -66,27 +64,6 @@ export function SetupSound() {
         onChange={(choice) => setPrefs(setupSoundChange(choice, prefs, family))}
         options={options}
       />
-      {/* a quiet pause and volume (the owner, 2026-09-30: "they might want it
-          enabled but not listen to it now, or it's too high") */}
-      {prefs.enabled && (
-        <div className="setup-sound-controls" role="group" aria-label="Music playback">
-          <button
-            type="button"
-            className="setup-sound-play"
-            aria-label={prefs.playing ? "Pause music" : "Play music"}
-            title={prefs.playing ? "Pause" : "Play"}
-            onClick={() => setPrefs({ playing: !prefs.playing })}
-          >
-            {prefs.playing ? <PauseGlyph /> : <PlayGlyph />}
-          </button>
-          <AmbientVolume prefs={prefs} setPrefs={setPrefs} className="setup-sound-volume" />
-          <small>
-            {prefs.playing
-              ? `Playing · ${trackTitle(prefs.track)}`
-              : `Paused · ${trackTitle(prefs.track)} · stays on for later`}
-          </small>
-        </div>
-      )}
       <p className="setup-arrow-note">
         <kbd>←</kbd>
         <kbd>→</kbd> moves and selects

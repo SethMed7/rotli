@@ -41,8 +41,8 @@ import { chatMark } from "../sidebar/chatMark";
 import { ModelLogo } from "../sidebar/modelLogo";
 import { OnboardingScenery } from "./onboardingScenery";
 import { SetupBack, SetupPrimary } from "./setupControls";
+import { SetupPlayer } from "./setupPlayer";
 import { SetupScrollCue, useStageScrollCue } from "./setupScrollCue";
-import { SetupSideFriends } from "./setupSideFriends";
 
 const CONNECTED_PROVIDERS = [
   "claude",
@@ -203,6 +203,7 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
     <div className="onb model-setup">
       <div className="onb-drag" data-tauri-drag-region />
       <OnboardingScenery />
+      <SetupPlayer />
       <section className="setup-shell" aria-labelledby="model-setup-title">
         <div className="setup-progress">
           <span>
@@ -212,16 +213,13 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
           <span>Models</span>
         </div>
 
-        <SetupSideFriends />
-
         <div className="setup-stage" ref={stageRef}>
           <aside className="setup-companion" aria-hidden="true">
-            <Character name="knowledge" size={152} accessorized={false} alwaysVisible />
+            <Character name="knowledge" size={152} alwaysVisible />
             <p>Choose one, several, or none. Your vault works without a model.</p>
           </aside>
 
           <div className="setup-content">
-            <p className="setup-eyebrow">Optional and changeable</p>
             <h1 id="model-setup-title">How should Rotli think?</h1>
             <p className="setup-lede">
               Run a model entirely on this Mac, or use your own Claude, ChatGPT, Cursor, or Gemini accounts

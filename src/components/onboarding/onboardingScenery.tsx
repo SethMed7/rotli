@@ -16,6 +16,7 @@ import { Character } from "../character";
 import { cloud } from "../sceneParts";
 import { SETTINGS_BACKDROPS } from "../settings/settingsBackdropArt";
 import { SceneryLayers } from "../settings/settingsBanner";
+import { SkyLife } from "./onboardingSkyLife";
 
 const waves = (y: number, x = 0) => (
   <path className="sc-wave" d={`M${x} ${y}q20-6 40 0t40 0${" 40 0".repeat(29)}`} />
@@ -113,7 +114,12 @@ export function onboardingScenery(family: ThemeFamily, welcome: boolean) {
 export function OnboardingScenery({ welcome = false }: { welcome?: boolean }) {
   const family = useUiStore((s) => s.themeFamily);
   const { name, sky, horizon } = onboardingScenery(family, welcome);
-  return <SceneryLayers className="onb-scenery" name={name} sky={sky} horizon={horizon} />;
+  return (
+    <>
+      <SceneryLayers className="onb-scenery" name={name} sky={sky} horizon={horizon} />
+      <SkyLife family={name === "island" ? "island" : family} />
+    </>
+  );
 }
 
 const INTRO_MS = 1700;

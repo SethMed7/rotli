@@ -17,7 +17,7 @@ import { requestVaultFolder } from "../../state/vaultFolderBrowser";
 import { Character } from "../character";
 import { OnboardingScenery } from "./onboardingScenery";
 import { SetupBack, SetupChoiceGroup, SetupPrimary } from "./setupControls";
-import { SetupSideFriends } from "./setupSideFriends";
+import { SetupPlayer } from "./setupPlayer";
 
 type Stage = "choose" | "create" | "scanning" | "review";
 
@@ -177,6 +177,7 @@ export function VaultActivation({
     <div className="onb vault-activation">
       <div className="onb-drag" data-tauri-drag-region />
       <OnboardingScenery />
+      {onboarding && <SetupPlayer />}
       <section className="setup-shell" aria-labelledby="vault-title">
         <div className="setup-progress">
           <span>{onboarding ? `${ONBOARDING_STEP_NUMBER.vault} of ${ONBOARDING_TOTAL_STEPS}` : "Vault"}</span>
@@ -192,14 +193,11 @@ export function VaultActivation({
           </span>
         </div>
 
-        {onboarding && <SetupSideFriends />}
-
         <div className="setup-stage" key={stage}>
           <aside className="setup-companion" aria-hidden="true">
             <Character
               name={stage === "scanning" ? "searching" : stage === "review" ? "knowledge" : "notes"}
               size={152}
-              accessorized={false}
               alwaysVisible
             />
             <p>
@@ -214,7 +212,6 @@ export function VaultActivation({
           <div className="setup-content">
             {stage === "choose" && (
               <>
-                <p className="setup-eyebrow">One folder is one vault</p>
                 <h1 id="vault-title">Where should your notes live?</h1>
                 <p className="setup-lede">
                   Start fresh or bring the Markdown folder you already use. There is one Main view—not a
@@ -265,7 +262,6 @@ export function VaultActivation({
 
             {stage === "create" && createPath && (
               <>
-                <p className="setup-eyebrow">New vault</p>
                 <h1 id="vault-title">Create {createPath.split("/").pop()}?</h1>
                 <p className="setup-path">{createPath}</p>
                 <SetupChoiceGroup
@@ -292,9 +288,10 @@ export function VaultActivation({
 
             {stage === "review" && inspection && (
               <>
-                <p className="setup-eyebrow">{inspection.source}</p>
                 <h1 id="vault-title">Bring in {inspection.label}.</h1>
-                <p className="setup-path">{inspection.path}</p>
+                <p className="setup-path">
+                  {inspection.source} · {inspection.path}
+                </p>
                 <div className="vault-stats" aria-label="Vault scan summary">
                   <span>
                     <strong>{inspection.markdownFiles}</strong> Markdown notes

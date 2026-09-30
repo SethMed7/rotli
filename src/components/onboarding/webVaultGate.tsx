@@ -263,7 +263,6 @@ export function WebVaultGate() {
           </aside>
 
           <div className="setup-content">
-            <p className="setup-eyebrow">One folder is one vault</p>
             <h1 id="web-vault-title">{paired ? "Rotli Helper is paired" : HEADINGS[stage.kind]}</h1>
             {paired ? (
               <PairedBody />

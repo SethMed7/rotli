@@ -32,10 +32,13 @@ again. With the setting off, the player shows only while something plays."
   under the tracks in Settings and on setup's Sound step. Moving it fades to the
   new level. Claude FM plays in its own page at that page's volume, so it gets
   no slider.
-- **Setup's Sound step** shows, once music is on, a small round pause/play
-  button, the volume slider, and "Playing" or "Paused · stays on for later".
-  Pausing keeps the music chosen and just stops it for now, so it is still
-  there in the player afterwards.
+- **Setup's player** (the owner, 2026-09-30: "mimic what we have in the
+  sidebar, something that moves through the next steps with you, in one of the
+  corners"). Once music is on, from the Sound step through where notes live
+  and the model step, a small pill in the top-right corner
+  (`onboarding/setupPlayer.tsx`) shows the track, previous and next (not for
+  Claude FM, a live stream), pause, and the volume slider. Pausing keeps the
+  music chosen and just stops it for now.
 
 ## The rules (`src/lib/ambient.ts`, `playerView`)
 

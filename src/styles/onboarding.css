@@ -243,30 +243,6 @@
   height: 0;
 }
 
-.setup-theme-dot {
-  display: block;
-  width: 18px;
-  height: 18px;
-  /* a dark swatch on a dark card still shows its edge */
-  border: 1px solid color-mix(in srgb, var(--text-muted) 45%, transparent);
-  border-radius: var(--r-pill);
-}
-
-.setup-theme-dot.warm-light { background: var(--swatch-warm-light); }
-.setup-theme-dot.warm-dark { background: var(--swatch-warm-dark); }
-.setup-theme-dot.mono-light { background: var(--swatch-paper); }
-.setup-theme-dot.mono-dark { background: var(--swatch-charcoal); }
-.setup-theme-dot.mono-system { background: var(--accent); }
-.setup-theme-dot.ocean-light { background: var(--swatch-ocean-light); }
-.setup-theme-dot.ocean-dark { background: var(--swatch-ocean-dark); }
-.setup-theme-dot.grove-light { background: var(--swatch-grove-light); }
-.setup-theme-dot.grove-dark { background: var(--swatch-grove-dark); }
-.setup-theme-dot.iris-light { background: var(--swatch-iris-light); }
-.setup-theme-dot.iris-dark { background: var(--swatch-iris-dark); }
-.setup-theme-dot.blossom-light { background: var(--swatch-blossom-light); }
-.setup-theme-dot.blossom-dark { background: var(--swatch-blossom-dark); }
-.setup-theme-dot.midnight-light { background: var(--swatch-midnight-light); }
-.setup-theme-dot.midnight-dark { background: var(--swatch-midnight-dark); }
 
 .setup-theme-pair {
   display: flex;
@@ -1034,44 +1010,6 @@
   gap: 14px;
 }
 
-.setup-side-friends {
-  position: fixed;
-  inset: 44px 0 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.setup-side-friend {
-  position: absolute;
-  top: var(--friend-top, 56%);
-  color: var(--text-muted);
-  opacity: 0;
-}
-
-.setup-side-friend .quokka {
-  max-width: 82px;
-  max-height: 82px;
-}
-
-.setup-side-friend--left {
-  left: -72px;
-  transform-origin: 50% 72%;
-  animation: setup-side-lean-left 32000ms var(--motion-ease) var(--friend-delay, 0ms) infinite both;
-}
-
-.setup-side-friend--right {
-  right: -69px;
-  transform-origin: 50% 72%;
-  animation: setup-side-lean-right 32000ms var(--motion-ease) var(--friend-delay, 0ms) infinite both;
-}
-
-.setup-side-friend--upper { --friend-top: 31%; }
-.setup-side-friend--middle { --friend-top: 54%; }
-.setup-side-friend--lower { --friend-top: 72%; }
-.setup-side-friend--beat-1 { --friend-delay: 0ms; }
-.setup-side-friend--beat-2 { --friend-delay: -8000ms; }
-.setup-side-friend--beat-3 { --friend-delay: -16000ms; }
-.setup-side-friend--beat-4 { --friend-delay: -24000ms; }
 
 .setup-scan-line {
   width: 100%;
@@ -1105,22 +1043,6 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes setup-side-lean-left {
-  0% { opacity: 0; transform: translate3d(-22px, 6px, 0) rotate(62deg); }
-  14% { opacity: 0.4; transform: translate3d(0, 0, 0) rotate(72deg); }
-  50% { opacity: 0.4; transform: translate3d(0, 0, 0) rotate(72deg); }
-  64% { opacity: 0; transform: translate3d(-22px, 6px, 0) rotate(62deg); }
-  100% { opacity: 0; transform: translate3d(-22px, 6px, 0) rotate(62deg); }
-}
-
-@keyframes setup-side-lean-right {
-  0% { opacity: 0; transform: translate3d(22px, 6px, 0) rotate(-62deg); }
-  14% { opacity: 0.4; transform: translate3d(0, 0, 0) rotate(-72deg); }
-  50% { opacity: 0.4; transform: translate3d(0, 0, 0) rotate(-72deg); }
-  64% { opacity: 0; transform: translate3d(22px, 6px, 0) rotate(-62deg); }
-  100% { opacity: 0; transform: translate3d(22px, 6px, 0) rotate(-62deg); }
-}
-
 @keyframes setup-scan {
   from { transform: translateX(-20%); }
   to { transform: translateX(280%); }
@@ -1152,7 +1074,6 @@
   .setup-mode-row { grid-template-columns: auto 1fr; }
   .setup-mode-row small { grid-column: 2; }
   .setup-quokka-row { grid-template-columns: 64px minmax(0, 1fr); }
-  .setup-side-friends { display: none; }
   .setup-footer { align-items: flex-end; }
   .setup-local-note { display: none; }
 }
@@ -1182,9 +1103,6 @@
     animation: none;
   }
 
-  .setup-side-friend { animation: none; opacity: 0; }
-  .setup-side-friend--beat-1 { opacity: 0.38; transform: rotate(72deg); }
-  .setup-side-friend--beat-2 { opacity: 0.38; transform: rotate(-72deg); }
 }
 /* Thank you (thanksDialog.tsx): the shared dialog frame, wide
    enough for the 1200×630 banner at a readable size; the quokka it copies
@@ -1413,50 +1331,6 @@
   to { opacity: 1; transform: none; }
 }
 
-/* setup's Sound step: a quiet pause and volume under the choices (2026-09-30)
-   — someone may want music on but not now, or softer. Small and muted; the
-   choice above stays the headline. */
-.setup-sound-controls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-  color: var(--text-muted);
-  font-size: 11.5px;
-}
-.setup-sound-play {
-  width: 26px;
-  height: 26px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  background: none;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-.setup-sound-play svg {
-  width: 12px;
-  height: 12px;
-}
-.setup-sound-play:hover {
-  background: var(--hov);
-  color: var(--text);
-}
-.setup-sound-play:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-.setup-sound-volume {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--text-muted);
-}
-.setup-sound-volume input {
-  width: 116px;
-}
 /* a step taller than the window scrolls; its companion stays in view at the
    top of the scroller instead of centering on the whole (scrolled) column */
 @media (min-width: 721px) {
@@ -1467,4 +1341,115 @@
     min-height: 0;
     justify-content: flex-start;
   }
+}
+
+/* the sky, alive (onboarding/onboardingSkyLife.tsx, 2026-09-30): clouds drift
+   across the page and birds (a paper plane, petals) cross the upper sky,
+   behind the card. Each rests at its own spot with motion off. */
+.onb-sky-life,
+.set-sky-life {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+/* first run: the sky moves in the side margins only — the setup card's
+   column (up to 920px, centered) stays clear, as in Settings */
+.onb-sky-life {
+  mask-image: linear-gradient(
+    to right,
+    black 0,
+    black calc(50% - 600px),
+    transparent calc(50% - 545px),
+    transparent calc(50% + 545px),
+    black calc(50% + 600px),
+    black 100%
+  );
+}
+.onb-drift,
+.onb-flyer {
+  position: absolute;
+  left: 0;
+  height: auto;
+  transform: translateX(var(--rest));
+}
+.onb-drift {
+  width: 150px;
+  opacity: 0.7;
+}
+.onb-flyer {
+  width: 64px;
+  opacity: 0.75;
+}
+.onb-stars {
+  position: absolute;
+  inset: 0 0 auto;
+  width: 100%;
+  height: 34%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .onb-drift,
+  .onb-flyer {
+    animation-name: onb-cross;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+  .onb-flyer {
+    animation-name: onb-cross, onb-glide;
+  }
+  .onb-wing {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: onb-flap 0.9s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes onb-cross {
+  from { transform: translateX(-180px); }
+  to { transform: translateX(calc(100vw + 40px)); }
+}
+@keyframes onb-glide {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -14px; }
+}
+@keyframes onb-flap {
+  to { transform: scaleY(0.55); }
+}
+
+/* setup's music player, top-right, with you from the Sound step on */
+.setup-player {
+  position: fixed;
+  top: 9px;
+  right: 14px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  animation: onb-scene-in 420ms var(--motion-ease) both;
+}
+.setup-player-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 4px;
+  max-width: 120px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+.setup-player-volume {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 6px;
+}
+.setup-player-volume input {
+  width: 72px;
 }

@@ -566,7 +566,7 @@ function GeneralPane() {
       {PLATFORM === "desktop" && (
         <>
           <p className="lead">
-            rotli is a visitor by default — summon it, write, dismiss it. Make it a resident when you&rsquo;re
+            Rotli is a visitor by default — summon it, write, dismiss it. Make it a resident when you&rsquo;re
             living in it.
           </p>
           <div className="swgroup">
@@ -583,7 +583,7 @@ function GeneralPane() {
             <Toggle
               on={showInDock}
               title="Show in the Dock"
-              desc="Otherwise rotli lives in the menu bar only."
+              desc="Otherwise Rotli lives in the menu bar only."
               onChange={() => {
                 const next = !showInDock;
                 setShowInDock(next);
@@ -609,7 +609,7 @@ function GeneralPane() {
         <input
           className="aikey-input"
           type="text"
-          placeholder="How should rotli address you?"
+          placeholder="How should Rotli address you?"
           value={userName}
           onChange={(e) => setUserName(e.target.value)}
           onKeyDown={(e) => e.stopPropagation()}

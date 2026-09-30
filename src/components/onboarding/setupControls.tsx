@@ -6,7 +6,7 @@ import { currentChord } from "../../keys/registry";
 export interface SetupOption<T extends string> {
   value: T;
   title: string;
-  description: string;
+  description?: string;
   detail?: ReactNode;
 }
 
@@ -111,7 +111,7 @@ export function SetupChoiceGroup<T extends string>({
               <kbd aria-hidden="true">{index + 1}</kbd>
               <span>{option.title}</span>
             </span>
-            <span className="setup-option-description">{option.description}</span>
+            {option.description && <span className="setup-option-description">{option.description}</span>}
             {option.detail && <span className="setup-option-detail">{option.detail}</span>}
           </button>
         );
