@@ -62,34 +62,38 @@ test("Welcome previews the island once: in the corner on short windows, on the h
   await expect(sky).toBeHidden();
 });
 
-test("the Sound step has a quiet pause and volume once music is on", async ({ page }) => {
+test("music gets a small player in the corner that stays through the rest of setup", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/?onboarding");
   await page.getByRole("button", { name: "Get started" }).click();
+  const player = page.getByRole("region", { name: "Music", exact: true });
+  await expect(player).toHaveCount(0); // before the Sound step, and with nothing chosen
   for (const _ of [1, 2]) await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { name: "Music while you write?" })).toBeVisible();
-  const playback = page.getByRole("group", { name: "Music playback" });
-  await expect(playback).toHaveCount(0); // Quiet: nothing to pause
+  await expect(player).toHaveCount(0); // Quiet
   const music = page.getByRole("radiogroup", { name: "Music" });
   await music.getByRole("radio", { name: /^Studio music/ }).click();
-  await expect(playback).toBeVisible();
+  await expect(player).toBeVisible();
   // pause keeps the music chosen, just not playing now
-  await playback.getByRole("button", { name: "Pause music" }).click();
-  await expect(playback.getByRole("button", { name: "Play music" })).toBeVisible();
+  await player.getByRole("button", { name: "Pause music" }).click();
+  await expect(player.getByRole("button", { name: "Play music" })).toBeVisible();
   await expect(music.getByRole("radio", { name: /^Studio music/ })).toHaveAttribute("aria-checked", "true");
-  await expect(playback).toContainText(/Paused · \w+ · stays on for later/);
-  // the volume is saved with the preference
-  const volume = playback.getByRole("slider", { name: "Music volume" });
+  const volume = player.getByRole("slider", { name: "Music volume" });
   await volume.fill("20");
   await expect(volume).toHaveValue("20");
-  // Claude FM plays in its own page: pause, but no volume of Rotli's
+  // Claude FM plays in its own page: no skipping, no volume of Rotli's
   await music.getByRole("radio", { name: /^Claude FM/ }).click();
   await expect(music.getByRole("radio", { name: /^Claude FM/ })).toHaveAttribute("aria-checked", "true");
-  await expect(music.getByRole("radio", { name: /^Studio music/ })).toHaveAttribute("aria-checked", "false");
-  await expect(playback).toContainText("Playing · Claude FM");
-  await expect(playback.getByRole("slider", { name: "Music volume" })).toHaveCount(0);
-  await music.getByRole("radio", { name: /^Quiet/ }).click();
-  await expect(playback).toHaveCount(0);
+  await expect(player).toContainText("Claude FM");
+  await expect(player.getByRole("slider", { name: "Music volume" })).toHaveCount(0);
+  await expect(player.getByRole("button", { name: "Next track" })).toHaveCount(0);
+  await music.getByRole("radio", { name: /^Studio music/ }).click();
+  // it comes along: Shortcuts, then where notes live
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(player.getByRole("button", { name: "Next track" })).toBeVisible();
+  await page.getByRole("button", { name: "Choose where notes live" }).click();
+  await expect(page.getByRole("heading", { name: "Where should your notes live?" })).toBeVisible();
+  await expect(player).toBeVisible();
 });
 
 test("a step taller than a short window says there's more below", async ({ page }) => {

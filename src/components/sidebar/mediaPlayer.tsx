@@ -48,7 +48,7 @@ export const PauseGlyph = () => (
     <rect x="13.5" y="5.5" width="4" height="13" rx="1" />
   </Svg>
 );
-const SkipGlyph = ({ back = false }: { back?: boolean }) => (
+export const SkipGlyph = ({ back = false }: { back?: boolean }) => (
   <Svg>
     <path d={back ? "M17 6v12L8.5 12zM7 6h2v12H7z" : "M7 6v12l8.5-6zM15 6h2v12h-2z"} />
   </Svg>

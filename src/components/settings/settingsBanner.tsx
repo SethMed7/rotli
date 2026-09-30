@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 import { useUiStore } from "../../state/ui";
 import { Character, type CharacterName } from "../character";
+import { SkyLife } from "../onboarding/onboardingSkyLife";
 import { SETTINGS_BACKDROPS } from "./settingsBackdropArt";
 import { BANNER_BACKDROPS, BANNER_MOTIFS, type BannerMotif } from "./settingsBannerArt";
 
@@ -68,5 +69,11 @@ export function SceneryLayers({
 export function SettingsScenery() {
   const family = useUiStore((s) => s.themeFamily);
   const scenery = SETTINGS_BACKDROPS[family] ?? SETTINGS_BACKDROPS.warm;
-  return <SceneryLayers className="set-scenery" name={family} sky={scenery.sky} horizon={scenery.horizon} />;
+  return (
+    <>
+      <SceneryLayers className="set-scenery" name={family} sky={scenery.sky} horizon={scenery.horizon} />
+      {/* clouds and birds in the side margins (the owner, 2026-09-30) */}
+      <SkyLife family={family} className="set-sky-life" />
+    </>
+  );
 }

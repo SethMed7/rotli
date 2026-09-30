@@ -607,6 +607,24 @@
     display: none;
   }
 }
+/* the sky's life in the side margins only: it fades out before the column */
+.set-sky-life {
+  opacity: 0.8;
+  mask-image: linear-gradient(
+    to right,
+    black 0,
+    black 14%,
+    transparent 26%,
+    transparent 74%,
+    black 86%,
+    black 100%
+  );
+}
+@media (max-width: 1100px) {
+  .set-sky-life {
+    display: none;
+  }
+}
 .set-scenery-horizon {
   position: absolute;
   left: 0;
@@ -1201,6 +1219,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 14px;
+  /* ends where the cards and rows above it end */
+  max-width: 640px;
   margin-top: 13px;
   color: var(--text);
   font-size: 12px;
@@ -2326,12 +2346,19 @@
   background-size: 5px 5px;
   background-repeat: no-repeat;
   border: 1px solid var(--border);
-  border-radius: var(--r-control);
-  padding: 6px 28px 6px 10px;
+  /* the same pill as the choice controls beside it */
+  border-radius: var(--r-pill);
+  min-height: 34px;
+  padding: 6px 32px 6px 14px;
+  font-weight: 500;
   cursor: pointer;
 }
 .setselect:hover {
   background-color: var(--hov);
+}
+.setselect:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ——— private browser preferences — one familiar provider choice plus the
@@ -2519,12 +2546,6 @@
   opacity: 0.5;
   cursor: default;
 }
-/* a settings segmented choice stays a compact CONTROL — the Aa panel's
-   flex:1 segments stretched each half to ~360px in the 720px body and the
-   pair read as two lost bars (the maintainer, 2026-07-30) */
-.set-main .segrow {
-  max-width: 344px;
-}
 /* a labelled pair of segmented picks (Appearance → Sidebar, 2026-09-17) */
 .set-main .segfield {
   display: flex;
@@ -2664,9 +2685,48 @@
   font-size: var(--fs-label);
   color: var(--text-muted);
 }
+/* a Settings choice is one connected control (the owner, 2026-09-30: "the
+   buttons feel very disconnected"), the same pill as setup's Light/Dark/System */
 .segrow {
-  display: flex;
-  gap: 6px;
+  display: inline-flex;
+  flex-wrap: nowrap;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+}
+.segrow .aaseg {
+  flex: 0 0 auto;
+  min-width: 72px;
+  min-height: 28px;
+  padding: 4px 14px;
+  border: 0;
+  border-radius: var(--r-pill);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.segrow .aaseg:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.segrow .aaseg.sel {
+  background: var(--selected-bg);
+  color: var(--selected-ink);
+}
+.segrow .aaseg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.segrow .aaseg:disabled,
+.segrow .aaseg:disabled:hover {
+  background: none;
+  color: var(--text-muted);
+  opacity: 0.6;
 }
 
 /* ——— storage: the notes-folder location row + ghost buttons ——— */

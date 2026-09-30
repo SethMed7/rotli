@@ -92,6 +92,22 @@ match what they chose." (`src/components/onboarding/onboardingScenery.tsx`)
   only takes the room the window has spare, so the card is never shorter for
   it. The horizon is drawn below that line; its top 30px, the band the card's
   footer may reach, is clear. No line art ever sits behind text or a button.
+- **A living sky, not peeking quokkas** (the owner, 2026-09-30: "remove the
+  rotlis popping out of the sides; better scenery like clouds or birds so it's
+  fully alive"). `SkyLife` (`onboarding/onboardingSkyLife.tsx`) drifts clouds
+  slowly across the page, and something crosses the upper sky: birds, a paper
+  plane for Paper & Charcoal, petals for Blossom, twinkling stars for Midnight.
+  It is masked to the side margins, so the setup card's column (a clear 1090px)
+  never has anything behind its text. With Reduce motion on, each drifter
+  stays still in its own spot. Settings shows the same sky in its side margins
+  only.
+- **The companion wears your choices.** Each step's big quokka keeps its pose
+  and takes your chosen colour and accessory.
+- **Theme cards are the site's orbs.** Each card holds a number, a name, and a
+  lit Light and Dark orb (rotli.co's picker, with Blossom added). The orbs are
+  the app's one radial-gradient surface, allowed only in
+  `src/styles/theme-orbs.css` (`RADIAL_EXCEPTION` in
+  `scripts/design-system-policy.mjs`, with its own test).
 - Settings and first run share `SceneryLayers` (`settingsBanner.tsx`). The same
   unit-tested rule applies: no color of its own.
 

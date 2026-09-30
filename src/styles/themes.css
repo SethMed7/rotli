@@ -92,6 +92,22 @@
   --swatch-blossom-dark: #1d1217;
   --swatch-midnight-light: #f0f2f5;
   --swatch-midnight-dark: #050607;
+  /* each environment's accent, for the lit theme orbs in setup (the site's
+     orb picker, 2026-09-30) — Blossom included */
+  --swatch-warm-light-accent: #c97e62;
+  --swatch-warm-dark-accent: #c97e62;
+  --swatch-paper-accent: #161616;
+  --swatch-charcoal-accent: #e9e7e2;
+  --swatch-ocean-light-accent: #2e6e91;
+  --swatch-ocean-dark-accent: #70b2d7;
+  --swatch-grove-light-accent: #427a55;
+  --swatch-grove-dark-accent: #82be96;
+  --swatch-iris-light-accent: #6b58a5;
+  --swatch-iris-dark-accent: #ad9ae3;
+  --swatch-blossom-light-accent: #a8456d;
+  --swatch-blossom-dark-accent: #e89ab8;
+  --swatch-midnight-light-accent: #364152;
+  --swatch-midnight-dark-accent: #cfd5dc;
 
   /* Character ink is deliberately independent from app text. "auto" follows
      the environment so the Line treatment never vanishes on a dark theme. */

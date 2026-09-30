@@ -1,0 +1,45 @@
+/* The theme orbs (onboarding's theme cards, 2026-09-30). The one place the
+   app keeps a lit, rounded swatch: the owner asked for "the same gradient
+   balls used on the website", which the site keeps as its own deliberate
+   exception to the flat rule because they read as the themes themselves.
+   scripts/design-system-policy.mjs allows radial gradients in THIS file only;
+   everything else stays flat. Colors come from the swatch tokens (themes.css). */
+
+/* the theme cards' lit orbs (the site's orb picker, 2026-09-30): the
+   environment's ground, lit from the upper left, its accent pooling low right,
+   a little depth at the foot — all from the swatch tokens */
+.setup-orb {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 32%, transparent);
+  background:
+    radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--swatch-paper) 45%, var(--orb-ground)) 0%, transparent 46%),
+    radial-gradient(
+      circle at 70% 74%,
+      var(--orb-accent) 0%,
+      color-mix(in srgb, var(--orb-accent) 55%, transparent) 30%,
+      transparent 62%
+    ),
+    radial-gradient(circle at 50% 118%, color-mix(in srgb, var(--swatch-charcoal) 18%, transparent) 0%, transparent 62%),
+    var(--orb-ground);
+}
+.setup-option.selected .setup-orb {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.setup-orb[data-orb="warm-light"] { --orb-ground: var(--swatch-warm-light); --orb-accent: var(--swatch-warm-light-accent); }
+.setup-orb[data-orb="warm-dark"] { --orb-ground: var(--swatch-warm-dark); --orb-accent: var(--swatch-warm-dark-accent); }
+.setup-orb[data-orb="mono-light"] { --orb-ground: var(--swatch-paper); --orb-accent: var(--swatch-paper-accent); }
+.setup-orb[data-orb="mono-dark"] { --orb-ground: var(--swatch-charcoal); --orb-accent: var(--swatch-charcoal-accent); }
+.setup-orb[data-orb="ocean-light"] { --orb-ground: var(--swatch-ocean-light); --orb-accent: var(--swatch-ocean-light-accent); }
+.setup-orb[data-orb="ocean-dark"] { --orb-ground: var(--swatch-ocean-dark); --orb-accent: var(--swatch-ocean-dark-accent); }
+.setup-orb[data-orb="grove-light"] { --orb-ground: var(--swatch-grove-light); --orb-accent: var(--swatch-grove-light-accent); }
+.setup-orb[data-orb="grove-dark"] { --orb-ground: var(--swatch-grove-dark); --orb-accent: var(--swatch-grove-dark-accent); }
+.setup-orb[data-orb="iris-light"] { --orb-ground: var(--swatch-iris-light); --orb-accent: var(--swatch-iris-light-accent); }
+.setup-orb[data-orb="iris-dark"] { --orb-ground: var(--swatch-iris-dark); --orb-accent: var(--swatch-iris-dark-accent); }
+.setup-orb[data-orb="blossom-light"] { --orb-ground: var(--swatch-blossom-light); --orb-accent: var(--swatch-blossom-light-accent); }
+.setup-orb[data-orb="blossom-dark"] { --orb-ground: var(--swatch-blossom-dark); --orb-accent: var(--swatch-blossom-dark-accent); }
+.setup-orb[data-orb="midnight-light"] { --orb-ground: var(--swatch-midnight-light); --orb-accent: var(--swatch-midnight-light-accent); }
+.setup-orb[data-orb="midnight-dark"] { --orb-ground: var(--swatch-midnight-dark); --orb-accent: var(--swatch-midnight-dark-accent); }
+
