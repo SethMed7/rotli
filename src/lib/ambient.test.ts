@@ -14,20 +14,28 @@ import {
   trackTitle,
 } from "./ambient";
 
-const on = { enabled: true, track: "tide", playing: true };
+const on = { enabled: true, track: "tide", playing: true, volume: 0.4 };
 const off = { ...on, enabled: false };
 
 describe("the ambient preference", () => {
   test("read tolerantly: anything missing or malformed is the default", () => {
     for (const value of [undefined, null, 3, "on", [], {}])
       expect(parseAmbient(value)).toEqual(DEFAULT_AMBIENT);
-    expect(parseAmbient({ enabled: true, track: "dusk", playing: true })).toEqual({
+    expect(parseAmbient({ enabled: true, track: "dusk", playing: true, volume: 0.25 })).toEqual({
       enabled: true,
       track: "dusk",
       playing: true,
+      volume: 0.25,
     });
+    // a volume outside 0–1, or not a number, is the default
+    for (const volume of [-0.1, 1.5, "loud", Number.NaN])
+      expect(parseAmbient({ enabled: true, track: "dusk", playing: true, volume }).volume).toBe(
+        DEFAULT_AMBIENT.volume,
+      );
     // a track this build doesn't ship falls back; only a real true turns it on
-    expect(parseAmbient({ enabled: "yes", track: "../../etc", playing: 1 })).toEqual(DEFAULT_AMBIENT);
+    expect(parseAmbient({ enabled: "yes", track: "../../etc", playing: 1, volume: 0.4 })).toEqual(
+      DEFAULT_AMBIENT,
+    );
   });
 
   test("six tracks, one per theme family, each a bundled file", () => {
@@ -56,7 +64,9 @@ describe("the ambient preference", () => {
   });
 
   test("Claude FM is a source the preference keeps and the menu offers, last", () => {
-    expect(parseAmbient({ enabled: true, track: "claude-fm", playing: true }).track).toBe("claude-fm");
+    expect(parseAmbient({ enabled: true, track: "claude-fm", playing: true, volume: 0.4 }).track).toBe(
+      "claude-fm",
+    );
     expect(trackTitle("claude-fm")).toBe("Claude FM");
     expect(isStream("claude-fm")).toBe(true);
     expect(isStream("tide")).toBe(false);

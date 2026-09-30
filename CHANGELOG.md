@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Music volume, and a pause during setup.** The studio music has a volume
+  slider in Settings → Ambient audio. Setup's Sound step has a small pause
+  button and the same slider, so you can keep music on without hearing it right
+  now, or turn it down.
 - **First run comes alive.** Setup opens on a short island intro: Rottnest
   rises out of the sea, the lighthouse turns, and your quokka hops onto the
   sand. Any key or click skips it, and it doesn't play with Reduce motion on.
@@ -81,6 +85,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- In a short window, a setup step taller than the window now says "Scroll
+  for more", as the model step already did. In dark themes, the clouds in the
+  scenery no longer disappear into the background.
 - Setup's theme cards show both color swatches for every family, not just
   Rotli and Paper & Charcoal. Grove's trees now have trunks, and Blossom's
   flowers and Iris's stars are easier to see, in Settings too.

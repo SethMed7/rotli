@@ -5,8 +5,10 @@ import { setupSoundChange, setupSoundChoice } from "./setupSound";
 
 test("the Sound step reads the saved preference as one of three choices", () => {
   expect(setupSoundChoice(DEFAULT_AMBIENT)).toBe("off");
-  expect(setupSoundChoice({ enabled: true, playing: true, track: "tide" })).toBe("studio");
-  expect(setupSoundChoice({ enabled: true, playing: false, track: CLAUDE_FM.id })).toBe("claude-fm");
+  expect(setupSoundChoice({ enabled: true, playing: true, track: "tide", volume: 0.4 })).toBe("studio");
+  expect(setupSoundChoice({ enabled: true, playing: false, track: CLAUDE_FM.id, volume: 0.4 })).toBe(
+    "claude-fm",
+  );
 });
 
 test("picking music plays it: the theme's track, or the one already chosen", () => {
@@ -15,9 +17,9 @@ test("picking music plays it: the theme's track, or the one already chosen", () 
     playing: true,
     track: "lamplight",
   });
-  const onCanopy = { enabled: true, playing: true, track: "canopy" };
+  const onCanopy = { enabled: true, playing: true, track: "canopy", volume: 0.4 };
   expect(setupSoundChange("studio", onCanopy, "midnight").track).toBe("canopy");
-  const onFm = { enabled: true, playing: true, track: CLAUDE_FM.id };
+  const onFm = { enabled: true, playing: true, track: CLAUDE_FM.id, volume: 0.4 };
   expect(setupSoundChange("studio", onFm, "ocean").track).toBe("tide");
   expect(setupSoundChange("claude-fm", DEFAULT_AMBIENT, "warm")).toEqual({
     enabled: true,

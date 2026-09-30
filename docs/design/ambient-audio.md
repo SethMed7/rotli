@@ -25,6 +25,17 @@ again. With the setting off, the player shows only while something plays."
 - **Settings → General → Ambient audio**: the switch, and the six tracks to
   pick from. Turning it on starts the track that sounds like the current theme
   family (unless one was picked before).
+- **Volume** (the owner, 2026-09-30: "a way to pause or change volume … they
+  might want it enabled but not listen to it now, or it's too high"). The
+  studio track plays at the saved `volume` (0–1, default 0.4, the old fixed
+  level; an older settings file without it reads as 0.4). A quiet slider sits
+  under the tracks in Settings and on setup's Sound step. Moving it fades to the
+  new level. Claude FM plays in its own page at that page's volume, so it gets
+  no slider.
+- **Setup's Sound step** shows, once music is on, a small round pause/play
+  button, the volume slider, and "Playing" or "Paused · stays on for later".
+  Pausing keeps the music chosen and just stops it for now, so it is still
+  there in the player afterwards.
 
 ## The rules (`src/lib/ambient.ts`, `playerView`)
 

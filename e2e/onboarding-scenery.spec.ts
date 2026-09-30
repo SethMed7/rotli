@@ -61,3 +61,69 @@ test("Welcome previews the island once: in the corner on short windows, on the h
   await page.setViewportSize({ width: 1280, height: 960 });
   await expect(sky).toBeHidden();
 });
+
+test("the Sound step has a quiet pause and volume once music is on", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/?onboarding");
+  await page.getByRole("button", { name: "Get started" }).click();
+  for (const _ of [1, 2]) await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { name: "Music while you write?" })).toBeVisible();
+  const playback = page.getByRole("group", { name: "Music playback" });
+  await expect(playback).toHaveCount(0); // Quiet: nothing to pause
+  const music = page.getByRole("radiogroup", { name: "Music" });
+  await music.getByRole("radio", { name: /^Studio music/ }).click();
+  await expect(playback).toBeVisible();
+  // pause keeps the music chosen, just not playing now
+  await playback.getByRole("button", { name: "Pause music" }).click();
+  await expect(playback.getByRole("button", { name: "Play music" })).toBeVisible();
+  await expect(music.getByRole("radio", { name: /^Studio music/ })).toHaveAttribute("aria-checked", "true");
+  await expect(playback).toContainText(/Paused · \w+ · stays on for later/);
+  // the volume is saved with the preference
+  const volume = playback.getByRole("slider", { name: "Music volume" });
+  await volume.fill("20");
+  await expect(volume).toHaveValue("20");
+  // Claude FM plays in its own page: pause, but no volume of Rotli's
+  await music.getByRole("radio", { name: /^Claude FM/ }).click();
+  await expect(music.getByRole("radio", { name: /^Claude FM/ })).toHaveAttribute("aria-checked", "true");
+  await expect(music.getByRole("radio", { name: /^Studio music/ })).toHaveAttribute("aria-checked", "false");
+  await expect(playback).toContainText("Playing · Claude FM");
+  await expect(playback.getByRole("slider", { name: "Music volume" })).toHaveCount(0);
+  await music.getByRole("radio", { name: /^Quiet/ }).click();
+  await expect(playback).toHaveCount(0);
+});
+
+test("a step taller than a short window says there's more below", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 860, height: 620 });
+  await page.goto("/?onboarding");
+  await page.getByRole("button", { name: "Get started" }).click();
+  const cue = page.locator(".setup-stage-scroll-cue");
+  await expect(cue).toBeVisible();
+  await page.locator(".setup-stage").evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  await expect(cue).toHaveCount(0);
+  // the companion stays in view while the cards scroll
+  await expect(page.locator(".setup-companion .quokka")).toBeInViewport({ ratio: 1 });
+});
+
+test("dark themes lift the sky's clouds to the tint so they don't vanish", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/?onboarding");
+  await page.getByRole("button", { name: "Get started" }).click();
+  await page
+    .getByRole("radiogroup", { name: "Appearance mode" })
+    .getByRole("radio", { name: "Dark" })
+    .click();
+  await page.getByRole("radiogroup", { name: "Theme" }).getByRole("radio", { name: /Grove/ }).click();
+  const fills = await page
+    .locator(".onb-scenery .sc-cloud")
+    .first()
+    .evaluate((cloud) => {
+      const probe = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      probe.style.fill = "var(--tint)";
+      cloud.parentElement!.appendChild(probe);
+      const tint = getComputedStyle(probe).fill;
+      probe.remove();
+      return { cloud: getComputedStyle(cloud).fill, tint };
+    });
+  expect(fills.cloud).toBe(fills.tint);
+});

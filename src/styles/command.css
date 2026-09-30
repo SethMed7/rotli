@@ -2441,6 +2441,49 @@
 }
 
 /* ——— real on/off switches (replaces the ambiguous dot-button) ——— */
+/* Settings → Ambient audio: the studio track's volume (2026-09-30) */
+.ambient-volume {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--text-muted);
+}
+.ambient-volume input {
+  width: 160px;
+}
+/* the volume slider (Settings and setup's Sound step): a quiet token track,
+   the accent only for the part that's filled (--fill, set from the value) */
+.volume-range {
+  appearance: none;
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(
+    to right,
+    var(--accent) var(--fill, 40%),
+    color-mix(in srgb, var(--text-muted) 30%, var(--border)) var(--fill, 40%)
+  );
+  cursor: pointer;
+}
+.volume-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--accent);
+}
+.volume-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--accent);
+}
+.volume-range:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
 .swgroup {
   display: flex;
   flex-direction: column;

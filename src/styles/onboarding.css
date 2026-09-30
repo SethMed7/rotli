@@ -1412,3 +1412,59 @@
   from { opacity: 0; transform: translateY(14px) scale(0.985); }
   to { opacity: 1; transform: none; }
 }
+
+/* setup's Sound step: a quiet pause and volume under the choices (2026-09-30)
+   — someone may want music on but not now, or softer. Small and muted; the
+   choice above stays the headline. */
+.setup-sound-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+.setup-sound-play {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.setup-sound-play svg {
+  width: 12px;
+  height: 12px;
+}
+.setup-sound-play:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.setup-sound-play:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.setup-sound-volume {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-muted);
+}
+.setup-sound-volume input {
+  width: 116px;
+}
+/* a step taller than the window scrolls; its companion stays in view at the
+   top of the scroller instead of centering on the whole (scrolled) column */
+@media (min-width: 721px) {
+  .setup-stage.is-scrolling .setup-companion {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    min-height: 0;
+    justify-content: flex-start;
+  }
+}

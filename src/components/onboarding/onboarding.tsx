@@ -36,6 +36,7 @@ const ACCESSORY_HUE_CHOICES = [38, 225, 195, 145, 280, 340, 10] as const;
 import { AccentRow } from "../settingsSurface";
 import { OnboardingIntro, OnboardingScenery, introWanted } from "./onboardingScenery";
 import { setupChoiceIndex, SetupBack, SetupChoiceGroup, SetupPrimary } from "./setupControls";
+import { SetupScrollCue, useStageScrollCue } from "./setupScrollCue";
 import { SetupSideFriends } from "./setupSideFriends";
 import { SetupSound } from "./setupSound";
 
@@ -157,6 +158,8 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
   // a fresh first run opens on the island (onboardingScenery.tsx)
   const [intro, setIntro] = useState(() => introWanted(initialStep === "welcome"));
   const endIntro = () => setIntro(false);
+  // a short window: the step scrolls, and says so
+  const [stageRef, showScrollCue, stageScrolls] = useStageScrollCue();
   const index = STEPS.indexOf(step);
   const theme = useUiStore((state) => state.theme);
   const family = useUiStore((state) => state.themeFamily);
@@ -252,7 +255,12 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
 
         <SetupSideFriends />
 
-        <div className="setup-stage" data-step={step} key={step}>
+        <div
+          className={stageScrolls ? "setup-stage is-scrolling" : "setup-stage"}
+          data-step={step}
+          key={step}
+          ref={stageRef}
+        >
           <aside className={`setup-companion setup-companion--${step}`} aria-hidden="true">
             <Character
               name={
@@ -495,6 +503,8 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
             )}
           </div>
         </div>
+
+        {showScrollCue && <SetupScrollCue />}
 
         <footer className="setup-footer">
           <button type="button" className="setup-skip" onClick={skip}>
