@@ -33,7 +33,6 @@ import { closeOrphanedTuck } from "./mediaDock";
 /** How often tabs are asked: quickly while something has media, else rarely. */
 const POLL_BUSY_MS = 400;
 const POLL_IDLE_MS = 1500;
-const VOLUME = 0.4;
 const FADE_TICK_MS = 30;
 /** A pause is heard within ~0.1 s; a start ramps up over ~0.3 s. */
 const FADE_OUT_STEP = 0.12;
@@ -129,12 +128,12 @@ export function applyAmbient(): void {
   }
   if (!plays) return silenceTrack();
   const element = trackElement(prefs.track);
-  if (!element.paused) return fadeTo(VOLUME);
+  if (!element.paused) return fadeTo(prefs.volume);
   // start audible at once rather than from silence, then ramp up
   element.volume = FADE_IN_STEP;
   // a play the webview refuses (no gesture yet at launch) reads as paused
   element.play().then(
-    () => fadeTo(VOLUME),
+    () => fadeTo(prefs.volume),
     () => useAmbient.getState().setPrefs({ playing: false }),
   );
 }

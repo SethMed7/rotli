@@ -37,12 +37,12 @@ function Svg({ children }: { children: ReactNode }) {
     </svg>
   );
 }
-const PlayGlyph = () => (
+export const PlayGlyph = () => (
   <Svg>
     <path d="M8 5.5v13l10.5-6.5z" />
   </Svg>
 );
-const PauseGlyph = () => (
+export const PauseGlyph = () => (
   <Svg>
     <rect x="6.5" y="5.5" width="4" height="13" rx="1" />
     <rect x="13.5" y="5.5" width="4" height="13" rx="1" />
