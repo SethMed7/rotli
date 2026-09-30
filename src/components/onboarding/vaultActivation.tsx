@@ -15,6 +15,7 @@ import { flushSettingsNow } from "../../state/persist";
 import { useUiStore } from "../../state/ui";
 import { requestVaultFolder } from "../../state/vaultFolderBrowser";
 import { Character } from "../character";
+import { OnboardingScenery } from "./onboardingScenery";
 import { SetupBack, SetupChoiceGroup, SetupPrimary } from "./setupControls";
 import { SetupSideFriends } from "./setupSideFriends";
 
@@ -175,6 +176,7 @@ export function VaultActivation({
   return (
     <div className="onb vault-activation">
       <div className="onb-drag" data-tauri-drag-region />
+      <OnboardingScenery />
       <section className="setup-shell" aria-labelledby="vault-title">
         <div className="setup-progress">
           <span>{onboarding ? `${ONBOARDING_STEP_NUMBER.vault} of ${ONBOARDING_TOTAL_STEPS}` : "Vault"}</span>
@@ -233,7 +235,7 @@ export function VaultActivation({
                       value: "open",
                       title: "Open an existing folder",
                       description:
-                        "Review an Obsidian, ZenNotes, or other Markdown tree before rotli writes anything.",
+                        "Review an Obsidian, ZenNotes, or other Markdown tree before Rotli writes anything.",
                     },
                     ...(current
                       ? [
