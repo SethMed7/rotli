@@ -23,8 +23,10 @@ test("Breve is a labelled segment of the front switcher, not a header icon", () 
   // switcher and footer survive the trip into Breve and back
   expect(sidebarSource).toContain('breveActive={sidebarMode === "breve"}');
   expect(sidebarSource).toContain('onBreve={showBreve ? () => dispatch("view.breve") : undefined}');
-  // Breve can be hidden (Settings → Show in Rotli) but keeps its switch while open
-  expect(sidebarSource).toContain('LAUNCH_FEATURES.breve && (!hideBreve || sidebarMode === "breve")');
+  // each front turns on and off in Settings → Sidebar (2026-09-30); with only
+  // one on, the switcher is gone
+  expect(sidebarSource).toContain('const showBreve = useFrontOn("breve");');
+  expect(sidebarSource).toContain("{!oneFront && (");
 });
 
 test("System stays Library, Assets, Archive, and Trash for every active vault", () => {
