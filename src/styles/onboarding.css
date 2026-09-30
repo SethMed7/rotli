@@ -77,6 +77,7 @@
 
 .setup-companion p {
   max-width: 176px;
+  text-wrap: balance;
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.55;
@@ -246,7 +247,8 @@
   display: block;
   width: 18px;
   height: 18px;
-  border: 1px solid var(--border);
+  /* a dark swatch on a dark card still shows its edge */
+  border: 1px solid color-mix(in srgb, var(--text-muted) 45%, transparent);
   border-radius: var(--r-pill);
 }
 
@@ -255,6 +257,16 @@
 .setup-theme-dot.mono-light { background: var(--swatch-paper); }
 .setup-theme-dot.mono-dark { background: var(--swatch-charcoal); }
 .setup-theme-dot.mono-system { background: var(--accent); }
+.setup-theme-dot.ocean-light { background: var(--swatch-ocean-light); }
+.setup-theme-dot.ocean-dark { background: var(--swatch-ocean-dark); }
+.setup-theme-dot.grove-light { background: var(--swatch-grove-light); }
+.setup-theme-dot.grove-dark { background: var(--swatch-grove-dark); }
+.setup-theme-dot.iris-light { background: var(--swatch-iris-light); }
+.setup-theme-dot.iris-dark { background: var(--swatch-iris-dark); }
+.setup-theme-dot.blossom-light { background: var(--swatch-blossom-light); }
+.setup-theme-dot.blossom-dark { background: var(--swatch-blossom-dark); }
+.setup-theme-dot.midnight-light { background: var(--swatch-midnight-light); }
+.setup-theme-dot.midnight-dark { background: var(--swatch-midnight-dark); }
 
 .setup-theme-pair {
   display: flex;
@@ -1225,4 +1237,178 @@
   align-self: center;
   color: var(--text-muted);
   font-size: 12.5px;
+}
+
+/* ─── first run's scenery (onboarding/onboardingScenery.tsx, 2026-09-30) ───
+   The page is the theme's sky: a breath of its accent at the top fading to
+   the ground. The setup card stands on a floor (--onb-floor) that takes only
+   the room the window has spare — the card is never shorter for it — and the
+   horizon is the ground below that line: its top 30px, the band the card's
+   footer may reach, is clear, so no line art runs behind text or a button. */
+.onb {
+  --onb-floor: clamp(28px, calc(100dvh - 776px), 132px);
+  padding-bottom: var(--onb-floor);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--accent) 8%, var(--ground)) 0,
+    var(--ground) 60%
+  );
+}
+.onb .setup-shell {
+  height: min(720px, calc(100dvh - 56px - var(--onb-floor)));
+}
+.onb-scenery {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.onb-scenery-sky {
+  position: absolute;
+  top: 9%;
+  right: 3%;
+  width: 220px;
+  height: auto;
+  opacity: 0.6;
+  animation: onb-scene-in 420ms var(--motion-ease) both;
+}
+@media (max-width: 1100px) {
+  .onb-scenery-sky {
+    display: none;
+  }
+}
+/* a window tall enough to show the island on the horizon shows it once */
+@media (min-height: 880px) {
+  .onb-scenery[data-scenery="island"] .onb-scenery-sky {
+    display: none;
+  }
+}
+.onb-scenery-horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: calc(var(--onb-floor) + 30px);
+  opacity: 0.6;
+  /* clear across the 30px the card's footer may reach, then the ground */
+  mask-image: linear-gradient(to bottom, transparent 30px, black 74px);
+  animation: onb-scene-in 420ms var(--motion-ease) both;
+}
+
+/* the island intro: the island rises out of the sea, the lighthouse turns,
+   the quokka hops onto the sand, then it opens onto setup. Never takes
+   pointer input; any key or click skips it. */
+.onb-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--accent) 8%, var(--ground)) 0,
+    var(--ground) 60%
+  );
+}
+.onb-intro.is-leaving {
+  animation: onb-intro-out 340ms var(--motion-ease) 180ms forwards;
+}
+/* its contents are gone before setup starts to show through */
+.onb-intro.is-leaving .onb-intro-stage,
+.onb-intro.is-leaving .onb-intro-word {
+  animation: onb-intro-fade 200ms var(--motion-ease) forwards;
+}
+.onb-intro-stage {
+  position: relative;
+  width: min(820px, 88vw);
+  /* the scene ends softly at its sides, not in a hard cut */
+  mask-image: linear-gradient(to right, transparent, black 11%, black 89%, transparent);
+  animation: onb-intro-appear 260ms var(--motion-ease) both;
+}
+.onb-intro-island {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.onb-intro-isle {
+  transform-box: fill-box;
+  animation: onb-intro-rise 700ms var(--motion-ease) 120ms both;
+}
+.onb-intro .sc-sun {
+  transform-box: fill-box;
+  animation: onb-intro-sun 900ms var(--motion-ease) both;
+}
+.onb-intro-beam {
+  animation: onb-intro-beam 900ms ease-in-out 420ms both;
+}
+/* feet on the sand, where Welcome's quokka will stand */
+.onb-intro-quokka {
+  position: absolute;
+  left: 12%;
+  bottom: -2px;
+  animation: onb-intro-hop 560ms var(--motion-ease) 360ms both;
+}
+.onb-intro-word {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 34px;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  animation: onb-intro-word 380ms var(--motion-ease) 450ms both;
+}
+/* setup opens as the intro leaves (a skip drops the attribute: no wait).
+   The card only fades — a transform on it would clip the fixed side
+   friends inside it — and its step content rises. */
+.onb[data-intro] .setup-shell {
+  animation: onb-intro-appear-full 520ms var(--motion-ease) 1120ms both;
+}
+.onb[data-intro] .setup-stage {
+  animation: onb-open 560ms var(--motion-ease) 1120ms both;
+}
+
+@keyframes onb-scene-in {
+  from { opacity: 0; }
+}
+@keyframes onb-intro-appear {
+  from { opacity: 0.35; }
+}
+@keyframes onb-intro-rise {
+  from { transform: translateY(46px); }
+  to { transform: translateY(0); }
+}
+@keyframes onb-intro-sun {
+  from { opacity: 0; transform: translateY(24px); }
+}
+@keyframes onb-intro-beam {
+  0% { opacity: 0; }
+  50% { opacity: 0.42; }
+}
+@keyframes onb-intro-hop {
+  0% { opacity: 0; transform: translate(-28px, 6px); }
+  25% { opacity: 1; }
+  55% { transform: translate(-12px, -12px); }
+  100% { opacity: 1; transform: translate(0, 0); }
+}
+@keyframes onb-intro-word {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes onb-intro-appear-full {
+  from { opacity: 0; }
+}
+@keyframes onb-intro-fade {
+  to { opacity: 0; }
+}
+@keyframes onb-intro-out {
+  to { opacity: 0; transform: scale(1.03); }
+}
+@keyframes onb-open {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: none; }
 }

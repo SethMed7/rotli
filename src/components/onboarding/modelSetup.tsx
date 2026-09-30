@@ -39,6 +39,7 @@ import { ChevronRight } from "../glyphs";
 import { ConnectorGuide } from "../settings/connectorGuide";
 import { chatMark } from "../sidebar/chatMark";
 import { ModelLogo } from "../sidebar/modelLogo";
+import { OnboardingScenery } from "./onboardingScenery";
 import { SetupBack, SetupPrimary } from "./setupControls";
 import { SetupSideFriends } from "./setupSideFriends";
 
@@ -220,6 +221,7 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
   return (
     <div className="onb model-setup">
       <div className="onb-drag" data-tauri-drag-region />
+      <OnboardingScenery />
       <section className="setup-shell" aria-labelledby="model-setup-title">
         <div className="setup-progress">
           <span>

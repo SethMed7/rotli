@@ -69,3 +69,29 @@ same `.sc-*` token classes as the scenes, and its unit test enforces the same
 no-color rule. The banner is as wide as the Settings rows below it (640px).
 Its sky is a 6% breath of the accent over the surface, so the scene's own
 surfaces still read.
+
+## First run's scenery (the same language)
+
+The owner, 2026-09-30: "make the onboarding just like we did in the settings —
+a full theme, life for the backdrop. The beginning can match our theme and even
+preview the island … once they choose their theme everything forward needs to
+match what they chose." (`src/components/onboarding/onboardingScenery.tsx`)
+
+- **An island intro.** A fresh first run opens on a 1.7-second scene: Rottnest
+  rises out of the sea, the lighthouse turns, the quokka hops onto the sand
+  where Welcome's quokka stands, and "Rotli" appears. Its contents fade before
+  its background, then setup fades in and its step rises. Any key or click
+  skips it, it never takes pointer input, and it doesn't play under Reduce
+  motion.
+- **Welcome is the island** in Rotli Light, the environment every first run
+  opens in.
+- **After that, the chosen theme.** From Appearance on, the backdrop is the
+  chosen family's Settings scenery (Rotli keeps the island). It changes with
+  each pick and stays through where notes live and the model step.
+- **Ground below the card.** The card stands on a floor, `--onb-floor`, that
+  only takes the room the window has spare, so the card is never shorter for
+  it. The horizon is drawn below that line; its top 30px, the band the card's
+  footer may reach, is clear. No line art ever sits behind text or a button.
+- Settings and first run share `SceneryLayers` (`settingsBanner.tsx`). The same
+  unit-tested rule applies: no color of its own.
+

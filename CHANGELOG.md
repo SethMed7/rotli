@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **First run comes alive.** Setup opens on a short island intro: Rottnest
+  rises out of the sea, the lighthouse turns, and your quokka hops onto the
+  sand. Any key or click skips it, and it doesn't play with Reduce motion on.
+  Welcome shows the island. Once you pick a theme, every step after it,
+  through choosing where your notes live, wears that theme's scenery.
+
 - **Dates from the slash menu.** Type `/today`, `/yesterday`, or `/tomorrow`
   to write the date into a note, even in the middle of a sentence. In a
   template, the same commands leave a placeholder, so a daily template shows
@@ -74,6 +80,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of its text.
 
 ### Fixed
+
+- Setup's theme cards show both color swatches for every family, not just
+  Rotli and Paper & Charcoal. Grove's trees now have trunks, and Blossom's
+  flowers and Iris's stars are easier to see, in Settings too.
 
 - The slash menu and its pickers now scroll with the arrow keys, so the
   highlighted row never sits out of sight. In a short window they fit the

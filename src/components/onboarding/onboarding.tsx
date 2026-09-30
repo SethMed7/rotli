@@ -34,6 +34,7 @@ import { Character } from "../character";
  * Amber first — it is the accessory default. */
 const ACCESSORY_HUE_CHOICES = [38, 225, 195, 145, 280, 340, 10] as const;
 import { AccentRow } from "../settingsSurface";
+import { OnboardingIntro, OnboardingScenery, introWanted } from "./onboardingScenery";
 import { setupChoiceIndex, SetupBack, SetupChoiceGroup, SetupPrimary } from "./setupControls";
 import { SetupSideFriends } from "./setupSideFriends";
 import { SetupSound } from "./setupSound";
@@ -153,6 +154,9 @@ function ChordRow({ id, label, hint }: (typeof HOTKEYS)[number]) {
 
 export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => void; initialStep?: Step }) {
   const [step, setStep] = useState<Step>(initialStep);
+  // a fresh first run opens on the island (onboardingScenery.tsx)
+  const [intro, setIntro] = useState(() => introWanted(initialStep === "welcome"));
+  const endIntro = () => setIntro(false);
   const index = STEPS.indexOf(step);
   const theme = useUiStore((state) => state.theme);
   const family = useUiStore((state) => state.themeFamily);
@@ -234,8 +238,9 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
   };
 
   return (
-    <div className="onb">
+    <div className="onb" data-intro={intro ? "" : undefined}>
       <div className="onb-drag" data-tauri-drag-region />
+      <OnboardingScenery welcome={step === "welcome"} />
       <section className="setup-shell" aria-labelledby="setup-title">
         <div className="setup-progress">
           <span>
@@ -507,6 +512,7 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
           </div>
         </footer>
       </section>
+      {intro && <OnboardingIntro onDone={endIntro} />}
     </div>
   );
 }
