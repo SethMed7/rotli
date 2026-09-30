@@ -10,7 +10,7 @@ import {
   slashSpanAtCaret,
   SLASH_ITEMS,
 } from "./slashMenu";
-import { filterPickerNotes, slashPickerCanCreate } from "./slashPicker";
+import { embedCreateName, filterPickerNotes, pickerHint, slashPickerCanCreate } from "./slashPicker";
 
 const file = (id: string): NoteSummary => ({
   id,
@@ -51,6 +51,10 @@ describe("slash command catalog", () => {
       "Board",
       "Sheet",
       "Document",
+      "Today",
+      "Yesterday",
+      "Tomorrow",
+      "Continue a project list",
     ]);
     for (const item of SLASH_ITEMS) {
       // picker, image, and Librarian commands open a flow first — no scaffold
@@ -62,6 +66,23 @@ describe("slash command catalog", () => {
       expect(insertion?.caret).toBeGreaterThanOrEqual(0);
       expect(insertion?.caret).toBeLessThanOrEqual(insertion?.insert.length ?? 0);
     }
+  });
+
+  test("a date command writes the date, or a placeholder when the note is a template", () => {
+    const now = new Date(2026, 8, 29, 9, 0);
+    expect(slashInsertion({ kind: "date", word: "today" }, { now })?.insert).toBe("September 29, 2026");
+    expect(slashInsertion({ kind: "date", word: "tomorrow" }, { now })?.insert).toBe("September 30, 2026");
+    expect(slashInsertion({ kind: "date", word: "yesterday" }, { now, template: true })?.insert).toBe(
+      "{{yesterday}}",
+    );
+    expect(filterSlashItems("today").map((item) => item.label)).toContain("Today");
+  });
+
+  test("a template's date placeholders become the day it's used", () => {
+    const now = new Date(2026, 8, 29, 9, 0);
+    expect(templateInsertion("# Daily\n\n## {{today}}\n\n- [ ] ", true, now)).toBe(
+      "# Daily\n\n## September 29, 2026\n\n- [ ]",
+    );
   });
 
   test("immediate commands produce the intended markdown scaffolds", () => {
@@ -109,13 +130,17 @@ describe("slash command catalog", () => {
     expect(slashPickerCanCreate("embedBoard", true)).toBe(true);
     expect(slashPickerCanCreate("embedSheet", true)).toBe(true);
     expect(slashPickerCanCreate("embedDocument", true)).toBe(true);
-    expect(slashPickerCanCreate("linkNote", true)).toBe(false);
     expect(slashPickerCanCreate("embedSheet", false)).toBe(false);
     expect(slashPickerCanCreate("embedDocument", true, false)).toBe(false);
     // a template is an ordinary note: creatable in every build that can write
     expect(slashPickerCanCreate("insertTemplate", false)).toBe(true);
     expect(slashPickerCanCreate("insertTemplate", true, false)).toBe(false);
     expect(slashPickerCanCreate("linkChat", true)).toBe(false);
+    // Link note makes the note you typed — web and native alike, never read-only
+    expect(slashPickerCanCreate("linkNote", false)).toBe(true);
+    expect(slashPickerCanCreate("linkNote", true, false)).toBe(false);
+    // Continue a project list makes its next note itself, never from the picker
+    expect(slashPickerCanCreate("continueList", true)).toBe(false);
   });
 
   test("document discovery uses the editable DOCX vocabulary", () => {
@@ -273,6 +298,11 @@ describe("slash commands inside a result row's reason", () => {
     expect(slashSpanAtCaret(item, item.length, chat)?.lead).toBe("");
     expect(slashSpanAtCaret(item, item.length, { kind: "code" })?.lead).toBe("");
     expect(slashSpanAtCaret(item, item.length, { kind: "table" })?.lead).toBe("\n      ");
+    // a date and a project-list link read as words in the sentence too
+    const due = "- [ ] Ship it /tom";
+    expect(slashSpanAtCaret(due, due.length, { kind: "date", word: "tomorrow" })?.lead).toBe("");
+    const project = { kind: "picker", mode: "continueList" } as const;
+    expect(slashSpanAtCaret("Today /cont", 11, project)?.lead).toBe("");
     // a command that owns the whole item was always in place, whatever it is
     expect(slashSpanAtCaret("- [ ] /table", 12, { kind: "table" })?.lead).toBe("");
   });
@@ -328,5 +358,26 @@ describe("/template", () => {
     expect(templateInsertion("---\ntitle: x\nsecure: false\n---\n\n## Agenda\n", false)).toBe("## Agenda");
     expect(templateInsertion("# Only a title\n", false)).toBe("");
     expect(templateInsertion("\n\n", true)).toBe("");
+  });
+
+  test("a picker row's hint is a readable place, never a native note's opaque id", () => {
+    const note = (id: string) => ({
+      id,
+      title: "T",
+      snippet: "",
+      folderId: "",
+      createdAt: 0,
+      updatedAt: 0,
+      pinned: false,
+    });
+    expect(pickerHint(note("01K6B3ZQ8R2X4Y7N9P5T1V3W6M"))).toBe("");
+    expect(pickerHint(note("wiki/_inbox/packing-list.md"))).toBe("packing-list.md");
+  });
+
+  test("a board made from /board is named from the picker's field first; other kinds name themselves", () => {
+    expect(embedCreateName("embedBoard", "  Q4 roadmap ")).toBe("Q4 roadmap");
+    expect(embedCreateName("embedBoard", "   ")).toBeNull();
+    expect(embedCreateName("embedSheet", "anything")).toBeUndefined();
+    expect(embedCreateName("embedDocument", "")).toBeUndefined();
   });
 });

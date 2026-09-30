@@ -11,14 +11,16 @@
 // two surfaces can evolve independently. Glyphs are reused from FormatBar's
 // vocabulary — same SVG voice, same 15px size.
 
-import type { ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 import { DOCUMENT_SEARCH_KEYWORDS } from "../documents/kinds";
 import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
-import type { BlockToggle } from "./commands";
+import { DATE_WORDS } from "../lib/noteDates";
+import { fitMenuToWindow, scrollRowIntoList } from "../lib/popover";
 import { Gl, bulletGlyph, checklistGlyph, codeGlyph, numberedGlyph, quoteGlyph } from "./formatGlyphs";
 import { parseBlock } from "./render";
 import { RESULT_REASON_SEPARATOR, resultTextParts } from "./resultState";
+import type { SlashItem, SlashOp } from "./slashTypes";
 
 // "H1/2/3" read as text glyphs (matches the format bar's H affordance voice)
 function Heading({ level }: { level: 1 | 2 | 3 }) {
@@ -30,42 +32,7 @@ function Heading({ level }: { level: 1 | 2 | 3 }) {
 // stays the inline-backticks primitive, and the multi-line kinds (table /
 // divider / fences) insert their scaffold with the caret placed inside
 // (CmEditor's pickSlash owns the caret math).
-export type SlashPickerMode =
-  | "linkNote"
-  | "linkChat"
-  | "insertTemplate"
-  | "embedBoard"
-  | "embedSheet"
-  | "embedDocument";
-
-export type SlashOp =
-  | { kind: "heading"; level: 1 | 2 | 3 }
-  | { kind: "block"; block: BlockToggle }
-  | { kind: "code" }
-  | { kind: "table" }
-  | { kind: "divider" }
-  | { kind: "fence"; lang: "" | "math" | "mermaid" }
-  | { kind: "picker"; mode: SlashPickerMode }
-  /** Opens Finder and inserts copied vault image assets at this position. */
-  | { kind: "attachImage" }
-  /** Opens the AI image popover (engine + prompt) — the maintainer, 2026-08-04. */
-  | { kind: "imageGen" }
-  /** Swaps the format bar for the Librarian bar (2026-09-28). */
-  | { kind: "librarian" }
-  /** Opens Hand to AI's prompt for this note (2026-09-28). */
-  | { kind: "handToAi" };
-
-export interface SlashItem {
-  label: string;
-  /** The Crepe-style section header this item files under. */
-  group: "Text" | "List" | "Insert" | "Link";
-  /** A muted one-line description (keeps the menu self-teaching). */
-  hint: string;
-  glyph: ReactNode;
-  op: SlashOp;
-  /** Extra filter tokens (note, wiki, excalidraw, …). */
-  keywords?: string[];
-}
+export type { SlashItem, SlashOp, SlashPickerMode } from "./slashTypes";
 
 // a minimal grid mark for Table + a thin rule for Divider (the shared Gl voice)
 const tableGlyph = (
@@ -100,6 +67,12 @@ const mermaidGlyph = (
 );
 
 // a framed picture with a sun + hill — the classic image mark, in the Gl voice
+const calendarGlyph = (
+  <Gl>
+    <rect x="4" y="5" width="16" height="15" rx="2" />
+    <path d="M4 10h16M9 3v4M15 3v4" />
+  </Gl>
+);
 const imageGenGlyph = (
   <svg
     viewBox="0 0 24 24"
@@ -392,6 +365,26 @@ export const SLASH_ITEMS: SlashItem[] = [
     op: { kind: "picker", mode: "embedDocument" },
     keywords: [...DOCUMENT_SEARCH_KEYWORDS],
   },
+  // dates (2026-09-29): the date itself, or a {{placeholder}} in a template
+  ...DATE_WORDS.map((word): SlashItem => ({
+    label: word[0]!.toUpperCase() + word.slice(1),
+    group: "Date",
+    hint:
+      word === "today"
+        ? "Today's date; in a template, the day it's used"
+        : `${word[0]!.toUpperCase() + word.slice(1)}'s date`,
+    glyph: calendarGlyph,
+    op: { kind: "date", word },
+    keywords: ["date", "day", word],
+  })),
+  {
+    label: "Continue a project list",
+    group: "Function",
+    hint: "Link a project's task note, or start its next one when it's all done",
+    glyph: calendarGlyph,
+    op: { kind: "picker", mode: "continueList" },
+    keywords: ["function", "project", "todo", "tasks", "next", "continue", "round"],
+  },
 ];
 
 /** How much room a slash popover wants below the caret row before it prefers
@@ -479,8 +472,10 @@ export interface SlashApplySpan {
  * beneath, so the sentence (or the list item's text) stays whole. */
 function isInlineOp(op: SlashOp | undefined): boolean {
   if (!op) return false;
-  if (op.kind === "code") return true;
-  return op.kind === "picker" && (op.mode === "linkNote" || op.mode === "linkChat");
+  if (op.kind === "code" || op.kind === "date") return true;
+  return (
+    op.kind === "picker" && (op.mode === "linkNote" || op.mode === "linkChat" || op.mode === "continueList")
+  );
 }
 
 /** A slash command owns paragraph or list-item content while the caret trails
@@ -554,8 +549,19 @@ export function SlashMenu({
   onPick: (item: SlashItem) => void;
 }) {
   const items = filterSlashItems(query);
+  // arrowing past the fold scrolls the menu with the highlight (and its group label)
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const root = rootRef.current;
+    const sel = root?.querySelector(".slashrow.sel");
+    if (root) scrollRowIntoList(root, sel?.closest(".slashgrouped") ?? sel);
+  }, [selectedIndex, query]);
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (root) fitMenuToWindow(root, !!root.closest(".rotli-slash-anchor.up"));
+  }, [query]);
   return (
-    <div className="slashmenu" role="menu" aria-label="Insert block">
+    <div className="slashmenu" role="menu" aria-label="Insert block" ref={rootRef}>
       {items.length === 0 && (
         <div className="slashmenu-empty" role="status">
           No commands found <span>Esc to close</span>

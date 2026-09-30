@@ -6,9 +6,13 @@
 import { EditorSelection } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 
+import { noteDiskFolder } from "../lib/noteLocation";
+import { keys } from "../services/hooks";
 import { notesService } from "../services/notes";
-import { isPresetTemplate, presetTemplateBody } from "../services/templates";
+import { queryClient } from "../services/query";
+import { isPresetTemplate, isTemplateFolder, presetTemplateBody } from "../services/templates";
 import { useUiStore } from "../state/ui";
+import type { NoteSummary } from "../types";
 import { templateInsertion } from "./slashActions";
 import { adaptSlashInsertion } from "./slashMenu";
 
@@ -44,4 +48,11 @@ export function insertTemplateFromPicker(
           `Couldn’t insert the template — ${error instanceof Error ? error.message : String(error)}`,
         );
     });
+}
+
+/** Whether the note open in an editor is a template (its loaded copy says
+ * where it lives): `/today` there keeps a placeholder, not today's date. */
+export function noteIsTemplateNow(noteId: string): boolean {
+  const note = queryClient.getQueryData<NoteSummary>(keys.note(noteId));
+  return !!note && isTemplateFolder(noteDiskFolder(note));
 }

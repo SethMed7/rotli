@@ -24,6 +24,7 @@ import { toggleNoteSecure } from "../keys/noteProtectionActions";
 import { QUICK_PICK_ROWS } from "../keys/quickNoteActions";
 import { hotkeyPeekDelay, useHeldModifier } from "../keys/useHeldModifier";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
+import { subsequenceMatch } from "../lib/fuzzy";
 import { useTransientPopover } from "../lib/popover";
 import { pickableNotes, quickNoteTitle } from "../lib/quickNoteList";
 import { corpusFrontmatter, emitQuickCreated, isTauri, onQuickShow, startWindowDrag } from "../lib/tauri";
@@ -47,18 +48,6 @@ import { WhichKey } from "./whichKey";
 function onDragRegionMouseDown(event: MouseEvent) {
   if (event.button !== 0 || event.detail > 1) return;
   void startWindowDrag();
-}
-
-/** Forgiving subsequence match — instant, no scoring (mirrors the palette). */
-function fuzzy(query: string, text: string): boolean {
-  const q = query.toLowerCase();
-  const t = text.toLowerCase();
-  let i = 0;
-  for (const ch of t) {
-    if (ch === q[i]) i++;
-    if (i >= q.length) return true;
-  }
-  return q.length === 0;
 }
 
 function StarGlyph({ filled }: { filled: boolean }) {
@@ -107,7 +96,7 @@ function NotePicker({
 
   const results = useMemo(() => {
     const q = query.trim();
-    const matched = notes.filter((n) => fuzzy(q, n.title) || fuzzy(q, n.snippet));
+    const matched = notes.filter((n) => subsequenceMatch(q, n.title) || subsequenceMatch(q, n.snippet));
     // pinned favorites first, then the rest — both filtered by the query
     const fav = matched.filter((n) => pinned.has(n.id));
     const rest = matched.filter((n) => !pinned.has(n.id));

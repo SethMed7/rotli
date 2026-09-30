@@ -13,7 +13,12 @@ export function artifactClarification(
   userText: string,
   capabilities: { documentTool: boolean },
 ): ({ kind: "question" } & AgentQuestion) | { kind: "final"; text: string } | null {
-  const text = userText.trim();
+  // a link names a place, not what to make: "docs.google.com/document/…",
+  // with or without its scheme, is not a request for a document
+  const text = userText
+    .replace(/\bhttps?:\/\/\S+/gi, " ")
+    .replace(/\b(?:[\w-]+\.)+[a-z]{2,}\/\S*/gi, " ")
+    .trim();
   if (!text || !CREATION.test(text) || !GENERIC_DOCUMENT.test(text)) return null;
 
   const explicitlyWord = WORD.test(text);

@@ -10,6 +10,7 @@ import { type KeyboardEvent, type ReactNode, useEffect, useId, useMemo, useRef, 
 import { useBindingsStore, resolveChord } from "../keys/bindings";
 import { formatChord } from "../keys/chords";
 import { type KeyAction, allActions, dispatch, getAction } from "../keys/registry";
+import { subsequenceMatch } from "../lib/fuzzy";
 import { useTransientPopover } from "../lib/popover";
 import { activeInstance } from "../memex/config";
 import { useInstanceChats, useMemexConfig } from "../memex/useMemex";
@@ -32,18 +33,6 @@ import {
 import { Icon } from "./icon";
 import { MatchText } from "./matchText";
 import { paletteMatchScore, rankSearchGroups } from "./paletteModel";
-
-/** Simple subsequence match — instant, forgiving, no scoring (no metric gates). */
-function fuzzy(query: string, text: string): boolean {
-  const q = query.toLowerCase();
-  const t = text.toLowerCase();
-  let i = 0;
-  for (const ch of t) {
-    if (ch === q[i]) i++;
-    if (i >= q.length) return true;
-  }
-  return q.length === 0;
-}
 
 function actionIcon(id: string): ReactNode {
   if (id === "notes.new" || id === "tabs.new") return <PlusGlyph size={15} />;
@@ -197,7 +186,7 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
       leaf.tabs.forEach((tab, i) => {
         if (tab.surfaceKind !== "note") return;
         const n = noteById.get(tab.noteId);
-        if (!n || !fuzzy(q, n.title)) return;
+        if (!n || !subsequenceMatch(q, n.title)) return;
         tabRows.push({
           key: `tab:${leaf.id}:${tab.id}`,
           score: paletteMatchScore(q, n.title, ""),
@@ -258,7 +247,7 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
     const noteRows = rankSearchGroups([
       ...(hits ?? []).map(hitRow),
       ...notes
-        .filter((n) => !hitIds.has(n.id) && (fuzzy(q, n.title) || fuzzy(q, n.snippet)))
+        .filter((n) => !hitIds.has(n.id) && (subsequenceMatch(q, n.title) || subsequenceMatch(q, n.snippet)))
         .map((n) => noteRow(n, n.snippet)),
     ]).slice(0, 8);
     // Files by NAME (audit F4) — the searchable universe excludes binaries, but
@@ -266,13 +255,13 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
     // index carries them; openSummary already routes kind "file" to its viewer.
     const fileRows: Row[] = [];
     for (const n of noteIndex.values()) {
-      if (n.kind !== "file" || !fuzzy(q, n.title)) continue;
+      if (n.kind !== "file" || !subsequenceMatch(q, n.title)) continue;
       fileRows.push(noteRow(n));
     }
     // Chats by TITLE (audit F3) — "everything has a chat", so a chat must at
     // least be findable by name. Full-text chat search is a later Rust lane.
     const chatRows: Row[] = chats
-      .filter((c) => fuzzy(q, c.title || c.slug))
+      .filter((c) => subsequenceMatch(q, c.title || c.slug))
       .map((c) => ({
         key: `chat:${c.slug}`,
         score: paletteMatchScore(q, c.title || c.slug, ""),
@@ -289,7 +278,9 @@ export function Palette({ onClose, breveActive = false }: { onClose: () => void;
     // null here and dispatching them would silently no-op
     const actionRows = allActions()
       .filter(
-        (a) => a.surface === "main" && (fuzzy(q, a.title) || (a.keywords ?? []).some((k) => fuzzy(q, k))),
+        (a) =>
+          a.surface === "main" &&
+          (subsequenceMatch(q, a.title) || (a.keywords ?? []).some((k) => subsequenceMatch(q, k))),
       )
       .map((a) => actionRow(a));
     const section = (name: string, rows: Row[], limit: number): Group | null => {

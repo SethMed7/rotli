@@ -9,6 +9,7 @@
 // are listed and moved here the way the Mac corpus lists them — id = path, no
 // frontmatter, never read to be indexed; their scene I/O is folderBoards.ts.
 
+import { bodyEdit } from "../lib/aiEditPolicy";
 import { extOf, fileName, fileNameStem, userFileName } from "../lib/fileKind";
 import {
   type NoteFrontmatter,
@@ -16,6 +17,7 @@ import {
   parseNoteDocument,
   shelfOf,
   withShelf,
+  isLockedFrontmatter,
   isSecureFrontmatter,
 } from "../lib/frontmatter";
 import type { MemexContractRaw } from "../lib/tauri";
@@ -214,6 +216,8 @@ export class FolderNotesService implements NotesService {
       pinned: frontmatter?.pinned ?? false,
       kind: "note",
       secure: frontmatter ? isSecureFrontmatter(frontmatter) : false,
+      locked: frontmatter ? isLockedFrontmatter(frontmatter) : false,
+      aiBodyEdit: bodyEdit(frontmatter?.foreign ?? []),
       body,
       revision: `${stat.lastModified}:${stat.size}`,
     };
@@ -409,7 +413,14 @@ export class FolderNotesService implements NotesService {
     const dir = this.isMemex ? WIKI_INBOX : "";
     const path = await this.freePath(dir, `${noteStem(title, id)}.md`);
     const text = composeNote(
-      { id, title, shelf: [DEST.inbox], reach: [], ...(policy?.secure ? { secure: true } : {}) },
+      {
+        id,
+        title,
+        shelf: [DEST.inbox],
+        reach: [],
+        ...(policy?.secure ? { secure: true } : {}),
+        ...(policy?.createdBy ? { createdBy: policy.createdBy } : {}),
+      },
       body,
       today(),
     );

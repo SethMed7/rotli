@@ -10,6 +10,177 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-09-30
+
+### Added
+
+- **Music volume, and previews in setup.** The studio music has a volume
+  slider in Settings → Ambient audio. During setup, each music choice has a
+  play button to hear it first. What you pick starts once setup is done.
+- **Rotli opens with a moment of its own.** Every launch opens on a short
+  scene in your theme with your quokka. Any key or click skips it, and it
+  doesn't play with Reduce motion on.
+- **First run comes alive.** Setup opens on a short island intro: Rottnest
+  rises out of the sea, the lighthouse turns, and your quokka hops onto the
+  sand. Any key or click skips it, and it doesn't play with Reduce motion on.
+  Welcome shows the island. Once you pick a theme, every step after it,
+  through choosing where your notes live, wears that theme's scenery.
+  Clouds drift and birds cross the sky (a paper plane in Paper & Charcoal,
+  petals in Blossom, stars in Midnight). Your quokka on each step wears what
+  you picked, the theme cards show each theme as a pair of lit orbs, like
+  rotli.co's picker, now with Blossom's, and the small headings above each
+  step's title are gone.
+- **A Vault view: your folders as they are on disk.** The view picker above
+  Main now offers Vault, which shows the vault's own folders and files the way
+  Finder does, instead of an arrangement you make. It's off unless you pick it.
+  While it's showing, the Librarian leaves any note you can see where it is,
+  and files it once it's out of sight, so nothing moves under your eyes.
+- **Turn off what you don't use in the sidebar.** Settings → Appearance →
+  Sidebar has a switch for Notes, Chat, and Breve, and a choice of which one
+  Rotli opens on (Notes unless you pick another). At least one stays on, and
+  with only one on the switcher at the top of the sidebar goes away. The
+  Home segment is now called Notes.
+- **The thank-you card is tidier.** Its share buttons sit on the same row as
+  Take the tour, and Star and Share wear GitHub's and X's marks.
+- **Settings feels more connected.** Each choice is now one joined control
+  instead of separate buttons, dropdowns match it, and clouds and birds drift
+  in the page's side margins.
+
+- **Dates from the slash menu.** Type `/today`, `/yesterday`, or `/tomorrow`
+  to write the date into a note, even in the middle of a sentence. In a
+  template, the same commands leave a placeholder, so a daily template shows
+  the day you use it rather than the day you wrote it.
+- **Continue a project list.** A new Function command: pick a note that holds
+  a project's tasks, such as "Bug fixes". While any of its tasks is open, Rotli
+  links that note. Once they are all done, it starts the next note in the
+  series ("Bug fixes 4"), linked back to the last one and filed beside it, and
+  links that instead.
+- **Link note can make the note.** Type a title that doesn't exist yet and
+  choose **Create** to make that note and link it in one step.
+
+- **Settings comes alive.** Every Settings pane now opens on a banner in your
+  theme's scenery with your quokka in it, holding something for that pane: a
+  signpost for General, keycaps for Keybindings, a palette and easel for
+  Appearance, books for the Librarian, a shield for Security, sparkles for AI
+  Models, the lighthouse for About, and more. It changes with your theme,
+  light and dark.
+- **A scene when every tab is closed.** The empty pane now shows a small scene
+  that matches your theme, with your own quokka in it: Rottnest's lighthouse
+  at golden hour, a writing desk, low tide, the gum trees, an iris field at
+  dusk, a blossom branch, or stargazing on a Midnight night. It follows light
+  and dark, moves gently (not with Reduce motion on), and quietly links to
+  rotli.co and Rotli's source.
+
+### Changed
+
+- **A shorter Welcome tutorial.** A new vault's Welcome folder now holds three
+  lessons instead of nine: **Writing** (formatting, tasks, results, choices,
+  switches, tables, code), **Organizing and finding** (links, views, files),
+  and **AI and privacy**, with the launch checklist folded into the welcome
+  note. A vault that already has the old lessons keeps them.
+- **Connected models always have the web.** Claude, Codex, Cursor and
+  Antigravity can search and read the web in every chat, the way they can in
+  a terminal, with no globe to turn on. The globe now matters only for the
+  on-device model. A secure chat still has no web for any model, and searches
+  still go through the provider you chose in Settings → Connections.
+- **Claude chat talks to Claude Code the way T3 Code and the Agent SDK do.**
+  A Claude turn is now one Claude Code session that calls Rotli's tools
+  directly, instead of a new process per step that wrote its tool calls as
+  JSON text. Rotli still decides every tool call: Claude Code's own tools stay
+  off, and each tool's input and output pass the same secret and secure-note
+  checks as before. Image turns, presets, and the other models work as they
+  did. ([ADR](docs/decisions/2026-09-28-claude-native-agent-protocol.md))
+- **Rename in place.** Rename… on a folder or note in the sidebar now edits
+  its row where it sits, the way a code editor renames a file: the field is
+  the row's own size, a folder's notes stay in view below it, Enter saves and
+  Escape keeps the old name. A document, sheet, or board's field holds its
+  name without the extension. Renaming from a tab still opens the small
+  Rename dialog. Renaming a folder used to hide everything inside it while you
+  typed.
+
+- **AI no longer rewrites notes you wrote.** Chat, agents and the Librarian
+  may change the text of a note an AI made, but a note you wrote (every
+  note from before this release included) stays yours until you turn on
+  **Let AI edit the text** in its menu. Lock still blocks everything. Rotli
+  now records which AI made a note, and a chat attached to one of your notes
+  keeps its conversation notes in a note of its own instead of writing into
+  yours. Filing a note moves it into its area without changing a character
+  of its text.
+
+### Fixed
+
+- A new board from `/board` works again: type its name in the picker and
+  choose **Create "name"**. Boards are named before they're made, and the
+  picker used to try without a name and fail.
+
+- What's new no longer appears right after setup. It's for updates, and setup
+  is a first run. Stopping music just as it starts no longer leaves it playing,
+  or quietly turns it off for next time.
+- Settings uses one width for every pane, and the quokka companion's preview
+  sits at the top, beside its choices.
+
+- In a short window, a setup step taller than the window now says "Scroll
+  for more", as the model step already did. In dark themes, the clouds in the
+  scenery no longer disappear into the background.
+- Setup's theme cards show both color swatches for every family, not just
+  Rotli and Paper & Charcoal. Grove's trees now have trunks, and Blossom's
+  flowers and Iris's stars are easier to see, in Settings too.
+
+- The slash menu and its pickers now scroll with the arrow keys, so the
+  highlighted row never sits out of sight. In a short window they fit the
+  room they have instead of running off the bottom, and arrowing through them
+  no longer scrolls the note underneath. Note pickers no longer show a note's
+  internal id beside its title. Pickers have a × to close them,
+  and closing one with Esc or the × puts your cursor back in the note.
+
+- **A new tab's note stays in the folder you're in.** With a note from a Main
+  folder open, ⌘T (or the tab strip's +) used to file the new note at the top
+  of Main, because the new tab had already taken focus when Rotli looked for
+  the folder. It now lands in the same folder as the note you were in.
+- **A slash command's panel closes when you click away.** After choosing an
+  Insert item that opens a panel (Link note, Link chat, Template, Board,
+  Sheet, Document, Generate image), clicking back into the note or pressing
+  Escape now closes it; before, it stayed on screen.
+- **The Quick Note's scroll-to-top arrow is small and out of the way.** In the
+  Quick Note window the big arrow rose over your text beside the format bar;
+  it's now a compact button tucked into the corner beside the bar.
+- **Claude models show their names again.** The model picker listed Claude
+  Code's models by their descriptions ("For complex work and everyday tasks",
+  "For your toughest challenges") instead of their names, because the current
+  Claude Code reports each model's name in a different place. They read
+  "Claude Opus 5.5", "Claude Fable 5.1", "Claude Haiku 4.5" again, and older
+  Claude Code versions still work. Rotli Web gets the fix with the next Rotli
+  Helper.
+- **Claude stops refusing ordinary chats.** Rotli asked connected models to
+  write their reasoning into every reply and then fed it back on the next step,
+  the pattern Claude's safeguards flag as reasoning extraction. Claude, Codex
+  and the other connected models now get only the tools, the rules and what
+  each step found; they reason on their own. The on-device model keeps its
+  short checkpoints. A reply that failed (a ⚠ notice) and the message it
+  answered are no longer sent back to the model, so one blocked turn can't
+  keep blocking the rest of the chat. When Claude's safety filter does block
+  a reply, the chat says so in one plain sentence instead of the raw API
+  error, and Rotli doesn't retry on its own, because a blocked request still
+  counts toward your plan.
+- **Chat can read links into apps that route after "#".** A link like
+  studio.rotli.co/#/piece/… only ever fetched the app's empty "Loading…"
+  page, because nothing after "#" reaches the server. Rotli now also tries
+  that route as a page on the same site and reads whichever says more.
+- **An attached image stays in view for the whole reply.** A model that
+  looked something up first used to lose the picture and answer "I couldn't
+  see the image"; the image now rides every step of the turn.
+- **A link no longer makes Rotli ask which format you want.** "Write me a
+  bio" next to a Google Docs link used to trigger the Word-or-Markdown
+  question, because "document" appeared in the URL.
+- **Chat messages no longer disappear.** An error reply now stays in the chat
+  after a reload instead of living only on screen. A reply that arrived while
+  Rotli was still saving a new chat's details could lose the race and vanish;
+  it now re-reads the chat and saves again.
+- **Chat says when a web page couldn't be read.** Some pages draw everything
+  with JavaScript, so a fetch only gets an empty shell ("Loading…"). When
+  neither the page nor its #-route yields more than that shell, the model is
+  told so and says it couldn't read the page instead of reviewing a blank one.
+
 ## [1.6.0] - 2026-09-28
 
 ### Added

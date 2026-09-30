@@ -4,12 +4,8 @@ import { readFileSync } from "node:fs";
 const characterSource = readFileSync(new URL("character.tsx", import.meta.url), "utf8");
 const artSource = readFileSync(new URL("characterArt.ts", import.meta.url), "utf8");
 const settingsSource = readFileSync(new URL("settingsSurface.tsx", import.meta.url), "utf8");
-const setupSideFriendsSource = readFileSync(
-  new URL("onboarding/setupSideFriends.tsx", import.meta.url),
-  "utf8",
-);
 const chatSource = readFileSync(new URL("chat/chatSurface.tsx", import.meta.url), "utf8");
-const paneSource = readFileSync(new URL("paneTree.tsx", import.meta.url), "utf8");
+const paneSource = readFileSync(new URL("paneEmptyState.tsx", import.meta.url), "utf8");
 const bucketHatFrontInk = readFileSync(
   new URL("../assets/characters/accessories/bucket-hat-ink.svg", import.meta.url),
   "utf8",
@@ -69,15 +65,15 @@ describe("quokka personalization", () => {
     // Calm = the preferred idle pose; Lively keeps chatWelcomeCharacter's
     // time-of-day pose (personalIdle used to override it, 2026-09-01)
     expect(chatSource).toContain('personalIdle={pristineChat && chatWelcomeStyle === "calm"}');
-    expect(paneSource).toContain('className="be-quokka" accessorized');
+    // the empty pane's scene always shows the person's own quokka (2026-09-29)
+    expect(paneSource).toContain('className="be-quokka pane-scene-quokka"');
+    expect(paneSource).toMatch(/pane-scene-quokka"\s+accessorized\s+alwaysVisible/);
   });
 
   test("small ambient characters use one crisp semantic line presentation", () => {
     expect(characterSource).toContain('appearance?: "personalized" | "quiet-line"');
     expect(characterSource).toContain('quietLine ? "line"');
     expect(characterSource).toContain('quietLine ? "none"');
-    expect(settingsSource).toContain('className="set-paneaccent" appearance="quiet-line"');
-    expect(setupSideFriendsSource.match(/appearance="quiet-line"/g)).toHaveLength(4);
   });
 
   test("bucket-hat angles expose one visible front brim without a rear arc across the face", () => {

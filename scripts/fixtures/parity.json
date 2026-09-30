@@ -64,7 +64,8 @@
         "secure",
         "localAiAllowed",
         "pinned",
-        "fields"
+        "fields",
+        "aiBodyEdit"
       ]
     },
     "keychainService": {
@@ -368,6 +369,87 @@
             "crème"
           ],
           "secure": true
+        }
+      ]
+    },
+    "aiCreators": {
+      "sourceOfTruth": "src/lib/aiEditPolicy.ts AI_CREATORS ↔ src-tauri/src/ai_edit_policy.rs AI_CREATORS (the note creators whose notes an AI may edit without a grant)",
+      "value": [
+        "chat",
+        "agent",
+        "librarian"
+      ]
+    },
+    "aiBodyEditCases": {
+      "sourceOfTruth": "src/lib/aiEditPolicy.ts bodyEdit ↔ src-tauri/src/ai_edit_policy.rs body_edit (behavioral: both run these cases through their own implementation)",
+      "value": [
+        {
+          "fields": [],
+          "verdict": "person-written"
+        },
+        {
+          "fields": [
+            "tags: []",
+            "area: Projects"
+          ],
+          "verdict": "person-written"
+        },
+        {
+          "fields": [
+            "created_by: chat"
+          ],
+          "verdict": "allowed"
+        },
+        {
+          "fields": [
+            "created_by: agent"
+          ],
+          "verdict": "allowed"
+        },
+        {
+          "fields": [
+            "created_by: librarian"
+          ],
+          "verdict": "allowed"
+        },
+        {
+          "fields": [
+            "created_by: someone-else"
+          ],
+          "verdict": "person-written"
+        },
+        {
+          "fields": [
+            "created_by: chat",
+            "ai_edit: false"
+          ],
+          "verdict": "revoked"
+        },
+        {
+          "fields": [
+            "ai_edit: true"
+          ],
+          "verdict": "allowed"
+        },
+        {
+          "fields": [
+            "ai_edit: yes"
+          ],
+          "verdict": "revoked"
+        },
+        {
+          "fields": [
+            "created_by: chat",
+            "ai_edit: true",
+            "locked: true"
+          ],
+          "verdict": "locked"
+        },
+        {
+          "fields": [
+            "locked: true"
+          ],
+          "verdict": "locked"
         }
       ]
     }

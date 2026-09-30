@@ -13,6 +13,7 @@
 //! so the vetting and the connect use the same addresses (no DNS-rebinding
 //! TOCTOU), with manual same-host redirects on top.
 
+use crate::web_page::{hash_route_page, script_shell_notice};
 use std::io::Read;
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::time::Duration;
@@ -192,6 +193,33 @@ fn web_fetch_blocking(url: &str, max_chars: Option<usize>) -> Result<String, Str
         return Err("blocked: that URL looks like it contains a secret — not fetching it.".into());
     }
     let cap = max_chars.unwrap_or(8000).clamp(500, 20_000);
+    let (text, notice) = fetch_text(url)?;
+    // A hash-routed app (`https://site/#/piece/x`) never sends its route to
+    // the server, so the fetch above sees only the app's empty shell. Try the
+    // same route as a path on the same site; a site that serves a real page
+    // there (a static per-route export, server rendering) becomes readable.
+    // The longer text wins, so a site without such pages loses nothing.
+    if let Some(page) = vet_fetch_url(url).ok().and_then(|u| hash_route_page(&u)) {
+        if let Ok((routed, _)) = fetch_text(page.as_str()) {
+            if routed.chars().count() > text.chars().count() {
+                return Ok(truncate_chars(
+                    &format!("(read from {page}, the page this link's #-route names)\n{routed}"),
+                    cap,
+                ));
+            }
+        }
+    }
+    // the shell is what the model gets: say so, so it doesn't review a page it never saw
+    let text = truncate_chars(&text, cap);
+    Ok(match notice {
+        Some(notice) => format!("{notice}\n\n{text}"),
+        None => text,
+    })
+}
+
+/// One vetted GET (SSRF-checked, redirect-capped, size-capped) as readable
+/// text, plus a notice when the page is only a script-drawn shell.
+fn fetch_text(url: &str) -> Result<(String, Option<String>), String> {
     let mut current = vet_fetch_url(url)?;
     let first_host = current.host_str().unwrap_or_default().to_ascii_lowercase();
     let mut hops = 0u32;
@@ -216,13 +244,15 @@ fn web_fetch_blocking(url: &str, max_chars: Option<usize>) -> Result<String, Str
         current = vet_redirect(&current, &loc, &first_host)?;
     };
     let buf = read_capped(resp.into_reader())?;
-    let text = html_to_text(&String::from_utf8_lossy(&buf));
-    Ok(truncate_chars(&text, cap))
+    let html = String::from_utf8_lossy(&buf);
+    let text = html_to_text(&html);
+    let notice = script_shell_notice(url, &html, &text);
+    Ok((text, notice))
 }
 
 // ── HTML → text ───────────────────────────────────────────────────────────────
 
-fn html_to_text(html: &str) -> String {
+pub(crate) fn html_to_text(html: &str) -> String {
     static SCRIPT: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
     static STYLE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
     static BLOCKS: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();

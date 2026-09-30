@@ -12,6 +12,7 @@
 // set_summon_shortcut, and click-away hiding is a setting (set_hide_on_blur)
 // so heavy use can keep the window resident.
 
+mod ai_edit_policy;
 mod app_settings;
 mod board;
 mod breve;
@@ -50,6 +51,9 @@ mod quick_window;
 mod vault_marker;
 mod provider;
 mod provider_lane; mod provider_models;
+mod child_run;
+mod claude_protocol;
+mod claude_session;
 mod remote_agent;
 mod routines;
 mod search_index; mod search_match;
@@ -59,6 +63,7 @@ mod usage;
 mod vault_browser;
 mod vault_location;
 mod web;
+mod web_page;
 mod web_search;
 mod workspace;
 mod workspace_help;
@@ -2246,6 +2251,7 @@ pub fn run() {
         .manage(memex::FolderAuthorizations::default())
         .manage(vault_browser::VaultBrowserState::default())
         .manage(provider::ProviderState::default())
+        .manage(claude_session::SessionState::default())
         .manage(localmodel::LocalModelState::default())
         .manage(compute::ComputeState::default())
         .manage(remote_agent::RemoteAgentState::default())
@@ -2335,6 +2341,7 @@ pub fn run() {
             corpus::corpus_raw_frontmatter,
             corpus::corpus_write_frontmatter_raw,
             corpus::corpus_set_locked,
+            corpus::corpus_set_ai_edit,
             corpus::corpus_set_pinned,
             corpus::corpus_set_field,
             corpus::corpus_set_ai_field,
@@ -2389,6 +2396,8 @@ pub fn run() {
             provider::cli_detect, provider_models::cli_models,
             provider::cli_complete,
             provider::cli_cancel,
+            claude_session::claude_session_run,
+            claude_session::claude_session_tool_result,
             provider::antigravity::antigravity_manage,
             provider::generate_image,
             usage::model_usage,
@@ -2415,9 +2424,10 @@ pub fn run() {
             organizer::organizer_stop,
             organizer::organizer_set_brain,
             organizer::organizer_set_trust,
+            organizer::organizer_set_visible,
             organizer::organizer_learn_field,
-            organizer::organizer_secure_hints,
-            organizer::organizer_dismiss_secure,
+            organizer::secure::organizer_secure_hints,
+            organizer::secure::organizer_dismiss_secure,
             web_search::web_search,
             web::web_fetch,
             web::open_url,

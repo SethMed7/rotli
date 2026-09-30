@@ -46,6 +46,7 @@ import { workbookToCsv } from "../sheets/view";
 import { usePanesStore } from "../state/panes";
 import { artifactFileName, editableDocumentText } from "./artifacts";
 import { contextWindowFor } from "./budget";
+import { aiEditBlock, UNREADABLE_PROTECTION } from "./editGate";
 import { endpointIsLocal, looksSecret, modelIsOnDevice } from "./guard";
 import { normalizeGeneratedImageLinks } from "./imageLinks";
 import { DEFAULT_WEB_SEARCH_PROVIDER, type WebSearchProvider } from "./searchProvider";
@@ -292,6 +293,7 @@ export function makeTauriHost(
         isSmart: true,
         localFallback: "Inbox",
         body: markdown,
+        createdBy: "chat",
         ...(opts?.artifactRootId ? { rootId: opts.artifactRootId } : {}),
         ...(secure ? { secure: true } : {}),
       });
@@ -357,21 +359,10 @@ export function makeTauriHost(
       // secure-context check below (Greptile PR #19: the second fetch doubled
       // the IPC hop on exactly the "edit a private note" path). Unknowable =
       // secure AND locked — fail closed on both axes.
-      let frontmatter: Awaited<ReturnType<typeof corpusFrontmatter>> | null = null;
-      let frontmatterUnknown = false;
-      try {
-        frontmatter = await corpusFrontmatter(id);
-      } catch {
-        frontmatterUnknown = true;
-      }
-      // LOCKED is an EDIT control that binds EVERY model class — "local" buys
-      // visibility, never edit authority (the maintainer, 2026-08-01). Rust refuses this
-      // again inside corpus_write_ai; neither layer trusts the other.
-      if (frontmatterUnknown || !frontmatter || frontmatter.locked === true) {
-        return frontmatterUnknown || !frontmatter
-          ? "blocked: this note's protection state couldn't be read, so it can't be edited."
-          : "blocked: this note is locked — no AI may edit it. The user can unlock it from the note's menu.";
-      }
+      const frontmatter = await corpusFrontmatter(id).catch(() => null);
+      // unreadable, LOCKED, or a person's note without a grant (editGate.ts)
+      const editBlock = aiEditBlock(frontmatter);
+      if (editBlock || !frontmatter) return editBlock ?? UNREADABLE_PROTECTION;
       if (opts?.onSecureNoteRead && frontmatter.secure === true) {
         opts.onSecureNoteRead();
       }
@@ -561,6 +552,7 @@ export function makeTauriHost(
           localFallback: "Inbox",
           body: `${heading}${content}\n`.replace(/\n+$/, "\n"),
           rootId,
+          createdBy: "chat",
         });
         await registerPopulatedManagedItem({ id: sourceId, kind: "markdown" });
         await opts.onArtifactCreated?.({

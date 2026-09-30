@@ -1,4 +1,4 @@
-//! The Welcome folder: the root welcome note plus nine Markdown lessons that
+//! The Welcome folder: the root welcome note plus three Markdown lessons that
 //! live in the vault as ordinary notes. Vault creation and Settings → Open
 //! welcome folder both seed them through `seed_welcome`, which reuses intact
 //! lessons by exact title and never overwrites a user's edits: a found note is
@@ -155,21 +155,20 @@ mod tests {
     use crate::memex::scaffold_memex;
 
     #[test]
-    fn the_catalog_is_the_welcome_note_plus_nine_lessons_with_the_promoted_grammar() {
-        assert_eq!(lessons().len(), 9);
+    fn the_catalog_is_the_welcome_note_plus_three_lessons_with_the_promoted_grammar() {
+        assert_eq!(lessons().len(), 3);
         assert!(welcome_body().starts_with("# Welcome to Rotli\n"));
         assert!(welcome_body().contains("## Guided lessons"));
         assert!(!welcome_body().contains("⌘S"));
         assert!(welcome_body()
             .contains("2. Press **⌘T** to create a note, or **⌘N** to choose what a new tab becomes."));
-        let controls = &lessons()[2].body;
+        let controls = &lessons()[0].body;
         assert!(controls.contains("- [#x] Medium"));
         assert!(controls.contains("- [##?] What belongs in the first release?"));
         assert!(controls.contains("- [True:green|x False:red] Ready to share"));
         assert!(controls.contains("- [:blue|:green] A color-only switch"));
-        let tables = &lessons()[3].body;
-        assert!(tables.starts_with("# Tables and code\n"));
-        assert!(tables.contains("`[#]`"));
+        assert!(controls.starts_with("# Writing\n"));
+        assert!(controls.contains("`[#]`"));
         for lesson in lessons() {
             assert!(!lesson.body.contains("Playground"), "{}", lesson.filename);
         }

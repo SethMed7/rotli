@@ -5,6 +5,7 @@
 import { dispatch } from "../../keys/registry";
 import type { Hidden } from "../../lib/hideable";
 import { DEST } from "../../services/destinations";
+import { useFrontOn } from "../../state/fronts";
 import { useHidden } from "../../state/hidden";
 import { ALL_NOTES, TASKS, useUiStore } from "../../state/ui";
 import { FileGlyph, TaskGlyph } from "../glyphs";
@@ -59,6 +60,7 @@ export function HomeShortcuts({
   rowFor: (row: RovingRow) => RovingRowProps;
 }) {
   const hidden = useHidden((s) => s.hidden);
+  const chatOn = useFrontOn("chat");
   const contentView = useUiStore((s) => s.contentView);
   const dashboardSection = useUiStore((s) => s.dashboardSection);
   const setDashboardSection = useUiStore((s) => s.setDashboardSection);
@@ -81,11 +83,14 @@ export function HomeShortcuts({
               <span>{dashboard.notes.newInRange} new</span>
               <span>{dashboard.notes.updatedInRange} updated</span>
             </>,
-            <>
-              <strong>Chats</strong>
-              <span>{dashboard.chat.activeInRange} active</span>
-              <span>{dashboard.chat.total} saved</span>
-            </>,
+            // Chat turned off (Settings → Sidebar): no Chats row
+            chatOn ? (
+              <>
+                <strong>Chats</strong>
+                <span>{dashboard.chat.activeInRange} active</span>
+                <span>{dashboard.chat.total} saved</span>
+              </>
+            ) : undefined,
           ]}
         />
       )}

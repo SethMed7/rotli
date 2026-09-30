@@ -13,7 +13,7 @@ test("a new vault's Tasks page and This week card count the Welcome lessons with
   await startWithVault(page);
 
   const week = page.getByRole("button", { name: "Open Rotli activity dashboard" });
-  await expect(week).toContainText(/10 new/);
+  await expect(week).toContainText(/4 new/);
 
   await page.locator("[role=option]", { hasText: "Tasks" }).first().click();
   const tasks = page.locator(".tasks-surface, [class*=tasks]").first();

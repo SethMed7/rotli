@@ -616,11 +616,50 @@
 .slashpicker {
   min-width: 260px;
   max-width: min(360px, 92vw);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* the rows scroll under a fixed search field and × */
+.slashpicker-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* the search field and the × that dismisses the picker (as Esc does) */
+.slashpicker-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 4px 6px;
+}
+.slashpicker-close {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: var(--r-control);
+  background: none;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.slashpicker-close:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.slashpicker-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 .slashpicker-input {
   display: block;
-  width: calc(100% - 8px);
-  margin: 2px 4px 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
   padding: 7px 10px;
   border: 1px solid var(--border);
   border-radius: var(--r-control);
@@ -798,6 +837,23 @@
    scrollTopLane.ts decides. */
 .editor[data-lift-scroll-top] .editor-scroll-top {
   bottom: 66px;
+}
+/* the Quick Note's small window: a compact arrow tucked in the corner beside
+   the bar (scrollTopLane.ts QUICK_LANE_PX), not a big box over the text */
+.quick-window .editor-scroll-top {
+  right: 10px;
+  bottom: 22px;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-control);
+  color: var(--text-muted);
+}
+.quick-window .editor-scroll-top svg {
+  width: 13px;
+  height: 13px;
+}
+.quick-window .editor[data-lift-scroll-top] .editor-scroll-top {
+  bottom: 58px;
 }
 
 /* Raw Markdown is an intentional source editor, not an unstyled fallback.

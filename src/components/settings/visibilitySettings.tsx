@@ -3,7 +3,7 @@
 // chrome in src/lib/hideable.ts, grouped by where it sits. Each description
 // says how to reach it without the button, so hiding never removes anything.
 
-import { LAUNCH_FEATURES, PLATFORM } from "../../lib/featurePolicy";
+import { PLATFORM } from "../../lib/featurePolicy";
 import { HIDEABLE, type HideId, type Hidden, hideDescription } from "../../lib/hideable";
 import { SHOW_HOTKEYS } from "../../lib/hotkeyHint";
 import { showEverything, useHidden } from "../../state/hidden";
@@ -15,11 +15,10 @@ type Item = (typeof HIDEABLE)[number];
  * way into the palette (⌘K belongs to the browser there), so neither is offered. */
 const WEB_KEEPS: readonly HideId[] = ["browserButton", "search"];
 
-/** The items this build has (Breve only where it ships). */
-export function visibilityItems(platform = PLATFORM, breve = LAUNCH_FEATURES.breve): readonly Item[] {
-  return HIDEABLE.filter(
-    (item) => (item.id !== "breve" || breve) && (platform !== "web" || !WEB_KEEPS.includes(item.id)),
-  );
+/** The items this build has. (Breve's switch moved to Sidebar: each front
+ * turns on and off there, frontsSettings.tsx.) */
+export function visibilityItems(platform = PLATFORM): readonly Item[] {
+  return HIDEABLE.filter((item) => platform !== "web" || !WEB_KEEPS.includes(item.id));
 }
 
 const ITEMS = visibilityItems();

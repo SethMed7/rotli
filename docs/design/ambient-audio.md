@@ -25,6 +25,25 @@ again. With the setting off, the player shows only while something plays."
 - **Settings → General → Ambient audio**: the switch, and the six tracks to
   pick from. Turning it on starts the track that sounds like the current theme
   family (unless one was picked before).
+- **Volume** (the owner, 2026-09-30: "a way to pause or change volume … they
+  might want it enabled but not listen to it now, or it's too high"). The
+  studio track plays at the saved `volume` (0–1, default 0.4, the old fixed
+  level; an older settings file without it reads as 0.4). A quiet slider sits
+  under the tracks in Settings and on setup's Sound step. Moving it fades to the
+  new level. Claude FM plays in its own page at that page's volume, so it gets
+  no slider.
+- **Setup previews, then plays** (the owner, 2026-09-30: "offer play buttons
+  for them to preview, but the actual audio won't start till they finish
+  onboarding"). The Sound step's Studio music and Claude FM cards each carry a
+  small round preview button. During setup only a preview sounds
+  (`useAmbientPreview`); choosing music doesn't start it, and a preview stops
+  with the step. The music you picked starts the moment setup finishes, as
+  `ambientNow` in `services/ambient.ts` switches from preview-only to the
+  ordinary rules.
+- A `play()` interrupted before it begins (an `AbortError`) is not a refusal:
+  it leaves the saved "playing" preference alone, and a resolved `play()`
+  re-applies the rules rather than fading up regardless (a stop during
+  start-up used to leave the track playing).
 
 ## The rules (`src/lib/ambient.ts`, `playerView`)
 

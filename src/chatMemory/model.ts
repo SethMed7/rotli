@@ -1,3 +1,5 @@
+import type { AiBodyEdit } from "../lib/aiEditPolicy";
+
 /** The managed section is a plain HEADING now — HTML comment markers rendered
  * as literal cruft in the editor and the note read like a machine's transcript
  * (the maintainer, 2026-07-29: notes "as if this was a convo and we were taking notes"). */
@@ -171,4 +173,20 @@ export function pickChatNote(
   const linked = matches.filter((match) => match.linksChat);
   const pool = linked.length > 0 ? linked : matches;
   return [...pool].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0]!.id;
+}
+
+/** Which note a chat's `memoryNote` pointer names, when its stem matches more
+ * than one (the chat's own note and an older note titled the same). The
+ * chat's writable note wins, newest first; a chat note the person turned AI
+ * editing off on comes next, so their "off" holds; a note a person wrote is
+ * never the chat's memory note (2026-09-29). */
+export function pickMemoryNote(
+  matches: readonly { id: string; updatedAt?: number; verdict: AiBodyEdit }[],
+): string | null {
+  const newest = (pool: typeof matches) =>
+    [...pool].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0]?.id ?? null;
+  return (
+    newest(matches.filter((m) => m.verdict === "allowed")) ??
+    newest(matches.filter((m) => m.verdict === "revoked"))
+  );
 }

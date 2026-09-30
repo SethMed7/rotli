@@ -74,6 +74,7 @@ import { APP_SETTINGS_KEYS } from "./appSettingsKeys";
 import { persistableChatMap, rescopeChatMapKeys } from "./chatMapKeys";
 import { useChatWindowStore } from "./chatWindowStore";
 import { withDetachedChats } from "./chatWindowTabs";
+import { landingFront } from "./fronts";
 import { helperLinked } from "./helperLink";
 import { useLibrarianRules } from "./librarianRules";
 import { hydrateMain, useMainStore } from "./main";
@@ -791,8 +792,7 @@ function applySettings(s: PersistedSettings): void {
     sidebarCollapsed: s.sidebarCollapsed,
     sidebarWidth: s.sidebarWidth,
     sidebarZoom: s.sidebarZoom,
-    sidebarMode: s.sidebarMode,
-    sidebarView: s.sidebarView,
+    ...landingFront(), // Rotli opens on the chosen home front (2026-09-30)
     breveView: s.breveView,
     expandedDests: s.expandedDests,
   });

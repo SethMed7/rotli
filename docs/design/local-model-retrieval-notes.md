@@ -45,6 +45,13 @@ re-enters the prompt, and never emitted as an `AgentEvent` or persisted as chat
 content. Each checkpoint also records the remaining-step count at the time it
 was made so the scratch remains append-only and prompt-cache safe.
 
+That checkpoint is the on-device lane's alone (2026-09-29). The frontier
+adapter (Claude, Codex, and the other connected lanes) neither asks for a
+`thought` nor replays one: those models reason natively, and a prompt that
+makes them write reasoning into the reply and feeds it back is the shape
+Claude's `reasoning_extraction` safeguard refuses. Their scratch is ACTION +
+RESULT only; `parseAction` still tolerates a stray `thought`.
+
 Citation validation now normalizes grouped source ids to the supported
 `[S1][S2]` form and applies one deliberately narrow semantic check without
 another generation: a cited date/time/timezone tuple must occur together in a

@@ -4,6 +4,7 @@
 // picked a LOCAL folder, which is always respected. One place so every new-note
 // entry point (⌘N, the + menu, …) routes identically.
 
+import type { NoteCreator } from "../lib/aiEditPolicy";
 import { CORPUS_INSTANCE_ID, activeInstance, isWritable } from "../memex/config";
 import { loadConfig, writeNote } from "../memex/service";
 import { creationIsSecure, isSecureNotesFolder } from "../security/secureNotes";
@@ -76,6 +77,8 @@ export interface RoutedCreate {
   /** Pin model/tool-created work to the chat's registered root instead of
    * consulting ambient UI selection again after an asynchronous run. */
   rootId?: string;
+  /** Which AI is making the note (`created_by`). Absent for a person. */
+  createdBy?: NoteCreator;
 }
 
 /** Resolve an explicit root capability without falling back to ambient UI
@@ -108,6 +111,7 @@ export async function createRoutedNote(opts: RoutedCreate): Promise<string> {
       body,
       secure,
       shelf: route.shelf ?? opts.shelf ?? [],
+      ...(opts.createdBy ? { createdBy: opts.createdBy } : {}),
     });
     // open the new note via the active root's wire prefix: BARE for a memex CORPUS
     // (the default root), `<id>:` for a connected brain (e.g. `vault:`).
@@ -116,6 +120,7 @@ export async function createRoutedNote(opts: RoutedCreate): Promise<string> {
   }
   const note = await notesService.createNote(route.kind === "local" ? route.folder : localFallback, body, {
     secure,
+    ...(opts.createdBy ? { createdBy: opts.createdBy } : {}),
   });
   return note.id;
 }

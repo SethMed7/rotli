@@ -117,6 +117,14 @@ export function endpointIsLocal(endpoint: string): boolean {
 /** Frontend fail-closed mirror for retrieval filtering. A localhost proxy for
  * any frontier provider is still remote AI, so endpoint locality alone is not
  * enough. Rust validates the model against the registry at the read boundary. */
+/** Whether a chat turn gets the web tools (the owner, 2026-09-29): connected
+ * models always do, as in a terminal; the on-device model only with the
+ * chat's globe on; nobody when secure content is in the chat or the turn. */
+export function webForTurn(turn: { secure: boolean; onDevice: boolean; globe: boolean }): boolean {
+  if (turn.secure) return false;
+  return turn.onDevice ? turn.globe : true;
+}
+
 export function modelIsOnDevice(model: { provider: string; endpoint: string }): boolean {
   return (
     endpointIsLocal(model.endpoint) &&

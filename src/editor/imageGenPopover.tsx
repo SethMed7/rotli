@@ -1,6 +1,10 @@
 // /image-gen is retained as an honest unavailable state while connected cloud
 // providers are paused. The native command independently refuses execution.
 
+import { useRef } from "react";
+
+import { useTransientPopover } from "../lib/popover";
+
 /** No subscription-authenticated image engine may be offered, even when stale
  * settings and a locally installed CLI both claim it is ready. */
 export function readyImageEngines(): never[] {
@@ -28,8 +32,12 @@ export function ImageGenPopover({
   onDone: (markdown: string) => void;
   onClose: () => void;
 }) {
+  // a click anywhere else, or Escape from the note, closes it too
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useTransientPopover([rootRef], true, onClose);
   return (
     <div
+      ref={rootRef}
       className="rotli-imagegen"
       role="dialog"
       aria-label="Generate image"

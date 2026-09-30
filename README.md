@@ -92,7 +92,7 @@ on-device models can, unless you turn that off.
 - **`⌘K`** finds every note, file, chat, and action. `⌘T` starts a note and
   `⌘N` chooses what a new tab becomes.
 - **Panes and tabs** split with `⌘D` and `⌘⇧D`; every hotkey can be rebound.
-- **The Welcome folder** holds nine short lessons, plus a guided tour of the
+- **The Welcome folder** holds three short lessons, plus a guided tour of the
   real controls. **Settings → General → Show me around** runs it again.
 
 Spreadsheets, Mermaid diagram tabs, and read-aloud are coming soon and are not

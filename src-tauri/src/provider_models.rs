@@ -152,22 +152,34 @@ fn finish(models: Vec<DiscoveredModel>) -> Result<Vec<DiscoveredModel>, String> 
 
 // ── parsers (pure) ────────────────────────────────────────────────────────────
 
-/// "Opus 5.5 with 1M context · Best for…" → "Claude Opus 5.5 (1M context)";
-/// the default entry reads "Claude Default · Opus 5.5 (1M context)".
+/// The model's name for a picker row. Two shapes of Claude Code report it:
+/// older ones put the versioned name before " · " in `description` ("Opus 5.5
+/// with 1M context · Best for…", with a bare "Opus" as `displayName`); current
+/// ones (2.1.28x) put it in `displayName` ("Opus 5.5") and only a pitch in
+/// `description` ("For complex work and everyday tasks"), which is never a
+/// name. The default entry reads "Claude Default · Opus 5.5 (1M context)", or
+/// just "Claude Default" when its model isn't named.
 pub(crate) fn claude_label(value: &str, display_name: &str, description: &str) -> String {
-    let head = description.split(" · ").next().unwrap_or_default().trim();
-    let head = if head.is_empty() { display_name.trim() } else { head };
-    let head = match head.split_once(" with ") {
-        Some((name, extra)) => format!("{name} ({extra})"),
-        None => head.to_string(),
-    };
-    let named = if head.starts_with("Claude") { head } else { format!("Claude {head}") };
-    let label = if value == CLAUDE_DEFAULT_ID {
-        format!("Claude Default · {}", named.trim_start_matches("Claude ").trim())
-    } else {
-        named
+    let from_description = description.split_once(" · ").map(|(name, _)| name.trim()).filter(|n| !n.is_empty());
+    let default = value == CLAUDE_DEFAULT_ID;
+    // the default's displayName is "Default (recommended)", not a model
+    let name = from_description.or_else(|| Some(display_name.trim()).filter(|n| !n.is_empty() && !default));
+    let label = match (default, name) {
+        (true, Some(name)) => format!("Claude Default · {}", model_name(name).trim_start_matches("Claude ").trim()),
+        (true, None) => "Claude Default".to_string(),
+        (false, Some(name)) => model_name(name),
+        (false, None) => value.to_string(),
     };
     clean_label(&label, value)
+}
+
+/// "Opus 5.5 with 1M context" → "Claude Opus 5.5 (1M context)".
+fn model_name(name: &str) -> String {
+    let name = match name.split_once(" with ") {
+        Some((model, extra)) => format!("{model} ({extra})"),
+        None => name.to_string(),
+    };
+    if name.starts_with("Claude") { name } else { format!("Claude {name}") }
 }
 
 /// One stdout line from the claude discovery spawn. `Some` once the line is

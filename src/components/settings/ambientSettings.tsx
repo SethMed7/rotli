@@ -3,6 +3,8 @@
 // playing a video (or any sound) takes over, and ambient comes back when it
 // stops (src/lib/ambient.ts).
 
+import type { CSSProperties } from "react";
+
 import {
   AMBIENT_SOURCES,
   type AmbientPrefs,
@@ -13,6 +15,7 @@ import {
 import { PLATFORM } from "../../lib/featurePolicy";
 import { useAmbient } from "../../state/ambient";
 import { useUiStore } from "../../state/ui";
+import { SpeakerGlyph } from "../glyphs";
 import { Seg } from "./seg";
 import { Toggle } from "./toggle";
 
@@ -23,6 +26,37 @@ export function toggledAmbient(prefs: AmbientPrefs, family: string): Partial<Amb
   if (prefs.enabled) return { enabled: false, playing: false };
   const track = prefs.track === DEFAULT_AMBIENT.track ? trackForFamily(family) : prefs.track;
   return { enabled: true, playing: true, track };
+}
+
+/** The studio track's volume: a quiet slider (Settings and setup's Sound
+ * step). Claude FM plays in its own page, at that page's volume. */
+export function AmbientVolume({
+  prefs,
+  setPrefs,
+  className = "ambient-volume",
+}: {
+  prefs: AmbientPrefs;
+  setPrefs: (change: Partial<AmbientPrefs>) => void;
+  className?: string;
+}) {
+  if (!prefs.enabled || isStream(prefs.track)) return null;
+  const percent = Math.round(prefs.volume * 100);
+  return (
+    <label className={className}>
+      <SpeakerGlyph size={13} />
+      <input
+        type="range"
+        className="volume-range"
+        style={{ "--fill": `${percent}%` } as CSSProperties}
+        min="0"
+        max="100"
+        step="5"
+        aria-label="Music volume"
+        value={percent}
+        onChange={(event) => setPrefs({ volume: Number(event.currentTarget.value) / 100 })}
+      />
+    </label>
+  );
 }
 
 export function AmbientSettings() {
@@ -63,6 +97,7 @@ export function AmbientSection({
           onPick={(track) => setPrefs({ track })}
         />
       )}
+      <AmbientVolume prefs={prefs} setPrefs={setPrefs} />
       {prefs.enabled && isStream(prefs.track) && (
         <p className="setnote">
           Claude FM is Anthropic’s live lo-fi stream on YouTube. It plays in a private browser page you don’t

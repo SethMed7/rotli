@@ -19,8 +19,9 @@ export function OverviewCard({
   current: boolean;
   onOpen: () => void;
   head: readonly [string, string];
-  /** The two rows' cells; the second row takes the chat tint. */
-  rows: readonly [ReactNode, ReactNode];
+  /** The rows' cells; the second (chat) row takes the chat tint, and is left
+   * out when Chat is turned off (Settings → Sidebar). */
+  rows: readonly [ReactNode, ReactNode?];
 }) {
   return (
     <button
@@ -35,7 +36,7 @@ export function OverviewCard({
         <span>{head[1]}&nbsp; ↗</span>
       </div>
       <div className="sb-home-dashboard-row">{rows[0]}</div>
-      <div className="sb-home-dashboard-row chat">{rows[1]}</div>
+      {rows[1] !== undefined && <div className="sb-home-dashboard-row chat">{rows[1]}</div>}
     </button>
   );
 }

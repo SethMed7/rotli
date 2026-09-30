@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { flatCssViolations } from "./design-system-policy.mjs";
+import { RADIAL_EXCEPTION, flatCssViolations } from "./design-system-policy.mjs";
 
 describe("flat CSS policy", () => {
   test.each([
@@ -29,6 +29,12 @@ describe("flat CSS policy", () => {
     ).toEqual([
       "src/styles/example.css: radial gradients are forbidden; use a solid semantic surface or scrim",
     ]);
+  });
+
+  test("allows radial gradients only in the theme orbs' own file", () => {
+    const orb = ".setup-orb { background: radial-gradient(circle, var(--orb-accent), transparent); }";
+    expect(flatCssViolations(orb, RADIAL_EXCEPTION)).toEqual([]);
+    expect(flatCssViolations(orb, "src/styles/onboarding.css")).toHaveLength(1);
   });
 
   test("rejects resuming animation against the idle pause", () => {

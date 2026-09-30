@@ -20,7 +20,7 @@
 //!     `file_note`) — no new write lane, so the user/Filer territories stay
 //!     exactly as contract v3.7 drew them.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
@@ -189,6 +189,11 @@ pub(crate) struct OrganizerInner {
     /// adoption rule as `settings_trust`, for the same debounce race.
     settings_brain: Mutex<Option<bool>>,
     status: Mutex<StatusSnapshot>,
+    /// Notes showing in the sidebar's Vault view right now (the owner,
+    /// 2026-09-30: "if it's visible anywhere, leave it; the moment it isn't
+    /// visible in the left menu, move it"). State keys (`state_key`); empty
+    /// unless the Vault view is on, so Main users see no change.
+    visible: Mutex<HashSet<String>>,
     /// Whether the worker thread was spawned (false = no memex corpus).
     running: AtomicBool,
     /// The Settings "Run now" nudge — bypasses quiet/idle/AC/thermal, never chat.
@@ -271,6 +276,7 @@ impl OrganizerHandle {
             brain_off: AtomicBool::new(false),
             settings_brain: Mutex::new(None),
             status: Mutex::new(StatusSnapshot::default()),
+            visible: Mutex::new(HashSet::new()),
             running: AtomicBool::new(false),
             run_now: AtomicBool::new(false),
             stop_now: AtomicBool::new(false),
@@ -571,10 +577,18 @@ enum Skip {
     Locked,
     Secure,
     Quiet,
+    /// Showing in the sidebar's Vault view: filing it would move it under the
+    /// person's eyes, so it waits until it scrolls out of sight (requeue).
+    Visible,
     Unchanged,
 }
 
-fn skip_reason(s: &NoteSnapshot, st: &OrganizerFile, quiet: Duration) -> Option<Skip> {
+fn skip_reason(
+    s: &NoteSnapshot,
+    st: &OrganizerFile,
+    quiet: Duration,
+    visible: &HashSet<String>,
+) -> Option<Skip> {
     if s.locked {
         return Some(Skip::Locked);
     }
@@ -583,6 +597,9 @@ fn skip_reason(s: &NoteSnapshot, st: &OrganizerFile, quiet: Duration) -> Option<
     }
     if s.mtime_age < quiet {
         return Some(Skip::Quiet);
+    }
+    if visible.contains(&state_key(s)) || visible.contains(&s.rel) {
+        return Some(Skip::Visible);
     }
     if classify_covered(s, st) && enrich_covered(s, st) {
         return Some(Skip::Unchanged);
@@ -1295,6 +1312,8 @@ pub(crate) fn run_cycle(
 
     let mut vocab: Option<Vec<(String, String)>> = None;
     let mut peers: Option<Vec<(String, String)>> = None; // enrich link haystack, once per cycle
+    // the Vault view's visible notes, read once per pass (empty in Main)
+    let visible = inner.visible.lock().unwrap().clone();
     'candidates: for rel in rels {
         // the Brain switch is LIVE per candidate too (pressure-test 2026-07-26:
         // a vault turned raw mid-cycle must stop MODELING now, not after the
@@ -1329,7 +1348,7 @@ pub(crate) fn run_cycle(
             inner.status.lock().unwrap().secure_pending.remove(&rel);
             continue;
         };
-        match skip_reason(&snap, &state, knobs.quiet) {
+        match skip_reason(&snap, &state, knobs.quiet, &visible) {
             Some(Skip::Secure) => {
                 // counted + remembered for the §4.2.3 "review them yourself"
                 // line — never modeled, never proposed with content, at any
@@ -1358,8 +1377,9 @@ pub(crate) fn run_cycle(
                         report.locked_skipped += 1;
                         continue;
                     }
-                    Some(Skip::Quiet) => {
-                        // being actively typed — requeue, never file under the cursor
+                    Some(Skip::Quiet) | Some(Skip::Visible) => {
+                        // being actively typed, or showing in the Vault view —
+                        // requeue, never move a note under the person's eyes
                         inner.queue.lock().unwrap().insert(rel, Instant::now());
                         report.requeued += 1;
                         continue;
@@ -2530,6 +2550,20 @@ pub fn organizer_set_brain(
     Ok(())
 }
 
+/// The notes showing in the sidebar's Vault view right now (state keys: a
+/// note's frontmatter id, else its path). The daemon leaves them where they are
+/// until they're out of sight; an empty list (Main, or nothing showing) lets
+/// everything file as before. Memory only, replaced on every call.
+#[tauri::command]
+pub fn organizer_set_visible(
+    state: tauri::State<OrganizerState>,
+    ids: Vec<String>,
+) -> Result<(), String> {
+    let inner = &state.0 .0;
+    *inner.visible.lock().unwrap() = ids.into_iter().collect();
+    Ok(())
+}
+
 /// Immediate in-memory trust flip; the frontend persists the same value into
 /// settings.json, which the daemon re-reads each cycle as the backstop.
 #[tauri::command]
@@ -2583,114 +2617,12 @@ pub fn organizer_learn_field(
     learn_field(&state, &note, &key, &value)
 }
 
-// ─── the secure review lane (feature B, decision 2026-07-22) ─────────────────
+// ─── the secure review lane (feature B, 2026-07-22): organizer_secure.rs ─────
 
-/// One "review this" row for the Activity pane — a note the daemon skipped as
-/// secure. `flagged` = the explicit frontmatter flag (already protected; the
-/// repair/passive lanes own those) vs detector-only (the confirm lane: the
-/// detector proposes, the user disposes — nothing is ever auto-marked here).
-/// `title` is for the user's own local UI, exactly like the sidebar shows it;
-/// nothing from this payload is journaled or sent anywhere.
-#[derive(serde::Serialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct SecureHint {
-    pub rel: String,
-    pub title: String,
-    pub flagged: bool,
-}
-
-/// The current review rows, RE-VALIDATED fresh per call: each pending rel is
-/// re-snapshotted, entries that stopped looking secure (or vanished) drop out.
-pub(crate) fn secure_hints(
-    corpus_state: &CorpusState,
-    handle: &OrganizerHandle,
-) -> Result<Vec<SecureHint>, String> {
-    let pending: Vec<String> = handle
-        .0
-        .status
-        .lock()
-        .unwrap()
-        .secure_pending
-        .iter()
-        .cloned()
-        .collect();
-    if pending.is_empty() {
-        return Ok(Vec::new());
-    }
-    let root_id = corpus_state.default_root_id()?;
-    corpus_state.route(&root_id, |s| {
-        let root = s.root().to_path_buf();
-        let mut out = Vec::new();
-        for rel in &pending {
-            // the set only ever holds our own sweep rels, but the IPC boundary
-            // re-checks anyway — dot components (../) never touch the fs
-            if !candidate_rel(rel) {
-                continue;
-            }
-            let Ok(snap) = snapshot_note(&root, rel) else {
-                continue;
-            };
-            if !snap.secure {
-                continue; // cleaned since the last cycle — not review material
-            }
-            out.push(SecureHint {
-                rel: rel.clone(),
-                title: snap.title,
-                flagged: snap.secure_flagged,
-            });
-        }
-        Ok(out)
-    })
-}
-
-/// The user's "Not sensitive" answer for a detector-only note: persist the
-/// whole-file hash so this exact content is never re-nagged, and clear the row
-/// immediately. Refuses explicitly flagged notes (they are protected, not
-/// pending) and non-candidate rels. Same benign raciness as `learn_field`
-/// (#28): a mid-flight cycle may re-persist over this write — the failure mode
-/// is one extra nag next cycle, never corruption.
-pub(crate) fn dismiss_secure(
-    corpus_state: &CorpusState,
-    handle: &OrganizerHandle,
-    rel: &str,
-) -> Result<(), String> {
-    if !candidate_rel(rel) {
-        return Err(format!("not a reviewable note: {rel}"));
-    }
-    let root_id = corpus_state.default_root_id()?;
-    corpus_state.route(&root_id, |s| {
-        let root = s.root().to_path_buf();
-        let snap = snapshot_note(&root, rel)?;
-        if snap.secure_flagged {
-            return Err("This note is marked secure — unmark it from its own menu instead.".into());
-        }
-        let mut st = parse_state(&s.dot_read("organizer")?);
-        st.notes
-            .entry(state_key(&snap))
-            .or_default()
-            .secure_dismissed = snap.text_hash.clone();
-        s.dot_write("organizer", &state_pretty(&st))
-    })?;
-    handle.0.status.lock().unwrap().secure_pending.remove(rel);
-    Ok(())
-}
-
-#[tauri::command]
-pub fn organizer_secure_hints(
-    corpus: tauri::State<CorpusState>,
-    state: tauri::State<OrganizerState>,
-) -> Result<Vec<SecureHint>, String> {
-    secure_hints(&corpus, &state.0)
-}
-
-#[tauri::command]
-pub fn organizer_dismiss_secure(
-    corpus: tauri::State<CorpusState>,
-    state: tauri::State<OrganizerState>,
-    rel: String,
-) -> Result<(), String> {
-    dismiss_secure(&corpus, &state.0, &rel)
-}
+#[path = "organizer_secure.rs"]
+pub mod secure;
+#[cfg(test)]
+use secure::{dismiss_secure, secure_hints};
 
 // ─── tests ───────────────────────────────────────────────────────────────────
 
@@ -2916,24 +2848,35 @@ mod tests {
         let snap = |name: &str| snapshot_note(&root, &format!("wiki/_inbox/{name}")).unwrap();
 
         assert_eq!(
-            skip_reason(&snap("locked.md"), &st, quiet),
+            skip_reason(&snap("locked.md"), &st, quiet, &HashSet::new()),
             Some(Skip::Locked)
         );
         assert_eq!(
-            skip_reason(&snap("flagged.md"), &st, quiet),
+            skip_reason(&snap("flagged.md"), &st, quiet, &HashSet::new()),
             Some(Skip::Secure)
         );
         assert_eq!(
-            skip_reason(&snap("ssn.md"), &st, quiet),
+            skip_reason(&snap("ssn.md"), &st, quiet, &HashSet::new()),
             Some(Skip::Secure),
             "looks_secure on the raw bytes must flag an unflagged secret note"
         );
-        assert_eq!(skip_reason(&snap("plain.md"), &st, quiet), None);
+        assert_eq!(skip_reason(&snap("plain.md"), &st, quiet, &HashSet::new()), None);
         // quiet period: a just-written note is being typed — requeue, not model
         assert_eq!(
-            skip_reason(&snap("plain.md"), &st, Duration::from_secs(45)),
+            skip_reason(&snap("plain.md"), &st, Duration::from_secs(45), &HashSet::new()),
             Some(Skip::Quiet)
         );
+        // showing in the Vault view: requeue until it scrolls out of sight,
+        // matched by its state key (id, else path) or its path
+        let plain = snap("plain.md");
+        let seen: HashSet<String> = [state_key(&plain)].into_iter().collect();
+        assert_eq!(skip_reason(&plain, &st, quiet, &seen), Some(Skip::Visible));
+        let by_path: HashSet<String> = [plain.rel.clone()].into_iter().collect();
+        assert_eq!(skip_reason(&plain, &st, quiet, &by_path), Some(Skip::Visible));
+        // locked and secure still win: they are never modeled at all
+        let locked = snap("locked.md");
+        let locked_seen: HashSet<String> = [state_key(&locked)].into_iter().collect();
+        assert_eq!(skip_reason(&locked, &st, quiet, &locked_seen), Some(Skip::Locked));
         // unchanged: state covers BOTH jobs for this exact body
         let s = snap("plain.md");
         let mut st2 = OrganizerFile::default();
@@ -2948,7 +2891,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(skip_reason(&s, &st2, quiet), Some(Skip::Unchanged));
+        assert_eq!(skip_reason(&s, &st2, quiet, &HashSet::new()), Some(Skip::Unchanged));
         // classify covered but enrich NOT ⇒ still a candidate (Job B has work)
         let mut st2b = OrganizerFile::default();
         st2b.notes.insert(
@@ -2958,7 +2901,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(skip_reason(&s, &st2b, quiet), None);
+        assert_eq!(skip_reason(&s, &st2b, quiet, &HashSet::new()), None);
         // outstanding proposals for this hash also block re-proposing
         let mut st3 = OrganizerFile::default();
         st3.notes.insert(
@@ -2972,7 +2915,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_eq!(skip_reason(&s, &st3, quiet), Some(Skip::Unchanged));
+        assert_eq!(skip_reason(&s, &st3, quiet, &HashSet::new()), Some(Skip::Unchanged));
     }
 
     #[test]

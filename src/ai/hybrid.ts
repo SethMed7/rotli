@@ -7,6 +7,7 @@
 
 import type { ChatModelInfo } from "../lib/tauri";
 import { runAgent } from "./loop";
+import { isSafeguardBlock, modelErrorText } from "./modelError";
 import { type HybridPreset, PRESET_PREFIX, findModel } from "./models";
 import { extractJsonObject } from "./parse";
 import type { AgentEvent, Host, RunInput } from "./types";
@@ -128,7 +129,7 @@ export async function* runHybrid(
         }
       }
     } catch (e) {
-      final = `⚠ ${e instanceof Error ? e.message : String(e)}`;
+      final = `⚠ ${modelErrorText(e instanceof Error ? e.message : String(e))}`;
     }
     return { final, questioned: false };
   };
@@ -137,9 +138,11 @@ export async function* runHybrid(
   if (outcome.questioned) return;
   let final = outcome.final;
 
-  // 3) a failed executor gets ONE fallback; a second failure surfaces as-is
+  // 3) a failed executor gets ONE fallback; a second failure surfaces as-is.
+  // A provider safety block never does: it is billed and repeats on the same
+  // content, so the person decides what to change (modelError.ts).
   const fallback = preset.fallback ? byId.get(preset.fallback) : undefined;
-  if (final.startsWith("⚠") && fallback && fallback.id !== chosen.model.id) {
+  if (final.startsWith("⚠") && !isSafeguardBlock(final) && fallback && fallback.id !== chosen.model.id) {
     yield { type: "status", text: `falling back to ${fallback.label}…` };
     outcome = yield* runOn(fallback, input.userText);
     if (outcome.questioned) return;
