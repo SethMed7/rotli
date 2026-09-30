@@ -32,13 +32,18 @@ again. With the setting off, the player shows only while something plays."
   under the tracks in Settings and on setup's Sound step. Moving it fades to the
   new level. Claude FM plays in its own page at that page's volume, so it gets
   no slider.
-- **Setup's player** (the owner, 2026-09-30: "mimic what we have in the
-  sidebar, something that moves through the next steps with you, in one of the
-  corners"). Once music is on, from the Sound step through where notes live
-  and the model step, a small pill in the top-right corner
-  (`onboarding/setupPlayer.tsx`) shows the track, previous and next (not for
-  Claude FM, a live stream), pause, and the volume slider. Pausing keeps the
-  music chosen and just stops it for now.
+- **Setup previews, then plays** (the owner, 2026-09-30: "offer play buttons
+  for them to preview, but the actual audio won't start till they finish
+  onboarding"). The Sound step's Studio music and Claude FM cards each carry a
+  small round preview button. During setup only a preview sounds
+  (`useAmbientPreview`); choosing music doesn't start it, and a preview stops
+  with the step. The music you picked starts the moment setup finishes, as
+  `ambientNow` in `services/ambient.ts` switches from preview-only to the
+  ordinary rules.
+- A `play()` interrupted before it begins (an `AbortError`) is not a refusal:
+  it leaves the saved "playing" preference alone, and a resolved `play()`
+  re-applies the rules rather than fading up regardless (a stop during
+  start-up used to leave the track playing).
 
 ## The rules (`src/lib/ambient.ts`, `playerView`)
 

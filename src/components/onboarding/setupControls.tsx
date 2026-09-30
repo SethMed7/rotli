@@ -8,6 +8,9 @@ export interface SetupOption<T extends string> {
   title: string;
   description?: string;
   detail?: ReactNode;
+  /** A control of its own at the card's corner (the Sound step's preview):
+   * beside the card's button, never inside it. */
+  action?: ReactNode;
 }
 
 export function setupChoiceIndex(
@@ -97,7 +100,7 @@ export function SetupChoiceGroup<T extends string>({
     <div ref={groupRef} className="setup-options" role="radiogroup" aria-label={label} onKeyDown={onKeyDown}>
       {options.map((option, index) => {
         const selected = option.value === value;
-        return (
+        const card = (
           <button
             type="button"
             role="radio"
@@ -114,6 +117,13 @@ export function SetupChoiceGroup<T extends string>({
             {option.description && <span className="setup-option-description">{option.description}</span>}
             {option.detail && <span className="setup-option-detail">{option.detail}</span>}
           </button>
+        );
+        if (!option.action) return card;
+        return (
+          <div className="setup-option-cell" key={option.value}>
+            {card}
+            <span className="setup-option-action">{option.action}</span>
+          </div>
         );
       })}
     </div>

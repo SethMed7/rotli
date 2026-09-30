@@ -12,10 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Music volume, and a player that comes with you through setup.** The
-  studio music has a volume slider in Settings → Ambient audio. Once you turn
-  music on during setup, a small player sits in the top corner for the rest of
-  it: previous, pause, next, and volume.
+- **Music volume, and previews in setup.** The studio music has a volume
+  slider in Settings → Ambient audio. During setup, each music choice has a
+  play button to hear it first. What you pick starts once setup is done.
+- **Rotli opens with a moment of its own.** Every launch opens on a short
+  scene in your theme with your quokka. Any key or click skips it, and it
+  doesn't play with Reduce motion on.
 - **First run comes alive.** Setup opens on a short island intro: Rottnest
   rises out of the sea, the lighthouse turns, and your quokka hops onto the
   sand. Any key or click skips it, and it doesn't play with Reduce motion on.
@@ -104,6 +106,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of its text.
 
 ### Fixed
+
+- What's new no longer appears right after setup. It's for updates, and setup
+  is a first run. Stopping music just as it starts no longer leaves it playing,
+  or quietly turns it off for next time.
+- Settings uses one width for every pane, and the quokka companion's preview
+  sits at the top, beside its choices.
 
 - In a short window, a setup step taller than the window now says "Scroll
   for more", as the model step already did. In dark themes, the clouds in the

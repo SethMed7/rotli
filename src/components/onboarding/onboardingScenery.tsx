@@ -9,7 +9,7 @@
 // The horizon is ground BELOW the setup card, never art behind its footer.
 // Like every scene, painted only by `.sc-*` token classes.
 
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import { type ThemeFamily, useUiStore } from "../../state/ui";
 import { Character } from "../character";
@@ -135,11 +135,27 @@ export function introWanted(welcome: boolean): boolean {
   return welcome && !prefersReducedMotion();
 }
 
-/** The 1.7-second opening: the island rises out of the sea, the lighthouse
- * turns, the quokka hops onto the sand where Welcome's quokka stands, and the
- * scene opens onto setup. Any key or click skips it; it never takes pointer
- * input, so setup is usable underneath. */
-export function OnboardingIntro({ onDone }: { onDone: () => void }) {
+/** An opening scene over the app (first run's island intro, and the app's
+ * opening on every launch, appOpening.tsx): the scene rises, the quokka hops
+ * onto its ground, the word appears, then it gives way. Any key or click skips
+ * it; it never takes pointer input, so what's underneath is usable. */
+export function SceneIntro({
+  art,
+  viewBox,
+  onDone,
+  testId,
+  scene = false,
+  accessorized = false,
+}: {
+  art: ReactNode;
+  viewBox: string;
+  onDone: () => void;
+  testId: string;
+  /** A theme's small scene (440×200) rather than the wide island. */
+  scene?: boolean;
+  /** Wear the person's chosen accessory (the app's opening; first run is bare). */
+  accessorized?: boolean;
+}) {
   const [leaving, setLeaving] = useState(false);
   useEffect(() => {
     const leave = window.setTimeout(() => setLeaving(true), INTRO_MS - 520);
@@ -156,19 +172,40 @@ export function OnboardingIntro({ onDone }: { onDone: () => void }) {
   }, [onDone]);
   return (
     <div
-      className={leaving ? "onb-intro is-leaving" : "onb-intro"}
-      data-testid="onboarding-intro"
+      className={["onb-intro", scene && "onb-intro--scene", leaving && "is-leaving"]
+        .filter(Boolean)
+        .join(" ")}
+      data-testid={testId}
       aria-hidden="true"
     >
       <div className="onb-intro-stage">
-        <svg className="onb-intro-island" viewBox="0 0 1200 240" focusable="false">
-          {ISLAND_SCENE}
+        <svg className="onb-intro-island" viewBox={viewBox} focusable="false">
+          {art}
         </svg>
         <span className="onb-intro-quokka">
-          <Character name="waving" size={96} accessorized={false} alwaysVisible />
+          <Character name="waving" size={96} accessorized={accessorized} alwaysVisible />
         </span>
       </div>
       <p className="onb-intro-word">Rotli</p>
     </div>
   );
 }
+
+/** The app opened in this launch already (first run's intro, or the opening):
+ * shown once per launch, never twice. On the window, so a development hot
+ * update doesn't replay it. */
+const opening = globalThis as { __rotliOpened?: boolean };
+export const openedThisLaunch = (): boolean => opening.__rotliOpened === true;
+export function markOpened(): void {
+  opening.__rotliOpened = true;
+}
+
+/** First run's 1.7-second opening: the island rises out of the sea, the
+ * lighthouse turns, the quokka hops onto the sand where Welcome's quokka
+ * stands, and the scene opens onto setup. */
+export function OnboardingIntro({ onDone }: { onDone: () => void }) {
+  useEffect(markOpened, []);
+  return <SceneIntro art={ISLAND_SCENE} viewBox="0 0 1200 240" onDone={onDone} testId="onboarding-intro" />;
+}
+
+export { ISLAND_SCENE, prefersReducedMotion };

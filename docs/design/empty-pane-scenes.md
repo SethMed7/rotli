@@ -83,6 +83,13 @@ match what they chose." (`src/components/onboarding/onboardingScenery.tsx`)
   its background, then setup fades in and its step rises. Any key or click
   skips it, it never takes pointer input, and it doesn't play under Reduce
   motion.
+- **The app's opening** (the owner, 2026-09-30: "the animation should be there
+  when someone opens the app fresh, even if onboarding is done").
+  `onboarding/appOpening.tsx` plays the same kind of opening once per launch of
+  the Mac app, in the person's theme: the island for Rotli, the family's empty-
+  pane scene otherwise, with their dressed quokka. It never plays right after
+  first run's intro, and never with Reduce motion on. `?opening` shows it in
+  the browser twin.
 - **Welcome is the island** in Rotli Light, the environment every first run
   opens in.
 - **After that, the chosen theme.** From Appearance on, the backdrop is the

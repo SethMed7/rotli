@@ -17,7 +17,6 @@ import { requestVaultFolder } from "../../state/vaultFolderBrowser";
 import { Character } from "../character";
 import { OnboardingScenery } from "./onboardingScenery";
 import { SetupBack, SetupChoiceGroup, SetupPrimary } from "./setupControls";
-import { SetupPlayer } from "./setupPlayer";
 
 type Stage = "choose" | "create" | "scanning" | "review";
 
@@ -177,7 +176,6 @@ export function VaultActivation({
     <div className="onb vault-activation">
       <div className="onb-drag" data-tauri-drag-region />
       <OnboardingScenery />
-      {onboarding && <SetupPlayer />}
       <section className="setup-shell" aria-labelledby="vault-title">
         <div className="setup-progress">
           <span>{onboarding ? `${ONBOARDING_STEP_NUMBER.vault} of ${ONBOARDING_TOTAL_STEPS}` : "Vault"}</span>

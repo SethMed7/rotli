@@ -62,38 +62,72 @@ test("Welcome previews the island once: in the corner on short windows, on the h
   await expect(sky).toBeHidden();
 });
 
-test("music gets a small player in the corner that stays through the rest of setup", async ({ page }) => {
+/** The one ambient element's state (services/ambient.ts keeps it on the window). */
+const ambientAudio = (page: import("@playwright/test").Page) =>
+  page.evaluate(() => {
+    const audio = (globalThis as { __rotliAmbientAudio?: HTMLAudioElement }).__rotliAmbientAudio;
+    return audio ? { playing: !audio.paused, src: audio.src } : null;
+  });
+
+test("setup's music only previews; what you pick starts once setup is done", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/?onboarding");
   await page.getByRole("button", { name: "Get started" }).click();
-  const player = page.getByRole("region", { name: "Music", exact: true });
-  await expect(player).toHaveCount(0); // before the Sound step, and with nothing chosen
   for (const _ of [1, 2]) await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { name: "Music while you write?" })).toBeVisible();
-  await expect(player).toHaveCount(0); // Quiet
   const music = page.getByRole("radiogroup", { name: "Music" });
+  // picking it doesn't start it
   await music.getByRole("radio", { name: /^Studio music/ }).click();
-  await expect(player).toBeVisible();
-  // pause keeps the music chosen, just not playing now
-  await player.getByRole("button", { name: "Pause music" }).click();
-  await expect(player.getByRole("button", { name: "Play music" })).toBeVisible();
   await expect(music.getByRole("radio", { name: /^Studio music/ })).toHaveAttribute("aria-checked", "true");
-  const volume = player.getByRole("slider", { name: "Music volume" });
-  await volume.fill("20");
-  await expect(volume).toHaveValue("20");
-  // Claude FM plays in its own page: no skipping, no volume of Rotli's
-  await music.getByRole("radio", { name: /^Claude FM/ }).click();
-  await expect(music.getByRole("radio", { name: /^Claude FM/ })).toHaveAttribute("aria-checked", "true");
-  await expect(player).toContainText("Claude FM");
-  await expect(player.getByRole("slider", { name: "Music volume" })).toHaveCount(0);
-  await expect(player.getByRole("button", { name: "Next track" })).toHaveCount(0);
-  await music.getByRole("radio", { name: /^Studio music/ }).click();
-  // it comes along: Shortcuts, then where notes live
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(player.getByRole("button", { name: "Next track" })).toBeVisible();
+  await page.waitForTimeout(400);
+  expect((await ambientAudio(page))?.playing ?? false).toBe(false);
+  // its card's own play button previews it, and stops it
+  const studioPreview = () => page.getByRole("button", { name: /^(Preview|Stop previewing) Linen$/ });
+  const playing = async () => (await ambientAudio(page))?.playing ?? false;
+  await studioPreview().click();
+  await expect(studioPreview()).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(playing).toBe(true);
+  await studioPreview().click();
+  await expect(studioPreview()).toHaveAttribute("aria-pressed", "false");
+  await expect.poll(playing).toBe(false);
+  // a preview left playing stops with the step
+  await studioPreview().click();
+  await expect.poll(playing).toBe(true);
+  await page.getByRole("button", { name: /^Continue/ }).click();
+  await expect(page.getByRole("heading", { name: /Three shortcuts/ })).toBeVisible();
+  await expect.poll(playing).toBe(false);
+  // no corner player anywhere in setup
+  await expect(page.getByRole("region", { name: "Music", exact: true })).toHaveCount(0);
+
+  // finish setup: the music picked starts
   await page.getByRole("button", { name: "Choose where notes live" }).click();
-  await expect(page.getByRole("heading", { name: "Where should your notes live?" })).toBeVisible();
-  await expect(player).toBeVisible();
+  await page.getByRole("button", { name: "Choose an empty folder" }).click();
+  await page.getByRole("button", { name: "New folder", exact: true }).click();
+  await page.getByLabel("New folder name").fill("Music Vault");
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await page.getByRole("button", { name: "Use empty folder", exact: true }).click();
+  await page.getByRole("button", { name: /^Create vault/ }).click();
+  await page.getByRole("button", { name: "Skip model setup" }).click();
+  await expect.poll(playing, { timeout: 8000 }).toBe(true);
+});
+
+test("the app opens on its opening scene each launch, in the person's theme", async ({ page }) => {
+  await page.goto("/?opening");
+  const opening = page.getByTestId("app-opening");
+  await expect(opening).toBeVisible();
+  await expect(opening).toHaveCount(0, { timeout: 4000 });
+  // a key skips it at once
+  await page.goto("/?opening");
+  await expect(page.getByTestId("app-opening")).toBeVisible();
+  await page.keyboard.press("Shift");
+  await expect(page.getByTestId("app-opening")).toHaveCount(0, { timeout: 500 });
+});
+
+test("no opening with Reduce motion on", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/?opening");
+  await page.getByRole("tablist").waitFor();
+  await expect(page.getByTestId("app-opening")).toHaveCount(0);
 });
 
 test("a step taller than a short window says there's more below", async ({ page }) => {

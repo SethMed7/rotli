@@ -41,7 +41,6 @@ import { chatMark } from "../sidebar/chatMark";
 import { ModelLogo } from "../sidebar/modelLogo";
 import { OnboardingScenery } from "./onboardingScenery";
 import { SetupBack, SetupPrimary } from "./setupControls";
-import { SetupPlayer } from "./setupPlayer";
 import { SetupScrollCue, useStageScrollCue } from "./setupScrollCue";
 
 const CONNECTED_PROVIDERS = [
@@ -203,7 +202,6 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
     <div className="onb model-setup">
       <div className="onb-drag" data-tauri-drag-region />
       <OnboardingScenery />
-      <SetupPlayer />
       <section className="setup-shell" aria-labelledby="model-setup-title">
         <div className="setup-progress">
           <span>

@@ -93,6 +93,12 @@ export function whatsNewDecision(input: {
   onboardingVersion: string;
   notes: WhatsNew;
 }): { version: string | null; record: boolean } {
+  // What's new is for an update; onboarding is a first run. Set up on this
+  // very version (just now, or a re-run of setup), there is nothing "new" to
+  // show — the two never land together (the owner, 2026-09-30)
+  if (input.onboarded && input.onboardingVersion === input.current) {
+    return { version: null, record: input.lastSeen !== input.current };
+  }
   if (input.lastSeen) {
     return {
       version: unseenRelease(input.notes, input.lastSeen, input.current),

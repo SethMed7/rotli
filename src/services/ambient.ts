@@ -13,8 +13,10 @@
 // - the player's buttons, which show their result at once and let the next
 //   answer confirm it (the owner, 2026-09-28: play and pause felt laggy).
 
-import { ambientSrc, CLAUDE_FM, isStream, playerView, stepTrack } from "../lib/ambient";
+import { type AmbientPrefs, ambientSrc, CLAUDE_FM, isStream, playerView, stepTrack } from "../lib/ambient";
+import { setupShows } from "../lib/reviewMode";
 import {
+  isTauri,
   privateBrowserClose,
   privateBrowserCreate,
   privateBrowserMedia,
@@ -23,7 +25,14 @@ import {
   type TabMediaAction,
   type TabMediaState,
 } from "../lib/tauri";
-import { forgetTabMedia, setInAppMedia, setTabMedia, useAmbient, useTabMedia } from "../state/ambient";
+import {
+  forgetTabMedia,
+  setInAppMedia,
+  setTabMedia,
+  useAmbient,
+  useAmbientPreview,
+  useTabMedia,
+} from "../state/ambient";
 import { useMediaDock } from "../state/mediaDock";
 import { usePanesStore } from "../state/panes";
 import { leaves } from "../state/paneTree";
@@ -114,11 +123,21 @@ function reconcileFm(wantsPlay: boolean, force = false): void {
 
 // ── the rules, applied ─────────────────────────────────────────────────────
 
+/** What ambient does right now. Before setup is done only a preview from the
+ * Sound step sounds; the chosen music starts once setup finishes. */
+function ambientNow(): { prefs: AmbientPrefs; plays: boolean } {
+  const { prefs } = useAmbient.getState();
+  if (setupShows(isTauri(), import.meta.env.DEV, window.location.search, useUiStore.getState().onboarded)) {
+    const preview = useAmbientPreview.getState().track;
+    return { prefs: { ...prefs, enabled: !!preview, track: preview ?? prefs.track }, plays: !!preview };
+  }
+  const { media, recent, inApp } = useTabMedia.getState();
+  return { prefs, plays: playerView(prefs, media, recent, inApp).ambientPlays };
+}
+
 /** The ambient source sounds exactly when the rules say it should. */
 export function applyAmbient(): void {
-  const { prefs } = useAmbient.getState();
-  const { media, recent, inApp } = useTabMedia.getState();
-  const plays = playerView(prefs, media, recent, inApp).ambientPlays;
+  const { prefs, plays } = ambientNow();
   if (!prefs.enabled || !isStream(prefs.track)) closeFm();
   if (isStream(prefs.track) && prefs.enabled) {
     silenceTrack();
@@ -133,8 +152,18 @@ export function applyAmbient(): void {
   element.volume = FADE_IN_STEP;
   // a play the webview refuses (no gesture yet at launch) reads as paused
   element.play().then(
-    () => fadeTo(prefs.volume),
-    () => useAmbient.getState().setPrefs({ playing: false }),
+    // the rules may have changed while play() was starting (paused, a
+    // preview stopped, setup's step left): apply them again rather than fade
+    // up regardless — that race kept a stopped track playing (2026-09-30)
+    () => applyAmbient(),
+    (error: unknown) => {
+      // a play paused before it began (AbortError) was interrupted, not
+      // refused; and a setup preview never changes the saved preference
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      if (setupShows(isTauri(), import.meta.env.DEV, window.location.search, useUiStore.getState().onboarded))
+        return;
+      useAmbient.getState().setPrefs({ playing: false });
+    },
   );
 }
 
@@ -178,11 +207,7 @@ export async function pollTabMedia(): Promise<void> {
         )
       : Promise.resolve(),
   ]);
-  if (fmOpen) {
-    const { prefs } = useAmbient.getState();
-    const now = useTabMedia.getState();
-    reconcileFm(playerView(prefs, now.media, now.recent, now.inApp).ambientPlays);
-  }
+  if (fmOpen) reconcileFm(ambientNow().plays);
 }
 
 function busy(): boolean {
@@ -214,7 +239,15 @@ export function startAmbient(): () => void {
   forceCloseFm();
   closeOrphanedTuck();
   if (audio && !useAmbient.getState().prefs.playing) audio.pause();
-  const unsubscribe = [useAmbient.subscribe(applyAmbient), useTabMedia.subscribe(applyAmbient)];
+  const unsubscribe = [
+    useAmbient.subscribe(applyAmbient),
+    useTabMedia.subscribe(applyAmbient),
+    useAmbientPreview.subscribe(applyAmbient),
+    // finishing setup starts the music chosen in it
+    useUiStore.subscribe((state, prev) => {
+      if (state.onboarded !== prev.onboarded) applyAmbient();
+    }),
+  ];
   const events = ["play", "pause", "ended", "emptied", "volumechange"] as const;
   for (const name of events) document.addEventListener(name, checkInApp, true);
   // one question at a time: the next waits for this one's answers

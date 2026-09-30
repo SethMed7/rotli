@@ -809,7 +809,7 @@
   color: var(--text-muted);
   margin-top: 16px;
   line-height: 1.6;
-  max-width: 560px;
+  max-width: 640px;
 }
 /* The one caption for a capability this build names but withholds. */
 .set-soon {
@@ -838,7 +838,7 @@
   align-items: center;
   gap: 8px;
   margin: 8px 0 4px;
-  max-width: 560px;
+  max-width: 640px;
 }
 .aikey-input {
   flex: 1;
@@ -858,7 +858,7 @@
 .websearch-options {
   display: flex;
   flex-direction: column;
-  max-width: 560px;
+  max-width: 640px;
   margin: 14px 0 0;
   padding: 0;
   overflow: hidden;
@@ -867,7 +867,9 @@
   border-radius: var(--r-card);
 }
 .websearch-legend {
-  padding: 0 4px;
+  float: left;
+  width: 100%;
+  padding: 12px 15px 4px;
   font-size: var(--fs-label);
   color: var(--text-muted);
 }
@@ -916,7 +918,7 @@
   color: var(--text-muted);
 }
 .websearch-key {
-  max-width: 560px;
+  max-width: 640px;
   margin-top: 12px;
   padding: 12px 13px;
   background: var(--surface-2);
@@ -955,7 +957,7 @@
   flex-direction: column;
   gap: 8px;
   margin: 12px 0;
-  max-width: 560px;
+  max-width: 640px;
 }
 /* a preset card: name + actions up top, the readable route flow under it
    (the old one-line summary ellipsized into raw ids — the maintainer, 2026-07-02) */
@@ -1002,7 +1004,7 @@
   gap: 8px;
   margin: 10px 0;
   padding: 12px;
-  max-width: 560px;
+  max-width: 640px;
   border: 1px solid var(--border);
   border-radius: var(--r-card);
   background: var(--surface-2);
@@ -1062,7 +1064,7 @@
   text-transform: uppercase;
 }
 .provider-transparency .setnote {
-  max-width: 70ch;
+  max-width: none;
   line-height: 1.6;
 }
 .provider-transparency-links {
@@ -1081,7 +1083,7 @@
   gap: 16px;
 }
 .remote-agents-head .setnote {
-  max-width: 68ch;
+  max-width: none;
 }
 .remote-agents-field {
   display: grid;
@@ -1136,13 +1138,13 @@
   white-space: nowrap;
 }
 .remote-agents-boundary {
-  max-width: 68ch;
+  max-width: none;
   margin-top: 12px;
 }
 
 /* connected lanes — one card per provider */
 .ailane {
-  max-width: 560px;
+  max-width: 640px;
   margin: 12px 0;
   padding: 14px 16px;
   border: 1px solid var(--border);
@@ -1548,7 +1550,7 @@
   flex-direction: column;
   gap: 8px;
   margin: 14px 0;
-  max-width: 560px;
+  max-width: 640px;
 }
 .localmodel-row {
   display: flex;
@@ -1588,7 +1590,7 @@
   gap: 8px;
   margin: 12px 0;
   padding: 12px;
-  max-width: 560px;
+  max-width: 640px;
   border: 1px solid var(--border);
   border-radius: var(--r-card);
   background: var(--surface-2);
@@ -1614,7 +1616,7 @@
 
 /* hotkeys — the rebind list */
 .hkrows {
-  max-width: 560px;
+  max-width: 640px;
 }
 .hkrow {
   display: flex;
@@ -1821,6 +1823,7 @@
 .quokka-studio {
   display: grid;
   max-width: 640px;
+  margin-top: 12px;
   grid-template-columns: 210px minmax(0, 1fr);
   overflow: hidden;
   border: 1px solid var(--border);
@@ -1832,9 +1835,11 @@
   min-height: 318px;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* at the top, beside Body color — centred in a tall column the quokka sank
+     out of sight below the fold (the owner, 2026-09-30) */
+  justify-content: flex-start;
   gap: 12px;
-  padding: 20px;
+  padding: 28px 20px 20px;
   border-right: 1px solid var(--border);
   background: var(--surface-2);
   text-align: center;
@@ -1978,12 +1983,14 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 7px 9px;
+  padding: 5px 10px 5px 7px;
   border: 1px solid transparent;
   border-radius: var(--r-control);
   background: transparent;
   color: var(--text-muted);
   font: inherit;
+  /* the same scale as the body colors above it */
+  font-size: 11px;
   cursor: pointer;
 }
 .quokka-line-choice:hover {
@@ -1996,8 +2003,8 @@
   color: var(--text);
 }
 .quokka-line-choice > span {
-  width: 22px;
-  height: 22px;
+  width: 16px;
+  height: 16px;
   border: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
   border-radius: 50%;
 }
@@ -2462,8 +2469,10 @@
 
 /* ——— settings layout: cap + center the content so a wide window doesn't
    strand everything on the left (the maintainer, 2026-06-15) ——— */
+/* one column for every pane: text, cards, rows, and the banner all end at
+   the same edge (the owner, 2026-09-30: "a consistent width") */
 .set-body {
-  max-width: 720px;
+  max-width: 640px;
   margin: 0 auto;
 }
 
@@ -2680,12 +2689,20 @@
   flex-direction: column;
   gap: 10px;
   margin: 12px 0 4px;
-  max-width: 560px;
+  max-width: 640px;
 }
 .mprow {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+/* a subheading inside a pane's copy (Security's "What secure means") */
+.setsubhead {
+  display: block;
+  margin: 28px 0 4px;
+  font-size: 12.5px;
+  font-weight: var(--wght-label);
+  color: var(--text);
 }
 .mplabel {
   width: 86px;
@@ -2693,10 +2710,26 @@
   font-size: var(--fs-label);
   color: var(--text-muted);
 }
+.set-body > .mplabel,
+.set-body > section > .mplabel {
+  display: block;
+  width: auto;
+  margin: 18px 0 6px;
+}
+/* buttons side by side keep a gap */
+.ghostbtn + .ghostbtn {
+  margin-left: 8px;
+}
+/* a button row right under its paragraph gets room to breathe */
+.setnote + .ghostbtn,
+.lead + .ghostbtn {
+  margin-top: 14px;
+}
 /* a Settings choice is one connected control (the owner, 2026-09-30: "the
    buttons feel very disconnected"), the same pill as setup's Light/Dark/System */
 .segrow {
-  display: inline-flex;
+  /* block-level at its own width: a label written before it sits above it */
+  display: flex;
   flex-wrap: nowrap;
   width: max-content;
   max-width: 100%;
@@ -3745,6 +3778,7 @@
   align-items: center;
   gap: 6px;
   margin-top: 14px;
+  margin-right: 8px;
   text-decoration: none;
 }
 
@@ -3824,7 +3858,8 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-width: 34rem;
+  /* the settings column (2026-09-30: one width for every pane) */
+  max-width: 640px;
 }
 .rules-chips,
 .rules-rows {
