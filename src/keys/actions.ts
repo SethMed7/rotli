@@ -161,7 +161,7 @@ export function registerDefaultActions(): void {
 
   registerAction({
     id: "app.hide",
-    title: "Hide rotli",
+    title: "Hide Rotli",
     defaultChord: "Esc",
     run: () => {
       // Esc unwinds one layer at a time (quokka rule): topmost transient
@@ -193,7 +193,7 @@ export function registerDefaultActions(): void {
   // the maintainer's law (2026-06-12): ⌥Space opens the APP; capture has its own chord. —
   registerAction({
     id: "app.toggleWindow",
-    title: "Open or hide rotli",
+    title: "Open or hide Rotli",
     defaultChord: "Alt+Space",
     global: true,
     run: () => void toggleMainWindow(),

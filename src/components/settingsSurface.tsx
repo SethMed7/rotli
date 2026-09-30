@@ -346,11 +346,11 @@ function HotkeysPane() {
   return (
     <>
       <PaneHead title="Keybindings" char="notes" motif="hotkeys" />
-      <p className="lead">Every shortcut in rotli is yours to rebind. Click a chord, press the new keys.</p>
+      <p className="lead">Every shortcut in Rotli is yours to rebind. Click a chord, press the new keys.</p>
       <section className="hksection">
         <div className="hkhead">Hold ⌘</div>
         <p className="setnote">
-          Hold ⌘ for a moment and rotli shows you what you can press — as badges pinned to the controls
+          Hold ⌘ for a moment and Rotli shows you what you can press — as badges pinned to the controls
           themselves, or as one grouped list.
         </p>
         <Seg
@@ -473,7 +473,7 @@ function UpdatesSection() {
       <h4 className="sethead">Updates</h4>
       <div className="setselect-row">
         <span>
-          rotli {version}
+          Rotli {version}
           {state.kind === "current" && " — up to date"}
           {state.kind === "available" && ` — update available${state.version ? ` (v${state.version})` : ""}`}
         </span>
@@ -861,7 +861,7 @@ function GeneralPane() {
 
       <h4 className="sethead">Checkboxes</h4>
       <p className="lead">
-        A task can be in progress, not just done or not — write <code>- [/]</code> and rotli draws the box
+        A task can be in progress, not just done or not — write <code>- [/]</code> and Rotli draws the box
         half-filled. Choose what a <em>click</em> on the box does.
       </p>
       <Seg
@@ -885,7 +885,7 @@ function GeneralPane() {
       <h4 className="sethead">Demo mode</h4>
       <p className="lead">
         Switch to a separate demo library with sample content — for screenshots or trying things out. Your
-        real notes are never touched; toggling relaunches rotli.
+        real notes are never touched; toggling relaunches Rotli.
       </p>
       <Toggle
         on={demo}
@@ -1343,6 +1343,7 @@ function AppearancePane() {
             </div>
           </section>
 
+          <span className="setsubhead">Expressions it picks on its own</span>
           <div className="quokka-expression-strip" aria-label="Automatic quokka expressions">
             {(
               [
@@ -1661,7 +1662,7 @@ function LocationPane() {
       <p className="lead">
         Your <b>vault</b> is one folder of plain Markdown and conventional files on this Mac. Rotli adds its
         organization and retrieval layer without taking ownership; you choose whether the on-device Librarian
-        keeps it tidy. rotli never holds your notes hostage.
+        keeps it tidy. Rotli never holds your notes hostage.
       </p>
 
       {/* —— the one folder —— */}
@@ -1723,13 +1724,13 @@ function LocationPane() {
       {isDev && developmentReadOnly && (
         <p className="setnote">
           This production-selected vault is visible only so the development shell can boot. It stays
-          read-only. Create or open a vault in the setup screen to give <b>rotli (dev)</b> its own isolated
+          read-only. Create or open a vault in the setup screen to give <b>Rotli (dev)</b> its own isolated
           binding without changing production&rsquo;s choice.
         </p>
       )}
       {isDev && !developmentReadOnly && (
         <p className="setnote">
-          This folder is selected only for <b>rotli (dev)</b>. Its files are real and writable; production
+          This folder is selected only for <b>Rotli (dev)</b>. Its files are real and writable; production
           Rotli keeps its own vault binding. Development-only appearance and window state stay in the app
           cache.
         </p>
@@ -3126,12 +3127,12 @@ function SecurityPane() {
     <>
       <PaneHead title="Security" char="local" motif="security" />
       <p className="lead">
-        A <b>secure note</b> is one rotli treats as private from AI. Some notes become secure on their own —
+        A <b>secure note</b> is one Rotli treats as private from AI. Some notes become secure on their own —
         quick captures (<b>⌥C</b>) are secure at birth, and a note that looks like it holds a secret (an API
-        key, a card number) is flagged when rotli reads it. You can also mark any note secure yourself from
+        key, a card number) is flagged when Rotli reads it. You can also mark any note secure yourself from
         its metadata panel or the note menu.
       </p>
-      <span className="mplabel">What secure means</span>
+      <span className="setsubhead">What secure means</span>
       <p className="setnote">
         Secure notes live in <b>Secure notes</b> — a real folder in your vault (<code>wiki/_secure/</code>),
         not a hidden vault — and every one is kept out of git automatically.
@@ -3160,7 +3161,7 @@ function SecurityPane() {
         read it. It means <b>no AI may edit it</b>, ever, cloud or on-device. Secure hides; locked protects.
       </p>
       <p className="setnote">
-        <b>The Librarian never touches them.</b> rotli&rsquo;s organizer skips secure notes entirely — it
+        <b>The Librarian never touches them.</b> Rotli&rsquo;s organizer skips secure notes entirely — it
         doesn&rsquo;t read, move, or tag them, even when it&rsquo;s allowed to read other notes. It skips
         locked notes too.
       </p>
@@ -3169,13 +3170,13 @@ function SecurityPane() {
         card numbers (checksum-verified), SSNs — so no model ever reads a note to decide whether it&rsquo;s
         sensitive. A model reads a note only to organize or answer about it, and only the model you chose.
       </p>
-      <span className="mplabel">Leaving and repairs</span>
+      <span className="setsubhead">Leaving and repairs</span>
       <p className="setnote">
         Removing protection (from the note&rsquo;s menu or its shield control) moves the note back to where it
         lived before and lifts the git ignore — but only after the secret-looking content is gone.
       </p>
       <p className="setnote">
-        Older versions of rotli could leave a secure note sitting in intake instead of Secure notes. When
+        Older versions of Rotli could leave a secure note sitting in intake instead of Secure notes. When
         that&rsquo;s the case, <b>Librarian Activity</b> shows the affected notes and offers a one-click move
         into the protected folder — words untouched, nothing shown to any AI.
       </p>

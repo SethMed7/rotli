@@ -36,7 +36,6 @@ const ACCESSORY_HUE_CHOICES = [38, 225, 195, 145, 280, 340, 10] as const;
 import { AccentRow } from "../settingsSurface";
 import { OnboardingIntro, OnboardingScenery, introWanted } from "./onboardingScenery";
 import { setupChoiceIndex, SetupBack, SetupChoiceGroup, SetupPrimary } from "./setupControls";
-import { SetupPlayer } from "./setupPlayer";
 import { SetupScrollCue, useStageScrollCue } from "./setupScrollCue";
 import { SetupSound } from "./setupSound";
 
@@ -519,8 +518,6 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
           </div>
         </footer>
       </section>
-      {/* the music player joins at the Sound step and stays */}
-      {index >= STEPS.indexOf("sound") && <SetupPlayer />}
       {intro && <OnboardingIntro onDone={endIntro} />}
     </div>
   );

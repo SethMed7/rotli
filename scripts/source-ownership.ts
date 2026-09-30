@@ -197,6 +197,7 @@ export const SERVICE_FILE_OWNERS = {
   "tasksView.ts": "tasks projection",
   "vaultSwitcher.ts": "vault lifecycle",
   "viewTree.ts": "named-view projection",
+  "appOpening.ts": "onboarding",
   "vaultTree.ts": "Vault view projection",
   "vaultVisibility.ts": "librarian",
 } as const;

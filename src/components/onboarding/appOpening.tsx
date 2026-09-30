@@ -1,0 +1,47 @@
+// The app's opening (the owner, 2026-09-30: "make sure the animation is there
+// when someone opens the app fresh, even if onboarding is done — like an app
+// opening animation"). Once per launch of the Mac app, in the person's own
+// theme: Rotli's island for Rotli, the family's own scene otherwise (the empty
+// pane's scenes), with their quokka as they dressed it. Never right after first
+// run's own intro, and not with Reduce motion on. `?opening` shows it in the
+// browser twin (tests).
+
+import { useCallback, useEffect, useState } from "react";
+
+import { openingPlaysHere } from "../../services/appOpening";
+import { useUiStore } from "../../state/ui";
+import { PANE_SCENES } from "../paneEmptyScenes";
+import {
+  ISLAND_SCENE,
+  SceneIntro,
+  markOpened,
+  openedThisLaunch,
+  prefersReducedMotion,
+} from "./onboardingScenery";
+
+export function openingWanted(): boolean {
+  if (openedThisLaunch() || prefersReducedMotion()) return false;
+  return openingPlaysHere();
+}
+
+export function AppOpening() {
+  const [show, setShow] = useState(openingWanted);
+  const family = useUiStore((s) => s.themeFamily);
+  useEffect(markOpened, []);
+  const done = useCallback(() => setShow(false), []);
+  if (!show) return null;
+  if (family === "warm")
+    return (
+      <SceneIntro art={ISLAND_SCENE} viewBox="0 0 1200 240" onDone={done} testId="app-opening" accessorized />
+    );
+  return (
+    <SceneIntro
+      art={(PANE_SCENES[family] ?? PANE_SCENES.warm).art}
+      viewBox="0 0 440 200"
+      onDone={done}
+      testId="app-opening"
+      scene
+      accessorized
+    />
+  );
+}
