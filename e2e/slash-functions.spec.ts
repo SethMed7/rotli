@@ -149,3 +149,29 @@ test("in a short window the slash menu fits, and arrowing scrolls only the menu"
   expect(await scroller.evaluate((el) => el.scrollTop)).toBe(before);
   expect(await fits()).toBe(true);
 });
+
+// The recheck (2026-09-29): a menu that opens UPWARD near the bottom of a short
+// window slid under the tab strip — room was measured to the window's top, not
+// to the top of the note's own visible area.
+test("near the bottom of a short window the upward slash menu stays below the tab strip", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1100, height: 560 });
+  await gotoApp(page);
+  await newNote(page, `# Tall\n\n${Array.from({ length: 30 }, (_, i) => `Line ${i + 1}.`).join("\n\n")}\n\n`);
+  // the pane's body starts right under its tab strip
+  const body = page.locator(".pane.focused .pane-body");
+  await page.keyboard.type("/");
+  const menu = page.getByRole("menu", { name: "Insert block" });
+  await expect(menu).toBeVisible();
+  await expect(page.locator(".rotli-slash-anchor.up")).toHaveCount(1);
+  const area = await body.boundingBox();
+  const inside = async () => {
+    const r = await menu.boundingBox();
+    return !!r && !!area && r.y >= area.y - 1 && r.y + r.height <= area.y + area.height + 1;
+  };
+  expect(await inside()).toBe(true);
+  await page.keyboard.press("ArrowDown");
+  await expect(menu.locator(".slashrow.sel")).toBeInViewport();
+  expect(await inside()).toBe(true);
+});

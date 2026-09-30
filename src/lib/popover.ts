@@ -218,13 +218,30 @@ function sidePlacement(
 
 // ─── menus that open at the caret ────────────────────────────────────────────
 
-/** Cap a caret menu to the room between it and the window's edge on the side
- * it opens toward (`up`: its bottom sits on the caret row), so a short window
- * never pushes its rows out of reach. The cap never grows past `max`. */
+/** The visible band a caret menu may use: its nearest clipping or scrolling
+ * ancestor (the note's own area, below the tab strip), within the window. */
+function visibleBand(menu: HTMLElement): { top: number; bottom: number } {
+  let top = 0;
+  let bottom = window.innerHeight;
+  for (let el = menu.parentElement; el; el = el.parentElement) {
+    const { overflowY } = getComputedStyle(el);
+    if (overflowY === "visible") continue;
+    const box = el.getBoundingClientRect();
+    top = Math.max(top, box.top);
+    bottom = Math.min(bottom, box.bottom);
+    break;
+  }
+  return { top, bottom };
+}
+
+/** Cap a caret menu to the room between it and the edge of the visible band
+ * on the side it opens toward (`up`: its bottom sits on the caret row), so a
+ * short window never pushes its rows out of reach. Never grows past `max`. */
 export function fitMenuToWindow(menu: HTMLElement, up: boolean, max = 440, margin = 8): void {
   menu.style.maxHeight = "";
   const box = menu.getBoundingClientRect();
-  const room = up ? box.bottom - margin : window.innerHeight - box.top - margin;
+  const band = visibleBand(menu);
+  const room = up ? box.bottom - band.top - margin : band.bottom - box.top - margin;
   menu.style.maxHeight = `${Math.max(96, Math.min(max, room))}px`;
 }
 
