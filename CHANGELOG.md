@@ -107,6 +107,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A new board from `/board` works again: type its name in the picker and
+  choose **Create "name"**. Boards are named before they're made, and the
+  picker used to try without a name and fail.
+
 - What's new no longer appears right after setup. It's for updates, and setup
   is a first run. Stopping music just as it starts no longer leaves it playing,
   or quietly turns it off for next time.

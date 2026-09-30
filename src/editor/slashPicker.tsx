@@ -40,7 +40,15 @@ function filterNotes(notes: NoteSummary[], mode: SlashPickerMode, query: string)
   return pool.filter((n) => subsequenceMatch(q, n.title) || subsequenceMatch(q, n.id));
 }
 
-async function createEmbeddedItem(mode: SlashPickerMode): Promise<string | null> {
+/** The name a new item made from the picker takes: a board needs one (boards
+ * are named before they're created, #92) and takes what's typed in the
+ * picker's field; null = type it first. Other kinds name themselves. */
+export function embedCreateName(mode: SlashPickerMode, query: string): string | null | undefined {
+  if (mode !== "embedBoard") return undefined;
+  return query.trim() || null;
+}
+
+async function createEmbeddedItem(mode: SlashPickerMode, name?: string): Promise<string | null> {
   if (
     !isTauri() ||
     mode === "linkNote" ||
@@ -50,7 +58,7 @@ async function createEmbeddedItem(mode: SlashPickerMode): Promise<string | null>
   )
     return null;
   const kind = mode === "embedBoard" ? "board" : mode === "embedSheet" ? "sheet" : "document";
-  const item = await createManagedItem(kind, { open: false });
+  const item = await createManagedItem(kind, name ? { open: false, name } : { open: false });
   return item.id || null;
 }
 
@@ -144,6 +152,7 @@ export function SlashPicker({
   // Link note makes the note you typed when none has that title (the owner,
   // 2026-09-29: "create a new note where I just have to type first line")
   const newTitle = mode === "linkNote" ? query.trim() : "";
+  const boardName = embedCreateName(mode, query) ?? "";
   const titleTaken = items.some((n) => n.title.toLowerCase() === newTitle.toLowerCase());
   const supportsCreate =
     mode === "insertTemplate" ||
@@ -186,8 +195,15 @@ export function SlashPicker({
       }
       return;
     }
+    // a board is named first: what's typed in the field above (2026-09-30:
+    // "/board" → Create new failed with "a board needs a name")
+    const name = embedCreateName(mode, query);
+    if (name === null) {
+      setCreateError("Type the board’s name above, then choose Create.");
+      return;
+    }
     try {
-      const id = await createEmbeddedItem(mode);
+      const id = await createEmbeddedItem(mode, name);
       if (!id) return;
       onPick({
         id,
@@ -237,7 +253,11 @@ export function SlashPicker({
         <input
           className="slashpicker-input"
           type="search"
-          placeholder={`Search ${MODE_LABEL[mode].toLowerCase()}…`}
+          placeholder={
+            mode === "embedBoard"
+              ? "Search boards, or name a new one…"
+              : `Search ${MODE_LABEL[mode].toLowerCase()}…`
+          }
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -302,14 +322,18 @@ export function SlashPicker({
             <span className="slashglyph">
               <PlusGlyph size={15} />
             </span>
-            <span className="slashlabel">{newTitle ? `Create “${newTitle}”` : "Create new"}</span>
+            <span className="slashlabel">
+              {newTitle || boardName ? `Create “${newTitle || boardName}”` : "Create new"}
+            </span>
             <span className="slashhint">
               {canCreate
                 ? newTitle
                   ? "New note, linked here"
                   : mode === "insertTemplate"
                     ? `New note in ${TEMPLATES_FOLDER}`
-                    : `New ${MODE_LABEL[mode].toLowerCase()}`
+                    : mode === "embedBoard" && !boardName
+                      ? "Type its name above first"
+                      : `New ${MODE_LABEL[mode].toLowerCase()}`
                 : creationAvailable === null
                   ? "Checking permissions…"
                   : "Read-only in development"}
