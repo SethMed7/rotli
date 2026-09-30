@@ -158,6 +158,7 @@ import { AliasCleanupSettings } from "./settings/aliasCleanupSettings";
 import { AmbientSettings } from "./settings/ambientSettings";
 import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { ConnectorGuide } from "./settings/connectorGuide";
+import { FrontsSettings } from "./settings/frontsSettings";
 import { LibrarianRulesSettings } from "./settings/librarianRulesSettings";
 import { Seg } from "./settings/seg";
 import { SettingsBanner, SettingsScenery } from "./settings/settingsBanner";
@@ -1413,6 +1414,7 @@ function AppearancePane() {
         />
       </div>
 
+      <FrontsSettings />
       <VisibilitySettings />
 
       <h4 className="sethead">New chat welcome</h4>

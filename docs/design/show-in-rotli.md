@@ -21,7 +21,6 @@ hidden part back. The list is `HIDEABLE` in `src/lib/hideable.ts`:
 | Title bar | Search | ⌘K opens it in its place |
 | Sidebar | Activity overview (Home's "This week" card, Chat's Model usage card) | ⌘K "Rotli activity dashboard" |
 | Sidebar | All notes, Captures, Tasks | ⌘K |
-| Sidebar | Breve (only where Breve ships) | ⌘⇧B; its switch stays while Breve is open, so the way back shows |
 | Sidebar footer | Files, Librarian, Feedback | Finder; Settings → Librarian; ⌘K and Settings → About |
 | Tabs | New tab + | ⌘T |
 
@@ -51,3 +50,5 @@ load round trip), `src/components/sidebar/homeShortcuts.test.tsx`,
 removes them, the footer closes up, Tasks still opens from ⌘K, and Show
 everything brings them back. The title bar's Browser button is Mac-only, so
 hiding it is proved by the same switch path rather than in the browser build.
+
+Breve's entry moved to Settings → Appearance → Sidebar (2026-09-30), where each front turns on and off (docs/design/sidebar-home-chat.md).

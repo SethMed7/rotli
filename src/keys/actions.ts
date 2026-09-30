@@ -35,6 +35,7 @@ import { trashSystemSelection } from "../services/systemTrash";
 import { toggleAaPanel } from "../state/aaPanel";
 import { reconnectActiveVault } from "../state/activeVault";
 import { useChatWindowStore } from "../state/chatWindowStore";
+import { frontOn } from "../state/fronts";
 import { chatRuntimeEnabled } from "../state/helperLink";
 import { navigate } from "../state/navHistory";
 import { DEFAULT_NOTE_STYLE, useNoteStyleStore } from "../state/noteStyle";
@@ -262,6 +263,7 @@ export function registerDefaultActions(): void {
   });
   if (LAUNCH_FEATURES.breve)
     registerAction({
+      enabled: () => frontOn("breve"),
       id: "view.breve",
       title: "Open or close Breve",
       defaultChord: "Meta+Shift+B", // Breve had no chord at all (audit 2026-09-02 §1.3)
@@ -687,9 +689,11 @@ export function registerDefaultActions(): void {
   //   switcher and these chords are the same gesture, and including ⌘ means the
   //   chord shown by the held-Command overlay can be pressed directly without
   //   releasing the reveal key first (review 2026-08-08). —
+  // A front turned off in Settings → Sidebar has no way in (2026-09-30)
   registerAction({
+    enabled: () => frontOn("notes"),
     id: "modules.notes",
-    title: "Go to Home",
+    title: "Go to Notes",
     defaultChord: "Meta+Ctrl+1",
     run: () => {
       const ui = useUiStore.getState();
@@ -700,6 +704,7 @@ export function registerDefaultActions(): void {
     },
   });
   registerAction({
+    enabled: () => frontOn("chat"),
     id: "modules.chat",
     title: "Go to Chat",
     defaultChord: "Meta+Ctrl+2",
@@ -716,8 +721,9 @@ export function registerDefaultActions(): void {
   // home and chat with hotkeys"). ⌃1/⌃2 stay the direct jumps; this is the
   // no-look switch for when you just want the other front.
   registerAction({
+    enabled: () => frontOn("notes") && frontOn("chat"),
     id: "modules.toggleFront",
-    title: "Switch sidebar front (Home ↔ Chat)",
+    title: "Switch sidebar front (Notes ↔ Chat)",
     defaultChord: "Ctrl+Backquote",
     run: () => {
       const ui = useUiStore.getState();
@@ -735,7 +741,7 @@ export function registerDefaultActions(): void {
   // off ⌃⌘2 so the two fronts could own ⌃⌘1/⌃⌘2 — bindings persist by action
   // id, so an existing override is untouched). Both reach ⌘K and are rebindable.
   registerAction({
-    enabled: chatRuntimeEnabled,
+    enabled: () => chatRuntimeEnabled() && frontOn("chat"),
     id: "chat.new",
     title: "New chat",
     defaultChord: "Meta+Ctrl+Shift+2",
@@ -750,7 +756,7 @@ export function registerDefaultActions(): void {
     },
   });
   registerAction({
-    enabled: chatRuntimeEnabled,
+    enabled: () => chatRuntimeEnabled() && frontOn("chat"),
     id: "chat.summon",
     title: "Summon chat",
     defaultChord: "Alt+A", // "ask" — the ⌥-letter global family (⌥Space/⌥C/⌥Q)

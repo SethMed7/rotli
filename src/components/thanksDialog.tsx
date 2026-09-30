@@ -21,8 +21,8 @@ import { THEME_FAMILY_PRESENTATIONS } from "../state/themeChoices";
 import { startTour } from "../state/tour";
 import { useUiStore } from "../state/ui";
 import { Character } from "./character";
-import { GitHubMarkGlyph, XMarkGlyph } from "./glyphs";
 import { composeBanner } from "./onboarding/bannerCanvas";
+import { GitHubMarkGlyph, XMarkGlyph } from "./onboarding/shareMarks";
 import { WebDialogFrame } from "./webDialogFrame";
 
 type Banner = { kind: "drawing" } | { kind: "ready"; blob: Blob; url: string } | { kind: "failed" };

@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   you picked, the theme cards show each theme as a pair of lit orbs, like
   rotli.co's picker, now with Blossom's, and the small headings above each
   step's title are gone.
+- **Turn off what you don't use in the sidebar.** Settings → Appearance →
+  Sidebar has a switch for Notes, Chat, and Breve, and a choice of which one
+  Rotli opens on (Notes unless you pick another). At least one stays on, and
+  with only one on the switcher at the top of the sidebar goes away. The
+  Home segment is now called Notes.
+- **The thank-you card is tidier.** Its share buttons sit on the same row as
+  Take the tour, and Star and Share wear GitHub's and X's marks.
 - **Settings feels more connected.** Each choice is now one joined control
   instead of separate buttons, dropdowns match it, and clouds and birds drift
   in the page's side margins.

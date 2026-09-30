@@ -50,4 +50,6 @@ export const APP_SETTINGS_KEYS = new Set([
   "ambient",
   // What the person hid from the chrome (src/lib/hideable.ts).
   "hidden",
+  // Which sidebar fronts are on and where Rotli opens (src/lib/sidebarFronts.ts).
+  "sidebarFronts",
 ]);

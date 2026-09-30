@@ -11,7 +11,7 @@ import { expect, test } from "@playwright/test";
 import { gotoApp } from "./support";
 
 const homeSeg = (page: import("@playwright/test").Page) =>
-  page.getByRole("button", { name: "Home", exact: true });
+  page.getByRole("button", { name: "Notes", exact: true });
 const chatSeg = (page: import("@playwright/test").Page) =>
   page.getByRole("button", { name: "Chat", exact: true });
 
@@ -174,4 +174,58 @@ test("the Activity overview fills the available pane on a wide display", async (
   const headerBox = await header.boundingBox();
   expect(paneBox?.width).toBeGreaterThan(1500);
   expect(headerBox?.width).toBeGreaterThan(1300);
+});
+
+// The owner, 2026-09-30: "turn off Chat and Breve, then Notes too; the user
+// chooses their home (Notes by default); at least one on; with one on, hide
+// the switcher."
+test("fronts turn off in Settings → Sidebar; one left hides the switcher and can't go off", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  const switcher = page.getByRole("group", { name: "Sidebar front" });
+  const openSidebarSettings = async () => {
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  };
+  const backToNotes = () => page.getByRole("button", { name: /Back to notes/ }).click();
+  const section = page.locator(".swgroup").filter({ has: page.getByRole("switch", { name: /^Notes/ }) });
+  const toggle = (name: string) => section.getByRole("switch", { name: new RegExp(`^${name}`) });
+  const opensOn = page.locator(".setselect-row", { hasText: "Rotli opens on" });
+
+  await openSidebarSettings();
+  await expect(toggle("Notes")).toHaveAttribute("aria-checked", "true");
+  // where Rotli opens: Notes by default
+  await expect(opensOn.getByRole("button", { name: "Notes", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
+  // Chat off: its segment leaves the switcher
+  await toggle("Chat").click();
+  await expect(toggle("Chat")).toHaveAttribute("aria-checked", "false");
+  await backToNotes();
+  await expect(switcher.getByRole("button", { name: "Chat", exact: true })).toHaveCount(0);
+
+  // Breve off too (where this build has it): one front left, no switcher,
+  // and its switch is locked on
+  await openSidebarSettings();
+  const breve = toggle("Breve");
+  if (await breve.count()) await breve.click();
+  await expect(toggle("Notes")).toBeDisabled();
+  await expect(opensOn).toHaveCount(0);
+  await backToNotes();
+  await expect(switcher).toHaveCount(0);
+  await expect(page.locator(".sb-notes-tree")).toBeVisible();
+
+  // Chat back on, and chosen as where Rotli opens
+  await openSidebarSettings();
+  await toggle("Chat").click();
+  await opensOn.getByRole("button", { name: "Chat", exact: true }).click();
+  await expect(opensOn.getByRole("button", { name: "Chat", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await backToNotes();
+  await expect(switcher.getByRole("button", { name: "Chat", exact: true })).toBeVisible();
 });
