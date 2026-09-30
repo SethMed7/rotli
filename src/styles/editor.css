@@ -616,6 +616,15 @@
 .slashpicker {
   min-width: 260px;
   max-width: min(360px, 92vw);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* the rows scroll under a fixed search field and × */
+.slashpicker-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 /* the search field and the × that dismisses the picker (as Esc does) */
 .slashpicker-head {

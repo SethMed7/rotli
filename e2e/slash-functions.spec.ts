@@ -175,3 +175,22 @@ test("near the bottom of a short window the upward slash menu stays below the ta
   await expect(menu.locator(".slashrow.sel")).toBeInViewport();
   expect(await inside()).toBe(true);
 });
+
+// The second recheck (2026-09-29): arrowing through a long Link note list in a
+// short window scrolled the picker's search field and × away with the rows.
+// The header stays put; only the list under it scrolls.
+test("the Link note picker keeps its search field and × in view while the list scrolls", async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 520 });
+  await gotoApp(page);
+  await newNote(page, "# Short\n\n");
+  await slash(page, /^Link note/);
+  const picker = page.locator(".slashpicker");
+  const search = picker.locator(".slashpicker-input");
+  const close = picker.getByRole("button", { name: "Close link note" });
+  await expect(search).toBeFocused();
+  for (let i = 0; i < 12; i++) await page.keyboard.press("ArrowDown");
+  await expect(picker.locator(".slashrow.sel")).toBeInViewport();
+  await expect(search).toBeInViewport({ ratio: 1 });
+  await expect(close).toBeInViewport({ ratio: 1 });
+  expect(await picker.evaluate((el) => el.scrollTop)).toBe(0);
+});
