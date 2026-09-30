@@ -160,7 +160,7 @@ import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { ConnectorGuide } from "./settings/connectorGuide";
 import { FrontsSettings } from "./settings/frontsSettings";
 import { LibrarianRulesSettings } from "./settings/librarianRulesSettings";
-import { Seg } from "./settings/seg";
+import { Seg, SegField } from "./settings/seg";
 import { SettingsBanner, SettingsScenery } from "./settings/settingsBanner";
 import type { BannerMotif } from "./settings/settingsBannerArt";
 import { SwitchKnob, Toggle } from "./settings/toggle";
@@ -1391,28 +1391,24 @@ function AppearancePane() {
         reaches the window's edge{hotkeyHint("; ⌘0 still brings it")}. The sidebar's own right-click menu has
         the same choices.
       </p>
-      <div className="segfield">
-        <span className="seglabel">Side</span>
-        <Seg
-          value={sidebarSide}
-          options={[
-            ["left", "Left"],
-            ["right", "Right"],
-          ]}
-          onPick={setSidebarSide}
-        />
-      </div>
-      <div className="segfield">
-        <span className="seglabel">Show</span>
-        <Seg
-          value={sidebarReveal}
-          options={[
-            ["pinned", "Always"],
-            ["hover", "On hover"],
-          ]}
-          onPick={setSidebarReveal}
-        />
-      </div>
+      <SegField
+        label="Side"
+        value={sidebarSide}
+        options={[
+          ["left", "Left"],
+          ["right", "Right"],
+        ]}
+        onPick={setSidebarSide}
+      />
+      <SegField
+        label="Show"
+        value={sidebarReveal}
+        options={[
+          ["pinned", "Always"],
+          ["hover", "On hover"],
+        ]}
+        onPick={setSidebarReveal}
+      />
 
       <FrontsSettings />
       <VisibilitySettings />

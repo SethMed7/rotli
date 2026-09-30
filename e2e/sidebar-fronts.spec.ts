@@ -191,7 +191,7 @@ test("fronts turn off in Settings → Sidebar; one left hides the switcher and c
   const backToNotes = () => page.getByRole("button", { name: /Back to notes/ }).click();
   const section = page.locator(".swgroup").filter({ has: page.getByRole("switch", { name: /^Notes/ }) });
   const toggle = (name: string) => section.getByRole("switch", { name: new RegExp(`^${name}`) });
-  const opensOn = page.locator(".setselect-row", { hasText: "Rotli opens on" });
+  const opensOn = page.locator(".segfield", { has: page.locator(".seglabel", { hasText: "Home" }) });
 
   await openSidebarSettings();
   await expect(toggle("Notes")).toHaveAttribute("aria-checked", "true");

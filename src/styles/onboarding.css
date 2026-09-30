@@ -112,6 +112,7 @@
 
 .setup-lede {
   max-width: 590px;
+  text-wrap: balance;
   color: var(--text-muted);
   font-size: 14px;
   line-height: 1.62;
@@ -1191,9 +1192,10 @@
 }
 .onb-scenery-sky {
   position: absolute;
-  top: 9%;
-  right: 3%;
-  width: 220px;
+  /* under the corner music player, above the step's text */
+  top: 48px;
+  right: 2%;
+  width: 180px;
   height: auto;
   opacity: 0.6;
   animation: onb-scene-in 420ms var(--motion-ease) both;

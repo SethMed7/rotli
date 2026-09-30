@@ -5,7 +5,7 @@
 
 import { type Front, canTurnOff, enabledFronts, homeFront } from "../../lib/sidebarFronts";
 import { AVAILABLE_FRONTS, useFronts } from "../../state/fronts";
-import { Seg } from "./seg";
+import { SegField } from "./seg";
 import { Toggle } from "./toggle";
 
 export const FRONT_LABEL: Record<Front, string> = { notes: "Notes", chat: "Chat", breve: "Breve" };
@@ -23,10 +23,10 @@ export function FrontsSettings() {
   const on = enabledFronts(prefs, AVAILABLE_FRONTS);
   return (
     <>
-      <h4 className="sethead">Sidebar</h4>
+      <h4 className="sethead">Sidebar sections</h4>
       <p className="setnote">
         Turn off what you don’t use; at least one stays on. With only one on, the switcher at the top of the
-        sidebar goes away.
+        sidebar goes away. Home is where Rotli opens.
       </p>
       <div className="swgroup">
         {AVAILABLE_FRONTS.map((front) => {
@@ -38,21 +38,19 @@ export function FrontsSettings() {
               on={isOn}
               title={FRONT_LABEL[front]}
               desc={last ? `${FRONT_DESC[front]} It’s the only one on, so it stays.` : FRONT_DESC[front]}
-              disabled={last}
+              locked={last}
               onChange={() => setFront(front, !isOn)}
             />
           );
         })}
       </div>
       {on.length > 1 && (
-        <div className="setselect-row">
-          <span>Rotli opens on</span>
-          <Seg<Front>
-            value={homeFront(prefs, AVAILABLE_FRONTS)}
-            options={on.map((front) => [front, FRONT_LABEL[front]])}
-            onPick={setHome}
-          />
-        </div>
+        <SegField<Front>
+          label="Home"
+          value={homeFront(prefs, AVAILABLE_FRONTS)}
+          options={on.map((front) => [front, FRONT_LABEL[front]])}
+          onPick={setHome}
+        />
       )}
     </>
   );

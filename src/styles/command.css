@@ -2542,6 +2542,14 @@
 .swrow:hover {
   background: color-mix(in srgb, var(--surface-2) 90%, var(--text));
 }
+/* a switch held on purpose (the last sidebar section): the words stay
+   readable; only the track says it can't move */
+.swrow.locked {
+  cursor: default;
+}
+.swrow.locked .sw {
+  opacity: 0.5;
+}
 .swrow:disabled {
   opacity: 0.5;
   cursor: default;
