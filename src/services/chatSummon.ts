@@ -11,6 +11,7 @@ import { activeInstance } from "../memex/config";
 import { listChats, loadConfig } from "../memex/service";
 import { openChatForNoteId } from "../noteChat/composition";
 import { useChatWindowStore } from "../state/chatWindowStore";
+import { frontOn } from "../state/fronts";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 
@@ -57,6 +58,7 @@ export function openNoteChatFromQuickNote(id: string, create: boolean): void {
 /** `here`: the summon was routed to THIS window (the Chat window while Chat
  * lives there) — same policy, without bringing main forward. */
 export async function summonChat(opts?: { here?: boolean }): Promise<void> {
+  if (!frontOn("chat")) return; // Chat is turned off (Settings → Sidebar)
   if (!opts?.here) await showMainWindow();
   // chat is a pane surface — Settings would sit on top of it (mirrors chat.new)
   useUiStore.getState().setSettingsOpen(false);

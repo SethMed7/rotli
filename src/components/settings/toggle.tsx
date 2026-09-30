@@ -19,22 +19,26 @@ export function Toggle({
   title,
   desc,
   disabled,
+  locked,
 }: {
   on: boolean;
   onChange: () => void;
   title: string;
   desc?: string;
   disabled?: boolean;
+  /** Held where it is on purpose (its description says why): only the track
+   * reads as locked; the words stay readable, unlike a disabled row. */
+  locked?: boolean;
 }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
-      aria-disabled={disabled}
+      aria-disabled={disabled || locked}
       disabled={disabled}
-      className={`${on ? "swrow on" : "swrow"}${disabled ? " disabled" : ""}`}
-      onClick={disabled ? undefined : onChange}
+      className={`${on ? "swrow on" : "swrow"}${disabled ? " disabled" : ""}${locked ? " locked" : ""}`}
+      onClick={disabled || locked ? undefined : onChange}
     >
       <span className="swtext">
         <span className="swt">{title}</span>

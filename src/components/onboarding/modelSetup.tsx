@@ -39,8 +39,9 @@ import { ChevronRight } from "../glyphs";
 import { ConnectorGuide } from "../settings/connectorGuide";
 import { chatMark } from "../sidebar/chatMark";
 import { ModelLogo } from "../sidebar/modelLogo";
+import { OnboardingScenery } from "./onboardingScenery";
 import { SetupBack, SetupPrimary } from "./setupControls";
-import { SetupSideFriends } from "./setupSideFriends";
+import { SetupScrollCue, useStageScrollCue } from "./setupScrollCue";
 
 const CONNECTED_PROVIDERS = [
   "claude",
@@ -100,8 +101,7 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [note, setNote] = useState<{ text: string; error: boolean } | null>(null);
   const [openSection, setOpenSection] = useState<ModelSection | null>("local");
-  const [showScrollCue, setShowScrollCue] = useState(false);
-  const stageRef = useRef<HTMLDivElement>(null);
+  const [stageRef, showScrollCue] = useStageScrollCue();
 
   const refreshLocal = () => void refreshLocalModels();
 
@@ -195,31 +195,13 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
       );
   };
 
-  useEffect(() => {
-    const stage = stageRef.current;
-    if (!stage) return;
-    const update = () => {
-      const overflow = stage.scrollHeight - stage.clientHeight > 8;
-      const moreBelow = stage.scrollTop + stage.clientHeight < stage.scrollHeight - 8;
-      setShowScrollCue(overflow && moreBelow);
-    };
-    const observer = new ResizeObserver(update);
-    observer.observe(stage);
-    for (const child of stage.children) observer.observe(child);
-    stage.addEventListener("scroll", update, { passive: true });
-    update();
-    return () => {
-      observer.disconnect();
-      stage.removeEventListener("scroll", update);
-    };
-  });
-
   const toggleSection = (section: ModelSection) =>
     setOpenSection((current) => (current === section ? null : section));
 
   return (
     <div className="onb model-setup">
       <div className="onb-drag" data-tauri-drag-region />
+      <OnboardingScenery />
       <section className="setup-shell" aria-labelledby="model-setup-title">
         <div className="setup-progress">
           <span>
@@ -229,16 +211,13 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
           <span>Models</span>
         </div>
 
-        <SetupSideFriends />
-
-        <div className="setup-stage" ref={stageRef}>
+        <div className={showScrollCue ? "setup-stage has-more" : "setup-stage"} ref={stageRef}>
           <aside className="setup-companion" aria-hidden="true">
-            <Character name="knowledge" size={152} accessorized={false} alwaysVisible />
+            <Character name="knowledge" size={152} alwaysVisible />
             <p>Choose one, several, or none. Your vault works without a model.</p>
           </aside>
 
           <div className="setup-content">
-            <p className="setup-eyebrow">Optional and changeable</p>
             <h1 id="model-setup-title">How should Rotli think?</h1>
             <p className="setup-lede">
               Run a model entirely on this Mac, or use your own Claude, ChatGPT, Cursor, or Gemini accounts
@@ -549,11 +528,7 @@ export function ModelSetup({ onBack, onDone }: { onBack: () => void; onDone: () 
           </div>
         </div>
 
-        {showScrollCue && (
-          <div className="setup-stage-scroll-cue" aria-hidden="true">
-            Scroll for more <span>↓</span>
-          </div>
-        )}
+        {showScrollCue && <SetupScrollCue />}
 
         <footer className="setup-footer">
           <button type="button" className="setup-skip" onClick={onDone}>

@@ -1,5 +1,10 @@
 /** Product-owned CSS stays flat and consumes semantic color roles.
  * Vendor styles are outside this policy; src/styles is not. */
+
+/** The one named exception to "no radial gradients": the lit theme orbs,
+ * the site's orb picker brought into setup at the owner's request
+ * (2026-09-30). Only this file; nothing else may light a surface. */
+export const RADIAL_EXCEPTION = "src/styles/theme-orbs.css";
 export function flatCssViolations(source, file) {
   const css = source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, '""');
   const violations = [];
@@ -12,7 +17,7 @@ export function flatCssViolations(source, file) {
   if (/--[a-z0-9-]*(?:glow|halo|shadow)[a-z0-9-]*\s*:/i.test(css)) {
     violations.push(`${file}: glow, halo, and shadow tokens are forbidden`);
   }
-  if (/(?:repeating-)?radial-gradient\s*\(/i.test(css)) {
+  if (file !== RADIAL_EXCEPTION && /(?:repeating-)?radial-gradient\s*\(/i.test(css)) {
     violations.push(`${file}: radial gradients are forbidden; use a solid semantic surface or scrim`);
   }
   // A hidden window must stay parked. `running` is the CSS default, so writing

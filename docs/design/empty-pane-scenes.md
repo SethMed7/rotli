@@ -69,3 +69,52 @@ same `.sc-*` token classes as the scenes, and its unit test enforces the same
 no-color rule. The banner is as wide as the Settings rows below it (640px).
 Its sky is a 6% breath of the accent over the surface, so the scene's own
 surfaces still read.
+
+## First run's scenery (the same language)
+
+The owner, 2026-09-30: "make the onboarding just like we did in the settings —
+a full theme, life for the backdrop. The beginning can match our theme and even
+preview the island … once they choose their theme everything forward needs to
+match what they chose." (`src/components/onboarding/onboardingScenery.tsx`)
+
+- **An island intro.** A fresh first run opens on a 1.7-second scene: Rottnest
+  rises out of the sea, the lighthouse turns, the quokka hops onto the sand
+  where Welcome's quokka stands, and "Rotli" appears. Its contents fade before
+  its background, then setup fades in and its step rises. Any key or click
+  skips it, it never takes pointer input, and it doesn't play under Reduce
+  motion.
+- **The app's opening** (the owner, 2026-09-30: "the animation should be there
+  when someone opens the app fresh, even if onboarding is done").
+  `onboarding/appOpening.tsx` plays the same kind of opening once per launch of
+  the Mac app, in the person's theme: the island for Rotli, the family's empty-
+  pane scene otherwise, with their dressed quokka. It never plays right after
+  first run's intro, and never with Reduce motion on. `?opening` shows it in
+  the browser twin.
+- **Welcome is the island** in Rotli Light, the environment every first run
+  opens in.
+- **After that, the chosen theme.** From Appearance on, the backdrop is the
+  chosen family's Settings scenery (Rotli keeps the island). It changes with
+  each pick and stays through where notes live and the model step.
+- **Ground below the card.** The card stands on a floor, `--onb-floor`, that
+  only takes the room the window has spare, so the card is never shorter for
+  it. The horizon is drawn below that line; its top 30px, the band the card's
+  footer may reach, is clear. No line art ever sits behind text or a button.
+- **A living sky, not peeking quokkas** (the owner, 2026-09-30: "remove the
+  rotlis popping out of the sides; better scenery like clouds or birds so it's
+  fully alive"). `SkyLife` (`onboarding/onboardingSkyLife.tsx`) drifts clouds
+  slowly across the page, and something crosses the upper sky: birds, a paper
+  plane for Paper & Charcoal, petals for Blossom, twinkling stars for Midnight.
+  It is masked to the side margins, so the setup card's column (a clear 1090px)
+  never has anything behind its text. With Reduce motion on, each drifter
+  stays still in its own spot. Settings shows the same sky in its side margins
+  only.
+- **The companion wears your choices.** Each step's big quokka keeps its pose
+  and takes your chosen colour and accessory.
+- **Theme cards are the site's orbs.** Each card holds a number, a name, and a
+  lit Light and Dark orb (rotli.co's picker, with Blossom added). The orbs are
+  the app's one radial-gradient surface, allowed only in
+  `src/styles/theme-orbs.css` (`RADIAL_EXCEPTION` in
+  `scripts/design-system-policy.mjs`, with its own test).
+- Settings and first run share `SceneryLayers` (`settingsBanner.tsx`). The same
+  unit-tested rule applies: no color of its own.
+

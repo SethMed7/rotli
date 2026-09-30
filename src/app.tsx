@@ -6,6 +6,7 @@ import "./styles/render.css";
 import "./styles/command.css";
 import "./styles/quick.css";
 import "./styles/onboarding.css";
+import "./styles/theme-orbs.css";
 import "./styles/board.css";
 import "./styles/memex.css";
 import "./styles/breve.css";
@@ -29,6 +30,7 @@ import { BoardNameDialog } from "./components/boardNameDialog";
 import { Titlebar } from "./components/titlebar";
 import { WhichKey } from "./components/whichKey";
 import { VaultFolderBrowser } from "./components/vaultFolderBrowserDialog";
+import { AppOpening } from "./components/onboarding/appOpening";
 import { WebVaultOverlays } from "./components/onboarding/webVaultOverlays";
 import { WebChatSetupDialog } from "./components/webChatSetupDialog";
 import { registerDefaultActions } from "./keys/actions";
@@ -57,7 +59,7 @@ import {
 } from "./lib/tauri";
 import { useNativeFileDrop } from "./editor/nativeFileDrop";
 import { LAUNCH_FEATURES, PLATFORM } from "./lib/featurePolicy";
-import { isOnboardingReview } from "./lib/reviewMode";
+import { setupShows } from "./lib/reviewMode";
 import { fileQuickNoteInMain } from "./newItems/composition";
 import { createVaultCapture } from "./services/captureRouting";
 import { openNoteChatFromQuickNote, summonChat } from "./services/chatSummon";
@@ -76,7 +78,6 @@ import {
 import { queryClient } from "./services/query";
 import { attachChatWindow } from "./state/chatWindow";
 import { addFragmentToMain, hydrateMain } from "./state/main";
-import { onboardingRequired } from "./state/onboarding";
 import { useOrganizerLive } from "./state/organizerLive";
 import { activeTabOf, leaves, usePanesStore } from "./state/panes";
 import { invalidateMemex } from "./memex/useMemex";
@@ -165,10 +166,7 @@ function MainShell() {
   const mainAutoRemoveDays = useUiStore((s) => s.mainAutoRemoveDays);
   const chatAutoArchiveDays = useUiStore((s) => s.chatAutoArchiveDays);
   // first run only (the real app); an app update never re-onboards
-  const onboardingActive = onboardingRequired(
-    isTauri() || isOnboardingReview(isTauri(), import.meta.env.DEV, window.location.search),
-    onboarded,
-  );
+  const onboardingActive = setupShows(isTauri(), import.meta.env.DEV, window.location.search, onboarded);
   const showOnboarding = onboardingActive && onboardingPhase === "preferences";
   const showModelSetup = onboardingActive && onboardingPhase === "models" && !vaultActivationPending;
   const showVaultActivation =
@@ -485,6 +483,8 @@ function MainShell() {
 
   return (
     <div className="app-window">
+      {/* the app's opening, once per launch (onboarding/appOpening.tsx) */}
+      <AppOpening />
       <Titlebar />
       <main className="app-content">
         {/* Settings is the one full-surface front. Chat · Board · All-notes ·

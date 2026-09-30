@@ -758,6 +758,18 @@ body[data-surface="capture"] {
 .sc-accent-fill { fill: var(--accent); opacity: 0.75; }
 .sc-accent-stroke { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; }
 .sc-sea { fill: var(--tint); }
+.sc-trunk { fill: var(--text-muted); opacity: 0.35; }
+/* a dark ground swallows a surface-colored cloud: dark themes lift it to the
+   tint, still quiet (the sky ornaments read as empty otherwise, 2026-09-30) */
+:root[data-theme="dark"] .sc-cloud,
+:root[data-theme="charcoal"] .sc-cloud,
+:root[data-theme="ocean-dark"] .sc-cloud,
+:root[data-theme="grove-dark"] .sc-cloud,
+:root[data-theme="iris-dark"] .sc-cloud,
+:root[data-theme="blossom-dark"] .sc-cloud,
+:root[data-theme="midnight-dark"] .sc-cloud {
+  fill: var(--tint);
+}
 .sc-sand { fill: var(--surface-2); }
 .sc-wave { fill: none; stroke: var(--accent); stroke-width: 1.4; opacity: 0.35; }
 .sc-branch { fill: none; stroke: var(--text-muted); stroke-width: 3; stroke-linecap: round; opacity: 0.7; }

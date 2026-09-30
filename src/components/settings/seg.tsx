@@ -29,3 +29,24 @@ export function Seg<T extends string>({
     </div>
   );
 }
+
+/** A labelled segmented pick on one row (Appearance → Sidebar's Side, Show,
+ * and Home): the label in a fixed column so the controls line up. */
+export function SegField<T extends string>({
+  label,
+  value,
+  options,
+  onPick,
+}: {
+  label: string;
+  value: T;
+  options: [T, string][];
+  onPick: (v: T) => void;
+}) {
+  return (
+    <div className="segfield">
+      <span className="seglabel">{label}</span>
+      <Seg value={value} options={options} onPick={onPick} />
+    </div>
+  );
+}

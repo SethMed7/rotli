@@ -55,9 +55,13 @@ export interface AmbientPrefs {
   /** Whether the person wants it playing (kept across launches; a tab's
    * media still takes over). */
   playing: boolean;
+  /** How loud the studio track plays, 0–1 (the owner, 2026-09-30: "a way to
+   * pause or change the volume … it might be too high"). Claude FM plays in
+   * its own page, at the page's volume. */
+  volume: number;
 }
 
-export const DEFAULT_AMBIENT: AmbientPrefs = { enabled: false, track: "linen", playing: false };
+export const DEFAULT_AMBIENT: AmbientPrefs = { enabled: false, track: "linen", playing: false, volume: 0.4 };
 
 const known = (id: unknown): id is string => AMBIENT_SOURCES.some((source) => source.id === id);
 
@@ -69,6 +73,10 @@ export function parseAmbient(value: unknown): AmbientPrefs {
     enabled: prefs.enabled === true,
     track: known(prefs.track) ? prefs.track : DEFAULT_AMBIENT.track,
     playing: prefs.playing === true,
+    volume:
+      typeof prefs.volume === "number" && prefs.volume >= 0 && prefs.volume <= 1
+        ? prefs.volume
+        : DEFAULT_AMBIENT.volume,
   };
 }
 

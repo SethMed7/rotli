@@ -77,6 +77,7 @@
 
 .setup-companion p {
   max-width: 176px;
+  text-wrap: balance;
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.55;
@@ -111,6 +112,7 @@
 
 .setup-lede {
   max-width: 590px;
+  text-wrap: balance;
   color: var(--text-muted);
   font-size: 14px;
   line-height: 1.62;
@@ -242,19 +244,6 @@
   height: 0;
 }
 
-.setup-theme-dot {
-  display: block;
-  width: 18px;
-  height: 18px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-}
-
-.setup-theme-dot.warm-light { background: var(--swatch-warm-light); }
-.setup-theme-dot.warm-dark { background: var(--swatch-warm-dark); }
-.setup-theme-dot.mono-light { background: var(--swatch-paper); }
-.setup-theme-dot.mono-dark { background: var(--swatch-charcoal); }
-.setup-theme-dot.mono-system { background: var(--accent); }
 
 .setup-theme-pair {
   display: flex;
@@ -1003,13 +992,15 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 6px 9px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  background: var(--ground);
   color: var(--text-muted);
-  font-size: 10.5px;
+  font-size: 11px;
   pointer-events: none;
+}
+
+/* the words sit on the page, not in a card (the owner, 2026-09-30): the
+   scrolling step fades out at its foot instead, so nothing runs under them */
+.setup-stage.has-more {
+  mask-image: linear-gradient(to bottom, black calc(100% - 56px), transparent);
 }
 
 .setup-stage-scroll-cue span {
@@ -1022,44 +1013,6 @@
   gap: 14px;
 }
 
-.setup-side-friends {
-  position: fixed;
-  inset: 44px 0 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.setup-side-friend {
-  position: absolute;
-  top: var(--friend-top, 56%);
-  color: var(--text-muted);
-  opacity: 0;
-}
-
-.setup-side-friend .quokka {
-  max-width: 82px;
-  max-height: 82px;
-}
-
-.setup-side-friend--left {
-  left: -72px;
-  transform-origin: 50% 72%;
-  animation: setup-side-lean-left 32000ms var(--motion-ease) var(--friend-delay, 0ms) infinite both;
-}
-
-.setup-side-friend--right {
-  right: -69px;
-  transform-origin: 50% 72%;
-  animation: setup-side-lean-right 32000ms var(--motion-ease) var(--friend-delay, 0ms) infinite both;
-}
-
-.setup-side-friend--upper { --friend-top: 31%; }
-.setup-side-friend--middle { --friend-top: 54%; }
-.setup-side-friend--lower { --friend-top: 72%; }
-.setup-side-friend--beat-1 { --friend-delay: 0ms; }
-.setup-side-friend--beat-2 { --friend-delay: -8000ms; }
-.setup-side-friend--beat-3 { --friend-delay: -16000ms; }
-.setup-side-friend--beat-4 { --friend-delay: -24000ms; }
 
 .setup-scan-line {
   width: 100%;
@@ -1093,22 +1046,6 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes setup-side-lean-left {
-  0% { opacity: 0; transform: translate3d(-22px, 6px, 0) rotate(62deg); }
-  14% { opacity: 0.4; transform: translate3d(0, 0, 0) rotate(72deg); }
-  50% { opacity: 0.4; transform: translate3d(0, 0, 0) rotate(72deg); }
-  64% { opacity: 0; transform: translate3d(-22px, 6px, 0) rotate(62deg); }
-  100% { opacity: 0; transform: translate3d(-22px, 6px, 0) rotate(62deg); }
-}
-
-@keyframes setup-side-lean-right {
-  0% { opacity: 0; transform: translate3d(22px, 6px, 0) rotate(-62deg); }
-  14% { opacity: 0.4; transform: translate3d(0, 0, 0) rotate(-72deg); }
-  50% { opacity: 0.4; transform: translate3d(0, 0, 0) rotate(-72deg); }
-  64% { opacity: 0; transform: translate3d(22px, 6px, 0) rotate(-62deg); }
-  100% { opacity: 0; transform: translate3d(22px, 6px, 0) rotate(-62deg); }
-}
-
 @keyframes setup-scan {
   from { transform: translateX(-20%); }
   to { transform: translateX(280%); }
@@ -1140,7 +1077,6 @@
   .setup-mode-row { grid-template-columns: auto 1fr; }
   .setup-mode-row small { grid-column: 2; }
   .setup-quokka-row { grid-template-columns: 64px minmax(0, 1fr); }
-  .setup-side-friends { display: none; }
   .setup-footer { align-items: flex-end; }
   .setup-local-note { display: none; }
 }
@@ -1170,9 +1106,6 @@
     animation: none;
   }
 
-  .setup-side-friend { animation: none; opacity: 0; }
-  .setup-side-friend--beat-1 { opacity: 0.38; transform: rotate(72deg); }
-  .setup-side-friend--beat-2 { opacity: 0.38; transform: rotate(-72deg); }
 }
 /* Thank you (thanksDialog.tsx): the shared dialog frame, wide
    enough for the 1200×630 banner at a readable size; the quokka it copies
@@ -1220,9 +1153,327 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+/* a brand's mark in place of its name (GitHub, X) */
+.thanks-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
 .thanks-status {
   margin-inline-end: auto;
   align-self: center;
   color: var(--text-muted);
   font-size: 12.5px;
+}
+
+/* ─── first run's scenery (onboarding/onboardingScenery.tsx, 2026-09-30) ───
+   The page is the theme's sky: a breath of its accent at the top fading to
+   the ground. The setup card stands on a floor (--onb-floor) that takes only
+   the room the window has spare — the card is never shorter for it — and the
+   horizon is the ground below that line: its top 30px, the band the card's
+   footer may reach, is clear, so no line art runs behind text or a button. */
+.onb {
+  --onb-floor: clamp(28px, calc(100dvh - 776px), 132px);
+  padding-bottom: var(--onb-floor);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--accent) 8%, var(--ground)) 0,
+    var(--ground) 60%
+  );
+}
+.onb .setup-shell {
+  height: min(720px, calc(100dvh - 56px - var(--onb-floor)));
+}
+.onb-scenery {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.onb-scenery-sky {
+  position: absolute;
+  /* under the corner music player, above the step's text */
+  top: 48px;
+  right: 2%;
+  width: 180px;
+  height: auto;
+  opacity: 0.6;
+  animation: onb-scene-in 420ms var(--motion-ease) both;
+}
+@media (max-width: 1100px) {
+  .onb-scenery-sky {
+    display: none;
+  }
+}
+/* a window tall enough to show the island on the horizon shows it once */
+@media (min-height: 880px) {
+  .onb-scenery[data-scenery="island"] .onb-scenery-sky {
+    display: none;
+  }
+}
+.onb-scenery-horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: calc(var(--onb-floor) + 30px);
+  opacity: 0.6;
+  /* clear across the 30px the card's footer may reach, then the ground */
+  mask-image: linear-gradient(to bottom, transparent 30px, black 74px);
+  animation: onb-scene-in 420ms var(--motion-ease) both;
+}
+
+/* the island intro: the island rises out of the sea, the lighthouse turns,
+   the quokka hops onto the sand, then it opens onto setup. Never takes
+   pointer input; any key or click skips it. */
+.onb-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--accent) 8%, var(--ground)) 0,
+    var(--ground) 60%
+  );
+}
+.onb-intro.is-leaving {
+  animation: onb-intro-out 340ms var(--motion-ease) 180ms forwards;
+}
+/* its contents are gone before setup starts to show through */
+.onb-intro.is-leaving .onb-intro-stage,
+.onb-intro.is-leaving .onb-intro-word {
+  animation: onb-intro-fade 200ms var(--motion-ease) forwards;
+}
+.onb-intro-stage {
+  position: relative;
+  width: min(820px, 88vw);
+  /* the scene ends softly at its sides, not in a hard cut */
+  mask-image: linear-gradient(to right, transparent, black 11%, black 89%, transparent);
+  animation: onb-intro-appear 260ms var(--motion-ease) both;
+}
+.onb-intro-island {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.onb-intro-isle {
+  transform-box: fill-box;
+  animation: onb-intro-rise 700ms var(--motion-ease) 120ms both;
+}
+.onb-intro .sc-sun {
+  transform-box: fill-box;
+  animation: onb-intro-sun 900ms var(--motion-ease) both;
+}
+.onb-intro-beam {
+  animation: onb-intro-beam 900ms ease-in-out 420ms both;
+}
+/* feet on the sand, where Welcome's quokka will stand */
+.onb-intro-quokka {
+  position: absolute;
+  left: 12%;
+  bottom: -2px;
+  animation: onb-intro-hop 560ms var(--motion-ease) 360ms both;
+}
+.onb-intro-word {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 34px;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  animation: onb-intro-word 380ms var(--motion-ease) 450ms both;
+}
+/* the app's opening in a theme's own small scene (440×200, ground at y 170):
+   a narrower stage, the quokka centred on the ground */
+.onb-intro--scene .onb-intro-stage {
+  width: min(560px, 80vw);
+}
+.onb-intro--scene .onb-intro-island {
+  animation: onb-intro-rise 700ms var(--motion-ease) 60ms both;
+}
+.onb-intro--scene .onb-intro-quokka {
+  left: calc(50% - 48px);
+  bottom: 9%;
+}
+/* setup opens as the intro leaves (a skip drops the attribute: no wait).
+   The card only fades — a transform on it would clip the fixed side
+   friends inside it — and its step content rises. */
+.onb[data-intro] .setup-shell {
+  animation: onb-intro-appear-full 520ms var(--motion-ease) 1120ms both;
+}
+.onb[data-intro] .setup-stage {
+  animation: onb-open 560ms var(--motion-ease) 1120ms both;
+}
+
+@keyframes onb-scene-in {
+  from { opacity: 0; }
+}
+@keyframes onb-intro-appear {
+  from { opacity: 0.35; }
+}
+@keyframes onb-intro-rise {
+  from { transform: translateY(46px); }
+  to { transform: translateY(0); }
+}
+@keyframes onb-intro-sun {
+  from { opacity: 0; transform: translateY(24px); }
+}
+@keyframes onb-intro-beam {
+  0% { opacity: 0; }
+  50% { opacity: 0.42; }
+}
+@keyframes onb-intro-hop {
+  0% { opacity: 0; transform: translate(-28px, 6px); }
+  25% { opacity: 1; }
+  55% { transform: translate(-12px, -12px); }
+  100% { opacity: 1; transform: translate(0, 0); }
+}
+@keyframes onb-intro-word {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes onb-intro-appear-full {
+  from { opacity: 0; }
+}
+@keyframes onb-intro-fade {
+  to { opacity: 0; }
+}
+@keyframes onb-intro-out {
+  to { opacity: 0; transform: scale(1.03); }
+}
+@keyframes onb-open {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+/* a step taller than the window scrolls; its companion stays in view at the
+   top of the scroller instead of centering on the whole (scrolled) column */
+@media (min-width: 721px) {
+  .setup-stage.is-scrolling .setup-companion {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    min-height: 0;
+    justify-content: flex-start;
+  }
+}
+
+/* the sky, alive (onboarding/onboardingSkyLife.tsx, 2026-09-30): clouds drift
+   across the page and birds (a paper plane, petals) cross the upper sky,
+   behind the card. Each rests at its own spot with motion off. */
+.onb-sky-life,
+.set-sky-life {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+/* first run: the sky moves in the side margins only — the setup card's
+   column (up to 920px, centered) stays clear, as in Settings */
+.onb-sky-life {
+  mask-image: linear-gradient(
+    to right,
+    black 0,
+    black calc(50% - 600px),
+    transparent calc(50% - 545px),
+    transparent calc(50% + 545px),
+    black calc(50% + 600px),
+    black 100%
+  );
+}
+.onb-drift,
+.onb-flyer {
+  position: absolute;
+  left: 0;
+  height: auto;
+  transform: translateX(var(--rest));
+}
+.onb-drift {
+  width: 150px;
+  opacity: 0.7;
+}
+.onb-flyer {
+  width: 64px;
+  opacity: 0.75;
+}
+.onb-stars {
+  position: absolute;
+  inset: 0 0 auto;
+  width: 100%;
+  height: 34%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .onb-drift,
+  .onb-flyer {
+    animation-name: onb-cross;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+  .onb-flyer {
+    animation-name: onb-cross, onb-glide;
+  }
+  .onb-wing {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: onb-flap 0.9s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes onb-cross {
+  from { transform: translateX(-180px); }
+  to { transform: translateX(calc(100vw + 40px)); }
+}
+@keyframes onb-glide {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -14px; }
+}
+@keyframes onb-flap {
+  to { transform: scaleY(0.55); }
+}
+
+/* a choice card's own control at its corner (the Sound step's preview) */
+.setup-option-cell {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+.setup-option-cell .setup-option {
+  padding-right: 52px;
+}
+.setup-option-action {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+.setup-preview {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.setup-preview svg {
+  width: 12px;
+  height: 12px;
+}
+.setup-preview:hover,
+.setup-preview[aria-pressed="true"] {
+  background: var(--selected-bg);
+  color: var(--selected-ink);
+}
+.setup-preview:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

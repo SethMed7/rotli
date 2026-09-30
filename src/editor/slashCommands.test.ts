@@ -10,7 +10,7 @@ import {
   slashSpanAtCaret,
   SLASH_ITEMS,
 } from "./slashMenu";
-import { filterPickerNotes, pickerHint, slashPickerCanCreate } from "./slashPicker";
+import { embedCreateName, filterPickerNotes, pickerHint, slashPickerCanCreate } from "./slashPicker";
 
 const file = (id: string): NoteSummary => ({
   id,
@@ -372,5 +372,12 @@ describe("/template", () => {
     });
     expect(pickerHint(note("01K6B3ZQ8R2X4Y7N9P5T1V3W6M"))).toBe("");
     expect(pickerHint(note("wiki/_inbox/packing-list.md"))).toBe("packing-list.md");
+  });
+
+  test("a board made from /board is named from the picker's field first; other kinds name themselves", () => {
+    expect(embedCreateName("embedBoard", "  Q4 roadmap ")).toBe("Q4 roadmap");
+    expect(embedCreateName("embedBoard", "   ")).toBeNull();
+    expect(embedCreateName("embedSheet", "anything")).toBeUndefined();
+    expect(embedCreateName("embedDocument", "")).toBeUndefined();
   });
 });

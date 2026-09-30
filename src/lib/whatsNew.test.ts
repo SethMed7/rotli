@@ -43,6 +43,19 @@ describe("What's new — when it shows", () => {
     ).toEqual({ version: null, record: true });
   });
 
+  test("What's new never follows onboarding: set up on this version, it's recorded, not shown", () => {
+    // a re-run of setup on 1.6.0, with an older version last seen
+    expect(
+      whatsNewDecision({
+        current: "1.6.0",
+        lastSeen: "1.5.0",
+        onboarded: true,
+        onboardingVersion: "1.6.0",
+        notes,
+      }),
+    ).toEqual({ version: null, record: true });
+  });
+
   test("someone set up on an older build sees it on their first updated launch", () => {
     expect(
       whatsNewDecision({

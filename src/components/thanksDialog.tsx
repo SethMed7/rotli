@@ -22,6 +22,7 @@ import { startTour } from "../state/tour";
 import { useUiStore } from "../state/ui";
 import { Character } from "./character";
 import { composeBanner } from "./onboarding/bannerCanvas";
+import { GitHubMarkGlyph, XMarkGlyph } from "./onboarding/shareMarks";
 import { WebDialogFrame } from "./webDialogFrame";
 
 type Banner = { kind: "drawing" } | { kind: "ready"; blob: Blob; url: string } | { kind: "failed" };
@@ -145,6 +146,36 @@ function ThanksCard() {
       onClose={close}
       actions={
         <>
+          {/* the shares and the tour share one row (the owner, 2026-09-30) */}
+          <div className="thanks-actions" role="group" aria-label="Share Rotli">
+            <button
+              type="button"
+              className="rename-btn thanks-mark"
+              aria-label="Star on GitHub"
+              title="Star Rotli on GitHub"
+              onClick={() => void openLink(ROTLI_REPO_URL)}
+            >
+              <GitHubMarkGlyph />
+              Star
+            </button>
+            <button type="button" className="rename-btn" onClick={() => void tellAFriend()}>
+              Tell a friend
+            </button>
+            <button
+              type="button"
+              className="rename-btn thanks-mark"
+              aria-label="Share on X"
+              title="Share on X"
+              disabled={!ready}
+              onClick={() => void shareOnX()}
+            >
+              <XMarkGlyph />
+              Share
+            </button>
+            <button type="button" className="rename-btn" disabled={!ready} onClick={() => void keepBanner()}>
+              {bannerSavesToAssets() ? "Save banner" : "Download banner"}
+            </button>
+          </div>
           <span className="thanks-status" role="status">
             {status}
           </span>
@@ -169,20 +200,6 @@ function ThanksCard() {
             Couldn’t draw your banner. Everything else still works.
           </p>
         )}
-      </div>
-      <div className="thanks-actions" role="group" aria-label="Share Rotli">
-        <button type="button" className="rename-btn" onClick={() => void openLink(ROTLI_REPO_URL)}>
-          Star on GitHub
-        </button>
-        <button type="button" className="rename-btn" onClick={() => void tellAFriend()}>
-          Tell a friend
-        </button>
-        <button type="button" className="rename-btn" disabled={!ready} onClick={() => void shareOnX()}>
-          Share on X
-        </button>
-        <button type="button" className="rename-btn" disabled={!ready} onClick={() => void keepBanner()}>
-          {bannerSavesToAssets() ? "Save banner" : "Download banner"}
-        </button>
       </div>
     </WebDialogFrame>
   );

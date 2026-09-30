@@ -34,8 +34,9 @@ import { Character } from "../character";
  * Amber first — it is the accessory default. */
 const ACCESSORY_HUE_CHOICES = [38, 225, 195, 145, 280, 340, 10] as const;
 import { AccentRow } from "../settingsSurface";
+import { OnboardingIntro, OnboardingScenery, introWanted } from "./onboardingScenery";
 import { setupChoiceIndex, SetupBack, SetupChoiceGroup, SetupPrimary } from "./setupControls";
-import { SetupSideFriends } from "./setupSideFriends";
+import { SetupScrollCue, useStageScrollCue } from "./setupScrollCue";
 import { SetupSound } from "./setupSound";
 
 const STEPS = ["welcome", "appearance", "behavior", "sound", "shortcuts"] as const;
@@ -153,6 +154,11 @@ function ChordRow({ id, label, hint }: (typeof HOTKEYS)[number]) {
 
 export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => void; initialStep?: Step }) {
   const [step, setStep] = useState<Step>(initialStep);
+  // a fresh first run opens on the island (onboardingScenery.tsx)
+  const [intro, setIntro] = useState(() => introWanted(initialStep === "welcome"));
+  const endIntro = () => setIntro(false);
+  // a short window: the step scrolls, and says so
+  const [stageRef, showScrollCue, stageScrolls] = useStageScrollCue();
   const index = STEPS.indexOf(step);
   const theme = useUiStore((state) => state.theme);
   const family = useUiStore((state) => state.themeFamily);
@@ -234,8 +240,9 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
   };
 
   return (
-    <div className="onb">
+    <div className="onb" data-intro={intro ? "" : undefined}>
       <div className="onb-drag" data-tauri-drag-region />
+      <OnboardingScenery welcome={step === "welcome"} />
       <section className="setup-shell" aria-labelledby="setup-title">
         <div className="setup-progress">
           <span>
@@ -245,9 +252,14 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
           <span>{titles[step]}</span>
         </div>
 
-        <SetupSideFriends />
-
-        <div className="setup-stage" data-step={step} key={step}>
+        <div
+          className={["setup-stage", stageScrolls && "is-scrolling", showScrollCue && "has-more"]
+            .filter(Boolean)
+            .join(" ")}
+          data-step={step}
+          key={step}
+          ref={stageRef}
+        >
           <aside className={`setup-companion setup-companion--${step}`} aria-hidden="true">
             <Character
               name={
@@ -260,7 +272,6 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
                       : "listening"
               }
               size={152}
-              accessorized={false}
               alwaysVisible
             />
             <p>
@@ -273,7 +284,6 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
           <div className="setup-content">
             {step === "welcome" && (
               <>
-                <p className="setup-eyebrow">Local-first notes for your Mac</p>
                 <h1 id="setup-title">Make Rotli feel like yours.</h1>
                 <p className="setup-lede">
                   Pick a look, choose how the window behaves, and meet the three shortcuts worth remembering.
@@ -305,22 +315,23 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
 
             {step === "appearance" && (
               <>
-                <p className="setup-eyebrow">Start somewhere comfortable</p>
                 <h1 id="setup-title">Choose a theme.</h1>
-                <p className="setup-lede">Pick its character, then choose Light, Dark, or follow your Mac.</p>
+                <p className="setup-lede">
+                  Pick a theme, then Light, Dark, or follow your Mac. An accent and your quokka come after.
+                </p>
                 <SetupChoiceGroup
                   label="Theme"
                   value={family}
                   onChange={pickFamily}
                   options={THEME_FAMILY_PRESENTATIONS.map(
-                    ({ family: optionFamily, label, description, lightLabel, darkLabel }) => ({
+                    ({ family: optionFamily, label, lightLabel, darkLabel }) => ({
                       value: optionFamily,
                       title: label,
-                      description,
+                      // the site's lit orbs, Light and Dark (the owner, 2026-09-30)
                       detail: (
                         <span className="setup-theme-pair" aria-hidden="true">
-                          <span className={`setup-theme-dot ${optionFamily}-light`} title={lightLabel} />
-                          <span className={`setup-theme-dot ${optionFamily}-dark`} title={darkLabel} />
+                          <span className="setup-orb" data-orb={`${optionFamily}-light`} title={lightLabel} />
+                          <span className="setup-orb" data-orb={`${optionFamily}-dark`} title={darkLabel} />
                         </span>
                       ),
                     }),
@@ -439,7 +450,6 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
 
             {step === "behavior" && (
               <>
-                <p className="setup-eyebrow">Choose a rhythm</p>
                 <h1 id="setup-title">How should the window live?</h1>
                 <p className="setup-lede">
                   The menu-bar icon is always available. This controls the Dock and what happens when you
@@ -478,7 +488,6 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
 
             {step === "shortcuts" && (
               <>
-                <p className="setup-eyebrow">Call Rotli from anywhere</p>
                 <h1 id="setup-title">Three shortcuts, right where they act.</h1>
                 <p className="setup-lede">Keep these defaults or click a shortcut to record your own.</p>
                 <div className="setup-shortcuts">
@@ -490,6 +499,8 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
             )}
           </div>
         </div>
+
+        {showScrollCue && <SetupScrollCue />}
 
         <footer className="setup-footer">
           <button type="button" className="setup-skip" onClick={skip}>
@@ -507,6 +518,7 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
           </div>
         </footer>
       </section>
+      {intro && <OnboardingIntro onDone={endIntro} />}
     </div>
   );
 }

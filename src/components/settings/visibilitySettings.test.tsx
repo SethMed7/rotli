@@ -27,13 +27,11 @@ describe("Settings → Show in Rotli", () => {
   });
 
   test("Rotli Web never offers to hide the palette's only door, or a Browser button it lacks", () => {
-    const web = visibilityItems("web", false).map((item) => item.id);
+    const web = visibilityItems("web").map((item) => item.id);
     expect(web).not.toContain("search");
     expect(web).not.toContain("browserButton");
-    expect(web).not.toContain("breve");
-    const mac = visibilityItems("desktop", true).map((item) => item.id);
+    const mac = visibilityItems("desktop").map((item) => item.id);
     expect(mac).toContain("search");
     expect(mac).toContain("browserButton");
-    expect(mac).toContain("breve");
   });
 });

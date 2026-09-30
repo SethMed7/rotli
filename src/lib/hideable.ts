@@ -70,13 +70,6 @@ export const HIDEABLE = [
     still: "in ⌘K",
   },
   { id: "tasks", group: "Sidebar", title: "Tasks", desc: "The row at the top of Home.", still: "in ⌘K" },
-  {
-    id: "breve",
-    group: "Sidebar",
-    title: "Breve",
-    desc: "The Breve switch beside Home and Chat.",
-    still: "⌘⇧B",
-  },
   { id: "files", group: "Sidebar footer", title: "Files", desc: "Opens the vault in Finder." },
   {
     id: "librarian",

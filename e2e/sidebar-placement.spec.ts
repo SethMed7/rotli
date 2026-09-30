@@ -8,7 +8,7 @@ import { gotoApp } from "./support";
 async function openAppearance(page: Page) {
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Appearance", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Sidebar" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sidebar", exact: true })).toBeVisible();
 }
 
 /** Into the edge strip: two moves, so a pointerenter lands even if the first

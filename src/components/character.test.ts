@@ -4,10 +4,6 @@ import { readFileSync } from "node:fs";
 const characterSource = readFileSync(new URL("character.tsx", import.meta.url), "utf8");
 const artSource = readFileSync(new URL("characterArt.ts", import.meta.url), "utf8");
 const settingsSource = readFileSync(new URL("settingsSurface.tsx", import.meta.url), "utf8");
-const setupSideFriendsSource = readFileSync(
-  new URL("onboarding/setupSideFriends.tsx", import.meta.url),
-  "utf8",
-);
 const chatSource = readFileSync(new URL("chat/chatSurface.tsx", import.meta.url), "utf8");
 const paneSource = readFileSync(new URL("paneEmptyState.tsx", import.meta.url), "utf8");
 const bucketHatFrontInk = readFileSync(
@@ -78,7 +74,6 @@ describe("quokka personalization", () => {
     expect(characterSource).toContain('appearance?: "personalized" | "quiet-line"');
     expect(characterSource).toContain('quietLine ? "line"');
     expect(characterSource).toContain('quietLine ? "none"');
-    expect(setupSideFriendsSource.match(/appearance="quiet-line"/g)).toHaveLength(4);
   });
 
   test("bucket-hat angles expose one visible front brim without a rear arc across the face", () => {

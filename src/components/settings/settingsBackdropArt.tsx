@@ -23,8 +23,8 @@ const petals = (spots: readonly [number, number][]) => (
         className="sc-petal"
         cx={x}
         cy={y}
-        rx="3"
-        ry="2"
+        rx="5"
+        ry="3.5"
         style={{ animationDelay: `${i * 1.7}s` }}
       />
     ))}
@@ -96,9 +96,15 @@ export const SETTINGS_BACKDROPS: Record<ThemeFamily, SettingsBackdrop> = {
     ),
     horizon: (
       <>
+        {/* gum trees: a trunk under each crown, so they read as trees */}
+        <g className="sc-trunk">
+          {[60, 150, 250, 900, 1000, 1110].map((x) => (
+            <rect key={x} x={x - 3} y={104} width="6" height="30" />
+          ))}
+        </g>
         <g className="sc-canopy">
           {[60, 150, 250, 900, 1000, 1110].map((x, i) => (
-            <circle key={x} cx={x} cy={104 - (i % 2) * 8} r={22 + (i % 3) * 4} />
+            <circle key={x} cx={x} cy={96 - (i % 2) * 8} r={18 + (i % 3) * 4} />
           ))}
         </g>
         <path className="sc-hill" d="M0 132c240-22 600-28 900-18s200 12 300 18z" />
@@ -109,9 +115,9 @@ export const SETTINGS_BACKDROPS: Record<ThemeFamily, SettingsBackdrop> = {
   iris: {
     sky: (
       <>
-        {star(110, 50, 1.4, 0)}
-        {star(160, 110, 1.2, 1.3)}
-        {star(80, 150, 1.4, 2.4)}
+        {star(110, 50, 2.4, 0)}
+        {star(160, 110, 2, 1.3)}
+        {star(80, 150, 2.4, 2.4)}
         <circle className="sc-firefly" cx="200" cy="160" r="2" />
       </>
     ),
@@ -144,9 +150,9 @@ export const SETTINGS_BACKDROPS: Record<ThemeFamily, SettingsBackdrop> = {
           [760, 100],
         ])}
         <g className="sc-blossom">
-          <circle cx="300" cy="130" r="3" />
-          <circle cx="620" cy="128" r="3" />
-          <circle cx="1040" cy="130" r="3" />
+          {[300, 312, 620, 632, 1040, 1052].map((x, i) => (
+            <circle key={x} cx={x} cy={126 - (i % 2) * 4} r="5" />
+          ))}
         </g>
         {ground}
       </>
