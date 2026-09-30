@@ -10,7 +10,7 @@ import {
   slashSpanAtCaret,
   SLASH_ITEMS,
 } from "./slashMenu";
-import { filterPickerNotes, slashPickerCanCreate } from "./slashPicker";
+import { filterPickerNotes, pickerHint, slashPickerCanCreate } from "./slashPicker";
 
 const file = (id: string): NoteSummary => ({
   id,
@@ -358,5 +358,19 @@ describe("/template", () => {
     expect(templateInsertion("---\ntitle: x\nsecure: false\n---\n\n## Agenda\n", false)).toBe("## Agenda");
     expect(templateInsertion("# Only a title\n", false)).toBe("");
     expect(templateInsertion("\n\n", true)).toBe("");
+  });
+
+  test("a picker row's hint is a readable place, never a native note's opaque id", () => {
+    const note = (id: string) => ({
+      id,
+      title: "T",
+      snippet: "",
+      folderId: "",
+      createdAt: 0,
+      updatedAt: 0,
+      pinned: false,
+    });
+    expect(pickerHint(note("01K6B3ZQ8R2X4Y7N9P5T1V3W6M"))).toBe("");
+    expect(pickerHint(note("wiki/_inbox/packing-list.md"))).toBe("packing-list.md");
   });
 });

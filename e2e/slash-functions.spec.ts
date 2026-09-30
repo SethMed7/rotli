@@ -123,3 +123,29 @@ test("Continue a project list links the list itself while work is open", async (
   await expect(page.locator(".pane.focused .cm-content")).toContainText("Enhancements");
   await expect(page.locator(".main-row", { hasText: "Enhancements 2" })).toHaveCount(0);
 });
+
+// Found by the computer-use pass, 2026-09-29: in a short window the menu ran
+// past the window's bottom, and arrowing to a row below the fold scrolled the
+// NOTE (scrollIntoView moves every scrollable ancestor), pushing the menu's top
+// under the tab strip. The menu now fits the room it has and only it scrolls.
+test("in a short window the slash menu fits, and arrowing scrolls only the menu", async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 520 });
+  await gotoApp(page);
+  await newNote(page, "# Short\n\nOne.\n\nTwo.\n\n");
+  const scroller = page.locator(".pane.focused .cm-scroller");
+  const before = await scroller.evaluate((el) => el.scrollTop);
+  await page.keyboard.type("/");
+  const menu = page.getByRole("menu", { name: "Insert block" });
+  await expect(menu).toBeVisible();
+  const fits = () =>
+    menu.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return r.top >= 0 && r.bottom <= window.innerHeight;
+    });
+  expect(await fits()).toBe(true);
+  await page.keyboard.press("ArrowUp");
+  for (let i = 0; i < 6; i++) await page.keyboard.press("ArrowDown");
+  await expect(menu.locator(".slashrow.sel")).toBeInViewport();
+  expect(await scroller.evaluate((el) => el.scrollTop)).toBe(before);
+  expect(await fits()).toBe(true);
+});

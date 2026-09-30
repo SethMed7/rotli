@@ -76,7 +76,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - The slash menu and its pickers now scroll with the arrow keys, so the
-  highlighted row never sits out of sight. Pickers have a × to close them,
+  highlighted row never sits out of sight. In a short window they fit the
+  room they have instead of running off the bottom, and arrowing through them
+  no longer scrolls the note underneath. Note pickers no longer show a note's
+  internal id beside its title. Pickers have a × to close them,
   and closing one with Esc or the × puts your cursor back in the note.
 
 - **A new tab's note stays in the folder you're in.** With a note from a Main

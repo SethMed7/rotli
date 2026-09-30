@@ -215,3 +215,25 @@ function sidePlacement(
   if (prefer === "right") return fitsRight || roomRight >= roomLeft ? "right" : "left";
   return fitsLeft || roomLeft >= roomRight ? "left" : "right";
 }
+
+// ─── menus that open at the caret ────────────────────────────────────────────
+
+/** Cap a caret menu to the room between it and the window's edge on the side
+ * it opens toward (`up`: its bottom sits on the caret row), so a short window
+ * never pushes its rows out of reach. The cap never grows past `max`. */
+export function fitMenuToWindow(menu: HTMLElement, up: boolean, max = 440, margin = 8): void {
+  menu.style.maxHeight = "";
+  const box = menu.getBoundingClientRect();
+  const room = up ? box.bottom - margin : window.innerHeight - box.top - margin;
+  menu.style.maxHeight = `${Math.max(96, Math.min(max, room))}px`;
+}
+
+/** Scroll `row` into view inside `list` ONLY. Element.scrollIntoView moves
+ * every scrollable ancestor too — the note under a slash menu included. */
+export function scrollRowIntoList(list: HTMLElement, row: Element | null | undefined): void {
+  if (!row) return;
+  const outer = list.getBoundingClientRect();
+  const inner = row.getBoundingClientRect();
+  if (inner.top < outer.top) list.scrollTop -= outer.top - inner.top;
+  else if (inner.bottom > outer.bottom) list.scrollTop += inner.bottom - outer.bottom;
+}
