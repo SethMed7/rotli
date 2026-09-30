@@ -14,7 +14,6 @@ import { type MouseEvent, useEffect, useRef, useState } from "react";
 
 import { dispatch } from "../keys/registry";
 import { isWebVault } from "../lib/browserVault";
-import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { useTransientPopover } from "../lib/popover";
 import { corpusInspectFolder, corpusRefreshVault } from "../lib/tauri";
 import { type MemexInstance } from "../memex/config";
@@ -37,7 +36,7 @@ import {
 } from "../services/vaultSwitcher";
 import { activateCreatedVault, reconnectActiveVault } from "../state/activeVault";
 import { useContextMenu } from "../state/contextMenu";
-import { useIsHidden } from "../state/hidden";
+import { useFrontCount, useFrontOn } from "../state/fronts";
 import { useFocusedTab } from "../state/panes";
 import { flushSettingsNow } from "../state/persist";
 import { useUiStore } from "../state/ui";
@@ -76,9 +75,9 @@ function FoldGlyph({ size = 16 }: { size?: number }) {
 
 export function Sidebar() {
   const sidebarMode = useUiStore((s) => s.sidebarMode);
-  // hidden Breve keeps its switch while Breve is open, so the way back shows
-  const hideBreve = useIsHidden("breve");
-  const showBreve = LAUNCH_FEATURES.breve && (!hideBreve || sidebarMode === "breve");
+  // each front is on or off (Settings → Sidebar); with one on, no switcher
+  const showBreve = useFrontOn("breve");
+  const oneFront = useFrontCount() <= 1;
   const sidebarView = useUiStore((s) => s.sidebarView);
   const setSidebarView = useUiStore((s) => s.setSidebarView);
   const sidebarZoom = useUiStore((s) => s.sidebarZoom);
@@ -408,12 +407,14 @@ export function Sidebar() {
           header, above everything the front renders. Breve is a MODE with its
           own rail below, but it sits in the same control (2026-09-02) so the
           way in and the way back are the same labelled segments. */}
-      <SidebarSwitcher
-        value={sidebarMode === "breve" ? null : sidebarFrontSelection(sidebarView, contentView)}
-        onPick={pickSidebarView}
-        breveActive={sidebarMode === "breve"}
-        onBreve={showBreve ? () => dispatch("view.breve") : undefined}
-      />
+      {!oneFront && (
+        <SidebarSwitcher
+          value={sidebarMode === "breve" ? null : sidebarFrontSelection(sidebarView, contentView)}
+          onPick={pickSidebarView}
+          breveActive={sidebarMode === "breve"}
+          onBreve={showBreve ? () => dispatch("view.breve") : undefined}
+        />
+      )}
 
       {/* a failed row-menu action (file-to-brain, board rename) says so HERE —
           inline, dismissible, above the tree it happened in (#11, audit 2026-07) */}

@@ -193,21 +193,34 @@ export function viewPickerItems(
   },
   /** The two-step hotkey opened it: the first nine choices wear ⌘1–⌘9. */
   numbered = false,
+  /** The Vault view (services/vaultTree.ts): the vault's folders as on disk. */
+  vault?: { on: boolean; show: () => void },
 ): MenuSpec[] {
   const slot = (index: number) => (numbered && index < 9 ? { hint: `⌘${index + 1}` } : {});
   const items: MenuSpec[] = [
     {
       kind: "action",
       label: "Main — all items",
-      checked: activeView === null,
+      checked: activeView === null && !vault?.on,
       checkedMark: "highlight",
       onClick: () => on.show(null),
       ...slot(0),
     },
+    ...(vault
+      ? [
+          {
+            kind: "action" as const,
+            label: "Vault — folders as on disk",
+            checked: vault.on,
+            checkedMark: "highlight" as const,
+            onClick: vault.show,
+          },
+        ]
+      : []),
     ...manifest.views.map((view, index) => ({
       kind: "action" as const,
       label: view.name,
-      checked: activeView === view.name,
+      checked: activeView === view.name && !vault?.on,
       checkedMark: "highlight" as const,
       onClick: () => on.show(view.name),
       ...slot(index + 1),

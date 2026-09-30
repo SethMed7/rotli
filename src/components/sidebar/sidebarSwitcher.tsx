@@ -19,11 +19,13 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import { createDragGhost } from "../../lib/dragGhost";
 import { LAUNCH_FEATURES } from "../../lib/featurePolicy";
 import { createPointerDragSession } from "../../lib/pointerDrag";
+import { enabledFronts } from "../../lib/sidebarFronts";
 import { chatWindowSupported } from "../../services/chatWindowShell";
 import { useChatSetupGuide } from "../../state/chatSetupGuide";
 import { popOutChat, regroupChat } from "../../state/chatWindow";
 import { useChatWindowStore } from "../../state/chatWindowStore";
 import { useContextMenu } from "../../state/contextMenu";
+import { AVAILABLE_FRONTS, useFronts } from "../../state/fronts";
 import { helperReadyFrom, useHelperLink } from "../../state/helperLink";
 import { type ContentView, type DashboardSection, type SidebarView, useUiStore } from "../../state/ui";
 import { PopOutGlyph, RegroupGlyph } from "../chatWindow/windowGlyphs";
@@ -40,9 +42,10 @@ const SIDEBAR_FRONTS: {
 }[] = [
   {
     id: "home",
-    label: "Home",
+    // "Notes" (2026-09-30): "home" now means where Rotli opens, a choice
+    label: "Notes",
     Glyph: HomeGlyph,
-    hint: "Your notes — All notes, Captures, Tasks and Main",
+    hint: "Your notes: All notes, Captures, Tasks and Main",
     action: "modules.notes",
   },
   {
@@ -85,6 +88,11 @@ export function SidebarSwitcher({
   /** Present when the Breve segment is offered (the main window). */
   onBreve?: (() => void) | undefined;
 }) {
+  // select the stable prefs, then derive (a fresh array per read would loop)
+  const frontsOn = enabledFronts(
+    useFronts((s) => s.prefs),
+    AVAILABLE_FRONTS,
+  );
   // Rotli Web: paired with Rotli Helper, chat is a real front
   const helperOk = useHelperLink((s) => helperReadyFrom(s));
   const helperProblem = useHelperLink((s) => s.problem);
@@ -104,6 +112,7 @@ export function SidebarSwitcher({
     // owns the one tablist in the window (the app's segmented-control grammar)
     <div className="sb-switch" role="group" aria-label="Sidebar front">
       {SIDEBAR_FRONTS.map(({ id, label, Glyph, hint, action }) => {
+        if (!frontsOn.includes(id === "home" ? "notes" : "chat")) return null;
         const active = !breveActive && value === id;
         if (id === "chat" && !LAUNCH_FEATURES.chat && !helperOk) {
           // Rotli Web: chat needs the tools on the user's computer. The front

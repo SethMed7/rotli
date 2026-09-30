@@ -254,7 +254,9 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
         </div>
 
         <div
-          className={stageScrolls ? "setup-stage is-scrolling" : "setup-stage"}
+          className={["setup-stage", stageScrolls && "is-scrolling", showScrollCue && "has-more"]
+            .filter(Boolean)
+            .join(" ")}
           data-step={step}
           key={step}
           ref={stageRef}
@@ -315,7 +317,9 @@ export function Onboarding({ onDone, initialStep = "welcome" }: { onDone: () => 
             {step === "appearance" && (
               <>
                 <h1 id="setup-title">Choose a theme.</h1>
-                <p className="setup-lede">Pick its character, then choose Light, Dark, or follow your Mac.</p>
+                <p className="setup-lede">
+                  Pick a theme, then Light, Dark, or follow your Mac. An accent and your quokka come after.
+                </p>
                 <SetupChoiceGroup
                   label="Theme"
                   value={family}

@@ -140,6 +140,33 @@ standard context and the default cache-write rate because local aggregates do
 not retain every billable routing detail. The browser twin shows an honest
 desktop-only empty state because it must not inspect the host.
 
+## Fronts on and off, and where Rotli opens (2026-09-30)
+
+The owner: "I should be able to turn off Chat and Breve, then have Notes be
+able to turn off too, and the user can choose their home, but Notes is the
+default home. The user needs at least one on. If they only have one on, hide
+the switcher."
+
+- **Settings → Appearance → Sidebar** has a switch per front (Notes, Chat,
+  Breve where it ships) and **Rotli opens on**, a choice among the fronts that
+  are on. The rules live once in `src/lib/sidebarFronts.ts`: at least one
+  front stays on (its switch locks), and turning off the home moves home to
+  the first front still on.
+- The segment formerly labelled **Home** now reads **Notes**; "home" means
+  where Rotli opens. Internal ids (`sidebarView: "home"`) are unchanged.
+- A front that's off has no way in. Its segment is gone, its shortcuts are
+  disabled (`modules.notes`, `modules.chat`, `modules.toggleFront`,
+  `chat.new`, `chat.summon` and ⌥A, `view.breve`), and anything that lands on
+  it anyway (a chat tab focused, a restored state) steps to the home front
+  (`enforceFronts`, `state/fronts.ts`). With only one front on, the switcher
+  is gone.
+- Notes off also hides the System zone (Library, Assets, Archive, Trash) from
+  the sidebar. ⌘K still reaches them.
+- A vault's load opens on the home front (`landingFront`) rather than the
+  last front it showed. The choice is an app setting on this Mac
+  (`sidebarFronts` in the app settings file, `state/appExtras.ts`). Breve's
+  old "hide the switch" entry in Show in Rotli is replaced by its switch here.
+
 ## Persistence
 
 Both new pieces of state ride the existing `.rotli/settings.json` writer in

@@ -16,6 +16,13 @@ second user-visible product or storage location.
   uniquely named reference trees with their own virtual folders. Main retains
   every item assigned to a named view; switching views changes navigation and
   creation context, never physical storage.
+- **The Vault view shows the disk itself (2026-09-30).** Beside Main and the
+  named views, the view picker offers **Vault — folders as on disk**
+  (`services/vaultTree.ts`): the vault's own folders and files, folders first,
+  by name, as Finder lists them (a memex's `wiki/` is its root; Archive and
+  Trash stay in the System zone). Nothing is stored for it, and it can't be
+  arranged: it moves when the files move. Off by default, and an app setting
+  on this Mac (`vaultView`). Picking Main or a named view turns it off.
 - **Both manifests are revision-gated, and a conflict is recovered quietly.**
   The app presents the revision it read with every `main.json` / `views.json`
   write; the CLI, the Librarian, and a views write that files a new item into
@@ -147,6 +154,11 @@ second user-visible product or storage location.
 - The Librarian waits for the configured quiet window after the note's
   latest edit (five minutes by default) before classifying or refiling it. New
   edits reset that window; filing changes location/metadata, never note prose.
+  While the Vault view is on, a note that is showing in the sidebar is left
+  where it is too, and it moves once it's out of sight. The sidebar sends
+  which rows are on screen (`organizer_set_visible`), the daemon requeues
+  them like a quiet note (`Skip::Visible`), and Main sends nothing, since a
+  note's place in Main never follows its file.
 - A newly created DOCX remains a session-pristine draft until its first content
   mutation. Explicitly closing its final tab while it is still pristine moves
   the managed file to Rotli's recoverable Trash and removes its Main reference.

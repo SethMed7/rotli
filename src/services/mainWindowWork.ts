@@ -7,6 +7,7 @@
 import { useEffect } from "react";
 
 import { onQuitFlushFailure } from "../lib/quitFlush";
+import { enforceFronts } from "../state/fronts";
 import { useUiStore } from "../state/ui";
 import { startAmbient } from "./ambient";
 import { startRoutineUpdateCheck } from "./updateCheck";
@@ -14,7 +15,7 @@ import { startRoutineUpdateCheck } from "./updateCheck";
 export function useMainWindowWork(surface: string): void {
   useEffect(() => {
     if (surface !== "main") return;
-    const stops = [startRoutineUpdateCheck(), startAmbient()];
+    const stops = [startRoutineUpdateCheck(), startAmbient(), enforceFronts()];
     return () => stops.forEach((stop) => stop());
   }, [surface]);
 

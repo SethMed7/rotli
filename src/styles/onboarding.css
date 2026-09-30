@@ -112,6 +112,7 @@
 
 .setup-lede {
   max-width: 590px;
+  text-wrap: balance;
   color: var(--text-muted);
   font-size: 14px;
   line-height: 1.62;
@@ -991,13 +992,15 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 6px 9px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  background: var(--ground);
   color: var(--text-muted);
-  font-size: 10.5px;
+  font-size: 11px;
   pointer-events: none;
+}
+
+/* the words sit on the page, not in a card (the owner, 2026-09-30): the
+   scrolling step fades out at its foot instead, so nothing runs under them */
+.setup-stage.has-more {
+  mask-image: linear-gradient(to bottom, black calc(100% - 56px), transparent);
 }
 
 .setup-stage-scroll-cue span {
@@ -1150,6 +1153,12 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+/* a brand's mark in place of its name (GitHub, X) */
+.thanks-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
 .thanks-status {
   margin-inline-end: auto;
   align-self: center;
@@ -1183,9 +1192,10 @@
 }
 .onb-scenery-sky {
   position: absolute;
-  top: 9%;
-  right: 3%;
-  width: 220px;
+  /* under the corner music player, above the step's text */
+  top: 48px;
+  right: 2%;
+  width: 180px;
   height: auto;
   opacity: 0.6;
   animation: onb-scene-in 420ms var(--motion-ease) both;
