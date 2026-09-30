@@ -1,12 +1,12 @@
 // Picker sub-mode for slash ops that need a note/board/sheet target before insert.
 
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { PlusGlyph, glyphForNote } from "../components/glyphs";
 import { DOCX_EDITABLE } from "../documents/kinds";
 import { extOf, fileName } from "../lib/fileKind";
 import { subsequenceMatch } from "../lib/fuzzy";
-import { useTransientPopover } from "../lib/popover";
+import { fitMenuToWindow, scrollRowIntoList, useTransientPopover } from "../lib/popover";
 import { corpusManagedFileCreationAvailable, isTauri } from "../lib/tauri";
 import { createManagedItem } from "../newItems/composition";
 import { DEST } from "../services/destinations";
@@ -64,6 +64,14 @@ const MODE_LABEL: Record<SlashPickerMode, string> = {
   continueList: "Project list",
 };
 
+/** A row's quiet right-hand hint: where the note lives. A native note's id is
+ * an opaque ULID, never shown (computer-use pass, 2026-09-29: "raw note IDs
+ * next to titles"); a path-shaped id shows its file name. */
+export function pickerHint(note: NoteSummary): string {
+  if (isPresetTemplate(note.id)) return "Built-in";
+  return note.id.includes("/") || note.id.includes(".") ? fileName(note.id) : "";
+}
+
 export function slashPickerCanCreate(mode: SlashPickerMode, tauri = isTauri(), writable = true): boolean {
   // a template — or a note made from Link note — is an ordinary note: every
   // vault can make one, web included
@@ -93,6 +101,8 @@ export function SlashPicker({
   // clicking back into the note (or anywhere else) or pressing Escape closes
   // it, as every other popover does (tester feedback, 2026-09-29)
   const rootRef = useRef<HTMLDivElement | null>(null);
+  // the search field and × stay put; only the rows under them scroll
+  const listRef = useRef<HTMLDivElement | null>(null);
   useTransientPopover([rootRef], true, onClose);
   const [creationAvailable, setCreationAvailable] = useState<boolean | null>(null);
   const [createError, setCreateError] = useState("");
@@ -146,8 +156,14 @@ export function SlashPicker({
   const createSelected = canCreate && selectedIndex === items.length;
   // arrowing past the fold scrolls the list with the highlight
   useEffect(() => {
-    rootRef.current?.querySelector(".slashrow.sel")?.scrollIntoView?.({ block: "nearest" });
+    const list = listRef.current;
+    if (list) scrollRowIntoList(list, list.querySelector(".slashrow.sel"));
   }, [selectedIndex]);
+  // a short window caps the picker to the room it has (computer-use pass, 2026-09-29)
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (root) fitMenuToWindow(root, !!root.closest(".rotli-slash-anchor.up"));
+  }, []);
 
   const runCreate = async () => {
     setCreateError("");
@@ -242,63 +258,65 @@ export function SlashPicker({
           ×
         </button>
       </div>
-      {!ready && <div className="slashpicker-empty">Loading…</div>}
-      {ready && rows === 0 && (
-        <div className="slashpicker-empty">
-          {mode === "embedDocument"
-            ? "No editable DOCX documents in Storage yet"
-            : mode === "linkChat" && !query.trim()
-              ? "No chats yet"
-              : mode === "insertTemplate" && !query.trim()
-                ? `No templates yet — any note you keep in a folder named ${TEMPLATES_FOLDER} shows up here`
-                : "No matches"}
-        </div>
-      )}
-      {createError && <div className="slashpicker-empty is-error">{createError}</div>}
-      {items.map((note, i) => (
-        <button
-          key={note.id}
-          type="button"
-          className={i === selectedIndex ? "slashrow sel" : "slashrow"}
-          role="menuitem"
-          onMouseDown={(e) => e.preventDefault()}
-          onMouseEnter={() => onHover(i)}
-          onClick={() => onPick(note)}
-        >
-          <span className="slashglyph">{glyphForNote(note)}</span>
-          <span className="slashlabel">{note.title}</span>
-          <span className="slashhint">{isPresetTemplate(note.id) ? "Built-in" : fileName(note.id)}</span>
-        </button>
-      ))}
-      {supportsCreate && (
-        <button
-          type="button"
-          className={createSelected ? "slashrow sel" : "slashrow"}
-          role="menuitem"
-          disabled={!canCreate}
-          onMouseDown={(e) => e.preventDefault()}
-          onMouseEnter={() => {
-            if (canCreate) onHover(items.length);
-          }}
-          onClick={() => void runCreate()}
-        >
-          <span className="slashglyph">
-            <PlusGlyph size={15} />
-          </span>
-          <span className="slashlabel">{newTitle ? `Create “${newTitle}”` : "Create new"}</span>
-          <span className="slashhint">
-            {canCreate
-              ? newTitle
-                ? "New note, linked here"
-                : mode === "insertTemplate"
-                  ? `New note in ${TEMPLATES_FOLDER}`
-                  : `New ${MODE_LABEL[mode].toLowerCase()}`
-              : creationAvailable === null
-                ? "Checking permissions…"
-                : "Read-only in development"}
-          </span>
-        </button>
-      )}
+      <div className="slashpicker-list" ref={listRef}>
+        {!ready && <div className="slashpicker-empty">Loading…</div>}
+        {ready && rows === 0 && (
+          <div className="slashpicker-empty">
+            {mode === "embedDocument"
+              ? "No editable DOCX documents in Storage yet"
+              : mode === "linkChat" && !query.trim()
+                ? "No chats yet"
+                : mode === "insertTemplate" && !query.trim()
+                  ? `No templates yet — any note you keep in a folder named ${TEMPLATES_FOLDER} shows up here`
+                  : "No matches"}
+          </div>
+        )}
+        {createError && <div className="slashpicker-empty is-error">{createError}</div>}
+        {items.map((note, i) => (
+          <button
+            key={note.id}
+            type="button"
+            className={i === selectedIndex ? "slashrow sel" : "slashrow"}
+            role="menuitem"
+            onMouseDown={(e) => e.preventDefault()}
+            onMouseEnter={() => onHover(i)}
+            onClick={() => onPick(note)}
+          >
+            <span className="slashglyph">{glyphForNote(note)}</span>
+            <span className="slashlabel">{note.title}</span>
+            <span className="slashhint">{pickerHint(note)}</span>
+          </button>
+        ))}
+        {supportsCreate && (
+          <button
+            type="button"
+            className={createSelected ? "slashrow sel" : "slashrow"}
+            role="menuitem"
+            disabled={!canCreate}
+            onMouseDown={(e) => e.preventDefault()}
+            onMouseEnter={() => {
+              if (canCreate) onHover(items.length);
+            }}
+            onClick={() => void runCreate()}
+          >
+            <span className="slashglyph">
+              <PlusGlyph size={15} />
+            </span>
+            <span className="slashlabel">{newTitle ? `Create “${newTitle}”` : "Create new"}</span>
+            <span className="slashhint">
+              {canCreate
+                ? newTitle
+                  ? "New note, linked here"
+                  : mode === "insertTemplate"
+                    ? `New note in ${TEMPLATES_FOLDER}`
+                    : `New ${MODE_LABEL[mode].toLowerCase()}`
+                : creationAvailable === null
+                  ? "Checking permissions…"
+                  : "Read-only in development"}
+            </span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }

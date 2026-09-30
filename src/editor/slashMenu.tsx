@@ -11,11 +11,12 @@
 // two surfaces can evolve independently. Glyphs are reused from FormatBar's
 // vocabulary — same SVG voice, same 15px size.
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 import { DOCUMENT_SEARCH_KEYWORDS } from "../documents/kinds";
 import { LAUNCH_FEATURES, PLATFORM } from "../lib/featurePolicy";
 import { DATE_WORDS } from "../lib/noteDates";
+import { fitMenuToWindow, scrollRowIntoList } from "../lib/popover";
 import { Gl, bulletGlyph, checklistGlyph, codeGlyph, numberedGlyph, quoteGlyph } from "./formatGlyphs";
 import { parseBlock } from "./render";
 import { RESULT_REASON_SEPARATOR, resultTextParts } from "./resultState";
@@ -551,9 +552,14 @@ export function SlashMenu({
   // arrowing past the fold scrolls the menu with the highlight (and its group label)
   const rootRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    const sel = rootRef.current?.querySelector(".slashrow.sel");
-    (sel?.closest(".slashgrouped") ?? sel)?.scrollIntoView?.({ block: "nearest" });
+    const root = rootRef.current;
+    const sel = root?.querySelector(".slashrow.sel");
+    if (root) scrollRowIntoList(root, sel?.closest(".slashgrouped") ?? sel);
   }, [selectedIndex, query]);
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (root) fitMenuToWindow(root, !!root.closest(".rotli-slash-anchor.up"));
+  }, [query]);
   return (
     <div className="slashmenu" role="menu" aria-label="Insert block" ref={rootRef}>
       {items.length === 0 && (
