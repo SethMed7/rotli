@@ -1,4 +1,39 @@
 {
+  "1.7.0": [
+    {
+      "title": "Rotli opens with a moment of its own",
+      "body": "Every launch opens on a short scene in your theme with your quokka. Any key or click skips it, and Reduce motion turns it off.",
+      "platform": "mac"
+    },
+    {
+      "title": "Choose your sidebar",
+      "body": "Turn Notes, Chat, or Breve off in Settings → Appearance, and pick which one Rotli opens on. With one left, the switcher steps aside."
+    },
+    {
+      "title": "A Vault view",
+      "body": "Pick Vault above Main to see your folders the way Finder does. While it's open, the Librarian leaves anything you can see where it is."
+    },
+    {
+      "title": "Dates and project lists from /",
+      "body": "Type /today, /yesterday, or /tomorrow for the date; in a template it fills in the day you use it. Continue a project list starts the next list once the last one's done."
+    },
+    {
+      "title": "Link note makes the note",
+      "body": "Type a title that doesn't exist yet and choose Create to make the note and link it in one step."
+    },
+    {
+      "title": "Your theme, everywhere",
+      "body": "Settings, an empty pane, and setup wear your theme's scenery, with drifting clouds and your quokka. Settings also got one width, joined controls, and a music volume."
+    },
+    {
+      "title": "AI edits only what it may",
+      "body": "Chat, agents, and the Librarian change notes an AI made. A note you wrote stays yours unless you turn on Let AI edit the text."
+    },
+    {
+      "title": "Rename in place",
+      "body": "Rename a note or folder right in its sidebar row: Enter saves, Escape keeps the old name."
+    }
+  ],
   "1.6.0": [
     {
       "title": "Talk to the Librarian",
