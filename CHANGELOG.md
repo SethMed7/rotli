@@ -10,10 +10,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`bun run stats`** for maintainers: downloads, installed updates, Macs per
+  version, site visitors, and Rotli Web loads, from GitHub's and Cloudflare's
+  aggregate counts (docs/operations/usage-stats.md).
+- **Your own YouTube stations.** Settings → General → Ambient audio takes up
+  to three YouTube videos, live streams, or playlists of your own. They play
+  like Claude FM, from the sidebar player.
+
 ### Changed
 
+- **Update checks go through rotli.co.** The Mac app asks rotli.co first,
+  with its version in the address, and rotli.co passes it to the signed feed
+  on GitHub (GitHub directly if rotli.co is down). That lets rotli.co's
+  traffic count Macs per version, with no identifier or personal data; the
+  privacy page and PRIVACY.md say so.
+- **Home is called Home.** Whichever sidebar section you choose as Home reads
+  "Home" and comes first in the switcher; the others keep their names. Chat
+  as Home stays in the main window.
 - **rotli.co shows all seven theme families.** The theme studio on the home
   page now includes Blossom, in light and dark, beside the other six.
+
+### Fixed
+
+- **Your settings survive updates.** Rotli no longer writes over a settings
+  file it couldn't read or one a newer Rotli saved, keeps a copy of a damaged
+  one before replacing it, and no longer forgets a custom global shortcut
+  another app happened to hold at launch.
+- **Pausing with AirPods pauses the music.** A pause or play from AirPods, a
+  media key, or the Now Playing menu now sticks: the player follows it, and
+  Claude FM is no longer started again a moment later.
+- **No sidebar footer for Settings alone.** With Files, Librarian, and
+  Feedback hidden, the footer goes away; Settings is still in the titlebar.
 
 ## [1.7.1] - 2026-09-30
 

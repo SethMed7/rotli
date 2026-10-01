@@ -10,11 +10,18 @@ import { nextAvailableStep, placeStep, TOUR_STEPS, type TourStep } from "./guide
 
 const CARD = { width: 300, height: 150 };
 
-function anchorRect(selector: string): DOMRect | null {
-  const node = document.querySelector<HTMLElement>(selector);
-  if (!node) return null;
-  const rect = node.getBoundingClientRect();
-  return rect.width > 0 && rect.height > 0 ? rect : null;
+/** The step's control: the first of its selectors that is on screen. */
+function anchorNode(anchor: TourStep["anchor"]): HTMLElement | null {
+  for (const selector of typeof anchor === "string" ? [anchor] : anchor) {
+    const node = document.querySelector<HTMLElement>(selector);
+    const rect = node?.getBoundingClientRect();
+    if (node && rect && rect.width > 0 && rect.height > 0) return node;
+  }
+  return null;
+}
+
+function anchorRect(anchor: TourStep["anchor"]): DOMRect | null {
+  return anchorNode(anchor)?.getBoundingClientRect() ?? null;
 }
 
 const available = (step: TourStep) => anchorRect(step.anchor) !== null;
@@ -54,7 +61,7 @@ export function GuidedTour() {
     if (requested === null) return;
     const index = nextAvailableStep(requested, 1, available);
     const anchor = index >= 0 ? TOUR_STEPS[index]?.anchor : undefined;
-    const node = anchor ? document.querySelector<HTMLElement>(anchor) : null;
+    const node = anchor ? anchorNode(anchor) : null;
     node?.setAttribute("data-tour-active", "");
     return () => node?.removeAttribute("data-tour-active");
   }, [requested, layout]);

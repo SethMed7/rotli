@@ -6460,6 +6460,11 @@ impl CorpusStore {
     pub fn dot_write(&self, which: &str, contents: &str) -> Result<(), String> {
         self.mutation_allowed()?;
         let path = self.guard_rel(&format!("{DOT_DIR}/{}", dot_file(which)?))?;
+        // the vault's settings that won't parse are kept beside them, never
+        // silently replaced (projections like viewstate rebuild, so skip them)
+        if which == "settings" {
+            crate::fsutil::keep_unreadable_settings(&path)?;
+        }
         atomic_write(&path, contents)
     }
 
@@ -8705,6 +8710,9 @@ pub fn corpus_settings_write(
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
+        if file == "settings" {
+            crate::fsutil::keep_unreadable_settings(&path)?;
+        }
         return atomic_write(&path, &contents);
     }
     // demo mode: per-machine chrome writes land on the real corpus, never the demo
@@ -8712,6 +8720,9 @@ pub fn corpus_settings_write(
     if let Some(path) = demo_machine_dot_path(&app, &file) {
         if let Some(p) = path.parent() {
             fs::create_dir_all(p).map_err(|e| e.to_string())?;
+        }
+        if file == "settings" {
+            crate::fsutil::keep_unreadable_settings(&path)?;
         }
         return atomic_write(&path, &contents);
     }

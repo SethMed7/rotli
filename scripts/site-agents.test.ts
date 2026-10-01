@@ -43,6 +43,18 @@ describe("Caddy serves the Markdown twins", () => {
   });
 });
 
+describe("the update check through rotli.co (2026-10-01)", () => {
+  test("a well-formed version path redirects to the signed GitHub feed, and only that", () => {
+    const flat = collapse(caddyfile);
+    expect(flat).toContain(
+      "@updateCheck path_regexp ^/update/[0-9][0-9A-Za-z.+%-]{0,31}/[a-z0-9_-]{1,32}/[a-z0-9_-]{1,16}/latest\\.json$",
+    );
+    expect(flat).toContain(
+      "redir @updateCheck https://github.com/SethMed7/rotli-releases/releases/latest/download/latest.json 302",
+    );
+  });
+});
+
 describe("robots.txt", () => {
   test("names each AI crawler; the ones the zone blocks stay disallowed", () => {
     const robots = agents.robotsText();

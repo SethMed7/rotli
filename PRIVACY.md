@@ -19,9 +19,13 @@ store. Deleting the app does not transfer ownership of the files to Rotli.
 Rotli does not operate an analytics or account endpoint. Network activity is
 limited to declared product capabilities:
 
-- the signed updater checks the pinned GitHub release feed for a newer version:
-  shortly after the app opens and a few times a day, and whenever you press
-  "Check for updates". The request carries no account, vault, or note data.
+- the signed updater checks for a newer version: shortly after the app opens
+  and a few times a day, and whenever you press "Check for updates". It asks
+  rotli.co first, with Rotli's version, macOS, and the chip type in the
+  address (so rotli.co's traffic shows how many Macs run each version), and
+  rotli.co redirects the app to the signed release feed on GitHub; if
+  rotli.co is unreachable the app asks GitHub directly. The request carries no account,
+  identifier, vault, or note data.
   Settings → General → "Check for updates automatically" turns the routine
   check off; nothing is downloaded until you choose Install;
 - a user-enabled connected chat lane launches the already-authenticated official

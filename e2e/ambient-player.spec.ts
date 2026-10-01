@@ -96,3 +96,42 @@ test("the ambient element can't be orphaned, and Stop all sound silences it", as
     ),
   ).toBe(true);
 });
+
+// 2026-10-01, the owner: "offer option to add another url, must be youtube,
+// for people to add their own yt fm music they like".
+test("your own YouTube station: added in Settings, picked from the player", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("switch", { name: /Ambient audio/ }).click();
+  const linkField = page.getByRole("textbox", { name: "YouTube link" });
+  await linkField.fill("https://vimeo.com/123");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("isn’t a YouTube");
+  await linkField.fill("https://youtu.be/jfKfPfyJRdk?si=shared");
+  await page.getByRole("textbox", { name: "Station name" }).fill("Lofi Girl");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  const stations = page.getByRole("list", { name: "Your YouTube stations" });
+  await expect(stations.getByRole("listitem")).toHaveText(["Lofi Girl×"]);
+  await expect(stations.getByText("Lofi Girl")).toHaveAttribute(
+    "title",
+    "https://www.youtube.com/watch?v=jfKfPfyJRdk",
+  );
+  await page.getByRole("button", { name: "Back to notes", exact: true }).click();
+
+  // added means chosen: it's what the player plays, and the menu lists it last
+  const player = page.getByRole("region", { name: "Now playing" });
+  await expect(player.locator(".sb-player-source span")).toHaveText("Lofi Girl");
+  await expect(player.getByRole("button", { name: "Open Lofi Girl in a tab" })).toBeVisible();
+  await player.getByRole("button", { name: /^Choose the ambient sound/ }).click();
+  const items = page.getByRole("menu").getByRole("menuitemcheckbox");
+  await expect(items.last()).toHaveText("Lofi Girl");
+  await expect(items.last()).toHaveAttribute("aria-checked", "true");
+  await page.keyboard.press("Escape");
+
+  // removing the station playing goes back to Linen
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "Remove “Lofi Girl”" }).click();
+  await expect(page.getByRole("list", { name: "Your YouTube stations" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Back to notes", exact: true }).click();
+  await expect(player.locator(".sb-player-source span")).toHaveText("Linen");
+});

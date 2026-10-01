@@ -40,6 +40,10 @@ way in but their buttons).
   the cursor never lands on something invisible.
 - The footer's grid gives each shown button an equal column, with no gap
   where a hidden one was.
+- With Files, Librarian, and Feedback all hidden, the footer itself goes
+  (`footerShown`): Settings alone is already in the titlebar. The tour's
+  Settings step then points at the titlebar's Settings (a step's `anchor` may
+  list selectors; the first on screen wins).
 
 ## Proof
 
@@ -50,5 +54,7 @@ load round trip), `src/components/sidebar/homeShortcuts.test.tsx`,
 removes them, the footer closes up, Tasks still opens from ⌘K, and Show
 everything brings them back. The title bar's Browser button is Mac-only, so
 hiding it is proved by the same switch path rather than in the browser build.
+`e2e/sidebar-footer.spec.ts` proves the footer goes when only Settings would
+be left, and that the tour's Settings step then points at the titlebar.
 
 Breve's entry moved to Settings → Appearance → Sidebar (2026-09-30), where each front turns on and off (docs/design/sidebar-home-chat.md).

@@ -19,7 +19,7 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import { createDragGhost } from "../../lib/dragGhost";
 import { LAUNCH_FEATURES } from "../../lib/featurePolicy";
 import { createPointerDragSession } from "../../lib/pointerDrag";
-import { enabledFronts } from "../../lib/sidebarFronts";
+import { enabledFronts, type Front, isHomeFront } from "../../lib/sidebarFronts";
 import { chatWindowSupported } from "../../services/chatWindowShell";
 import { useChatSetupGuide } from "../../state/chatSetupGuide";
 import { popOutChat, regroupChat } from "../../state/chatWindow";
@@ -29,7 +29,7 @@ import { AVAILABLE_FRONTS, useFronts } from "../../state/fronts";
 import { helperReadyFrom, useHelperLink } from "../../state/helperLink";
 import { type ContentView, type DashboardSection, type SidebarView, useUiStore } from "../../state/ui";
 import { PopOutGlyph, RegroupGlyph } from "../chatWindow/windowGlyphs";
-import { ChatGlyph, CoffeeGlyph, HomeGlyph } from "../glyphs";
+import { ChatGlyph, CoffeeGlyph, HomeGlyph, NotesStackGlyph } from "../glyphs";
 
 const SIDEBAR_FRONTS: {
   id: SidebarView;
@@ -42,9 +42,10 @@ const SIDEBAR_FRONTS: {
 }[] = [
   {
     id: "home",
-    // "Notes" (2026-09-30): "home" now means where Rotli opens, a choice
+    // "Notes" (2026-09-30): "home" means where Rotli opens, a choice; the
+    // front chosen as home reads Home, with the house (homeSegment)
     label: "Notes",
-    Glyph: HomeGlyph,
+    Glyph: NotesStackGlyph,
     hint: "Your notes: All notes, Captures, Tasks and Main",
     action: "modules.notes",
   },
@@ -89,10 +90,9 @@ export function SidebarSwitcher({
   onBreve?: (() => void) | undefined;
 }) {
   // select the stable prefs, then derive (a fresh array per read would loop)
-  const frontsOn = enabledFronts(
-    useFronts((s) => s.prefs),
-    AVAILABLE_FRONTS,
-  );
+  const frontsPrefs = useFronts((s) => s.prefs);
+  const frontsOn = enabledFronts(frontsPrefs, AVAILABLE_FRONTS);
+  const isHome = (front: Front) => isHomeFront(front, frontsPrefs, AVAILABLE_FRONTS);
   // Rotli Web: paired with Rotli Helper, chat is a real front
   const helperOk = useHelperLink((s) => helperReadyFrom(s));
   const helperProblem = useHelperLink((s) => s.problem);
@@ -111,80 +111,75 @@ export function SidebarSwitcher({
     // sidebar's own content, not a tabpanel, and the pane tab strip already
     // owns the one tablist in the window (the app's segmented-control grammar)
     <div className="sb-switch" role="group" aria-label="Sidebar front">
-      {SIDEBAR_FRONTS.map(({ id, label, Glyph, hint, action }) => {
-        if (!frontsOn.includes(id === "home" ? "notes" : "chat")) return null;
-        const active = !breveActive && value === id;
-        if (id === "chat" && !LAUNCH_FEATURES.chat && !helperOk) {
-          // Rotli Web: chat needs the tools on the user's computer. The front
-          // stays visible so the product reads whole, says so on hover, and
-          // one click opens the walkthrough that gets it there — also when a
-          // pairing exists but the helper is silent or refuses the token.
+      {/* Home leads the switch, whichever front it is */}
+      {onBreve && isHome("breve") && <BreveSegment active={breveActive} home onPick={onBreve} />}
+      {homeFirst(SIDEBAR_FRONTS, (id) => isHome(id === "home" ? "notes" : "chat")).map(
+        ({ id, label: name, Glyph: OwnGlyph, hint, action }) => {
+          const front: Front = id === "home" ? "notes" : "chat";
+          if (!frontsOn.includes(front)) return null;
+          const { label, Glyph } = homeSegment(isHome(front), name, OwnGlyph);
+          const active = !breveActive && value === id;
+          if (id === "chat" && !LAUNCH_FEATURES.chat && !helperOk) {
+            // Rotli Web: chat needs the tools on the user's computer. The front
+            // stays visible so the product reads whole, says so on hover, and
+            // one click opens the walkthrough that gets it there — also when a
+            // pairing exists but the helper is silent or refuses the token.
+            return (
+              <button
+                key={id}
+                type="button"
+                className="sb-switch-seg desktop-only"
+                aria-pressed={false}
+                title={
+                  helperProblem === "refused"
+                    ? "Rotli Helper refused the pairing — click to pair again"
+                    : helperProblem === "unreachable"
+                      ? "Rotli Helper isn't answering — click to reconnect"
+                      : helperVerifying
+                        ? "Checking Rotli Helper…"
+                        : "Chat isn't set up on the web yet — click to see how"
+                }
+                onClick={() => useChatSetupGuide.getState().show()}
+              >
+                <Glyph size={14} />
+                <span className="sb-switch-label">{label}</span>
+              </button>
+            );
+          }
+          // Chat is in its own window: main shows no trace of it here (the
+          // owner, 2026-09-21) — the switch's trailing button brings it back
+          if (id === "chat" && chatWindow && chatDetached) return null;
+          // Home stays where Rotli opens: only a Chat that isn't home pulls out
+          if (id === "chat" && chatWindow && !isHome("chat")) {
+            return (
+              <ChatWindowSegment
+                key={id}
+                active={active}
+                hint={hint}
+                action={action}
+                onPick={() => onPick(id)}
+                onPullOut={pullChatOut}
+              />
+            );
+          }
           return (
             <button
               key={id}
               type="button"
-              className="sb-switch-seg desktop-only"
-              aria-pressed={false}
-              title={
-                helperProblem === "refused"
-                  ? "Rotli Helper refused the pairing — click to pair again"
-                  : helperProblem === "unreachable"
-                    ? "Rotli Helper isn't answering — click to reconnect"
-                    : helperVerifying
-                      ? "Checking Rotli Helper…"
-                      : "Chat isn't set up on the web yet — click to see how"
-              }
-              onClick={() => useChatSetupGuide.getState().show()}
+              aria-pressed={active}
+              data-tour={id === "chat" ? "chat" : undefined}
+              title={hint}
+              data-hotkey={action}
+              className={active ? "sb-switch-seg sel" : "sb-switch-seg"}
+              onClick={() => onPick(id)}
             >
               <Glyph size={14} />
               <span className="sb-switch-label">{label}</span>
             </button>
           );
-        }
-        // Chat is in its own window: main shows no trace of it here (the
-        // owner, 2026-09-21) — the switch's trailing button brings it back
-        if (id === "chat" && chatWindow && chatDetached) return null;
-        if (id === "chat" && chatWindow) {
-          return (
-            <ChatWindowSegment
-              key={id}
-              active={active}
-              hint={hint}
-              action={action}
-              onPick={() => onPick(id)}
-              onPullOut={pullChatOut}
-            />
-          );
-        }
-        return (
-          <button
-            key={id}
-            type="button"
-            aria-pressed={active}
-            data-tour={id === "chat" ? "chat" : undefined}
-            title={hint}
-            data-hotkey={action}
-            className={active ? "sb-switch-seg sel" : "sb-switch-seg"}
-            onClick={() => onPick(id)}
-          >
-            <Glyph size={14} />
-            <span className="sb-switch-label">{label}</span>
-          </button>
-        );
-      })}
-      {onBreve && (
-        <button
-          type="button"
-          aria-pressed={breveActive}
-          title="Breve — your briefs, watchlist, and routines"
-          data-hotkey="view.breve"
-          className={breveActive ? "sb-switch-seg sel" : "sb-switch-seg"}
-          onClick={onBreve}
-        >
-          <CoffeeGlyph size={14} />
-          <span className="sb-switch-label">Breve</span>
-        </button>
+        },
       )}
+      {onBreve && !isHome("breve") && <BreveSegment active={breveActive} home={false} onPick={onBreve} />}
       {chatWindow && chatDetached && (
         <button
           type="button"
@@ -197,6 +192,40 @@ export function SidebarSwitcher({
         </button>
       )}
     </div>
+  );
+}
+
+/** The fronts with home first, the rest in their usual order. */
+export function homeFirst<T extends { id: SidebarView }>(
+  fronts: readonly T[],
+  home: (id: SidebarView) => boolean,
+): T[] {
+  return [...fronts.filter((front) => home(front.id)), ...fronts.filter((front) => !home(front.id))];
+}
+
+/** The front chosen as home reads Home, with the house; the others keep their names. */
+export function homeSegment(
+  home: boolean,
+  label: string,
+  Glyph: typeof HomeGlyph,
+): { label: string; Glyph: typeof HomeGlyph } {
+  return home ? { label: "Home", Glyph: HomeGlyph } : { label, Glyph };
+}
+
+function BreveSegment({ active, home, onPick }: { active: boolean; home: boolean; onPick: () => void }) {
+  const { label, Glyph } = homeSegment(home, "Breve", CoffeeGlyph);
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      title="Breve — your briefs, watchlist, and routines"
+      data-hotkey="view.breve"
+      className={active ? "sb-switch-seg sel" : "sb-switch-seg"}
+      onClick={onPick}
+    >
+      <Glyph size={14} />
+      <span className="sb-switch-label">{label}</span>
+    </button>
   );
 }
 

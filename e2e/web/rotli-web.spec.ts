@@ -127,7 +127,7 @@ test("the web build keeps Chat visible; clicking it walks through the helper and
   page,
 }) => {
   await startWithVault(page);
-  await expect(page.getByRole("button", { name: "Notes", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Home", exact: true })).toBeVisible();
   const chatFront = page.locator(".sb-switch-seg.desktop-only");
   await expect(chatFront).toBeVisible();
   await expect(chatFront).toHaveAttribute("title", /click to see how/i);

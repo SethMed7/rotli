@@ -62,9 +62,22 @@ again. With the setting off, the player shows only while something plays."
   on the main document.
 - "Override the video" is simply pausing it; the rules then resume ambient.
   There is no separate override flag to fall out of step.
-- The preference `{enabled, track, playing}` is saved in Rotli's app settings
-  on this Mac (`ambient` key). A launch never forces sound: if the webview
-  refuses a play without a click, the player reads as paused.
+- The preference `{enabled, track, playing, volume, stations}` is saved in
+  Rotli's app settings on this Mac (`ambient` key). A launch never forces
+  sound: if the webview refuses a play without a click, the player reads as
+  paused.
+- **A pause from outside Rotli is the person's choice** (the owner,
+  2026-10-01: "if I pause with airpods … it should pause"). AirPods, a media
+  key, or the Now Playing menu pause or play the ambient element itself; its
+  `onpause`/`onplay` turn that into `playing`, while Rotli's own pauses (a tab
+  taking over, a fade-out) are marked and leave the choice alone. A stream's
+  page that stops playing without Rotli having asked in the last 3 s starts a
+  wait (`nextPausedSince`); once it has stayed paused 1.2 s it counts as the
+  person's pause (`streamFollow` → `pause-theirs`; a page's own stall, an ad
+  ending, is shorter), and until then the service doesn't nudge it, so it is
+  never fought back to playing. Rotli's own pauses (Pause, a tab taking over)
+  never start the wait, and asking the page to play clears it, so Play after a
+  long pause plays. A page playing again from outside sets `playing` too.
 
 ## Knowing what a tab plays (`src-tauri/src/private_browser_media.rs`)
 
@@ -110,9 +123,20 @@ playing and pausing is extremely laggy".
   and an **Open Claude FM in a tab** button: an ordinary tab on the stream,
   with ambient stepping back so the two never both play.
 - **The source menu.** The ambient title in the player is a button that opens
-  the sources: the six tracks, then Claude FM (`AMBIENT_SOURCES`), the current
-  one highlighted. Choosing one starts it. Settings lists the same. Rotli Web
-  hides Claude FM (no private browser there).
+  the sources: the six tracks, then Claude FM, then the person's own stations
+  (`ambientSources`), the current one highlighted. Choosing one starts it.
+  Settings lists the same, as a pill row up to eight sources and a dropdown
+  past that. Rotli Web hides every stream (no private browser there).
+- **Your YouTube stations** (`lib/youtubeStation.ts`, Settings →
+  `youtubeStations.tsx`; the owner, 2026-10-01). Up to three. A pasted link is
+  read for a video or playlist id (youtube.com, m., music., youtu.be; watch,
+  live, shorts, embed, playlist) and rebuilt as
+  `https://www.youtube.com/watch?v=…[&list=…]`; the pasted text is never
+  stored or loaded, and saved stations are parsed again on every load, so a
+  hand-edited file can't point the page at another host. A station plays
+  exactly like Claude FM (the same hidden page; a different station navigates
+  it), with no Stop or volume and an **Open <name> in a tab** button. Adding
+  one plays it; removing the one playing goes back to Linen.
 - **Claude FM** (`CLAUDE_FM` in `lib/ambient.ts`): Anthropic's 24/7 lo-fi
   stream on YouTube, at the address Claude Code's `/radio` opens. As the
   ambient source it plays in a private browser page with a fixed id
@@ -163,8 +187,12 @@ it. Skip app setup returns ambient to its default, off, like the rest of setup.
   `src/services/ambient.test.ts` (the buttons), the rendered player and the
   settings section, and Rust tests for the state names, the action scripts,
   the YouTube host check and the action names.
-- `e2e/ambient-player.spec.ts`: the setting, the player above the footer, and
-  skipping tracks.
+- `e2e/ambient-player.spec.ts`: the setting, the player above the footer,
+  skipping tracks, and a YouTube station added, picked, and removed.
+- `src/lib/youtubeStation.test.ts` (link shapes in, every other host out),
+  `src/components/settings/youtubeStations.test.ts`, and the outside pause:
+  `services/ambient.test.ts` (an AirPods pause on the element; Rotli's own
+  pause leaves the choice) and `pausedFromOutside` in `lib/ambient.test.ts`.
 - Owed to the owner (native, cannot run in the browser build): a YouTube tab
   shows the speaker and takes over from ambient; pause/stop/next/previous and
   Open the tab work from the player; closing the tab brings ambient back; the

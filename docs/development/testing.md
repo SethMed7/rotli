@@ -9,6 +9,7 @@ direction, runtime wiring, and owning documentation must agree.
 | Command | Purpose |
 |---|---|
 | `bun run security:protect` | Print the five repository rulesets (main/dev, all branches, tags); `--check` compares GitHub with them read-only; explicit `--apply` checks the owner, then creates or updates each one and verifies it against the plan |
+| `bun run stats` | Maintainer usage counts, read-only: GitHub release downloads and installed updates, repository traffic, and rotli.co's Cloudflare traffic (visitors, download page, Rotli Web loads, Mac update checks by version) with a read-only token from `CLOUDFLARE_API_TOKEN` or the Keychain item `rotli-cloudflare-stats`; aggregate only (`docs/operations/usage-stats.md`) |
 | `bun run security:secrets` | Redacted Gitleaks 8.30.1 scan of tracked/unignored working-tree files; separate from verify, fails on findings/errors; the external binary is intentionally listed in knip's tool allowlist |
 | `bun run security:working` | Scan proposed tracked/untracked worktree text with pinned Gitleaks without printing values; included in the required verify secrets lane alongside a latest-commit scan. Full history remains a separate publication gate |
 | `bun run security:bundle <candidate.app>` | Inspect actual release resources and binary strings for prohibited files, embedded home paths, and symlinks escaping the bundle; required before Apple uploads |

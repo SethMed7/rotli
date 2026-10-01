@@ -1,8 +1,7 @@
 {
   "fileLines": {
     "src/state/panes.test.ts": 848,
-    "src/state/persist.test.ts": 630,
-    "src/state/persist.ts": 1679,
+    "src/state/persist.ts": 1654,
     "src/state/ui.ts": 1115,
     "src/state/panes.ts": 1267,
     "src/components/systemSurface.tsx": 1189,

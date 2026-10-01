@@ -152,8 +152,15 @@ the switcher."
   are on. The rules live once in `src/lib/sidebarFronts.ts`: at least one
   front stays on (its switch locks), and turning off the home moves home to
   the first front still on.
-- The segment formerly labelled **Home** now reads **Notes**; "home" means
-  where Rotli opens. Internal ids (`sidebarView: "home"`) are unchanged.
+- **Whichever front is home reads Home** (the owner, 2026-10-01: "one needs
+  to be marked as home, and whatever it is is called Home, not its specific
+  one, and that one can't be dragged out"). The home segment wears the house
+  and the word Home and leads the switch (`homeSegment`, `homeFirst`); the
+  others keep their names (Notes with the notes stack, Chat, Breve). Settings
+  marks it too ("Notes · Home"). Chat as home has no pull-out: no tear-off,
+  no corner button, no context menu, and `popOutBlocker` refuses the ⌘K
+  action (`POP_OUT_HOME`); choosing Chat as home while it's out in its own
+  window brings it back. Internal ids (`sidebarView: "home"`) are unchanged.
 - A front that's off has no way in. Its segment is gone, its shortcuts are
   disabled (`modules.notes`, `modules.chat`, `modules.toggleFront`,
   `chat.new`, `chat.summon` and ⌥A, `view.breve`), and anything that lands on
@@ -209,7 +216,8 @@ in the unknown-key passthrough (`#35`), so a downgrade keeps the user's cap.
 ## Chat in its own window (1.3.0, in the work)
 
 Chat can be pulled out of this switch into a window of its own; Home cannot —
-main is where Home lives. Decision and seams:
+main is where Home lives. Since 2026-10-01 Home is whichever front the person
+chose, so Chat as Home stays put too (`POP_OUT_HOME`). Decision and seams:
 [`docs/decisions/2026-09-21-chat-window-same-vault.md`](../decisions/2026-09-21-chat-window-same-vault.md).
 Development builds only until the native checklist passes
 (`LAUNCH_FEATURES.chatWindow`), the Mac app only.

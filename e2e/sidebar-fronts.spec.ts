@@ -10,8 +10,9 @@ import { expect, test } from "@playwright/test";
 
 import { gotoApp } from "./support";
 
+// the front chosen as Home reads "Home" (Notes by default)
 const homeSeg = (page: import("@playwright/test").Page) =>
-  page.getByRole("button", { name: "Notes", exact: true });
+  page.getByRole("button", { name: "Home", exact: true });
 const chatSeg = (page: import("@playwright/test").Page) =>
   page.getByRole("button", { name: "Chat", exact: true });
 
@@ -227,5 +228,12 @@ test("fronts turn off in Settings → Sidebar; one left hides the switcher and c
     "true",
   );
   await backToNotes();
-  await expect(switcher.getByRole("button", { name: "Chat", exact: true })).toBeVisible();
+  // the owner, 2026-10-01: whichever is home is called Home, and can't be
+  // dragged out — Chat as home reads Home, with no pull-out; Notes is Notes
+  await expect(switcher.getByRole("button")).toHaveText(["Home", "Notes"]);
+  await expect(switcher.getByRole("button", { name: "Home", exact: true })).toHaveAttribute(
+    "data-tour",
+    "chat",
+  );
+  await expect(page.getByRole("button", { name: "Pull Chat out into its own window" })).toHaveCount(0);
 });

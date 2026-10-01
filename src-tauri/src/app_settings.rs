@@ -52,6 +52,8 @@ pub fn app_settings_write(app: tauri::AppHandle, contents: String) -> Result<(),
     let path = settings_file(&app)?;
     let parent = path.parent().ok_or("no app config directory")?;
     fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    // a file that won't parse is kept beside it, never silently replaced
+    crate::fsutil::keep_unreadable_settings(&path)?;
     crate::fsutil::atomic_write(&path, &contents, ".rotli-app-settings-")
 }
 

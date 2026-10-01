@@ -90,7 +90,9 @@ import {
   useNoteStyleStore,
 } from "./noteStyle";
 import { findLeaf, leaves, usePanesStore } from "./panes";
+import { createPersistDrain } from "./persistDrain";
 import { QUICK_MAX } from "./quick";
+import { noteSettingsRead, SETTINGS_VERSION, settingsWritable, unreadable } from "./settingsGuard";
 import { MIN_TABLE_COL_PX, MIN_TABLE_ROW_PX, noteIdOfWidthKey, useTableWidthsStore } from "./tableWidths";
 import { applyAccent, applySyntaxPalette, applyTheme } from "./theme";
 
@@ -475,7 +477,7 @@ export function parseSettings(raw: string): PersistedSettings {
   const captureVaultId =
     typeof data.captureVaultId === "string" && data.captureVaultId ? data.captureVaultId : null;
   return {
-    v: 1,
+    v: SETTINGS_VERSION,
     theme: asEnum(data.theme, THEME_SETTINGS, "light"),
     themeFamily: asEnum(data.themeFamily, THEME_FAMILIES, "warm"),
     syntaxPalette: asEnum(data.syntaxPalette, SYNTAX_PALETTES, "rotli"),
@@ -905,8 +907,12 @@ function applyShellSideEffects(s: PersistedSettings): void {
   for (const action of allActions()) {
     if (!action.global || !(action.id in s.bindings)) continue;
     const chord = s.bindings[action.id] ?? null;
+    // refused (another app holds it): the default for this session only, the choice kept
     setGlobalShortcut(action.id, chord ? toAccelerator(chord) : null).catch(() => {
-      useBindingsStore.getState().setOverride(action.id, action.defaultChord);
+      void setGlobalShortcut(
+        action.id,
+        action.defaultChord ? toAccelerator(action.defaultChord) : null,
+      ).catch(() => {});
     });
   }
 }
@@ -1323,7 +1329,8 @@ export async function hydratePersistedState(): Promise<void> {
   let appSettings = shellSettings;
   let appSettingsPresent = false;
   try {
-    const appRaw = await appSettingsRead();
+    const appRaw = await appSettingsRead().catch(unreadable("app"));
+    noteSettingsRead("app", appRaw);
     appSettingsPresent = Object.keys(record(JSON.parse(appRaw))).length > 0;
     appSettingsPassthrough = unknownAppSettingsKeys(appRaw);
     appSettingsNeedsWrite = !appSettingsPresent;
@@ -1337,7 +1344,8 @@ export async function hydratePersistedState(): Promise<void> {
 
   if (configured) {
     try {
-      const raw = await corpusSettingsRead("settings");
+      const raw = await corpusSettingsRead("settings").catch(unreadable("vault"));
+      noteSettingsRead("vault", raw);
       const settings = parseSettings(raw);
       shellSettings = settings;
       // keys this build doesn't know survive every rewrite (#35) — main window
@@ -1406,11 +1414,12 @@ export function applyAppearanceBroadcast(payload: AppearanceBroadcast): void {
   useNoteStyleStore.setState({ styles });
 }
 
-function appSettingsSnapshot(): string {
+/** The app settings file as this build writes it (exported for the survival tests). */
+export function appSettingsSnapshot(): string {
   const ui = useUiStore.getState();
   return JSON.stringify({
     ...appSettingsPassthrough,
-    v: 1,
+    v: SETTINGS_VERSION,
     ...appExtrasSnapshot(),
     theme: ui.theme,
     themeFamily: ui.themeFamily,
@@ -1452,7 +1461,7 @@ function appSettingsSnapshot(): string {
 function settingsSnapshot(): string {
   const ui = useUiStore.getState();
   const snapshot: PersistedSettings = {
-    v: 1,
+    v: SETTINGS_VERSION,
     theme: ui.theme,
     themeFamily: ui.themeFamily,
     syntaxPalette: ui.syntaxPalette,
@@ -1547,7 +1556,7 @@ function settingsSnapshot(): string {
 function viewstateSnapshot(): string {
   const panes = usePanesStore.getState();
   const snapshot: PersistedViewstate = {
-    v: 1,
+    v: SETTINGS_VERSION,
     root: withDetachedChats(durablePane(panes.root), useChatWindowStore.getState().refs),
     focusedPaneId: panes.focusedPaneId,
     selectedFolderId: useUiStore.getState().selectedFolderId,
@@ -1563,48 +1572,11 @@ function viewstateSnapshot(): string {
  * before a deliberate relaunch so flags like `onboarded` survive the restart. */
 export async function flushSettingsNow(): Promise<void> {
   if (!hasDurableCorpus()) return;
-  const writes: Array<Promise<void>> = [appSettingsWrite(appSettingsSnapshot())];
-  if (useVaultStore.getState().status === "configured") {
+  const writes = settingsWritable("app") ? [appSettingsWrite(appSettingsSnapshot())] : [];
+  if (useVaultStore.getState().status === "configured" && settingsWritable("vault")) {
     writes.push(corpusSettingsWrite("settings", settingsSnapshot()));
   }
   await Promise.all(writes);
-}
-
-/** One drain of the debounced writer. The high-water marks advance ONLY when
- * a write LANDS — advancing before (the pre-audit shape) meant one transient
- * failure marked the payload written and it never retried: theme/keys/panes
- * silently reverted at next launch (perf audit 2026-07-30, correctness #4).
- * Exported for tests (the shell's corpusSettingsWrite doesn't exist under bun). */
-export function createPersistDrain(
-  write: (key: "settings" | "viewstate", payload: string) => Promise<void>,
-  snapshot: { settings: () => string; viewstate: () => string },
-  seed: { settings: string; viewstate: string },
-  onFailure: () => void,
-): () => Promise<void> {
-  let lastSettings = seed.settings;
-  let lastViewstate = seed.viewstate;
-  return () => {
-    const writes: Array<Promise<void>> = [];
-    const settings = snapshot.settings();
-    if (settings !== lastSettings) {
-      writes.push(
-        write("settings", settings).then(() => {
-          lastSettings = settings;
-        }),
-      );
-    }
-    const viewstate = snapshot.viewstate();
-    if (viewstate !== lastViewstate) {
-      writes.push(
-        write("viewstate", viewstate).then(() => {
-          lastViewstate = viewstate;
-        }),
-      );
-    }
-    return Promise.allSettled(writes).then((results) => {
-      if (results.some((r) => r.status === "rejected")) onFailure();
-    });
-  };
 }
 
 /** Subscribe the one writer to every durable store. Writes are debounced,
@@ -1619,7 +1591,7 @@ export function attachPersistence(): () => void {
   let lastAppSettings = appSettingsNeedsWrite ? "" : appSettingsSnapshot();
   const appDrain = async (): Promise<void> => {
     const next = appSettingsSnapshot();
-    if (next === lastAppSettings) return;
+    if (next === lastAppSettings || !settingsWritable("app")) return;
     await appSettingsWrite(next);
     lastAppSettings = next;
   };
@@ -1630,7 +1602,10 @@ export function attachPersistence(): () => void {
   // configured vault. No command in a skipped first run can create `.rotli/`.
   const corpusDrain = configured
     ? createPersistDrain(
-        corpusSettingsWrite,
+        (key, payload) =>
+          key === "settings" && !settingsWritable("vault")
+            ? Promise.resolve()
+            : corpusSettingsWrite(key, payload),
         { settings: settingsSnapshot, viewstate: viewstateSnapshot },
         { settings: settingsSnapshot(), viewstate: viewstateSnapshot() },
         () => corpusSaver.schedule(),

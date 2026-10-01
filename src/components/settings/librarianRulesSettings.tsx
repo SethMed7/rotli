@@ -17,6 +17,7 @@ import {
 import { secureByKeywords } from "../../lib/vaultRepair";
 import { invalidateNotes } from "../../services/hooks";
 import { useLibrarianRules } from "../../state/librarianRules";
+import { AddField, AddRow, EntryProblem, RemovableRows } from "./removableList";
 import { Seg } from "./seg";
 
 type Check = (value: string, current: readonly string[]) => string | null;
@@ -80,32 +81,14 @@ function ListEditor({
   };
   return (
     <div className="rules-list">
-      {items.length > 0 && (
-        <ul className={rows ? "rules-rows" : "rules-chips"} aria-label={label}>
-          {items.map((item) => (
-            <li key={item}>
-              <span>{item}</span>
-              <button
-                type="button"
-                className="rules-remove"
-                aria-label={`Remove “${item}”`}
-                onClick={() => onChange(items.filter((other) => other !== item))}
-              >
-                ×
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <form
-        className="rules-add"
-        onSubmit={(event) => {
-          event.preventDefault();
-          add();
-        }}
-      >
-        <input
-          className="rules-input"
+      <RemovableRows
+        label={label}
+        rows={items.map((item) => ({ key: item, text: item }))}
+        chips={!rows}
+        onRemove={(key) => onChange(items.filter((other) => other !== key))}
+      />
+      <AddRow disabled={!draft.trim()} onAdd={add}>
+        <AddField
           aria-label={`Add to ${label}`}
           placeholder={placeholder}
           value={draft}
@@ -114,15 +97,8 @@ function ListEditor({
             setProblem(null);
           }}
         />
-        <button type="submit" className="ghostbtn" disabled={!draft.trim()}>
-          Add
-        </button>
-      </form>
-      {problem && (
-        <p className="setnote err" role="alert">
-          {problem}
-        </p>
-      )}
+      </AddRow>
+      <EntryProblem problem={problem} />
     </div>
   );
 }

@@ -28,8 +28,9 @@ afterAll(() => {
   void mock.module("../lib/chatWindowBridge", () => realBridge);
 });
 
-const { POP_OUT_BLOCKED, POP_OUT_IMAGES, attachChatWindow, popOutBlocker, popOutChat } =
+const { POP_OUT_BLOCKED, POP_OUT_HOME, POP_OUT_IMAGES, attachChatWindow, popOutBlocker, popOutChat } =
   await import("./chatWindow");
+const { useFronts } = await import("./fronts");
 const { useChatDrafts } = await import("./chatDrafts");
 const { useChatRuns } = await import("./chatRuns");
 const { useChatWindowStore } = await import("./chatWindowStore");
@@ -102,6 +103,18 @@ describe("pulling Chat out of main", () => {
     expect(popOutChat()).toBe(POP_OUT_IMAGES);
     expect(chatTabs()).toHaveLength(1);
     expect(sent).toEqual([]);
+  });
+
+  // 2026-10-01: Home stays where Rotli opens, whichever front it is
+  test("Chat as Home never leaves the main window", () => {
+    usePanesStore.getState().openChat("plan", { newTab: true });
+    useFronts.setState({ prefs: { off: [], home: "chat" } });
+    expect(popOutBlocker()).toBe(POP_OUT_HOME);
+    expect(popOutChat()).toBe(POP_OUT_HOME);
+    expect(chatTabs()).toHaveLength(1);
+    expect(sent).toEqual([]);
+    useFronts.setState({ prefs: { off: [], home: "notes" } });
+    expect(popOutBlocker()).toBeNull();
   });
 });
 

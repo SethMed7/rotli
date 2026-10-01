@@ -3928,6 +3928,10 @@
   border-radius: var(--r-control);
   padding: 6px 10px;
 }
+/* a station's optional name stays narrower than its link */
+.yt-station-name {
+  flex: 0 1 11rem;
+}
 .rules-input:focus-visible {
   outline: none;
   border-color: color-mix(in srgb, var(--accent-text) 45%, var(--border));

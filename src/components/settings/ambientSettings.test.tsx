@@ -17,7 +17,9 @@ describe("Settings → Ambient audio", () => {
       playing: true,
       track: "dusk",
     });
-    expect(toggledAmbient({ enabled: true, track: "dusk", playing: true, volume: 0.4 }, "grove")).toEqual({
+    expect(
+      toggledAmbient({ enabled: true, track: "dusk", playing: true, volume: 0.4, stations: [] }, "grove"),
+    ).toEqual({
       enabled: false,
       playing: false,
     });
@@ -31,7 +33,7 @@ describe("Settings → Ambient audio", () => {
     expect(offMarkup).not.toContain("Lamplight");
     const onMarkup = renderToStaticMarkup(
       <AmbientSection
-        prefs={{ enabled: true, track: "tide", playing: true, volume: 0.4 }}
+        prefs={{ enabled: true, track: "tide", playing: true, volume: 0.4, stations: [] }}
         setPrefs={() => {}}
         family="warm"
       />,
@@ -44,12 +46,12 @@ describe("Settings → Ambient audio", () => {
   test("the studio track has a volume; off, or Claude FM (its own page's volume), has none", () => {
     const at = (prefs: typeof DEFAULT_AMBIENT) =>
       renderToStaticMarkup(<AmbientSection prefs={prefs} setPrefs={() => {}} family="warm" />);
-    const studio = at({ enabled: true, track: "tide", playing: true, volume: 0.25 });
+    const studio = at({ enabled: true, track: "tide", playing: true, volume: 0.25, stations: [] });
     expect(studio).toContain('aria-label="Music volume"');
     expect(studio).toContain('value="25"');
     expect(at(DEFAULT_AMBIENT)).not.toContain("Music volume");
-    expect(at({ enabled: true, track: CLAUDE_FM.id, playing: true, volume: 0.4 })).not.toContain(
-      "Music volume",
-    );
+    expect(
+      at({ enabled: true, track: CLAUDE_FM.id, playing: true, volume: 0.4, stations: [] }),
+    ).not.toContain("Music volume");
   });
 });

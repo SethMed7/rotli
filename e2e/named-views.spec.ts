@@ -69,7 +69,7 @@ test("Chat names the inherited Notes view and can leave it for all chats", async
   // view; the old UI then highlighted "All chats" beside a filtered list.
   await page.getByRole("button", { name: "Chat", exact: true }).click();
   await page.getByRole("button", { name: "All chats", exact: true }).click();
-  await page.getByRole("button", { name: "Notes", exact: true }).click();
+  await page.getByRole("button", { name: "Home", exact: true }).click();
 
   const viewSwitcher = page.getByRole("button", { name: /Current view: Main/ });
   await viewSwitcher.scrollIntoViewIfNeeded();
@@ -90,7 +90,7 @@ test("Chat names the inherited Notes view and can leave it for all chats", async
   await expect(context.getByRole("button", { name: /Current view: Main/ })).toBeVisible();
   await expect(allChats).toHaveClass(/\bsel\b/);
 
-  await page.getByRole("button", { name: "Notes", exact: true }).click();
+  await page.getByRole("button", { name: "Home", exact: true }).click();
   await expect(page.getByRole("button", { name: /Current view: Main/ })).toBeVisible();
 });
 
@@ -196,7 +196,7 @@ test("Chat switches views without leaving Chat, and ⌘T there files into that v
   // ⌘T from here makes a note in Research — and in Main, which holds everything
   await page.keyboard.press("Meta+T");
   await page.keyboard.type("# Research draft");
-  await page.getByRole("button", { name: "Notes", exact: true }).click();
+  await page.getByRole("button", { name: "Home", exact: true }).click();
   await expect(
     page.locator('.main-tree[data-active-view="Research"] [data-main-id]', { hasText: "Research draft" }),
   ).toBeVisible();

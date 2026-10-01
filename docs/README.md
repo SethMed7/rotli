@@ -61,6 +61,7 @@ fix both in the same change.
 | Repository privacy, main/dev protection, reviewers, and PR flow | [`operations/repository-access.md`](operations/repository-access.md) |
 | Release integrity, provenance, SBOM, keys, and rollback | [`operations/release-and-supply-chain.md`](operations/release-and-supply-chain.md) |
 | Privacy-safe support, diagnostics, backup, and incident triage | [`operations/support-and-diagnostics.md`](operations/support-and-diagnostics.md) |
+| Usage stats without tracking (`bun run stats`) | [`operations/usage-stats.md`](operations/usage-stats.md) |
 | Cross-boundary architecture decision records | [`decisions/README.md`](decisions/README.md) |
 | Where new code, dependencies, and shared constants go | [`development/adding-things.md`](development/adding-things.md) |
 | Token-efficient AI context and project CARL | [`architecture/ai-context-architecture.md`](architecture/ai-context-architecture.md) |

@@ -9,5 +9,6 @@ test('the Chat segment is named "Chat" — no count rides in its accessible name
   // "Chat 3", and a number cannot hold up at a thousand chats
   const markup = renderToStaticMarkup(<SidebarSwitcher value="home" onPick={() => {}} />);
   const labels = [...markup.matchAll(/<span class="sb-switch-label">([^<]*)<\/span>([^<]*)</g)];
-  expect(labels.map((m) => `${m[1]}${m[2]}`)).toEqual(["Notes", "Chat"]);
+  // Notes is the default home, so it reads Home (2026-10-01)
+  expect(labels.map((m) => `${m[1]}${m[2]}`)).toEqual(["Home", "Chat"]);
 });
