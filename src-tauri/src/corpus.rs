@@ -6460,6 +6460,11 @@ impl CorpusStore {
     pub fn dot_write(&self, which: &str, contents: &str) -> Result<(), String> {
         self.mutation_allowed()?;
         let path = self.guard_rel(&format!("{DOT_DIR}/{}", dot_file(which)?))?;
+        // the vault's settings that won't parse are kept beside them, never
+        // silently replaced (projections like viewstate rebuild, so skip them)
+        if which == "settings" {
+            crate::fsutil::keep_unreadable_settings(&path)?;
+        }
         atomic_write(&path, contents)
     }
 

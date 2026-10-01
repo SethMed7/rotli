@@ -200,6 +200,83 @@ pub(crate) fn atomic_write_bytes(path: &Path, contents: &[u8], prefix: &str) -> 
     Ok(())
 }
 
+/// Before Rotli replaces a settings file that won't parse, it keeps a copy:
+/// `<name>.unreadable-<unix seconds>` beside it (the owner, 2026-10-01:
+/// "ensure users' settings survive any updates"). None when there is nothing
+/// to keep (no file) or the copy failed; callers refuse the write then.
+pub(crate) fn set_aside_unreadable(path: &Path) -> Option<PathBuf> {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let name = path.file_name()?.to_string_lossy().into_owned();
+    let mut copy = path.with_file_name(format!("{name}.unreadable-{secs}"));
+    let mut n = 1;
+    while copy.exists() {
+        copy = path.with_file_name(format!("{name}.unreadable-{secs}-{n}"));
+        n += 1;
+    }
+    std::fs::copy(path, &copy).ok()?;
+    Some(copy)
+}
+
+/// Whether a settings file holds a JSON object (anything else is unreadable).
+pub(crate) fn is_json_object(contents: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(contents).is_ok_and(|v| v.is_object())
+}
+
+/// Keep a copy of the settings file at `path` when what's there won't parse,
+/// before it is replaced. A missing or readable file needs nothing.
+pub(crate) fn keep_unreadable_settings(path: &Path) -> Result<(), String> {
+    match std::fs::read_to_string(path) {
+        Ok(old) if !is_json_object(&old) => set_aside_unreadable(path)
+            .map(|_| ())
+            .ok_or_else(|| "could not keep a copy of the unreadable settings; not replacing them".into()),
+        _ => Ok(()),
+    }
+}
+
+#[cfg(test)]
+mod set_aside_tests {
+    use super::{is_json_object, keep_unreadable_settings};
+
+    #[test]
+    fn an_unreadable_settings_file_is_copied_aside_before_it_is_replaced() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("app-settings.json");
+        std::fs::write(&path, "{ \"theme\": \"dark\", oops").unwrap();
+        keep_unreadable_settings(&path).unwrap();
+        let kept: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|n| n.starts_with("app-settings.json.unreadable-"))
+            .collect();
+        assert_eq!(kept.len(), 1, "one copy of the unreadable file");
+        let copy = std::fs::read_to_string(dir.path().join(&kept[0])).unwrap();
+        assert_eq!(copy, "{ \"theme\": \"dark\", oops");
+        // a second write keeps its own copy instead of overwriting the first
+        keep_unreadable_settings(&path).unwrap();
+        let copies = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter(|e| e.as_ref().unwrap().file_name().to_string_lossy().contains(".unreadable-"))
+            .count();
+        assert_eq!(copies, 2);
+    }
+
+    #[test]
+    fn a_readable_or_missing_file_needs_no_copy() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("settings.json");
+        keep_unreadable_settings(&path).unwrap();
+        std::fs::write(&path, "{\"v\":1}").unwrap();
+        keep_unreadable_settings(&path).unwrap();
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+        assert!(is_json_object("{}"));
+        assert!(!is_json_object("[]"));
+        assert!(!is_json_object(""));
+    }
+}
+
 #[cfg(test)]
 mod lock_tests {
     use super::{with_file_lock_attempts, LOCK_STALE};

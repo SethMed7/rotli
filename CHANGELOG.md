@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Your settings survive updates.** Rotli no longer writes over a settings
+  file it couldn't read or one a newer Rotli saved, keeps a copy of a damaged
+  one before replacing it, and no longer forgets a custom global shortcut
+  another app happened to hold at launch.
 - **Pausing with AirPods pauses the music.** A pause or play from AirPods, a
   media key, or the Now Playing menu now sticks: the player follows it, and
   Claude FM is no longer started again a moment later.
