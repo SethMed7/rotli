@@ -21,9 +21,11 @@ import {
   type AmbientPrefs,
   ambientSrc,
   isStream,
-  pausedFromOutside,
+  nextPausedSince,
   playerView,
   stepTrack,
+  STREAM_STEP,
+  streamFollow,
   streamUrl,
 } from "../lib/ambient";
 import { setupShows } from "../lib/reviewMode";
@@ -168,7 +170,9 @@ function reconcileFm(wantsPlay: boolean, force = false): void {
   const now = Date.now();
   if (!force && now - fmNudged < FM_NUDGE_MS) return;
   fmNudged = now;
-  if (!wantsPlay) fmAskedPause = now;
+  if (wantsPlay)
+    fmPausedSince = null; // a pause still showing is latency now, not intent
+  else fmAskedPause = now;
   void privateBrowserMedia(FM_PAGE, wantsPlay ? "play" : "pause").catch(() => {});
 }
 
@@ -212,6 +216,8 @@ export function applyAmbient(): void {
     (error: unknown) => {
       // a play paused before it began (AbortError) was interrupted, not
       // refused; and a setup preview never changes the saved preference
+      // a refused play fires no play event: the flag mustn't swallow the next real one
+      ownPlay = false;
       if (error instanceof DOMException && error.name === "AbortError") return;
       if (previewing()) return;
       useAmbient.getState().setPrefs({ playing: false });
@@ -251,8 +257,7 @@ export async function pollTabMedia(): Promise<void> {
     fmOpen
       ? privateBrowserMediaState(FM_PAGE).then(
           (state) => {
-            if (state === "paused" && fmState === "playing") fmPausedSince ??= Date.now();
-            if (state !== "paused") fmPausedSince = null;
+            fmPausedSince = nextPausedSince(fmState, state, fmPausedSince, fmAskedPause, Date.now());
             fmState = state;
           },
           () => {
@@ -267,18 +272,23 @@ export async function pollTabMedia(): Promise<void> {
 /** The hidden page against the rules, letting the person's own pause or play
  * from outside Rotli stand (a pause still settling is left alone). */
 function followFm(): void {
-  const now = Date.now();
   const { plays } = ambientNow();
-  const held = fmPausedSince === null ? null : now - fmPausedSince;
-  if (!previewing()) {
-    if (plays && pausedFromOutside(held, now - fmAskedPause)) {
-      fmPausedSince = null;
-      return useAmbient.getState().setPrefs({ playing: false });
-    }
-    if (fmState === "playing" && !useAmbient.getState().prefs.playing && now - fmAskedPause >= 3000)
-      return useAmbient.getState().setPrefs({ playing: true });
-  }
-  if (held === null || !plays) reconcileFm(plays);
+  const { prefs, setPrefs } = useAmbient.getState();
+  const step = previewing()
+    ? STREAM_STEP.nudge
+    : streamFollow({
+        state: fmState,
+        plays,
+        playing: prefs.playing,
+        pausedSince: fmPausedSince,
+        askedPauseAt: fmAskedPause,
+        now: Date.now(),
+      });
+  if (step === STREAM_STEP.pauseTheirs) {
+    fmPausedSince = null;
+    setPrefs({ playing: false });
+  } else if (step === STREAM_STEP.playTheirs) setPrefs({ playing: true });
+  else if (step === STREAM_STEP.nudge) reconcileFm(plays);
 }
 
 function busy(): boolean {

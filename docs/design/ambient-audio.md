@@ -71,11 +71,13 @@ again. With the setting off, the player shows only while something plays."
   key, or the Now Playing menu pause or play the ambient element itself; its
   `onpause`/`onplay` turn that into `playing`, while Rotli's own pauses (a tab
   taking over, a fade-out) are marked and leave the choice alone. A stream's
-  page paused from outside counts once it has stayed paused 1.2 s and Rotli
-  asked for no pause in the last 3 s (`pausedFromOutside`: a page's own stall,
-  an ad ending, is shorter); until then the service doesn't nudge it, so it is
-  never fought back to playing. A page playing again from outside sets
-  `playing` too.
+  page that stops playing without Rotli having asked in the last 3 s starts a
+  wait (`nextPausedSince`); once it has stayed paused 1.2 s it counts as the
+  person's pause (`streamFollow` → `pause-theirs`; a page's own stall, an ad
+  ending, is shorter), and until then the service doesn't nudge it, so it is
+  never fought back to playing. Rotli's own pauses (Pause, a tab taking over)
+  never start the wait, and asking the page to play clears it, so Play after a
+  long pause plays. A page playing again from outside sets `playing` too.
 
 ## Knowing what a tab plays (`src-tauri/src/private_browser_media.rs`)
 

@@ -477,7 +477,7 @@ export function parseSettings(raw: string): PersistedSettings {
   const captureVaultId =
     typeof data.captureVaultId === "string" && data.captureVaultId ? data.captureVaultId : null;
   return {
-    v: 1,
+    v: SETTINGS_VERSION,
     theme: asEnum(data.theme, THEME_SETTINGS, "light"),
     themeFamily: asEnum(data.themeFamily, THEME_FAMILIES, "warm"),
     syntaxPalette: asEnum(data.syntaxPalette, SYNTAX_PALETTES, "rotli"),
@@ -1461,7 +1461,7 @@ export function appSettingsSnapshot(): string {
 function settingsSnapshot(): string {
   const ui = useUiStore.getState();
   const snapshot: PersistedSettings = {
-    v: 1,
+    v: SETTINGS_VERSION,
     theme: ui.theme,
     themeFamily: ui.themeFamily,
     syntaxPalette: ui.syntaxPalette,
@@ -1556,7 +1556,7 @@ function settingsSnapshot(): string {
 function viewstateSnapshot(): string {
   const panes = usePanesStore.getState();
   const snapshot: PersistedViewstate = {
-    v: 1,
+    v: SETTINGS_VERSION,
     root: withDetachedChats(durablePane(panes.root), useChatWindowStore.getState().refs),
     focusedPaneId: panes.focusedPaneId,
     selectedFolderId: useUiStore.getState().selectedFolderId,

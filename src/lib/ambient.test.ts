@@ -9,9 +9,12 @@ import {
   DEFAULT_AMBIENT,
   isStream,
   parseAmbient,
-  pausedFromOutside,
+  nextPausedSince,
   playerView,
   stepTrack,
+  STREAM_HOLD_MS,
+  STREAM_STEP,
+  streamFollow,
   streamUrl,
   trackForFamily,
   trackTitle,
@@ -179,12 +182,53 @@ describe("the player for one moment", () => {
   });
 });
 
-// A stream page paused from outside Rotli (AirPods, a media key) is the
-// person's choice once it holds; a page's own short stall isn't.
-test("a stream's outside pause counts once it holds and Rotli didn't ask", () => {
-  expect(pausedFromOutside(null, 10_000)).toBe(false);
-  expect(pausedFromOutside(500, 10_000)).toBe(false);
-  expect(pausedFromOutside(1500, 10_000)).toBe(true);
-  // Rotli asked for this pause a moment ago: it's Rotli's, not the person's
-  expect(pausedFromOutside(1500, 1000)).toBe(false);
+// A stream page (Claude FM, a station) paused from outside Rotli is the
+// person's choice once it holds; Rotli's own pauses never count, and asking it
+// to play again clears the wait (2026-10-01, a review: Play after a long pause
+// used to flip straight back to Pause).
+describe("a stream page and the person's own pause", () => {
+  const T = 1_000_000;
+  const moment = (overrides: Partial<Parameters<typeof streamFollow>[0]>) => ({
+    state: "paused" as const,
+    plays: true,
+    playing: true,
+    pausedSince: null,
+    askedPauseAt: 0,
+    now: T,
+    ...overrides,
+  });
+
+  test("AirPods pause: it holds, then it's theirs; a short stall isn't", () => {
+    const since = nextPausedSince("playing", "paused", null, 0, T);
+    expect(since).toBe(T);
+    expect(streamFollow(moment({ pausedSince: since, now: T + 500 }))).toBe(STREAM_STEP.hold);
+    expect(streamFollow(moment({ pausedSince: since, now: T + STREAM_HOLD_MS }))).toBe(
+      STREAM_STEP.pauseTheirs,
+    );
+    // playing again before the hold: the stall is over
+    expect(nextPausedSince("paused", "playing", since, 0, T + 600)).toBeNull();
+  });
+
+  test("Rotli's own pause (the Pause button, a tab taking over) never counts", () => {
+    const asked = T - 400;
+    expect(nextPausedSince("playing", "paused", null, asked, T)).toBeNull();
+    // a minute later, Play: still paused while the page catches up — that's a nudge, not a pause
+    expect(streamFollow(moment({ pausedSince: null, askedPauseAt: asked, now: T + 60_000 }))).toBe(
+      STREAM_STEP.nudge,
+    );
+  });
+
+  test("a page loading paused (autoplay held) is nudged, not read as a pause", () => {
+    expect(nextPausedSince("none", "paused", null, 0, T)).toBeNull();
+    expect(streamFollow(moment({}))).toBe(STREAM_STEP.nudge);
+  });
+
+  test("played from outside while paused: theirs, once no pause of Rotli's is landing", () => {
+    expect(
+      streamFollow(moment({ state: "playing", plays: false, playing: false, askedPauseAt: T - 10_000 })),
+    ).toBe(STREAM_STEP.playTheirs);
+    expect(
+      streamFollow(moment({ state: "playing", plays: false, playing: false, askedPauseAt: T - 1000 })),
+    ).toBe(STREAM_STEP.nudge);
+  });
 });

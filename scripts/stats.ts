@@ -198,7 +198,7 @@ async function cloudflareSection(token: string): Promise<string[]> {
   for (const row of versions) lines.push(`      ${row.version.padEnd(10)} ${row.checks}`);
   if (versions.length === 0)
     lines.push(
-      "      (none yet: versions from 1.7.2 on check through rotli.co; older ones ask GitHub directly)",
+      "      (none yet: only builds that shipped the rotli.co update check appear; older ones ask GitHub directly)",
     );
   return lines;
 }

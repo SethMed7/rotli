@@ -124,17 +124,56 @@ export function stepTrack(id: string, step: 1 | -1): string {
   return AMBIENT_TRACKS[next]!.id;
 }
 
-/** A stream page that stopped playing without Rotli asking (AirPods, a media
- * key, the page's own button): the person paused it, once it has stayed
- * paused for `holdMs` (a page's own stall, an ad ending, is shorter) and no
- * pause of Rotli's own went out in the last `quietMs`. */
-export function pausedFromOutside(
-  heldMs: number | null,
-  askedAgoMs: number,
-  holdMs = 1200,
-  quietMs = 3000,
-): boolean {
-  return heldMs !== null && heldMs >= holdMs && askedAgoMs >= quietMs;
+/** How long a stream page must stay paused, unasked, to count as the person's
+ * pause (a page's own stall, an ad ending, is shorter). */
+export const STREAM_HOLD_MS = 1200;
+/** A pause landing this soon after Rotli asked for one is Rotli's own. */
+export const STREAM_QUIET_MS = 3000;
+
+/** When the stream page's current outside pause began, after one poll: set
+ * when it stops playing without Rotli having asked (AirPods, a media key, the
+ * page's own button), kept while it stays paused, cleared once it plays. A
+ * pause Rotli asked for (the Pause button, a tab taking over) never starts it. */
+export function nextPausedSince(
+  was: TabMediaState,
+  state: TabMediaState,
+  pausedSince: number | null,
+  askedPauseAt: number,
+  now: number,
+): number | null {
+  if (state !== "paused") return null;
+  if (pausedSince !== null || was !== "playing") return pausedSince;
+  return now - askedPauseAt < STREAM_QUIET_MS ? null : now;
+}
+
+/** The stream page's next step (streamFollow). */
+export const STREAM_STEP = {
+  pauseTheirs: "pause-theirs",
+  playTheirs: "play-theirs",
+  hold: "hold",
+  nudge: "nudge",
+} as const;
+export type StreamStep = (typeof STREAM_STEP)[keyof typeof STREAM_STEP];
+
+/** What to do with the stream page this poll: let an outside pause or play
+ * stand as the person's choice, wait while an outside pause settles, or nudge
+ * the page toward the rules. */
+export function streamFollow(moment: {
+  state: TabMediaState;
+  /** The rules say ambient sounds now. */
+  plays: boolean;
+  /** The person's saved choice. */
+  playing: boolean;
+  pausedSince: number | null;
+  askedPauseAt: number;
+  now: number;
+}): StreamStep {
+  const held = moment.pausedSince === null ? null : moment.now - moment.pausedSince;
+  if (moment.plays && held !== null)
+    return held >= STREAM_HOLD_MS ? STREAM_STEP.pauseTheirs : STREAM_STEP.hold;
+  if (moment.state === "playing" && !moment.playing && moment.now - moment.askedPauseAt >= STREAM_QUIET_MS)
+    return STREAM_STEP.playTheirs;
+  return STREAM_STEP.nudge;
 }
 
 /** What each browser tab's page is doing, by tab id. */
