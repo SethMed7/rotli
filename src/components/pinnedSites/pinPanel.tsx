@@ -7,7 +7,14 @@
 import { useEffect, useRef, useState } from "react";
 
 import { pinMark } from "../../lib/pinnedSites";
-import { closePinPanel, hidePin, movePin, pinsAreNative, showPin } from "../../services/pinnedSites";
+import {
+  closePinPanel,
+  hidePin,
+  hidePinsUnderOverlays,
+  movePin,
+  pinsAreNative,
+  showPin,
+} from "../../services/pinnedSites";
 import { useContextMenu } from "../../state/contextMenu";
 import { usePinnedSites } from "../../state/pinnedSites";
 import { useUiStore } from "../../state/ui";
@@ -16,15 +23,20 @@ export function PinPanel() {
   const open = usePinnedSites((s) => s.open);
   const sites = usePinnedSites((s) => s.sites);
   const site = sites.find((candidate) => candidate.id === open) ?? null;
-  const paletteOpen = useUiStore((s) => s.paletteOpen);
-  const settingsOpen = useUiStore((s) => s.settingsOpen);
-  const menu = useContextMenu((s) => s.menu);
   const body = useRef<HTMLDivElement>(null);
   const [problem, setProblem] = useState<{ id: string; text: string } | null>(null);
 
-  useEffect(() => {
-    if (open && (paletteOpen || settingsOpen || menu)) closePinPanel();
-  }, [open, paletteOpen, settingsOpen, menu]);
+  // ⌘K, Settings, and menus put the page away as they open (a store change,
+  // before React paints them), never after
+  useEffect(
+    () =>
+      hidePinsUnderOverlays([
+        { subscribe: useUiStore.subscribe, isOpen: () => useUiStore.getState().paletteOpen },
+        { subscribe: useUiStore.subscribe, isOpen: () => useUiStore.getState().settingsOpen },
+        { subscribe: useContextMenu.subscribe, isOpen: () => useContextMenu.getState().menu !== null },
+      ]),
+    [],
+  );
 
   useEffect(() => {
     const node = body.current;

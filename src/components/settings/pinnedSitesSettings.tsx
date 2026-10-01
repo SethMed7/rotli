@@ -5,7 +5,7 @@
 import { useState } from "react";
 
 import { MAX_PINS, pinProblem } from "../../lib/pinnedSites";
-import { addPin, removePin } from "../../services/pinnedSites";
+import { addPin, canAddPins, removePin } from "../../services/pinnedSites";
 import { usePinnedSites } from "../../state/pinnedSites";
 import { AddField, AddRow, EntryProblem, NameField, RemovableRows } from "./removableList";
 
@@ -30,32 +30,34 @@ export function PinnedSitesSettings() {
         opens in a panel instead of a tab. You stay signed in; each site keeps its own sign-in, apart from the
         others and from private pages. Removing a site signs you out of it.
       </p>
-      {supported === false ? (
-        <p className="setnote">Pinned sites need macOS 14 or later.</p>
-      ) : (
-        <>
-          <RemovableRows
-            label="Pinned sites"
-            rows={sites.map((site) => ({ key: site.id, text: site.label, title: site.url }))}
-            onRemove={(id) => void removePin(id)}
-          />
-          {sites.length < MAX_PINS && (
-            <AddRow disabled={!link.trim()} onAdd={add}>
-              <AddField
-                aria-label="Site address"
-                placeholder="https://x.com"
-                value={link}
-                onChange={(event) => {
-                  setLink(event.currentTarget.value);
-                  setProblem(null);
-                }}
-              />
-              <NameField label="Site name" value={name} onChange={setName} />
-            </AddRow>
-          )}
-          <EntryProblem problem={problem} />
-        </>
-      )}
+      {supported === false && <p className="setnote">Pinned sites need macOS 14 or later.</p>}
+      <>
+        {/* a saved pin can always be removed, whatever this Mac supports */}
+        <RemovableRows
+          label="Pinned sites"
+          rows={sites.map((site) => ({ key: site.id, text: site.label, title: site.url }))}
+          onRemove={(id) =>
+            void removePin(id).catch((error: unknown) =>
+              setProblem(`Couldn’t remove it: ${error instanceof Error ? error.message : String(error)}`),
+            )
+          }
+        />
+        {canAddPins(supported) && sites.length < MAX_PINS && (
+          <AddRow disabled={!link.trim()} onAdd={add}>
+            <AddField
+              aria-label="Site address"
+              placeholder="https://x.com"
+              value={link}
+              onChange={(event) => {
+                setLink(event.currentTarget.value);
+                setProblem(null);
+              }}
+            />
+            <NameField label="Site name" value={name} onChange={setName} />
+          </AddRow>
+        )}
+        <EntryProblem problem={problem} />
+      </>
     </div>
   );
 }
