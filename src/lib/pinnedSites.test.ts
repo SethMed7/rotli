@@ -71,6 +71,7 @@ test("saved pins are checked again: a bad address, store, slot, or duplicate dro
     { ...ok, slot: 2, url: "http://x.com/", store: "1".repeat(32) },
     { ...ok, slot: 2, store: "0".repeat(32) },
     { ...ok, slot: 9, store: "2".repeat(32) },
+    { ...ok, slot: 1, store: "4".repeat(32), url: "https://x.com/messages" }, // same origin, hand-edited
     { ...ok, slot: 2, store: "3".repeat(32), url: "https://github.com", label: "" },
     "junk",
   ]);

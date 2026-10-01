@@ -102,7 +102,11 @@ export function parsePinnedSites(value: unknown): PinnedSite[] {
         : null;
     const slot = typeof saved.slot === "number" && Number.isInteger(saved.slot) ? saved.slot : -1;
     if (!url || !store || slot < 0 || slot >= MAX_PINS) continue;
-    if (sites.some((site) => site.slot === slot || site.store === store)) continue;
+    const origin = new URL(url).origin;
+    if (
+      sites.some((site) => site.slot === slot || site.store === store || new URL(site.url).origin === origin)
+    )
+      continue;
     const label = pinLabel(typeof saved.label === "string" ? saved.label : "", url);
     sites.push({ id: `pin-${store.slice(0, 12)}`, slot, label, url, store });
     if (sites.length === MAX_PINS) break;

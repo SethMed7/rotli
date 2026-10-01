@@ -7,6 +7,7 @@
 import { type CSSProperties, useState } from "react";
 
 import { extOf } from "../../lib/fileKind";
+import { FOLDER_ICON_KIND, iconKind } from "../../lib/sidebarLook";
 import { renameTargetFor } from "../../services/itemRename";
 import type { NoteSummary } from "../../types";
 import { ChevronRight, FolderGlyph, glyphForNote } from "../glyphs";
@@ -31,7 +32,7 @@ export function FolderRenameRow({
       <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
         <ChevronRight size={10} />
       </span>
-      <FolderGlyph size={14} />
+      <FolderGlyph size={14} className={FOLDER_ICON_KIND} />
       <InlineRenameInput
         className="sb-rename-input"
         defaultValue={name}
@@ -83,7 +84,7 @@ export function NoteRenameRow({
   return (
     <>
       <div className="snrow main-row renaming" style={style}>
-        {glyphForNote(note, { size: 14, className: "snicon" })}
+        {glyphForNote(note, { size: 14, className: `snicon kind-${iconKind(note)}` })}
         <InlineRenameInput
           className="sb-rename-input"
           defaultValue={target.current}

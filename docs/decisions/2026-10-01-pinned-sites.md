@@ -28,18 +28,27 @@ it is decided here first.
    own webview uses, so Rust refuses to open a pin there
    (`pinned_sites_supported`) and the feature doesn't show.
 3. **The same guest as the private browser, minus forgetting.** A child webview
-   of the main window labelled `pinned-site-<0..2>`, in no Tauri capability (so
-   the page can't reach Rotli's IPC), `blocked_for_remote` on the address,
-   http(s)-only top-level navigation, downloads refused. A page that asks for a
+   of the main window labelled `pinned-site-<slot>-<store>`, in no Tauri
+   capability (so the page can't reach Rotli's IPC), `blocked_for_remote` on the
+   address, https-only navigation (stricter than the private browser: a
+   signed-in session never rides plain http), downloads refused. The label
+   carries the store, so a page only ever shows the pin it was built for: a new
+   pin in a freed slot never reuses an older pin's live page. A page that asks for a
    new window is navigated in place instead (redirect-style sign-in keeps
    working; it stays inside the pin).
 4. **A panel, not a tab.** A pin's button sits left of the globe; it opens the
    site in a panel under the title bar. Dismissing hides the page and keeps it
    alive for a quick return; a page hidden for ten minutes is closed (WKWebView
-   doesn't throttle a hidden page, CARL ROTLI_CORE#10). ⌘K, Settings, and menus
-   close the panel first, because a native webview draws over Rotli's own UI.
-5. **Removing a pin signs it out.** It closes the page and deletes its store
-   (`remove_data_store`); replacing a pin's address does the same.
+   doesn't throttle a hidden page, CARL ROTLI_CORE#10); showing it again first
+   cancels that. ⌘K, Settings, and menus put the page away as they open (on the
+   store change, before they paint), because a native webview draws over
+   Rotli's own UI.
+5. **Removing a pin signs it out.** It closes the page, then deletes its store
+   (`remove_data_store`), and only then frees the slot; if either step fails
+   the pin stays, so removing can be tried again. A pin's address is changed
+   by removing it and pinning the new one. A pin saved on this Mac can always
+   be removed; new pins are offered only once the Mac has said it supports
+   them.
 
 ## Consequences
 

@@ -2904,11 +2904,13 @@
 .sb-scene-top {
   top: 0;
   height: 56px;
+  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent);
   mask-image: linear-gradient(to bottom, black 60%, transparent);
 }
 .sb-scene-bottom {
   bottom: 0;
   height: 64px;
+  -webkit-mask-image: linear-gradient(to top, black 55%, transparent);
   mask-image: linear-gradient(to top, black 55%, transparent);
 }
 
@@ -2930,6 +2932,7 @@
 .sidebar[data-icons="neutral"] .model-logo-ink {
   display: inline-block;
   background: currentColor;
+  -webkit-mask: var(--logo) center / contain no-repeat;
   mask: var(--logo) center / contain no-repeat;
 }
 .sidebar[data-icons="color"] .kind-board,

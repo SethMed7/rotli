@@ -6,7 +6,7 @@ import { describe, expect, test } from "bun:test";
 import ExcelJS from "exceljs";
 
 import { b64FromBytes, saveXlsx } from "./codec/xlsx";
-import { parseWorkbook, workbookToCsv } from "./view";
+import { parseWorkbook, workbookForAi, workbookToCsv } from "./view";
 
 describe("parseWorkbook truncation flag", () => {
   const csvRows = (n: number) => `a,b\n${Array.from({ length: n }, (_, i) => `x${i},y${i}`).join("\n")}\n`;
@@ -57,6 +57,24 @@ describe("xlsx bytes through the exceljs codec", () => {
     fill(wb);
     return b64FromBytes(await saveXlsx(wb));
   }
+
+  test("chat reads a real workbook by address: dates as dates, every sheet named", async () => {
+    const b64 = await xlsxB64((wb) => {
+      const plan = wb.addWorksheet("Plan");
+      plan.addRow(["Launch", new Date(Date.UTC(2026, 9, 1))]);
+      plan.addRow(["Budget", 1200]);
+      wb.addWorksheet("Notes").addRow(["ok"]);
+    });
+    const text = await workbookForAi(b64, "plan.xlsx");
+    expect(text).toContain(
+      '## Sheet "Plan" (2 rows × 2 columns used)\nA1 "Launch" | B1 2026-10-01\nA2 "Budget" | B2 1200',
+    );
+    expect(text).toContain('## Sheet "Notes" (1 rows × 1 columns used)\nA1 "ok"');
+  });
+
+  test("a workbook that isn't one is refused, never read as empty", async () => {
+    expect(workbookForAi(b64FromBytes(new TextEncoder().encode("not a zip")), "x.xlsx")).rejects.toThrow();
+  });
 
   test("cells come back as display strings, blank rows dropped", async () => {
     const b64 = await xlsxB64((wb) => {
