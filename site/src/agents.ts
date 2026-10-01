@@ -76,7 +76,7 @@ export function llmsText(writing: { resources: Writing[]; posts: Writing[] }): s
     site.sourcePublic ? 'Free, with no account. The source is open under the MIT license.' : 'Free, with no account.',
     'Notes are plain Markdown files in one folder you choose. A hidden .rotli folder holds settings and search indexes that rotli can rebuild at any time.',
     'Writing, tasks, links, and search work offline. Chat works offline too with an on-device model.',
-    'AI is optional: a model on your Mac, or the AI tools you install yourself, like Claude Code and Codex, which rotli runs without ever holding your keys. Secure notes never reach a remote model, and no AI can edit a locked note.',
+    'AI is optional: a model on your Mac, or the AI tools you install yourself, like Claude Code and Codex, with Cursor for code chat, which rotli runs without ever holding your keys. Secure notes never reach a remote model, and no AI can edit a locked note.',
     'No analytics, ads, or crash uploads.',
     site.webAppEnabled
       ? 'Platforms: the Mac app, and Rotli Web in the browser. Chrome, Edge, and Arc open your folder directly; Firefox, Zen, and Brave use Rotli Helper. Safari and phones are not supported yet. Native Windows and Linux apps are planned.'
