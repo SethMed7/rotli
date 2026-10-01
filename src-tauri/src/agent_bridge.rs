@@ -14,9 +14,8 @@
 //! `corpus_write_file_ai`'s own gates.
 
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Condvar, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -27,17 +26,11 @@ use tauri::{AppHandle, Emitter, Manager};
 /// The tools the bridge carries; anything else is refused before the app sees it.
 pub(crate) const BRIDGE_TOOLS: [&str; 3] = ["read_document", "apply_document", "create_document"];
 /// How long an agent waits for the app's answer (a big document's save included).
-const ANSWER_MAX: Duration = Duration::from_secs(30);
-/// One request or answer line; mirrors the MCP envelope limits.
-const LINE_MAX: u64 = 600_000;
+pub(crate) const ANSWER_MAX: Duration = Duration::from_secs(30);
 /// The largest .docx an agent gets: the editor's own cap
 /// (`DOCUMENT_EDIT_MAX_BYTES`, src/documents/kinds.ts; parity.json), so Rust
 /// refuses what the webview would, before reading it.
 pub(crate) const DOCX_MAX_BYTES: u64 = 12_000_000;
-/// Socket requests carried at once; a runaway agent loop gets refusals, not threads.
-const IN_FLIGHT_MAX: usize = 8;
-const NOT_RUNNING: &str =
-    "Rotli isn't running. Open Rotli on this Mac to read or edit Word documents, then try again.";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -52,18 +45,8 @@ pub(crate) struct BridgeRequest {
     pub agent: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct BridgeAnswer {
-    ok: bool,
-    #[serde(default)]
-    result: Value,
-    #[serde(default)]
-    error: Option<String>,
-}
-
 static IN_APP: OnceLock<AppHandle> = OnceLock::new();
 static CLIENT: Mutex<Option<String>> = Mutex::new(None);
-static IN_FLIGHT: AtomicUsize = AtomicUsize::new(0);
 
 /// Remember the MCP client's name from `initialize` (sanitized, short).
 pub(crate) fn remember_client(params: &Value) {
@@ -101,37 +84,7 @@ pub(crate) fn ask_app(request: BridgeRequest) -> Result<Value, String> {
     }
     match IN_APP.get() {
         Some(app) => dispatch(app, request),
-        None => ask_over_socket(&socket_path()?, &request),
-    }
-}
-
-fn socket_path() -> Result<PathBuf, String> {
-    if let Ok(path) = std::env::var("ROTLI_AGENT_BRIDGE_SOCKET") {
-        return Ok(PathBuf::from(path));
-    }
-    let config = crate::workspace::production_config_path()?;
-    let dir = config.parent().ok_or("Rotli's settings folder is unavailable")?;
-    Ok(dir.join("agent-bridge.sock"))
-}
-
-fn ask_over_socket(path: &Path, request: &BridgeRequest) -> Result<Value, String> {
-    use std::os::unix::net::UnixStream;
-    let mut stream = UnixStream::connect(path).map_err(|_| NOT_RUNNING.to_string())?;
-    let _ = stream.set_read_timeout(Some(ANSWER_MAX + Duration::from_secs(5)));
-    let _ = stream.set_write_timeout(Some(Duration::from_secs(5)));
-    let mut line = serde_json::to_vec(request).map_err(|e| e.to_string())?;
-    line.push(b'\n');
-    stream.write_all(&line).map_err(|_| NOT_RUNNING.to_string())?;
-    let mut answer = String::new();
-    BufReader::new(stream.take(LINE_MAX))
-        .read_line(&mut answer)
-        .map_err(|_| "Rotli didn't answer in time".to_string())?;
-    let answer: BridgeAnswer =
-        serde_json::from_str(answer.trim()).map_err(|_| "Rotli sent an unreadable answer".to_string())?;
-    if answer.ok {
-        Ok(answer.result)
-    } else {
-        Err(answer.error.unwrap_or_else(|| "Rotli refused the request".into()))
+        None => crate::agent_bridge_socket::ask_over_socket(&crate::agent_bridge_socket::socket_path()?, &request),
     }
 }
 
@@ -142,7 +95,7 @@ pub(crate) fn start(app: &AppHandle) {
         return;
     }
     let _ = IN_APP.set(app.clone());
-    let path = match socket_path() {
+    let path = match crate::agent_bridge_socket::socket_path() {
         Ok(path) => path,
         Err(error) => return eprintln!("rotli: agent bridge has no socket path ({error})"),
     };
@@ -150,64 +103,10 @@ pub(crate) fn start(app: &AppHandle) {
     let _ = std::thread::Builder::new()
         .name("rotli-agent-bridge".into())
         .spawn(move || {
-            if let Err(error) = listen(&app, &path) {
+            if let Err(error) = crate::agent_bridge_socket::listen(&app, &path) {
                 eprintln!("rotli: agent bridge is not listening ({error})");
             }
         });
-}
-
-fn listen(app: &AppHandle, path: &Path) -> Result<(), String> {
-    use std::os::unix::fs::PermissionsExt;
-    use std::os::unix::net::{UnixListener, UnixStream};
-    // another Rotli already answers here: leave its socket alone
-    if UnixStream::connect(path).is_ok() {
-        return Err("another Rotli is already listening".into());
-    }
-    let _ = std::fs::remove_file(path);
-    let listener = UnixListener::bind(path).map_err(|e| e.to_string())?;
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).map_err(|e| e.to_string())?;
-    for mut stream in listener.incoming().flatten() {
-        if IN_FLIGHT.fetch_add(1, Ordering::AcqRel) >= IN_FLIGHT_MAX {
-            IN_FLIGHT.fetch_sub(1, Ordering::AcqRel);
-            let busy = BridgeAnswer { ok: false, result: Value::Null, error: Some("Rotli is busy with other agent requests; try again in a moment".into()) };
-            if let Ok(mut bytes) = serde_json::to_vec(&busy) {
-                bytes.push(b'\n');
-                let _ = stream.write_all(&bytes);
-            }
-            continue;
-        }
-        let app = app.clone();
-        let spawned = std::thread::Builder::new().name("rotli-agent-request".into()).spawn(move || {
-            serve(&app, stream);
-            IN_FLIGHT.fetch_sub(1, Ordering::AcqRel);
-        });
-        if spawned.is_err() {
-            IN_FLIGHT.fetch_sub(1, Ordering::AcqRel);
-        }
-    }
-    Ok(())
-}
-
-fn serve(app: &AppHandle, stream: std::os::unix::net::UnixStream) {
-    let _ = stream.set_read_timeout(Some(Duration::from_secs(10)));
-    let Ok(mut writer) = stream.try_clone() else { return };
-    let mut line = String::new();
-    if BufReader::new(stream.take(LINE_MAX)).read_line(&mut line).is_err() {
-        return;
-    }
-    let answer = match serde_json::from_str::<BridgeRequest>(line.trim()) {
-        Ok(request) if BRIDGE_TOOLS.contains(&request.tool.as_str()) => dispatch(app, request),
-        Ok(request) => Err(format!("unknown document tool: {}", request.tool)),
-        Err(_) => Err("unreadable request".into()),
-    };
-    let answer = match answer {
-        Ok(result) => BridgeAnswer { ok: true, result, error: None },
-        Err(error) => BridgeAnswer { ok: false, result: Value::Null, error: Some(error) },
-    };
-    if let Ok(mut bytes) = serde_json::to_vec(&answer) {
-        bytes.push(b'\n');
-        let _ = writer.write_all(&bytes);
-    }
 }
 
 /// The vault and write rules, from what the agent asked and what the app has open.
@@ -239,9 +138,14 @@ fn document_rel(request: &BridgeRequest) -> Result<String, String> {
     Ok(rel)
 }
 
-/// What a remote reader may never receive: a document hidden from agents,
-/// named with a secure keyword, or holding secret-shaped text.
-fn document_gate(store: &mut crate::corpus::CorpusStore, rel: &str, editing: bool) -> Result<(), String> {
+/// What a remote reader may never receive, by the vault's own records (held
+/// under the corpus lock): a document hidden from agents or named with a
+/// secure keyword, and, for an edit, one no AI made. Returns its path.
+fn document_records_gate(
+    store: &mut crate::corpus::CorpusStore,
+    rel: &str,
+    editing: bool,
+) -> Result<PathBuf, String> {
     if !store.agent_listable(rel) {
         return Err("that document isn't available to agents".into());
     }
@@ -250,47 +154,71 @@ fn document_gate(store: &mut crate::corpus::CorpusStore, rel: &str, editing: boo
         return Err("blocked: that document is named as secure; Rotli never gives it to an agent".into());
     }
     let path = store.guard_rel(rel)?;
-    let meta = std::fs::metadata(&path).map_err(|_| "that document doesn't exist".to_string())?;
+    if editing && !crate::ai_files::ai_may_edit(store.root(), rel) {
+        return Err("that Word document is a person's: agents edit only documents an AI created. Ask for a new document instead".into());
+    }
+    Ok(path)
+}
+
+/// ...and by its contents (read outside the corpus lock): too large for the
+/// editor, or holding secret-shaped text.
+fn document_contents_gate(path: &Path) -> Result<(), String> {
+    let meta = std::fs::metadata(path).map_err(|_| "that document doesn't exist".to_string())?;
     if meta.len() > DOCX_MAX_BYTES {
         return Err("that document is too large for an agent".into());
     }
-    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
     if crate::secret::blocked_for_remote(&crate::ai_files::docx_text(&bytes)?) {
         return Err("blocked: that document holds secret-shaped text; Rotli never gives it to an agent".into());
-    }
-    if editing && !crate::ai_files::ai_may_edit(store.root(), rel) {
-        return Err("that Word document is a person's: agents edit only documents an AI created. Ask for a new document instead".into());
     }
     Ok(())
 }
 
-/// Every answer leaves Rust only after the same egress check every reader gets.
-fn egress(result: Value) -> Result<Value, String> {
-    let text = serde_json::to_string(&result).map_err(|e| e.to_string())?;
-    if crate::secret::blocked_for_remote(&text) {
-        return Err("blocked: the answer would carry secret-shaped text".into());
+const EGRESS_BLOCKED: &str = "blocked: the answer would carry secret-shaped text";
+
+/// Every answer leaves Rust only after the same egress check every reader
+/// gets: a result, and a refusal's own words too.
+fn egress(answer: Result<Value, String>) -> Result<Value, String> {
+    match answer {
+        Ok(result) => {
+            let text = serde_json::to_string(&result).map_err(|e| e.to_string())?;
+            if crate::secret::blocked_for_remote(&text) {
+                return Err(EGRESS_BLOCKED.into());
+            }
+            Ok(result)
+        }
+        Err(error) if crate::secret::blocked_for_remote(&error) => Err(EGRESS_BLOCKED.into()),
+        Err(error) => Err(error),
     }
-    Ok(result)
 }
 
-fn dispatch(app: &AppHandle, request: BridgeRequest) -> Result<Value, String> {
+pub(crate) fn dispatch(app: &AppHandle, request: BridgeRequest) -> Result<Value, String> {
     crate::feature_policy::require_agents()?;
     let corpus = app.state::<crate::corpus::CorpusState>();
     let root_id = corpus.default_root_id()?;
     let app_root = corpus.default_root_path()?;
     admit(&request, &app_root, crate::development_read_only(app))?;
-    if request.tool != "create_document" {
+    if request.tool == "create_document" {
+        let title = request.args.get("title").and_then(Value::as_str).unwrap_or_default().trim().to_string();
+        let rel = format!("storage/rotli/{title}.docx");
+        if corpus.route(&root_id, |store| Ok(store.secure_by_name(&title, &rel)))? {
+            return Err("blocked: that name is one of the vault's secure keywords; agents don't make documents named as secure".into());
+        }
+    } else {
         let rel = document_rel(&request)?;
         let editing = request.tool == "apply_document";
-        corpus.route(&root_id, |store| document_gate(store, &rel, editing))?;
+        let path = corpus.route(&root_id, |store| document_records_gate(store, &rel, editing))?;
+        document_contents_gate(&path)?;
     }
-    let result = app.state::<Pending>().ask(app, &request)?;
-    egress(result)
+    egress(app.state::<Pending>().ask(app, &request))
 }
 
 /// Requests the main webview owes an answer, by id (several agents at once).
 #[derive(Default)]
 pub(crate) struct Pending {
+    /// The main webview listens for requests (`agent_bridge_ready`); until
+    /// then a request is refused at once instead of waiting out the timeout.
+    listening: std::sync::atomic::AtomicBool,
     next: AtomicU64,
     answers: Mutex<HashMap<u64, Option<Result<Value, String>>>>,
     ready: Condvar,
@@ -336,7 +264,16 @@ impl Pending {
         }
     }
 
+    fn listening(&self) -> Result<(), String> {
+        if self.listening.load(Ordering::Acquire) {
+            Ok(())
+        } else {
+            Err("Rotli is still starting; try again in a moment".into())
+        }
+    }
+
     fn ask(&self, app: &AppHandle, request: &BridgeRequest) -> Result<Value, String> {
+        self.listening()?;
         let id = self.begin();
         let event = json!({
             "requestId": id,
@@ -349,6 +286,16 @@ impl Pending {
         }
         self.wait(id, ANSWER_MAX)
     }
+}
+
+/// The main webview now listens for agent requests.
+#[tauri::command]
+pub(crate) fn agent_bridge_ready(window: tauri::WebviewWindow, pending: tauri::State<'_, Pending>) -> Result<(), String> {
+    if window.label() != "main" {
+        return Err("only Rotli's main window answers agents".into());
+    }
+    pending.listening.store(true, Ordering::Release);
+    Ok(())
 }
 
 /// The main webview's answer to a `rotli:agent-request`.
@@ -444,6 +391,12 @@ mod tests {
         );
     }
 
+    /// Both halves of the document check, as dispatch runs them.
+    fn document_gate(store: &mut crate::corpus::CorpusStore, rel: &str, editing: bool) -> Result<(), String> {
+        let path = document_records_gate(store, rel, editing)?;
+        document_contents_gate(&path)
+    }
+
     #[test]
     fn a_document_reaches_an_agent_only_when_clean_and_edits_only_when_ai_made() {
         use crate::ai_files::tests::{zip_with, XML};
@@ -475,12 +428,28 @@ mod tests {
         )
         .unwrap();
         assert!(document_gate(&mut store, &plan, true).is_ok());
+        // over the editor's own cap: refused before it is read
+        let big = root.join("storage/rotli/big.docx");
+        std::fs::File::create(&big).unwrap().set_len(DOCX_MAX_BYTES + 1).unwrap();
+        assert!(document_contents_gate(&big).unwrap_err().contains("too large"));
     }
 
     #[test]
     fn no_answer_leaves_with_secret_shaped_text() {
-        assert!(egress(json!({ "blocks": "[1] paragraph: Launch" })).is_ok());
-        assert!(egress(json!({ "blocks": "key sk-ant-api03-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" })).is_err());
+        let key = "key sk-ant-api03-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+        assert!(egress(Ok(json!({ "blocks": "[1] paragraph: Launch" }))).is_ok());
+        assert_eq!(egress(Ok(json!({ "blocks": key }))).unwrap_err(), EGRESS_BLOCKED);
+        // a refusal's own words are checked too
+        assert_eq!(egress(Err(format!("error: no block 9 in {key}"))).unwrap_err(), EGRESS_BLOCKED);
+        assert_eq!(egress(Err("error: no block 9".into())).unwrap_err(), "error: no block 9");
+    }
+
+    #[test]
+    fn a_request_before_the_window_listens_is_refused_at_once() {
+        let pending = Pending::default();
+        assert!(pending.listening().unwrap_err().contains("still starting"));
+        pending.listening.store(true, Ordering::Release);
+        assert!(pending.listening().is_ok());
     }
 
     #[test]
@@ -489,31 +458,5 @@ mod tests {
         assert_eq!(agent_name(&"x".repeat(200)).len(), 64);
     }
 
-    #[test]
-    fn a_headless_agent_hears_when_rotli_isnt_running() {
-        let dir = tempfile::TempDir::new().unwrap();
-        let error = ask_over_socket(&dir.path().join("none.sock"), &request("read_document", dir.path(), false))
-            .unwrap_err();
-        assert_eq!(error, NOT_RUNNING);
-    }
 
-    #[test]
-    fn the_socket_carries_one_request_and_one_answer() {
-        use std::os::unix::net::UnixListener;
-        let dir = tempfile::TempDir::new().unwrap();
-        let path = dir.path().join("bridge.sock");
-        let listener = UnixListener::bind(&path).unwrap();
-        let server = std::thread::spawn(move || {
-            let (stream, _) = listener.accept().unwrap();
-            let mut writer = stream.try_clone().unwrap();
-            let mut line = String::new();
-            BufReader::new(stream).read_line(&mut line).unwrap();
-            let asked: BridgeRequest = serde_json::from_str(line.trim()).unwrap();
-            let answer = BridgeAnswer { ok: false, result: Value::Null, error: Some(format!("refused {}", asked.tool)) };
-            writer.write_all(&[serde_json::to_vec(&answer).unwrap(), b"\n".to_vec()].concat()).unwrap();
-        });
-        let error = ask_over_socket(&path, &request("apply_document", dir.path(), false)).unwrap_err();
-        server.join().unwrap();
-        assert_eq!(error, "refused apply_document");
-    }
 }

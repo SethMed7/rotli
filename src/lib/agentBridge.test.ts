@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 
-import { agentBridgeReply, onAgentRequest } from "./agentBridge";
+import { agentBridgeReady, agentBridgeReply, onAgentRequest } from "./agentBridge";
 
 // What @tauri-apps/api's invoke calls on the Mac app (the IPC mock's own seam),
 // so the adapter's payload is checked without a webview.
@@ -27,11 +27,13 @@ test("an answer goes back by its request id, a result or an error, never both", 
   };
   await agentBridgeReply(7, { ok: true, result: { blocks: "[1] paragraph: Hi" } });
   await agentBridgeReply(8, { ok: false, error: "blocked" });
+  await agentBridgeReady();
   expect(calls).toEqual([
     {
       cmd: "agent_bridge_reply",
       args: { requestId: 7, ok: true, result: { blocks: "[1] paragraph: Hi" }, error: null },
     },
     { cmd: "agent_bridge_reply", args: { requestId: 8, ok: false, result: null, error: "blocked" } },
+    { cmd: "agent_bridge_ready", args: {} },
   ]);
 });

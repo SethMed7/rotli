@@ -5,7 +5,13 @@
 // same edit path as the chat. Rust checks the answer again before it leaves.
 
 import { DOCX_EDITABLE } from "../documents/kinds";
-import { type AgentAnswer, type AgentRequest, agentBridgeReply, onAgentRequest } from "../lib/agentBridge";
+import {
+  type AgentAnswer,
+  type AgentRequest,
+  agentBridgeReady,
+  agentBridgeReply,
+  onAgentRequest,
+} from "../lib/agentBridge";
 import { extOf, fileNameStem } from "../lib/fileKind";
 import { editableDocumentForAi } from "./artifacts";
 import { editDocumentAsAi } from "./documentEdits";
@@ -64,13 +70,16 @@ export async function answerAgentRequest(request: AgentRequest): Promise<AgentAn
 
 /** Answer every agent request that reaches this window; returns the stop. */
 export function attachAgentBridge(): () => void {
-  return onAgentRequest((request) => {
-    void answerAgentRequest(request)
-      .catch((error: unknown): AgentAnswer => ({
-        ok: false,
-        error: error instanceof Error ? error.message : String(error),
-      }))
-      .then((answer) => agentBridgeReply(request.requestId, answer))
-      .catch(() => {});
-  });
+  return onAgentRequest(
+    (request) => {
+      void answerAgentRequest(request)
+        .catch((error: unknown): AgentAnswer => ({
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        }))
+        .then((answer) => agentBridgeReply(request.requestId, answer))
+        .catch(() => {});
+    },
+    () => void agentBridgeReady().catch(() => {}),
+  );
 }

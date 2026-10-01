@@ -10,8 +10,8 @@ use serde_json::{json, Value};
 use crate::agent_bridge::{ask_app, client_name, BridgeRequest};
 
 /// The chat's limits (`MAX_EDIT_ACTIONS`, `MAX_EDIT_TEXT` in aiEdit.ts).
-const MAX_ACTIONS: usize = 40;
-const MAX_TEXT: usize = 8000;
+pub(crate) const MAX_ACTIONS: usize = 40;
+pub(crate) const MAX_TEXT: usize = 8000;
 const RUNNING: &str = "Rotli must be running on this Mac.";
 
 pub(crate) fn tools(tool: fn(&str, &str, Value, bool) -> Value) -> Vec<Value> {
@@ -61,12 +61,29 @@ pub(crate) fn call(name: &str, args: &Value) -> Option<Result<Value, String>> {
     Some(ask(tool, args))
 }
 
-fn ask(tool: &str, args: &Value) -> Result<Value, String> {
-    if let Some(actions) = args.get("actions").and_then(Value::as_array) {
-        if actions.is_empty() || actions.len() > MAX_ACTIONS {
+/// What a call must carry, refused here before anything reaches the app.
+fn complete(tool: &str, args: &Value) -> Result<(), String> {
+    let text = |name: &str| args.get(name).and_then(Value::as_str).is_some_and(|v| !v.trim().is_empty());
+    if tool == "create_document" {
+        return if text("title") { Ok(()) } else { Err("title is required".into()) };
+    }
+    if !text("file") {
+        return Err("file is required (a .docx id from rotli_list)".into());
+    }
+    if tool == "apply_document" {
+        if !text("expectedRevision") {
+            return Err("expectedRevision is required (from the rotli_read_document just before)".into());
+        }
+        let count = args.get("actions").and_then(Value::as_array).map_or(0, Vec::len);
+        if count == 0 || count > MAX_ACTIONS {
             return Err(format!("send 1 to {MAX_ACTIONS} actions"));
         }
     }
+    Ok(())
+}
+
+fn ask(tool: &str, args: &Value) -> Result<Value, String> {
+    complete(tool, args)?;
     let root_id = args.get("rootId").and_then(Value::as_str);
     let file = args.get("file").and_then(Value::as_str);
     let (root, read_only, local) = crate::workspace::bridge_target(file, root_id)?;
@@ -104,6 +121,19 @@ mod tests {
             json!(["replace", "insert_after", "delete", "set_cell", "set_kind"])
         );
         assert!(call("rotli_not_a_document_tool", &json!({})).is_none());
+    }
+
+    #[test]
+    fn an_incomplete_call_never_reaches_the_app() {
+        assert!(complete("read_document", &json!({})).unwrap_err().contains("file"));
+        assert!(complete("apply_document", &json!({ "file": "a.docx", "actions": [{}] }))
+            .unwrap_err()
+            .contains("expectedRevision"));
+        assert!(complete("apply_document", &json!({ "file": "a.docx", "expectedRevision": "r" }))
+            .unwrap_err()
+            .contains("1 to 40"));
+        assert!(complete("create_document", &json!({ "title": "  " })).is_err());
+        assert!(complete("create_document", &json!({ "title": "Plan" })).is_ok());
     }
 
     #[test]

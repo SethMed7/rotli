@@ -143,7 +143,10 @@ Agents count as remote. Refused: a vault other than the one open in Rotli;
 writes to a read-only vault; a document hidden from agents, named with a secure
 keyword, or holding secret-shaped text; an edit to a document no AI created
 (`.rotli/file-grants.json`); an edit while the document is open in a pane; a
-stale revision. Every answer passes the secret check before it leaves Rust.
+stale revision. Every answer, a refusal included, passes the secret check
+before it leaves Rust. A headless `rotli mcp` reaches the app through
+`agent-bridge/bridge.sock` in Rotli's app-support folder (a 0700 folder, a
+0600 socket); the paired relay runs inside the app.
 
 ## Opening in Rotli
 

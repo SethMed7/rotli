@@ -1,6 +1,14 @@
 {
   "_comment": "TS↔Rust shared constants — parity by fixture, never by codegen or source scraping. Each entry declares its source of truth; hand-written tests on BOTH sides (src-tauri/src/parity_tests.rs via include_str!, src/lib/parity.test.ts via the real TS modules) assert their named constants equal these values, so a one-sided edit fails cargo test or bun test. scripts/check-parity.mjs (in the lint chain) validates this file's shape and that every entry key is referenced by both suites. endpointLocality is behavioral: the two implementations stay independent (security policy is never shared across the boundary) and the fixture pins the agreed verdicts.",
   "entries": {
+    "documentEditMaxActions": {
+      "sourceOfTruth": "src/documents/aiEdit.ts MAX_EDIT_ACTIONS ↔ src-tauri/src/workspace_documents.rs MAX_ACTIONS",
+      "value": 40
+    },
+    "documentEditMaxText": {
+      "sourceOfTruth": "src/documents/aiEdit.ts MAX_EDIT_TEXT ↔ src-tauri/src/workspace_documents.rs MAX_TEXT",
+      "value": 8000
+    },
     "documentEditMaxBytes": {
       "sourceOfTruth": "src/documents/kinds.ts DOCUMENT_EDIT_MAX_BYTES ↔ src-tauri/src/agent_bridge.rs DOCX_MAX_BYTES",
       "value": 12000000

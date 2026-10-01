@@ -17,11 +17,16 @@ export interface AgentRequest {
 
 export type AgentAnswer = { ok: true; result: unknown } | { ok: false; error: string };
 
-export function onAgentRequest(cb: (request: AgentRequest) => void): () => void {
+/** Listen for agent requests; `onListening` runs once the listener is live. */
+export function onAgentRequest(cb: (request: AgentRequest) => void, onListening?: () => void): () => void {
   if (!isTauri()) return () => {};
   const unlisten = listen<AgentRequest>("rotli:agent-request", (event) => cb(event.payload));
+  void unlisten.then(() => onListening?.());
   return () => void unlisten.then((fn) => fn());
 }
+
+/** Tell Rust the main window now answers agents (until then it refuses at once). */
+export const agentBridgeReady = (): Promise<void> => invoke<void>("agent_bridge_ready");
 
 export function agentBridgeReply(requestId: number, answer: AgentAnswer): Promise<void> {
   return invoke<void>("agent_bridge_reply", {

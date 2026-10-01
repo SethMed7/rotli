@@ -21,21 +21,28 @@ process to ask the running app something and get an answer.
    `rotli_apply_document`, `rotli_create_document`; `workspace_documents.rs`)
    travel to the running app, where the chat's own code does the work: one
    codec, one block numbering (an apply addresses the numbers the read gave),
-   one action vocabulary and its limits (`src/documents/aiEdit.ts`). Rotli
+   one action vocabulary and its limits (`src/documents/aiEdit.ts`; the 40
+   actions, 8,000 characters, and 12 MB are pinned TS↔Rust in `parity.json`). Rotli
    must be running; a closed app is a clear error, never an auto-launch.
 2. **One Rust entry, two paths.** `agent_bridge::ask_app`. Inside the app (the
    relay that carries a cloud client such as the Grok bot) it dispatches in
    process; a headless `rotli mcp` sends one JSON line over a Unix socket,
-   `agent-bridge.sock` in the per-user app-support folder (mode 0600, never
-   inside a vault, which can be synced or shared). Both meet in `dispatch`.
-   Stable builds open no socket.
+   `agent-bridge/bridge.sock` in the per-user app-support folder: bound inside
+   a 0700 folder (private from the moment it exists, whatever the umask), then
+   0600 itself, never inside a vault (which can be synced or shared). At most
+   8 socket requests run at once. Both paths meet in `dispatch`. Stable builds
+   open no socket. Until the main window says it listens
+   (`agent_bridge_ready`), a request is refused at once rather than waiting.
 3. **Rust enforces the rules, independently of the webview.** An agent counts
    as remote. Before the webview sees a request, Rust refuses another vault
    than the one open, writes to a read-only vault (the relay's flag or the
    development fallback), a document hidden from agents, named with a secure
    keyword, or holding secret-shaped text (`docx_text` + `blocked_for_remote`),
-   and an edit to a document no AI created. After, every answer passes
-   `blocked_for_remote` before it leaves. Saves go through
+   an edit to a document no AI created, a new document named with a secure
+   keyword, and an incomplete call (no file, no revision, no actions). After, every answer passes
+   `blocked_for_remote` before it leaves, a refusal's own words included. The
+   document's records are checked under the corpus lock; its contents (size,
+   secret scan) are read outside it. Saves go through
    `corpus_write_file_ai` (grant, secret check, revision gate, `.bak`).
 4. **The webview keeps its own checks too**: the action parser, the revision
    named by the read (a newer file is refused), a document open in a pane

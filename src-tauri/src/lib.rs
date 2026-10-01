@@ -13,6 +13,7 @@
 // so heavy use can keep the window resident.
 
 mod agent_bridge;
+mod agent_bridge_socket;
 mod ai_edit_policy;
 mod app_settings;
 mod board;
@@ -2271,6 +2272,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            agent_bridge::agent_bridge_ready,
             agent_bridge::agent_bridge_reply,
             toggle_main_window,
             quit_flush_done,
