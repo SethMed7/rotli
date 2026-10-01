@@ -530,4 +530,28 @@ describe("DOCX editor codec", () => {
     first.runs = [{ text: "Changed" }];
     await expect(encodeDocx(decoded.source, decoded.document)).rejects.toThrow(/unsupported Word inline/i);
   });
+
+  test("a link in a table cell saves and reads back", async () => {
+    const decoded = await decodeDocx(
+      await createDocxBase64({
+        title: "Owners",
+        table: [
+          ["Team", "Site"],
+          ["Rotli", "tbd"],
+        ],
+      }),
+      "storage/rotli/owners.docx",
+    );
+    const table = decoded.document.content.find((content) => content.kind === "table");
+    if (table?.kind !== "table") throw new Error("expected the table");
+    table.table.rows[1]!.cells[1]!.paragraphs[0]!.runs = [{ text: "home", link: "https://rotli.co/team" }];
+    const encoded = await encodeDocx(decoded.source, decoded.document);
+    expect(await saved(encoded, "word/_rels/document.xml.rels")).toMatch(/rotli\.co\/team/);
+    const reopened = (await decodeDocx(encoded, "storage/rotli/owners.docx")).document.content.find(
+      (content) => content.kind === "table",
+    );
+    expect(reopened?.kind === "table" && reopened.table.rows[1]!.cells[1]!.paragraphs[0]!.runs).toEqual([
+      { text: "home", link: "https://rotli.co/team" },
+    ]);
+  });
 });

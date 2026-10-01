@@ -18,7 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   new text for secrets, keeps a backup of the original, and waits while the
   document is open.
 - **Links in Word documents.** Web and mail links in a .docx now open, edit,
-  and save as real Word links: add one from the document toolbar, change its
+  and save as real Word links: add one from the document toolbar (or the
+  palette's Link), change its
   text or address, and it stays a link in Word. A click in a link's text
   edits it; ⌘-click, or the address on the card that hovering shows, opens it
   in your browser or mail app. Chat sees links as Markdown links, keeps them

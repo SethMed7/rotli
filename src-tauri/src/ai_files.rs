@@ -156,6 +156,14 @@ pub(crate) fn docx_text(bytes: &[u8]) -> Result<String, String> {
         }
         text.push('\n');
     }
+    // a link's address lives in the relationships part, not the body
+    if let Ok(rels) = zip_entry(bytes, "word/_rels/document.xml.rels") {
+        let rels = String::from_utf8_lossy(&rels);
+        for target in rels.split("Target=\"").skip(1) {
+            text.push_str(target.split('"').next().unwrap_or(""));
+            text.push('\n');
+        }
+    }
     Ok(text
         .replace("&lt;", "<")
         .replace("&gt;", ">")
@@ -240,40 +248,51 @@ mod tests {
 
     /// A one-entry zip, deflated or stored (the CRC isn't checked here).
     fn zip_of(name: &str, data: &[u8], deflate: bool) -> Vec<u8> {
-        let body = if deflate {
-            let mut encoder = flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::default());
-            encoder.write_all(data).unwrap();
-            encoder.finish().unwrap()
-        } else {
-            data.to_vec()
-        };
+        zip_with(&[(name, data)], deflate)
+    }
+
+    fn zip_with(entries: &[(&str, &[u8])], deflate: bool) -> Vec<u8> {
         let method: u16 = if deflate { 8 } else { 0 };
         let mut zip = Vec::new();
-        zip.extend_from_slice(&0x0403_4b50u32.to_le_bytes());
-        zip.extend_from_slice(&[20, 0, 0, 0]);
-        zip.extend_from_slice(&method.to_le_bytes());
-        zip.extend_from_slice(&[0; 8]);
-        zip.extend_from_slice(&(body.len() as u32).to_le_bytes());
-        zip.extend_from_slice(&(data.len() as u32).to_le_bytes());
-        zip.extend_from_slice(&(name.len() as u16).to_le_bytes());
-        zip.extend_from_slice(&0u16.to_le_bytes());
-        zip.extend_from_slice(name.as_bytes());
-        zip.extend_from_slice(&body);
+        let mut directory = Vec::new();
+        for (name, data) in entries {
+            let body = if deflate {
+                let mut encoder = flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::default());
+                encoder.write_all(data).unwrap();
+                encoder.finish().unwrap()
+            } else {
+                data.to_vec()
+            };
+            let offset = zip.len() as u32;
+            zip.extend_from_slice(&0x0403_4b50u32.to_le_bytes());
+            zip.extend_from_slice(&[20, 0, 0, 0]);
+            zip.extend_from_slice(&method.to_le_bytes());
+            zip.extend_from_slice(&[0; 8]);
+            zip.extend_from_slice(&(body.len() as u32).to_le_bytes());
+            zip.extend_from_slice(&(data.len() as u32).to_le_bytes());
+            zip.extend_from_slice(&(name.len() as u16).to_le_bytes());
+            zip.extend_from_slice(&0u16.to_le_bytes());
+            zip.extend_from_slice(name.as_bytes());
+            zip.extend_from_slice(&body);
+            directory.extend_from_slice(&0x0201_4b50u32.to_le_bytes());
+            directory.extend_from_slice(&[20, 0, 20, 0, 0, 0]);
+            directory.extend_from_slice(&method.to_le_bytes());
+            directory.extend_from_slice(&[0; 8]);
+            directory.extend_from_slice(&(body.len() as u32).to_le_bytes());
+            directory.extend_from_slice(&(data.len() as u32).to_le_bytes());
+            directory.extend_from_slice(&(name.len() as u16).to_le_bytes());
+            directory.extend_from_slice(&[0; 12]);
+            directory.extend_from_slice(&offset.to_le_bytes());
+            directory.extend_from_slice(name.as_bytes());
+        }
         let central = zip.len();
-        zip.extend_from_slice(&0x0201_4b50u32.to_le_bytes());
-        zip.extend_from_slice(&[20, 0, 20, 0, 0, 0]);
-        zip.extend_from_slice(&method.to_le_bytes());
-        zip.extend_from_slice(&[0; 8]);
-        zip.extend_from_slice(&(body.len() as u32).to_le_bytes());
-        zip.extend_from_slice(&(data.len() as u32).to_le_bytes());
-        zip.extend_from_slice(&(name.len() as u16).to_le_bytes());
-        zip.extend_from_slice(&[0; 12]);
-        zip.extend_from_slice(&0u32.to_le_bytes());
-        zip.extend_from_slice(name.as_bytes());
-        let central_len = zip.len() - central;
+        zip.extend_from_slice(&directory);
+        let count = (entries.len() as u16).to_le_bytes();
         zip.extend_from_slice(&0x0605_4b50u32.to_le_bytes());
-        zip.extend_from_slice(&[0, 0, 0, 0, 1, 0, 1, 0]);
-        zip.extend_from_slice(&(central_len as u32).to_le_bytes());
+        zip.extend_from_slice(&[0, 0, 0, 0]);
+        zip.extend_from_slice(&count);
+        zip.extend_from_slice(&count);
+        zip.extend_from_slice(&(directory.len() as u32).to_le_bytes());
         zip.extend_from_slice(&(central as u32).to_le_bytes());
         zip.extend_from_slice(&0u16.to_le_bytes());
         zip
@@ -310,5 +329,21 @@ mod tests {
         let secret = XML.replace("Launch &amp; land", "key sk-ant-api03-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
         assert!(refuse_secret(&zip_of("word/document.xml", secret.as_bytes(), true)).is_err());
         assert!(refuse_secret(&zip_of("word/document.xml", XML.as_bytes(), true)).is_ok());
+    }
+
+    #[test]
+    fn a_secret_in_a_link_address_is_refused_too() {
+        let rels = |target: &str| {
+            format!(r#"<Relationships><Relationship Id="rIdRotliLink1" Type="…/hyperlink" Target="{target}" TargetMode="External"/></Relationships>"#)
+        };
+        let secret = rels("https://example.com/?k=sk-ant-api03-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+        let entries = |rels: &str| {
+            zip_with(
+                &[("word/document.xml", XML.as_bytes()), ("word/_rels/document.xml.rels", rels.as_bytes())],
+                true,
+            )
+        };
+        assert!(refuse_secret(&entries(&secret)).is_err());
+        assert!(refuse_secret(&entries(&rels("https://rotli.co"))).is_ok());
     }
 }

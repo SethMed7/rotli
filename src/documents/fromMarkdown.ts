@@ -23,8 +23,22 @@ function plainText(source: string): string {
 /** Inline Markdown as runs: a web or mail `[text](url)` stays a link, any
  * other link keeps only its text; emphasis marks drop. Empty when blank. */
 function inlineRuns(source: string): DocumentRun[] {
-  const text = source.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_whole, alt: string, path: string) =>
-    alt.trim() ? `[Image placement: ${alt.trim()} — ${path.trim()}]` : `[Image placement — ${path.trim()}]`,
+  const links: { label: string; url: string | undefined }[] = [];
+  // each link waits behind a private-use placeholder, so emphasis around it
+  // (`**[Rotli](https://rotli.co)**`) strips as a whole and its url stays whole
+  const text = plainText(
+    source
+      .replace(/[\uE000\uE001]/g, "")
+      .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_whole, alt: string, path: string) =>
+        alt.trim()
+          ? `[Image placement: ${alt.trim()} — ${path.trim()}]`
+          : `[Image placement — ${path.trim()}]`,
+      )
+      .replace(
+        /\[([^\]]+)\]\(([^)]+)\)/g,
+        (_whole, label: string, url: string) =>
+          `\uE000${links.push({ label, url: safeLinkUrl(url) }) - 1}\uE001`,
+      ),
   );
   const runs: DocumentRun[] = [];
   const add = (piece: string, link?: string) => {
@@ -34,12 +48,13 @@ function inlineRuns(source: string): DocumentRun[] {
     else runs.push({ text: piece, ...(link ? { link } : {}) });
   };
   let cursor = 0;
-  for (const match of text.matchAll(/\[([^\]]+)\]\(([^)]+)\)/g)) {
-    add(plainText(text.slice(cursor, match.index)));
-    add(plainText(match[1] ?? ""), safeLinkUrl(match[2]));
+  for (const match of text.matchAll(/\uE000(\d+)\uE001/g)) {
+    add(text.slice(cursor, match.index));
+    const link = links[Number(match[1])];
+    add(plainText(link?.label ?? ""), link?.url);
     cursor = match.index + match[0].length;
   }
-  add(plainText(text.slice(cursor)));
+  add(text.slice(cursor));
   const first = runs[0];
   const last = runs.at(-1);
   if (first) first.text = first.text.trimStart();

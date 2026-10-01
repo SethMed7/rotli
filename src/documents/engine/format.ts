@@ -15,6 +15,8 @@ const MARK_COMMANDS: Partial<Record<DocumentMark, string>> = {
   italic: "doc.command.set-inline-format-italic",
   underline: "doc.command.set-inline-format-underline",
   strike: "doc.command.set-inline-format-strikethrough",
+  // the link plugin's add/edit card, for the selection or the link at the caret
+  link: "doc.operation.show-hyper-link-edit-popup",
 };
 
 const HEADING_COMMANDS: Record<1 | 2 | 3, string> = {
@@ -42,7 +44,7 @@ export function documentBlockCommand(block: DocumentBlock): string | null {
   return BLOCK_COMMANDS[block] ?? null;
 }
 
-/** Markdown-only intents (code, highlight, link, quote, checklist) are no-ops. */
+/** Markdown-only intents (code, highlight, quote, checklist) are no-ops. */
 export function documentFormatHandle(runCommand: (id: string) => void) {
   const run = (id: string | null) => {
     if (id) runCommand(id);

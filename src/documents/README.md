@@ -44,12 +44,13 @@ Local documents follow Rotli's [clean architecture protocol](../../docs/architec
   their own shortcuts. `codec/xml.ts` drops XML 1.0 forbidden characters on
   save, so a stray control character cannot make the file unreadable.
 - `engine/format.ts` maps Rotli's editor format intents (bold, italic,
-  underline, strike, H1–H3, bullet and numbered lists) to Univer commands;
+  underline, strike, link, H1–H3, bullet and numbered lists) to Univer
+  commands (link opens the link plugin's add/edit card);
   `documentEditor.tsx` registers it as the pane's editor handle so the key
   registry never swallows a format chord in a document pane. Inside the canvas
   Univer's built-in ⌘B/⌘I/⌘U also apply and win first (like the board canvas's
   owned chords), so a rebind moves only the registry side. Code, highlight,
-  link, quote, and checklist are Markdown-only and do nothing in a document.
+  quote, and checklist are Markdown-only and do nothing in a document.
 - `codec/runStyle.ts` owns the run properties Rotli edits, `codec/lists.ts`
   list numbering, `codec/hyperlinks.ts` link relationships; `codec/xml.ts`
   holds the shared WordprocessingML string helpers.

@@ -114,4 +114,12 @@ describe("Word document creation content", () => {
       },
     });
   });
+
+  test("emphasis around a link strips whole, and a url keeps its underscores", () => {
+    const draft = documentDraftFromMarkdown("Emphasis", "**[Rotli](https://rotli.co/a_b_c)** ships _today_");
+    expect(draft.content?.[0]).toEqual({
+      kind: "paragraph",
+      paragraph: { runs: [{ text: "Rotli", link: "https://rotli.co/a_b_c" }, { text: " ships today" }] },
+    });
+  });
 });
