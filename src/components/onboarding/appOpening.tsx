@@ -3,8 +3,10 @@
 // opening animation"). Once per launch of the Mac app, in the person's own
 // theme: Rotli's island for Rotli, the family's own scene otherwise (the empty
 // pane's scenes), with their quokka as they dressed it. Never right after first
-// run's own intro, and not with Reduce motion on. `?opening` shows it in the
-// browser twin (tests).
+// run's own intro, and not with Reduce motion on. It takes its time (the owner:
+// "happens way too fast") and holds still until the window is in front, so a
+// launch that starts behind other windows doesn't play it unseen. `?opening`
+// shows it in the browser twin (tests).
 
 import { useCallback, useEffect, useState } from "react";
 
@@ -19,6 +21,9 @@ import {
   prefersReducedMotion,
 } from "./onboardingScenery";
 
+/** How much slower than first run's 1.7-second intro: about 2.9 seconds. */
+const OPENING_PACE = 1.7;
+
 export function openingWanted(): boolean {
   if (openedThisLaunch() || prefersReducedMotion()) return false;
   return openingPlaysHere();
@@ -32,7 +37,15 @@ export function AppOpening() {
   if (!show) return null;
   if (family === "warm")
     return (
-      <SceneIntro art={ISLAND_SCENE} viewBox="0 0 1200 240" onDone={done} testId="app-opening" accessorized />
+      <SceneIntro
+        art={ISLAND_SCENE}
+        viewBox="0 0 1200 240"
+        onDone={done}
+        testId="app-opening"
+        accessorized
+        pace={OPENING_PACE}
+        waitForFront
+      />
     );
   return (
     <SceneIntro
@@ -42,6 +55,8 @@ export function AppOpening() {
       testId="app-opening"
       scene
       accessorized
+      pace={OPENING_PACE}
+      waitForFront
     />
   );
 }

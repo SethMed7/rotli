@@ -123,6 +123,30 @@ test("the app opens on its opening scene each launch, in the person's theme", as
   await expect(page.getByTestId("app-opening")).toHaveCount(0, { timeout: 500 });
 });
 
+test("the opening takes its time, and waits for the window to be in front", async ({ page }) => {
+  // unhurried: still playing two seconds in
+  await page.goto("/?opening");
+  await page.waitForTimeout(2000);
+  await expect(page.getByTestId("app-opening")).toBeVisible();
+  // a window launched behind others (a menu-bar app isn't activated by its
+  // own start) holds the opening until it comes forward
+  await page.addInitScript(() => {
+    let focused = false;
+    Document.prototype.hasFocus = () => focused;
+    (window as { bringForward?: () => void }).bringForward = () => {
+      focused = true;
+      window.dispatchEvent(new Event("focus"));
+    };
+  });
+  await page.goto("/?opening");
+  const opening = page.getByTestId("app-opening");
+  await page.waitForTimeout(3200);
+  await expect(opening).toHaveClass(/is-waiting/);
+  await page.evaluate(() => (window as { bringForward?: () => void }).bringForward?.());
+  await expect(opening).not.toHaveClass(/is-waiting/);
+  await expect(opening).toHaveCount(0, { timeout: 4000 });
+});
+
 test("no opening with Reduce motion on", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/?opening");

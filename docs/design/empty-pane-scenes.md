@@ -88,8 +88,13 @@ match what they chose." (`src/components/onboarding/onboardingScenery.tsx`)
   `onboarding/appOpening.tsx` plays the same kind of opening once per launch of
   the Mac app, in the person's theme: the island for Rotli, the family's empty-
   pane scene otherwise, with their dressed quokka. It never plays right after
-  first run's intro, and never with Reduce motion on. `?opening` shows it in
-  the browser twin.
+  first run's intro, and never with Reduce motion on. It runs at 1.7× first
+  run's pace (about 2.9 s; the owner: "happens way too fast"), and it holds
+  still (`is-waiting`, animations paused) until the window has focus, since a
+  launch can start behind other windows. Launch also brings the main window
+  forward once the Dock policy is applied (`persist.ts`
+  `applyShellSideEffects`): an Accessory app isn't activated by its own start.
+  `?opening` shows it in the browser twin.
 - **Welcome is the island** in Rotli Light, the environment every first run
   opens in.
 - **After that, the chosen theme.** From Appearance on, the backdrop is the
