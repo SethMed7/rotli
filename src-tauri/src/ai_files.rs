@@ -31,7 +31,11 @@ struct Grants {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Grant {
+    /// "ai" (Rotli's chat) or "agent" (an outside agent through the bridge).
     created_by: String,
+    /// The outside agent's name (MCP `clientInfo.name`); chat records none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    agent: Option<String>,
     ai_edit: bool,
 }
 
@@ -47,7 +51,7 @@ fn read_grants(root: &Path) -> Grants {
         .unwrap_or_default()
 }
 
-fn record_ai_created(root: &Path, rel: &str) -> Result<(), String> {
+fn record_ai_created(root: &Path, rel: &str, agent: Option<&str>) -> Result<(), String> {
     let path = grants_path(root);
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -58,7 +62,8 @@ fn record_ai_created(root: &Path, rel: &str) -> Result<(), String> {
         grants.files.insert(
             rel.to_string(),
             Grant {
-                created_by: "ai".into(),
+                created_by: if agent.is_some() { "agent" } else { "ai" }.into(),
+                agent: agent.map(str::to_string),
                 ai_edit: true,
             },
         );
@@ -71,7 +76,8 @@ pub(crate) fn ai_may_edit(root: &Path, rel: &str) -> bool {
     read_grants(root)
         .files
         .get(rel)
-        .is_some_and(|grant| grant.created_by == "ai" && grant.ai_edit)
+        // any AI's document is open to every AI, as with notes (`created_by`)
+        .is_some_and(|grant| matches!(grant.created_by.as_str(), "ai" | "agent") && grant.ai_edit)
 }
 
 fn u16_at(bytes: &[u8], at: usize) -> Option<u16> {
@@ -193,13 +199,15 @@ fn is_docx(name: &str) -> bool {
         .is_some_and(|ext| ext.eq_ignore_ascii_case("docx"))
 }
 
-/// The AI creates a Word document in the managed lane and records that it did.
+/// The AI creates a Word document in the managed lane and records that it did
+/// (and which outside agent, when one asked through the bridge).
 #[tauri::command]
 pub fn corpus_create_managed_file_ai(
     state: tauri::State<'_, CorpusState>,
     name: String,
     base64: String,
     root_id: Option<String>,
+    agent: Option<String>,
 ) -> Result<String, String> {
     if !is_docx(&name) {
         return Err("Rotli's AI creates Word documents (.docx) here".into());
@@ -212,7 +220,7 @@ pub fn corpus_create_managed_file_ai(
     };
     let rel = state.route(&root_id, |store| {
         let rel = store.create_managed_file(&name, &bytes)?;
-        record_ai_created(store.root(), &rel)?;
+        record_ai_created(store.root(), &rel, agent.as_deref())?;
         Ok(rel)
     })?;
     Ok(compose_root_id(&root_id, &rel))
@@ -242,7 +250,7 @@ pub fn corpus_write_file_ai(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use std::io::Write;
 
@@ -251,7 +259,7 @@ mod tests {
         zip_with(&[(name, data)], deflate)
     }
 
-    fn zip_with(entries: &[(&str, &[u8])], deflate: bool) -> Vec<u8> {
+    pub(crate) fn zip_with(entries: &[(&str, &[u8])], deflate: bool) -> Vec<u8> {
         let method: u16 = if deflate { 8 } else { 0 };
         let mut zip = Vec::new();
         let mut directory = Vec::new();
@@ -298,7 +306,7 @@ mod tests {
         zip
     }
 
-    const XML: &str = r#"<w:document><w:body><w:p><w:r><w:t>Launch &amp; land</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t xml:space="preserve">Owner </w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#;
+    pub(crate) const XML: &str = r#"<w:document><w:body><w:p><w:r><w:t>Launch &amp; land</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t xml:space="preserve">Owner </w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#;
 
     #[test]
     fn a_documents_text_is_read_from_the_package_itself_deflated_or_stored() {
@@ -316,7 +324,11 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         let root = dir.path();
         assert!(!ai_may_edit(root, "storage/rotli/plan.docx"));
-        record_ai_created(root, "storage/rotli/plan.docx").unwrap();
+        record_ai_created(root, "storage/rotli/plan.docx", None).unwrap();
+        record_ai_created(root, "storage/rotli/agent.docx", Some("Claude Code")).unwrap();
+        assert!(ai_may_edit(root, "storage/rotli/agent.docx"));
+        let grants = std::fs::read_to_string(grants_path(root)).unwrap();
+        assert!(grants.contains("\"createdBy\": \"agent\"") && grants.contains("\"agent\": \"Claude Code\""));
         assert!(ai_may_edit(root, "storage/rotli/plan.docx"));
         assert!(!ai_may_edit(root, "storage/rotli/mine.docx"));
         // an unreadable record grants nothing

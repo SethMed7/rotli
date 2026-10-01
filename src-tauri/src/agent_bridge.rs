@@ -1,0 +1,496 @@
+//! The agent bridge (docs/decisions/2026-10-01-agent-app-bridge.md): agents
+//! (`rotli mcp` in Claude Code or Codex, the paired relay's Grok bot) reach
+//! Word documents through the RUNNING app, so one codec reads and writes them
+//! and every rule the app keeps applies.
+//!
+//! `ask_app` is the one entry. Inside the app (the relay) it dispatches in
+//! process; a headless `rotli mcp` sends the request over a Unix socket in the
+//! per-user app-support folder (never the vault) to the app's listener. Both
+//! meet in `dispatch`, which owns the Rust-side rules before and after the
+//! webview does the codec work: an agent counts as remote, so a secure or
+//! secret-shaped document is refused before the webview reads it and every
+//! answer passes the egress check before it leaves; writes need a writable
+//! vault and a document an AI made (`ai_files.rs`), and save through
+//! `corpus_write_file_ai`'s own gates.
+
+use std::collections::HashMap;
+use std::io::{BufRead, BufReader, Read, Write};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Condvar, Mutex, OnceLock};
+use std::time::{Duration, Instant};
+
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use tauri::{AppHandle, Emitter, Manager};
+
+/// The tools the bridge carries; anything else is refused before the app sees it.
+pub(crate) const BRIDGE_TOOLS: [&str; 3] = ["read_document", "apply_document", "create_document"];
+/// How long an agent waits for the app's answer (a big document's save included).
+const ANSWER_MAX: Duration = Duration::from_secs(30);
+/// One request or answer line; mirrors the MCP envelope limits.
+const LINE_MAX: u64 = 600_000;
+/// The largest .docx the Rust pre-check reads.
+const DOCX_MAX_BYTES: u64 = 32 * 1024 * 1024;
+const NOT_RUNNING: &str =
+    "Rotli isn't running. Open Rotli on this Mac to read or edit Word documents, then try again.";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BridgeRequest {
+    pub tool: String,
+    pub args: Value,
+    /// The vault the agent was pointed at; the app refuses any other.
+    pub root: PathBuf,
+    /// The agent's own read-only flag (the relay's, or a read-only root).
+    pub read_only: bool,
+    /// Who is asking (MCP `clientInfo.name`), recorded on what it creates.
+    pub agent: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct BridgeAnswer {
+    ok: bool,
+    #[serde(default)]
+    result: Value,
+    #[serde(default)]
+    error: Option<String>,
+}
+
+static IN_APP: OnceLock<AppHandle> = OnceLock::new();
+static CLIENT: Mutex<Option<String>> = Mutex::new(None);
+
+/// Remember the MCP client's name from `initialize` (sanitized, short).
+pub(crate) fn remember_client(params: &Value) {
+    let name = params
+        .pointer("/clientInfo/name")
+        .and_then(Value::as_str)
+        .map(agent_name)
+        .filter(|name| !name.is_empty());
+    if let Ok(mut client) = CLIENT.lock() {
+        *client = name;
+    }
+}
+
+fn agent_name(raw: &str) -> String {
+    raw.chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, ' ' | '-' | '_' | '.'))
+        .take(64)
+        .collect::<String>()
+        .trim()
+        .to_string()
+}
+
+pub(crate) fn client_name() -> String {
+    CLIENT
+        .lock()
+        .ok()
+        .and_then(|client| client.clone())
+        .unwrap_or_else(|| "agent".into())
+}
+
+/// Ask the running app to carry out one document tool.
+pub(crate) fn ask_app(request: BridgeRequest) -> Result<Value, String> {
+    if !BRIDGE_TOOLS.contains(&request.tool.as_str()) {
+        return Err(format!("unknown document tool: {}", request.tool));
+    }
+    match IN_APP.get() {
+        Some(app) => dispatch(app, request),
+        None => ask_over_socket(&socket_path()?, &request),
+    }
+}
+
+fn socket_path() -> Result<PathBuf, String> {
+    if let Ok(path) = std::env::var("ROTLI_AGENT_BRIDGE_SOCKET") {
+        return Ok(PathBuf::from(path));
+    }
+    let config = crate::workspace::production_config_path()?;
+    let dir = config.parent().ok_or("Rotli's settings folder is unavailable")?;
+    Ok(dir.join("agent-bridge.sock"))
+}
+
+fn ask_over_socket(path: &Path, request: &BridgeRequest) -> Result<Value, String> {
+    use std::os::unix::net::UnixStream;
+    let mut stream = UnixStream::connect(path).map_err(|_| NOT_RUNNING.to_string())?;
+    let _ = stream.set_read_timeout(Some(ANSWER_MAX + Duration::from_secs(5)));
+    let _ = stream.set_write_timeout(Some(Duration::from_secs(5)));
+    let mut line = serde_json::to_vec(request).map_err(|e| e.to_string())?;
+    line.push(b'\n');
+    stream.write_all(&line).map_err(|_| NOT_RUNNING.to_string())?;
+    let mut answer = String::new();
+    BufReader::new(stream.take(LINE_MAX))
+        .read_line(&mut answer)
+        .map_err(|_| "Rotli didn't answer in time".to_string())?;
+    let answer: BridgeAnswer =
+        serde_json::from_str(answer.trim()).map_err(|_| "Rotli sent an unreadable answer".to_string())?;
+    if answer.ok {
+        Ok(answer.result)
+    } else {
+        Err(answer.error.unwrap_or_else(|| "Rotli refused the request".into()))
+    }
+}
+
+/// Start the app's side: remember the app for in-process asks and listen on
+/// the socket. Only development builds carry agents; stable opens nothing.
+pub(crate) fn start(app: &AppHandle) {
+    if !crate::feature_policy::agents_enabled() {
+        return;
+    }
+    let _ = IN_APP.set(app.clone());
+    let path = match socket_path() {
+        Ok(path) => path,
+        Err(error) => return eprintln!("rotli: agent bridge has no socket path ({error})"),
+    };
+    let app = app.clone();
+    let _ = std::thread::Builder::new()
+        .name("rotli-agent-bridge".into())
+        .spawn(move || {
+            if let Err(error) = listen(&app, &path) {
+                eprintln!("rotli: agent bridge is not listening ({error})");
+            }
+        });
+}
+
+fn listen(app: &AppHandle, path: &Path) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::net::{UnixListener, UnixStream};
+    // another Rotli already answers here: leave its socket alone
+    if UnixStream::connect(path).is_ok() {
+        return Err("another Rotli is already listening".into());
+    }
+    let _ = std::fs::remove_file(path);
+    let listener = UnixListener::bind(path).map_err(|e| e.to_string())?;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).map_err(|e| e.to_string())?;
+    for stream in listener.incoming().flatten() {
+        let app = app.clone();
+        let _ = std::thread::Builder::new()
+            .name("rotli-agent-request".into())
+            .spawn(move || serve(&app, stream));
+    }
+    Ok(())
+}
+
+fn serve(app: &AppHandle, stream: std::os::unix::net::UnixStream) {
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(10)));
+    let Ok(mut writer) = stream.try_clone() else { return };
+    let mut line = String::new();
+    if BufReader::new(stream.take(LINE_MAX)).read_line(&mut line).is_err() {
+        return;
+    }
+    let answer = match serde_json::from_str::<BridgeRequest>(line.trim()) {
+        Ok(request) if BRIDGE_TOOLS.contains(&request.tool.as_str()) => dispatch(app, request),
+        Ok(request) => Err(format!("unknown document tool: {}", request.tool)),
+        Err(_) => Err("unreadable request".into()),
+    };
+    let answer = match answer {
+        Ok(result) => BridgeAnswer { ok: true, result, error: None },
+        Err(error) => BridgeAnswer { ok: false, result: Value::Null, error: Some(error) },
+    };
+    if let Ok(mut bytes) = serde_json::to_vec(&answer) {
+        bytes.push(b'\n');
+        let _ = writer.write_all(&bytes);
+    }
+}
+
+/// The vault and write rules, from what the agent asked and what the app has open.
+fn admit(request: &BridgeRequest, app_root: &Path, app_read_only: bool) -> Result<(), String> {
+    let same = |path: &Path| std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    if same(&request.root) != same(app_root) {
+        return Err("Rotli has a different vault open. Switch Rotli to the agent's vault, or point the agent at the open one.".into());
+    }
+    if request.tool != "read_document" && (request.read_only || app_read_only) {
+        return Err("this vault is read-only for agents".into());
+    }
+    Ok(())
+}
+
+/// A document's file id inside the vault, or why it isn't one.
+fn document_rel(request: &BridgeRequest) -> Result<String, String> {
+    let file = request
+        .args
+        .get("file")
+        .and_then(Value::as_str)
+        .ok_or("name the document's file id (from rotli_list)")?;
+    let (_, rel) = crate::corpus::split_root_id(file);
+    crate::corpus::validate_rel(&rel)?;
+    if !rel.to_ascii_lowercase().ends_with(".docx") {
+        return Err("Rotli's agents read and edit Word documents (.docx)".into());
+    }
+    Ok(rel)
+}
+
+/// What a remote reader may never receive: a document hidden from agents,
+/// named with a secure keyword, or holding secret-shaped text.
+fn document_gate(store: &mut crate::corpus::CorpusStore, rel: &str, editing: bool) -> Result<(), String> {
+    if !store.agent_listable(rel) {
+        return Err("that document isn't available to agents".into());
+    }
+    let title = Path::new(rel).file_stem().and_then(|s| s.to_str()).unwrap_or_default();
+    if store.secure_by_name(title, rel) {
+        return Err("blocked: that document is named as secure; Rotli never gives it to an agent".into());
+    }
+    let path = store.guard_rel(rel)?;
+    let meta = std::fs::metadata(&path).map_err(|_| "that document doesn't exist".to_string())?;
+    if meta.len() > DOCX_MAX_BYTES {
+        return Err("that document is too large for an agent".into());
+    }
+    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+    if crate::secret::blocked_for_remote(&crate::ai_files::docx_text(&bytes)?) {
+        return Err("blocked: that document holds secret-shaped text; Rotli never gives it to an agent".into());
+    }
+    if editing && !crate::ai_files::ai_may_edit(store.root(), rel) {
+        return Err("that Word document is a person's: agents edit only documents an AI created. Ask for a new document instead".into());
+    }
+    Ok(())
+}
+
+/// Every answer leaves Rust only after the same egress check every reader gets.
+fn egress(result: Value) -> Result<Value, String> {
+    let text = serde_json::to_string(&result).map_err(|e| e.to_string())?;
+    if crate::secret::blocked_for_remote(&text) {
+        return Err("blocked: the answer would carry secret-shaped text".into());
+    }
+    Ok(result)
+}
+
+fn dispatch(app: &AppHandle, request: BridgeRequest) -> Result<Value, String> {
+    crate::feature_policy::require_agents()?;
+    let corpus = app.state::<crate::corpus::CorpusState>();
+    let root_id = corpus.default_root_id()?;
+    let app_root = corpus.default_root_path()?;
+    admit(&request, &app_root, crate::development_read_only(app))?;
+    if request.tool != "create_document" {
+        let rel = document_rel(&request)?;
+        let editing = request.tool == "apply_document";
+        corpus.route(&root_id, |store| document_gate(store, &rel, editing))?;
+    }
+    let result = app.state::<Pending>().ask(app, &request)?;
+    egress(result)
+}
+
+/// Requests the main webview owes an answer, by id (several agents at once).
+#[derive(Default)]
+pub(crate) struct Pending {
+    next: AtomicU64,
+    answers: Mutex<HashMap<u64, Option<Result<Value, String>>>>,
+    ready: Condvar,
+}
+
+impl Pending {
+    fn begin(&self) -> u64 {
+        let id = self.next.fetch_add(1, Ordering::Relaxed) + 1;
+        if let Ok(mut answers) = self.answers.lock() {
+            answers.insert(id, None);
+        }
+        id
+    }
+
+    /// An answer for a request still waiting; any other id is ignored.
+    fn finish(&self, id: u64, answer: Result<Value, String>) {
+        let Ok(mut answers) = self.answers.lock() else { return };
+        if let Some(slot) = answers.get_mut(&id) {
+            if slot.is_none() {
+                *slot = Some(answer);
+                self.ready.notify_all();
+            }
+        }
+    }
+
+    fn wait(&self, id: u64, max: Duration) -> Result<Value, String> {
+        let deadline = Instant::now() + max;
+        let mut answers = self.answers.lock().map_err(|_| "agent bridge lock poisoned")?;
+        loop {
+            if let Some(Some(_)) = answers.get(&id) {
+                return answers.remove(&id).flatten().unwrap_or_else(|| Err("no answer".into()));
+            }
+            let now = Instant::now();
+            if now >= deadline {
+                answers.remove(&id);
+                return Err("Rotli didn't answer in time. Is a dialog open in Rotli?".into());
+            }
+            answers = self
+                .ready
+                .wait_timeout(answers, deadline - now)
+                .map_err(|_| "agent bridge lock poisoned")?
+                .0;
+        }
+    }
+
+    fn ask(&self, app: &AppHandle, request: &BridgeRequest) -> Result<Value, String> {
+        let id = self.begin();
+        let event = json!({
+            "requestId": id,
+            "tool": request.tool,
+            "args": request.args,
+            "agent": request.agent,
+        });
+        if app.emit_to("main", "rotli:agent-request", event).is_err() {
+            self.finish(id, Err("Rotli's window didn't receive the request".into()));
+        }
+        self.wait(id, ANSWER_MAX)
+    }
+}
+
+/// The main webview's answer to a `rotli:agent-request`.
+#[tauri::command]
+pub(crate) fn agent_bridge_reply(
+    window: tauri::WebviewWindow,
+    pending: tauri::State<'_, Pending>,
+    request_id: u64,
+    ok: bool,
+    result: Option<Value>,
+    error: Option<String>,
+) -> Result<(), String> {
+    if window.label() != "main" {
+        return Err("only Rotli's main window answers agents".into());
+    }
+    let answer = if ok {
+        Ok(result.unwrap_or(Value::Null))
+    } else {
+        Err(error.unwrap_or_else(|| "Rotli refused the request".into()))
+    };
+    pending.finish(request_id, answer);
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn request(tool: &str, root: &Path, read_only: bool) -> BridgeRequest {
+        BridgeRequest {
+            tool: tool.into(),
+            args: json!({ "file": "storage/rotli/plan.docx" }),
+            root: root.to_path_buf(),
+            read_only,
+            agent: "claude-code".into(),
+        }
+    }
+
+    #[test]
+    fn answers_meet_their_own_request_and_a_silent_app_times_out() {
+        let pending = std::sync::Arc::new(Pending::default());
+        let (first, second) = (pending.begin(), pending.begin());
+        let waiter = {
+            let pending = pending.clone();
+            std::thread::spawn(move || pending.wait(first, Duration::from_secs(2)))
+        };
+        pending.finish(999, Ok(json!("stray")));
+        pending.finish(second, Ok(json!("second")));
+        pending.finish(first, Ok(json!("first")));
+        // a second answer for the same id never replaces the first
+        pending.finish(first, Ok(json!("late")));
+        assert_eq!(waiter.join().unwrap(), Ok(json!("first")));
+        assert_eq!(pending.wait(second, Duration::from_millis(10)), Ok(json!("second")));
+        let silent = pending.begin();
+        assert!(pending.wait(silent, Duration::from_millis(20)).unwrap_err().contains("in time"));
+        // a timed-out request is forgotten: its late answer goes nowhere
+        pending.finish(silent, Ok(json!("too late")));
+        assert!(pending.answers.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn only_the_open_vault_and_writes_only_where_writable() {
+        let open = tempfile::TempDir::new().unwrap();
+        let other = tempfile::TempDir::new().unwrap();
+        assert!(admit(&request("read_document", open.path(), false), open.path(), false).is_ok());
+        assert!(admit(&request("read_document", other.path(), false), open.path(), false)
+            .unwrap_err()
+            .contains("different vault"));
+        // reads stay open on a read-only vault; writes don't
+        assert!(admit(&request("read_document", open.path(), true), open.path(), true).is_ok());
+        for tool in ["apply_document", "create_document"] {
+            assert!(admit(&request(tool, open.path(), true), open.path(), false).is_err());
+            assert!(admit(&request(tool, open.path(), false), open.path(), true).is_err());
+            assert!(admit(&request(tool, open.path(), false), open.path(), false).is_ok());
+        }
+    }
+
+    #[test]
+    fn a_document_id_stays_a_docx_inside_the_vault() {
+        let mut bad = request("read_document", Path::new("/v"), false);
+        for file in ["../outside.docx", "/etc/passwd", "storage/rotli/notes.md"] {
+            bad.args = json!({ "file": file });
+            assert!(document_rel(&bad).is_err(), "{file}");
+        }
+        bad.args = json!({});
+        assert!(document_rel(&bad).is_err());
+        assert_eq!(
+            document_rel(&request("read_document", Path::new("/v"), false)).unwrap(),
+            "storage/rotli/plan.docx"
+        );
+    }
+
+    #[test]
+    fn a_document_reaches_an_agent_only_when_clean_and_edits_only_when_ai_made() {
+        use crate::ai_files::tests::{zip_with, XML};
+        let dir = tempfile::TempDir::new().unwrap();
+        let root = dir.path().join("brain");
+        std::fs::create_dir_all(root.join(".rotli")).unwrap();
+        std::fs::write(root.join("memex.json"), r#"{"id":"mx_bridge","contract":"3.4","apps":{}}"#).unwrap();
+        for folder in ["self", "wiki", "history", "chats", "archive", "trash"] {
+            std::fs::create_dir_all(root.join(folder)).unwrap();
+        }
+        std::fs::write(root.join(".rotli/settings.json"), r#"{"librarianRules":{"secureKeywords":["bank"]}}"#)
+            .unwrap();
+        let mut store = crate::corpus::CorpusStore::open(root.clone()).unwrap();
+        let docx = |xml: &str| zip_with(&[("word/document.xml", xml.as_bytes())], true);
+        let plan = store.create_managed_file("plan.docx", &docx(XML)).unwrap();
+        let bank = store.create_managed_file("bank details.docx", &docx(XML)).unwrap();
+        let secret = XML.replace("Launch &amp; land", "sk-ant-api03-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+        let keys = store.create_managed_file("keys.docx", &docx(&secret)).unwrap();
+
+        assert!(document_gate(&mut store, &plan, false).is_ok());
+        assert!(document_gate(&mut store, &bank, false).unwrap_err().contains("secure"));
+        assert!(document_gate(&mut store, &keys, false).unwrap_err().contains("secret-shaped"));
+        assert!(document_gate(&mut store, "storage/rotli/missing.docx", false).is_err());
+        // a person's document reads, but never edits
+        assert!(document_gate(&mut store, &plan, true).unwrap_err().contains("a person's"));
+        std::fs::write(
+            root.join(".rotli/file-grants.json"),
+            format!(r#"{{"v":1,"files":{{"{plan}":{{"createdBy":"agent","agent":"Codex","aiEdit":true}}}}}}"#),
+        )
+        .unwrap();
+        assert!(document_gate(&mut store, &plan, true).is_ok());
+    }
+
+    #[test]
+    fn no_answer_leaves_with_secret_shaped_text() {
+        assert!(egress(json!({ "blocks": "[1] paragraph: Launch" })).is_ok());
+        assert!(egress(json!({ "blocks": "key sk-ant-api03-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" })).is_err());
+    }
+
+    #[test]
+    fn an_agent_is_named_by_its_client_never_by_markup() {
+        assert_eq!(agent_name("Claude Code <script>"), "Claude Code script");
+        assert_eq!(agent_name(&"x".repeat(200)).len(), 64);
+    }
+
+    #[test]
+    fn a_headless_agent_hears_when_rotli_isnt_running() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let error = ask_over_socket(&dir.path().join("none.sock"), &request("read_document", dir.path(), false))
+            .unwrap_err();
+        assert_eq!(error, NOT_RUNNING);
+    }
+
+    #[test]
+    fn the_socket_carries_one_request_and_one_answer() {
+        use std::os::unix::net::UnixListener;
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("bridge.sock");
+        let listener = UnixListener::bind(&path).unwrap();
+        let server = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut writer = stream.try_clone().unwrap();
+            let mut line = String::new();
+            BufReader::new(stream).read_line(&mut line).unwrap();
+            let asked: BridgeRequest = serde_json::from_str(line.trim()).unwrap();
+            let answer = BridgeAnswer { ok: false, result: Value::Null, error: Some(format!("refused {}", asked.tool)) };
+            writer.write_all(&[serde_json::to_vec(&answer).unwrap(), b"\n".to_vec()].concat()).unwrap();
+        });
+        let error = ask_over_socket(&path, &request("apply_document", dir.path(), false)).unwrap_err();
+        server.join().unwrap();
+        assert_eq!(error, "refused apply_document");
+    }
+}

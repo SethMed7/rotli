@@ -242,6 +242,15 @@
         "src-tauri/src/provider.rs"
       ],
       "reason": "Not a mirror: both lanes spawn the same Claude Code binary, so each names the CLI's own flags (--output-format, --effort, ...). The policy is already shared — session_args calls provider::build_args_tuned and copies its model/effort flags, so one model and effort allowlist gates both the one-shot lane and the native session."
+    },
+    {
+      "id": "mcp-tool-schema-vocabulary",
+      "signal": "literal",
+      "files": [
+        "src-tauri/src/workspace.rs",
+        "src-tauri/src/workspace_documents.rs"
+      ],
+      "reason": "Not a mirror: both files declare MCP tool input schemas, which are spelled in JSON-Schema's own vocabulary (type, array, items, maxItems). The document tools live in workspace_documents.rs only because workspace.rs is at its size ceiling; they share workspace.rs's tool() builder rather than a copy of it."
     }
   ]
 }

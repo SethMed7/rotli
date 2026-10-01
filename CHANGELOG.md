@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   heading level. Rotli lets it edit only documents its AI created, checks the
   new text for secrets, keeps a backup of the original, and waits while the
   document is open.
+- **Agents work in your Word documents, by Rotli's rules** (development
+  builds). `rotli mcp` gains `rotli_read_document`, `rotli_apply_document`, and
+  `rotli_create_document`, for Claude Code, Codex, or a paired cloud agent.
+  They go through the running app, so agents get the same numbered blocks,
+  edits, and refusals as chat: no secure or secret-shaped documents, edits
+  only to documents an AI made, never while one is open, never over a newer
+  version. A document an agent creates is recorded with the agent's name.
 - **Links in Word documents.** Web and mail links in a .docx now open, edit,
   and save as real Word links: add one from the document toolbar (or the
   palette's Link), change its

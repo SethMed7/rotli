@@ -70,17 +70,19 @@ export function createManagedDocumentFromMarkdown(
   );
 }
 
-/** A Word document the chat writes: the AI's own creation lane, which records
- * that the AI made it (the only documents its edits may touch). */
+/** A Word document the chat (or an outside `agent`, through the agent bridge)
+ * writes: the AI's own creation lane, which records that an AI made it (the
+ * only documents AI edits may touch). */
 export async function createAiDocumentFromMarkdown(
   title: string,
   body: string,
   images: DocumentImage[] = [],
   rootId?: string,
+  agent?: string,
 ): Promise<string> {
   const { docxEncoder } = await import("./create");
   const aiRepository: DocumentRepository = {
-    create: (name, base64) => corpusCreateManagedFileAi(name, base64, rootId),
+    create: (name, base64) => corpusCreateManagedFileAi(name, base64, rootId, agent),
   };
   return createNamedDocument(
     { encoder: docxEncoder, repository: aiRepository },

@@ -120,6 +120,31 @@ is never silently replaced.
 Board writes also require the revision returned by the immediately preceding
 read. This is optimistic conflict protection, not a long-lived edit lock.
 
+## Word documents
+
+Word documents (`.docx`, listed by `rotli_list` as files) travel through the
+running app (decision: `docs/decisions/2026-10-01-agent-app-bridge.md`), so
+agents use Rotli's own codec and chat's own edit path. Rotli must be running;
+otherwise the tools answer "Rotli isn't running".
+
+- `rotli_read_document {file}` returns numbered blocks (headings, paragraphs,
+  list items, table cells `r1c1…`, images by alt text; links as Markdown
+  links), warnings, and a revision.
+- `rotli_apply_document {file, expectedRevision, actions}` (destructive) takes
+  at most 40 actions by the read's block numbers, which keep meaning the
+  document as read: `replace`, `insert_after` (0 = top), `delete`, `set_cell`,
+  `set_kind`; text at most 8,000 characters each, Markdown links to https or
+  mailto allowed.
+- `rotli_create_document {title, body}` writes a document from Markdown into
+  managed storage, files it in Main without opening it, and records the
+  agent's `clientInfo.name` as its maker.
+
+Agents count as remote. Refused: a vault other than the one open in Rotli;
+writes to a read-only vault; a document hidden from agents, named with a secure
+keyword, or holding secret-shaped text; an edit to a document no AI created
+(`.rotli/file-grants.json`); an edit while the document is open in a pane; a
+stale revision. Every answer passes the secret check before it leaves Rust.
+
 ## Opening in Rotli
 
 `rotli open` and the MCP `rotli_open` tool write one item ID and kind to the

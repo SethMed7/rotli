@@ -3,14 +3,13 @@
 // edit_document, the AI's edits to a Word document it created (Rust refuses
 // one a person made; src-tauri/src/ai_files.rs).
 
-import { applyDocumentEdits, type DocumentEditAction, parseEditAction } from "../documents/aiEdit";
 import { DOCX_EDITABLE } from "../documents/kinds";
-import { documentIsOpen } from "../documents/session";
 import { extOf } from "../lib/fileKind";
 import { type ChatModelInfo, corpusFileBytes, corpusFileText, corpusList } from "../lib/tauri";
 import { SHEET_BIN, SHEET_TEXT } from "../sheets/kinds";
 import { workbookForAi, workbookToCsv } from "../sheets/view";
 import { editableDocumentForAi } from "./artifacts";
+import { editDocumentAsAi } from "./documentEdits";
 import { looksSecret, modelIsOnDevice } from "./guard";
 import type { Host } from "./types";
 
@@ -66,31 +65,12 @@ export function makeFileTools(
       if (opts?.isSecureContext?.() === true) {
         return "blocked: this chat carries secure-note content, and Word documents are not protected note files.";
       }
-      const actions: DocumentEditAction[] = [];
-      for (const [index, raw] of rawActions.entries()) {
-        const action = parseEditAction(raw);
-        if (typeof action === "string") return `error: action ${index + 1}: ${action}`;
-        actions.push(action);
-      }
       const file = await findVaultFile(query);
       if (!file || !DOCX_EDITABLE.has(extOf(file.title))) return `no Word document matching "${query}".`;
-      // an open document saves on its own (documents/session.ts): edit it once it's closed
-      if (documentIsOpen(file.id)) {
-        return `blocked: "${file.title}" is open in a pane. Ask the user to close it, then try again.`;
-      }
-      const { editAiDocument } = await import("../documents/composition");
-      const editable = await editAiDocument(file.id);
-      if (editable.kind !== "ready") return "error: this document is too large for Rotli to edit.";
-      const next = applyDocumentEdits(editable.document, actions);
-      if (typeof next === "string") return `error: ${next}. Nothing was changed.`;
-      try {
-        // Rust refuses a document a person made, and secret-shaped text
-        await editable.save(next);
-      } catch (error) {
-        return `blocked: ${error instanceof Error ? error.message : String(error)}`;
-      }
-      const count = `${actions.length} change${actions.length === 1 ? "" : "s"}`;
-      return `saved ${count} to "${file.title}" (a backup of the original was kept). It now reads:\n${editableDocumentForAi(next)}`;
+      const edit = await editDocumentAsAi(file, rawActions);
+      if (edit.kind === "refused") return edit.reason;
+      const count = `${edit.count} change${edit.count === 1 ? "" : "s"}`;
+      return `saved ${count} to "${file.title}" (a backup of the original was kept). It now reads:\n${editableDocumentForAi(edit.document)}`;
     },
   };
   return tools;

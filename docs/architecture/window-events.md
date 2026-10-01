@@ -15,6 +15,7 @@ writer, the floating windows announce), **W→R** webview to Rust.
 
 | Event | Direction | Purpose |
 |---|---|---|
+| `rotli:agent-request` | R→W | An agent's Word document request through the agent bridge (`agent_bridge.rs`), already admitted by Rust; the main webview carries it out and answers with `agent_bridge_reply`. |
 | `rotli:appearance` | W→W | Main broadcasts its whole app-settings snapshot (theme, accent, quokka, syntax palette, hotkey peek, rebinds, per-note typography) so the Quick Note and capture webviews apply it live. |
 | `rotli:brain-journal` | R→W | The organizer appended a journal entry; the Activity surface refreshes. |
 | `rotli:capture` | W→W | The capture card hands a typed capture (id, body, open flag) to the main window, which owns the corpus and files it. |
