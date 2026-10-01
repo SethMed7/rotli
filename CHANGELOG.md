@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **About credits Excalidraw and Univer.** Settings → About Rotli and the
+  site's About page name the two open-source editors built in: Excalidraw for
+  boards and Univer for Word documents.
 - **Update checks go through rotli.co.** The Mac app asks rotli.co first,
   with its version in the address, and rotli.co passes it to the signed feed
   on GitHub (GitHub directly if rotli.co is down). That lets rotli.co's

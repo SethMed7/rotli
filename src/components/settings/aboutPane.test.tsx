@@ -3,7 +3,7 @@ import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { feedbackUrl } from "../../lib/feedback";
-import { AboutPane, ROTLI_WEBSITE_URL } from "./aboutPane";
+import { AboutPane, BUILT_IN, ROTLI_WEBSITE_URL } from "./aboutPane";
 
 const FEEDBACK = feedbackUrl("0.95.1", "mac");
 
@@ -32,4 +32,16 @@ test("Send feedback links the prefilled issue and says that issues are public", 
   expect(markup.includes(`href="${FEEDBACK.replaceAll("&", "&amp;")}"`)).toBe(true);
   expect(markup.includes("Send feedback")).toBe(true);
   expect(markup.includes("Issues are public")).toBe(true);
+});
+
+test("About credits the open-source editors built in: Excalidraw and Univer, by their sites", () => {
+  const markup = renderToStaticMarkup(
+    <AboutPane version="1.8.0" feedbackUrl={FEEDBACK} onOpenUrl={() => {}} />,
+  );
+  for (const editor of BUILT_IN) {
+    expect(markup.includes(`href="${editor.url}"`)).toBe(true);
+    expect(markup.includes(`>${editor.name}</a>`)).toBe(true);
+  }
+  expect(markup).toContain("Excalidraw</a> draws your boards, and ");
+  expect(markup).toContain("Univer</a> edits your Word documents.");
 });
