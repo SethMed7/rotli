@@ -3,7 +3,13 @@
 // numbers the model read (`editableDocumentForAi`). Pure; the codec saves the
 // result, keeping every part of the file these actions don't touch.
 
-import type { DocumentContent, DocumentNamedStyle, DocumentParagraph, EditableDocument } from "./model";
+import {
+  type DocumentContent,
+  type DocumentNamedStyle,
+  type DocumentParagraph,
+  type EditableDocument,
+  runsWithLinks,
+} from "./model";
 
 export type BlockKind = "paragraph" | "heading1" | "heading2" | "heading3" | "title" | "bullet" | "number";
 
@@ -68,11 +74,16 @@ function asParagraph(kind: BlockKind, text: string, base?: DocumentParagraph): D
   const named: DocumentNamedStyle | undefined =
     kind === "paragraph" || kind === "bullet" || kind === "number" ? undefined : kind;
   return {
-    runs: [{ text, ...(style ? { style } : {}) }],
+    runs: runsWithLinks(text).map((run) => (style ? { ...run, style } : run)),
     ...(named ? { namedStyle: named } : {}),
     ...(kind === "bullet" || kind === "number" ? { list: kind } : {}),
     ...(base?.alignment ? { alignment: base.alignment } : {}),
   };
+}
+
+/** A paragraph's text as the AI reads it: links as `[label](url)`. */
+export function linkedText(paragraph: DocumentParagraph): string {
+  return paragraph.runs.map((run) => (run.link ? `[${run.text}](${run.link})` : run.text)).join("");
 }
 
 function kindOf(paragraph: DocumentParagraph): BlockKind {
@@ -140,11 +151,7 @@ export function applyDocumentEdits(
         paragraph:
           action.op === "replace"
             ? asParagraph(kindOf(content.paragraph), action.text, content.paragraph)
-            : asParagraph(
-                action.kind,
-                content.paragraph.runs.map((run) => run.text).join(""),
-                content.paragraph,
-              ),
+            : asParagraph(action.kind, linkedText(content.paragraph), content.paragraph),
       };
     }
   }

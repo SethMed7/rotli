@@ -64,6 +64,33 @@ stays closed to the AI; a per-file grant can open one later.
   open in a pane (shown or parked): panes save on their own, so the edit
   waits until it's closed.
 
+## Done (2026-10-01): links in Word documents
+
+The owner, on Univer: "avoid what is paid, see what else we can support and
+support what we can, only targeting docs for now." Univer's open-source
+docs-hyper-link preset (`@univerjs/preset-docs-hyper-link`, Apache-2.0) is
+mounted: the toolbar's link button, the hover card, edit and remove. Rotli's
+side (`src/documents/README.md`, Editing boundary):
+
+- the model's run `link` (web and mail only, `safeLinkUrl`);
+- the Word codec reads and writes external `<w:hyperlink r:id>` with their
+  relationships, adding Word's Hyperlink style for a new one; in-document
+  anchors stay refused;
+- a plain click in a link's text edits it; ⌘/Ctrl-click or the card's address
+  opens it through Rotli's guarded `openUrl`, never the webview;
+- chat reads and writes links as Markdown links; a chat-made document keeps
+  its Markdown links.
+
+## What else open-source Univer offers for documents (0.25)
+
+| Piece | License | Status |
+|---|---|---|
+| Comments (`preset-docs-thread-comment`) | Apache-2.0 | **Next candidate.** Needs a `word/comments.xml` codec (read, add, reply, resolve via `commentsExtended.xml`), the comment ranges Rotli already keeps, and an author name (Settings → your name) |
+| Quick insert (`docs-quick-insert-ui`) | Apache-2.0 | **No.** A slash menu; slash commands are Markdown's alone (AGENTS.md) |
+| Find & replace for documents | — | Not in 0.25 (sheets only); with the 1.0.3 upgrade (slice 5) |
+| Headers/footers, page setup, horizontal rule, checklists, H4/H5 | Apache-2.0 (core) | Shown when the codec learns each; hidden until then (`UNSAVABLE_MENU`) |
+| Collaboration, print, docx exchange, AI, MCP | Pro | **No** |
+
 ## Next slices (each its own PR)
 
 | # | Slice | Needs |

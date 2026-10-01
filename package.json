@@ -107,6 +107,7 @@
     "@tauri-apps/plugin-updater": "^2.10.1",
     "@univerjs/preset-docs-core": "^0.25.1",
     "@univerjs/preset-docs-drawing": "^0.25.1",
+    "@univerjs/preset-docs-hyper-link": "^0.25.1",
     "@univerjs/preset-sheets-core": "^0.25.1",
     "@univerjs/presets": "^0.25.1",
     "exceljs": "^4.4.0",

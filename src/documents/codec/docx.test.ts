@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import JSZip from "jszip";
 
 import { createDocxBase64 } from "../create";
+import type { EditableDocument } from "../model";
 import { decodeDocx, encodeDocx } from "./docx";
 
 // Document fixture colors (OOXML hex without the leading #), not UI colors.
@@ -186,7 +187,7 @@ describe("DOCX editor codec", () => {
     expect(savedXml).toContain(object);
   });
 
-  test("refuses to rewrite a changed hyperlink paragraph instead of silently dropping its relationship", async () => {
+  test("refuses to rewrite a changed in-document link paragraph instead of silently dropping its target", async () => {
     const base64 = await createDocxBase64({
       title: "Links",
       blocks: [{ kind: "paragraph", text: "Linked text" }],
@@ -198,7 +199,7 @@ describe("DOCX editor codec", () => {
       "word/document.xml",
       xml.replace(
         '<w:r><w:t xml:space="preserve">Linked text</w:t></w:r>',
-        '<w:hyperlink r:id="rId99"><w:r><w:t xml:space="preserve">Linked text</w:t></w:r></w:hyperlink>',
+        '<w:hyperlink w:anchor="_Top"><w:r><w:t xml:space="preserve">Linked text</w:t></w:r></w:hyperlink>',
       ),
     );
     const linked = await zip.generateAsync({ type: "base64" });
@@ -421,5 +422,112 @@ describe("DOCX editor codec", () => {
     expect(start).toBeLessThan(text);
     expect(end).toBeGreaterThan(text);
     expect(reference).toBeGreaterThan(end);
+  });
+
+  /** A one-paragraph document whose text sits in a hyperlink to `target`. */
+  async function linkedDocx(target: string): Promise<string> {
+    const zip = await JSZip.loadAsync(
+      await createDocxBase64({
+        title: "Guide links",
+        blocks: [
+          { kind: "paragraph", text: "Read the guide" },
+          { kind: "paragraph", text: "Untouched" },
+        ],
+      }),
+      { base64: true },
+    );
+    const xml = (await zip.file("word/document.xml")?.async("string")) ?? "";
+    zip.file(
+      "word/document.xml",
+      xml.replace(
+        '<w:r><w:t xml:space="preserve">Read the guide</w:t></w:r>',
+        '<w:r><w:t xml:space="preserve">Read </w:t></w:r><w:hyperlink r:id="rIdGuide" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t>the guide</w:t></w:r></w:hyperlink>',
+      ),
+    );
+    const rels = (await zip.file("word/_rels/document.xml.rels")?.async("string")) ?? "";
+    zip.file(
+      "word/_rels/document.xml.rels",
+      rels.replace(
+        "</Relationships>",
+        `<Relationship Id="rIdGuide" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${target}" TargetMode="External"/></Relationships>`,
+      ),
+    );
+    return zip.generateAsync({ type: "base64" });
+  }
+
+  const linkedParagraph = (document: EditableDocument) => {
+    const found = document.content.find(
+      (content) =>
+        content.kind === "paragraph" && /^(Read|Open) /.test(content.paragraph.runs[0]?.text ?? ""),
+    );
+    if (found?.kind !== "paragraph") throw new Error("expected the linked paragraph");
+    return found.paragraph;
+  };
+
+  const saved = async (base64: string, part: string) =>
+    (await (await JSZip.loadAsync(base64, { base64: true })).file(part)?.async("string")) ?? "";
+
+  test("a Word web link reads as a linked run and an edit keeps it a link", async () => {
+    const decoded = await decodeDocx(await linkedDocx("https://rotli.co/guide"), "storage/rotli/links.docx");
+    const first = linkedParagraph(decoded.document);
+    expect(first.runs).toEqual([{ text: "Read " }, { text: "the guide", link: "https://rotli.co/guide" }]);
+    expect(decoded.warnings).toEqual([]);
+
+    first.runs = [{ text: "Open " }, { text: "the new guide", link: "https://rotli.co/guide" }];
+    const encoded = await encodeDocx(decoded.source, decoded.document);
+    const xml = await saved(encoded, "word/document.xml");
+    expect(xml).toContain(
+      '<w:hyperlink r:id="rIdGuide" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/>',
+    );
+    expect(xml).toContain("the new guide</w:t></w:r></w:hyperlink>");
+    // the link reuses its relationship; nothing is added
+    expect(await saved(encoded, "word/_rels/document.xml.rels")).not.toContain("rIdRotliLink");
+    const reopened = await decodeDocx(encoded, "storage/rotli/links.docx");
+    expect(linkedParagraph(reopened.document).runs[1]).toEqual({
+      text: "the new guide",
+      link: "https://rotli.co/guide",
+    });
+  });
+
+  test("a new link adds its relationship and Word's link style", async () => {
+    const decoded = await decodeDocx(
+      await createDocxBase64({ title: "Plan", blocks: [{ kind: "paragraph", text: "See Rotli" }] }),
+      "storage/rotli/plan.docx",
+    );
+    const paragraph = decoded.document.content.find(
+      (content) => content.kind === "paragraph" && content.paragraph.runs[0]?.text === "See Rotli",
+    );
+    if (paragraph?.kind !== "paragraph") throw new Error("expected the paragraph");
+    paragraph.paragraph.runs = [
+      { text: "Find " },
+      { text: "Rotli", link: "https://rotli.co/new" },
+      { text: " and " },
+      { text: "write", link: "mailto:hello@rotli.co" },
+    ];
+    const encoded = await encodeDocx(decoded.source, decoded.document);
+    const rels = await saved(encoded, "word/_rels/document.xml.rels");
+    expect(rels).toMatch(/Target="https:\/\/rotli\.co\/new" TargetMode="External"/);
+    expect(rels).toContain('Target="mailto:hello@rotli.co" TargetMode="External"');
+    expect(await saved(encoded, "word/styles.xml")).toMatch(/styleId="Hyperlink"/);
+    expect(await saved(encoded, "word/document.xml")).toContain('<w:rStyle w:val="Hyperlink"/>');
+    const reopened = await decodeDocx(encoded, "storage/rotli/plan.docx");
+    const again = reopened.document.content.find(
+      (content) => content.kind === "paragraph" && content.paragraph.runs[0]?.text === "Find ",
+    );
+    expect(again?.kind === "paragraph" && again.paragraph.runs.map((run) => run.link)).toEqual([
+      undefined,
+      "https://rotli.co/new",
+      undefined,
+      "mailto:hello@rotli.co",
+    ]);
+  });
+
+  test("a link to anything but the web or mail is no link, and its paragraph stays unedited", async () => {
+    const decoded = await decodeDocx(await linkedDocx("javascript:alert(1)"), "storage/rotli/links.docx");
+    const first = linkedParagraph(decoded.document);
+    expect(first.runs.some((run) => run.link)).toBe(false);
+    expect(decoded.warnings.join(" ")).toMatch(/advanced Word content/);
+    first.runs = [{ text: "Changed" }];
+    await expect(encodeDocx(decoded.source, decoded.document)).rejects.toThrow(/unsupported Word inline/i);
   });
 });

@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   heading level. Rotli lets it edit only documents its AI created, checks the
   new text for secrets, keeps a backup of the original, and waits while the
   document is open.
+- **Links in Word documents.** Web and mail links in a .docx now open, edit,
+  and save as real Word links: add one from the document toolbar, change its
+  text or address, and it stays a link in Word. A click in a link's text
+  edits it; ⌘-click, or the address on the card that hovering shows, opens it
+  in your browser or mail app. Chat sees links as Markdown links, keeps them
+  when it edits a document it made, and Markdown links in a document it
+  writes stay links.
 - **A living sidebar.** Settings → Appearance → Sidebar adds Scenery (Off,
   Top, Bottom, or Both): your theme's hills as a faint silhouette behind the
   header row or the footer, never behind what you read. And Icons: Neutral, where every mark shares one ink,

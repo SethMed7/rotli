@@ -95,4 +95,23 @@ describe("Word document creation content", () => {
       ],
     });
   });
+
+  test("a web or mail link stays a link; any other keeps only its text", () => {
+    const draft = documentDraftFromMarkdown(
+      "Markdown links",
+      "Try [**Rotli**](https://rotli.co) then [mail us](mailto:hi@rotli.co), not [this](javascript:alert(1)).",
+    );
+    expect(draft.content?.[0]).toEqual({
+      kind: "paragraph",
+      paragraph: {
+        runs: [
+          { text: "Try " },
+          { text: "Rotli", link: "https://rotli.co" },
+          { text: " then " },
+          { text: "mail us", link: "mailto:hi@rotli.co" },
+          { text: ", not this)." },
+        ],
+      },
+    });
+  });
 });

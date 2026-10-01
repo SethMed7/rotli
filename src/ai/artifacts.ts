@@ -1,3 +1,4 @@
+import { linkedText } from "../documents/aiEdit";
 import type { DocumentBlock, DocumentDraft, EditableDocument } from "../documents/model";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 
@@ -99,9 +100,6 @@ const STYLE_LABEL: Record<string, string> = {
   heading3: "Heading 3",
 };
 
-const paragraphText = (paragraph: { runs: { text: string }[] }) =>
-  paragraph.runs.map((run) => run.text).join("");
-
 /** What the chat reads from a Word document (2026-10-01): numbered blocks it
  * can point at — headings with their level, list items, each table cell by
  * row and column, and images by their alt text — in document order. */
@@ -114,13 +112,13 @@ export function editableDocumentForAi(document: EditableDocument): string {
         const kind =
           STYLE_LABEL[paragraph.namedStyle ?? ""] ??
           (paragraph.list ? `${paragraph.list} item` : "paragraph");
-        return `${n} ${kind}: ${paragraphText(paragraph)}`;
+        return `${n} ${kind}: ${linkedText(paragraph)}`;
       }
       if (content.kind === "image") return `${n} image: ${content.image.alt?.trim() || content.image.name}`;
       const { rows } = content.table;
       const width = Math.max(0, ...rows.map((row) => row.cells.length));
       const cells = rows.flatMap((row, r) =>
-        row.cells.map((cell, c) => `  r${r + 1}c${c + 1}: ${cell.paragraphs.map(paragraphText).join(" ")}`),
+        row.cells.map((cell, c) => `  r${r + 1}c${c + 1}: ${cell.paragraphs.map(linkedText).join(" ")}`),
       );
       return [`${n} table (${rows.length} rows × ${width} columns):`, ...cells].join("\n");
     })

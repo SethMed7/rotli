@@ -50,8 +50,9 @@ Local documents follow Rotli's [clean architecture protocol](../../docs/architec
   Univer's built-in ⌘B/⌘I/⌘U also apply and win first (like the board canvas's
   owned chords), so a rebind moves only the registry side. Code, highlight,
   link, quote, and checklist are Markdown-only and do nothing in a document.
-- `codec/runStyle.ts` owns the run properties Rotli edits; `codec/xml.ts` holds
-  the shared WordprocessingML string helpers.
+- `codec/runStyle.ts` owns the run properties Rotli edits, `codec/lists.ts`
+  list numbering, `codec/hyperlinks.ts` link relationships; `codec/xml.ts`
+  holds the shared WordprocessingML string helpers.
 - `composition.ts` is the only module that joins concrete adapters to Tauri.
 - Chat-authored Word documents reuse that composition and the ordinary managed
   item filing workflow. Model-authored Markdown-like headings, paragraphs,
@@ -75,8 +76,19 @@ returns when the codec learns it. Lists take their kind from the file's own
 its original numbering while its kind holds. A commented paragraph keeps its
 comment's range markers around its edited text.
 
+Links are web and mail links (`safeLinkUrl` in `model.ts`): a run's `link`, a
+Word `<w:hyperlink r:id>` whose relationship is external
+(`codec/hyperlinks.ts`), and a Univer hyperlink custom range from the
+open-source docs-hyper-link preset (`engine/links.ts`). Saving reuses a link's
+relationship or adds one, with Word's Hyperlink character style. An
+in-document anchor or any other target is still refused when its paragraph
+changes. In the editor a plain click in a link's text places the caret;
+⌘/Ctrl-click or the address on the link's hover card opens it through Rotli's
+guarded opener (`openUrl`). Chat reads and writes links as Markdown links,
+and Markdown links in a chat-made document stay links.
+
 DOCX support is create + local structured editing. The portable subset currently
-supports paragraphs, heading/title styles, alignment, lists, fonts, sizes, color,
+supports paragraphs, heading/title styles, alignment, lists, links, fonts, sizes, color,
 background shading, subscript/superscript, common inline emphasis, embedded raster images, and native Word tables with editable cell content and
 row/column structure through Univer. Unsupported Word objects remain preserved
 in their OOXML locations but are not editable; a one-time `.bak` protects the

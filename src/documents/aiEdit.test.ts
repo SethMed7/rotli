@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { applyDocumentEdits, MAX_EDIT_ACTIONS, parseEditAction } from "./aiEdit";
+import { applyDocumentEdits, linkedText, MAX_EDIT_ACTIONS, parseEditAction } from "./aiEdit";
 import type { EditableDocument } from "./model";
 
 const doc: EditableDocument = {
@@ -109,4 +109,36 @@ test("a model's arguments become actions, or a reason", () => {
   expect(parseEditAction({ op: "replace", block: "2", text: "x" })).toMatch(/block number/);
   expect(parseEditAction({ op: "set_kind", block: 2, kind: "heading9" })).toMatch(/set_kind needs/);
   expect(parseEditAction({ op: "replace", block: 1, text: "x".repeat(9000) })).toMatch(/under/);
+});
+
+test("links read as [label](url) and an edit may keep or add them", () => {
+  const linked: EditableDocument = {
+    ...doc,
+    content: [
+      {
+        kind: "paragraph",
+        paragraph: { runs: [{ text: "See " }, { text: "Rotli", link: "https://rotli.co" }] },
+      },
+    ],
+  };
+  const edited = applyDocumentEdits(linked, [
+    { op: "set_kind", block: 1, kind: "heading2" },
+    {
+      op: "insert_after",
+      block: 1,
+      kind: "bullet",
+      text: "Write [us](mailto:hi@rotli.co) or [run](javascript:x)",
+    },
+  ]);
+  if (typeof edited === "string") throw new Error(edited);
+  const [heading, bullet] = edited.content;
+  expect(heading?.kind === "paragraph" && linkedText(heading.paragraph)).toBe(
+    "See [Rotli](https://rotli.co)",
+  );
+  expect(bullet?.kind === "paragraph" && bullet.paragraph.runs).toEqual([
+    { text: "Write " },
+    { text: "us", link: "mailto:hi@rotli.co" },
+    { text: " or " },
+    { text: "run" },
+  ]);
 });

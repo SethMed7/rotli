@@ -79,7 +79,7 @@ const SPECS: Partial<Record<ToolName, Omit<NativeToolSpec, "name">>> = {
   },
   edit_document: {
     description:
-      "Edit a Word document Rotli's AI created (read it first with read_file; Rotli refuses one the user made). Actions use read_file's block numbers, which keep meaning the document as read: replace {block,text}, insert_after {block (0 = top), kind, text}, delete {block}, set_cell {block,row,column,text}, set_kind {block,kind}. Kinds: paragraph, heading1, heading2, heading3, title, bullet, number.",
+      "Edit a Word document Rotli's AI created (read it first with read_file; Rotli refuses one the user made). Actions use read_file's block numbers, which keep meaning the document as read: replace {block,text}, insert_after {block (0 = top), kind, text}, delete {block}, set_cell {block,row,column,text}, set_kind {block,kind}. Kinds: paragraph, heading1, heading2, heading3, title, bullet, number. Links read and write as [label](https://…) or mailto:.",
     inputSchema: object(
       {
         file: text("the document's file name, e.g. plan.docx"),
