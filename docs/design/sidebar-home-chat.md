@@ -355,11 +355,14 @@ both, very subtle", from T3 Code's hill and tree behind its sidebar header;
 uses their own color".
 
 - **Scenery** (`sidebar/sidebarScenery.tsx`; Settings → Appearance → Sidebar →
-  Scenery: Off · Top · Bottom · Both, default Top). The theme family's own art:
-  the Settings banner backdrop behind the header and switcher, the Settings
-  horizon behind the player and footer. Still, never animated (the sidebar is
-  always on screen; ROTLI_DESIGN#2), `pointer-events: none`, under the rows
-  through `isolation` on `.sidebar`, faded out by a linear mask.
+  Scenery: Off · Top · Bottom · Both, default Top). The theme family's own
+  horizon as a **one-ink silhouette** behind the header row (56px) and/or the
+  footer (64px). The owner, the same day: "it can't make things hard to see …
+  more subtle, no visual clutter", so: no sky objects, no detail strokes,
+  every shape the text ink at 6% (`opacity: 0.06`), never under the rows'
+  middle. `e2e/sidebar-look.spec.ts` holds it there (opacity ≤ 0.08, bands ≤
+  64px). Still, never animated (ROTLI_DESIGN#2), `pointer-events: none`, under
+  the rows through `isolation` on `.sidebar`, faded by a linear mask.
 - **Icons** (`data-icons` on `.sidebar`; Icons: Neutral · Color, default
   Neutral). Neutral gives every mark one ink: the Word badge, the kit's clay,
   and the color provider logos (drawn as masks, `model-logo-ink`). Color gives

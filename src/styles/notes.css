@@ -2878,9 +2878,12 @@
   color: var(--failure);
 }
 
-/* The sidebar, alive (2026-10-01, sidebarScenery.tsx): the theme's own scene,
-   very quiet, behind the top and/or the bottom. Still art that never takes a
-   click; isolation keeps it above the sidebar's ground and under every row. */
+/* The sidebar, alive (2026-10-01, sidebarScenery.tsx): the theme's horizon as
+   a one-ink silhouette behind the header row and/or the footer. It must never
+   make anything harder to read (the owner: "more subtle, no visual clutter"):
+   every shape is the text ink at a few percent, no sky objects, no detail
+   strokes, never under the rows' middle. Still, never takes a click;
+   isolation keeps it above the sidebar's ground and under every control. */
 .sidebar {
   position: relative;
   isolation: isolate;
@@ -2891,20 +2894,22 @@
   width: 100%;
   z-index: -1;
   pointer-events: none;
+  color: var(--text);
+  opacity: 0.06;
 }
-/* the header and switcher's band: the scene's ground meets the switcher's foot */
+.sb-scene :is(path, circle, ellipse, rect, polygon) {
+  fill: currentColor;
+  stroke: none;
+}
 .sb-scene-top {
   top: 0;
-  height: 104px;
-  opacity: 0.85;
-  mask-image: linear-gradient(to bottom, black 55%, transparent);
+  height: 56px;
+  mask-image: linear-gradient(to bottom, black 60%, transparent);
 }
-/* the player and footer's band: hills rising behind them */
 .sb-scene-bottom {
   bottom: 0;
-  height: 112px;
-  opacity: 0.8;
-  mask-image: linear-gradient(to top, black 45%, transparent);
+  height: 64px;
+  mask-image: linear-gradient(to top, black 55%, transparent);
 }
 
 /* The sidebar's icons (Settings → Appearance → Sidebar → Icons). Neutral: one

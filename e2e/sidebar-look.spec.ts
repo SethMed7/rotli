@@ -24,6 +24,12 @@ test("sidebar scenery and icons follow Settings, and the scene never takes a cli
   await expect(sidebar).toHaveAttribute("data-icons", "color");
   // under the rows: the header's buttons still take their clicks
   await expect(sidebar.locator(".sb-scene").first()).toHaveCSS("pointer-events", "none");
+  // the owner, 2026-10-01: "it can't make things hard to see" — a few percent
+  // of ink, kept to the header row and the footer, never under the rows
+  for (const scene of await sidebar.locator(".sb-scene").all()) {
+    expect(Number(await scene.evaluate((node) => getComputedStyle(node).opacity))).toBeLessThanOrEqual(0.08);
+    expect((await scene.boundingBox())?.height ?? 0).toBeLessThanOrEqual(64);
+  }
   await page.getByRole("button", { name: "Collapse all folders" }).click();
 
   await page.getByRole("button", { name: "Settings", exact: true }).first().click();
