@@ -152,8 +152,15 @@ the switcher."
   are on. The rules live once in `src/lib/sidebarFronts.ts`: at least one
   front stays on (its switch locks), and turning off the home moves home to
   the first front still on.
-- The segment formerly labelled **Home** now reads **Notes**; "home" means
-  where Rotli opens. Internal ids (`sidebarView: "home"`) are unchanged.
+- **Whichever front is home reads Home** (the owner, 2026-10-01: "one needs
+  to be marked as home, and whatever it is is called Home, not its specific
+  one, and that one can't be dragged out"). The home segment wears the house
+  and the word Home and leads the switch (`homeSegment`, `homeFirst`); the
+  others keep their names (Notes with the notes stack, Chat, Breve). Settings
+  marks it too ("Notes · Home"). Chat as home has no pull-out: no tear-off,
+  no corner button, no context menu, and `popOutBlocker` refuses the ⌘K
+  action (`POP_OUT_HOME`); choosing Chat as home while it's out in its own
+  window brings it back. Internal ids (`sidebarView: "home"`) are unchanged.
 - A front that's off has no way in. Its segment is gone, its shortcuts are
   disabled (`modules.notes`, `modules.chat`, `modules.toggleFront`,
   `chat.new`, `chat.summon` and ⌥A, `view.breve`), and anything that lands on

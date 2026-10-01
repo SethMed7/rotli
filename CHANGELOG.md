@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Home is called Home.** Whichever sidebar section you choose as Home reads
+  "Home" and comes first in the switcher; the others keep their names. Chat
+  as Home stays in the main window.
 - **rotli.co shows all seven theme families.** The theme studio on the home
   page now includes Blossom, in light and dark, beside the other six.
 

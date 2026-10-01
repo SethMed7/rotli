@@ -70,3 +70,10 @@ export function frontState(front: Front): { sidebarMode: "notes" | "breve"; side
   if (front === "breve") return { sidebarMode: "breve", sidebarView: "home" };
   return { sidebarMode: "notes", sidebarView: front === "chat" ? "chat" : "home" };
 }
+
+/** Whichever front is home reads as Home (the owner, 2026-10-01: "one needs
+ * to be marked as home and whatever it is is called home, not its specific
+ * one, and that one can't be dragged out"). */
+export function isHomeFront(front: Front, prefs: FrontsPrefs, available: readonly Front[]): boolean {
+  return homeFront(prefs, available) === front;
+}

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  isHomeFront,
   DEFAULT_FRONTS,
   type Front,
   canTurnOff,
@@ -54,4 +55,12 @@ describe("sidebar fronts", () => {
       expect(frontOf(sidebarMode, sidebarView)).toBe(front);
     }
   });
+});
+
+test("whichever front is home is the home front (the switch calls it Home)", () => {
+  const all = ["notes", "chat", "breve"] as const;
+  expect(isHomeFront("notes", DEFAULT_FRONTS, all)).toBe(true);
+  expect(isHomeFront("chat", { off: [], home: "chat" }, all)).toBe(true);
+  // a home that's turned off hands home to the first front still on
+  expect(isHomeFront("notes", { off: ["chat"], home: "chat" }, all)).toBe(true);
 });

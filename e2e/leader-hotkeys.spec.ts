@@ -112,7 +112,7 @@ test("⌘⇧W opens the numbered view menu; ⌘number switches view, even from t
     "aria-pressed",
     "true",
   );
-  await page.getByRole("button", { name: "Notes", exact: true }).click();
+  await page.getByRole("button", { name: "Home", exact: true }).click();
   await expect(switcher).toHaveAccessibleName(/Current view: Main/);
 
   // opened by pointer, the same menu carries no numbers

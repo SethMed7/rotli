@@ -26,14 +26,18 @@ import {
   sendChatWindow,
   showChatWindow,
 } from "../lib/chatWindowBridge";
+import { isHomeFront } from "../lib/sidebarFronts";
 import type { MainNode } from "../services/mainTree";
 import { chatDraftFor, useChatDrafts } from "./chatDrafts";
 import { useChatRuns } from "./chatRuns";
 import { useChatWindowStore, windowSurface } from "./chatWindowStore";
 import { type ChatTabRef, type DraftOf, movableChatTabs, savedChatRefs } from "./chatWindowTabs";
+import { AVAILABLE_FRONTS, useFronts } from "./fronts";
 import { activeTabOf, findLeaf, leaves, usePanesStore } from "./panes";
 import { useUiStore } from "./ui";
 
+/** Home stays where Rotli opens. */
+export const POP_OUT_HOME = "Chat is your Home, so it stays in this window.";
 export const POP_OUT_BLOCKED =
   "A chat is still answering. Let it finish, then pull Chat out — a reply can’t follow its chat to another window.";
 
@@ -52,6 +56,7 @@ const anyRunning = () => Object.values(useChatRuns.getState().runs).some((state)
 
 /** Why Chat cannot be pulled out right now, or null. */
 export function popOutBlocker(): string | null {
+  if (isHomeFront("chat", useFronts.getState().prefs, AVAILABLE_FRONTS)) return POP_OUT_HOME;
   if (anyRunning()) return POP_OUT_BLOCKED;
   const root = usePanesStore.getState().root;
   const withImages = movableChatTabs(root, draftOf, true).length > movableChatTabs(root, draftOf).length;
