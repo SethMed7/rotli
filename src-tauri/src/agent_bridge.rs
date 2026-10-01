@@ -16,7 +16,7 @@
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Condvar, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -30,8 +30,12 @@ pub(crate) const BRIDGE_TOOLS: [&str; 3] = ["read_document", "apply_document", "
 const ANSWER_MAX: Duration = Duration::from_secs(30);
 /// One request or answer line; mirrors the MCP envelope limits.
 const LINE_MAX: u64 = 600_000;
-/// The largest .docx the Rust pre-check reads.
-const DOCX_MAX_BYTES: u64 = 32 * 1024 * 1024;
+/// The largest .docx an agent gets: the editor's own cap
+/// (`DOCUMENT_EDIT_MAX_BYTES`, src/documents/kinds.ts; parity.json), so Rust
+/// refuses what the webview would, before reading it.
+pub(crate) const DOCX_MAX_BYTES: u64 = 12_000_000;
+/// Socket requests carried at once; a runaway agent loop gets refusals, not threads.
+const IN_FLIGHT_MAX: usize = 8;
 const NOT_RUNNING: &str =
     "Rotli isn't running. Open Rotli on this Mac to read or edit Word documents, then try again.";
 
@@ -59,6 +63,7 @@ struct BridgeAnswer {
 
 static IN_APP: OnceLock<AppHandle> = OnceLock::new();
 static CLIENT: Mutex<Option<String>> = Mutex::new(None);
+static IN_FLIGHT: AtomicUsize = AtomicUsize::new(0);
 
 /// Remember the MCP client's name from `initialize` (sanitized, short).
 pub(crate) fn remember_client(params: &Value) {
@@ -161,11 +166,24 @@ fn listen(app: &AppHandle, path: &Path) -> Result<(), String> {
     let _ = std::fs::remove_file(path);
     let listener = UnixListener::bind(path).map_err(|e| e.to_string())?;
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).map_err(|e| e.to_string())?;
-    for stream in listener.incoming().flatten() {
+    for mut stream in listener.incoming().flatten() {
+        if IN_FLIGHT.fetch_add(1, Ordering::AcqRel) >= IN_FLIGHT_MAX {
+            IN_FLIGHT.fetch_sub(1, Ordering::AcqRel);
+            let busy = BridgeAnswer { ok: false, result: Value::Null, error: Some("Rotli is busy with other agent requests; try again in a moment".into()) };
+            if let Ok(mut bytes) = serde_json::to_vec(&busy) {
+                bytes.push(b'\n');
+                let _ = stream.write_all(&bytes);
+            }
+            continue;
+        }
         let app = app.clone();
-        let _ = std::thread::Builder::new()
-            .name("rotli-agent-request".into())
-            .spawn(move || serve(&app, stream));
+        let spawned = std::thread::Builder::new().name("rotli-agent-request".into()).spawn(move || {
+            serve(&app, stream);
+            IN_FLIGHT.fetch_sub(1, Ordering::AcqRel);
+        });
+        if spawned.is_err() {
+            IN_FLIGHT.fetch_sub(1, Ordering::AcqRel);
+        }
     }
     Ok(())
 }
@@ -194,8 +212,10 @@ fn serve(app: &AppHandle, stream: std::os::unix::net::UnixStream) {
 
 /// The vault and write rules, from what the agent asked and what the app has open.
 fn admit(request: &BridgeRequest, app_root: &Path, app_read_only: bool) -> Result<(), String> {
-    let same = |path: &Path| std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-    if same(&request.root) != same(app_root) {
+    // both must exist: two missing folders would otherwise compare as strings
+    let same = |path: &Path| std::fs::canonicalize(path).ok();
+    let (asked, open) = (same(&request.root), same(app_root));
+    if asked.is_none() || asked != open {
         return Err("Rotli has a different vault open. Switch Rotli to the agent's vault, or point the agent at the open one.".into());
     }
     if request.tool != "read_document" && (request.read_only || app_read_only) {
@@ -397,6 +417,9 @@ mod tests {
         assert!(admit(&request("read_document", other.path(), false), open.path(), false)
             .unwrap_err()
             .contains("different vault"));
+        // a vault that isn't there is never the open one, even by the same name
+        let gone = open.path().join("gone");
+        assert!(admit(&request("read_document", &gone, false), &gone, false).is_err());
         // reads stay open on a read-only vault; writes don't
         assert!(admit(&request("read_document", open.path(), true), open.path(), true).is_ok());
         for tool in ["apply_document", "create_document"] {

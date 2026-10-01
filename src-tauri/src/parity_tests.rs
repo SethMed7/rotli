@@ -24,6 +24,14 @@ fn string_list(value: &Value) -> Vec<String> {
 }
 
 #[test]
+fn document_edit_max_bytes_matches_fixture() {
+    assert_eq!(
+        entry("documentEditMaxBytes").as_u64(),
+        Some(crate::agent_bridge::DOCX_MAX_BYTES)
+    );
+}
+
+#[test]
 fn sheet_edit_max_bytes_matches_fixture() {
     assert_eq!(
         entry("sheetEditMaxBytes").as_u64(),
