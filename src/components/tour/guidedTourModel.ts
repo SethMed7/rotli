@@ -3,8 +3,9 @@
 
 export interface TourStep {
   id: string;
-  /** Selector for the real control the step points at. */
-  anchor: string;
+  /** Selector for the real control the step points at; a list is tried in
+   * order, the first on screen wins. */
+  anchor: string | readonly string[];
   title: string;
   body: string;
 }
@@ -42,7 +43,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
   },
   {
     id: "settings",
-    anchor: '[data-tour="settings"]',
+    // the sidebar footer's Settings, or the titlebar's when the footer is gone
+    anchor: ['.sb-foot [data-tour="settings"]', '.titlebar [data-hotkey="app.settings"]'],
     title: "Everything can change later",
     body: "Theme, shortcuts, window behavior, and this tour live in Settings.",
   },

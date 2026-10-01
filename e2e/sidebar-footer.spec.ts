@@ -84,3 +84,34 @@ test("badges sit on the icons and never cut a label short", async ({ page }) => 
   expect(p!.x).toBeGreaterThanOrEqual(b!.x); // inside its button
   expect(p!.x + p!.width).toBeLessThanOrEqual(n!.x); // and clear of the label
 });
+
+// The owner, 2026-10-01: "side bar footer if just settings hide it since we
+// have settings top right". With Files, Librarian, and Feedback hidden, the
+// footer goes; the tour's Settings step points at the titlebar's Settings.
+test("a footer left with only Settings goes away; the tour finds Settings in the titlebar", async ({
+  page,
+}) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: "Settings", exact: true }).first().click();
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  for (const name of [/^Files/, /^Librarian/, /^Feedback/]) {
+    const toggle = page.getByRole("switch", { name });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+  }
+  await page.getByRole("button", { name: "Back to notes", exact: true }).click();
+  await expect(footer(page)).toHaveCount(0);
+
+  await page
+    .locator(".titlebar")
+    .getByRole("button", { name: /^Settings/ })
+    .click();
+  await page.getByRole("button", { name: "Show me around" }).click();
+  const tour = page.getByRole("region", { name: "Guided tour" });
+  for (let index = 0; index < 6; index++) {
+    if ((await tour.getAttribute("data-step")) === "settings") break;
+    await tour.getByRole("button", { name: "Next" }).click();
+  }
+  await expect(tour).toHaveAttribute("data-step", "settings");
+  await expect(page.locator(".titlebar [data-tour-active]")).toHaveCount(1);
+});

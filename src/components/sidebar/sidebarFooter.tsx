@@ -11,6 +11,7 @@
 
 import { dispatch } from "../../keys/registry";
 import { webVaultName } from "../../lib/browserVault";
+import type { Hidden } from "../../lib/hideable";
 import { isTauri, revealCorpus } from "../../lib/tauri";
 import { deriveJournal } from "../../services/brainJournal";
 import { useChatTranscripts, useJournal, useNoteIndex, useSecureHints } from "../../services/hooks";
@@ -78,6 +79,9 @@ export function SidebarFooter() {
       else openSystemRoot("Brain");
     });
   };
+  // Settings alone is no footer: the titlebar already has it (the owner,
+  // 2026-10-01: "side bar footer if just settings hide it")
+  if (!footerShown(hidden)) return null;
   return (
     <div className="sb-foot">
       {!hidden.files && (
@@ -159,6 +163,11 @@ export function SidebarFooter() {
       )}
     </div>
   );
+}
+
+/** Whether the footer has anything besides Settings to show. */
+export function footerShown(hidden: Hidden): boolean {
+  return !hidden.files || !hidden.librarian || !hidden.feedback;
 }
 
 /** A badge's number, short enough to sit on an icon. */

@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **rotli.co shows all seven theme families.** The theme studio on the home
   page now includes Blossom, in light and dark, beside the other six.
 
+### Fixed
+
+- **No sidebar footer for Settings alone.** With Files, Librarian, and
+  Feedback hidden, the footer goes away; Settings is still in the titlebar.
+
 ## [1.7.1] - 2026-09-30
 
 ### Added

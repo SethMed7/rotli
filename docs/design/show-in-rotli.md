@@ -40,6 +40,10 @@ way in but their buttons).
   the cursor never lands on something invisible.
 - The footer's grid gives each shown button an equal column, with no gap
   where a hidden one was.
+- With Files, Librarian, and Feedback all hidden, the footer itself goes
+  (`footerShown`): Settings alone is already in the titlebar. The tour's
+  Settings step then points at the titlebar's Settings (a step's `anchor` may
+  list selectors; the first on screen wins).
 
 ## Proof
 
