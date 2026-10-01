@@ -9,7 +9,12 @@ import { join } from "node:path";
 const caddyfile = readFileSync(join(import.meta.dir, "..", "site", "Caddyfile"), "utf8");
 const collapse = (text: string) => text.replace(/\s+/g, " ");
 
-let agents: typeof import("../site/src/agents");
+// the site's own types (astro:content) stay out of the root typecheck: a
+// computed path, and only the two functions under test
+let agents: {
+  robotsText(): string;
+  llmsText(writing: { resources: never[]; posts: never[] }): string;
+};
 
 beforeAll(async () => {
   process.env.SITE_MODE = "full";
@@ -17,7 +22,7 @@ beforeAll(async () => {
   process.env.SOURCE_REPOSITORY_PUBLIC = "true";
   // writing.ts reads Astro's content collections; these tests pass entries in
   mock.module("astro:content", () => ({ getCollection: async () => [] }));
-  agents = await import("../site/src/agents");
+  agents = (await import(join(import.meta.dir, "..", "site", "src", "agents.ts"))) as typeof agents;
 });
 
 describe("Caddy serves the Markdown twins", () => {
