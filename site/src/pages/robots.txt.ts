@@ -1,9 +1,6 @@
 import type { APIRoute } from 'astro';
-import { site } from '../site';
 
-const body = site.indexable
-  ? `User-agent: *\nAllow: /\n\nSitemap: ${site.url}/sitemap-index.xml\n`
-  : 'User-agent: *\nDisallow: /\n';
+import { robotsText } from '../agents';
 
 export const GET: APIRoute = () =>
-  new Response(body, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+  new Response(robotsText(), { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });

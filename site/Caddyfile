@@ -93,6 +93,27 @@
 		@vtt path /media/*.vtt /media/story/*.vtt
 		header @vtt Content-Type "text/vtt; charset=utf-8"
 
+		# Agents (src/agents.ts). A request that asks for Markdown gets the page's
+		# Markdown twin when one exists (writing pages, and / as the llms.txt
+		# summary); every other request gets HTML. Header matchers see the request
+		# as it arrived, so the Markdown type is set here on the same matcher the
+		# rewrite uses. Vary keeps a cache from handing one to the other. Types are
+		# explicit because caddy:alpine has no /etc/mime.types (Go would sniff .md
+		# as text/plain). llms.txt stays text/plain so a browser shows it inline.
+		@markdown {
+			header Accept *text/markdown*
+			file {path}index.md
+		}
+		header @markdown Content-Type "text/markdown; charset=utf-8"
+		rewrite @markdown {file_match.relative}
+		@markdownFile path *.md
+		header @markdownFile Content-Type "text/markdown; charset=utf-8"
+		@llms path /llms.txt
+		header @llms Content-Type "text/plain; charset=utf-8"
+		header Vary Accept
+		# Crawlers ask for /sitemap.xml by habit; @astrojs/sitemap writes an index.
+		rewrite /sitemap.xml /sitemap-index.xml
+
 		# The dev site is never indexed; the build already emits noindex meta and a
 		# Disallow robots.txt, this is the HTTP-layer twin (SITE_MODE is a runtime
 		# variable on Railway as well as a build arg).

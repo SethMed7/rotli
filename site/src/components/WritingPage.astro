@@ -28,6 +28,9 @@ interface Props {
   wide?: boolean;
   /** Center the head and the reading column on the page (About). */
   center?: boolean;
+  /** Passed through to Base: JSON-LD facts and the Markdown twin. */
+  structuredData?: Record<string, unknown>[];
+  markdownPath?: string;
 }
 
 const {
@@ -42,11 +45,20 @@ const {
   toc = [],
   wide = false,
   center = false,
+  structuredData,
+  markdownPath,
 } = Astro.props;
 const hasToc = toc.length > 1;
 ---
 
-<Base title={title} description={description} canonicalPath={canonicalPath} noindex={!site.indexable}>
+<Base
+  title={title}
+  description={description}
+  canonicalPath={canonicalPath}
+  noindex={!site.indexable}
+  structuredData={structuredData}
+  markdownPath={markdownPath}
+>
   <SiteHeader current={section} />
   <main id="content" class:list={['wrap writing', { center }]}>
     <header class="writing-head">

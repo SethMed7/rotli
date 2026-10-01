@@ -5,6 +5,7 @@
 // meantime. Without script the Mac panel shows. Below, every platform and its
 // status in one list. The hero's "Download for Mac" still fetches the DMG
 // directly (DOWNLOAD_HREF in src/site.ts).
+import { application } from '../../agents';
 import WritingPage from '../../components/WritingPage.astro';
 import { DOWNLOAD_URL, RELEASES_URL, WEB_APP_PATH, site } from '../../site';
 
@@ -43,6 +44,7 @@ const platforms: { name: string; detail: string; status: Status; action?: { href
   description="Get rotli for your Mac, or open it in your browser on Windows and Linux."
   canonicalPath="/download/"
   section="download"
+  structuredData={[application()]}
   heading="Get rotli"
   lede="Free, with no account. Your notes stay in a folder you choose."
   wide
