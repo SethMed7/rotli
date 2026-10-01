@@ -314,4 +314,112 @@ describe("DOCX editor codec", () => {
     expect(saved).toContain("Keep this");
     expect(saved).toContain("<w:tab/>");
   });
+
+  // 2026-10-01 (the Univer review): an edited numbered list saved as a bullet
+  // list — the encoder wrote numId 1 for every list, and only numId 2 decoded
+  // as numbered. A list's kind now comes from the file's own numbering.
+  const listDoc = (items: { list: "bullet" | "number"; text: string }[]) =>
+    createDocxBase64({
+      title: "Lists",
+      content: items.map((item) => ({
+        kind: "paragraph" as const,
+        paragraph: { list: item.list, runs: [{ text: item.text }] },
+      })),
+    });
+  const lists = (document: { content: { kind: string; paragraph?: { list?: string } }[] }) =>
+    document.content.flatMap((content) =>
+      content.kind === "paragraph" && content.paragraph?.list ? [content.paragraph.list] : [],
+    );
+
+  test("an edited numbered list stays numbered, and a bullet stays a bullet", async () => {
+    const decoded = await decodeDocx(
+      await listDoc([
+        { list: "number", text: "one" },
+        { list: "bullet", text: "dot" },
+      ]),
+      "storage/rotli/lists.docx",
+    );
+    for (const content of decoded.document.content) {
+      if (content.kind === "paragraph" && content.paragraph.list)
+        content.paragraph.runs = [{ text: "edited" }];
+    }
+    const again = await decodeDocx(
+      await encodeDocx(decoded.source, decoded.document),
+      "storage/rotli/lists.docx",
+    );
+    expect(lists(again.document)).toEqual(["number", "bullet"]);
+  });
+
+  test("a Word file's own list numbering decides numbered or bullet, and an edit keeps it", async () => {
+    const zip = await JSZip.loadAsync(await listDoc([{ list: "number", text: "one" }]), { base64: true });
+    // another app's numbering: numId 7 is decimal, numId 3 is a bullet
+    zip.file(
+      "word/numbering.xml",
+      `<?xml version="1.0"?><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="4"><w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl></w:abstractNum><w:abstractNum w:abstractNumId="5"><w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/></w:lvl></w:abstractNum><w:num w:numId="7"><w:abstractNumId w:val="4"/></w:num><w:num w:numId="3"><w:abstractNumId w:val="5"/></w:num></w:numbering>`,
+    );
+    const xml = (await zip.file("word/document.xml")?.async("string")) ?? "";
+    zip.file("word/document.xml", xml.replace(/<w:numId w:val="\d+"\/>/, '<w:numId w:val="7"/>'));
+    const base64 = await zip.generateAsync({ type: "base64" });
+    const decoded = await decodeDocx(base64, "storage/rotli/foreign.docx");
+    expect(lists(decoded.document)).toEqual(["number"]);
+    const first = decoded.document.content.find(
+      (content) => content.kind === "paragraph" && content.paragraph.list,
+    );
+    if (first?.kind !== "paragraph") throw new Error("expected the list paragraph");
+    first.paragraph.runs = [{ text: "edited" }];
+    // a new bullet uses the file's own bullet numbering
+    decoded.document.content.push({
+      kind: "paragraph",
+      paragraph: { list: "bullet", runs: [{ text: "new" }] },
+    });
+    const saved = await encodeDocx(decoded.source, decoded.document);
+    const savedXml =
+      (await (await JSZip.loadAsync(saved, { base64: true })).file("word/document.xml")?.async("string")) ??
+      "";
+    expect(savedXml).toContain('<w:numId w:val="7"/>');
+    expect(savedXml).toContain('<w:numId w:val="3"/>');
+    expect(lists((await decodeDocx(saved, "storage/rotli/foreign.docx")).document)).toEqual([
+      "number",
+      "bullet",
+    ]);
+  });
+
+  // 2026-10-01 (the Univer review): editing a commented paragraph dropped the
+  // comment's start and end markers and left its reference dangling. The
+  // comment now spans the edited paragraph.
+  test("a commented paragraph keeps its comment around the edited text", async () => {
+    const zip = await JSZip.loadAsync(
+      await createDocxBase64({ title: "Notes", blocks: [{ kind: "paragraph", text: "Reviewed text" }] }),
+      { base64: true },
+    );
+    const xml = (await zip.file("word/document.xml")?.async("string")) ?? "";
+    zip.file(
+      "word/document.xml",
+      xml.replace(
+        /(<w:p>(?:(?!<\/w:p>).)*?)(<w:r>(?:(?!<\/w:p>).)*?Reviewed text(?:(?!<\/w:p>).)*?<\/w:r>)/s,
+        '$1<w:commentRangeStart w:id="0"/>$2<w:commentRangeEnd w:id="0"/><w:r><w:commentReference w:id="0"/></w:r>',
+      ),
+    );
+    const decoded = await decodeDocx(await zip.generateAsync({ type: "base64" }), "storage/rotli/notes.docx");
+    const paragraph = decoded.document.content.find(
+      (content) =>
+        content.kind === "paragraph" && content.paragraph.runs.some((run) => run.text === "Reviewed text"),
+    );
+    if (paragraph?.kind !== "paragraph") throw new Error("expected the commented paragraph");
+    paragraph.paragraph.runs = [{ text: "Edited text" }];
+    const saved = await encodeDocx(decoded.source, decoded.document);
+    const savedXml =
+      (await (await JSZip.loadAsync(saved, { base64: true })).file("word/document.xml")?.async("string")) ??
+      "";
+    const commented =
+      /<w:p\b(?:(?!<\/w:p>).)*?Edited text(?:(?!<\/w:p>).)*?<\/w:p>/s.exec(savedXml)?.[0] ?? "";
+    const start = commented.indexOf("commentRangeStart");
+    const text = commented.indexOf("Edited text");
+    const end = commented.indexOf("commentRangeEnd");
+    const reference = commented.indexOf("commentReference");
+    expect(start).toBeGreaterThan(-1);
+    expect(start).toBeLessThan(text);
+    expect(end).toBeGreaterThan(text);
+    expect(reference).toBeGreaterThan(end);
+  });
 });

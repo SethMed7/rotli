@@ -233,3 +233,43 @@ test("the native Undo menu command undoes the last document edit", async ({ page
   await page.waitForTimeout(300);
   expect((await savedText(page)).join("")).not.toContain("oops");
 });
+
+// 2026-10-01 (the Univer review): the editor offered controls whose changes
+// Rotli's Word codec can't save — header/footer, page setup, the mode switch,
+// horizontal line, checklist — so they were lost on the next save. Hidden.
+test("the document toolbar offers only what Rotli can save to the .docx", async ({ page }) => {
+  await gotoApp(page);
+  const ids = await page.evaluate(async () => {
+    const { mountDocumentEditor } = await import("/src/documents/engine/univer.ts");
+    const model = {
+      id: "t.docx",
+      title: "T",
+      content: [{ kind: "paragraph", paragraph: { runs: [{ text: "Hi" }] } }],
+    };
+    const host = document.createElement("div");
+    host.style.cssText = "width: 1400px; height: 700px";
+    document.body.append(host);
+    const handle = mountDocumentEditor(host, model);
+    try {
+      await handle.ready;
+      // the toolbar renders in stages after the editor is ready
+      const read = () =>
+        [...host.querySelectorAll("[data-u-command]")].map((node) => node.getAttribute("data-u-command"));
+      for (let wait = 0; wait < 50 && !read().includes("doc.command.set-inline-format-bold"); wait++)
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      return read();
+    } finally {
+      handle.dispose();
+      host.remove();
+    }
+  });
+  expect(ids).toContain("doc.command.set-inline-format-bold");
+  for (const lossy of [
+    "doc.command.open-header-footer-panel",
+    "doc.command.switch-mode",
+    "docs.operation.open-page-setting",
+    "doc.command.horizontal-line",
+    "doc.command.check-list",
+  ])
+    expect(ids).not.toContain(lossy);
+});

@@ -29,12 +29,44 @@ type LayoutNode =
     }
   | { kind: "opaque"; xml: string };
 
+/** numId → list kind, from the file's own word/numbering.xml. */
+type ListKinds = ReadonlyMap<string, "bullet" | "number">;
+const NO_LISTS: ListKinds = new Map();
+
+/** Which numbering instances are bullets and which are numbered (level 0's
+ * numFmt), so a list keeps its kind whatever ids another app chose. */
+function listKinds(numberingXml: string): ListKinds {
+  const abstract = new Map<string, "bullet" | "number">();
+  for (const match of numberingXml.matchAll(
+    /<w:abstractNum\b[^>]*\bw:abstractNumId=["']([^"']+)["'][^>]*>([\s\S]*?)<\/w:abstractNum>/gi,
+  )) {
+    const level0 =
+      /<w:lvl\b[^>]*\bw:ilvl=["']0["'][^>]*>([\s\S]*?)<\/w:lvl>/i.exec(match[2] ?? "")?.[1] ?? match[2] ?? "";
+    abstract.set(match[1] ?? "", val(level0, "numFmt") === "bullet" ? "bullet" : "number");
+  }
+  const kinds = new Map<string, "bullet" | "number">();
+  for (const match of numberingXml.matchAll(
+    /<w:num\b[^>]*\bw:numId=["']([^"']+)["'][^>]*>([\s\S]*?)<\/w:num>/gi,
+  )) {
+    const kind = abstract.get(val(match[2] ?? "", "abstractNumId") ?? "");
+    if (match[1] && kind) kinds.set(match[1], kind);
+  }
+  return kinds;
+}
+
+/** A numbering id's kind: the file's own, else Rotli's (1 bullet, 2 numbered). */
+function listKindOf(numId: string | undefined, lists: ListKinds): "bullet" | "number" {
+  return (numId && lists.get(numId)) || (numId === "2" ? "number" : "bullet");
+}
+
 export interface DocxSource {
   zip: JSZip;
   documentXml: string;
   bodyOpen: string;
   bodyClose: string;
   layout: LayoutNode[];
+  /** The file's list numbering, so an edited list keeps its kind. */
+  lists: ListKinds;
 }
 
 function parseRun(runXml: string): DocumentRun {
@@ -65,7 +97,7 @@ function alignment(value?: string): DocumentAlignment | undefined {
   return undefined;
 }
 
-function parseParagraph(xml: string): DocumentParagraph {
+function parseParagraph(xml: string, lists: ListKinds = NO_LISTS): DocumentParagraph {
   const props = /<w:pPr\b[^>]*>([\s\S]*?)<\/w:pPr>/i.exec(xml)?.[1] ?? "";
   const runs = [...xml.matchAll(/<w:r\b[^>]*>[\s\S]*?<\/w:r>/gi)]
     .map((match) => parseRun(match[0]))
@@ -76,9 +108,7 @@ function parseParagraph(xml: string): DocumentParagraph {
     runs: runs.length ? runs : [{ text: "" }],
     ...(paragraphStyle ? { namedStyle: paragraphStyle } : {}),
     ...(paragraphAlignment ? { alignment: paragraphAlignment } : {}),
-    ...(/<w:numPr\b/i.test(props)
-      ? { list: val(props, "numId") === "2" ? ("number" as const) : ("bullet" as const) }
-      : {}),
+    ...(/<w:numPr\b/i.test(props) ? { list: listKindOf(val(props, "numId"), lists) } : {}),
   };
 }
 
@@ -193,7 +223,11 @@ function innerXml(xml: string, tag: string): string {
   return new RegExp(`<w:${tag}\\b[^>]*>([\\s\\S]*?)<\\/w:${tag}>`, "i").exec(xml)?.[1] ?? "";
 }
 
-function tableFromXml(xml: string, index: number): { table: DocumentTable; advancedParagraphs: number } {
+function tableFromXml(
+  xml: string,
+  index: number,
+  lists: ListKinds = NO_LISTS,
+): { table: DocumentTable; advancedParagraphs: number } {
   const grid = /<w:tblGrid\b[^>]*>([\s\S]*?)<\/w:tblGrid>/i.exec(xml)?.[1] ?? "";
   const columnWidths = [...grid.matchAll(/<w:gridCol\b[^>]*\bw:w=["'](\d+)["'][^>]*\/?\s*>/gi)]
     .map((match) => Number.parseInt(match[1] ?? "", 10) / 15)
@@ -220,7 +254,7 @@ function tableFromXml(xml: string, index: number): { table: DocumentTable; advan
               ) {
                 advancedParagraphs += 1;
               }
-              return parseParagraph(paragraphXml);
+              return parseParagraph(paragraphXml, lists);
             });
           return {
             paragraphs: paragraphs.length ? paragraphs : [{ runs: [{ text: "" }] }],
@@ -299,18 +333,41 @@ function hasUnsupportedInlineStructure(paragraphXml: string): boolean {
   );
 }
 
-function preservedParagraphObjects(originalXml?: string): string {
-  if (!originalXml) return "";
-  return topLevelNodes(innerXml(originalXml, "p"))
-    .filter(
-      (node) =>
-        !/^<w:pPr\b/i.test(node) &&
-        /<w:(?:drawing|object|pict|fldChar|commentReference|bookmarkStart|bookmarkEnd|sdt)\b/i.test(node),
-    )
-    .join("");
+/** A paragraph's objects Rotli doesn't edit, kept around its new text:
+ * where a range opens (a comment, a bookmark) goes before it, so the comment
+ * still covers the edited paragraph; everything else follows it. */
+function preservedParagraphObjects(originalXml?: string): { before: string; after: string } {
+  if (!originalXml) return { before: "", after: "" };
+  const kept = topLevelNodes(innerXml(originalXml, "p")).filter(
+    (node) =>
+      !/^<w:pPr\b/i.test(node) &&
+      /<w:(?:drawing|object|pict|fldChar|commentReference|commentRangeStart|commentRangeEnd|bookmarkStart|bookmarkEnd|sdt)\b/i.test(
+        node,
+      ),
+  );
+  const opens = (node: string) => /^<w:(?:commentRangeStart|bookmarkStart)\b/i.test(node);
+  return {
+    before: kept.filter(opens).join(""),
+    after: kept.filter((node) => !opens(node)).join(""),
+  };
 }
 
-function paragraphXml(paragraph: DocumentParagraph, originalXml?: string): string {
+/** A list paragraph's numbering: its original one while its kind holds (the
+ * list keeps its numbering and level), else the file's own numbering of that
+ * kind, else Rotli's (1 bullet, 2 numbered). */
+function listProps(list: DocumentParagraph["list"], originalProps: string, lists: ListKinds): string {
+  if (!list) return "";
+  const original = /<w:numPr\b[\s\S]*?<\/w:numPr>/i.exec(originalProps)?.[0];
+  if (original && listKindOf(val(original, "numId"), lists) === list) return original;
+  const id = [...lists].find(([, kind]) => kind === list)?.[0] ?? (list === "number" ? "2" : "1");
+  return `<w:numPr><w:ilvl w:val="0"/><w:numId w:val="${id}"/></w:numPr>`;
+}
+
+function paragraphXml(
+  paragraph: DocumentParagraph,
+  originalXml?: string,
+  lists: ListKinds = NO_LISTS,
+): string {
   if (originalXml && hasUnsupportedInlineStructure(originalXml)) {
     throw new Error(
       "This paragraph contains unsupported Word inline content (such as a hyperlink, field, content control, or tracked change). Rotli left the DOCX unchanged.",
@@ -318,12 +375,12 @@ function paragraphXml(paragraph: DocumentParagraph, originalXml?: string): strin
   }
   const id = styleId(paragraph.namedStyle);
   const align = paragraphAlignment(paragraph.alignment);
+  const originalProps = /<w:pPr\b[^>]*>([\s\S]*?)<\/w:pPr>/i.exec(originalXml ?? "")?.[1] ?? "";
   const ownedProps = [
     id ? `<w:pStyle w:val="${id}"/>` : "",
     align ? `<w:jc w:val="${align}"/>` : "",
-    paragraph.list ? '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>' : "",
+    listProps(paragraph.list, originalProps, lists),
   ].join("");
-  const originalProps = /<w:pPr\b[^>]*>([\s\S]*?)<\/w:pPr>/i.exec(originalXml ?? "")?.[1] ?? "";
   const retainedProps = stripOwnedProperties(originalProps, ["pStyle", "jc", "numPr"]);
   const props = `${retainedProps}${ownedProps}`;
   const runs = paragraph.runs.length ? paragraph.runs : [{ text: "" }];
@@ -331,7 +388,8 @@ function paragraphXml(paragraph: DocumentParagraph, originalXml?: string): strin
     ? topLevelNodes(innerXml(originalXml, "p")).filter((node) => /^<w:r\b/i.test(node))
     : [];
   const open = /^<w:p\b[^>]*>/i.exec(originalXml ?? "")?.[0] ?? "<w:p>";
-  return `${open}${props ? `<w:pPr>${props}</w:pPr>` : ""}${runs.map((run, index) => runXml(run, originalRuns[index])).join("")}${preservedParagraphObjects(originalXml)}</w:p>`;
+  const kept = preservedParagraphObjects(originalXml);
+  return `${open}${props ? `<w:pPr>${props}</w:pPr>` : ""}${kept.before}${runs.map((run, index) => runXml(run, originalRuns[index])).join("")}${kept.after}</w:p>`;
 }
 
 function sameParagraph(left: DocumentParagraph, right: DocumentParagraph): boolean {
@@ -355,9 +413,9 @@ function cellProperties(cell: DocumentTableCell, originalXml?: string): string {
   return retained || owned ? `<w:tcPr>${retained}${owned}</w:tcPr>` : "<w:tcPr/>";
 }
 
-function cellXml(cell: DocumentTableCell, originalXml?: string): string {
+function cellXml(cell: DocumentTableCell, originalXml?: string, lists: ListKinds = NO_LISTS): string {
   if (!originalXml) {
-    return `<w:tc>${cellProperties(cell)}${cell.paragraphs.map((paragraph) => paragraphXml(paragraph)).join("")}</w:tc>`;
+    return `<w:tc>${cellProperties(cell)}${cell.paragraphs.map((paragraph) => paragraphXml(paragraph, undefined, lists)).join("")}</w:tc>`;
   }
   const open = /^<w:tc\b[^>]*>/i.exec(originalXml)?.[0] ?? "<w:tc>";
   const children = topLevelNodes(innerXml(originalXml, "tc"));
@@ -371,38 +429,40 @@ function cellXml(cell: DocumentTableCell, originalXml?: string): string {
     } else if (/^<w:p\b/i.test(child)) {
       const paragraph = cell.paragraphs[paragraphIndex++];
       if (paragraph) {
-        const original = parseParagraph(child);
-        next.push(sameParagraph(paragraph, original) ? child : paragraphXml(paragraph, child));
+        const original = parseParagraph(child, lists);
+        next.push(sameParagraph(paragraph, original) ? child : paragraphXml(paragraph, child, lists));
       }
     } else {
       next.push(child);
     }
   }
   if (!sawProperties) next.unshift(cellProperties(cell));
-  while (paragraphIndex < cell.paragraphs.length) next.push(paragraphXml(cell.paragraphs[paragraphIndex++]!));
+  while (paragraphIndex < cell.paragraphs.length)
+    next.push(paragraphXml(cell.paragraphs[paragraphIndex++]!, undefined, lists));
   if (!cell.paragraphs.length) next.push(paragraphXml({ runs: [{ text: "" }] }));
   return `${open}${next.join("")}</w:tc>`;
 }
 
-function rowXml(cells: DocumentTableCell[], originalXml?: string): string {
-  if (!originalXml) return `<w:tr>${cells.map((cell) => cellXml(cell)).join("")}</w:tr>`;
+function rowXml(cells: DocumentTableCell[], originalXml?: string, lists: ListKinds = NO_LISTS): string {
+  if (!originalXml) return `<w:tr>${cells.map((cell) => cellXml(cell, undefined, lists)).join("")}</w:tr>`;
   const open = /^<w:tr\b[^>]*>/i.exec(originalXml)?.[0] ?? "<w:tr>";
   const next: string[] = [];
   let cellIndex = 0;
   for (const child of topLevelNodes(innerXml(originalXml, "tr"))) {
     if (/^<w:tc\b/i.test(child)) {
       const cell = cells[cellIndex++];
-      if (cell) next.push(cellXml(cell, child));
+      if (cell) next.push(cellXml(cell, child, lists));
     } else {
       next.push(child);
     }
   }
-  while (cellIndex < cells.length) next.push(cellXml(cells[cellIndex++]!));
+  while (cellIndex < cells.length) next.push(cellXml(cells[cellIndex++]!, undefined, lists));
   return `${open}${next.join("")}</w:tr>`;
 }
 
-function tableXml(table: DocumentTable, originalXml?: string): string {
-  if (!originalXml) return `<w:tbl>${table.rows.map((row) => rowXml(row.cells)).join("")}</w:tbl>`;
+function tableXml(table: DocumentTable, originalXml?: string, lists: ListKinds = NO_LISTS): string {
+  if (!originalXml)
+    return `<w:tbl>${table.rows.map((row) => rowXml(row.cells, undefined, lists)).join("")}</w:tbl>`;
   const open = /^<w:tbl\b[^>]*>/i.exec(originalXml)?.[0] ?? "<w:tbl>";
   const next: string[] = [];
   let rowIndex = 0;
@@ -415,7 +475,7 @@ function tableXml(table: DocumentTable, originalXml?: string): string {
       sawGrid = true;
     } else if (/^<w:tr\b/i.test(child)) {
       const row = table.rows[rowIndex++];
-      if (row) next.push(rowXml(row.cells, child));
+      if (row) next.push(rowXml(row.cells, child, lists));
     } else {
       next.push(child);
       if (/^<w:tblGrid\b/i.test(child)) sawGrid = true;
@@ -426,7 +486,7 @@ function tableXml(table: DocumentTable, originalXml?: string): string {
     const grid = `<w:tblGrid>${table.columnWidths.map((width) => `<w:gridCol w:w="${Math.max(1, Math.round(width * 15))}"/>`).join("")}</w:tblGrid>`;
     next.splice(at < 0 ? next.length : at, 0, grid);
   }
-  while (rowIndex < table.rows.length) next.push(rowXml(table.rows[rowIndex++]!.cells));
+  while (rowIndex < table.rows.length) next.push(rowXml(table.rows[rowIndex++]!.cells, undefined, lists));
   return `${open}${next.join("")}</w:tbl>`;
 }
 
@@ -553,16 +613,17 @@ function contentXml(
   content: DocumentContent,
   imageBindings: ReadonlyMap<string, ImageBinding>,
   template?: LayoutNode,
+  lists: ListKinds = NO_LISTS,
 ): string {
   if (content.kind === "paragraph") {
     if (template?.kind === "paragraph" && sameParagraph(content.paragraph, template.original))
       return template.xml;
-    return paragraphXml(content.paragraph, template?.kind === "paragraph" ? template.xml : undefined);
+    return paragraphXml(content.paragraph, template?.kind === "paragraph" ? template.xml : undefined, lists);
   }
   if (content.kind === "table") {
     if (template?.kind === "table" && JSON.stringify(content.table) === JSON.stringify(template.original))
       return template.xml;
-    return tableXml(content.table, template?.kind === "table" ? template.xml : undefined);
+    return tableXml(content.table, template?.kind === "table" ? template.xml : undefined, lists);
   }
   const binding = imageBindings.get(content.image.id);
   if (!binding) throw new Error("The DOCX media adapter could not allocate this image.");
@@ -589,6 +650,7 @@ export async function decodeDocx(
   const children = topLevelNodes(body[2] ?? "");
   const relationshipXml = (await zip.file("word/_rels/document.xml.rels")?.async("string")) ?? "";
   const relationships = relationshipTargets(relationshipXml);
+  const lists = listKinds((await zip.file("word/numbering.xml")?.async("string")) ?? "");
   const content: DocumentContent[] = [];
   const layout: LayoutNode[] = [];
   const warnings: string[] = [];
@@ -608,7 +670,7 @@ export async function decodeDocx(
         });
         continue;
       }
-      const paragraph = parseParagraph(child);
+      const paragraph = parseParagraph(child, lists);
       content.push({ kind: "paragraph", paragraph });
       layout.push({ kind: "paragraph", xml: child, original: structuredClone(paragraph) });
       if (
@@ -618,7 +680,7 @@ export async function decodeDocx(
         advancedParagraphs += 1;
       }
     } else if (/^<w:tbl\b/i.test(child)) {
-      const parsed = tableFromXml(child, tableIndex++);
+      const parsed = tableFromXml(child, tableIndex++, lists);
       content.push({ kind: "table", table: parsed.table });
       layout.push({ kind: "table", xml: child, original: structuredClone(parsed.table) });
       advancedParagraphs += parsed.advancedParagraphs;
@@ -638,6 +700,7 @@ export async function decodeDocx(
       bodyOpen: body[1] ?? "<w:body>",
       bodyClose: body[3] ?? "</w:body>",
       layout,
+      lists,
     },
     document: {
       id: fileId,
@@ -651,7 +714,7 @@ export async function decodeDocx(
 export async function encodeDocx(source: DocxSource, document: EditableDocument): Promise<string> {
   const imageBindings = await prepareImageBindings(source, document);
   const render = (content: DocumentContent, template?: LayoutNode) =>
-    contentXml(content, imageBindings, template);
+    contentXml(content, imageBindings, template, source.lists);
   const edited = [...document.content];
   const children: string[] = [];
   let contentIndex = 0;

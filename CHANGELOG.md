@@ -56,6 +56,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Numbered lists stay numbered in Word documents.** Editing a numbered
+  list saved it as bullets; Rotli now reads each list's kind from the file
+  and keeps its numbering.
+- **Comments stay attached when you edit a commented paragraph.**
+- **The document toolbar only offers what Rotli can save.** Headers and
+  footers, page setup, horizontal lines, and checklists were lost on save;
+  they're hidden until Rotli can keep them.
 - **Your settings survive updates.** Rotli no longer writes over a settings
   file it couldn't read or one a newer Rotli saved, keeps a copy of a damaged
   one before replacing it, and no longer forgets a custom global shortcut

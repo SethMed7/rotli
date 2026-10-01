@@ -66,6 +66,15 @@ Local documents follow Rotli's [clean architecture protocol](../../docs/architec
 
 ## Editing boundary
 
+The editor offers only what the codec saves. Univer controls Rotli can't write
+back — headers and footers, page setup, the page/modern mode switch,
+horizontal rules, checklists, the paragraph-settings panel, H4/H5 — are hidden
+through the preset's menu config (`UNSAVABLE_MENU`, `engine/univer.ts`); one
+returns when the codec learns it. Lists take their kind from the file's own
+`word/numbering.xml` (level 0's `numFmt`), and an edited list paragraph keeps
+its original numbering while its kind holds. A commented paragraph keeps its
+comment's range markers around its edited text.
+
 DOCX support is create + local structured editing. The portable subset currently
 supports paragraphs, heading/title styles, alignment, lists, fonts, sizes, color,
 background shading, subscript/superscript, common inline emphasis, embedded raster images, and native Word tables with editable cell content and
