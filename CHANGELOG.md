@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Chat edits the Word documents it made.** After reading one, chat can
+  change a paragraph, add or remove blocks, set a table cell, or change a
+  heading level. Rotli lets it edit only documents its AI created, checks the
+  new text for secrets, keeps a backup of the original, and waits while the
+  document is open.
 - **A living sidebar.** Settings → Appearance → Sidebar adds Scenery (Off,
   Top, Bottom, or Both): your theme's hills as a faint silhouette behind the
   header row or the footer, never behind what you read. And Icons: Neutral, where every mark shares one ink,

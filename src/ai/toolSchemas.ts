@@ -77,6 +77,36 @@ const SPECS: Partial<Record<ToolName, Omit<NativeToolSpec, "name">>> = {
       ["title", "body"],
     ),
   },
+  edit_document: {
+    description:
+      "Edit a Word document Rotli's AI created (read it first with read_file; Rotli refuses one the user made). Actions use read_file's block numbers, which keep meaning the document as read: replace {block,text}, insert_after {block (0 = top), kind, text}, delete {block}, set_cell {block,row,column,text}, set_kind {block,kind}. Kinds: paragraph, heading1, heading2, heading3, title, bullet, number.",
+    inputSchema: object(
+      {
+        file: text("the document's file name, e.g. plan.docx"),
+        actions: {
+          type: "array",
+          maxItems: 40,
+          items: {
+            type: "object",
+            properties: {
+              op: { type: "string", enum: ["replace", "insert_after", "delete", "set_cell", "set_kind"] },
+              block: { type: "integer", minimum: 0 },
+              text: { type: "string" },
+              kind: {
+                type: "string",
+                enum: ["paragraph", "heading1", "heading2", "heading3", "title", "bullet", "number"],
+              },
+              row: { type: "integer", minimum: 1 },
+              column: { type: "integer", minimum: 1 },
+            },
+            required: ["op", "block"],
+            additionalProperties: false,
+          },
+        },
+      },
+      ["file", "actions"],
+    ),
+  },
   create_artifact: {
     description:
       "Create a user-owned work file: an editable sheet (CSV with a header row) or a PDF with an editable Markdown source. Use create_document for Word files.",

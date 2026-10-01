@@ -36,7 +36,7 @@ const NOTE_TOOLS: ToolName[] = [
   "open_note",
   "read_file",
 ];
-const DOCUMENT_TOOLS: ToolName[] = ["create_document"];
+const DOCUMENT_TOOLS: ToolName[] = ["create_document", "edit_document"];
 const ARTIFACT_TOOLS: ToolName[] = ["create_artifact"];
 const NOTE_SEARCH_TOOLS: ToolName[] = ["search_memory", "search_notes"];
 const WEB_PRIMITIVE_TOOLS: ToolName[] = ["web_search", "web_fetch"];

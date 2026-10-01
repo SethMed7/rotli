@@ -13,7 +13,6 @@
     "src/components/activitySurface.tsx": 984,
     "src/components/glyphs.tsx": 714,
     "src/ai/loop.test.ts": 1254,
-    "src/ai/host.ts": 635,
     "src/lib/tauri.ts": 2391,
     "src/keys/actions.ts": 894,
     "src/documents/codec/docx.ts": 793,

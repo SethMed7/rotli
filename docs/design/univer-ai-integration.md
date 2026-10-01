@@ -43,22 +43,41 @@ Chat's `read_file` now reads what a model can point at, instead of flat text:
 
 The secret gate is unchanged (a remote model never gets secret-shaped text).
 
+## Done (slice 3, 2026-10-01): chat edits Word documents it created
+
+The owner's 2026-09-29 rule for notes, applied to files: **Rotli's AI edits a
+Word document only when Rotli's AI created it.** Files carry no frontmatter,
+so the record is `.rotli/file-grants.json`, written only by Rust's
+`corpus_create_managed_file_ai` (chat's `create_document` now uses it). A
+document a person made, or any file without a record (a renamed one too),
+stays closed to the AI; a per-file grant can open one later.
+
+- `edit_document` (chat; `src/ai/hostFiles.ts`): bounded actions over the
+  document model by the block numbers `read_file` gave (`replace`,
+  `insert_after` with 0 for the top, `delete`, `set_cell`, `set_kind`; at most
+  40; `src/documents/aiEdit.ts`). Numbers always mean the document as read.
+- Saved through `corpus_write_file_ai` (`src-tauri/src/ai_files.rs`):
+  provenance, then its own secret check on the text read from
+  `word/document.xml` in the package itself, then the revision gate with a
+  one-time `.bak`. Rotli's Word codec keeps every part the edit doesn't touch.
+- Refused in a chat carrying secure-note content, and while the document is
+  open in a pane (shown or parked): panes save on their own, so the edit
+  waits until it's closed.
+
 ## Next slices (each its own PR)
 
 | # | Slice | Needs |
 |---|---|---|
 | 2 | `sheet_apply` in chat: set values/formulas in a range, insert/delete rows/columns, add/rename a sheet → model → ExcelJS save through a new `corpus_write_file_ai` (re-derives model locality, managed lane only, secret check, refuses in a secure chat) | decision 1 |
-| 3 | `document_apply` in chat: replace a block's text, insert after, delete, set a table cell, set a heading level → docx model → Rotli's codec (untouched parts preserved) | decision 1 |
-| 4 | Live-pane routing: a file open in a pane takes the same actions through Univer's Facade, so the person reviews and saves (no revision clash) | — |
+| 4 | Live-pane routing: a file open in a pane takes the same actions through Univer's Facade instead of a disk write (no revision clash). Note: document panes save on their own when the window hides or the app quits (`flushDirtyDocuments`, `src/documents/session.ts`), so this is not a review step; until it exists, an AI edit is refused while the document is open (live or parked) | — |
 | 5 | Upgrade to Univer 1.0.3: retest `src/documents/engine/univer.ts` (it uses internal services, not the Facade); depend on `@univerjs/core` instead of the presets meta-package | native QA |
 | 6 | `rotli mcp` tools `rotli_read_sheet` / `rotli_apply_sheet` / `rotli_read_document` / `rotli_apply_document`, modeled on the board tools | decision 2 |
 
 ## Decisions for the owner
 
-1. **Can the AI edit a file it didn't make?** Notes follow the 2026-09-29 rule
-   (`created_by` + `ai_edit`); files carry no frontmatter. Either follow the
-   board precedent (a secret check, no ownership grant) or keep a small
-   `.rotli/` record of `created_by` / `ai_edit` / locked per file.
+1. **Can the AI edit a file it didn't make?** Applied (2026-10-01): the notes
+   rule — only documents the AI created, by a `.rotli/file-grants.json` record.
+   Open: a per-file grant so the person can open one of theirs to the AI.
 2. **How `rotli mcp` (Rust, headless) reaches the TypeScript codecs.** (A) a
    second codec in Rust: works with Rotli closed, but two codecs; (B) a
    request/response bridge through the running app: one codec, open files

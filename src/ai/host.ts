@@ -6,7 +6,6 @@
 import { createEditableBoardFromMermaid } from "../boards/composition";
 import { memoryKeywords, mergeKeywordHits, rankChatMemories } from "../chatMemory/retrieval";
 import { documentImageFromBase64 } from "../documents/images";
-import { DOCX_EDITABLE } from "../documents/kinds";
 import type { DocumentImage } from "../documents/model";
 import { extOf, fileName } from "../lib/fileKind";
 import {
@@ -15,11 +14,9 @@ import {
   chatMessagesStream,
   cliComplete,
   corpusFileBytes,
-  corpusFileText,
   corpusFrontmatter,
   corpusCreateManagedFile,
   corpusExportNotePdf,
-  corpusList,
   corpusNotesAi,
   corpusReadAi,
   corpusReadAiVersioned,
@@ -41,13 +38,12 @@ import {
 } from "../newItems/composition";
 import { createRoutedNote } from "../services/createNote";
 import { invalidateNotes } from "../services/hooks";
-import { SHEET_BIN, SHEET_TEXT } from "../sheets/kinds";
-import { workbookForAi, workbookToCsv } from "../sheets/view";
 import { usePanesStore } from "../state/panes";
-import { artifactFileName, editableDocumentForAi } from "./artifacts";
+import { artifactFileName } from "./artifacts";
 import { contextWindowFor } from "./budget";
 import { aiEditBlock, UNREADABLE_PROTECTION } from "./editGate";
 import { endpointIsLocal, looksSecret, modelIsOnDevice } from "./guard";
+import { makeFileTools } from "./hostFiles";
 import { normalizeGeneratedImageLinks } from "./imageLinks";
 import { DEFAULT_WEB_SEARCH_PROVIDER, type WebSearchProvider } from "./searchProvider";
 import { channelStream } from "./stream";
@@ -144,6 +140,7 @@ export function makeTauriHost(
   },
 ): Host {
   const generatedImagePaths: string[] = [];
+  const files = makeFileTools(model, opts ?? {});
   const markSecureIds = async (ids: readonly string[]): Promise<void> => {
     if (!opts?.onSecureNoteRead || !modelIsOnDevice(model) || ids.length === 0) return;
     for (const id of new Set(ids)) {
@@ -335,6 +332,7 @@ export function makeTauriHost(
       }
       const item = await createManagedDocumentWithContent(documentTitle, body, {
         open: false,
+        byAi: true,
         ...(images.length ? { images } : {}),
         ...(opts?.artifactRootId ? { rootId: opts.artifactRootId } : {}),
       });
@@ -461,43 +459,8 @@ export function makeTauriHost(
       if (protectedContent) opts?.onSecureNoteRead?.();
       return body;
     },
-    async readFile(query) {
-      const { notes } = await corpusList();
-      const q = query
-        .toLowerCase()
-        .trim()
-        .replace(/^["']|["']$/g, "");
-      const files = notes.filter((n) => n.kind === "file");
-      const file =
-        files.find((n) => n.title.toLowerCase() === q) ??
-        files.find((n) => n.title.toLowerCase().includes(q));
-      if (!file) return `no file matching "${query}". Use the exact filename (e.g. report.csv).`;
-      const ext = extOf(file.title);
-      let text: string;
-      if (SHEET_BIN.has(ext)) {
-        text = await workbookForAi(await corpusFileBytes(file.id), file.title);
-      } else if (SHEET_TEXT.has(ext)) {
-        text = await workbookToCsv({
-          csv: await corpusFileText(file.id),
-          delimiter: ext === "tsv" ? "\t" : ",",
-        });
-      } else if (DOCX_EDITABLE.has(ext)) {
-        const { editManagedDocument } = await import("../documents/composition");
-        const editable = await editManagedDocument(file.id);
-        text = editable.kind === "ready" ? editableDocumentForAi(editable.document) : "";
-        if (!text) return "This document is too large or has no editable text Rotli can give the model.";
-      } else {
-        text = await corpusFileText(file.id);
-      }
-      // Storage files carry no frontmatter, so they skip corpus_read_ai's
-      // secure gate — apply the same policy prior chats get (audit 2026-07):
-      // a remote model never receives secret-shaped file contents.
-      if (!modelIsOnDevice(model) && looksSecret(text)) {
-        return "blocked: this file contains secret-shaped content and cannot be sent to a remote model.";
-      }
-      if (modelIsOnDevice(model) && looksSecret(text)) opts?.onSecureNoteRead?.();
-      return text;
-    },
+    readFile: files.readFile,
+    editDocument: files.editDocument,
     webSearch(query, limit) {
       if (opts?.isSecureContext?.() === true) {
         return Promise.reject(

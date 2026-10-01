@@ -1,3 +1,4 @@
+import { corpusCreateManagedFileAi, corpusWriteFileAi } from "../lib/aiFiles";
 /**
  * Document composition root. This is the only module allowed to join Tauri
  * storage with concrete DOCX adapters and application use cases.
@@ -66,6 +67,38 @@ export function createManagedDocumentFromMarkdown(
     { ...documentDraftFromMarkdown(title, body), ...(images.length ? { images } : {}) },
     now,
     rootId,
+  );
+}
+
+/** A Word document the chat writes: the AI's own creation lane, which records
+ * that the AI made it (the only documents its edits may touch). */
+export async function createAiDocumentFromMarkdown(
+  title: string,
+  body: string,
+  images: DocumentImage[] = [],
+  rootId?: string,
+): Promise<string> {
+  const { docxEncoder } = await import("./create");
+  const aiRepository: DocumentRepository = {
+    create: (name, base64) => corpusCreateManagedFileAi(name, base64, rootId),
+  };
+  return createNamedDocument(
+    { encoder: docxEncoder, repository: aiRepository },
+    title,
+    { ...documentDraftFromMarkdown(title, body), ...(images.length ? { images } : {}) },
+    Date.now(),
+  );
+}
+
+/** The AI's edit session: the same codec, saving through the AI's write lane. */
+export async function editAiDocument(fileId: string) {
+  const { docxEditorCodec } = await import("./codec/docx");
+  const aiWriter: DocumentFileWriter = {
+    writeBase64: (id, base64, _backup, revision) => corpusWriteFileAi(id, base64, revision),
+  };
+  return editDocument(
+    { reader, writer: aiWriter, codec: docxEditorCodec, maxBytes: DOCUMENT_EDIT_MAX_BYTES },
+    fileId,
   );
 }
 

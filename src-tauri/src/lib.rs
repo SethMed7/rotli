@@ -45,6 +45,7 @@ mod organizer;
 mod organizer_knobs;
 #[cfg(test)]
 mod parity_tests;
+mod ai_files;
 mod pinned_site;
 mod private_browser;
 mod private_browser_media;
@@ -2432,6 +2433,8 @@ pub fn run() {
             web_search::web_search,
             web::web_fetch,
             web::open_url,
+            ai_files::corpus_create_managed_file_ai,
+            ai_files::corpus_write_file_ai,
             pinned_site::pinned_sites_supported,
             pinned_site::pinned_site_open,
             pinned_site::pinned_site_set_bounds,
