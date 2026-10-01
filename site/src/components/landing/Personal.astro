@@ -1,5 +1,5 @@
 ---
-// Make it yours: the theme studio (twelve real captures from public/themes/)
+// Make it yours: the theme studio (fourteen real captures from public/themes/)
 // and the optional quokka companion. Both move only when the visitor asks:
 // no timers, so a background tab does no work and nothing loops beside text.
 // Behind it, faintly, the story film's island by day (IslandScene.astro).
@@ -15,6 +15,7 @@ const families = [
   { id: 'ocean', name: 'Ocean', light: ['Ocean Light', 'ocean-light'], dark: ['Ocean Dark', 'ocean-dark'] },
   { id: 'grove', name: 'Grove', light: ['Grove Light', 'grove-light'], dark: ['Grove Dark', 'grove-dark'] },
   { id: 'iris', name: 'Iris', light: ['Iris Light', 'iris-light'], dark: ['Iris Dark', 'iris-dark'] },
+  { id: 'blossom', name: 'Blossom', light: ['Blossom Light', 'blossom-light'], dark: ['Blossom Dark', 'blossom-dark'] },
   { id: 'midnight', name: 'Midnight', light: ['Midnight Light', 'midnight-light'], dark: ['Midnight', 'midnight'] },
 ] as const;
 
@@ -48,7 +49,7 @@ const companions = showcaseManifest.map((entry) => {
     <header class="section-head">
       <h2 class="section-title" id="personal-title">Make it yours.</h2>
       <p class="section-lede">
-        Six theme families, each with a tuned light and dark environment. The calm grammar around
+        Seven theme families, each with a tuned light and dark environment. The calm grammar around
         your notes stays the same in every one.
       </p>
     </header>
@@ -70,7 +71,7 @@ const companions = showcaseManifest.map((entry) => {
           <b id="theme-environment">{first.environment}</b>
         </figcaption>
       </figure>
-      <!-- Narrow screens: the same twelve environments as a carousel, like the quokkas below. -->
+      <!-- Narrow screens: the same fourteen environments as a carousel, like the quokkas below. -->
       <div class="studio-steps">
         <button type="button" class="carousel-step" data-theme-step="-1" aria-label="Previous theme">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 5-7 7 7 7" /></svg>
@@ -360,6 +361,8 @@ const companions = showcaseManifest.map((entry) => {
   .swatch[data-swatch='grove-dark'] { --swatch-ground: var(--swatch-grove-dark); --swatch-accent: var(--swatch-grove-dark-accent); }
   .swatch[data-swatch='iris-light'] { --swatch-ground: var(--swatch-iris-light); --swatch-accent: var(--swatch-iris-light-accent); }
   .swatch[data-swatch='iris-dark'] { --swatch-ground: var(--swatch-iris-dark); --swatch-accent: var(--swatch-iris-dark-accent); }
+  .swatch[data-swatch='blossom-light'] { --swatch-ground: var(--swatch-blossom-light); --swatch-accent: var(--swatch-blossom-light-accent); }
+  .swatch[data-swatch='blossom-dark'] { --swatch-ground: var(--swatch-blossom-dark); --swatch-accent: var(--swatch-blossom-dark-accent); }
   .swatch[data-swatch='midnight-light'] { --swatch-ground: var(--swatch-midnight-light); --swatch-accent: var(--swatch-midnight-light-accent); }
   .swatch[data-swatch='midnight-dark'] { --swatch-ground: var(--swatch-midnight-dark); --swatch-accent: var(--swatch-midnight-dark-accent); }
 
