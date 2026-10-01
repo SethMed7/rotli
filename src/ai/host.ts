@@ -42,9 +42,9 @@ import {
 import { createRoutedNote } from "../services/createNote";
 import { invalidateNotes } from "../services/hooks";
 import { SHEET_BIN, SHEET_TEXT } from "../sheets/kinds";
-import { workbookToCsv } from "../sheets/view";
+import { workbookForAi, workbookToCsv } from "../sheets/view";
 import { usePanesStore } from "../state/panes";
-import { artifactFileName, editableDocumentText } from "./artifacts";
+import { artifactFileName, editableDocumentForAi } from "./artifacts";
 import { contextWindowFor } from "./budget";
 import { aiEditBlock, UNREADABLE_PROTECTION } from "./editGate";
 import { endpointIsLocal, looksSecret, modelIsOnDevice } from "./guard";
@@ -475,7 +475,7 @@ export function makeTauriHost(
       const ext = extOf(file.title);
       let text: string;
       if (SHEET_BIN.has(ext)) {
-        text = await workbookToCsv({ base64: await corpusFileBytes(file.id) });
+        text = await workbookForAi(await corpusFileBytes(file.id), file.title);
       } else if (SHEET_TEXT.has(ext)) {
         text = await workbookToCsv({
           csv: await corpusFileText(file.id),
@@ -484,7 +484,7 @@ export function makeTauriHost(
       } else if (DOCX_EDITABLE.has(ext)) {
         const { editManagedDocument } = await import("../documents/composition");
         const editable = await editManagedDocument(file.id);
-        text = editable.kind === "ready" ? editableDocumentText(editable.document) : "";
+        text = editable.kind === "ready" ? editableDocumentForAi(editable.document) : "";
         if (!text) return "This document is too large or has no editable text Rotli can give the model.";
       } else {
         text = await corpusFileText(file.id);

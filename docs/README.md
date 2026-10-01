@@ -18,6 +18,7 @@ fix both in the same change.
 | Public beta support boundary | [`../SUPPORT.md`](../SUPPORT.md) |
 | Project-level system architecture | [`../ARCHITECTURE.md`](../ARCHITECTURE.md) |
 | Languages, frameworks, libraries, and tools (the stack inventory) | [`architecture/tech-stack.md`](architecture/tech-stack.md) |
+| How AI reads and (next) edits sheets and Word documents; what fits from Univer 1.0 | [`design/univer-ai-integration.md`](design/univer-ai-integration.md) |
 | Product interface and interaction design | [`../DESIGN.md`](../DESIGN.md) |
 | Syntax, naming, and formatting | [`../SYNTAX.md`](../SYNTAX.md) |
 | Clean architecture and dependency direction | [`architecture/clean-architecture.md`](architecture/clean-architecture.md) |

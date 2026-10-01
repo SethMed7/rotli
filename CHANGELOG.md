@@ -30,6 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Chat reads spreadsheets and Word documents by address.** An .xlsx
+  arrives as every cell by its A1 address, with formulas and their results and
+  real row numbers; a Word document arrives as numbered blocks (headings, list
+  items, table cells). Before, sheets came as CSV that dropped blank rows and
+  formulas.
 - **About credits Excalidraw and Univer.** Settings → About Rotli and the
   site's About page name the two open-source editors built in: Excalidraw for
   boards and Univer for Word documents.

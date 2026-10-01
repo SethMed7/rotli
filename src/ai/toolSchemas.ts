@@ -52,7 +52,8 @@ const SPECS: Partial<Record<ToolName, Omit<NativeToolSpec, "name">>> = {
     inputSchema: object({ id: text("the note id") }, ["id"]),
   },
   read_file: {
-    description: "Read a file from the vault by name (text, or a spreadsheet as CSV).",
+    description:
+      "Read a file from the vault by name: text as itself, a CSV as CSV, an .xlsx as every cell by its A1 address (formulas with their results), and a Word document as numbered blocks (headings, list items, table cells r1c1…).",
     inputSchema: object({ query: text("the file name or path, e.g. report.csv") }, ["query"]),
   },
   web_search: {
