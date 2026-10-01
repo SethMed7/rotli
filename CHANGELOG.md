@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **rotli.co reads well to AI assistants and search engines.** The site now
+  publishes `/llms.txt` (a short summary with links for AI systems), a Markdown
+  version of every resource and blog page that agents get when they ask for
+  Markdown, structured data describing the app, its FAQ, and each article, and
+  a robots.txt that names each AI crawler explicitly. The build fails if the
+  summary links a page that does not exist.
+
 ## [1.7.0] - 2026-09-30
 
 ### Added

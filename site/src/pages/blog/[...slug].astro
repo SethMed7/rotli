@@ -1,6 +1,7 @@
 ---
 // /blog/ (the index, newest first) and /blog/<post>/.
 import { render } from 'astro:content';
+import { twinPath, writingGraph, writingPath } from '../../agents';
 import WritingList from '../../components/WritingList.astro';
 import WritingPage from '../../components/WritingPage.astro';
 import { site } from '../../site';
@@ -33,6 +34,8 @@ const { Content } = entry ? await render(entry) : { Content: null };
       title={`${entry.data.title} — rotli`}
       description={entry.data.description}
       canonicalPath={`/blog/${slugOf(entry)}/`}
+      structuredData={writingGraph(entry)}
+      markdownPath={twinPath(writingPath(entry))}
       section="blog"
       crumbs={[{ href: '/blog/', label: 'Blog' }]}
       kicker={entry.data.draft ? 'Draft · dev site only' : formatDate(entry.data.date)}

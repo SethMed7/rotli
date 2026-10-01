@@ -59,6 +59,59 @@ function cspInlineStyleGuard() {
 }
 
 /**
+ * The agent-facing files (src/agents.ts) are only useful if they are true to
+ * the build: every link in /llms.txt must land on a page this build emitted
+ * (agents follow them literally), and every JSON-LD block must parse. A page
+ * renamed without updating the summary fails here, not on rotli.co.
+ */
+function agentFilesGuard() {
+  return {
+    name: "rotli-agent-files-guard",
+    hooks: {
+      "astro:build:done": ({ dir }) => {
+        const root = fileURLToPath(dir);
+        const problems = [];
+        const llms = join(root, "llms.txt");
+        if (!existsSync(llms)) problems.push("llms.txt was not emitted");
+        else {
+          for (const [, href] of readFileSync(llms, "utf8").matchAll(/\]\((https?:[^)\s]+)\)/g)) {
+            const url = new URL(href);
+            if (url.origin !== site.url) continue;
+            const file = join(
+              root,
+              decodeURIComponent(url.pathname),
+              url.pathname.endsWith("/") ? "index.html" : "",
+            );
+            if (!existsSync(file)) problems.push(`llms.txt links ${href}, which this build did not emit`);
+          }
+        }
+        const walk = (folder) => {
+          for (const entry of readdirSync(folder, { withFileTypes: true })) {
+            const path = join(folder, entry.name);
+            if (entry.isDirectory()) walk(path);
+            else if (entry.name.endsWith(".html")) {
+              const html = readFileSync(path, "utf8");
+              for (const [, body] of html.matchAll(
+                /<script type="application\/ld\+json">([\s\S]*?)<\/script>/g,
+              )) {
+                try {
+                  JSON.parse(body);
+                } catch (error) {
+                  problems.push(`${path.slice(root.length)}: JSON-LD does not parse (${error.message})`);
+                }
+              }
+            }
+          }
+        };
+        walk(root);
+        if (problems.length > 0)
+          throw new Error(`Agent-facing files are out of step with the build:\n  ${problems.join("\n  ")}`);
+      },
+    },
+  };
+}
+
+/**
  * Locally there is no Caddy and no Docker `app` stage, so `/app/` (Rotli Web)
  * has nothing behind it and "Open in browser" landed on the 404 page. Dev and
  * preview pass `/app/` through to the web app's own dev server
@@ -104,5 +157,6 @@ export default defineConfig({
   integrations: [
     ...(site.indexable ? [sitemap({ filter: (page) => page !== `${site.url}/404/` })] : []),
     cspInlineStyleGuard(),
+    agentFilesGuard(),
   ],
 });

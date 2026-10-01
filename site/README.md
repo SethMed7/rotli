@@ -281,6 +281,39 @@ bun run preview  # serve the built dist/ locally
   LinkedIn and Facebook cache scrapes; re-scrape with their post inspectors
   after a deploy.
 
+## Agents and search engines
+
+`src/agents.ts` is the one home for what the site tells crawlers and AI
+agents; every sentence in it restates a claim the pages already make.
+
+- **`/robots.txt`** allows everything except `/app/` (Rotli Web's shell) and
+  names each AI crawler in its own group (`AI_AGENTS`). Each entry must match
+  what the edge enforces: Cloudflare's AI-bot blocking is a zone setting outside
+  this repository, and a robots.txt that welcomes an agent the edge then refuses
+  reads as a broken promise. To block an agent, set `allow: false` *and* block
+  it at the edge. The dev site disallows everything.
+- **`/llms.txt`** ([llmstxt.org](https://llmstxt.org)): a title, a one-line
+  summary, the key facts, and links to the pages and to each resource's
+  Markdown twin, built from the published writing so a link cannot go stale.
+  It is also served as `/index.md`, the landing page's twin.
+- **Markdown twins.** Every writing page has `index.md` beside its
+  `index.html` (the source Markdown under a title and summary), declared with
+  `<link rel="alternate" type="text/markdown">`. The Caddyfile answers a request
+  whose `Accept` names `text/markdown` with the twin when one exists, and with
+  HTML otherwise (`Vary: Accept`); `/sitemap.xml` serves the sitemap index.
+  Cloudflare ignores `Vary` for everything but images; negotiation is safe only
+  because it caches no HTML, `.md`, or `.txt` by default. A "Cache Everything"
+  rule would hand cached Markdown to browsers: exclude the negotiated paths first.
+- **JSON-LD.** The landing page carries `WebSite`, `SoftwareApplication`, and
+  `FAQPage` (the FAQ's own list, `src/faq.ts`); `/download/` carries
+  `SoftwareApplication`; writing pages carry `Article` or `BlogPosting` with a
+  `BreadcrumbList`.
+- The build fails if an `llms.txt` link points at a page it did not emit, or if
+  a JSON-LD block does not parse (`astro.config.mjs`, `rotli-agent-files-guard`).
+- To check reachability as agents see it, scan with
+  [agentcapable.dev](https://agentcapable.dev/methodology) or request a page
+  with an agent's User-Agent (for example `curl -A 'GPTBot/1.1' https://rotli.co/`).
+
 ## Validate a build under production headers (the prod twin)
 
 `astro dev` and `astro preview` send no security headers, so a page can look
@@ -356,7 +389,7 @@ launch:
    (leave `SITE_URL=https://rotli.co`). Redeploy so the Docker build picks up
    the new build arg.
 3. Check `https://rotli.co/` renders the landing (the hero film, Download for
-   Mac), `/robots.txt` allows indexing, and `/sitemap-index.xml` exists.
+   Mac), `/robots.txt` allows indexing, and `/sitemap-index.xml` and `/llms.txt` exist.
 4. Roll back by setting `SITE_MODE=coming-soon` again and redeploying.
 
 Both modes are built by `bun run verify` (quality lane) so the flip never
