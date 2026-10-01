@@ -123,6 +123,48 @@ test("the app opens on its opening scene each launch, in the person's theme", as
   await expect(page.getByTestId("app-opening")).toHaveCount(0, { timeout: 500 });
 });
 
+test("the opening takes its time, and waits for the window to be in front", async ({ page }) => {
+  // unhurried: on screen for well over two seconds, from the moment it mounts
+  // (timed in the page, so a slow load can't eat into it)
+  await page.addInitScript(() => {
+    const w = window as { openingShown?: number; openingGone?: number };
+    new MutationObserver(() => {
+      const here = document.querySelector('[data-testid="app-opening"]') !== null;
+      if (here) w.openingShown ??= performance.now();
+      else if (w.openingShown !== undefined) w.openingGone ??= performance.now();
+    }).observe(document, { childList: true, subtree: true });
+  });
+  await page.goto("/?opening");
+  await expect(page.getByTestId("app-opening")).toHaveCount(0, { timeout: 8000 });
+  const shownFor = await page.evaluate(() => {
+    const w = window as { openingShown?: number; openingGone?: number };
+    return (w.openingGone ?? 0) - (w.openingShown ?? 0);
+  });
+  expect(shownFor).toBeGreaterThan(2400);
+  // a window launched behind others (a menu-bar app isn't activated by its
+  // own start) holds the opening until it comes forward
+  await page.addInitScript(() => {
+    let focused = false;
+    Document.prototype.hasFocus = () => focused;
+    // the browser's own focus events don't count until the window comes forward
+    window.addEventListener("focus", (event) => focused || event.stopImmediatePropagation(), true);
+    (window as { bringForward?: () => void }).bringForward = () => {
+      focused = true;
+      window.dispatchEvent(new Event("focus"));
+    };
+  });
+  await page.goto("/?opening");
+  const opening = page.getByTestId("app-opening");
+  await page.waitForTimeout(3200);
+  await expect(opening).toHaveClass(/is-waiting/);
+  // a click while it waits (the one that brings the window forward) doesn't skip it
+  await page.mouse.click(10, 10);
+  await expect(opening).toHaveClass(/is-waiting/);
+  await page.evaluate(() => (window as { bringForward?: () => void }).bringForward?.());
+  await expect(opening).not.toHaveClass(/is-waiting/);
+  await expect(opening).toHaveCount(0, { timeout: 4000 });
+});
+
 test("no opening with Reduce motion on", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/?opening");
