@@ -133,6 +133,8 @@ test("the opening takes its time, and waits for the window to be in front", asyn
   await page.addInitScript(() => {
     let focused = false;
     Document.prototype.hasFocus = () => focused;
+    // the browser's own focus events don't count until the window comes forward
+    window.addEventListener("focus", (event) => focused || event.stopImmediatePropagation(), true);
     (window as { bringForward?: () => void }).bringForward = () => {
       focused = true;
       window.dispatchEvent(new Event("focus"));
@@ -141,6 +143,9 @@ test("the opening takes its time, and waits for the window to be in front", asyn
   await page.goto("/?opening");
   const opening = page.getByTestId("app-opening");
   await page.waitForTimeout(3200);
+  await expect(opening).toHaveClass(/is-waiting/);
+  // a click while it waits (the one that brings the window forward) doesn't skip it
+  await page.mouse.click(10, 10);
   await expect(opening).toHaveClass(/is-waiting/);
   await page.evaluate(() => (window as { bringForward?: () => void }).bringForward?.());
   await expect(opening).not.toHaveClass(/is-waiting/);

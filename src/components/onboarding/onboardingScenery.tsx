@@ -168,7 +168,12 @@ export function SceneIntro({
     if (live) return;
     const front = () => setLive(true);
     window.addEventListener("focus", front, { once: true });
-    return () => window.removeEventListener("focus", front);
+    // focus may have landed between the first render and this effect
+    const already = document.hasFocus() ? window.setTimeout(front) : 0;
+    return () => {
+      window.removeEventListener("focus", front);
+      window.clearTimeout(already);
+    };
   }, [live]);
   useEffect(() => {
     if (!live) return;
@@ -180,6 +185,8 @@ export function SceneIntro({
     };
   }, [live, onDone, pace]);
   useEffect(() => {
+    // armed once it plays: the click that brings the window forward isn't a skip
+    if (!live) return;
     const skip = () => onDone();
     window.addEventListener("keydown", skip, { once: true });
     window.addEventListener("pointerdown", skip, { once: true });
@@ -187,7 +194,7 @@ export function SceneIntro({
       window.removeEventListener("keydown", skip);
       window.removeEventListener("pointerdown", skip);
     };
-  }, [onDone]);
+  }, [live, onDone]);
   return (
     <div
       className={["onb-intro", scene && "onb-intro--scene", !live && "is-waiting", leaving && "is-leaving"]

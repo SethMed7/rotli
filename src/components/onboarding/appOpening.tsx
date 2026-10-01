@@ -21,7 +21,7 @@ import {
   prefersReducedMotion,
 } from "./onboardingScenery";
 
-/** How much slower than first run's 1.7-second intro: about 2.9 seconds. */
+/** Every beat at 1.7× first run's 1.7-second intro: about 2.9 seconds. */
 const OPENING_PACE = 1.7;
 
 export function openingWanted(): boolean {
