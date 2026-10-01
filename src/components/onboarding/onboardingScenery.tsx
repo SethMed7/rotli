@@ -9,7 +9,7 @@
 // The horizon is ground BELOW the setup card, never art behind its footer.
 // Like every scene, painted only by `.sc-*` token classes.
 
-import { type ReactNode, useEffect, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 
 import { type ThemeFamily, useUiStore } from "../../state/ui";
 import { Character } from "../character";
@@ -146,6 +146,8 @@ export function SceneIntro({
   testId,
   scene = false,
   accessorized = false,
+  pace = 1,
+  waitForFront = false,
 }: {
   art: ReactNode;
   viewBox: string;
@@ -155,26 +157,50 @@ export function SceneIntro({
   scene?: boolean;
   /** Wear the person's chosen accessory (the app's opening; first run is bare). */
   accessorized?: boolean;
+  /** Stretch every beat by this much (the app's opening is unhurried). */
+  pace?: number;
+  /** Hold still until the window is in front: a launch can start behind others. */
+  waitForFront?: boolean;
 }) {
   const [leaving, setLeaving] = useState(false);
+  const [live, setLive] = useState(() => !waitForFront || document.hasFocus());
   useEffect(() => {
-    const leave = window.setTimeout(() => setLeaving(true), INTRO_MS - 520);
-    const done = window.setTimeout(onDone, INTRO_MS);
+    if (live) return;
+    const front = () => setLive(true);
+    window.addEventListener("focus", front, { once: true });
+    // focus may have landed between the first render and this effect
+    const already = document.hasFocus() ? window.setTimeout(front) : 0;
+    return () => {
+      window.removeEventListener("focus", front);
+      window.clearTimeout(already);
+    };
+  }, [live]);
+  useEffect(() => {
+    if (!live) return;
+    const leave = window.setTimeout(() => setLeaving(true), (INTRO_MS - 520) * pace);
+    const done = window.setTimeout(onDone, INTRO_MS * pace);
+    return () => {
+      window.clearTimeout(leave);
+      window.clearTimeout(done);
+    };
+  }, [live, onDone, pace]);
+  useEffect(() => {
+    // armed once it plays: the click that brings the window forward isn't a skip
+    if (!live) return;
     const skip = () => onDone();
     window.addEventListener("keydown", skip, { once: true });
     window.addEventListener("pointerdown", skip, { once: true });
     return () => {
-      window.clearTimeout(leave);
-      window.clearTimeout(done);
       window.removeEventListener("keydown", skip);
       window.removeEventListener("pointerdown", skip);
     };
-  }, [onDone]);
+  }, [live, onDone]);
   return (
     <div
-      className={["onb-intro", scene && "onb-intro--scene", leaving && "is-leaving"]
+      className={["onb-intro", scene && "onb-intro--scene", !live && "is-waiting", leaving && "is-leaving"]
         .filter(Boolean)
         .join(" ")}
+      style={{ "--intro-t": pace } as CSSProperties}
       data-testid={testId}
       aria-hidden="true"
     >

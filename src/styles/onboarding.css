@@ -1243,20 +1243,25 @@
     var(--ground) 60%
   );
 }
+/* a launch behind other windows holds the opening still until it's in front */
+.onb-intro.is-waiting,
+.onb-intro.is-waiting * {
+  animation-play-state: paused;
+}
 .onb-intro.is-leaving {
-  animation: onb-intro-out 340ms var(--motion-ease) 180ms forwards;
+  animation: onb-intro-out calc(340ms * var(--intro-t, 1)) var(--motion-ease) calc(180ms * var(--intro-t, 1)) forwards;
 }
 /* its contents are gone before setup starts to show through */
 .onb-intro.is-leaving .onb-intro-stage,
 .onb-intro.is-leaving .onb-intro-word {
-  animation: onb-intro-fade 200ms var(--motion-ease) forwards;
+  animation: onb-intro-fade calc(200ms * var(--intro-t, 1)) var(--motion-ease) forwards;
 }
 .onb-intro-stage {
   position: relative;
   width: min(820px, 88vw);
   /* the scene ends softly at its sides, not in a hard cut */
   mask-image: linear-gradient(to right, transparent, black 11%, black 89%, transparent);
-  animation: onb-intro-appear 260ms var(--motion-ease) both;
+  animation: onb-intro-appear calc(260ms * var(--intro-t, 1)) var(--motion-ease) both;
 }
 .onb-intro-island {
   display: block;
@@ -1265,21 +1270,21 @@
 }
 .onb-intro-isle {
   transform-box: fill-box;
-  animation: onb-intro-rise 700ms var(--motion-ease) 120ms both;
+  animation: onb-intro-rise calc(700ms * var(--intro-t, 1)) var(--motion-ease) calc(120ms * var(--intro-t, 1)) both;
 }
 .onb-intro .sc-sun {
   transform-box: fill-box;
-  animation: onb-intro-sun 900ms var(--motion-ease) both;
+  animation: onb-intro-sun calc(900ms * var(--intro-t, 1)) var(--motion-ease) both;
 }
 .onb-intro-beam {
-  animation: onb-intro-beam 900ms ease-in-out 420ms both;
+  animation: onb-intro-beam calc(900ms * var(--intro-t, 1)) ease-in-out calc(420ms * var(--intro-t, 1)) both;
 }
 /* feet on the sand, where Welcome's quokka will stand */
 .onb-intro-quokka {
   position: absolute;
   left: 12%;
   bottom: -2px;
-  animation: onb-intro-hop 560ms var(--motion-ease) 360ms both;
+  animation: onb-intro-hop calc(560ms * var(--intro-t, 1)) var(--motion-ease) calc(360ms * var(--intro-t, 1)) both;
 }
 .onb-intro-word {
   margin: 0;
@@ -1288,7 +1293,7 @@
   font-size: 34px;
   letter-spacing: -0.01em;
   color: var(--text);
-  animation: onb-intro-word 380ms var(--motion-ease) 450ms both;
+  animation: onb-intro-word calc(380ms * var(--intro-t, 1)) var(--motion-ease) calc(450ms * var(--intro-t, 1)) both;
 }
 /* the app's opening in a theme's own small scene (440×200, ground at y 170):
    a narrower stage, the quokka centred on the ground */
@@ -1296,7 +1301,7 @@
   width: min(560px, 80vw);
 }
 .onb-intro--scene .onb-intro-island {
-  animation: onb-intro-rise 700ms var(--motion-ease) 60ms both;
+  animation: onb-intro-rise calc(700ms * var(--intro-t, 1)) var(--motion-ease) calc(60ms * var(--intro-t, 1)) both;
 }
 .onb-intro--scene .onb-intro-quokka {
   left: calc(50% - 48px);

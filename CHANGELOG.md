@@ -10,6 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-09-30
+
+### Added
+
+- **rotli.co reads well to AI assistants and search engines.** The site now
+  publishes `/llms.txt` (a short summary with links for AI systems), a Markdown
+  version of every resource and blog page that agents get when they ask for
+  Markdown, structured data describing the app, its FAQ, and each article, and
+  a robots.txt that names each AI crawler explicitly. The build fails if the
+  summary links a page that does not exist.
+
+### Fixed
+
+- **Rotli comes to the front when it opens.** Launching it no longer leaves
+  the window behind other apps until you click it twice.
+- **The opening takes its time.** It plays a little slower, and it waits
+  until Rotli's window is in front, so you see it instead of missing it.
+
 ## [1.7.0] - 2026-09-30
 
 ### Added

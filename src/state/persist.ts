@@ -58,6 +58,7 @@ import {
   setDockVisible,
   setGlobalShortcut,
   setHideOnBlur,
+  showMainWindow,
 } from "../lib/tauri";
 import { activeInstance } from "../memex/config";
 import { archiveChat, listChats, loadConfig } from "../memex/service";
@@ -895,7 +896,9 @@ function applyShellSideEffects(s: PersistedSettings): void {
   // true) — assert it BEFORE first paint so the flow can't vanish in the gap
   // before App's reactive effect runs. App.tsx re-applies on finish.
   if (s.stayOpen || !s.onboarded) void setHideOnBlur(false);
-  if (s.showInDock) void setDockVisible(true);
+  // a menu-bar app isn't activated by its own launch: bring the window forward
+  const dock = s.showInDock ? setDockVisible(true) : Promise.resolve();
+  void dock.then(showMainWindow, showMainWindow).catch(() => {});
   // push the persisted trust rung to the daemon NOW — it also re-reads
   // settings.json each cycle, so this is immediacy, not correctness
   organizerSetTrust(s.organizerTrust).catch(() => {});
