@@ -24,6 +24,26 @@ fn string_list(value: &Value) -> Vec<String> {
 }
 
 #[test]
+fn document_edit_limits_match_fixture() {
+    assert_eq!(
+        entry("documentEditMaxActions").as_u64(),
+        Some(crate::workspace_documents::MAX_ACTIONS as u64)
+    );
+    assert_eq!(
+        entry("documentEditMaxText").as_u64(),
+        Some(crate::workspace_documents::MAX_TEXT as u64)
+    );
+}
+
+#[test]
+fn document_edit_max_bytes_matches_fixture() {
+    assert_eq!(
+        entry("documentEditMaxBytes").as_u64(),
+        Some(crate::agent_bridge::DOCX_MAX_BYTES)
+    );
+}
+
+#[test]
 fn sheet_edit_max_bytes_matches_fixture() {
     assert_eq!(
         entry("sheetEditMaxBytes").as_u64(),

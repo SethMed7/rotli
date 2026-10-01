@@ -23,7 +23,7 @@ impl CorpusStore {
 
     /// Is this note named with one of the vault's secure keywords? Its title or
     /// file name only — never the body, never a model (Librarian rules).
-    pub(super) fn secure_by_name(&self, title: &str, rel: &str) -> bool {
+    pub(crate) fn secure_by_name(&self, title: &str, rel: &str) -> bool {
         self.layout == Layout::Memex
             && crate::librarian_rules::secure_by_name(
                 title,

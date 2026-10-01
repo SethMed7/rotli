@@ -98,7 +98,7 @@ side (`src/documents/README.md`, Editing boundary):
 | 2 | `sheet_apply` in chat: set values/formulas in a range, insert/delete rows/columns, add/rename a sheet → model → ExcelJS save through a new `corpus_write_file_ai` (re-derives model locality, managed lane only, secret check, refuses in a secure chat) | decision 1 |
 | 4 | Live-pane routing: a file open in a pane takes the same actions through Univer's Facade instead of a disk write (no revision clash). Note: document panes save on their own when the window hides or the app quits (`flushDirtyDocuments`, `src/documents/session.ts`), so this is not a review step; until it exists, an AI edit is refused while the document is open (live or parked) | — |
 | 5 | Upgrade to Univer 1.0.3: retest `src/documents/engine/univer.ts` (it uses internal services, not the Facade); depend on `@univerjs/core` instead of the presets meta-package | native QA |
-| 6 | `rotli mcp` tools `rotli_read_sheet` / `rotli_apply_sheet` / `rotli_read_document` / `rotli_apply_document`, modeled on the board tools | decision 2 |
+| 6 | `rotli mcp` document tools: **done 2026-10-01** through the agent bridge (`docs/decisions/2026-10-01-agent-app-bridge.md`); `rotli_read_sheet` / `rotli_apply_sheet` take the same bridge next | — |
 
 ## Decisions for the owner
 
@@ -109,8 +109,10 @@ side (`src/documents/README.md`, Editing boundary):
    second codec in Rust: works with Rotli closed, but two codecs; (B) a
    request/response bridge through the running app: one codec, open files
    update live, Rotli must be running; (C) a Bun sidecar: dev-only unless Bun
-   is bundled. Recommended: B for writes, a small Rust text extractor for
-   reads and the secret check.
+   is bundled. **Applied 2026-10-01: B, for reads and writes** — an apply
+   addresses the block numbers the TypeScript model gives a read, so reads go
+   through the bridge too; Rust's `docx_text` stays the pre-check, not the
+   reader (`docs/decisions/2026-10-01-agent-app-bridge.md`).
 
 Effort: slices 2–3 about two weeks, the rest four more, all behind the existing
 development gates for sheets and agents.

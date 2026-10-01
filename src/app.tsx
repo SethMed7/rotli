@@ -58,6 +58,7 @@ import {
   setHideOnBlur,
   workspaceTakeOpenRequest,
 } from "./lib/tauri";
+import { attachAgentBridge } from "./ai/agentRequests";
 import { useNativeFileDrop } from "./editor/nativeFileDrop";
 import { LAUNCH_FEATURES, PLATFORM } from "./lib/featurePolicy";
 import { setupShows } from "./lib/reviewMode";
@@ -318,6 +319,9 @@ function MainShell() {
       unlisten();
     };
   }, []);
+
+  // Agents reach Word documents through this window (ai/agentRequests.ts).
+  useEffect(() => (LAUNCH_FEATURES.agents ? attachAgentBridge() : undefined), []);
 
   // AppKit owns menu accelerators before WKWebView. Rust replaces the default
   // Close Window ⌘W with Close Tab and forwards it here so native, browser,

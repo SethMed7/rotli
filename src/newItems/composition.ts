@@ -394,6 +394,8 @@ export function createManagedDocumentWithContent(
     rootId?: string;
     /** The chat made it: the AI's creation lane, which records that. */
     byAi?: boolean;
+    /** An outside agent made it (the agent bridge), recorded by name. */
+    agent?: string;
   } = {},
 ): Promise<CreatedItem> {
   refuseWithheldKind("document");
@@ -402,7 +404,7 @@ export function createManagedDocumentWithContent(
       const { createAiDocumentFromMarkdown, createManagedDocumentFromMarkdown } =
         await import("../documents/composition");
       const id = options.byAi
-        ? await createAiDocumentFromMarkdown(title, body, options.images, options.rootId)
+        ? await createAiDocumentFromMarkdown(title, body, options.images, options.rootId, options.agent)
         : await createManagedDocumentFromMarkdown(title, body, Date.now(), options.images, options.rootId);
       return { id, kind: "document" };
     },

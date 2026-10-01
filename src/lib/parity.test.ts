@@ -17,7 +17,8 @@ import { ROTLI_KEYCHAIN_SERVICE, ROTLI_RESEND_ACCOUNT } from "../../breve-runtim
 import fixture from "../../scripts/fixtures/parity.json";
 import { containsPrivateDataOverlap, endpointIsLocal } from "../ai/guard";
 import { BOARD_LIMITS } from "../boards/validation";
-import { DOCUMENT_CONVERTIBLE_EXTS } from "../documents/kinds";
+import { MAX_EDIT_ACTIONS, MAX_EDIT_TEXT } from "../documents/aiEdit";
+import { DOCUMENT_CONVERTIBLE_EXTS, DOCUMENT_EDIT_MAX_BYTES } from "../documents/kinds";
 import { NATIVE_IMAGE_EXTS } from "../editor/externalImageDrop";
 import { AI_KEYS } from "../memex/contract";
 import { SECURE_NOTES_FOLDER } from "../security/secureNotes";
@@ -37,6 +38,18 @@ import { type FrontmatterView, type MemexPerms, SECRET_BRAVE_SEARCH_API_KEY } fr
 const entries = fixture.entries;
 
 describe("parity.json ↔ TS constants", () => {
+  test("documentEditMaxActions", () => {
+    expect(MAX_EDIT_ACTIONS).toBe(entries.documentEditMaxActions.value);
+  });
+
+  test("documentEditMaxText", () => {
+    expect(MAX_EDIT_TEXT).toBe(entries.documentEditMaxText.value);
+  });
+
+  test("documentEditMaxBytes", () => {
+    expect(DOCUMENT_EDIT_MAX_BYTES).toBe(entries.documentEditMaxBytes.value);
+  });
+
   test("sheetEditMaxBytes", () => {
     expect(SHEET_EDIT_MAX_BYTES).toBe(entries.sheetEditMaxBytes.value);
   });

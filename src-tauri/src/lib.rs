@@ -12,6 +12,8 @@
 // set_summon_shortcut, and click-away hiding is a setting (set_hide_on_blur)
 // so heavy use can keep the window resident.
 
+mod agent_bridge;
+mod agent_bridge_socket;
 mod ai_edit_policy;
 mod app_settings;
 mod board;
@@ -69,6 +71,7 @@ mod web_page;
 mod web_search;
 mod workspace;
 mod workspace_help;
+mod workspace_documents;
 
 use std::sync::{atomic::{AtomicUsize, Ordering}, Condvar, Mutex};
 use std::time::{Duration, Instant};
@@ -2257,6 +2260,7 @@ pub fn run() {
         .manage(localmodel::LocalModelState::default())
         .manage(compute::ComputeState::default())
         .manage(remote_agent::RemoteAgentState::default())
+        .manage(agent_bridge::Pending::default())
         // App-menu replacements installed in setup. Tray menu events have their
         // own handler; the ids are distinct so double-dispatch cannot occur.
         .on_menu_event(|app, event| {
@@ -2268,6 +2272,8 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            agent_bridge::agent_bridge_ready,
+            agent_bridge::agent_bridge_reply,
             toggle_main_window,
             quit_flush_done,
             restart_after_flush,
@@ -2614,6 +2620,8 @@ pub fn run() {
                 }
             }
             app.manage(corpus::CorpusState(Mutex::new(registry)));
+            // agents reach Word documents through this app (agent_bridge.rs)
+            agent_bridge::start(app.handle());
             if let Ok(root) = app.state::<corpus::CorpusState>().default_root_path() {
                 if feature_policy::breve_enabled() && root.join(routines::MANAGED_MARKER).is_file() {
                     if let Err(e) = breve::install_rotli_login_agent() {

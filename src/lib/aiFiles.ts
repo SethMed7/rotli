@@ -8,9 +8,21 @@ import { isTauri } from "./tauri";
 
 const noLane = () => Promise.reject(new Error("Word documents are edited in the Mac app."));
 
-export const corpusCreateManagedFileAi = (name: string, base64: string, rootId?: string): Promise<string> =>
+/** `agent` names the outside agent that asked through the agent bridge; the
+ * chat leaves it out. */
+export const corpusCreateManagedFileAi = (
+  name: string,
+  base64: string,
+  rootId?: string,
+  agent?: string,
+): Promise<string> =>
   isTauri()
-    ? invoke<string>("corpus_create_managed_file_ai", { name, base64, rootId: rootId ?? null })
+    ? invoke<string>("corpus_create_managed_file_ai", {
+        name,
+        base64,
+        rootId: rootId ?? null,
+        agent: agent ?? null,
+      })
     : noLane();
 
 export const corpusWriteFileAi = (id: string, base64: string, expectedRevision: string): Promise<string> =>

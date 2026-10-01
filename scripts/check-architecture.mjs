@@ -231,6 +231,7 @@ const tauriAllowlist = new Set([
   "src/lib/clipboard.ts",
   "src/lib/nativeDrag.ts",
   "src/lib/noteProtection.ts",
+  "src/lib/agentBridge.ts",
   "src/lib/aiFiles.ts",
   "src/lib/pinnedSiteShell.ts",
   "src/lib/quitFlush.ts",
