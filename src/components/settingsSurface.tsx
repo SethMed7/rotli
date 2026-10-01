@@ -160,6 +160,7 @@ import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { ConnectorGuide } from "./settings/connectorGuide";
 import { FrontsSettings } from "./settings/frontsSettings";
 import { LibrarianRulesSettings } from "./settings/librarianRulesSettings";
+import { PinnedSitesSettings } from "./settings/pinnedSitesSettings";
 import { Seg, SegField } from "./settings/seg";
 import { SettingsBanner, SettingsScenery } from "./settings/settingsBanner";
 import type { BannerMotif } from "./settings/settingsBannerArt";
@@ -3196,6 +3197,8 @@ function BrowserPane() {
         light or dark environment; websites still control their own appearance. Each page is a normal Rotli
         tab, and ⌘T or the tab-strip plus opens another private page while you browse.
       </p>
+
+      <PinnedSitesSettings />
 
       <h4 className="sethead">Default search engine</h4>
       <p className="setnote browser-engine-note">

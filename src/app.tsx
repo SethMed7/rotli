@@ -31,6 +31,7 @@ import { Titlebar } from "./components/titlebar";
 import { WhichKey } from "./components/whichKey";
 import { VaultFolderBrowser } from "./components/vaultFolderBrowserDialog";
 import { AppOpening } from "./components/onboarding/appOpening";
+import { PinPanel } from "./components/pinnedSites/pinPanel";
 import { WebVaultOverlays } from "./components/onboarding/webVaultOverlays";
 import { WebChatSetupDialog } from "./components/webChatSetupDialog";
 import { registerDefaultActions } from "./keys/actions";
@@ -485,6 +486,7 @@ function MainShell() {
     <div className="app-window">
       {/* the app's opening, once per launch (onboarding/appOpening.tsx) */}
       <AppOpening />
+      <PinPanel />
       <Titlebar />
       <main className="app-content">
         {/* Settings is the one full-surface front. Chat · Board · All-notes ·

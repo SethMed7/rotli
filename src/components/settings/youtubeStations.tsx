@@ -7,7 +7,7 @@ import { useState } from "react";
 
 import { type AmbientPrefs, DEFAULT_AMBIENT } from "../../lib/ambient";
 import { MAX_STATIONS, parseYouTubeLink, stationTitle } from "../../lib/youtubeStation";
-import { AddField, AddRow, EntryProblem, RemovableRows } from "./removableList";
+import { AddField, AddRow, EntryProblem, NameField, RemovableRows } from "./removableList";
 
 /** Why a pasted link can't be added, or null when it can. */
 export function stationProblem(link: string, prefs: Pick<AmbientPrefs, "stations">): string | null {
@@ -77,13 +77,7 @@ export function YouTubeStations({
               setProblem(null);
             }}
           />
-          <AddField
-            className="yt-station-name"
-            aria-label="Station name"
-            placeholder="Name (optional)"
-            value={name}
-            onChange={(event) => setName(event.currentTarget.value)}
-          />
+          <NameField label="Station name" value={name} onChange={setName} />
         </AddRow>
       )}
       <EntryProblem problem={problem} />

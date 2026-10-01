@@ -5,10 +5,12 @@
 
 import { parseAmbient } from "../lib/ambient";
 import { parseHidden } from "../lib/hideable";
+import { parsePinnedSites } from "../lib/pinnedSites";
 import { parseFronts } from "../lib/sidebarFronts";
 import { useAmbient } from "./ambient";
 import { useFronts } from "./fronts";
 import { useHidden } from "./hidden";
+import { usePinnedSites } from "./pinnedSites";
 import { useVaultView } from "./vaultView";
 
 /** Load every extra from the app settings file's text. */
@@ -24,6 +26,7 @@ export function hydrateAppExtras(appSettings: string): void {
   useHidden.setState({ hidden: parseHidden(data.hidden) });
   useFronts.setState({ prefs: parseFronts(data.sidebarFronts) });
   useVaultView.setState({ on: data.vaultView === true });
+  usePinnedSites.setState({ sites: parsePinnedSites(data.pinnedSites) });
 }
 
 /** The extras' keys, for the app settings file. */
@@ -32,17 +35,26 @@ export function appExtrasSnapshot(): {
   hidden: unknown;
   sidebarFronts: unknown;
   vaultView: unknown;
+  pinnedSites: unknown;
 } {
   return {
     ambient: useAmbient.getState().prefs,
     hidden: useHidden.getState().hidden,
     sidebarFronts: useFronts.getState().prefs,
     vaultView: useVaultView.getState().on,
+    pinnedSites: usePinnedSites.getState().sites,
   };
 }
 
 /** Save when any extra changes. */
 export function subscribeAppExtras(save: () => void): () => void {
-  const stops = [useAmbient, useHidden, useFronts, useVaultView].map((store) => store.subscribe(save));
+  const stops = [
+    useAmbient.subscribe(save),
+    useHidden.subscribe(save),
+    useFronts.subscribe(save),
+    useVaultView.subscribe(save),
+    // only the pins themselves, not which panel is open
+    usePinnedSites.subscribe((state, prev) => state.sites !== prev.sites && save()),
+  ];
   return () => stops.forEach((stop) => stop());
 }

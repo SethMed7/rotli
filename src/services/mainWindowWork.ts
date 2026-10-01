@@ -10,11 +10,13 @@ import { onQuitFlushFailure } from "../lib/quitFlush";
 import { enforceFronts } from "../state/fronts";
 import { useUiStore } from "../state/ui";
 import { startAmbient } from "./ambient";
+import { loadPinSupport } from "./pinnedSites";
 import { startRoutineUpdateCheck } from "./updateCheck";
 
 export function useMainWindowWork(surface: string): void {
   useEffect(() => {
     if (surface !== "main") return;
+    void loadPinSupport();
     const stops = [startRoutineUpdateCheck(), startAmbient(), enforceFronts()];
     return () => stops.forEach((stop) => stop());
   }, [surface]);

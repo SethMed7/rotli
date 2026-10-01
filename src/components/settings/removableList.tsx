@@ -76,3 +76,24 @@ export function AddRow({
 export function AddField({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={className ? `rules-input ${className}` : "rules-input"} {...props} />;
 }
+
+/** The row's optional name, beside its address. */
+export function NameField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <AddField
+      className="rules-input-name"
+      aria-label={label}
+      placeholder="Name (optional)"
+      value={value}
+      onChange={(event) => onChange(event.currentTarget.value)}
+    />
+  );
+}

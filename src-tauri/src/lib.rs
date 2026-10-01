@@ -45,6 +45,7 @@ mod organizer;
 mod organizer_knobs;
 #[cfg(test)]
 mod parity_tests;
+mod pinned_site;
 mod private_browser;
 mod private_browser_media;
 mod quick_window;
@@ -2431,6 +2432,12 @@ pub fn run() {
             web_search::web_search,
             web::web_fetch,
             web::open_url,
+            pinned_site::pinned_sites_supported,
+            pinned_site::pinned_site_open,
+            pinned_site::pinned_site_set_bounds,
+            pinned_site::pinned_site_hide,
+            pinned_site::pinned_site_close,
+            pinned_site::pinned_site_forget,
             private_browser::private_browser_create,
             private_browser::private_browser_set_bounds,
             private_browser::private_browser_set_visible,
