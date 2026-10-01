@@ -38,7 +38,11 @@ export function makeFileTools(
       const ext = extOf(file.title);
       let text: string;
       if (SHEET_BIN.has(ext)) {
-        text = await workbookForAi(await corpusFileBytes(file.id), file.title);
+        try {
+          text = await workbookForAi(await corpusFileBytes(file.id), file.title);
+        } catch {
+          return `"${file.title}" isn't a workbook Rotli can read (damaged, or a format it doesn't open).`;
+        }
       } else if (SHEET_TEXT.has(ext)) {
         text = await workbookToCsv({
           csv: await corpusFileText(file.id),

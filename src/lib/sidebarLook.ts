@@ -35,6 +35,9 @@ export function parseSidebarLook(value: unknown): SidebarLook {
 export const showsTop = (scenery: SidebarScenery) => scenery === "top" || scenery === "both";
 export const showsBottom = (scenery: SidebarScenery) => scenery === "bottom" || scenery === "both";
 
+/** A folder row's icon class (Color mode tints it like a board). */
+export const FOLDER_ICON_KIND = "kind-folder";
+
 /** A row's file kind, for its icon's color in Color mode (`kind-<kind>`). */
 export function iconKind(note: {
   kind?: "note" | "board" | "file" | undefined;

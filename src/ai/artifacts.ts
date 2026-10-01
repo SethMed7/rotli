@@ -102,7 +102,9 @@ const STYLE_LABEL: Record<string, string> = {
 
 /** What the chat reads from a Word document (2026-10-01): numbered blocks it
  * can point at — headings with their level, list items, each table cell by
- * row and column, and images by their alt text — in document order. */
+ * row and column, and images by their alt text — in document order. Empty
+ * paragraphs keep their numbers: an edit's block numbers are positions in the
+ * document (`applyDocumentEdits`), so none may be skipped. */
 export function editableDocumentForAi(document: EditableDocument): string {
   return document.content
     .map((content, index) => {
