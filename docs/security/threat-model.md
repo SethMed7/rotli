@@ -70,6 +70,11 @@ as an encrypted vault.
   the app-owned `main`, `capture`, and `quick` labels receive IPC permissions.
   The sidebar player asks WebKit whether it plays sound and runs only fixed
   media scripts in it; the guest still has no way to message Rotli.
+- **A pinned-site guest** (2026-10-01, `docs/decisions/2026-10-01-pinned-sites.md`)
+  is the same untrusted remote content with one difference: its WebKit store
+  persists, one store per pin, so the person stays signed in. It matches no
+  Tauri capability either, and its store is never shared with Rotli's webview,
+  another pin, or a private tab.
 - **Imported content** is untrusted, including Markdown, DOCX packages, sheets,
   Excalidraw scenes, PDFs, fetched web pages, email, and chat memory.
 - **Local models** are untrusted interpreters running on loopback. Locality
@@ -133,6 +138,7 @@ transport, credential, or filesystem authority directly.
 | Active content in a Markdown SVG fence reaches the webview | Parse as XML, rebuild only allowlisted SVG elements/attributes, reject event attributes, scripts, `foreignObject`, external resources, unsafe URLs, styles, and foreign namespaces; production CSP remains defense-in-depth | Browser SVG implementations still require dependency/browser regression review |
 | A compromised webview invokes privileged IPC | Strict CSP, narrow Tauri capability grants, typed facade, Rust revalidation | Webview compromise may exercise any intentionally exposed command as the user |
 | A remote session remains attached while the user changes vaults | Connector captures only the Rust-owned active root; every live vault activation stops and generation-invalidates the connector before the route changes; reconnect is explicit | A filesystem writer can still change ordinary files inside the already-authorized vault while a session is active |
+| A pinned site's page reaches Rotli, or its signed-in session leaks to another page | Child webview in no capability; one persistent WebKit store per pin by random 16-byte id (never Rotli's own, another pin's, or a private tab's); refused below macOS 14, where WebKit would fall back to the shared default store; `blocked_for_remote` on the address; http(s)-only navigation; downloads refused; new windows navigate in place; removing a pin deletes its store | The session lives in WebKit's storage under this macOS account, as Safari's does: anyone using the account can use the signed-in site |
 | A page in the private browser invokes Rotli IPC or retains a session | Separate child webview; capability targets name only app-owned webviews; no remote capability URLs; non-persistent WebKit data store; HTTP(S)-only top-level navigation; browser tabs hydrate as absent | The viewed site still receives ordinary browser request metadata and user-entered data; downloads are intentionally disabled in this first slice |
 | A connected client, or a tampered model cache, reports a hostile model id, effort, or label | Model discovery (`provider_models.rs`) accepts only what the client itself reported: ids must match `^[A-Za-z0-9][A-Za-z0-9._-]{0,95}(\[1m\])?$` (never a flag, no spaces), efforts are intersected with Rotli's fixed vocabulary before any `-c` value is built, labels lose control/format characters and are length-capped; the webview can name an id but never add one; discovery spawns reuse each lane's isolation (Claude safe mode, tools off, no persistence), send no prompt, and are killed at a 20 s deadline with 1 MB output caps | A same-user process that can edit `~/.codex/models_cache.json` can add a well-formed model name the user may then pick; it already controls that CLI's own configuration |
 | A hostile same-user process invokes the workspace CLI | Registered roots, secure/locked refusal, revisions, remote content gate | Same-user processes can edit ordinary files directly; stronger OS isolation is not claimed |
