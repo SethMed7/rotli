@@ -1,6 +1,6 @@
 // The hidden stream page (Claude FM, a station) and the person's own pause,
-// end to end through the service with a stand-in page (2026-10-01 review of
-// #146: the stream half had only pure tests).
+// end to end through the service with a stand-in page (the 2026-10-01 review
+// of the round's PR: the stream half had only pure tests).
 
 import { beforeEach, expect, test } from "bun:test";
 
