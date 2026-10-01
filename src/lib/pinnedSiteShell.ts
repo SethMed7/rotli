@@ -19,8 +19,8 @@ export const pinnedSitesSupported = (): Promise<boolean> =>
 export const pinnedSiteOpen = (slot: number, url: string, store: string, bounds: PinBounds): Promise<void> =>
   isTauri() ? invoke("pinned_site_open", { slot, url, store, bounds }) : Promise.resolve();
 
-export const pinnedSiteSetBounds = (slot: number, bounds: PinBounds): Promise<void> =>
-  isTauri() ? invoke("pinned_site_set_bounds", { slot, bounds }) : Promise.resolve();
+export const pinnedSiteSetBounds = (slot: number, store: string, bounds: PinBounds): Promise<void> =>
+  isTauri() ? invoke("pinned_site_set_bounds", { slot, store, bounds }) : Promise.resolve();
 
 export const pinnedSiteHide = (slot: number): Promise<void> =>
   isTauri() ? invoke("pinned_site_hide", { slot }) : Promise.resolve();
