@@ -226,13 +226,16 @@ pub(crate) fn is_json_object(contents: &str) -> bool {
 }
 
 /// Keep a copy of the settings file at `path` when what's there won't parse,
-/// before it is replaced. A missing or readable file needs nothing.
+/// before it is replaced. A missing or readable file needs nothing; a file
+/// that can't be read at all (a disk error) is never replaced.
 pub(crate) fn keep_unreadable_settings(path: &Path) -> Result<(), String> {
     match std::fs::read_to_string(path) {
         Ok(old) if !is_json_object(&old) => set_aside_unreadable(path)
             .map(|_| ())
             .ok_or_else(|| "could not keep a copy of the unreadable settings; not replacing them".into()),
-        _ => Ok(()),
+        Ok(_) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!("could not read the settings ({error}); not replacing them")),
     }
 }
 
@@ -261,6 +264,15 @@ mod set_aside_tests {
             .filter(|e| e.as_ref().unwrap().file_name().to_string_lossy().contains(".unreadable-"))
             .count();
         assert_eq!(copies, 2);
+    }
+
+    #[test]
+    fn a_file_that_cannot_be_read_is_never_replaced() {
+        let dir = tempfile::TempDir::new().unwrap();
+        // a directory where the file should be: reading it fails, not NotFound
+        let path = dir.path().join("settings.json");
+        std::fs::create_dir(&path).unwrap();
+        assert!(keep_unreadable_settings(&path).is_err());
     }
 
     #[test]

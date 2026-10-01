@@ -109,13 +109,17 @@ from the recorded backup; they never guess.
 
 The owner: "ensure users' settings survive any updates". Both settings files
 (the app's `app-settings.json` and the vault's `.rotli/settings.json`) follow
-four rules, enforced in `src/state/settingsGuard.ts` and Rust `fsutil.rs`:
+four rules. The webview enforces the first two (`src/state/settingsGuard.ts`);
+Rust enforces the third on every settings write (`fsutil.rs`
+`keep_unreadable_settings`, which also refuses to replace a file it couldn't
+read):
 
 - **No write over a file Rotli couldn't read.** A read that fails (a disk
   error, not a missing file) turns that file's writes off for the session, so
   the next save can't replace real settings with defaults.
 - **No write down of a newer file.** A file whose `v` is above
-  `SETTINGS_VERSION` loads, and is left as it is for the session.
+  `SETTINGS_VERSION` loads, and is left as it is for the session (a console
+  warning today; the person sees no message yet, and Rust does not read `v`).
 - **A file that won't parse is kept.** Before it is replaced, Rust copies it
   to `<name>.unreadable-<unix seconds>` beside it (`keep_unreadable_settings`);
   if the copy fails, the write is refused.

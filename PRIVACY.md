@@ -23,8 +23,8 @@ limited to declared product capabilities:
   and a few times a day, and whenever you press "Check for updates". It asks
   rotli.co first, with Rotli's version, macOS, and the chip type in the
   address (so rotli.co's traffic shows how many Macs run each version), and
-  rotli.co sends it on to the signed release feed on GitHub; if rotli.co is
-  unreachable it asks GitHub directly. The request carries no account,
+  rotli.co redirects the app to the signed release feed on GitHub; if
+  rotli.co is unreachable the app asks GitHub directly. The request carries no account,
   identifier, vault, or note data.
   Settings → General → "Check for updates automatically" turns the routine
   check off; nothing is downloaded until you choose Install;

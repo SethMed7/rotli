@@ -216,7 +216,8 @@ in the unknown-key passthrough (`#35`), so a downgrade keeps the user's cap.
 ## Chat in its own window (1.3.0, in the work)
 
 Chat can be pulled out of this switch into a window of its own; Home cannot —
-main is where Home lives. Decision and seams:
+main is where Home lives. Since 2026-10-01 Home is whichever front the person
+chose, so Chat as Home stays put too (`POP_OUT_HOME`). Decision and seams:
 [`docs/decisions/2026-09-21-chat-window-same-vault.md`](../decisions/2026-09-21-chat-window-same-vault.md).
 Development builds only until the native checklist passes
 (`LAUNCH_FEATURES.chatWindow`), the Mac app only.

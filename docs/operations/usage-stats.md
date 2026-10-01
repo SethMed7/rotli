@@ -26,8 +26,10 @@ The updater's first endpoint (`src-tauri/tauri.conf.json`) is
 `site/Caddyfile` answers a well-formed path with a 302 to the signed GitHub
 feed and anything else with 404; the GitHub feed is the second endpoint, so a
 rotli.co outage only costs the count. The trust analysis lives in
-`docs/development/security.md` (Updater row): a hostile redirect can withhold
-an update, never substitute or downgrade one. Versions before the one that
+`docs/development/security.md` (Updater row): a hostile rotli.co can withhold
+an update and can't substitute an unsigned build, but could offer an older
+signed one, which makes rotli.co's Railway and Cloudflare accounts
+release-critical. Versions before the one that
 shipped this ask GitHub directly and don't appear in the per-version count.
 
 ## Setting up the Cloudflare half
