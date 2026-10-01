@@ -2,6 +2,7 @@
 // /resources/ (the index) and /resources/<article>/. The MCP guide is its own
 // page (resources/mcp/) and joins the index on the dev site only.
 import { render } from 'astro:content';
+import { twinPath, writingGraph, writingPath } from '../../agents';
 import WritingList from '../../components/WritingList.astro';
 import WritingPage from '../../components/WritingPage.astro';
 import { site } from '../../site';
@@ -49,6 +50,8 @@ const more = entry ? items.filter((item) => item.href !== `/resources/${slugOf(e
       title={`${entry.data.title} — rotli`}
       description={entry.data.description}
       canonicalPath={`/resources/${slugOf(entry)}/`}
+      structuredData={writingGraph(entry)}
+      markdownPath={twinPath(writingPath(entry))}
       section="resources"
       crumbs={[{ href: '/resources/', label: 'Resources' }]}
       kicker={entry.data.draft ? 'Draft · dev site only' : undefined}

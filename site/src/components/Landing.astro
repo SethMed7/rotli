@@ -4,6 +4,7 @@
 // steps, the full tour and the 30-second episodes are /features/), privacy in
 // brief, the ways in, make it yours, and questions. Base.astro owns the tokens
 // and the section grammar.
+import { landingGraph } from '../agents';
 import Base from '../layouts/Base.astro';
 import { site } from '../site';
 import SiteFooter from './SiteFooter.astro';
@@ -18,7 +19,7 @@ import Personal from './landing/Personal.astro';
 import PrivacyBrief from './landing/PrivacyBrief.astro';
 ---
 
-<Base noindex={!site.indexable}>
+<Base noindex={!site.indexable} structuredData={landingGraph()} markdownPath="/index.md">
   <SiteHeader current="product" />
   <main id="content">
     <Hero />

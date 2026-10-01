@@ -1,4 +1,5 @@
 ---
+import { jsonLd } from '../agents';
 interface Props {
   title?: string;
   description?: string;
@@ -6,6 +7,10 @@ interface Props {
   image?: string;
   imageAlt?: string;
   noindex?: boolean;
+  /** schema.org facts for this page (src/agents.ts), emitted as JSON-LD. */
+  structuredData?: Record<string, unknown>[];
+  /** The page's Markdown twin, declared for agents (src/agents.ts). */
+  markdownPath?: string;
 }
 
 const {
@@ -15,6 +20,8 @@ const {
   image = '/social-card.png',
   imageAlt = 'rotli — room to think, files you keep',
   noindex = false,
+  structuredData,
+  markdownPath,
 } = Astro.props as Props;
 const siteUrl = Astro.site ?? Astro.url;
 const canonicalUrl = new URL(canonicalPath, siteUrl).href;
@@ -30,6 +37,8 @@ const socialImageUrl = new URL(image, siteUrl).href;
     <meta name="description" content={description} />
     <meta name="robots" content={noindex ? 'noindex, nofollow' : 'index, follow'} />
     <link rel="canonical" href={canonicalUrl} />
+    {markdownPath && <link rel="alternate" type="text/markdown" href={markdownPath} />}
+    {structuredData && <script type="application/ld+json" is:inline set:html={jsonLd(structuredData)} />}
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Rotli" />
     <meta property="og:title" content={title} />
