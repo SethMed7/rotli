@@ -54,6 +54,7 @@
     "check:parity": "bun scripts/check-parity.mjs",
     "check:structure": "bun scripts/check-structure.mjs",
     "check:security": "bun scripts/check-security.mjs",
+    "stats": "bun scripts/stats.ts",
     "check:docs": "bun scripts/check-documentation.mjs",
     "check:ratchets": "bun scripts/check-ratchets.mjs",
     "check:window-events": "bun scripts/check-window-events.mjs",

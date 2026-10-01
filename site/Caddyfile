@@ -65,6 +65,13 @@
 	# The motion studio lives on its own subdomain; people type the path.
 	redir /studio https://studio.rotli.co/ permanent
 	redir /studio/ https://studio.rotli.co/ permanent
+	# The Mac app's update check (2026-10-01): /update/<version>/<target>/<arch>/
+	# latest.json answers with the signed feed on GitHub, so the request line
+	# counts installs by version (Cloudflare's aggregate traffic, no logs kept
+	# here). No account, vault, or note data rides in it; the app falls back to
+	# GitHub directly when this is unreachable (tauri.conf.json endpoints).
+	@updateCheck path_regexp ^/update/[0-9][0-9A-Za-z.+%-]{0,31}/[a-z0-9_-]{1,32}/[a-z0-9_-]{1,16}/latest\.json$
+	redir @updateCheck https://github.com/SethMed7/rotli-releases/releases/latest/download/latest.json 302
 
 	handle {
 		import security

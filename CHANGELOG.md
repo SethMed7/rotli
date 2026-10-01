@@ -12,12 +12,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`bun run stats`** for maintainers: downloads, installed updates, Macs per
+  version, site visitors, and Rotli Web loads, from GitHub's and Cloudflare's
+  aggregate counts (docs/operations/usage-stats.md).
 - **Your own YouTube stations.** Settings → General → Ambient audio takes up
   to three YouTube videos, live streams, or playlists of your own. They play
   like Claude FM, from the sidebar player.
 
 ### Changed
 
+- **Update checks go through rotli.co.** The Mac app asks rotli.co first,
+  with its version in the address, and rotli.co passes it to the signed feed
+  on GitHub (GitHub directly if rotli.co is down). That lets rotli.co's
+  traffic count Macs per version, with no identifier or personal data; the
+  privacy page and PRIVACY.md say so.
 - **Home is called Home.** Whichever sidebar section you choose as Home reads
   "Home" and comes first in the switcher; the others keep their names. Chat
   as Home stays in the main window.
