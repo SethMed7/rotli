@@ -12,6 +12,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Chat edits the Word documents it made.** After reading one, chat can
+  change a paragraph, add or remove blocks, set a table cell, or change a
+  heading level. Rotli lets it edit only documents its AI created, checks the
+  new text for secrets, keeps a backup of the original, and waits while the
+  document is open.
+- **Links in Word documents.** Web and mail links in a .docx now open, edit,
+  and save as real Word links: add one from the document toolbar (or the
+  palette's Link), change its
+  text or address, and it stays a link in Word. A click in a link's text
+  edits it; ⌘-click, or the address on the card that hovering shows, opens it
+  in your browser or mail app. Chat sees links as Markdown links, keeps them
+  when it edits a document it made, and Markdown links in a document it
+  writes stay links.
+- **A living sidebar.** Settings → Appearance → Sidebar adds Scenery (Off,
+  Top, Bottom, or Both): your theme's hills as a faint silhouette behind the
+  header row or the footer, never behind what you read. And Icons: Neutral, where every mark shares one ink,
+  or Color, where each kind of file has its own.
 - **Pinned sites.** Pin up to three sites you sign in to (Settings →
   Browser). Each gets a button in the title bar, left of the globe, that opens
   the site in a panel instead of a tab, and you stay signed in. Each site keeps
@@ -26,6 +43,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Chat reads spreadsheets and Word documents by address.** An .xlsx
+  arrives as every cell by its A1 address, with formulas and their results and
+  real row numbers; a Word document arrives as numbered blocks (headings, list
+  items, table cells). Before, sheets came as CSV that dropped blank rows and
+  formulas.
+- **About credits Excalidraw and Univer.** Settings → About Rotli and the
+  site's About page name the two open-source editors built in: Excalidraw for
+  boards and Univer for Word documents.
 - **Update checks go through rotli.co.** The Mac app asks rotli.co first,
   with its version in the address, and rotli.co passes it to the signed feed
   on GitHub (GitHub directly if rotli.co is down). That lets rotli.co's
@@ -39,6 +64,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Numbered lists stay numbered in Word documents.** Editing a numbered
+  list saved it as bullets; Rotli now reads each list's kind from the file
+  and keeps its numbering.
+- **Comments stay attached when you edit a commented paragraph.**
+- **The document toolbar only offers what Rotli can save.** Headers and
+  footers, page setup, horizontal lines, and checklists were lost on save;
+  they're hidden until Rotli can keep them.
 - **Your settings survive updates.** Rotli no longer writes over a settings
   file it couldn't read or one a newer Rotli saved, keeps a copy of a damaged
   one before replacing it, and no longer forgets a custom global shortcut

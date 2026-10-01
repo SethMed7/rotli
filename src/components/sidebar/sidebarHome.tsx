@@ -28,6 +28,7 @@ import { noteDiskFolder, projectNoteToBrain } from "../../lib/noteLocation";
 import { commitPaneDrop } from "../../lib/paneDropDrag";
 import { createPointerDragSession } from "../../lib/pointerDrag";
 import { rangeBetween } from "../../lib/rangeSelect";
+import { iconKind } from "../../lib/sidebarLook";
 import { panePreviewAt } from "../../lib/tabDrag";
 import { useNow } from "../../lib/useNow";
 import { DEST, isRootMarker } from "../../services/destinations";
@@ -663,7 +664,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
               }}
               {...rp({ id: `main>${n.id}`, kind: "note" })}
             >
-              {glyphForNote(n, { size: 14, className: "snicon" })}
+              {glyphForNote(n, { size: 14, className: `snicon kind-${iconKind(n)}` })}
               <span className="snt">{displayTitle}</span>
               <MainSlotHint slot={slot} />
               {/* the floated pin's marker — same quiet glyph as pinned chats */}
@@ -730,7 +731,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
                   <span className={`fchev${open ? " open" : ""}`} aria-hidden="true">
                     <ChevronRight size={10} />
                   </span>
-                  <FolderGlyph size={14} />
+                  <FolderGlyph size={14} className="kind-folder" />
                   <span className="fname">{f.name}</span>
                   {/* NO inline remove-× here: it rendered unstyled mid-row on .frow
                     (the .snactbtn hover/size grammar is .snrow-scoped), so
@@ -1164,7 +1165,7 @@ export function SidebarHome({ zoom, chats }: { zoom: number; chats: SidebarChatD
           )}
           {mainNewFolder && (
             <div className="sb-newfolder" style={{ paddingLeft: 44 }}>
-              <FolderGlyph size={14} />
+              <FolderGlyph size={14} className="kind-folder" />
               <input
                 autoFocus
                 type="text"

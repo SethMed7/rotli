@@ -233,3 +233,110 @@ test("the native Undo menu command undoes the last document edit", async ({ page
   await page.waitForTimeout(300);
   expect((await savedText(page)).join("")).not.toContain("oops");
 });
+
+// 2026-10-01 (the Univer review): the editor offered controls whose changes
+// Rotli's Word codec can't save — header/footer, page setup, the mode switch,
+// horizontal line, checklist — so they were lost on the next save. Hidden.
+test("the document toolbar offers only what Rotli can save to the .docx", async ({ page }) => {
+  await gotoApp(page);
+  const ids = await page.evaluate(async () => {
+    const enginePath = "/src/documents/engine/univer.ts";
+    const { mountDocumentEditor } = await import(enginePath);
+    const model = {
+      id: "t.docx",
+      title: "T",
+      content: [{ kind: "paragraph", paragraph: { runs: [{ text: "Hi" }] } }],
+    };
+    const host = document.createElement("div");
+    host.style.cssText = "width: 1400px; height: 700px";
+    document.body.append(host);
+    const handle = mountDocumentEditor(host, model);
+    try {
+      await handle.ready;
+      // the toolbar renders in stages after the editor is ready
+      const read = () =>
+        [...host.querySelectorAll("[data-u-command]")].map((node) => node.getAttribute("data-u-command"));
+      for (let wait = 0; wait < 50 && !read().includes("doc.command.set-inline-format-bold"); wait++)
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      return read();
+    } finally {
+      handle.dispose();
+      host.remove();
+    }
+  });
+  expect(ids).toContain("doc.command.set-inline-format-bold");
+  for (const lossy of [
+    "doc.command.open-header-footer-panel",
+    "doc.command.switch-mode",
+    "docs.operation.open-page-setting",
+    "doc.command.horizontal-line",
+    "doc.command.check-list",
+  ])
+    expect(ids).not.toContain(lossy);
+});
+
+test("a Word link survives the live editor and opens through Rotli's opener", async ({ page }) => {
+  await gotoApp(page);
+  const result = await page.evaluate(async () => {
+    const enginePath = "/src/documents/engine/univer.ts";
+    const { mountDocumentEditor } = await import(/* @vite-ignore */ enginePath);
+    const model = {
+      id: "links.docx",
+      title: "Links",
+      content: [
+        {
+          kind: "paragraph",
+          paragraph: { runs: [{ text: "Rotli website", link: "https://rotli.co" }, { text: " and more" }] },
+        },
+      ],
+    };
+    const host = document.createElement("div");
+    host.id = "link-host";
+    // under Univer's body-level popups (z-index 1020), as the app's panes are
+    host.style.cssText = "position: fixed; inset: 0; z-index: 1000; background: white";
+    document.body.append(host);
+    const opened: string[] = [];
+    const handle = mountDocumentEditor(host, model, { openLink: (url: string) => opened.push(url) });
+    const w = window as unknown as { __linkDoc: unknown; __linkOpened: string[] };
+    w.__linkDoc = handle;
+    w.__linkOpened = opened;
+    await handle.ready;
+    const read = () =>
+      [...host.querySelectorAll("[data-u-command]")].map((node) => node.getAttribute("data-u-command"));
+    for (let wait = 0; wait < 50 && !read().includes("doc.operation.show-hyper-link-edit-popup"); wait++)
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    return { toolbar: read(), saved: handle.save() };
+  });
+  expect(result.toolbar).toContain("doc.operation.show-hyper-link-edit-popup");
+  expect(result.saved.content[0].paragraph.runs).toEqual([
+    { text: "Rotli website", link: "https://rotli.co" },
+    { text: " and more" },
+  ]);
+
+  // A person clicks into the link's text (which only places the caret), then
+  // clicks the address on the card that hovering it shows.
+  const canvas = page.locator("#link-host canvas").first();
+  await expect(canvas).toBeVisible();
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error("document canvas has no box");
+  // the canvas settles its fit zoom after the first frames
+  await page.waitForTimeout(1000);
+  const card = page.getByText("https://rotli.co", { exact: true });
+  const opened = () => page.evaluate(() => (window as unknown as { __linkOpened: string[] }).__linkOpened);
+  // sweep the first line with plain clicks until one lands in the link's text:
+  // that places the caret and shows the link's card, and never opens the link
+  let over: { x: number; y: number } | null = null;
+  for (let y = 40; y < 200 && !over; y += 8)
+    for (let x = box.width * 0.2; x < box.width * 0.6 && !over; x += 20) {
+      await page.mouse.click(box.x + x, box.y + y);
+      await page.mouse.move(box.x + x + 1, box.y + y);
+      await page.waitForTimeout(40);
+      if (await card.isVisible()) over = { x: box.x + x, y: box.y + y };
+    }
+  if (!over) throw new Error("clicking into the link never showed its card");
+  expect(await opened()).toEqual([]);
+  await page.mouse.move(over.x + 1, over.y);
+  await card.click();
+  expect(await opened()).toEqual(["https://rotli.co"]);
+  await page.evaluate(() => (window as unknown as { __linkDoc: { dispose(): void } }).__linkDoc.dispose());
+});

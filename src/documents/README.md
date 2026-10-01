@@ -44,14 +44,16 @@ Local documents follow Rotli's [clean architecture protocol](../../docs/architec
   their own shortcuts. `codec/xml.ts` drops XML 1.0 forbidden characters on
   save, so a stray control character cannot make the file unreadable.
 - `engine/format.ts` maps Rotli's editor format intents (bold, italic,
-  underline, strike, H1–H3, bullet and numbered lists) to Univer commands;
+  underline, strike, link, H1–H3, bullet and numbered lists) to Univer
+  commands (link opens the link plugin's add/edit card);
   `documentEditor.tsx` registers it as the pane's editor handle so the key
   registry never swallows a format chord in a document pane. Inside the canvas
   Univer's built-in ⌘B/⌘I/⌘U also apply and win first (like the board canvas's
   owned chords), so a rebind moves only the registry side. Code, highlight,
-  link, quote, and checklist are Markdown-only and do nothing in a document.
-- `codec/runStyle.ts` owns the run properties Rotli edits; `codec/xml.ts` holds
-  the shared WordprocessingML string helpers.
+  quote, and checklist are Markdown-only and do nothing in a document.
+- `codec/runStyle.ts` owns the run properties Rotli edits, `codec/lists.ts`
+  list numbering, `codec/hyperlinks.ts` link relationships; `codec/xml.ts`
+  holds the shared WordprocessingML string helpers.
 - `composition.ts` is the only module that joins concrete adapters to Tauri.
 - Chat-authored Word documents reuse that composition and the ordinary managed
   item filing workflow. Model-authored Markdown-like headings, paragraphs,
@@ -66,8 +68,28 @@ Local documents follow Rotli's [clean architecture protocol](../../docs/architec
 
 ## Editing boundary
 
+The editor offers only what the codec saves. Univer controls Rotli can't write
+back — headers and footers, page setup, the page/modern mode switch,
+horizontal rules, checklists, the paragraph-settings panel, H4/H5 — are hidden
+through the preset's menu config (`UNSAVABLE_MENU`, `engine/univer.ts`); one
+returns when the codec learns it. Lists take their kind from the file's own
+`word/numbering.xml` (level 0's `numFmt`), and an edited list paragraph keeps
+its original numbering while its kind holds. A commented paragraph keeps its
+comment's range markers around its edited text.
+
+Links are web and mail links (`safeLinkUrl` in `model.ts`): a run's `link`, a
+Word `<w:hyperlink r:id>` whose relationship is external
+(`codec/hyperlinks.ts`), and a Univer hyperlink custom range from the
+open-source docs-hyper-link preset (`engine/links.ts`). Saving reuses a link's
+relationship or adds one, with Word's Hyperlink character style. An
+in-document anchor or any other target is still refused when its paragraph
+changes. In the editor a plain click in a link's text places the caret;
+⌘/Ctrl-click or the address on the link's hover card opens it through Rotli's
+guarded opener (`openUrl`). Chat reads and writes links as Markdown links,
+and Markdown links in a chat-made document stay links.
+
 DOCX support is create + local structured editing. The portable subset currently
-supports paragraphs, heading/title styles, alignment, lists, fonts, sizes, color,
+supports paragraphs, heading/title styles, alignment, lists, links, fonts, sizes, color,
 background shading, subscript/superscript, common inline emphasis, embedded raster images, and native Word tables with editable cell content and
 row/column structure through Univer. Unsupported Word objects remain preserved
 in their OOXML locations but are not editable; a one-time `.bak` protects the

@@ -392,16 +392,19 @@ export function createManagedDocumentWithContent(
     open?: boolean;
     images?: DocumentImage[];
     rootId?: string;
+    /** The chat made it: the AI's creation lane, which records that. */
+    byAi?: boolean;
   } = {},
 ): Promise<CreatedItem> {
   refuseWithheldKind("document");
   const populatedDocumentCreator: NewItemCreator = {
     async create() {
-      const { createManagedDocumentFromMarkdown } = await import("../documents/composition");
-      return {
-        id: await createManagedDocumentFromMarkdown(title, body, Date.now(), options.images, options.rootId),
-        kind: "document",
-      };
+      const { createAiDocumentFromMarkdown, createManagedDocumentFromMarkdown } =
+        await import("../documents/composition");
+      const id = options.byAi
+        ? await createAiDocumentFromMarkdown(title, body, options.images, options.rootId)
+        : await createManagedDocumentFromMarkdown(title, body, Date.now(), options.images, options.rootId);
+      return { id, kind: "document" };
     },
   };
   return createNewItem({ creator: populatedDocumentCreator, presenter }, "document", options);

@@ -3782,6 +3782,17 @@
   text-decoration: none;
 }
 
+/* About → Built in: the editors' names link to their sites, in the accent */
+.about-inline-link {
+  color: var(--accent-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+.about-inline-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
 /* Rotli Web's connect-a-folder explanation: the rename card, a little wider,
    with plain paragraphs before the actions */
 .web-connect-card {

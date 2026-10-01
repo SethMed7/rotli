@@ -95,4 +95,31 @@ describe("Word document creation content", () => {
       ],
     });
   });
+
+  test("a web or mail link stays a link; any other keeps only its text", () => {
+    const draft = documentDraftFromMarkdown(
+      "Markdown links",
+      "Try [**Rotli**](https://rotli.co) then [mail us](mailto:hi@rotli.co), not [this](javascript:alert(1)).",
+    );
+    expect(draft.content?.[0]).toEqual({
+      kind: "paragraph",
+      paragraph: {
+        runs: [
+          { text: "Try " },
+          { text: "Rotli", link: "https://rotli.co" },
+          { text: " then " },
+          { text: "mail us", link: "mailto:hi@rotli.co" },
+          { text: ", not this)." },
+        ],
+      },
+    });
+  });
+
+  test("emphasis around a link strips whole, and a url keeps its underscores", () => {
+    const draft = documentDraftFromMarkdown("Emphasis", "**[Rotli](https://rotli.co/a_b_c)** ships _today_");
+    expect(draft.content?.[0]).toEqual({
+      kind: "paragraph",
+      paragraph: { runs: [{ text: "Rotli", link: "https://rotli.co/a_b_c" }, { text: " ships today" }] },
+    });
+  });
 });

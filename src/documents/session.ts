@@ -29,6 +29,12 @@ const parked = new Map<string, ParkedDocumentSession>();
 const live = new Map<string, LiveDocumentSession>();
 let activeFlush: Promise<void> | null = null;
 
+/** Whether a document is open in a pane now, shown or parked with unsaved
+ * work: an AI edit waits until it isn't (panes save on their own). */
+export function documentIsOpen(fileId: string): boolean {
+  return live.has(fileId) || parked.has(fileId);
+}
+
 export function getParkedDocument(fileId: string): ParkedDocumentSession | undefined {
   return parked.get(fileId);
 }

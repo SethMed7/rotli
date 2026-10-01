@@ -108,6 +108,7 @@ export const LIB_EFFECTFUL_FILE_OWNERS = {
   "noteProtection.ts": "native per-note protection controls (lock, secure, on-device access, AI edit grant)",
   "claudeSession.ts": "native Claude agent-protocol adapter: the tool-call Channel and its answers",
   "pinnedSiteShell.ts": "pinned sites' native pages (their own signed-in WebKit stores)",
+  "aiFiles.ts": "the AI's Word-document lane: create (recorded as AI-made) and edit only those",
   "quitFlush.ts": "native quit lifecycle adapter",
   "tabDrag.ts": "cross-surface tab drag workflow",
   "tauri.ts": "typed native-host adapter facade",

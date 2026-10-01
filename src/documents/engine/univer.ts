@@ -12,6 +12,7 @@ import {
   createUniver,
   merge,
   type IDocumentData,
+  type ICustomRange,
   type ICustomTable,
   type IParagraph,
   type ITable,
@@ -19,6 +20,8 @@ import {
   type ITextRun,
 } from "@univerjs/presets";
 import { UniverDocsDrawingPreset } from "@univerjs/preset-docs-drawing";
+import { UniverDocsHyperLinkPreset } from "@univerjs/preset-docs-hyper-link";
+import UniverPresetDocsHyperLinkEnUS from "@univerjs/preset-docs-hyper-link/locales/en-US";
 import {
   DOCS_VIEW_KEY,
   CreateDocTableCommand,
@@ -39,10 +42,13 @@ import {
 } from "@univerjs/preset-docs-core";
 import UniverPresetDocsCoreEnUS from "@univerjs/preset-docs-core/locales/en-US";
 import "@univerjs/preset-docs-core/lib/index.css";
+import "@univerjs/preset-docs-hyper-link/lib/index.css";
 import { DOCUMENT_CANVAS_COLORS, documentUniverTheme } from "../../brand/univerTheme";
 import { documentFitZoom } from "../layout";
 import { keepCaretStyleThroughNoopMutations } from "./caretStyle";
+import { linkRange, paragraphRuns, routeDocumentLinks } from "./links";
 import { installDocumentKeys } from "./keys";
+import { UNSAVABLE_MENU } from "./menu";
 import {
   documentInsertionRange,
   documentStructureSignature,
@@ -50,14 +56,7 @@ import {
   isDocumentContentMutation,
 } from "./policy";
 import { documentImageDrawing } from "./imageDrawing";
-import {
-  fromHorizontalAlign,
-  fromNamedStyle,
-  fromTextStyle,
-  horizontalAlign,
-  namedStyle,
-  textStyle,
-} from "./textStyle";
+import { fromHorizontalAlign, fromNamedStyle, horizontalAlign, namedStyle, textStyle } from "./textStyle";
 import { GENERATED_DOCX_THEME } from "../theme";
 import type {
   DocumentContent,
@@ -100,6 +99,7 @@ export interface DocumentEngineHandle {
 export function documentToSnapshot(document: EditableDocument): IDocumentData {
   let dataStream = "";
   const textRuns: ITextRun[] = [];
+  const customRanges: ICustomRange[] = [];
   const paragraphs: IParagraph[] = [];
   const sectionBreaks: Array<{ startIndex: number }> = [];
   const tables: ICustomTable[] = [];
@@ -115,6 +115,7 @@ export function documentToSnapshot(document: EditableDocument): IDocumentData {
       const end = dataStream.length;
       const style = textStyle(run.style);
       if (style && end > start) textRuns.push({ st: start, ed: end, ts: style });
+      linkRange(customRanges, run, start, end);
     }
     const startIndex = dataStream.length;
     dataStream += "\r";
@@ -194,6 +195,7 @@ export function documentToSnapshot(document: EditableDocument): IDocumentData {
       paragraphs,
       sectionBreaks,
       ...(customBlocks.length ? { customBlocks } : {}),
+      ...(customRanges.length ? { customRanges } : {}),
       ...(tables.length ? { tables } : {}),
     },
     ...(tables.length ? { tableSource } : {}),
@@ -307,28 +309,6 @@ function insertTableAfterSelection(
     document.content.push({ kind: "paragraph", paragraph: { runs: [{ text: "" }] } });
   }
   return { snapshot: documentToSnapshot(document), tableId: table.id };
-}
-
-function paragraphRuns(snapshot: IDocumentData, start: number, end: number) {
-  const body = snapshot.body;
-  const stream = body?.dataStream ?? "";
-  const runs = (body?.textRuns ?? [])
-    .filter((run) => run.ed > start && run.st < end)
-    .sort((a, b) => a.st - b.st);
-  const result: DocumentParagraph["runs"] = [];
-  let cursor = start;
-  for (const run of runs) {
-    const runStart = Math.max(start, run.st);
-    const runEnd = Math.min(end, run.ed);
-    if (runStart > cursor) result.push({ text: stream.slice(cursor, runStart) });
-    if (runEnd > runStart) {
-      const style = fromTextStyle(run.ts);
-      result.push({ text: stream.slice(runStart, runEnd), ...(style ? { style } : {}) });
-    }
-    cursor = Math.max(cursor, runEnd);
-  }
-  if (cursor < end) result.push({ text: stream.slice(cursor, end) });
-  return result.length ? result : [{ text: "" }];
 }
 
 export function snapshotToDocument(snapshot: IDocumentData, fallback: EditableDocument): EditableDocument {
@@ -461,15 +441,22 @@ function tableInRange(snapshot: IDocumentData, range: ICustomTable): DocumentTab
   };
 }
 
-export function mountDocumentEditor(host: HTMLElement, model: EditableDocument): DocumentEngineHandle {
+/** `openLink` opens a link opened on purpose (Rotli's guarded opener); without
+ * it the link plugin keeps the webview's own `window.open`. */
+export function mountDocumentEditor(
+  host: HTMLElement,
+  model: EditableDocument,
+  options: { openLink?: (url: string) => void } = {},
+): DocumentEngineHandle {
   const snapshot = documentToSnapshot(model);
+  const releaseLinks = options.openLink ? routeDocumentLinks(host, options.openLink) : () => {};
   snapshot.settings = {
     ...snapshot.settings,
     zoomRatio: documentFitZoom(host.clientWidth, host.clientHeight),
   };
   const { univer, univerAPI } = createUniver({
     locale: LocaleType.EN_US,
-    locales: { [LocaleType.EN_US]: merge({}, UniverPresetDocsCoreEnUS) },
+    locales: { [LocaleType.EN_US]: merge({}, UniverPresetDocsCoreEnUS, UniverPresetDocsHyperLinkEnUS) },
     theme: documentUniverTheme(),
     darkMode: false,
     presets: [
@@ -479,8 +466,10 @@ export function mountDocumentEditor(host: HTMLElement, model: EditableDocument):
         toolbar: true,
         ribbonType: "simple",
         footer: false,
+        menu: UNSAVABLE_MENU,
       }),
       UniverDocsDrawingPreset(),
+      UniverDocsHyperLinkPreset(),
     ],
   });
   const api = univerAPI as unknown as UniverApiLike;
@@ -792,6 +781,7 @@ export function mountDocumentEditor(host: HTMLElement, model: EditableDocument):
       recoverDroppedTable.dispose();
       keepCanvasConventional.dispose();
       structureChangeCallbacks.clear();
+      releaseLinks();
       univer.dispose();
     },
   };

@@ -18,7 +18,7 @@ import {
   type ReadyDocumentSession,
 } from "../documents/session";
 import { registerEditor, unregisterEditor } from "../editor/commands";
-import { corpusFileStat } from "../lib/tauri";
+import { corpusFileStat, openUrl } from "../lib/tauri";
 import { invalidateNotes } from "../services/hooks";
 import { usePanesStore } from "../state/panes";
 
@@ -105,7 +105,9 @@ export default function DocumentEditor({
 
         const { mountDocumentEditor } = await import("../documents/engine/univer");
         if (disposed) return;
-        const handle = mountDocumentEditor(host, model);
+        const handle = mountDocumentEditor(host, model, {
+          openLink: (url) => void openUrl(url).catch(() => undefined),
+        });
         handleRef.current = handle;
         const subscription = handle.onDirty(() => {
           if (!armedRef.current) return;

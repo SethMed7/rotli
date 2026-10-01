@@ -42,3 +42,15 @@ export async function workbookToCsv(input: WorkbookInput): Promise<string> {
     })
     .join("\n\n");
 }
+
+/** An .xlsx workbook as the chat reads it: every cell by its A1 address,
+ * formulas with their results (sheets/aiView.ts). */
+export async function workbookForAi(base64: string, name: string): Promise<string> {
+  const [{ bytesFromB64, loadXlsx }, { workbookToModel }, { sheetModelForAi }] = await Promise.all([
+    import("./codec/xlsx"),
+    import("./engine/bridge"),
+    import("./aiView"),
+  ]);
+  const bytes = bytesFromB64(base64);
+  return sheetModelForAi(workbookToModel(await loadXlsx(bytes.buffer as ArrayBuffer), name));
+}

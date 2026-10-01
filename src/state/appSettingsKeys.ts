@@ -6,6 +6,8 @@
 export const APP_SETTINGS_KEYS = new Set([
   // pinned sites (2026-10-01): name, https address, slot, and store id
   "pinnedSites",
+  // the sidebar's scenery and icons (2026-10-01)
+  "sidebarLook",
   "v",
   "theme",
   "themeFamily",

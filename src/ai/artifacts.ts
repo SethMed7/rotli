@@ -1,3 +1,4 @@
+import { linkedText } from "../documents/aiEdit";
 import type { DocumentBlock, DocumentDraft, EditableDocument } from "../documents/model";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 
@@ -91,27 +92,37 @@ export function markdownToDocumentDraft(title: string, markdown: string): Docume
   return { title: title.trim(), ...(blocks.length > 0 ? { blocks } : {}) };
 }
 
-/** AI reads the same structured DOCX subset the editor owns; formatting is
- * omitted while paragraph and table order remain inspectable. */
-export function editableDocumentText(document: EditableDocument): string {
+const STYLE_LABEL: Record<string, string> = {
+  title: "Title",
+  subtitle: "Subtitle",
+  heading1: "Heading 1",
+  heading2: "Heading 2",
+  heading3: "Heading 3",
+};
+
+/** What the chat reads from a Word document (2026-10-01): numbered blocks it
+ * can point at — headings with their level, list items, each table cell by
+ * row and column, and images by their alt text — in document order. Empty
+ * paragraphs keep their numbers: an edit's block numbers are positions in the
+ * document (`applyDocumentEdits`), so none may be skipped. */
+export function editableDocumentForAi(document: EditableDocument): string {
   return document.content
-    .map((content) => {
+    .map((content, index) => {
+      const n = `[${index + 1}]`;
       if (content.kind === "paragraph") {
-        return content.paragraph.runs.map((run) => run.text).join("");
+        const { paragraph } = content;
+        const kind =
+          STYLE_LABEL[paragraph.namedStyle ?? ""] ??
+          (paragraph.list ? `${paragraph.list} item` : "paragraph");
+        return `${n} ${kind}: ${linkedText(paragraph)}`;
       }
-      if (content.kind === "image") {
-        return content.image.alt?.trim() || content.image.name;
-      }
-      return content.table.rows
-        .map((row) =>
-          row.cells
-            .map((cell) =>
-              cell.paragraphs.map((paragraph) => paragraph.runs.map((run) => run.text).join("")).join(" "),
-            )
-            .join("\t"),
-        )
-        .join("\n");
+      if (content.kind === "image") return `${n} image: ${content.image.alt?.trim() || content.image.name}`;
+      const { rows } = content.table;
+      const width = Math.max(0, ...rows.map((row) => row.cells.length));
+      const cells = rows.flatMap((row, r) =>
+        row.cells.map((cell, c) => `  r${r + 1}c${c + 1}: ${cell.paragraphs.map(linkedText).join(" ")}`),
+      );
+      return [`${n} table (${rows.length} rows × ${width} columns):`, ...cells].join("\n");
     })
-    .filter(Boolean)
-    .join("\n\n");
+    .join("\n");
 }

@@ -204,6 +204,10 @@ function stripComments(src) {
     // corpus repository; secure-tainted runs are refused because DOCX has no
     // note protection metadata.
     "create_document",
+    // edit_document applies bounded actions to a Word document the AI created
+    // and saves only through corpus_write_file_ai (Rust: provenance, secret
+    // check, revision); nothing leaves the device
+    "edit_document",
     "update_note",
     "open_note",
     "search_memory",
