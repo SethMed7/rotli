@@ -124,10 +124,23 @@ test("the app opens on its opening scene each launch, in the person's theme", as
 });
 
 test("the opening takes its time, and waits for the window to be in front", async ({ page }) => {
-  // unhurried: still playing two seconds in
+  // unhurried: on screen for well over two seconds, from the moment it mounts
+  // (timed in the page, so a slow load can't eat into it)
+  await page.addInitScript(() => {
+    const w = window as { openingShown?: number; openingGone?: number };
+    new MutationObserver(() => {
+      const here = document.querySelector('[data-testid="app-opening"]') !== null;
+      if (here) w.openingShown ??= performance.now();
+      else if (w.openingShown !== undefined) w.openingGone ??= performance.now();
+    }).observe(document, { childList: true, subtree: true });
+  });
   await page.goto("/?opening");
-  await page.waitForTimeout(2000);
-  await expect(page.getByTestId("app-opening")).toBeVisible();
+  await expect(page.getByTestId("app-opening")).toHaveCount(0, { timeout: 8000 });
+  const shownFor = await page.evaluate(() => {
+    const w = window as { openingShown?: number; openingGone?: number };
+    return (w.openingGone ?? 0) - (w.openingShown ?? 0);
+  });
+  expect(shownFor).toBeGreaterThan(2400);
   // a window launched behind others (a menu-bar app isn't activated by its
   // own start) holds the opening until it comes forward
   await page.addInitScript(() => {
