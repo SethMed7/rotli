@@ -125,6 +125,18 @@ function silenceTrack(): void {
   if (audio && !audio.paused) fadeTo(0, pauseOwn);
 }
 
+/** The hidden stream page's native calls, one seam so tests can stand in for
+ * the Mac app's page (services/ambientStream.test.ts). */
+export const fmPage = {
+  create: (url: string) =>
+    privateBrowserCreate(FM_PAGE, url, { x: 0, y: 0, width: 1, height: 1 }).then(() =>
+      privateBrowserSetVisible(FM_PAGE, false),
+    ),
+  media: (action: "play" | "pause") => privateBrowserMedia(FM_PAGE, action),
+  state: () => privateBrowserMediaState(FM_PAGE),
+  close: () => privateBrowserClose(FM_PAGE),
+};
+
 // ── Claude FM ──────────────────────────────────────────────────────────────
 
 let fmOpen = false;
@@ -144,21 +156,20 @@ function openFm(url: string): void {
   fmNudged = 0;
   fmState = "none";
   fmPausedSince = null;
-  void privateBrowserCreate(FM_PAGE, url, { x: 0, y: 0, width: 1, height: 1 })
-    .then(() => privateBrowserSetVisible(FM_PAGE, false))
-    .catch(() => {
-      fmOpen = false;
-      fmUrl = null;
-    });
+  void fmPage.create(url).catch(() => {
+    fmOpen = false;
+    fmUrl = null;
+  });
 }
 
 function closeFm(): void {
   if (!fmOpen) return;
   fmOpen = false;
+  fmAskedPause = 0;
   fmUrl = null;
   fmState = "none";
   fmPausedSince = null;
-  void privateBrowserClose(FM_PAGE).catch(() => {});
+  void fmPage.close().catch(() => {});
 }
 
 /** Keep Claude FM's page doing what the rules say. The page loads on its own
@@ -173,7 +184,7 @@ function reconcileFm(wantsPlay: boolean, force = false): void {
   if (wantsPlay)
     fmPausedSince = null; // a pause still showing is latency now, not intent
   else fmAskedPause = now;
-  void privateBrowserMedia(FM_PAGE, wantsPlay ? "play" : "pause").catch(() => {});
+  void fmPage.media(wantsPlay ? "play" : "pause").catch(() => {});
 }
 
 // ── the rules, applied ─────────────────────────────────────────────────────
@@ -198,7 +209,8 @@ export function applyAmbient(): void {
   if (stream && prefs.enabled) {
     silenceTrack();
     if (plays) openFm(stream);
-    reconcileFm(plays, true);
+    // an outside pause still settling is the person's to make, not to undo
+    if (!(plays && fmPausedSince !== null)) reconcileFm(plays, true);
     return;
   }
   if (!plays) return silenceTrack();
@@ -255,7 +267,7 @@ export async function pollTabMedia(): Promise<void> {
       ),
     ),
     fmOpen
-      ? privateBrowserMediaState(FM_PAGE).then(
+      ? fmPage.state().then(
           (state) => {
             fmPausedSince = nextPausedSince(fmState, state, fmPausedSince, fmAskedPause, Date.now());
             fmState = state;
@@ -310,10 +322,11 @@ export function stopAllSound(): void {
  * from before a reload is still a native view, still playing). */
 function forceCloseFm(): void {
   fmOpen = false;
+  fmAskedPause = 0;
   fmUrl = null;
   fmState = "none";
   fmPausedSince = null;
-  void privateBrowserClose(FM_PAGE).catch(() => {});
+  void fmPage.close().catch(() => {});
 }
 
 /** Start the player's machinery (main window, once). */
