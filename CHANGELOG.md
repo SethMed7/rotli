@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A living sidebar.** Settings → Appearance → Sidebar adds Scenery (Off,
+  Top, Bottom, or Both): your theme's own scene, very quiet, behind the top or
+  bottom of the sidebar. And Icons: Neutral, where every mark shares one ink,
+  or Color, where each kind of file has its own.
 - **Pinned sites.** Pin up to three sites you sign in to (Settings →
   Browser). Each gets a button in the title bar, left of the globe, that opens
   the site in a panel instead of a tab, and you stay signed in. Each site keeps

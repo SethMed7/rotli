@@ -32,6 +32,10 @@ export function SettingsBanner({
   );
 }
 
+/** A horizon band's frame: wide, its ground on the bottom edge (the page
+ * scenery here, and the sidebar's bottom scene). */
+export const HORIZON_FRAME = { viewBox: "0 0 1200 150", preserveAspectRatio: "xMidYMax slice" } as const;
+
 /** A page's scenery: the theme's sky ornament and its horizon, pinned behind
  * the content. `name` keys both, so a new scene fades in when it changes.
  * Settings and first run share it (`set-scenery`, `onb-scenery`). */
@@ -51,13 +55,7 @@ export function SceneryLayers({
       <svg key={`sky-${name}`} className={`${className}-sky`} viewBox="0 0 320 200" focusable="false">
         {sky}
       </svg>
-      <svg
-        key={name}
-        className={`${className}-horizon`}
-        viewBox="0 0 1200 150"
-        preserveAspectRatio="xMidYMax slice"
-        focusable="false"
-      >
+      <svg key={name} className={`${className}-horizon`} {...HORIZON_FRAME} focusable="false">
         {horizon}
       </svg>
     </div>

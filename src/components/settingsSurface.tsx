@@ -164,6 +164,7 @@ import { PinnedSitesSettings } from "./settings/pinnedSitesSettings";
 import { Seg, SegField } from "./settings/seg";
 import { SettingsBanner, SettingsScenery } from "./settings/settingsBanner";
 import type { BannerMotif } from "./settings/settingsBannerArt";
+import { SidebarLookSettings } from "./settings/sidebarLookSettings";
 import { SwitchKnob, Toggle } from "./settings/toggle";
 import { VisibilitySettings } from "./settings/visibilitySettings";
 import { VoiceSettings } from "./settings/voiceSettings";
@@ -1411,6 +1412,7 @@ function AppearancePane() {
         ]}
         onPick={setSidebarReveal}
       />
+      <SidebarLookSettings />
 
       <FrontsSettings />
       <VisibilitySettings />

@@ -2877,3 +2877,67 @@
   line-height: 1.4;
   color: var(--failure);
 }
+
+/* The sidebar, alive (2026-10-01, sidebarScenery.tsx): the theme's own scene,
+   very quiet, behind the top and/or the bottom. Still art that never takes a
+   click; isolation keeps it above the sidebar's ground and under every row. */
+.sidebar {
+  position: relative;
+  isolation: isolate;
+}
+.sb-scene {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  z-index: -1;
+  pointer-events: none;
+}
+/* the header and switcher's band: the scene's ground meets the switcher's foot */
+.sb-scene-top {
+  top: 0;
+  height: 104px;
+  opacity: 0.85;
+  mask-image: linear-gradient(to bottom, black 55%, transparent);
+}
+/* the player and footer's band: hills rising behind them */
+.sb-scene-bottom {
+  bottom: 0;
+  height: 112px;
+  opacity: 0.8;
+  mask-image: linear-gradient(to top, black 45%, transparent);
+}
+
+/* The sidebar's icons (Settings → Appearance → Sidebar → Icons). Neutral: one
+   ink for every mark, the Word badge, the kit's clay, and the provider logos
+   (shown as masks). Color: each kind of file its own semantic color. */
+.model-logo-ink {
+  display: none;
+}
+.sidebar[data-icons="neutral"] {
+  --format-word: currentColor;
+  --on-format-word: var(--ground);
+  --icon-clay: currentColor;
+  --icon-olive: currentColor;
+}
+.sidebar[data-icons="neutral"] .model-logo-color {
+  display: none;
+}
+.sidebar[data-icons="neutral"] .model-logo-ink {
+  display: inline-block;
+  background: currentColor;
+  mask: var(--logo) center / contain no-repeat;
+}
+.sidebar[data-icons="color"] .kind-board,
+.sidebar[data-icons="color"] .kind-folder {
+  color: var(--accent-text);
+}
+.sidebar[data-icons="color"] .kind-pdf {
+  color: var(--danger);
+}
+.sidebar[data-icons="color"] .kind-image {
+  color: var(--success);
+}
+.sidebar[data-icons="color"] .kind-doc,
+.sidebar[data-icons="color"] .kind-svg {
+  color: var(--syntax-blue);
+}

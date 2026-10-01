@@ -39,6 +39,7 @@ import { useContextMenu } from "../state/contextMenu";
 import { useFrontCount, useFrontOn } from "../state/fronts";
 import { useFocusedTab } from "../state/panes";
 import { flushSettingsNow } from "../state/persist";
+import { useSidebarLook } from "../state/sidebarLook";
 import { useUiStore } from "../state/ui";
 import { requestVaultFolder } from "../state/vaultFolderBrowser";
 import { useWebVaultConnect } from "../state/webVaultConnect";
@@ -49,6 +50,7 @@ import { SidebarChat } from "./sidebar/sidebarChat";
 import { SidebarFooter } from "./sidebar/sidebarFooter";
 import { SidebarHome } from "./sidebar/sidebarHome";
 import { isSidebarSurface, sidebarPlacementMenu } from "./sidebar/sidebarPlacementMenu";
+import { SidebarScenery } from "./sidebar/sidebarScenery";
 import { SidebarSwitcher, sidebarFrontBody, sidebarFrontSelection } from "./sidebar/sidebarSwitcher";
 import { useActiveTree } from "./sidebar/useActiveTree";
 import { useChatFolders } from "./sidebar/useChatFolders";
@@ -78,6 +80,7 @@ export function Sidebar() {
   // each front is on or off (Settings → Sidebar); with one on, no switcher
   const showBreve = useFrontOn("breve");
   const oneFront = useFrontCount() <= 1;
+  const sidebarIcons = useSidebarLook((s) => s.look.icons);
   const sidebarView = useUiStore((s) => s.sidebarView);
   const setSidebarView = useUiStore((s) => s.setSidebarView);
   const sidebarZoom = useUiStore((s) => s.sidebarZoom);
@@ -223,6 +226,7 @@ export function Sidebar() {
   return (
     <aside
       className="sidebar"
+      data-icons={sidebarIcons}
       aria-label={sidebarMode === "breve" ? "Breve" : "Notes"}
       // suppress the WKWebView's default right-click menu ("Reload", …) inside the
       // sidebar; rotli's own row menus (board rename) handle contextmenu instead.
@@ -234,6 +238,7 @@ export function Sidebar() {
           openContextMenu(event.clientX, event.clientY, sidebarPlacementMenu());
       }}
     >
+      <SidebarScenery />
       {/* ONE header row: the active vault never disappears. Breve routines and
           notifications are owned by that vault, so hiding the switcher made
           the mode look detached from its durable home. Only the Coffee/Quokka
