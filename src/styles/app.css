@@ -946,3 +946,84 @@ body[data-surface="capture"] {
   font-weight: 600;
   color: var(--text-muted);
 }
+
+/* Pinned sites (2026-10-01, docs/decisions/2026-10-01-pinned-sites.md): a
+   one-letter mark per site in the title bar, and the panel its native page
+   sits over. The scrim starts under the title bar so the pins stay clickable. */
+.pin-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border-strong);
+  color: var(--accent-text);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
+}
+.pin-btn.railon .pin-mark {
+  border-color: var(--accent);
+}
+.pin-scrim {
+  position: fixed;
+  inset: 42px 0 0 0;
+  z-index: 45;
+}
+.pin-panel {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  bottom: 12px;
+  width: min(560px, calc(100vw - 24px));
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-card);
+  overflow: hidden;
+}
+.pin-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 6px 0 12px;
+  border-bottom: 1px solid var(--border);
+}
+.pin-title {
+  font-weight: 600;
+  color: var(--text);
+}
+.pin-host {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.pin-close {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+}
+.pin-close:hover {
+  background: var(--ground);
+  color: var(--text);
+}
+.pin-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.pin-note {
+  margin: 24px;
+  color: var(--text-muted);
+}

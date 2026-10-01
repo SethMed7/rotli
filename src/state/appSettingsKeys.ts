@@ -4,6 +4,8 @@
 // which sits at its size ceiling.
 
 export const APP_SETTINGS_KEYS = new Set([
+  // pinned sites (2026-10-01): name, https address, slot, and store id
+  "pinnedSites",
   "v",
   "theme",
   "themeFamily",

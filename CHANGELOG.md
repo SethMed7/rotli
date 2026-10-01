@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Pinned sites.** Pin up to three sites you sign in to (Settings →
+  Browser). Each gets a button in the title bar, left of the globe, that opens
+  the site in a panel instead of a tab, and you stay signed in. Each site keeps
+  its own sign-in, apart from the others and from private pages; removing one
+  signs you out. Mac app, macOS 14 or later.
 - **`bun run stats`** for maintainers: downloads, installed updates, Macs per
   version, site visitors, and Rotli Web loads, from GitHub's and Cloudflare's
   aggregate counts (docs/operations/usage-stats.md).

@@ -3928,8 +3928,8 @@
   border-radius: var(--r-control);
   padding: 6px 10px;
 }
-/* a station's optional name stays narrower than its link */
-.yt-station-name {
+/* an optional name (a station's, a pinned site's) stays narrower than its address */
+.rules-input-name {
   flex: 0 1 11rem;
 }
 .rules-input:focus-visible {

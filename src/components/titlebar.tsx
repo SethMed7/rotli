@@ -32,6 +32,7 @@ import {
 import { Icon } from "./icon";
 import { IconButton } from "./iconButton";
 import { Palette } from "./palette";
+import { PinButtons } from "./pinnedSites/pinButtons";
 
 /** One size for every titlebar icon so the bar reads as one cohesive row
  * (the maintainer, 2026-06-15). */
@@ -215,6 +216,8 @@ export function Titlebar() {
             <span className="tb-sep" aria-hidden="true" />
           </>
         )}
+        {/* pinned sites, left of the globe (2026-10-01) */}
+        {!settingsOpen && !WEB && <PinButtons />}
         {!settingsOpen && !WEB && !hidden.browserButton && (
           <IconButton label="New private browser" onClick={() => usePanesStore.getState().openBrowser()}>
             <BrowserGlyph size={TB_ICON} />

@@ -33,6 +33,7 @@ export const SOURCE_ROOT_FILE_OWNERS = {
 } as const;
 
 export const COMPONENT_DIRECTORY_OWNERS = {
+  pinnedSites: "pinned sites: the title bar buttons and the panel",
   breve: "Breve presentation feature",
   chat: "Chat pane presentation feature",
   chatWindow: "the Chat window's shell: Chat pulled out of main into a window of its own",
@@ -106,6 +107,7 @@ export const LIB_EFFECTFUL_FILE_OWNERS = {
   "chatWindowBridge.ts": "native Chat window adapter: show/hide and the two shell windows' messages",
   "noteProtection.ts": "native per-note protection controls (lock, secure, on-device access, AI edit grant)",
   "claudeSession.ts": "native Claude agent-protocol adapter: the tool-call Channel and its answers",
+  "pinnedSiteShell.ts": "pinned sites' native pages (their own signed-in WebKit stores)",
   "quitFlush.ts": "native quit lifecycle adapter",
   "tabDrag.ts": "cross-surface tab drag workflow",
   "tauri.ts": "typed native-host adapter facade",
@@ -132,6 +134,7 @@ export const SERVICE_FILE_OWNERS = {
   "chatRename.ts": "chat",
   "handToAi.ts": "notes",
   "ambient.ts": "ambient audio + the sidebar player (tab media polling, the ambient track)",
+  "pinnedSites.ts": "pinned sites (the panel's page shown, hidden, idle-closed, signed out)",
   "mediaDock.ts": "ambient (a browser tab tucked into the sidebar player)",
   "mainWindowWork.ts": "app shell (the main window's lifelong background work)",
   "librarianBar.ts": "librarian (the /librarian bar: gate, one model call, journaled apply)",
