@@ -240,7 +240,8 @@ test("the native Undo menu command undoes the last document edit", async ({ page
 test("the document toolbar offers only what Rotli can save to the .docx", async ({ page }) => {
   await gotoApp(page);
   const ids = await page.evaluate(async () => {
-    const { mountDocumentEditor } = await import("/src/documents/engine/univer.ts");
+    const enginePath = "/src/documents/engine/univer.ts";
+    const { mountDocumentEditor } = await import(enginePath);
     const model = {
       id: "t.docx",
       title: "T",
