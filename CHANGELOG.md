@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Your own YouTube stations.** Settings → General → Ambient audio takes up
+  to three YouTube videos, live streams, or playlists of your own. They play
+  like Claude FM, from the sidebar player.
+
 ### Changed
 
 - **rotli.co shows all seven theme families.** The theme studio on the home
@@ -17,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Pausing with AirPods pauses the music.** A pause or play from AirPods, a
+  media key, or the Now Playing menu now sticks: the player follows it, and
+  Claude FM is no longer started again a moment later.
 - **No sidebar footer for Settings alone.** With Files, Librarian, and
   Feedback hidden, the footer goes away; Settings is still in the titlebar.
 

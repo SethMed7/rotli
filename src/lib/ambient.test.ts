@@ -3,29 +3,34 @@ import { describe, expect, test } from "bun:test";
 import {
   AMBIENT_SOURCES,
   AMBIENT_TRACKS,
+  ambientSources,
   ambientSrc,
   CLAUDE_FM,
   DEFAULT_AMBIENT,
   isStream,
   parseAmbient,
+  pausedFromOutside,
   playerView,
   stepTrack,
+  streamUrl,
   trackForFamily,
   trackTitle,
 } from "./ambient";
 
-const on = { enabled: true, track: "tide", playing: true, volume: 0.4 };
+const on = { enabled: true, track: "tide", playing: true, volume: 0.4, stations: [] };
 const off = { ...on, enabled: false };
 
 describe("the ambient preference", () => {
   test("read tolerantly: anything missing or malformed is the default", () => {
     for (const value of [undefined, null, 3, "on", [], {}])
       expect(parseAmbient(value)).toEqual(DEFAULT_AMBIENT);
+    // a file saved before stations existed reads with none
     expect(parseAmbient({ enabled: true, track: "dusk", playing: true, volume: 0.25 })).toEqual({
       enabled: true,
       track: "dusk",
       playing: true,
       volume: 0.25,
+      stations: [],
     });
     // a volume outside 0–1, or not a number, is the default
     for (const volume of [-0.1, 1.5, "loud", Number.NaN])
@@ -36,6 +41,41 @@ describe("the ambient preference", () => {
     expect(parseAmbient({ enabled: "yes", track: "../../etc", playing: 1, volume: 0.4 })).toEqual(
       DEFAULT_AMBIENT,
     );
+  });
+
+  test("a saved station is kept, may be the current source, and is checked again on load", () => {
+    const station = {
+      id: "yt-jfKfPfyJRdk",
+      title: "Lofi",
+      url: "https://www.youtube.com/watch?v=jfKfPfyJRdk",
+    };
+    const prefs = parseAmbient({
+      enabled: true,
+      track: station.id,
+      playing: true,
+      volume: 0.4,
+      stations: [station],
+    });
+    expect(prefs.stations).toEqual([station]);
+    expect(prefs.track).toBe(station.id);
+    expect(isStream(prefs.track)).toBe(true);
+    expect(streamUrl(prefs, prefs.track)).toBe(station.url);
+    expect(trackTitle(prefs.track, prefs)).toBe("Lofi");
+    expect(
+      ambientSources(prefs)
+        .map((source) => source.id)
+        .at(-1),
+    ).toBe(station.id);
+    // a station that no longer parses takes its selection with it
+    const tampered = parseAmbient({
+      enabled: true,
+      track: "yt-jfKfPfyJRdk",
+      playing: true,
+      volume: 0.4,
+      stations: [{ ...station, url: "https://evil.test/watch?v=jfKfPfyJRdk" }],
+    });
+    expect(tampered.stations).toEqual([]);
+    expect(tampered.track).toBe(DEFAULT_AMBIENT.track);
   });
 
   test("six tracks, one per theme family, each a bundled file", () => {
@@ -64,9 +104,9 @@ describe("the ambient preference", () => {
   });
 
   test("Claude FM is a source the preference keeps and the menu offers, last", () => {
-    expect(parseAmbient({ enabled: true, track: "claude-fm", playing: true, volume: 0.4 }).track).toBe(
-      "claude-fm",
-    );
+    expect(
+      parseAmbient({ enabled: true, track: "claude-fm", playing: true, volume: 0.4, stations: [] }).track,
+    ).toBe("claude-fm");
     expect(trackTitle("claude-fm")).toBe("Claude FM");
     expect(isStream("claude-fm")).toBe(true);
     expect(isStream("tide")).toBe(false);
@@ -137,4 +177,14 @@ describe("the player for one moment", () => {
   test("Rotli's own audio or video pauses ambient without taking the player", () => {
     expect(playerView(on, {}, null, true)).toMatchObject({ tab: null, ambientPlays: false, visible: true });
   });
+});
+
+// A stream page paused from outside Rotli (AirPods, a media key) is the
+// person's choice once it holds; a page's own short stall isn't.
+test("a stream's outside pause counts once it holds and Rotli didn't ask", () => {
+  expect(pausedFromOutside(null, 10_000)).toBe(false);
+  expect(pausedFromOutside(500, 10_000)).toBe(false);
+  expect(pausedFromOutside(1500, 10_000)).toBe(true);
+  // Rotli asked for this pause a moment ago: it's Rotli's, not the person's
+  expect(pausedFromOutside(1500, 1000)).toBe(false);
 });

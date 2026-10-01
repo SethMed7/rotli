@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { playerView } from "../../lib/ambient";
 import { LABELS, Player, SKIP } from "./mediaPlayer";
 
-const on = { enabled: true, track: "tide", playing: true, volume: 0.4 };
+const on = { enabled: true, track: "tide", playing: true, volume: 0.4, stations: [] };
 const render = (view: ReturnType<typeof playerView>, title: string) =>
   renderToStaticMarkup(
     <Player view={view} title={title} ambientTitle="Tide" ambientWanted onAmbientPlay={() => {}} />,

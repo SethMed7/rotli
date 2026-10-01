@@ -6,8 +6,9 @@
 import type { CSSProperties } from "react";
 
 import {
-  AMBIENT_SOURCES,
+  ambientSources,
   type AmbientPrefs,
+  CLAUDE_FM,
   DEFAULT_AMBIENT,
   isStream,
   trackForFamily,
@@ -18,6 +19,7 @@ import { useUiStore } from "../../state/ui";
 import { SpeakerGlyph } from "../glyphs";
 import { Seg } from "./seg";
 import { Toggle } from "./toggle";
+import { YouTubeStations } from "./youtubeStations";
 
 /** The switch's change: turning it on starts it (a click, so the Mac lets it
  * play) on the track that sounds like the current theme, unless one was
@@ -66,6 +68,45 @@ export function AmbientSettings() {
   return <AmbientSection prefs={prefs} setPrefs={setPrefs} family={family} />;
 }
 
+/** More sources than fit one pill row (the tracks, Claude FM, and stations). */
+const SEG_MAX = 8;
+
+/** What plays: a pill row, or a dropdown once stations make it too long. */
+function SourcePicker({
+  prefs,
+  setPrefs,
+}: {
+  prefs: AmbientPrefs;
+  setPrefs: (change: Partial<AmbientPrefs>) => void;
+}) {
+  // streams play in the Mac app's private browser, which Rotli Web hasn't
+  const sources = ambientSources(prefs).filter((source) => PLATFORM !== "web" || !isStream(source.id));
+  if (sources.length <= SEG_MAX)
+    return (
+      <Seg<string>
+        value={prefs.track}
+        options={sources.map((source) => [source.id, source.title])}
+        onPick={(track) => setPrefs({ track })}
+      />
+    );
+  return (
+    <label className="setselect-row">
+      <span>Playing</span>
+      <select
+        className="setselect"
+        value={prefs.track}
+        onChange={(event) => setPrefs({ track: event.target.value })}
+      >
+        {sources.map((source) => (
+          <option key={source.id} value={source.id}>
+            {source.title}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 /** The section for one preference (tests render it directly). */
 export function AmbientSection({
   prefs,
@@ -88,22 +129,16 @@ export function AmbientSection({
           onChange={toggle}
         />
       </div>
-      {prefs.enabled && (
-        <Seg<string>
-          value={prefs.track}
-          options={AMBIENT_SOURCES.filter((source) => PLATFORM !== "web" || !isStream(source.id)).map(
-            (source) => [source.id, source.title],
-          )}
-          onPick={(track) => setPrefs({ track })}
-        />
-      )}
+      {prefs.enabled && <SourcePicker prefs={prefs} setPrefs={setPrefs} />}
       <AmbientVolume prefs={prefs} setPrefs={setPrefs} />
-      {prefs.enabled && isStream(prefs.track) && (
+      {prefs.enabled && prefs.track === CLAUDE_FM.id && (
         <p className="setnote">
           Claude FM is Anthropic’s live lo-fi stream on YouTube. It plays in a private browser page you don’t
           see, so it needs the internet; the six tracks play offline.
         </p>
       )}
+      {/* the Mac app's private browser plays them; Rotli Web has none */}
+      {prefs.enabled && PLATFORM !== "web" && <YouTubeStations prefs={prefs} setPrefs={setPrefs} />}
     </>
   );
 }

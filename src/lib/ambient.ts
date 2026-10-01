@@ -12,6 +12,7 @@
 // play offline.
 
 import type { TabMediaState } from "./tauri";
+import { parseStations, type YouTubeStation } from "./youtubeStation";
 
 export interface AmbientTrack {
   id: string;
@@ -41,7 +42,9 @@ export const ambientSrc = (id: string, base = BASE) => `${base}ambient/${id}.m4a
  * player; it needs the network, unlike the tracks. */
 export const CLAUDE_FM = { id: "claude-fm", title: "Claude FM", url: "https://clau.de/radio" } as const;
 
-export const isStream = (id: string): boolean => id === CLAUDE_FM.id;
+/** Claude FM or one of the person's own YouTube stations: both play in the
+ * hidden page, need the network, and have no Stop or volume of their own. */
+export const isStream = (id: string): boolean => id === CLAUDE_FM.id || id.startsWith("yt-");
 
 /** Everything the player's menu offers: the tracks, then Claude FM. */
 export const AMBIENT_SOURCES: readonly { id: string; title: string }[] = [
@@ -59,16 +62,37 @@ export interface AmbientPrefs {
    * pause or change the volume … it might be too high"). Claude FM plays in
    * its own page, at the page's volume. */
   volume: number;
+  /** The person's own YouTube stations (src/lib/youtubeStation.ts), after Claude FM. */
+  stations: YouTubeStation[];
 }
 
-export const DEFAULT_AMBIENT: AmbientPrefs = { enabled: false, track: "linen", playing: false, volume: 0.4 };
+export const DEFAULT_AMBIENT: AmbientPrefs = {
+  enabled: false,
+  track: "linen",
+  playing: false,
+  volume: 0.4,
+  stations: [],
+};
 
-const known = (id: unknown): id is string => AMBIENT_SOURCES.some((source) => source.id === id);
+/** Every source for these preferences: the tracks, Claude FM, then the
+ * person's own stations. */
+export function ambientSources(prefs: Pick<AmbientPrefs, "stations">): { id: string; title: string }[] {
+  return [...AMBIENT_SOURCES, ...prefs.stations.map(({ id, title }) => ({ id, title }))];
+}
+
+/** The address a stream plays: Claude FM's, or a station's rebuilt one. */
+export function streamUrl(prefs: Pick<AmbientPrefs, "stations">, id: string): string | null {
+  if (id === CLAUDE_FM.id) return CLAUDE_FM.url;
+  return prefs.stations.find((station) => station.id === id)?.url ?? null;
+}
 
 /** The preference read tolerantly: anything missing or malformed is the default. */
 export function parseAmbient(value: unknown): AmbientPrefs {
   if (!value || typeof value !== "object" || Array.isArray(value)) return { ...DEFAULT_AMBIENT };
   const prefs = value as Record<string, unknown>;
+  const stations = parseStations(prefs.stations);
+  const known = (id: unknown): id is string =>
+    ambientSources({ stations }).some((source) => source.id === id);
   return {
     enabled: prefs.enabled === true,
     track: known(prefs.track) ? prefs.track : DEFAULT_AMBIENT.track,
@@ -77,6 +101,7 @@ export function parseAmbient(value: unknown): AmbientPrefs {
       typeof prefs.volume === "number" && prefs.volume >= 0 && prefs.volume <= 1
         ? prefs.volume
         : DEFAULT_AMBIENT.volume,
+    stations,
   };
 }
 
@@ -85,18 +110,31 @@ export function trackForFamily(family: string): string {
   return AMBIENT_TRACKS.find((track) => track.family === family)?.id ?? DEFAULT_AMBIENT.track;
 }
 
-export function trackTitle(id: string): string {
-  return AMBIENT_SOURCES.find((source) => source.id === id)?.title ?? id;
+export function trackTitle(id: string, prefs: Pick<AmbientPrefs, "stations"> = DEFAULT_AMBIENT): string {
+  return ambientSources(prefs).find((source) => source.id === id)?.title ?? id;
 }
 
-/** The track before or after `id`, wrapping around. From Claude FM (a live
- * stream, nothing to skip), Next goes to the first track and Previous to the
- * last. */
+/** The track before or after `id`, wrapping around. From a stream (Claude FM
+ * or a station, nothing to skip), Next goes to the first track and Previous to
+ * the last. */
 export function stepTrack(id: string, step: 1 | -1): string {
   const at = AMBIENT_TRACKS.findIndex((track) => track.id === id);
   if (at < 0) return AMBIENT_TRACKS[step === 1 ? 0 : AMBIENT_TRACKS.length - 1]!.id;
   const next = (at + step + AMBIENT_TRACKS.length) % AMBIENT_TRACKS.length;
   return AMBIENT_TRACKS[next]!.id;
+}
+
+/** A stream page that stopped playing without Rotli asking (AirPods, a media
+ * key, the page's own button): the person paused it, once it has stayed
+ * paused for `holdMs` (a page's own stall, an ad ending, is shorter) and no
+ * pause of Rotli's own went out in the last `quietMs`. */
+export function pausedFromOutside(
+  heldMs: number | null,
+  askedAgoMs: number,
+  holdMs = 1200,
+  quietMs = 3000,
+): boolean {
+  return heldMs !== null && heldMs >= holdMs && askedAgoMs >= quietMs;
 }
 
 /** What each browser tab's page is doing, by tab id. */
