@@ -28,6 +28,11 @@ test("the palette's Hand to AI builds an editable prompt and copies it", async (
   const dialog = page.getByRole("dialog", { name: "Hand to AI" });
   const prompt = dialog.getByRole("textbox", { name: "Prompt" });
   await expect(prompt).toBeFocused();
+  // Basic is the default; Refined needs the Librarian's model, which the
+  // browser twin doesn't have
+  const style = dialog.getByRole("group", { name: "Prompt style" });
+  await expect(style.getByRole("button", { name: "Basic" })).toHaveAttribute("aria-pressed", "true");
+  await expect(style.getByRole("button", { name: "Refined" })).toBeDisabled();
   await expect(prompt).toHaveValue(/## Goal\n\nGet the beta out on Friday\./);
   await expect(prompt).toHaveValue(/## Open tasks\n\n- \[ \] Write release notes/);
   await expect(prompt).toHaveValue(/## Already done\n\n- \[x\] Freeze scope/);
@@ -95,4 +100,20 @@ test("/hand to AI opens Hand to AI for the note, and the slash text goes", async
   const dialog = page.getByRole("dialog", { name: "Hand to AI" });
   await expect(dialog.getByRole("textbox", { name: "Prompt" })).toHaveValue(/Get the beta out on Friday\./);
   await expect(page.locator(".cm-content").last()).not.toContainText("/hand");
+});
+
+// v2, 2026-10-02: a linked file is named in an Attachments section, and one
+// that isn't in the vault is listed as missing rather than dropped.
+test("an image the note links to is listed, and a missing one says so", async ({ page }) => {
+  await gotoApp(page);
+  await newNote(page, "Login bug\n\nFix the overlap.\n\n![Overlap|300](storage:no-such-shot.png)");
+  await page.getByRole("button", { name: /Search notes and actions/ }).click();
+  await page.getByPlaceholder("Search notes, files, chats, actions…").fill("Hand to AI");
+  await page.locator(".prow", { hasText: "Hand to AI…" }).first().click();
+  const prompt = page.getByRole("dialog", { name: "Hand to AI" }).getByRole("textbox", { name: "Prompt" });
+  await expect(prompt).toHaveValue(
+    /## Attachments\n\n.*\n\n- storage\/no-such-shot\.png \(image, “Overlap”\): missing, not found in the vault/,
+  );
+  await expect(prompt).toHaveValue(/\[missing file: Overlap \(storage\/no-such-shot\.png\)\]/);
+  await expect(prompt).not.toHaveValue(/\|300/);
 });

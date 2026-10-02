@@ -3624,6 +3624,58 @@
   color: var(--text-muted);
   font-size: 12px;
 }
+/* Basic | Refined: the dashboard range's segmented grammar, sized for a card */
+.hand-to-ai-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.hand-to-ai-head .hand-to-ai-note {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+.hand-to-ai-mode {
+  display: inline-flex;
+  flex: none;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: var(--tint);
+}
+.hand-to-ai-mode button {
+  min-height: 26px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-inner);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.hand-to-ai-mode button:hover:not(:disabled) {
+  color: var(--text);
+}
+.hand-to-ai-mode button.sel {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.hand-to-ai-mode button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.hand-to-ai-mode button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.hand-to-ai-working {
+  min-height: 12rem;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-inner);
+}
 
 /* — hotkey BADGES (the maintainer, 2026-08-04): the alternative to the whichkey panel —
    each chord pinned to the control it drives, so the eye never leaves the UI.

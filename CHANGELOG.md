@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Hand to AI brings the note's files along.** Images and files the note
+  links to are listed under Attachments with where they are on your Mac, and
+  the links in the note point there, so the agent can open them. A file that
+  isn't in your vault is listed as missing. A note that links to a file in a
+  secure folder isn't handed off at all.
+- **Hand to AI has a Refined mode.** Next to Basic (the prompt built from
+  the note, as before), Refined asks the Librarian's model to rewrite it as a
+  full prompt: the task, the context, the constraints, the files, and how to
+  check it's done. It uses the model on this Mac unless your Librarian is set
+  to a connected model. If it can't help this time, you get Basic and the
+  reason. Hand to AI remembers which one you chose last.
+
 ### Changed
 
 - **Setup is four screens.** Your name and theme, where your notes live, who
