@@ -50,7 +50,7 @@ export const STUDIO_URL = 'https://studio.rotli.co/';
 /**
  * The earlier launch film. The reviewed export lives in `public/media/`; the
  * holding page plays it on request (PromoFilm.astro). The launch page plays the
- * studio's story film instead (src/films.ts).
+ * hero's product film instead (src/films.ts).
  */
 export const PROMO_VIDEO_PATH = '/media/rotli-promo.mp4';
 export const PROMO_POSTER_PATH = '/media/rotli-promo-poster.jpg';

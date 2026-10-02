@@ -1,8 +1,17 @@
-// The studio's films on the site (public/media/story/, encoded for the web from
-// rotli-studio/motion/out/video). The story film plays in the landing hero; the
-// eight "Rotli in 30 seconds" episodes live in one series player on /features/
-// (EpisodeShelf.astro). Posters and thumbnails are frames of the films.
-export type Film = { src: string; poster: string; label: string };
+// The site's films. The landing hero plays a product film (public/media/hero/):
+// a real Rotli Web session on synthetic notes, recorded by `bun run capture:hero`,
+// silent, its captions in a band under the picture. The studio's films
+// (public/media/story/, encoded for the web from rotli-studio/motion/out/video)
+// are the eight "Rotli in 30 seconds" episodes in one series player on
+// /features/ (EpisodeShelf.astro) and the story film, which no page plays now.
+// Posters and thumbnails are frames of the films.
+export type Film = {
+  src: string;
+  poster: string;
+  label: string;
+  /** No soundtrack: the player offers a replay, never sound. */
+  silent?: true;
+};
 export type Episode = Film & { n: number; title: string; thumb: string };
 
 const media = (slug: string) => ({
@@ -10,6 +19,15 @@ const media = (slug: string) => ({
   poster: `/media/story/${slug}-poster.webp`,
 });
 
+export const hero: Film = {
+  src: '/media/hero/rotli-hero.mp4',
+  poster: '/media/hero/rotli-hero-poster.webp',
+  silent: true,
+  label:
+    'A screen recording of rotli, under a minute, without sound: a quick messy note with two tasks, a dropped picture of tiles, and a link to the Lisbon trip note; the Library, where the Librarian files notes into areas such as Travel; a search for "tile" that finds the note again; a chat asking what is still open for Lisbon, answered from those notes; and the same note as plain Markdown.',
+};
+
+/** The studio's 60-second story film, which the hero played until the product film. */
 export const story: Film = {
   ...media('rotli-story'),
   label:

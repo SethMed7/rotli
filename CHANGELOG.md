@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **rotli.co's home page opens on the app itself.** The film under the
+  headline is now a real recording of rotli: a quick note, the Library,
+  search, chat, and the same note as plain Markdown. It has no sound, so the
+  player offers Watch again instead of Click for sound.
 - **rotli.co says what rotli is for.** The landing page now opens on "Write
   like a person. Let AI do the filing.", explains with a side-by-side note why
   AI reads notes differently from people (and what the Librarian adds around

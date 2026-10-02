@@ -2,19 +2,20 @@
 // The landing hero: one promise, one sentence, the two ways in. It fills the
 // first screen on a faint tile of note, folder, and checklist icons (the same
 // pattern as the link preview, public/social-card.svg) that fades out behind
-// the words. Right below them the story film plays (FilmPlayer.astro): muted and once, with
-// "Click for sound" to watch it from the top with its score. The app itself is shown by the
-// episodes further down and the theme preview, so the hero carries no capture.
+// the words. Right below them the product film plays (FilmPlayer.astro): a real Rotli Web
+// session on synthetic notes (write, the Library, search, chat, plain Markdown), silent,
+// muted and once, resting on its last frame with "Watch again". `bun run capture:hero`
+// records it; site/README.md ("Films") says what in it is fixture.
 //
 // Motion: on arrival the page lands in one short sequence (header and pattern
 // fade in, the two headline lines slide up out of a mask, the rest rises in
-// turn, and the film's clay line inks itself under "the filing."). As the visitor
+// turn, and the clay line inks itself under "the filing."). As the visitor
 // scrolls, the film settles into place. Everything plays once and rests,
 // is plain CSS (no script, no inline style, so the production CSP allows it),
 // and reduced motion shows the finished state at once.
 import { site } from '../../site';
 import SiteActions from '../SiteActions.astro';
-import { story } from '../../films';
+import { hero } from '../../films';
 import FilmPlayer from '../FilmPlayer.astro';
 
 ---
@@ -37,7 +38,7 @@ import FilmPlayer from '../FilmPlayer.astro';
 
 <div class="wrap below-fold">
   <div class="hero-film">
-    <FilmPlayer src={story.src} poster={story.poster} label={story.label} />
+    <FilmPlayer src={hero.src} poster={hero.poster} label={hero.label} silent={hero.silent === true} />
   </div>
 </div>
 

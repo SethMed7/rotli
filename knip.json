@@ -21,7 +21,8 @@
   "ignoreBinaries": [
     "mktemp",
     "gitleaks",
-    "ffmpeg"
+    "ffmpeg",
+    "cwebp"
   ],
   "ignoreExportsUsedInFile": true
 }
