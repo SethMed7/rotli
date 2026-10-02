@@ -154,7 +154,7 @@ bun run preview  # serve the built dist/ locally
   note wandered off." in the middle of the window, one "Take me home" button
   with a quiet line of other ways in, and the footer's quokka scenery along
   the bottom edge. The missing path and a hint (`/app`, `/helper`) are chosen
-  in the browser. `SunsetScene.astro` remains the closing invitation's ground.
+  in the browser.
 - **The quokka scenery** (`src/components/QuokkaScene.astro`, under every
   footer, the 404, and `/subscribed/`) is a strip of Rottnest by day in the
   film's palette (sea, the far lighthouse, scrub on the dunes, sand) with a
@@ -283,7 +283,7 @@ bun run preview  # serve the built dist/ locally
   Rotli Helper runs the same tools for Rotli Web; the install lines mirror
   `src/ai/connectorGuides.ts`).
 - **Scenes from the film**, drawn in inline SVG on the film's palette (the
-  `--sunset-*`, `--sea*`, `--sand`, `--olive*`, `--limestone`, `--lake`,
+  `--sea*`, `--sand`, `--olive*`, `--limestone`, `--lake`,
   `--wood*`, and `--lantern` tokens in `Base.astro`) with the app's own
   character art. Each plays once when revealed (`[data-reveal]`) and rests;
   reduced motion shows it at rest. `SecureScene.astro` is the film's "secure
@@ -291,8 +291,9 @@ bun run preview  # serve the built dist/ locally
   through `.band-night` (the landing privacy band and the night frame on
   `/privacy/`); `IslandScene.astro` is the island by
   day (a faint vignette behind Make it yours, and the framed scene opening
-  `/about/`); the FAQ has the searching quokka among question cards; the
-  closing invitation is the film's sunset in flat bands. `/privacy/` and
+  `/about/`); the FAQ has the searching quokka among question cards. The
+  closing invitation has no scene of its own (2026-10-02): the footer's
+  quokka beach right below it is the page's one closing scene. `/privacy/` and
   `/about/` place their scene through `WritingPage`'s `scene` slot; `/about/`
   uses the centered layout (`center`).
 - The landing privacy band is brief and points to `/privacy/`: the promise and
