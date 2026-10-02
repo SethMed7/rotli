@@ -23,13 +23,16 @@ export function showSettingsHintNow(): void {
   useSettingsHint.setState({ armed: false, open: true });
 }
 
+/** Put the note away for good: shown, or still waiting for the tour to end
+ * (someone who already opened Settings needs no pointer to it). */
 export function dismissSettingsHint(): void {
-  useSettingsHint.setState({ open: false });
+  useSettingsHint.setState({ open: false, armed: false });
 }
 
 useTourStore.subscribe((state, prev) => {
-  // a tour starting again puts the note away; it never covers the tour
-  if (state.step !== null) return dismissSettingsHint();
+  // a tour starting puts a shown note away (it never covers the tour), and
+  // leaves one still waiting for the tour's end armed
+  if (state.step !== null) return useSettingsHint.setState({ open: false });
   if (prev.step !== null && useSettingsHint.getState().armed)
     useSettingsHint.setState({ armed: false, open: true });
 });

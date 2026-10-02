@@ -1,6 +1,14 @@
 import { describe, expect, test } from "bun:test";
 
-import { folderMismatch, keepableVault, openedOrWhy, vaultChoiceLabel } from "./vaultActivation";
+import { renderToStaticMarkup } from "react-dom/server";
+
+import {
+  folderMismatch,
+  keepableVault,
+  openedOrWhy,
+  VaultActivation,
+  vaultChoiceLabel,
+} from "./vaultActivation";
 
 describe("vault activation primary action", () => {
   test("names the exact next action instead of a generic folder choice", () => {
@@ -34,4 +42,14 @@ test("setup moves on from Open only when the folder really is the vault now", ()
   expect(openedOrWhy(false, true)).toBeNull();
   // a debug build's borrowed vault: "opening" it recorded nothing
   expect(openedOrWhy(false, false)).toMatch(/read-only/);
+});
+
+test("a new vault outside setup asks about the Librarian; in setup its own screen does", () => {
+  const outside = renderToStaticMarkup(<VaultActivation />);
+  expect(outside).toContain('aria-label="Librarian choice"');
+  expect(outside).toContain("Raw vault");
+  const inSetup = renderToStaticMarkup(<VaultActivation onboarding />);
+  expect(inSetup).not.toContain('aria-label="Librarian choice"');
+  // one decision: the folder pick is the confirmation, no second screen
+  expect(inSetup).toContain(">Choose an empty folder<");
 });

@@ -207,6 +207,10 @@ test("the shortcuts screen says each can change, and a changed one can go back",
   await expect(page.getByRole("button", { name: "Press the new Quick capture shortcut" })).toContainText(
     "Esc cancels",
   );
+  // Esc cancels: the shortcut stays as it was
+  await page.keyboard.press("Escape");
+  await expect(capture).toContainText("⌥C");
+  await capture.click();
   await page.keyboard.press("Alt+Shift+KeyK");
   await expect(capture).toContainText("⌥⇧K");
   await page.getByRole("button", { name: "Use default" }).click();

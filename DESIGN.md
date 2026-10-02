@@ -406,9 +406,12 @@ polish work.
   and ease fully in and out instead of snapping at the viewport edge.
 - Vault selection is required even in development. A development fallback may
   make a vault available so the shell can boot, but it does not count as the
-  user's selection; only the isolated development vault binding does. A
-  configured installation can explicitly keep its current vault, create a
-  tagged Rotli vault, open an existing folder, or start with a practice vault.
+  user's selection; only the isolated development vault binding does, so setup
+  never offers to keep the borrowed vault, and opening it moves setup on only
+  once a vault is really recorded. A configured installation can explicitly
+  keep its current vault, create a tagged Rotli vault, or open an existing
+  folder. Outside setup, creating a vault asks about the Librarian on the same
+  screen; in setup the Librarian screen does.
 - Vault selection opens Rotli's flat, directory-only navigator at the user's
   Home folder (`~`, with the absolute `/Users/…` path visible). It lists visible
   direct-child directories, supports arrow navigation, Enter, Backspace, Esc,

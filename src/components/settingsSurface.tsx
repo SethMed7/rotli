@@ -81,7 +81,6 @@ import {
   localModelSetDefault,
   localModelUninstall,
   organizerRunOnce,
-  organizerSetBrain,
   organizerSetTrust,
   openUrl,
   revealCorpus,
@@ -117,6 +116,7 @@ import { availableNewItems } from "../newItems/model";
 import { readyFrom, useConnectedCatalog } from "../services/connectedModels";
 import { isChatsPath, isHidden, isVault, isWikiPath } from "../services/destinations";
 import { useFolders } from "../services/hooks";
+import { setLibrarianOn } from "../services/librarianSwitch";
 import { queryClient } from "../services/query";
 import { DEFAULT_RETENTION_DAYS, MAX_RETENTION_DAYS, parseRetentionDays } from "../services/retentionPolicy";
 import type { TaskArchiveAge } from "../services/tasksView";
@@ -1858,7 +1858,6 @@ const TRUST_CAPTIONS: Record<OrganizerTrust, string> = {
 
 function BrainPane() {
   const brainOn = useUiStore((s) => s.brainEnabled);
-  const setBrainEnabled = useUiStore((s) => s.setBrainEnabled);
   const trust = useUiStore((s) => s.organizerTrust);
   const setTrust = useUiStore((s) => s.setOrganizerTrust);
   const model = useUiStore((s) => s.organizerModel);
@@ -1883,20 +1882,13 @@ function BrainPane() {
   // nothing moves; existing areas and metadata stay exactly as they are.
   // Turning it back ON resumes at Suggest (never auto-apply on re-entry).
   const toggleBrain = () => {
-    if (brainOn) {
-      setBrainEnabled(false);
-      // the LIVE off signal (pressure-test 2026-07-26): stop an in-flight
-      // cycle now — the debounced settings write alone left minutes of
-      // modeling after the user's raw choice
-      organizerSetBrain(false).catch(() => {});
-      return;
-    }
-    setBrainEnabled(true);
+    // live, both ways (services/librarianSwitch.ts): off stops an in-flight
+    // cycle now; on owes the daemon a sweep, which resumes on the normal gates
+    // (idle, plugged in), gently, at Suggest
+    if (brainOn) return setLibrarianOn(false);
     setTrust("suggest");
     organizerSetTrust("suggest").catch(() => {});
-    // the live on signal owes the daemon a sweep — it resumes on the normal
-    // gates (idle, plugged in), gently, at Suggest
-    organizerSetBrain(true).catch(() => {});
+    setLibrarianOn(true);
   };
   return (
     <>

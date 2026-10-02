@@ -21,14 +21,10 @@ import { allActions, conflictFor, getAction, rebind, setDispatchSuspended } from
 import { DEFAULT_AMBIENT } from "../../lib/ambient";
 import { setDockVisible, setGlobalShortcut } from "../../lib/tauri";
 import { readyFrom, useConnectedCatalog } from "../../services/connectedModels";
+import { setLibrarianOn } from "../../services/librarianSwitch";
 import { useAmbient } from "../../state/ambient";
 import { DEFAULT_APPEARANCE } from "../../state/appearanceDefaults";
-import {
-  ONBOARDING_STEP_NUMBER,
-  ONBOARDING_TOTAL_STEPS,
-  firstRunWindow,
-  startingAppearance,
-} from "../../state/onboarding";
+import { ONBOARDING_STEP_NUMBER, ONBOARDING_TOTAL_STEPS, firstRunWindow } from "../../state/onboarding";
 import { flushSettingsNow } from "../../state/persist";
 import { startSetupDetection, useSetupDetection } from "../../state/setupDetection";
 import { THEME_FAMILY_PRESENTATIONS, type ThemeFamily, type ThemeSetting, useUiStore } from "../../state/ui";
@@ -254,7 +250,6 @@ function YouScreen({ advance }: { advance: () => void }) {
 
 function LibrarianScreen() {
   const brainEnabled = useUiStore((state) => state.brainEnabled);
-  const setBrainEnabled = useUiStore((state) => state.setBrainEnabled);
   const organizerModel = useUiStore((state) => state.organizerModel);
   const setOrganizerModel = useUiStore((state) => state.setOrganizerModel);
   // detection began on the first screen; by now the answers are usually in
@@ -282,7 +277,7 @@ function LibrarianScreen() {
       <SetupChoiceGroup
         label="Librarian"
         value={brainEnabled ? "on" : "off"}
-        onChange={(choice) => setBrainEnabled(choice === "on")}
+        onChange={(choice) => setLibrarianOn(choice === "on")}
         options={[
           {
             value: "on",
@@ -418,14 +413,16 @@ export function Onboarding({
   const advance = onDone;
 
   useSetupHandle(advance, onBack);
-  // A fresh first run starts in Rotli Light with the plain quokka, and a new
-  // install is in the Dock from this screen on (testers lost a menu-bar-only
-  // app mid-setup); saved at once, so a quit here relaunches in the Dock too.
+  // A new install is in the Dock from the first frame (persist.ts) and stays
+  // there through setup (testers lost a menu-bar-only app mid-setup); saved at
+  // once, so a quit here relaunches in the Dock too. The appearance isn't
+  // reset here: a fresh install and Reset & re-onboard already start in Rotli
+  // Light with the plain quokka, and a relaunch mid-setup keeps what was picked.
   useEffect(() => {
     if (step !== "you" || resumed) return;
     const ui = useUiStore.getState();
     const firstWindow = firstRunWindow(ui.onboarded, ui.onboardingVersion);
-    useUiStore.setState({ ...startingAppearance(), ...firstWindow });
+    useUiStore.setState(firstWindow);
     if (firstWindow.showInDock) {
       void setDockVisible(true).catch(() => {});
       void flushSettingsNow().catch(() => {});

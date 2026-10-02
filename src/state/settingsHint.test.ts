@@ -53,3 +53,13 @@ test("Start now skips the tour and shows the note at once, armed or not", () => 
   useTourStore.getState().setStep(null);
   expect(useSettingsHint.getState().open).toBe(false);
 });
+
+test("someone who opens Settings while the note waits for the tour never gets it", () => {
+  armSettingsHint();
+  useTourStore.getState().setStep(0);
+  // the tour's last step points at Settings, and the app stays clickable
+  useUiStore.getState().setSettingsOpen(true);
+  useUiStore.getState().setSettingsOpen(false);
+  useTourStore.getState().setStep(null);
+  expect(useSettingsHint.getState()).toEqual({ armed: false, open: false });
+});

@@ -1,5 +1,5 @@
 // Which connected clients the Librarian may file through, and what to offer
-// on the Models step and in Settings. Pure; the Rust twin is
+// on setup's Librarian screen and in Settings. Pure; the Rust twin is
 // organizer_knobs::LIBRARIAN_LANES (byte-identical id list).
 
 import type { CliDetect } from "../lib/tauri";

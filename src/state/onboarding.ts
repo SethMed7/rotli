@@ -13,6 +13,7 @@ import { allActions } from "../keys/registry";
 import { DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE } from "../lib/privateBrowser";
 import { setDockVisible, setGlobalShortcut, setHideOnBlur } from "../lib/tauri";
 import { DEFAULT_APPEARANCE } from "./appearanceDefaults";
+import { FIRST_RUN_WINDOW } from "./onboardingPhase";
 import { useUiStore } from "./ui";
 
 /** First run's four screens (the owner, 2026-10-01, after testers' "too many
@@ -33,11 +34,6 @@ export const ONBOARDING_TOTAL_STEPS = Object.keys(ONBOARDING_STEP_NUMBER).length
 export function startingAppearance(): typeof DEFAULT_APPEARANCE & { quokkaAccessory: QuokkaAccessory } {
   return { ...DEFAULT_APPEARANCE, quokkaAccessory: "none" };
 }
-
-/** A new install's window (the owner, 2026-10-01, after testers lost the app
- * behind other windows): in the Dock and ⌘Tab, staying open like any app. The
- * menu-bar visitor remains a choice in Settings → General. */
-export const FIRST_RUN_WINDOW = { stayOpen: true, showInDock: true } as const;
 
 /** Whether this is a true first run: never onboarded, no recorded onboarding
  * version (Settings → Reset & re-onboard keeps the version it had). */
@@ -80,7 +76,7 @@ export async function resetAndReonboard(): Promise<void> {
 
   // theme + the General flags + the gate → defaults, in one store write
   useUiStore.setState({
-    ...DEFAULT_APPEARANCE,
+    ...startingAppearance(),
     ...FIRST_RUN_WINDOW,
     privateBrowserSearchEngine: DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE,
     remoteAgentRelayUrl: "",

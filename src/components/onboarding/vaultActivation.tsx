@@ -77,6 +77,8 @@ export function VaultActivation({
   onSwitchFailed?: () => void | Promise<void>;
 }) {
   const [intent, setIntent] = useState<Intent>("create");
+  // outside setup no Librarian screen follows, so a new vault asks here
+  const [librarian, setLibrarian] = useState<"on" | "off">("on");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [current, setCurrent] = useState<CorpusRefView | null>(null);
@@ -128,8 +130,8 @@ export function VaultActivation({
       await onBeforeSwitch?.();
       await flushSettingsNow();
       if (intent === "create") {
-        // whether the Librarian works here is the next screen's question
-        await initMemexAsCorpus(path, useUiStore.getState().brainEnabled);
+        // in setup, whether the Librarian works here is the next screen's question
+        await initMemexAsCorpus(path, onboarding ? useUiStore.getState().brainEnabled : librarian === "on");
         await activateCreatedVault();
       } else if (await chooseFolder(path)) {
         await refreshActiveVault();
@@ -200,6 +202,26 @@ export function VaultActivation({
                   : []),
               ]}
             />
+            {!onboarding && intent === "create" && (
+              <SetupChoiceGroup
+                label="Librarian choice"
+                value={librarian}
+                onChange={setLibrarian}
+                options={[
+                  {
+                    value: "on",
+                    title: "With the Librarian",
+                    description: "It files and tidies for you. Every action is logged and undoable.",
+                  },
+                  {
+                    value: "off",
+                    title: "Raw vault",
+                    description:
+                      "You arrange your notes yourself. Turn the Librarian on anytime in Settings.",
+                  },
+                ]}
+              />
+            )}
             <p className="setup-arrow-note">
               <kbd>←</kbd>
               <kbd>→</kbd> moves and selects

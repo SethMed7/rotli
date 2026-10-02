@@ -97,7 +97,7 @@ import { MIN_TABLE_COL_PX, MIN_TABLE_ROW_PX, noteIdOfWidthKey, useTableWidthsSto
 import { applyAccent, applySyntaxPalette, applyTheme } from "./theme";
 
 export { rescopeChatMapKeys } from "./chatMapKeys";
-import { type OnboardingPhase, onboardingPhaseOf } from "./onboardingPhase";
+import { FIRST_RUN_WINDOW, type OnboardingPhase, onboardingPhaseOf } from "./onboardingPhase";
 import {
   ALL_NOTES,
   type BreveView,
@@ -1369,13 +1369,11 @@ export async function hydratePersistedState(): Promise<void> {
     // The first-ever paint is Rotli Light. Existing installations are
     // untouched because either their app sidecar or their configured vault
     // supplies the prior choice.
-    useUiStore.setState({
-      ...DEFAULT_APPEARANCE,
-      stayOpen: false,
-      showInDock: false,
-    });
+    // and a new install's window: in the Dock from its very first frame
+    useUiStore.setState({ ...DEFAULT_APPEARANCE, ...FIRST_RUN_WINDOW });
     shellSettings = {
       ...shellSettings,
+      ...FIRST_RUN_WINDOW,
       theme: DEFAULT_APPEARANCE.theme,
       themeFamily: DEFAULT_APPEARANCE.themeFamily,
     };
