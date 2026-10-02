@@ -313,7 +313,8 @@ second user-visible product or storage location.
   runtime supplies byte-backed browser `File` objects instead of native paths,
   those bytes may use the separately bounded, signature-validating image-asset
   command. Markdown drops resolve nested pointer hits to the owning editor,
-  accept physical or logical runtime coordinates, copy into that note's
+  read the runtime position in the platform's own space (logical view points
+  on macOS and Linux, client pixels on Windows) as one point, copy into that note's
   registered root, and normalize both default and root-prefixed import ids to a
   portable root-relative `storage:` source. `/attatch` (also searchable as
   `/attach`) opens a native multi-image picker whose returned paths receive the

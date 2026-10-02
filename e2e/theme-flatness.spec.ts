@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { gotoApp } from "./support";
+import { cycleEveryTheme, gotoApp } from "./support";
 
 const themes = [
   "Warm Light",
@@ -21,10 +21,11 @@ const themes = [
 
 test("all fourteen environments keep titlebar tooltips flat and semantically colored", async ({ page }) => {
   await gotoApp(page);
+  await cycleEveryTheme(page);
   const themeButton = page.getByRole("button", { name: /^Theme —/ });
 
   for (const theme of themes) {
-    await expect(themeButton).toHaveAccessibleName(`Theme — ${theme}`);
+    await expect(themeButton).toHaveAccessibleName(new RegExp(`^Theme — ${theme} · `));
     await themeButton.hover();
 
     const tip = themeButton.locator(".tip");
@@ -62,10 +63,11 @@ test("all fourteen environments keep titlebar tooltips flat and semantically col
 
 test("all fourteen environments use one flat semantic scrim for full-screen backdrops", async ({ page }) => {
   await gotoApp(page);
+  await cycleEveryTheme(page);
   const themeButton = page.getByRole("button", { name: /^Theme —/ });
 
   for (const theme of themes) {
-    await expect(themeButton).toHaveAccessibleName(`Theme — ${theme}`);
+    await expect(themeButton).toHaveAccessibleName(new RegExp(`^Theme — ${theme} · `));
 
     const audit = await page.evaluate(() => {
       const semanticProbe = document.createElement("div");

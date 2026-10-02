@@ -9,6 +9,7 @@ import { parsePinnedSites } from "../lib/pinnedSites";
 import { parseFronts } from "../lib/sidebarFronts";
 import { parseSidebarLook } from "../lib/sidebarLook";
 import { useAmbient } from "./ambient";
+import { appearanceLookSnapshot, parseAppearanceLook, useAppearanceLook } from "./appearanceLook";
 import { useFronts } from "./fronts";
 import { parseHandToAiMode, useHandToAiMode } from "./handToAiMode";
 import { useHidden } from "./hidden";
@@ -32,6 +33,7 @@ export function hydrateAppExtras(appSettings: string): void {
   usePinnedSites.setState({ sites: parsePinnedSites(data.pinnedSites) });
   useSidebarLook.setState({ look: parseSidebarLook(data.sidebarLook) });
   useHandToAiMode.setState({ mode: parseHandToAiMode(data.handToAiMode) });
+  useAppearanceLook.setState(parseAppearanceLook(data));
 }
 
 /** The extras' keys, for the app settings file. */
@@ -43,6 +45,9 @@ export function appExtrasSnapshot(): {
   pinnedSites: unknown;
   sidebarLook: unknown;
   handToAiMode: unknown;
+  themeCycle: unknown;
+  themeCyclePicks: unknown;
+  outlineImages: unknown;
 } {
   return {
     ambient: useAmbient.getState().prefs,
@@ -52,6 +57,7 @@ export function appExtrasSnapshot(): {
     pinnedSites: usePinnedSites.getState().sites,
     sidebarLook: useSidebarLook.getState().look,
     handToAiMode: useHandToAiMode.getState().mode,
+    ...appearanceLookSnapshot(),
   };
 }
 
@@ -64,6 +70,7 @@ export function subscribeAppExtras(save: () => void): () => void {
     useVaultView.subscribe(save),
     useSidebarLook.subscribe(save),
     useHandToAiMode.subscribe(save),
+    useAppearanceLook.subscribe(save),
     // only the pins themselves, not which panel is open
     usePinnedSites.subscribe((state, prev) => state.sites !== prev.sites && save()),
   ];

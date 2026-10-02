@@ -15,10 +15,13 @@ import { dispatch } from "../keys/registry";
 import { PLATFORM } from "../lib/featurePolicy";
 import { SHOW_HOTKEYS, hotkeyHint } from "../lib/hotkeyHint";
 import { startWindowDrag, toggleMaximize } from "../lib/tauri";
+import { useAppearanceLook } from "../state/appearanceLook";
 import { useHidden } from "../state/hidden";
 import { canBack, canForward, useNavHistory } from "../state/navHistory";
 import { usePanesStore } from "../state/panes";
-import { SOLID_THEMES, useUiStore } from "../state/ui";
+import { useIsDarkTheme } from "../state/theme";
+import { nextTheme, solidThemeLabel } from "../state/themeCycle";
+import { useUiStore } from "../state/ui";
 import { QuokkaMark } from "./character";
 import {
   BrowserGlyph,
@@ -69,10 +72,15 @@ export function Titlebar() {
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
   const theme = useUiStore((s) => s.theme);
   const themeFamily = useUiStore((s) => s.themeFamily);
-  const themeLabel =
-    theme === "system"
-      ? "System"
-      : (SOLID_THEMES.find((t) => t.family === themeFamily && t.mode === theme)?.label ?? theme);
+  const themeLabel = theme === "system" ? "System" : solidThemeLabel({ family: themeFamily, mode: theme });
+  // the label says where the next click lands: it follows the cycle setting
+  // and, under System, the mode the Mac shows now (the applied theme)
+  const themeCycle = useAppearanceLook((s) => s.themeCycle);
+  const themeCyclePicks = useAppearanceLook((s) => s.themeCyclePicks);
+  const shownDark = useIsDarkTheme();
+  const nextLabel = solidThemeLabel(
+    nextTheme({ theme, themeFamily }, shownDark, themeCycle, themeCyclePicks),
+  );
 
   return (
     <header className="titlebar">
@@ -223,9 +231,12 @@ export function Titlebar() {
             <BrowserGlyph size={TB_ICON} />
           </IconButton>
         )}
-        {/* The sun cycles the four intentional work environments. */}
+        {/* The sun steps through environments as Appearance → Theme button says. */}
         {!hidden.themeButton && (
-          <IconButton label={`Theme — ${themeLabel}`} onClick={() => dispatch("theme.cycle")}>
+          <IconButton
+            label={`Theme — ${themeLabel} · click for ${nextLabel}`}
+            onClick={() => dispatch("theme.cycle")}
+          >
             <SunGlyph size={TB_ICON} />
           </IconButton>
         )}

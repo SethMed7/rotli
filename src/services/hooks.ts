@@ -15,7 +15,7 @@ import {
 } from "../lib/tauri";
 import { secureRepairScan } from "../lib/vaultRepair";
 import { useUiStore } from "../state/ui";
-import type { Note, NoteSummary } from "../types";
+import type { Note, NoteSummary, SearchHit } from "../types";
 import { readJournal } from "./brainJournalStore";
 import { summaryOrder } from "./derive";
 import { DEST, isChats, isChatsPath, isSink } from "./destinations";
@@ -245,14 +245,35 @@ function useDebouncedValue<T>(value: T, ms: number): T {
  * live query length — a placeholder can briefly carry the previous query's
  * hits. */
 export function useNoteSearch(query: string) {
-  const q = useDebouncedValue(query.trim(), 180);
-  return useQuery({
+  return useQuery(noteSearchOptions(useDebouncedValue(query.trim(), 180)));
+}
+
+function noteSearchOptions(q: string) {
+  return {
     queryKey: ["search", q],
     queryFn: () => notesService.searchNotes(q, 50),
     enabled: q.length >= 2,
     placeholderData: keepPreviousData,
     staleTime: 5_000,
-  });
+  };
+}
+
+/** The same full-text search, answering only for the query in the box: `hits`
+ * is undefined until the debounce has settled on this exact query and its
+ * result has arrived — a previous query's rows never pose as this one's.
+ * `state` says whether the list is complete (the ⌘P picker's honesty line). */
+export function useLiveNoteSearch(query: string): {
+  hits: SearchHit[] | undefined;
+  state: "idle" | "pending" | "settled" | "failed";
+} {
+  const live = query.trim();
+  const q = useDebouncedValue(live, 180);
+  const result = useQuery(noteSearchOptions(q));
+  if (live.length < 2) return { hits: undefined, state: "idle" };
+  if (q !== live || result.isPlaceholderData) return { hits: undefined, state: "pending" };
+  if (result.isError) return { hits: undefined, state: "failed" };
+  if (!result.isSuccess) return { hits: undefined, state: "pending" };
+  return { hits: result.data, state: "settled" };
 }
 
 export function useNote(id: string, options: { enabled?: boolean } = {}) {

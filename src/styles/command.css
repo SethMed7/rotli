@@ -252,6 +252,12 @@
   padding-left: 10px;
   color: var(--text-muted);
 }
+.pv-note p.pv-align-center {
+  text-align: center;
+}
+.pv-note p.pv-align-right {
+  text-align: right;
+}
 .pv-blank {
   height: 0.6em;
 }
@@ -2768,6 +2774,41 @@
   background: none;
   color: var(--text-muted);
   opacity: 0.6;
+}
+
+/* Appearance → Theme button → My picks: the fourteen environments as compact
+   on/off pills, in the order the sun walks them; wraps on a narrow window */
+.theme-picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 6px;
+  max-width: 560px;
+  margin-top: 10px;
+}
+.theme-pick {
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.theme-pick:hover {
+  background: var(--hov);
+  color: var(--text);
+}
+.theme-pick.sel {
+  border-color: var(--accent);
+  background: var(--selected-bg);
+  color: var(--selected-ink);
+}
+.theme-pick:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ——— storage: the notes-folder location row + ghost buttons ——— */
