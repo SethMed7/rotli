@@ -18,6 +18,11 @@ export function armSettingsHint(): void {
   useSettingsHint.setState({ armed: true, open: false });
 }
 
+/** "Start now" on the thank-you card: no tour, so the note shows at once. */
+export function showSettingsHintNow(): void {
+  useSettingsHint.setState({ armed: false, open: true });
+}
+
 export function dismissSettingsHint(): void {
   useSettingsHint.setState({ open: false });
 }

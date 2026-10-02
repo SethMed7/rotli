@@ -1568,13 +1568,6 @@ export function corpusInspectFolder(path: string): Promise<VaultInspection> {
   return invoke<VaultInspection>("corpus_inspect_folder", { path });
 }
 
-/** Copy a reviewed third-party Markdown tree into an empty destination, then
- * activate the copy. The source is never modified. */
-export async function corpusImportVaultCopy(source: string, destination: string): Promise<void> {
-  if (!isTauri()) return;
-  await invoke("corpus_import_vault_copy", { source, destination });
-}
-
 export type { VaultBrowserView } from "./vaultBrowserPreview";
 
 /** Open Rotli's directory-only, Home-contained vault navigator. Rust owns the

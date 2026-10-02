@@ -24,9 +24,7 @@ async function onboard(page: Page) {
   await page.getByRole("button", { name: "New folder", exact: true }).click();
   await page.getByLabel("New folder name").fill("Launch Practice");
   await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Use empty folder", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Create Launch Practice?" })).toBeVisible();
-  await page.getByRole("button", { name: /^Create vault/ }).click();
+  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
   // the Librarian has its own screen; with no signed-in client in the twin it
   // offers only this Mac, already pressed
   await expect(page.getByText("3 of 4")).toBeVisible();
@@ -130,8 +128,7 @@ test("skipping the tour points at Settings, and the note opens it", async ({ pag
   await page.getByRole("button", { name: "New folder", exact: true }).click();
   await page.getByLabel("New folder name").fill("Hint Practice");
   await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Use empty folder", exact: true }).click();
-  await page.getByRole("button", { name: /^Create vault/ }).click();
+  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Finish setup" }).click();
   await page
@@ -160,10 +157,9 @@ test("the Librarian screen asks whether first; Not now hides where it thinks and
   await page.getByRole("button", { name: "New folder", exact: true }).click();
   await page.getByLabel("New folder name").fill("Raw Practice");
   await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Use empty folder", exact: true }).click();
+  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
   // the vault step no longer asks; the Librarian screen does
   await expect(page.getByRole("radiogroup", { name: "Librarian choice" })).toHaveCount(0);
-  await page.getByRole("button", { name: /^Create vault/ }).click();
   const choice = page.getByRole("radiogroup", { name: "Librarian", exact: true });
   await expect(choice.getByRole("radio", { name: /^Use the Librarian/ })).toHaveAttribute(
     "aria-checked",
@@ -201,8 +197,7 @@ test("the shortcuts screen says each can change, and a changed one can go back",
   await page.getByRole("button", { name: "New folder", exact: true }).click();
   await page.getByLabel("New folder name").fill("Keys Practice");
   await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Use empty folder", exact: true }).click();
-  await page.getByRole("button", { name: /^Create vault/ }).click();
+  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByText("4 of 4")).toBeVisible();
   await expect(page.getByText(/change them anytime in Settings → Hotkeys/)).toBeVisible();
@@ -228,8 +223,7 @@ test("the guided tour follows setup, spotlights real controls, skips missing one
   await page.getByRole("button", { name: "New folder", exact: true }).click();
   await page.getByLabel("New folder name").fill("Tour Practice");
   await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Use empty folder", exact: true }).click();
-  await page.getByRole("button", { name: /^Create vault/ }).click();
+  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
   // the Librarian, then the shortcuts, then the thank-you card
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Finish setup" }).click();

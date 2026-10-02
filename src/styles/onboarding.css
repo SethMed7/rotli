@@ -470,58 +470,6 @@
 
 .setup-skip:hover { color: var(--text); }
 
-.setup-path {
-  max-width: 100%;
-  overflow: hidden;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.vault-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  border-block: 1px solid var(--border);
-}
-
-.vault-stats span {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px 4px;
-  color: var(--text-muted);
-  font-size: 10.5px;
-}
-
-.vault-stats strong {
-  color: var(--text);
-  font-size: 17px;
-  font-weight: 650;
-}
-
-.vault-preservation {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px 16px;
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-.vault-preservation strong {
-  grid-column: 1 / -1;
-  color: var(--text);
-  font-size: 11.5px;
-}
-
-.vault-preservation span::before {
-  content: "✓";
-  margin-right: 6px;
-  color: var(--success);
-}
-
 /* Rotli Web's first screen: what the browser's own picker is about to do,
    said in Rotli's voice before it opens (the same lines the Connect dialog
    shows once a vault exists). */
@@ -565,7 +513,6 @@
   line-height: 1.5;
 }
 
-.setup-warning,
 .setup-error {
   padding: 8px 10px;
   border-left: 2px solid var(--accent-text);
@@ -900,28 +847,6 @@
   color: var(--accent-text);
 }
 
-.setup-scanning {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-
-.setup-scan-line {
-  width: 100%;
-  height: 2px;
-  overflow: hidden;
-  background: var(--border);
-}
-
-.setup-scan-line::after {
-  content: "";
-  display: block;
-  width: 28%;
-  height: 100%;
-  background: var(--accent);
-  animation: setup-scan 900ms var(--motion-ease) infinite alternate;
-}
 
 @keyframes setup-step-in {
   from { opacity: 0; transform: translateY(5px); }
@@ -939,8 +864,6 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes setup-scan {
-  from { transform: translateX(-20%); }
   to { transform: translateX(280%); }
 }
 
@@ -983,15 +906,12 @@
   .setup-model-summary-meta { padding-top: 2px; }
   .setup-model-row { flex-wrap: wrap; }
   .setup-stage-scroll-cue { right: 0; }
-  .vault-stats { grid-template-columns: 1fr 1fr 1fr; }
-  .vault-preservation { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .setup-stage,
   .setup-companion .quokka,
-  .setup-model-panel,
-  .setup-scan-line::after {
+  .setup-model-panel {
     animation: none;
   }
 

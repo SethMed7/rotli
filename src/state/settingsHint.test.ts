@@ -1,6 +1,6 @@
 import { beforeEach, expect, test } from "bun:test";
 
-import { armSettingsHint, dismissSettingsHint, useSettingsHint } from "./settingsHint";
+import { armSettingsHint, dismissSettingsHint, showSettingsHintNow, useSettingsHint } from "./settingsHint";
 import { useTourStore } from "./tour";
 import { useUiStore } from "./ui";
 
@@ -41,5 +41,15 @@ test("opening Settings, or another tour, puts the note away", () => {
   useUiStore.getState().setSettingsOpen(false);
   useSettingsHint.setState({ open: true });
   useTourStore.getState().setStep(0);
+  expect(useSettingsHint.getState().open).toBe(false);
+});
+
+test("Start now skips the tour and shows the note at once, armed or not", () => {
+  armSettingsHint();
+  showSettingsHintNow();
+  expect(useSettingsHint.getState()).toEqual({ armed: false, open: true });
+  // no tour follows to show it a second time
+  useTourStore.getState().setStep(0);
+  useTourStore.getState().setStep(null);
   expect(useSettingsHint.getState().open).toBe(false);
 });

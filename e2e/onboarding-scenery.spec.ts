@@ -76,8 +76,7 @@ test("nothing sounds during setup; afterward the player waits for Play", async (
   await page.getByRole("button", { name: "New folder", exact: true }).click();
   await page.getByLabel("New folder name").fill("Music Vault");
   await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Use empty folder", exact: true }).click();
-  await page.getByRole("button", { name: /^Create vault/ }).click();
+  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Finish setup" }).click();
   // the player is there, quiet, until the person presses Play

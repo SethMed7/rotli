@@ -441,9 +441,13 @@ polish work.
   and Skip, Back, and Continue/Finish stay in one fixed footer position. A
   content-heavy step scrolls only its middle stage rather than pushing the
   primary action down or moving it relative to the other steps.
-- Opening an existing Markdown folder always has a read-only inventory/review
-  step before confirmation. Open-in-place adds only hidden Rotli sidecars;
-  import-copy requires an empty destination and leaves the source untouched.
+- Choosing where notes live is one decision (the owner, 2026-10-01: "you
+  either start fresh or connect a folder, that's it"): pick Create or Open,
+  pick the folder, and that is the confirmation; there is no second screen.
+  Rotli first reads the folder read-only, and a folder that doesn't fit (files
+  in a would-be new vault, an empty folder to open) is refused with why,
+  before anything is written. Opening uses the folder in place and adds only
+  hidden Rotli sidecars.
 - An adopted Obsidian, ZenNotes, or generic Markdown tree becomes the one Main
   reference tree with its nested folders intact. It does not create a parallel
   content store or named views, and scanning does not rewrite note bodies or

@@ -1,7 +1,7 @@
 // Thank you (2026-09-28): after setup, a card thanks the person and shows a
 // banner drawn from their own choices, with a GitHub star, an invite, Share on
 // X (a fixed caption; the banner goes on the clipboard), and a download.
-// Closing it starts the guided tour. Uses the development `?onboarding` route.
+// Then Take the tour, or Start now (closing the card is Start now). Uses the development `?onboarding` route.
 
 import { expect, type Page, test } from "@playwright/test";
 
@@ -13,8 +13,7 @@ async function onboardAs(page: Page, name: string) {
   await page.getByRole("button", { name: "New folder", exact: true }).click();
   await page.getByLabel("New folder name").fill("Thanks Practice");
   await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Use empty folder", exact: true }).click();
-  await page.getByRole("button", { name: /^Create vault/ }).click();
+  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
   // the Librarian, then the shortcuts, then the thank-you card
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Finish setup" }).click();
@@ -92,13 +91,24 @@ test("setup ends with a thank-you card, a banner of their own, and ways to share
   await expect(page.getByRole("region", { name: "Guided tour" })).toBeVisible();
 });
 
-test("Escape closes the card and still starts the tour", async ({ page }) => {
+test("Start now goes straight in: no tour, and the note at Settings at once", async ({ page }) => {
+  await onboardAs(page, "");
+  const card = page.getByRole("dialog", { name: "Thank you for trying Rotli" });
+  await expect(card.getByRole("button", { name: "Take the tour" })).toBeVisible();
+  await card.getByRole("button", { name: "Start now" }).click();
+  await expect(card).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Guided tour" })).toHaveCount(0);
+  await expect(page.getByRole("status", { name: "More in Settings" })).toBeVisible();
+});
+
+test("Escape closes the card the way Start now does", async ({ page }) => {
   await onboardAs(page, "");
   const card = page.getByRole("dialog", { name: "Thank you for trying Rotli" });
   await expect(card).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(card).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Guided tour" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Guided tour" })).toHaveCount(0);
+  await expect(page.getByRole("status", { name: "More in Settings" })).toBeVisible();
 });
 
 test("the banner wears their theme, Grove Dark, with the plain quokka setup gives everyone", async ({
@@ -116,8 +126,7 @@ test("the banner wears their theme, Grove Dark, with the plain quokka setup give
   await page.getByRole("button", { name: "New folder", exact: true }).click();
   await page.getByLabel("New folder name").fill("Banner Practice");
   await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Use empty folder", exact: true }).click();
-  await page.getByRole("button", { name: /^Create vault/ }).click();
+  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
   // the Librarian, then the shortcuts, then the thank-you card
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Finish setup" }).click();
