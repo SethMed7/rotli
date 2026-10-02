@@ -92,6 +92,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The opening scene can't hold the app any more.** On macOS 27 a window
+  in front could fail to tell Rotli so, and the opening waited forever over a
+  blank app. A click or key now starts it, and unseen it gives way on its own
+  within five seconds.
 - **Numbered lists stay numbered in Word documents.** Editing a numbered
   list saved it as bullets; Rotli now reads each list's kind from the file
   and keeps its numbering.
