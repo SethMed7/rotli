@@ -1,3 +1,13 @@
+/** Lowercase with diacritics stripped, so "cafe" finds "Café" and "resume"
+ * finds "Résumé". For matching only — never for display or offsets (NFD
+ * changes the length). */
+export function foldText(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/\p{M}+/gu, "")
+    .toLowerCase();
+}
+
 /** Forgiving subsequence match — instant, no scoring: every character of the
  * query appears in the text, in order. Shared by ⌘K, Quick Note, and the
  * slash pickers. */

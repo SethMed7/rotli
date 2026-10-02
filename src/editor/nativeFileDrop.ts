@@ -51,6 +51,7 @@ import {
   importImageFilesAtPosition,
   isImagePath,
   nativeDropPoints,
+  nativeDropSpace,
 } from "./externalImageDrop";
 import { deliverFiles } from "./fileDelivery";
 import { noteIdFacet } from "./livePreview";
@@ -87,10 +88,15 @@ function springRow(spring: SpringOpen, target: SidebarDropTarget): void {
 
 const HELPER_TEXT_ONLY = "Files can’t be sent through Rotli Helper yet — drop images into a note instead.";
 
-/** Every candidate CSS point for a native position, with the WHOLE element
- * stack there — an overlay on top must not hide the chat or note beneath. */
+/** This platform's native drop coordinate space, read once. */
+const DROP_SPACE = nativeDropSpace(
+  typeof navigator === "undefined" ? "" : navigator.platform || navigator.userAgent,
+);
+
+/** The CSS point for a native position, with the WHOLE element stack there —
+ * an overlay on top must not hide the chat or note beneath. */
 function candidatesFor(px: number, py: number): DropCandidate<Element>[] {
-  return nativeDropPoints(px, py, window.devicePixelRatio || 1).map((point) => ({
+  return nativeDropPoints(px, py, window.devicePixelRatio || 1, DROP_SPACE).map((point) => ({
     point,
     stack: document.elementsFromPoint(point.x, point.y),
   }));

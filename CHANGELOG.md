@@ -102,9 +102,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as Home stays in the main window.
 - **rotli.co shows all seven theme families.** The theme studio on the home
   page now includes Blossom, in light and dark, beside the other six.
+- **The Quick Note's ⌘P picker searches what your notes say.** Titles still
+  match as you type, accents and capitals aside ("cafe" finds "Café"); note
+  text follows from full-text search, always below the title matches. The
+  picker says when it is still loading or searching, and a blank note you
+  named can be found by its name.
+- **The scroll-to-top arrow is smaller and quieter.** A muted glyph until you
+  hover or Tab to it, in every theme.
 
 ### Fixed
 
+- **Images dropped from Finder land where you drop them.** On Retina
+  screens a dropped image went in about halfway up the note; Rotli now reads
+  the drop position as the Mac reports it.
 - **Numbered lists stay numbered in Word documents.** Editing a numbered
   list saved it as bullets; Rotli now reads each list's kind from the file
   and keeps its numbering.
@@ -121,6 +131,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Claude FM is no longer started again a moment later.
 - **No sidebar footer for Settings alone.** With Files, Librarian, and
   Feedback hidden, the footer goes away; Settings is still in the titlebar.
+- **The "Keep" quokka has its whole body.** The quokka holding the file stack
+  was missing the outline of its side behind the little card tree, so the
+  hip between the cards showed as background in the app and on rotli.co. The
+  side now runs behind the cards and closes at the hip.
 
 ## [1.7.1] - 2026-09-30
 
