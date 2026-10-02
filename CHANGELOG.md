@@ -33,6 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **rotli.co has a "hear when it's ready" list and quokkas at the bottom.**
+  The footer takes an email address for occasional workshop notes (sent
+  through Resend; the form is hidden while the list is off, and it works
+  without JavaScript). Below it, and on the page-not-found screen, a strip of
+  Rottnest where the quokkas follow your pointer, reach for it, and guard
+  their leaves; under reduced motion they stand still. The Founder.best
+  badge is gone.
 - **Chat edits the Word documents it made.** After reading one, chat can
   change a paragraph, add or remove blocks, set a table cell, or change a
   heading level. Rotli lets it edit only documents its AI created, checks the
