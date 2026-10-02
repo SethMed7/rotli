@@ -118,6 +118,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Claude FM is no longer started again a moment later.
 - **No sidebar footer for Settings alone.** With Files, Librarian, and
   Feedback hidden, the footer goes away; Settings is still in the titlebar.
+- **The "Keep" quokka has its whole body.** The quokka holding the file stack
+  was missing the outline of its side behind the little card tree, so the
+  hip between the cards showed as background in the app and on rotli.co. The
+  side now runs behind the cards and closes at the hip.
 
 ## [1.7.1] - 2026-09-30
 
