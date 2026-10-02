@@ -6,6 +6,7 @@ import {
   isEmbeddablePath,
   isImagePath,
   nativeDropPoints,
+  nativeDropSpace,
   storageImageSource,
 } from "./externalImageDrop";
 
@@ -46,12 +47,30 @@ describe("native image drop routing", () => {
     expect(isImagePath("/tmp/notes.md")).toBe(false);
   });
 
-  test("tries physical-to-CSS coordinates and the raw runtime coordinates", () => {
-    expect(nativeDropPoints(400, 200, 2)).toEqual([
-      { x: 200, y: 100 },
+  // wry 0.55 reads NSDraggingInfo.draggingLocation — view POINTS, already CSS
+  // pixels — and Tauri 2.11 wraps them in a PhysicalPosition unscaled. On a
+  // Retina screen the old halved candidate came first and won, so a drop near
+  // the bottom of a note landed about halfway up (#5).
+  test("macOS: a Retina drop is the raw point, never a halved one", () => {
+    const mac = nativeDropSpace("Macintosh; Intel Mac OS X 10_15_7");
+    expect(nativeDropPoints(400, 200, 2, mac)).toEqual([{ x: 400, y: 200 }]);
+    expect(nativeDropPoints(40, 20, 1, mac)).toEqual([{ x: 40, y: 20 }]);
+  });
+
+  test("Linux keeps GTK's logical point; Windows converts its client pixels", () => {
+    expect(nativeDropPoints(400, 200, 2, nativeDropSpace("X11; Linux aarch64"))).toEqual([
       { x: 400, y: 200 },
     ]);
-    expect(nativeDropPoints(40, 20, 1)).toEqual([{ x: 40, y: 20 }]);
+    const windows = nativeDropSpace("Windows NT 10.0; Win64");
+    expect(nativeDropPoints(300, 150, 1.5, windows)).toEqual([{ x: 200, y: 100 }]);
+    expect(nativeDropPoints(300, 150, Number.NaN, windows)).toEqual([{ x: 300, y: 150 }]);
+  });
+
+  test("names the coordinate space from the platform hint", () => {
+    expect(nativeDropSpace("Macintosh; Intel Mac OS X 10_15_7")).toBe("logical");
+    expect(nativeDropSpace("Darwin")).toBe("logical");
+    expect(nativeDropSpace("X11; Linux aarch64")).toBe("logical");
+    expect(nativeDropSpace("Windows NT 10.0; Win64")).toBe("physical");
   });
 });
 

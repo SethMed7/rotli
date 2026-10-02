@@ -43,7 +43,7 @@ export interface DropCandidate<E> {
 }
 
 /** The first reachable element any candidate point resolves to a target, in
- * candidate order (Tauri's physical→CSS pair first, then the raw pair). */
+ * candidate order (a native drop yields one CSS point; see nativeDropPoints). */
 export function firstTarget<E extends Closest, T>(
   candidates: readonly DropCandidate<E>[],
   resolve: (element: E) => T | null,
