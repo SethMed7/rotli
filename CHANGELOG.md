@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **rotli.co says what rotli is for.** The landing page now opens on "Write
+  like a person. Let AI do the filing.", explains with a side-by-side note why
+  AI reads notes differently from people (and what the Librarian adds around
+  your words), cites two figures on unused AI subscriptions, and shows the
+  night privacy band in Ocean Dark. The Rotli Web section explains how Rotli
+  Helper connects the browser to your folder and gives the one-line command to
+  copy. The quokka carousel is gone from the landing and Features pages, and
+  the About page's belief now reads "AI works for you, inside rules you set."
 - **Setup is four screens.** Your name and theme, where your notes live, who
   files them (the Librarian), and your three shortcuts, which now say plainly
   that you can change them. Then the thank-you card and the tour, and a small
