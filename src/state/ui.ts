@@ -25,11 +25,11 @@ import { DEFAULT_TASK_ARCHIVE_AGE, type TaskArchiveAge } from "../services/tasks
 import type { NoteSummary } from "../types";
 import { DEFAULT_VOICE } from "../voice/speech";
 import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
+import { nextThemeNow } from "./appearanceLook";
 import type { Measure } from "./noteStyle";
 import type { OnboardingPhase } from "./onboardingPhase";
 import type { SidebarReveal, SidebarSide } from "./sidebarPlacement";
-import { systemPrefersDark } from "./systemScheme";
-import { SOLID_THEMES, type ThemeFamily } from "./themeChoices";
+import type { ThemeFamily } from "./themeChoices";
 
 export type ThemeSetting = "light" | "dark" | "system";
 
@@ -720,14 +720,12 @@ interface UiState {
 export const useUiStore = create<UiState>((set, get) => ({
   theme: DEFAULT_APPEARANCE.theme,
   setTheme: (theme) => set({ theme }),
-  // The titlebar sun walks the same ordered environment catalog shown in Appearance;
+  // The titlebar sun steps by Appearance → Theme button (state/themeCycle.ts);
   // a "system" setting resolves to its current mode before stepping on.
   cycleTheme: () =>
     set((s) => {
-      const mode = s.theme === "system" ? (systemPrefersDark() ? "dark" : "light") : s.theme;
-      const i = SOLID_THEMES.findIndex((t) => t.family === s.themeFamily && t.mode === mode);
-      const next = SOLID_THEMES[(i + 1) % SOLID_THEMES.length];
-      return next ? { themeFamily: next.family, theme: next.mode } : s;
+      const next = nextThemeNow(s);
+      return { themeFamily: next.family, theme: next.mode };
     }),
 
   themeFamily: DEFAULT_APPEARANCE.themeFamily,

@@ -12,6 +12,7 @@
 // markdown-text.ts through scripts/fixtures/markdown-strip.json
 // (MIRROR-NOT-IMPORT across the app/runtime boundary).
 
+import { parseAlignedLine } from "./alignedLine";
 import { imageSourceSpan } from "./imageSelection";
 import { underscoreEm } from "./inlineEmphasis";
 import { type OrderedStyle, parseOrderedMarker } from "./listMarkers";
@@ -198,7 +199,12 @@ export function clipboardHtml(markdown: string, images: ImageDataUrls = new Map(
         }
         closeLists(0);
         closeQuote();
-        out.push(`<p>${image ? body : inlineHtml(raw)}</p>`);
+        const aligned = image ? null : parseAlignedLine(raw);
+        out.push(
+          aligned
+            ? `<p align="${aligned.align}">${inlineHtml(aligned.inner)}</p>`
+            : `<p>${image ? body : inlineHtml(raw)}</p>`,
+        );
       }
     }
   }

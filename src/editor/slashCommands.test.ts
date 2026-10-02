@@ -32,6 +32,8 @@ describe("slash command catalog", () => {
       "Heading 2",
       "Heading 3",
       "Quote",
+      "Center",
+      "Align right",
       "Bullet",
       "Numbered",
       "Checklist",

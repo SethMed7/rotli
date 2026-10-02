@@ -80,6 +80,40 @@ test("in the Quick Note, ⌘1–⌘9 and ⌘⇧1–⌘⇧9 open picker rows", as
   await expect(title).toHaveText(tenth);
 });
 
+// #23: the picker searches note TEXT through the full-text engine, and a
+// title match still sits above a note that only mentions the words.
+test("the ⌘P picker finds a note by its body, beneath title matches", async ({ page }) => {
+  await page.goto("/?window=quick");
+  const win = page.locator(".quick-window");
+  await win.getByRole("button", { name: "New note" }).click();
+  await page.locator(".cm-content").click();
+  // the word sits past the 140-char list snippet the old picker matched on
+  const filler = "pick up the dry cleaning, return the library books, water the plants. ".repeat(3);
+  await page.keyboard.type(`Errands for Friday\n\n${filler}\n\nbuy the saffron threads`);
+  const title = win.locator(".quick-pick-name");
+  await expect(title).toHaveText("Errands for Friday");
+  await win.getByRole("button", { name: "New quick note — ⌘N" }).click();
+  await page.locator(".cm-content").click();
+  await page.keyboard.type("Saffron rice\n\nfor the weekend");
+  await expect(title).toHaveText("Saffron rice");
+
+  await win.getByRole("button", { name: "Switch or pin a note — ⌘P" }).click();
+  const picker = page.getByRole("dialog", { name: "Switch or pin a note" });
+  await picker.getByRole("textbox", { name: "Switch to a note" }).fill("saffron");
+  const labels = picker.locator(".qsopen .qslabel");
+  await expect(labels.filter({ hasText: "Errands for Friday" })).toBeVisible();
+  await expect(picker.getByRole("status")).toHaveCount(0);
+  const order = await labels.allTextContents();
+  expect(order.indexOf("Saffron rice")).toBeLessThan(order.indexOf("Errands for Friday"));
+
+  // the keyboard still drives the list: ↓ then ⏎ opens the second row
+  await page.keyboard.press("ArrowDown");
+  const second = order[1] ?? "";
+  await page.keyboard.press("Enter");
+  await expect(picker).toHaveCount(0);
+  await expect(title).toHaveText(second);
+});
+
 test("⌘⇧A opens and closes the Aa panel, in the Quick Note and in main", async ({ page }) => {
   await page.goto("/?window=quick");
   await page.locator(".quick-window").getByRole("button", { name: "New note" }).click();
