@@ -1,15 +1,16 @@
 ---
 // /features/: the whole tour, as its own page rather than a landing anchor.
-// "Rotli in 30 seconds" (the studio's eight episodes, one player) opens it; then
-// it composes Features in full (rendering, chat, documents and boards, assets,
-// the Librarian, connecting AI tools, the smaller habits), then the folder and
-// the themes. The ways in (Mac, Rotli Web, Helper) stay on the landing page and
-// /download/; the Helper also appears under connecting AI.
+// One display headline opens it, with "Rotli in 30 seconds" (the studio's eight
+// episodes, one player) right under it; then Features in full (rendering, chat,
+// documents and boards, assets, the Librarian and the smaller habits,
+// connecting AI tools), then the folder and the themes, alternating plain and
+// warm grounds. The ways in (Mac, Rotli Web, Helper) stay on the landing page
+// and /download/; the Helper also appears under connecting AI. The landing
+// page's dev-only Experiments chapter is not repeated here.
 import Base from '../../layouts/Base.astro';
 import EpisodeShelf from '../../components/EpisodeShelf.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
 import SiteHeader from '../../components/SiteHeader.astro';
-import Experiments from '../../components/landing/Experiments.astro';
 import Features from '../../components/landing/Features.astro';
 import FinalCta from '../../components/landing/FinalCta.astro';
 import Folder from '../../components/landing/Folder.astro';
@@ -38,7 +39,6 @@ export function getStaticPaths() {
     </header>
     <EpisodeShelf />
     <Features />
-    <Experiments />
     <Folder />
     <Personal />
     <FinalCta />
@@ -49,6 +49,8 @@ export function getStaticPaths() {
 <style>
   .page-head {
     padding-top: clamp(3rem, 7vw, 5rem);
+    padding-bottom: clamp(1.5rem, 3vw, 2.5rem);
+    border-bottom: 1px solid var(--border-strong);
   }
   h1 {
     max-width: 16ch;
