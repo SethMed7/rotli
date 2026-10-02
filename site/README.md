@@ -315,7 +315,7 @@ bun run preview  # serve the built dist/ locally
   URL there until that deployment has been verified. The old
   `/resources/mcp/` guide (itself moved from `/mcp/`) folded in on
   2026-10-02: the build writes a refresh page there (`redirects` in
-  `astro.config.mjs`), which the Caddyfile's `/mcp` redirect lands on.
+  `astro.config.mjs`); the Caddyfile sends `/mcp` straight to the developer page.
 - `public/social-card.svg` is the editable source for the link preview, set on
   the story film's island by day: the wordmark and the hero line over a faint
   file-icon pattern that fades out before the bay, the lighthouse on its hill,
