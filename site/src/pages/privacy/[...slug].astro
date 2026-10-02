@@ -294,7 +294,9 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   .access td[data-access='read'] {
     color: var(--text-muted);
   }
-  /* The story film's night: the dome of "on this Mac", on a starry frame above the policy. */
+  /* The story film's night: the dome of "on this Mac", on a starry frame above the policy.
+     The sky and its Ocean stars come from .band-night (Base.astro), like the landing's
+     PrivacyBrief; only the colour is set here, so the stars are never overridden. */
   .night {
     display: grid;
     gap: 1.5rem 2rem;
@@ -303,8 +305,7 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
     padding: clamp(1.75rem, 4vw, 3rem) clamp(1.5rem, 4vw, 3rem) 0;
     overflow: hidden;
     border-radius: var(--radius-frame);
-    background: var(--deep) url('/night-stars.svg');
-    background-size: 480px 480px;
+    background-color: var(--deep);
     color: var(--deep-text);
   }
   .night-caption {

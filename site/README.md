@@ -287,8 +287,9 @@ bun run preview  # serve the built dist/ locally
   `--wood*`, and `--lantern` tokens in `Base.astro`) with the app's own
   character art. Each plays once when revealed (`[data-reveal]`) and rests;
   reduced motion shows it at rest. `SecureScene.astro` is the film's "secure
-  stays home" night (the landing privacy band on `public/night-stars.svg`,
-  and the night frame on `/privacy/`); `IslandScene.astro` is the island by
+  stays home" night, in Ocean Dark under `public/night-stars-ocean.svg`
+  through `.band-night` (the landing privacy band and the night frame on
+  `/privacy/`); `IslandScene.astro` is the island by
   day (a faint vignette behind Make it yours, and the framed scene opening
   `/about/`); the FAQ has the searching quokka among question cards; the
   closing invitation is the film's sunset in flat bands. `/privacy/` and
