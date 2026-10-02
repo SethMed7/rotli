@@ -21,6 +21,12 @@ const writing = defineCollection({
     draft: z.boolean().default(false),
     /** Describes a capability under review: dev site only, labeled. */
     experiment: z.boolean().default(false),
+    /**
+     * `coming-soon`: listed on its index with a "Coming soon" label and no
+     * link. It has no page, Markdown twin, sitemap entry, or llms.txt line
+     * until it becomes `published` (src/writing.ts).
+     */
+    status: z.enum(['published', 'coming-soon']).default('published'),
   }),
 });
 

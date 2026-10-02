@@ -1,8 +1,10 @@
 ---
 // Features: what rotli does, organized the way you meet it: how a note
 // renders (and the Markdown it is saved as), chat and what it writes, the
-// formats beyond Markdown and where assets live, the Librarian, how AI tools
-// connect, then the smaller habits. Pictures are captures of the real app
+// formats beyond Markdown and where assets live, the Librarian and the
+// smaller habits, then how AI tools connect. Every chapter opens with the same
+// section head (one h2 at the section scale); the chapters alternate between
+// the warm band and the plain ground so each reads as its own step. Pictures are captures of the real app
 // (stable browser twin and the Mac launch shoot, synthetic vaults only) or
 // plain drawings where a screenshot would only be a box of small text.
 // The alpha scope only; experiments live in Experiments.astro.
@@ -29,7 +31,7 @@ const habits = [
 ];
 ---
 
-<section class="section features" id="features" aria-labelledby="features-title">
+<section class="section band-warm features" id="features" aria-labelledby="features-title">
   <div class="wrap">
     <header class="section-head">
       <h2 class="section-title" id="features-title">Write in Markdown. See it rendered.</h2>
@@ -42,15 +44,21 @@ const habits = [
   </div>
 </section>
 
-<section class="section band-warm" id="chat" aria-labelledby="chat-title">
+<section class="section" id="chat" aria-labelledby="chat-title">
   <div class="wrap">
-    <h2 class="visually-hidden" id="chat-title">Chat</h2>
+    <header class="section-head">
+      <h2 class="section-title" id="chat-title">Chat that works inside your notes.</h2>
+      <p class="section-lede">
+        Ask what shipped, what is left, or what you decided last week, and get an answer grounded in your own
+        files. Use a model on your Mac, or the AI tools you already use.
+      </p>
+    </header>
     <ChatFlow />
   </div>
 </section>
 
 <>
-  <section class="section" id="formats" aria-labelledby="formats-title">
+  <section class="section band-warm" id="formats" aria-labelledby="formats-title">
     <div class="wrap">
       <header class="section-head">
         <h2 class="section-title" id="formats-title">More than notes.</h2>
@@ -63,51 +71,61 @@ const habits = [
     </div>
   </section>
 
-  <section class="section band-warm" id="organize" aria-labelledby="organize-title">
+  <section class="section" id="organize" aria-labelledby="librarian-title">
     <div class="wrap">
-      <h2 class="visually-hidden" id="organize-title">Organize</h2>
-          <article class="row flip" id="librarian" data-reveal>
-            <div class="row-copy">
-              <h3>A Librarian that files, never rewrites.</h3>
-              <p>
-                Turn it on and new notes get tags, summaries, links, and a place in your Library while you
-                keep working in Main. It organizes around your writing without editing it. Turn it off and
-                the folder is still a complete workspace.
-              </p>
-            </div>
-            <figure class="filing" aria-label="How the Librarian files three new notes">
-              <div class="filing-head" aria-hidden="true">
-                <span>New notes</span>
-                <span>Filed in your Library</span>
-              </div>
-              <ol>
-                {filings.map((filing) => (
-                  <li>
-                    <span class="filing-note">
-                      <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2">
-                        <path d="M4 1.5h5.5L12.5 4.5v10h-8.5z" />
-                        <path d="M9.5 1.5v3h3" />
-                      </svg>
-                      {filing.note}
-                    </span>
-                    <span class="filing-line" aria-hidden="true"></span>
-                    <span class="filing-folder">
-                      <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2">
-                        <path d="M1.5 3.5h4.5l1.5 1.5h7v8.5h-13z" />
-                      </svg>
-                      <span class="visually-hidden">filed in</span> {filing.folder}
-                    </span>
-                    <small>{filing.adds}</small>
-                  </li>
-                ))}
-              </ol>
-              <figcaption>Every note keeps its words exactly as you wrote them.</figcaption>
-            </figure>
-          </article>
+      <article class="row" id="librarian" data-reveal>
+        <div class="row-copy">
+          <h2 class="section-title" id="librarian-title">A Librarian that files, never rewrites.</h2>
+          <p class="section-lede">
+            Turn it on and new notes get tags, summaries, links, and a place in your Library while you keep
+            working in Main. It organizes around your writing without editing it. Turn it off and the folder is
+            still a complete workspace.
+          </p>
+        </div>
+        <figure class="filing" aria-label="How the Librarian files three new notes">
+          <div class="filing-head" aria-hidden="true">
+            <span>New notes</span>
+            <span>Filed in your Library</span>
+          </div>
+          <ol>
+            {filings.map((filing) => (
+              <li>
+                <span class="filing-note">
+                  <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2">
+                    <path d="M4 1.5h5.5L12.5 4.5v10h-8.5z" />
+                    <path d="M9.5 1.5v3h3" />
+                  </svg>
+                  {filing.note}
+                </span>
+                <span class="filing-line" aria-hidden="true"></span>
+                <span class="filing-folder">
+                  <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.2">
+                    <path d="M1.5 3.5h4.5l1.5 1.5h7v8.5h-13z" />
+                  </svg>
+                  <span class="visually-hidden">filed in</span> {filing.folder}
+                </span>
+                <small>{filing.adds}</small>
+              </li>
+            ))}
+          </ol>
+          <figcaption>Every note keeps its words exactly as you wrote them.</figcaption>
+        </figure>
+      </article>
+      <div class="habits-block">
+        <h3 id="habits-title">Smaller things worth knowing</h3>
+        <ul class="habits" aria-labelledby="habits-title" data-stagger>
+          {habits.map((habit) => (
+            <li>
+              <kbd>{habit.key}</kbd>
+              <p>{habit.text}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   </section>
 
-  <section class="section" id="connect" aria-labelledby="connect-title">
+  <section class="section band-warm" id="connect" aria-labelledby="connect-title">
     <div class="wrap">
       <header class="section-head">
         <h2 class="section-title" id="connect-title">Your AI, connected the honest way.</h2>
@@ -116,14 +134,6 @@ const habits = [
         </p>
       </header>
       <ConnectAI />
-      <ul class="habits" aria-label="Smaller things worth knowing" data-stagger>
-        {habits.map((habit) => (
-          <li>
-            <kbd>{habit.key}</kbd>
-            <p>{habit.text}</p>
-          </li>
-        ))}
-      </ul>
     </div>
   </section>
 </>
@@ -136,25 +146,15 @@ const habits = [
     line-height: 1.2;
     letter-spacing: -0.02em;
   }
-  h3 + p {
-    margin: 0.8rem 0 0;
-    color: var(--text-muted);
-    line-height: 1.62;
-  }
   figure {
     margin: 0;
   }
+  /* The Librarian: its heading and lede beside the filing drawing, top edges level. */
   .row {
     display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
     gap: 2rem clamp(2rem, 6vw, 5rem);
     align-items: start;
-  }
-  .row.flip .row-copy {
-    order: 2;
-  }
-  .row-copy p {
-    max-width: 30rem;
   }
   .filing {
     margin: 0;
@@ -233,13 +233,18 @@ const habits = [
     clip: rect(0 0 0 0);
     white-space: nowrap;
   }
+  /* The smaller habits close the chapter under one hairline and a plain heading. */
+  .habits-block {
+    margin-top: clamp(3.5rem, 7vw, 5rem);
+    padding-top: 1.75rem;
+    border-top: 1px solid var(--border-strong);
+  }
   .habits {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 1.5rem;
-    margin: clamp(4rem, 8vw, 6rem) 0 0;
-    padding: 1.75rem 0 0;
-    border-top: 1px solid var(--border-strong);
+    margin: 1.25rem 0 0;
+    padding: 0;
     list-style: none;
   }
   kbd {
@@ -269,9 +274,6 @@ const habits = [
   @media (max-width: 820px) {
     .row {
       grid-template-columns: 1fr;
-    }
-    .row.flip .row-copy {
-      order: 0;
     }
     .habits {
       grid-template-columns: repeat(2, minmax(0, 1fr));

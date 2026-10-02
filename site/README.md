@@ -42,8 +42,8 @@ bun run preview  # serve the built dist/ locally
   | Mode          | Deployment                    | Pages                    | Downloads | Indexed |
   | ------------- | ----------------------------- | ------------------------ | --------- | ------- |
   | `coming-soon` | holding page                  | holding page + 404       | no        | yes     |
-  | `dev`         | live dev site · `dev.rotli.co`| full site + drafts + `/resources/mcp/` | no | no |
-  | `full`        | production · `rotli.co`       | landing, Resources, Blog, About, 404 | yes | yes |
+  | `dev`         | live dev site · `dev.rotli.co`| full site + drafts + the full developer reference | no | no |
+  | `full`        | production · `rotli.co`       | landing, Features, Privacy, Resources (Guides, Blog, Developers, Changelog), About, 404 | yes | yes |
 
   An unknown value fails the build. Flipping production to launch is a variable
   change (`SITE_MODE=full`), not a code change — see "Going live" below. `dev` additionally sets
@@ -53,17 +53,26 @@ bun run preview  # serve the built dist/ locally
   pending fidelity review. Site labels do not enforce app access.
 - **Structure and navigation.** `src/nav.ts` is the one navigation policy.
   The header links real pages, never landing anchors: Features · Privacy ·
-  Resources · About, plus Blog once a post is published (an empty index is
-  never linked). On the right sit the GitHub mark (icon only, while the source
-  is public) and one Download button, which opens `/download/`. Download is
-  not also a menu item. The footer's link columns (Product · Learn · Open
-  source, the last only while the source is public) and tagline default from
-  the same file. Pages pass only `current`. The header stays pinned on a solid
-  ground (flat: no blur, no shadow); `[id]` targets carry a matching
-  `scroll-margin-top`. Below 1080px the pages fold into a Menu disclosure
-  (`<details>`; Escape, an outside click, or choosing a link closes it); below
-  560px the GitHub mark and Download move into it too. The footer's closing
-  row holds the maker line and the two directory badges.
+  Resources · About. Resources is a dropdown of four pages, each with a
+  one-line description: Guides (`/resources/`), Blog (`/blog/`, listed only
+  once a post can be read, so an index of nothing but "coming soon" is never
+  linked), Developers (`/resources/developers/`, marked "Coming soon" outside
+  the dev site), and Changelog (`/changelog/`). The dropdown is a disclosure:
+  a button with `aria-expanded` (Enter/Space/click toggles; ArrowDown opens
+  into the list; ArrowUp/ArrowDown, Home, End move; Escape closes and returns
+  focus; tabbing away or an outside click closes). Without script the button
+  is hidden and "Resources" is a plain link to `/resources/`. On the right sit
+  the GitHub mark (icon only, while the source is public) and one Download
+  button, which opens `/download/`. Download is not also a menu item. The
+  footer's link columns (Product · Learn · Open source, the last only while
+  the source is public) and tagline default from the same file. Pages pass
+  only `current` (a dropdown's label is marked current when any of its pages
+  is). The header stays pinned on a solid ground (flat: no blur, no shadow);
+  `[id]` targets carry a matching `scroll-margin-top`. Below 1080px the pages
+  fold into a Menu disclosure (`<details>`; Escape, an outside click, or
+  choosing a link closes it), where the dropdown's pages are listed under its
+  name; below 560px the GitHub mark and Download move into it too. The
+  footer's closing row holds the maker line and the two directory badges.
 - **The landing page** (`src/components/Landing.astro`) only composes its
   chapters from `src/components/landing/`, bookended like the studio's story
   film: Hero (the story film itself) → Overview (Write. Keep. Ask.: three
@@ -75,12 +84,16 @@ bun run preview  # serve the built dist/ locally
   Dark via `.band-night` in `Base.astro`, three facts, and a link to
   `/privacy/`) → Everywhere (Rotli Web and how Rotli Helper connects it, with
   the copyable install line; only while `WEB_APP_ENABLED`) → Personal (the
-  theme studio, with a faint island vignette) → Faq → FinalCta (the film's sunset). The landing page carries
-  exactly one video. **`/features/`** opens with "Rotli in 30 seconds"
-  (`EpisodeShelf.astro`: the eight episodes in one player) and then composes
-  the chapters in full (Features with every smaller habit, Folder, Personal)
-  under its own page head. On narrow screens the theme studio is a carousel
-  (previous/next and a swipe on the capture).
+  theme studio, with a faint island vignette) → Faq → FinalCta (the film's
+  sunset). The landing page carries exactly one video. **`/features/`** has
+  one display headline, with "Rotli in 30 seconds" (`EpisodeShelf.astro`: the
+  eight episodes in one player, under a quiet heading; two columns of episodes
+  below the player on narrow screens) right under it, then the chapters in
+  full (Features with every smaller habit, Folder, Personal). Every chapter
+  opens with the same section head (one h2 at `--step-h2` and a lede), and the
+  chapters alternate plain and warm grounds. The landing page's dev-only
+  Experiments chapter is not repeated there. On narrow screens the theme
+  studio is a carousel (previous/next and a swipe on the capture).
   Each chapter owns its
   markup, scoped styles, and script. `Base.astro` owns the tokens, the shared
   section grammar (`.wrap`, `.section`, `.section-title`, `.section-lede`,
@@ -99,16 +112,25 @@ bun run preview  # serve the built dist/ locally
   changes. Features that are off in released builds (Breve, remote agents)
   are described as off, not as available.
 - **Subpages** (`WritingPage.astro`) sit on the site grid: breadcrumb, title,
-  and lede line up with the header's brand, a full-width rule divides the head
-  from the body, and long pages pass `toc` for a sticky "On this page" column
-  (resource articles build it from their `##` headings). Resource articles end
-  with "More resources". Index lists (`WritingList.astro`) are plain entries
-  in columns with a hairline above each, never boxes.
+  lede, and an optional metadata line (`meta`: a date, "Updated …", a reading
+  time) line up with the header's brand, and a full-width rule divides the
+  head from the body. Long pages pass `toc` and read as an article: a sticky
+  "On this page" tree beside a reading column of about 70 characters, the
+  section in view highlighted and a slim rail filling as you read (one
+  bundled script; without it the tree is plain links). Below 900px the tree
+  becomes an "On this page" disclosure above the text. Privacy, resource
+  articles, and blog posts use it (articles and posts build it from their
+  `##` headings). Resource articles end with "More guides". Index lists
+  (`WritingList.astro`) are plain entries in columns with a hairline above
+  each, never boxes; an entry without a link is announced ("Coming soon").
 - **Writing.** Resources (evergreen, question-titled) and blog posts are
   Markdown in one content collection, `src/content/writing/{resources,posts}/`
   (schema: `src/content.config.ts`). `src/writing.ts` decides what a build
   publishes: nothing in `coming-soon`; `draft: true` and `experiment: true`
-  entries only on the dev site. Routes: `/resources/`, `/resources/<file>/`,
+  entries only on the dev site. `status: coming-soon` announces a piece: it is
+  listed on its index with a "Coming soon" label and no link, and has no
+  page, Markdown twin, sitemap entry, or llms.txt line until the field comes
+  off (`publishedWriting` vs `upcomingWriting`). Routes: `/resources/`, `/resources/<file>/`,
   `/blog/`, `/blog/<file>/`, and `/about/` (which holds the name story and
   links the `the-creation-of-rotli` post once it is published). Markdown code
   blocks are not syntax-highlighted: Shiki writes inline `style=` attributes,
@@ -228,10 +250,11 @@ bun run preview  # serve the built dist/ locally
   reply; the four steps: asks, keeps "Conversation notes" after every reply,
   writes notes and files on the Mac, you jump in or Lock it) → Formats
   (Documents on Univer, Sheets coming soon, Boards on Excalidraw, with status
-  chips from `featurePolicy.ts`, and where Assets live) → the Librarian →
-  ConnectAI (each provider's own CLI installed in Terminal; rotli never signs in,
-  reads login files, or stores credentials; Rotli Helper runs the same tools for
-  Rotli Web; the install lines mirror `src/ai/connectorGuides.ts`) → habits.
+  chips from `featurePolicy.ts`, and where Assets live) → the Librarian and
+  the smaller habits → ConnectAI (each provider's own CLI installed in
+  Terminal; rotli never signs in, reads login files, or stores credentials;
+  Rotli Helper runs the same tools for Rotli Web; the install lines mirror
+  `src/ai/connectorGuides.ts`).
 - **Scenes from the film**, drawn in inline SVG on the film's palette (the
   `--sunset-*`, `--sea*`, `--sand`, `--olive*`, `--limestone`, `--lake`,
   `--wood*`, and `--lantern` tokens in `Base.astro`) with the app's own
@@ -252,14 +275,19 @@ bun run preview  # serve the built dist/ locally
   public, "Watch the film" when the film exists, and otherwise nothing. Mobile
   uses one column; the product preview sits beside the copy from 960px.
   It does not expose downloads or the full landing page's navigation.
-- `/resources/mcp/` (moved from `/mcp/` on 2026-09-18; the Caddyfile
-  redirects the old path) is the connection guide for local stdio clients (Claude Code, Codex,
-  Cursor), the workspace policy, and disposable verification. Since 2026-09-11
-  the whole guide, the landing page's agent section, and their navigation
-  render only on the dev site under the experiment label: MCP and agent
-  integrations left production until refined. The remote route (Grok Bot, the
-  relay, self-hosting) sits inside that same dev-only guide. Do not publish a hosted relay URL there until that
-  deployment has been verified.
+- **`/resources/developers/`** is the one home for MCP and the CLI, for
+  agents (Claude Code, Codex, Cursor) working in a configured vault; facts
+  restate `docs/architecture/agent-workspace.md`. MCP and the agent commands
+  run in development builds only and have not shipped, so the launch site
+  shows an honest "Coming soon" summary, and the dev site
+  (`showsExperiments`) shows the full reference under the experiment label:
+  connecting a local stdio client, `agent doctor` and `agent self-test`, the
+  tools, the rules every call follows, the JSON CLI, limits, and remote
+  agents (Grok Bot, the relay, self-hosting). Do not publish a hosted relay
+  URL there until that deployment has been verified. The old
+  `/resources/mcp/` guide (itself moved from `/mcp/`) folded in on
+  2026-10-02: the build writes a refresh page there (`redirects` in
+  `astro.config.mjs`), which the Caddyfile's `/mcp` redirect lands on.
 - `public/social-card.svg` is the editable source for the link preview, set on
   the story film's island by day: the wordmark and the hero line over a faint
   file-icon pattern that fades out before the bay, the lighthouse on its hill,

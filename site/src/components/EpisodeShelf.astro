@@ -3,16 +3,19 @@
 // listed beside it. No film downloads until an episode is played (the poster and the
 // thumbnails do load); choosing one plays it with sound and native controls. Without script
 // each episode is a plain link to its film.
+//
+// /features/ opens with it right under the page's own headline, so its heading
+// is a quiet line there, not a second display title.
 import { episodes } from '../films';
 
 const [first] = episodes;
 ---
 
-<section class="section shelf" id="episodes" aria-labelledby="episodes-title">
+<section class="shelf" id="episodes" aria-labelledby="episodes-title">
   <div class="wrap">
-    <header class="section-head">
-      <h2 class="section-title" id="episodes-title">Rotli in <span class="inked">30 seconds.</span></h2>
-      <p class="section-lede">Eight short films, one idea each. Pick one.</p>
+    <header class="shelf-head">
+      <h2 id="episodes-title">Rotli in 30 seconds</h2>
+      <p>Eight short films, one idea each. Pick one.</p>
     </header>
     <div class="shelf-grid" data-shelf>
       <figure class="shelf-player">
@@ -73,6 +76,26 @@ const [first] = episodes;
 </script>
 
 <style>
+  .shelf {
+    padding-block: clamp(2.5rem, 5vw, 3.5rem) var(--section-space);
+  }
+  .shelf-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 1rem;
+    margin-bottom: 1.25rem;
+  }
+  .shelf-head h2 {
+    margin: 0;
+    font-size: var(--step-h3);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .shelf-head p {
+    margin: 0;
+    color: var(--text-muted);
+  }
   .shelf-grid {
     display: grid;
     gap: clamp(1.25rem, 3vw, 2rem);
@@ -140,6 +163,22 @@ const [first] = episodes;
   @media (min-width: 1000px) {
     .shelf-grid {
       grid-template-columns: minmax(0, 1fr) minmax(17rem, 22rem);
+    }
+  }
+  /* Under the player on narrower screens: two columns, picture over title,
+     so eight episodes take four rows instead of eight. */
+  @media (max-width: 999px) {
+    .shelf-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem;
+    }
+    .shelf-list a {
+      grid-template-columns: 1fr;
+      align-items: start;
+      gap: 0.5rem;
+    }
+    .shelf-list img {
+      width: 100%;
     }
   }
 </style>

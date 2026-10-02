@@ -3,10 +3,11 @@ title: The creation of rotli
 description: Why I started building a quiet, local-first workspace, and what building it has taught me.
 section: post
 date: 2026-09-18
-draft: true
+status: coming-soon
 ---
 
-> Draft. This post appears only on the dev site until it is written and `draft` comes off.
+<!-- Coming soon: listed on /blog/ without a link until `status` comes off. The outline below is
+     the working draft; it is not published anywhere while the post is coming soon. -->
 
 ## Why I started
 

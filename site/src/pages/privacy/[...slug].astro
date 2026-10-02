@@ -43,9 +43,9 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   description="How rotli handles your notes: no account, no analytics, files on your computer, and AI only on your terms. What connects to the internet, and why."
   canonicalPath="/privacy/"
   section="privacy"
-  kicker={`Updated ${UPDATED}`}
   heading="Privacy"
   lede="rotli is built so there is nothing about you to collect. This page explains exactly what it does with your data, what connects to the internet, and why it works that way."
+  meta={[`Updated ${UPDATED}`]}
   toc={toc}
 >
   <div slot="scene" class="night band-night" data-reveal>
@@ -114,8 +114,8 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   <img class="spot" src={aiChat.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
   <p>
     AI in rotli is a visitor, not the owner of your workspace. You can leave it off entirely. If you use it,
-    an <strong>on-device model</strong> runs on your Mac and works without a network. <strong>Connected AI</strong>
-    means the tools you already use, like Claude Code or Codex, and rotli labels them as remote.
+    an <strong>on-device model</strong> runs on your Mac and works without a network.{' '}
+    <strong>Connected AI</strong> means the tools you already use, like Claude Code or Codex, and rotli labels them as remote.
   </p>
   <div class="access">
     <table>
@@ -237,32 +237,44 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
 </WritingPage>
 
 <style>
+  /* The access table: its own full-width block below any floated companion,
+     a strong rule over the header and hairlines between rows. */
   .access {
-    margin: 1.5rem 0 1.75rem;
+    clear: both;
+    margin: 1.75rem 0 2rem;
     overflow-x: auto;
   }
-  table {
+  .access table {
     width: 100%;
+    margin: 0;
     border-collapse: collapse;
     font-size: 0.98rem;
   }
-  caption {
+  .access caption {
     padding-bottom: 0.75rem;
-    color: var(--text-muted);
-    font-size: 0.9rem;
+    color: var(--text);
+    font-size: 0.92rem;
+    font-weight: 600;
     text-align: left;
   }
-  th,
-  td {
-    padding: 0.9rem 1rem 0.9rem 0;
-    border-bottom: 1px solid var(--border-strong);
+  .access th,
+  .access td {
+    padding: 0.85rem 1rem 0.85rem 0;
+    border-bottom: 1px solid var(--border);
     text-align: left;
     vertical-align: top;
   }
-  thead th {
+  .access thead th {
+    border-top: 1px solid var(--border-strong);
+    border-bottom-color: var(--border-strong);
     color: var(--text-muted);
     font-size: 0.84rem;
     font-weight: 600;
+  }
+  .access tbody th {
+    width: 38%;
+    color: var(--text);
+    font-size: 0.98rem;
   }
   tbody th b {
     display: block;
@@ -270,15 +282,16 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   }
   tbody th small {
     display: block;
+    margin-top: 0.15rem;
     color: var(--text-muted);
-    font-size: 0.84rem;
+    font-size: 0.86rem;
     font-weight: 400;
   }
-  td[data-access='none'] {
+  .access td[data-access='none'] {
     color: var(--accent-text);
     font-weight: 600;
   }
-  td[data-access='read'] {
+  .access td[data-access='read'] {
     color: var(--text-muted);
   }
   /* The story film's night: the dome of "on this Mac", on a starry frame above the policy. */
