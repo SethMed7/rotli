@@ -10,7 +10,8 @@ use crate::corpus::{validate_rel, CorpusState};
 /// Largest image inlined into a copy (a 12 MB PNG is already a poor paste).
 const MAX_DATA_URL_BYTES: usize = 12_000_000;
 
-fn mime_of(rel: &str) -> Option<&'static str> {
+/// The MIME type of an image Rotli shows, by extension; `None` for anything else.
+pub(crate) fn mime_of(rel: &str) -> Option<&'static str> {
     let ext = rel.rsplit('.').next()?.to_ascii_lowercase();
     Some(match ext.as_str() {
         "png" => "image/png",

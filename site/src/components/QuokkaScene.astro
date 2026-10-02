@@ -1,0 +1,362 @@
+---
+// The scenery at the foot of every page (the footer), of the 404, and of /subscribed/: a
+// strip of Rottnest by day, with the sea and the far lighthouse, low scrub on the dunes, the
+// sand, a little pile of leaves, quokkas minding it, and now and then one strolling past
+// behind them.
+//
+// The quokkas are the app's own canonical line art (base.svg), rigged rather than redrawn:
+// the head turns about the neck, the eyes are redrawn on top so they can follow the pointer
+// and blink, a paw reaches for a pointer that comes close, and brows and mouths drawn in the
+// art's own line weight swap in for moods: cross when the pointer nears the leaves, sad when
+// it is on them, happy when it leaves. src/quokka/rig.ts holds the pivots; src/quokka/scene.ts
+// moves it, only while it is on screen and never under reduced motion. Then, and without
+// script, the scene simply stands still. Decoration only: hidden from assistive technology,
+// and it holds no text or controls, so it never covers any.
+import baseSvg from '../../../src/assets/characters/base.svg?raw';
+import { quokkaArt } from '../quokka/art';
+import { CENTER_X, EYES, HEAD_CLIP_BOTTOM, INK_WIDTH, SHOULDERS, TORSO_CLIP_TOP, VIEWBOX } from '../quokka/rig';
+
+interface Props {
+  /** How the quokkas greet the page: `happy` on /subscribed/. */
+  mood?: 'happy';
+}
+
+const { mood } = Astro.props;
+const art = quokkaArt(baseSvg);
+const viewBox = `${VIEWBOX.x} ${VIEWBOX.y} ${VIEWBOX.width} ${VIEWBOX.height}`;
+const ink = `stroke-width="${INK_WIDTH}"`;
+
+// The drawn arm hangs straight down from its shoulder (+y); the script turns it toward the
+// pointer. While it reaches, a cocoa patch hides the canonical folded arm on that side.
+const arm = 'M-46 -30L-48 142Q-50 206 0 208Q50 206 48 142L46 -30';
+const fingers = 'M-17 170v28M17 170v28';
+const armPatch = {
+  l: 'M512 566L548 584L614 652L614 762L528 764L452 714L444 656L472 638Z',
+  r: 'M716 566L752 590L814 622L818 648L762 718L706 764L636 762L630 690L660 616Z',
+};
+// Moods replace the canonical smile: a patch over it, the philtrum, then the new mouth.
+const mouthPatch = 'M528 400L562 400L592 418L652 418L684 400L720 400L724 432L692 474L650 498L594 498L552 474L524 432Z';
+
+/** One quokka's layers; every quokka in the scene shares this exactly. */
+const eye = ({ x, y }: { x: number; y: number }) =>
+  `<g class="qk-eye" data-eye><g data-eye-look><ellipse class="qk-ink" cx="${x}" cy="${y}" rx="28" ry="33"/><ellipse class="qk-fill" cx="${x + 1}" cy="${y - 12}" rx="14" ry="12"/></g></g>`;
+const limb = (side: 'l' | 'r') =>
+  `<g class="qk-arm qk-arm-${side}"><path class="qk-fill" d="${armPatch[side]}"/><g data-arm="${side}" transform="translate(${SHOULDERS[side].x} ${SHOULDERS[side].y})"><use href="#qk-arm"/></g></g>`;
+const rig = [
+  '<g data-rig>',
+  '<g clip-path="url(#qk-clip-torso)"><use href="#qk-body" class="qk-fill"/><use href="#qk-line" class="qk-ink"/></g>',
+  '<g data-head>',
+  '<g clip-path="url(#qk-clip-head)"><use href="#qk-body" class="qk-fill"/><use href="#qk-line" class="qk-ink"/></g>',
+  '<g class="qk-live">',
+  ...EYES.map(({ x, y }) => `<circle class="qk-fill" cx="${x}" cy="${y}" r="40"/>`),
+  `<g class="qk-eyes">${EYES.map(eye).join('')}</g>`,
+  `<path class="qk-line qk-x qk-x-happy" ${ink} d="${EYES.map(({ x, y }) => `M${x - 26} ${y + 8}Q${x} ${y - 26} ${x + 26} ${y + 8}`).join('')}"/>`,
+  '</g>',
+  `<path class="qk-fill qk-x qk-x-mad qk-x-sad" d="${mouthPatch}"/>`,
+  `<path class="qk-line qk-x qk-x-mad qk-x-sad" ${ink} d="M622 406V428"/>`,
+  `<path class="qk-line qk-x qk-x-mad" ${ink} d="M586 454Q604 440 622 448Q640 440 658 454M484 274L550 296M760 274L694 296"/>`,
+  `<path class="qk-line qk-x qk-x-sad" ${ink} d="M584 466Q622 426 660 466M488 294L550 272M756 294L694 272"/>`,
+  '</g>',
+  limb('l'),
+  limb('r'),
+  '</g>',
+].join('');
+const cast = ['q1', 'q2', 'q3', 'q4'];
+/** A quokka facing the other way: mirrored about its own centre line. */
+const mirror = `matrix(-1 0 0 1 ${2 * CENTER_X} 0)`;
+---
+
+<div class="scenery" aria-hidden="true" data-scenery data-start-mood={mood}>
+  <svg class="scenery-defs" width="0" height="0" focusable="false">
+    <defs>
+      <path id="qk-line" d={art.line} fill-rule="evenodd"></path>
+      <path id="qk-body" d={art.silhouette}></path>
+      <clipPath id="qk-clip-head"><rect x="0" y="-200" width="1254" height={HEAD_CLIP_BOTTOM + 200}></rect></clipPath>
+      <clipPath id="qk-clip-torso"><rect x="0" y={TORSO_CLIP_TOP} width="1254" height={1254 - TORSO_CLIP_TOP}></rect></clipPath>
+      <g id="qk-arm">
+        <path class="qk-arm-skin" stroke-width={INK_WIDTH} d={arm}></path>
+        <path class="qk-arm-line" stroke-width={INK_WIDTH} d={fingers}></path>
+      </g>
+      <g id="qk-leaf">
+        <path class="qk-leaf-blade" d="M0 0Q22-15 46 0Q22 15 0 0Z"></path>
+        <path class="qk-leaf-rib" d="M5 0H38"></path>
+      </g>
+    </defs>
+  </svg>
+
+  <svg class="scenery-land" viewBox="0 0 1440 150" preserveAspectRatio="xMidYMax slice" focusable="false">
+    <g class="cloud">
+      <ellipse cx="236" cy="40" rx="46" ry="11"></ellipse>
+      <ellipse cx="268" cy="33" rx="28" ry="11"></ellipse>
+    </g>
+    <g class="cloud">
+      <ellipse cx="1004" cy="26" rx="36" ry="9"></ellipse>
+      <ellipse cx="1028" cy="20" rx="22" ry="9"></ellipse>
+    </g>
+    <rect class="sea" x="0" y="98" width="1440" height="52"></rect>
+    <path class="sea-edge" d="M0 98H1440"></path>
+    <path class="waves" d="M150 110q8-4 16 0M520 106q8-4 16 0M720 112q8-4 16 0M1250 108q8-4 16 0"></path>
+    <path class="far-isle" d="M1070 99C1110 86 1150 72 1196 70S1290 78 1340 99"></path>
+    <g class="lighthouse">
+      <path class="tower" d="M1189 72l3-34h10l3 34z"></path>
+      <rect class="lamp" x="1192" y="29" width="10" height="9"></rect>
+      <path class="cap" d="M1190 29q7-8 14 0z"></path>
+    </g>
+    <path class="dune dune-far" d="M-10 152V126C90 112 190 108 300 118S470 130 560 122 760 106 880 114 1080 130 1180 120 1360 110 1450 116V152Z"></path>
+    <g class="scrub">
+      <ellipse cx="96" cy="118" rx="32" ry="11"></ellipse>
+      <ellipse cx="130" cy="113" rx="20" ry="9"></ellipse>
+      <ellipse cx="392" cy="123" rx="26" ry="9"></ellipse>
+      <ellipse cx="826" cy="112" rx="28" ry="10"></ellipse>
+      <ellipse cx="856" cy="116" rx="17" ry="7"></ellipse>
+      <ellipse cx="1124" cy="124" rx="24" ry="9"></ellipse>
+      <ellipse cx="1330" cy="113" rx="30" ry="10"></ellipse>
+    </g>
+    <path class="dune dune-near" d="M-10 152V138C120 128 260 132 420 138S700 140 860 134 1160 128 1450 136V152Z"></path>
+  </svg>
+  <div class="scenery-sand"></div>
+
+  <svg class="qk qk-walker" viewBox={viewBox} focusable="false" data-quokka="walker" data-mood={mood}>
+    <g data-flip set:html={rig} />
+  </svg>
+
+  <svg class="food" viewBox="0 0 150 72" focusable="false" data-food>
+    <ellipse class="food-shadow" cx="75" cy="66" rx="68" ry="6"></ellipse>
+    <use href="#qk-leaf" transform="translate(8 62) rotate(-6)"></use>
+    <use href="#qk-leaf" class="leaf-light" transform="translate(50 65) rotate(2)"></use>
+    <use href="#qk-leaf" transform="translate(142 63) rotate(186)"></use>
+    <use href="#qk-leaf" class="leaf-light" transform="translate(24 52) rotate(-18)"></use>
+    <use href="#qk-leaf" transform="translate(124 52) rotate(198)"></use>
+    <use href="#qk-leaf" transform="translate(50 40) rotate(-22)"></use>
+    <use href="#qk-leaf" class="leaf-light" transform="translate(102 40) rotate(204)"></use>
+    <use href="#qk-leaf" transform="translate(54 31) rotate(-6)"></use>
+  </svg>
+
+  {
+    cast.map((name) => (
+      <svg class={`qk qk-${name}`} viewBox={viewBox} focusable="false" data-quokka={name} data-mood={mood} data-face={name === 'q3' ? 'left' : undefined}>
+        <g data-flip transform={name === 'q3' ? mirror : undefined} set:html={rig} />
+      </svg>
+    ))
+  }
+</div>
+
+<script>
+  import '../quokka/scene';
+</script>
+
+<style is:global>
+  /* Global, under .scenery: the rig is shared markup and <use> clones, which scoped
+     selectors cannot reach. */
+  .scenery {
+    --sand-height: clamp(38px, 4vw, 52px);
+    position: relative;
+    height: clamp(168px, 15vw, 212px);
+    overflow: hidden;
+    color: var(--text);
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .scenery svg {
+    max-width: none;
+  }
+  .scenery-defs {
+    position: absolute;
+    overflow: hidden;
+  }
+  .scenery-land {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: calc(100% - var(--sand-height));
+  }
+  .scenery-sand {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: var(--sand-height);
+    background: var(--sand);
+  }
+  .scenery .cloud ellipse {
+    fill: var(--surface-2);
+  }
+  .scenery .sea {
+    fill: var(--sea);
+  }
+  .scenery .sea-edge {
+    stroke: var(--sea-deep);
+    stroke-width: 1.6;
+  }
+  .scenery .waves {
+    fill: none;
+    stroke: var(--sea-line);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+  }
+  .scenery .far-isle {
+    fill: var(--limestone);
+    stroke: var(--text);
+    stroke-width: 1.6;
+  }
+  .scenery .tower {
+    fill: var(--surface);
+    stroke: var(--text);
+    stroke-width: 1.6;
+  }
+  .scenery .lamp {
+    fill: var(--lantern);
+    stroke: var(--text);
+    stroke-width: 1.6;
+  }
+  .scenery .cap {
+    fill: var(--accent);
+    stroke: var(--text);
+    stroke-width: 1.6;
+  }
+  .scenery .scrub ellipse {
+    fill: var(--olive);
+    stroke: var(--text);
+    stroke-width: 1.6;
+  }
+  .scenery .dune {
+    stroke: var(--text);
+    stroke-width: 1.6;
+  }
+  .scenery .dune-far {
+    fill: var(--limestone);
+  }
+  .scenery .dune-near {
+    fill: var(--sand);
+  }
+
+  /* The cast stands on the sand, each at its own spot; widths follow the height. */
+  .scenery .qk,
+  .scenery .food {
+    position: absolute;
+    overflow: visible;
+  }
+  .scenery .qk {
+    --qk-height: clamp(96px, 8.6vw, 124px);
+    bottom: 10px;
+    height: var(--qk-height);
+    width: calc(var(--qk-height) * 0.68);
+    translate: -50% 0;
+  }
+  .scenery .qk-q1 {
+    left: 20%;
+    bottom: 18px;
+  }
+  .scenery .qk-q2 {
+    left: 45%;
+    bottom: 8px;
+  }
+  .scenery .qk-q3 {
+    left: 63%;
+    bottom: 4px;
+  }
+  .scenery .qk-q4 {
+    left: 82%;
+    bottom: 20px;
+  }
+  .scenery .food {
+    left: 54%;
+    bottom: 6px;
+    width: clamp(78px, 6.8vw, 100px);
+    height: auto;
+    aspect-ratio: 150 / 72;
+    translate: -50% 0;
+  }
+  /* The stroller walks the dune line behind the others, a little further off. At rest (no
+     script, reduced motion) it stands at the left; the script sets off from there. */
+  .scenery .qk-walker {
+    --qk-height: clamp(60px, 5.2vw, 76px);
+    left: 7%;
+    bottom: calc(var(--sand-height) - 12px);
+    translate: none;
+  }
+  .scenery.is-live .qk-walker {
+    left: 0;
+  }
+  @media (max-width: 760px) {
+    .scenery .qk-q1 {
+      display: none;
+    }
+    .scenery .qk-q2 {
+      left: 18%;
+    }
+    .scenery .food {
+      left: 44%;
+    }
+    .scenery .qk-q3 {
+      left: 67%;
+    }
+    .scenery .qk-q4 {
+      left: 88%;
+    }
+  }
+
+  /* Layers: the body colour under the canonical ink, and overlays in the same ink weight. */
+  .scenery .qk-fill {
+    fill: var(--cocoa);
+  }
+  .scenery .qk-ink {
+    fill: var(--text);
+  }
+  .scenery .qk-line {
+    fill: none;
+    stroke: var(--text);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  /* Inside <use> clones (the arm, the leaves) a descendant selector never matches, so
+     these are plain classes; a leaf's colour arrives as an inherited custom property. */
+  .qk-arm-skin {
+    fill: var(--cocoa);
+    stroke: var(--text);
+    stroke-linejoin: round;
+  }
+  .qk-arm-line {
+    fill: none;
+    stroke: var(--text);
+    stroke-linecap: round;
+  }
+  .scenery .qk-live,
+  .scenery .qk-x,
+  .scenery .qk-arm {
+    display: none;
+  }
+  .js .scenery .qk-live,
+  .scenery .qk[data-mood='mad'] .qk-x-mad,
+  .scenery .qk[data-mood='sad'] .qk-x-sad,
+  .scenery .qk[data-mood='happy'] .qk-x-happy,
+  .scenery .qk[data-reach='l'] .qk-arm-l,
+  .scenery .qk[data-reach='r'] .qk-arm-r {
+    display: inline;
+  }
+  .scenery .qk[data-mood='happy'] .qk-eyes {
+    display: none;
+  }
+
+  .scenery .food-shadow {
+    fill: var(--wood);
+    opacity: 0.24;
+  }
+  .qk-leaf-blade {
+    fill: var(--leaf, var(--olive));
+    stroke: var(--text);
+    stroke-width: 2.4;
+    stroke-linejoin: round;
+  }
+  .scenery .leaf-light {
+    --leaf: var(--olive-bright);
+  }
+  .qk-leaf-rib {
+    fill: none;
+    stroke: var(--text);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+  }
+</style>

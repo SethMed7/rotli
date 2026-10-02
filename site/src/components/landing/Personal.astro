@@ -1,10 +1,9 @@
 ---
-// Make it yours: the theme studio (fourteen real captures from public/themes/)
-// and the optional quokka companion. Both move only when the visitor asks:
-// no timers, so a background tab does no work and nothing loops beside text.
+// Make it yours: the theme studio (fourteen real captures from public/themes/). It moves
+// only when the visitor asks: no timers, so a background tab does no work and nothing
+// loops beside text.
 // Behind it, faintly, the story film's island by day (IslandScene.astro).
 import IslandScene from '../IslandScene.astro';
-import showcaseManifest from '../../assets/characters/showcase/showcase.json';
 
 // Swatch colours read the site swatch layer (Base.astro), which mirrors the
 // app's per-environment ground and accent tokens. They are CSS rules keyed by
@@ -28,17 +27,6 @@ const stops = families.flatMap((family) =>
   })),
 );
 const first = stops[0];
-
-// Companion: real, selectable combinations rendered by
-// scripts/build-companion-showcase.ts with the app's own placement rules.
-const showcaseImages = import.meta.glob<{ default: ImageMetadata }>('../../assets/characters/showcase/*.webp', {
-  eager: true,
-});
-const companions = showcaseManifest.map((entry) => {
-  const image = showcaseImages[`../../assets/characters/showcase/${entry.slug}.webp`];
-  if (!image) throw new Error(`Missing companion render for ${entry.slug}; run bun scripts/build-companion-showcase.ts`);
-  return { ...entry, src: image.default.src };
-});
 ---
 
 <section class="section band-warm personal" id="personal" aria-labelledby="personal-title">
@@ -112,51 +100,6 @@ const companions = showcaseManifest.map((entry) => {
         ))}
       </div>
     </div>
-
-    <div class="companion" data-reveal>
-      <div class="companion-art">
-        <div class="companion-stage">
-          {companions.map((companion, index) => (
-            <img
-              class:list={['companion-slide', { 'is-active': index === 0, 'is-next': index === 1, 'is-prev': index === companions.length - 1 }]}
-              data-companion={index}
-              src={companion.src}
-              width="400"
-              height="400"
-              alt={index === 0 ? companion.alt : ''}
-              data-alt={companion.alt}
-              data-label={companion.label}
-              loading="lazy"
-              decoding="async"
-            />
-          ))}
-        </div>
-        <div class="companion-controls">
-          <button type="button" class="carousel-step companion-step" data-step="-1" aria-label="Previous quokka">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 5-7 7 7 7" /></svg>
-          </button>
-          <p class="carousel-label" id="companion-label" aria-live="polite">
-            <span class="carousel-count" id="companion-count">1 / {companions.length}</span>
-            <span class="carousel-name" id="companion-name">{companions[0].label}</span>
-          </p>
-          <button type="button" class="carousel-step companion-step" data-step="1" aria-label="Next quokka">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 5 7 7-7 7" /></svg>
-          </button>
-        </div>
-      </div>
-      <div class="companion-copy">
-        <h3>A quokka, when you want one.</h3>
-        <p>
-          Pick a body colour, black or white linework, a mood and pose, and glasses or a bucket hat
-          in any colour. Empty states choose a pose that fits. Turn the companion off and it appears
-          only during onboarding.
-        </p>
-        <p class="companion-name">
-          Why a quokka? rotli is short for Rottnest, the island quokkas call home.{' '}
-          <a href="/about/#name">The story behind the name <span aria-hidden="true">→</span></a>
-        </p>
-      </div>
-    </div>
   </div>
 </section>
 
@@ -207,34 +150,6 @@ const companions = showcaseManifest.map((entry) => {
     const dx = event.clientX - swipeFrom;
     swipeFrom = null;
     if (Math.abs(dx) > 40 && matchMedia('(max-width: 900px)').matches) selectTheme(theme + (dx < 0 ? 1 : -1));
-  });
-
-  // Companion: previous/next buttons and the neighbouring slides step through
-  // the showcase. Only the active slide carries alt text.
-  const slides = [...document.querySelectorAll<HTMLImageElement>('.companion-slide')];
-  const count = document.querySelector<HTMLElement>('#companion-count');
-  const name = document.querySelector<HTMLElement>('#companion-name');
-  let current = 0;
-  const show = (index: number) => {
-    const total = slides.length;
-    if (!total) return;
-    current = ((index % total) + total) % total;
-    slides.forEach((slide, i) => {
-      slide.classList.toggle('is-active', i === current);
-      slide.classList.toggle('is-prev', total > 1 && i === (current - 1 + total) % total);
-      slide.classList.toggle('is-next', total > 2 && i === (current + 1) % total);
-      slide.alt = i === current ? (slide.dataset.alt ?? '') : '';
-    });
-    if (count) count.textContent = `${current + 1} / ${total}`;
-    if (name) name.textContent = slides[current].dataset.label ?? '';
-  };
-  document.querySelectorAll<HTMLButtonElement>('.companion-step').forEach((button) => {
-    button.addEventListener('click', () => show(current + Number(button.dataset.step)));
-  });
-  slides.forEach((slide, i) => {
-    slide.addEventListener('click', () => {
-      if (slide.classList.contains('is-prev') || slide.classList.contains('is-next')) show(i);
-    });
   });
 </script>
 
@@ -366,63 +281,6 @@ const companions = showcaseManifest.map((entry) => {
   .swatch[data-swatch='midnight-light'] { --swatch-ground: var(--swatch-midnight-light); --swatch-accent: var(--swatch-midnight-light-accent); }
   .swatch[data-swatch='midnight-dark'] { --swatch-ground: var(--swatch-midnight-dark); --swatch-accent: var(--swatch-midnight-dark-accent); }
 
-  .companion {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 2rem clamp(2rem, 6vw, 5rem);
-    align-items: center;
-    margin-top: clamp(4rem, 8vw, 6rem);
-    padding-top: clamp(3rem, 6vw, 4.5rem);
-    border-top: 1px solid var(--border-strong);
-  }
-  .companion-stage {
-    position: relative;
-    aspect-ratio: 5 / 3;
-    overflow: hidden;
-  }
-  .companion-slide {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    width: 58%;
-    height: 100%;
-    object-fit: contain;
-    opacity: 0;
-    transform: translateX(-50%) scale(0.5);
-    transition: opacity 420ms ease, transform 420ms cubic-bezier(0.2, 0.7, 0.2, 1);
-    pointer-events: none;
-  }
-  .companion-slide.is-active {
-    z-index: 2;
-    opacity: 1;
-    transform: translateX(-50%) scale(1);
-  }
-  .companion-slide.is-prev,
-  .companion-slide.is-next {
-    z-index: 1;
-    opacity: 0.4;
-    cursor: pointer;
-    pointer-events: auto;
-  }
-  .companion-slide.is-prev {
-    transform: translateX(-100%) scale(0.6);
-  }
-  .companion-slide.is-next {
-    transform: translateX(0%) scale(0.6);
-  }
-  .companion-slide.is-prev:hover,
-  .companion-slide.is-next:hover {
-    opacity: 0.7;
-  }
-  .companion-controls,
-  .studio-steps {
-    display: grid;
-    grid-template-columns: 44px minmax(0, 1fr) 44px;
-    align-items: center;
-    gap: 0.75rem;
-    max-width: 24rem;
-    margin: 1rem auto 0;
-  }
   .carousel-step {
     width: 44px;
     height: 44px;
@@ -455,38 +313,12 @@ const companions = showcaseManifest.map((entry) => {
     font-size: 0.95rem;
     font-weight: 600;
   }
-  .companion-copy h3 {
-    margin: 0;
-    font-size: var(--step-h3);
-    font-weight: 600;
-    letter-spacing: -0.02em;
-  }
-  .companion-copy p {
-    margin: 0.8rem 0 0;
-    max-width: 32rem;
-    color: var(--text-muted);
-    line-height: 1.62;
-  }
-  .companion-name a {
-    display: inline-flex;
-    min-height: 44px;
-    align-items: center;
-    color: var(--accent-text);
-    font-weight: 600;
-    text-decoration: none;
-  }
-  .companion-name a:hover {
-    text-decoration: underline;
-    text-underline-offset: 0.25em;
-  }
-
   /* The theme carousel shows only where the orb picker would crowd the capture. */
   .studio-steps {
     display: none;
   }
   @media (max-width: 900px) {
-    .studio,
-    .companion {
+    .studio {
       grid-template-columns: 1fr;
     }
     .studio {

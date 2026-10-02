@@ -299,7 +299,8 @@ export function SlashPicker({
             className={i === selectedIndex ? "slashrow sel" : "slashrow"}
             role="menuitem"
             onMouseDown={(e) => e.preventDefault()}
-            onMouseEnter={() => onHover(i)}
+            // only a moving pointer picks the row (see SlashMenu)
+            onMouseMove={() => i !== selectedIndex && onHover(i)}
             onClick={() => onPick(note)}
           >
             <span className="slashglyph">{glyphForNote(note)}</span>

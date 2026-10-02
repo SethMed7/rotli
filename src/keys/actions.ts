@@ -43,6 +43,7 @@ import { activeTabOf, findLeaf, leaves, openNavTarget, usePanesStore } from "../
 import { toggleSettings } from "../state/settingsToggle";
 import { startTour } from "../state/tour";
 import { ALL_NOTES, SIDEBAR_ZOOM_STEP, TASKS, useUiStore } from "../state/ui";
+import { registerAlignActions } from "./alignActions";
 import { registerAppLinkActions } from "./appLinkActions";
 import { registerCaptureActions } from "./captureActions";
 import { registerChatWindowActions } from "./chatWindowActions";
@@ -440,6 +441,7 @@ export function registerDefaultActions(): void {
   });
 
   registerNoteProtectionActions();
+  registerAlignActions();
   registerLeaderActions();
 
   // — tabs (created only by explicit gestures; plain click replaces). ⌘T uses

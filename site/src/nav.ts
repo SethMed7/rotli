@@ -9,7 +9,16 @@ import {
   site,
 } from './site';
 
-export type NavSection = 'product' | 'features' | 'privacy' | 'download' | 'resources' | 'blog' | 'about';
+export type NavSection =
+  | 'product'
+  | 'features'
+  | 'privacy'
+  | 'download'
+  | 'resources'
+  | 'blog'
+  | 'developers'
+  | 'changelog'
+  | 'about';
 
 export interface SiteLink {
   href: string;
@@ -20,17 +29,66 @@ export interface NavLink extends SiteLink {
   section: NavSection;
 }
 
+/** One entry inside a header dropdown: a page, a line about it, and an optional status. */
+export interface NavItem extends NavLink {
+  description: string;
+  /** A short status shown beside the label, e.g. "Coming soon". */
+  status?: string;
+}
+
+/** A header dropdown. `href` is where its label goes without script (and the no-JS fallback). */
+export interface NavGroup extends NavLink {
+  items: NavItem[];
+}
+
+export type NavEntry = NavLink | NavGroup;
+
+export const isNavGroup = (entry: NavEntry): entry is NavGroup => 'items' in entry;
+
+/** True when `current` is the entry's own section or one of its items'. */
+export function navEntryHolds(entry: NavEntry, current: NavSection | undefined): boolean {
+  if (current === undefined) return false;
+  return entry.section === current || (isNavGroup(entry) && entry.items.some((item) => item.section === current));
+}
+
 /**
  * Header links: real pages, never landing-page anchors. Download is not
- * listed; it is the header's one button (SiteHeader.astro). Blog appears only
- * once a post is published, so the header never leads to an empty index.
+ * listed; it is the header's one button (SiteHeader.astro). Resources is a
+ * dropdown (Guides, Blog, Developers, Changelog) whose label links to
+ * /resources/ when script is off. Blog appears only once a post can be read,
+ * so the header never leads to an index of nothing but "coming soon". The
+ * developer reference (MCP and the CLI) is a development-build feature: the
+ * launch site labels it coming soon (src/site.ts `showsExperiments`).
  */
-export function primaryNav(options: { hasPosts: boolean }): NavLink[] {
+export function primaryNav(options: { hasPosts: boolean }): NavEntry[] {
+  const resources: NavItem[] = [
+    {
+      section: 'resources',
+      href: '/resources/',
+      label: 'Guides',
+      description: 'Short answers on how rotli works',
+    },
+    ...(options.hasPosts
+      ? [{ section: 'blog' as const, href: '/blog/', label: 'Blog', description: 'Notes from building rotli' }]
+      : []),
+    {
+      section: 'developers',
+      href: '/resources/developers/',
+      label: 'Developers',
+      description: 'MCP and the command line, for agents',
+      ...(site.showsExperiments ? {} : { status: 'Coming soon' }),
+    },
+    {
+      section: 'changelog',
+      href: '/changelog/',
+      label: 'Changelog',
+      description: 'Every release, newest first',
+    },
+  ];
   return [
     { section: 'features', href: '/features/', label: 'Features' },
     { section: 'privacy', href: '/privacy/', label: 'Privacy' },
-    { section: 'resources', href: '/resources/', label: 'Resources' },
-    ...(options.hasPosts ? [{ section: 'blog' as const, href: '/blog/', label: 'Blog' }] : []),
+    { section: 'resources', href: '/resources/', label: 'Resources', items: resources },
     { section: 'about', href: '/about/', label: 'About' },
   ];
 }

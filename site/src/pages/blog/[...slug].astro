@@ -1,31 +1,49 @@
 ---
-// /blog/ (the index, newest first) and /blog/<post>/.
+// /blog/ (the index: readable posts newest first, then the ones announced as
+// coming soon, which are listed without a link) and /blog/<post>/, an article
+// with the "On this page" tree (WritingPage `toc`).
 import { render } from 'astro:content';
 import { twinPath, writingGraph, writingPath } from '../../agents';
 import WritingList from '../../components/WritingList.astro';
 import WritingPage from '../../components/WritingPage.astro';
 import { site } from '../../site';
-import { publishedWriting, slugOf, type Writing } from '../../writing';
+import { publishedWriting, readingMinutes, slugOf, upcomingWriting, type Writing } from '../../writing';
 
 export async function getStaticPaths() {
   if (!site.showsFullSite) return [];
   const entries = await publishedWriting('post');
+  const upcoming = await upcomingWriting('post');
   return [
-    { params: { slug: undefined }, props: { entry: null, entries } },
-    ...entries.map((entry) => ({ params: { slug: slugOf(entry) }, props: { entry, entries } })),
+    { params: { slug: undefined }, props: { entry: null, entries, upcoming } },
+    ...entries.map((entry) => ({ params: { slug: slugOf(entry) }, props: { entry, entries, upcoming } })),
   ];
 }
 
-const { entry, entries } = Astro.props as { entry: Writing | null; entries: Writing[] };
+const { entry, entries, upcoming } = Astro.props as {
+  entry: Writing | null;
+  entries: Writing[];
+  upcoming: Writing[];
+};
 const formatDate = (date: Date) =>
   date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
-const items = entries.map((item) => ({
-  href: `/blog/${slugOf(item)}/`,
-  title: item.data.title,
-  description: item.data.description,
-  meta: item.data.draft ? 'Draft · dev site only' : formatDate(item.data.date),
-}));
-const { Content } = entry ? await render(entry) : { Content: null };
+const items = [
+  ...entries.map((item) => ({
+    href: `/blog/${slugOf(item)}/`,
+    title: item.data.title,
+    description: item.data.description,
+    meta: item.data.draft ? 'Draft · dev site only' : `${formatDate(item.data.date)} · ${readingMinutes(item)} min read`,
+  })),
+  ...upcoming.map((item) => ({
+    title: item.data.title,
+    description: item.data.description,
+    meta: 'Coming soon',
+  })),
+];
+const rendered = entry ? await render(entry) : null;
+const Content = rendered?.Content ?? null;
+const toc = (rendered?.headings ?? [])
+  .filter((heading) => heading.depth === 2)
+  .map((heading) => ({ slug: heading.slug, text: heading.text }));
 ---
 
 {
@@ -38,9 +56,11 @@ const { Content } = entry ? await render(entry) : { Content: null };
       markdownPath={twinPath(writingPath(entry))}
       section="blog"
       crumbs={[{ href: '/blog/', label: 'Blog' }]}
-      kicker={entry.data.draft ? 'Draft · dev site only' : formatDate(entry.data.date)}
+      kicker={entry.data.draft ? 'Draft · dev site only' : undefined}
       heading={entry.data.title}
       lede={entry.data.description}
+      meta={[formatDate(entry.data.date), `${readingMinutes(entry)} min read`]}
+      toc={toc}
     >
       <Content />
     </WritingPage>
@@ -51,7 +71,7 @@ const { Content } = entry ? await render(entry) : { Content: null };
       canonicalPath="/blog/"
       section="blog"
       heading="Blog"
-      lede="Notes from building rotli."
+      lede="Notes from building rotli: how it works, and why it works that way."
       wide
     >
       <WritingList items={items} empty="The first post is on its way." />

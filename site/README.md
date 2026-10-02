@@ -42,8 +42,8 @@ bun run preview  # serve the built dist/ locally
   | Mode          | Deployment                    | Pages                    | Downloads | Indexed |
   | ------------- | ----------------------------- | ------------------------ | --------- | ------- |
   | `coming-soon` | holding page                  | holding page + 404       | no        | yes     |
-  | `dev`         | live dev site · `dev.rotli.co`| full site + drafts + `/resources/mcp/` | no | no |
-  | `full`        | production · `rotli.co`       | landing, Resources, Blog, About, 404 | yes | yes |
+  | `dev`         | live dev site · `dev.rotli.co`| full site + drafts + the full developer reference | no | no |
+  | `full`        | production · `rotli.co`       | landing, Features, Privacy, Resources (Guides, Blog, Developers, Changelog), About, 404 | yes | yes |
 
   An unknown value fails the build. Flipping production to launch is a variable
   change (`SITE_MODE=full`), not a code change — see "Going live" below. `dev` additionally sets
@@ -53,36 +53,59 @@ bun run preview  # serve the built dist/ locally
   pending fidelity review. Site labels do not enforce app access.
 - **Structure and navigation.** `src/nav.ts` is the one navigation policy.
   The header links real pages, never landing anchors: Features · Privacy ·
-  Resources · About, plus Blog once a post is published (an empty index is
-  never linked). On the right sit the GitHub mark (icon only, while the source
-  is public) and one Download button, which opens `/download/`. Download is
-  not also a menu item. The footer's link columns (Product · Learn · Open
-  source, the last only while the source is public) and tagline default from
-  the same file. Pages pass only `current`. The header stays pinned on a solid
-  ground (flat: no blur, no shadow); `[id]` targets carry a matching
-  `scroll-margin-top`. Below 1080px the pages fold into a Menu disclosure
-  (`<details>`; Escape, an outside click, or choosing a link closes it); below
-  560px the GitHub mark and Download move into it too. The footer's closing
-  row holds the maker line and the two directory badges.
+  Resources · About. Resources is a dropdown of four pages, each with a
+  one-line description: Guides (`/resources/`), Blog (`/blog/`, listed only
+  once a post can be read, so an index of nothing but "coming soon" is never
+  linked), Developers (`/resources/developers/`, marked "Coming soon" outside
+  the dev site), and Changelog (`/changelog/`). The dropdown is a disclosure:
+  a button with `aria-expanded` (Enter/Space/click toggles; ArrowDown opens
+  into the list; ArrowUp/ArrowDown, Home, End move; Escape closes and returns
+  focus; tabbing away or an outside click closes). Without script the button
+  is hidden and "Resources" is a plain link to `/resources/`. On the right sit
+  the GitHub mark (icon only, while the source is public) and one Download
+  button, which opens `/download/`. Download is not also a menu item. The
+  footer's link columns (Product · Learn · Open source, the last only while
+  the source is public) and tagline default from the same file. Pages pass
+  only `current` (a dropdown's label is marked current when any of its pages
+  is). The header stays pinned on a solid ground (flat: no blur, no shadow);
+  `[id]` targets carry a matching `scroll-margin-top`. Below 1080px the pages
+  fold into a Menu disclosure (`<details>`; Escape, an outside click, or
+  choosing a link closes it), where the dropdown's pages are listed under its
+  name; below 560px the GitHub mark and Download move into it too. The
+  footer's lead column holds the brand, the tagline, and the "Hear when it's
+  ready." sign-up (see "The coming-soon list" below); its closing row holds
+  the maker line and the Launch Llama badge; the quokka scenery runs along its
+  bottom edge.
 - **The landing page** (`src/components/Landing.astro`) only composes its
   chapters from `src/components/landing/`: Hero (the product film) → Overview (Write. Keep. Ask.: three
-  steps with the app's quokkas, then links to the episodes and `/features/`;
-  the dev-only Experiments follow) → PrivacyBrief (the night scene, three
-  facts, and a link to `/privacy/`) → Everywhere (Rotli Web, only while
-  `WEB_APP_ENABLED`) → Personal (themes + companion, with a faint island
-  vignette) → Faq → FinalCta (the film's sunset). The landing page carries
-  exactly one video. **`/features/`** opens with "Rotli in 30 seconds"
-  (`EpisodeShelf.astro`: the eight episodes in one player) and then composes
-  the chapters in full (Features with every smaller habit, Folder, Personal)
-  under its own page head. On narrow screens the theme studio is a carousel
-  (previous/next and a swipe on the capture), like the quokka companion's.
+  steps with the app's quokkas, then links to the episodes and `/features/`)
+  → TwoKinds ("You write for yourself. AI reads differently.": a plain
+  HTML mock of one note as typed and as the Librarian files it) → StatBand
+  (two sourced figures, footnoted; keep the sources and "never wasted"
+  wording) → the dev-only Experiments → PrivacyBrief (the night scene in Ocean
+  Dark via `.band-night` in `Base.astro`, three facts, and a link to
+  `/privacy/`) → Everywhere (Rotli Web and how Rotli Helper connects it, with
+  the copyable install line; only while `WEB_APP_ENABLED`) → Personal (the
+  theme studio, with a faint island vignette) → Faq → FinalCta (the closing call; the footer's quokka beach ends the
+  page). The landing page carries exactly one video. **`/features/`** has
+  one display headline, with "Rotli in 30 seconds" (`EpisodeShelf.astro`: the
+  eight episodes in one player, under a quiet heading; two columns of episodes
+  below the player on narrow screens) right under it, then the chapters in
+  full (Features with every smaller habit, Folder, Personal). Every chapter
+  opens with the same section head (one h2 at `--step-h2` and a lede), and the
+  chapters alternate plain and warm grounds. The landing page's dev-only
+  Experiments chapter is not repeated there. On narrow screens the theme
+  studio is a carousel (previous/next and a swipe on the capture).
   Each chapter owns its
   markup, scoped styles, and script. `Base.astro` owns the tokens, the shared
   section grammar (`.wrap`, `.section`, `.section-title`, `.section-lede`,
   `.band-warm`, `.band-deep`, the spacing and type steps), and the one
   scroll-reveal script. Nothing on the page moves on a timer: the theme studio
-  and companion change only when a visitor picks a swatch or steps the
-  carousel, and scroll reveals fire once and rest. Two-column rows share a
+  changes only when a visitor picks a swatch or steps the
+  carousel, and scroll reveals fire once and rest. The one sanctioned
+  exception (the owner's call, 2026-10-02) is the quokka scenery under the
+  footer, described below: it lives in its own band, below every word, and
+  stands still under reduced motion. Two-column rows share a
   top edge so each heading starts level with its picture.
 - **`/privacy/`** is the full privacy policy in plain language: the short
   version, where notes live, every network connection and when it happens, AI
@@ -95,16 +118,25 @@ bun run preview  # serve the built dist/ locally
   changes. Features that are off in released builds (Breve, remote agents)
   are described as off, not as available.
 - **Subpages** (`WritingPage.astro`) sit on the site grid: breadcrumb, title,
-  and lede line up with the header's brand, a full-width rule divides the head
-  from the body, and long pages pass `toc` for a sticky "On this page" column
-  (resource articles build it from their `##` headings). Resource articles end
-  with "More resources". Index lists (`WritingList.astro`) are plain entries
-  in columns with a hairline above each, never boxes.
+  lede, and an optional metadata line (`meta`: a date, "Updated …", a reading
+  time) line up with the header's brand, and a full-width rule divides the
+  head from the body. Long pages pass `toc` and read as an article: a sticky
+  "On this page" tree beside a reading column of about 70 characters, the
+  section in view highlighted and a slim rail filling as you read (one
+  bundled script; without it the tree is plain links). Below 900px the tree
+  becomes an "On this page" disclosure above the text. Privacy, resource
+  articles, and blog posts use it (articles and posts build it from their
+  `##` headings). Resource articles end with "More guides". Index lists
+  (`WritingList.astro`) are plain entries in columns with a hairline above
+  each, never boxes; an entry without a link is announced ("Coming soon").
 - **Writing.** Resources (evergreen, question-titled) and blog posts are
   Markdown in one content collection, `src/content/writing/{resources,posts}/`
   (schema: `src/content.config.ts`). `src/writing.ts` decides what a build
   publishes: nothing in `coming-soon`; `draft: true` and `experiment: true`
-  entries only on the dev site. Routes: `/resources/`, `/resources/<file>/`,
+  entries only on the dev site. `status: coming-soon` announces a piece: it is
+  listed on its index with a "Coming soon" label and no link, and has no
+  page, Markdown twin, sitemap entry, or llms.txt line until the field comes
+  off (`publishedWriting` vs `upcomingWriting`). Routes: `/resources/`, `/resources/<file>/`,
   `/blog/`, `/blog/<file>/`, and `/about/` (which holds the name story and
   links the `the-creation-of-rotli` post once it is published). Markdown code
   blocks are not syntax-highlighted: Shiki writes inline `style=` attributes,
@@ -118,11 +150,32 @@ bun run preview  # serve the built dist/ locally
   status. The hero's Download for Mac still fetches the DMG directly
   (`DOWNLOAD_HREF`). The Helper guide is `/resources/rotli-helper/`; the 404
   page's `/helper` hint links there.
-- **The 404 page** (`src/pages/404.astro`) is set where the story film ends:
-  `SunsetScene.astro` (`full`) fills the window with the sunset, there is no
-  header or footer, and one "Take me home" button leads back with a quiet line
-  of other ways in. The missing path and a hint (`/app`, `/helper`) are chosen
-  in the browser. `SunsetScene.astro` is also the closing invitation's ground.
+- **The 404 page** (`src/pages/404.astro`) has no header or footer: "This
+  note wandered off." in the middle of the window, one "Take me home" button
+  with a quiet line of other ways in, and the footer's quokka scenery along
+  the bottom edge. The missing path and a hint (`/app`, `/helper`) are chosen
+  in the browser. `SunsetScene.astro` remains the closing invitation's ground.
+- **The quokka scenery** (`src/components/QuokkaScene.astro`, under every
+  footer, the 404, and `/subscribed/`) is a strip of Rottnest by day in the
+  film's palette (sea, the far lighthouse, scrub on the dunes, sand) with a
+  pile of leaves, four quokkas (three below 760px), and one that now and then
+  strolls along the dunes behind them, pausing to look at the pointer. The
+  quokkas are the app's canonical `base.svg` line art, rigged rather than
+  redrawn: `src/quokka/art.ts` thins the traced outline at build time and
+  takes its outer ring as the body fill (`--cocoa`, the app's Cocoa body);
+  `src/quokka/rig.ts` holds the pivots; overlays (eyes, brows, mouths, the
+  reaching arm, the leaves) use the art's own 14-unit ink. `src/quokka/scene.ts`
+  (one external module, about 7 KB) makes the head tilt and the eyes follow the
+  pointer, a paw reach for a pointer that comes close, brows go cross when the
+  pointer nears the leaves, faces fall when it is on them, and everyone cheers
+  when it leaves; they blink, hop, and nibble now and then, and a tap pokes
+  one. It runs one `requestAnimationFrame` loop only while the scene is on
+  screen and the tab is visible, uses pointer events only, and writes SVG
+  `transform` attributes and one CSSOM transform (never an inline `style`
+  attribute, which the CSP would drop). Under reduced motion, or without
+  script, nothing runs and the scene stands at rest. The band is decorative
+  (`aria-hidden`), has a fixed height (no layout shift), clips its own
+  content, and holds no text, so nothing can overlap a word or a link.
 - **The motion studio** lives at `studio.rotli.co` (`STUDIO_URL` in
   `src/site.ts`): the footer's Learn column links it whatever the source flag, and the Caddyfile
   sends `/studio` there.
@@ -180,8 +233,8 @@ bun run preview  # serve the built dist/ locally
   1536 × 1536 from the canonical SVG with the existing fill pipeline
   (`bun scripts/build-character-fills.mjs --site`); app-sized 512px exports
   stay unchanged.
-- The companion carousel reads `src/assets/characters/showcase/` (renders +
-  `showcase.json`), produced by `bun scripts/build-companion-showcase.ts`. That
+- The companion renders in `src/assets/characters/showcase/` (renders +
+  `showcase.json`; the landing page no longer shows them), produced by `bun scripts/build-companion-showcase.ts`. That
   script composites body preset, accessory, line color, and pose with the same
   placement rules as `src/components/character.tsx`, so every slide is a
   combination a person can pick in Settings → Companion. Edit `COMBOS` there
@@ -224,10 +277,11 @@ bun run preview  # serve the built dist/ locally
   reply; the four steps: asks, keeps "Conversation notes" after every reply,
   writes notes and files on the Mac, you jump in or Lock it) → Formats
   (Documents on Univer, Sheets coming soon, Boards on Excalidraw, with status
-  chips from `featurePolicy.ts`, and where Assets live) → the Librarian →
-  ConnectAI (each provider's own CLI installed in Terminal; rotli never signs in,
-  reads login files, or stores credentials; Rotli Helper runs the same tools for
-  Rotli Web; the install lines mirror `src/ai/connectorGuides.ts`) → habits.
+  chips from `featurePolicy.ts`, and where Assets live) → the Librarian and
+  the smaller habits → ConnectAI (each provider's own CLI installed in
+  Terminal; rotli never signs in, reads login files, or stores credentials;
+  Rotli Helper runs the same tools for Rotli Web; the install lines mirror
+  `src/ai/connectorGuides.ts`).
 - **Scenes from the film**, drawn in inline SVG on the film's palette (the
   `--sunset-*`, `--sea*`, `--sand`, `--olive*`, `--limestone`, `--lake`,
   `--wood*`, and `--lantern` tokens in `Base.astro`) with the app's own
@@ -248,14 +302,19 @@ bun run preview  # serve the built dist/ locally
   public, "Watch the film" when the film exists, and otherwise nothing. Mobile
   uses one column; the product preview sits beside the copy from 960px.
   It does not expose downloads or the full landing page's navigation.
-- `/resources/mcp/` (moved from `/mcp/` on 2026-09-18; the Caddyfile
-  redirects the old path) is the connection guide for local stdio clients (Claude Code, Codex,
-  Cursor), the workspace policy, and disposable verification. Since 2026-09-11
-  the whole guide, the landing page's agent section, and their navigation
-  render only on the dev site under the experiment label: MCP and agent
-  integrations left production until refined. The remote route (Grok Bot, the
-  relay, self-hosting) sits inside that same dev-only guide. Do not publish a hosted relay URL there until that
-  deployment has been verified.
+- **`/resources/developers/`** is the one home for MCP and the CLI, for
+  agents (Claude Code, Codex, Cursor) working in a configured vault; facts
+  restate `docs/architecture/agent-workspace.md`. MCP and the agent commands
+  run in development builds only and have not shipped, so the launch site
+  shows an honest "Coming soon" summary, and the dev site
+  (`showsExperiments`) shows the full reference under the experiment label:
+  connecting a local stdio client, `agent doctor` and `agent self-test`, the
+  tools, the rules every call follows, the JSON CLI, limits, and remote
+  agents (Grok Bot, the relay, self-hosting). Do not publish a hosted relay
+  URL there until that deployment has been verified. The old
+  `/resources/mcp/` guide (itself moved from `/mcp/`) folded in on
+  2026-10-02: the build writes a refresh page there (`redirects` in
+  `astro.config.mjs`), which the Caddyfile's `/mcp` redirect lands on.
 - `public/social-card.svg` is the editable source for the link preview, set on
   the story film's island by day: the wordmark and the hero line over a faint
   file-icon pattern that fades out before the bay, the lighthouse on its hill,
@@ -346,12 +405,12 @@ download, so landing there first costs nothing.
 The site is a static Astro build served by Caddy from a pinned two-stage
 [`Dockerfile`](Dockerfile). [`Caddyfile`](Caddyfile) is the one home for the
 browser-security and cache headers. There is no SSR, adapter, or Worker.
-The footer's Launch Llama and Founder.best badges are the site's only
-third-party images: `img-src` allows only `https://tools.launchllama.co` and
-`https://www.founder.best` beyond same-origin and data images,
-and `check:security` keeps literal remote `<img>` origins aligned with that
-deployed policy so a local-preview success cannot become a blank production
-badge.
+The footer's Launch Llama badge is the site's only third-party image:
+`img-src` allows only `https://tools.launchllama.co` beyond same-origin and
+data images, and `check:security` keeps literal remote `<img>` origins aligned
+with that deployed policy so a local-preview success cannot become a blank
+production badge. Pages may talk only to their own origin (`connect-src
+'self'`, `form-action 'self'`), which is all the coming-soon list needs.
 
 The Docker build context is the **repository root**, because the pages import
 the canonical mark and companion art from `src/assets/characters/`. The
@@ -376,6 +435,46 @@ TXT ownership token (the CLI omits it; read it from the dashboard or the API's
 `customDomain.status.verificationToken`). Without the TXT record Railway answers
 `Application not found` even though the CNAME routes. Cloudflare's proxy may
 stay on with the SSL/TLS mode set to **Full** (not Full strict).
+
+### The coming-soon list (Resend)
+
+The footer's "Hear when it's ready." sign-up adds an address to a Resend
+segment. The static site cannot hold an API key, so the image runs one more
+process: a small Bun sidecar (`server/subscribe.ts`, one file, no
+dependencies) on `127.0.0.1:8787`. Caddy proxies `/api/*` to it under the
+site's own headers (`Cache-Control: no-store`); `entrypoint.sh` starts it in a
+retry loop and then execs Caddy, so Caddy is PID 1 and the sidecar fails soft:
+if it is down, `/api/*` answers 503, the footer hides its form, and every page
+keeps serving.
+
+- `GET /api/subscribe` → `{ "live": true | false }`. The footer hides the form
+  unless it reads `live: true` (so it is also hidden under `astro dev` and
+  `astro preview`, which have no sidecar).
+- `POST /api/subscribe` (JSON from the footer's script, or a plain form post
+  without JavaScript, which is redirected to `/subscribed/`): validates the
+  address, drops a filled honeypot field (`website`) with a fake success,
+  limits each visitor to 5 tries per 10 minutes (keyed on `CF-Connecting-IP`,
+  then `X-Real-IP`; 120 per 10 minutes overall), then calls Resend's
+  `POST https://api.resend.com/contacts` with
+  `{ email, unsubscribed: false, segments: [{ id }] }`. Contacts are global
+  per address in Resend, so when the contact already exists it calls
+  `POST /contacts/{email}/segments/{segment_id}` instead; a repeat signup is
+  answered exactly like a new one, and an earlier unsubscribe is never
+  overridden. Addresses are never logged (only Resend's status and error name).
+- Tests: `bun run test` (Resend mocked; part of `bun run verify` and CI).
+
+Set these as **runtime** service variables in Railway (never build args; the
+Dockerfile does not declare them, so no secret lands in an image layer):
+
+| Variable            | Purpose                                                                 |
+| ------------------- | ----------------------------------------------------------------------- |
+| `RESEND_API_KEY`    | A Resend API key with full access (contacts need it; a sending-only key is refused). Unset: the list is off. |
+| `RESEND_SEGMENT_ID` | The segment new contacts join (Resend → Audience → Segments; the old Audiences API is deprecated). Unset: the list is off. |
+| `SUBSCRIBE_PORT`    | Optional. The sidecar's loopback port, read by both Caddy and the sidecar (default `8787`). |
+
+To rehearse it in the prod twin, pass the variables to `docker run`
+(`-e RESEND_API_KEY=… -e RESEND_SEGMENT_ID=…`); with a test key, use a test
+segment.
 
 ### Going live (turning off the holding page)
 

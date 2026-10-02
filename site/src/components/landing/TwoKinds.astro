@@ -1,0 +1,145 @@
+---
+// Two kinds of notes: the way a person writes, and the way an AI finds things again. The
+// mock is plain HTML on the site's tokens (not a capture): the same note twice, as typed and
+// as filed, with only the Librarian's frontmatter fields (area, summary, tags, links; see
+// docs/architecture/memex-data-contract.md) added above the words, which stay as written.
+// Synthetic people and text. The panes sit side by side and stack on narrow widths.
+const typed = ['call w/ dana re pricing', '', 'she’s ok w/ annual. wants the', 'deck fri?? ask jo about the', 'discount thing'];
+const filed = [
+  { key: 'area', value: 'Clients/Dana Reyes' },
+  { key: 'summary', value: 'Dana agrees to annual pricing and wants the deck on Friday.' },
+  { key: 'tags', value: '[pricing, annual, deck]' },
+  { key: 'links', value: '["[[Discount policy]]", "[[Jo Park]]"]' },
+];
+---
+
+<section class="section band-warm two-kinds" id="two-kinds" aria-labelledby="two-kinds-title">
+  <div class="wrap">
+    <header class="section-head" data-reveal>
+      <h2 class="section-title" id="two-kinds-title">You write for yourself. <span class="inked">AI reads differently.</span></h2>
+      <p class="section-lede">
+        People and AI take notes for different reasons. You write fast and loose, in half sentences,
+        trusting that you’ll know what you meant. An AI does better with a clear title, a few tags, and
+        links to related notes, because that is how it finds things again. Most apps make you do the
+        second kind of work yourself, and it pulls your attention away from the thinking. In rotli you
+        only write. The Librarian adds the filing, tags, and links around your words and never rewrites
+        them.
+      </p>
+    </header>
+
+    <figure class="pair" data-reveal>
+      <div class="note">
+        <p class="note-label" id="typed-label">As you write it</p>
+        <div class="paper" role="group" aria-labelledby="typed-label">
+          <p class="name">dana-call.md</p>
+          <p class="body">{typed.join('\n')}</p>
+        </div>
+      </div>
+      <div class="note">
+        <p class="note-label" id="filed-label">After the Librarian</p>
+        <div class="paper" role="group" aria-labelledby="filed-label">
+          <p class="name">dana-call.md</p>
+          <dl class="meta">
+            {
+              filed.map((field) => (
+                <div>
+                  <dt>{field.key}</dt>
+                  <dd>{field.value}</dd>
+                </div>
+              ))
+            }
+          </dl>
+          <p class="body">{typed.join('\n')}</p>
+        </div>
+      </div>
+      <figcaption>The same words. The Librarian’s fields sit above them in the file; nothing you typed is changed.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<style>
+  .section-title {
+    max-width: 22ch;
+  }
+  .section-lede {
+    max-width: 40rem;
+    font-size: 1.1rem;
+    line-height: 1.65;
+  }
+  .pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem clamp(1.5rem, 4vw, 3rem);
+    margin: 0;
+  }
+  .note {
+    min-width: 0;
+  }
+  /* A data label for the mock's two panes, not a section eyebrow. */
+  .note-label {
+    margin: 0 0 0.6rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  .paper {
+    padding: 1.25rem 1.4rem 1.5rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-frame);
+    background: var(--surface);
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+    line-height: 1.65;
+  }
+  .name {
+    margin: 0 0 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+  .body {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  /* What the Librarian added: set apart by the one clay rule, as a list of facts. */
+  .meta {
+    margin: 0 0 1rem;
+    padding: 0.1rem 0 0.1rem 0.9rem;
+    border-left: 2px solid var(--accent);
+  }
+  .meta div {
+    display: grid;
+    grid-template-columns: 8ch minmax(0, 1fr);
+    gap: 0 1.5ch;
+  }
+  .meta dt {
+    color: var(--accent-text);
+    font-weight: 600;
+  }
+  .meta dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+  figcaption {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+  }
+  @media (max-width: 800px) {
+    .pair {
+      grid-template-columns: 1fr;
+    }
+    .meta div {
+      grid-template-columns: 1fr;
+    }
+    .meta dt {
+      font-size: 0.8rem;
+    }
+    .meta div + div {
+      margin-top: 0.35rem;
+    }
+  }
+</style>

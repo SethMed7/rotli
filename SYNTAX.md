@@ -252,6 +252,24 @@ imports.
 - Inline code is opaque to the control grammar. Backticked content renders as
   ordinary literal text with no code-chip background; only the backticks are
   hidden in beautified mode. Fenced code blocks retain their code styling.
+- A centered or right-aligned paragraph is one line of HTML:
+  `<p align="center">text</p>` or `<p align="right">text</p>`, exactly that
+  spelling, with the closing tag on the same line. Left is the default and is
+  never written; choosing **Align left** removes the tags, and a hand-written
+  `<p align="left">` reads as left so it can be removed the same way. The
+  **Align left / center / right** commands (palette; no default chord) apply
+  to every paragraph line in the selection — headings, list items, quotes,
+  image lines, tables, fences, and other HTML are left alone — and choosing
+  the alignment a line already has changes nothing. A caret on an empty line,
+  `/center`, or `/align right` starts an empty aligned paragraph. Rotli
+  renders the line aligned with its inline Markdown (bold, links, wikilinks)
+  and hides the tags until the caret is in the line. Enter inside it starts
+  the next paragraph with the same alignment; Enter in an empty one ends it.
+  Plain-text readers (titles, snippets, link cards) drop the tags and rich
+  copy keeps the alignment. Other Markdown renderers that follow CommonMark
+  show the alignment but treat the line as an HTML block, so inline Markdown
+  inside it appears as literal text there and a line written directly below
+  it, with no blank line between, joins that block.
 
 ## CSS and design tokens
 
