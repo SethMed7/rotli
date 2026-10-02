@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 
 import {
   corpusInspectFolder,
+  corpusStatus,
   type CorpusConfigView,
   corpusListConfig,
   type CorpusRefView,
@@ -37,6 +38,15 @@ export function vaultChoiceLabel(intent: Intent): string {
   if (intent === "create") return "Choose an empty folder";
   if (intent === "open") return "Choose an existing folder";
   return "Use this vault";
+}
+
+/** After opening a folder: carry on only when it really is the vault now. A
+ * folder already open here is a no-op, which is fine for a vault this install
+ * chose; a debug build only borrows production's vault read-only, so "opening"
+ * it records nothing, and setup would end on the vault screen again. */
+export function openedOrWhy(opened: boolean, configured: boolean): string | null {
+  if (opened || configured) return null;
+  return "That folder is already open here read-only, so Rotli can't keep it as this build's vault. Create a new vault, or pick another folder.";
 }
 
 /** Why a picked folder can't be used for what was asked, or null. */
@@ -123,6 +133,9 @@ export function VaultActivation({
         await activateCreatedVault();
       } else if (await chooseFolder(path)) {
         await refreshActiveVault();
+      } else {
+        const why = openedOrWhy(false, await corpusStatus());
+        if (why) throw new Error(why);
       }
       await onDone?.();
     } catch (cause) {

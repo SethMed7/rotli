@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { folderMismatch, keepableVault, vaultChoiceLabel } from "./vaultActivation";
+import { folderMismatch, keepableVault, openedOrWhy, vaultChoiceLabel } from "./vaultActivation";
 
 describe("vault activation primary action", () => {
   test("names the exact next action instead of a generic folder choice", () => {
@@ -26,4 +26,12 @@ test("picking the folder is the confirmation, so a folder that doesn't fit says 
   expect(folderMismatch("open", "markdown")).toBeNull();
   expect(folderMismatch("open", "memex")).toBeNull();
   expect(folderMismatch("open", "empty")).toMatch(/is empty/);
+});
+
+test("setup moves on from Open only when the folder really is the vault now", () => {
+  expect(openedOrWhy(true, true)).toBeNull();
+  // the vault already in use, chosen again: nothing to do, and that's fine
+  expect(openedOrWhy(false, true)).toBeNull();
+  // a debug build's borrowed vault: "opening" it recorded nothing
+  expect(openedOrWhy(false, false)).toMatch(/read-only/);
 });
