@@ -481,6 +481,69 @@ describe("Tab indents the LINE, not the caret", () => {
   });
 });
 
+// Owner request #10 (2026-10-02, "proper tab for like indenting in"): in live
+// preview a Tab on prose showed two space-widths, and a Tab on a heading turned
+// it into literal "  ## Heading" text. lineIndent.ts owns the per-line policy.
+describe("Tab is a real indent for every kind of line", () => {
+  test("a paragraph takes one level; a second Tab is consumed and changes nothing", () => {
+    const v = viewOf("prose", 5);
+    expect(press(v, "Tab")).toBe(true);
+    expect(text(v)).toBe("  prose");
+    expect(head(v)).toBe(7);
+    expect(press(v, "Tab")).toBe(true); // still trapped: focus never leaves the editor
+    expect(text(v)).toBe("  prose");
+    expect(press(v, "Tab", true)).toBe(true);
+    expect(text(v)).toBe("prose");
+  });
+
+  test("a caret mid-line indents the line and keeps its place in the words", () => {
+    const v = viewOf("mid line text", 3);
+    expect(press(v, "Tab")).toBe(true);
+    expect(text(v)).toBe("  mid line text");
+    typeText(v, "!");
+    expect(text(v)).toBe("  mid! line text");
+  });
+
+  test("a heading stays a heading", () => {
+    const v = viewOf("# Title\n## Heading", 18);
+    expect(press(v, "Tab")).toBe(true);
+    expect(text(v)).toBe("# Title\n## Heading");
+  });
+
+  test("list items and tasks nest a level per press", () => {
+    const v = viewOf("- a\n- b", 7);
+    press(v, "Tab");
+    press(v, "Tab");
+    expect(text(v)).toBe("- a\n    - b");
+    const task = viewOf("- [ ] a\n- [ ] b", 13);
+    press(task, "Tab");
+    expect(text(task)).toBe("- [ ] a\n  - [ ] b");
+  });
+
+  test("a nested numbered item starts its own count and Shift-Tab rejoins the run", () => {
+    const doc = "1. one\n2. two\n3. three";
+    const v = viewOf(doc, doc.length);
+    press(v, "Tab");
+    expect(text(v)).toBe("1. one\n2. two\n  1. three");
+    press(v, "Tab", true);
+    expect(text(v)).toBe("1. one\n2. two\n3. three");
+  });
+
+  test("a multi-line selection applies the same policy line by line", () => {
+    const doc = "# Head\nprose\n\n- item\n  indented prose";
+    const v = viewOf(doc, doc.length, 0);
+    expect(press(v, "Tab")).toBe(true);
+    expect(text(v)).toBe("# Head\n  prose\n\n  - item\n  indented prose");
+  });
+
+  test("a multi-line selection inside a fence indents code without the paragraph cap", () => {
+    const doc = "```\n  a\n  b\n```";
+    const v = viewOf(doc, doc.indexOf("b") + 1, doc.indexOf("a"));
+    press(v, "Tab");
+    expect(text(v)).toBe("```\n    a\n    b\n```");
+  });
+});
+
 describe("Tab outside a table", () => {
   test("indents a bullet even when the note holds a table elsewhere", () => {
     const doc = "| a | b |\n|---|---|\n| 1 | 2 |\n\n- item";
