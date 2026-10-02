@@ -962,6 +962,13 @@
   padding-left: 14px;
   color: var(--text-muted);
 }
+/* an aligned paragraph — <p align="center|right">…</p> (SYNTAX.md) */
+.rotli-cm-host .cm-line.rotli-align-center {
+  text-align: center;
+}
+.rotli-cm-host .cm-line.rotli-align-right {
+  text-align: right;
+}
 .rotli-cm-host .cm-line.rotli-li,
 .rotli-cm-host .cm-line.rotli-task,
 .rotli-cm-host .cm-line.rotli-result-line,
@@ -1992,6 +1999,23 @@
 }
 .rotli-img:hover .rotli-img-resize {
   opacity: 1;
+}
+/* Appearance → Outline images: a hairline drawn just inside the frame, on its
+   own layer, so it keeps the image's radius, never shifts layout, and never
+   competes with the accent selection outline below (that one sits outside) */
+:root[data-outline-images="true"] .rotli-img::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+  pointer-events: none;
+}
+:root[data-outline-images="true"] .rotli-img.missing::after {
+  display: none;
+}
+:root[data-outline-images="true"] .rotli-img-resize {
+  z-index: 1;
 }
 /* click-selected image — the widget stays rendered; the outline marks the object */
 .rotli-img.sel img,

@@ -1,4 +1,5 @@
 import { dateFor, dateToken, expandDateTokens, noteDateText } from "../lib/noteDates";
+import { ALIGN_CLOSE, alignOpenTag } from "./alignedLine";
 import { applyBlockToggle, applyHeading } from "./commands";
 import type { SlashOp, SlashPickerMode } from "./slashTypes";
 import { cellSpansOf, insertTableText } from "./tables";
@@ -50,6 +51,10 @@ export function slashInsertion(
     }
     const insert = `\`\`\`${op.lang}\n\n\`\`\``;
     return { insert, caret: 4 + op.lang.length };
+  }
+  if (op.kind === "align") {
+    const open = alignOpenTag(op.align);
+    return { insert: `${open}${ALIGN_CLOSE}`, caret: open.length };
   }
   if (op.kind === "heading") {
     const result = applyHeading("", op.level);

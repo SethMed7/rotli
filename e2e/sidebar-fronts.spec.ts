@@ -8,7 +8,7 @@
 
 import { expect, test } from "@playwright/test";
 
-import { gotoApp } from "./support";
+import { cycleEveryTheme, gotoApp } from "./support";
 
 // the front chosen as Home reads "Home" (Notes by default)
 const homeSeg = (page: import("@playwright/test").Page) =>
@@ -100,6 +100,7 @@ test("opening content pulls the sidebar to the front that can show it", async ({
 
 test("the switcher reads from semantic tokens in every environment", async ({ page }) => {
   await gotoApp(page);
+  await cycleEveryTheme(page);
   const themeButton = page.getByRole("button", { name: /^Theme —/ });
 
   for (const theme of [
@@ -118,7 +119,7 @@ test("the switcher reads from semantic tokens in every environment", async ({ pa
     "Moonlight",
     "Midnight",
   ] as const) {
-    await expect(themeButton).toHaveAccessibleName(`Theme — ${theme}`);
+    await expect(themeButton).toHaveAccessibleName(new RegExp(`^Theme — ${theme} · `));
 
     const active = homeSeg(page);
     await expect(active).toHaveCSS("box-shadow", "none");

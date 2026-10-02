@@ -40,6 +40,9 @@ test("the slash menu scrolls with the arrow keys", async ({ page }) => {
   await expect(menu).toBeVisible();
   expect(await menu.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
   await expect.poll(() => menu.evaluate((el) => el.scrollTop)).toBe(0);
+  // the pointer still rests where the note was clicked, over the menu's rows:
+  // only a moving pointer picks a row, so the keyboard keeps the first one
+  await expect(menu.locator(".slashrow.sel")).toContainText("Heading 1");
   // up from the first row wraps to the last one, which sits below the fold
   await page.keyboard.press("ArrowUp");
   await expect.poll(() => menu.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);

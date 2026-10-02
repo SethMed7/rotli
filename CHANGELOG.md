@@ -33,6 +33,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Center or right-align a paragraph.** Align center, Align right, and Align
+  left are in the command palette (bind them in Settings → Keybindings), and
+  `/center` and `/align right` start an aligned paragraph. The file keeps
+  ordinary HTML, `<p align="center">…</p>`, with the tags hidden until the
+  caret is in the line; bold, links, and the rest still render inside. Left
+  removes the tags.
+- **Choose what the titlebar sun does.** Settings → Appearance → Theme button:
+  flip light and dark in your family (now the default), walk your own picks of
+  the fourteen environments, or walk all fourteen. Its label says where the
+  next click lands.
+- **Outline images.** An Appearance switch, off by default, draws a quiet line
+  around pictures and videos in a note, so a white image doesn't melt into a
+  light page.
 - **Chat edits the Word documents it made.** After reading one, chat can
   change a paragraph, add or remove blocks, set a table cell, or change a
   heading level. Rotli lets it edit only documents its AI created, checks the
