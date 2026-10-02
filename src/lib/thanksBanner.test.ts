@@ -3,6 +3,8 @@ import { describe, expect, test } from "bun:test";
 import {
   bannerText,
   clipPolygon,
+  FRIEND_INVITE,
+  friendInviteMailto,
   maskUrl,
   SHARE_CAPTION,
   shareOnXUrl,
@@ -10,36 +12,31 @@ import {
 } from "./thanksBanner";
 
 describe("the banner's words", () => {
-  test("greets by first name and lists the choices that were made", () => {
-    expect(
-      bannerText({
-        userName: "  Ada Lovelace ",
-        themeLabel: "Grove Dark",
-        quokkaLabel: "Fern",
-        accessoryLabel: "Bucket hat",
-      }),
-    ).toMatchObject({
-      headline: "Welcome to Rotli, Ada",
-      chips: ["Grove Dark", "Fern quokka", "Bucket hat"],
-    });
+  test("thanks by first name, with nothing about the choices made", () => {
+    const text = bannerText("  Ada Lovelace ");
+    expect(text.headline).toBe("Thank you, Ada");
+    expect(text.subline).toMatch(/^for trying Rotli\./);
+    expect(Object.keys(text).sort()).toEqual(["headline", "subline"]);
   });
 
-  test("no name, plain quokka, nothing worn: only the theme", () => {
-    const text = bannerText({ userName: "", themeLabel: "Paper", quokkaLabel: null, accessoryLabel: null });
-    expect(text.headline).not.toContain(","); // no name, no dangling comma
-    expect(text.chips).toEqual(["Paper"]);
+  test("no name: a plain thank-you, no dangling comma", () => {
+    expect(bannerText("").headline).not.toContain(",");
   });
 
   test("a very long name is cut to fit", () => {
-    const { headline } = bannerText({
-      userName: "x".repeat(60),
-      themeLabel: "Paper",
-      quokkaLabel: null,
-      accessoryLabel: null,
-    });
-    expect(headline.length).toBeLessThanOrEqual("Welcome to Rotli, ".length + 24);
+    const { headline } = bannerText("x".repeat(60));
+    expect(headline.length).toBeLessThanOrEqual("Thank you, ".length + 24);
     expect(headline.endsWith("…")).toBe(true);
   });
+});
+
+test("Tell a friend drafts a mail to nobody, holding only the fixed invite", () => {
+  const url = friendInviteMailto();
+  expect(url.startsWith("mailto:?")).toBe(true);
+  expect(/\s/.test(url)).toBe(false); // Rust's open_url refuses whitespace
+  const params = new URLSearchParams(url.slice("mailto:?".length));
+  expect(params.get("subject")).toBe("Try Rotli");
+  expect(params.get("body")).toBe(FRIEND_INVITE);
 });
 
 test("Share on X carries the fixed caption and the site, nothing personal", () => {

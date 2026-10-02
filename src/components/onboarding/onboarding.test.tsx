@@ -44,7 +44,7 @@ test("every shortcut says it can change, and where to change it later", () => {
   const html = render("shortcuts");
   expect(html).toContain(`4 of ${ONBOARDING_TOTAL_STEPS}`);
   expect(html).toContain("Three shortcuts, yours to change.");
-  expect(html).toContain("Settings → Hotkeys");
+  expect(html).toContain("Settings → Keybindings");
   expect(html.match(/class="setup-chord-change"/g)).toHaveLength(3);
   expect(html).toContain('aria-label="Change Quick capture shortcut"');
   // nothing changed yet: no way back to a default it already has

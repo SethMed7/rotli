@@ -182,6 +182,7 @@ export const SERVICE_FILE_OWNERS = {
   "templates.ts": "the Templates folder rule, the built-in presets (which /template may offer)",
   "welcome.ts": "Welcome folder seeding and Main filing composition",
   "librarianSwitch.ts": "the Librarian on or off for this vault, live: the setting and the organizer at once",
+  "librarianSetup.ts": "whether the Librarian's chosen lane still needs setting up on this Mac",
   "firstRun.ts": "first run's finish: the window takes effect, welcome, thank-you, tour, Settings note",
   "webNotes.ts": "notes",
   "webTasks.ts": "Tasks projection outside the Mac app (the corpus.rs twin)",

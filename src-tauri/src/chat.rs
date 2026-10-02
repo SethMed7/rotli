@@ -12,37 +12,17 @@
 
 use std::time::Duration;
 
-const DEFAULT_ENDPOINT: &str = "http://localhost:11435";
+pub use crate::chat_registry::ChatModel;
+
+pub(crate) const DEFAULT_ENDPOINT: &str = "http://localhost:11435";
 /// pub(crate): the organizer daemon journals which model produced a proposal.
 pub(crate) const DEFAULT_MODEL: &str = "gemma-3-12b-it-qat-4bit";
-const DEFAULT_API: &str = "generate";
+pub(crate) const DEFAULT_API: &str = "generate";
 
 /// The interactive paths wait up to two minutes; the background daemon uses a
 /// much shorter caller-set timeout so it never camps on the model server.
 const CHAT_TIMEOUT: Duration = Duration::from_secs(120);
 
-/// One chat-capable model the memex-ai store can serve. `api` is the server wire
-/// shape ("generate" = Ollama `/api/generate` · "openai" = `/v1/chat/completions`).
-#[derive(serde::Serialize)]
-pub struct ChatModel {
-    id: String,
-    label: String,
-    provider: String,
-    endpoint: String,
-    api: String,
-    /// Can this model see images? Gates the composer's image-attach affordance.
-    /// Read from the registry's `vision: true` (text-only models omit it).
-    vision: bool,
-    #[serde(rename = "isDefault")]
-    is_default: bool,
-    /// Is this the shared MLX server's PINNED DEFAULT (its launchd env)? Since
-    /// server 0.3 every installed mlx model serves on demand (the request's
-    /// `model` swaps the slot), so this no longer gates the picker — it marks
-    /// which model no-model callers (Breve, warmup) get, and what Settings
-    /// badges as "default". llama.cpp models are never the mlx default.
-    #[serde(rename = "localDefault")]
-    local_default: bool,
-}
 
 // The one-shot `chat_complete` command lived here until the 2026-07 audit (#68):
 // registered with zero frontend callers, it was unregistered and removed — the
@@ -85,8 +65,7 @@ pub(crate) fn model_is_local(model_id: &str, endpoint: &str) -> bool {
     if !endpoint_is_local(endpoint) {
         return false;
     }
-    read_models()
-        .unwrap_or_else(default_models)
+    crate::chat_registry::models()
         .iter()
         .any(|model| {
             model.id == model_id
@@ -98,8 +77,7 @@ pub(crate) fn model_is_local(model_id: &str, endpoint: &str) -> bool {
 /// Whether an id belongs to a registered on-device chat model. Breve uses this
 /// to normalize legacy remote model policy without trusting a webview label.
 pub(crate) fn is_registered_local_model_id(model_id: &str) -> bool {
-    read_models()
-        .unwrap_or_else(default_models)
+    crate::chat_registry::models()
         .iter()
         .any(|model| {
             model.id == model_id
@@ -114,134 +92,7 @@ pub(crate) fn is_registered_local_model_id(model_id: &str) -> bool {
 /// MLX default so the picker is never empty.
 #[tauri::command]
 pub fn chat_models() -> Vec<ChatModel> {
-    read_models().unwrap_or_else(default_models)
-}
-
-fn default_models() -> Vec<ChatModel> {
-    vec![ChatModel {
-        id: DEFAULT_MODEL.to_string(),
-        label: format!("{DEFAULT_MODEL} · MLX"),
-        provider: "mlx".to_string(),
-        endpoint: DEFAULT_ENDPOINT.to_string(),
-        api: DEFAULT_API.to_string(),
-        vision: true, // gemma-3 is natively multimodal (served once mlx-vlm is wired)
-        is_default: true,
-        local_default: true, // the sole fallback model IS the pinned one
-    }]
-}
-
-fn read_models() -> Option<Vec<ChatModel>> {
-    let home = std::env::var("HOME").ok()?;
-    let path = std::path::Path::new(&home).join(".memex/ai/registry.json");
-    let raw = std::fs::read_to_string(path).ok()?;
-    let reg: serde_json::Value = serde_json::from_str(&raw).ok()?;
-    let providers = reg.get("providers")?;
-    let models = reg.get("models")?.as_array()?;
-
-    // which mlx model the shared server is PINNED to (its launchd env) — the
-    // default for no-model callers; every registered mlx model serves on demand
-    let default_mlx = crate::localmodel::local_model_default();
-
-    let mut out: Vec<ChatModel> = Vec::new();
-    let mut picked_default = false;
-    for m in models {
-        if m.get("kind").and_then(|v| v.as_str()) != Some("llm-chat") {
-            continue;
-        }
-        let id = match m.get("id").and_then(|v| v.as_str()) {
-            Some(s) => s.to_string(),
-            None => continue,
-        };
-        let provider = m
-            .get("provider")
-            .and_then(|v| v.as_str())
-            .unwrap_or("mlx")
-            .to_string();
-        let p = providers.get(&provider);
-        let endpoint = p
-            .and_then(|v| v.get("endpoint"))
-            .and_then(|v| v.as_str())
-            .unwrap_or(DEFAULT_ENDPOINT)
-            .to_string();
-        // map the provider's descriptive `api` ("openai (...)" / "ollama-generate
-        // (...)") down to the wire shape the bridge speaks
-        let api_desc = p
-            .and_then(|v| v.get("api"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let api = if api_desc.contains("openai") {
-            "openai"
-        } else {
-            "generate"
-        }
-        .to_string();
-        // the default = the first chat model on the provider flagged default:true
-        let provider_default = p
-            .and_then(|v| v.get("default"))
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-        let is_default = provider_default && !picked_default;
-        if is_default {
-            picked_default = true;
-        }
-        // vision capability: the model entry opts in with `vision: true`.
-        let vision = m.get("vision").and_then(|v| v.as_bool()).unwrap_or(false);
-        // the shared server's pinned default (a badge + the no-model fallback,
-        // NOT a usability gate — server 0.3 swaps to any requested mlx model)
-        let model_path = m.get("path").and_then(|v| v.as_str());
-        let local_default = if provider == "mlx" {
-            match (model_path, default_mlx.as_deref()) {
-                (Some(p), Some(a)) => same_model_path(p, a),
-                // no plist yet (fresh setup / no launchd) → trust the registry default
-                (Some(_), None) => is_default,
-                _ => false,
-            }
-        } else {
-            false
-        };
-        out.push(ChatModel {
-            label: format!("{id} · {}", provider_human(&provider)),
-            id,
-            provider,
-            endpoint,
-            api,
-            vision,
-            is_default,
-            local_default,
-        });
-    }
-    if out.is_empty() {
-        return None;
-    }
-    // if nothing was flagged default, the first entry wins
-    if !picked_default {
-        if let Some(first) = out.first_mut() {
-            first.is_default = true;
-        }
-    }
-    Some(out)
-}
-
-/// Two on-disk model paths refer to the same model — trailing-slash tolerant,
-/// canonicalized when both resolve (a symlinked store, `..`), else trimmed
-/// string equality (the common case: the registry path IS the plist env).
-fn same_model_path(a: &str, b: &str) -> bool {
-    let trim = |s: &str| s.trim_end_matches('/').to_string();
-    if trim(a) == trim(b) {
-        return true;
-    }
-    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
-        (Ok(pa), Ok(pb)) => pa == pb,
-        _ => false,
-    }
-}
-
-fn provider_human(provider: &str) -> &str {
-    match provider {
-        "mlx" => "MLX",
-        "llamacpp" => "llama.cpp",
-        other => other,
-    }
+    crate::chat_registry::models()
 }
 
 // ── multi-turn bridge (the agentic client) ────────────────────────────────────

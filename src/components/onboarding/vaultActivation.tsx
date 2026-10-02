@@ -21,7 +21,13 @@ import { useUiStore } from "../../state/ui";
 import { requestVaultFolder } from "../../state/vaultFolderBrowser";
 import { Character } from "../character";
 import { OnboardingScenery } from "./onboardingScenery";
-import { SetupBack, SetupChoiceGroup, SetupPrimary, useSetupHandle } from "./setupControls";
+import {
+  LIBRARIAN_ON_DESCRIPTION,
+  SetupBack,
+  SetupChoiceGroup,
+  SetupPrimary,
+  useSetupHandle,
+} from "./setupControls";
 
 type Intent = "create" | "open" | "current";
 
@@ -211,7 +217,7 @@ export function VaultActivation({
                   {
                     value: "on",
                     title: "With the Librarian",
-                    description: "It files and tidies for you. Every action is logged and undoable.",
+                    description: LIBRARIAN_ON_DESCRIPTION,
                   },
                   {
                     value: "off",

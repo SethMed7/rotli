@@ -1,6 +1,7 @@
 // Thank you (2026-09-28): after setup, a card thanks the person and shows a
-// banner drawn from their own choices, with a GitHub star, an invite, Share on
-// X (a fixed caption; the banner goes on the clipboard), and a download.
+// thank-you banner with their name and quokka, with a GitHub star, a mail
+// draft inviting a friend, Share on X (a fixed caption; the banner goes on the
+// clipboard), and a download.
 // Then Take the tour, or Start now (closing the card is Start now). Uses the development `?onboarding` route.
 
 import { expect, type Page, test } from "@playwright/test";
@@ -37,7 +38,7 @@ test("setup ends with a thank-you card, a banner of their own, and ways to share
   // the tour waits for the card
   await expect(page.getByRole("region", { name: "Guided tour" })).toHaveCount(0);
 
-  const banner = card.getByRole("img", { name: "Your Rotli welcome banner" });
+  const banner = card.getByRole("img", { name: "Your Rotli thank-you banner" });
   await expect(banner).toBeVisible({ timeout: 15_000 });
   const drawn = await banner.evaluate(async (image: HTMLImageElement) => {
     await image.decode();
@@ -74,17 +75,40 @@ test("setup ends with a thank-you card, a banner of their own, and ways to share
   const clip = await page.evaluate(async () => (await navigator.clipboard.read())[0]?.types ?? []);
   expect(clip).toContain("image/png");
 
+  // Tell a friend opens a mail draft (caught here, never a real mail app)
+  await page.evaluate(() => {
+    const opened: string[] = [];
+    const real = window.open;
+    (window as { opened?: string[] }).opened = opened;
+    window.open = (url?: string | URL) => {
+      opened.push(String(url));
+      window.open = real; // just this one: Star's popup below is real
+      return null;
+    };
+  });
   await card.getByRole("button", { name: "Tell a friend" }).click();
-  await expect(card.getByRole("status")).toHaveText("An invite is copied. Send it to a friend.");
+  await expect(card.getByRole("status")).toHaveText(
+    "Opening a mail draft with an invite. It’s on your clipboard too.",
+  );
+  const mail = await page.evaluate(() => (window as { opened?: string[] }).opened?.[0] ?? "");
+  expect(mail.startsWith("mailto:?subject=Try%20Rotli&body=")).toBe(true);
+  expect(mail).not.toContain("Ada");
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("https://rotli.co");
 
   const download = page.waitForEvent("download");
   await card.getByRole("button", { name: "Download banner" }).click();
-  expect((await download).suggestedFilename()).toBe("rotli-welcome.png");
+  expect((await download).suggestedFilename()).toBe("rotli-thank-you.png");
 
   const star = page.waitForEvent("popup");
   await card.getByRole("button", { name: "Star on GitHub" }).click();
   expect((await star).url()).toBe("https://github.com/SethMed7/rotli");
+
+  // what's next sits on its own row, each button on one line
+  const startNow = await card.getByRole("button", { name: "Start now" }).boundingBox();
+  const tour = await card.getByRole("button", { name: "Take the tour" }).boundingBox();
+  expect(startNow!.height).toBeLessThan(44);
+  expect(tour!.height).toBeLessThan(44);
+  expect(Math.abs(startNow!.y - tour!.y)).toBeLessThan(2);
 
   await card.getByRole("button", { name: "Take the tour" }).click();
   await expect(card).toHaveCount(0);
@@ -133,7 +157,7 @@ test("the banner wears their theme, Grove Dark, with the plain quokka setup give
 
   const banner = page
     .getByRole("dialog", { name: "Thank you for trying Rotli" })
-    .getByRole("img", { name: "Your Rotli welcome banner" });
+    .getByRole("img", { name: "Your Rotli thank-you banner" });
   await expect(banner).toBeVisible({ timeout: 15_000 });
   const [ground, crown] = await banner.evaluate(async (image: HTMLImageElement) => {
     await image.decode();

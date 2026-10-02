@@ -37,7 +37,7 @@
     "src-tauri/src/web_search.rs": 849,
     "src-tauri/src/breve.rs": 2648,
     "src-tauri/src/acp.rs": 642,
-    "src-tauri/src/chat.rs": 906,
+    "src-tauri/src/chat.rs": 757,
     "breve-runtime/scripts/signal-daemon.ts": 2190,
     "scripts/eval-local-chat.ts": 1113,
     "scripts/check-documentation.mjs": 676,
