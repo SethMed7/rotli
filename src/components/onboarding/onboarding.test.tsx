@@ -29,6 +29,11 @@ test("the Librarian has a screen of its own; chat models wait for Chat", () => {
   const html = render("librarian");
   expect(html).toContain(`3 of ${ONBOARDING_TOTAL_STEPS}`);
   expect(html).toContain("Who files your notes?");
+  // whether first, as two cards; on by default, so where it thinks follows
+  expect(html).toContain('aria-label="Librarian"');
+  expect(html).toContain("Use the Librarian");
+  expect(html).toContain("Not now");
+  expect(html.indexOf("Use the Librarian")).toBeLessThan(html.indexOf('aria-label="Librarian model"'));
   expect(html).toContain('aria-label="Librarian model"');
   expect(html).toContain("Models for chat come the first time you open Chat");
   expect(html).not.toContain("Install a model");

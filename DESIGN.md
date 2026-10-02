@@ -372,7 +372,9 @@ polish work.
 - First-run setup is four screens (the owner, 2026-10-01, after testers' "too
   many steps before I can use the app"): **you** (an optional name and a
   theme, mode, and accent), **your vault** (an explicit decision), **the
-  Librarian** (where it thinks), and **your shortcuts**. Then the thank-you
+  Librarian** (whether, as two cards, and only then where it thinks and on
+  which model), and **your shortcuts**. The vault step asks nothing about the
+  Librarian; one screen owns that choice, whichever way the vault arrived. Then the thank-you
   card, the tour, and a note beside Settings naming what else is there.
   Everything else waits where it is used: the window behavior and the quokka's
   look in Settings, music in the sidebar player (shown from the first run,

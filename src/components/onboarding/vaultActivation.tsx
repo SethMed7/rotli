@@ -48,7 +48,6 @@ export function VaultActivation({
   const [createPath, setCreatePath] = useState<string | null>(null);
   const [inspection, setInspection] = useState<VaultInspection | null>(null);
   const [importMode, setImportMode] = useState<ImportMode>("in-place");
-  const [brainEnabled, setBrainEnabled] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [current, setCurrent] = useState<CorpusRefView | null>(null);
@@ -121,7 +120,8 @@ export function VaultActivation({
     setError(null);
     try {
       if (stage === "create" && createPath) {
-        useUiStore.getState().setBrainEnabled(brainEnabled);
+        // whether the Librarian works here is the next screen's question
+        const brainEnabled = useUiStore.getState().brainEnabled;
         await onBeforeSwitch?.();
         await flushSettingsNow();
         await initMemexAsCorpus(createPath, brainEnabled);
@@ -258,25 +258,10 @@ export function VaultActivation({
               <>
                 <h1 id="vault-title">Create {createPath.split("/").pop()}?</h1>
                 <p className="setup-path">{createPath}</p>
-                <SetupChoiceGroup
-                  label="Librarian choice"
-                  value={brainEnabled ? "librarian" : "raw"}
-                  onChange={(value) => setBrainEnabled(value === "librarian")}
-                  options={[
-                    {
-                      value: "librarian",
-                      title: "With the Librarian",
-                      description:
-                        "An on-device helper can file captures and suggest metadata. Actions are logged and undoable.",
-                    },
-                    {
-                      value: "raw",
-                      title: "Raw vault",
-                      description:
-                        "No AI organization. You arrange the same plain files yourself and can opt in later.",
-                    },
-                  ]}
-                />
+                <p className="setup-lede">
+                  A fresh vault of ordinary Markdown files in this folder. Whether the Librarian helps keep it
+                  tidy is the next question.
+                </p>
               </>
             )}
 

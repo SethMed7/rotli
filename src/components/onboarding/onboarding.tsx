@@ -253,16 +253,12 @@ function YouScreen({ advance }: { advance: () => void }) {
 }
 
 function LibrarianScreen() {
-  const providers = useUiStore((state) => state.aiProviders);
-  const setAiProvider = useUiStore((state) => state.setAiProvider);
-  const providerDefaults = useUiStore((state) => state.providerDefaults);
+  const brainEnabled = useUiStore((state) => state.brainEnabled);
+  const setBrainEnabled = useUiStore((state) => state.setBrainEnabled);
   const organizerModel = useUiStore((state) => state.organizerModel);
   const setOrganizerModel = useUiStore((state) => state.setOrganizerModel);
-  const organizerModelId = useUiStore((state) => state.organizerModelId);
-  const setOrganizerModelId = useUiStore((state) => state.setOrganizerModelId);
   // detection began on the first screen; by now the answers are usually in
   const detections = useSetupDetection((state) => state.detections);
-  const { lanes } = useConnectedCatalog(providers, readyFrom(detections));
 
   // Gemini is proposed once (per mount) when it is signed in and nothing was
   // chosen; picking any client below is the consent to use it
@@ -280,8 +276,47 @@ function LibrarianScreen() {
       <h1 id="setup-title">Who files your notes?</h1>
       <p className="setup-lede">
         The Librarian keeps your Library tidy on its own schedule: it files new notes and suggests moves for
-        you to approve. Choose where it thinks. Secure and locked notes never leave this Mac.
+        you to approve. It never rewrites what you wrote, and secure and locked notes never leave this Mac.
       </p>
+      {/* the owner, 2026-10-01: whether first, then where it thinks */}
+      <SetupChoiceGroup
+        label="Librarian"
+        value={brainEnabled ? "on" : "off"}
+        onChange={(choice) => setBrainEnabled(choice === "on")}
+        options={[
+          {
+            value: "on",
+            title: "Use the Librarian",
+            description: "It files and tidies for you. Every action is logged and undoable.",
+          },
+          {
+            value: "off",
+            title: "Not now",
+            description: "You arrange your notes yourself. Turn it on anytime in Settings → Librarian.",
+          },
+        ]}
+      />
+      {brainEnabled && <LibrarianModel />}
+      <p className="setup-local-note">
+        Models for chat come the first time you open Chat. Everything else is in Settings → AI Models.
+      </p>
+    </>
+  );
+}
+
+/** Where the Librarian thinks: this Mac or a connected client, and its model. */
+function LibrarianModel() {
+  const providers = useUiStore((state) => state.aiProviders);
+  const setAiProvider = useUiStore((state) => state.setAiProvider);
+  const providerDefaults = useUiStore((state) => state.providerDefaults);
+  const organizerModel = useUiStore((state) => state.organizerModel);
+  const setOrganizerModel = useUiStore((state) => state.setOrganizerModel);
+  const organizerModelId = useUiStore((state) => state.organizerModelId);
+  const setOrganizerModelId = useUiStore((state) => state.setOrganizerModelId);
+  const detections = useSetupDetection((state) => state.detections);
+  const { lanes } = useConnectedCatalog(providers, readyFrom(detections));
+  return (
+    <>
       <section className="setup-librarian" aria-labelledby="librarian-title">
         <strong id="librarian-title">The Librarian thinks</strong>
         <div className="setup-librarian-options" role="group" aria-label="Librarian model">
@@ -321,9 +356,6 @@ function LibrarianScreen() {
           {librarianCaption(organizerModel, organizerModel === "local" || providers[organizerModel])}
         </p>
       </section>
-      <p className="setup-local-note">
-        Models for chat come the first time you open Chat. Everything else is in Settings → AI Models.
-      </p>
     </>
   );
 }

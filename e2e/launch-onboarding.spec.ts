@@ -151,6 +151,49 @@ test("skipping the tour points at Settings, and the note opens it", async ({ pag
   await expect(page.getByRole("button", { name: "Back to notes", exact: true })).toBeVisible();
 });
 
+test("the Librarian screen asks whether first; Not now hides where it thinks and leaves it off", async ({
+  page,
+}) => {
+  await page.goto("/?onboarding");
+  await page.getByRole("button", { name: "Skip app setup" }).click();
+  await page.getByRole("button", { name: "Choose an empty folder" }).click();
+  await page.getByRole("button", { name: "New folder", exact: true }).click();
+  await page.getByLabel("New folder name").fill("Raw Practice");
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await page.getByRole("button", { name: "Use empty folder", exact: true }).click();
+  // the vault step no longer asks; the Librarian screen does
+  await expect(page.getByRole("radiogroup", { name: "Librarian choice" })).toHaveCount(0);
+  await page.getByRole("button", { name: /^Create vault/ }).click();
+  const choice = page.getByRole("radiogroup", { name: "Librarian", exact: true });
+  await expect(choice.getByRole("radio", { name: /^Use the Librarian/ })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  const where = page.getByRole("group", { name: "Librarian model" });
+  await expect(where).toBeVisible();
+  await choice.getByRole("radio", { name: /^Not now/ }).click();
+  await expect(where).toHaveCount(0);
+  await choice.getByRole("radio", { name: /^Use the Librarian/ }).click();
+  await expect(where).toBeVisible();
+  await choice.getByRole("radio", { name: /^Not now/ }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Finish setup" }).click();
+  await page
+    .getByRole("dialog", { name: "Thank you for trying Rotli" })
+    .getByRole("button", { name: "Take the tour" })
+    .click();
+  await page.getByRole("button", { name: "Skip tour" }).click();
+  await page
+    .getByRole("status", { name: "More in Settings" })
+    .getByRole("button", { name: "Open Settings" })
+    .click();
+  await page.getByRole("button", { name: "Librarian", exact: true }).click();
+  await expect(page.getByRole("switch", { name: /This is a raw vault/ })).toHaveAttribute(
+    "aria-checked",
+    "false",
+  );
+});
+
 test("the shortcuts screen says each can change, and a changed one can go back", async ({ page }) => {
   await page.goto("/?onboarding");
   await page.getByRole("button", { name: "Skip app setup" }).click();
