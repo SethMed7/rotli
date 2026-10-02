@@ -72,6 +72,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   edits, and refusals as chat: no secure or secret-shaped documents, edits
   only to documents an AI made, never while one is open, never over a newer
   version. A document an agent creates is recorded with the agent's name.
+- **Rotli keeps a record of every AI edit.** Each time chat (or its memory)
+  or an agent changes a note's text, Rotli writes who, when, and a diff to
+  `.rotli/ai-edit-journal.jsonl` in the vault. Secure notes are recorded
+  without their text. The app does not show this record yet.
+- **The command line renames, trashes, and lists attachments.** `rotli rename`
+  takes `--revision` to refuse a stale rename; `rotli notes attachments` lists
+  a note's linked files with type and size (small text files on request);
+  `rotli notes trash` moves a note to Rotli's Trash, where you can restore it;
+  `rotli notes history` shows a note's AI edits; `rotli notes undo-ai-edit`
+  undoes the last one only while the note is exactly as it left it. Renaming,
+  trashing, and undoing follow the edit rule: only notes an AI made, or ones
+  you let AI edit, never locked or secure ones. `rotli open` and deep links
+  now reach notes in connected vaults.
+- **Agents get the same tools** (development builds). `rotli mcp` gains
+  `rotli_rename`, `rotli_note_attachments`, `rotli_trash_note`,
+  `rotli_note_history`, and `rotli_undo_ai_edit`, and `rotli agent config`
+  also prints Cursor and Gemini CLI setups.
 - **Links in Word documents.** Web and mail links in a .docx now open, edit,
   and save as real Word links: add one from the document toolbar (or the
   palette's Link), change its
