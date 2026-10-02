@@ -864,9 +864,6 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-  to { transform: translateX(280%); }
-}
-
 @media (max-width: 720px) {
   .onb {
     align-items: flex-start;
