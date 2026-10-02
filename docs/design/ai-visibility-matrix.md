@@ -60,8 +60,33 @@ secure keyword (the Librarian rules' `secureByName`, even before a save has
 flagged it; in the Mac app a file name that can't be read counts as secure,
 and on Rotli Web, which has no path lookup, the title alone is checked), or
 one whose text trips the secret detector, gets no prompt
-(`src/services/handToAi.ts`). The
-prompt is built from the note alone; no model runs in Rotli.
+(`src/services/handToAi.ts`).
+
+Since v2 (2026-10-02) the files the note links to follow the same law. A
+`storage:` or vault-relative link (outside code fences, never a `.md` note
+link) whose path sits under `Secure notes/` or `wiki/_secure/` (any case: the
+Mac's disk ignores it), or whose file name carries a secure keyword, refuses
+the whole handoff before anything is located. Every other linked file is
+resolved the way the editor's image widget resolves it (`imageSrcToRel` +
+`corpus_abs`, plus a stat), listed under **Attachments** with its absolute
+path, and its in-body link rewritten to that path (the editor's `|width` is
+dropped); a file that isn't there is listed as missing. Rotli Web has no file
+paths, so it lists the vault-relative path.
+
+**Basic** (the default, and the fallback) is built from the note alone; no
+model runs. **Refined** sends the Basic handoff to the Librarian's model
+through the same `Host.complete` port the Librarian bar uses
+(`tauriHostFor`): its own model when that is on this Mac, a connected lane
+only when the Librarian is on and set to that lane, otherwise this Mac's
+model (`refineModelFor`). Every refusal above is asked again before the
+call, and the secret gate runs on the exact request, so a secure note or
+secure file never reaches any model. The instructions are a versioned asset
+(`src/ai/prompts/handToAiRefine.md`, `version:` header); a reply that drops
+or alters an attachment path, comes back empty, or runs away is refused and
+the card shows Basic with the reason (`src/ai/handToAiRefine.ts`; offline
+eval `src/ai/handToAiRefineEval.test.ts`). The last mode chosen is the
+`handToAiMode` app setting on this Mac (`src/state/handToAiMode.ts`, through
+`state/appExtras.ts`).
 
 ### What changed on 2026-08-01
 

@@ -58,4 +58,6 @@ export const APP_SETTINGS_KEYS = new Set([
   "sidebarFronts",
   // The sidebar shows the vault's folders as on disk (services/vaultTree.ts).
   "vaultView",
+  // Hand to AI opens in the mode chosen last (state/handToAiMode.ts).
+  "handToAiMode",
 ]);
