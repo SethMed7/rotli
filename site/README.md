@@ -72,7 +72,10 @@ bun run preview  # serve the built dist/ locally
   fold into a Menu disclosure (`<details>`; Escape, an outside click, or
   choosing a link closes it), where the dropdown's pages are listed under its
   name; below 560px the GitHub mark and Download move into it too. The
-  footer's closing row holds the maker line and the two directory badges.
+  footer's lead column holds the brand, the tagline, and the "Hear when it's
+  ready." sign-up (see "The coming-soon list" below); its closing row holds
+  the maker line and the Launch Llama badge; the quokka scenery runs along its
+  bottom edge.
 - **The landing page** (`src/components/Landing.astro`) only composes its
   chapters from `src/components/landing/`, bookended like the studio's story
   film: Hero (the story film itself) → Overview (Write. Keep. Ask.: three
@@ -99,7 +102,11 @@ bun run preview  # serve the built dist/ locally
   section grammar (`.wrap`, `.section`, `.section-title`, `.section-lede`,
   `.band-warm`, `.band-deep`, the spacing and type steps), and the one
   scroll-reveal script. Nothing on the page moves on a timer: the theme studio
-  changes only when a visitor picks a swatch or steps the carousel, and scroll reveals fire once and rest. Two-column rows share a
+  changes only when a visitor picks a swatch or steps the
+  carousel, and scroll reveals fire once and rest. The one sanctioned
+  exception (the owner's call, 2026-10-02) is the quokka scenery under the
+  footer, described below: it lives in its own band, below every word, and
+  stands still under reduced motion. Two-column rows share a
   top edge so each heading starts level with its picture.
 - **`/privacy/`** is the full privacy policy in plain language: the short
   version, where notes live, every network connection and when it happens, AI
@@ -144,11 +151,32 @@ bun run preview  # serve the built dist/ locally
   status. The hero's Download for Mac still fetches the DMG directly
   (`DOWNLOAD_HREF`). The Helper guide is `/resources/rotli-helper/`; the 404
   page's `/helper` hint links there.
-- **The 404 page** (`src/pages/404.astro`) is set where the story film ends:
-  `SunsetScene.astro` (`full`) fills the window with the sunset, there is no
-  header or footer, and one "Take me home" button leads back with a quiet line
-  of other ways in. The missing path and a hint (`/app`, `/helper`) are chosen
-  in the browser. `SunsetScene.astro` is also the closing invitation's ground.
+- **The 404 page** (`src/pages/404.astro`) has no header or footer: "This
+  note wandered off." in the middle of the window, one "Take me home" button
+  with a quiet line of other ways in, and the footer's quokka scenery along
+  the bottom edge. The missing path and a hint (`/app`, `/helper`) are chosen
+  in the browser. `SunsetScene.astro` remains the closing invitation's ground.
+- **The quokka scenery** (`src/components/QuokkaScene.astro`, under every
+  footer, the 404, and `/subscribed/`) is a strip of Rottnest by day in the
+  film's palette (sea, the far lighthouse, scrub on the dunes, sand) with a
+  pile of leaves, four quokkas (three below 760px), and one that now and then
+  strolls along the dunes behind them, pausing to look at the pointer. The
+  quokkas are the app's canonical `base.svg` line art, rigged rather than
+  redrawn: `src/quokka/art.ts` thins the traced outline at build time and
+  takes its outer ring as the body fill (`--cocoa`, the app's Cocoa body);
+  `src/quokka/rig.ts` holds the pivots; overlays (eyes, brows, mouths, the
+  reaching arm, the leaves) use the art's own 14-unit ink. `src/quokka/scene.ts`
+  (one external module, about 7 KB) makes the head tilt and the eyes follow the
+  pointer, a paw reach for a pointer that comes close, brows go cross when the
+  pointer nears the leaves, faces fall when it is on them, and everyone cheers
+  when it leaves; they blink, hop, and nibble now and then, and a tap pokes
+  one. It runs one `requestAnimationFrame` loop only while the scene is on
+  screen and the tab is visible, uses pointer events only, and writes SVG
+  `transform` attributes and one CSSOM transform (never an inline `style`
+  attribute, which the CSP would drop). Under reduced motion, or without
+  script, nothing runs and the scene stands at rest. The band is decorative
+  (`aria-hidden`), has a fixed height (no layout shift), clips its own
+  content, and holds no text, so nothing can overlap a word or a link.
 - **The motion studio** lives at `studio.rotli.co` (`STUDIO_URL` in
   `src/site.ts`): the footer's Learn column links it whatever the source flag, and the Caddyfile
   sends `/studio` there.
@@ -378,12 +406,12 @@ download, so landing there first costs nothing.
 The site is a static Astro build served by Caddy from a pinned two-stage
 [`Dockerfile`](Dockerfile). [`Caddyfile`](Caddyfile) is the one home for the
 browser-security and cache headers. There is no SSR, adapter, or Worker.
-The footer's Launch Llama and Founder.best badges are the site's only
-third-party images: `img-src` allows only `https://tools.launchllama.co` and
-`https://www.founder.best` beyond same-origin and data images,
-and `check:security` keeps literal remote `<img>` origins aligned with that
-deployed policy so a local-preview success cannot become a blank production
-badge.
+The footer's Launch Llama badge is the site's only third-party image:
+`img-src` allows only `https://tools.launchllama.co` beyond same-origin and
+data images, and `check:security` keeps literal remote `<img>` origins aligned
+with that deployed policy so a local-preview success cannot become a blank
+production badge. Pages may talk only to their own origin (`connect-src
+'self'`, `form-action 'self'`), which is all the coming-soon list needs.
 
 The Docker build context is the **repository root**, because the pages import
 the canonical mark and companion art from `src/assets/characters/`. The
@@ -408,6 +436,46 @@ TXT ownership token (the CLI omits it; read it from the dashboard or the API's
 `customDomain.status.verificationToken`). Without the TXT record Railway answers
 `Application not found` even though the CNAME routes. Cloudflare's proxy may
 stay on with the SSL/TLS mode set to **Full** (not Full strict).
+
+### The coming-soon list (Resend)
+
+The footer's "Hear when it's ready." sign-up adds an address to a Resend
+segment. The static site cannot hold an API key, so the image runs one more
+process: a small Bun sidecar (`server/subscribe.ts`, one file, no
+dependencies) on `127.0.0.1:8787`. Caddy proxies `/api/*` to it under the
+site's own headers (`Cache-Control: no-store`); `entrypoint.sh` starts it in a
+retry loop and then execs Caddy, so Caddy is PID 1 and the sidecar fails soft:
+if it is down, `/api/*` answers 503, the footer hides its form, and every page
+keeps serving.
+
+- `GET /api/subscribe` → `{ "live": true | false }`. The footer hides the form
+  unless it reads `live: true` (so it is also hidden under `astro dev` and
+  `astro preview`, which have no sidecar).
+- `POST /api/subscribe` (JSON from the footer's script, or a plain form post
+  without JavaScript, which is redirected to `/subscribed/`): validates the
+  address, drops a filled honeypot field (`website`) with a fake success,
+  limits each visitor to 5 tries per 10 minutes (keyed on `CF-Connecting-IP`,
+  then `X-Real-IP`; 120 per 10 minutes overall), then calls Resend's
+  `POST https://api.resend.com/contacts` with
+  `{ email, unsubscribed: false, segments: [{ id }] }`. Contacts are global
+  per address in Resend, so when the contact already exists it calls
+  `POST /contacts/{email}/segments/{segment_id}` instead; a repeat signup is
+  answered exactly like a new one, and an earlier unsubscribe is never
+  overridden. Addresses are never logged (only Resend's status and error name).
+- Tests: `bun run test` (Resend mocked; part of `bun run verify` and CI).
+
+Set these as **runtime** service variables in Railway (never build args; the
+Dockerfile does not declare them, so no secret lands in an image layer):
+
+| Variable            | Purpose                                                                 |
+| ------------------- | ----------------------------------------------------------------------- |
+| `RESEND_API_KEY`    | A Resend API key with full access (contacts need it; a sending-only key is refused). Unset: the list is off. |
+| `RESEND_SEGMENT_ID` | The segment new contacts join (Resend → Audience → Segments; the old Audiences API is deprecated). Unset: the list is off. |
+| `SUBSCRIBE_PORT`    | Optional. The sidecar's loopback port, read by both Caddy and the sidecar (default `8787`). |
+
+To rehearse it in the prod twin, pass the variables to `docker run`
+(`-e RESEND_API_KEY=… -e RESEND_SEGMENT_ID=…`); with a test key, use a test
+segment.
 
 ### Going live (turning off the holding page)
 

@@ -159,7 +159,7 @@ export default defineConfig({
   redirects: site.showsFullSite ? { "/resources/mcp": "/resources/developers/" } : {},
   vite: { server: { proxy: localWebApp }, preview: { proxy: localWebApp } },
   integrations: [
-    ...(site.indexable ? [sitemap({ filter: (page) => page !== `${site.url}/404/` })] : []),
+    ...(site.indexable ? [sitemap({ filter: (page) => page !== `${site.url}/404/` && page !== `${site.url}/subscribed/` })] : []),
     cspInlineStyleGuard(),
     agentFilesGuard(),
   ],

@@ -1,13 +1,13 @@
 ---
 import Base from '../layouts/Base.astro';
 import mark from '../../../src/assets/characters/_logo.svg?raw';
-import SunsetScene from '../components/SunsetScene.astro';
+import QuokkaScene from '../components/QuokkaScene.astro';
 import { DOWNLOAD_HREF, WEB_APP_PATH, site } from '../site';
 
-// One page for every missing path, set where the story film ends: the sunset fills the
-// window, no header or footer, one way home. The hint under the headline is chosen in the
-// browser from the path itself: /app when Rotli Web is not switched on here, /helper for the
-// helper's pages, else the plain truth.
+// One page for every missing path: the note that wandered off, one way home, and the
+// footer's quokka scenery along the bottom of the window (no header or footer). The hint
+// under the headline is chosen in the browser from the path itself: /app when Rotli Web is
+// not switched on here, /helper for the helper's pages, else the plain truth.
 const also = [
   ...(site.downloadsEnabled ? [{ href: DOWNLOAD_HREF, label: 'Download for Mac' }] : []),
   ...(site.webAppEnabled ? [{ href: WEB_APP_PATH, label: 'Open Rotli Web' }] : []),
@@ -22,42 +22,41 @@ const also = [
   noindex
 >
   <main id="content" class="not-found" data-web-app={site.webAppEnabled ? 'on' : 'off'}>
-    <SunsetScene full>
-      <div class="lost" data-reveal>
-        <a class="brand" href="/" aria-label="rotli home"><span set:html={mark} aria-hidden="true"></span><b>rotli</b></a>
-        <p class="code">404</p>
-        <h1>This note <span class="inked">wandered off.</span></h1>
-        <p class="hint" data-hint="default">The page you followed is not here, but rotli still is.</p>
-        <p class="hint" data-hint="app" hidden>
-          Rotli Web is not switched on at this address yet. Everything it will do, the Mac app does today.
-        </p>
-        <p class="hint" data-hint="helper" hidden>
-          {
-            site.showsFullSite ? (
-              <>
-                Looking for Rotli Helper? <a href="/resources/rotli-helper/">What it is and how to install it</a>.
-              </>
-            ) : (
-              'Rotli Helper is not published at this address yet.'
-            )
-          }
-        </p>
-        <p class="path"><code data-path></code></p>
-        <a class="button primary home" href="/">Take me home</a>
+    <div class="lost" data-reveal>
+      <a class="brand" href="/" aria-label="rotli home"><span set:html={mark} aria-hidden="true"></span><b>rotli</b></a>
+      <p class="code">404</p>
+      <h1>This note <span class="inked">wandered off.</span></h1>
+      <p class="hint" data-hint="default">The page you followed is not here, but rotli still is.</p>
+      <p class="hint" data-hint="app" hidden>
+        Rotli Web is not switched on at this address yet. Everything it will do, the Mac app does today.
+      </p>
+      <p class="hint" data-hint="helper" hidden>
         {
-          also.length > 0 && (
-            <nav class="also" aria-label="Where to go instead">
-              {also.map((link, i) => (
-                <>
-                  {i > 0 && <span aria-hidden="true"> · </span>}
-                  <a href={link.href}>{link.label}</a>
-                </>
-              ))}
-            </nav>
+          site.showsFullSite ? (
+            <>
+              Looking for Rotli Helper? <a href="/resources/rotli-helper/">What it is and how to install it</a>.
+            </>
+          ) : (
+            'Rotli Helper is not published at this address yet.'
           )
         }
-      </div>
-    </SunsetScene>
+      </p>
+      <p class="path"><code data-path></code></p>
+      <a class="button primary home" href="/">Take me home</a>
+      {
+        also.length > 0 && (
+          <nav class="also" aria-label="Where to go instead">
+            {also.map((link, i) => (
+              <>
+                {i > 0 && <span aria-hidden="true"> · </span>}
+                <a href={link.href}>{link.label}</a>
+              </>
+            ))}
+          </nav>
+        )
+      }
+    </div>
+    <QuokkaScene />
   </main>
 
   <script>
@@ -70,7 +69,15 @@ const also = [
   </script>
 
   <style>
+    /* The words in the middle of the window, the scenery along its bottom edge. */
+    .not-found {
+      display: grid;
+      grid-template-rows: 1fr auto;
+      min-height: 100svh;
+    }
     .lost {
+      align-self: center;
+      padding-block: clamp(2rem, 6vh, 4rem) clamp(1.5rem, 4vh, 3rem);
       display: grid;
       justify-items: center;
       gap: 0.6rem;
@@ -106,7 +113,6 @@ const also = [
       letter-spacing: -0.045em;
       text-wrap: balance;
     }
-    /* Muted ink is too faint on the sky; the sunset reads in the page's ink. */
     .hint {
       max-width: 34rem;
       margin: 0.6rem 0 0;

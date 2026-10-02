@@ -55,6 +55,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **rotli.co has a "hear when it's ready" list and quokkas at the bottom.**
+  The footer takes an email address for occasional workshop notes (sent
+  through Resend; the form is hidden while the list is off, and it works
+  without JavaScript). Below it, and on the page-not-found screen, a strip of
+  Rottnest where the quokkas follow your pointer, reach for it, and guard
+  their leaves; under reduced motion they stand still. The Founder.best
+  badge is gone.
 - **Center or right-align a paragraph.** Align center, Align right, and Align
   left are in the command palette (bind them in Settings → Keybindings), and
   `/center` and `/align right` start an aligned paragraph. The file keeps

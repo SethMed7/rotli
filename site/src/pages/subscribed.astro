@@ -1,0 +1,73 @@
+---
+// Where the footer's sign-up lands without script (site/server/subscribe.ts redirects a
+// plain form post here): a thank-you, one way back, and the quokka scenery, pleased. With
+// script the footer says the same thing in place and nobody sees this page. Every build
+// mode has it, since the holding page carries the sign-up too; it is never indexed.
+import Base from '../layouts/Base.astro';
+import mark from '../../../src/assets/characters/_logo.svg?raw';
+import QuokkaScene from '../components/QuokkaScene.astro';
+---
+
+<Base
+  title="You’re on the list — rotli"
+  description="You will hear from rotli when there is something worth reading."
+  canonicalPath="/subscribed/"
+  noindex
+>
+  <main id="content" class="subscribed">
+    <div class="thanks">
+      <a class="brand" href="/" aria-label="rotli home"><span set:html={mark} aria-hidden="true"></span><b>rotli</b></a>
+      <h1>You’re on the list.</h1>
+      <p class="lede">
+        We’ll write when there is something worth reading: notes from the workshop now and then, and one when rotli
+        is ready for you. Every email has a way to unsubscribe.
+      </p>
+      <a class="button primary" href="/">Back to rotli</a>
+    </div>
+    <QuokkaScene mood="happy" />
+  </main>
+
+  <style>
+    .subscribed {
+      display: grid;
+      grid-template-rows: 1fr auto;
+      min-height: 100svh;
+    }
+    .thanks {
+      align-self: center;
+      display: grid;
+      justify-items: center;
+      gap: 0.9rem;
+      padding: clamp(2rem, 6vh, 4rem) var(--gutter) clamp(1.5rem, 4vh, 3rem);
+      text-align: center;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: clamp(1rem, 4vh, 2.5rem);
+      color: var(--text);
+      font-family: var(--font-wordmark);
+      font-size: 1.5rem;
+      text-decoration: none;
+    }
+    .brand :global(svg) {
+      width: 30px;
+      height: 30px;
+    }
+    h1 {
+      margin: 0;
+      font-size: var(--step-h2);
+      font-weight: 600;
+      line-height: 1.04;
+      letter-spacing: -0.035em;
+    }
+    .lede {
+      max-width: 34rem;
+      margin: 0 0 0.6rem;
+      color: var(--text-muted);
+      font-size: var(--step-lede);
+      line-height: 1.55;
+    }
+  </style>
+</Base>
