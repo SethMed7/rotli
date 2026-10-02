@@ -141,8 +141,18 @@ things get built lives in [AGENTS.md](AGENTS.md) and [docs/](docs/README.md).
 - **Actionable checklists as a family** · L — `/email:send` is the first one.
   The same pattern for `/remind`, `/event`, and `/open`, so a checkbox can carry
   an action.
-- **Chat can look inside a folder** · M — access is managed via metadata, not a
-  grant per chat. Still to define.
+- **Connect a folder to a chat** · L — the owner, 2026-10-01: connect a
+  folder on your Mac, such as a whole software project, and talk about it: ask
+  questions and keep the project in mind across the conversation. Read-only:
+  it is not a coding agent (T3 Code and Claude Code do that); nothing in the
+  folder is edited. The chat, its notes, and anything it learns stay in your
+  vault and in Rotli; the folder stays where it is and never moves into the
+  vault. To decide: how a connection is granted and remembered (a chat's
+  metadata or a vault-level list, not a fresh grant every time), what is read
+  (ignore rules like `.gitignore`, size limits, binaries skipped), how a big
+  project fits a model's context (search and summaries rather than the whole
+  tree), and the same secret gate the vault has (a remote model never sees a
+  secret-shaped file).
 - **Beta channel** · M — a setting that lets testers opt into in-the-work
   features like Sheets. Today those only exist in development builds.
 - **Shortcuts and Raycast hooks** · M — extend the `rotli://` link so other

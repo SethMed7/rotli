@@ -10,6 +10,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Setup is four screens.** Your name and theme, where your notes live, who
+  files them (the Librarian), and your three shortcuts, which now say plainly
+  that you can change them. Then the thank-you card and the tour, and a small
+  note beside Settings pointing to everything else.
+- **Choosing where notes live is one step.** Pick Create a Rotli vault or Open
+  an existing folder, pick the folder, and you're in: no confirmation screen
+  after it. An existing folder opens in place.
+- **The Librarian screen asks whether first** (Use the Librarian, or Not now),
+  then which provider and model.
+- **The thank-you card has Take the tour and Start now**, so skipping the tour
+  is one click.
+- **The rest waits where you use it.** Your quokka starts plain (dress it in
+  Settings). The music player is in the sidebar from the start, quiet until
+  you press Play; pick music from it or hide it. Chat offers its models,
+  local or connected, the first time it has none.
+- **A new install lives in the Dock** and stays open like any app. Testers
+  lost the menu-bar-only app mid-setup; the quiet visitor is a choice in
+  Settings → General.
+
 ### Added
 
 - **Chat edits the Word documents it made.** After reading one, chat can

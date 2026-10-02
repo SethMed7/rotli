@@ -1,7 +1,9 @@
 // Thank you (2026-09-28): the card after setup, before the guided tour. A
 // short note, a banner made from the person's own choices (their quokka, their
 // theme, their name), and ways to pass Rotli on: a GitHub star, an invite for
-// a friend, a post on X, and the banner to keep. Closing it starts the tour.
+// a friend, a post on X, and the banner to keep. Then the tour, or straight in
+// (the owner, 2026-10-01: "Take tour" or "Start now", so skipping the tour is
+// one click); closing the card is Start now.
 
 import { type RefObject, useEffect, useRef, useState } from "react";
 
@@ -16,6 +18,7 @@ import {
   saveBanner,
 } from "../services/thanksShare";
 import { useOnboardingThanks } from "../state/onboardingThanks";
+import { showSettingsHintNow } from "../state/settingsHint";
 import { isDarkDataTheme, readDataTheme } from "../state/theme";
 import { THEME_FAMILY_PRESENTATIONS } from "../state/themeChoices";
 import { startTour } from "../state/tour";
@@ -101,9 +104,13 @@ function ThanksCard() {
   const banner = useBanner(quokkaHost);
   const [status, setStatus] = useState("");
 
-  const close = () => {
+  const takeTour = () => {
     hide();
     startTour();
+  };
+  const startNow = () => {
+    hide();
+    showSettingsHintNow();
   };
 
   const shareOnX = async () => {
@@ -143,7 +150,7 @@ function ThanksCard() {
       id="thanks"
       title="Thank you for trying Rotli"
       className="thanks-card"
-      onClose={close}
+      onClose={startNow}
       actions={
         <>
           {/* the shares and the tour share one row (the owner, 2026-09-30) */}
@@ -179,7 +186,10 @@ function ThanksCard() {
           <span className="thanks-status" role="status">
             {status}
           </span>
-          <button type="button" className="rename-btn primary" onClick={close}>
+          <button type="button" className="rename-btn" onClick={startNow}>
+            Start now
+          </button>
+          <button type="button" className="rename-btn primary" onClick={takeTour}>
             Take the tour
           </button>
         </>

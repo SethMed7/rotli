@@ -1,7 +1,7 @@
 // Thank you (2026-09-28): after setup, a card thanks the person and shows a
 // banner drawn from their own choices, with a GitHub star, an invite, Share on
 // X (a fixed caption; the banner goes on the clipboard), and a download.
-// Closing it starts the guided tour. Uses the development `?onboarding` route.
+// Then Take the tour, or Start now (closing the card is Start now). Uses the development `?onboarding` route.
 
 import { expect, type Page, test } from "@playwright/test";
 
@@ -13,9 +13,10 @@ async function onboardAs(page: Page, name: string) {
   await page.getByRole("button", { name: "New folder", exact: true }).click();
   await page.getByLabel("New folder name").fill("Thanks Practice");
   await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Use empty folder", exact: true }).click();
-  await page.getByRole("button", { name: /^Create vault/ }).click();
-  await page.getByRole("button", { name: "Skip model setup" }).click();
+  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
+  // the Librarian, then the shortcuts, then the thank-you card
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Finish setup" }).click();
 }
 
 test("setup ends with a thank-you card, a banner of their own, and ways to share", async ({
@@ -90,42 +91,45 @@ test("setup ends with a thank-you card, a banner of their own, and ways to share
   await expect(page.getByRole("region", { name: "Guided tour" })).toBeVisible();
 });
 
-test("Escape closes the card and still starts the tour", async ({ page }) => {
+test("Start now goes straight in: no tour, and the note at Settings at once", async ({ page }) => {
+  await onboardAs(page, "");
+  const card = page.getByRole("dialog", { name: "Thank you for trying Rotli" });
+  await expect(card.getByRole("button", { name: "Take the tour" })).toBeVisible();
+  await card.getByRole("button", { name: "Start now" }).click();
+  await expect(card).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Guided tour" })).toHaveCount(0);
+  await expect(page.getByRole("status", { name: "More in Settings" })).toBeVisible();
+});
+
+test("Escape closes the card the way Start now does", async ({ page }) => {
   await onboardAs(page, "");
   const card = page.getByRole("dialog", { name: "Thank you for trying Rotli" });
   await expect(card).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(card).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Guided tour" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Guided tour" })).toHaveCount(0);
+  await expect(page.getByRole("status", { name: "More in Settings" })).toBeVisible();
 });
 
-test("the banner wears their choices: a Grove Dark ground and the bucket hat they picked", async ({
+test("the banner wears their theme, Grove Dark, with the plain quokka setup gives everyone", async ({
   page,
 }) => {
   await page.goto("/?onboarding");
   await page.getByPlaceholder("Your first name").fill("Ada");
-  await page.getByRole("button", { name: "Get started" }).click();
   await page
     .getByRole("radiogroup", { name: "Theme" })
     .getByRole("radio", { name: /^Grove/ })
     .click();
   await page.getByRole("radio", { name: "Dark", exact: true }).first().click();
-  await page.getByRole("checkbox", { name: "Keep my quokka throughout Rotli" }).check();
-  await page
-    .getByRole("radiogroup", { name: "Accessory" })
-    .getByRole("radio", { name: /^Bucket hat/ })
-    .click();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Choose where notes live" }).click();
   await page.getByRole("button", { name: "Choose an empty folder" }).click();
   await page.getByRole("button", { name: "New folder", exact: true }).click();
-  await page.getByLabel("New folder name").fill("Hat Practice");
+  await page.getByLabel("New folder name").fill("Banner Practice");
   await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Use empty folder", exact: true }).click();
-  await page.getByRole("button", { name: /^Create vault/ }).click();
-  await page.getByRole("button", { name: "Skip model setup" }).click();
+  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
+  // the Librarian, then the shortcuts, then the thank-you card
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Finish setup" }).click();
 
   const banner = page
     .getByRole("dialog", { name: "Thank you for trying Rotli" })
@@ -139,8 +143,9 @@ test("the banner wears their choices: a Grove Dark ground and the bucket hat the
     const ctx = canvas.getContext("2d")!;
     ctx.drawImage(image, 0, 0);
     const pixel = (x: number, y: number) => Array.from(ctx.getImageData(x, y, 1, 1).data.slice(0, 3));
-    return [pixel(4, 4), pixel(330, 170)]; // a corner, and the hat's crown over the quokka's head
+    return [pixel(4, 4), pixel(330, 170)]; // a corner, and the air above the quokka's head
   });
   expect(ground[0]! + ground[1]! + ground[2]!).toBeLessThan(150); // a dark ground
-  expect(crown[0]!).toBeGreaterThan(crown[1]! + 40); // the warm hat, not the green quokka or ground
+  // no hat: above the plain quokka's head is the same dark ground
+  expect(Math.abs(crown[0]! - ground[0]!) + Math.abs(crown[1]! - ground[1]!)).toBeLessThan(40);
 });

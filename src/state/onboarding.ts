@@ -13,16 +13,18 @@ import { allActions } from "../keys/registry";
 import { DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE } from "../lib/privateBrowser";
 import { setDockVisible, setGlobalShortcut, setHideOnBlur } from "../lib/tauri";
 import { DEFAULT_APPEARANCE } from "./appearanceDefaults";
+import { FIRST_RUN_WINDOW } from "./onboardingPhase";
 import { useUiStore } from "./ui";
 
+/** First run's four screens (the owner, 2026-10-01, after testers' "too many
+ * steps"): you and your theme, your vault, the Librarian, your shortcuts. The
+ * window, music, quokka, and models wait in the app: Settings, the sidebar
+ * player, and Chat offer them where they're used. */
 export const ONBOARDING_STEP_NUMBER = {
-  welcome: 1,
-  appearance: 2,
-  behavior: 3,
-  sound: 4,
-  shortcuts: 5,
-  vault: 6,
-  models: 7,
+  you: 1,
+  vault: 2,
+  librarian: 3,
+  shortcuts: 4,
 } as const;
 
 export const ONBOARDING_TOTAL_STEPS = Object.keys(ONBOARDING_STEP_NUMBER).length;
@@ -33,15 +35,20 @@ export function startingAppearance(): typeof DEFAULT_APPEARANCE & { quokkaAccess
   return { ...DEFAULT_APPEARANCE, quokkaAccessory: "none" };
 }
 
-/** The window flags "Skip app setup" writes. Only a true first run (never
- * onboarded, no recorded onboarding version) takes the visitor defaults; an
- * install re-onboarded from Settings keeps its Stay open / Dock choice —
- * resetting it made the window hide on the next Finder click. */
-export function windowBehaviorOnSkip(
+/** Whether this is a true first run: never onboarded, no recorded onboarding
+ * version (Settings → Reset & re-onboard keeps the version it had). */
+export function isFirstRun(onboarded: boolean, onboardingVersion: string): boolean {
+  return !onboarded && onboardingVersion === "";
+}
+
+/** The window flags a true first run starts with. An install re-onboarded
+ * from Settings keeps its own Stay open / Dock choice: resetting it made the
+ * window hide on the next Finder click. */
+export function firstRunWindow(
   onboarded: boolean,
   onboardingVersion: string,
-): { stayOpen?: false; showInDock?: false } {
-  return !onboarded && onboardingVersion === "" ? { stayOpen: false, showInDock: false } : {};
+): { stayOpen?: true; showInDock?: true } {
+  return isFirstRun(onboarded, onboardingVersion) ? { ...FIRST_RUN_WINDOW } : {};
 }
 
 /** Setup runs only on a true first run (or after Settings → Reset & re-onboard).
@@ -63,15 +70,14 @@ export async function resetAndReonboard(): Promise<void> {
     );
   }
 
-  // window behavior + Dock → defaults (visitor, menu-bar-only)
-  await setHideOnBlur(true).catch(() => {});
-  await setDockVisible(false).catch(() => {});
+  // window behavior + Dock → defaults (in the Dock, staying open)
+  await setHideOnBlur(false).catch(() => {});
+  await setDockVisible(true).catch(() => {});
 
   // theme + the General flags + the gate → defaults, in one store write
   useUiStore.setState({
-    ...DEFAULT_APPEARANCE,
-    stayOpen: false,
-    showInDock: false,
+    ...startingAppearance(),
+    ...FIRST_RUN_WINDOW,
     privateBrowserSearchEngine: DEFAULT_PRIVATE_BROWSER_SEARCH_ENGINE,
     remoteAgentRelayUrl: "",
     onboarded: false,

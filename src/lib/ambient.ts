@@ -66,8 +66,11 @@ export interface AmbientPrefs {
   stations: YouTubeStation[];
 }
 
+/** The player shows from the first run, quiet until the person presses Play
+ * (the owner, 2026-10-01: set up while they're already in; they hide it or
+ * pick music there, and it no longer needs a setup screen). */
 export const DEFAULT_AMBIENT: AmbientPrefs = {
-  enabled: false,
+  enabled: true,
   track: "linen",
   playing: false,
   volume: 0.4,
@@ -94,7 +97,8 @@ export function parseAmbient(value: unknown): AmbientPrefs {
   const known = (id: unknown): id is string =>
     ambientSources({ stations }).some((source) => source.id === id);
   return {
-    enabled: prefs.enabled === true,
+    // a saved choice either way stands; anything else is the default (shown)
+    enabled: typeof prefs.enabled === "boolean" ? prefs.enabled : DEFAULT_AMBIENT.enabled,
     track: known(prefs.track) ? prefs.track : DEFAULT_AMBIENT.track,
     playing: prefs.playing === true,
     volume:

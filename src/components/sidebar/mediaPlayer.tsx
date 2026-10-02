@@ -27,6 +27,7 @@ import {
   openMediaTab,
   openStreamTab,
   stepAmbient,
+  hideAmbient,
   stopAmbient,
   tabMediaAction,
   toggleAmbient,
@@ -87,6 +88,7 @@ export const LABELS = {
   open: "Open the tab",
   tuck: "Tuck into the player",
   close: "Close the tab",
+  hide: "Hide the player",
   choose: "Choose the ambient sound",
   /** "Open Claude FM in a tab", or the station's name. */
   openStream: (title: string) => `Open ${title} in a tab`,
@@ -276,6 +278,9 @@ export function Player({
                 <ExternalLinkGlyph size={13} />
               </Control>
             )}
+            <Control label={LABELS.hide} onClick={hideAmbient}>
+              <CloseGlyph />
+            </Control>
           </div>
         )}
       </div>

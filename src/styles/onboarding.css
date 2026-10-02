@@ -297,162 +297,6 @@
   font-size: 11.5px;
 }
 
-.setup-quokka-row {
-  display: grid;
-  grid-template-columns: 78px minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-  padding-block: 10px;
-  border-block: 1px solid var(--border);
-}
-
-.setup-quokka-preview {
-  display: grid;
-  place-items: center;
-  min-height: 74px;
-}
-
-.setup-quokka-controls {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 8px 10px;
-  color: var(--text-muted);
-  font-size: 11.5px;
-}
-
-.setup-quokka-swatches {
-  display: flex;
-  min-width: 0;
-  grid-column: 1 / -1;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
-.setup-quokka-mode,
-.setup-quokka-controls > label:not(.setup-quokka-mode),
-.setup-quokka-controls > small {
-  grid-column: 1 / -1;
-}
-
-.setup-quokka-mode input {
-  accent-color: var(--accent);
-}
-
-.setup-quokka-swatches button,
-.setup-quokka-swatches input {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  padding: 3px;
-  border: 1px solid transparent;
-  border-radius: 50%;
-  background: transparent;
-  cursor: pointer;
-}
-
-.setup-quokka-swatches button:hover,
-.setup-quokka-swatches button.selected {
-  border-color: var(--accent);
-  background: var(--selected-bg);
-}
-
-.setup-quokka-swatches button > span {
-  position: relative;
-  width: 15px;
-  height: 15px;
-  border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
-  border-radius: 50%;
-}
-
-.setup-quokka-line-swatch::before,
-.setup-quokka-line-swatch::after {
-  content: "";
-  position: absolute;
-  left: 3px;
-  right: 3px;
-  height: 1px;
-  background: var(--text);
-}
-
-.setup-quokka-line-swatch::before {
-  top: 5px;
-}
-
-.setup-quokka-line-swatch::after {
-  top: 9px;
-}
-
-.setup-quokka-swatches input {
-  border-color: var(--border);
-}
-
-.setup-quokka-swatches input[type="range"] {
-  width: 128px;
-  border-radius: var(--r-pill);
-  accent-color: var(--accent);
-}
-
-.setup-quokka-controls label {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 8px;
-}
-
-.setup-quokka-accrow {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.setup-quokka-accs {
-  display: flex;
-  gap: 6px;
-}
-
-.setup-quokka-accs button {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  padding: 2px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-control);
-  background: transparent;
-  cursor: pointer;
-}
-
-.setup-quokka-accs button:hover {
-  background: var(--hov);
-}
-
-.setup-quokka-accs button.selected {
-  border-color: var(--accent);
-  background: var(--selected-bg);
-}
-
-.setup-quokka-accs button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.setup-quokka-controls > small {
-  color: var(--text-muted);
-  font-size: 10px;
-  line-height: 1.35;
-}
-
-.setup-quokka-swatches button:focus-visible,
-.setup-quokka-swatches input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
 .setup-arrow-note {
   display: flex;
   align-items: center;
@@ -503,6 +347,55 @@
 }
 
 .setup-shortcut-copy em { color: var(--danger); }
+
+.setup-librarian-caption {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+/* a shortcut reads as changeable (the owner, 2026-10-01): its keys and a
+   Change label on one button, and a way back to the default once changed */
+.setup-shortcut-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setup-chord {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setup-chord-change {
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.setup-shortcut-reset {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.setup-shortcut-reset:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.setup-shortcut-reset:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-control);
+}
 
 .setup-footer {
   flex: none;
@@ -577,58 +470,6 @@
 
 .setup-skip:hover { color: var(--text); }
 
-.setup-path {
-  max-width: 100%;
-  overflow: hidden;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.vault-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  border-block: 1px solid var(--border);
-}
-
-.vault-stats span {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px 4px;
-  color: var(--text-muted);
-  font-size: 10.5px;
-}
-
-.vault-stats strong {
-  color: var(--text);
-  font-size: 17px;
-  font-weight: 650;
-}
-
-.vault-preservation {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px 16px;
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-.vault-preservation strong {
-  grid-column: 1 / -1;
-  color: var(--text);
-  font-size: 11.5px;
-}
-
-.vault-preservation span::before {
-  content: "✓";
-  margin-right: 6px;
-  color: var(--success);
-}
-
 /* Rotli Web's first screen: what the browser's own picker is about to do,
    said in Rotli's voice before it opens (the same lines the Connect dialog
    shows once a vault exists). */
@@ -672,7 +513,6 @@
   line-height: 1.5;
 }
 
-.setup-warning,
 .setup-error {
   padding: 8px 10px;
   border-left: 2px solid var(--accent-text);
@@ -1007,28 +847,6 @@
   color: var(--accent-text);
 }
 
-.setup-scanning {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-
-.setup-scan-line {
-  width: 100%;
-  height: 2px;
-  overflow: hidden;
-  background: var(--border);
-}
-
-.setup-scan-line::after {
-  content: "";
-  display: block;
-  width: 28%;
-  height: 100%;
-  background: var(--accent);
-  animation: setup-scan 900ms var(--motion-ease) infinite alternate;
-}
 
 @keyframes setup-step-in {
   from { opacity: 0; transform: translateY(5px); }
@@ -1044,11 +862,6 @@
 @keyframes setup-disclosure-in {
   from { opacity: 0; transform: translateY(-3px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes setup-scan {
-  from { transform: translateX(-20%); }
-  to { transform: translateX(280%); }
 }
 
 @media (max-width: 720px) {
@@ -1076,7 +889,6 @@
   .setup-options { grid-template-columns: 1fr; }
   .setup-mode-row { grid-template-columns: auto 1fr; }
   .setup-mode-row small { grid-column: 2; }
-  .setup-quokka-row { grid-template-columns: 64px minmax(0, 1fr); }
   .setup-footer { align-items: flex-end; }
   .setup-local-note { display: none; }
 }
@@ -1090,19 +902,13 @@
   .setup-model-summary { align-items: flex-start; }
   .setup-model-summary-meta { padding-top: 2px; }
   .setup-model-row { flex-wrap: wrap; }
-  .setup-quokka-row { grid-template-columns: 1fr; }
-  .setup-quokka-preview { display: none; }
-  .setup-quokka-controls { grid-template-columns: 1fr; }
   .setup-stage-scroll-cue { right: 0; }
-  .vault-stats { grid-template-columns: 1fr 1fr 1fr; }
-  .vault-preservation { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .setup-stage,
   .setup-companion .quokka,
-  .setup-model-panel,
-  .setup-scan-line::after {
+  .setup-model-panel {
     animation: none;
   }
 
@@ -1456,29 +1262,4 @@
   position: absolute;
   top: 12px;
   right: 12px;
-}
-.setup-preview {
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--r-pill);
-  background: var(--surface);
-  color: var(--text-muted);
-  cursor: pointer;
-}
-.setup-preview svg {
-  width: 12px;
-  height: 12px;
-}
-.setup-preview:hover,
-.setup-preview[aria-pressed="true"] {
-  background: var(--selected-bg);
-  color: var(--selected-ink);
-}
-.setup-preview:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }

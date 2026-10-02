@@ -1,5 +1,5 @@
 // Which connected clients the Librarian may file through, and what to offer
-// on the Models step and in Settings. Pure; the Rust twin is
+// on setup's Librarian screen and in Settings. Pure; the Rust twin is
 // organizer_knobs::LIBRARIAN_LANES (byte-identical id list).
 
 import type { CliDetect } from "../lib/tauri";
@@ -64,7 +64,7 @@ export function librarianOptions(
   return offered;
 }
 
-/** The default the Models step proposes: Gemini when it is signed in on this
+/** The default the Librarian screen proposes: Gemini when it is signed in on this
  * Mac (the maintainer's preference), else whatever is chosen already. */
 export function suggestedLibrarian(
   detections: Partial<Record<ProviderId, CliDetect>>,

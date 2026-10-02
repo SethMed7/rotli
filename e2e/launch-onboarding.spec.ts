@@ -24,20 +24,26 @@ async function onboard(page: Page) {
   await page.getByRole("button", { name: "New folder", exact: true }).click();
   await page.getByLabel("New folder name").fill("Launch Practice");
   await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Use empty folder", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Create Launch Practice?" })).toBeVisible();
-  await page.getByRole("button", { name: /^Create vault/ }).click();
-  // the Librarian choice is on the Models step; with no signed-in client in
-  // the twin it offers only this Mac, already pressed
+  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
+  // the Librarian has its own screen; with no signed-in client in the twin it
+  // offers only this Mac, already pressed
+  await expect(page.getByText("3 of 4")).toBeVisible();
   await expect(
     page.getByRole("group", { name: "Librarian model" }).getByRole("button", { name: "On this Mac" }),
   ).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "Skip model setup" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { name: "Three shortcuts, yours to change." })).toBeVisible();
+  await page.getByRole("button", { name: "Finish setup" }).click();
   await page
     .getByRole("dialog", { name: "Thank you for trying Rotli" })
     .getByRole("button", { name: "Take the tour" })
     .click();
   await page.getByRole("button", { name: "Skip tour" }).click();
+  // skipping the tour points at Settings for the rest
+  await page
+    .getByRole("status", { name: "More in Settings" })
+    .getByRole("button", { name: "Got it" })
+    .click();
   await expect(page.getByRole("tab", { selected: true })).toContainText("Welcome to Rotli");
   const folder = welcomeFolder(page);
   await expect(folder).toBeVisible();
@@ -67,15 +73,18 @@ async function gutterOffsets(page: Page) {
     });
 }
 
-test("first-time setup opens in Rotli Light with a quokka wearing nothing", async ({ page }) => {
+test("first-time setup opens in Rotli Light with a plain quokka, and a choice survives the vault round trip", async ({
+  page,
+}) => {
   await page.goto("/?onboarding");
-  await expect(page.getByRole("heading", { name: "Make Rotli feel like yours." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Make Rotli yours." })).toBeVisible();
+  await expect(page.getByText("1 of 4")).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   const companion = page.locator(".setup-companion .quokka");
   await expect(companion).toBeVisible();
   await expect(companion.locator(".quokka-accessory-layer")).toHaveCount(0);
-  await page.getByRole("button", { name: "Get started" }).click();
-  await expect(page.getByRole("heading", { name: "Choose a theme." })).toBeVisible();
+  // the quokka's wardrobe waits in Settings (the owner, 2026-10-01)
+  await expect(page.getByRole("checkbox", { name: "Keep my quokka throughout Rotli" })).toHaveCount(0);
   await expect(
     page.getByRole("radiogroup", { name: "Theme" }).getByRole("radio", { name: /Rotli/ }),
   ).toHaveAttribute("aria-checked", "true");
@@ -84,7 +93,6 @@ test("first-time setup opens in Rotli Light with a quokka wearing nothing", asyn
       .getByRole("radiogroup", { name: "Appearance mode" })
       .getByRole("radio", { name: "Light", exact: true }),
   ).toHaveAttribute("aria-checked", "true");
-  await expect(page.locator(".setup-quokka-preview .quokka-accessory-layer")).toHaveCount(0);
 
   // a choice made in setup survives the round trip through the vault step
   await page
@@ -96,32 +104,118 @@ test("first-time setup opens in Rotli Light with a quokka wearing nothing", asyn
     .getByRole("radio", { name: "Dark" })
     .click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "midnight-dark");
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Choose where notes live" }).click();
+  await expect(page.getByText("2 of 4")).toBeVisible();
   await expect(page.getByRole("button", { name: "Choose an empty folder" })).toBeVisible();
   await page.getByRole("button", { name: "Back" }).click();
   await expect(page.getByRole("button", { name: "Choose where notes live" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "midnight-dark");
 });
 
-test("setup's Sound step offers quiet, the theme's studio track, or Claude FM", async ({ page }) => {
+test("after setup the music player is already there, quiet, and can be put away", async ({ page }) => {
+  await onboard(page);
+  const player = page.getByRole("region", { name: "Now playing" });
+  await expect(player).toBeVisible();
+  await expect(player.getByRole("button", { name: "Play", exact: true })).toBeVisible();
+  await player.getByRole("button", { name: "Hide the player" }).click();
+  await expect(player).toHaveCount(0);
+});
+
+test("skipping the tour points at Settings, and the note opens it", async ({ page }) => {
   await page.goto("/?onboarding");
-  await page.getByRole("button", { name: "Get started" }).click();
-  await page.getByRole("radiogroup", { name: "Theme" }).getByRole("radio", { name: /Ocean/ }).click();
+  await page.getByRole("button", { name: "Skip app setup" }).click();
+  await page.getByRole("button", { name: "Choose an empty folder" }).click();
+  await page.getByRole("button", { name: "New folder", exact: true }).click();
+  await page.getByLabel("New folder name").fill("Hint Practice");
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
   await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Finish setup" }).click();
+  await page
+    .getByRole("dialog", { name: "Thank you for trying Rotli" })
+    .getByRole("button", { name: "Take the tour" })
+    .click();
+  const note = page.getByRole("status", { name: "More in Settings" });
+  // the tour first; the note waits for it
+  await expect(note).toHaveCount(0);
+  await page.getByRole("button", { name: "Skip tour" }).click();
+  await expect(note).toBeVisible();
+  await expect(note).toContainText("Your quokka, music, how the window lives, chat models");
+  // it sits beside Settings, inside the window
+  await expect(note).toBeInViewport({ ratio: 1 });
+  await note.getByRole("button", { name: "Open Settings" }).click();
+  await expect(note).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Back to notes", exact: true })).toBeVisible();
+});
+
+test("the Librarian screen asks whether first; Not now hides where it thinks and leaves it off", async ({
+  page,
+}) => {
+  await page.goto("/?onboarding");
+  await page.getByRole("button", { name: "Skip app setup" }).click();
+  await page.getByRole("button", { name: "Choose an empty folder" }).click();
+  await page.getByRole("button", { name: "New folder", exact: true }).click();
+  await page.getByLabel("New folder name").fill("Raw Practice");
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
+  // the vault step no longer asks; the Librarian screen does
+  await expect(page.getByRole("radiogroup", { name: "Librarian choice" })).toHaveCount(0);
+  const choice = page.getByRole("radiogroup", { name: "Librarian", exact: true });
+  await expect(choice.getByRole("radio", { name: /^Use the Librarian/ })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  const where = page.getByRole("group", { name: "Librarian model" });
+  await expect(where).toBeVisible();
+  await choice.getByRole("radio", { name: /^Not now/ }).click();
+  await expect(where).toHaveCount(0);
+  await choice.getByRole("radio", { name: /^Use the Librarian/ }).click();
+  await expect(where).toBeVisible();
+  await choice.getByRole("radio", { name: /^Not now/ }).click();
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Music while you write?" })).toBeVisible();
-  const music = page.getByRole("radiogroup", { name: "Music" });
-  await expect(music.getByRole("radio", { name: /^Quiet/ })).toHaveAttribute("aria-checked", "true");
-  await expect(music.getByRole("radio", { name: /^Claude FM/ })).toBeVisible();
-  await music.getByRole("radio", { name: /^Studio music · Tide/ }).click();
-  await expect(music.getByRole("radio", { name: /^Studio music/ })).toHaveAttribute("aria-checked", "true");
-  // Back and forth keeps the pick
+  await page.getByRole("button", { name: "Finish setup" }).click();
+  await page
+    .getByRole("dialog", { name: "Thank you for trying Rotli" })
+    .getByRole("button", { name: "Take the tour" })
+    .click();
+  await page.getByRole("button", { name: "Skip tour" }).click();
+  await page
+    .getByRole("status", { name: "More in Settings" })
+    .getByRole("button", { name: "Open Settings" })
+    .click();
+  await page.getByRole("button", { name: "Librarian", exact: true }).click();
+  await expect(page.getByRole("switch", { name: /This is a raw vault/ })).toHaveAttribute(
+    "aria-checked",
+    "false",
+  );
+});
+
+test("the shortcuts screen says each can change, and a changed one can go back", async ({ page }) => {
+  await page.goto("/?onboarding");
+  await page.getByRole("button", { name: "Skip app setup" }).click();
+  await page.getByRole("button", { name: "Choose an empty folder" }).click();
+  await page.getByRole("button", { name: "New folder", exact: true }).click();
+  await page.getByLabel("New folder name").fill("Keys Practice");
+  await page.getByRole("button", { name: "Create", exact: true }).click();
+  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("button", { name: "Back" }).click();
-  await expect(music.getByRole("radio", { name: /^Studio music/ })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByText("4 of 4")).toBeVisible();
+  await expect(page.getByText(/change them anytime in Settings → Hotkeys/)).toBeVisible();
+  const capture = page.getByRole("button", { name: "Change Quick capture shortcut" });
+  await expect(capture).toContainText("Change");
+  await capture.click();
+  await expect(page.getByRole("button", { name: "Press the new Quick capture shortcut" })).toContainText(
+    "Esc cancels",
+  );
+  // Esc cancels: the shortcut stays as it was
+  await page.keyboard.press("Escape");
+  await expect(capture).toContainText("⌥C");
+  await capture.click();
+  await page.keyboard.press("Alt+Shift+KeyK");
+  await expect(capture).toContainText("⌥⇧K");
+  await page.getByRole("button", { name: "Use default" }).click();
+  await expect(capture).toContainText("⌥C");
+  await expect(page.getByRole("button", { name: "Use default" })).toHaveCount(0);
 });
 
 test("the guided tour follows setup, spotlights real controls, skips missing ones, and reopens from Settings", async ({
@@ -133,9 +227,10 @@ test("the guided tour follows setup, spotlights real controls, skips missing one
   await page.getByRole("button", { name: "New folder", exact: true }).click();
   await page.getByLabel("New folder name").fill("Tour Practice");
   await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Use empty folder", exact: true }).click();
-  await page.getByRole("button", { name: /^Create vault/ }).click();
-  await page.getByRole("button", { name: "Skip model setup" }).click();
+  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
+  // the Librarian, then the shortcuts, then the thank-you card
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Finish setup" }).click();
   await page
     .getByRole("dialog", { name: "Thank you for trying Rotli" })
     .getByRole("button", { name: "Take the tour" })

@@ -5,7 +5,7 @@ const onboardingCss = readFileSync(new URL("../../styles/onboarding.css", import
 const onboardingSource = readFileSync(new URL("onboarding.tsx", import.meta.url), "utf8");
 const skySource = readFileSync(new URL("onboardingSkyLife.tsx", import.meta.url), "utf8");
 const vaultSource = readFileSync(new URL("vaultActivation.tsx", import.meta.url), "utf8");
-const modelSource = readFileSync(new URL("modelSetup.tsx", import.meta.url), "utf8");
+const modelSource = readFileSync(new URL("../chat/chatModelChoices.tsx", import.meta.url), "utf8");
 
 function ruleBody(selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -46,8 +46,7 @@ describe("onboarding companion presentation", () => {
   });
 
   test("the sky is alive instead of edge quokkas: drifting clouds and fliers, still with motion off", () => {
-    for (const source of [onboardingSource, vaultSource, modelSource])
-      expect(source).not.toContain("SideFriends");
+    for (const source of [onboardingSource, vaultSource]) expect(source).not.toContain("SideFriends");
     expect(skySource).toContain("export function SkyLife");
     // motion only when it's welcome; each drifter rests at its own spot otherwise
     expect(onboardingCss).toMatch(
@@ -56,15 +55,16 @@ describe("onboarding companion presentation", () => {
     expect(ruleBody(".onb-drift,\n.onb-flyer")).toContain("transform: translateX(var(--rest))");
   });
 
-  test("approved expressions and companion personalization appear in first run", () => {
-    expect(onboardingSource).toContain('? "thoughtful"');
-    expect(onboardingSource).toContain('? "walking"');
-    expect(onboardingSource).toContain(': "listening"');
-    expect(onboardingSource).toContain("QUOKKA_STYLE_PRESENTATIONS.map");
-    expect(onboardingSource).toContain("QUOKKA_ACCESSORY_PRESENTATIONS.map");
+  test("approved expressions appear in first run, and the quokka's wardrobe waits in Settings", () => {
+    expect(onboardingSource).toContain('pose: "waving"');
+    expect(onboardingSource).toContain('pose: "knowledge"');
+    expect(onboardingSource).toContain('pose: "listening"');
+    // the owner, 2026-10-01: a plain quokka in setup; dressing it is a Settings choice
+    expect(onboardingSource).not.toContain("QUOKKA_STYLE_PRESENTATIONS");
+    expect(onboardingSource).not.toContain("QUOKKA_ACCESSORY_PRESENTATIONS");
   });
 
-  test("model setup uses compact disclosures and explicit scroll affordances", () => {
+  test("chat's model chooser uses compact disclosures and explicit scroll affordances", () => {
     expect(ruleBody(".setup-model-disclosures")).toContain("flex-direction: column");
     expect(onboardingCss).toMatch(/\.setup-install-list\s*\{[^}]*overflow-y:\s*auto/);
     expect(ruleBody(".setup-stage-scroll-cue")).toContain("position: absolute");

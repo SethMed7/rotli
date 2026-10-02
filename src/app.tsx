@@ -19,7 +19,9 @@ import { Suspense, lazy, useEffect, useState } from "react";
 import { CaptureCard } from "./components/captureCard";
 import { ContextMenu } from "./components/contextMenu";
 import { FileNotice } from "./components/fileNotice";
+import { useSetupFront } from "./components/onboarding/setupFlow";
 import { GuidedTour } from "./components/tour/guidedTour";
+import { SettingsHint } from "./components/tour/settingsHint";
 import { HotkeyBadges } from "./components/hotkeyBadges";
 import { NotesSurface } from "./components/notesSurface";
 import { PreviewModal } from "./components/previewModal";
@@ -54,7 +56,6 @@ import {
   onSummonSearch,
   onVaultChanged,
   setAppIcon,
-  setDockVisible,
   setHideOnBlur,
   workspaceTakeOpenRequest,
 } from "./lib/tauri";
@@ -71,7 +72,6 @@ import { adoptPendingAtOrganize } from "./services/librarianAutoAdopt";
 import { notesService } from "./services/notes";
 import { isWebVault } from "./lib/browserVault";
 import { useMainWindowWork } from "./services/mainWindowWork";
-import { openSeededWelcome } from "./services/welcome";
 import {
   WebVaultGateHost,
   useFreshFolderWelcome,
@@ -86,13 +86,11 @@ import { invalidateMemex } from "./memex/useMemex";
 import { invalidateChatFolders } from "./services/chatFolders";
 import { refreshAfterExternalCorpusChange } from "./services/externalCorpusChange";
 import { refreshActiveVault } from "./state/activeVault";
-import { flushSettingsNow, runAutoRetentionMaintenance } from "./state/persist";
+import { runAutoRetentionMaintenance } from "./state/persist";
 import { applyQuickState } from "./state/quick";
 import { useAppearanceSync } from "./state/appearanceSync";
 import { applyAccent, applySyntaxPalette, applyTheme } from "./state/theme";
-import { useOnboardingThanks } from "./state/onboardingThanks";
 import { useUiStore } from "./state/ui";
-import { useVaultStore } from "./state/vault";
 import { hydrateViews } from "./state/views";
 
 // Settings and Onboarding are full-surface fronts most sessions never (or
@@ -103,22 +101,6 @@ const SettingsSurface = lazy(() =>
     default: m.SettingsSurface,
   })),
 );
-const Onboarding = lazy(() =>
-  import("./components/onboarding/onboarding").then((m) => ({
-    default: m.Onboarding,
-  })),
-);
-const VaultActivation = lazy(() =>
-  import("./components/onboarding/vaultActivation").then((m) => ({
-    default: m.VaultActivation,
-  })),
-);
-const ModelSetup = lazy(() =>
-  import("./components/onboarding/modelSetup").then((m) => ({
-    default: m.ModelSetup,
-  })),
-);
-
 registerDefaultActions();
 
 if (import.meta.env.DEV) {
@@ -149,34 +131,21 @@ function surfaceFromUrl(): Surface {
   return "main";
 }
 
-declare const __APP_VERSION__: string;
-const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.0.0";
-
 function MainShell() {
-  const [resumeAtShortcuts, setResumeAtShortcuts] = useState(false);
   const settingsOpen = useUiStore((s) => s.settingsOpen);
   const paletteOpen = useUiStore((s) => s.paletteOpen);
   const transientCount = useUiStore((s) => s.transients.length);
   const focusMode = useUiStore((s) => s.focusMode);
   const onboarded = useUiStore((s) => s.onboarded);
-  const setOnboarded = useUiStore((s) => s.setOnboarded);
-  const setOnboardingVersion = useUiStore((s) => s.setOnboardingVersion);
-  const onboardingPhase = useUiStore((s) => s.onboardingPhase);
-  const [vaultActivationPending, setVaultActivationPending] = useState(false);
-  const setOnboardingPhase = useUiStore((s) => s.setOnboardingPhase);
-  const vaultStatus = useVaultStore((s) => s.status);
   const mainAutoRemoveDays = useUiStore((s) => s.mainAutoRemoveDays);
   const chatAutoArchiveDays = useUiStore((s) => s.chatAutoArchiveDays);
   // first run only (the real app); an app update never re-onboards
   const onboardingActive = setupShows(isTauri(), import.meta.env.DEV, window.location.search, onboarded);
-  const showOnboarding = onboardingActive && onboardingPhase === "preferences";
-  const showModelSetup = onboardingActive && onboardingPhase === "models" && !vaultActivationPending;
-  const showVaultActivation =
-    vaultActivationPending ||
-    (onboardingActive && onboardingPhase === "vault") ||
-    (isTauri() && vaultStatus === "unconfigured" && !onboardingActive);
+  // first run's screens, or the vault screen when there is no vault (setupFlow.tsx)
+  const setupScreen = useSetupFront(onboardingActive, isTauri());
+  const inSetup = setupScreen !== null;
   const showWebVaultGate = useWebVaultGateShown();
-  const setupFront = showOnboarding || showVaultActivation || showModelSetup || showWebVaultGate;
+  const setupFront = inSetup || showWebVaultGate;
 
   // A lone ⌘ reveals shortcut help immediately in the normal workspace. When
   // a modal/popover owns attention, keep the deliberate hold threshold so a
@@ -401,90 +370,12 @@ function MainShell() {
   // the flow would disappear the moment focus slips. The real behavior is
   // (re)applied on finish from the user's chosen Stay-open value.
   useEffect(() => {
-    if (showOnboarding || showVaultActivation || showModelSetup) void setHideOnBlur(false);
-  }, [showOnboarding, showVaultActivation, showModelSetup]);
+    if (inSetup) void setHideOnBlur(false);
+  }, [inSetup]);
 
   if (showWebVaultGate) return <WebVaultGateHost />;
 
-  if (showOnboarding) {
-    return (
-      <div className="app-window">
-        <Suspense fallback={null}>
-          <Onboarding
-            initialStep={resumeAtShortcuts ? "shortcuts" : "welcome"}
-            onDone={() => {
-              setResumeAtShortcuts(false);
-              setOnboardingPhase("vault");
-              void flushSettingsNow().catch(() => {});
-            }}
-          />
-        </Suspense>
-      </div>
-    );
-  }
-
-  if (showVaultActivation) {
-    return (
-      <div className="app-window">
-        <Suspense fallback={null}>
-          <VaultActivation
-            onboarding={onboardingActive}
-            allowCurrent={vaultStatus === "configured"}
-            {...(onboardingActive
-              ? {
-                  onBack: () => {
-                    setResumeAtShortcuts(true);
-                    setOnboardingPhase("preferences");
-                    void flushSettingsNow().catch(() => {});
-                  },
-                  onDone: () => {
-                    setVaultActivationPending(false);
-                    setOnboardingPhase("models");
-                    return flushSettingsNow();
-                  },
-                  onBeforeSwitch: () => {
-                    setVaultActivationPending(true);
-                    setOnboardingPhase("models");
-                    return flushSettingsNow();
-                  },
-                  onSwitchFailed: () => {
-                    setVaultActivationPending(false);
-                    setOnboardingPhase("vault");
-                    return flushSettingsNow();
-                  },
-                }
-              : {})}
-          />
-        </Suspense>
-      </div>
-    );
-  }
-
-  if (showModelSetup) {
-    return (
-      <div className="app-window">
-        <Suspense fallback={null}>
-          <ModelSetup
-            onBack={() => {
-              setOnboardingPhase("vault");
-              void flushSettingsNow().catch(() => {});
-            }}
-            onDone={() => {
-              setOnboarded(true);
-              openSeededWelcome();
-              useOnboardingThanks.getState().show(); // the thank-you card, then the tour
-              setOnboardingVersion(APP_VERSION);
-              setOnboardingPhase("preferences");
-              const ui = useUiStore.getState();
-              void setHideOnBlur(!ui.stayOpen);
-              void setDockVisible(ui.showInDock);
-              void flushSettingsNow().catch(() => {});
-            }}
-          />
-        </Suspense>
-      </div>
-    );
-  }
+  if (setupScreen) return setupScreen;
 
   return (
     <div className="app-window">
@@ -507,6 +398,7 @@ function MainShell() {
       </main>
       <PreviewModal />
       <GuidedTour />
+      <SettingsHint />
       <FileNotice />
       {whichKey &&
         (hotkeyPeek === "badges" ? <HotkeyBadges /> : <WhichKey onClose={() => setWhichKey(false)} />)}
