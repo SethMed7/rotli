@@ -71,6 +71,7 @@
     "security:secrets": "bun scripts/scan-repository-secrets.mjs",
     "security:history": "bun scripts/scan-repository-secrets.mjs --history",
     "capture:launch": "bun scripts/capture-launch.mjs",
+    "capture:hero": "bun scripts/capture-hero.mjs",
     "audit:grammar": "bun scripts/audit-grammar.mjs",
     "security:changes": "bash scripts/scan-changed-secrets.sh",
     "security:working": "bun scripts/scan-working-secrets.mjs",

@@ -65,8 +65,7 @@ bun run preview  # serve the built dist/ locally
   560px the GitHub mark and Download move into it too. The footer's closing
   row holds the maker line and the two directory badges.
 - **The landing page** (`src/components/Landing.astro`) only composes its
-  chapters from `src/components/landing/`, bookended like the studio's story
-  film: Hero (the story film itself) → Overview (Write. Keep. Ask.: three
+  chapters from `src/components/landing/`: Hero (the product film) → Overview (Write. Keep. Ask.: three
   steps with the app's quokkas, then links to the episodes and `/features/`;
   the dev-only Experiments follow) → PrivacyBrief (the night scene, three
   facts, and a link to `/privacy/`) → Everywhere (Rotli Web, only while
@@ -192,13 +191,13 @@ bun run preview  # serve the built dist/ locally
   `src/layouts/Base.astro`. Pages own only their sections.
 - The ways-in chapter (Mac app, Rotli Web, Rotli Helper) is three plain
   columns with no screenshot.
-- The hero is the promise, the two ways in, and the story film right under
+- The hero is the promise, the two ways in, and the product film right under
   them (`FilmPlayer.astro`, see "Films" below), on `public/hero-pattern.svg`
   (the social card's faint note, folder, checklist, and chat icons, masked so
   they fade out behind the headline). The words land in one short CSS
-  entrance and the film's clay line (`.inked`, `public/ink-underline.svg`)
-  draws itself under "Files you keep." The landing page shows no capture;
-  the theme studio does. `public/rotli-app-warm-light@3x.png` (the social
+  entrance and the clay line (`.inked`, `public/ink-underline.svg`)
+  draws itself under "Files you keep." Apart from the film, the landing page
+  shows no capture; the theme studio does. `public/rotli-app-warm-light@3x.png` (the social
   card) and the theme studio's `public/themes/` are lossless browser-demo captures (1280 × 800 logical
   viewport at 3× and 2× density), never a live vault. The coming-soon page
   uses the 4320 × 2700 `rotli-playground@3x.png`. The `@3x.png` filenames
@@ -417,6 +416,43 @@ docker build -f site/Dockerfile --build-arg SITE_MODE=dev -t rotli-site:dev ..  
 
 ## Films
 
+**The hero film** (`public/media/hero/rotli-hero.mp4` and
+`rotli-hero-poster.webp`, `hero` in `src/films.ts`) is the product itself: a
+real Rotli Web session, under a minute, made by `bun run capture:hero` from a
+local `ROTLI_BUILD_CHANNEL=stable bun run dev:web`. It writes a messy note (two
+tasks, a dropped image, a `[[link]]`), opens the linked note and the Library,
+finds the note with search, asks chat what is still open, and ends on the note
+as raw Markdown. Real controls are clicked with a drawn pointer; captions sit
+in a band under the picture, never over the UI. H.264 1920 × 1080, 30 fps,
+`+faststart`, no audio, CRF 18 (about 1.7 MB); the poster is a frame of the
+written note. What is fixture, all synthetic:
+
+- **The Library's filed notes** (Travel, People, Home) are planted as files
+  carrying the Librarian's own fields (`area`, `summary`, `tags`, `links`,
+  `filed_by`). The Librarian runs only in the Mac app, so the film shows what
+  it filed, never a live run, and the note written on camera stays a capture.
+- **Chat** runs through a fake Rotli Helper on loopback (the
+  `e2e/web/rotli-helper.spec.ts` pattern). The app's real agent loop sends
+  every prompt and runs the search and both note reads; only the model's text
+  is scripted, and it answers from what those reads returned.
+- **The clock** is fixed (with the time zone) so the dates on screen agree. A
+  new note's age still reads "4h": `created` is a New York date read back as
+  UTC midnight (`src/memex/contract.ts`), so a just-written note is never
+  "just now" in Rotli Web.
+
+The script fails if the note written on camera is not Markdown in the vault
+or the film is over 6 MB. Look at `_review/hero-video/frame-*.png` and the
+poster before committing a new take.
+
+`FilmPlayer.astro` plays it muted, once, as soon as it is on screen, then it
+rests on its last frame; it never loops. A silent film (`silent` in
+`films.ts`) gets no sound control: a pause button while it plays and "Watch
+again" when it ends. A film with a soundtrack gets "Click for sound", which
+restarts it from the top with sound and native controls. It pauses when
+scrolled away and resumes if it was playing, and the file downloads only once
+the player first comes into view. Under reduced motion, Save-Data, or without
+script it is a poster with native controls.
+
 The studio's films (`public/media/story/`, `src/films.ts`) come from the
 motion room kept on the maintainer's Mac (`rotli-studio/motion/out/video`),
 outside this repository, re-encoded for the web: H.264 with `-tune animation`,
@@ -424,13 +460,8 @@ outside this repository, re-encoded for the web: H.264 with `-tune animation`,
 CRF 30, about 2.5 to 3.5 MB). Posters and episode thumbnails are frames of the
 films (WebP, via `cwebp`).
 
-- **The story film** (`rotli-story.mp4`, 60 s) plays in the landing hero
-  through `FilmPlayer.astro`: muted, once, as soon as it is on screen, then it
-  rests on its last frame; it never loops. "Click for sound" restarts it from
-  the top with sound and native controls; a pause button is there while it
-  plays muted; it pauses when scrolled away and resumes if it was playing, and
-  the film itself downloads only once the player first comes into view. Under reduced motion, Save-Data,
-  or without script it is a poster with native controls.
+- **The story film** (`rotli-story.mp4`, 60 s) played in the hero until the
+  product film replaced it; its files stay, and no page plays it now.
 - **"Rotli in 30 seconds"** (`epNN-*.mp4`, eight episodes) lives in one player
   on `/features/` (`EpisodeShelf.astro`), `preload="none"`: no film downloads
   until an episode is played (the poster and thumbnails do), and choosing one

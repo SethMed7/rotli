@@ -1,22 +1,26 @@
 ---
-// The story film in the landing hero (public/media/story/). It starts muted as soon as it is
-// on screen and plays once, then rests on its last frame (the sunset lockup); nothing loops.
-// "Click for sound" restarts it from the top with sound, the way the score was written, and
-// hands over native controls. A pause button is there while it plays muted. It pauses when
-// scrolled away and, if it was playing, resumes when back. The film itself only downloads
-// once the player first comes into view. Without script, under reduced motion, or with
-// Save-Data on, it is a poster with native controls: nothing plays until asked.
+// The film in the landing hero (src/films.ts). It starts muted as soon as it is on screen
+// and plays once, then rests on its last frame; nothing loops. A film with a soundtrack
+// offers "Click for sound", which restarts it from the top with sound and hands over
+// native controls. A silent film (the product film) offers no sound at all: when it ends,
+// "Watch again" plays it once more from the top. A pause button is there while it plays.
+// It pauses when scrolled away and, if it was playing, resumes when back. The film itself
+// only downloads once the player first comes into view. Without script, under reduced
+// motion, or with Save-Data on, it is a poster with native controls: nothing plays until
+// asked.
 interface Props {
   src: string;
   poster: string;
   /** What the film shows, for assistive technology. */
   label: string;
+  /** No soundtrack: no sound chip, and the replay stays muted. */
+  silent?: boolean;
 }
 
-const { src, poster, label } = Astro.props;
+const { src, poster, label, silent = false } = Astro.props;
 ---
 
-<figure class="player" data-player>
+<figure class="player" data-player data-silent={silent ? '' : undefined}>
   <video
     controls
     muted
@@ -31,7 +35,7 @@ const { src, poster, label } = Astro.props;
     <p class="player-fallback">Your browser cannot play this video. <a href={src}>Download it (MP4)</a>.</p>
   </video>
   <div class="player-bar" hidden>
-    <button class="player-chip player-sound" type="button">
+    <button class="player-chip player-sound" type="button" hidden={silent}>
       <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
         <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
         <path d="M16 9.5l5 5M21 9.5l-5 5" />
@@ -52,7 +56,7 @@ const { src, poster, label } = Astro.props;
         <path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" />
         <path d="M4.5 4.5v4h4" />
       </svg>
-      <span>Watch again with sound</span>
+      <span>{silent ? 'Watch again' : 'Watch again with sound'}</span>
     </button>
   </div>
 </figure>
@@ -77,6 +81,7 @@ const { src, poster, label } = Astro.props;
     const sound = bar.querySelector<HTMLButtonElement>('.player-sound')!;
     const pause = bar.querySelector<HTMLButtonElement>('.player-pause')!;
     const replay = bar.querySelector<HTMLButtonElement>('.player-replay')!;
+    const silent = player.hasAttribute('data-silent');
     video.controls = false;
     video.muted = true;
     bar.hidden = false;
@@ -99,7 +104,14 @@ const { src, poster, label } = Astro.props;
       withSound(video, true);
     };
     sound.addEventListener('click', handOver);
-    replay.addEventListener('click', handOver);
+    replay.addEventListener('click', () => {
+      if (!silent) return handOver();
+      // A silent film plays once more, muted, with the same pause button.
+      replay.hidden = true;
+      pause.hidden = false;
+      video.currentTime = 0;
+      void video.play();
+    });
     pause.addEventListener('click', () => {
       userPaused = !video.paused;
       if (video.paused) void video.play();

@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **rotli.co's home page opens on the app itself.** The film under the
+  headline is now a real recording of rotli: a quick note, the Library,
+  search, chat, and the same note as plain Markdown. It has no sound, so the
+  player offers Watch again instead of Click for sound.
 - **Setup is four screens.** Your name and theme, where your notes live, who
   files them (the Librarian), and your three shortcuts, which now say plainly
   that you can change them. Then the thank-you card and the tour, and a small
