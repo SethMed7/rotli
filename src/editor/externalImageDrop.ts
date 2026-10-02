@@ -36,15 +36,32 @@ export function isEmbeddablePath(path: string): boolean {
   return isImagePath(path) || VIDEO_EXTS.has(extOf(path));
 }
 
-/** Tauri has emitted physical coordinates in some versions/platforms and
- * logical coordinates in others. Try the documented physical→CSS conversion
- * first, then the raw pair, so a runtime upgrade cannot silently route an
- * editor drop into generic Storage again. */
-export function nativeDropPoints(px: number, py: number, devicePixelRatio: number): DropPoint[] {
+/** The space a native drop position arrives in. Tauri 2.11 wraps whatever
+ * wry reports in a `PhysicalPosition` WITHOUT scaling it, so the type says
+ * nothing; the platform does. wry 0.55 on macOS reads
+ * `NSDraggingInfo.draggingLocation` (view points, i.e. CSS pixels) and on
+ * Linux GTK's widget coordinates — both logical. Only Windows reports client
+ * pixels (`ScreenToClient`), which need the device-pixel ratio. */
+export type NativeDropSpace = "logical" | "physical";
+
+export function nativeDropSpace(platformHint: string): NativeDropSpace {
+  return /\bwin/i.test(platformHint) ? "physical" : "logical";
+}
+
+/** The CSS point for a native drop position. One point, not a guess list:
+ * the old "physical first, raw second" pair halved every Retina drop and,
+ * because the halved point usually still hit an editor, it won — the image
+ * landed about halfway up the note (#5). A guessed second point can only
+ * misroute, so there is none. */
+export function nativeDropPoints(
+  px: number,
+  py: number,
+  devicePixelRatio: number,
+  space: NativeDropSpace,
+): DropPoint[] {
+  if (space === "logical") return [{ x: px, y: py }];
   const scale = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
-  const logical = { x: px / scale, y: py / scale };
-  if (logical.x === px && logical.y === py) return [logical];
-  return [logical, { x: px, y: py }];
+  return [{ x: px / scale, y: py / scale }];
 }
 
 /** `elementFromPoint` usually returns a nested line, mark, or image node. Ask

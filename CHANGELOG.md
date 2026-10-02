@@ -89,9 +89,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as Home stays in the main window.
 - **rotli.co shows all seven theme families.** The theme studio on the home
   page now includes Blossom, in light and dark, beside the other six.
+- **The Quick Note's ⌘P picker searches what your notes say.** Titles still
+  match as you type, accents and capitals aside ("cafe" finds "Café"); note
+  text follows from full-text search, always below the title matches. The
+  picker says when it is still loading or searching, and a blank note you
+  named can be found by its name.
+- **The scroll-to-top arrow is smaller and quieter.** A muted glyph until you
+  hover or Tab to it, in every theme.
 
 ### Fixed
 
+- **Images dropped from Finder land where you drop them.** On Retina
+  screens a dropped image went in about halfway up the note; Rotli now reads
+  the drop position as the Mac reports it.
 - **Numbered lists stay numbered in Word documents.** Editing a numbered
   list saved it as bullets; Rotli now reads each list's kind from the file
   and keeps its numbering.
