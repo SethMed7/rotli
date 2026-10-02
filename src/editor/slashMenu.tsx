@@ -20,6 +20,7 @@ import { fitMenuToWindow, scrollRowIntoList } from "../lib/popover";
 import { Gl, bulletGlyph, checklistGlyph, codeGlyph, numberedGlyph, quoteGlyph } from "./formatGlyphs";
 import { parseBlock } from "./render";
 import { RESULT_REASON_SEPARATOR, resultTextParts } from "./resultState";
+import { ALIGN_SLASH_ITEMS } from "./slashAlign";
 import type { SlashItem, SlashOp } from "./slashTypes";
 
 // "H1/2/3" read as text glyphs (matches the format bar's H affordance voice)
@@ -219,6 +220,7 @@ export const SLASH_ITEMS: SlashItem[] = [
     glyph: quoteGlyph,
     op: { kind: "block", block: "quote" },
   },
+  ...ALIGN_SLASH_ITEMS,
   {
     label: "Bullet",
     group: "List",
@@ -580,7 +582,9 @@ export function SlashMenu({
             role="menuitem"
             // keep the editor focused — picking must never end the edit
             onMouseDown={(e) => e.preventDefault()}
-            onMouseEnter={() => onHover(i)}
+            // a moving pointer picks the row; a resting one the menu opened
+            // under does not, or it would steal the keyboard's first row
+            onMouseMove={() => i !== selectedIndex && onHover(i)}
             onClick={() => onPick(item)}
           >
             <span className="slashglyph">{item.glyph}</span>

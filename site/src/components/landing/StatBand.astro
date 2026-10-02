@@ -1,0 +1,141 @@
+---
+// Why the Librarian exists, in two figures from other people's research and one sentence of
+// ours. Quiet on purpose: no card, no chart, no count-up. Each figure is checked against its
+// source (verified 2026-10-02): Self Financial found ChatGPT the most commonly unused paid AI
+// platform (50.4% of its paid users had not used it in the past 30 days); Bango's 2025 report
+// puts the average subscriber at about $66 a month across 4 AI tools. Never call it "wasted".
+const figures = [
+  { value: 'Half', text: 'of people paying for ChatGPT hadn’t used it in the past 30 days.', note: 1 },
+  { value: '4 tools', text: 'is what the average AI subscriber pays for, about $66 a month.', note: 2 },
+];
+const sources = [
+  {
+    href: 'https://www.self.inc/info/cost-of-unused-paid-subscriptions/',
+    text: 'Self Financial, survey of 1,272 U.S. adults with a paid AI subscription, March 2026',
+  },
+  {
+    href: 'https://bango.com/its-not-a-bubble-over-three-quarters-say-their-ai-subscriptions-are-now-essential-to-everyday-life/',
+    text: 'Bango, “The rise of the AI subscriber,” 2025',
+  },
+];
+---
+
+<section class="section stat-band" id="waiting" aria-labelledby="waiting-title">
+  <div class="wrap">
+    <h2 class="section-title" id="waiting-title" data-reveal>The AI you already pay for is mostly waiting.</h2>
+    <ul class="figures" data-stagger>
+      {
+        figures.map((figure) => (
+          <li>
+            <p class="value">
+              {figure.value}
+              <sup>
+                <a href={`#fn-${figure.note}`} id={`fnref-${figure.note}`} aria-label={`Source ${figure.note}`}>{figure.note}</a>
+              </sup>
+            </p>
+            <p class="text">{figure.text}</p>
+          </li>
+        ))
+      }
+    </ul>
+    <p class="close" data-reveal>rotli gives that AI something useful to do: keep your notes in order while you write.</p>
+    <ol class="sources">
+      {
+        sources.map((source, index) => (
+          <li id={`fn-${index + 1}`}>
+            <a href={source.href} target="_blank" rel="noopener noreferrer">{source.text}</a>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</section>
+
+<style>
+  .section-title {
+    max-width: 24ch;
+  }
+  .figures {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2rem clamp(2rem, 6vw, 5rem);
+    max-width: 52rem;
+    margin: clamp(2rem, 4vw, 3rem) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .figures li {
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border-strong);
+  }
+  .value {
+    margin: 0;
+    font-size: clamp(2.4rem, 5vw, 3.6rem);
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.04em;
+  }
+  .value sup {
+    margin-left: 0.15em;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    vertical-align: super;
+  }
+  .text {
+    max-width: 22rem;
+    margin: 0.75rem 0 0;
+    color: var(--text-muted);
+    font-size: var(--step-lede);
+    line-height: 1.45;
+  }
+  .close {
+    max-width: 38rem;
+    margin: clamp(2rem, 4vw, 3rem) 0 0;
+    font-size: var(--step-lede);
+    font-weight: 600;
+    line-height: 1.45;
+  }
+  .sources {
+    display: grid;
+    gap: 0.25rem;
+    max-width: 52rem;
+    margin: clamp(2rem, 4vw, 3rem) 0 0;
+    padding-left: 1.2rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  .sources a,
+  .value a {
+    color: var(--accent-text);
+    text-underline-offset: 0.2em;
+  }
+  .value a {
+    display: inline-block;
+    min-width: 1.5ch;
+    text-decoration: none;
+  }
+  .value a {
+    position: relative;
+  }
+  .value a::after {
+    content: '';
+    position: absolute;
+    inset: -14px;
+  }
+  .value a:hover {
+    text-decoration: underline;
+  }
+  /* Footnote targets are small text links; give them room to tap on touch screens. */
+  @media (pointer: coarse) {
+    .sources li {
+      padding-block: 0.6rem;
+    }
+  }
+  @media (max-width: 700px) {
+    .figures {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

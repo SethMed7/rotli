@@ -27,6 +27,11 @@ use crate::loopback_http::{
     write_http_response,
 };
 
+#[path = "workspace_attachments.rs"]
+mod attachments;
+#[path = "workspace_note_ops.rs"]
+mod note_ops;
+
 const MCP_PROTOCOL: &str = "2025-03-26";
 pub(crate) const MCP_MAX_REQUEST_BYTES: usize = 256_000;
 pub(crate) const MCP_MAX_OUTPUT_BYTES: usize = 512_000;
@@ -67,8 +72,7 @@ struct NoteReadResult {
     document: MarkdownDocument,
     /// Clickable `rotli://open?…` link for THIS item (2026-07-31) — agents
     /// print it so the human can jump straight into the app. None when a
-    /// working link can't be minted (connected roots — the open lane serves
-    /// the default root only; ids the parser can't round-trip).
+    /// working link can't be minted (ids the parser can't round-trip).
     #[serde(skip_serializing_if = "Option::is_none")]
     deep_link: Option<String>,
 }
@@ -411,10 +415,10 @@ impl Workspace {
     }
 
     /// Mint the clickable link only when it will actually WORK (review F1):
-    /// the open lane serves the default root, so a connected-root link would
-    /// be a dead click; ids the parser can't round-trip get no link either.
+    /// ids the parser can't round-trip get none. A connected root's item
+    /// carries its root-prefixed wire id, which the app's open lane routes.
     fn deep_link_of(&self, wire_id: &str, kind: &str) -> Option<String> {
-        (self.root.is_default && deep_linkable(wire_id)).then(|| deep_link_for(wire_id, kind))
+        deep_linkable(wire_id).then(|| deep_link_for(wire_id, kind))
     }
 
     fn update_note(
@@ -436,7 +440,7 @@ impl Workspace {
         // is conceded in docs/architecture/egress-threat-model.md. What closes
         // here is the change-detection oracle, which is the part that leaked.)
         self.store
-            .write_for_remote_agent_if_revision(local_id, body, expected_revision)
+            .write_for_remote_agent_if_revision(local_id, body, expected_revision, None)
             .map(|result| self.prefix_meta(result.meta))
     }
 
@@ -467,10 +471,16 @@ impl Workspace {
         self.update_note(local_id, &body, expected_revision)
     }
 
-    fn rename_note(&mut self, selector: &str, next_title: &str) -> Result<NoteReadResult, String> {
+    fn rename_note(
+        &mut self,
+        selector: &str,
+        next_title: &str,
+        expected_revision: Option<&str>,
+    ) -> Result<NoteReadResult, String> {
         let next_title = validate_note_title(next_title)?;
         let local_id = self.resolve_note_selector(selector)?;
         let current = self.read_note(&local_id)?;
+        Self::check_revision(&current, expected_revision)?;
         if crate::corpus::title_of(&current.note.body) == next_title {
             return Ok(current);
         }
@@ -1050,27 +1060,7 @@ impl Workspace {
     }
 
     fn queue_open(&mut self, local_id: &str, kind: &str) -> Result<Value, String> {
-        if !self.root.is_default {
-            return Err(
-                "opening a connected root is not available yet; use the default workspace".into(),
-            );
-        }
-        let kind = match kind {
-            "note" | "board" | "file" => kind,
-            _ => return Err("kind must be note, board, or file".into()),
-        };
-        if !self.reference_visible_to_remote(local_id) {
-            return Err("item is unavailable to connected agents".into());
-        }
-        let request = WorkspaceOpenRequest {
-            id: local_id.to_string(),
-            kind: kind.to_string(),
-        };
-        let path = self.store.root().join(DOT_DIR).join(OPEN_REQUEST_FILE);
-        fs::create_dir_all(path.parent().ok_or("open request has no parent")?)
-            .map_err(|e| e.to_string())?;
-        let body = serde_json::to_string(&request).map_err(|e| e.to_string())?;
-        crate::fsutil::atomic_write(&path, &body, ".rotli-open-")?;
+        let queued = self.write_open_request(local_id, kind)?;
         #[cfg(target_os = "macos")]
         {
             let status = std::process::Command::new("open")
@@ -1081,11 +1071,38 @@ impl Workspace {
                 return Err("macOS could not open the Rotli app".into());
             }
         }
+        Ok(queued)
+    }
+
+    /// The open mailbox lives beside the DEFAULT root's sidecars (the app
+    /// consumes it there); an item in a connected root rides it by wire id.
+    fn write_open_request(&mut self, local_id: &str, kind: &str) -> Result<Value, String> {
+        if !matches!(kind, "note" | "board" | "file") {
+            return Err("kind must be note, board, or file".into());
+        }
+        if !self.reference_visible_to_remote(local_id) {
+            return Err("item is unavailable to connected agents".into());
+        }
+        let wire_id = self.wire(local_id);
+        let mailbox = match self.root.is_default {
+            true => self.store.root().to_path_buf(),
+            false => root_targets()?
+                .into_iter()
+                .find(|root| root.is_default)
+                .ok_or("no default Rotli root to open in")?
+                .path,
+        };
+        let request = WorkspaceOpenRequest { id: wire_id.clone(), kind: kind.to_string() };
+        let path = mailbox.join(DOT_DIR).join(OPEN_REQUEST_FILE);
+        fs::create_dir_all(path.parent().ok_or("open request has no parent")?)
+            .map_err(|e| e.to_string())?;
+        let body = serde_json::to_string(&request).map_err(|e| e.to_string())?;
+        crate::fsutil::atomic_write(&path, &body, ".rotli-open-")?;
         Ok(json!({
             "queued": true,
-            "id": local_id,
+            "id": wire_id,
             "kind": kind,
-            "deepLink": self.deep_link_of(&self.wire(local_id), kind),
+            "deepLink": self.deep_link_of(&wire_id, kind),
         }))
     }
 }
@@ -1870,7 +1887,7 @@ fn run_cli(args: &[String]) -> Result<Value, String> {
             let current = positional(args, 1, "rename needs the current note title or id")?;
             let next = positional(args, 2, "rename needs the new note title")?;
             let (mut workspace, local) = Workspace::open_for_item(current, root_id)?;
-            json_value(workspace.rename_note(&local, next)?)
+            json_value(workspace.rename_note(&local, next, option(args, "--revision"))?)
         }
         "notes" => run_notes_cli(args, root_id),
         "folders" => run_folders_cli(args, root_id),
@@ -1898,6 +1915,9 @@ fn run_agent_cli(args: &[String], root_id: Option<&str>) -> Result<Value, String
 
 fn run_notes_cli(args: &[String], root_id: Option<&str>) -> Result<Value, String> {
     let sub = args.get(1).map(String::as_str).unwrap_or("list");
+    if let Some(result) = note_ops::notes_cli(sub, args, root_id) {
+        return result;
+    }
     match sub {
         "list" => {
             let mut workspace = Workspace::open(root_id)?;
@@ -2191,34 +2211,7 @@ fn input_text(args: &[String], direct_name: &str) -> Result<String, String> {
 
 fn mcp_config() -> Result<Value, String> {
     let executable = std::env::current_exe().map_err(|error| error.to_string())?;
-    let command = executable.display().to_string();
-    let quoted = shell_quote(&command);
-    Ok(json!({
-        "server": "rotli-workspace",
-        "transport": "stdio",
-        "command": command,
-        "args": ["mcp"],
-        "claudeCode": format!("claude mcp add --transport stdio --scope user rotli-workspace -- {quoted} mcp"),
-        "codex": format!("codex mcp add rotli-workspace -- {quoted} mcp"),
-        "codexToml": format!("[mcp_servers.rotli-workspace]\ncommand = {:?}\nargs = [\"mcp\"]\ndefault_tools_approval_mode = \"writes\"", command),
-        "remoteHttp": {
-            "transport": "streamable-http",
-            "mcpUrl": "https://YOUR-RELAY.example/mcp",
-            "authorization": "Bearer <client token returned only when Settings creates the pairing>",
-            "grokBot": "Tell Grok Bot to add the MCP URL, then provide the static Authorization bearer header. Rotli must be open and explicitly connected for this app session."
-        },
-        "verify": {
-            "rotli": format!("{quoted} agent doctor"),
-            "isolatedSelfTest": format!("{quoted} agent self-test"),
-            "claude": "claude mcp get rotli-workspace",
-            "codex": "codex mcp get rotli-workspace"
-        },
-        "boundary": "Rotli prints setup instructions but never edits Claude or Codex global configuration itself. Use the installed app binary, not a temporary target/debug build."
-    }))
-}
-
-fn shell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "'\\''"))
+    Ok(crate::workspace_help::mcp_setup(&executable.display().to_string()))
 }
 
 fn workspace_policy() -> Value {
@@ -2345,6 +2338,12 @@ fn agent_self_test() -> Result<Value, String> {
         &read.revision,
     )?;
     checks.push("patch one exact span with revision protection");
+    let patched = workspace.read_note(&created.id)?;
+    let undone = workspace.undo_last_ai_edit(&created.id, &patched.revision)?;
+    if undone.note.body != read.note.body {
+        return Err("AI edit journal undo self-test did not restore the body".into());
+    }
+    checks.push("journal an AI edit and undo it while the note is unchanged");
     workspace.view_create("OpenSource")?;
     workspace.view_assign(&created.id, Some("OpenSource"), MAIN_ROOT)?;
     let view_rel = workspace.store.resolve_note_rel(&created.id)?;
@@ -2702,6 +2701,7 @@ fn mcp_tools() -> Vec<Value> {
         tool("rotli_apply_board", "Edit a board with compact actions. This can remove or replace board content and requires approval. Actions: {op:add,id,kind,x,y,width,height,text}; {op:update,id,...}; {op:remove,id}.", json!({"type":"object","properties":{"id":{"type":"string","maxLength":1024},"expectedRevision":{"type":"string","maxLength":128},"actions":{"type":"array","maxItems":500,"items":{"type":"object"}},"description":{"type":"string","maxLength":2000},"tags":{"type":"string","maxLength":2000},"rootId":{"type":"string","maxLength":128}},"required":["id","expectedRevision","actions"],"additionalProperties":false}), false),
         tool("rotli_open", "Open a note, board, or file in the Rotli app.", json!({"type":"object","properties":{"id":{"type":"string"},"kind":{"type":"string","enum":["note","board","file"]},"rootId":{"type":"string"}},"required":["id"],"additionalProperties":false}), false),
     ];
+    tools.extend(note_ops::tools(tool));
     tools.extend(crate::workspace_documents::tools(tool));
     tools
 }
@@ -2719,6 +2719,8 @@ fn tool(name: &str, description: &str, input_schema: Value, read_only: bool) -> 
             | "rotli_unassign_view"
             | "rotli_apply_board"
             | "rotli_apply_document"
+            | "rotli_trash_note"
+            | "rotli_undo_ai_edit"
     );
     json!({
         "name": name,
@@ -2747,6 +2749,9 @@ fn main_item_schema(parent_required: bool) -> Value {
 
 fn call_mcp_tool(name: &str, args: &Value) -> Result<Value, String> {
     if let Some(result) = crate::workspace_documents::call(name, args) {
+        return result;
+    }
+    if let Some(result) = note_ops::call(name, args) {
         return result;
     }
     let root = arg_string(args, "rootId");
@@ -3011,7 +3016,7 @@ mod tests {
     use std::net::TcpStream;
     use tempfile::TempDir;
 
-    fn test_workspace(temp: &TempDir) -> Workspace {
+    pub(super) fn test_workspace(temp: &TempDir) -> Workspace {
         Workspace::open_target(RootTarget {
             id: DEFAULT_ROOT_ID.into(),
             label: "Test".into(),
@@ -3133,7 +3138,7 @@ mod tests {
             .unwrap();
         let before = workspace.store.resolve_note_rel(&created.id).unwrap();
 
-        let renamed = workspace.rename_note("Old name", "New name").unwrap();
+        let renamed = workspace.rename_note("Old name", "New name", None).unwrap();
         let after = workspace.store.resolve_note_rel(&created.id).unwrap();
 
         assert_eq!(renamed.note.id, created.id);
@@ -3156,10 +3161,10 @@ mod tests {
             .unwrap();
 
         assert!(workspace
-            .rename_note("Duplicate", "Ambiguous")
+            .rename_note("Duplicate", "Ambiguous", None)
             .unwrap_err()
             .contains("ambiguous"));
-        let renamed = workspace.rename_note(&first.id, "By id").unwrap();
+        let renamed = workspace.rename_note(&first.id, "By id", None).unwrap();
         assert_eq!(crate::corpus::title_of(&renamed.note.body), "By id");
     }
 
@@ -3171,9 +3176,9 @@ mod tests {
             .create_note("Old file name", "Body", MAIN_ROOT)
             .unwrap();
 
-        workspace.rename_note(&created.id, "Current title").unwrap();
+        workspace.rename_note(&created.id, "Current title", None).unwrap();
         let renamed = workspace
-            .rename_note("old-file-name", "Final title")
+            .rename_note("old-file-name", "Final title", None)
             .unwrap();
 
         assert_eq!(crate::corpus::title_of(&renamed.note.body), "Final title");
@@ -3551,6 +3556,9 @@ mod tests {
         assert_eq!(destructive("rotli_apply_board"), Some(true));
         assert_eq!(destructive("rotli_patch_note"), Some(false));
         assert_eq!(destructive("rotli_create_note"), Some(false));
+        assert_eq!(destructive(note_ops::TRASH_NOTE), Some(true));
+        assert_eq!(destructive(note_ops::UNDO_AI_EDIT), Some(true));
+        assert_eq!(destructive(note_ops::RENAME), Some(false));
     }
 
     #[test]

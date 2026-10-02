@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { cycleEveryTheme, themeNow } from "./support";
+
 // Fresh-vault onboarding (development-only `?onboarding` route, empty in-memory
 // corpus). Every new vault gets a Welcome folder in Main: the welcome note and
 // three lessons as ordinary notes, opened from the left menu, edited in the
@@ -353,6 +355,7 @@ test("checkboxes and list markers align with the H1 in every environment and a n
   test.slow();
   await page.setViewportSize({ width: 1440, height: 900 });
   await onboard(page);
+  await cycleEveryTheme(page);
   await lessonRows(page).nth(1).click();
   await expect(page.getByRole("tab", { selected: true })).toContainText("Writing");
   const theme = page.getByRole("button", { name: /^Theme —/ });
@@ -369,10 +372,10 @@ test("checkboxes and list markers align with the H1 in every environment and a n
     }
   };
   for (let index = 0; index < 14; index++) {
-    const label = (await theme.getAttribute("aria-label"))!;
+    const label = themeNow(await theme.getAttribute("aria-label"));
     environments.add(label);
     await assertAligned(label);
-    if (label === "Theme — Ocean Light" || label === "Theme — Ocean Dark") {
+    if (label === "Ocean Light" || label === "Ocean Dark") {
       await page.screenshot({
         path: testInfo.outputPath(label.endsWith("Light") ? "playground-light.png" : "playground-dark.png"),
       });

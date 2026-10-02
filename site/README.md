@@ -76,26 +76,30 @@ bun run preview  # serve the built dist/ locally
 - **The landing page** (`src/components/Landing.astro`) only composes its
   chapters from `src/components/landing/`, bookended like the studio's story
   film: Hero (the story film itself) → Overview (Write. Keep. Ask.: three
-  steps with the app's quokkas, then links to the episodes and `/features/`;
-  the dev-only Experiments follow) → PrivacyBrief (the night scene, three
-  facts, and a link to `/privacy/`) → Everywhere (Rotli Web, only while
-  `WEB_APP_ENABLED`) → Personal (themes + companion, with a faint island
-  vignette) → Faq → FinalCta (the film's sunset). The landing page carries
-  exactly one video. **`/features/`** has one display headline, with "Rotli
-  in 30 seconds" (`EpisodeShelf.astro`: the eight episodes in one player,
-  under a quiet heading; two columns of episodes below the player on narrow
-  screens) right under it, then the chapters in full (Features, Folder,
-  Personal). Every chapter opens with the same section head (one h2 at
-  `--step-h2` and a lede), and the chapters alternate plain and warm grounds.
-  The landing page's dev-only Experiments chapter is not repeated there. On narrow screens the theme studio is a carousel
-  (previous/next and a swipe on the capture), like the quokka companion's.
+  steps with the app's quokkas, then links to the episodes and `/features/`)
+  → TwoKinds ("You write for yourself. AI reads differently.": a plain
+  HTML mock of one note as typed and as the Librarian files it) → StatBand
+  (two sourced figures, footnoted; keep the sources and "never wasted"
+  wording) → the dev-only Experiments → PrivacyBrief (the night scene in Ocean
+  Dark via `.band-night` in `Base.astro`, three facts, and a link to
+  `/privacy/`) → Everywhere (Rotli Web and how Rotli Helper connects it, with
+  the copyable install line; only while `WEB_APP_ENABLED`) → Personal (the
+  theme studio, with a faint island vignette) → Faq → FinalCta (the film's
+  sunset). The landing page carries exactly one video. **`/features/`** has
+  one display headline, with "Rotli in 30 seconds" (`EpisodeShelf.astro`: the
+  eight episodes in one player, under a quiet heading; two columns of episodes
+  below the player on narrow screens) right under it, then the chapters in
+  full (Features with every smaller habit, Folder, Personal). Every chapter
+  opens with the same section head (one h2 at `--step-h2` and a lede), and the
+  chapters alternate plain and warm grounds. The landing page's dev-only
+  Experiments chapter is not repeated there. On narrow screens the theme
+  studio is a carousel (previous/next and a swipe on the capture).
   Each chapter owns its
   markup, scoped styles, and script. `Base.astro` owns the tokens, the shared
   section grammar (`.wrap`, `.section`, `.section-title`, `.section-lede`,
   `.band-warm`, `.band-deep`, the spacing and type steps), and the one
   scroll-reveal script. Nothing on the page moves on a timer: the theme studio
-  and companion change only when a visitor picks a swatch or steps the
-  carousel, and scroll reveals fire once and rest. Two-column rows share a
+  changes only when a visitor picks a swatch or steps the carousel, and scroll reveals fire once and rest. Two-column rows share a
   top edge so each heading starts level with its picture.
 - **`/privacy/`** is the full privacy policy in plain language: the short
   version, where notes live, every network connection and when it happens, AI
@@ -202,8 +206,8 @@ bun run preview  # serve the built dist/ locally
   1536 × 1536 from the canonical SVG with the existing fill pipeline
   (`bun scripts/build-character-fills.mjs --site`); app-sized 512px exports
   stay unchanged.
-- The companion carousel reads `src/assets/characters/showcase/` (renders +
-  `showcase.json`), produced by `bun scripts/build-companion-showcase.ts`. That
+- The companion renders in `src/assets/characters/showcase/` (renders +
+  `showcase.json`; the landing page no longer shows them), produced by `bun scripts/build-companion-showcase.ts`. That
   script composites body preset, accessory, line color, and pose with the same
   placement rules as `src/components/character.tsx`, so every slide is a
   combination a person can pick in Settings → Companion. Edit `COMBOS` there

@@ -10,8 +10,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Hand to AI brings the note's files along.** Images and files the note
+  links to are listed under Attachments with where they are on your Mac, and
+  the links in the note point there, so the agent can open them. A file that
+  isn't in your vault is listed as missing. A note that links to a file in a
+  secure folder isn't handed off at all.
+- **Hand to AI has a Refined mode.** Next to Basic (the prompt built from
+  the note, as before), Refined asks the Librarian's model to rewrite it as a
+  full prompt: the task, the context, the constraints, the files, and how to
+  check it's done. It uses the model on this Mac unless your Librarian is set
+  to a connected model. If it can't help this time, you get Basic and the
+  reason. Hand to AI remembers which one you chose last.
+
 ### Changed
 
+- **rotli.co says what rotli is for.** The landing page now opens on "Write
+  like a person. Let AI do the filing.", explains with a side-by-side note why
+  AI reads notes differently from people (and what the Librarian adds around
+  your words), cites two figures on unused AI subscriptions, and shows the
+  night privacy band in Ocean Dark. The Rotli Web section explains how Rotli
+  Helper connects the browser to your folder and gives the one-line command to
+  copy. The quokka carousel is gone from the landing and Features pages, and
+  the About page's belief now reads "AI works for you, inside rules you set."
 - **Setup is four screens.** Your name and theme, where your notes live, who
   files them (the Librarian), and your three shortcuts, which now say plainly
   that you can change them. Then the thank-you card and the tour, and a small
@@ -33,6 +55,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Center or right-align a paragraph.** Align center, Align right, and Align
+  left are in the command palette (bind them in Settings → Keybindings), and
+  `/center` and `/align right` start an aligned paragraph. The file keeps
+  ordinary HTML, `<p align="center">…</p>`, with the tags hidden until the
+  caret is in the line; bold, links, and the rest still render inside. Left
+  removes the tags.
+- **Choose what the titlebar sun does.** Settings → Appearance → Theme button:
+  flip light and dark in your family (now the default), walk your own picks of
+  the fourteen environments, or walk all fourteen. Its label says where the
+  next click lands.
+- **Outline images.** An Appearance switch, off by default, draws a quiet line
+  around pictures and videos in a note, so a white image doesn't melt into a
+  light page.
 - **Chat edits the Word documents it made.** After reading one, chat can
   change a paragraph, add or remove blocks, set a table cell, or change a
   heading level. Rotli lets it edit only documents its AI created, checks the
@@ -45,6 +80,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   edits, and refusals as chat: no secure or secret-shaped documents, edits
   only to documents an AI made, never while one is open, never over a newer
   version. A document an agent creates is recorded with the agent's name.
+- **Rotli keeps a record of every AI edit.** Each time chat (or its memory)
+  or an agent changes a note's text, Rotli writes who, when, and a diff to
+  `.rotli/ai-edit-journal.jsonl` in the vault. Secure notes are recorded
+  without their text. The app does not show this record yet.
+- **The command line renames, trashes, and lists attachments.** `rotli rename`
+  takes `--revision` to refuse a stale rename; `rotli notes attachments` lists
+  a note's linked files with type and size (small text files on request);
+  `rotli notes trash` moves a note to Rotli's Trash, where you can restore it;
+  `rotli notes history` shows a note's AI edits; `rotli notes undo-ai-edit`
+  undoes the last one only while the note is exactly as it left it. Renaming,
+  trashing, and undoing follow the edit rule: only notes an AI made, or ones
+  you let AI edit, never locked or secure ones. `rotli open` and deep links
+  now reach notes in connected vaults.
+- **Agents get the same tools** (development builds). `rotli mcp` gains
+  `rotli_rename`, `rotli_note_attachments`, `rotli_trash_note`,
+  `rotli_note_history`, and `rotli_undo_ai_edit`, and `rotli agent config`
+  also prints Cursor and Gemini CLI setups.
 - **Links in Word documents.** Web and mail links in a .docx now open, edit,
   and save as real Word links: add one from the document toolbar (or the
   palette's Link), change its
@@ -89,9 +141,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as Home stays in the main window.
 - **rotli.co shows all seven theme families.** The theme studio on the home
   page now includes Blossom, in light and dark, beside the other six.
+- **The Quick Note's ⌘P picker searches what your notes say.** Titles still
+  match as you type, accents and capitals aside ("cafe" finds "Café"); note
+  text follows from full-text search, always below the title matches. The
+  picker says when it is still loading or searching, and a blank note you
+  named can be found by its name.
+- **The scroll-to-top arrow is smaller and quieter.** A muted glyph until you
+  hover or Tab to it, in every theme.
 
 ### Fixed
 
+- **Images dropped from Finder land where you drop them.** On Retina
+  screens a dropped image went in about halfway up the note; Rotli now reads
+  the drop position as the Mac reports it.
 - **Numbered lists stay numbered in Word documents.** Editing a numbered
   list saved it as bullets; Rotli now reads each list's kind from the file
   and keeps its numbering.
@@ -108,6 +170,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Claude FM is no longer started again a moment later.
 - **No sidebar footer for Settings alone.** With Files, Librarian, and
   Feedback hidden, the footer goes away; Settings is still in the titlebar.
+- **The "Keep" quokka has its whole body.** The quokka holding the file stack
+  was missing the outline of its side behind the little card tree, so the
+  hip between the cards showed as background in the app and on rotli.co. The
+  side now runs behind the cards and closes at the hip.
 
 ## [1.7.1] - 2026-09-30
 

@@ -1,9 +1,9 @@
 ---
 // The launch page, bookended like the studio's story film: the film itself in
 // the hero, a sunset to close on. Between them, in order: what rotli does (three
-// steps, the full tour and the 30-second episodes are /features/), privacy in
-// brief, the ways in, make it yours, and questions. Base.astro owns the tokens
-// and the section grammar.
+// steps, the full tour and the 30-second episodes are /features/), why the Librarian
+// exists (two kinds of notes, the AI you already pay for), privacy in brief, the ways
+// in, make it yours, and questions. Base.astro owns the tokens and the section grammar.
 import { landingGraph } from '../agents';
 import Base from '../layouts/Base.astro';
 import { site } from '../site';
@@ -15,6 +15,8 @@ import Faq from './landing/Faq.astro';
 import FinalCta from './landing/FinalCta.astro';
 import Hero from './landing/Hero.astro';
 import Overview from './landing/Overview.astro';
+import StatBand from './landing/StatBand.astro';
+import TwoKinds from './landing/TwoKinds.astro';
 import Personal from './landing/Personal.astro';
 import PrivacyBrief from './landing/PrivacyBrief.astro';
 ---
@@ -24,6 +26,8 @@ import PrivacyBrief from './landing/PrivacyBrief.astro';
   <main id="content">
     <Hero />
     <Overview />
+    <TwoKinds />
+    <StatBand />
     <Experiments />
     <PrivacyBrief />
     <Everywhere />

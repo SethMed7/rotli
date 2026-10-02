@@ -69,6 +69,7 @@ import { openSlashPanel } from "./slashPanels";
 import { SlashPicker } from "./slashPicker";
 import { tableRender } from "./tableRender";
 import { insertTemplateFromPicker, noteIsTemplateNow } from "./templateInsert";
+import { applyTextAlign } from "./textAlign";
 import { useWikilinkIndex } from "./useWikilinkIndex";
 import { vendorKeymap } from "./vendorKeymap";
 import { buildTitleCounts, wikilinkLabel } from "./wikilink";
@@ -323,6 +324,7 @@ function CmEditorImpl({
       if (spec) view.dispatch({ ...spec, scrollIntoView: true });
       view.focus();
     },
+    setAlign: (align) => applyTextAlign(viewRef.current, align),
     setHeading: (level) => {
       const view = viewRef.current;
       if (!view) return;

@@ -4156,10 +4156,13 @@ impl CorpusStore {
                 );
             }
             crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
+            let remote_visible = !model_is_local || self.read_for_ai(&rel, false).is_ok();
             let meta = self.write_resolved(id_or_rel, body, rel.clone())?;
             let landed_rel = self.path_of(id_or_rel)?;
             let landed = fs::read(self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
+            let editor = ai_journal::AiEditor::chat(model_is_local);
+            self.journal_ai_edit(&meta.id, &landed_rel, &text, &landed, remote_visible, &editor);
             Ok(CorpusWriteResult {
                 meta,
                 revision: crate::fsutil::revision(&landed),
@@ -4203,6 +4206,7 @@ impl CorpusStore {
         id: &str,
         body: &str,
         expected_revision: &str,
+        undo_of: Option<&str>,
     ) -> Result<CorpusWriteResult, String> {
         let rel = self.resolve_note_rel(id)?;
         if self.layout == Layout::Memex && (rel == "wiki" || rel.starts_with("wiki/")) {
@@ -4229,6 +4233,8 @@ impl CorpusStore {
             let landed_rel = self.path_of(id)?;
             let landed = fs::read(self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
+            let editor = ai_journal::AiEditor::agent(undo_of);
+            self.journal_ai_edit(&meta.id, &landed_rel, &text, &landed, true, &editor);
             Ok(CorpusWriteResult {
                 meta,
                 revision: crate::fsutil::revision(&landed),
@@ -8824,6 +8830,9 @@ pub mod rules_store;
 /// The AI edit control on the store: the person's grant (2026-09-29).
 #[path = "corpus_ai_edit.rs"]
 mod ai_edit;
+/// Every AI body write's journal row (`.rotli/ai-edit-journal.jsonl`).
+#[path = "corpus_ai_journal.rs"]
+pub(crate) mod ai_journal;
 
 #[cfg(test)]
 #[path = "injection_evals.rs"]

@@ -1,9 +1,11 @@
 // Pure markdown → rendered text for the clipboard (the "beautified" copy). No
 // CodeMirror or React imports, so it unit-tests headless. Drops inline markers
-// (**, *, ==, ~~, `, <u>, links→their text) and per-line block prefixes (#, -,
+// (**, *, ==, ~~, `, <u>, links→their text), the <p align> tags of an aligned
+// paragraph, and per-line block prefixes (#, -,
 // 1., >, - [ ]) so a copy reads like what you SEE — no stray ** around a bold
 // word. Raw mode copies the source verbatim instead.
 
+import { parseAlignedLine } from "./alignedLine";
 import { CHOICE_MARK } from "./choiceState";
 import { parseChoiceControlLine, parseChoicePromptLine, parseToggleLine } from "./controlState";
 import { underscoreEm } from "./inlineEmphasis";
@@ -37,6 +39,8 @@ export function stripMarkdown(text: string): string {
   return text
     .split("\n")
     .map((line) => {
+      const aligned = parseAlignedLine(line);
+      if (aligned) return inline(aligned.inner);
       const prompt = parseChoicePromptLine(line);
       if (prompt) return inline(`${prompt.indentSource}${prompt.text}`);
       const toggle = parseToggleLine(line);

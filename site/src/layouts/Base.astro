@@ -14,11 +14,11 @@ interface Props {
 }
 
 const {
-  title = 'rotli — room to think, files you keep',
-  description = 'A calm, local-first Mac workspace for notes, tasks, links, and optional AI conversations. One folder you own, with no account required.',
+  title = 'rotli — write like a person, let AI do the filing',
+  description = 'A private workspace for your Mac. Write however you think, in plain Markdown files you own. The Librarian files, tags, and links them in the background, with no account required.',
   canonicalPath = Astro.url.pathname,
   image = '/social-card.png',
-  imageAlt = 'rotli — room to think, files you keep',
+  imageAlt = 'rotli — write like a person, let AI do the filing',
   noindex = false,
   structuredData,
   markdownPath,
@@ -335,6 +335,27 @@ const socialImageUrl = new URL(image, siteUrl).href;
       .band-deep {
         background: var(--deep);
         color: var(--deep-text);
+      }
+      /* Night, in the app's Ocean Dark environment (src/styles/themes.css): add it beside
+         .band-deep and the --deep-* tokens, and the colours the night scene borrows
+         (SecureScene.astro) take Ocean's values. Stars and the underline get blue twins. */
+      .band-night {
+        --deep: #0e171d;
+        --deep-surface: #152229;
+        --deep-text: #e7f0f4;
+        --deep-muted: #a1b6c0;
+        --deep-border: #263a43;
+        --tint: #213843;
+        --accent: #70b2d7;
+        --accent-text: #86c2e0;
+        --olive: #8cc4a5;
+        --olive-bright: #8cc4a5;
+        --text: #0e171d;
+        background-image: url('/night-stars-ocean.svg');
+        background-size: 480px 480px;
+      }
+      .band-night .inked {
+        background-image: url('/ink-underline-ocean.svg');
       }
       .section-title {
         margin: 0;

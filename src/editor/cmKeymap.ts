@@ -2,7 +2,8 @@
 // ⌘B, headings, etc. — stay in the global key registry and reach the editor
 // through activeEditor()). Mirrors the old EditorSurface grammar exactly:
 //   Enter   — carry the list marker onto the next line; on an EMPTY item clear
-//             it (the exit ramp); numbered lists count up.
+//             it (the exit ramp); numbered lists count up. In an aligned
+//             paragraph, start the next one with the same alignment.
 //   Tab     — indent the LINE by 2 spaces (a list line nests); only fenced code
 //             gets a soft 2-space tab at the caret, since indentation inside a
 //             fence is the user's code.
@@ -35,6 +36,7 @@ import {
   tableToText,
 } from "./tables";
 import { MARK, markOf, TASK_LINE_RE, taskStateOf } from "./taskState";
+import { alignedEnterSpec } from "./textAlign";
 
 /** Fenced code is grammar-free: no list continuation, no task shorthand, no
  * list indent — `[]` or `- item` inside a ``` fence is the user's code. */
@@ -162,6 +164,13 @@ const enterContinueList: Command = (view) => {
     userEvent: "input",
   });
   return true;
+};
+
+const enterAlignedParagraph: Command = (view) => {
+  const line = view.state.doc.lineAt(view.state.selection.main.head);
+  const spec = inFence(view, line) ? null : alignedEnterSpec(view.state);
+  if (spec) view.dispatch({ ...spec, scrollIntoView: true, userEvent: "input" });
+  return spec !== null;
 };
 
 /** A line's leading indent, tab-tolerant (a tab = one level = 2 columns).
@@ -548,6 +557,7 @@ export const rotliKeymap: KeyBinding[] = [
   { key: "ArrowLeft", run: imageArrow("left") },
   { key: "ArrowRight", run: imageArrow("right") },
   { key: "Enter", run: enterContinueList },
+  { key: "Enter", run: enterAlignedParagraph },
   { key: "Tab", run: tabIndent, shift: tabOutdent },
   { key: "Space", run: listControlOnSpace },
 ];
