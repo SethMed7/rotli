@@ -1,5 +1,5 @@
 ---
-// Chat: a real reply from the Mac app (a raw take of the launch shoot, synthetic
+// Chat (under its section head in Features.astro): a real reply from the Mac app (a raw take of the launch shoot, synthetic
 // Notebook vault), then what a conversation does to your folder, step by step.
 // Facts (current code): each chat is chats/<slug>.md; after every reply the
 // chat's own model rewrites a "Conversation notes" section in the chat's note
@@ -39,13 +39,6 @@ const steps = [
 ---
 
 <div class="chat-row" data-reveal>
-  <div class="chat-copy">
-    <h3>Chat that works inside your notes.</h3>
-    <p>
-      Ask what shipped, what is left, or what you decided last week, and get an answer grounded in your own
-      files. Use a model on your Mac, or the AI tools you already use.
-    </p>
-  </div>
   <figure class="frame">
     <img
       src="/shots/chat.webp"
@@ -103,24 +96,10 @@ const steps = [
     width: 100%;
     height: auto;
   }
+  /* The chapter's heading and lede live in its section head (Features.astro);
+     the reply sits under them at a reading width, not the full page. */
   .chat-row {
-    display: grid;
-    grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
-    gap: 2rem clamp(2rem, 6vw, 5rem);
-    align-items: start;
-  }
-  h3 {
-    margin: 0;
-    font-size: var(--step-h3);
-    font-weight: 600;
-    line-height: 1.2;
-    letter-spacing: -0.02em;
-  }
-  .chat-copy p {
-    max-width: 30rem;
-    margin: 0.8rem 0 0;
-    color: var(--text-muted);
-    line-height: 1.62;
+    max-width: 56rem;
   }
   .steps {
     display: grid;
@@ -135,7 +114,7 @@ const steps = [
     border-top: 1px solid var(--border-strong);
   }
   .n {
-    color: var(--accent-text);
+    color: var(--text-muted);
     font-size: 0.82rem;
     font-weight: 600;
   }
@@ -207,7 +186,6 @@ const steps = [
     line-height: 1.5;
   }
   @media (max-width: 860px) {
-    .chat-row,
     .chat-detail {
       grid-template-columns: 1fr;
     }

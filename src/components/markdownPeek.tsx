@@ -5,6 +5,7 @@
 
 import type { ReactNode } from "react";
 
+import { parseAlignedLine } from "../editor/alignedLine";
 import { choiceGlyph } from "../editor/choiceState";
 import {
   type Block,
@@ -69,7 +70,19 @@ export function MarkdownPeek({ body, className = "pv-note" }: { body: string; cl
                 : renderInline(b.text)}
         </div>,
       );
-    else blocks.push(<p key={key}>{renderInline(b.text)}</p>);
+    else {
+      // an aligned paragraph reads aligned, its tags unseen (editor/alignedLine.ts)
+      const aligned = parseAlignedLine(line);
+      blocks.push(
+        aligned ? (
+          <p key={key} className={`pv-align-${aligned.align}`}>
+            {renderInline(aligned.inner)}
+          </p>
+        ) : (
+          <p key={key}>{renderInline(b.text)}</p>
+        ),
+      );
+    }
   }
   return <div className={className}>{blocks}</div>;
 }

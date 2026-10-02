@@ -5,6 +5,7 @@
 
 import { expect, type Page, test } from "@playwright/test";
 
+import { themeNow } from "../support";
 import { readOpfsFile, startWithVault } from "./support";
 
 async function newBoard(page: Page, name: string): Promise<string> {
@@ -46,7 +47,7 @@ function canvasLook(page: Page) {
 async function darkTheme(page: Page): Promise<void> {
   for (let i = 0; i < 14; i += 1) {
     const toggle = page.getByRole("button", { name: /^Theme — / });
-    if (/Dark|Charcoal|Midnight/.test((await toggle.getAttribute("aria-label")) ?? "")) return;
+    if (/Dark|Charcoal|Midnight/.test(themeNow(await toggle.getAttribute("aria-label")))) return;
     await toggle.click();
   }
   throw new Error("no dark theme reached");

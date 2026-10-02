@@ -153,6 +153,10 @@ export default defineConfig({
   // only external stylesheets, and Astro's default inlines small ones (the 404
   // page shipped unstyled that way). The guard below proves it.
   build: { inlineStylesheets: "never" },
+  // The MCP guide folded into /resources/developers/ (2026-10-02). The static
+  // build writes a small refresh page at the old address; the Caddyfile's
+  // /mcp redirect lands on it and follows through.
+  redirects: site.showsFullSite ? { "/resources/mcp": "/resources/developers/" } : {},
   vite: { server: { proxy: localWebApp }, preview: { proxy: localWebApp } },
   integrations: [
     ...(site.indexable ? [sitemap({ filter: (page) => page !== `${site.url}/404/` && page !== `${site.url}/subscribed/` })] : []),

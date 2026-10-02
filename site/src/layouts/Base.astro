@@ -14,11 +14,11 @@ interface Props {
 }
 
 const {
-  title = 'rotli — room to think, files you keep',
-  description = 'A calm, local-first Mac workspace for notes, tasks, links, and optional AI conversations. One folder you own, with no account required.',
+  title = 'rotli — write like a person, let AI do the filing',
+  description = 'A private workspace for your Mac. Write however you think, in plain Markdown files you own. The Librarian files, tags, and links them in the background, with no account required.',
   canonicalPath = Astro.url.pathname,
   image = '/social-card.png',
-  imageAlt = 'rotli — room to think, files you keep',
+  imageAlt = 'rotli — write like a person, let AI do the filing',
   noindex = false,
   structuredData,
   markdownPath,
@@ -338,6 +338,27 @@ const socialImageUrl = new URL(image, siteUrl).href;
         background: var(--deep);
         color: var(--deep-text);
       }
+      /* Night, in the app's Ocean Dark environment (src/styles/themes.css): add it beside
+         .band-deep and the --deep-* tokens, and the colours the night scene borrows
+         (SecureScene.astro) take Ocean's values. Stars and the underline get blue twins. */
+      .band-night {
+        --deep: #0e171d;
+        --deep-surface: #152229;
+        --deep-text: #e7f0f4;
+        --deep-muted: #a1b6c0;
+        --deep-border: #263a43;
+        --tint: #213843;
+        --accent: #70b2d7;
+        --accent-text: #86c2e0;
+        --olive: #8cc4a5;
+        --olive-bright: #8cc4a5;
+        --text: #0e171d;
+        background-image: url('/night-stars-ocean.svg');
+        background-size: 480px 480px;
+      }
+      .band-night .inked {
+        background-image: url('/ink-underline-ocean.svg');
+      }
       .section-title {
         margin: 0;
         font-size: var(--step-h2);
@@ -410,7 +431,9 @@ const socialImageUrl = new URL(image, siteUrl).href;
         gap: clamp(1rem, 2.2vw, 2rem);
         margin-inline: auto;
       }
-      .primary-nav a,
+      .primary-nav > a,
+      .nav-dropdown-fallback,
+      .nav-dropdown-toggle,
       .github-link {
         min-height: 44px;
         display: inline-flex;
@@ -419,16 +442,107 @@ const socialImageUrl = new URL(image, siteUrl).href;
         font-size: 0.92rem;
         text-decoration: none;
       }
-      .primary-nav a:hover,
-      .primary-nav a[aria-current='page'],
+      .primary-nav > a:hover,
+      .primary-nav > a[aria-current='page'],
+      .nav-dropdown-fallback:hover,
+      .nav-dropdown-toggle:hover,
+      .nav-dropdown-toggle[aria-expanded='true'],
+      .nav-dropdown.is-current > *,
       .github-link:hover {
         color: var(--text);
       }
-      .primary-nav a[aria-current='page'] {
+      .primary-nav > a[aria-current='page'],
+      .nav-dropdown.is-current > .nav-dropdown-fallback,
+      .nav-dropdown.is-current > .nav-dropdown-toggle {
         text-decoration: underline;
         text-decoration-color: var(--accent-text);
         text-decoration-thickness: 2px;
         text-underline-offset: 0.5rem;
+      }
+      /* Resources: a disclosure (SiteHeader.astro). The fallback link shows
+         without script; with it (the `js` class) the button takes its place. */
+      .nav-dropdown {
+        position: relative;
+      }
+      .nav-dropdown-toggle {
+        display: none;
+        gap: 0.3rem;
+        padding: 0;
+        border: 0;
+        background: none;
+        cursor: pointer;
+      }
+      .js .nav-dropdown-fallback {
+        display: none;
+      }
+      .js .nav-dropdown-toggle {
+        display: inline-flex;
+      }
+      .nav-dropdown-toggle svg {
+        width: 0.75rem;
+        height: 0.75rem;
+        transition: transform 140ms ease-out;
+      }
+      .nav-dropdown-toggle[aria-expanded='true'] svg {
+        transform: rotate(180deg);
+      }
+      .nav-dropdown-panel {
+        position: absolute;
+        top: calc(100% + 1rem);
+        left: 50%;
+        z-index: 40;
+        width: 19rem;
+        padding: 0.45rem;
+        border: 1px solid var(--border-strong);
+        border-radius: 0.8rem;
+        background: var(--surface);
+        transform: translateX(-50%);
+      }
+      .nav-dropdown-panel[hidden] {
+        display: none;
+      }
+      .nav-dropdown-panel ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .nav-dropdown-panel a {
+        display: grid;
+        gap: 0.1rem;
+        min-height: 44px;
+        padding: 0.6rem 0.75rem;
+        border-radius: 0.5rem;
+        color: var(--text);
+        text-decoration: none;
+      }
+      .nav-dropdown-panel a:hover,
+      .nav-dropdown-panel a:focus-visible {
+        background: var(--surface-2);
+      }
+      .nav-dropdown-panel a:focus-visible {
+        outline-offset: -2px;
+      }
+      .nav-dropdown-panel a[aria-current='page'] {
+        background: var(--tint);
+      }
+      .nav-dropdown-panel b {
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+        font-size: 0.94rem;
+        font-weight: 600;
+      }
+      .nav-dropdown-panel span {
+        color: var(--text-muted);
+        font-size: 0.84rem;
+        line-height: 1.4;
+      }
+      /* A status beside a page's name, in the dropdown and the Menu. Text, not a chip. */
+      .nav-dropdown-panel small,
+      .nav-menu-group small {
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        font-weight: 500;
       }
       .header-actions {
         display: flex;
@@ -558,6 +672,8 @@ const socialImageUrl = new URL(image, siteUrl).href;
         top: calc(100% + 0.5rem);
         right: 0;
         min-width: 15rem;
+        max-height: calc(100dvh - var(--header-height) - 1rem);
+        overflow-y: auto;
         display: grid;
         gap: 0.15rem;
         padding: 0.5rem;
@@ -565,20 +681,42 @@ const socialImageUrl = new URL(image, siteUrl).href;
         border-radius: 0.8rem;
         background: var(--surface);
       }
-      .nav-menu-panel > a {
+      .nav-menu-panel > a,
+      .nav-menu-group > a {
         min-height: 44px;
         display: flex;
         align-items: center;
+        gap: 0.5rem;
         padding-inline: 0.75rem;
         border-radius: 0.5rem;
         color: var(--text);
         text-decoration: none;
       }
-      .nav-menu-panel > a:hover {
+      .nav-menu-panel > a:hover,
+      .nav-menu-group > a:hover {
         background: var(--surface-2);
       }
-      .nav-menu-panel > a[aria-current='page'] {
+      .nav-menu-panel > a[aria-current='page'],
+      .nav-menu-group > a[aria-current='page'] {
         background: var(--tint);
+      }
+      /* The dropdown's pages, listed under its name and set in from the rail. */
+      .nav-menu-group {
+        display: grid;
+        gap: 0.15rem;
+        margin: 0.2rem 0;
+        padding: 0.35rem 0;
+        border-block: 1px solid var(--border);
+      }
+      .nav-menu-label {
+        margin: 0;
+        padding: 0.2rem 0.75rem 0.1rem;
+        color: var(--text-muted);
+        font-size: 0.82rem;
+        font-weight: 600;
+      }
+      .nav-menu-group > a {
+        padding-left: 1.4rem;
       }
       .nav-menu-panel > .button {
         display: none;

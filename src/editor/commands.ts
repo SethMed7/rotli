@@ -4,6 +4,7 @@
 // highlight = ==…== (always peach); bold/italic/strike native syntax.
 
 import { usePanesStore } from "../state/panes";
+import type { TextAlign } from "./alignedLine";
 import { CHOICE_MARK } from "./choiceState";
 import { parseChoiceControlLine, parseToggleLine } from "./controlState";
 import { ORDERED_MARKER_SOURCE } from "./listMarkers";
@@ -21,6 +22,8 @@ export interface EditorHandle {
   toggleMark(mark: InlineMark): void;
   setHeading(level: HeadingLevel): void;
   toggleBlock(kind: BlockToggle): void;
+  /** Align the selected paragraphs (textAlign.ts). Optional: Markdown only. */
+  setAlign?(align: TextAlign): void;
   /** Fold/unfold the section the caret sits in (2026-08-04). Optional so a
    * surface without folding (the Quick Note window) simply doesn't offer it. */
   toggleFold?(): void;

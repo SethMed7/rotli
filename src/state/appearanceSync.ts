@@ -21,6 +21,7 @@ import { readDocumentPdfPalette } from "../brand/pdfPalette";
 import { useBindingsStore } from "../keys/bindings";
 import type { Surface } from "../keys/registry";
 import { breveWritePdfPalette, emitAppearance, isTauri, onAppearance } from "../lib/tauri";
+import { applyAppearanceLookBroadcast, useAppearanceLook } from "./appearanceLook";
 import { useNoteStyleStore } from "./noteStyle";
 import { type AppearanceBroadcast, appearanceBroadcast, applyAppearanceBroadcast } from "./persist";
 import { useDataTheme } from "./theme";
@@ -46,6 +47,7 @@ export function startAppearanceBroadcast(emit: (payload: AppearanceBroadcast) =>
     useUiStore.subscribe(push),
     useBindingsStore.subscribe(push),
     useNoteStyleStore.subscribe(push),
+    useAppearanceLook.subscribe(push),
   ];
   return () => {
     for (const unsub of unsubs) unsub();
@@ -64,7 +66,10 @@ export function useAppearanceSync(surface: Surface): void {
 
   useEffect(() => {
     if (surface === "main") return;
-    return onAppearance(applyAppearanceBroadcast);
+    return onAppearance((payload) => {
+      applyAppearanceBroadcast(payload);
+      applyAppearanceLookBroadcast(payload.app);
+    });
   }, [surface]);
 
   useEffect(() => {
