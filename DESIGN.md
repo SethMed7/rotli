@@ -369,19 +369,27 @@ polish work.
 
 ## First-run setup
 
-- First-run setup is one resumable sequence: app preferences, an explicit vault
-  decision, then optional model configuration. Skipping app preferences still
-  lands on the vault decision; skipping models is allowed. A successful vault
+- First-run setup is four screens (the owner, 2026-10-01, after testers' "too
+  many steps before I can use the app"): **you** (an optional name and a
+  theme, mode, and accent), **your vault** (an explicit decision), **the
+  Librarian** (where it thinks), and **your shortcuts**. Then the thank-you
+  card, the tour, and a note beside Settings naming what else is there.
+  Everything else waits where it is used: the window behavior and the quokka's
+  look in Settings, music in the sidebar player (shown from the first run,
+  quiet until Play), and chat models the first time Chat has none. Skipping
+  the first screen still lands on the vault decision. A successful vault
   switch keeps the native shell alive and rebinds vault-owned state in place,
-  so the machine-level checkpoint resumes on model configuration instead of
+  so the machine-level checkpoint resumes on the Librarian instead of
   repeating or silently finishing setup.
+- A new install lives in the Dock and stays open like any app (testers lost
+  a menu-bar-only app mid-setup); it is in the Dock from the first screen on,
+  and the menu-bar visitor remains a choice in Settings → General.
 - The companion character appears directly on the ground, without a card, on
   every setup and activation state. Its state entrance is short and one-shot.
-  First-run Appearance offers the optional companion mode and the same body
-  palette and accessory choice as the full Appearance studio. Thoughtful,
-  walking, listening, and gentle-attention
-  expressions give later steps and empty states semantic variety rather than
-  repeating one neutral pose everywhere.
+  Setup's quokka is the plain one; dressing it is a Settings choice. Waving,
+  knowledge, listening, and gentle-attention expressions give the screens and
+  empty states semantic variety rather than repeating one neutral pose
+  everywhere.
   Welcome may keep two partly hidden edge companions visible while a slow,
   low-opacity pair alternates positions; reduced motion keeps two static.
   Scanning may use a bounded loading indicator while work is active.
@@ -390,8 +398,8 @@ polish work.
   and arrow shortcuts work from the quiet setup canvas before a card owns
   focus. Real inputs and controls keep their own keys. The current `⌘Enter`
   binding is rendered inside the primary button it activates.
-- Progress uses one six-step count across preferences, vault, and models; a
-  component boundary must never restart the denominator. Quiet edge companions
+- Progress uses one four-screen count across you, vault, the Librarian, and
+  shortcuts; a component boundary must never restart the denominator. Quiet edge companions
   persist across the complete sequence, alternate in slow overlapping pairs,
   and ease fully in and out instead of snapping at the viewport edge.
 - Vault selection is required even in development. A development fallback may
@@ -407,12 +415,12 @@ polish work.
   and ordinary folders beneath Home remain valid. Finder is an explicit reveal
   action; **More locations…** is the deliberate native-picker fallback for
   external volumes and locations outside the contained Home session.
-- Model setup distinguishes on-device installs from connected subscription
-  CLIs. Installing or connecting is always explicit, connected lanes are named
+- Chat's model chooser (the first time Chat has no model that can answer)
+  distinguishes on-device installs from connected subscription CLIs. Installing or connecting is always explicit, connected lanes are named
   as remote, unavailable CLIs show actionable setup guidance, and the user can
   finish with no model because the vault remains useful on its own. Every local
   model already registered on the Mac is reusable without another download;
-  the setup surface lists installed models, supports an explicit default,
+  the chooser lists installed models, supports an explicit default,
   confirms removal, and offers the curated install catalog individually.
   Local, installable, and subscription controls use progressive disclosures so
   only one decision set is open at a time. Any clipped model content carries a
@@ -420,10 +428,13 @@ polish work.
   Disclosure controls use the shared chrome chevron, while model rows use the
   approved provider or model-family mark and reserve a neutral fallback only
   for genuinely unknown local families.
-- Back is one real, remappable command throughout first run. Every step after
-  Welcome renders its current chord, and invoking it returns one logical step:
-  model setup to vault, vault substate to its chooser, and the chooser to
-  Shortcuts. A decorative arrow must never imply an unregistered shortcut.
+- Back is one real, remappable command throughout first run. Every screen
+  after the first renders its current chord, and invoking it returns one
+  logical step: shortcuts to the Librarian, the Librarian to the vault, vault
+  substate to its chooser, and the chooser to the first screen.
+- The shortcuts screen reads as changeable: each shortcut's button shows its
+  keys and a Change label, recording says how to finish or cancel, a changed
+  one offers its default back, and the copy names Settings → Hotkeys. A decorative arrow must never imply an unregistered shortcut.
 - The onboarding frame does not move between steps: progress stays at the top
   and Skip, Back, and Continue/Finish stay in one fixed footer position. A
   content-heavy step scrolls only its middle stage rather than pushing the

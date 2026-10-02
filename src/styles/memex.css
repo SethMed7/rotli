@@ -3397,6 +3397,24 @@ body:has(.document-editor) [role="dialog"][class*="univer-"] input:disabled {
   margin-top: 12px;
   padding: 0;
 }
+/* the Mac's model chooser under the welcome (chatModelChoices.tsx): a quiet
+   section heading, not a second welcome title */
+.chat-models-title {
+  margin: 0 0 4px;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 650;
+}
+.chat-models-lede {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.chat-models-actions {
+  display: flex;
+  margin-top: 12px;
+}
 .chat-welcome-actions {
   display: grid;
   width: min(100%, 700px);

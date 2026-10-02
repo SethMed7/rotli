@@ -46,12 +46,3 @@ export function forgetTabMedia(tabId: string): void {
 export function setInAppMedia(inApp: boolean): void {
   if (useTabMedia.getState().inApp !== inApp) useTabMedia.setState({ inApp });
 }
-
-/** A preview from setup's Sound step (the owner, 2026-09-30: "offer play
- * buttons for them to preview, but the actual audio won't start till they
- * finish onboarding"): the one source that may sound before setup is done. */
-export const useAmbientPreview = create<{ track: string | null }>(() => ({ track: null }));
-
-export function setAmbientPreview(track: string | null): void {
-  if (useAmbientPreview.getState().track !== track) useAmbientPreview.setState({ track });
-}

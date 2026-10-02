@@ -39,14 +39,7 @@ import {
   type TabMediaAction,
   type TabMediaState,
 } from "../lib/tauri";
-import {
-  forgetTabMedia,
-  setInAppMedia,
-  setTabMedia,
-  useAmbient,
-  useAmbientPreview,
-  useTabMedia,
-} from "../state/ambient";
+import { forgetTabMedia, setInAppMedia, setTabMedia, useAmbient, useTabMedia } from "../state/ambient";
 import { useMediaDock } from "../state/mediaDock";
 import { usePanesStore } from "../state/panes";
 import { leaves } from "../state/paneTree";
@@ -84,7 +77,7 @@ function pauseOwn(): void {
   audio.pause();
 }
 
-/** Whether only setup's preview sounds (it never changes the saved choice). */
+/** Setup is on screen: nothing sounds, and nothing changes the saved choice. */
 const previewing = () =>
   setupShows(isTauri(), import.meta.env.DEV, window.location.search, useUiStore.getState().onboarded);
 
@@ -189,14 +182,11 @@ function reconcileFm(wantsPlay: boolean, force = false): void {
 
 // ── the rules, applied ─────────────────────────────────────────────────────
 
-/** What ambient does right now. Before setup is done only a preview from the
- * Sound step sounds; the chosen music starts once setup finishes. */
+/** What ambient does right now. Nothing sounds during setup; the player
+ * waits in the sidebar for the person to press Play. */
 function ambientNow(): { prefs: AmbientPrefs; plays: boolean } {
   const { prefs } = useAmbient.getState();
-  if (previewing()) {
-    const preview = useAmbientPreview.getState().track;
-    return { prefs: { ...prefs, enabled: !!preview, track: preview ?? prefs.track }, plays: !!preview };
-  }
+  if (previewing()) return { prefs: { ...prefs, enabled: false }, plays: false };
   const { media, recent, inApp } = useTabMedia.getState();
   return { prefs, plays: playerView(prefs, media, recent, inApp).ambientPlays };
 }
@@ -338,8 +328,7 @@ export function startAmbient(): () => void {
   const unsubscribe = [
     useAmbient.subscribe(applyAmbient),
     useTabMedia.subscribe(applyAmbient),
-    useAmbientPreview.subscribe(applyAmbient),
-    // finishing setup starts the music chosen in it
+    // finishing setup lets the player's music be heard
     useUiStore.subscribe((state, prev) => {
       if (state.onboarded !== prev.onboarded) applyAmbient();
     }),
@@ -355,9 +344,8 @@ export function startAmbient(): () => void {
     });
   };
   loop();
-  // the chosen track is ready before the first press
-  const { prefs } = useAmbient.getState();
-  if (prefs.enabled && !isStream(prefs.track)) trackElement(prefs.track).load();
+  // nothing loads until Play: the player shows for everyone from the first
+  // run, and most launches never press it (the bundled track starts fast)
   applyAmbient();
   return () => {
     stopped = true;
@@ -405,6 +393,12 @@ export function toggleAmbient(): void {
 export function stopAmbient(): void {
   useAmbient.getState().setPrefs({ playing: false });
   if (audio) audio.currentTime = 0;
+}
+
+/** Put the player away (it stays in Settings → General → Ambient audio). */
+export function hideAmbient(): void {
+  stopAmbient();
+  useAmbient.getState().setPrefs({ enabled: false });
 }
 
 export function stepAmbient(step: 1 | -1): void {

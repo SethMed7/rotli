@@ -40,7 +40,10 @@ describe("the ambient preference", () => {
       expect(parseAmbient({ enabled: true, track: "dusk", playing: true, volume }).volume).toBe(
         DEFAULT_AMBIENT.volume,
       );
-    // a track this build doesn't ship falls back; only a real true turns it on
+    // the player shows by default, quiet; a saved "hidden" stays hidden
+    expect(DEFAULT_AMBIENT).toMatchObject({ enabled: true, playing: false });
+    expect(parseAmbient({ enabled: false }).enabled).toBe(false);
+    // a track this build doesn't ship falls back; only a real boolean is a choice
     expect(parseAmbient({ enabled: "yes", track: "../../etc", playing: 1, volume: 0.4 })).toEqual(
       DEFAULT_AMBIENT,
     );

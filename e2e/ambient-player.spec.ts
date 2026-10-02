@@ -1,6 +1,6 @@
 // Ambient audio and the sidebar player (2026-09-28; docs/design/ambient-audio.md).
-// Turning Ambient audio on in Settings puts the player right above the
-// sidebar's footer with the ambient track. What browser tabs play is read
+// The player sits right above the sidebar's footer from the first run, quiet
+// until Play (2026-10-01); Settings turns it off and on. What browser tabs play is read
 // from WebKit in the Mac app only (this build's tabs are always silent), so
 // the tab half is proved by the unit tests and a native check.
 
@@ -8,9 +8,23 @@ import { expect, test } from "@playwright/test";
 
 import { gotoApp } from "./support";
 
-test("Ambient audio: turned on in Settings, the player sits above the footer", async ({ page }) => {
+test("the player is there from the start, above the footer; hidden, Settings brings it back", async ({
+  page,
+}) => {
   await gotoApp(page);
-  await expect(page.getByRole("region", { name: "Now playing" })).toHaveCount(0);
+  const player = page.getByRole("region", { name: "Now playing" });
+  // shown by default, quiet (the owner, 2026-10-01)
+  await expect(player).toBeVisible();
+  await expect(player.getByRole("button", { name: "Play", exact: true })).toBeVisible();
+  // right above the footer
+  const [playerBox, footerBox] = await Promise.all([
+    player.boundingBox(),
+    page.locator(".sb-foot").boundingBox(),
+  ]);
+  expect(playerBox && footerBox && playerBox.y + playerBox.height <= footerBox.y + 1).toBe(true);
+
+  await player.getByRole("button", { name: "Hide the player" }).click();
+  await expect(player).toHaveCount(0);
 
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   const toggle = page.getByRole("switch", { name: /Ambient audio/ });
@@ -20,7 +34,6 @@ test("Ambient audio: turned on in Settings, the player sits above the footer", a
   await page.getByRole("button", { name: "Dusk", exact: true }).click();
   await page.getByRole("button", { name: "Back to notes", exact: true }).click();
 
-  const player = page.getByRole("region", { name: "Now playing" });
   // the chosen sound's name shows at the sidebar's usual width
   const chosen = player.locator(".sb-player-source span");
   await expect(chosen).toBeVisible();
@@ -29,21 +42,11 @@ test("Ambient audio: turned on in Settings, the player sits above the footer", a
   await expect(chosen).toHaveText("Lamplight");
   // nothing in a tab: no tab to open, no ambient toggle waiting on the left
   await expect(player.getByRole("button", { name: "Open the tab" })).toHaveCount(0);
-
-  // right above the footer
-  const [playerBox, footerBox] = await Promise.all([
-    player.boundingBox(),
-    page.locator(".sb-foot").boundingBox(),
-  ]);
-  expect(playerBox && footerBox && playerBox.y + playerBox.height <= footerBox.y + 1).toBe(true);
 });
 
 // 2026-09-28, the owner: "choose my ambient song in the media player".
 test("the player's title picks the ambient sound: any track, or Claude FM", async ({ page }) => {
   await gotoApp(page);
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await page.getByRole("switch", { name: /Ambient audio/ }).click();
-  await page.getByRole("button", { name: "Back to notes", exact: true }).click();
 
   const player = page.getByRole("region", { name: "Now playing" });
   await player.getByRole("button", { name: /^Choose the ambient sound/ }).click();
@@ -77,10 +80,13 @@ test("the player's title picks the ambient sound: any track, or Claude FM", asyn
 // again), and ⌘K → Stop all sound silences everything the player can reach.
 test("the ambient element can't be orphaned, and Stop all sound silences it", async ({ page }) => {
   await gotoApp(page);
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await page.getByRole("switch", { name: /Ambient audio/ }).click();
-  await page.getByRole("button", { name: "Back to notes", exact: true }).click();
-  await expect(page.getByRole("region", { name: "Now playing" })).toBeVisible();
+  const shown = page.getByRole("region", { name: "Now playing" });
+  await expect(shown).toBeVisible();
+  // nothing loads until Play (the player shows for everyone from the first run)
+  expect(await page.evaluate(() => !!(window as { __rotliAmbientAudio?: unknown }).__rotliAmbientAudio)).toBe(
+    false,
+  );
+  await shown.getByRole("button", { name: "Play", exact: true }).click();
   await expect
     .poll(() => page.evaluate(() => !!(window as { __rotliAmbientAudio?: unknown }).__rotliAmbientAudio))
     .toBe(true);
@@ -102,7 +108,6 @@ test("the ambient element can't be orphaned, and Stop all sound silences it", as
 test("your own YouTube station: added in Settings, picked from the player", async ({ page }) => {
   await gotoApp(page);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await page.getByRole("switch", { name: /Ambient audio/ }).click();
   const linkField = page.getByRole("textbox", { name: "YouTube link" });
   await linkField.fill("https://vimeo.com/123");
   await page.getByRole("button", { name: "Add", exact: true }).click();

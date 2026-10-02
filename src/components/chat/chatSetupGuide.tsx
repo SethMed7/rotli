@@ -1,14 +1,16 @@
 // The chat's empty state when no model can answer: instead of a dead send
-// button, the same walkthrough the Settings lane cards show — install, sign
-// in, come back — for each connected tool the user has switched on, with a
-// door to Settings for the rest.
+// button, a way in. The Mac app offers the full chooser (models on this Mac,
+// installing one, connecting a client); the web, the walkthrough the Settings
+// lane cards show for each connected tool, with a door to Settings.
 
 import { useQueries } from "@tanstack/react-query";
 
 import { PROVIDER_LABELS, type ProviderId } from "../../ai/models";
+import { PLATFORM } from "../../lib/featurePolicy";
 import { canDetectConnectors, connectorDetectionQuery } from "../../services/connectorSetup";
 import { useUiStore } from "../../state/ui";
 import { ConnectorGuide } from "../settings/connectorGuide";
+import { ChatModelChoices } from "./chatModelChoices";
 
 const LANES: readonly ProviderId[] = ["claude", "codex", "cursor"];
 
@@ -20,6 +22,12 @@ export function ChatSetupGuide({
   secureOnly?: boolean;
   onOpenSettings: () => void;
 }) {
+  // the Mac app offers every way in, local models first (chatModelChoices.tsx)
+  if (!secureOnly && PLATFORM !== "web") return <ChatModelChoices onOpenSettings={onOpenSettings} />;
+  return <LaneGuide secureOnly={secureOnly} onOpenSettings={onOpenSettings} />;
+}
+
+function LaneGuide({ secureOnly, onOpenSettings }: { secureOnly: boolean; onOpenSettings: () => void }) {
   const aiProviders = useUiStore((s) => s.aiProviders);
   const enabledLanes = LANES.filter((id) => aiProviders[id]);
   const lanes = enabledLanes.length > 0 ? enabledLanes : ["claude" as ProviderId];

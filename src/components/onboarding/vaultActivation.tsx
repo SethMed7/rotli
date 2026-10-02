@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 
-import { setSetupHandle } from "../../keys/handles";
 import {
   corpusImportVaultCopy,
   corpusInspectFolder,
@@ -16,7 +15,7 @@ import { useUiStore } from "../../state/ui";
 import { requestVaultFolder } from "../../state/vaultFolderBrowser";
 import { Character } from "../character";
 import { OnboardingScenery } from "./onboardingScenery";
-import { SetupBack, SetupChoiceGroup, SetupPrimary } from "./setupControls";
+import { SetupBack, SetupChoiceGroup, SetupPrimary, useSetupHandle } from "./setupControls";
 
 type Stage = "choose" | "create" | "scanning" | "review";
 
@@ -167,10 +166,7 @@ export function VaultActivation({
 
   const primary = stage === "choose" ? () => void chooseIntent() : () => void activate();
   const goBack = stage === "choose" ? onBack : back;
-  useEffect(() => {
-    setSetupHandle({ continue: primary, ...(goBack ? { back: goBack } : {}) });
-    return () => setSetupHandle(null);
-  });
+  useSetupHandle(primary, goBack);
 
   return (
     <div className="onb vault-activation">

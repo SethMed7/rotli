@@ -181,6 +181,7 @@ export const SERVICE_FILE_OWNERS = {
   "templateCreate.ts": "/template → Create new: a note made the ordinary way, moved into Templates",
   "templates.ts": "the Templates folder rule, the built-in presets (which /template may offer)",
   "welcome.ts": "Welcome folder seeding and Main filing composition",
+  "firstRun.ts": "first run's finish: the window takes effect, welcome, thank-you, tour, Settings note",
   "webNotes.ts": "notes",
   "webTasks.ts": "Tasks projection outside the Mac app (the corpus.rs twin)",
   "importedVault.ts": "notes",

@@ -2492,7 +2492,9 @@ pub fn run() {
                     native_drag_promise::dump_drop_targets(&main.as_ref().window());
                 }
             }
-            // The visitor law: never in the dock, never in Cmd-Tab.
+            // Start as a menu-bar app; the person's settings decide the Dock
+            // (persist.ts applies showInDock at boot). A new install is in the
+            // Dock and stays open (2026-10-01); the visitor is a Settings choice.
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             #[cfg(all(target_os = "macos", debug_assertions))]

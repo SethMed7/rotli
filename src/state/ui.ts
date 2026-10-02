@@ -26,6 +26,7 @@ import type { NoteSummary } from "../types";
 import { DEFAULT_VOICE } from "../voice/speech";
 import { DEFAULT_ACCENT_HUE, DEFAULT_APPEARANCE } from "./appearanceDefaults";
 import type { Measure } from "./noteStyle";
+import type { OnboardingPhase } from "./onboardingPhase";
 import type { SidebarReveal, SidebarSide } from "./sidebarPlacement";
 import { systemPrefersDark } from "./systemScheme";
 import { SOLID_THEMES, type ThemeFamily } from "./themeChoices";
@@ -35,7 +36,7 @@ export type ThemeSetting = "light" | "dark" | "system";
 /** Every family is a deliberately tuned light/dark pair. The first two retain
  * Rotli's original environments; the others are optional personality layers. */
 export { THEME_FAMILIES, type ThemeFamily } from "./themeChoices";
-export type OnboardingPhase = "preferences" | "vault" | "models";
+export type { OnboardingPhase } from "./onboardingPhase";
 export type SyntaxPalette = "rotli" | "mono";
 
 /** The user's PRIMARY color (the maintainer, 2026-07-28): the active state, folder

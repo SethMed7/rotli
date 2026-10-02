@@ -29,17 +29,17 @@ again. With the setting off, the player shows only while something plays."
   might want it enabled but not listen to it now, or it's too high"). The
   studio track plays at the saved `volume` (0–1, default 0.4, the old fixed
   level; an older settings file without it reads as 0.4). A quiet slider sits
-  under the tracks in Settings and on setup's Sound step. Moving it fades to the
+  under the tracks in Settings. Moving it fades to the
   new level. Claude FM plays in its own page at that page's volume, so it gets
   no slider.
-- **Setup previews, then plays** (the owner, 2026-09-30: "offer play buttons
-  for them to preview, but the actual audio won't start till they finish
-  onboarding"). The Sound step's Studio music and Claude FM cards each carry a
-  small round preview button. During setup only a preview sounds
-  (`useAmbientPreview`); choosing music doesn't start it, and a preview stops
-  with the step. The music you picked starts the moment setup finishes, as
-  `ambientNow` in `services/ambient.ts` switches from preview-only to the
-  ordinary rules.
+- **The player is there from the first run** (the owner, 2026-10-01: "the
+  media player should pop up by default and the user can choose to hide or
+  choose music that way it's set up when the user is already in"). Ambient is
+  on by default and quiet: the player shows in the sidebar, nothing plays
+  until Play, its title picks the music, and **Hide the player** turns it off
+  (`hideAmbient`; Settings → General → Ambient audio brings it back). A saved
+  choice either way stands. Nothing sounds while setup is on screen
+  (`ambientNow` in `services/ambient.ts`).
 - A `play()` interrupted before it begins (an `AbortError`) is not a refusal:
   it leaves the saved "playing" preference alone, and a resolved `play()`
   re-applies the rules rather than fading up regardless (a stop during
@@ -160,16 +160,14 @@ playing and pausing is extremely laggy".
   set before WebKit answers, then two quick polls confirm it); ambient fades
   out over ~0.1 s and starts audible, ramping over ~0.3 s; tabs are asked every
   0.4 s while anything has media (1.5 s otherwise), one round at a time so
-  slow answers never pile up; the chosen track loads at launch.
+  slow answers never pile up; the track loads on the first Play (since
+  2026-10-01, when the player began showing for everyone).
 
-## In setup (2026-09-28, later)
+## In setup (2026-09-28; retired 2026-10-01)
 
-The owner: "have the music part be part of the onboarding for the app
-experience." Setup gains a **Sound** step between Window and Shortcuts
-(`src/components/onboarding/setupSound.tsx`, now step 4 of 7): Quiet, Studio
-music (the chosen theme's track, named on the card), or Claude FM (Mac only).
-Picking plays it at once, so the person hears the choice; Back and forth keeps
-it. Skip app setup returns ambient to its default, off, like the rest of setup.
+Setup had a Sound step (2026-09-28 to 2026-10-01). It went with the rest of
+the steps testers found too many: the player now shows from the first run
+instead, quiet, where the person picks music or hides it.
 
 ## Known limits
 

@@ -97,6 +97,7 @@ import { MIN_TABLE_COL_PX, MIN_TABLE_ROW_PX, noteIdOfWidthKey, useTableWidthsSto
 import { applyAccent, applySyntaxPalette, applyTheme } from "./theme";
 
 export { rescopeChatMapKeys } from "./chatMapKeys";
+import { type OnboardingPhase, onboardingPhaseOf } from "./onboardingPhase";
 import {
   ALL_NOTES,
   type BreveView,
@@ -338,7 +339,7 @@ interface PersistedSettings {
   /** The version whose What's new the user has seen (lib/whatsNew). */
   lastSeenVersion: string;
   /** First-run checkpoint that survives a vault-selection relaunch. */
-  onboardingPhase: "preferences" | "vault" | "models";
+  onboardingPhase: OnboardingPhase;
   /** The Quick Note window's capped set, remembered note, and new-note folder
    * (the maintainer, 2026-06-15). */
   quickNoteIds: string[];
@@ -651,10 +652,7 @@ export function parseSettings(raw: string): PersistedSettings {
     onboarded: typeof data.onboarded === "boolean" ? data.onboarded : Object.keys(data).length > 0,
     onboardingVersion: typeof data.onboardingVersion === "string" ? data.onboardingVersion : "",
     lastSeenVersion: typeof data.lastSeenVersion === "string" ? data.lastSeenVersion : "",
-    onboardingPhase:
-      data.onboardingPhase === "vault" || data.onboardingPhase === "models"
-        ? data.onboardingPhase
-        : "preferences",
+    onboardingPhase: onboardingPhaseOf(data.onboardingPhase),
     quickNoteIds,
     captureOrder,
     quickActiveId,

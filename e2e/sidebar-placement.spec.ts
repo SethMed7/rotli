@@ -201,6 +201,8 @@ test("the app frame never scrolls sideways", async ({ page }) => {
 // was clicked. It opens on the pointer's other side instead.
 test("on the right edge a context menu opens leftward, ending at the pointer", async ({ page }) => {
   await gotoApp(page);
+  // the music player (shown from the first run) takes sidebar room this test measures
+  await page.getByRole("button", { name: "Hide the player" }).click();
   await openAppearance(page);
   await page.getByRole("button", { name: "Right", exact: true }).click();
   await backToNotes(page);
@@ -235,6 +237,8 @@ test("on the right edge a context menu opens leftward, ending at the pointer", a
 // on hover" — the sidebar must actually change mode: leave the flow and close.
 test("the sidebar's own menu always offers the other reveal, and picking it switches", async ({ page }) => {
   await gotoApp(page);
+  // the music player (shown from the first run) takes sidebar room this test measures
+  await page.getByRole("button", { name: "Hide the player" }).click();
   await expect(page.locator(".rail-wrap aside.sidebar")).toBeVisible();
   const menu = page.locator(".ctxmenu");
   const box = (await page.locator("aside.sidebar").boundingBox())!;

@@ -64,7 +64,7 @@ export function librarianOptions(
   return offered;
 }
 
-/** The default the Models step proposes: Gemini when it is signed in on this
+/** The default the Librarian screen proposes: Gemini when it is signed in on this
  * Mac (the maintainer's preference), else whatever is chosen already. */
 export function suggestedLibrarian(
   detections: Partial<Record<ProviderId, CliDetect>>,

@@ -40,7 +40,10 @@ describe("onboarding checkpoint", () => {
   test("survives a vault-selection relaunch and rejects unknown phases", () => {
     expect(parseSettings("{}").onboardingPhase).toBe("preferences");
     expect(parseSettings('{"onboardingPhase":"vault"}').onboardingPhase).toBe("vault");
-    expect(parseSettings('{"onboardingPhase":"models"}').onboardingPhase).toBe("models");
+    expect(parseSettings('{"onboardingPhase":"librarian"}').onboardingPhase).toBe("librarian");
+    expect(parseSettings('{"onboardingPhase":"shortcuts"}').onboardingPhase).toBe("shortcuts");
+    // setup before 2026-10-01 ended on Models (models + the Librarian): it resumes at the Librarian
+    expect(parseSettings('{"onboardingPhase":"models"}').onboardingPhase).toBe("librarian");
     expect(parseSettings('{"onboardingPhase":"workspace"}').onboardingPhase).toBe("preferences");
   });
 });
