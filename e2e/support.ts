@@ -17,6 +17,22 @@ export async function gotoApp(page: Page): Promise<void> {
   await page.getByRole("tablist").waitFor();
 }
 
+/** Set Appearance → Theme button to All 14 through the real control, so a
+ * spec can walk every environment with the titlebar sun (its default flips
+ * light and dark inside one family), then come back to the notes. */
+export async function cycleEveryTheme(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  await page.getByRole("button", { name: "All 14", exact: true }).click();
+  await page.getByRole("button", { name: "Back to notes", exact: true }).click();
+}
+
+/** The environment the titlebar sun names as current ("Theme — Paper · click
+ * for Charcoal" → "Paper"). */
+export function themeNow(label: string | null): string {
+  return (label ?? "").replace(/^Theme — /, "").split(" · ")[0] ?? "";
+}
+
 /** Drive the app's ONE pointer-drag gesture (src/lib/pointerDrag.ts) — real
  * mouse events, not HTML5 DnD, because HTML5 drag is dead in the macOS
  * WKWebView shell the app ships in, so the app never listens for it. Presses

@@ -29,6 +29,7 @@ import { type DragGhost, createImageDragGhost } from "../lib/dragGhost";
 import { VIDEO_EXTS, extOf } from "../lib/fileKind";
 import { resolveImageSrc, rootIdOf } from "../lib/tauri";
 import { locateLostImage } from "../services/imageRepair";
+import { ALIGN_CLOSE, parseAlignedLine } from "./alignedLine";
 import { ChoiceAlignWidget } from "./choiceAlignWidget";
 import { selectChoiceGroup } from "./choiceState";
 import { choiceGroupAlign, isControlLiteral } from "./controlState";
@@ -1126,9 +1127,20 @@ function build(view: EditorView): {
           hidePrefix(ls, prefixEnd, null, decos, atomics);
           scanInline(content, contentBase, sel, decos, atomics);
           break;
-        case "para":
-          scanInline(text, ls, sel, decos, atomics);
+        case "para": {
+          // <p align="center">…</p>: the tags are markers (hidden until the
+          // caret is in the line); the line aligns and its Markdown renders
+          const aligned = parseAlignedLine(text);
+          if (!aligned) {
+            scanInline(text, ls, sel, decos, atomics);
+            break;
+          }
+          decos.push(Decoration.line({ class: `rotli-align rotli-align-${aligned.align}` }).range(ls));
+          revealablePrefix(ls, ls + aligned.open, lineTouched, decos, atomics);
+          revealablePrefix(line.to - ALIGN_CLOSE.length, line.to, lineTouched, decos, atomics);
+          scanInline(aligned.inner, ls + aligned.open, sel, decos, atomics);
           break;
+        }
         case "blank":
           break;
       }
