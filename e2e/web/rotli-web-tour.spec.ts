@@ -6,6 +6,7 @@
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { themeNow } from "../support";
 import { startWithVault } from "./support";
 
 test.use({ viewport: { width: 1280, height: 820 } });
@@ -74,7 +75,7 @@ test("every major web surface opens without a console error or a failed request"
   await page.setViewportSize({ width: 1280, height: 820 });
   for (let step = 0; step < 14; step += 1) {
     const toggle = page.getByRole("button", { name: /^Theme — / });
-    if (/Dark/.test((await toggle.getAttribute("aria-label")) ?? "")) break;
+    if (/Dark/.test(themeNow(await toggle.getAttribute("aria-label")))) break;
     await toggle.click();
   }
   await row("Welcome to Rotli").click();

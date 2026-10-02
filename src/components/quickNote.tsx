@@ -24,15 +24,14 @@ import { toggleNoteSecure } from "../keys/noteProtectionActions";
 import { QUICK_PICK_ROWS } from "../keys/quickNoteActions";
 import { hotkeyPeekDelay, useHeldModifier } from "../keys/useHeldModifier";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
-import { subsequenceMatch } from "../lib/fuzzy";
 import { useTransientPopover } from "../lib/popover";
-import { pickableNotes, quickNoteTitle } from "../lib/quickNoteList";
+import { pickerResults, pickerStatus, quickNoteTitle } from "../lib/quickNoteList";
 import { corpusFrontmatter, emitQuickCreated, isTauri, onQuickShow, startWindowDrag } from "../lib/tauri";
 import { fileQuickNoteInMain } from "../newItems/composition";
 import { createVaultCapture } from "../services/captureRouting";
 import { createRoutedNote } from "../services/createNote";
 import { isChatsPath, isVault, isWikiPath } from "../services/destinations";
-import { invalidateNotes, useSearchableNotes } from "../services/hooks";
+import { invalidateNotes, useLiveNoteSearch, useSearchableNotes } from "../services/hooks";
 import { inboxFolderId, notesService } from "../services/notes";
 import { usePanesStore } from "../state/panes";
 import { pruneQuick, setQuickActive, togglePinQuick } from "../state/quick";
@@ -68,10 +67,12 @@ function StarGlyph({ filled }: { filled: boolean }) {
   );
 }
 
-/** The picker (⌘P): search ALL notes; click a row to OPEN it, click the star to
- * pin/unpin it to quick access. Favorites float to the top. */
+/** The picker (⌘P): search ALL notes — titles instantly, then note text
+ * through the full-text engine; click a row to OPEN it, click the star to
+ * pin/unpin it to quick access. Favorites float to the top of an empty query. */
 function NotePicker({
   notes,
+  notesReady,
   pinned,
   activeId,
   onOpen,
@@ -80,6 +81,8 @@ function NotePicker({
   rowsRef,
 }: {
   notes: NoteSummary[];
+  /** Every listing has loaded — until then the list is not the whole vault. */
+  notesReady: boolean;
   pinned: Set<string>;
   activeId: string | null;
   onOpen: (id: string) => void;
@@ -94,14 +97,12 @@ function NotePicker({
   // Esc (quick.dismiss) + outside-click close the picker before the window
   useTransientPopover([panelRef], true, onClose);
 
-  const results = useMemo(() => {
-    const q = query.trim();
-    const matched = notes.filter((n) => subsequenceMatch(q, n.title) || subsequenceMatch(q, n.snippet));
-    // pinned favorites first, then the rest — both filtered by the query
-    const fav = matched.filter((n) => pinned.has(n.id));
-    const rest = matched.filter((n) => !pinned.has(n.id));
-    return [...fav, ...rest].slice(0, 60);
-  }, [notes, query, pinned]);
+  const search = useLiveNoteSearch(query);
+  const results = useMemo(
+    () => pickerResults({ notes, query, pinned, hits: search.hits }),
+    [notes, query, pinned, search.hits],
+  );
+  const status = pickerStatus({ query, rows: results.length, notesReady, search: search.state });
   const sel = Math.min(index, Math.max(0, results.length - 1));
   useEffect(() => {
     rowsRef.current = results;
@@ -167,7 +168,11 @@ function NotePicker({
             </div>
           );
         })}
-        {results.length === 0 && <div className="qsempty">No notes match.</div>}
+        {status && (
+          <div className="qsempty" role="status">
+            {status}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -182,7 +187,6 @@ export function QuickNote() {
   // garbage). useNotes() alone missed staged notes (the search audit's P0).
   const universe = useSearchableNotes();
   const notes = useMemo(() => universe.notes.filter((n) => n.kind !== "board"), [universe.notes]);
-  const pickable = useMemo(() => pickableNotes(notes), [notes]);
   const byId = useMemo(() => new Map(notes.map((n) => [n.id, n])), [notes]);
   const [pickerOpen, setPickerOpen] = useState(false);
   // hold ⌘ to see this window's shortcuts — the main window's peek, scoped here
@@ -437,7 +441,8 @@ export function QuickNote() {
 
       {pickerOpen && (
         <NotePicker
-          notes={pickable}
+          notes={notes}
+          notesReady={universe.ready}
           pinned={new Set(ids)}
           activeId={activeId}
           onOpen={(id) => {

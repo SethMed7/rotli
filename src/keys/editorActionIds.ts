@@ -14,4 +14,7 @@ export const EDITOR_ACTION = {
   bulletList: "editor.bulletList",
   numberedList: "editor.numberedList",
   checklist: "editor.checklist",
+  alignLeft: "editor.alignLeft",
+  alignCenter: "editor.alignCenter",
+  alignRight: "editor.alignRight",
 } as const;

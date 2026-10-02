@@ -813,47 +813,61 @@
   pointer-events: none;
 }
 
+/* The scroll-to-top arrow (#6, 2026-10-02): a small, quiet control that sits
+   centered in the corner's 42px slot — the Librarian pill and
+   scrollTopLane.ts still measure that slot, so nothing beside it moves. At
+   rest it is a muted glyph on the ground with a faint hairline; hover and
+   keyboard focus bring the full hairline and the text color, and focus keeps
+   the global accent ring. Flat, like every surface: no shadow. */
 .editor-scroll-top {
   position: absolute;
-  right: 16px;
-  bottom: 16px;
+  right: 21px;
+  bottom: 21px;
   z-index: 4;
-  width: 42px;
-  height: 42px;
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--r-card);
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  border-radius: var(--r-control);
   background: var(--ground);
-  color: var(--text);
+  color: var(--text-muted);
   cursor: pointer;
+  transition:
+    color var(--motion-exit) var(--motion-ease),
+    border-color var(--motion-exit) var(--motion-ease);
 }
-.editor-scroll-top:hover {
+.editor-scroll-top svg {
+  width: 14px;
+  height: 14px;
+}
+.editor-scroll-top:hover,
+.editor-scroll-top:focus-visible {
+  border-color: var(--border);
   background-image: linear-gradient(var(--hov), var(--hov));
+  color: var(--text);
 }
 /* A narrow editor: the centered format bar reaches the arrow's corner, so the
-   arrow rises above the bar (16px slot inset + 42px bar + 8px gap) —
-   scrollTopLane.ts decides. */
+   arrow rises above the bar (16px slot inset + 42px bar + 8px gap, then
+   re-centered in the slot) — scrollTopLane.ts decides. */
 .editor[data-lift-scroll-top] .editor-scroll-top {
-  bottom: 66px;
+  bottom: 71px;
 }
-/* the Quick Note's small window: a compact arrow tucked in the corner beside
-   the bar (scrollTopLane.ts QUICK_LANE_PX), not a big box over the text */
+/* the Quick Note's small window: a smaller arrow tucked in the corner beside
+   the bar (scrollTopLane.ts QUICK_LANE_PX), centered where the 28px one sat */
 .quick-window .editor-scroll-top {
-  right: 10px;
-  bottom: 22px;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--r-control);
-  color: var(--text-muted);
+  right: 12px;
+  bottom: 24px;
+  width: 24px;
+  height: 24px;
 }
 .quick-window .editor-scroll-top svg {
-  width: 13px;
-  height: 13px;
+  width: 12px;
+  height: 12px;
 }
 .quick-window .editor[data-lift-scroll-top] .editor-scroll-top {
-  bottom: 58px;
+  bottom: 60px;
 }
 
 /* Raw Markdown is an intentional source editor, not an unstyled fallback.
@@ -947,6 +961,13 @@
   border-left: 3px solid var(--quote-bar);
   padding-left: 14px;
   color: var(--text-muted);
+}
+/* an aligned paragraph — <p align="center|right">…</p> (SYNTAX.md) */
+.rotli-cm-host .cm-line.rotli-align-center {
+  text-align: center;
+}
+.rotli-cm-host .cm-line.rotli-align-right {
+  text-align: right;
 }
 .rotli-cm-host .cm-line.rotli-li,
 .rotli-cm-host .cm-line.rotli-task,
@@ -1978,6 +1999,23 @@
 }
 .rotli-img:hover .rotli-img-resize {
   opacity: 1;
+}
+/* Appearance → Outline images: a hairline drawn just inside the frame, on its
+   own layer, so it keeps the image's radius, never shifts layout, and never
+   competes with the accent selection outline below (that one sits outside) */
+:root[data-outline-images="true"] .rotli-img::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+  pointer-events: none;
+}
+:root[data-outline-images="true"] .rotli-img.missing::after {
+  display: none;
+}
+:root[data-outline-images="true"] .rotli-img-resize {
+  z-index: 1;
 }
 /* click-selected image — the widget stays rendered; the outline marks the object */
 .rotli-img.sel img,

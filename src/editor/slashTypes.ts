@@ -19,6 +19,8 @@ export type SlashPickerMode =
 export type SlashOp =
   | { kind: "heading"; level: 1 | 2 | 3 }
   | { kind: "block"; block: BlockToggle }
+  /** Starts a centered or right-aligned paragraph (alignedLine.ts). */
+  | { kind: "align"; align: "center" | "right" }
   | { kind: "code" }
   | { kind: "table" }
   | { kind: "divider" }

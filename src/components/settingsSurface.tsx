@@ -156,6 +156,7 @@ import {
 import { AboutPane } from "./settings/aboutPane";
 import { AliasCleanupSettings } from "./settings/aliasCleanupSettings";
 import { AmbientSettings } from "./settings/ambientSettings";
+import { ImageOutlineSetting, ThemeCycleSettings } from "./settings/appearanceLookSettings";
 import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { ConnectorGuide } from "./settings/connectorGuide";
 import { FrontsSettings } from "./settings/frontsSettings";
@@ -1157,6 +1158,7 @@ function AppearancePane() {
           );
         })}
       </div>
+      <ThemeCycleSettings />
 
       <h4 className="sethead">Primary color</h4>
       <p className="lead">
@@ -1445,6 +1447,9 @@ function AppearancePane() {
         ]}
         onPick={(value) => useUiStore.setState({ boardBackground: value })}
       />
+
+      <h4 className="sethead">Images in notes</h4>
+      <ImageOutlineSetting />
 
       <h4 className="sethead">Markdown source</h4>
       <p className="lead">Choose the syntax colors used in Raw Markdown. This never changes the file.</p>
