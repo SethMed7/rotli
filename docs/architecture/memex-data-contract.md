@@ -456,6 +456,11 @@ The Rust corpus boundary independently validates every write.
 - Rotli owns identity/provenance facts such as `id`, `created`, `updated`, and
   `pinned`. `id` is the primary key and never changes; paths, filenames, titles,
   and aliases are selectors rather than identity.
+- `created` and `updated` are calendar days (`YYYY-MM-DD`), stamped with the
+  writer's own day. A day is never read as an hour: Rotli Web shows a note's
+  age from the file's own time when that time falls on the stamped day
+  (anywhere on Earth), and otherwise from local midnight of that day
+  (`stampToMs`, `src/memex/dates.ts`).
 - `aliases` is a human-editable string list with Rotli-maintained rename
   history. A title/file rename appends the prior title and useful filename
   stem; the list is append-only, except that a rename strips placeholder

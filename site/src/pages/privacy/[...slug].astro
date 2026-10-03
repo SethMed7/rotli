@@ -15,7 +15,7 @@ export function getStaticPaths() {
   return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
 }
 
-const UPDATED = 'October 1, 2026';
+const UPDATED = 'October 2, 2026';
 
 const toc = [
   { slug: 'short-version', text: 'The short version' },
@@ -205,10 +205,15 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   <h2 id="website">This website</h2>
   <p>
     rotli.co sets no cookies and runs no analytics, ads, or third-party scripts. Fonts, images, and the film
-    are served from this site. Two badges in the footer, from Launch Llama and Founder.best, are images loaded
-    from their own servers, so those services see a request from your browser when a page shows them. Our
-    hosting and DNS providers, Railway and Cloudflare, process standard request details such as your IP
+    are served from this site. The one exception is the Launch Llama badge in the footer, an image loaded
+    from Launch Llama's own server, so that service sees a request from your browser when a page shows it.
+    Our hosting and DNS providers, Railway and Cloudflare, process standard request details such as your IP
     address to deliver pages.
+  </p>
+  <p>
+    The footer's “Hear when it’s ready” list is optional. Only when you submit it, the address you type is
+    sent to Resend, our email provider, to keep the list. You can unsubscribe anytime, and nothing else is
+    collected or shared.
   </p>
   <p>
     <strong>Why:</strong> a site about keeping your work private shouldn't watch you read it.
@@ -294,7 +299,9 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   .access td[data-access='read'] {
     color: var(--text-muted);
   }
-  /* The story film's night: the dome of "on this Mac", on a starry frame above the policy. */
+  /* The story film's night: the dome of "on this Mac", on a starry frame above the policy.
+     The sky and its Ocean stars come from .band-night (Base.astro), like the landing's
+     PrivacyBrief; only the colour is set here, so the stars are never overridden. */
   .night {
     display: grid;
     gap: 1.5rem 2rem;
@@ -303,8 +310,7 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
     padding: clamp(1.75rem, 4vw, 3rem) clamp(1.5rem, 4vw, 3rem) 0;
     overflow: hidden;
     border-radius: var(--radius-frame);
-    background: var(--deep) url('/night-stars.svg');
-    background-size: 480px 480px;
+    background-color: var(--deep);
     color: var(--deep-text);
   }
   .night-caption {

@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, setSystemTime, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { relativeLabel } from "../lib/dateLabels";
 import { parseNoteDocument } from "../lib/frontmatter";
-import { today } from "../memex/contract";
+import { stampToMs, today } from "../memex/contract";
 import { DEST } from "./destinations";
 import { FolderNotesService } from "./folderNotes";
 import { MemoryVaultDir } from "./vaultDir";
@@ -413,5 +414,76 @@ describe("a plain folder of Markdown files", () => {
     expect(chat?.aliases?.[0]).toBe("planning");
     expect((await svc.listNotes()).some((n) => n.folderId === "chats")).toBe(false);
     expect((await svc.searchNotes("launch")).map((h) => h.folderId)).toEqual(["wiki"]);
+  });
+});
+
+/** A MemoryVaultDir whose stat reports a wall-clock write time (the browser
+ * adapter's `File.lastModified`) instead of the fake's ordering counter. */
+class WallClockVaultDir extends MemoryVaultDir {
+  private readonly written = new Map<string, number>();
+  constructor(private readonly writtenAt: number) {
+    super();
+  }
+  override async writeText(path: string, text: string): Promise<void> {
+    await super.writeText(path, text);
+    this.written.set(path, this.writtenAt);
+  }
+  override async stat(path: string) {
+    const stat = await super.stat(path);
+    const at = this.written.get(path);
+    return stat && at !== undefined ? { ...stat, lastModified: at } : stat;
+  }
+}
+
+/** Run `body` with the process time zone set to `tz`, restoring it after. */
+async function inZone(tz: string, body: () => Promise<void> | void): Promise<void> {
+  const before = process.env.TZ;
+  process.env.TZ = tz;
+  try {
+    await body();
+  } finally {
+    process.env.TZ = before;
+  }
+}
+
+describe("a note's age (date-only created/updated)", () => {
+  // 7:30pm on Oct 2 in New York is 23:30 UTC. The New York date read back as
+  // UTC midnight made a brand-new note look 23h old (4h at New York midnight).
+  const NOW = Date.UTC(2026, 9, 2, 23, 30);
+  beforeEach(() => setSystemTime(new Date(NOW)));
+  afterEach(() => setSystemTime());
+  const ZONES = ["America/New_York", "UTC", "Asia/Tokyo", "Pacific/Kiritimati", "Pacific/Pago_Pago"];
+
+  test("a brand-new note reads “just now” in every time zone", async () => {
+    for (const tz of ZONES) {
+      await inZone(tz, async () => {
+        const dir = new WallClockVaultDir(NOW);
+        const notes = new FolderNotesService(dir);
+        const note = await notes.createNote(DEST.inbox, "# Fresh\n");
+        const path = (await notes.listNotes()).find((n) => n.id === note.id)?.diskFolderId ?? "";
+        const fm = parseNoteDocument(await dir.readText(path ? `${path}/fresh.md` : "fresh.md")).frontmatter;
+        expect(fm?.created).toMatch(/^\d{4}-\d{2}-\d{2}$/); // the date-only contract holds
+        expect(relativeLabel(note.updatedAt, NOW)).toBe("just now");
+        expect(relativeLabel(note.createdAt, NOW)).toBe("just now");
+      });
+    }
+  });
+
+  test("a new note is stamped with the writer's own calendar day", async () => {
+    await inZone("Asia/Tokyo", () => {
+      // 23:30 UTC on Oct 2 is already Oct 3 in Tokyo
+      expect(today(new Date(NOW))).toBe("2026-10-03");
+    });
+  });
+
+  test("without a trustworthy file time, a date-only stamp is that local day", async () => {
+    await inZone("Asia/Tokyo", () => {
+      // a copied file: its mtime (here 1970) says nothing about the stamped day
+      expect(stampToMs("2026-09-30", 3)).toBe(new Date(2026, 8, 30).getTime());
+      expect(new Date(stampToMs("2026-09-30", 3) ?? 0).getDate()).toBe(30);
+      expect(stampToMs("2026-09-30T10:00:00Z", 3)).toBe(Date.UTC(2026, 8, 30, 10));
+      expect(stampToMs("2026-13-40", 3)).toBeNull();
+      expect(stampToMs("", 3)).toBeNull();
+    });
   });
 });

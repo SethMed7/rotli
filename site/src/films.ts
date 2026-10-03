@@ -11,6 +11,8 @@ export type Film = {
   label: string;
   /** No soundtrack: the player offers a replay, never sound. */
   silent?: true;
+  /** Captions burned into a band along the bottom (the player keeps its controls above it). */
+  captioned?: true;
 };
 export type Episode = Film & { n: number; title: string; thumb: string };
 
@@ -23,6 +25,7 @@ export const hero: Film = {
   src: '/media/hero/rotli-hero.mp4',
   poster: '/media/hero/rotli-hero-poster.webp',
   silent: true,
+  captioned: true,
   label:
     'A screen recording of rotli, under a minute, without sound: a quick messy note with two tasks, a dropped picture of tiles, and a link to the Lisbon trip note; the Library, where the Librarian files notes into areas such as Travel; a search for "tile" that finds the note again; a chat asking what is still open for Lisbon, answered from those notes; and the same note as plain Markdown.',
 };
@@ -49,6 +52,6 @@ export const episodes: Episode[] = [
   episode(4, 'ep04-yours', 'Make it yours.', 'six themes in light and dark, and a companion quokka in seven colors with glasses or a bucket hat, or turned off.'),
   episode(5, 'ep05-librarian', 'A Librarian that files, never rewrites.', 'with the Librarian on, a new note gets tags, a summary, links, and a place in the Library while its words stay unchanged.'),
   episode(6, 'ep06-chat', 'Ask your notes.', 'chat answers from the notes in the vault, keeps Conversation notes after every reply, and files a PDF beside the chat.'),
-  episode(7, 'ep07-secure', 'AI is invited in. It does not own the house.', 'no account or tracking, AI off or on your Mac or your own tools, secure notes that remote models never see, and locked notes no model can edit.'),
+  episode(7, 'ep07-secure', 'Some notes never leave this Mac.', 'no account or tracking, AI off or on your Mac or your own tools, secure notes that remote models never see, and locked notes no model can edit.'),
   episode(8, 'ep08-web', 'Your folder, in your browser.', 'Rotli Web opens a folder on your computer in Chrome, Edge, or Arc; Rotli Helper brings Firefox, Zen, and Brave; the Mac app and the browser share the same folder.'),
 ];
