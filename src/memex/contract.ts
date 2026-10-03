@@ -91,12 +91,8 @@ export interface ChatArtifactTurn {
   artifacts: ChatArtifact[];
 }
 
-// ── dates (mirror conversations.ts `today`) ──────────────────────────────────
-// conversations.ts stamps YYYY-MM-DD in the home tz. The composition helpers take
-// an explicit `date` so they stay pure/testable; the service passes today().
-const TZ = "America/New_York";
-export const today = (now: Date = new Date(), tz: string = TZ): string =>
-  new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(now);
+// ── dates (src/memex/dates.ts) ──────────────────────────────────────────────
+export { stampToMs, today } from "./dates";
 
 // ── chat slug (byte-identical to conversations.ts) ───────────────────────────
 export const slugify = (s: string): string =>
