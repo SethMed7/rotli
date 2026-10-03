@@ -1,10 +1,9 @@
 // the maintainer, 2026-07-28: "I should be able to close all tabs and have an empty
 // state which uses one of my quokkas" — the lone pane goes empty instead of
 // silently refusing the close, and the rest-state actions lead back in. Since
-// the appearance studio landed, the quokka companion is opt-in
-// (quokkaCompanionEnabled defaults to false), so a fresh profile shows the
-// rest state — since 2026-09-29 a small scene that matches the theme, with the
-// person's own quokka in it either way.
+// 2026-09-29 the rest state is a small scene that matches the theme; since
+// 2026-10-02 it holds no quokka (full-body quokkas live in Chat, Settings, and
+// setup only).
 
 import { expect, test } from "@playwright/test";
 
@@ -33,10 +32,9 @@ test("closing every tab shows the rest state, and reopen brings the tab back", a
   const empty = page.locator(".pane-empty");
   await expect(empty).toBeVisible();
   await expect(empty.getByText("All clear")).toBeVisible();
-  // the scene always shows the person's quokka, even with the sidebar
-  // companion off (2026-09-29), in the default theme's island
+  // the default theme's island, with no quokka on it
   await expect(empty.locator(".pane-scene")).toHaveAttribute("data-scene", "island");
-  await expect(empty.locator(".pane-scene .quokka")).toHaveCount(1);
+  await expect(empty.locator(".quokka")).toHaveCount(0);
   await expect(empty.getByRole("button", { name: "rotli.co" })).toBeVisible();
   await expect(empty.getByRole("button", { name: "source on GitHub" })).toBeVisible();
   // the inline "reopen tab" action restores the last closed tab

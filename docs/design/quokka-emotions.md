@@ -3,12 +3,18 @@
 Status: **slice 1 shipped on `feat/quokka-moods`; slice 2 proposed, waiting on
 the owner's pick and on art.** 2026-09-28.
 
+**Update 2026-10-02 (the owner: "In the chat user doesn't get a choice its
+like a chat buddy but they can decorate it").** The idle-mood picker and the
+companion switch are gone. Every pose is now *semantic*: Chat's buddy picks
+its expression from the chat's moment (`src/components/chat/chatBuddyModel.ts`:
+waving or resting at the welcome, thoughtful while a reply runs, celebrating
+when it lands, listening when the person spoke last, gentle attention with no
+vault), and Settings and setup pick theirs per screen. Full-body quokkas appear
+only in Chat, Settings, and setup, so slice 2's rows for What's new, Tasks,
+Focus mode, and recoverable errors no longer have a placement; slice 1 below is
+historical. A `ChatBuddyMoment` is where a new expression would land.
+
 The quokka has fifteen drawn poses (`QUOKKA_POSES` in `src/brand/quokka.ts`).
-Some are *semantic*: empty states and moments choose them to explain what is
-happening (`notes`, `inbox`, `board`, `knowledge`, `local`, `chat`,
-`attention`). The rest can be *moods*, the "Idle mood & pose" the person picks
-in Settings → Appearance (`QUOKKA_IDLE_POSES`), which personal placements
-follow.
 
 ## Slice 1: more moods from art we already have (shipped)
 
@@ -62,11 +68,11 @@ currently show `celebrating`, the same pose as the chat's end mark.
 4. **Fit.** Use the throwaway harness loop: render the real `Character` at 66,
    152, and 440 px, with every accessory, in a light and a dark theme. Ears
    tuck under the brim, and no hat floats.
-5. **Use.** Add the pose to `QUOKKA_IDLE_POSES` only if it is a mood; a moment
-   picks it by name. Unit tests: `src/brand/quokka.test.ts` (catalog) and
-   `src/components/character.test.ts` (placements). E2E: the picker spec
-   `e2e/quokka-moods.spec.ts`, and the banner spec if the thank-you card uses
-   it.
+5. **Use.** A moment picks it by name (for Chat, in `chatBuddyPose`). Unit
+   tests: `src/brand/quokka.test.ts` (catalog),
+   `src/components/chat/chatBuddyModel.test.ts` (Chat's moments), and
+   `src/components/character.test.ts` (rendering). E2E: `e2e/chat-buddy.spec.ts`,
+   and the banner spec if the thank-you card uses it.
 
 The thank-you banner (`components/onboarding/bannerCanvas.ts`) copies whatever
 `Character` renders, so a new pose appears there with no extra work.

@@ -26,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The quokka is your chat buddy.** Every chat has its quokka: it waves on a
+  new chat, thinks while a reply is on its way, cheers when it lands, and
+  listens when it's your turn. It picks its own expression; you decorate it
+  in Settings → Appearance → Chat buddy (body color, lines, glasses or a
+  bucket hat and its color), with a live preview. The Quokka companion switch
+  and the idle mood picker are gone. Outside Chat, Settings, and setup, empty
+  states, the empty pane, What's new, and the launch opening no longer show a
+  quokka.
 - **Tab indents.** Tab on a paragraph now moves it in by one visible level,
   lined up with a bullet's text, instead of two spaces you could barely see.
   A paragraph stops at one level, because Markdown reads four spaces as a

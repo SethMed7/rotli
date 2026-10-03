@@ -2804,11 +2804,9 @@ body:has(.document-editor) [role="dialog"][class*="univer-"] input:disabled {
 .cmsg:has(.cmsg-act.on) .cmsg-actions {
   opacity: 1;
 }
-/* While a response streams the compact line mark stays quiet. Once the thread
-   settles, the user's chosen full-body quokka gets one restrained arrival. */
-.chat-mark {
-  color: var(--accent-text);
-}
+/* The chat buddy at the thread's live edge: one per thread, never per message.
+   It arrives once with a restrained hop, then only its pose changes with the
+   chat (thinking, done, listening), with no idle animation. */
 .chat-endmark {
   display: inline-flex;
   margin: 0;
@@ -2829,7 +2827,7 @@ body:has(.document-editor) [role="dialog"][class*="univer-"] input:disabled {
     transform: none;
   }
 }
-.chat-endmark-row {
+.chat-buddy-row {
   display: flex;
   width: 100%;
   min-height: 72px;

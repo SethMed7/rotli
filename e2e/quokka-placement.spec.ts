@@ -21,8 +21,7 @@ test("every Settings pane opens on a banner with the person's quokka, and it fol
   await gotoApp(page);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Appearance", exact: true }).click();
-  // the banner shows the person's own quokka even with the companion off
-  await page.getByRole("switch", { name: /Companion off/ }).click();
+  // the banner shows the person's own quokka, dressed as they dressed it
   await page.getByRole("radio", { name: /Glasses/ }).click();
 
   for (const pane of settingsPanes) {

@@ -8,7 +8,6 @@ import { dispatch } from "../keys/registry";
 import { highlightsFor, platformNote, WHATS_NEW as NOTES, whatsNewDecision } from "../lib/whatsNew";
 import { useUiStore } from "../state/ui";
 import { hideWhatsNew, showWhatsNew, useWhatsNew } from "../state/whatsNew";
-import { Character } from "./character";
 import { WebDialogFrame } from "./webDialogFrame";
 
 declare const __APP_VERSION__: string;
@@ -58,7 +57,6 @@ export function WhatsNewDialog() {
         </>
       }
     >
-      <Character name="celebrating" size={88} className="whats-new-quokka" />
       <ul className="whats-new-list">
         {items.map((item) => {
           const only = platformNote(item.platform);

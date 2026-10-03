@@ -1,6 +1,3 @@
-import type { ChatWelcomeStyle } from "../../state/ui";
-import type { CharacterName } from "../character";
-
 export type ChatDaypart = "morning" | "noon" | "afternoon" | "evening";
 export type ChatWelcomeSuggestionKind = "search" | "write" | "organize";
 
@@ -30,19 +27,6 @@ export function chatGreeting(hour: number, userName: string): string {
 export function chatWorkPrompt(userName: string): string {
   const name = userName.trim().split(/\s+/)[0];
   return `What should we work on${name ? `, ${name}` : ""}?`;
-}
-
-export function chatWelcomeCharacter(hour: number, style: ChatWelcomeStyle): CharacterName {
-  if (style === "calm") return "chat";
-  switch (chatDaypart(hour)) {
-    case "morning":
-      return "waving";
-    case "afternoon":
-    case "noon":
-      return "waving";
-    case "evening":
-      return "rest";
-  }
 }
 
 export function chatWelcomeSuggestions(hour: number): readonly ChatWelcomeSuggestion[] {

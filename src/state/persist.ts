@@ -21,12 +21,10 @@ import { type HybridPreset, PROVIDER_IDS, type ProviderId, providerDefaultModel 
 import { parseWebSearchProvider, type WebSearchProvider } from "../ai/searchProvider";
 import { BOARD_BACKGROUND_MODES, type BoardBackgroundMode } from "../brand/boardBackground";
 import {
-  QUOKKA_IDLE_POSES,
   QUOKKA_ACCESSORIES,
   QUOKKA_LINE_COLORS,
   QUOKKA_STYLES,
   type QuokkaAccessory,
-  type QuokkaIdlePose,
   type QuokkaLineColor,
   type QuokkaStyle,
   normalizeQuokkaAccessoryHue,
@@ -214,13 +212,11 @@ interface PersistedSettings {
   boardBackground: BoardBackgroundMode;
   accentColor: AccentColor;
   accentHue: number;
-  quokkaCompanionEnabled: boolean;
   quokkaStyle: QuokkaStyle;
   quokkaCustomHue: number;
   quokkaLineColor: QuokkaLineColor;
   quokkaAccessory: QuokkaAccessory;
   quokkaAccessoryHue: number;
-  quokkaIdlePose: QuokkaIdlePose;
   chatNavigatorStyle: ChatNavigatorStyle;
   sidebarSide: SidebarSide;
   sidebarReveal: SidebarReveal;
@@ -491,7 +487,6 @@ export function parseSettings(raw: string): PersistedSettings {
       data.accentHue <= 359
         ? Math.round(data.accentHue)
         : DEFAULT_ACCENT_HUE,
-    quokkaCompanionEnabled: asBool(data.quokkaCompanionEnabled, false),
     quokkaStyle: asEnum(data.quokkaStyle, QUOKKA_STYLES, "cocoa"),
     quokkaCustomHue:
       data.quokkaCustomHue === undefined
@@ -503,7 +498,6 @@ export function parseSettings(raw: string): PersistedSettings {
     quokkaLineColor: asEnum(data.quokkaLineColor, QUOKKA_LINE_COLORS, "auto"),
     quokkaAccessory: asEnum(data.quokkaAccessory, QUOKKA_ACCESSORIES, "none"),
     quokkaAccessoryHue: normalizeQuokkaAccessoryHue(data.quokkaAccessoryHue),
-    quokkaIdlePose: asEnum(data.quokkaIdlePose, QUOKKA_IDLE_POSES, "rest"),
     chatNavigatorStyle: asEnum(data.chatNavigatorStyle, CHAT_NAVIGATOR_STYLES, "paws"),
     sidebarSide: asEnum(data.sidebarSide, SIDEBAR_SIDES, "left"),
     sidebarReveal: asEnum(data.sidebarReveal, SIDEBAR_REVEALS, "pinned"),
@@ -710,6 +704,10 @@ export function unknownSettingsKeys(raw: string): Record<string, unknown> {
     "matchLightFamily",
     "matchDarkFamily",
     "imageEngine",
+    // the companion switch and idle mood: the chat buddy is always there and
+    // picks its own pose (2026-10-02)
+    "quokkaCompanionEnabled",
+    "quokkaIdlePose",
   ]);
   return Object.fromEntries(Object.entries(data).filter(([key]) => !known.has(key) && !retired.has(key)));
 }
@@ -722,13 +720,11 @@ function applySettings(s: PersistedSettings): void {
     boardBackground: s.boardBackground,
     accentColor: s.accentColor,
     accentHue: s.accentHue,
-    quokkaCompanionEnabled: s.quokkaCompanionEnabled,
     quokkaStyle: s.quokkaStyle,
     quokkaCustomHue: s.quokkaCustomHue,
     quokkaLineColor: s.quokkaLineColor,
     quokkaAccessory: s.quokkaAccessory,
     quokkaAccessoryHue: s.quokkaAccessoryHue,
-    quokkaIdlePose: s.quokkaIdlePose,
     chatNavigatorStyle: s.chatNavigatorStyle,
     sidebarSide: s.sidebarSide,
     sidebarReveal: s.sidebarReveal,
@@ -816,13 +812,11 @@ function applyAppSettings(s: PersistedSettings): void {
     boardBackground: s.boardBackground,
     accentColor: s.accentColor,
     accentHue: s.accentHue,
-    quokkaCompanionEnabled: s.quokkaCompanionEnabled,
     quokkaStyle: s.quokkaStyle,
     quokkaCustomHue: s.quokkaCustomHue,
     quokkaLineColor: s.quokkaLineColor,
     quokkaAccessory: s.quokkaAccessory,
     quokkaAccessoryHue: s.quokkaAccessoryHue,
-    quokkaIdlePose: s.quokkaIdlePose,
     chatNavigatorStyle: s.chatNavigatorStyle,
     sidebarSide: s.sidebarSide,
     sidebarReveal: s.sidebarReveal,
@@ -856,13 +850,11 @@ function withAppSettings(vault: PersistedSettings, app: PersistedSettings): Pers
     boardBackground: app.boardBackground,
     accentColor: app.accentColor,
     accentHue: app.accentHue,
-    quokkaCompanionEnabled: app.quokkaCompanionEnabled,
     quokkaStyle: app.quokkaStyle,
     quokkaCustomHue: app.quokkaCustomHue,
     quokkaLineColor: app.quokkaLineColor,
     quokkaAccessory: app.quokkaAccessory,
     quokkaAccessoryHue: app.quokkaAccessoryHue,
-    quokkaIdlePose: app.quokkaIdlePose,
     chatNavigatorStyle: app.chatNavigatorStyle,
     sidebarSide: app.sidebarSide,
     sidebarReveal: app.sidebarReveal,
@@ -1423,13 +1415,11 @@ export function appSettingsSnapshot(): string {
     boardBackground: ui.boardBackground,
     accentColor: ui.accentColor,
     accentHue: ui.accentHue,
-    quokkaCompanionEnabled: ui.quokkaCompanionEnabled,
     quokkaStyle: ui.quokkaStyle,
     quokkaCustomHue: ui.quokkaCustomHue,
     quokkaLineColor: ui.quokkaLineColor,
     quokkaAccessory: ui.quokkaAccessory,
     quokkaAccessoryHue: ui.quokkaAccessoryHue,
-    quokkaIdlePose: ui.quokkaIdlePose,
     chatNavigatorStyle: ui.chatNavigatorStyle,
     sidebarSide: ui.sidebarSide,
     sidebarReveal: ui.sidebarReveal,
@@ -1464,13 +1454,11 @@ function settingsSnapshot(): string {
     boardBackground: ui.boardBackground,
     accentColor: ui.accentColor,
     accentHue: ui.accentHue,
-    quokkaCompanionEnabled: ui.quokkaCompanionEnabled,
     quokkaStyle: ui.quokkaStyle,
     quokkaCustomHue: ui.quokkaCustomHue,
     quokkaLineColor: ui.quokkaLineColor,
     quokkaAccessory: ui.quokkaAccessory,
     quokkaAccessoryHue: ui.quokkaAccessoryHue,
-    quokkaIdlePose: ui.quokkaIdlePose,
     chatNavigatorStyle: ui.chatNavigatorStyle,
     sidebarSide: ui.sidebarSide,
     sidebarReveal: ui.sidebarReveal,

@@ -652,7 +652,7 @@ body[data-surface="capture"] {
 }
 
 /* — the ONE empty-state container (remediation Batch 3, F20c): the centered
-   quokka + title + sub stage every surface's "nothing here" uses. Four surfaces
+   title + sub stage every surface's "nothing here" uses (Chat's adds its buddy). Four surfaces
    had retyped it under divergent names (.empty-stage / .board-empty /
    .quick-empty / .chat-empty); surface files keep only their genuinely
    divergent content voices (.et/.es, .be-*, .qe-*, .chat-empty text). — */
@@ -672,15 +672,15 @@ body[data-surface="capture"] {
   min-height: 0;
   overflow: auto;
 }
-/* the mascot yields before the words: in a short pane the illustration scales
-   down (viewBox letterboxing does the work) instead of pushing the message it
-   decorates out of the box (the maintainer, 2026-08-01 fit sweep) */
+/* the chat buddy yields before the words: in a short pane the illustration
+   scales down (viewBox letterboxing does the work) instead of pushing the
+   message it decorates out of the box (the maintainer, 2026-08-01 fit sweep) */
 .list-empty > .quokka {
   flex: 0 1 auto;
   min-height: 0;
 }
 
-/* — all tabs closed: the lone pane's quokka rest state (the maintainer, 2026-07-28) —
+/* — all tabs closed: the lone pane's rest state (the maintainer, 2026-07-28) —
    the .list-empty stage plus quiet inline actions back into the app */
 .pane-empty {
   height: 100%;
@@ -717,8 +717,7 @@ body[data-surface="capture"] {
 
 /* — the empty pane's scene (paneEmptyScenes.tsx, 2026-09-29): one small stage
    per theme family, painted only with the theme's own tokens so it follows
-   light and dark; the person's quokka stands on the shared ground line
-   (y 170 of 200). Motion is slow, CSS-only (base.css pauses it when the
+   light and dark, with its ground line at y 170 of 200. Motion is slow, CSS-only (base.css pauses it when the
    window is put away) and off under reduced motion. — */
 .pane-scene {
   position: relative;
@@ -734,14 +733,6 @@ body[data-surface="capture"] {
   height: 100%;
   /* the scene fades into the page at its sides instead of ending in a box */
   mask-image: linear-gradient(90deg, transparent, black 14%, black 86%, transparent);
-}
-.pane-scene .pane-scene-quokka {
-  position: absolute;
-  left: 50%;
-  bottom: 13%;
-  width: 22%;
-  height: auto;
-  transform: translateX(-50%);
 }
 .sc-ground { fill: var(--surface-2); }
 .sc-hill { fill: var(--tint); }
