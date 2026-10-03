@@ -71,9 +71,10 @@
 	}
 
 	# The marketing site: everything that is not /app/ or /api/.
-	# The MCP guide moved under Resources on 2026-09-18; old links keep working.
-	redir /mcp /resources/mcp/ permanent
-	redir /mcp/ /resources/mcp/ permanent
+	# The MCP guide moved under Resources on 2026-09-18 and became part of the
+	# developer page on 2026-10-02; old links go straight there in one hop.
+	redir /mcp /resources/developers/ permanent
+	redir /mcp/ /resources/developers/ permanent
 	# The motion studio lives on its own subdomain; people type the path.
 	redir /studio https://studio.rotli.co/ permanent
 	redir /studio/ https://studio.rotli.co/ permanent

@@ -4,6 +4,9 @@
 // offers "Click for sound", which restarts it from the top with sound and hands over
 // native controls. A silent film (the product film) offers no sound at all: when it ends,
 // "Watch again" plays it once more from the top. A pause button is there while it plays.
+// A film with captions burned into a band along its bottom (`captioned`: the product film's
+// 162 of 1080 px, scripts/capture-hero.mjs `BAND`) keeps those controls just above the band,
+// so they never cover a caption at any width.
 // It pauses when scrolled away and, if it was playing, resumes when back. The film itself
 // only downloads once the player first comes into view. Without script, under reduced
 // motion, or with Save-Data on, it is a poster with native controls: nothing plays until
@@ -15,12 +18,14 @@ interface Props {
   label: string;
   /** No soundtrack: no sound chip, and the replay stays muted. */
   silent?: boolean;
+  /** Captions burned into the bottom band: the controls sit above it. */
+  captioned?: boolean;
 }
 
-const { src, poster, label, silent = false } = Astro.props;
+const { src, poster, label, silent = false, captioned = false } = Astro.props;
 ---
 
-<figure class="player" data-player data-silent={silent ? '' : undefined}>
+<figure class="player" data-player data-silent={silent ? '' : undefined} data-captioned={captioned ? '' : undefined}>
   <video
     controls
     muted
@@ -157,6 +162,10 @@ const { src, poster, label, silent = false } = Astro.props;
     position: relative;
     margin: 0;
   }
+  /* The caption band's share of the frame (162 / 1080, scripts/capture-hero.mjs). */
+  .player[data-captioned] {
+    --caption-band: 15%;
+  }
   video {
     display: block;
     width: 100%;
@@ -173,7 +182,7 @@ const { src, poster, label, silent = false } = Astro.props;
   .player-bar {
     position: absolute;
     left: clamp(0.6rem, 2vw, 1.1rem);
-    bottom: clamp(0.6rem, 2vw, 1.1rem);
+    bottom: calc(var(--caption-band, 0%) + clamp(0.6rem, 2vw, 1.1rem));
     display: flex;
     gap: 0.45rem;
   }
@@ -224,7 +233,7 @@ const { src, poster, label, silent = false } = Astro.props;
   @media (max-width: 600px) {
     .player-bar {
       left: 0.5rem;
-      bottom: 0.5rem;
+      bottom: calc(var(--caption-band, 0%) + 0.5rem);
       gap: 0.35rem;
     }
     .player-bar .player-chip {

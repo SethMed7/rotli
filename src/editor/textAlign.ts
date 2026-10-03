@@ -11,15 +11,14 @@ import type { EditorView } from "@codemirror/view";
 import { ALIGN_CLOSE, type TextAlign, alignOpenTag, parseAlignedLine } from "./alignedLine";
 import { lineInFence, scanFences } from "./fences";
 import { imageSourceSpan } from "./imageSelection";
+import { DIVIDER_LINE } from "./lineIndent";
 import { parseBlock } from "./render";
 import { lineInTable, scanTables } from "./tables";
-
-const HR_LINE = /^ {0,3}(-{3,}|\*{3,}|_{3,})\s*$/;
 
 /** Whether a line is a paragraph that may carry an alignment. */
 export function canAlign(text: string): boolean {
   if (parseAlignedLine(text)) return true;
-  if (text.trim() === "" || HR_LINE.test(text)) return false;
+  if (text.trim() === "" || DIVIDER_LINE.test(text)) return false;
   if (/^\s*(?:<(?!u>)|\|)/.test(text)) return false; // raw HTML (not <u>) or a table row
   if (imageSourceSpan(text, 0)) return false;
   return parseBlock(text).kind === "para";

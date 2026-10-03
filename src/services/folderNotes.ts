@@ -21,7 +21,7 @@ import {
   isSecureFrontmatter,
 } from "../lib/frontmatter";
 import type { MemexContractRaw } from "../lib/tauri";
-import { composeNote, noteSlugify, noteStem, today, ulid } from "../memex/contract";
+import { composeNote, noteSlugify, noteStem, stampToMs, today, ulid } from "../memex/contract";
 import type { NoteCreationPolicy } from "../security/secureNotes";
 import type { Folder, Note, NoteSummary, SearchHit } from "../types";
 import { snippetOf, summaryOrder, titleOf } from "./derive";
@@ -114,12 +114,6 @@ function withoutSinkPrefix(path: string): string {
   return path;
 }
 
-const dateOrNull = (value: string | null | undefined): number | null => {
-  if (!value) return null;
-  const ms = Date.parse(value);
-  return Number.isNaN(ms) ? null : ms;
-};
-
 export class FolderNotesService implements NotesService {
   private index: Map<string, string> | null = null;
   private readonly cache = new Map<string, CachedFile>();
@@ -201,7 +195,7 @@ export class FolderNotesService implements NotesService {
     const { frontmatter, body } = parseNoteDocument(text);
     const title = titleOf(body);
     const diskFolderId = parentPath(path);
-    const updatedAt = dateOrNull(frontmatter?.updated) ?? stat.lastModified;
+    const updatedAt = stampToMs(frontmatter?.updated, stat.lastModified) ?? stat.lastModified;
     const aliases = [...new Set([fileNameStem(path), noteSlugify(title)].filter(Boolean))];
     return {
       id: frontmatter?.id || path,
@@ -211,7 +205,7 @@ export class FolderNotesService implements NotesService {
       aliases,
       folderId: projectVaultFolder(diskFolderId, frontmatter, this.isMemex),
       diskFolderId,
-      createdAt: dateOrNull(frontmatter?.created) ?? updatedAt,
+      createdAt: stampToMs(frontmatter?.created, stat.lastModified) ?? updatedAt,
       updatedAt,
       pinned: frontmatter?.pinned ?? false,
       kind: "note",

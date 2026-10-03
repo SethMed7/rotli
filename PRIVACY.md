@@ -72,6 +72,20 @@ can't lose it, then written into the vault and cleared. The one outbound path
 is a chat you start: the helper runs your own AI tool, which contacts its
 provider as above, and secure notes are refused before it runs.
 
+## The rotli.co website
+
+rotli.co sets no cookies and runs no analytics, ads, or third-party scripts.
+Its pages, fonts, images, and films are served from the site itself. The one
+exception is the Launch Llama badge in the footer, an image loaded from Launch
+Llama's own server, which therefore sees a request from the visitor's browser.
+Railway (hosting) and Cloudflare (DNS) process standard request details such
+as the IP address to deliver pages.
+
+The footer's optional "Hear when it's ready" list sends the address a visitor
+types to Resend, Rotli's email provider, to keep the list, and only when the
+visitor submits it. Anyone on the list can unsubscribe at any time. Nothing
+else is collected or shared.
+
 ## Secure notes and locked notes
 
 Secure notes are excluded from remote models, remote search observations, and

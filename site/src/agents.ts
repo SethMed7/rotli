@@ -92,7 +92,7 @@ export function llmsText(writing: { resources: Writing[]; posts: Writing[] }): s
       link('Privacy', '/privacy/', 'what connects to the internet, what AI can see, and why'),
       link('Download', '/download/', site.webAppEnabled ? 'the Mac app, Rotli Web, and Rotli Helper' : 'the Mac app'),
       link('Changelog', '/changelog/', 'every release, newest first'),
-      link('About', '/about/', 'where the name comes from, what rotli believes, and who makes it'),
+      link('About', '/about/', 'why it is being built, where the name comes from, and who makes it'),
     );
     const section = (title: string, entries: Writing[]) =>
       entries.length > 0
