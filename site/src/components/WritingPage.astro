@@ -35,9 +35,11 @@ interface Props {
   wide?: boolean;
   /** Center the head and the reading column on the page (About). */
   center?: boolean;
-  /** Passed through to Base: JSON-LD facts and the Markdown twin. */
+  /** Passed through to Base: JSON-LD facts, the Markdown twin, and the link card (src/og.ts). */
   structuredData?: Record<string, unknown>[];
   markdownPath?: string;
+  image?: string;
+  imageAlt?: string;
 }
 
 const {
@@ -55,6 +57,8 @@ const {
   center = false,
   structuredData,
   markdownPath,
+  image,
+  imageAlt,
 } = Astro.props;
 const hasToc = toc.length > 1;
 ---
@@ -66,6 +70,8 @@ const hasToc = toc.length > 1;
   noindex={!site.indexable}
   structuredData={structuredData}
   markdownPath={markdownPath}
+  image={image}
+  imageAlt={imageAlt}
 >
   <SiteHeader current={section} />
   <main id="content" class:list={['wrap writing', { center }]}>

@@ -10,6 +10,7 @@
 // (`site.showsExperiments`) shows the full reference under the experiment
 // label, remote agents included.
 import WritingPage from '../../../components/WritingPage.astro';
+import { ogImage } from '../../../og';
 import { GITHUB_URL, PRIVACY_URL, site } from '../../../site';
 
 export function getStaticPaths() {
@@ -60,6 +61,7 @@ const rules = [
     ? 'Connect Claude Code, Codex, Cursor, and other MCP clients to your rotli vault: setup, tools, the rules every call follows, and the command line.'
     : 'MCP and a command line for AI agents like Claude Code and Codex, under the same rules as the app. Coming soon: in development builds today.'}
   canonicalPath="/resources/developers/"
+  {...ogImage('developers')}
   section="developers"
   kicker={reference ? 'In development · dev site only' : 'Coming soon'}
   heading="rotli for developers and agents"

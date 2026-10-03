@@ -9,6 +9,7 @@ import aiChat from '../../../../src/assets/characters/filled/cocoa/ai_chat.webp'
 import knowledge from '../../../../src/assets/characters/filled/cocoa/knowledge_system.webp';
 import SecureScene from '../../components/SecureScene.astro';
 import WritingPage from '../../components/WritingPage.astro';
+import { ogImage } from '../../og';
 import { GITHUB_URL, site } from '../../site';
 
 export function getStaticPaths() {
@@ -42,6 +43,7 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   title="Privacy — rotli"
   description="How rotli handles your notes: no account, no analytics, files on your computer, and AI only on your terms. What connects to the internet, and why."
   canonicalPath="/privacy/"
+  {...ogImage('privacy')}
   section="privacy"
   heading="Privacy"
   lede="rotli is built so there is nothing about you to collect. This page explains exactly what it does with your data, what connects to the internet, and why it works that way."

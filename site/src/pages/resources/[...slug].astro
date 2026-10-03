@@ -6,6 +6,7 @@ import { render } from 'astro:content';
 import { twinPath, writingGraph, writingPath } from '../../agents';
 import WritingList from '../../components/WritingList.astro';
 import WritingPage from '../../components/WritingPage.astro';
+import { ogImage } from '../../og';
 import { site } from '../../site';
 import { publishedWriting, slugOf, type Writing } from '../../writing';
 
@@ -39,6 +40,7 @@ const more = entry ? items.filter((item) => item.href !== `/resources/${slugOf(e
       title={`${entry.data.title} — rotli`}
       description={entry.data.description}
       canonicalPath={`/resources/${slugOf(entry)}/`}
+      {...ogImage('resources')}
       structuredData={writingGraph(entry)}
       markdownPath={twinPath(writingPath(entry))}
       section="resources"
@@ -59,6 +61,7 @@ const more = entry ? items.filter((item) => item.href !== `/resources/${slugOf(e
       title="Guides — rotli"
       description="Short answers to the questions people ask about rotli: why local, where notes live, and how it works."
       canonicalPath="/resources/"
+      {...ogImage('resources')}
       section="resources"
       heading="Guides"
       lede="Short answers to the questions people ask about rotli: why local, where notes live, and how the pieces fit."

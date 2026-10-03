@@ -6,6 +6,7 @@
 // brief, the ways in, make it yours, and questions. Base.astro owns the tokens
 // and the section grammar.
 import { landingGraph } from '../agents';
+import { ogImage } from '../og';
 import Base from '../layouts/Base.astro';
 import { site } from '../site';
 import SiteFooter from './SiteFooter.astro';
@@ -22,7 +23,7 @@ import Personal from './landing/Personal.astro';
 import PrivacyBrief from './landing/PrivacyBrief.astro';
 ---
 
-<Base noindex={!site.indexable} structuredData={landingGraph()} markdownPath="/index.md">
+<Base noindex={!site.indexable} structuredData={landingGraph()} markdownPath="/index.md" {...ogImage('home')}>
   <SiteHeader current="product" />
   <main id="content">
     <Hero />

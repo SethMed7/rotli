@@ -15,6 +15,7 @@
 import stayLocal from '../../../../src/assets/characters/filled/cocoa/stays_local.webp';
 import IslandScene from '../../components/IslandScene.astro';
 import WritingPage from '../../components/WritingPage.astro';
+import { ogImage } from '../../og';
 import { GITHUB_URL, site } from '../../site';
 import { publishedWriting, slugOf } from '../../writing';
 
@@ -34,6 +35,7 @@ const story = posts.find((post) => slugOf(post) === 'the-creation-of-rotli');
   title="About — rotli"
   description="Why Seth Medina is building rotli: a private workspace on notes you own, with AI that works under your rules and costs nothing extra. Also, where the name comes from."
   canonicalPath="/about/"
+  {...ogImage('about')}
   section="about"
   heading="Why I’m building rotli"
   lede="Notes are where work starts. They should live somewhere that is yours."
