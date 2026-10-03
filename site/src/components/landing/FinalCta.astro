@@ -1,28 +1,23 @@
 ---
-// The closing invitation, set where the story film ends: sunset on the island
-// (SunsetScene.astro) behind one line and the two ways in.
+// The closing invitation: one line and the two ways in, on the page's own ground. The
+// footer's quokka beach (QuokkaScene.astro) right below is the page's one closing scene.
 import { site } from '../../site';
 import SiteActions from '../SiteActions.astro';
-import SunsetScene from '../SunsetScene.astro';
 ---
 
-<section class="final" aria-labelledby="final-title">
-  <SunsetScene>
-    <div class="wrap final-inner" data-reveal>
-      <h2 class="section-title" id="final-title">A durable place for the work <span class="inked">you want to keep.</span></h2>
-      <p class="section-lede">Warm enough to return to. Quiet enough to disappear. Local enough to stay yours.</p>
-      <SiteActions webLabel="Open in your browser" downloadLabel="Download for Mac" />
-      <p class="final-meta">
-        Your first vault opens with three short lessons{site.downloadsEnabled ? '. Free, no account.' : '.'}
-      </p>
-    </div>
-  </SunsetScene>
+<section class="section final" aria-labelledby="final-title">
+  <div class="wrap final-inner" data-reveal>
+    <h2 class="section-title" id="final-title">A durable place for the work <span class="inked">you want to keep.</span></h2>
+    <p class="section-lede">Warm enough to return to. Quiet enough to disappear. Local enough to stay yours.</p>
+    <SiteActions webLabel="Open in your browser" downloadLabel="Download for Mac" />
+    <p class="final-meta">
+      Your first vault opens with three short lessons{site.downloadsEnabled ? '. Free, no account.' : '.'}
+    </p>
+  </div>
 </section>
 
 <style>
   .final-inner {
-    position: relative;
-    z-index: 1;
     display: grid;
     justify-items: center;
     text-align: center;
@@ -30,24 +25,16 @@ import SunsetScene from '../SunsetScene.astro';
   .section-title {
     max-width: 16ch;
   }
-  /* Muted text is too faint on the sky; the sunset reads in the page's ink. */
-  .section-lede,
-  .final-meta {
+  .section-lede {
     margin-inline: auto;
-    color: var(--text);
   }
   .final-inner :global(.site-actions) {
     justify-content: center;
     margin-top: 2rem;
   }
-  .final-inner :global(.button.secondary) {
-    border-color: var(--text);
-  }
-  .final-inner :global(.button.secondary:hover) {
-    background: var(--sunset-5);
-  }
   .final-meta {
     margin: 1rem 0 0;
+    color: var(--text-muted);
     font-size: 0.9rem;
   }
 </style>

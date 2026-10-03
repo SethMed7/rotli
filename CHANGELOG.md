@@ -168,6 +168,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A new note in Rotli Web says "just now".** It read hours old (at least
+  4h in New York) because its date was taken as midnight UTC. A
+  note's created and updated dates stay plain days in the file; Rotli Web
+  now uses the file's own time when it falls on that day, and otherwise
+  shows the day rather than an hour count. New notes are dated with your
+  own calendar day, not New York's.
 - **Images dropped from Finder land where you drop them.** On Retina
   screens a dropped image went in about halfway up the note; Rotli now reads
   the drop position as the Mac reports it.
