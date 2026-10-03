@@ -14,8 +14,7 @@
 //   rotli-helper.spec.ts pattern). The app's real agent loop sends every
 //   prompt; the fake answers with scripted model text, and the search and the
 //   note reads in between are the app's own, over the vault on screen.
-// - The page clock and time zone are fixed so the dates on screen agree
-//   (see START below).
+// - The page clock starts at the real time, in a fixed zone (see START below).
 //
 // Output: _review/hero-video/ (frames, raw take, caption plates, contact frames)
 // and the encoded film + poster in site/public/media/hero/.
@@ -38,19 +37,12 @@ await mkdir(siteOut, { recursive: true });
 
 const HELPER_PORT = 43111;
 const HELPER_TOKEN = "fixture-token-with-at-least-twenty-four-chars";
-// The app fills 1920 × 918 device pixels; the film's 1920 × 1080 frame adds a
-// 162 px caption band below it, so a caption never covers the UI it describes.
-// The band and its 80 px type are sized for phones: a 390 px-wide page shows the
-// film about 350 px wide, which keeps a caption near 15 px. The site's player
-// keeps its controls above the band (FilmPlayer.astro `--caption-band`, 15%).
+// The app fills 1920 × 918 device pixels over a 162 px caption band (15%, the
+// player's `--caption-band`); 80 px type stays ~15 px in a 350 px phone player.
 const VIEW = { width: 1280, height: 612 };
 const SCALE = 1.5;
 const BAND = 1080 - VIEW.height * SCALE;
-const CAPTION_PX = 80;
-// The page clock starts at the real time, so the app's clock and the vault's
-// file times (the browser's own, which a page clock cannot move) agree: a note
-// written on camera reads "just now".
-const TIMEZONE = "America/New_York";
+const TIMEZONE = "America/New_York"; // START is real: page clock = browser file times
 const START = new Date(Math.floor(Date.now() / 60_000) * 60_000);
 
 // —— the synthetic vault: notes the Librarian filed earlier, by area ——
@@ -365,9 +357,7 @@ try {
     await editor.locator('img[src^="blob:"]').first().waitFor();
     await hold(900);
     await page.keyboard.press("ControlOrMeta+End");
-    // "Lisbon t", not "Lis": the note being written (just now, so ranked first) is
-    // titled "lisbon w/ ana…" and would otherwise be the first choice
-    await jot("\nsee [[Lisbon t");
+    await jot("\nsee [[Lisbon t"); // not "Lis": the newer note being written would rank first
     await page.locator(".rotli-linkpick").waitFor();
     await page.locator(".rotli-linkpick-title").first().filter({ hasText: "Lisbon trip" }).waitFor();
     await hold(800);
@@ -510,12 +500,12 @@ try {
       @font-face { font-family: GS; src: url(data:font/woff2;base64,${font}) format("woff2"); font-weight: 500; }
       html, body { margin: 0; background: transparent; }
       body { width: 1920px; height: 1080px; display: flex; align-items: flex-end; justify-content: center; }
-      span { height: ${BAND}px; display: flex; align-items: center; color: #3a3028; font: 500 ${CAPTION_PX}px/1 GS; letter-spacing: -0.01em; white-space: nowrap; }
+      span { height: ${BAND}px; display: flex; align-items: center; color: #3a3028; font: 500 80px/1 GS; letter-spacing: -0.01em; white-space: nowrap; }
     </style><span>${caption.text}</span>`);
     await plate.evaluate(() => document.fonts.ready);
     // one line, clear of the edges: a longer caption needs fewer words, not smaller type
-    const width = await plate.$eval("span", (el) => el.getBoundingClientRect().width);
-    if (width > 1760) throw new Error(`caption ${i + 1} is ${Math.round(width)} px wide; keep it under 1760`);
+    if ((await plate.$eval("span", (el) => el.getBoundingClientRect().width)) > 1760)
+      throw new Error(`caption ${i + 1} is wider than 1760 px; shorten it`);
     caption.png = join(review, `plates/caption-${i + 1}.png`);
     await plate.screenshot({ path: caption.png, omitBackground: true });
   }
@@ -530,8 +520,7 @@ const chain = [
 let last = "[base]";
 for (const [i, c] of CAPTIONS.entries()) {
   const length = c.to - c.from;
-  // the last caption stays on the frame the player rests on (under "Watch again")
-  const final = i === CAPTIONS.length - 1;
+  const final = i === CAPTIONS.length - 1; // stays on the frame the player rests on
   const fadeOut = final ? "" : `,fade=t=out:st=${(length - 0.3).toFixed(3)}:d=0.3:alpha=1`;
   inputs.push("-loop", "1", "-t", length.toFixed(3), "-i", c.png);
   chain.push(
