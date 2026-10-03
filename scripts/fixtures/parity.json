@@ -464,6 +464,107 @@
           "verdict": "locked"
         }
       ]
+    },
+    "noteDateStamps": {
+      "sourceOfTruth": "behavioral: docs/architecture/memex-data-contract.md (Metadata ownership) — src/memex/dates.ts stampToMs + today ↔ src-tauri/src/note_dates.rs stamp_to_ms + day_stamp (independent implementations, fixture-aligned answers; localMidnight is each side's own zone)",
+      "value": {
+        "reads": [
+          {
+            "stamp": "2026-10-02",
+            "fileMs": 1790931600000,
+            "expect": "file"
+          },
+          {
+            "stamp": " 2026-10-02 ",
+            "fileMs": 1790931600000,
+            "expect": "file"
+          },
+          {
+            "stamp": "2026-10-02",
+            "fileMs": 1790848800000,
+            "expect": "file"
+          },
+          {
+            "stamp": "2026-10-02",
+            "fileMs": 1791028799999,
+            "expect": "file"
+          },
+          {
+            "stamp": "2026-10-02",
+            "fileMs": 1790848799999,
+            "expect": "localMidnight"
+          },
+          {
+            "stamp": "2026-10-02",
+            "fileMs": 1791028800000,
+            "expect": "localMidnight"
+          },
+          {
+            "stamp": "2026-10-02",
+            "expect": "localMidnight"
+          },
+          {
+            "stamp": "2026-06-25T12:00:00Z",
+            "fileMs": 1790931600000,
+            "expect": "asWritten",
+            "ms": 1782388800000
+          },
+          {
+            "stamp": "2026-06-25T12:00:00+02:00",
+            "expect": "asWritten",
+            "ms": 1782381600000
+          },
+          {
+            "stamp": "2026-02-30",
+            "fileMs": 1790931600000,
+            "expect": "none"
+          },
+          {
+            "stamp": "2026-13-01",
+            "expect": "none"
+          },
+          {
+            "stamp": "not-a-date",
+            "expect": "none"
+          },
+          {
+            "stamp": "",
+            "expect": "none"
+          }
+        ],
+        "days": [
+          {
+            "nowMs": 1790994600000,
+            "offsetMinutes": -600,
+            "timeZone": "Etc/GMT+10",
+            "day": "2026-10-02"
+          },
+          {
+            "nowMs": 1790994600000,
+            "offsetMinutes": -240,
+            "timeZone": "Etc/GMT+4",
+            "day": "2026-10-02"
+          },
+          {
+            "nowMs": 1790994600000,
+            "offsetMinutes": 0,
+            "timeZone": "UTC",
+            "day": "2026-10-03"
+          },
+          {
+            "nowMs": 1790994600000,
+            "offsetMinutes": 540,
+            "timeZone": "Etc/GMT-9",
+            "day": "2026-10-03"
+          },
+          {
+            "nowMs": 1791062000000,
+            "offsetMinutes": 840,
+            "timeZone": "Etc/GMT-14",
+            "day": "2026-10-04"
+          }
+        ]
+      }
     }
   }
 }

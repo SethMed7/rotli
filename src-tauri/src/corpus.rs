@@ -29,6 +29,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
+
+use crate::note_dates::{stamp_to_ms, today_stamp};
 use ulid::Ulid;
 
 // ─── the one place the corpus root is decided ───────────────────────────────
@@ -1178,40 +1180,6 @@ fn now_stamp() -> String {
 
 fn now_ms() -> i64 {
     (OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000_000) as i64
-}
-
-fn stamp_to_ms(stamp: &str) -> Option<i64> {
-    // rotli's local notes stamp RFC3339; a memex note (v3.5) stamps a plain
-    // YYYY-MM-DD date — parse both so a projected note's frontmatter dates are
-    // honored (sort order + created/updated) instead of silently falling back to
-    // the file mtime, which a git clone/copy would have reset.
-    if let Ok(t) = OffsetDateTime::parse(stamp, &Rfc3339) {
-        return Some((t.unix_timestamp_nanos() / 1_000_000) as i64);
-    }
-    let s = stamp.trim();
-    if s.len() == 10 && s.as_bytes()[4] == b'-' && s.as_bytes()[7] == b'-' {
-        let y: i32 = s[0..4].parse().ok()?;
-        let mo: u8 = s[5..7].parse().ok()?;
-        let d: u8 = s[8..10].parse().ok()?;
-        let month = time::Month::try_from(mo).ok()?;
-        let date = time::Date::from_calendar_date(y, month, d).ok()?;
-        let dt = date.with_hms(0, 0, 0).ok()?.assume_utc();
-        return Some((dt.unix_timestamp_nanos() / 1_000_000) as i64);
-    }
-    None
-}
-
-/// A plain YYYY-MM-DD date stamp (UTC) — the memex note convention (v3.5). Local
-/// notes keep the RFC3339 `now_stamp`; a memex edit bumps `updated` with this so the
-/// note stays date-shaped like everything memex-vault writes.
-fn today_stamp() -> String {
-    let now = OffsetDateTime::now_utc().date();
-    format!(
-        "{:04}-{:02}-{:02}",
-        now.year(),
-        u8::from(now.month()),
-        now.day()
-    )
 }
 
 /// (created_ms, updated_ms) from file metadata — the fallback for notes that
@@ -5035,12 +5003,12 @@ impl CorpusStore {
             created_at: fm
                 .created
                 .as_deref()
-                .and_then(stamp_to_ms)
+                .and_then(|s| stamp_to_ms(s, Some(file_created)))
                 .unwrap_or(file_created),
             updated_at: fm
                 .updated
                 .as_deref()
-                .and_then(stamp_to_ms)
+                .and_then(|s| stamp_to_ms(s, Some(file_updated)))
                 .unwrap_or(file_updated),
             pinned: fm.pinned.unwrap_or(false),
         })
@@ -5124,7 +5092,7 @@ impl CorpusStore {
         let created = old_fm
             .created
             .clone()
-            .filter(|s| stamp_to_ms(s).is_some())
+            .filter(|s| stamp_to_ms(s, None).is_some())
             .unwrap_or_else(|| ms_to_stamp(file_created));
         // a memex note stays date-shaped (v3.5: updated: YYYY-MM-DD); local notes
         // keep rotli's RFC3339 stamp.
@@ -5208,6 +5176,9 @@ impl CorpusStore {
                 Err(_) => eprintln!("secure keyword protection failed; the note is still refused to AI by its name"),
             }
         }
+        // the file was just written: its own time is the save, so a note dated
+        // today reads as just edited, not as hours old (stamp_to_ms)
+        let (_, saved_at) = file_stamps(&target_abs);
         Ok(NoteMeta {
             id: id.to_string(),
             title,
@@ -5216,8 +5187,8 @@ impl CorpusStore {
             aliases: note_aliases(&target_rel, &title_of(body), id, &fm),
             folder_id: folder,
             disk_folder_id: disk_folder.clone(),
-            created_at: stamp_to_ms(&created).unwrap_or_else(now_ms),
-            updated_at: stamp_to_ms(&updated).unwrap_or_else(now_ms),
+            created_at: stamp_to_ms(&created, Some(file_created)).unwrap_or_else(now_ms),
+            updated_at: stamp_to_ms(&updated, Some(saved_at)).unwrap_or_else(now_ms),
             pinned: fm.pinned.unwrap_or(false),
             origin: if is_hidden_root(&disk_folder) {
                 fm.origin
@@ -5402,12 +5373,12 @@ impl CorpusStore {
         let created = old_fm
             .created
             .clone()
-            .filter(|s| stamp_to_ms(s).is_some())
+            .filter(|s| stamp_to_ms(s, None).is_some())
             .unwrap_or_else(|| ms_to_stamp(file_created));
         let updated = old_fm
             .updated
             .clone()
-            .filter(|s| stamp_to_ms(s).is_some())
+            .filter(|s| stamp_to_ms(s, None).is_some())
             .unwrap_or_else(|| ms_to_stamp(file_updated));
         let pinned = old_fm.pinned.unwrap_or(false);
         let fm = Frontmatter {
@@ -5464,8 +5435,8 @@ impl CorpusStore {
             aliases: note_aliases(&target_rel, &title_of(&body), id, &fm),
             folder_id: project_lifecycle_folder(self.layout, target_folder),
             disk_folder_id: target_folder.to_string(),
-            created_at: stamp_to_ms(&created).unwrap_or(file_created),
-            updated_at: stamp_to_ms(&updated).unwrap_or(file_updated),
+            created_at: stamp_to_ms(&created, Some(file_created)).unwrap_or(file_created),
+            updated_at: stamp_to_ms(&updated, Some(file_updated)).unwrap_or(file_updated),
             pinned,
             origin,
             kind: NoteKind::Note,
@@ -6069,7 +6040,7 @@ impl CorpusStore {
         atomic_write(&abs, &compose_document(&fm, &format!("\n{body}")))?;
         self.index.insert(id.clone(), rel.clone());
         self.persist_index();
-        let ms = stamp_to_ms(&now).unwrap_or_else(now_ms);
+        let ms = stamp_to_ms(&now, None).unwrap_or_else(now_ms);
         let aliases = note_aliases(&rel, &title, &id, &fm);
         Ok(NoteMeta {
             id,
@@ -6692,12 +6663,12 @@ fn walk(
                     created_at: fm
                         .created
                         .as_deref()
-                        .and_then(stamp_to_ms)
+                        .and_then(|s| stamp_to_ms(s, Some(file_created)))
                         .unwrap_or(file_created),
                     updated_at: fm
                         .updated
                         .as_deref()
-                        .and_then(stamp_to_ms)
+                        .and_then(|s| stamp_to_ms(s, Some(file_updated)))
                         .unwrap_or(file_updated),
                     pinned: false,
                     origin: None,
@@ -6799,12 +6770,12 @@ fn walk(
                 created_at: fm
                     .created
                     .as_deref()
-                    .and_then(stamp_to_ms)
+                    .and_then(|s| stamp_to_ms(s, Some(file_created)))
                     .unwrap_or(file_created),
                 updated_at: fm
                     .updated
                     .as_deref()
-                    .and_then(stamp_to_ms)
+                    .and_then(|s| stamp_to_ms(s, Some(file_updated)))
                     .unwrap_or(file_updated),
                 pinned: fm.pinned.unwrap_or(false),
                 origin,
@@ -12457,17 +12428,6 @@ mod tests {
     }
 
     #[test]
-    fn stamp_to_ms_parses_both_rfc3339_and_date() {
-        assert!(stamp_to_ms("2026-06-25T12:00:00Z").is_some());
-        // a bare v3.5 date parses to that day at 00:00 UTC
-        let a = stamp_to_ms("2026-06-25").unwrap();
-        let b = stamp_to_ms("2026-06-25T00:00:00Z").unwrap();
-        assert_eq!(a, b);
-        assert!(stamp_to_ms("not-a-date").is_none());
-        assert!(stamp_to_ms("2026/06/25").is_none()); // wrong separators
-    }
-
-    #[test]
     fn editing_a_memex_note_preserves_the_v35_frontmatter_and_bumps_updated() {
         let dir = TempDir::new().unwrap();
         let root = dir.path().join("brain");
@@ -12487,6 +12447,12 @@ mod tests {
         let meta = store.write("01ABC", "# Pricing\n\nedited body").unwrap();
         // the default "Inbox" shelf projects onto the Captures surface ("Board"), not wiki/_inbox
         assert_eq!(meta.folder_id, "Board");
+        // the bump is a calendar day, yet the edit reads as just now — never as
+        // hours since that day's UTC midnight — on save and on every re-read
+        let fresh = |ms: i64| (0..60_000).contains(&(now_ms() - ms));
+        assert!(fresh(meta.updated_at), "saved {}ms ago", now_ms() - meta.updated_at);
+        let reread = store.read("01ABC").unwrap();
+        assert!(fresh(reread.updated_at), "re-read {}ms ago", now_ms() - reread.updated_at);
 
         // A first save normalizes the legacy slug-id filename into the clean
         // title slug while retaining the old human stem as a durable alias.

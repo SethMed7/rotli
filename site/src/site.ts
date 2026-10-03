@@ -118,6 +118,11 @@ function publicFileExists(publicDir: string | null, path: string): boolean {
   return existsSync(file) && statSync(file).isFile() && statSync(file).size > 0;
 }
 
+/** Whether a generated file (a post's link card, say) is in `public/` for this build. */
+export function hasPublicFile(path: string): boolean {
+  return publicFileExists(findPublicDir(), path);
+}
+
 /**
  * The film is included only when its real artifacts exist in `public/media/`
  * at build time; until then the pages omit the player rather than rendering an

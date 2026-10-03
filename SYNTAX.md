@@ -202,6 +202,20 @@ imports.
   it and shows none of its text, as does a chat's (a conversation is not
   something to flash on an accidental hover), and a link with no target shows
   no card.
+- Tab indents the caret's line wherever the caret sits in it, and Shift-Tab
+  outdents it. One level is two spaces; a tab character in a pasted note counts
+  as one level and Tab or Shift-Tab rewrites it as spaces. A list item,
+  checklist item, quote, or empty line nests one level per press, and a nested
+  numbered run counts from `1.`. A paragraph takes one level (`  text`) and
+  then stops: Rotli shows it indented, with its text lined up with a bullet's
+  text, while other Markdown readers drop up to three leading spaces and read
+  four or more as an indented code block. A paragraph already written four or
+  more spaces deep shows one indent level per two spaces in Rotli. Tab leaves
+  a heading, an aligned paragraph, a divider, and an image line as they are,
+  because indenting them would make them plain text. With several lines
+  selected, each line follows its own rule and blank lines stay blank. Tables
+  (Tab moves between cells), fenced code (Tab types two spaces at the caret),
+  and open pickers keep their own Tab.
 - Ordered lists count with numbers (`1. `) or a single ASCII letter
   (`a. `, `A. `). Rotli keeps each run consecutive in its own style: `a. a.
   d.` reads `a. b. c.`, a nested run starts at `1.` or `a.`, and a run never

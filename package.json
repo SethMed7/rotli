@@ -76,6 +76,7 @@
     "security:changes": "bash scripts/scan-changed-secrets.sh",
     "security:working": "bun scripts/scan-working-secrets.mjs",
     "build:social-card": "bun scripts/build-social-card.mjs",
+    "build:brand-images": "bun scripts/build-brand-images.mjs",
     "build:companion-showcase": "bun scripts/build-companion-showcase.ts",
     "security:bundle": "bun scripts/check-release-privacy.mjs"
   },

@@ -15,6 +15,7 @@ import Features from '../../components/landing/Features.astro';
 import FinalCta from '../../components/landing/FinalCta.astro';
 import Folder from '../../components/landing/Folder.astro';
 import Personal from '../../components/landing/Personal.astro';
+import { ogImage } from '../../og';
 import { site } from '../../site';
 
 export function getStaticPaths() {
@@ -27,6 +28,7 @@ export function getStaticPaths() {
   description="What rotli does: a quiet Markdown editor, tasks that stay text, links and search, chat that reads your notes, a Librarian that files without rewriting, and themes to make it yours."
   canonicalPath="/features/"
   noindex={!site.indexable}
+  {...ogImage('features')}
 >
   <SiteHeader current="features" />
   <main id="content">

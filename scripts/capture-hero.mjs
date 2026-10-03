@@ -14,8 +14,7 @@
 //   rotli-helper.spec.ts pattern). The app's real agent loop sends every
 //   prompt; the fake answers with scripted model text, and the search and the
 //   note reads in between are the app's own, over the vault on screen.
-// - The page clock and time zone are fixed so the dates on screen agree
-//   (see START below).
+// - The page clock starts at the real time, in a fixed zone (see START below).
 //
 // Output: _review/hero-video/ (frames, raw take, caption plates, contact frames)
 // and the encoded film + poster in site/public/media/hero/.
@@ -38,16 +37,13 @@ await mkdir(siteOut, { recursive: true });
 
 const HELPER_PORT = 43111;
 const HELPER_TOKEN = "fixture-token-with-at-least-twenty-four-chars";
-// The app fills 1920 × 972 device pixels; the film's 1920 × 1080 frame adds a
-// caption band below it, so a caption never covers the UI it describes.
-const VIEW = { width: 1280, height: 648 };
+// The app fills 1920 × 918 device pixels over a 162 px caption band (15%, the
+// player's `--caption-band`); 80 px type stays ~15 px in a 350 px phone player.
+const VIEW = { width: 1280, height: 612 };
 const SCALE = 1.5;
 const BAND = 1080 - VIEW.height * SCALE;
-// A new note's `created` is the New York date (src/memex/contract.ts `today`),
-// read back as UTC midnight, so the header's age is at least four hours however
-// the clock is set; this start keeps it at "4h" with the date in step.
-const TIMEZONE = "Asia/Tokyo";
-const START = new Date("2026-10-02T04:02:00Z");
+const TIMEZONE = "America/New_York"; // START is real: page clock = browser file times
+const START = new Date(Math.floor(Date.now() / 60_000) * 60_000);
 
 // —— the synthetic vault: notes the Librarian filed earlier, by area ——
 const FILED = {
@@ -361,8 +357,9 @@ try {
     await editor.locator('img[src^="blob:"]').first().waitFor();
     await hold(900);
     await page.keyboard.press("ControlOrMeta+End");
-    await jot("\nsee [[Lis");
+    await jot("\nsee [[Lisbon t"); // not "Lis": the newer note being written would rank first
     await page.locator(".rotli-linkpick").waitFor();
+    await page.locator(".rotli-linkpick-title").first().filter({ hasText: "Lisbon trip" }).waitFor();
     await hold(800);
     await page.keyboard.press("Enter");
     await hold(1600);
@@ -486,7 +483,7 @@ const duration = at("end");
 const CAPTIONS = [
   { text: "Write however you think.", from: at("write") + 0.4, to: at("library") - 0.3 },
   {
-    text: "Captures wait. The Librarian files notes into your Library.",
+    text: "The Librarian files notes into your Library.",
     from: at("library") + 0.2,
     to: at("find") - 0.3,
   },
@@ -503,9 +500,12 @@ try {
       @font-face { font-family: GS; src: url(data:font/woff2;base64,${font}) format("woff2"); font-weight: 500; }
       html, body { margin: 0; background: transparent; }
       body { width: 1920px; height: 1080px; display: flex; align-items: flex-end; justify-content: center; }
-      span { height: ${BAND}px; display: flex; align-items: center; color: #3a3028; font: 500 40px/1 GS; letter-spacing: -0.01em; }
+      span { height: ${BAND}px; display: flex; align-items: center; color: #3a3028; font: 500 80px/1 GS; letter-spacing: -0.01em; white-space: nowrap; }
     </style><span>${caption.text}</span>`);
     await plate.evaluate(() => document.fonts.ready);
+    // one line, clear of the edges: a longer caption needs fewer words, not smaller type
+    if ((await plate.$eval("span", (el) => el.getBoundingClientRect().width)) > 1760)
+      throw new Error(`caption ${i + 1} is wider than 1760 px; shorten it`);
     caption.png = join(review, `plates/caption-${i + 1}.png`);
     await plate.screenshot({ path: caption.png, omitBackground: true });
   }
@@ -520,10 +520,12 @@ const chain = [
 let last = "[base]";
 for (const [i, c] of CAPTIONS.entries()) {
   const length = c.to - c.from;
+  const final = i === CAPTIONS.length - 1; // stays on the frame the player rests on
+  const fadeOut = final ? "" : `,fade=t=out:st=${(length - 0.3).toFixed(3)}:d=0.3:alpha=1`;
   inputs.push("-loop", "1", "-t", length.toFixed(3), "-i", c.png);
   chain.push(
-    `[${i + 1}:v]format=rgba,fade=t=in:st=0:d=0.3:alpha=1,fade=t=out:st=${(length - 0.3).toFixed(3)}:d=0.3:alpha=1,setpts=PTS-STARTPTS+${c.from.toFixed(3)}/TB[c${i}]`,
-    `${last}[c${i}]overlay=0:0:eof_action=pass[v${i}]`,
+    `[${i + 1}:v]format=rgba,fade=t=in:st=0:d=0.3:alpha=1${fadeOut},setpts=PTS-STARTPTS+${c.from.toFixed(3)}/TB[c${i}]`,
+    `${last}[c${i}]overlay=0:0:eof_action=${final ? "repeat" : "pass"}[v${i}]`,
   );
   last = `[v${i}]`;
 }

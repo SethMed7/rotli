@@ -6,6 +6,7 @@ import { render } from 'astro:content';
 import { twinPath, writingGraph, writingPath } from '../../agents';
 import WritingList from '../../components/WritingList.astro';
 import WritingPage from '../../components/WritingPage.astro';
+import { ogImage, postOgImage } from '../../og';
 import { site } from '../../site';
 import { publishedWriting, readingMinutes, slugOf, upcomingWriting, type Writing } from '../../writing';
 
@@ -52,6 +53,7 @@ const toc = (rendered?.headings ?? [])
       title={`${entry.data.title} — rotli`}
       description={entry.data.description}
       canonicalPath={`/blog/${slugOf(entry)}/`}
+      {...postOgImage(slugOf(entry), entry.data.title)}
       structuredData={writingGraph(entry)}
       markdownPath={twinPath(writingPath(entry))}
       section="blog"
@@ -69,6 +71,7 @@ const toc = (rendered?.headings ?? [])
       title="Blog — rotli"
       description="Notes from building rotli."
       canonicalPath="/blog/"
+      {...ogImage('blog')}
       section="blog"
       heading="Blog"
       lede="Notes from building rotli: how it works, and why it works that way."

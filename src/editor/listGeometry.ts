@@ -65,6 +65,14 @@ export const RESULT_EM = 2.9;
  * it reaches a style attribute. */
 const em = (n: number): string => String(Number(n.toFixed(4)));
 
+/** A paragraph line indented `levels` deep (lineIndent.ts). Its text lands on
+ * the list ladder's text column one level up — so one level sits exactly
+ * under a top-level bullet's words, where CommonMark reads it as that item's
+ * continuation — and wrapped rows keep the indent. */
+export function paragraphIndentStyle(levels: number): string {
+  return `padding-left:${em((levels - 1) * STEP_EM + MARKER_EM)}em`;
+}
+
 /**
  * The inline style for a list/task line at `depth` (0 = top level). `markerEm`
  * is the hanging marker column — MARKER_EM for bullets/numbers, CHECK_EM for

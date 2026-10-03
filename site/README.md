@@ -154,7 +154,7 @@ bun run preview  # serve the built dist/ locally
   note wandered off." in the middle of the window, one "Take me home" button
   with a quiet line of other ways in, and the footer's quokka scenery along
   the bottom edge. The missing path and a hint (`/app`, `/helper`) are chosen
-  in the browser. `SunsetScene.astro` remains the closing invitation's ground.
+  in the browser.
 - **The quokka scenery** (`src/components/QuokkaScene.astro`, under every
   footer, the 404, and `/subscribed/`) is a strip of Rottnest by day in the
   film's palette (sea, the far lighthouse, scrub on the dunes, sand) with a
@@ -283,15 +283,17 @@ bun run preview  # serve the built dist/ locally
   Rotli Helper runs the same tools for Rotli Web; the install lines mirror
   `src/ai/connectorGuides.ts`).
 - **Scenes from the film**, drawn in inline SVG on the film's palette (the
-  `--sunset-*`, `--sea*`, `--sand`, `--olive*`, `--limestone`, `--lake`,
+  `--sea*`, `--sand`, `--olive*`, `--limestone`, `--lake`,
   `--wood*`, and `--lantern` tokens in `Base.astro`) with the app's own
   character art. Each plays once when revealed (`[data-reveal]`) and rests;
   reduced motion shows it at rest. `SecureScene.astro` is the film's "secure
-  stays home" night (the landing privacy band on `public/night-stars.svg`,
-  and the night frame on `/privacy/`); `IslandScene.astro` is the island by
+  stays home" night, in Ocean Dark under `public/night-stars-ocean.svg`
+  through `.band-night` (the landing privacy band and the night frame on
+  `/privacy/`); `IslandScene.astro` is the island by
   day (a faint vignette behind Make it yours, and the framed scene opening
-  `/about/`); the FAQ has the searching quokka among question cards; the
-  closing invitation is the film's sunset in flat bands. `/privacy/` and
+  `/about/`); the FAQ has the searching quokka among question cards. The
+  closing invitation has no scene of its own (2026-10-02): the footer's
+  quokka beach right below it is the page's one closing scene. `/privacy/` and
   `/about/` place their scene through `WritingPage`'s `scene` slot; `/about/`
   uses the centered layout (`center`).
 - The landing privacy band is brief and points to `/privacy/`: the promise and
@@ -314,7 +316,7 @@ bun run preview  # serve the built dist/ locally
   URL there until that deployment has been verified. The old
   `/resources/mcp/` guide (itself moved from `/mcp/`) folded in on
   2026-10-02: the build writes a refresh page there (`redirects` in
-  `astro.config.mjs`), which the Caddyfile's `/mcp` redirect lands on.
+  `astro.config.mjs`); the Caddyfile sends `/mcp` straight to the developer page.
 - `public/social-card.svg` is the editable source for the link preview, set on
   the story film's island by day: the wordmark and the hero line over a faint
   file-icon pattern that fades out before the bay, the lighthouse on its hill,
@@ -338,6 +340,24 @@ bun run preview  # serve the built dist/ locally
   `src-tauri/icons/icon.png`) for the previews that cannot use the SVG favicon.
   LinkedIn and Facebook cache scrapes; re-scrape with their post inspectors
   after a deploy.
+- **Per-page link cards** (`public/og/`, 1200×630) give each page its own
+  preview: home, Features, Privacy, Guides (and every guide), Blog, each
+  published post (`public/og/blog/<slug>.png`, from its frontmatter title),
+  About, Download, and Developers. One family: the warm ground, the wordmark,
+  the page's own heading and one line of its lede, and the quokka pose that fits
+  the page, standing on a beach over the bay. `src/og.ts` holds the words, the
+  poses, and the alt text; pages pass `{...ogImage('<page>')}` (posts
+  `postOgImage`) to Base's `image` / `imageAlt`. A post without a rendered card
+  falls back to the Blog card, and pages without one (the changelog, the 404,
+  the holding page) keep `social-card.png`. After changing a heading or adding
+  a post, run `bun run build:brand-images` from the repository root: it renders
+  every card in Chromium with the bundled fonts and the network off, shrinks a
+  title only as far as its three-line limit, fails if any text leaves the safe
+  area, touches the quokka or the lighthouse, or falls under 4.5:1 contrast, and
+  palette-compresses the PNGs (about 35 KB each). The same run writes the
+  banners, profile pictures, and thumbnails described in `brand/README.md`, and
+  a contact sheet of everything at `_review/brand-images/contact-sheet.png`
+  (gitignored).
 
 ## Agents and search engines
 
@@ -522,8 +542,12 @@ local `ROTLI_BUILD_CHANNEL=stable bun run dev:web`. It writes a messy note (two
 tasks, a dropped image, a `[[link]]`), opens the linked note and the Library,
 finds the note with search, asks chat what is still open, and ends on the note
 as raw Markdown. Real controls are clicked with a drawn pointer; captions sit
-in a band under the picture, never over the UI. H.264 1920 × 1080, 30 fps,
-`+faststart`, no audio, CRF 18 (about 1.7 MB); the poster is a frame of the
+in a 162 px band under the picture, never over the UI, in 80 px type so they
+still read (about 15 px) when a phone shows the film 350 px wide. Each caption
+is one line (the script refuses one over 1760 px), the last stays on the frame
+the player rests on, and the player keeps Watch again and pause above the band
+(`captioned` in `src/films.ts`). H.264 1920 × 1080, 30 fps,
+`+faststart`, no audio, CRF 18 (about 1.75 MB); the poster is a frame of the
 written note. What is fixture, all synthetic:
 
 - **The Library's filed notes** (Travel, People, Home) are planted as files
@@ -534,10 +558,10 @@ written note. What is fixture, all synthetic:
   `e2e/web/rotli-helper.spec.ts` pattern). The app's real agent loop sends
   every prompt and runs the search and both note reads; only the model's text
   is scripted, and it answers from what those reads returned.
-- **The clock** is fixed (with the time zone) so the dates on screen agree. A
-  new note's age still reads "4h": `created` is a New York date read back as
-  UTC midnight (`src/memex/contract.ts`), so a just-written note is never
-  "just now" in Rotli Web.
+- **The clock** starts at the real time (New York time zone) so the app's
+  clock and the vault's file times, which the browser stamps itself, agree:
+  the note written on camera reads "just now" and the dates are the day it
+  was shot.
 
 The script fails if the note written on camera is not Markdown in the vault
 or the film is over 6 MB. Look at `_review/hero-video/frame-*.png` and the

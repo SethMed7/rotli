@@ -1,10 +1,21 @@
 ---
-// /about/: what rotli is, where the name comes from, what it believes, and who makes it,
-// opened by the story film's island (IslandScene.astro). Every belief restates a claim the
-// rest of the site makes; the maker section says only what is public. The longer story is
-// the "creation" post, linked once it is published.
+// /about/: the story of why rotli exists, told by its maker in first person, then the name
+// (the #name anchor is linked from other pages, so it stays). One reading column, no table of
+// contents: it is a story, not a reference. The two quokkas are the story film's island (the
+// opening scene, IslandScene.astro) and the app's own "stays local" character beside the vault.
+// Every claim restates something the rest of the site already says (landing, /privacy/,
+// PRODUCT.md); the maker's facts come only from his public portfolio. The longer story is the
+// "creation" post, linked once it is published.
+//
+// [[OWNER: one real moment from your own life that made you start (a note you lost, an app that
+// changed under you, a bill you did not expect). If you add it, put it as one or two sentences
+// at the end of "Notes come first". The page reads true without it.]]
+// [[OWNER: the true reason it is called a quokka and not something else, if there is one beyond
+// "they look happy". Optional; the name section works without it.]]
+import stayLocal from '../../../../src/assets/characters/filled/cocoa/stays_local.webp';
 import IslandScene from '../../components/IslandScene.astro';
 import WritingPage from '../../components/WritingPage.astro';
+import { ogImage } from '../../og';
 import { GITHUB_URL, site } from '../../site';
 import { publishedWriting, slugOf } from '../../writing';
 
@@ -13,37 +24,21 @@ export function getStaticPaths() {
 }
 
 const X_URL = 'https://x.com/iamsethmedina';
+// The same survey the landing page's figure cites (StatBand.astro), checked 2026-10-02.
+const SURVEY_URL = 'https://www.self.inc/info/cost-of-unused-paid-subscriptions/';
 
 const posts = await publishedWriting('post');
 const story = posts.find((post) => slugOf(post) === 'the-creation-of-rotli');
-
-const beliefs = [
-  {
-    title: 'Your files are the product.',
-    body: 'Notes are plain Markdown in one folder you choose. rotli’s own data is rebuildable, never a second copy of your work, and deleting rotli leaves every file where it was.',
-  },
-  {
-    title: 'Calm over clever.',
-    body: 'Nothing asks for your attention. Open it with ⌥Space, write, and put it away; the handful of keys worth learning are the ones you will use every day.',
-  },
-  {
-    title: 'AI works for you, inside rules you set.',
-    body: 'AI is optional. Run a model on your Mac or connect the tools you already use; secure notes never reach a remote model, and no model can edit a note you lock.',
-  },
-  {
-    title: 'Nothing about you to collect.',
-    body: 'No account, no analytics, no ads, and no crash uploads. There is no rotli server holding your notes.',
-  },
-];
 ---
 
 <WritingPage
   title="About — rotli"
-  description="rotli is a calm, local-first workspace: one folder of ordinary files, on your Mac or in your browser. Where the name comes from, what it believes, and who makes it."
+  description="Why Seth Medina is building rotli: a private workspace on notes you own, with AI that works under your rules and costs nothing extra. Also, where the name comes from."
   canonicalPath="/about/"
+  {...ogImage('about')}
   section="about"
-  heading="About rotli"
-  lede="A calm place to think, built on one folder of ordinary files you keep."
+  heading="Why I’m building rotli"
+  lede="Notes are where work starts. They should live somewhere that is yours."
   center
 >
   <figure slot="scene" class="island-frame">
@@ -51,52 +46,97 @@ const beliefs = [
     <figcaption>Rottnest Island, where the quokkas live, and where rotli gets its name.</figcaption>
   </figure>
 
+  <h2 id="notes">Notes come first</h2>
   <p>
-    rotli is a local-first workspace for notes, tasks, links, and optional AI conversations. Everything lives
-    in one folder you choose, as plain Markdown files, so your work opens anywhere and outlasts any app,
-    including this one.{site.webAppEnabled ? ' It runs on your Mac, and in your browser with Rotli Web.' : ''}
+    Before there is a project, there is a note. A name, a half idea, something someone said on a call. You
+    type a few words so you won’t forget, and everything else gets built on top of them.
+  </p>
+  <p>
+    So I think where your notes live matters more than almost any other choice you make about your tools.
+    It is the foundation. rotli is my attempt to build a private workspace on that foundation, powered by
+    your own AI and kept in a vault you own.
   </p>
 
-  <h2 id="name">Why “rotli”?</h2>
+  <h2 id="two-kinds">People and AI take notes differently</h2>
   <p>
-    rotli is short for Rottnest, the island off Western Australia where quokkas live. Short, quick to say, easy
-    to remember. The workspace is the island, and you are the quokka.
+    I write in half sentences. <em>call w/ dana re pricing, deck fri??</em>{' '}I know exactly what that means
+    today. An AI reads differently. It wants a clear title, a few tags, and links to related notes, because
+    that is how it finds things again. Neither way is wrong. They are two different jobs.
   </p>
   <p>
-    Quokkas are famous for looking like they can’t stop smiling. That is the feeling rotli is built for: a
+    Most tools hand you the second job. Name it properly, tag it, write it so the assistant can follow it.
+    I think that is backwards. Every minute you spend shaping your notes around an AI is a minute taken from
+    the thing you sat down to do, and it breaks your flow. That attention belongs to your creative work.
+  </p>
+  <p>
+    So in rotli you only write. A Librarian files your notes in the background, adds the tags and links
+    around your words, and never rewrites them.
+  </p>
+
+  <h2 id="vault">A vault you own</h2>
+  <div class="vault">
+    <img src={stayLocal.src} width="512" height="512" alt="" loading="lazy" decoding="async" />
+    <div>
+      <p>
+        Every note is a plain Markdown file in one folder you choose. I call that folder your vault. There is
+        no account to make and no rotli server holding your notes. Delete rotli tomorrow and your files are
+        right where you left them, and any other editor can open them.
+      </p>
+      <p>
+        Search, chat, and the Librarian are all built on top of that folder. When the foundation is yours, the
+        rest can change without you losing anything.
+      </p>
+    </div>
+  </div>
+
+  <h2 id="cost">You shouldn’t pay extra to use your own notes</h2>
+  <p>
+    Many people already pay for an AI tool, and often more than one. One survey found about half of the
+    people paying for ChatGPT hadn’t used it in the past month (<a href={SURVEY_URL}>Self Financial</a>).
+    The subscriptions are there, waiting.
+  </p>
+  <p>
+    So rotli doesn’t sell you AI, and it doesn’t add a fee for it. Run a model on your Mac, or connect the
+    AI tools you already have. rotli never holds your keys.
+  </p>
+
+  <h2 id="rules">AI is welcome, under rules you set</h2>
+  <p>
+    I like having AI around. I just want it to follow house rules, and I want you to write them. Mark a note
+    secure and only the model on your Mac can read it. Lock a note and no AI can change it. You decide, note
+    by note, what each one may see.
+  </p>
+
+  <h2 id="name">Why “rotli”, and why a quokka</h2>
+  <p>
+    rotli is short for Rottnest, the island off Western Australia where quokkas live. Short, quick to say,
+    easy to remember. The workspace is the island, and you are the quokka.
+  </p>
+  <p>
+    Quokkas are famous for looking like they can’t stop smiling. That is the feeling I want rotli to have: a
     workspace that feels good to be in, so getting things done feels good too.
   </p>
 
-  <h2 id="beliefs">What rotli believes</h2>
-  <ol class="beliefs">
-    {
-      beliefs.map((belief) => (
-        <li>
-          <h3>{belief.title}</h3>
-          <p>{belief.body}</p>
-        </li>
-      ))
-    }
-  </ol>
-
   <h2 id="who">Who makes it</h2>
   <p>
-    rotli is designed and built by Seth Medina, a software engineer in Florida.
+    I’m Seth Medina, a software engineer in Florida. I taught myself to build software, and I like tools that
+    get out of the way.
     {
       story && (
         <>
-          {' '}The story of how it came together is on the blog:{' '}
+          {' '}The longer story is on the blog:{' '}
           <a href={`/blog/${slugOf(story)}/`}>{story.data.title}</a>.
         </>
       )
     }
   </p>
   <p>
-    Two open-source editors are built in, and both save ordinary files in your folder:
-    <a href="https://excalidraw.com">Excalidraw</a> draws your boards, and
+    Two open-source editors are built in, and both save ordinary files in your folder:{' '}
+    <a href="https://excalidraw.com">Excalidraw</a> draws your boards, and{' '}
     <a href="https://univer.ai">Univer</a> edits your Word documents.
   </p>
   <ul class="elsewhere">
+    <li><a href="/download/">Try rotli</a></li>
     <li><a href={X_URL} rel="me">Follow along on X · @iamsethmedina</a></li>
     {site.sourcePublic && <li><a href={GITHUB_URL}>Read the source on GitHub</a></li>}
     <li><a href="/blog/">Read the blog</a></li>
@@ -120,34 +160,25 @@ const beliefs = [
     color: var(--text-muted);
     font-size: 0.9rem;
   }
-  .beliefs {
+  /* The vault: the quokka beside the first paragraphs, stacked above them on narrow screens. */
+  .vault {
     display: grid;
-    gap: 1.4rem;
-    margin: 1.5rem 0 0;
-    padding: 0;
-    list-style: none;
-    counter-reset: belief;
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    align-items: start;
+    gap: 1.5rem;
   }
-  .beliefs li {
-    position: relative;
-    padding-left: 3rem;
-    counter-increment: belief;
+  .vault img {
+    width: 100%;
+    height: auto;
   }
-  .beliefs li::before {
-    position: absolute;
-    left: 0;
-    top: 0.1rem;
-    content: counter(belief, decimal-leading-zero);
-    color: var(--accent-text);
-    font-size: 0.9rem;
-    font-weight: 600;
-  }
-  .beliefs h3 {
-    margin: 0;
-    font-size: 1.12rem;
-  }
-  .beliefs p {
-    margin: 0.35rem 0 0;
+  @media (max-width: 560px) {
+    .vault {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.5rem;
+    }
+    .vault img {
+      width: 6rem;
+    }
   }
   .elsewhere {
     display: flex;

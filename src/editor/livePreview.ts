@@ -38,6 +38,7 @@ import { imageSourceSpan, selectionCoversImage } from "./imageSelection";
 import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
 import { underscoreEm } from "./inlineEmphasis";
 import { AUTOLINK_SOURCE, MD_LINK_SOURCE } from "./inlineLinks";
+import { DIVIDER_LINE, indentColumns, leadingIndent } from "./lineIndent";
 import {
   CHECK_EM,
   CHOICE_EM,
@@ -47,6 +48,7 @@ import {
   listStyle,
   MARKER_EM,
   numberColumnEm,
+  paragraphIndentStyle,
   RESULT_EM,
 } from "./listGeometry";
 import { widestOrdinalInRun } from "./listNumbers";
@@ -223,10 +225,6 @@ function listItemImage(
   atomics.push(d.range(contentBase, lineEnd));
   return true;
 }
-
-// a thematic break — ---, ***, ___ (frontmatter never reaches here: the Rust
-// corpus splits it off the body; table delimiter rows carry pipes so they miss)
-const HR_LINE = /^ {0,3}(-{3,}|\*{3,}|_{3,})\s*$/;
 
 // resolved image urls, keyed by root + raw markdown src (see ImgWidget.toDOM)
 const IMG_SRC_CACHE = new Map<string, string>();
@@ -852,7 +850,7 @@ function build(view: EditorView): {
       }
 
       // a divider (--- / *** / ___) renders as a thin rule; caret reveals dashes
-      if (HR_LINE.test(text) && !lineTouched && line.to > ls) {
+      if (DIVIDER_LINE.test(text) && !lineTouched && line.to > ls) {
         const d = Decoration.replace({ widget: new HrWidget() });
         decos.push(d.range(ls, line.to));
         atomics.push(d.range(ls, line.to));
@@ -1131,6 +1129,14 @@ function build(view: EditorView): {
           // <p align="center">…</p>: the tags are markers (hidden until the
           // caret is in the line); the line aligns and its Markdown renders
           const aligned = parseAlignedLine(text);
+          // a Tab-indented paragraph shows its levels as a real indent on the
+          // list ladder, not two space-widths (lineIndent.ts owns the levels)
+          const levels = Math.floor(indentColumns(text) / 2);
+          if (!aligned && levels > 0) {
+            const style = paragraphIndentStyle(levels);
+            decos.push(Decoration.line({ class: "rotli-indented", attributes: { style } }).range(ls));
+            hidePrefix(ls, ls + leadingIndent(text).length, null, decos, atomics);
+          }
           if (!aligned) {
             scanInline(text, ls, sel, decos, atomics);
             break;
