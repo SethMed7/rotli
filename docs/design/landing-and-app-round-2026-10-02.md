@@ -94,53 +94,48 @@ site message and structure follow. The story film (#21) comes last.
 - **Opus:** drag-drop, search engine wiring, MCP, Hand-to-AI refiner, SVG rig + interaction, privacy-page layout.
 - **Sonnet:** copy passes and blog drafts, About interview → draft, stat verification (done), E2E spec drafting, screenshot capture runs.
 
-## Status (2026-10-02)
+## Status (2026-10-03)
 
-Ten local branches, each built on the one before (none pushed yet):
+Fifteen pull requests, stacked in one line (`dev ← #151 ← … ← #165`), each
+proved by `bun run verify` on the stack tip:
 
-1. `fix/keep-quokka-outline` — #8: the Keep quokka's missing outline is
-   restored in the art; app and site re-rendered.
-2. `fix/drop-search-scrolltop` — #5 Finder drops land under the pointer
-   (failing test first), #23 ⌘P searches note text through the ranked
-   engine, #6 a smaller, quieter scroll-to-top.
-3. `feat/theme-cycle-image-outline-align` — #3 the theme button flips
-   light/dark (cycle knob), #4 image outline knob, #9 align commands with
-   `<p align>` round-trip.
-4. `feat/hand-to-ai-v2` — #22 attachments as real paths, Basic and
-   Refined modes with offline evals.
-5. `feat/agents-lane-buildout` — #24 MCP rename, trash, attachment reads,
-   and a journal for every AI body edit (the #2 side note).
-6. `feat/site-message` — #2, #11, #12, #13, #19: the new hero line,
-   TwoKinds, the sourced StatBand, the Ocean night privacy band, the
-   Helper explained; carousel and Founder.best badge gone.
-7. `feat/site-structure` — #15–#17: the Resources dropdown, blog, developer
-   page, and the privacy article layout.
-8. `feat/site-living-footer` — #7: the quokka footer and 404 scenery, and
-   the Resend newsletter sidecar.
-9. `feat/hero-product-video` — #1: the hero plays a real Rotli Web
-   recording.
-10. `fix/site-integration` — a new note in Rotli Web reads "just now"
-    (date-only stamps are never read as hours); the privacy page and
-    PRIVACY.md name only the Launch Llama badge and describe the Resend
-    list; the privacy night uses the Ocean stars; `/mcp` goes straight to
-    the developer page; episode 7 is retitled; the landing ends on one
-    beach (sunset scene removed); the hero film's captions read on a
-    phone, Watch again stays above them, and the film is re-recorded.
+| PR | Branch | Items |
+|---|---|---|
+| #151 | `fix/keep-quokka-outline` | #8 the Keep quokka's outline |
+| #152 | `fix/drop-search-scrolltop` | #5 Retina drops, #23 ⌘P body search, #6 quieter scroll-to-top |
+| #153 | `feat/theme-cycle-image-outline-align` | #3 theme cycle knob, #4 image outline, #9 `<p align>`; slash rows no longer select on mouseenter |
+| #154 | `feat/hand-to-ai-v2` | #22 attachments as paths, Basic/Refined with offline evals |
+| #155 | `feat/agents-lane-buildout` | #24 MCP rename/trash/attachments/roots/configs, the AI edit journal (#2 side note) |
+| #156 | `feat/site-message` | #2, #11–#14 site message, TwoKinds, StatBand, Ocean night, carousel retired |
+| #157 | `feat/site-structure` | #13, #15–#17 Resources menu, blog + Rotli Web post, Developers, article layout, Features |
+| #158 | `feat/site-living-footer` | #7, #19 quokka footer and 404, Resend list, one badge |
+| #159 | `feat/hero-product-video` | #1 real product film in the hero |
+| #160 | `fix/site-integration` | Rotli Web "just now" dates, privacy truth, one beach, legible film captions |
+| #161 | `feat/about-story` | #18 About as a first-person story |
+| #162 | `feat/tab-indent` | #10 Tab as a visible indent |
+| #163 | `feat/brand-images` | #20 per-page link cards, banners, profile pictures, thumbnails |
+| #164 | `fix/native-date-age` | the Mac app's date-only ages; `[[` never offers the current note |
+| #165 | `feat/chat-quokka-buddy` | #14 the chat buddy; quokkas only in Chat, Settings, setup |
 
-Remaining:
+Decisions taken under the owner's delegation (2026-10-03): the footer
+quokkas' idle motion is the site's one timer exception; the landing ends on
+the footer beach (sunset removed); chat-buddy decoration stays per Mac; the
+launch opening drops its quokka; Tab stops paragraphs at one level; new notes
+keep full UTC `created` timestamps.
 
-- #10 Tab (still needs the owner's answer on what feels wrong).
-- #14 the chat buddy (app half).
-- #18 About (needs the owner interview).
-- #20 branding.
-- #21 the story film, last.
-- Native proofs: the Retina drop (#5) and Refined with a real model (#22).
-- Building the site's Docker image.
-- Setting the Resend environment (`RESEND_API_KEY`, `RESEND_SEGMENT_ID`)
-  on Railway.
+Remaining, owner-blocked:
 
-## Still open (non-blocking)
+- Review and merge the stack bottom-up (stack-and-merge-down).
+- Resend: a segment + full-access key; Railway runtime `RESEND_API_KEY`,
+  `RESEND_SEGMENT_ID`.
+- Build the site Docker image once (Bun sidecar stage untested locally).
+- Upload banners, profile picture, and GitHub social preview.
+- About: optionally supply a real "why I started" moment and the quokka
+  reason (marked in code comments).
+- Native proofs: a Retina Finder drop (#5), Refined with a real model (#22).
+- Review the hero film cut by eye.
+- #21 the story film — last, after the above settles.
 
-- About page: what story? (origin of the name, why local-first, who it's for). An interview gets the raw material.
-- #10: what feels wrong about Tab today?
-- #14 (app half): does the chat buddy's decoration live per-vault or per-Mac?
+Known follow-ups: nested ordered lists indent 2 spaces (CommonMark wants 3);
+an in-app viewer for the AI edit journal; `![[file]]` embeds as Hand to AI
+attachments; `public/night-stars.svg` is unused.
