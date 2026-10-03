@@ -5,6 +5,7 @@
 // the "creation" post, linked once it is published.
 import IslandScene from '../../components/IslandScene.astro';
 import WritingPage from '../../components/WritingPage.astro';
+import { ogImage } from '../../og';
 import { GITHUB_URL, site } from '../../site';
 import { publishedWriting, slugOf } from '../../writing';
 
@@ -41,6 +42,7 @@ const beliefs = [
   title="About — rotli"
   description="rotli is a calm, local-first workspace: one folder of ordinary files, on your Mac or in your browser. Where the name comes from, what it believes, and who makes it."
   canonicalPath="/about/"
+  {...ogImage('about')}
   section="about"
   heading="About rotli"
   lede="A calm place to think, built on one folder of ordinary files you keep."

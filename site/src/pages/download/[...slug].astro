@@ -7,6 +7,7 @@
 // directly (DOWNLOAD_HREF in src/site.ts).
 import { application } from '../../agents';
 import WritingPage from '../../components/WritingPage.astro';
+import { ogImage } from '../../og';
 import { DOWNLOAD_URL, RELEASES_URL, WEB_APP_PATH, site } from '../../site';
 
 export function getStaticPaths() {
@@ -43,6 +44,7 @@ const platforms: { name: string; detail: string; status: Status; action?: { href
   title="Download — rotli"
   description="Get rotli for your Mac, or open it in your browser on Windows and Linux."
   canonicalPath="/download/"
+  {...ogImage('download')}
   section="download"
   structuredData={[application()]}
   heading="Get rotli"

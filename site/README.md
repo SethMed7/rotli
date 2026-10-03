@@ -338,6 +338,24 @@ bun run preview  # serve the built dist/ locally
   `src-tauri/icons/icon.png`) for the previews that cannot use the SVG favicon.
   LinkedIn and Facebook cache scrapes; re-scrape with their post inspectors
   after a deploy.
+- **Per-page link cards** (`public/og/`, 1200×630) give each page its own
+  preview: home, Features, Privacy, Guides (and every guide), Blog, each
+  published post (`public/og/blog/<slug>.png`, from its frontmatter title),
+  About, Download, and Developers. One family: the warm ground, the wordmark,
+  the page's own heading and one line of its lede, and the quokka pose that fits
+  the page, standing on a beach over the bay. `src/og.ts` holds the words, the
+  poses, and the alt text; pages pass `{...ogImage('<page>')}` (posts
+  `postOgImage`) to Base's `image` / `imageAlt`. A post without a rendered card
+  falls back to the Blog card, and pages without one (the changelog, the 404,
+  the holding page) keep `social-card.png`. After changing a heading or adding
+  a post, run `bun run build:brand-images` from the repository root: it renders
+  every card in Chromium with the bundled fonts and the network off, shrinks a
+  title only as far as its three-line limit, fails if any text leaves the safe
+  area, touches the quokka or the lighthouse, or falls under 4.5:1 contrast, and
+  palette-compresses the PNGs (about 35 KB each). The same run writes the
+  banners, profile pictures, and thumbnails described in `brand/README.md`, and
+  a contact sheet of everything at `_review/brand-images/contact-sheet.png`
+  (gitignored).
 
 ## Agents and search engines
 
