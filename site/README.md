@@ -524,8 +524,12 @@ local `ROTLI_BUILD_CHANNEL=stable bun run dev:web`. It writes a messy note (two
 tasks, a dropped image, a `[[link]]`), opens the linked note and the Library,
 finds the note with search, asks chat what is still open, and ends on the note
 as raw Markdown. Real controls are clicked with a drawn pointer; captions sit
-in a band under the picture, never over the UI. H.264 1920 × 1080, 30 fps,
-`+faststart`, no audio, CRF 18 (about 1.7 MB); the poster is a frame of the
+in a 162 px band under the picture, never over the UI, in 80 px type so they
+still read (about 15 px) when a phone shows the film 350 px wide. Each caption
+is one line (the script refuses one over 1760 px), the last stays on the frame
+the player rests on, and the player keeps Watch again and pause above the band
+(`captioned` in `src/films.ts`). H.264 1920 × 1080, 30 fps,
+`+faststart`, no audio, CRF 18 (about 1.75 MB); the poster is a frame of the
 written note. What is fixture, all synthetic:
 
 - **The Library's filed notes** (Travel, People, Home) are planted as files
@@ -536,10 +540,10 @@ written note. What is fixture, all synthetic:
   `e2e/web/rotli-helper.spec.ts` pattern). The app's real agent loop sends
   every prompt and runs the search and both note reads; only the model's text
   is scripted, and it answers from what those reads returned.
-- **The clock** is fixed (with the time zone) so the dates on screen agree. A
-  new note's age still reads "4h": `created` is a New York date read back as
-  UTC midnight (`src/memex/contract.ts`), so a just-written note is never
-  "just now" in Rotli Web.
+- **The clock** starts at the real time (New York time zone) so the app's
+  clock and the vault's file times, which the browser stamps itself, agree:
+  the note written on camera reads "just now" and the dates are the day it
+  was shot.
 
 The script fails if the note written on camera is not Markdown in the vault
 or the film is over 6 MB. Look at `_review/hero-video/frame-*.png` and the

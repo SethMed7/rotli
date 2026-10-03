@@ -11,6 +11,8 @@ export type Film = {
   label: string;
   /** No soundtrack: the player offers a replay, never sound. */
   silent?: true;
+  /** Captions burned into a band along the bottom (the player keeps its controls above it). */
+  captioned?: true;
 };
 export type Episode = Film & { n: number; title: string; thumb: string };
 
@@ -23,6 +25,7 @@ export const hero: Film = {
   src: '/media/hero/rotli-hero.mp4',
   poster: '/media/hero/rotli-hero-poster.webp',
   silent: true,
+  captioned: true,
   label:
     'A screen recording of rotli, under a minute, without sound: a quick messy note with two tasks, a dropped picture of tiles, and a link to the Lisbon trip note; the Library, where the Librarian files notes into areas such as Travel; a search for "tile" that finds the note again; a chat asking what is still open for Lisbon, answered from those notes; and the same note as plain Markdown.',
 };
