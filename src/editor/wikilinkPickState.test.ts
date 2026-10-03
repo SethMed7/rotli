@@ -50,5 +50,13 @@ test("choices rank title prefixes, then aliases, then substrings, newest first, 
   expect(wikilinkChoices(notes, "pri").map((n) => n.id)).toEqual(["c", "a", "d", "b"]);
   expect(wikilinkChoices(notes, "").map((n) => n.id)).toEqual(["d", "c", "a", "b"]);
   expect(wikilinkChoices(notes, "zzz")).toEqual([]);
-  expect(wikilinkChoices(notes, "", 2)).toHaveLength(2);
+  expect(wikilinkChoices(notes, "", { limit: 2 })).toHaveLength(2);
+});
+
+test("the note being edited is never offered as its own link target", () => {
+  const notes = [note("self", "Pricing decision", 30), note("other", "Pricing plan", 10)];
+  expect(wikilinkChoices(notes, "pri", { exclude: "self" }).map((n) => n.id)).toEqual(["other"]);
+  expect(wikilinkChoices(notes, "", { exclude: "self" }).map((n) => n.id)).toEqual(["other"]);
+  // no open note (or an unknown id) excludes nothing
+  expect(wikilinkChoices(notes, "pri", { exclude: "" }).map((n) => n.id)).toEqual(["self", "other"]);
 });

@@ -179,6 +179,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reason as on the web, and was dated with the UTC day, so an evening edit in
   the Americas carried tomorrow's date. The Mac app now reads dates the way
   Rotli Web does and dates edits with your own calendar day.
+- **The `[[` link picker no longer offers the note you're in.** Picking it
+  linked the note to itself.
 - **Images dropped from Finder land where you drop them.** On Retina
   screens a dropped image went in about halfway up the note; Rotli now reads
   the drop position as the Mac reports it.
