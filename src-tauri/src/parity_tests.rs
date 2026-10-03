@@ -345,3 +345,41 @@ fn ai_body_edit_cases_match_fixture() {
         );
     }
 }
+
+/// A note's date stamps read and write alike in the Mac app and Rotli Web
+/// (docs/architecture/memex-data-contract.md, "Metadata ownership").
+/// `localMidnight` is each side's own zone, so here it is the no-file reading:
+/// a local midnight within UTC−12..UTC+14 of the fixture day's UTC midnight.
+#[test]
+fn note_date_stamps_match_fixture() {
+    const HOUR_MS: i64 = 3_600_000;
+    const FIXTURE_DAY_UTC_MIDNIGHT: i64 = 1_790_899_200_000; // 2026-10-02T00:00:00Z
+    let value = entry("noteDateStamps");
+    for case in value["reads"].as_array().expect("reads") {
+        let stamp = case["stamp"].as_str().expect("stamp");
+        let file = case["fileMs"].as_i64();
+        let read = crate::note_dates::stamp_to_ms(stamp, file);
+        match case["expect"].as_str().expect("expect") {
+            "file" => assert_eq!(read, file, "{case}"),
+            "asWritten" => assert_eq!(read, case["ms"].as_i64(), "{case}"),
+            "none" => assert_eq!(read, None, "{case}"),
+            "localMidnight" => {
+                let midnight = crate::note_dates::stamp_to_ms(stamp, None).expect("a day");
+                assert_eq!(read, Some(midnight), "{case}");
+                let earliest = FIXTURE_DAY_UTC_MIDNIGHT - 14 * HOUR_MS;
+                let latest = FIXTURE_DAY_UTC_MIDNIGHT + 12 * HOUR_MS;
+                assert!((earliest..=latest).contains(&midnight), "{case}");
+            }
+            other => panic!("unknown expectation {other}"),
+        }
+    }
+    for case in value["days"].as_array().expect("days") {
+        let minutes = case["offsetMinutes"].as_i64().expect("offsetMinutes");
+        let now_secs = case["nowMs"].as_i64().expect("nowMs") / 1000;
+        assert_eq!(
+            crate::note_dates::day_stamp(now_secs, move |_| minutes * 60),
+            case["day"].as_str().expect("day"),
+            "{case}"
+        );
+    }
+}
