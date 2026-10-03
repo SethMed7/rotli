@@ -17,11 +17,12 @@ wordmark/tile family are intentionally absent from this live kit.
   fills are inset under their selected black-or-white ink so original raster
   color cannot fringe the character.
 
-The companion may use Line, Cocoa, Fern, Ocean, Iris, Berry, Amber, or a custom
+The chat buddy may use Line, Cocoa, Fern, Ocean, Iris, Berry, Amber, or a custom
 hue for its body, plus black or white ink. Glasses, a bucket hat, and goggles
-are optional and carry their own custom hue. The product companion may
-be disabled entirely outside onboarding. None of these choices may alter the
-compact product mark, provider identities, tray icon, or app icon.
+are optional and carry their own custom hue. The buddy is always part of Chat
+and picks its own pose; full-body quokkas appear only in Chat, Settings, and
+first-run setup (DESIGN.md). None of these choices may alter the compact
+product mark, provider identities, tray icon, or app icon.
 
 ## Product boundary
 

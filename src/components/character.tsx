@@ -1,6 +1,6 @@
-// The rotli quokka character set — canonical illustrations that appear ONLY in
-// the "quokka world" placements: onboarding, empty states, and section/about
-// flourishes (never the editor, never notifications — the brand placement law).
+// The rotli quokka character set — full-body illustrations that appear ONLY in
+// three places: Chat (the chat buddy), Settings, and first-run setup (never the
+// editor, empty states, or notifications — the brand placement law).
 // Full-body poses can keep their original currentColor line art or use one of
 // the filled treatments derived from that exact geometry. The compact mark is
 // intentionally always the original line drawing.
@@ -68,10 +68,6 @@ interface CharacterProps {
   accessory?: QuokkaAccessory;
   /** Use the user's chosen accessory on this eligible product placement. */
   accessorized?: boolean;
-  /** Onboarding is character-led even when the optional product companion is off. */
-  alwaysVisible?: boolean;
-  /** Use the user's preferred idle mood instead of the supplied fallback pose. */
-  personalIdle?: boolean;
 }
 
 function maskStyle(source: string): CSSProperties {
@@ -195,8 +191,8 @@ function poseAccessoryArt(set: AccessoryCharacterArtSet, pose: CharacterName): A
   return set;
 }
 
-/** A full-body quokka illustration. Without an explicit treatment it follows
- * the user's Appearance preference across every product placement. */
+/** A full-body quokka illustration. The caller picks the pose; without an
+ * explicit treatment it wears the person's chosen look (Settings → Appearance). */
 export function Character({
   name,
   size = 120,
@@ -205,20 +201,16 @@ export function Character({
   treatment,
   accessory,
   accessorized = true,
-  alwaysVisible = false,
-  personalIdle = false,
 }: CharacterProps) {
-  const companionEnabled = useUiStore((s) => s.quokkaCompanionEnabled);
   const preferredTreatment = useUiStore((s) => s.quokkaStyle);
   const customHue = useUiStore((s) => s.quokkaCustomHue);
   const lineColor = useUiStore((s) => s.quokkaLineColor);
   const preferredAccessory = useUiStore((s) => s.quokkaAccessory);
   const accessoryHue = useUiStore((s) => s.quokkaAccessoryHue);
-  const idlePose = useUiStore((s) => s.quokkaIdlePose);
   const quietLine = appearance === "quiet-line";
   const resolvedTreatment = quietLine ? "line" : (treatment ?? preferredTreatment);
   const resolvedAccessory = quietLine ? "none" : (accessory ?? (accessorized ? preferredAccessory : "none"));
-  const resolvedName = personalIdle ? idlePose : name;
+  const resolvedName = name;
   const fill = quokkaFill(resolvedTreatment);
   const [art, setArt] = useState(artCache);
   useEffect(() => {
@@ -231,8 +223,6 @@ export function Character({
       live = false;
     };
   }, [art]);
-
-  if (!companionEnabled && !alwaysVisible) return null;
 
   const canonicalName = resolvedName as CanonicalCharacterName;
   const canonicalLine = art?.line[canonicalName];
@@ -265,8 +255,8 @@ export function Character({
             lineColor === "auto" && fill ? "var(--quokka-line-black)" : `var(--quokka-line-${lineColor})`,
         }),
     ...(fill ? { "--quokka-fill": fill } : {}),
-    // Line art draws from `currentColor`, and placements (`.be-quokka`,
-    // `.empty-stage .quokka`) set `color: var(--text)` so the Line treatment
+    // Line art draws from `currentColor`, and placements (`.quokka`,
+    // `.chat-buddy`) set a theme color so the Line treatment
     // on Auto tints with the theme. Inline wins over every placement rule, so
     // (a) a filled quokka keeps its designed ink on dark themes instead of
     // drawing light body lines under dark accessory ink (rest state,
@@ -299,6 +289,7 @@ export function Character({
     <span
       className={["quokka", quietLine ? "quokka-quiet-line" : "", className ?? ""].filter(Boolean).join(" ")}
       style={style}
+      data-pose={resolvedName}
       aria-hidden="true"
     >
       {layered && fill && (

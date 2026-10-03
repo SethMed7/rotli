@@ -200,7 +200,7 @@ function ThanksCard() {
         it, and telling a friend helps even more.
       </p>
       <span ref={quokkaHost} className="thanks-quokka-source" aria-hidden="true">
-        <Character name="celebrating" size={440} alwaysVisible />
+        <Character name="celebrating" size={440} />
       </span>
       <div className="thanks-banner" aria-busy={banner.kind === "drawing"}>
         {banner.kind === "ready" && <img src={banner.url} alt="Your Rotli welcome banner" />}

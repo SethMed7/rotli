@@ -382,13 +382,11 @@ function skipToDefaults(): void {
   }
   useUiStore.setState({
     ...DEFAULT_APPEARANCE,
-    quokkaCompanionEnabled: false,
     quokkaStyle: "cocoa",
     quokkaCustomHue: DEFAULT_QUOKKA_CUSTOM_HUE,
     quokkaAccessory: "none",
     quokkaAccessoryHue: DEFAULT_QUOKKA_ACCESSORY_HUE,
     quokkaLineColor: "auto",
-    quokkaIdlePose: "base",
     ...firstRunWindow(ui.onboarded, ui.onboardingVersion),
   });
   useAmbient.setState({ prefs: { ...DEFAULT_AMBIENT } });
@@ -456,7 +454,7 @@ export function Onboarding({
           ref={stageRef}
         >
           <aside className={`setup-companion setup-companion--${step}`} aria-hidden="true">
-            <Character name={companion.pose} size={152} alwaysVisible />
+            <Character name={companion.pose} size={152} />
             <p>{companion.line}</p>
           </aside>
 

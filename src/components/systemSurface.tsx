@@ -59,7 +59,6 @@ import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
 import type { NoteSummary } from "../types";
 import { BackToNotes } from "./backToNotes";
-import { Character } from "./character";
 import {
   ChevronRight,
   ColumnsViewGlyph,
@@ -863,7 +862,6 @@ export function SystemSurface({ rootId }: { rootId: string }) {
       ) : empty ? (
         atRoot ? (
           <div className="list-empty">
-            <Character name="rest" size={104} className="be-quokka" />
             <p className="be-title">Nothing here</p>
             <p className="be-sub">{root.title} is empty.</p>
           </div>

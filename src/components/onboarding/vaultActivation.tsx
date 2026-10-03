@@ -164,7 +164,7 @@ export function VaultActivation({
 
         <div className="setup-stage">
           <aside className="setup-companion" aria-hidden="true">
-            <Character name={busy ? "searching" : "notes"} size={152} alwaysVisible />
+            <Character name={busy ? "searching" : "notes"} size={152} />
             <p>Your notes stay ordinary files you own.</p>
           </aside>
 

@@ -10,6 +10,8 @@ test("first run opens on the island intro, which gives way to Welcome on the isl
   await page.goto("/?onboarding");
   const intro = page.getByTestId("onboarding-intro");
   await expect(intro).toBeVisible();
+  // setup keeps its quokka: the plain one hops onto the sand
+  await expect(intro.locator(".quokka")).toHaveCount(1);
   await expect(intro).toHaveCount(0, { timeout: 4000 });
   await expect(page.getByRole("heading", { name: "Make Rotli yours." })).toBeVisible();
   await expect(scenery(page)).toHaveAttribute("data-scenery", "island");
@@ -95,6 +97,8 @@ test("the app opens on its opening scene each launch, in the person's theme", as
   await page.goto("/?opening");
   const opening = page.getByTestId("app-opening");
   await expect(opening).toBeVisible();
+  // scene and word only: outside setup, quokkas live in Chat and Settings
+  await expect(opening.locator(".quokka")).toHaveCount(0);
   await expect(opening).toHaveCount(0, { timeout: 4000 });
   // a key skips it at once
   await page.goto("/?opening");

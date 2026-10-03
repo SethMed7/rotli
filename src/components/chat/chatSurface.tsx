@@ -119,7 +119,6 @@ import {
 import { useViewsStore } from "../../state/views";
 import { takeSentences } from "../../voice/sentences";
 import { speaker } from "../../voice/speech";
-import { Character, QuokkaMark } from "../character";
 import {
   CheckGlyph,
   CopyGlyph,
@@ -133,6 +132,8 @@ import {
 import { WebDialogFrame } from "../webDialogFrame";
 import { ArtifactItem, ChatArtifactButtons } from "./chatArtifactItems";
 import { ChatAttachedImages } from "./chatAttachedImages";
+import { ChatBuddy, useJustFinished } from "./chatBuddy";
+import { chatBuddyMoment } from "./chatBuddyModel";
 import { ChatClarificationBar } from "./chatClarificationBar";
 import { copyChatSelection } from "./chatCopy";
 import { CHAT_PANE_ATTR } from "./chatDrop";
@@ -158,7 +159,6 @@ import {
 } from "./chatTitleModel";
 import {
   chatDaypart,
-  chatWelcomeCharacter,
   chatWelcomeSuggestions,
   chatWorkPrompt,
   type ChatWelcomeSuggestionKind,
@@ -929,8 +929,8 @@ const ChatMessage = memo(function ChatMessage({
   speech?: "idle" | "preparing" | "speaking";
   at?: string;
   images?: string[];
-  /** The one quiet Rotli signature rests below the final reply's controls so
-   * hover actions never overlap or visually merge with it. */
+  /** The chat buddy rests below the final reply, so its controls take their
+   * own row instead of overlapping or visually merging with it. */
   endMark?: boolean;
   /** Files created by the completed assistant turn stay attached to that turn. */
   artifacts?: ChatArtifact[];
@@ -974,11 +974,6 @@ const ChatMessage = memo(function ChatMessage({
           )}
         </div>
       </div>
-      {endMark && (
-        <div className="chat-endmark-row">
-          <Character name="celebrating" size={80} className="chat-endmark" personalIdle />
-        </div>
-      )}
     </div>
   );
 });
@@ -2204,6 +2199,14 @@ export function ChatSurface({
   const showArtifactsPanel = artifactsOpen && !artifactsCompact;
   const pristineChat = runtimeAvailable && !chatSlug && messages.length === 0 && !busy;
   const welcomeHour = new Date().getHours();
+  const justFinished = useJustFinished(working, chatSlug);
+  const lastMessage = messages.at(-1);
+  const buddyMoment = chatBuddyMoment({
+    working,
+    queued: queued !== null,
+    lastSpeaker: lastMessage ? (lastMessage.speaker === "you" ? "you" : "ai") : null,
+    justFinished,
+  });
   const welcomeDaypart = chatDaypart(welcomeHour);
   const welcomeSuggestions = chatWelcomeSuggestions(welcomeHour);
   /** Open the attached note per the Settings choice: a new tab here, or a
@@ -2421,7 +2424,7 @@ export function ChatSurface({
 
       {!runtimeAvailable ? (
         <div className="list-empty chat-empty">
-          <Character name="listening" size={120} accessorized />
+          <ChatBuddy moment="unavailable" hour={welcomeHour} size={120} />
           {PLATFORM === "web" ? (
             <>
               <p>Chat runs the AI tools on your own computer. On the web that takes Rotli Helper.</p>
@@ -2435,7 +2438,7 @@ export function ChatSurface({
         </div>
       ) : !active ? (
         <div className="list-empty chat-empty">
-          <Character name="attention" size={120} />
+          <ChatBuddy moment="no-vault" hour={welcomeHour} size={120} />
           <p>No vault connected yet.</p>
           <button type="button" className="chat-cta" onClick={() => setSettingsOpen(true)}>
             Connect one in Settings → Location
@@ -2461,15 +2464,11 @@ export function ChatSurface({
                   <div className={`chat-newhint ${pristineChat ? chatWelcomeStyle : "calm"}`}>
                     <div className="chat-welcome-heading">
                       <div className="chat-welcome-scene">
-                        <Character
-                          name={pristineChat ? chatWelcomeCharacter(welcomeHour, chatWelcomeStyle) : "chat"}
+                        <ChatBuddy
+                          moment={pristineChat ? "welcome" : "empty"}
+                          hour={welcomeHour}
                           size={pristineChat ? 58 : 50}
                           className="chat-welcome-character"
-                          accessorized={pristineChat}
-                          // Calm = the user's preferred idle pose; Lively = the
-                          // time-of-day pose from chatWelcomeCharacter (personalIdle
-                          // used to discard it, DESIGN.md "Calm/Lively", 2026-09-01)
-                          personalIdle={pristineChat && chatWelcomeStyle === "calm"}
                         />
                       </div>
                       <p className="chat-hint-title">
@@ -2485,7 +2484,7 @@ export function ChatSurface({
                   </div>
                 ) : (
                   // messages are PLAIN text — no per-message author label; the
-                  // brand mark appears once at the thread's live edge instead
+                  // chat buddy appears once at the thread's live edge instead
                   // (the maintainer, 2026-07-30: match the premium chat grammar). Options
                   // ride each message, revealed on hover/focus.
                   messages.map((m, idx) => (
@@ -2521,7 +2520,6 @@ export function ChatSurface({
                   )}
                 {working && !streamingText && (
                   <div className="cmsg ai">
-                    <QuokkaMark size={17} className="chat-mark" />
                     {queued ? (
                       // waiting on measured compute headroom, not thinking — say
                       // which, and offer the jump-the-line the user actually has
@@ -2551,6 +2549,11 @@ export function ChatSurface({
                         {status}
                       </div>
                     )}
+                  </div>
+                )}
+                {(messages.length > 0 || working) && (
+                  <div className="chat-buddy-row" data-moment={buddyMoment}>
+                    <ChatBuddy moment={buddyMoment} hour={welcomeHour} size={72} className="chat-endmark" />
                   </div>
                 )}
                 {saveErr && (

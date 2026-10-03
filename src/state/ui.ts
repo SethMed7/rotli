@@ -8,7 +8,6 @@ import {
   DEFAULT_QUOKKA_ACCESSORY_HUE,
   DEFAULT_QUOKKA_CUSTOM_HUE,
   type QuokkaAccessory,
-  type QuokkaIdlePose,
   type QuokkaLineColor,
   type QuokkaStyle,
   normalizeQuokkaAccessoryHue,
@@ -256,10 +255,7 @@ interface UiState {
   /** Hue used by the contrast-managed Custom accent (0–359). */
   accentHue: number;
   setAccentHue: (hue: number) => void;
-  /** The optional personal companion layer. Onboarding characters are exempt. */
-  quokkaCompanionEnabled: boolean;
-  setQuokkaCompanionEnabled: (enabled: boolean) => void;
-  /** Canonical full-body quokka treatment used across product character placements. */
+  /** The chat buddy's body treatment (also worn by Settings and setup's quokkas). */
   quokkaStyle: QuokkaStyle;
   setQuokkaStyle: (style: QuokkaStyle) => void;
   /** Hue used by the contrast-managed Custom body treatment (0–359). */
@@ -274,9 +270,6 @@ interface UiState {
   /** Hue used by colorable accessory layers (0–359). */
   quokkaAccessoryHue: number;
   setQuokkaAccessoryHue: (hue: number) => void;
-  /** Preferred mood/pose for personal idle placements, never semantic empty states. */
-  quokkaIdlePose: QuokkaIdlePose;
-  setQuokkaIdlePose: (pose: QuokkaIdlePose) => void;
   /** Visual treatment for the prompt navigator shown in longer chats. */
   chatNavigatorStyle: ChatNavigatorStyle;
   setChatNavigatorStyle: (style: ChatNavigatorStyle) => void;
@@ -738,8 +731,6 @@ export const useUiStore = create<UiState>((set, get) => ({
   setAccentColor: (accent) => set({ accentColor: accent }),
   accentHue: DEFAULT_ACCENT_HUE,
   setAccentHue: (hue) => set({ accentHue: Math.max(0, Math.min(359, Math.round(hue))) }),
-  quokkaCompanionEnabled: false,
-  setQuokkaCompanionEnabled: (enabled) => set({ quokkaCompanionEnabled: enabled }),
   quokkaStyle: "cocoa",
   setQuokkaStyle: (style) => set({ quokkaStyle: style }),
   quokkaCustomHue: DEFAULT_QUOKKA_CUSTOM_HUE,
@@ -750,8 +741,6 @@ export const useUiStore = create<UiState>((set, get) => ({
   setQuokkaAccessory: (accessory) => set({ quokkaAccessory: accessory }),
   quokkaAccessoryHue: DEFAULT_QUOKKA_ACCESSORY_HUE,
   setQuokkaAccessoryHue: (hue) => set({ quokkaAccessoryHue: normalizeQuokkaAccessoryHue(hue) }),
-  quokkaIdlePose: "rest",
-  setQuokkaIdlePose: (pose) => set({ quokkaIdlePose: pose }),
   chatNavigatorStyle: "paws",
   setChatNavigatorStyle: (style) => set({ chatNavigatorStyle: style }),
   sidebarSide: "left",

@@ -23,7 +23,6 @@ export const APP_SETTINGS_KEYS = new Set([
   "boardBackground",
   "accentColor",
   "accentHue",
-  "quokkaCompanionEnabled",
   "quokkaStyle",
   "quokkaCustomHue",
   "quokkaLineColor",
@@ -32,6 +31,10 @@ export const APP_SETTINGS_KEYS = new Set([
   "quokkaCustomColor",
   "quokkaAccessory",
   "quokkaAccessoryHue",
+  // Retired 2026-10-02: the companion switch and its idle mood. The chat
+  // buddy is always there and picks its own pose; recognized so an old file's
+  // values are dropped on the next write, never carried forever.
+  "quokkaCompanionEnabled",
   "quokkaIdlePose",
   "chatNavigatorStyle",
   "sidebarSide",

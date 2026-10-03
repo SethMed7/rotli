@@ -17,7 +17,6 @@ import { assignedView } from "../services/viewTree";
 import { usePanesStore } from "../state/panes";
 import { useViewsStore } from "../state/views";
 import type { NoteSummary, SearchHit } from "../types";
-import { Character } from "./character";
 import { SearchGlyph } from "./glyphs";
 import { MatchText } from "./matchText";
 import { NoteListRow } from "./noteListRow";
@@ -123,7 +122,6 @@ export function NoteListSurface({
 
       {rows.length === 0 ? (
         <div className="list-empty">
-          {notes.length === 0 && <Character name="thoughtful" size={104} className="be-quokka" />}
           <p className="be-title">{notes.length === 0 ? "No notes yet" : "No matches"}</p>
           <p className="be-sub">
             {notes.length === 0

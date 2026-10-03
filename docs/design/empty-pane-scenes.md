@@ -8,6 +8,11 @@ link to the site, so even the empty state is enjoyable."
 When every tab is closed, the lone pane shows a small scene above "All clear"
 and its three ways back in (`src/components/paneEmptyState.tsx`).
 
+**Update 2026-10-02 (the owner: "just use the quokkas in chats and like
+settings/onboarding that's it").** The empty pane's scene and the app's launch
+opening no longer hold a quokka; the scenes stand on their own. The Settings
+banners and first run keep theirs. The pose column below is historical.
+
 ## One scene per theme family
 
 | Family | Scene | Quokka pose |
@@ -21,9 +26,7 @@ and its three ways back in (`src/components/paneEmptyState.tsx`).
 | Midnight | Stargazing from the hill, the telescope | attention |
 
 The art lives in `src/components/paneEmptyScenes.tsx` as one SVG stage each
-(440×200, the ground line at y 170). The person's quokka (their style,
-accessory and colors) stands on that line, drawn over the scene. It shows even
-when the sidebar companion is off, because the scene is the empty state.
+(440×200, the ground line at y 170).
 
 ## Rules the scenes keep
 
@@ -45,8 +48,7 @@ when the sidebar companion is off, because the scene is the empty state.
 
 Add its scene to `PANE_SCENES`. The type requires one per `ThemeFamily`, and
 the unit test checks that every family has its own. Draw with the existing
-`.sc-*` classes, keep the ground at y 170, and leave the middle (x 180–260)
-clear for the quokka.
+`.sc-*` classes and keep the ground at y 170.
 
 ## Settings banners (the same language)
 
@@ -87,7 +89,7 @@ match what they chose." (`src/components/onboarding/onboardingScenery.tsx`)
   when someone opens the app fresh, even if onboarding is done").
   `onboarding/appOpening.tsx` plays the same kind of opening once per launch of
   the Mac app, in the person's theme: the island for Rotli, the family's empty-
-  pane scene otherwise, with their dressed quokka. It never plays right after
+  pane scene otherwise: scene and word, no quokka. It never plays right after
   first run's intro, and never with Reduce motion on. It runs at 1.7× first
   run's pace (about 2.9 s; the owner: "happens way too fast"), and it holds
   still (`is-waiting`, animations paused) until the window has focus, since a
@@ -113,8 +115,8 @@ match what they chose." (`src/components/onboarding/onboardingScenery.tsx`)
   never has anything behind its text. With Reduce motion on, each drifter
   stays still in its own spot. Settings shows the same sky in its side margins
   only.
-- **The companion wears your choices.** Each step's big quokka keeps its pose
-  and takes your chosen colour and accessory.
+- **Setup's quokka is plain.** Each step's big quokka keeps its pose; dressing
+  it is a Settings → Appearance → Chat buddy choice.
 - **Theme cards are the site's orbs.** Each card holds a number, a name, and a
   lit Light and Dark orb (rotli.co's picker, with Blossom added). The orbs are
   the app's one radial-gradient surface, allowed only in

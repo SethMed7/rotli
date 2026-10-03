@@ -26,7 +26,6 @@ import {
 import { toggleWebTask } from "../services/webTasks";
 import { usePanesStore } from "../state/panes";
 import { useUiStore } from "../state/ui";
-import { Character } from "./character";
 import { ChevronRight, FileGlyph, SearchGlyph } from "./glyphs";
 import { SurfaceSearch } from "./surfaceSearch";
 
@@ -104,7 +103,6 @@ export function TasksSurface() {
         <p className="main-empty">Loading…</p>
       ) : groups.length === 0 ? (
         <div className="list-empty">
-          <Character name="celebrating" size={104} className="be-quokka" />
           <p className="be-title">Nothing open</p>
           <p className="be-sub">
             Any <code>- [ ]</code> checkbox you write in a note shows up here — including the ones you marked{" "}

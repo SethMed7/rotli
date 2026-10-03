@@ -35,6 +35,8 @@ function fakeHelper(
   page: import("@playwright/test").Page,
   calls: { cmd: string; args: unknown }[],
   models: ModelList | null = null,
+  /** Held until it settles before a reply goes back (a reply in flight). */
+  replyGate: Promise<void> = Promise.resolve(),
 ) {
   return page.route(`${HELPER}/**`, async (route) => {
     const request = route.request();
@@ -69,6 +71,7 @@ function fakeHelper(
       case "cli_detect":
         return reply({ installed: true, version: "2.1.0 (Claude Code)", authenticated: true });
       case "cli_complete":
+        await replyGate;
         return reply("Hello from the fake helper.");
       case "cli_cancel":
         return reply(null);
@@ -282,4 +285,28 @@ test("a helper that refuses the pairing token keeps Chat behind the setup dialog
   await expect(dialog.getByRole("status").filter({ hasText: "Paired with" })).toBeVisible();
   await dialog.getByRole("button", { name: "Done" }).click();
   await expect(page.locator(".sb-switch-seg.desktop-only")).toHaveCount(0);
+});
+
+test("the chat buddy thinks while a reply runs and is happy when it lands", async ({ page }) => {
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  await fakeHelper(page, [], null, gate);
+  await pairAndOpenChat(page);
+  // the welcome is the buddy too, greeting by the time of day
+  await expect(page.locator(".chat-welcome-character")).toHaveAttribute("data-pose", /^(waving|rest)$/);
+
+  const composer = page.getByPlaceholder(/Message rotli/).first();
+  await composer.fill("Say hello");
+  await composer.press("Enter");
+  const edge = page.locator(".chat-buddy-row");
+  await expect(edge).toHaveAttribute("data-moment", "thinking");
+  await expect(edge.locator(".quokka")).toHaveAttribute("data-pose", "thoughtful");
+  // one buddy for the thread, never one per message
+  await expect(page.locator(".chat-thread .quokka")).toHaveCount(1);
+
+  release();
+  await expect(page.getByText("Hello from the fake helper.")).toBeVisible({ timeout: 15_000 });
+  await expect(edge).toHaveAttribute("data-moment", "done");
+  await expect(edge.locator(".quokka")).toHaveAttribute("data-pose", "celebrating");
+  await expect(page.locator(".chat-thread .quokka")).toHaveCount(1);
 });

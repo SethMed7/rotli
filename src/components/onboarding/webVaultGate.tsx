@@ -255,7 +255,7 @@ export function WebVaultGate() {
 
         <div className="setup-stage">
           <aside className="setup-companion" aria-hidden="true">
-            <Character name="notes" size={152} accessorized={false} alwaysVisible />
+            <Character name="notes" size={152} accessorized={false} />
             <p>
               Nothing leaves your computer. This page talks only to your own computer, and only to the folder
               you choose.

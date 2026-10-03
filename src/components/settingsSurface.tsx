@@ -6,15 +6,7 @@
 // the chord is taken).
 
 import { useQuery } from "@tanstack/react-query";
-import {
-  type CSSProperties,
-  type KeyboardEvent,
-  type ReactNode,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { guideOs } from "../ai/connectorGuides";
 import { makeTauriHost } from "../ai/host";
@@ -39,15 +31,6 @@ import {
   scanVerdict,
 } from "../ai/models";
 import { verifyLane } from "../ai/verify";
-import {
-  QUOKKA_ACCESSORY_PRESENTATIONS,
-  QUOKKA_IDLE_POSE_PRESENTATIONS,
-  QUOKKA_LINE_COLORS,
-  QUOKKA_STYLE_PRESENTATIONS,
-  quokkaAccessoryColor,
-  quokkaCustomColor,
-  type QuokkaLineColor,
-} from "../brand/quokka";
 import { resolveChord, useBindingsStore } from "../keys/bindings";
 import { chordFromEvent, formatChord } from "../keys/chords";
 import {
@@ -139,7 +122,7 @@ import {
 } from "../state/ui";
 import { requestVaultFolder } from "../state/vaultFolderBrowser";
 import { AntigravitySetup } from "./antigravitySetup";
-import { Character, type CharacterName, QuokkaMark } from "./character";
+import { type CharacterName, QuokkaMark } from "./character";
 import {
   BrowserGlyph,
   ChatGlyph,
@@ -157,6 +140,7 @@ import { AboutPane } from "./settings/aboutPane";
 import { AliasCleanupSettings } from "./settings/aliasCleanupSettings";
 import { AmbientSettings } from "./settings/ambientSettings";
 import { ImageOutlineSetting, ThemeCycleSettings } from "./settings/appearanceLookSettings";
+import { ChatBuddyStudio } from "./settings/chatBuddyStudio";
 import { ConnectionsSettings } from "./settings/connectionsSettings";
 import { ConnectorGuide } from "./settings/connectorGuide";
 import { FrontsSettings } from "./settings/frontsSettings";
@@ -999,13 +983,6 @@ function NavigatorSample({ style }: { style: ChatNavigatorStyle }) {
 
 /** Dock/app icon options — the quokka re-tiled in a few palettes. "default" is
  * the shipped icon; colors live in themes.css (the appicon-tile-- classes). */
-/** The three line-colour choices, named honestly: Auto follows the theme. */
-const QUOKKA_LINE_COLOR_LABEL: Record<QuokkaLineColor, string> = {
-  auto: "Auto",
-  black: "Black",
-  white: "White",
-};
-
 const APP_ICONS: { id: AppIcon; label: string }[] = [
   { id: "default", label: "Default" },
   { id: "paper", label: "Paper" },
@@ -1075,20 +1052,6 @@ function AppearancePane() {
   const setTheme = useUiStore((s) => s.setTheme);
   const themeFamily = useUiStore((s) => s.themeFamily);
   const setThemeFamily = useUiStore((s) => s.setThemeFamily);
-  const quokkaCompanionEnabled = useUiStore((s) => s.quokkaCompanionEnabled);
-  const setQuokkaCompanionEnabled = useUiStore((s) => s.setQuokkaCompanionEnabled);
-  const quokkaStyle = useUiStore((s) => s.quokkaStyle);
-  const setQuokkaStyle = useUiStore((s) => s.setQuokkaStyle);
-  const quokkaCustomHue = useUiStore((s) => s.quokkaCustomHue);
-  const setQuokkaCustomHue = useUiStore((s) => s.setQuokkaCustomHue);
-  const quokkaLineColor = useUiStore((s) => s.quokkaLineColor);
-  const setQuokkaLineColor = useUiStore((s) => s.setQuokkaLineColor);
-  const quokkaAccessory = useUiStore((s) => s.quokkaAccessory);
-  const setQuokkaAccessory = useUiStore((s) => s.setQuokkaAccessory);
-  const quokkaAccessoryHue = useUiStore((s) => s.quokkaAccessoryHue);
-  const setQuokkaAccessoryHue = useUiStore((s) => s.setQuokkaAccessoryHue);
-  const quokkaIdlePose = useUiStore((s) => s.quokkaIdlePose);
-  const setQuokkaIdlePose = useUiStore((s) => s.setQuokkaIdlePose);
   const chatNavigatorStyle = useUiStore((s) => s.chatNavigatorStyle);
   const setChatNavigatorStyle = useUiStore((s) => s.setChatNavigatorStyle);
   const sidebarSide = useUiStore((s) => s.sidebarSide);
@@ -1167,204 +1130,7 @@ function AppearancePane() {
       </p>
       <AccentRow />
 
-      <h4 className="sethead" id="appearance-quokka-title">
-        Quokka companion
-      </h4>
-      <p className="lead">
-        Keep a personal quokka around the workspace, or leave characters just for onboarding. The compact
-        product mark always stays its original line drawing.
-      </p>
-      <Toggle
-        on={quokkaCompanionEnabled}
-        onChange={() => setQuokkaCompanionEnabled(!quokkaCompanionEnabled)}
-        title={quokkaCompanionEnabled ? "Companion on" : "Companion off"}
-        desc={
-          quokkaCompanionEnabled
-            ? "Your colors, mood, and accessories follow you through Rotli."
-            : "Quokkas stay in the onboarding flow only."
-        }
-      />
-      {quokkaCompanionEnabled && (
-        <>
-          <section className="quokka-studio" aria-labelledby="appearance-quokka-title">
-            <div className="quokka-studio-preview">
-              <Character name="rest" size={148} accessory={quokkaAccessory} personalIdle />
-              <span>
-                <strong>
-                  {QUOKKA_STYLE_PRESENTATIONS.find((choice) => choice.style === quokkaStyle)?.label ??
-                    "Cocoa"}
-                </strong>
-                <small>
-                  {QUOKKA_ACCESSORY_PRESENTATIONS.find((choice) => choice.accessory === quokkaAccessory)
-                    ?.description ?? "Just the quokka"}{" "}
-                  · {QUOKKA_LINE_COLOR_LABEL[quokkaLineColor]} lines ·{" "}
-                  {QUOKKA_IDLE_POSE_PRESENTATIONS.find((choice) => choice.pose === quokkaIdlePose)?.label ??
-                    "Peaceful"}
-                </small>
-              </span>
-            </div>
-
-            <div className="quokka-studio-controls">
-              <fieldset>
-                <legend>Body color</legend>
-                <div className="quokka-swatches" role="radiogroup" aria-label="Quokka body color">
-                  {QUOKKA_STYLE_PRESENTATIONS.map((choice) => (
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={quokkaStyle === choice.style}
-                      aria-label={`${choice.label}: ${choice.description}`}
-                      className={
-                        quokkaStyle === choice.style
-                          ? `quokka-swatch ${choice.style} sel`
-                          : `quokka-swatch ${choice.style}`
-                      }
-                      key={choice.style}
-                      style={
-                        choice.style === "line"
-                          ? undefined
-                          : ({
-                              "--quokka-choice-color": choice.color ?? quokkaCustomColor(quokkaCustomHue),
-                            } as CSSProperties)
-                      }
-                      onClick={() => setQuokkaStyle(choice.style)}
-                    >
-                      <span aria-hidden="true" />
-                      <small>{choice.label}</small>
-                    </button>
-                  ))}
-                </div>
-                {quokkaStyle === "custom" && (
-                  <label
-                    className="quokka-custom-hue"
-                    style={{ "--quokka-custom-color": quokkaCustomColor(quokkaCustomHue) } as CSSProperties}
-                  >
-                    <span>Hue {quokkaCustomHue}°</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="359"
-                      value={quokkaCustomHue}
-                      aria-label="Custom quokka body color hue"
-                      onChange={(event) => setQuokkaCustomHue(Number(event.currentTarget.value))}
-                    />
-                  </label>
-                )}
-              </fieldset>
-
-              <fieldset>
-                <legend>Line color</legend>
-                <div className="quokka-line-colors" role="radiogroup" aria-label="Quokka line color">
-                  {QUOKKA_LINE_COLORS.map((color) => (
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={quokkaLineColor === color}
-                      className={
-                        quokkaLineColor === color
-                          ? `quokka-line-choice ${color} sel`
-                          : `quokka-line-choice ${color}`
-                      }
-                      key={color}
-                      onClick={() => setQuokkaLineColor(color)}
-                    >
-                      <span aria-hidden="true" />
-                      {QUOKKA_LINE_COLOR_LABEL[color]}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-
-              <fieldset>
-                <legend>Idle mood &amp; pose</legend>
-                <p className="quokka-field-note">
-                  This is your quokka at rest. Empty states still pick the expression that best explains the
-                  moment.
-                </p>
-                <div className="quokka-idle-poses" role="radiogroup" aria-label="Quokka idle mood and pose">
-                  {QUOKKA_IDLE_POSE_PRESENTATIONS.map((choice) => (
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={quokkaIdlePose === choice.pose}
-                      className={quokkaIdlePose === choice.pose ? "quokka-idle-pose sel" : "quokka-idle-pose"}
-                      key={choice.pose}
-                      onClick={() => setQuokkaIdlePose(choice.pose)}
-                    >
-                      <Character name={choice.pose} size={52} accessory="none" />
-                      <span>
-                        <strong>{choice.label}</strong>
-                        <small>{choice.description}</small>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-
-              <fieldset>
-                <legend>Accessory</legend>
-                <div className="quokka-accessories" role="radiogroup" aria-label="Quokka accessory">
-                  {QUOKKA_ACCESSORY_PRESENTATIONS.map((choice) => (
-                    <button
-                      type="button"
-                      role="radio"
-                      aria-checked={quokkaAccessory === choice.accessory}
-                      className={
-                        quokkaAccessory === choice.accessory ? "quokka-accessory sel" : "quokka-accessory"
-                      }
-                      key={choice.accessory}
-                      onClick={() => setQuokkaAccessory(choice.accessory)}
-                    >
-                      <Character name="base" size={48} accessory={choice.accessory} />
-                      <span>
-                        <strong>{choice.label}</strong>
-                        <small>{choice.description}</small>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-                {quokkaAccessory !== "none" && quokkaStyle !== "line" && (
-                  <label
-                    className="quokka-accessory-hue"
-                    style={
-                      {
-                        "--quokka-accessory-color": quokkaAccessoryColor(quokkaAccessoryHue),
-                      } as CSSProperties
-                    }
-                  >
-                    <span>Accessory hue {quokkaAccessoryHue}°</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="359"
-                      value={quokkaAccessoryHue}
-                      aria-label="Quokka accessory color hue"
-                      onChange={(event) => setQuokkaAccessoryHue(Number(event.currentTarget.value))}
-                    />
-                  </label>
-                )}
-              </fieldset>
-            </div>
-          </section>
-
-          <span className="setsubhead">Expressions it picks on its own</span>
-          <div className="quokka-expression-strip" aria-label="Automatic quokka expressions">
-            {(
-              [
-                ["thoughtful", "Thinking"],
-                ["walking", "Moving"],
-                ["listening", "Listening"],
-                ["attention", "Attention"],
-              ] as const satisfies readonly (readonly [CharacterName, string])[]
-            ).map(([name, label]) => (
-              <span key={name}>
-                <Character name={name} size={64} />
-                <small>{label}</small>
-              </span>
-            ))}
-          </div>
-        </>
-      )}
+      <ChatBuddyStudio />
 
       <h4 className="sethead">Conversation navigator</h4>
       <p className="lead">
@@ -1421,8 +1187,8 @@ function AppearancePane() {
 
       <h4 className="sethead">New chat welcome</h4>
       <p className="lead">
-        Calm keeps the companion still. Lively adds one restrained arrival hop without a decorative scene or
-        an idle animation loop.
+        Calm keeps the chat buddy still on a plain page. Lively adds one restrained arrival hop and a quiet
+        time-of-day scene, never an idle animation loop. Either way the buddy picks its own pose.
       </p>
       <Seg
         value={chatWelcomeStyle}

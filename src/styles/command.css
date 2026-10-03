@@ -462,8 +462,7 @@
 
 /* — the quokka character set: line-art illustrations whose LINE color follows
    the theme (each SVG is a single currentColor path), shape constant. Used in
-   the quokka-world placements only: empty states, onboarding, the chat connect
-   state (the maintainer, 2026-06-26). — */
+   three places only: Chat (the chat buddy), Settings, and first-run setup. — */
 .quokka,
 .quokka-mark {
   display: inline-flex;
@@ -515,12 +514,6 @@
 .quokka-detail-layer {
   object-fit: contain;
   user-select: none;
-}
-/* the empty-state quokka sits in the warm ink, a touch soft so it reads as a
-   friendly mascot, not a heavy graphic */
-.empty-stage .quokka {
-  color: var(--text);
-  margin-bottom: 18px;
 }
 .empty-stage .et {
   font-family: var(--font-display);
@@ -2023,52 +2016,6 @@
 }
 .quokka-line-choice.white > span {
   background: var(--quokka-line-white);
-}
-.quokka-field-note {
-  margin: -3px 0 8px;
-  color: var(--text-muted);
-  font-size: 10px;
-  line-height: 1.45;
-}
-.quokka-idle-poses {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-}
-.quokka-idle-pose {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: 52px 1fr;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 7px;
-  border: 1px solid transparent;
-  border-radius: var(--r-control);
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.quokka-idle-pose:hover {
-  background: var(--hov);
-}
-.quokka-idle-pose.sel {
-  border-color: color-mix(in srgb, var(--accent-text) 42%, var(--border));
-  background: var(--selected-bg);
-}
-.quokka-idle-pose > span {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-.quokka-idle-pose strong {
-  font-size: 11px;
-  font-weight: var(--wght-label);
-}
-.quokka-idle-pose small {
-  color: var(--text-muted);
-  font-size: 9.5px;
 }
 .quokka-accessories {
   display: grid;
