@@ -33,8 +33,14 @@ export function wikilinkPickAt(line: string, caret: number): WikilinkPickSpan | 
 const key = (value: string) => value.trim().toLowerCase();
 
 /** Titles (then aliases) that start with the typed text rank first, then any
- * that contain it; an empty query offers the most recently updated notes. */
-export function wikilinkChoices(notes: readonly NoteSummary[], query: string, limit = 8): NoteSummary[] {
+ * that contain it; an empty query offers the most recently updated notes. The
+ * note being edited (`exclude`, its wire id) is never offered: a note does not
+ * link to itself. */
+export function wikilinkChoices(
+  notes: readonly NoteSummary[],
+  query: string,
+  { limit = 8, exclude }: { limit?: number; exclude?: string } = {},
+): NoteSummary[] {
   const q = key(query);
   const rank = (note: NoteSummary): number => {
     const title = key(note.title);
@@ -46,7 +52,7 @@ export function wikilinkChoices(notes: readonly NoteSummary[], query: string, li
     return -1;
   };
   return notes
-    .filter((note) => note.kind !== "file" && note.kind !== "board")
+    .filter((note) => note.kind !== "file" && note.kind !== "board" && note.id !== exclude)
     .map((note) => ({ note, rank: rank(note) }))
     .filter((entry) => entry.rank >= 0)
     .sort((a, b) => a.rank - b.rank || b.note.updatedAt - a.note.updatedAt)
