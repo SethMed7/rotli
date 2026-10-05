@@ -288,6 +288,45 @@ imports.
   show the alignment but treat the line as an HTML block, so inline Markdown
   inside it appears as literal text there and a line written directly below
   it, with no blank line between, joins that block.
+- A chart is a fenced code block whose language is `chart`. Its body is plain
+  text any reader can follow: options first, one `key: value` per line, then a
+  blank line, then the data as comma-separated rows. The first data row names
+  the columns. The first column holds the labels and every further column is a
+  series of numbers:
+
+  ````markdown
+  ```chart
+  type: bar
+  title: Hours this week
+  unit: h
+
+  Day, Writing, Reading
+  Mon, 4, 1
+  Tue, 6, 2
+  Wed, 3, 2
+  ```
+  ````
+
+  `type` is required and is one of `bar`, `line`, `area`, or `pie`. `title`
+  and `unit` (a suffix for values, such as `h`, `%`, or `kg`) are optional.
+  Option names are lowercase. A field holding a comma is quoted as in CSV
+  (`"Smith, J."`), a value may be negative or a decimal written with a point
+  (`-2.5`), and an empty field is a missing value: a gap in a line, no bar.
+  A pie draws only the first series; its values must not be negative, and at
+  least one must be above zero. A chart holds up to 8 series and 200 rows.
+  Rotli fails closed. An unknown type or option, a value that isn't a number,
+  a row with more fields than the header, a missing header, a chart with no
+  data rows, or one past the limits shows the source as code with the reason,
+  and the source is never rewritten. **Bar chart**, **Line chart**, **Area
+  chart**, and **Pie chart** (typing `/chart` finds all four) insert a starter
+  chart and open its editor. The rendered chart's **Edit** opens a small form
+  (type, title, unit, and a grid of the rows) whose **Apply** replaces only
+  the fence's body and rewrites it in this form, one space after each comma.
+  Series take the theme's chart colors in order; several series stand side by
+  side in a bar chart, draw one line each in a line chart, and stack in an
+  area chart. A repeated label stays its own bar or slice, counted on the axis
+  (`Mon (2)`). Other Markdown readers show the fence as a code block holding
+  the same data.
 
 ## CSS and design tokens
 

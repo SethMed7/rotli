@@ -233,6 +233,13 @@ second user-visible product or storage location.
   final layout. The secondary `Convert copy to Excalidraw…` action creates a new
   user-owned `.excalidraw` file in the active creation context and leaves the
   Mermaid fence unchanged.
+- A Markdown `chart` fence owns its chart as plain text (SYNTAX.md): options,
+  a blank line, then comma-separated rows. **Bar / Line / Area / Pie chart**
+  insert a starter and open its Edit form. Apply replaces only the fence body,
+  in the canonical form, after the same stale-source guard as Mermaid. A chart
+  Rotli can't read fails closed with its reason and its source and is never
+  rewritten. The renderer (TanStack Charts) sits behind one adapter
+  (`src/editor/chartRender.ts`), so it can be replaced without touching a note.
 - Documents are conventional DOCX files. They do not host Markdown slash
   commands or embed syntax. Rotli creates and edits them locally through a
   structured document model, including native Word tables. The DOCX codec

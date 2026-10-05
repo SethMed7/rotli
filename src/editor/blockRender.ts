@@ -27,9 +27,18 @@ import { isTauri } from "../lib/tauri";
 import { findLeaf, leaves, usePanesStore } from "../state/panes";
 import { isDarkDataTheme } from "../state/theme";
 import { useUiStore } from "../state/ui";
+import { destroyChartBlocks, openChartForm, renderChartBlock } from "./chartBlock";
+import { takeChartEdit } from "./chartPending";
 import { installEmbedControls } from "./embedControls";
 import { mountBoardEmbed, mountDocumentEmbed, mountSheetEmbed } from "./embedHosts";
-import { type FenceBlock, type LangKey, innerCode, scanFences, withheldEmbedMessage } from "./fences";
+import {
+  type FenceBlock,
+  type LangKey,
+  fenceBodyRange,
+  innerCode,
+  scanFences,
+  withheldEmbedMessage,
+} from "./fences";
 import { type InlineMermaidCamera, createInlineMermaidCamera } from "./mermaidInlineCamera";
 import { mermaidErrorMessage, renderMermaidElement } from "./mermaidRender";
 import { mountMermaidWorkspace } from "./mermaidWorkspace";
@@ -226,7 +235,15 @@ const RENDERERS: Record<StaticLangKey, (code: string, ctx: RenderCtx) => HTMLEle
       el.appendChild(frame);
       return el;
     },
+
+    // A chart draws from its plain-text spec, or fails closed with the reason
+    // and the source (chartBlock.ts, SYNTAX.md). Colors follow CSS tokens.
+    chart: (code) => renderChartBlock(code),
   };
+
+/** Blocks that own live DOM (a board, a chart host) are never shared through
+ * the render cache: each widget mounts and frees its own. */
+const UNCACHED = new Set<StaticLangKey>(["jsxgraph", "chart"]);
 
 type RenderEl = HTMLElement & { __freeBoard?: () => void };
 
@@ -428,13 +445,19 @@ class RenderBlockWidget extends WidgetType {
     const expand = document.createElement("button");
     expand.type = "button";
     expand.className = "rotli-render-expand";
-    expand.textContent = this.lang === "mermaid" ? "Open" : "Expand";
-    expand.setAttribute("aria-label", this.lang === "mermaid" ? "Open Mermaid diagram" : "Expand");
+    const action = this.lang === "mermaid" ? "Open" : this.lang === "chart" ? "Edit" : "Expand";
+    expand.textContent = action;
+    expand.setAttribute(
+      "aria-label",
+      this.lang === "mermaid" ? "Open Mermaid diagram" : this.lang === "chart" ? "Edit chart" : "Expand",
+    );
     expand.addEventListener("mousedown", (e) => {
       e.preventDefault();
       e.stopPropagation();
       if (this.lang === "mermaid") {
         openMermaidWorkspace(this.code, container, this.sourceFrom, this.sourceTo);
+      } else if (this.lang === "chart") {
+        openChartForm(container, this.code, this.sourceFrom, this.sourceTo);
       } else {
         openExpandOverlay(this.lang, this.code, container);
       }
@@ -458,7 +481,7 @@ class RenderBlockWidget extends WidgetType {
       }
     };
 
-    if (this.lang !== "jsxgraph") {
+    if (!UNCACHED.has(this.lang)) {
       const cached = cacheGet(key);
       if (cached) {
         mountRendered(cached);
@@ -470,22 +493,31 @@ class RenderBlockWidget extends WidgetType {
     if (out instanceof Promise) {
       out
         .then((el) => {
-          if (this.destroyed) return; // widget gone — never touch its DOM
-          if (this.lang !== "jsxgraph") cacheSet(key, el);
+          if (this.destroyed) {
+            destroyChartBlocks(el); // widget gone — free what it mounted, never touch its DOM
+            return;
+          }
+          if (!UNCACHED.has(this.lang)) cacheSet(key, el);
           mountRendered(el);
+          if (this.lang === "chart" && takeChartEdit(this.code)) {
+            openChartForm(container, this.code, this.sourceFrom, this.sourceTo);
+          }
         })
         .catch(() => {});
     } else {
-      if (this.lang !== "jsxgraph") cacheSet(key, out);
+      if (!UNCACHED.has(this.lang)) cacheSet(key, out);
       mountRendered(out);
     }
     return container;
   }
 
-  ignoreEvent(): boolean {
+  ignoreEvent(event: Event): boolean {
     // math/mermaid are static — let clicks through so CM lands the caret at the
     // block edge and reveals the raw source (click-to-edit). jsxgraph keeps its
     // own events (draggable points), so it ignores them; edit it by arrowing in.
+    // A chart's open Edit form keeps its typing and clicks to itself.
+    if (this.lang === "chart")
+      return event.target instanceof Element && !!event.target.closest(".chart-form");
     return this.lang === "jsxgraph" || this.lang === "mermaid";
   }
 
@@ -495,6 +527,7 @@ class RenderBlockWidget extends WidgetType {
     this.camera = null;
     if (this.dom) {
       this.dom.querySelectorAll<HTMLElement>(".rotli-render-jsxgraph").forEach(freeIfBoard);
+      destroyChartBlocks(this.dom);
     }
     this.dom = null;
   }
@@ -541,14 +574,7 @@ function mermaidCodeRange(
   sourceFrom: number,
   sourceTo: number,
 ): { from: number; to: number } | null {
-  if (sourceFrom < 0 || sourceTo > view.state.doc.length || sourceFrom > sourceTo) {
-    return null;
-  }
-  const openLine = view.state.doc.lineAt(sourceFrom);
-  const closeLine = view.state.doc.lineAt(sourceTo);
-  const from = openLine.to + 1;
-  const to = Math.max(from, closeLine.from - 1);
-  return { from, to };
+  return fenceBodyRange(view.state.doc, sourceFrom, sourceTo);
 }
 
 /** The note hosting the workspace — the focused pane's active note tab (the

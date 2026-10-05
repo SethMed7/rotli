@@ -1,5 +1,7 @@
 import { dateFor, dateToken, expandDateTokens, noteDateText } from "../lib/noteDates";
 import { ALIGN_CLOSE, alignOpenTag } from "./alignedLine";
+import { requestChartEdit } from "./chartPending";
+import { chartStarter } from "./chartSpec";
 import { applyBlockToggle, applyHeading } from "./commands";
 import type { SlashOp, SlashPickerMode } from "./slashTypes";
 import { cellSpansOf, insertTableText } from "./tables";
@@ -51,6 +53,14 @@ export function slashInsertion(
     }
     const insert = `\`\`\`${op.lang}\n\n\`\`\``;
     return { insert, caret: 4 + op.lang.length };
+  }
+  if (op.kind === "chart") {
+    // the caret lands below the fence so the chart renders, and its block
+    // opens the Edit form once (chartBlock.ts) — fill in the rows from there
+    const body = chartStarter(op.chartType);
+    requestChartEdit(body);
+    const insert = `\`\`\`chart\n${body}\n\`\`\`\n`;
+    return { insert, caret: insert.length };
   }
   if (op.kind === "align") {
     const open = alignOpenTag(op.align);

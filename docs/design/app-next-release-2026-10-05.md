@@ -223,6 +223,21 @@ edit journal. A note the owner typed is `person-written`. Three options:
 5. **Slash form:** per-type commands (Bar chart, Line chart…), or make the
    `/chart:bar` colon form part of the slash grammar?
 
+## Charts: the dependency record
+
+- **Release-age override (owner's call).** `@tanstack/charts` 1.0.0 was two
+  days old, younger than the three-day `minimumReleaseAge` hold in
+  `bunfig.toml`. The owner chose to override the hold once, on 2026-10-05.
+  - How: one `bun add --exact` run against a temporary copy of `bunfig.toml`
+    with the hold and the frozen lockfile off. The repository's `bunfig.toml`
+    is unchanged, and frozen installs accept the lockfile.
+  - Only the TanStack package itself is new. Its D3 dependencies are long
+    published.
+- **Type packages deduplicated.** `bun dedupe` (the `deps dedupe-check`
+  gate) settled `@types/d3-path` on 1.0.11, which `@types/d3-sankey` needs and
+  every other consumer accepts. Both TypeScript lanes stay clean.
+- **Pinned exact.** The version is pinned, as TanStack's stability guide asks.
+
 ## Native checklist (the owner, in the Mac app)
 
 The browser twin can't prove these.
@@ -237,3 +252,6 @@ The browser twin can't prove these.
 - [ ] **Chat: pasted screenshot.** ⌃⇧⌘4 a region, then ⌘V into the composer: it attaches with its tag. A rich copy from a web page still pastes as text.
 - [ ] **Chat: the sent chip.** The sent message shows each tag as a chip (image, file name, size) where it was typed; it reads the same after reopening the chat.
 - [ ] **Chat: dropped and Finder-pasted images.** A Finder drop or a Finder ⌘C/⌘V still attaches, with the tag typed at the end.
+- [ ] **Charts: insert one.** Type `/chart` in a note and pick Bar chart: a chart and its form appear. Edit a value, press Apply, and the chart redraws. ⌘Z undoes the Apply.
+- [ ] **Charts: themes.** Switch through a light and a dark theme: the chart's colors and axes follow.
+- [ ] **Charts: a narrow pane.** Split the pane: the chart and its form fit the narrow width, and the form scrolls sideways instead of overflowing.

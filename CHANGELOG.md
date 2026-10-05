@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Charts in your notes.** Type `/chart` and pick **Bar**, **Line**,
+  **Area**, or **Pie chart**: Rotli drops in a small example and opens a form
+  where you set the type, title, unit, and rows. The chart lives in the note
+  as plain text you can read and edit by hand (a `chart` block of options and
+  comma-separated rows), so the file stays portable. If Rotli can't read a
+  chart, it shows why and leaves the text alone. Charts follow your theme's
+  colors.
 - **Images in a chat sit where you mention them.** Attaching an image types
   its tag, `[Image #1]`, where your cursor is, so you can write "compare
   [Image #1] with [Image #2]". The sent message shows each tag as a chip

@@ -263,6 +263,8 @@ const vendorSeams = [
     vendor: "@univerjs",
     allowed: ["src/sheets/engine/", "src/documents/engine/", "src/brand/univerTheme.ts"],
   },
+  // the ```chart fence's renderer (2026-10-05); chartSpec.ts owns the text
+  { vendor: "@tanstack/charts", allowed: ["src/editor/chartRender.ts"] },
   {
     vendor: "jszip",
     allowed: ["src/documents/codec/", "src/documents/create.ts", "src/sheets/codec/", "src/lib/vaultZip.ts"],
