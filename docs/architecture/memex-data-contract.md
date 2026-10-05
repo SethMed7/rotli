@@ -200,6 +200,12 @@ second user-visible product or storage location.
   acknowledge the attempt; failure or timeout cancels exit/restart and restores
   the main window with an error. Forced process/OS termination can still lose
   unsaved in-memory debounce work; no durable draft journal exists yet.
+- A sheet's unsaved edits are written when the window hides and at quit; a
+  background save that fails says why. Edits parked from an earlier session
+  whose file changed on disk since are never written over the newer file and
+  never dropped silently: the sheet opens the version on disk and offers
+  **Save my edits as a copy** (a new `.xlsx` in the managed lane) or
+  **Discard my edits**.
 
 ## Editing capabilities
 

@@ -2354,6 +2354,40 @@
   opacity: 0.5;
   cursor: default;
 }
+/* Edits parked before the file changed on disk: the person chooses, nothing is
+   dropped. Wraps on a narrow pane; the safe choice (copy) comes first. */
+.sheet-conflict {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--tint);
+  border-bottom: 1px solid var(--border);
+}
+.sheet-conflict > span {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+.sheet-conflict button {
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 3px 12px;
+  cursor: pointer;
+}
+.sheet-conflict button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
 .sheet-view-toggle {
   flex: 0 0 auto;
   font: inherit;

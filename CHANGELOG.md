@@ -229,6 +229,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A spreadsheet that changed on disk keeps your unsaved edits.** Edits you
+  hadn't saved when the file changed outside Rotli used to be set aside and
+  lost. Now the sheet shows the version on disk and offers **Save my edits as
+  a copy** (a new workbook, opened in a tab) or **Discard my edits**.
+- **A spreadsheet that can't save in the background says so.** When Rotli
+  saves your sheet as the window hides and that save fails, you see why,
+  instead of nothing.
 - **The theme studio's previous and next buttons on rotli.co sit on one row
   on phones** again, beside the theme's name.
 - **A new note in Rotli Web says "just now".** It read hours old (at least

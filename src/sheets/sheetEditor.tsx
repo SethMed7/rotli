@@ -22,8 +22,13 @@ import {
 import { SHEET_EDIT_MAX_BYTES } from "./kinds";
 import {
   deleteParked,
+  deleteSetAside,
   getParked,
+  getSetAside,
+  parkedResume,
   registerLiveDirty,
+  saveSetAsideAsCopy,
+  setAsideParked,
   setParked,
   unregisterLiveDirty,
   writeSheetModel,
@@ -55,7 +60,8 @@ export default function SheetEditor({
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  // edits parked before the file changed on disk — offered as a copy, never dropped
+  const [conflict, setConflict] = useState(false);
   const [ready, setReady] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -92,21 +98,21 @@ export default function SheetEditor({
     armedRef.current = false;
     setReady(false);
     setErr(null);
+    setConflict(getSetAside(fileId) !== undefined);
 
     void (async () => {
       try {
         const stat = await corpusFileStat(fileId);
         if (!stat) throw new Error("this file is unavailable");
         let park = getParked(fileId);
-        if (park) {
-          const stale = stat.revision !== park.revision;
-          if (stale || park.mode !== mode) {
-            deleteParked(fileId);
-            park = undefined;
-            if (!disposed && stale)
-              setNote("the file changed on disk — unsaved edits from the earlier session were set aside");
-          }
+        const resume = parkedResume(park, stat.revision, mode);
+        if (resume === "conflict") {
+          setAsideParked(fileId);
+          if (!disposed) setConflict(true);
+        } else if (resume === "fresh" && park) {
+          deleteParked(fileId);
         }
+        if (resume !== "resume") park = undefined;
 
         let wb: Workbook;
         let model: SheetModel;
@@ -293,7 +299,6 @@ export default function SheetEditor({
         {themeMode === "raw" ? "Themed" : "Raw"}
       </button>
       {err && <span className="sheet-save-err">⚠ {err}</span>}
-      {!err && note && <span className="sheet-save-err">{note}</span>}
       {dirty && !saving && <span className="sheet-dirty" title="Unsaved changes" />}
       <button type="button" className="sheet-save" disabled={saving || !ready} onClick={() => void save()}>
         {saving ? "Saving…" : dirty ? "Save ⌘S" : "Saved"}
@@ -301,9 +306,37 @@ export default function SheetEditor({
     </div>
   );
 
+  const keepAsCopy = async () => {
+    try {
+      const copyId = await saveSetAsideAsCopy(fileId);
+      setConflict(false);
+      void invalidateNotes();
+      usePanesStore.getState().openFile(copyId, { newTab: true });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  };
+  const discardSetAside = () => {
+    deleteSetAside(fileId);
+    setConflict(false);
+  };
+
   return (
     <div className={`sheet-editor${themeMode === "raw" ? " sheet-raw" : ""}`}>
       {chromeEl ? createPortal(chrome, chromeEl) : <div className="sheet-editor-bar">{chrome}</div>}
+      {conflict && (
+        <div className="sheet-conflict" role="alert">
+          <span>
+            This file changed on disk after your last unsaved edits. You&rsquo;re seeing the version on disk.
+          </span>
+          <button type="button" className="sheet-conflict-keep" onClick={() => void keepAsCopy()}>
+            Save my edits as a copy
+          </button>
+          <button type="button" className="sheet-conflict-discard" onClick={discardSetAside}>
+            Discard my edits
+          </button>
+        </div>
+      )}
       {!err && !ready && <p className="file-loading">Loading…</p>}
       <div ref={hostRef} className="sheet-editor-host" />
     </div>

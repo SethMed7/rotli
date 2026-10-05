@@ -53,8 +53,8 @@ revision-checked atomic writes; a one-time `.bak`):
 
 | Finding | Verdict |
 |---|---|
-| A file changed on disk while edits were parked: the edits are set aside with a visible note (`sheetEditor.tsx:101-108`). They are not silent, but they are lost, with no recovery copy. | **Fix with the flip.** Write the set-aside edits to a sibling recovery file instead of dropping them. |
-| A failed flush on window hide or page-hide is swallowed (`session.ts:143,146`). At quit, a failed flush aborts the quit, which is correct. | **Fix with the flip.** Surface a failed background save. |
+| A file changed on disk while edits were parked: the edits are set aside with a visible note (`sheetEditor.tsx:101-108`). They are not silent, but they are lost, with no recovery copy. | **Fixed** The edits are held out of the flush; the sheet offers Save my edits as a copy (a new `.xlsx` in the managed lane, opened in a tab) or Discard. |
+| A failed flush on window hide or page-hide is swallowed (`session.ts:143,146`). At quit, a failed flush aborts the quit, which is correct. | **Fixed.** A failed background save shows its reason. |
 | Closing a dirty tab parks the edits in memory; they are written on the next hide or quit. | Acceptable for Beta. Document it. |
 | Undo history resets on a theme change, a Raw/Themed toggle, or a tab switch, because the engine is rebuilt. | Beta limitation. Document it. |
 | Unknown XLSX parts outside the refusal list may not survive a save; data validation and conditional formatting are not editable. | Beta limitation, already in the launch-readiness doc. |
