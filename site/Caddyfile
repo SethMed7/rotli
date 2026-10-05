@@ -58,11 +58,12 @@
 		file_server
 	}
 
-	# The "coming soon" list (2026-10-02): /api/subscribe is answered by the Bun
-	# sidecar on loopback (site/server/subscribe.ts, started by site/entrypoint.sh).
-	# The site's own headers apply; the pages reach it under connect-src 'self'
-	# (the footer's probe and JSON post) and form-action 'self' (a plain form
-	# post without JavaScript). Nothing under /api/ is ever cached.
+	# The Bun sidecar on loopback (site/server/main.ts, started by
+	# site/entrypoint.sh) answers /api/: the "coming soon" list (2026-10-02,
+	# /api/subscribe) and the roadmap's votes and requests (2026-10-05,
+	# /api/roadmap/*). The site's own headers apply; the pages reach it under
+	# connect-src 'self' (probes and JSON posts) and form-action 'self' (plain
+	# form posts without JavaScript). Nothing under /api/ is ever cached.
 	handle /api/* {
 		import security
 		# Deferred (>), so it replaces whatever the sidecar sends instead of adding to it.
@@ -147,13 +148,14 @@
 	# /about to /about/ on its own. Unknown paths fall through to the 404 page.
 	handle_errors {
 		import security
-		# The sidecar is down (or still starting): the list reads as closed. The
-		# footer's probe sees a non-200 and hides its form; a plain form post gets
+		# The sidecar is down (or still starting): the list and the roadmap's
+		# voting read as closed. The pages' probes see a non-200 (the footer hides
+		# its form, the roadmap says voting opens soon); a plain form post gets
 		# this line instead of the site's 404 page.
 		@api path /api/*
 		handle @api {
 			header Cache-Control "no-store"
-			respond "The list is not open right now. Try again later." 503
+			respond "This is not open right now. Try again later." 503
 		}
 		@notfound expression {http.error.status_code} == 404
 		rewrite @notfound /404.html
