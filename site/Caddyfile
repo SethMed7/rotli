@@ -149,8 +149,8 @@
 	handle_errors {
 		import security
 		# The sidecar is down (or still starting): the list and the roadmap's
-		# voting read as closed. The pages' probes see a non-200 (the footer hides
-		# its form, the roadmap says voting opens soon); a plain form post gets
+		# voting read as closed. The pages' probes see a non-200 (the footer's
+		# submit says the list isn't open yet, the roadmap says voting opens soon); a plain form post gets
 		# this line instead of the site's 404 page.
 		@api path /api/*
 		handle @api {

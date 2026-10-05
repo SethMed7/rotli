@@ -120,6 +120,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Long commands fit their boxes on rotli.co.** The Rotli Helper install
   line wraps inside its box in the guide and the blog post instead of being
   cut off, and the privacy page's night scene sets its words beside the dome.
+- **The AI tools on rotli.co's bench are ChatGPT, Claude, Gemini, and Grok.**
+  Each wears its product's colour and a name underneath, so it's clear which
+  AI the figures are about.
+- **rotli.co's night falls like dusk.** Scrolling into the privacy section,
+  the page, its header, and its buttons fade into the night together, on one
+  clock, a little sooner, and the section's edges fade into the page instead
+  of cutting across it. Text stays readable all the way through.
+- **"Make it yours" on rotli.co shows the themes on its own.** When you reach
+  it, it steps through every theme. Hover a swatch to see that one; click it
+  to keep it. With reduced motion it waits for you.
+- **The quokka beach at the bottom of rotli.co has a person you walk.** Move
+  the mouse onto the sand (or tap it, or use Walk on the beach and the arrow
+  keys) and your person walks there. Stop at the leaves to pick one up, by a
+  quokka to feed it, or by the two with the ball to join their game. With
+  reduced motion nothing moves on its own, and your person steps straight to
+  where you send it.
+- **rotli.co's "Hear when it's ready" sign-up is always in the footer.** Until
+  the list opens, it says so and doesn't send your address anywhere. The
+  footer's maker line links to Seth Medina on X.
 - **Setup is four screens.** Your name and theme, where your notes live, who
   files them (the Librarian), and your three shortcuts, which now say plainly
   that you can change them. Then the thank-you card and the tour, and a small

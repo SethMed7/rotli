@@ -1,7 +1,9 @@
 ---
-// Make it yours: the theme studio (fourteen real captures from public/themes/). It moves
-// only when the visitor asks: no timers, so a background tab does no work and nothing
-// loops beside text.
+// Make it yours: the theme studio (fourteen real captures from public/themes/). Once it is
+// on screen it steps through them on its own at a calm pace, and it follows the visitor: a
+// hovered or focused swatch shows at once and holds the cycle, a click pins it (the owner,
+// 2026-10-05; the rules are src/themeCycle.ts). It never plays under reduced motion, off
+// screen, or in a hidden tab, so a background tab does no work.
 // Behind it, faintly, the story film's island by day (IslandScene.astro).
 import IslandScene from '../IslandScene.astro';
 
@@ -64,7 +66,7 @@ const first = stops[0];
         <button type="button" class="carousel-step" data-theme-step="-1" aria-label="Previous theme">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 5-7 7 7 7" /></svg>
         </button>
-        <p class="carousel-label" aria-live="polite">
+        <p class="carousel-label" aria-live="off">
           <span class="carousel-count" id="theme-count">1 / {stops.length}</span>
           <span class="carousel-name" id="theme-name">{first.family} · {first.environment}</span>
         </p>
@@ -104,44 +106,122 @@ const first = stops[0];
 </section>
 
 <script>
-  // Theme studio: a swatch (wide screens) or the carousel (narrow screens, with a swipe on
-  // the capture) swaps the capture and caption. Nothing cycles on its own.
+  // Theme studio: it plays on its own (src/themeCycle.ts), a swatch (wide screens) or the
+  // carousel (narrow screens, with a swipe on the capture) takes over, and the capture and
+  // caption follow. Steps it takes on its own are not announced; the visitor's are.
+  import { createCycle, hover, leave, pin, resume, tick, wait, type Cycle } from '../../themeCycle';
+
+  const studio = document.querySelector<HTMLElement>('.studio');
+  const picker = document.querySelector<HTMLElement>('.studio-picker');
   const shot = document.querySelector<HTMLImageElement>('#theme-shot');
   const family = document.querySelector<HTMLElement>('#theme-family');
   const environment = document.querySelector<HTMLElement>('#theme-environment');
   const themeCount = document.querySelector<HTMLElement>('#theme-count');
   const themeName = document.querySelector<HTMLElement>('#theme-name');
+  const label = document.querySelector<HTMLElement>('.carousel-label');
   const swatches = [...document.querySelectorAll<HTMLButtonElement>('.swatch-button')];
-  const warm = (button: HTMLButtonElement | undefined) => {
-    if (!button?.dataset.shot) return;
-    const image = new Image();
-    image.src = button.dataset.shot;
+  const warmed = new Map<string, Promise<void>>();
+  const warm = (index: number): Promise<void> => {
+    const url = swatches[index]?.dataset.shot;
+    if (!url) return Promise.resolve();
+    let ready = warmed.get(url);
+    if (!ready) {
+      const image = new Image();
+      image.src = url;
+      ready = image.decode().catch(() => undefined);
+      warmed.set(url, ready);
+    }
+    return ready;
   };
-  let theme = 0;
-  const selectTheme = (index: number) => {
-    const total = swatches.length;
-    if (!total) return;
-    theme = ((index % total) + total) % total;
-    const button = swatches[theme];
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let cycle: Cycle = createCycle(swatches.length, performance.now(), false);
+  let shown = 0;
+
+  const render = (announce: boolean) => {
+    const index = cycle.shown;
+    const button = swatches[index];
+    if (!button || index === shown) return;
+    shown = index;
+    label?.setAttribute('aria-live', announce ? 'polite' : 'off');
     if (shot && button.dataset.shot) {
       shot.src = button.dataset.shot;
       shot.alt = `The rotli workspace in the ${button.dataset.environment} environment`;
     }
     if (family) family.textContent = button.dataset.family ?? '';
     if (environment) environment.textContent = button.dataset.environment ?? '';
-    if (themeCount) themeCount.textContent = `${theme + 1} / ${total}`;
+    if (themeCount) themeCount.textContent = `${index + 1} / ${swatches.length}`;
     if (themeName) themeName.textContent = `${button.dataset.family} · ${button.dataset.environment}`;
     swatches.forEach((other) => other.setAttribute('aria-pressed', String(other === button)));
-    warm(swatches[(theme + 1) % total]); // the next one is ready before it is asked for
+    if (studio) studio.dataset.cycle = cycle.mode;
+    void warm((index + 1) % swatches.length); // the next one is ready before it is asked for
   };
+  const set = (next: Cycle, announce: boolean) => {
+    cycle = next;
+    if (studio) studio.dataset.cycle = cycle.mode;
+    render(announce);
+    schedule();
+  };
+
+  // One timeout, and only while the studio is on screen in a visible tab.
+  let timer = 0;
+  let onScreen = false;
+  const running = () => onScreen && !document.hidden;
+  function schedule() {
+    window.clearTimeout(timer);
+    timer = 0;
+    if (!running()) return;
+    const due = wait(cycle, performance.now());
+    if (due === null) return;
+    timer = window.setTimeout(async () => {
+      timer = 0;
+      const next = tick(cycle, performance.now());
+      if (next === cycle) return schedule();
+      await warm(next.shown); // never swap to a capture that is not there yet
+      if (cycle.mode === 'auto') set(next, false);
+      else schedule();
+    }, due);
+  }
+  let revealed = false;
+  if (studio && 'IntersectionObserver' in window) {
+    new IntersectionObserver(
+      (entries) => {
+        onScreen = entries.some((entry) => entry.isIntersecting);
+        if (onScreen && !revealed) {
+          revealed = true;
+          // It starts playing the first time it is seen, unless the visitor already chose.
+          if (cycle.mode !== 'pinned') {
+            cycle = { ...createCycle(swatches.length, performance.now(), !reduced.matches), shown: cycle.shown };
+          }
+          studio.dataset.cycle = cycle.mode;
+        } else if (onScreen) {
+          cycle = resume(cycle, performance.now());
+        }
+        schedule();
+      },
+      { threshold: 0.35 },
+    ).observe(studio);
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) cycle = resume(cycle, performance.now());
+    schedule();
+  });
+  reduced.addEventListener('change', () => {
+    if (reduced.matches && (cycle.mode === 'auto' || cycle.mode === 'held')) set({ ...cycle, mode: 'off' }, false);
+  });
+
   swatches.forEach((button, index) => {
-    // Warm the cache on intent so the swap is instant.
-    button.addEventListener('pointerenter', () => warm(button), { once: true });
-    button.addEventListener('focus', () => warm(button), { once: true });
-    button.addEventListener('click', () => selectTheme(index));
+    button.addEventListener('pointerenter', (event) => {
+      if (event.pointerType === 'mouse' || event.pointerType === 'pen') set(hover(cycle, index), false);
+    });
+    button.addEventListener('focus', () => set(hover(cycle, index), true));
+    button.addEventListener('click', () => set(pin(cycle, index), true));
+  });
+  picker?.addEventListener('pointerleave', () => set(leave(cycle, performance.now()), false));
+  picker?.addEventListener('focusout', (event) => {
+    if (!picker.contains(event.relatedTarget as Node | null)) set(leave(cycle, performance.now()), false);
   });
   document.querySelectorAll<HTMLButtonElement>('[data-theme-step]').forEach((button) => {
-    button.addEventListener('click', () => selectTheme(theme + Number(button.dataset.themeStep)));
+    button.addEventListener('click', () => set(pin(cycle, cycle.shown + Number(button.dataset.themeStep)), true));
   });
   let swipeFrom: number | null = null;
   shot?.addEventListener('pointerdown', (event) => (swipeFrom = event.clientX));
@@ -149,7 +229,7 @@ const first = stops[0];
     if (swipeFrom === null) return;
     const dx = event.clientX - swipeFrom;
     swipeFrom = null;
-    if (Math.abs(dx) > 40 && matchMedia('(max-width: 900px)').matches) selectTheme(theme + (dx < 0 ? 1 : -1));
+    if (Math.abs(dx) > 40 && matchMedia('(max-width: 900px)').matches) set(pin(cycle, cycle.shown + (dx < 0 ? 1 : -1)), true);
   });
 </script>
 

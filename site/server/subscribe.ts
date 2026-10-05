@@ -3,7 +3,7 @@
 // site/entrypoint.sh). It adds an email address to a Resend segment and nothing else:
 // the segment is the list the owner sends Broadcasts to (site/README.md).
 //
-//   GET/HEAD  /api/subscribe  → { live } — is the list open? The footer hides its form if not.
+//   GET/HEAD  /api/subscribe  → { live } — is the list open? If not, the footer says so on submit.
 //   POST      /api/subscribe  → adds the contact. JSON in and out for the footer's script;
 //                               a plain form post (no JavaScript) is redirected to /subscribed/.
 //

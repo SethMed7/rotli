@@ -86,7 +86,8 @@ types to Resend, Rotli's email provider, and only when the visitor submits it.
 Resend keeps it as a contact in Rotli's list (a Resend segment) so the owner
 can email updates about Rotli. Every such email carries Resend's unsubscribe
 link, and one click removes the address from future sends. Nothing else is
-collected or shared.
+collected or shared. Until the list opens, the form says so and the address
+is not kept or passed on.
 
 The roadmap page (rotli.co/roadmap/) keeps a vote count per roadmap item and
 nothing about who voted. The visitor's browser remembers its own votes in

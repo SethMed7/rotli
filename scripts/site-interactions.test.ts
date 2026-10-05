@@ -1,6 +1,7 @@
-// The website's interactive rules, without a browser: the privacy passage's trigger
-// (site/src/passage.ts), the resource reading meter (site/src/reading.ts), the 404 game
-// (site/src/runner/game.ts), and the footer scene's play (site/src/quokka/play.ts and the
+// The website's interactive rules, without a browser: the privacy passage's trigger and
+// crossfade (site/src/passage.ts), the theme studio's autoplay (site/src/themeCycle.ts), the
+// resource reading meter (site/src/reading.ts), the 404 game (site/src/runner/game.ts), and
+// the footer scene's play (site/src/quokka/play.ts, the person in human.ts, and the
 // traced-pose cleanup in art.ts). The pages wire these to the DOM; e2e/site/ proves the
 // wiring. Like site-agents.test.ts, the site's modules load through a computed path so
 // their types stay out of the root typecheck; only the functions under test are typed here.
@@ -42,10 +43,26 @@ interface Game {
   best: number;
 }
 
+type Rgb = readonly [number, number, number];
+interface PassagePair {
+  text: readonly [string, string];
+  ground: readonly [string, string];
+  main?: readonly [string, string];
+}
 let passage: {
   passageActive(section: { top: number; bottom: number }, viewport: number, active: boolean): boolean;
-  FOCAL_LINE: number;
-  HYSTERESIS: number;
+  ENTER_SHARE: number;
+  LEAVE_SHARE: number;
+  PASSAGE_MS: number;
+  GROUND_EASE: readonly [number, number, number, number];
+  INK_AT: number;
+  LEAN_KEYS: readonly (readonly [number, number])[];
+  cubicBezier(x1: number, y1: number, x2: number, y2: number): (t: number) => number;
+  leanAt(t: number): number;
+  contrast(a: Rgb, b: Rgb): number;
+  rgb(hex: string): Rgb;
+  mix(a: Rgb, b: Rgb, k: number): Rgb;
+  passageFrame(pair: PassagePair, t: number): { text: Rgb; ground: Rgb };
 };
 let reading: {
   readingProgress(
@@ -86,6 +103,45 @@ let play: {
     nearPile: boolean;
   }): string;
 };
+interface Cycle {
+  total: number;
+  shown: number;
+  mode: "auto" | "held" | "pinned" | "off";
+  pinned: number;
+  nextAt: number;
+}
+let cycle: {
+  CYCLE_MS: number;
+  RESUME_MS: number;
+  createCycle(total: number, now: number, autoplay: boolean): Cycle;
+  tick(c: Cycle, now: number): Cycle;
+  hover(c: Cycle, index: number): Cycle;
+  leave(c: Cycle, now: number): Cycle;
+  pin(c: Cycle, index: number): Cycle;
+  resume(c: Cycle, now: number): Cycle;
+  wait(c: Cycle, now: number): number | null;
+};
+interface Walk {
+  x: number;
+  v: number;
+  facing: 1 | -1;
+  phase: number;
+}
+interface Spot {
+  pile: boolean;
+  quokka: string | null;
+  players: boolean;
+}
+let human: {
+  STRIDE: { speed: number; accel: number; near: number; cycle: number };
+  createWalk(x: number, facing?: 1 | -1): Walk;
+  stepWalk(walk: Walk, target: number, ms: number, teleport?: boolean): Walk;
+  arrived(walk: Walk, target: number): boolean;
+  limbs(walk: Walk): { leg: number; arm: number; bob: number };
+  deed(holding: boolean, spot: Spot): "pick" | "feed" | "join" | null;
+  onSand(x: number, width: number, bodyWidth: number): number;
+  entrance(target: number, width: number, bodyWidth: number): number;
+};
 let art: {
   tracedPose(svg: string): { line: string; silhouette: string; transform: string; viewBox: number };
 };
@@ -96,32 +152,175 @@ beforeAll(async () => {
   game = (await import(site("runner", "game.ts"))) as typeof game;
   play = (await import(site("quokka", "play.ts"))) as typeof play;
   art = (await import(site("quokka", "art.ts"))) as typeof art;
+  cycle = (await import(site("themeCycle.ts"))) as typeof cycle;
+  human = (await import(site("quokka", "human.ts"))) as typeof human;
 });
 
 describe("the privacy passage", () => {
   const viewport = 800;
-  const line = () => viewport * passage.FOCAL_LINE;
-  const margin = () => viewport * passage.HYSTERESIS;
+  // A band taller than the window, its top edge at `top`.
+  const band = (top: number, height = 1200) => ({ top, bottom: top + height });
 
-  test("turns on only once the section holds the middle of the window", () => {
-    expect(passage.passageActive({ top: 900, bottom: 1700 }, viewport, false)).toBe(false); // still below
-    expect(passage.passageActive({ top: line() - 1, bottom: 1300 }, viewport, false)).toBe(false); // edge: inside the margin
-    expect(passage.passageActive({ top: line() - margin() - 1, bottom: 1300 }, viewport, false)).toBe(true);
+  test("turns on once the band fills a good share of the window, not only its middle", () => {
+    expect(passage.passageActive(band(900), viewport, false)).toBe(false); // still below
+    const enter = viewport * (1 - passage.ENTER_SHARE);
+    expect(passage.passageActive(band(enter + 1), viewport, false)).toBe(false);
+    expect(passage.passageActive(band(enter - 1), viewport, false)).toBe(true);
+    // Earlier than the old focal line (the middle of the window, plus a margin).
+    expect(enter).toBeGreaterThan(viewport * 0.5);
   });
 
   test("holds near a boundary instead of flickering, then lets go in either direction", () => {
+    const enter = viewport * (1 - passage.ENTER_SHARE);
+    const leave = viewport * (1 - passage.LEAVE_SHARE);
     // Scrolling back up a little past the switch point keeps it on.
-    expect(passage.passageActive({ top: line() + margin() / 2, bottom: 1300 }, viewport, true)).toBe(true);
-    // Leaving upward (the section falls below the line) turns it off.
-    expect(passage.passageActive({ top: line() + margin() + 1, bottom: 1300 }, viewport, true)).toBe(false);
-    // Leaving downward (the section's end rises above the line) turns it off too.
-    expect(passage.passageActive({ top: -900, bottom: line() - margin() / 2 }, viewport, true)).toBe(true);
-    expect(passage.passageActive({ top: -900, bottom: line() - margin() - 1 }, viewport, true)).toBe(false);
+    expect(passage.passageActive(band(enter + 20), viewport, true)).toBe(true);
+    // Leaving upward (the band falls back down the window) turns it off.
+    expect(passage.passageActive(band(leave + 1), viewport, true)).toBe(false);
+    // Leaving downward (the band's end rises up the window) turns it off too.
+    const end = (bottom: number) => ({ top: bottom - 1200, bottom });
+    expect(passage.passageActive(end(viewport * passage.LEAVE_SHARE + 1), viewport, true)).toBe(true);
+    expect(passage.passageActive(end(viewport * passage.LEAVE_SHARE - 1), viewport, true)).toBe(false);
+    expect(passage.LEAVE_SHARE).toBeLessThan(passage.ENTER_SHARE);
+  });
+
+  test("a band shorter than the window counts its own height", () => {
+    // A 300px band wholly in an 800px window fills all of itself.
+    expect(passage.passageActive({ top: 200, bottom: 500 }, viewport, false)).toBe(true);
   });
 
   test("a hidden or empty section never turns it on", () => {
     expect(passage.passageActive({ top: 0, bottom: 0 }, viewport, false)).toBe(false);
     expect(passage.passageActive({ top: 0, bottom: 800 }, 0, true)).toBe(false);
+  });
+});
+
+describe("the privacy passage's crossfade", () => {
+  // Every text/ground pair the page shows, day then night (Base.astro's tokens).
+  const text = ["#3a3028", "#e7f0f4"] as const;
+  const pairs: Record<string, PassagePair> = {
+    "text on the ground": { text, ground: ["#f8f2e9", "#0e171d"] },
+    "text on the warm band": { text, ground: ["#f1e7d8", "#1c2d35"] },
+    "text on a surface": { text, ground: ["#fbf6ee", "#152229"] },
+    "muted text on the ground": { text: ["#6e6155", "#a1b6c0"], ground: ["#f8f2e9", "#0e171d"], main: text },
+    "muted text on the warm band": {
+      text: ["#6e6155", "#a1b6c0"],
+      ground: ["#f1e7d8", "#1c2d35"],
+      main: text,
+    },
+    "accent text on the ground": { text: ["#8f4e37", "#86c2e0"], ground: ["#f8f2e9", "#0e171d"], main: text },
+  };
+  const frames = (pair: PassagePair) =>
+    Array.from({ length: passage.PASSAGE_MS + 1 }, (_, ms) => {
+      const { text: ink, ground } = passage.passageFrame(pair, ms / passage.PASSAGE_MS);
+      return passage.contrast(ink, ground);
+    });
+
+  test("every pair stays readable in every frame of the dusk", () => {
+    for (const [name, pair] of Object.entries(pairs)) {
+      const worst = Math.min(...frames(pair));
+      expect({ name, readable: worst >= 3 }).toEqual({ name, readable: true });
+    }
+  });
+
+  test("text dips under 4.5:1 only for a moment, while the ground crosses mid-tone", () => {
+    for (const [name, pair] of Object.entries(pairs)) {
+      const dim = frames(pair).filter((ratio) => ratio < 4.5).length;
+      expect({ name, quick: dim <= 100 }).toEqual({ name, quick: true });
+    }
+  });
+
+  test("a primary button and its label switch together, so the label never fades through it", () => {
+    const css = readFileSync(site("layouts", "Base.astro"), "utf8");
+    expect(css).toMatch(/\.button\.primary \{\s*background: var\(--text\);\s*color: var\(--on-text\);/);
+    const ratio = (a: string, b: string) => passage.contrast(passage.rgb(a), passage.rgb(b));
+    expect(ratio("#f8f2e9", "#3a3028")).toBeGreaterThan(4.5);
+    expect(ratio("#0e171d", "#e7f0f4")).toBeGreaterThan(4.5);
+  });
+
+  test("a plain crossfade, text fading with the ground, would vanish halfway", () => {
+    const ease = passage.cubicBezier(...passage.GROUND_EASE);
+    const mixHex = (pair: readonly [string, string], k: number): Rgb => {
+      const [a, b] = pair.map((hex) => passage.rgb(hex));
+      return passage.mix(a!, b!, k);
+    };
+    const naive = Array.from({ length: 101 }, (_, i) => {
+      const k = ease(i / 100);
+      return passage.contrast(mixHex(text, k), mixHex(["#f8f2e9", "#0e171d"], k));
+    });
+    expect(Math.min(...naive)).toBeLessThan(1.5);
+  });
+
+  test("the grounds ease out and in, the inks switch about halfway, and the lean returns", () => {
+    const ease = passage.cubicBezier(...passage.GROUND_EASE);
+    expect(ease(0)).toBe(0);
+    expect(ease(1)).toBe(1);
+    expect(ease(0.5)).toBeCloseTo(0.5, 3);
+    expect(ease(0.1)).toBeLessThan(0.05); // a slow start
+    expect(passage.INK_AT).toBeCloseTo(0.5, 1);
+    expect(passage.leanAt(0)).toBe(0);
+    expect(passage.leanAt(0.5)).toBe(1);
+    expect(passage.leanAt(1)).toBe(0);
+  });
+
+  test("the stylesheet runs the same clock", () => {
+    const css = readFileSync(site("layouts", "Base.astro"), "utf8");
+    const [x1, y1, x2, y2] = passage.GROUND_EASE;
+    expect(css).toContain(`--passage-ms: ${passage.PASSAGE_MS}ms;`);
+    expect(css).toContain(`--passage-ease: cubic-bezier(${x1}, ${y1}, ${x2}, ${y2});`);
+    expect(css).toContain(`--passage-ink-at: ${Math.round(passage.PASSAGE_MS * passage.INK_AT)}ms;`);
+    for (const [share, lean] of passage.LEAN_KEYS)
+      expect(css).toContain(`${share * 100}% { --passage-lean: ${lean}; }`);
+  });
+});
+
+describe("the theme studio's autoplay", () => {
+  test("steps through every environment at a calm pace, and round again", () => {
+    let c = cycle.createCycle(14, 0, true);
+    expect(cycle.tick(c, cycle.CYCLE_MS - 1).shown).toBe(0); // not before its time
+    expect(cycle.CYCLE_MS).toBeGreaterThanOrEqual(2500);
+    for (let i = 1; i <= 14; i++) {
+      c = cycle.tick(c, i * cycle.CYCLE_MS);
+      expect(c.shown).toBe(i % 14);
+    }
+    expect(cycle.wait(c, 14 * cycle.CYCLE_MS)).toBe(cycle.CYCLE_MS);
+  });
+
+  test("a hover shows that environment at once and holds; leaving goes on from there", () => {
+    let c = cycle.hover(cycle.createCycle(14, 0, true), 9);
+    expect(c).toMatchObject({ shown: 9, mode: "held" });
+    expect(cycle.tick(c, 99_999).shown).toBe(9); // held, however long
+    expect(cycle.wait(c, 0)).toBeNull();
+    c = cycle.leave(c, 10_000);
+    expect(c.mode).toBe("auto");
+    expect(cycle.tick(c, 10_000 + cycle.RESUME_MS - 1).shown).toBe(9);
+    expect(cycle.tick(c, 10_000 + cycle.RESUME_MS).shown).toBe(10);
+  });
+
+  test("a click pins it: the cycle stops, and a hover only previews", () => {
+    let c = cycle.pin(cycle.createCycle(14, 0, true), 4);
+    expect(cycle.tick(c, 99_999).shown).toBe(4);
+    c = cycle.hover(c, 11);
+    expect(c).toMatchObject({ shown: 11, mode: "pinned" });
+    expect(cycle.leave(c, 0).shown).toBe(4);
+    // The carousel's steps pin too, wrapping at either end.
+    expect(cycle.pin(c, -1).shown).toBe(13);
+    expect(cycle.pin(c, 14).shown).toBe(0);
+  });
+
+  test("never plays under reduced motion, but still follows a hover", () => {
+    const c = cycle.createCycle(14, 0, false);
+    expect(cycle.tick(c, 99_999).shown).toBe(0);
+    expect(cycle.wait(c, 0)).toBeNull();
+    const hovered = cycle.hover(c, 6);
+    expect(hovered).toMatchObject({ shown: 6, mode: "off" });
+    expect(cycle.tick(cycle.leave(hovered, 0), 99_999).shown).toBe(6);
+  });
+
+  test("coming back on screen waits a full step before moving", () => {
+    const c = cycle.resume(cycle.createCycle(14, 0, true), 50_000);
+    expect(cycle.tick(c, 50_000 + cycle.CYCLE_MS - 1).shown).toBe(0);
+    expect(cycle.tick(c, 50_000 + cycle.CYCLE_MS).shown).toBe(1);
   });
 });
 
@@ -223,6 +422,81 @@ describe("the 404 game", () => {
     expect(game.metres(game.WORLD.unitsPerMetre * 12.9)).toBe(12);
     const g = game.step(game.start(game.createGame(800)), 5000, never);
     expect(g.distance).toBeLessThan(40);
+  });
+});
+
+describe("the person on the footer beach", () => {
+  const walkTo = (from: number, target: number, ms = 16, frames = 2000) => {
+    let walk = human.createWalk(from);
+    const path: Walk[] = [];
+    for (let i = 0; i < frames && !human.arrived(walk, target); i++) {
+      walk = human.stepWalk(walk, target, ms);
+      path.push(walk);
+    }
+    return path;
+  };
+
+  test("walks to where it is sent, easing in and out, and stops exactly there", () => {
+    const path = walkTo(100, 900);
+    const last = path.at(-1)!;
+    expect(last.x).toBe(900);
+    expect(last.v).toBe(0);
+    expect(human.arrived(last, 900)).toBe(true);
+    const speeds = path.map((w) => w.v);
+    expect(speeds[0]).toBeLessThan(human.STRIDE.speed / 4); // it sets off gently
+    expect(Math.max(...speeds)).toBeCloseTo(human.STRIDE.speed, 5); // a walk, never a run
+    expect(speeds.at(-2)!).toBeLessThan(human.STRIDE.speed / 3); // and slows to arrive
+    // Never past the spot, never back again.
+    path.slice(1).forEach((walk, i) => expect(walk.x).toBeGreaterThanOrEqual(path[i]!.x));
+    expect(Math.max(...path.map((w) => w.x))).toBe(900);
+  });
+
+  test("faces the way it walks, and keeps facing that way standing still", () => {
+    const left = walkTo(500, 200);
+    expect(left[5]!.facing).toBe(-1);
+    expect(left.at(-1)!.facing).toBe(-1);
+    expect(walkTo(200, 500)[5]!.facing).toBe(1);
+  });
+
+  test("a long frame (a hidden tab) never teleports it", () => {
+    const walk = human.stepWalk({ x: 0, v: human.STRIDE.speed, facing: 1, phase: 0 }, 2000, 5000);
+    expect(walk.x).toBeLessThanOrEqual(64 * human.STRIDE.speed + 1);
+  });
+
+  test("under reduced motion it is simply there, standing", () => {
+    expect(human.stepWalk(human.createWalk(10), 700, 16, true)).toEqual({
+      x: 700,
+      v: 0,
+      facing: 1,
+      phase: 0,
+    });
+  });
+
+  test("legs and arms swing opposite ways while walking, and hang still when standing", () => {
+    expect(human.limbs(human.createWalk(0))).toEqual({ leg: 0, arm: 0, bob: 0 });
+    const striding = { x: 0, v: human.STRIDE.speed, facing: 1 as const, phase: Math.PI / 2 };
+    const swing = human.limbs(striding);
+    expect(swing.leg).toBeGreaterThan(15);
+    expect(swing.arm).toBeGreaterThan(10);
+    expect(human.limbs({ ...striding, phase: (3 * Math.PI) / 2 }).leg).toBeLessThan(-15);
+  });
+
+  test("stopping does the one thing that fits: pick, feed, or join", () => {
+    const none = { pile: false, quokka: null, players: false };
+    expect(human.deed(false, { ...none, pile: true })).toBe("pick");
+    expect(human.deed(true, { ...none, pile: true })).toBeNull(); // hands full
+    expect(human.deed(true, { ...none, quokka: "sitter" })).toBe("feed");
+    expect(human.deed(false, { ...none, quokka: "sitter" })).toBeNull(); // nothing to give
+    expect(human.deed(false, { ...none, players: true, quokka: "player-a" })).toBe("join");
+    expect(human.deed(true, { ...none, players: true, quokka: "player-a" })).toBe("feed");
+    expect(human.deed(false, none)).toBeNull();
+  });
+
+  test("it stays on the sand, and arrives from the nearer side", () => {
+    expect(human.onSand(-50, 1000, 80)).toBe(40);
+    expect(human.onSand(990, 1000, 80)).toBe(960);
+    expect(human.entrance(300, 1000, 80)).toBeLessThan(300);
+    expect(human.entrance(800, 1000, 80)).toBeGreaterThan(800);
   });
 });
 
