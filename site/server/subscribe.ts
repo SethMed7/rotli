@@ -1,6 +1,7 @@
-// The "coming soon" list: one endpoint, /api/subscribe, run as a small Bun sidecar in the
-// site's container on 127.0.0.1 behind Caddy (site/Caddyfile `handle /api/*`,
-// site/entrypoint.sh). It adds an email address to a Resend segment and nothing else.
+// The "coming soon" list: one endpoint, /api/subscribe, served by the site's small Bun
+// sidecar on 127.0.0.1 behind Caddy (site/server/main.ts, site/Caddyfile `handle /api/*`,
+// site/entrypoint.sh). It adds an email address to a Resend segment and nothing else:
+// the segment is the list the owner sends Broadcasts to (site/README.md).
 //
 //   GET/HEAD  /api/subscribe  → { live } — is the list open? The footer hides its form if not.
 //   POST      /api/subscribe  → adds the contact. JSON in and out for the footer's script;
@@ -10,6 +11,8 @@
 // the probe says { live: false }. Contacts are global in Resend (one per address), so a
 // repeat signup is answered exactly like a new one and only re-checks segment membership.
 // A previous unsubscribe is never overridden. Addresses are never logged.
+
+import { clientAddress, limiter, NO_STORE, page, readFields, wantsJson } from './http';
 
 const RESEND_API = 'https://api.resend.com';
 const MAX_BODY_BYTES = 4096;
@@ -44,38 +47,6 @@ export function normalizeEmail(value: unknown): string | null {
   return `${email.slice(0, at)}@${email.slice(at + 1).toLowerCase()}`;
 }
 
-/** The visitor's address as Cloudflare → Railway → Caddy hand it over. */
-function clientKey(req: Request): string {
-  const header = (name: string) => req.headers.get(name)?.split(',')[0]?.trim();
-  return header('cf-connecting-ip') || header('x-real-ip') || header('x-forwarded-for') || 'local';
-}
-
-function limiter(rule: { count: number; windowMs: number }, now: () => number) {
-  const hits = new Map<string, number[]>();
-  return (key: string): boolean => {
-    const t = now();
-    const recent = (hits.get(key) ?? []).filter((at) => t - at < rule.windowMs);
-    recent.push(t);
-    hits.set(key, recent);
-    if (hits.size > 5000) hits.clear(); // never let the map grow without bound
-    return recent.length > rule.count;
-  };
-}
-
-async function readFields(req: Request, json: boolean): Promise<Record<string, unknown> | null> {
-  try {
-    if (json) {
-      const body: unknown = await req.json();
-      return body && typeof body === 'object' ? (body as Record<string, unknown>) : null;
-    }
-    const fields: Record<string, unknown> = {};
-    for (const [key, value] of await req.formData()) if (typeof value === 'string') fields[key] = value;
-    return fields;
-  } catch {
-    return null;
-  }
-}
-
 async function resendError(res: Response): Promise<{ name: string; message: string }> {
   try {
     const body = (await res.json()) as { name?: unknown; message?: unknown };
@@ -86,9 +57,6 @@ async function resendError(res: Response): Promise<{ name: string; message: stri
 }
 
 const ALREADY = /already (exists|in|a member|added)|duplicate/i;
-
-const page = (title: string, body: string) =>
-  `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>${title} — rotli</title><body><h1>${title}</h1><p>${body}</p><p><a href="/">Back to rotli</a></p></body></html>`;
 
 export function createSubscribe(options: SubscribeOptions = {}): (req: Request) => Promise<Response> {
   const { apiKey, segmentId, now = Date.now, log = (line) => console.warn(line) } = options;
@@ -127,7 +95,7 @@ export function createSubscribe(options: SubscribeOptions = {}): (req: Request) 
     if (Number(req.headers.get('content-length') ?? 0) > MAX_BODY_BYTES) {
       return { status: 413, ok: false, error: 'That is more than an email address.' };
     }
-    if (perClient(clientKey(req)) || overall('*')) {
+    if (perClient(clientAddress(req)) || overall('*')) {
       return { status: 429, ok: false, error: 'Too many tries in a row. Give it a few minutes.' };
     }
     const fields = await readFields(req, json);
@@ -152,16 +120,14 @@ export function createSubscribe(options: SubscribeOptions = {}): (req: Request) 
     const { pathname } = new URL(req.url);
     if (pathname !== '/api/subscribe') return new Response('Not found', { status: 404 });
     if (req.method === 'GET' || req.method === 'HEAD') {
-      return Response.json({ live }, { headers: { 'Cache-Control': 'no-store' } });
+      return Response.json({ live }, { headers: NO_STORE });
     }
     if (req.method !== 'POST') {
       return new Response(null, { status: 405, headers: { Allow: 'GET, HEAD, POST' } });
     }
-    const json =
-      (req.headers.get('content-type') ?? '').includes('application/json') ||
-      (req.headers.get('accept') ?? '').includes('application/json');
+    const json = wantsJson(req);
     const outcome = await subscribe(req, json);
-    const headers = { 'Cache-Control': 'no-store' };
+    const headers = NO_STORE;
     if (json) return Response.json({ ok: outcome.ok, error: outcome.error }, { status: outcome.status, headers });
     if (outcome.ok) return new Response(null, { status: 303, headers: { ...headers, Location: SUCCESS_PATH } });
     return new Response(page('Not added', outcome.error ?? ''), {
@@ -170,18 +136,3 @@ export function createSubscribe(options: SubscribeOptions = {}): (req: Request) 
     });
   };
 }
-
-// `bun server/subscribe.ts` serves the default export (site/entrypoint.sh starts it).
-// Loopback only: Caddy is the one way in.
-const env = process.env;
-if ((import.meta as { main?: boolean }).main) {
-  const open = env.RESEND_API_KEY && env.RESEND_SEGMENT_ID;
-  console.log(`subscribe sidecar on 127.0.0.1:${env.SUBSCRIBE_PORT ?? 8787}${open ? '' : ' (list off: RESEND_API_KEY or RESEND_SEGMENT_ID unset)'}`);
-}
-export default {
-  hostname: '127.0.0.1',
-  // Never Bun's development error page (stack traces) for a visitor.
-  development: false,
-  port: Number(env.SUBSCRIBE_PORT ?? 8787),
-  fetch: createSubscribe({ apiKey: env.RESEND_API_KEY, segmentId: env.RESEND_SEGMENT_ID }),
-};

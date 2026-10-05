@@ -82,9 +82,22 @@ Railway (hosting) and Cloudflare (DNS) process standard request details such
 as the IP address to deliver pages.
 
 The footer's optional "Hear when it's ready" list sends the address a visitor
-types to Resend, Rotli's email provider, to keep the list, and only when the
-visitor submits it. Anyone on the list can unsubscribe at any time. Nothing
-else is collected or shared.
+types to Resend, Rotli's email provider, and only when the visitor submits it.
+Resend keeps it as a contact in Rotli's list (a Resend segment) so the owner
+can email updates about Rotli. Every such email carries Resend's unsubscribe
+link, and one click removes the address from future sends. Nothing else is
+collected or shared.
+
+The roadmap page (rotli.co/roadmap/) keeps a vote count per roadmap item and
+nothing about who voted. The visitor's browser remembers its own votes in
+local storage (not a cookie, never sent). Abuse limits use an HMAC of the IP
+address and the UTC day under a secret salt, held in the server's memory only:
+never the raw address, never written to disk, new every day, and gone on
+restart. A feature request stores its title, description, the time it
+arrived, and an email address only if the visitor gives one, in a SQLite file
+on the site's Railway volume. Requests are read only by the owner, never
+published, and never added to the email list; a visitor can ask for theirs to
+be deleted by sending another request.
 
 ## Secure notes and locked notes
 

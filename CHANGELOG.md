@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   check it's done. It uses the model on this Mac unless your Librarian is set
   to a connected model. If it can't help this time, or its rewrite drops a
   file path, you get Basic and the reason; edits you made to Basic stay. Hand to AI remembers which one you chose last.
+- **rotli.co has a public roadmap you can vote on.** `/roadmap/` shows what's
+  being built, what's planned, and what's still an idea, straight from the
+  roadmap kept with rotli's source, each with how big it is. Vote for what
+  you want (once per item; your browser remembers) or ask for something new
+  with a short form; requests are read, never published. Until voting opens
+  on the live site, the page says so. It's in the Resources menu and the
+  footer, and the privacy page says what votes and requests keep.
 
 ### Changed
 

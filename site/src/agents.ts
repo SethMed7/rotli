@@ -5,6 +5,7 @@
 // site/Caddyfile answers `Accept: text/markdown` with these twins, and the
 // build (astro.config.mjs) fails if an llms.txt link points at a missing page.
 import { questions } from "./faq";
+import type { RoadmapSection } from "./roadmap";
 import { DOCS_AND_SHEETS, DOWNLOAD_URL, GITHUB_URL, LICENSE_URL, PLATFORMS, site } from "./site";
 import { slugOf, type Writing } from "./writing";
 
@@ -102,6 +103,11 @@ export function llmsText(writing: { resources: Writing[]; posts: Writing[] }): s
         site.webAppEnabled ? "the Mac app, Rotli Web, and Rotli Helper" : "the Mac app",
       ),
       link("Changelog", "/changelog/", "every release, newest first"),
+      link(
+        "Roadmap",
+        "/roadmap/index.md",
+        "what is being built, what is planned, and what is still an idea; people vote on items and send requests on the page",
+      ),
       link("About", "/about/", "why it is being built, where the name comes from, and who makes it"),
     );
     const section = (title: string, entries: Writing[]) =>
@@ -123,6 +129,29 @@ export function llmsText(writing: { resources: Writing[]; posts: Writing[] }): s
   ];
   if (optional.length > 0) lines.push("", "## Optional", "", ...optional);
   return lines.join("\n") + "\n";
+}
+
+/** /roadmap/'s twin: the three public sections, each item with its size and summary. */
+export function roadmapMarkdown(sections: RoadmapSection[]): string {
+  const lines = [
+    "# What's next for rotli",
+    "",
+    "> Direction, not a promise, and no dates. Sizes: S hours, M days, L 1–3 weeks, XL a month or more.",
+  ];
+  for (const section of sections) {
+    lines.push("", `## ${section.title}`, "");
+    for (const item of section.items) {
+      lines.push(`- **${item.title}**${item.size ? ` (${item.size})` : ""}: ${item.summary}`);
+    }
+  }
+  lines.push(
+    "",
+    "---",
+    "",
+    `Vote for an item, or ask for something new, at ${site.url}/roadmap/`,
+    "",
+  );
+  return lines.join("\n");
 }
 
 /** A writing page as Markdown: its title, summary, and the source body. */

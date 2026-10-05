@@ -18,6 +18,7 @@ export type NavSection =
   | 'blog'
   | 'developers'
   | 'changelog'
+  | 'roadmap'
   | 'about';
 
 export interface SiteLink {
@@ -54,7 +55,7 @@ export function navEntryHolds(entry: NavEntry, current: NavSection | undefined):
 /**
  * Header links: real pages, never landing-page anchors. Download is not
  * listed; it is the header's one button (SiteHeader.astro). Resources is a
- * dropdown (Guides, Blog, Developers, Changelog) whose label links to
+ * dropdown (Guides, Blog, Developers, Changelog, Roadmap) whose label links to
  * /resources/ when script is off. Blog appears only once a post can be read,
  * so the header never leads to an index of nothing but "coming soon". The
  * developer reference (MCP and the CLI) is a development-build feature: the
@@ -83,6 +84,12 @@ export function primaryNav(options: { hasPosts: boolean }): NavEntry[] {
       href: '/changelog/',
       label: 'Changelog',
       description: 'Every release, newest first',
+    },
+    {
+      section: 'roadmap',
+      href: '/roadmap/',
+      label: 'Roadmap',
+      description: 'What’s next, and your vote on it',
     },
   ];
   return [
@@ -115,6 +122,7 @@ export function footerGroups(options: { hasPosts: boolean }): FooterGroup[] {
       links: [
         { href: '/resources/', label: 'Resources' },
         { href: '/resources/getting-started/', label: 'Getting started' },
+        { href: '/roadmap/', label: 'Roadmap' },
         ...(options.hasPosts ? [{ href: '/blog/', label: 'Blog' }] : []),
         { href: '/about/', label: 'About' },
         // The open motion studio; not gated on the source flag, it is its own site.
@@ -128,7 +136,7 @@ export function footerGroups(options: { hasPosts: boolean }): FooterGroup[] {
       title: 'Open source',
       links: [
         { href: GITHUB_URL, label: 'GitHub' },
-        { href: ROADMAP_URL, label: 'Roadmap' },
+        { href: ROADMAP_URL, label: 'Roadmap source' },
         { href: LICENSE_URL, label: 'MIT license' },
       ],
     });

@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import sitemap from "@astrojs/sitemap";
 import { defineConfig } from "astro/config";
 
+import { votableIds } from "./src/roadmap";
+import { readRoadmapFile } from "./src/roadmap-file";
 import { site } from "./src/site";
 
 /**
@@ -112,6 +114,34 @@ function agentFilesGuard() {
 }
 
 /**
+ * /roadmap/ is ROADMAP.md rendered (src/roadmap.ts), and votes attach to item ids,
+ * so the built page must carry every votable id from the file exactly once, and
+ * nothing else. Parsing the file already fails on a missing or repeated id; this
+ * catches a page that drops, repeats, or invents an item.
+ */
+function roadmapGuard() {
+  return {
+    name: "rotli-roadmap-guard",
+    hooks: {
+      "astro:build:done": ({ dir }) => {
+        if (!site.showsFullSite) return;
+        const page = join(fileURLToPath(dir), "roadmap", "index.html");
+        if (!existsSync(page)) throw new Error("The roadmap page was not emitted (src/pages/roadmap/).");
+        const html = readFileSync(page, "utf8");
+        const onPage = [...html.matchAll(/data-roadmap-item="([^"]+)"/g)].map((match) => match[1]);
+        const inFile = votableIds(readRoadmapFile());
+        const problems = [
+          ...inFile.filter((id) => !onPage.includes(id)).map((id) => `"${id}" is in ROADMAP.md but not on the page`),
+          ...onPage.filter((id) => !inFile.includes(id)).map((id) => `"${id}" is on the page but not in ROADMAP.md`),
+          ...onPage.filter((id, index) => onPage.indexOf(id) !== index).map((id) => `"${id}" appears twice on the page`),
+        ];
+        if (problems.length > 0) throw new Error(`/roadmap/ and ROADMAP.md disagree:\n  ${problems.join("\n  ")}`);
+      },
+    },
+  };
+}
+
+/**
  * Locally there is no Caddy and no Docker `app` stage, so `/app/` (Rotli Web)
  * has nothing behind it and "Open in browser" landed on the 404 page. Dev and
  * preview pass `/app/` through to the web app's own dev server
@@ -162,5 +192,6 @@ export default defineConfig({
     ...(site.indexable ? [sitemap({ filter: (page) => page !== `${site.url}/404/` && page !== `${site.url}/subscribed/` })] : []),
     cspInlineStyleGuard(),
     agentFilesGuard(),
+    roadmapGuard(),
   ],
 });
