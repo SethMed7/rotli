@@ -15,14 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Hand to AI brings the note's files along.** Images and files the note
   links to are listed under Attachments with where they are on your Mac, and
   the links in the note point there, so the agent can open them. A file that
-  isn't in your vault is listed as missing. A note that links to a file in a
-  secure folder isn't handed off at all.
+  isn't in your vault, or that Rotli Web can't confirm is there, is listed as
+  missing. A note that links to a file in a secure folder, however the link is
+  written, or with a link Rotli can't read safely, isn't handed off at all.
 - **Hand to AI has a Refined mode.** Next to Basic (the prompt built from
   the note, as before), Refined asks the Librarian's model to rewrite it as a
   full prompt: the task, the context, the constraints, the files, and how to
   check it's done. It uses the model on this Mac unless your Librarian is set
-  to a connected model. If it can't help this time, you get Basic and the
-  reason. Hand to AI remembers which one you chose last.
+  to a connected model. If it can't help this time, or its rewrite drops a
+  file path, you get Basic and the reason; edits you made to Basic stay. Hand to AI remembers which one you chose last.
 
 ### Changed
 
@@ -39,7 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A paragraph stops at one level, because Markdown reads four spaces as a
   code block. Tab on a bullet, number, or checklist item still nests it, and
   Shift-Tab brings any line back. Tab on a heading leaves it a heading
-  instead of turning it into plain text.
+  instead of turning it into plain text. Tab over several lines that include
+  a code block indents the code but leaves its ``` lines in place, so the
+  block stays a code block.
 - **rotli.co's home page opens on the app itself.** The film under the
   headline is now a real recording of rotli: a quick note, the Library,
   search, chat, and the same note as plain Markdown. It has no sound, so the
@@ -155,8 +158,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `rotli notes history` shows a note's AI edits; `rotli notes undo-ai-edit`
   undoes the last one only while the note is exactly as it left it. Renaming,
   trashing, and undoing follow the edit rule: only notes an AI made, or ones
-  you let AI edit, never locked or secure ones. `rotli open` and deep links
-  now reach notes in connected vaults.
+  you let AI edit, never locked or secure ones, checked again at the moment
+  of the move. A linked note an agent may not read (secure, in a secure
+  folder, or holding a secret) is listed with its link only, never its size
+  or where it is on your Mac. `rotli open` and deep links now reach notes in
+  connected vaults: Rotli switches to that vault, then opens the note. A
+  connected folder that isn't a vault is refused with a message saying so.
 - **Agents get the same tools** (development builds). `rotli mcp` gains
   `rotli_rename`, `rotli_note_attachments`, `rotli_trash_note`,
   `rotli_note_history`, and `rotli_undo_ai_edit`, and `rotli agent config`
@@ -221,15 +228,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   4h in New York) because its date was taken as midnight UTC. A
   note's created and updated dates stay plain days in the file; Rotli Web
   now uses the file's own time when it falls on that day, and otherwise
-  shows the day rather than an hour count. New notes are dated with your
-  own calendar day, not New York's.
+  counts from the start of that day in your time zone. New notes made in
+  Rotli Web are dated with your own calendar day, not New York's.
 - **A note you just edited in the Mac app says "just now".** In a memex
   vault, an edit read hours old (at least 4h in New York) for the same
   reason as on the web, and was dated with the UTC day, so an evening edit in
   the Americas carried tomorrow's date. The Mac app now reads dates the way
-  Rotli Web does and dates edits with your own calendar day.
-- **The `[[` link picker no longer offers the note you're in.** Picking it
-  linked the note to itself.
+  Rotli Web does and dates edits with your own calendar day. New notes made
+  on the Mac still carry a full UTC timestamp, by design; Rotli Web writes a
+  plain day. Both read correctly everywhere.
+- **The `[[` picker and Link note no longer offer the note you're in.**
+  Picking it linked the note to itself.
 - **Images dropped from Finder land where you drop them.** On Retina
   screens a dropped image went in about halfway up the note; Rotli now reads
   the drop position as the Mac reports it.

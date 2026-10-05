@@ -75,7 +75,7 @@ site message and structure follow. The story film (#21) comes last.
 - Resources becomes a dropdown: Guides · Blog · Developers (MCP/CLI, labelled coming soon) · Changelog. The blog gets "coming soon" stubs.
 - Features page cleanup using fresh demo-vault captures (keep-docs-fresh). The owner can supply cleaner shots instead.
 - Privacy page moves to the article flow: sticky left TOC with reading progress, a readable column, and the walking quokka in the footer.
-- About: a story rewrite. Needs an owner interview (questions below).
+- About: a story rewrite. Done in #161 as a first-person story; the owner can still add a personal moment (the `[[OWNER]]` notes in the page).
 
 ### PR 8 — Living footer + 404 (#7)
 - Newsletter form plus the Bun sidecar (CSP: `form-action`/`connect-src 'self'`). The owner sets `RESEND_API_KEY` + audience id on Railway.

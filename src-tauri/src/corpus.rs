@@ -12444,7 +12444,9 @@ mod tests {
         store.os_trash = false;
         // the note is reachable by its frontmatter id (indexed via list)
         let _ = store.list().unwrap();
+        let day_before = today_stamp();
         let meta = store.write("01ABC", "# Pricing\n\nedited body").unwrap();
+        let day_after = today_stamp();
         // the default "Inbox" shelf projects onto the Captures surface ("Board"), not wiki/_inbox
         assert_eq!(meta.folder_id, "Board");
         // the bump is a calendar day, yet the edit reads as just now — never as
@@ -12489,6 +12491,13 @@ mod tests {
         assert!(
             !updated_line.contains('T'),
             "updated should be a date, not RFC3339: {updated_line}"
+        );
+        // ...and that date is the writer's own calendar day, not UTC's: an
+        // evening edit in the Americas must not carry tomorrow's date
+        let updated_day = updated_line.trim_start_matches("updated:").trim();
+        assert!(
+            updated_day == day_before || updated_day == day_after,
+            "updated {updated_day} is not the local day {day_before}"
         );
         // the body changed
         assert!(on_disk.contains("edited body"));

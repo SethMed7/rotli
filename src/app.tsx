@@ -83,9 +83,11 @@ import { addFragmentToMain, hydrateMain } from "./state/main";
 import { useOrganizerLive } from "./state/organizerLive";
 import { activeTabOf, leaves, usePanesStore } from "./state/panes";
 import { invalidateMemex } from "./memex/useMemex";
+import { switchVault } from "./memex/service";
 import { invalidateChatFolders } from "./services/chatFolders";
 import { refreshAfterExternalCorpusChange } from "./services/externalCorpusChange";
 import { refreshActiveVault } from "./state/activeVault";
+import { routeOpenRequest } from "./state/openRequest";
 import { runAutoRetentionMaintenance } from "./state/persist";
 import { applyQuickState } from "./state/quick";
 import { applyImageOutline, useAppearanceLook } from "./state/appearanceLook";
@@ -274,8 +276,15 @@ function MainShell() {
       void workspaceTakeOpenRequest()
         .then((request) => {
           if (!request || stopped) return;
-          useUiStore.getState().setContentView("panes");
-          usePanesStore.getState().openSummary(request);
+          return routeOpenRequest(request, {
+            switchVault,
+            refreshActiveVault,
+            open: (item) => {
+              useUiStore.getState().setContentView("panes");
+              usePanesStore.getState().openSummary(item);
+            },
+            fail: (message) => useUiStore.getState().setRowActionError(message),
+          });
         })
         .catch(() => {})
         .finally(() => {

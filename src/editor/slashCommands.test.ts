@@ -199,6 +199,18 @@ describe("slash target filtering", () => {
     ]);
     expect(filterPickerNotes(files, "embedDocument", "legacy")).toEqual([]);
   });
+
+  // owner review of PR 164: /Link note listed the open note, so it could link a
+  // note to itself — the same rule the [[ picker already keeps
+  test("Link note never offers the note being written in", () => {
+    const notes = [
+      { ...file("01HOST"), kind: "note" as const, title: "Trip plan" },
+      { ...file("01OTHER"), kind: "note" as const, title: "Trip budget" },
+    ];
+    expect(filterPickerNotes(notes, "linkNote", "trip", "01HOST").map((n) => n.id)).toEqual(["01OTHER"]);
+    expect(filterPickerNotes(notes, "linkNote", "", "01HOST").map((n) => n.id)).toEqual(["01OTHER"]);
+    expect(filterPickerNotes(notes, "linkNote", "trip").map((n) => n.id)).toEqual(["01HOST", "01OTHER"]);
+  });
 });
 
 // /image-gen (the maintainer, 2026-08-04): "it will only offer models you are actively

@@ -11,19 +11,19 @@ and its three ways back in (`src/components/paneEmptyState.tsx`).
 **Update 2026-10-02 (the owner: "just use the quokkas in chats and like
 settings/onboarding that's it").** The empty pane's scene and the app's launch
 opening no longer hold a quokka; the scenes stand on their own. The Settings
-banners and first run keep theirs. The pose column below is historical.
+banners and first run keep theirs.
 
 ## One scene per theme family
 
-| Family | Scene | Quokka pose |
-|---|---|---|
-| Rotli | Rottnest at golden hour, the lighthouse on the far hill | base |
-| Paper & Charcoal | A writing desk: ruled lines, a paper stack, a pencil | thoughtful |
-| Ocean | Low tide: a sailboat on the horizon, gulls | walking |
-| Grove | An afternoon under the gum trees | listening |
-| Iris | An iris field at dusk, a crescent moon and fireflies | attention |
-| Blossom | A blossom branch, a paper lantern, drifting petals | celebrating |
-| Midnight | Stargazing from the hill, the telescope | attention |
+| Family | Scene |
+|---|---|
+| Rotli | Rottnest at golden hour, the lighthouse on the far hill |
+| Paper & Charcoal | A writing desk: ruled lines, a paper stack, a pencil |
+| Ocean | Low tide: a sailboat on the horizon, gulls |
+| Grove | An afternoon under the gum trees |
+| Iris | An iris field at dusk, a crescent moon and fireflies |
+| Blossom | A blossom branch, a paper lantern, drifting petals |
+| Midnight | Stargazing from the hill, the telescope |
 
 The art lives in `src/components/paneEmptyScenes.tsx` as one SVG stage each
 (440×200, the ground line at y 170).

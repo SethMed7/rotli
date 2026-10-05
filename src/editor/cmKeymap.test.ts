@@ -542,6 +542,15 @@ describe("Tab is a real indent for every kind of line", () => {
     press(v, "Tab");
     expect(text(v)).toBe("```\n    a\n    b\n```");
   });
+
+  test("a selection spanning a whole fence leaves its ``` markers at column 0", () => {
+    const doc = "before\n```js\nconst a = 1;\n  b();\n```\nafter";
+    const v = viewOf(doc, doc.length, 0);
+    expect(press(v, "Tab")).toBe(true);
+    expect(text(v)).toBe("  before\n```js\n  const a = 1;\n    b();\n```\n  after");
+    expect(press(v, "Tab", true)).toBe(true);
+    expect(text(v)).toBe("before\n```js\nconst a = 1;\n  b();\n```\nafter");
+  });
 });
 
 describe("Tab outside a table", () => {

@@ -133,7 +133,7 @@ import { WebDialogFrame } from "../webDialogFrame";
 import { ArtifactItem, ChatArtifactButtons } from "./chatArtifactItems";
 import { ChatAttachedImages } from "./chatAttachedImages";
 import { ChatBuddy, useJustFinished } from "./chatBuddy";
-import { chatBuddyMoment } from "./chatBuddyModel";
+import { chatBuddyMoment, chatBuddyPlacement, chatBuddyWorking, lastReplyPosition } from "./chatBuddyModel";
 import { ChatClarificationBar } from "./chatClarificationBar";
 import { copyChatSelection } from "./chatCopy";
 import { CHAT_PANE_ATTR } from "./chatDrop";
@@ -2199,13 +2199,17 @@ export function ChatSurface({
   const showArtifactsPanel = artifactsOpen && !artifactsCompact;
   const pristineChat = runtimeAvailable && !chatSlug && messages.length === 0 && !busy;
   const welcomeHour = new Date().getHours();
-  const justFinished = useJustFinished(working, chatSlug);
   const lastMessage = messages.at(-1);
-  const buddyMoment = chatBuddyMoment({
-    working,
-    queued: queued !== null,
-    lastSpeaker: lastMessage ? (lastMessage.speaker === "you" ? "you" : "ai") : null,
-    justFinished,
+  const lastSpeaker = lastMessage ? (lastMessage.speaker === "you" ? "you" : "ai") : null;
+  // the buddy follows the reply, not the composer's post-run hold
+  const buddyWorking = chatBuddyWorking({ busy, foreignRun, foreignPending, lastSpeaker });
+  const lastReply = lastReplyPosition(messages, hiddenMessageCount);
+  const justFinished = useJustFinished(buddyWorking, chatSlug, lastReply);
+  const buddy = chatBuddyPlacement({
+    hasMessages: messages.length > 0,
+    working: buddyWorking,
+    pristine: pristineChat,
+    live: chatBuddyMoment({ working: buddyWorking, queued: queued !== null, lastSpeaker, justFinished }),
   });
   const welcomeDaypart = chatDaypart(welcomeHour);
   const welcomeSuggestions = chatWelcomeSuggestions(welcomeHour);
@@ -2465,7 +2469,7 @@ export function ChatSurface({
                     <div className="chat-welcome-heading">
                       <div className="chat-welcome-scene">
                         <ChatBuddy
-                          moment={pristineChat ? "welcome" : "empty"}
+                          moment={buddy.welcome ?? (pristineChat ? "welcome" : "empty")}
                           hour={welcomeHour}
                           size={pristineChat ? 58 : 50}
                           className="chat-welcome-character"
@@ -2551,9 +2555,9 @@ export function ChatSurface({
                     )}
                   </div>
                 )}
-                {(messages.length > 0 || working) && (
-                  <div className="chat-buddy-row" data-moment={buddyMoment}>
-                    <ChatBuddy moment={buddyMoment} hour={welcomeHour} size={72} className="chat-endmark" />
+                {buddy.edge && (
+                  <div className="chat-buddy-row" data-moment={buddy.edge}>
+                    <ChatBuddy moment={buddy.edge} hour={welcomeHour} size={72} className="chat-endmark" />
                   </div>
                 )}
                 {saveErr && (

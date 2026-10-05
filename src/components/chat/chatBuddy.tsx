@@ -5,7 +5,13 @@
 import { useState } from "react";
 
 import { Character } from "../character";
-import { type ChatBuddyMoment, type ChatBuddyRun, chatBuddyPose, justFinishedAfter } from "./chatBuddyModel";
+import {
+  type ChatBuddyMoment,
+  type ChatBuddyRun,
+  chatBuddyPose,
+  justFinishedAfter,
+  nextBuddyRun,
+} from "./chatBuddyModel";
 
 export function ChatBuddy({
   moment,
@@ -27,15 +33,22 @@ export function ChatBuddy({
   );
 }
 
-/** True once a reply finishes while this chat is on screen, until the next
- * run starts or another chat opens: the buddy is happy about the answer it
- * just watched land, and calm on a thread reopened later. */
-export function useJustFinished(working: boolean, chatSlug: string | null): boolean {
-  const [seen, setSeen] = useState<ChatBuddyRun>({ working, chatSlug, justFinished: false });
+/** True once a reply lands while this chat is on screen, until the next run
+ * starts or another chat opens: the buddy is happy about the answer it just
+ * watched land, and calm on a thread reopened later or a run stopped before it
+ * answered. `lastReply` is the thread position of the last assistant reply. */
+export function useJustFinished(working: boolean, chatSlug: string | null, lastReply: number): boolean {
+  // a run already under way when this view mounts (a remount mid-reply) marks
+  // the reply it found, so its answer still lands as one
+  const [seen, setSeen] = useState<ChatBuddyRun>({
+    working,
+    chatSlug,
+    replyMark: working ? lastReply : null,
+  });
   if (seen.working !== working || seen.chatSlug !== chatSlug) {
-    const justFinished = justFinishedAfter(seen, working, chatSlug);
-    setSeen({ working, chatSlug, justFinished });
-    return justFinished;
+    const next = nextBuddyRun(seen, working, chatSlug, lastReply);
+    setSeen(next);
+    return justFinishedAfter(next, lastReply);
   }
-  return seen.justFinished;
+  return justFinishedAfter(seen, lastReply);
 }
