@@ -55,11 +55,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Helper connects the browser to your folder and gives the one-line command to
   copy. The quokka carousel is gone from the landing and Features pages, and
   the About page's belief now reads "AI works for you, inside rules you set."
-- **rotli.co says rotli is for your notes, on the Mac first.** The home page
-  promises a private workspace for your notes and says where it runs under
-  the buttons: Mac first (and in your browser today), with Windows and Linux
-  apps planned. The download page lists Windows and Linux as planned rather
-  than coming soon.
+- **rotli.co leads with free, not the Mac.** The home page now says rotli is
+  a free workspace built on plain Markdown files: notes first, with Docs and
+  Sheets (beta), chat, and boards in the same folder, no account, and AI only
+  if you want it. Under the buttons it reads "Free. No account. Works
+  offline." and then where it runs. Windows and Linux apps are "Coming soon"
+  on the home page, the download page, and the FAQ. The Rotli Web section is
+  now "On your computer. In your browser.", and the closing invitation at the
+  bottom of the home and Features pages is gone, so the questions run
+  straight into the footer.
+- **The before-and-after on rotli.co says it plainly.** The Librarian files
+  the note and fills in the frontmatter at the top of the file; it never
+  changes what you wrote.
+- **A new post explains the unused-AI figures.** "The AI you already pay for
+  could be filing your notes" sets out both surveys behind the home page's
+  figures, who was asked, and what the numbers don't say, with links to the
+  sources. The figures on the home page link to it.
 - **The before-and-after note on rotli.co is no longer two cards.** The same
   file sits in two open columns, as you write it and after the Librarian: the
   lines it adds are marked, and your words are marked unchanged. Its example

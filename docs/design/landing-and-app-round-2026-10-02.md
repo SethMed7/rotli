@@ -41,6 +41,7 @@ site message and structure follow. The story film (#21) comes last.
 - Capture it, cut it in hyperframes, add a poster, and keep the existing `FilmPlayer` behavior (muted autoplay once, reduced-motion poster).
 - Under ~6 MB.
 - Human step: the owner reviews the cut.
+- 2026-10-05: the owner asked for a polished launch cut (no caption bar, cards between cuts). The plan is [launch-video-plan-2026-10-05.md](launch-video-plan-2026-10-05.md).
 
 ### PR 2 — App fixes (#5, #23, #6, #8)
 - **#5:** start with a failing reproduction. Prefer the raw pair on macOS, or choose the candidate inside the editor rect. Update `externalImageDrop.test.ts`. Prove it with native validation (browser can't).

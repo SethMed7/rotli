@@ -1,13 +1,15 @@
 # Rotli — marketing site
 
-A product-led landing page for Rotli, the local-first workspace for your notes
-where one ordinary folder remains the durable source of truth. The Mac comes
-first; native Windows and Linux apps are planned (see "Where rotli runs"). The launch page explains
+A product-led landing page for Rotli, the free, local-first workspace built on
+plain Markdown files, where one ordinary folder remains the durable source of
+truth. The Mac app and Rotli Web exist today; native Windows and Linux apps are
+coming soon (see "Where rotli runs"). The launch page explains
 the Markdown workspace (tasks, links, views), the Playground, optional local or
 connected chat, the privacy boundary, theme families, the optional quokka
-companion, and local stdio MCP. Features under review (Breve, DOCX and
-sheets, boards, Mermaid visual editing, remote agents) appear
-only on the dev site under an explicit experiment label.
+companion, and local stdio MCP. Docs and Sheets are named as beta (see
+"Docs and Sheets"). Features under review (Breve, boards, Mermaid visual
+editing, remote agents) appear only on the dev site under an explicit
+experiment label.
 Built with [Astro](https://astro.build).
 
 ## This is a separate sub-project
@@ -103,7 +105,9 @@ area under `(pointer: coarse)`, never their glyphs.
   tint, the body is marked unchanged, and `area` is a flat area as the memex
   contract requires) → StatBand (two sourced figures, footnoted, beside a
   bench by the sea where four idle AI tools, two asleep, are each handed a
-  note by the quokka; keep the sources and "never wasted" wording) → the
+  note by the quokka; keep the sources and "never wasted" wording; the text
+  column ends on "Where these numbers come from", a link to the post
+  `the-ai-you-already-pay-for`, which sets out both surveys in full) → the
   dev-only Experiments → PrivacyBrief (the night scene in Ocean Dark via
   `.band-night` in `Base.astro`, three facts, and a link to `/privacy/`; while
   it is the focal passage the whole page steps into its night, see "The
@@ -112,8 +116,10 @@ area under `(pointer: coarse)`, never their glyphs.
   theme studio, with a faint island vignette from 1180px up; narrower, its
   left edge would reach into the lede, so it steps out) → Faq (with the
   Overview's lede, two entries carry the owner's item 2 message: notes are the
-  foundation of a workspace, and rotli charges nothing for AI) → FinalCta (the closing call; the footer's quokka beach ends the
-  page). The landing page carries exactly one video. **`/features/`** has
+  foundation of a workspace, and rotli charges nothing for AI), which runs
+  straight into the footer and its quokka beach. There is no closing
+  invitation (cut 2026-10-05: it repeated the hero), on the landing page or
+  `/features/`. The landing page carries exactly one video. **`/features/`** has
   one display headline with the product film right under it (the hero's
   `FilmPlayer`, the same real Rotli Web session: the real product leads, not
   the illustrated story; visitors asked for it, 2026-10-05), then the chapters
@@ -196,17 +202,27 @@ area under `(pointer: coarse)`, never their glyphs.
 - **`/download/`** is where the header's Download button goes. It leads with
   the visitor's own system (`Base.astro` stamps `data-os`: mac, windows,
   linux, mobile, or other): the Mac download on a Mac; on Windows and Linux,
-  a native app that is planned, with Rotli Web to use in the meantime and
+  a native app that is coming soon, with Rotli Web to use in the meantime and
   Rotli Helper for browsers without folder access. Without script the Mac
   panel shows. Below, "Every platform" lists Mac, Windows, Linux, and any
-  browser with their status (Windows and Linux: "Planned", never "Coming
-  soon", which would promise a date).
-- **Where rotli runs** (the owner, 2026-10-05). The promise is a private
-  workspace for your notes, not a Mac app: pages state availability
-  separately, with `PLATFORMS` in `src/site.ts` (the hero's line under the
-  ways in: "Mac first. Windows and Linux apps are planned.", plus "and in your
-  browser today" while `WEB_APP_ENABLED`). Never imply the Mac is the only
-  platform rotli will have, or that Windows or Linux apps exist today.
+  browser with their status (Windows and Linux: "Coming soon", the owner's
+  call on 2026-10-05, replacing the earlier "Planned").
+- **Where rotli runs** (the owner, 2026-10-05). The promise is a free
+  workspace, not a Mac app: pages lead with what it is and what it costs
+  ("Free. No account. Works offline." under the hero's ways in) and state
+  availability separately, with `PLATFORMS` in `src/site.ts` ("On the Mac
+  today. Windows and Linux apps are coming soon.", or "In your browser and on
+  the Mac today. …" while `WEB_APP_ENABLED`; `PLATFORMS.soon` is the status
+  label). The ways-in section is "On your computer. In your browser." Never
+  imply the Mac is the only platform rotli will have, or that Windows or
+  Linux apps exist today.
+- **Docs and Sheets** (Word `.docx` and Excel `.xlsx`, edited with Univer in
+  the Mac app) are named as beta (the owner, 2026-10-05; Sheets leaves
+  development builds in the same release). The word comes from
+  `DOCS_AND_SHEETS` in `src/site.ts` (`status` for a label, `inline` inside a
+  sentence); never write "Beta" by hand, and say no more about them than that
+  they open and edit. The hero, the Overview, the Features page's formats,
+  the FAQ, and `llms.txt` use it.
   Sentences about what the Mac app does today (the on-device model, the
   Keychain) stay about the Mac. The hero's Download for Mac still fetches the DMG directly
   (`DOWNLOAD_HREF`). The Helper guide is `/resources/rotli-helper/`; the 404
@@ -281,8 +297,8 @@ area under `(pointer: coarse)`, never their glyphs.
   `src/site.ts`): the footer's Learn column links it whatever the source flag, and the Caddyfile
   sends `/studio` there.
 - **Download and the browser.** `SiteActions.astro` renders the two ways in —
-  Open in browser and Download — in the hero and the closing invitation (the
-  header has only its Download button to `/download/`). `DOWNLOAD_HREF` in
+  Open in browser and Download — in the hero (the header has only its
+  Download button to `/download/`). `DOWNLOAD_HREF` in
   `src/site.ts` is where those Download buttons go (today the newest Mac DMG,
   directly). `Base.astro` stamps `data-platform` on `<html>`; off a
   Mac (iPads included) the browser action leads and the download reads
@@ -345,7 +361,7 @@ area under `(pointer: coarse)`, never their glyphs.
   the warm band, 4.90:1).
 - Fonts (General Sans body, Baloo 2 wordmark) are copied into
   `public/fonts/` from `src/brand/fonts/`.
-- The compact mark comes from `src/assets/characters/`. The closing card's
+- The compact mark comes from `src/assets/characters/`. The
   celebrating quokka in `src/assets/characters/cocoa/` is generated at
   1536 × 1536 from the canonical SVG with the existing fill pipeline
   (`bun scripts/build-character-fills.mjs --site`); app-sized 512px exports
@@ -418,9 +434,8 @@ area under `(pointer: coarse)`, never their glyphs.
   the `/about/` story, captioned with where the name comes from); the
   StatBand's bench by the sea and each resource article's
   `ResourceScene.astro` are the island by day too; the FAQ has the searching
-  quokka among question cards. The
-  closing invitation has no scene of its own (2026-10-02): the footer's
-  quokka beach right below it is the page's one closing scene. `/privacy/` and
+  quokka among question cards. The footer's quokka beach, right below the
+  FAQ, is the page's one closing scene. `/privacy/` and
   `/about/` place their scene through `WritingPage`'s `scene` slot; `/about/`
   uses the centered layout (`center`).
 - The landing privacy band is brief and points to `/privacy/`: the promise and
@@ -763,7 +778,7 @@ bun scripts/build-character-fills.mjs --site
 It writes `public/rotli-app-warm-light@3x.png` (the social card's workspace)
 and `public/rotli-playground@3x.png` (the coming-soon page); the theme studio's
 `public/themes/` captures are a separate set it does not touch, and the fill
-script makes only the closing card's celebrating quokka. The capture script
+script makes only the celebrating quokka. The capture script
 uses fresh browser contexts and actual theme, Settings, and Playground controls. It waits for fonts, hides hover tooltips, verifies
 pixel dimensions, and checks that the tutorial has no files in Main.
 
