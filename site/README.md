@@ -353,7 +353,9 @@ bun run preview  # serve the built dist/ locally
   a post, run `bun run build:brand-images` from the repository root: it renders
   every card in Chromium with the bundled fonts and the network off, shrinks a
   title only as far as its three-line limit, fails if any text leaves the safe
-  area, touches the quokka or the lighthouse, or falls under 4.5:1 contrast, and
+  area or touches the quokka or the lighthouse, or if the title and line colors
+  fall under 4.5:1 on the solid warm ground (text over the pattern, sea, sand,
+  or underline is not sampled; check the contact sheet), and
   palette-compresses the PNGs (about 35 KB each). The same run writes the
   banners, profile pictures, and thumbnails described in `brand/README.md`, and
   a contact sheet of everything at `_review/brand-images/contact-sheet.png`
