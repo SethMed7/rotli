@@ -1,16 +1,16 @@
 ---
-// Ways in, and how Rotli Web works: the page runs in the browser and the notes stay in a folder on
+// Ways in (the desktop app, on the Mac today, and Rotli Web), and how Rotli Web works: the page runs in the browser and the notes stay in a folder on
 // the visitor's own computer. Chrome, Edge, and Arc open the folder themselves; Firefox, Zen, and
 // Brave (and chat through the tools already installed) go through Rotli Helper, started with one
 // line in Terminal, which serves that one folder on localhost to rotli.co only. Facts are held to
 // docs/architecture/web-vault-connection.md and content/writing/resources/rotli-helper.md. The
 // command is the one Rotli Web's own setup screen gives. Rendered only while WEB_APP_ENABLED is on.
-import { DOWNLOAD_HREF, WEB_APP_PATH, site } from '../../site';
+import { DOWNLOAD_HREF, PLATFORMS, WEB_APP_PATH, site } from '../../site';
 
 const ways = [
   {
-    title: 'Mac app',
-    body: 'The whole workspace: the editor, chat with on-device or connected AI, the Librarian, and ⌥Space from anywhere.',
+    title: 'Desktop app',
+    body: `The whole workspace: the editor, chat with on-device or connected AI, the Librarian, and ⌥Space from anywhere. On the Mac today; Windows and Linux apps are ${PLATFORMS.soon.toLowerCase()}.`,
     link: site.downloadsEnabled ? { href: DOWNLOAD_HREF, label: 'Download for Mac', external: true } : null,
   },
   {
@@ -27,10 +27,10 @@ const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open
     <section class="section everywhere" id="web" aria-labelledby="web-title">
       <div class="wrap">
         <header class="section-head">
-          <h2 class="section-title" id="web-title">On your Mac. In your browser.</h2>
+          <h2 class="section-title" id="web-title">On your computer. In your browser.</h2>
           <p class="section-lede">
-            Rotli Web runs in your browser while your notes stay on your computer. No account, and nothing for a
-            rotli server to hold.
+            Use the desktop app, or Rotli Web in your browser. Either way your notes stay in a folder on your
+            computer. No account, and nothing for a rotli server to hold.
           </p>
         </header>
         <div class="web-grid">
@@ -65,7 +65,7 @@ const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open
             </figure>
             <p class="more">On Windows, <a href="/resources/rotli-helper/">the Helper guide</a> has the PowerShell line.</p>
             <a class="why" href="/blog/rotli-web-and-your-mac/">
-              Why Rotli Web talks to your Mac through Terminal <span aria-hidden="true">→</span>
+              Why Rotli Web talks to your computer through Terminal <span aria-hidden="true">→</span>
             </a>
           </div>
         </div>

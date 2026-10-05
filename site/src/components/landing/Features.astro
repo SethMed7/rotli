@@ -12,6 +12,7 @@ import ChatFlow from './ChatFlow.astro';
 import ConnectAI from './ConnectAI.astro';
 import Formats from './Formats.astro';
 import RenderShowcase from './RenderShowcase.astro';
+import { DOCS_AND_SHEETS } from '../../site';
 
 // An illustration of one Librarian pass over a synthetic vault (the notes and
 // folders from the launch film): where each new note is filed, and what the
@@ -63,8 +64,8 @@ const habits = [
       <header class="section-head">
         <h2 class="section-title" id="formats-title">More than notes.</h2>
         <p class="section-lede">
-          Word documents and boards open right beside your notes, as the same ordinary files any other app
-          reads. Spreadsheets are next.
+          Docs, Sheets, and boards open right beside your notes, as the same ordinary files any other app
+          reads. Docs and Sheets are in {DOCS_AND_SHEETS.inline}.
         </p>
       </header>
       <Formats />

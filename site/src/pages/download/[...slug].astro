@@ -1,8 +1,8 @@
 ---
 // /download/: where the header's Download button goes. It leads with the
 // visitor's own system (Base.astro stamps data-os): the Mac download on a
-// Mac; on Windows and Linux, a native app that is planned (no date; the words
-// are PLATFORMS in src/site.ts), with Rotli Web to use in the meantime. Without script the Mac panel shows. Below, every platform and its
+// Mac; on Windows and Linux, a native app that is coming soon (the words are
+// PLATFORMS in src/site.ts), with Rotli Web to use in the meantime. Without script the Mac panel shows. Below, every platform and its
 // status in one list. The hero's "Download for Mac" still fetches the DMG
 // directly (DOWNLOAD_HREF in src/site.ts).
 import { application } from '../../agents';
@@ -17,7 +17,7 @@ export function getStaticPaths() {
 const web = site.webAppEnabled;
 const mac = site.downloadsEnabled;
 
-type Status = 'available' | 'soon' | 'planned';
+type Status = 'available' | 'soon';
 const platforms: { name: string; detail: string; status: Status; action?: { href: string; label: string; external?: boolean } }[] = [
   {
     name: 'Mac',
@@ -25,8 +25,8 @@ const platforms: { name: string; detail: string; status: Status; action?: { href
     status: mac ? 'available' : 'soon',
     action: mac ? { href: DOWNLOAD_URL, label: 'Download .dmg', external: true } : undefined,
   },
-  { name: 'Windows', detail: 'A native app is planned. No date yet.', status: 'planned' },
-  { name: 'Linux', detail: 'A native app is planned. No date yet.', status: 'planned' },
+  { name: 'Windows', detail: 'A native Windows app is on the way.', status: 'soon' },
+  { name: 'Linux', detail: 'A native Linux app is on the way.', status: 'soon' },
   ...(web
     ? [
         {
@@ -42,7 +42,7 @@ const platforms: { name: string; detail: string; status: Status; action?: { href
 
 <WritingPage
   title="Download — rotli"
-  description="Get rotli for Mac, the first platform, or open it in your browser. Windows and Linux apps are planned."
+  description="Get rotli, free and with no account: the Mac app, or Rotli Web in your browser. Windows and Linux apps are coming soon."
   canonicalPath="/download/"
   {...ogImage('download')}
   section="download"
@@ -70,11 +70,11 @@ const platforms: { name: string; detail: string; status: Status; action?: { href
     {
       (['windows', 'linux', 'other'] as const).map((os) => (
         <div class={`pick-panel for-${os}`}>
-          <h2>{os === 'windows' ? 'A Windows app is planned' : os === 'linux' ? 'A Linux app is planned' : 'rotli runs on your computer'}</h2>
+          <h2>{os === 'windows' ? 'rotli for Windows is coming soon' : os === 'linux' ? 'rotli for Linux is coming soon' : 'rotli runs on your computer'}</h2>
           <p>
             {web
               ? 'In the meantime, Rotli Web runs the same workspace in your browser, with no account. In Chrome, Edge, or Arc there is nothing to install.'
-              : 'rotli comes to the Mac first. Native apps for Windows and Linux are planned.'}
+              : 'The Mac app is the first one out. Native apps for Windows and Linux are coming soon.'}
           </p>
           <div class="pick-actions">
             {web && <a class="button primary" href={WEB_APP_PATH}>Open rotli in your browser</a>}
@@ -101,7 +101,7 @@ const platforms: { name: string; detail: string; status: Status; action?: { href
             <h3>{platform.name}</h3>
             <p>{platform.detail}</p>
           </div>
-          <span class:list={['status', platform.status]}>{platform.status === 'available' ? 'Available' : platform.status === 'planned' ? PLATFORMS.planned : 'Coming soon'}</span>
+          <span class:list={['status', platform.status]}>{platform.status === 'available' ? 'Available' : PLATFORMS.soon}</span>
           <span class="action">
             {platform.action && (
               <a href={platform.action.href} rel={platform.action.external ? 'noopener' : undefined}>

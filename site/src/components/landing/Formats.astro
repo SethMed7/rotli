@@ -1,20 +1,22 @@
 ---
-// Beyond Markdown: Word documents (a Rotli-owned DOCX codec with a Univer
-// editor, Mac app), spreadsheets (coming soon; CSV edits in place today),
-// and Excalidraw boards. Then one line on Assets: where pasted images and the
+// Beyond Markdown: Docs (Word files through a Rotli-owned DOCX codec with a
+// Univer editor) and Sheets (Excel workbooks, CSV in place too), both in the
+// Mac app and both beta (DOCS_AND_SHEETS in src/site.ts), and Excalidraw boards. Then one line on Assets: where pasted images and the
 // files chat makes are kept (the Folder chapter shows the vault itself). Status follows src/lib/featurePolicy.ts and the stable New
 // chooser; the board is a real
 // Excalidraw canvas drawn with its own tools in Rotli Web.
+import { DOCS_AND_SHEETS } from '../../site';
+
 const formats = [
   {
-    title: 'Documents',
-    status: 'Mac app',
+    title: 'Docs',
+    status: `Mac app · ${DOCS_AND_SHEETS.status}`,
     body: 'Open and edit real Word files. rotli saves them back as .docx, keeps the parts it does not touch, and makes a one-time backup first. The editor is built on Univer.',
   },
   {
     title: 'Sheets',
-    status: 'Coming soon',
-    body: 'Excel workbooks are on the way. CSV files already open and edit in place.',
+    status: `Mac app · ${DOCS_AND_SHEETS.status}`,
+    body: 'Open and edit Excel workbooks (.xlsx). CSV files open and edit in place too.',
   },
   {
     title: 'Boards',
@@ -41,7 +43,7 @@ const formats = [
       <li>
         <div class="format-head">
           <h3 class="format-title">{format.title}</h3>
-          <span class:list={['status', { soon: format.status === 'Coming soon' }]}>{format.status}</span>
+          <span class="status">{format.status}</span>
         </div>
         <p>{format.body}</p>
       </li>
@@ -103,10 +105,6 @@ const formats = [
     font-size: 0.78rem;
     font-weight: 600;
     white-space: nowrap;
-  }
-  .status.soon {
-    border-color: var(--border-strong);
-    color: var(--text-muted);
   }
   .format-list p {
     margin: 0.5rem 0 0;

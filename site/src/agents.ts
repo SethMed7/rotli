@@ -5,12 +5,11 @@
 // site/Caddyfile answers `Accept: text/markdown` with these twins, and the
 // build (astro.config.mjs) fails if an llms.txt link points at a missing page.
 import { questions } from "./faq";
-import { DOWNLOAD_URL, GITHUB_URL, LICENSE_URL, site } from "./site";
+import { DOCS_AND_SHEETS, DOWNLOAD_URL, GITHUB_URL, LICENSE_URL, PLATFORMS, site } from "./site";
 import { slugOf, type Writing } from "./writing";
 
 const NAME = "rotli";
-const SUMMARY =
-  "rotli is a private workspace for your notes, on the Mac first, with Windows and Linux apps planned. Write however you think, in plain Markdown files you own, with no account. The Librarian files, tags, and links them in the background, using AI on your own computer or the AI tools you already use, and never rewrites your words.";
+const SUMMARY = `rotli is a free workspace built on plain Markdown files you own, with no account. Notes come first; Docs and Sheets (${DOCS_AND_SHEETS.inline}), chat, and Excalidraw boards work from the same folder. The Librarian files, tags, and links notes in the background, using AI on your own computer or the AI tools you already use, and never rewrites your words. ${PLATFORMS.availability}`;
 
 /**
  * AI crawlers named in robots.txt. Each gets its own group so the policy is
@@ -82,8 +81,8 @@ export function llmsText(writing: { resources: Writing[]; posts: Writing[] }): s
     "rotli charges nothing for AI and sells no AI plan: it uses a model on your Mac or the AI tools you already pay for.",
     "No analytics, ads, or crash uploads.",
     site.webAppEnabled
-      ? "Platforms: the Mac app, and Rotli Web in the browser. Chrome, Edge, and Arc open your folder directly; Firefox, Zen, and Brave use Rotli Helper. Safari and phones are not supported yet. Native Windows and Linux apps are planned."
-      : "Platforms: the Mac app. Native Windows and Linux apps are planned.",
+      ? "Platforms: the Mac app, and Rotli Web in the browser. Chrome, Edge, and Arc open your folder directly; Firefox, Zen, and Brave use Rotli Helper. Safari and phones are not supported yet. Native Windows and Linux apps are coming soon."
+      : "Platforms: the Mac app. Native Windows and Linux apps are coming soon.",
   ];
   const lines = [`# ${NAME}`, "", `> ${SUMMARY}`, "", ...facts.map((fact) => `- ${fact}`)];
   if (site.showsFullSite) {
@@ -94,7 +93,7 @@ export function llmsText(writing: { resources: Writing[]; posts: Writing[] }): s
       link(
         "Features",
         "/features/",
-        "the editor, tasks, links, chat, documents and boards, the Librarian, and themes",
+        `the editor, tasks, links, chat, Docs and Sheets (${DOCS_AND_SHEETS.inline}), boards, the Librarian, and themes`,
       ),
       link("Privacy", "/privacy/", "what connects to the internet, what AI can see, and why"),
       link(

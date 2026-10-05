@@ -2,7 +2,7 @@
 // a claim made elsewhere on the site; nothing here may promise more. The
 // landing FAQ renders these, and the same list is the page's FAQPage JSON-LD
 // (src/agents.ts), so what a search engine quotes is what a visitor reads.
-import { site } from './site';
+import { DOCS_AND_SHEETS, site } from './site';
 
 export const questions: { q: string; a: string }[] = [
   {
@@ -29,7 +29,7 @@ export const questions: { q: string; a: string }[] = [
   },
   {
     q: 'Is rotli just a notes app?',
-    a: 'Notes are the foundation. Around them, chat answers from your own notes, the Librarian files and links them, and documents and boards live as ordinary files in the same folder. The Features page says which parts run on the Mac and which in the browser.',
+    a: `Notes are the foundation, as plain Markdown files. Around them, chat answers from your own notes, the Librarian files and links them, and Docs and Sheets (${DOCS_AND_SHEETS.inline}) and boards live as ordinary files in the same folder. The Features page says which parts run on the Mac and which in the browser.`,
   },
   {
     q: 'Can I leave?',
@@ -38,7 +38,7 @@ export const questions: { q: string; a: string }[] = [
   {
     q: 'What about Windows and Linux?',
     a: site.webAppEnabled
-      ? 'Use Rotli Web in your browser today. Native Windows and Linux apps are planned.'
-      : 'Native Windows and Linux apps are planned.',
+      ? 'Native Windows and Linux apps are coming soon. Until then, Rotli Web works in your browser today.'
+      : 'Native Windows and Linux apps are coming soon.',
   },
 ];

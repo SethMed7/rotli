@@ -1,5 +1,5 @@
 ---
-title: Why Rotli Web talks to your Mac through Terminal
+title: Why Rotli Web talks to your computer through Terminal
 description: Rotli Web keeps your notes in a folder on your computer, not on a server. How Rotli Helper makes that work, what its one-line install does, and what it can and can't reach.
 section: post
 date: 2026-10-02

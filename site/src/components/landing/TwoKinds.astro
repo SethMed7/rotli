@@ -21,12 +21,10 @@ const filed = [
     <header class="section-head" data-reveal>
       <h2 class="section-title" id="two-kinds-title">You write for yourself. <span class="inked">AI reads differently.</span></h2>
       <p class="section-lede">
-        People and AI take notes for different reasons. You write fast and loose, in half sentences,
-        trusting that you’ll know what you meant. An AI does better with a clear title, a few tags, and
-        links to related notes, because that is how it finds things again. Most apps make you do the
-        second kind of work yourself, and it pulls your attention away from the thinking. In rotli you
-        only write. The Librarian adds the filing, tags, and links around your words and never rewrites
-        them.
+        You write fast and loose, in half sentences, and you know what you meant. An AI finds things again by
+        title, tags, and links, and most apps leave you to add those. In rotli you just write. The Librarian
+        files the note and fills in the frontmatter, the few fields at the top of the file. It never changes
+        what you wrote, and no other AI does either unless you allow it for that note.
       </p>
     </header>
 
@@ -48,7 +46,7 @@ const filed = [
         <p class="note-mark">Your words, unchanged</p>
         <pre class="lines"><code class="body">{typed.join('\n')}</code></pre>
       </div>
-      <figcaption>The same words. The Librarian’s fields sit above them in the file; nothing you typed is changed.</figcaption>
+      <figcaption>The Librarian adds the fields at the top. Everything under them is exactly what you typed.</figcaption>
     </figure>
   </div>
 </section>

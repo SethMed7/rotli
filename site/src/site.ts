@@ -33,7 +33,7 @@ export const RELEASES_URL = 'https://github.com/SethMed7/rotli-releases/releases
 // The newest notarized DMG, downloaded directly. scripts/release.sh publishes a
 // stable-named copy (Rotli.dmg) on every release, so this never needs editing.
 export const DOWNLOAD_URL = `${RELEASES_URL}/download/Rotli.dmg`;
-/** Where the hero's and closing card's "Download for Mac" buttons go: the
+/** Where the hero's "Download for Mac" button goes: the
  * newest Mac DMG, fetched directly. The header's Download button always opens
  * /download/, which picks by the visitor's system (SiteHeader.astro). */
 export const DOWNLOAD_HREF = DOWNLOAD_URL;
@@ -194,17 +194,32 @@ export const site = {
 } as const;
 
 /**
- * Where rotli runs, said one way everywhere (the owner, 2026-10-05). The
- * promise is a private workspace for your notes, not a Mac app: the Mac comes
- * first, and native Windows and Linux apps are planned, with no date. Pages
- * state availability with these words and never imply the Mac is the only
- * platform rotli will ever have, or that Windows and Linux apps exist today.
+ * Where rotli runs, said one way everywhere (the owner, 2026-10-05, second
+ * call that day). The promise is a free workspace, not a Mac app, so pages
+ * lead with what it is and what it costs and state availability separately:
+ * the Mac app and Rotli Web exist today, and native Windows and Linux apps are
+ * "Coming soon" (this replaces the earlier "Planned"). Never imply the Mac is
+ * the only platform rotli will have, or that Windows or Linux apps exist
+ * today. Sentences about what the Mac app alone does (the on-device model,
+ * the Keychain) stay about the Mac.
  */
 export const PLATFORMS = {
-  /** Beside the hero's ways in. */
+  /** Under the hero's ways in, after what it costs. */
   availability: site.webAppEnabled
-    ? 'Mac first, and in your browser today. Windows and Linux apps are planned.'
-    : 'Mac first. Windows and Linux apps are planned.',
-  /** The status of a platform that is planned but not built. */
-  planned: 'Planned',
+    ? 'In your browser and on the Mac today. Windows and Linux apps are coming soon.'
+    : 'On the Mac today. Windows and Linux apps are coming soon.',
+  /** The status of a platform whose app is not out yet. */
+  soon: 'Coming soon',
+} as const;
+
+/**
+ * Docs (Word, .docx) and Sheets (Excel, .xlsx), both edited with Univer in the
+ * Mac app, ship as beta (the owner, 2026-10-05; Sheets leaves development
+ * builds in the same release, src/lib/featurePolicy.ts). Every page that
+ * names them takes the word from here: `status` as a label, `inline` inside a
+ * sentence. Say no more about them than that they open and edit.
+ */
+export const DOCS_AND_SHEETS = {
+  status: 'Beta',
+  inline: 'beta',
 } as const;
