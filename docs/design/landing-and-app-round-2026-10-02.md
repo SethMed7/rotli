@@ -167,7 +167,55 @@ rule tests, 20 new site specs (`bun run test:e2e:site`, 100/100 under repeat),
 and `astro check` clean. Full `verify` stopped only on the `tab-indent` flake
 (below); its later lanes passed when run on their own.
 
-### What blocks merging
+### Review holds and integration (2026-10-05, later)
+
+Every review hold and the tracked should-fixes are fixed, each committed on
+its own PR's branch and merged up the chain. **Nothing is pushed.**
+
+| PR | Fix |
+|---|---|
+| #154 | Secure-folder links are decoded and normalized (`%20`, `..`, `%2e%2e`, backslashes) before the check, and anything undecodable or escaping the vault fails closed. Refine can't overwrite Basic edits. Path survival is whole-token, missing paths included. Rotli Web checks that non-image attachments exist |
+| #155 | A linked `.md` goes through `read_for_ai`, and secure folders are refused, with no `absPath`. **Connected-vault open now switches the app to that vault (closes the current tabs) — owner to approve.** Trash re-checks policy and revision under the move lock |
+| #160 | The web date window is now the reader's local day widened to the UTC day; the contract and CHANGELOG are made true |
+| #161 | About copy matches the site ("past 30 days", AI optional) |
+| #162 | `tab-indent` flake: Chromium caps the resource list at 250 entries, so the spec now imports the module directly (20/20 under load). Tab no longer breaks fence markers |
+| #163 | Ocean and Grove profile pictures use real theme grounds; the contrast claim is honest; the About card restates the page |
+| #164 | `/Link note` leaves out the open note. The contract records the Mac (UTC timestamp) vs web (local day) stamps |
+| #165 | The buddy stops "thinking" once the reply shows, there is one buddy per view, and it never cheers a Stop |
+
+The merge of #164 into #163 needed a real fix: Rust kept the old -14h/+36h
+window while #160 had tightened the TS one. Both now use the tightened rule,
+and the `noteDateStamps` fixture holds in every zone.
+
+On top of #165 now sit:
+
+- `feat/website-round-2026-10-05`: the seven 2026-10-03 items, plus a
+  Features cleanup. The real product film leads; the episode strip is gone,
+  because episodes 4 and 7 carry stale burned-in copy, whose source is the
+  studio repo. A drawn note menu replaces the cropped capture, and the page is
+  1,200px shorter. Long code lines wrap, and the privacy scene text is
+  balanced.
+- `fix/onboarding-on-stack` (worktree `~/rotli-stack`): the two local
+  onboarding branches merged in, with their commits kept so the opening-hang
+  fix can still be cherry-picked as a 1.7.x hotfix.
+
+Proof on the tip: `bun run verify` passed in one run (secrets, quality, app
+E2E 275, web E2E 66, Rust 692), and `bun run test:e2e:site` passed 20/20.
+
+### Owner decisions now
+
+- Push the updated branches and open #166 (website round) and #167
+  (onboarding) as stack positions 16 and 17.
+- Approve connected-vault open switching vaults (#155).
+- Re-cut or delete story episodes 4 and 7 in the studio; nothing links them
+  now.
+- Send the fresh captures on the wish-list: Mac chat, the note menu, a Mac
+  board, a Word document, the Library after filing, and optionally the
+  themes.
+- Earlier items still stand: the site E2E lane in CI, the 1.7.2 hotfix,
+  Resend, the Docker image, banner uploads, native proofs, and #21 last.
+
+### Superseded: what blocked merging (morning of 2026-10-05)
 
 The stack is linear, so a hold on one PR blocks every PR above it. Only
 #151–#153 can merge today.
