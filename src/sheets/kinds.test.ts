@@ -19,7 +19,8 @@ test("stable withholds binary workbooks but keeps CSV editing", () => {
 test("an editable sheet file also needs a writable root and the byte gate", () => {
   // bun test compiles as the stable channel
   expect(sheetEditableFile("csv", { writable: true, len: 10 })).toBe(true);
-  expect(sheetEditableFile("xlsx", { writable: true, len: 10 })).toBe(false);
+  // Sheets ship on the stable desktop channel as Beta (2026-10-05)
+  expect(sheetEditableFile("xlsx", { writable: true, len: 10 })).toBe(true);
   expect(sheetEditableFile("csv", { writable: false, len: 10 })).toBe(false);
   expect(sheetEditableFile("csv", { writable: true, len: 9_000_000 })).toBe(false);
   expect(sheetEditableFile("csv", null)).toBe(false);

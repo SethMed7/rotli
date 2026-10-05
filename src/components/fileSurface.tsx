@@ -47,6 +47,7 @@ import { deriveSheetFacts, describeShape, formatStamp, sizeLine } from "../sheet
 import * as sheetKinds from "../sheets/kinds";
 import { type SheetTable, parseWorkbook } from "../sheets/view";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
+import { FileHeaderMarks } from "./fileHeaderMarks";
 
 // Univer + exceljs are heavy — code-split like CanvasSurface, loaded only when an editor mounts.
 const SheetEditor = lazy(() => import("../sheets/sheetEditor"));
@@ -476,6 +477,7 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
         <span className="file-name" title={name}>
           {name}
         </span>
+        <FileHeaderMarks {...{ kind, ext, stat, probed, tooLarge, sheetEditable, documentEditable }} />
         {kind === "html" && !tooLarge && (
           <div className="file-mode-tabs" role="tablist" aria-label="View mode">
             <button
@@ -504,21 +506,9 @@ export function FileSurface({ paneId, fileId }: { paneId: string; fileId: string
             {imgNat.w}×{imgNat.h} · {Math.round(imgScale * 100)}%
           </button>
         )}
-        {/* EVERY read-only sheet says WHY editing is off, not just the read-only
-            root — .ods/.xls/oversize/failed-probe were silent (#53, audit 2026-07) */}
-        {kind === "sheet" && probed && !sheetEditable && !tooLarge && (
-          <span className="file-readonly" title={sheetKinds.sheetReadOnlyReason(stat, ext).title}>
-            {sheetKinds.sheetReadOnlyReason(stat, ext).label}
-          </span>
-        )}
         {kind === "sheet" && sheetEditable && <div ref={sheetChromeRef} className="file-sheet-chrome" />}
         {kind === "document" && documentEditable && (
           <div ref={documentChromeRef} className="file-document-chrome" />
-        )}
-        {kind === "document" && probed && DOCX_EDITABLE.has(ext) && !documentEditable && !tooLarge && (
-          <span className="file-readonly" title="Move this document into Assets to edit it locally.">
-            read-only location
-          </span>
         )}
         {kind === "pdf" && (
           <button

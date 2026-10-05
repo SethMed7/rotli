@@ -59,8 +59,8 @@ revision-checked atomic writes; a one-time `.bak`):
 | Undo history resets on a theme change, a Raw/Themed toggle, or a tab switch, because the engine is rebuilt. | Beta limitation. Document it. |
 | Unknown XLSX parts outside the refusal list may not survive a save; data validation and conditional formatting are not editable. | Beta limitation, already in the launch-readiness doc. |
 | Files over 8 MB open read-only (same limit in TS and Rust); the viewer shows 2,000 rows. | Fine. |
-| Univer portals its popups to the page at z 1020; Rotli's overlays sit at 1000. There is no Rotli constant for this. | Check during the slice: a Univer menu must not cover the palette or a dialog. Not a blocker. |
-| No e2e test opens, edits, or saves a sheet, and `session.ts` has no unit test. | **Add in the slice:** one e2e (create, edit a cell, Save, reopen, value kept) and a `session.test.ts`. |
+| Univer portals its popups to the page; Rotli's overlays sit at 1000. There is no Rotli constant for this. | **Probed in the browser twin.** Univer's right-click menu sits at z **1070** (not 1020), and the open search panel at 1000. Clicking into search closes Univer's menu, so the two never overlapped. A Rotli overlay opened by keyboard while a Univer menu is open could sit under it. That is cosmetic, not a blocker; it is on the native checklist. |
+| No e2e test opens, edits, or saves a sheet, and `session.ts` has no unit test. | `session.test.ts` added (the resume decision, set-aside, the CSV copy round trip, flush reporting). The browser twin has no file bytes (`corpusFileStat` is null), so create, edit, Save, and reopen are a native check. |
 
 **Beta badge.** One shared component (`src/components/betaBadge.tsx`) built from
 semantic tokens, in the calm pill voice of `.file-readonly`, never nested in
@@ -222,3 +222,13 @@ edit journal. A note the owner typed is `person-written`. Three options:
    threat-model review?
 5. **Slash form:** per-type commands (Bar chart, Line chart…), or make the
    `/chart:bar` colon form part of the slash grammar?
+
+## Native checklist (the owner, in the Mac app)
+
+The browser twin can't prove these.
+
+- [ ] **Sheet round trip.** New Sheet, edit a cell, Save, quit, reopen: the value is kept and the header says Beta.
+- [ ] **Conflict banner.** Edit a sheet without saving, switch to another tab, change the file in Excel or Numbers, then come back. The banner offers the copy.
+- [ ] **The copy.** Save my edits as a copy opens a new workbook with your edits, and the original keeps the outside change.
+- [ ] **Source-app compare.** Open an Excel-authored `.xlsx` with formulas, dates, and styles, save it, and compare it in Excel (launch-readiness item).
+- [ ] **Univer menu vs a Rotli overlay.** Right-click a cell, then press ⌘K: note whether the search panel opens under Univer's menu.

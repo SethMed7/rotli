@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Spreadsheets are in Rotli, in Beta.** New Sheet makes a real `.xlsx`, and
+  `.xlsx` files open to edit in the Mac app the way `.csv` files already did.
+  Chat can make a workbook for you, and `/Sheet` embeds one in a note. Undo
+  starts over when you switch themes or tabs, and dropdowns and colour rules
+  aren't editable yet; that's what Beta means here. Rotli Web doesn't open
+  workbooks yet.
+
 - **Hand to AI brings the note's files along.** Images and files the note
   links to are listed under Attachments with where they are on your Mac, and
   the links in the note point there, so the agent can open them. A file that
@@ -27,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Documents and spreadsheets wear a Beta mark.** Both run on Univer and
+  are still being finished, so the New chooser, the New… menu, Settings, the
+  slash menu, and an open document or sheet say Beta.
 - **The quokka is your chat buddy.** Every chat has its quokka: it waves on a
   new chat, thinks while a reply is on its way, cheers when it lands, and
   listens when it's your turn. It picks its own expression; you decorate it

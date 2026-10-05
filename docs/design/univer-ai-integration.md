@@ -114,5 +114,5 @@ side (`src/documents/README.md`, Editing boundary):
    through the bridge too; Rust's `docx_text` stays the pre-check, not the
    reader (`docs/decisions/2026-10-01-agent-app-bridge.md`).
 
-Effort: slices 2–3 about two weeks, the rest four more, all behind the existing
-development gates for sheets and agents.
+Effort: slices 2–3 about two weeks, the rest four more. Agent tools stay behind
+the development gate for agents; Sheets themselves ship as Beta since 2026-10-05.

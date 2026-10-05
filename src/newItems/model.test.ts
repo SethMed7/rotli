@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  isBetaFileExt,
+  isBetaKind,
+  withBetaLabel,
   DEFAULT_NEW_ITEM_KIND,
   NEW_ITEM_DEFINITIONS,
   NEW_ITEM_KINDS,
@@ -67,5 +70,22 @@ describe("launch availability", () => {
     expect(availableNewItems(web).map((item) => item.kind)).toEqual(["markdown", "board"]);
     expect(availableNewTabDefault("document", web)).toBe("markdown");
     expect(isNewItemAvailable("board", web)).toBe(true);
+  });
+});
+
+describe("the Beta mark", () => {
+  test("Sheet and Document are Beta; every other kind is not", () => {
+    expect(NEW_ITEM_KINDS.filter(isBetaKind)).toEqual(["document", "sheet"]);
+  });
+
+  test("text-only surfaces add the one Beta word", () => {
+    expect(withBetaLabel("Sheet", "sheet")).toBe("Sheet · Beta");
+    expect(withBetaLabel("New document", "document")).toBe("New document · Beta");
+    expect(withBetaLabel("Board", "board")).toBe("Board");
+  });
+
+  test("files that open in a Beta editor read from the same definitions", () => {
+    for (const ext of ["xlsx", "csv", "docx", "XLSX"]) expect(isBetaFileExt(ext)).toBe(true);
+    for (const ext of ["md", "excalidraw", "xlsm", "tsv", "pdf", ""]) expect(isBetaFileExt(ext)).toBe(false);
   });
 });

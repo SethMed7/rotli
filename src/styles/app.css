@@ -938,6 +938,29 @@ body[data-surface="capture"] {
   color: var(--text-muted);
 }
 
+/* The one Beta mark (2026-10-05): a capability that ships but is still being
+   finished. The calm pill voice of the file header's read-only label — muted
+   text on a hairline, never accent, never inside another badge. */
+.beta-badge {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 2px 7px;
+  white-space: nowrap;
+  user-select: none;
+}
+.ni-label .beta-badge {
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+
 /* Pinned sites (2026-10-01, docs/decisions/2026-10-01-pinned-sites.md): a
    one-letter mark per site in the title bar, and the panel its native page
    sits over. The scrim starts under the title bar so the pins stay clickable. */

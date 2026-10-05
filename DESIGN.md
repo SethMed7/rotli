@@ -320,6 +320,15 @@ destructive states, plus narrow-window behavior. Long content, missing content,
 keyboard-only navigation, and focus recovery are normal cases rather than
 polish work.
 
+A capability that ships but is still being finished wears one **Beta** mark,
+defined once (`beta` on its `NEW_ITEM_DEFINITIONS` entry). Where it is offered
+or open (a New chooser card, the open file's header), the mark is the shared
+`BetaBadge`: a calm pill (muted text on a hairline, never accent), next to
+the name and never inside another badge. Text-only surfaces (a menu row, a
+select option, a palette title, a slash hint) append ` · Beta`. A coming-soon
+card or a read-only view does not wear it. Sheets (XLSX and CSV) and DOCX
+documents, both on Univer, are Beta.
+
 ## Chat artifacts
 
 - Creating an image, board, document, or other artifact leaves the conversation

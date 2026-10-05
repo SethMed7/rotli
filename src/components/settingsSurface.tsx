@@ -102,7 +102,7 @@ import {
   useSetMemexPerms,
   useSwitchVault,
 } from "../memex/useMemex";
-import { availableNewItems } from "../newItems/model";
+import { availableNewItems, withBetaLabel } from "../newItems/model";
 import { readyFrom, useConnectedCatalog } from "../services/connectedModels";
 import { isChatsPath, isHidden, isVault, isWikiPath } from "../services/destinations";
 import { useFolders } from "../services/hooks";
@@ -722,7 +722,7 @@ function GeneralPane() {
         >
           {availableNewItems(LAUNCH_FEATURES).map((item) => (
             <option key={item.kind} value={item.kind}>
-              {item.label}
+              {withBetaLabel(item.label, item.kind)}
             </option>
           ))}
         </select>

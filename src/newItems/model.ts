@@ -7,6 +7,8 @@ export interface NewItemDefinition {
   kind: NewItemKind;
   label: string;
   description: string;
+  /** Ships, but still Beta: every surface that offers or opens it says so. */
+  beta?: true;
 }
 
 /** Kinds whose filename IS their name, so the name is collected before the
@@ -76,11 +78,13 @@ export const NEW_ITEM_DEFINITIONS: readonly NewItemDefinition[] = [
     kind: "document",
     label: "Document",
     description: "A conventional DOCX document without Markdown embeds.",
+    beta: true,
   },
   {
     kind: "sheet",
     label: "Sheet",
     description: "An editable XLSX workbook.",
+    beta: true,
   },
   {
     kind: "board",
@@ -102,4 +106,29 @@ export function isNewItemKind(value: unknown): value is NewItemKind {
 
 export function newItemDefinition(kind: NewItemKind): NewItemDefinition {
   return NEW_ITEM_DEFINITIONS.find((item) => item.kind === kind) ?? NEW_ITEM_DEFINITIONS[0]!;
+}
+
+/** The one Beta word, for surfaces that can only show text. */
+export const BETA_LABEL = "Beta";
+
+export function isBetaKind(kind: NewItemKind): boolean {
+  return newItemDefinition(kind).beta === true;
+}
+
+/** "Sheet · Beta" — a menu row, a select option, a palette title. */
+export function withBetaLabel(text: string, kind: NewItemKind): string {
+  return isBetaKind(kind) ? `${text} · ${BETA_LABEL}` : text;
+}
+
+/** Files that open in a Beta editor: workbooks and CSV in the sheet editor,
+ * DOCX in the document editor (both run on Univer). */
+const EDITOR_KIND_BY_EXT: Readonly<Record<string, NewItemKind>> = {
+  xlsx: "sheet",
+  csv: "sheet",
+  docx: "document",
+};
+
+export function isBetaFileExt(ext: string): boolean {
+  const kind = EDITOR_KIND_BY_EXT[ext.toLowerCase()];
+  return kind !== undefined && isBetaKind(kind);
 }

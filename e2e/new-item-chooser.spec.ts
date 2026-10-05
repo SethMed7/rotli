@@ -117,3 +117,29 @@ test("an Excalidraw board asks for its name before creation", async ({ page }) =
   await expect(dialog.getByRole("textbox", { name: "Board name" })).toBeFocused();
   await expect(dialog.getByRole("button", { name: "Create board" })).toBeDisabled();
 });
+
+// Sheets ship as Beta beside Documents (the owner, 2026-10-05): the chooser
+// cards and the New… menu both say so, from one definition in newItems/model.
+test("Sheet and Document wear the one Beta mark where they are offered", async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole("button", { name: /Search notes and actions/ }).click();
+  await page.getByPlaceholder("Search notes, files, chats, actions…").fill("choose type");
+  await page.locator(".prow", { hasText: "New tab (choose type)" }).click();
+
+  const chooser = page.locator(".ni-surface");
+  await expect(chooser).toBeVisible();
+  for (const name of ["New Sheet — Beta", "New Document — Beta"]) {
+    const card = chooser.getByRole("button", { name });
+    await expect(card).toBeEnabled();
+    await expect(card.locator(".beta-badge")).toHaveText("Beta");
+  }
+  for (const name of ["New Markdown note", "New Board", "New Chat"]) {
+    await expect(chooser.getByRole("button", { name }).locator(".beta-badge")).toHaveCount(0);
+  }
+
+  await page.getByRole("button", { name: "New…", exact: true }).click();
+  const menu = page.locator(".ctxmenu");
+  await expect(menu.getByText("Sheet · Beta", { exact: true })).toBeVisible();
+  await expect(menu.getByText("Document · Beta", { exact: true })).toBeVisible();
+  await expect(menu.getByText("Board", { exact: true })).toBeVisible();
+});
