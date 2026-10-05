@@ -3,7 +3,8 @@
 // the footer's quokka beach to close on. Between them, in order: what rotli does
 // (three steps, the full tour and the 30-second episodes are /features/), why the
 // Librarian exists (two kinds of notes, the AI you already pay for), privacy in
-// brief, the ways in, make it yours, and questions. Base.astro owns the tokens
+// brief, the ways in, make it yours, and questions, which run straight into the
+// footer (the closing invitation was cut on 2026-10-05: it repeated the hero). Base.astro owns the tokens
 // and the section grammar.
 import { landingGraph } from '../agents';
 import { ogImage } from '../og';
@@ -14,7 +15,6 @@ import SiteHeader from './SiteHeader.astro';
 import Everywhere from './landing/Everywhere.astro';
 import Experiments from './landing/Experiments.astro';
 import Faq from './landing/Faq.astro';
-import FinalCta from './landing/FinalCta.astro';
 import Hero from './landing/Hero.astro';
 import Overview from './landing/Overview.astro';
 import StatBand from './landing/StatBand.astro';
@@ -35,7 +35,6 @@ import PrivacyBrief from './landing/PrivacyBrief.astro';
     <Everywhere />
     <Personal />
     <Faq />
-    <FinalCta />
   </main>
   <SiteFooter />
 </Base>
