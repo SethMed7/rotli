@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Images in a chat sit where you mention them.** Attaching an image types
+  its tag, `[Image #1]`, where your cursor is, so you can write "compare
+  [Image #1] with [Image #2]". The sent message shows each tag as a chip
+  with the picture, its file name, and its size. Thumbnails in the composer
+  are bigger, with the remove × inside the corner, and removing one removes
+  its tag. A screenshot you paste into the chat attaches the same way.
 - **Spreadsheets are in Rotli, in Beta.** New Sheet makes a real `.xlsx`, and
   `.xlsx` files open to edit in the Mac app the way `.csv` files already did.
   Chat can make a workbook for you, and `/Sheet` embeds one in a note. Undo
@@ -239,6 +245,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Rotli Web says plainly that chat images need the Mac app.** Choosing a
+  photo, or pasting one, used to attach it and then fail on send. Images in
+  a chat written on the Mac now show when you open it on the web, instead of
+  coming back blank.
 - **A spreadsheet that changed on disk keeps your unsaved edits.** Edits you
   hadn't saved when the file changed outside Rotli used to be set aside and
   lost. Now the sheet shows the version on disk and offers **Save my edits as

@@ -1366,8 +1366,8 @@
 .chat-attachments {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 6px;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 .chat-attachment {
   position: relative;
@@ -1388,27 +1388,33 @@
   font-weight: 600;
   line-height: 1.5;
 }
+/* a thumbnail you can recognise (2026-10-05, after a modern composer), its
+   remove × inside the top-right corner where it can't be clipped */
 .chat-attachment img {
-  width: 46px;
-  height: 46px;
+  width: 64px;
+  height: 64px;
   object-fit: cover;
   border-radius: var(--r-control);
   border: 1px solid var(--border);
 }
 .chat-attachment-x {
   position: absolute;
-  top: -6px;
-  right: -6px;
-  width: 16px;
-  height: 16px;
-  line-height: 14px;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  line-height: 18px;
   text-align: center;
   border: none;
   border-radius: 50%;
   background: var(--text);
   color: var(--surface-2);
-  font-size: 12px;
+  font-size: 14px;
   cursor: pointer;
+}
+.chat-attachment-x:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 /* an image from outside hovering a chat row (2026-09-17): the drop opens the
@@ -3139,18 +3145,53 @@ body:has(.document-editor) [role="dialog"][class*="univer-"] input:disabled {
 }
 /* an attachment's `[Image #n]` in the sent bubble reads as the same #n chip
    the composer put on its thumbnail (2026-09-17) */
+/* The image tag where it was referenced (2026-10-05, after a modern
+   composer): a small thumbnail, the file name, and its size in a hairline
+   pill on the surface, so it reads as a thing in the sentence, not a word. */
 .cmsg-imgref {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
   margin: 0 2px;
-  padding: 0 6px;
+  padding: 1px 8px 1px 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.82em;
+  line-height: 1.5;
+  vertical-align: -0.2em;
+  white-space: nowrap;
+}
+.cmsg-imgref img {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  object-fit: cover;
+  border-radius: 50%;
+}
+.cmsg-imgref-n {
+  flex: 0 0 auto;
+  min-width: 18px;
+  padding: 0 4px;
   border-radius: var(--r-pill);
   background: var(--accent);
   color: var(--on-accent);
-  font-size: 0.78em;
+  font-size: 0.9em;
   font-weight: 600;
-  line-height: 1.6;
-  vertical-align: 0.08em;
-  white-space: nowrap;
+  text-align: center;
+}
+.cmsg-imgref-name {
+  min-width: 0;
+  max-width: 18em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cmsg-imgref-size {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 /* An image or video a reply shows (chatReplyMedia.tsx): the file itself, at
    its own shape, never wider than the bubble; a video keeps native controls */

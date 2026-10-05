@@ -232,3 +232,8 @@ The browser twin can't prove these.
 - [ ] **The copy.** Save my edits as a copy opens a new workbook with your edits, and the original keeps the outside change.
 - [ ] **Source-app compare.** Open an Excel-authored `.xlsx` with formulas, dates, and styles, save it, and compare it in Excel (launch-readiness item).
 - [ ] **Univer menu vs a Rotli overlay.** Right-click a cell, then press ⌘K: note whether the search panel opens under Univer's menu.
+- [ ] **Chat: attach at the caret.** In a chat on a vision model, type "compare ", put the caret there, attach two images with + → Add files or photos. `[Image #1] [Image #2]` appear at the caret, and the thumbnails show 64 px with × inside the corner.
+- [ ] **Chat: remove a thumbnail.** × on the first image removes its tag; the other tag becomes `[Image #1]`.
+- [ ] **Chat: pasted screenshot.** ⌃⇧⌘4 a region, then ⌘V into the composer: it attaches with its tag. A rich copy from a web page still pastes as text.
+- [ ] **Chat: the sent chip.** The sent message shows each tag as a chip (image, file name, size) where it was typed; it reads the same after reopening the chat.
+- [ ] **Chat: dropped and Finder-pasted images.** A Finder drop or a Finder ⌘C/⌘V still attaches, with the tag typed at the end.

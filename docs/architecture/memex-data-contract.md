@@ -336,6 +336,16 @@ second user-visible product or storage location.
   both attached to the originating assistant turn. Rust keeps both in the same
   registered root and refuses secure, secret-shaped, locked, read-only, or
   oversized sources before invoking the local macOS renderer.
+- An attached image is referenced where it was attached: attaching (picker,
+  drop, or a pasted screenshot, which is image bytes with no text) types its
+  `[Image #n]` tag at the composer's caret, or at the end when the composer
+  isn't focused. Removing its thumbnail removes the tag and numbers the later
+  ones down. On send each tag becomes the image's portable link in place (the
+  tag followed by its `storage:` target); an untagged image leads the message.
+  A sent message draws each tag as a chip with the image, its vault file name,
+  and its size when the vault can say. Rotli Web resolves the image in the
+  connected folder. It never attaches one to a chat: Rotli Helper carries text
+  only, so the picker and a paste say that sending images needs the Mac app.
 - Unsent chat title, text, and image attachments are session state owned by the
   stable tab id. Switching tabs or temporarily unmounting a chat surface never
   clears that draft; sending it does. The first successful save binds the

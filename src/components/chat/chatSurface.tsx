@@ -47,7 +47,6 @@ import { renderInline } from "../../editor/render";
 import {
   CHAT_IMAGE_ASSET_EXTS,
   CHAT_IMAGE_ASSET_MAX_BYTES,
-  attachmentReference,
   projectChatWorkItems,
   visibleChatText,
 } from "../../lib/chatWork";
@@ -139,6 +138,13 @@ import { copyChatSelection } from "./chatCopy";
 import { CHAT_PANE_ATTR } from "./chatDrop";
 import { useChatDropTarget } from "./chatDropTarget";
 import { UserMessageText } from "./chatImageRefs";
+import {
+  WEB_IMAGES_NEED_THE_MAC_APP,
+  attachToChatDraft,
+  composeImageText,
+  pastedChatImages,
+  removeChatDraftImage,
+} from "./chatImageTokens";
 import { ModelPicker } from "./chatModelPicker";
 import { ChatPromptNavigator } from "./chatPromptNavigator";
 import { conversationPrompts, visiblePromptIndexes } from "./chatPromptNavigatorModel";
@@ -944,7 +950,7 @@ const ChatMessage = memo(function ChatMessage({
     <div className={you ? "cmsg you" : "cmsg ai"} data-chat-message-index={index}>
       <div className="cmsg-bubble">
         {you && images.length > 0 && <ChatAttachedImages images={images} />}
-        {you ? <UserMessageText text={text} /> : renderMessage(text, mediaRoot)}
+        {you ? <UserMessageText text={text} images={images} /> : renderMessage(text, mediaRoot)}
       </div>
       {!you && onOpenArtifact && <ChatArtifactButtons artifacts={artifacts} onOpen={onOpenArtifact} />}
       <div className={endMark ? "cmsg-footer has-endmark" : "cmsg-footer"}>
@@ -1573,20 +1579,12 @@ export function ChatSurface({
     // The portable storage link makes an image referable afterwards and keeps
     // the relationship durable. The bubble hides its storage target; the Rust
     // command has already copied the bytes into this vault's asset lane.
-    const userText =
-      imgs.length > 0
-        ? `${imgs
-            .map((image, i) => (image.id ? attachmentReference(i + 1, image.id) : `[Image #${i + 1}]`))
-            .join(" ")}${typed ? `\n${typed}` : ""}`
-        : typed;
+    // A tag typed where the image was referenced links there; an untagged
+    // image leads the message (chatImageTokens.ts).
+    const userText = composeImageText(typed, imgs);
     // Routing syntax remains in the durable user turn, while the provider sees
     // the question without Rotli's @provider[:model] control token.
-    const providerUserText =
-      imgs.length > 0
-        ? `${imgs
-            .map((image, i) => (image.id ? attachmentReference(i + 1, image.id) : `[Image #${i + 1}]`))
-            .join(" ")}${providerTyped ? `\n${providerTyped}` : ""}`
-        : providerTyped;
+    const providerUserText = composeImageText(providerTyped, imgs);
     const sentTitle = normalizeChatTitle(title) || deriveChatTitle(visibleChatText(userText));
     setProvisionalTitle(sentTitle);
     lastSentRef.current = { text: typed, images: imgs };
@@ -1602,7 +1600,8 @@ export function ChatSurface({
         speaker: "you",
         text: userText,
         at: userAt,
-        images: imgs.map((image) => image.src),
+        // the vault id when there is one, so the chip can name the file
+        images: imgs.map((image) => image.id || image.src),
       },
     ]);
     setBusy(true);
@@ -2080,6 +2079,10 @@ export function ChatSurface({
   };
 
   const onAttachClick = () => {
+    if (!isTauri()) {
+      setAttachmentErr(WEB_IMAGES_NEED_THE_MAC_APP);
+      return;
+    }
     if (!canVision) {
       setVisionHint(true); // this model can't see — prompt to pick one that can
       return;
@@ -2087,8 +2090,12 @@ export function ChatSurface({
     fileRef.current?.click();
   };
 
-  const onPickFiles = async (files: FileList | null) => {
+  const onPickFiles = async (files: FileList | readonly File[] | null) => {
     if (!files) return;
+    if (!isTauri()) {
+      setAttachmentErr(WEB_IMAGES_NEED_THE_MAC_APP);
+      return;
+    }
     // Finder/WebKit can omit MIME metadata for otherwise valid local images.
     // The extension allowlist is the portable UI check; Rust independently
     // validates both the name and decoded payload before writing the asset.
@@ -2104,7 +2111,7 @@ export function ChatSurface({
         const src = await readAsDataURL(file);
         const payload = src.split(",", 2)[1];
         if (!payload) throw new Error("the selected image could not be encoded");
-        const id = isTauri() ? await corpusCreateImageAsset(rootId, file.name, payload) : "";
+        const id = await corpusCreateImageAsset(rootId, file.name, payload);
         attached.push({ id, name: file.name, src });
       } catch (error) {
         setAttachmentErr(
@@ -2113,9 +2120,21 @@ export function ChatSurface({
       }
     }
     if (attached.length > 0) {
-      setDraftImages(tabId, [...(useChatDrafts.getState().drafts[tabId]?.images ?? []), ...attached]);
+      attachToChatDraft(tabId, attached, msgRef.current);
       if (attached.length === picks.length && picks.length === files.length) setAttachmentErr(null);
     }
+  };
+
+  // A pasted screenshot (image bytes, no text) attaches like a picked image.
+  const onComposerPaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const images = pastedChatImages([...event.clipboardData.files], [...event.clipboardData.types]);
+    if (images.length === 0) return;
+    event.preventDefault();
+    if (isTauri() && !canVision) {
+      setVisionHint(true);
+      return;
+    }
+    void onPickFiles(images);
   };
 
   // — dropped images (the maintainer, 2026-08-04) — the window handler hands us OS PATHS.
@@ -2154,12 +2173,12 @@ export function ChatSurface({
           }
         }
         if (attached.length > 0) {
-          setDraftImages(tabId, [...(useChatDrafts.getState().drafts[tabId]?.images ?? []), ...attached]);
+          attachToChatDraft(tabId, attached, msgRef.current);
           if (attached.length === paths.length) setAttachmentErr(null);
         }
       })();
     },
-    [active, tabId, setDraftImages],
+    [active, tabId],
   );
 
   useChatDropTarget(paneId, chatSlug, attachPaths, canVision, () => setDropVisionError(true), !!active);
@@ -2599,17 +2618,13 @@ export function ChatSurface({
                             {/* the handle you can talk about — the same number the
                             sent message carries as [Image #N] (2026-08-04) */}
                             <span className="chat-attachment-n" aria-hidden="true">{`#${i + 1}`}</span>
-                            <img src={image.src} alt={`Attached image ${i + 1}`} />
+                            <img src={image.src} alt={`Attached image ${i + 1}`} title={image.name} />
                             <button
                               type="button"
                               className="chat-attachment-x"
                               title="Remove"
-                              onClick={() =>
-                                setDraftImages(
-                                  tabId,
-                                  images.filter((_, j) => j !== i),
-                                )
-                              }
+                              aria-label={`Remove image ${i + 1}`}
+                              onClick={() => removeChatDraftImage(tabId, i)}
                             >
                               ×
                             </button>
@@ -2686,6 +2701,7 @@ export function ChatSurface({
                         placeholder={working ? "thinking…" : "Message rotli…  (⏎ to send · ⇧⏎ new line)"}
                         value={message}
                         onChange={(e) => setDraftMessage(tabId, e.target.value)}
+                        onPaste={onComposerPaste}
                         onKeyDown={(e) => {
                           e.stopPropagation();
                           if (e.key === "Enter" && !e.shiftKey) {
