@@ -108,6 +108,37 @@ describe("which replies become the prompt", () => {
     expect(parseRefinedReply(encoded, BASIC, PATHS).ok).toBe(false);
   });
 
+  // review of PR 154: the check was a substring test, so a longer path that
+  // merely contains a listed one passed
+  test("a path kept only inside a longer one is refused", () => {
+    const backup = REFINED.replace(`${PATHS[0]}:`, `${PATHS[0]}.backup:`);
+    expect(parseRefinedReply(backup, BASIC, PATHS)).toEqual({
+      ok: false,
+      reason: "The model's answer dropped a file path.",
+    });
+    const nested = REFINED.replace(`${PATHS[0]}:`, `/Old${PATHS[0]}:`);
+    expect(parseRefinedReply(nested, BASIC, PATHS).ok).toBe(false);
+  });
+
+  test("a path at the end of a sentence, in brackets, or in a link still counts", () => {
+    for (const shape of [`see ${PATHS[0]}.`, `(${PATHS[0]})`, `[shot](<${PATHS[0]}>)`, `\`${PATHS[0]}\``]) {
+      const reply = REFINED.replace(`- ${PATHS[0]}: the overlap`, `- ${shape}`);
+      expect([shape, parseRefinedReply(reply, BASIC, PATHS).ok]).toEqual([shape, true]);
+    }
+  });
+
+  test("a file marked missing must survive too", () => {
+    const missing = "storage/gone.pdf";
+    const paths = [...PATHS, missing];
+    const basic = `${BASIC}\n- ${missing} (file, “old spec”): missing, not found in the vault`;
+    expect(parseRefinedReply(REFINED, basic, paths)).toEqual({
+      ok: false,
+      reason: "The model's answer dropped a file path.",
+    });
+    const kept = `${REFINED}\n- ${missing}: missing, ask me for it`;
+    expect(parseRefinedReply(kept, basic, paths)).toEqual({ ok: true, prompt: `${kept}\n` });
+  });
+
   test("an empty or runaway reply is refused", () => {
     expect(parseRefinedReply("  ", BASIC, []).ok).toBe(false);
     expect(parseRefinedReply("x".repeat(BASIC.length * 4 + 4001), BASIC, []).ok).toBe(false);

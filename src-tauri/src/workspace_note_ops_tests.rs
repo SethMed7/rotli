@@ -81,6 +81,57 @@ fn trash_moves_an_ai_made_note_and_refuses_people_locks_and_stale_reads() {
     assert!(ws.trash_note(&secure.id, "fnv1a64:0").unwrap_err().contains("secure"));
 }
 
+/// Review (PR #155): the policy is decided under the move's file lock from the
+/// bytes being moved — not from the agent's earlier read. A note locked or made
+/// secure after the read is refused even when the revision handed in is the
+/// CURRENT one, and it stays exactly where it was.
+#[test]
+fn trash_decides_on_the_note_as_it_is_at_the_move() {
+    let temp = TempDir::new().unwrap();
+    let mut ws = test_workspace(&temp);
+    for (title, line, refusal) in [("Kept", "locked: true", "locked"), ("Turned", "secure: true", "secure")] {
+        let note = ws.create_note(title, "body", MAIN_ROOT).unwrap();
+        let read = ws.read_note(&note.id).unwrap();
+        let rel = ws.store.resolve_note_rel(&note.id).unwrap();
+        // the person changes the note after the agent's read...
+        add_frontmatter_line(&mut ws, &note.id, line);
+        let err = ws.trash_note(&note.id, &read.revision).unwrap_err();
+        assert!(err.contains(refusal), "{title}: {err}");
+        // ...and an agent holding the newest revision is refused on policy alone
+        let current = crate::fsutil::revision(&fs::read(ws.store.root().join(&rel)).unwrap());
+        let err = ws.trash_note(&note.id, &current).unwrap_err();
+        assert!(err.contains(refusal), "{title}: {err}");
+        assert_eq!(ws.store.resolve_note_rel(&note.id).unwrap(), rel, "{title} never moved");
+    }
+    assert!(!ws.store.ai_journal_rows().iter().any(|row| row.action == TRASH));
+}
+
+/// The race itself: another writer holds the note's lock while the agent's
+/// trash call arrives, and locks the note before letting go. The call waits on
+/// the lock, then sees the lock flag — a check made before the wait would have
+/// passed and moved a locked note.
+#[test]
+fn a_note_locked_while_trash_waits_on_its_lock_is_refused() {
+    let temp = TempDir::new().unwrap();
+    let mut ws = test_workspace(&temp);
+    let note = ws.create_note("Raced", "body", MAIN_ROOT).unwrap();
+    let read = ws.read_note(&note.id).unwrap();
+    let rel = ws.store.resolve_note_rel(&note.id).unwrap();
+    let path = ws.store.root().join(&rel);
+    let lock = std::path::PathBuf::from(format!("{}.lock", path.display()));
+    fs::write(&lock, format!("{}\n", std::process::id())).unwrap();
+    let writer = std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        let raw = fs::read_to_string(&path).unwrap().replacen("\n---\n", "\nlocked: true\n---\n", 1);
+        fs::write(&path, raw).unwrap();
+        fs::remove_file(&lock).unwrap();
+    });
+    let result = ws.trash_note(&note.id, &read.revision);
+    writer.join().unwrap();
+    assert!(result.unwrap_err().contains("locked"));
+    assert_eq!(ws.store.resolve_note_rel(&note.id).unwrap(), rel, "never moved");
+}
+
 #[test]
 fn every_agent_edit_is_journaled_and_the_last_one_undoes_only_while_current() {
     let temp = TempDir::new().unwrap();
@@ -151,7 +202,7 @@ fn a_secure_notes_edits_are_journaled_without_their_text_and_its_history_is_refu
 }
 
 #[test]
-fn opening_a_connected_roots_item_queues_its_wire_id_in_the_default_mailbox() {
+fn opening_a_connected_vaults_item_queues_its_wire_id_in_the_default_mailbox() {
     let default = TempDir::new().unwrap();
     let other = TempDir::new().unwrap();
     let mut connected = Workspace::open_target(super::super::RootTarget {
@@ -164,8 +215,11 @@ fn opening_a_connected_roots_item_queues_its_wire_id_in_the_default_mailbox() {
     .unwrap();
     let note = connected.store.create_for_remote_agent("Inbox", "# Elsewhere\n\nx").unwrap();
     super::super::CONNECTOR_ROOT.with(|root| *root.borrow_mut() = Some((default.path().to_path_buf(), false)));
-    let queued = connected.write_open_request(&note.id, "note");
+    // a connected folder is no vault the app can switch to: refused, nothing queued
+    let folder = connected.queue_open_request(&note.id, "note", &[]);
+    let queued = connected.queue_open_request(&note.id, "note", &["work".to_string()]);
     super::super::CONNECTOR_ROOT.with(|root| *root.borrow_mut() = None);
+    assert!(folder.unwrap_err().contains("connected folder, not a vault"));
     let queued = queued.unwrap();
 
     let wire = format!("work:{}", note.id);

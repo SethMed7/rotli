@@ -1,12 +1,15 @@
 import { describe, expect, test } from "bun:test";
 
 import type { CompleteReq } from "../ai/types";
+import { currentWebFileStore, registerWebFileStore } from "../lib/webAiSeam";
 import { useLibrarianRules } from "../state/librarianRules";
 import { DEST } from "./destinations";
 import {
   attachmentIsSecure,
+  attachmentRel,
   handToAiFor,
   type LocateAttachment,
+  locateAttachment,
   refineHandToAiFor,
   secureByNameOrUnknown,
 } from "./handToAi";
@@ -48,7 +51,7 @@ describe("Hand to AI — the files a note links to", () => {
     const result = await handToAiFor(note.id, locate);
     expect(result.kind).toBe("ready");
     if (result.kind !== "ready") return;
-    expect(result.paths).toEqual(["/Synthetic Vault/storage/shot.png"]);
+    expect(result.paths).toEqual(["/Synthetic Vault/storage/shot.png", "storage/gone.pdf"]);
     expect(result.prompt).toContain("- /Synthetic Vault/storage/shot.png (image, “Overlap”)");
     expect(result.prompt).toContain("- storage/gone.pdf (file, “spec”): missing, not found in the vault");
     expect(result.prompt).toContain("![Overlap](</Synthetic Vault/storage/shot.png>)");
@@ -74,6 +77,98 @@ describe("Hand to AI — the files a note links to", () => {
     expect(attachmentIsSecure("storage/bank-statement.pdf", ["bank"])).toBe(true);
     expect(attachmentIsSecure("storage/riverbank.png", ["bank"])).toBe(false);
     expect(attachmentIsSecure("storage/shot.png", [])).toBe(false);
+  });
+
+  // review of PR 154: the folder test ran on the raw link, so an escape or a
+  // `..` walked a secure file past it
+  const DISGUISED = [
+    "Secure%20notes/w2.png",
+    "../Secure notes/w2.png",
+    "storage:../Secure notes/w2.png",
+    "%2e%2e/Secure notes/w2.png",
+    "..%2FSecure notes/w2.png",
+    "storage/..%2F..%2FSecure notes/w2.png",
+    "storage%3A..%2FSecure%20notes%2Fw2.png",
+    "Secure%2520notes/w2.png",
+    "storage\\..\\Secure notes\\w2.png",
+    "./wiki/./_secure/id.png",
+    "wiki/_SECURE/../_secure/id.png",
+    "storage/%E0%A4%A.png",
+    "storage/%252525252525252e.png",
+    "storage/a%00.png",
+  ];
+
+  test("an escaped, dotted, or unreadable link is refused like a secure one", () => {
+    for (const src of DISGUISED) expect([src, attachmentIsSecure(src, [])]).toEqual([src, true]);
+  });
+
+  test("a link is resolved before it is checked or located", () => {
+    expect(attachmentRel("storage:../Secure notes/w2.png")).toBe("Secure notes/w2.png");
+    expect(attachmentRel("%2e%2e/Secure notes/w2.png")).toBeNull();
+    expect(attachmentRel("../Secure notes/w2.png")).toBeNull();
+    expect(attachmentRel("storage:my%20shot.png")).toBe("storage/my shot.png");
+    expect(attachmentRel("storage:./a/../shot.png")).toBe("storage/shot.png");
+    expect(attachmentRel("storage%3Ashot.png")).toBe("storage/shot.png");
+    expect(attachmentRel("storage/%E0%A4%A.png")).toBeNull();
+    expect(attachmentIsSecure("storage/../shots/a.png", [])).toBe(false);
+  });
+
+  test("a note linking a disguised secure file is refused, and nothing is located", async () => {
+    for (const src of DISGUISED.slice(0, 5)) {
+      let asked = 0;
+      const counting: LocateAttachment = (...args) => {
+        asked += 1;
+        return locate(...args);
+      };
+      const note = await notesService.createNote(DEST.inbox, `# Taxes\n\nFile them.\n\n![w2](<${src}>)`);
+      expect([src, await handToAiFor(note.id, counting)]).toEqual([
+        src,
+        { kind: "secureAttachment", title: "Taxes" },
+      ]);
+      expect(asked).toBe(0);
+    }
+  });
+
+  test("the file located is the resolved one", async () => {
+    const seen: string[] = [];
+    const recording: LocateAttachment = (rootId, rel) => {
+      seen.push(rel);
+      return locate(rootId, rel);
+    };
+    const note = await notesService.createNote(
+      DEST.inbox,
+      "# Login\n\nFix it.\n\n![](storage:a/../shot%2Epng)",
+    );
+    const result = await handToAiFor(note.id, recording);
+    expect(seen).toEqual(["storage/shot.png"]);
+    expect(result.kind === "ready" && result.paths).toEqual(["/Synthetic Vault/storage/shot.png"]);
+  });
+});
+
+describe("Hand to AI on Rotli Web — a linked file is checked, not assumed", () => {
+  test("a file the folder has is found; one it lacks, or none can check, is missing", async () => {
+    const before = currentWebFileStore();
+    const files = new Set(["storage/spec.pdf"]);
+    registerWebFileStore({
+      createImageAsset: () => Promise.reject(new Error("unused")),
+      imageUrl: () => Promise.resolve(""),
+      fileExists: (rel) => Promise.resolve(files.has(rel)),
+    });
+    try {
+      expect(await locateAttachment("default", "storage/spec.pdf")).toEqual({
+        status: "found",
+        rel: "storage/spec.pdf",
+        path: null,
+      });
+      expect(await locateAttachment("default", "storage/gone.pdf")).toEqual({
+        status: "missing",
+        rel: "storage/gone.pdf",
+      });
+      registerWebFileStore(null);
+      expect((await locateAttachment("default", "storage/spec.pdf")).status).toBe("missing");
+    } finally {
+      registerWebFileStore(before);
+    }
   });
 });
 
