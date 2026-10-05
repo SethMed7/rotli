@@ -38,7 +38,7 @@ import { imageSourceSpan, selectionCoversImage } from "./imageSelection";
 import { type DropTarget, type LineSpan, planLineMove, snapOutOfBlocks } from "./imgMove";
 import { underscoreEm } from "./inlineEmphasis";
 import { AUTOLINK_SOURCE, MD_LINK_SOURCE } from "./inlineLinks";
-import { DIVIDER_LINE, indentColumns, leadingIndent } from "./lineIndent";
+import { DIVIDER_LINE, leadingIndent, paragraphIndentLevels } from "./lineIndent";
 import {
   CHECK_EM,
   CHOICE_EM,
@@ -1131,7 +1131,7 @@ function build(view: EditorView): {
           const aligned = parseAlignedLine(text);
           // a Tab-indented paragraph shows its levels as a real indent on the
           // list ladder, not two space-widths (lineIndent.ts owns the levels)
-          const levels = Math.floor(indentColumns(text) / 2);
+          const levels = paragraphIndentLevels(text);
           if (!aligned && levels > 0) {
             const style = paragraphIndentStyle(levels);
             decos.push(Decoration.line({ class: "rotli-indented", attributes: { style } }).range(ls));

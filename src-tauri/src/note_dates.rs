@@ -12,10 +12,11 @@ const HOUR_MS: i64 = 3_600_000;
 /// A frontmatter `created`/`updated` stamp as epoch ms, or None when it is not
 /// a date. A full RFC 3339 timestamp is taken as written. A date-only stamp
 /// names a day, not an hour, so it never becomes an age in hours on its own:
-/// the file's own time (`file_ms`) stands in when it falls on the stamped day
-/// somewhere on Earth (UTC−12 to UTC+14), so a note saved a minute ago reads
-/// "just now"; otherwise (a copy or clone reset the file time) the stamp is
-/// local midnight of that day.
+/// the file's own time (`file_ms`) stands in when it falls on the stamped day —
+/// the reader's local day, widened to the UTC day because Mac builds before
+/// 2026-10 stamped the UTC day — so a note saved a minute ago reads "just
+/// now"; otherwise (a copy or clone reset the file time) the stamp is local
+/// midnight of that day. Same window as `stampToMs` in src/memex/dates.ts.
 pub(crate) fn stamp_to_ms(stamp: &str, file_ms: Option<i64>) -> Option<i64> {
     stamp_to_ms_in(stamp, file_ms, local_offset_secs)
 }
@@ -47,18 +48,22 @@ fn stamp_to_ms_in(
     let month = Month::try_from(value[5..7].parse::<u8>().ok()?).ok()?;
     let day = Date::from_calendar_date(year, month, value[8..10].parse().ok()?).ok()?;
     let utc_midnight = day.midnight().assume_utc().unix_timestamp() * 1000;
+    let midnight = local_midnight(utc_midnight, &offset_at);
     if let Some(file) = file_ms {
-        if file >= utc_midnight - 14 * HOUR_MS && file < utc_midnight + 36 * HOUR_MS {
+        let next_utc = utc_midnight + 24 * HOUR_MS;
+        let start = midnight.min(utc_midnight);
+        let end = local_midnight(next_utc, &offset_at).max(next_utc);
+        if file >= start && file < end {
             return Some(file);
         }
     }
-    Some(local_midnight(utc_midnight, offset_at))
+    Some(midnight)
 }
 
 /// Local 00:00 of the day whose UTC midnight is `utc_midnight` (ms). Two passes
 /// find the offset in force at local midnight; when a DST jump skips midnight,
 /// the first instant after the gap wins (what a JS `new Date(y, m, d)` gives).
-fn local_midnight(utc_midnight: i64, offset_at: impl Fn(i64) -> i64) -> i64 {
+fn local_midnight(utc_midnight: i64, offset_at: &impl Fn(i64) -> i64) -> i64 {
     let at = |ms: i64| offset_at(ms.div_euclid(1000)) * 1000;
     let guess = utc_midnight - at(utc_midnight);
     let offset = at(guess);
@@ -167,13 +172,31 @@ mod tests {
     }
 
     #[test]
-    fn the_file_time_window_spans_every_zone_on_the_stamped_day() {
+    fn the_file_time_window_is_the_local_day_widened_to_the_utc_day() {
         let utc_midnight = 1_790_899_200_000_i64; // 2026-10-02T00:00:00Z
-        let read = |file: i64| stamp_to_ms_in("2026-10-02", Some(file), fixed(0));
-        assert_eq!(read(utc_midnight - 14 * HOUR_MS), Some(utc_midnight - 14 * HOUR_MS));
-        assert_eq!(read(utc_midnight + 36 * HOUR_MS - 1), Some(utc_midnight + 36 * HOUR_MS - 1));
-        assert_eq!(read(utc_midnight - 14 * HOUR_MS - 1), Some(utc_midnight));
-        assert_eq!(read(utc_midnight + 36 * HOUR_MS), Some(utc_midnight));
+        let next_utc = utc_midnight + 24 * HOUR_MS;
+        // UTC: the window is exactly the UTC day.
+        let utc = |file: i64| stamp_to_ms_in("2026-10-02", Some(file), fixed(0));
+        assert_eq!(utc(utc_midnight), Some(utc_midnight));
+        assert_eq!(utc(next_utc - 1), Some(next_utc - 1));
+        assert_eq!(utc(utc_midnight - 1), Some(utc_midnight));
+        assert_eq!(utc(next_utc), Some(utc_midnight));
+        // New York (UTC−4): the local day runs past the UTC day; a file touched
+        // the next morning UTC (a move or copy of yesterday's note) still falls
+        // in the local day, but one touched after local midnight does not.
+        let ny_midnight = utc_midnight + 4 * HOUR_MS;
+        let ny = |file: i64| stamp_to_ms_in("2026-10-02", Some(file), fixed(-240));
+        assert_eq!(ny(utc_midnight), Some(utc_midnight));
+        assert_eq!(ny(next_utc + 4 * HOUR_MS - 1), Some(next_utc + 4 * HOUR_MS - 1));
+        assert_eq!(ny(next_utc + 4 * HOUR_MS), Some(ny_midnight));
+        // Tokyo (UTC+9): the local day starts 9h before the UTC day and the
+        // UTC widening keeps the rest of the UTC day.
+        let tokyo_midnight = utc_midnight - 9 * HOUR_MS;
+        let tokyo = |file: i64| stamp_to_ms_in("2026-10-02", Some(file), fixed(540));
+        assert_eq!(tokyo(tokyo_midnight), Some(tokyo_midnight));
+        assert_eq!(tokyo(next_utc - 1), Some(next_utc - 1));
+        assert_eq!(tokyo(next_utc), Some(tokyo_midnight));
+        assert_eq!(tokyo(tokyo_midnight - 1), Some(tokyo_midnight));
     }
 
     #[test]
@@ -199,7 +222,7 @@ mod tests {
         let utc_midnight = 1_541_289_600_000_i64; // 2018-11-04T00:00:00Z
         let jump = utc_midnight + 3 * HOUR_MS; // 00:00 −03 == 03:00Z
         let zone = move |secs: i64| if secs * 1000 < jump { -3 * 3600 } else { -2 * 3600 };
-        assert_eq!(local_midnight(utc_midnight, zone), jump);
+        assert_eq!(local_midnight(utc_midnight, &zone), jump);
     }
 
     /// The real zone lookup agrees with itself: today's local midnight is at

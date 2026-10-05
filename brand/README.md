@@ -23,7 +23,9 @@ bundled fonts, the quokka line art in `src/assets/characters/` filled with the
 app's Cocoa body, and the story film's island palette. The same run renders the
 site's per-page link cards (`site/README.md`) and a contact sheet at
 `_review/brand-images/contact-sheet.png`. Every text block is checked against
-its safe area, the quokka, and 4.5:1 contrast before anything is written.
+its safe area and the quokka before anything is written, and the title and line
+colors must reach 4.5:1 on the solid warm ground. Text set over the pattern,
+sea, sand, or ink underline is not sampled; check it on the contact sheet.
 
 | File | Size | Use |
 | --- | --- | --- |
@@ -31,7 +33,7 @@ its safe area, the quokka, and 4.5:1 contrast before anything is written.
 | `banners/linkedin-banner-1128x191.png` | 1128×191 | LinkedIn company page. Text starts right of the logo's overlap. |
 | `banners/github-social-preview-1280x640.png` | 1280×640 | GitHub Settings → Social preview (uploaded by hand). |
 | `banners/youtube-channel-art-2560x1440.png` | 2560×1440 | YouTube banner. Wordmark, headline, and quokka sit inside the 1546×423 safe area every device shows; the bay, clouds, and lighthouse fill the TV area. |
-| `pfp/rotli-pfp-{rotli,ocean,grove,midnight}.png` | 1024×1024 | Profile pictures: the face mark on the Rotli, Ocean, Grove, and Midnight grounds, safe for a circular crop. |
+| `pfp/rotli-pfp-{rotli,ocean,grove,midnight}.png` | 1024×1024 | Profile pictures: the face mark on each family's ground from `src/styles/themes.css` (Rotli, Ocean, and Grove light; Midnight dark), safe for a circular crop. |
 | `thumbnails/template.png` | 1280×720 | The blog/YouTube thumbnail with its title slot. |
 | `thumbnails/<post slug>.png` | 1280×720 | One per published post, from its frontmatter title. |
 

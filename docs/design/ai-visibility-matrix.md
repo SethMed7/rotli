@@ -64,14 +64,21 @@ one whose text trips the secret detector, gets no prompt
 
 Since v2 (2026-10-02) the files the note links to follow the same law. A
 `storage:` or vault-relative link (outside code fences, never a `.md` note
-link) whose path sits under `Secure notes/` or `wiki/_secure/` (any case: the
-Mac's disk ignores it), or whose file name carries a secure keyword, refuses
-the whole handoff before anything is located. Every other linked file is
-resolved the way the editor's image widget resolves it (`imageSrcToRel` +
-`corpus_abs`, plus a stat), listed under **Attachments** with its absolute
-path, and its in-body link rewritten to that path (the editor's `|width` is
-dropped); a file that isn't there is listed as missing. Rotli Web has no file
-paths, so it lists the vault-relative path.
+link) is first resolved (`attachmentRel`): percent-escapes undone (repeatedly;
+a malformed one, too many rounds, or a control character makes it unreadable),
+`storage:` expanded, backslashes read as slashes, and `.`/`..` resolved. One
+whose resolved path sits under `Secure notes/` or `wiki/_secure/` (any case:
+the Mac's disk ignores it), whose file name carries a secure keyword, or that
+can't be resolved (unreadable, or climbing out of the vault) refuses the whole
+handoff before anything is located: fail closed. Every other linked file is
+located by that same resolved path (`corpus_abs`, plus a stat), listed under
+**Attachments** with its absolute path, and its in-body link rewritten to that
+path (the editor's `|width` is dropped); a file that isn't there is listed as
+missing. Rotli Web has no file paths, so it lists the vault-relative path once
+the connected folder or browser vault confirms the file is there
+(`fileExists`); one it can't confirm is listed as missing, never as found. A
+Refined rewrite must keep every listed path, found and missing, as a whole
+token (`keepsPath`), or Basic is used instead.
 
 **Basic** (the default, and the fallback) is built from the note alone; no
 model runs. **Refined** sends the Basic handoff to the Librarian's model

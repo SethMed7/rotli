@@ -24,6 +24,10 @@ export const PARAGRAPH_INDENT_MAX = 2;
  * pipes, so neither matches. */
 export const DIVIDER_LINE = /^ {0,3}(-{3,}|\*{3,}|_{3,})\s*$/;
 
+/** An ATX heading written one to three spaces deep. CommonMark still reads it
+ * as a heading, so Tab leaves it alone rather than deepening it into prose. */
+const NEAR_HEADING = /^ {1,3}#{1,6}(\s|$)/;
+
 export type IndentRole = "nests" | "paragraph" | "fixed";
 
 /** How Tab treats a line outside fenced code. */
@@ -31,7 +35,13 @@ export function indentRoleOf(text: string): IndentRole {
   if (text.trim() === "") return "nests";
   const kind = parseBlock(text).kind;
   if (kind !== "para") return /^h\d$/.test(kind) ? "fixed" : "nests";
-  if (parseAlignedLine(text) || DIVIDER_LINE.test(text) || imageSourceSpan(text, 0)) return "fixed";
+  if (
+    NEAR_HEADING.test(text) ||
+    parseAlignedLine(text) ||
+    DIVIDER_LINE.test(text) ||
+    imageSourceSpan(text, 0)
+  )
+    return "fixed";
   return "paragraph";
 }
 
@@ -40,6 +50,13 @@ export const leadingIndent = (text: string): string => /^[ \t]*/.exec(text)?.[0]
 
 /** Columns of leading indent, a tab counting one level. */
 export const indentColumns = (text: string): number => leadingIndent(text).replace(/\t/g, INDENT_UNIT).length;
+
+/** The indent levels live preview draws for a paragraph line: one per two
+ * columns, and a lone leading space still reads as one level rather than flush. */
+export function paragraphIndentLevels(text: string): number {
+  const columns = indentColumns(text);
+  return columns === 0 ? 0 : Math.max(1, Math.floor(columns / 2));
+}
 
 /** The new leading indent after one Tab (tabs normalized to the two-space
  * grammar), or null when Tab leaves the line as it is. Fenced code is the

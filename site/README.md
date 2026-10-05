@@ -137,8 +137,11 @@ bun run preview  # serve the built dist/ locally
   listed on its index with a "Coming soon" label and no link, and has no
   page, Markdown twin, sitemap entry, or llms.txt line until the field comes
   off (`publishedWriting` vs `upcomingWriting`). Routes: `/resources/`, `/resources/<file>/`,
-  `/blog/`, `/blog/<file>/`, and `/about/` (which holds the name story and
-  links the `the-creation-of-rotli` post once it is published). Markdown code
+  `/blog/`, `/blog/<file>/`, and `/about/` (the maker's first-person story of
+  why rotli exists: notes first, people and AI note differently, the vault
+  you own beside the "stays local" quokka, no extra AI fee, house rules for
+  AI, then the name story and who makes it; it links the
+  `the-creation-of-rotli` post once it is published). Markdown code
   blocks are not syntax-highlighted: Shiki writes inline `style=` attributes,
   which the production CSP drops. Keep article images local.
 - **`/download/`** is where the header's Download button goes. It leads with
@@ -291,7 +294,7 @@ bun run preview  # serve the built dist/ locally
   through `.band-night` (the landing privacy band and the night frame on
   `/privacy/`); `IslandScene.astro` is the island by
   day (a faint vignette behind Make it yours, and the framed scene opening
-  `/about/`); the FAQ has the searching quokka among question cards. The
+  the `/about/` story, captioned with where the name comes from); the FAQ has the searching quokka among question cards. The
   closing invitation has no scene of its own (2026-10-02): the footer's
   quokka beach right below it is the page's one closing scene. `/privacy/` and
   `/about/` place their scene through `WritingPage`'s `scene` slot; `/about/`
@@ -353,7 +356,9 @@ bun run preview  # serve the built dist/ locally
   a post, run `bun run build:brand-images` from the repository root: it renders
   every card in Chromium with the bundled fonts and the network off, shrinks a
   title only as far as its three-line limit, fails if any text leaves the safe
-  area, touches the quokka or the lighthouse, or falls under 4.5:1 contrast, and
+  area or touches the quokka or the lighthouse, or if the title and line colors
+  fall under 4.5:1 on the solid warm ground (text over the pattern, sea, sand,
+  or underline is not sampled; check the contact sheet), and
   palette-compresses the PNGs (about 35 KB each). The same run writes the
   banners, profile pictures, and thumbnails described in `brand/README.md`, and
   a contact sheet of everything at `_review/brand-images/contact-sheet.png`

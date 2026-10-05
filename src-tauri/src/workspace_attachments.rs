@@ -6,9 +6,11 @@
 //!
 //! The note itself must pass the remote read gate first, so a secure note's
 //! attachments are never enumerated. Each file then takes the document lane's
-//! records gate (surface + secure-keyword name), and any text returned takes
-//! the egress secret check. Binaries are described (path, MIME type, size),
-//! never base64-encoded.
+//! records gate (surface + secure-keyword name) and the secure-home check; a
+//! linked note also takes `read_for_ai`, the gate a remote read of it would
+//! take. A refused file is answered with its link alone. Any text returned
+//! takes the egress secret check. Binaries are described (path, MIME type,
+//! size), never base64-encoded.
 
 use std::path::Path;
 
@@ -151,18 +153,31 @@ impl Workspace {
         local: bool,
     ) -> Value {
         let mut out = json!({ "source": source, "path": rel });
-        let stem = Path::new(rel).file_stem().and_then(|s| s.to_str()).unwrap_or_default();
-        if !self.store.agent_listable(rel) || self.store.secure_by_name(stem, rel) {
+        let mime = mime_of(rel);
+        // A refused target answers with its link and nothing else — no size,
+        // no absolute path, and no "missing" for a linked note, so the answer
+        // never tells existing secure notes from absent ones.
+        let refused = |mut out: Value| {
             out["available"] = json!(false);
             out["reason"] = json!("not available to agents");
-            return out;
+            out
+        };
+        let stem = Path::new(rel).file_stem().and_then(|s| s.to_str()).unwrap_or_default();
+        if !self.store.agent_listable(rel)
+            || self.store.secure_by_name(stem, rel)
+            || self.store.in_secure_home(rel)
+        {
+            return refused(out);
+        }
+        // a linked note passes the very gate a remote read of it would
+        if mime == "text/markdown" && self.store.read_for_ai(rel, false).is_err() {
+            return refused(out);
         }
         let Some(path) = self.store.guard_rel(rel).ok().filter(|path| path.is_file()) else {
             out["available"] = json!(false);
             out["reason"] = json!("missing");
             return out;
         };
-        let mime = mime_of(rel);
         let size = std::fs::metadata(&path).map(|meta| meta.len()).unwrap_or_default();
         out["available"] = json!(true);
         out["mime"] = json!(mime);
@@ -254,6 +269,54 @@ mod tests {
         // a remote caller gets no absolute path
         let remote = ws.attachments(&note.id, None, false).unwrap();
         assert!(remote["attachments"][0].get("absPath").is_none());
+    }
+
+    /// Review hold (PR #155): a public note must not hand an agent a secure
+    /// note it links — not its contents, not its size, not its absolute path.
+    #[test]
+    fn a_public_note_never_opens_a_secure_note_it_links() {
+        let temp = TempDir::new().unwrap();
+        let mut ws = test_workspace(&temp);
+        let secure = ws.store.create_with_policy("Secure notes", "# Private\n\nbody", true).unwrap();
+        let secure_rel = ws.store.resolve_note_rel(&secure.id).unwrap();
+        assert!(secure_rel.starts_with("Secure notes/"), "{secure_rel}");
+        let write = |rel: &str, text: &str| {
+            let path = temp.path().join(rel);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, text).unwrap();
+        };
+        // a memex secure home, a file beside the notes there, a public-folder
+        // note whose frontmatter says secure, one the detector catches, a clean one
+        write("wiki/_secure/vault.md", "# Vault\n\nplain words");
+        write("wiki/_secure/scan.pdf", "%PDF-1.4");
+        write("Inbox/flagged.md", "---\nsecure: true\n---\n# Flagged\n\nplain words");
+        write("Inbox/hot.md", "# Card\n\ncard 4242424242424242");
+        write("Inbox/plain.md", "# Plain\n\nplain words");
+        let note = ws
+            .create_note(
+                "Links",
+                &format!(
+                    "[s](<{secure_rel}>) [v](wiki/_secure/vault.md) [p](wiki/_secure/scan.pdf) [f](Inbox/flagged.md) [h](Inbox/hot.md) [g](Inbox/gone.md) [ok](Inbox/plain.md)"
+                ),
+                super::super::MAIN_ROOT,
+            )
+            .unwrap();
+
+        let out = ws.attachments(&note.id, Some(TEXT_DEFAULT_BYTES), true).unwrap();
+        let files = out["attachments"].as_array().unwrap();
+        assert_eq!(files.len(), 7);
+        // every refusal — a missing linked note included — reads the same and
+        // carries the link alone
+        for refused in &files[..6] {
+            assert_eq!(refused["available"], false, "{refused}");
+            assert_eq!(refused["reason"], "not available to agents", "{refused}");
+            let keys: Vec<&str> = refused.as_object().unwrap().keys().map(String::as_str).collect();
+            assert_eq!(keys.len(), 4, "only source, path, available, reason: {refused}");
+        }
+        assert_eq!(files[6]["available"], true);
+        assert_eq!(files[6]["kind"], "note");
+        assert!(files[6]["absPath"].as_str().unwrap().ends_with("Inbox/plain.md"));
+        assert!(files[6].get("text").is_none(), "a linked note is read through the note lane");
     }
 
     #[test]
