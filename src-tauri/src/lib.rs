@@ -19,6 +19,7 @@ mod app_settings;
 mod board;
 mod breve;
 mod chat;
+mod chat_registry;
 mod chat_window;
 mod clipboard_assets;
 mod compute;

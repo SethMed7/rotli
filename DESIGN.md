@@ -383,9 +383,15 @@ polish work.
   many steps before I can use the app"): **you** (an optional name and a
   theme, mode, and accent), **your vault** (an explicit decision), **the
   Librarian** (whether, as two cards, and only then where it thinks and on
-  which model), and **your shortcuts**. The vault step asks nothing about the
+  which model), and **your shortcuts**. The Librarian screen offers every
+  lane with what this Mac has for it (Ready, Checking…, Not installed, Not
+  signed in, No model yet); a lane that isn't ready can still be chosen, and
+  the sidebar's Librarian then wears a dot until it is set up, opening
+  Settings → Librarian with the step left. The vault step asks nothing about the
   Librarian; one screen owns that choice, whichever way the vault arrived. Then the thank-you
-  card, the tour, and a note beside Settings naming what else is there.
+  card (a thank-you banner with no badges for the choices made; Start now and
+  Take the tour on their own row), the tour, and a note beside Settings
+  naming what else is there.
   Everything else waits where it is used: the window behavior and the quokka's
   look in Settings, music in the sidebar player (shown from the first run,
   quiet until Play), and chat models the first time Chat has none. Skipping

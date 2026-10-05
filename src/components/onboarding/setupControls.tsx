@@ -4,6 +4,9 @@ import { formatChord } from "../../keys/chords";
 import { setSetupHandle } from "../../keys/handles";
 import { currentChord } from "../../keys/registry";
 
+/** What the Librarian does, in one line: the same on every screen that asks. */
+export const LIBRARIAN_ON_DESCRIPTION = "It files and tidies for you. Every action is logged and undoable.";
+
 export interface SetupOption<T extends string> {
   value: T;
   title: string;

@@ -123,6 +123,8 @@ export function OnboardingScenery({ welcome = false }: { welcome?: boolean }) {
 }
 
 const INTRO_MS = 1700;
+/** The longest an opening waits for its window to come in front. */
+const FRONT_WAIT_MS = 5000;
 
 function prefersReducedMotion(): boolean {
   return (
@@ -168,14 +170,20 @@ export function SceneIntro({
   useEffect(() => {
     if (live) return;
     const front = () => setLive(true);
-    window.addEventListener("focus", front, { once: true });
+    // a click or key means the window is in front, whatever focus says: a web
+    // view can sit in front without ever reporting focus (macOS 27)
+    const signals = ["focus", "pointerdown", "keydown"] as const;
+    for (const signal of signals) window.addEventListener(signal, front, { once: true });
     // focus may have landed between the first render and this effect
     const already = document.hasFocus() ? window.setTimeout(front) : 0;
+    // and it never holds the app: unseen this long, it gives way unplayed
+    const giveUp = window.setTimeout(onDone, FRONT_WAIT_MS);
     return () => {
-      window.removeEventListener("focus", front);
+      for (const signal of signals) window.removeEventListener(signal, front);
       window.clearTimeout(already);
+      window.clearTimeout(giveUp);
     };
-  }, [live]);
+  }, [live, onDone]);
   useEffect(() => {
     if (!live) return;
     const leave = window.setTimeout(() => setLeaving(true), (INTRO_MS - 520) * pace);

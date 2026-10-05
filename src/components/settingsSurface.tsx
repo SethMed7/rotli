@@ -11,7 +11,14 @@ import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useStat
 import { guideOs } from "../ai/connectorGuides";
 import { makeTauriHost } from "../ai/host";
 import { suggestPresets } from "../ai/hybrid";
-import { LIBRARIAN_LABELS, librarianCaption, librarianModelFor, librarianOptions } from "../ai/librarianLane";
+import {
+  LIBRARIAN_LABELS,
+  ORGANIZER_MODELS,
+  librarianCaption,
+  librarianLaneStatus,
+  librarianModelFor,
+  librarianSetupStep,
+} from "../ai/librarianLane";
 import {
   type HybridPreset,
   type LocalCatalogEntry,
@@ -1638,8 +1645,14 @@ function BrainPane() {
   const modelId = useUiStore((s) => s.organizerModelId);
   const setModelId = useUiStore((s) => s.setOrganizerModelId);
   const detections = useSetupDetection((s) => s.detections);
-  // the picker offers signed-in clients, so make sure the probes have run
+  const local = useSetupDetection((s) => s.local);
+  const localChecked = useSetupDetection((s) => s.localChecked);
+  // every lane is offered; the probes say which of them is ready
   useEffect(() => startSetupDetection(), []);
+  const setupStep = librarianSetupStep(
+    model,
+    librarianLaneStatus(model, { detections, local, localChecked }),
+  );
   const { lanes } = useConnectedCatalog(providers, readyFrom(detections));
   const quiet = useUiStore((s) => s.organizerQuietSecs);
   const setQuiet = useUiStore((s) => s.setOrganizerQuietSecs);
@@ -1714,10 +1727,15 @@ function BrainPane() {
           <span className="mplabel">Organizing model</span>
           <Seg
             value={model}
-            options={librarianOptions(detections, model).map((lane) => [lane, LIBRARIAN_LABELS[lane]])}
+            options={ORGANIZER_MODELS.map((lane) => [lane, LIBRARIAN_LABELS[lane]])}
             onPick={(m) => setModel(m)}
           />
           <p className="setnote">{librarianCaption(model, model === "local" || providers[model])}</p>
+          {setupStep && (
+            <p className="setnote err" role="status">
+              Not set up yet. {setupStep}
+            </p>
+          )}
           {model !== "local" && (
             <label className="setselect-row">
               <span>Model</span>

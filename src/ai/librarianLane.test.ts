@@ -6,13 +6,15 @@ import {
   describeFiledBy,
   librarianCaption,
   librarianModelFor,
+  librarianLaneStatus,
   librarianModelId,
-  librarianOptions,
+  librarianSetupStep,
   suggestedLibrarian,
 } from "./librarianLane";
 
 const signedIn = { installed: true, authenticated: true, version: "1" };
 const installedOnly = { installed: true, authenticated: false, version: "1" };
+const notInstalled = { installed: false, authenticated: false, version: null };
 
 test("Cursor is never a Librarian lane", () => {
   expect([...LIBRARIAN_LANES]).toEqual(["claude", "codex", "antigravity"]);
@@ -20,12 +22,43 @@ test("Cursor is never a Librarian lane", () => {
   expect(isLibrarianLane("antigravity")).toBe(true);
 });
 
-test("options are local plus signed-in clients, and never drop the current choice", () => {
-  expect(librarianOptions({}, "local")).toEqual(["local"]);
+const installedModel = { endpoint: "http://127.0.0.1:11435", registered: true };
+const fallbackModel = { endpoint: "http://127.0.0.1:11435", registered: false };
+const noEvidence = { detections: {}, local: [], localChecked: false };
+
+test("each lane says how far this Mac is, never hiding one", () => {
+  expect(librarianLaneStatus("local", noEvidence)).toBe("checking");
+  expect(librarianLaneStatus("claude", noEvidence)).toBe("checking");
+  const checked = {
+    detections: { claude: signedIn, codex: installedOnly, antigravity: notInstalled },
+    local: [installedModel],
+    localChecked: true,
+  };
+  expect(librarianLaneStatus("local", checked)).toBe("ready");
+  expect(librarianLaneStatus("claude", checked)).toBe("ready");
+  expect(librarianLaneStatus("codex", checked)).toBe("signed-out");
+  expect(librarianLaneStatus("antigravity", checked)).toBe("not-installed");
+});
+
+test("Rust's built-in fallback or a remote endpoint isn't a model on this Mac", () => {
+  const evidence = (model: { endpoint: string; registered: boolean }) => ({
+    detections: {},
+    local: [model],
+    localChecked: true,
+  });
+  expect(librarianLaneStatus("local", evidence(fallbackModel))).toBe("no-model");
   expect(
-    librarianOptions({ claude: signedIn, codex: installedOnly, antigravity: signedIn }, "local"),
-  ).toEqual(["local", "claude", "antigravity"]);
-  expect(librarianOptions({}, "codex")).toEqual(["local", "codex"]);
+    librarianLaneStatus("local", evidence({ endpoint: "https://api.example.com/v1", registered: true })),
+  ).toBe("no-model");
+  expect(librarianLaneStatus("local", { detections: {}, local: [], localChecked: true })).toBe("no-model");
+});
+
+test("only a lane that isn't ready has a step left", () => {
+  expect(librarianSetupStep("local", "ready")).toBeNull();
+  expect(librarianSetupStep("claude", "checking")).toBeNull();
+  expect(librarianSetupStep("local", "no-model")).toMatch(/^Add a local model in Settings → AI Models/);
+  expect(librarianSetupStep("codex", "signed-out")).toMatch(/^Sign in to ChatGPT/);
+  expect(librarianSetupStep("antigravity", "not-installed")).toMatch(/^Install Gemini/);
 });
 
 test("Gemini is suggested only when signed in and nothing else was chosen", () => {

@@ -104,7 +104,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The Librarian screen asks whether first** (Use the Librarian, or Not now),
   then which provider and model.
 - **The thank-you card has Take the tour and Start now**, so skipping the tour
-  is one click.
+  is one click. They sit on their own row now instead of squeezing onto two
+  lines, and the banner is a thank-you with your name and quokka, without
+  badges for your theme and quokka.
+- **The Librarian screen shows what this Mac has.** Each choice (On this Mac,
+  Claude, ChatGPT, Gemini) says whether it's ready, not installed, not signed
+  in, or has no model yet. You can choose one that isn't ready; the
+  Librarian in the sidebar then shows a dot and opens Settings → Librarian
+  with the step left.
 - **The rest waits where you use it.** Your quokka starts plain (dress it in
   Settings). The music player is in the sidebar from the start, quiet until
   you press Play; pick music from it or hide it. Chat offers its models,
@@ -242,6 +249,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Images dropped from Finder land where you drop them.** On Retina
   screens a dropped image went in about halfway up the note; Rotli now reads
   the drop position as the Mac reports it.
+- **Tell a friend does something you can see.** It opens a mail draft with
+  the invite (also copied, for Messages or anywhere else).
+- **The Shortcuts screen names the right place**: Settings → Keybindings.
+- **The opening scene can't hold the app any more.** On macOS 27 a window
+  in front could fail to tell Rotli so, and the opening waited forever over a
+  blank app. A click or key now starts it, and unseen it gives way on its own
+  within five seconds.
 - **Numbered lists stay numbered in Word documents.** Editing a numbered
   list saved it as bullets; Rotli now reads each list's kind from the file
   and keeps its numbering.

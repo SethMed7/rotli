@@ -5,8 +5,10 @@
 // pane's scenes): scene and word, no quokka. Never right after first
 // run's own intro, and not with Reduce motion on. It takes its time (the owner:
 // "happens way too fast") and holds still until the window is in front, so a
-// launch that starts behind other windows doesn't play it unseen. `?opening`
-// shows it in the browser twin (tests).
+// launch that starts behind other windows doesn't play it unseen; a click or
+// key counts as in front, and past five seconds unseen it gives way unplayed
+// (it once hung over a blank app on macOS 27). `?opening` shows it in the
+// browser twin (tests).
 
 import { useCallback, useEffect, useState } from "react";
 

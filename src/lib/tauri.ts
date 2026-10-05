@@ -463,6 +463,9 @@ export interface ChatModelInfo {
    * since server 0.3 every installed mlx model serves on demand per request.
    * Optional (absent on connected/preset synthetic models). */
   localDefault?: boolean;
+  /** Listed in the registry, so actually installed; false for the built-in
+   * fallback Rust offers before any model exists. */
+  registered?: boolean;
 }
 
 /** The on-device model bridge (chat + web). Same guard+normalize contract as

@@ -4,32 +4,23 @@
 // shortcuts worth knowing. The window, music, quokka, and chat models wait in
 // the app, where they're used: Settings, the sidebar player, and Chat.
 
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useState } from "react";
 
-import {
-  LIBRARIAN_LABELS,
-  librarianCaption,
-  librarianModelFor,
-  librarianOptions,
-  suggestedLibrarian,
-} from "../../ai/librarianLane";
-import { providerCatalog } from "../../ai/models";
 import { DEFAULT_QUOKKA_ACCESSORY_HUE, DEFAULT_QUOKKA_CUSTOM_HUE } from "../../brand/quokka";
 import { resolveChord, useBindingsStore } from "../../keys/bindings";
 import { chordFromEvent, formatChord, toAccelerator } from "../../keys/chords";
 import { allActions, conflictFor, getAction, rebind, setDispatchSuspended } from "../../keys/registry";
 import { DEFAULT_AMBIENT } from "../../lib/ambient";
 import { setDockVisible, setGlobalShortcut } from "../../lib/tauri";
-import { readyFrom, useConnectedCatalog } from "../../services/connectedModels";
-import { setLibrarianOn } from "../../services/librarianSwitch";
 import { useAmbient } from "../../state/ambient";
 import { DEFAULT_APPEARANCE } from "../../state/appearanceDefaults";
 import { ONBOARDING_STEP_NUMBER, ONBOARDING_TOTAL_STEPS, firstRunWindow } from "../../state/onboarding";
 import { flushSettingsNow } from "../../state/persist";
-import { startSetupDetection, useSetupDetection } from "../../state/setupDetection";
+import { startSetupDetection } from "../../state/setupDetection";
 import { THEME_FAMILY_PRESENTATIONS, type ThemeFamily, type ThemeSetting, useUiStore } from "../../state/ui";
 import { Character } from "../character";
 import { AccentRow } from "../settingsSurface";
+import { LibrarianScreen } from "./librarianStep";
 import { OnboardingIntro, OnboardingScenery, introWanted } from "./onboardingScenery";
 import { setupChoiceIndex, SetupBack, SetupChoiceGroup, SetupPrimary, useSetupHandle } from "./setupControls";
 import { SetupScrollCue, useStageScrollCue } from "./setupScrollCue";
@@ -248,120 +239,13 @@ function YouScreen({ advance }: { advance: () => void }) {
   );
 }
 
-function LibrarianScreen() {
-  const brainEnabled = useUiStore((state) => state.brainEnabled);
-  const organizerModel = useUiStore((state) => state.organizerModel);
-  const setOrganizerModel = useUiStore((state) => state.setOrganizerModel);
-  // detection began on the first screen; by now the answers are usually in
-  const detections = useSetupDetection((state) => state.detections);
-
-  // Gemini is proposed once (per mount) when it is signed in and nothing was
-  // chosen; picking any client below is the consent to use it
-  const proposed = useRef(false);
-  useEffect(() => {
-    if (proposed.current) return;
-    const proposal = suggestedLibrarian(detections, organizerModel);
-    if (proposal === organizerModel) return;
-    proposed.current = true;
-    setOrganizerModel(proposal);
-  }, [detections, organizerModel, setOrganizerModel]);
-
-  return (
-    <>
-      <h1 id="setup-title">Who files your notes?</h1>
-      <p className="setup-lede">
-        The Librarian keeps your Library tidy on its own schedule: it files new notes and suggests moves for
-        you to approve. It never rewrites what you wrote, and secure and locked notes never leave this Mac.
-      </p>
-      {/* the owner, 2026-10-01: whether first, then where it thinks */}
-      <SetupChoiceGroup
-        label="Librarian"
-        value={brainEnabled ? "on" : "off"}
-        onChange={(choice) => setLibrarianOn(choice === "on")}
-        options={[
-          {
-            value: "on",
-            title: "Use the Librarian",
-            description: "It files and tidies for you. Every action is logged and undoable.",
-          },
-          {
-            value: "off",
-            title: "Not now",
-            description: "You arrange your notes yourself. Turn it on anytime in Settings → Librarian.",
-          },
-        ]}
-      />
-      {brainEnabled && <LibrarianModel />}
-      <p className="setup-local-note">
-        Models for chat come the first time you open Chat. Everything else is in Settings → AI Models.
-      </p>
-    </>
-  );
-}
-
-/** Where the Librarian thinks: this Mac or a connected client, and its model. */
-function LibrarianModel() {
-  const providers = useUiStore((state) => state.aiProviders);
-  const setAiProvider = useUiStore((state) => state.setAiProvider);
-  const providerDefaults = useUiStore((state) => state.providerDefaults);
-  const organizerModel = useUiStore((state) => state.organizerModel);
-  const setOrganizerModel = useUiStore((state) => state.setOrganizerModel);
-  const organizerModelId = useUiStore((state) => state.organizerModelId);
-  const setOrganizerModelId = useUiStore((state) => state.setOrganizerModelId);
-  const detections = useSetupDetection((state) => state.detections);
-  const { lanes } = useConnectedCatalog(providers, readyFrom(detections));
-  return (
-    <>
-      <section className="setup-librarian" aria-labelledby="librarian-title">
-        <strong id="librarian-title">The Librarian thinks</strong>
-        <div className="setup-librarian-options" role="group" aria-label="Librarian model">
-          {librarianOptions(detections, organizerModel).map((lane) => (
-            <button
-              key={lane}
-              type="button"
-              className={`setup-model-action${organizerModel === lane ? " selected" : ""}`}
-              aria-pressed={organizerModel === lane}
-              onClick={() => {
-                setOrganizerModel(lane);
-                if (lane !== "local") setAiProvider(lane, true);
-              }}
-            >
-              {LIBRARIAN_LABELS[lane]}
-            </button>
-          ))}
-        </div>
-        {organizerModel !== "local" && (
-          <label className="setselect-row">
-            <span>Model</span>
-            <select
-              className="setselect"
-              aria-label="Librarian model"
-              value={librarianModelFor(organizerModel, organizerModelId, providerDefaults)}
-              onChange={(event) => setOrganizerModelId(event.currentTarget.value)}
-            >
-              {providerCatalog(organizerModel, lanes).map((entry) => (
-                <option key={entry.id} value={entry.id}>
-                  {entry.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <p className="setup-librarian-caption">
-          {librarianCaption(organizerModel, organizerModel === "local" || providers[organizerModel])}
-        </p>
-      </section>
-    </>
-  );
-}
-
 function ShortcutsScreen() {
   return (
     <>
       <h1 id="setup-title">Three shortcuts, yours to change.</h1>
       <p className="setup-lede">
         They work from any app. Keep these, or click one and press the keys you’d rather use. You can change
-        them anytime in Settings → Hotkeys.
+        them anytime in Settings → Keybindings.
       </p>
       <div className="setup-shortcuts">
         {HOTKEYS.map((hotkey) => (

@@ -141,12 +141,29 @@ test("the opening takes its time, and waits for the window to be in front", asyn
   const opening = page.getByTestId("app-opening");
   await page.waitForTimeout(3200);
   await expect(opening).toHaveClass(/is-waiting/);
-  // a click while it waits (the one that brings the window forward) doesn't skip it
-  await page.mouse.click(10, 10);
-  await expect(opening).toHaveClass(/is-waiting/);
   await page.evaluate(() => (window as { bringForward?: () => void }).bringForward?.());
   await expect(opening).not.toHaveClass(/is-waiting/);
   await expect(opening).toHaveCount(0, { timeout: 4000 });
+});
+
+test("an opening waiting to be seen never holds the app", async ({ page }) => {
+  // a window in front whose web view never reports focus (seen on macOS 27)
+  await page.addInitScript(() => {
+    Document.prototype.hasFocus = () => false;
+    window.addEventListener("focus", (event) => event.stopImmediatePropagation(), true);
+  });
+  await page.goto("/?opening");
+  const opening = page.getByTestId("app-opening");
+  await expect(opening).toHaveClass(/is-waiting/);
+  // the click that brings the window forward plays it rather than skipping it
+  await page.mouse.click(10, 10);
+  await expect(opening).not.toHaveClass(/is-waiting/);
+  await expect(opening).toBeVisible();
+  await expect(opening).toHaveCount(0, { timeout: 4000 });
+  // with no click or key at all it gives way on its own
+  await page.goto("/?opening");
+  await expect(page.getByTestId("app-opening")).toHaveClass(/is-waiting/);
+  await expect(page.getByTestId("app-opening")).toHaveCount(0, { timeout: 7000 });
 });
 
 test("no opening with Reduce motion on", async ({ page }) => {
