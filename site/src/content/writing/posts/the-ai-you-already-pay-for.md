@@ -26,7 +26,8 @@ used it in the past 30 days was:
 - **Claude:** 27.2%
 
 The same survey looked past AI. 59.9% of respondents said they had a paid subscription going unused each
-month, 2.6 of them on average, worth $26.79 a month together.
+month, 2.6 of them on average. It put the average value of those unused subscriptions at $26.79 a
+month.
 
 It also found that people like what they pay for. 90.3% of those with a paid AI plan said the paid
 version is better value than the free one.

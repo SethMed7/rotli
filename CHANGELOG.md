@@ -107,7 +107,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   boards build on, and says there is no extra AI plan to buy: rotli uses the
   one you already have, or a model on your Mac. Two new questions, "Do I
   have to pay for AI?" and "Is rotli just a notes app?", answer both. The
-  closing line and the privacy page's opening on AI are plainer.
+  privacy page's opening on AI is plainer.
 - **The privacy page and blog posts show how far through you are,** with the
   same "N% through" bar as the guides, so every article reads the same way.
 - **Long commands fit their boxes on rotli.co.** The Rotli Helper install
