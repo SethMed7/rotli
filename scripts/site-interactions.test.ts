@@ -1,6 +1,7 @@
 // The website's interactive rules, without a browser: the privacy passage's trigger and
-// crossfade (site/src/passage.ts), the resource reading meter (site/src/reading.ts), the 404 game
-// (site/src/runner/game.ts), and the footer scene's play (site/src/quokka/play.ts and the
+// crossfade (site/src/passage.ts), the theme studio's autoplay (site/src/themeCycle.ts), the
+// resource reading meter (site/src/reading.ts), the 404 game (site/src/runner/game.ts), and
+// the footer scene's play (site/src/quokka/play.ts, the person in human.ts, and the
 // traced-pose cleanup in art.ts). The pages wire these to the DOM; e2e/site/ proves the
 // wiring. Like site-agents.test.ts, the site's modules load through a computed path so
 // their types stay out of the root typecheck; only the functions under test are typed here.
@@ -100,6 +101,24 @@ let play: {
     nearPile: boolean;
   }): string;
 };
+interface Cycle {
+  total: number;
+  shown: number;
+  mode: "auto" | "held" | "pinned" | "off";
+  pinned: number;
+  nextAt: number;
+}
+let cycle: {
+  CYCLE_MS: number;
+  RESUME_MS: number;
+  createCycle(total: number, now: number, autoplay: boolean): Cycle;
+  tick(c: Cycle, now: number): Cycle;
+  hover(c: Cycle, index: number): Cycle;
+  leave(c: Cycle, now: number): Cycle;
+  pin(c: Cycle, index: number): Cycle;
+  resume(c: Cycle, now: number): Cycle;
+  wait(c: Cycle, now: number): number | null;
+};
 let art: {
   tracedPose(svg: string): { line: string; silhouette: string; transform: string; viewBox: number };
 };
@@ -110,6 +129,7 @@ beforeAll(async () => {
   game = (await import(site("runner", "game.ts"))) as typeof game;
   play = (await import(site("quokka", "play.ts"))) as typeof play;
   art = (await import(site("quokka", "art.ts"))) as typeof art;
+  cycle = (await import(site("themeCycle.ts"))) as typeof cycle;
 });
 
 describe("the privacy passage", () => {
@@ -228,6 +248,56 @@ describe("the privacy passage's crossfade", () => {
     expect(css).toContain(`--passage-ink-at: ${Math.round(passage.PASSAGE_MS * passage.INK_AT)}ms;`);
     for (const [share, lean] of passage.LEAN_KEYS)
       expect(css).toContain(`${share * 100}% { --passage-lean: ${lean}; }`);
+  });
+});
+
+describe("the theme studio's autoplay", () => {
+  test("steps through every environment at a calm pace, and round again", () => {
+    let c = cycle.createCycle(14, 0, true);
+    expect(cycle.tick(c, cycle.CYCLE_MS - 1).shown).toBe(0); // not before its time
+    expect(cycle.CYCLE_MS).toBeGreaterThanOrEqual(2500);
+    for (let i = 1; i <= 14; i++) {
+      c = cycle.tick(c, i * cycle.CYCLE_MS);
+      expect(c.shown).toBe(i % 14);
+    }
+    expect(cycle.wait(c, 14 * cycle.CYCLE_MS)).toBe(cycle.CYCLE_MS);
+  });
+
+  test("a hover shows that environment at once and holds; leaving goes on from there", () => {
+    let c = cycle.hover(cycle.createCycle(14, 0, true), 9);
+    expect(c).toMatchObject({ shown: 9, mode: "held" });
+    expect(cycle.tick(c, 99_999).shown).toBe(9); // held, however long
+    expect(cycle.wait(c, 0)).toBeNull();
+    c = cycle.leave(c, 10_000);
+    expect(c.mode).toBe("auto");
+    expect(cycle.tick(c, 10_000 + cycle.RESUME_MS - 1).shown).toBe(9);
+    expect(cycle.tick(c, 10_000 + cycle.RESUME_MS).shown).toBe(10);
+  });
+
+  test("a click pins it: the cycle stops, and a hover only previews", () => {
+    let c = cycle.pin(cycle.createCycle(14, 0, true), 4);
+    expect(cycle.tick(c, 99_999).shown).toBe(4);
+    c = cycle.hover(c, 11);
+    expect(c).toMatchObject({ shown: 11, mode: "pinned" });
+    expect(cycle.leave(c, 0).shown).toBe(4);
+    // The carousel's steps pin too, wrapping at either end.
+    expect(cycle.pin(c, -1).shown).toBe(13);
+    expect(cycle.pin(c, 14).shown).toBe(0);
+  });
+
+  test("never plays under reduced motion, but still follows a hover", () => {
+    const c = cycle.createCycle(14, 0, false);
+    expect(cycle.tick(c, 99_999).shown).toBe(0);
+    expect(cycle.wait(c, 0)).toBeNull();
+    const hovered = cycle.hover(c, 6);
+    expect(hovered).toMatchObject({ shown: 6, mode: "off" });
+    expect(cycle.tick(cycle.leave(hovered, 0), 99_999).shown).toBe(6);
+  });
+
+  test("coming back on screen waits a full step before moving", () => {
+    const c = cycle.resume(cycle.createCycle(14, 0, true), 50_000);
+    expect(cycle.tick(c, 50_000 + cycle.CYCLE_MS - 1).shown).toBe(0);
+    expect(cycle.tick(c, 50_000 + cycle.CYCLE_MS).shown).toBe(1);
   });
 });
 
