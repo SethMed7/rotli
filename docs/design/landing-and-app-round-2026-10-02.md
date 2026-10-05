@@ -222,6 +222,16 @@ against this log. Committed locally, not pushed.
 Owner: accept or reword the new copy (Overview lede, StatBand close, the two
 FAQ answers, the closing line).
 
+### Landing layout (2026-10-05)
+
+The owner found parts of the landing messy. `feat/site-landing-layout`
+restructures it from three reference patterns: three cards with drawn app
+pictures replace the Write/Keep/Ask trio; a tour ("A closer look") absorbs
+the ways-in chapter; and a closing panel sits above the footer beach. The
+audit, the new order, and the banner headline drafts are in
+[landing-layout-2026-10-05.md](landing-layout-2026-10-05.md). It is committed
+locally and not pushed.
+
 ### Owner decisions now
 
 - Push the updated branches and open #166 (website round) and #167

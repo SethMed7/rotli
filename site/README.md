@@ -47,12 +47,16 @@ wired into `verify` or CI (an owner decision: it would add a site build to
 the e2e lane), so run it by hand after changing those pages.
 
 Narrow widths are part of that proof: `e2e/site/narrow-layout.spec.ts`
-checks that no page scrolls sideways at 390 and 768 (inline code in the
-changelog breaks inside the column), that the theme studio's island never
-sits under its lede, that each Overview quokka sits beside its step on a
-tablet, and that the landing's smallest controls (the footnote marks, the
-404's other ways in) answer a 44px touch. Small controls grow their hit
-area under `(pointer: coarse)`, never their glyphs.
+checks that no page scrolls sideways at 390 and 768, and the landing at 320,
+1024, and 1920 too (inline code in the changelog breaks inside the column).
+It also checks that the theme studio's island never sits under its lede, that
+each Overview card puts its picture beside its words on a tablet, and that
+the landing's smallest controls (the footnote marks, the 404's other ways in)
+answer a 44px touch. Small controls grow their hit area under
+`(pointer: coarse)`, never their glyphs. `e2e/site/landing-layout.spec.ts`
+holds the landing's order and grounds, the cards, the tour (mouse, keyboard,
+phone, no script), and the closing panel, whose art never touches its words
+from 320 to 1920.
 
 ## Production details
 
@@ -101,29 +105,64 @@ area under `(pointer: coarse)`, never their glyphs.
   target, and the Launch Llama badge; the quokka scenery runs along its bottom
   edge.
 - **The landing page** (`src/components/Landing.astro`) only composes its
-  chapters from `src/components/landing/`: Hero (the product film) → Overview (Write. Keep. Ask.: three
-  steps with the app's quokkas, then one link to `/features/`)
-  → TwoKinds ("You write for yourself. AI reads differently.": the same
-  file as typed and as the Librarian files it, in two open columns on the band
-  with no card around either; the added frontmatter lines carry a "+" and a
-  tint, the body is marked unchanged, and `area` is a flat area as the memex
-  contract requires) → StatBand (two sourced figures, footnoted, beside a
-  bench by the sea where four idle AI tools, two asleep, are each handed a
-  note by the quokka; keep the sources and "never wasted" wording; the text
-  column ends on "Where these numbers come from", a link to the post
-  `the-ai-you-already-pay-for`, which sets out both surveys in full) → the
-  dev-only Experiments → PrivacyBrief (the night scene in Ocean Dark via
-  `.band-night` in `Base.astro`, three facts, and a link to `/privacy/`; while
-  it is the focal passage the whole page steps into its night, see "The
-  privacy passage") → Everywhere (Rotli Web and how Rotli Helper connects it, with
-  the copyable install line; only while `WEB_APP_ENABLED`) → Personal (the
-  theme studio, with a faint island vignette from 1180px up; narrower, its
-  left edge would reach into the lede, so it steps out) → Faq (with the
-  Overview's lede, two entries carry the owner's item 2 message: notes are the
-  foundation of a workspace, and rotli charges nothing for AI), which runs
-  straight into the footer and its quokka beach. There is no closing
-  invitation (cut 2026-10-05: it repeated the hero), on the landing page or
-  `/features/`. The landing page carries exactly one video. **`/features/`** has
+  chapters from `src/components/landing/`, in the order set out in
+  `docs/design/landing-layout-2026-10-05.md` (each thing said once; grounds
+  alternate plain and warm):
+  1. Hero (the product film; plain).
+  2. Overview ("Write it down. rotli puts it away."; warm): three cards, each
+     a small picture of the app drawn in HTML on the site's tokens (a rendered
+     note, the fields the Librarian filled with an area pill and ticks, a chat
+     reply that names the notes it came from), with the app's quokka standing
+     on the panel, then a heading and one sentence. The pictures are one image
+     each to assistive tech (`role="img"` and a label); no "sources" control is
+     drawn because the app has none. Its lede carries the owner's item 2
+     message, as does the FAQ.
+  3. StatBand (plain): two sourced figures, footnoted, beside a bench by the
+     sea where four idle AI tools, two asleep, are each handed a note by the
+     quokka. Keep the sources and the "never wasted" wording. The text column
+     ends on "Where these numbers come from", a link to the post
+     `the-ai-you-already-pay-for`, which sets out both surveys in full. It is
+     the one chapter whose headline has no lede: its figures are the lede.
+  4. TwoKinds ("You write for yourself. AI reads differently."; warm): the
+     same file as typed and as the Librarian files it, in two open columns on
+     the band with no card around either. The added frontmatter lines carry a
+     "+" and a tint, the body is marked unchanged, and `area` is a flat area,
+     as the memex contract requires.
+  5. Tour ("A closer look."; plain): a disclosure list with one part open at a
+     time. Each name is a `<button aria-expanded>` in an h3, with arrow keys,
+     Home, and End; pressing the open part leaves it open. The parts are Notes
+     and Markdown, Docs and Sheets (`DOCS_AND_SHEETS.status`), Chat with your
+     notes, Boards, the Librarian, and, only while `WEB_APP_ENABLED`, Rotli Web
+     and the Helper. That last part replaced the ways-in chapter (2026-10-05):
+     which browsers open the folder, why the others go through Rotli Helper,
+     the copyable install line, the Windows guide, and the "why Terminal" post.
+     From 960px, with script, the open part's preview fills a fixed-height
+     right column, so switching never moves the page. Narrower, and without
+     script, the preview sits inside the open part (without script every part
+     shows). Previews are `public/shots/` captures or drawings in the cards'
+     panel language. The tour never moves on its own. It ends on the one link
+     to `/features/`.
+  6. The dev-only Experiments.
+  7. Personal (the theme studio; warm), with a faint island vignette from
+     1180px up. Narrower, its left edge would reach into the lede, so it steps
+     out.
+  8. PrivacyBrief: the night scene in Ocean Dark via `.band-night` in
+     `Base.astro`, three facts, and a link to `/privacy/`. While it is the
+     focal passage the whole page steps into its night (see "The privacy
+     passage").
+  9. Faq (plain): two entries carry the owner's item 2 message. Notes are the
+     foundation of a workspace, and rotli charges nothing for AI.
+  10. Closing (plain, one framed panel on the warm colour). The two-tone
+      headline "Start with one note." / "It stays in your folder." has its
+      first line in full ink and the second muted. Under it are "Free, with no
+      account to make." and the hero's two ways in (`SiteActions`). The writing
+      quokka comes in from the right, cut off by the frame. Under 900px it
+      steps below the words, never onto them. It asks for a first step rather
+      than repeating the hero (the earlier invitation was cut for that). Right
+      under it is the footer's quokka beach.
+
+  `/features/` has no closing panel. The landing page carries exactly one
+  video. **`/features/`** has
   one display headline with the product film right under it (the hero's
   `FilmPlayer`, the same real Rotli Web session: the real product leads, not
   the illustrated story; visitors asked for it, 2026-10-05), then the chapters
@@ -441,16 +480,18 @@ area under `(pointer: coarse)`, never their glyphs.
 - `src/components/SiteHeader.astro` and `SiteFooter.astro` are the only header
   and footer; their shared styles live in
   `src/layouts/Base.astro`. Pages own only their sections.
-- The ways-in chapter (Mac app, Rotli Web, Rotli Helper) is three plain
-  columns with no screenshot.
+- Rotli Web and Rotli Helper are the tour's last part on the landing page
+  (only while `WEB_APP_ENABLED`): words, the copyable install line, and links,
+  with no screenshot.
 - The hero is the promise (a private workspace for your notes), the two ways
   in, where rotli runs (`PLATFORMS.availability`), and the product film right
   under them (`FilmPlayer.astro`, see "Films" below), on `public/hero-pattern.svg`
   (the social card's faint note, folder, checklist, and chat icons, masked so
   they fade out behind the headline). The words land in one short CSS
   entrance and the clay line (`.inked`, `public/ink-underline.svg`)
-  draws itself under "the filing." Apart from the film, the landing page
-  shows no capture; the theme studio does. `public/rotli-app-warm-light@3x.png` (the social
+  draws itself under "the filing." Besides the film, the landing page shows
+  captures in two places: the theme studio, and the tour's previews
+  (`public/shots/render-note`, `chat`, `board`). `public/rotli-app-warm-light@3x.png` (the social
   card) and the theme studio's `public/themes/` are lossless browser-demo captures (1280 × 800 logical
   viewport at 3× and 2× density), never a live vault. The coming-soon page
   uses the 4320 × 2700 `rotli-playground@3x.png`. The `@3x.png` filenames
@@ -500,8 +541,9 @@ area under `(pointer: coarse)`, never their glyphs.
   the `/about/` story, captioned with where the name comes from); the
   StatBand's bench by the sea and each resource article's
   `ResourceScene.astro` are the island by day too; the FAQ has the searching
-  quokka among question cards. The footer's quokka beach, right below the
-  FAQ, is the page's one closing scene. `/privacy/` and
+  quokka among question cards; the closing panel has the writing quokka.
+  The footer's quokka beach, right below that panel, is the page's one
+  closing scene. `/privacy/` and
   `/about/` place their scene through `WritingPage`'s `scene` slot; `/about/`
   uses the centered layout (`center`).
 - The landing privacy band is brief and points to `/privacy/`: the promise and

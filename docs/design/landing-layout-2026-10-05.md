@@ -114,7 +114,7 @@ them repeats another's example.
 
 Drafts, in the plain register the owner asked for:
 
-1. **Start with one note.** / *It stays a file in your folder.*
+1. **Start with one note.** / *It stays in your folder.*
 2. **Your notes, in your folder.** / *Start writing today.* (the owner's
    example of the register)
 3. **Write it down now.** / *rotli files it while you work.*

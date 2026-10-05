@@ -139,6 +139,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **rotli.co's "Hear when it's ready" sign-up is always in the footer.** Until
   the list opens, it says so and doesn't send your address anywhere. The
   footer's maker line links to Seth Medina on X.
+- **rotli.co's home page reads in a clearer order, and says each thing
+  once.** Three cards show what rotli does (write, keep, ask), each with a
+  small picture of the app in place of the old list of bullets. The AI
+  figures and the before-and-after follow, then "A closer look": pick a part
+  of rotli (notes, Docs and Sheets, chat, boards, the Librarian, Rotli Web)
+  and see it beside the list, or inside it on a phone. Rotli Web and the
+  Helper's install line now live there instead of in a section of their own.
+  The page ends on one panel, "Start with one note.", with the download, just
+  above the quokka beach.
 - **Setup is four screens.** Your name and theme, where your notes live, who
   files them (the Librarian), and your three shortcuts, which now say plainly
   that you can change them. Then the thank-you card and the tour, and a small
