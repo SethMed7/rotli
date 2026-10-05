@@ -58,6 +58,11 @@ test.describe("touch", () => {
     }
   });
 
+  test("a guide's breadcrumb answers a 44px-tall touch", async ({ page }) => {
+    await page.goto("/resources/getting-started/");
+    expect((await page.locator(".crumbs a").first().boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  });
+
   test("the 404's other ways in answer a 44px-tall touch", async ({ page }) => {
     await page.goto("/no-such-page/");
     for (const link of await page.locator(".also a").all()) {
