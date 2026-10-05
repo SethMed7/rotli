@@ -83,8 +83,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `rotli notes history` shows a note's AI edits; `rotli notes undo-ai-edit`
   undoes the last one only while the note is exactly as it left it. Renaming,
   trashing, and undoing follow the edit rule: only notes an AI made, or ones
-  you let AI edit, never locked or secure ones. `rotli open` and deep links
-  now reach notes in connected vaults.
+  you let AI edit, never locked or secure ones, checked again at the moment
+  of the move. A linked note an agent may not read (secure, in a secure
+  folder, or holding a secret) is listed with its link only, never its size
+  or where it is on your Mac. `rotli open` and deep links now reach notes in
+  connected vaults: Rotli switches to that vault, then opens the note. A
+  connected folder that isn't a vault is refused with a message saying so.
 - **Agents get the same tools** (development builds). `rotli mcp` gains
   `rotli_rename`, `rotli_note_attachments`, `rotli_trash_note`,
   `rotli_note_history`, and `rotli_undo_ai_edit`, and `rotli agent config`
