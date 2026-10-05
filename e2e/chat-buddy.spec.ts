@@ -36,11 +36,18 @@ test("Settings decorates the buddy with a live preview, and Chat wears it", asyn
   const strip = page.getByLabel("Automatic quokka expressions");
   await expect(strip.locator(".quokka-accessory-layer")).toHaveCount(4);
 
-  // Chat's own buddy wears the same decoration, in the pose of its moment
+  // Chat's own buddy wears the same decoration. This lane has no chat runtime,
+  // so Chat shows its "unavailable" moment (listening), not the welcome: the
+  // welcome, its one-buddy placement, and the reply arc are proven on the web
+  // lane through a fake Rotli Helper, and the pose rules in chatBuddyModel.test.ts.
   await page.getByRole("button", { name: "Back to notes", exact: true }).click();
   await page.getByRole("button", { name: "Chat", exact: true }).click();
   await page.locator(".sb-chatnew").click();
-  const buddy = page.locator(".chat-empty .chat-buddy");
+  const unavailable = page.locator(".chat-empty");
+  await expect(unavailable).toContainText("it runs in the app");
+  await expect(page.locator(".chat-welcome-character")).toHaveCount(0);
+  const buddy = unavailable.locator(".chat-buddy");
+  await expect(buddy).toHaveCount(1);
   await expect(buddy).toBeVisible();
   await expect(buddy).toHaveAttribute("data-pose", "listening");
   await expect(buddy).toHaveAttribute("style", /--quokka-fill: #6FA68B/i);

@@ -366,12 +366,15 @@ polish work.
   rail stays unboxed; accent and scale identify the active marker, while hover
   preview uses lower opacity only. The list stays beside the rail and inside
   its owning chat pane.
-- A thread has one chat buddy, on its own row at the live edge, never one per
-  message. It arrives once with at most one restrained hop, then only its pose
-  changes: thoughtful while a reply is queued or running, celebrating when a
-  reply lands in view, listening when the person spoke last and nothing runs,
-  and resting on a thread reopened later. Chat's no-runtime and no-vault states
-  hold the buddy too (listening, gentle attention). The policy lives in
+- A chat view has one chat buddy, never one per message: in the welcome while
+  the thread is empty (taking the live pose if a run is under way there), and
+  on its own row at the live edge once the thread has messages. It arrives
+  once with at most one restrained hop, then only its pose changes:
+  thoughtful while a reply is queued or running, celebrating when a reply
+  lands in view (a Stop that produced nothing is no landing), listening when
+  the person spoke last and nothing runs, and resting on a thread reopened
+  later. Chat's no-runtime and no-vault states hold the buddy too (listening,
+  gentle attention). The policy lives in
   `src/components/chat/chatBuddyModel.ts`.
 
 ## First-run setup
