@@ -60,6 +60,8 @@ let passage: {
   cubicBezier(x1: number, y1: number, x2: number, y2: number): (t: number) => number;
   leanAt(t: number): number;
   contrast(a: Rgb, b: Rgb): number;
+  rgb(hex: string): Rgb;
+  mix(a: Rgb, b: Rgb, k: number): Rgb;
   passageFrame(pair: PassagePair, t: number): { text: Rgb; ground: Rgb };
 };
 let reading: {
@@ -231,17 +233,16 @@ describe("the privacy passage's crossfade", () => {
   test("a primary button and its label switch together, so the label never fades through it", () => {
     const css = readFileSync(site("layouts", "Base.astro"), "utf8");
     expect(css).toMatch(/\.button\.primary \{\s*background: var\(--text\);\s*color: var\(--on-text\);/);
-    const rgb = (hex: string): Rgb =>
-      [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)) as unknown as Rgb;
-    expect(passage.contrast(rgb("#f8f2e9"), rgb("#3a3028"))).toBeGreaterThan(4.5);
-    expect(passage.contrast(rgb("#0e171d"), rgb("#e7f0f4"))).toBeGreaterThan(4.5);
+    const ratio = (a: string, b: string) => passage.contrast(passage.rgb(a), passage.rgb(b));
+    expect(ratio("#f8f2e9", "#3a3028")).toBeGreaterThan(4.5);
+    expect(ratio("#0e171d", "#e7f0f4")).toBeGreaterThan(4.5);
   });
 
   test("a plain crossfade, text fading with the ground, would vanish halfway", () => {
     const ease = passage.cubicBezier(...passage.GROUND_EASE);
     const mixHex = (pair: readonly [string, string], k: number): Rgb => {
-      const [a, b] = pair.map((hex) => [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)));
-      return [0, 1, 2].map((i) => a[i] + (b[i] - a[i]) * k) as unknown as Rgb;
+      const [a, b] = pair.map((hex) => passage.rgb(hex));
+      return passage.mix(a!, b!, k);
     };
     const naive = Array.from({ length: 101 }, (_, i) => {
       const k = ease(i / 100);
@@ -446,15 +447,15 @@ describe("the person on the footer beach", () => {
     expect(Math.max(...speeds)).toBeCloseTo(human.STRIDE.speed, 5); // a walk, never a run
     expect(speeds.at(-2)!).toBeLessThan(human.STRIDE.speed / 3); // and slows to arrive
     // Never past the spot, never back again.
-    for (let i = 1; i < path.length; i++) expect(path[i].x).toBeGreaterThanOrEqual(path[i - 1].x);
+    path.slice(1).forEach((walk, i) => expect(walk.x).toBeGreaterThanOrEqual(path[i]!.x));
     expect(Math.max(...path.map((w) => w.x))).toBe(900);
   });
 
   test("faces the way it walks, and keeps facing that way standing still", () => {
     const left = walkTo(500, 200);
-    expect(left[5].facing).toBe(-1);
+    expect(left[5]!.facing).toBe(-1);
     expect(left.at(-1)!.facing).toBe(-1);
-    expect(walkTo(200, 500)[5].facing).toBe(1);
+    expect(walkTo(200, 500)[5]!.facing).toBe(1);
   });
 
   test("a long frame (a hidden tab) never teleports it", () => {
