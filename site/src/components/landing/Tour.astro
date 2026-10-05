@@ -1,0 +1,639 @@
+---
+// A closer look: the deeper tour (the owner's reference, 2026-10-05: a list of parts on the
+// left, a large preview of the open one on the right). It is a disclosure list: each part's
+// name is a real <button aria-expanded> in a heading, exactly one part is open, and opening
+// another closes the one before; pressing the open one again leaves it open. Arrow keys,
+// Home, and End move between the names. On wide screens the open part's preview fills the
+// right column; on narrow screens, and without script, the preview sits inside the open part.
+// It never moves on its own: the page's three self-moving things (the theme studio, the
+// footer quokkas, the 404 game) are each the owner's call, and an accordion that changes while
+// someone reads it moves their text.
+//
+// Previews are real captures from public/shots/ (synthetic vaults; site/README.md says how
+// each was made) or small drawings in the app's language where no capture exists (Docs and
+// Sheets, the Librarian's filing, using describeAppliedAction's words "Filed in" and
+// "Tagged:"). The last part, Rotli Web and the Helper, replaces the ways-in chapter: its facts
+// are held to docs/architecture/web-vault-connection.md and
+// content/writing/resources/rotli-helper.md, and the command is the one Rotli Web's own setup
+// screen gives. It renders only while WEB_APP_ENABLED, as that chapter did.
+import { DOCS_AND_SHEETS, WEB_APP_PATH, site } from '../../site';
+
+type Item = {
+  id: string;
+  title: string;
+  status?: string;
+  line: string;
+  icon: string;
+};
+
+const items: Item[] = [
+  {
+    id: 'notes',
+    title: 'Notes and Markdown',
+    line: 'Tasks, tables, diagrams, and math render as you type, and Aa shows the plain Markdown underneath.',
+    icon: 'M6 3.5h8l4 4V20.5H6zM14 3.5v4h4M9 12h6M9 15.5h6M9 9h2',
+  },
+  {
+    id: 'docs',
+    title: 'Docs and Sheets',
+    status: DOCS_AND_SHEETS.status,
+    line: 'Open and edit Word documents and Excel workbooks in the Mac app. They stay ordinary Word and Excel files.',
+    icon: 'M4 4.5h16v15H4zM4 9.5h16M4 14.5h16M10 4.5v15',
+  },
+  {
+    id: 'chat',
+    title: 'Chat with your notes',
+    line: 'Ask what shipped or what you decided last week, and get an answer from your own notes.',
+    icon: 'M4.5 5.5h15v10h-8l-4.5 3.5v-3.5h-2.5z',
+  },
+  {
+    id: 'boards',
+    title: 'Boards',
+    line: 'Sketch on an Excalidraw canvas, saved as an ordinary .excalidraw file, on the Mac or in Rotli Web.',
+    icon: 'M3.5 6.5h7v6h-7zM15.5 13.5a3.5 3.5 0 1 0 0.01 0M10.5 9.5h3.5l2 2.5',
+  },
+  {
+    id: 'librarian',
+    title: 'The Librarian',
+    line: 'Turn it on and new notes get tags, a summary, links, and a place in your Library, with your words left as they are.',
+    icon: 'M3.5 6.5h6l2 2h9v11h-17zM9 14l2.2 2.2L15.5 12',
+  },
+  ...(site.webAppEnabled
+    ? [
+        {
+          id: 'web',
+          title: 'Rotli Web and the Helper',
+          line: 'The same editor in your browser, while your notes stay in a folder on your computer.',
+          icon: 'M12 3.5a8.5 8.5 0 1 0 0.01 0M3.5 12h17M12 3.5c-2.6 2.8-2.6 14.2 0 17M12 3.5c2.6 2.8 2.6 14.2 0 17',
+        },
+      ]
+    : []),
+];
+
+const filings = [
+  { note: 'Q4 launch plan', area: 'Projects', tags: 'launch, q4' },
+  { note: 'Call with Maya', area: 'People', tags: 'maya, demo' },
+  { note: 'Local-first reading list', area: 'Research', tags: 'reading' },
+];
+const sheet = [
+  ['', 'A', 'B', 'C'],
+  ['1', 'Item', 'Cost', 'Owner'],
+  ['2', 'Demo video', '1,200', 'Maya'],
+  ['3', 'Pricing page', '400', 'Jo'],
+  ['4', 'Launch ads', '2,000', 'Dana'],
+  ['5', 'Total', '3,600', ''],
+];
+const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open https://rotli.co/app/';
+---
+
+<section class="section tour" id="tour" aria-labelledby="tour-title">
+  <div class="wrap">
+    <header class="section-head">
+      <h2 class="section-title" id="tour-title">A closer look.</h2>
+      <p class="section-lede">Pick a part of the workspace to see what it does.</p>
+    </header>
+
+    <div class="tour-body" data-tour>
+      {
+        items.map((item, i) => (
+          <div class="tour-item" data-tour-item={item.id}>
+            <h3 class="tour-name">
+              <button
+                type="button"
+                id={`tour-button-${item.id}`}
+                aria-expanded={i === 0 ? 'true' : 'false'}
+                aria-controls={`tour-panel-${item.id}`}
+              >
+                <svg class="tour-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d={item.icon} />
+                </svg>
+                <span class="tour-title">{item.title}</span>
+                {item.status && <span class="status">{item.status}</span>}
+                <svg class="chevron" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="m9 6 6 6-6 6" />
+                </svg>
+              </button>
+            </h3>
+            <div class="tour-panel" id={`tour-panel-${item.id}`} role="region" aria-labelledby={`tour-button-${item.id}`} hidden={i !== 0}>
+              <p class="tour-line">{item.line}</p>
+              <div class:list={['tour-preview', `preview-${item.id}`]}>
+                {item.id === 'notes' && (
+                  <img src="/shots/render-note.webp" width="1512" height="1226" alt="A note called Launch week with tasks in three states, result buttons, a switch, a single choice, and a checklist panel" loading="lazy" decoding="async" />
+                )}
+                {item.id === 'chat' && (
+                  <img src="/shots/chat.webp" width="1800" height="850" alt="A rotli chat answering “What did I already ship, and what’s next on my Q4 launch plan?” with shipped, in-progress, and still-to-do lists drawn from the notes" loading="lazy" decoding="async" />
+                )}
+                {item.id === 'boards' && (
+                  <img src="/shots/board.webp" width="1500" height="470" alt="An Excalidraw board in rotli titled Launch map, with Capture, Note, and Library boxes joined by arrows" loading="lazy" decoding="async" />
+                )}
+                {item.id === 'docs' && (
+                  <div class="mock-pair" role="img" aria-label="A Word document called Launch brief beside an Excel workbook called Q4 budget, both open in rotli">
+                    <div class="mock doc">
+                      <div class="mock-head"><span>launch-brief.docx</span></div>
+                      <div class="doc-page">
+                        <p class="doc-h">Launch brief</p>
+                        <p>The Mac beta is out. Next is the demo video, then the pricing page.</p>
+                        <p class="doc-h2">Who does what</p>
+                        <p>Maya records the demo. Jo updates pricing.</p>
+                      </div>
+                    </div>
+                    <div class="mock sheet">
+                      <div class="mock-head"><span>q4-budget.xlsx</span></div>
+                      <p class="formula"><b>fx</b> =SUM(B2:B4)</p>
+                      <table>
+                        <tbody>
+                          {sheet.map((row, r) => (
+                            <tr class:list={{ 'sheet-letters': r === 0, total: r === sheet.length - 1 }}>
+                              {row.map((cell, c) => (c === 0 || r === 0 ? <th>{cell}</th> : <td class:list={{ num: c === 2 && r > 1 }}>{cell}</td>))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+                {item.id === 'librarian' && (
+                  <div class="mock filing" role="img" aria-label="Three new notes, each filed by the Librarian into a Library area and tagged">
+                    <div class="mock-head"><span>Library</span></div>
+                    <ol>
+                      {filings.map((filing) => (
+                        <li>
+                          <span class="filing-note">{filing.note}</span>
+                          <span class="filing-what">
+                            <span class="pill">Filed in {filing.area}</span>
+                            <span class="filing-tags">Tagged: {filing.tags}</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                    <p class="mock-foot">Every note keeps its words exactly as you wrote them.</p>
+                  </div>
+                )}
+                {item.id === 'web' && (
+                  <div class="web">
+                    <p>
+                      Chrome, Edge, and Arc open the folder directly. Firefox, Zen, and Brave can’t, and no browser tab
+                      can start the AI tools you already have, so Rotli Web talks to Rotli Helper on your own computer.
+                      It serves the one folder you choose and answers only rotli.co. Safari and phones aren’t supported
+                      yet. Run this once in Terminal:
+                    </p>
+                    <figure class="terminal">
+                      <figcaption>
+                        <b>Terminal</b>
+                        <span>Mac and Linux</span>
+                        <button type="button" class="copy" data-copy={command} hidden>Copy</button>
+                      </figcaption>
+                      <pre><code><span class="prompt" aria-hidden="true">$ </span>{command}</code></pre>
+                    </figure>
+                    <p class="more">On Windows, <a href="/resources/rotli-helper/">the Helper guide</a> has the PowerShell line.</p>
+                    <p class="links">
+                      <a href={WEB_APP_PATH}>Open Rotli Web <span aria-hidden="true">→</span></a>
+                      <a href="/blog/rotli-web-and-your-mac/">Why it goes through Terminal <span aria-hidden="true">→</span></a>
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))
+      }
+    </div>
+
+    <p class="tour-more">
+      <a class="button secondary" href="/features/">See every feature</a>
+    </p>
+  </div>
+</section>
+
+<script>
+  // One part open at a time. Opening a part closes the others; the open part stays open when
+  // pressed again, so the preview is never empty. Arrow keys, Home, and End move focus.
+  const tour = document.querySelector<HTMLElement>('[data-tour]');
+  const buttons = tour ? [...tour.querySelectorAll<HTMLButtonElement>('.tour-name button')] : [];
+  const panelOf = (button: HTMLButtonElement) => document.getElementById(button.getAttribute('aria-controls') ?? '');
+  const open = (target: HTMLButtonElement) => {
+    for (const button of buttons) {
+      const isTarget = button === target;
+      button.setAttribute('aria-expanded', String(isTarget));
+      const panel = panelOf(button);
+      if (panel) panel.hidden = !isTarget;
+    }
+  };
+  buttons.forEach((button, i) => {
+    button.addEventListener('click', () => open(button));
+    button.addEventListener('keydown', (event) => {
+      const next =
+        event.key === 'ArrowDown'
+          ? buttons[(i + 1) % buttons.length]
+          : event.key === 'ArrowUp'
+            ? buttons[(i - 1 + buttons.length) % buttons.length]
+            : event.key === 'Home'
+              ? buttons[0]
+              : event.key === 'End'
+                ? buttons[buttons.length - 1]
+                : null;
+      if (!next) return;
+      event.preventDefault();
+      next.focus();
+    });
+  });
+
+  // The Helper's install line: the Copy button stays hidden until script runs, so without it
+  // the command is still plain, selectable text.
+  document.querySelectorAll<HTMLButtonElement>('.tour button.copy[data-copy]').forEach((button) => {
+    button.hidden = false;
+    let timer: number | undefined;
+    button.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(button.dataset.copy ?? '');
+        button.textContent = 'Copied';
+      } catch {
+        button.textContent = 'Press ⌘C';
+        const code = button.closest('figure')?.querySelector('code');
+        if (code) getSelection()?.selectAllChildren(code);
+      }
+      clearTimeout(timer);
+      timer = window.setTimeout(() => (button.textContent = 'Copy'), 2000);
+    });
+  });
+</script>
+
+<style>
+  /* The list: one hairline between parts, the open one's name in full ink. */
+  .tour-item {
+    border-top: 1px solid var(--border-strong);
+  }
+  .tour-item:last-child {
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .tour-name {
+    margin: 0;
+    font-size: inherit;
+  }
+  .tour-name button {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    width: 100%;
+    min-height: 64px;
+    padding: 0.7rem 0.25rem;
+    border: 0;
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-align: left;
+    cursor: pointer;
+  }
+  .tour-name button:hover,
+  .tour-name button[aria-expanded='true'] {
+    color: var(--text);
+  }
+  .tour-name button:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: -2px;
+    border-radius: 0.4rem;
+  }
+  .tour-icon {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    padding: 8px;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.6rem;
+  }
+  [aria-expanded='true'] .tour-icon {
+    border-color: var(--accent);
+    background: var(--tint);
+    color: var(--accent-text);
+  }
+  .tour-title {
+    min-width: 0;
+  }
+  .status {
+    flex: none;
+    padding: 0.05rem 0.5rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
+  .chevron {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin-left: auto;
+    transition: transform 160ms ease-out;
+  }
+  [aria-expanded='true'] .chevron {
+    transform: rotate(90deg);
+  }
+  .tour-panel[hidden] {
+    display: none;
+  }
+  /* Without script nothing could open a part, so every part shows, stacked. */
+  :global(html:not(.js)) .tour-panel[hidden] {
+    display: block;
+  }
+  .tour-line {
+    max-width: 34rem;
+    margin: 0;
+    padding: 0 0.25rem 1.25rem calc(40px + 1.15rem);
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+
+  /* The preview: a warm frame; captures sit on their own editor paper. */
+  .tour-preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 0 1.5rem;
+    padding: clamp(1rem, 3vw, 2rem);
+    border-radius: var(--radius-frame);
+    background: var(--surface-2);
+  }
+  .tour-preview img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.7rem;
+    background: var(--capture-ground);
+  }
+
+  /* Drawn previews share one panel language with the cards above. */
+  .mock {
+    min-width: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.7rem;
+    background: var(--surface);
+    font-size: 0.88rem;
+    line-height: 1.45;
+  }
+  .mock-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.6rem 0.9rem;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+  }
+  .mock-head > span:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mock-pair {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    gap: 1rem;
+    align-items: start;
+    width: 100%;
+  }
+  .doc-page {
+    padding: 0.9rem 1rem 1.1rem;
+  }
+  .doc-page p {
+    margin: 0 0 0.55rem;
+  }
+  .doc-h {
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+  .doc-h2 {
+    margin-top: 0.85rem !important;
+    font-weight: 600;
+  }
+  .formula {
+    margin: 0;
+    padding: 0.4rem 0.9rem;
+    border-bottom: 1px solid var(--border);
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+  }
+  .formula b {
+    margin-right: 0.5rem;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+  th,
+  td {
+    padding: 0.32rem 0.5rem;
+    border: 1px solid var(--border);
+    text-align: left;
+    white-space: nowrap;
+  }
+  th {
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-weight: 600;
+    text-align: center;
+  }
+  tr:first-child th {
+    border-top: 0;
+  }
+  tr > :first-child {
+    border-left: 0;
+  }
+  tr > :last-child {
+    border-right: 0;
+  }
+  tr:last-child > * {
+    border-bottom: 0;
+  }
+  .num {
+    text-align: right;
+  }
+  .total td {
+    font-weight: 600;
+  }
+  .filing {
+    width: 100%;
+    max-width: 34rem;
+  }
+  .filing ol {
+    margin: 0;
+    padding: 0 0.9rem;
+    list-style: none;
+  }
+  .filing li {
+    display: grid;
+    gap: 0.35rem;
+    padding: 0.75rem 0;
+  }
+  .filing li + li {
+    border-top: 1px solid var(--border);
+  }
+  .filing-note {
+    font-weight: 600;
+  }
+  .filing-what {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.75rem;
+  }
+  .pill {
+    padding: 0.08rem 0.6rem;
+    border-radius: 999px;
+    background: var(--tint);
+    color: var(--accent-text);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .filing-tags {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+  }
+  .mock-foot {
+    margin: 0;
+    padding: 0.6rem 0.9rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+
+  /* Rotli Web and the Helper: words, the install line, and where to go next. */
+  .preview-web {
+    align-items: stretch;
+  }
+  .web {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+  }
+  .web p {
+    margin: 0;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+  .web a {
+    color: var(--accent-text);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .web a:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+  .web .more {
+    margin-top: 0.9rem;
+  }
+  .web .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 1.5rem;
+    margin-top: 0.25rem;
+  }
+  .links a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 44px;
+  }
+  .terminal {
+    margin: 1.1rem 0 0;
+    overflow: hidden;
+    border-radius: var(--radius-frame);
+    background: var(--deep);
+    color: var(--deep-text);
+  }
+  .terminal figcaption {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.35rem 0.5rem 0.35rem 1rem;
+    border-bottom: 1px solid var(--deep-border);
+    font-size: 0.86rem;
+  }
+  .terminal figcaption span {
+    flex: 1;
+    color: var(--deep-muted);
+  }
+  .copy {
+    min-width: 5.5rem;
+    min-height: 44px;
+    padding: 0 0.9rem;
+    border: 1px solid var(--deep-border);
+    border-radius: 0.5rem;
+    background: transparent;
+    color: var(--deep-text);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .copy:hover {
+    border-color: var(--deep-muted);
+  }
+  .copy:focus-visible {
+    outline: 2px solid var(--tint);
+    outline-offset: 2px;
+  }
+  .terminal pre {
+    margin: 0;
+    padding: 0.9rem 1rem 1rem;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.84rem;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .prompt {
+    color: var(--tint);
+    user-select: none;
+  }
+
+  .tour-more {
+    margin: clamp(2.5rem, 5vw, 3.5rem) 0 0;
+  }
+
+  /* Wide screens, with script: the list on the left, the open part's preview filling the right
+     column at one fixed height, so switching parts never moves the page. */
+  @media (min-width: 960px) {
+    :global(.js) .tour-body {
+      --tour-gap: clamp(2rem, 4vw, 4rem);
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+      align-content: start;
+      column-gap: var(--tour-gap);
+      min-height: 34rem;
+    }
+    :global(.js) .tour-item {
+      grid-column: 1;
+    }
+    :global(.js) .tour-preview {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: calc((100% - var(--tour-gap)) * 7 / 12);
+      margin: 0;
+    }
+    :global(.js) .tour-preview img {
+      width: auto;
+      max-height: 100%;
+    }
+  }
+  @media (max-width: 620px) {
+    .tour-line {
+      padding-left: 0.25rem;
+    }
+    .mock-pair {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>

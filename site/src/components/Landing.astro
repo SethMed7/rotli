@@ -1,18 +1,18 @@
 ---
-// The launch page: the product film in the hero (the app itself, at work) and
-// the footer's quokka beach to close on. Between them, in order: what rotli does
-// (three steps, the full tour and the 30-second episodes are /features/), why the
-// Librarian exists (two kinds of notes, the AI you already pay for), privacy in
-// brief, the ways in, make it yours, and questions, which run straight into the
-// footer (the closing invitation was cut on 2026-10-05: it repeated the hero). Base.astro owns the tokens
-// and the section grammar.
+// The launch page, in the order of docs/design/landing-layout-2026-10-05.md. The hero (the
+// product film) says what rotli is; three cards say what it does (write, keep, ask); the
+// StatBand and TwoKinds say why the Librarian exists (the AI you already pay for is idle, and
+// it can file your notes without touching your words); the tour shows each part up close and
+// holds Rotli Web and the Helper; then make it yours, privacy in brief, and questions, right
+// above the footer's quokka beach. Grounds
+// alternate plain and warm, with the privacy night between. Base.astro owns the tokens and
+// the section grammar.
 import { landingGraph } from '../agents';
 import { ogImage } from '../og';
 import Base from '../layouts/Base.astro';
 import { site } from '../site';
 import SiteFooter from './SiteFooter.astro';
 import SiteHeader from './SiteHeader.astro';
-import Everywhere from './landing/Everywhere.astro';
 import Experiments from './landing/Experiments.astro';
 import Faq from './landing/Faq.astro';
 import Hero from './landing/Hero.astro';
@@ -21,6 +21,7 @@ import StatBand from './landing/StatBand.astro';
 import TwoKinds from './landing/TwoKinds.astro';
 import Personal from './landing/Personal.astro';
 import PrivacyBrief from './landing/PrivacyBrief.astro';
+import Tour from './landing/Tour.astro';
 ---
 
 <Base noindex={!site.indexable} structuredData={landingGraph()} markdownPath="/index.md" {...ogImage('home')}>
@@ -28,12 +29,12 @@ import PrivacyBrief from './landing/PrivacyBrief.astro';
   <main id="content">
     <Hero />
     <Overview />
-    <TwoKinds />
     <StatBand />
+    <TwoKinds />
+    <Tour />
     <Experiments />
-    <PrivacyBrief />
-    <Everywhere />
     <Personal />
+    <PrivacyBrief />
     <Faq />
   </main>
   <SiteFooter />
