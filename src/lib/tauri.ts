@@ -1413,6 +1413,8 @@ export function corpusWriteAi(
 export interface CorpusAiRead {
   body: string;
   revision: string;
+  /** The editor's copy of the note (desktop only). */
+  editor?: string;
 }
 
 export async function corpusReadAiVersioned(

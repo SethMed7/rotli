@@ -2372,8 +2372,12 @@ pub struct CorpusWriteResult {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CorpusAiRead {
+    /// The whole file a model may read (frontmatter included).
     pub body: String,
     pub revision: String,
+    /// The same note as the editor holds it — what `/ai` checks its view
+    /// against and what `corpus_insert_ai` measures an insertion on.
+    pub editor: String,
 }
 
 /// A memex's board lane: where a board is born when the caller's folder isn't a
@@ -4095,6 +4099,17 @@ impl CorpusStore {
         model_is_local: bool,
         expected_revision: &str,
     ) -> Result<CorpusWriteResult, String> {
+        self.write_for_ai_as(id_or_rel, body, model_is_local, expected_revision, AiWrite::Replace)
+    }
+
+    pub(crate) fn write_for_ai_as(
+        &mut self,
+        id_or_rel: &str,
+        body: &str,
+        model_is_local: bool,
+        expected_revision: &str,
+        mode: AiWrite<'_>,
+    ) -> Result<CorpusWriteResult, String> {
         let rel = self.resolve_note_rel(id_or_rel)?;
         self.writable(&rel)?;
         let path = self.abs(&rel);
@@ -4112,8 +4127,21 @@ impl CorpusStore {
                         .into(),
                 );
             }
-            if let Some(refusal) = crate::ai_edit_policy::body_edit(&fm.foreign).refusal() {
+            let refusal = match mode {
+                AiWrite::Replace => crate::ai_edit_policy::body_edit(&fm.foreign).refusal(),
+                AiWrite::Insert(_) => crate::ai_edit_policy::consented_insert_refusal(&fm.foreign),
+            };
+            if let Some(refusal) = refusal {
                 return Err(refusal.into());
+            }
+            if let AiWrite::Insert(inserted) = mode {
+                // measured against the editor body the read seam hands out
+                if !crate::ai_edit_policy::is_pure_insertion(ai_journal::editor_text(&text), body, inserted) {
+                    return Err(
+                        "The note changed while the answer was ready, so it wasn't inserted. Try again."
+                            .into(),
+                    );
+                }
             }
             let target_secure = fm.foreign.iter().any(|l| secure_field(l) == Some(true))
                 || looks_secure(target_body);
@@ -4129,7 +4157,10 @@ impl CorpusStore {
             let landed_rel = self.path_of(id_or_rel)?;
             let landed = fs::read(self.guard_rel(&landed_rel)?)
                 .map_err(|e| format!("read saved note {landed_rel}: {e}"))?;
-            let editor = ai_journal::AiEditor::chat(model_is_local);
+            let editor = match mode {
+                AiWrite::Replace => ai_journal::AiEditor::chat(model_is_local),
+                AiWrite::Insert(_) => ai_journal::AiEditor::inline(model_is_local),
+            };
             self.journal_ai_edit(&meta.id, &landed_rel, &text, &landed, remote_visible, &editor);
             Ok(CorpusWriteResult {
                 meta,
@@ -8279,6 +8310,7 @@ pub fn corpus_read_ai(
         let body = s.read_for_ai(&rel, model_is_local)?;
         Ok(CorpusAiRead {
             revision: crate::fsutil::revision(body.as_bytes()),
+            editor: ai_journal::editor_text(&body).to_string(),
             body,
         })
     })
@@ -8798,9 +8830,11 @@ pub mod rules_store;
 /// The prompt-injection evals — a fully cooperating, fully compromised caller
 /// driven against the real gates. Kept in its own file because it is a
 /// deliverable, not a unit test (docs/architecture/egress-threat-model.md).
-/// The AI edit control on the store: the person's grant (2026-09-29).
+/// The AI edit control on the store: the person's grant (2026-09-29) and the
+/// `/ai` insert lane (2026-10-05).
 #[path = "corpus_ai_edit.rs"]
-mod ai_edit;
+pub mod ai_edit;
+pub(crate) use ai_edit::AiWrite;
 /// Every AI body write's journal row (`.rotli/ai-edit-journal.jsonl`).
 #[path = "corpus_ai_journal.rs"]
 pub(crate) mod ai_journal;

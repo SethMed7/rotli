@@ -233,6 +233,7 @@ const tauriAllowlist = new Set([
   "src/lib/noteProtection.ts",
   "src/lib/agentBridge.ts",
   "src/lib/aiFiles.ts",
+  "src/lib/aiInsert.ts",
   "src/lib/pinnedSiteShell.ts",
   "src/lib/quitFlush.ts",
   "src/lib/tauri.ts",

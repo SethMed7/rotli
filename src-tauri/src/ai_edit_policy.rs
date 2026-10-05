@@ -99,6 +99,40 @@ impl BodyEdit {
     }
 }
 
+/// A consented insertion (2026-10-05, `/ai`): the person read the model's text
+/// and chose Insert, so it may land in a note they wrote without the standing
+/// grant. Their consent covers only the default — a deliberate `ai_edit:
+/// false` still refuses, and a locked note refuses every AI.
+pub(crate) fn consented_insert_refusal<S: AsRef<str>>(foreign: &[S]) -> Option<&'static str> {
+    match body_edit(foreign) {
+        BodyEdit::Allowed | BodyEdit::PersonWritten => None,
+        verdict => verdict.refusal(),
+    }
+}
+
+/// Whether `after` is `before` with exactly `text` inserted at one place —
+/// nothing of the person's removed or changed. Byte-exact, on char
+/// boundaries; an empty insertion is not one.
+pub(crate) fn is_pure_insertion(before: &str, after: &str, text: &str) -> bool {
+    if text.is_empty() || after.len() != before.len() + text.len() {
+        return false;
+    }
+    let (b, a) = (before.as_bytes(), after.as_bytes());
+    let prefix = b.iter().zip(a).take_while(|(x, y)| x == y).count();
+    let suffix = b.iter().rev().zip(a.iter().rev()).take_while(|(x, y)| x == y).count();
+    // the split point i satisfies before[..i] == after[..i] (i <= prefix) and
+    // before[i..] == after[i + len..] (i >= before.len() - suffix)
+    let low = before.len().saturating_sub(suffix);
+    (low..=prefix.min(before.len())).any(|i| {
+        before.is_char_boundary(i)
+            && after.is_char_boundary(i)
+            && after.is_char_boundary(i + text.len())
+            && &after[i..i + text.len()] == text
+            && after[..i] == before[..i]
+            && after[i + text.len()..] == before[i..]
+    })
+}
+
 /// The one body-edit verdict, from a note's foreign frontmatter lines.
 pub(crate) fn body_edit<S: AsRef<str>>(foreign: &[S]) -> BodyEdit {
     if foreign
@@ -169,5 +203,35 @@ mod tests {
             let line = creator.line();
             assert_eq!(created_by_field(&line).and_then(Creator::parse), Some(creator));
         }
+    }
+
+    #[test]
+    fn a_consented_insertion_lands_in_a_person_written_note_but_never_past_a_no() {
+        assert_eq!(consented_insert_refusal(&["tags: []"]), None);
+        assert_eq!(consented_insert_refusal(&["created_by: chat"]), None);
+        assert_eq!(consented_insert_refusal(&["ai_edit: true"]), None);
+        assert!(consented_insert_refusal(&["ai_edit: false"]).is_some());
+        assert!(consented_insert_refusal(&["locked: true", "ai_edit: true"]).is_some());
+    }
+
+    #[test]
+    fn only_a_pure_insertion_of_the_accepted_text_counts() {
+        let before = "# Note\n\nOne.\nTwo.\n";
+        // at the start, in the middle, at the end
+        assert!(is_pure_insertion(before, &format!("X\n{before}"), "X\n"));
+        assert!(is_pure_insertion(before, "# Note\n\nOne.\nNEW\nTwo.\n", "NEW\n"));
+        assert!(is_pure_insertion(before, &format!("{before}tail"), "tail"));
+        // text that repeats what follows the caret still finds its place
+        assert!(is_pure_insertion("aaa", "aaaa", "a"));
+        // a deletion, a replacement, a different text, an empty insertion
+        assert!(!is_pure_insertion(before, "# Note\n\nTwo.\n", "One.\n"));
+        assert!(!is_pure_insertion(before, "# Note\n\nOne!\nNEW\nTwo.\n", "NEW\n"));
+        assert!(!is_pure_insertion(before, "# Note\n\nOne.\nNEW\nTwo.\n", "OLD\n"));
+        assert!(!is_pure_insertion(before, before, ""));
+        // multi-byte text around and inside the insertion
+        assert!(is_pure_insertion("café ☕", "café → ☕", "→ "));
+        // the split falls between characters, never inside one
+        assert!(is_pure_insertion("éé", "ééé", "é"));
+        assert!(!is_pure_insertion("éé", "éxé", "é"));
     }
 }

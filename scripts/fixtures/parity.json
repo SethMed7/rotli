@@ -465,6 +465,46 @@
         }
       ]
     },
+    "consentedInsertCases": {
+      "sourceOfTruth": "src/lib/aiEditPolicy.ts consentedInsertRefusal ↔ src-tauri/src/ai_edit_policy.rs consented_insert_refusal (behavioral: a /ai insertion the person accepted lands under the default, never past a lock or an explicit no)",
+      "value": [
+        {
+          "fields": [],
+          "refused": false
+        },
+        {
+          "fields": [
+            "created_by: chat"
+          ],
+          "refused": false
+        },
+        {
+          "fields": [
+            "ai_edit: true"
+          ],
+          "refused": false
+        },
+        {
+          "fields": [
+            "ai_edit: false"
+          ],
+          "refused": true
+        },
+        {
+          "fields": [
+            "locked: true"
+          ],
+          "refused": true
+        },
+        {
+          "fields": [
+            "locked: true",
+            "ai_edit: true"
+          ],
+          "refused": true
+        }
+      ]
+    },
     "noteDateStamps": {
       "sourceOfTruth": "behavioral: docs/architecture/memex-data-contract.md (Metadata ownership) — src/memex/dates.ts stampToMs + today ↔ src-tauri/src/note_dates.rs stamp_to_ms + day_stamp (independent implementations, fixture-aligned answers; localMidnight is each side's own zone)",
       "value": {

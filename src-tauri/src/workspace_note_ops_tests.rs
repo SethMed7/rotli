@@ -229,3 +229,70 @@ fn opening_a_connected_vaults_item_queues_its_wire_id_in_the_default_mailbox() {
     assert!(mailbox.contains(&wire), "{mailbox}");
     assert!(!other.path().join(".rotli/workspace-open.json").exists());
 }
+
+/// A `/ai` insertion the person accepted (2026-10-05): it lands in a note they
+/// wrote, journaled as `inline`, and nowhere the person said no.
+#[test]
+fn an_accepted_insertion_lands_in_a_person_written_note_and_nowhere_it_was_refused() {
+    fn revision_of(ws: &mut Workspace, id: &str) -> String {
+        let rel = ws.store.resolve_note_rel(id).unwrap();
+        crate::fsutil::revision(&fs::read(ws.store.root().join(rel)).unwrap())
+    }
+    // the editor body the insertion is measured against, read off disk
+    fn body_of(ws: &mut Workspace, id: &str) -> String {
+        let rel = ws.store.resolve_note_rel(id).unwrap();
+        let file = fs::read_to_string(ws.store.root().join(rel)).unwrap();
+        crate::corpus::ai_journal::editor_text(&file).to_string()
+    }
+    fn insert(ws: &mut Workspace, id: &str, body: &str, text: &str, local: bool) -> Result<(), String> {
+        let revision = revision_of(ws, id);
+        ws.store.insert_for_ai_if_revision(id, body, text, local, &revision).map(|_| ())
+    }
+
+    let temp = TempDir::new().unwrap();
+    let mut ws = test_workspace(&temp);
+    let note = ws.store.create_as("Notes", "# Plan\n\nFirst.\nLast.", false, None).unwrap();
+    let body = body_of(&mut ws, &note.id);
+    let inserted = "Middle.\n";
+    let after = body.replacen("Last.", &format!("{inserted}Last."), 1);
+
+    // a rewrite of the person's text is not an insertion, whatever it claims
+    let rewrite = after.replacen("First.", "Fist.", 1);
+    let refused = insert(&mut ws, &note.id, &rewrite, inserted, true).unwrap_err();
+    assert!(refused.contains("Try again"), "{refused}");
+
+    insert(&mut ws, &note.id, &after, inserted, true).unwrap();
+    assert_eq!(body_of(&mut ws, &note.id), after);
+    let row = ws.store.ai_journal_rows().pop().unwrap();
+    let inline = AiEditor::inline(true);
+    assert_eq!((row.actor.as_str(), row.lane.as_str()), (inline.actor, inline.lane));
+    assert_eq!(row.status, APPLIED);
+
+    // the same insertion through the chat's rewrite lane is still refused
+    let again = after.replacen("Last.", &format!("{inserted}Last."), 1);
+    let revision = revision_of(&mut ws, &note.id);
+    let chat = ws.store.write_for_ai_if_revision(&note.id, &again, true, &revision).unwrap_err();
+    assert!(chat.contains("written by the person"), "{chat}");
+
+    // an explicit no and a lock both outrank the person's consent
+    for line in ["ai_edit: false", "locked: true"] {
+        let other = ws.store.create_as("Notes", "# Kept\n\nText.", false, None).unwrap();
+        add_frontmatter_line(&mut ws, &other.id, line);
+        let base = body_of(&mut ws, &other.id);
+        let refused = insert(&mut ws, &other.id, &format!("{base}\nMore."), "\nMore.", true).unwrap_err();
+        assert!(refused.contains("Let AI edit") || refused.contains("locked"), "{line}: {refused}");
+    }
+
+    // a remote model never writes into a secure note it could not have read
+    let secure = ws.store.create_as("Secure notes", "# Vault\n\nold", true, None).unwrap();
+    let base = body_of(&mut ws, &secure.id);
+    let refused = insert(&mut ws, &secure.id, &format!("{base}\nx"), "\nx", false).unwrap_err();
+    assert!(refused.contains("secure"), "the read gate refuses, not the revision: {refused}");
+
+    // a note with no frontmatter that opens on a blank line still takes one
+    let rel = ws.store.resolve_note_rel(&note.id).unwrap().replace(".md", "-plain.md");
+    fs::write(ws.store.root().join(&rel), "\n# Plain\n\nText.\n").unwrap();
+    let plain = body_of(&mut ws, &rel);
+    insert(&mut ws, &rel, &format!("{plain}More.\n"), "More.\n", true).unwrap();
+    assert!(body_of(&mut ws, &rel).ends_with("Text.\nMore.\n"));
+}

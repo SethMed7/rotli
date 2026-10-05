@@ -48,6 +48,7 @@ describe("slash command catalog", () => {
       "Area chart",
       "Pie chart",
       "Attach image",
+      "Ask AI",
       "Generate image",
       "Talk to the Librarian",
       "Hand to AI",
@@ -157,6 +158,24 @@ describe("slash command catalog", () => {
     expect(filterSlashItems("librarian", { sheets: false }).map((item) => item.label)).toEqual([
       "Talk to the Librarian",
     ]);
+  });
+
+  test("Ask AI needs the Mac app's model lanes, like the Librarian", () => {
+    expect(filterSlashItems("ask ai", { sheets: true, librarian: false })).toEqual([]);
+    expect(filterSlashItems("ask ai", { sheets: true }).map((item) => item.label)).toEqual(["Ask AI"]);
+  });
+
+  test("the best match leads: /ai and /ask land on Ask AI, /bar on Bar chart", () => {
+    // Mermaid holds "ai" mid-word and Checklist's keyword "tasks" holds "ask";
+    // a word of the label starting with the query outranks both
+    expect(filterSlashItems("ai", { sheets: true })[0]?.label).toBe("Ask AI");
+    expect(filterSlashItems("ask", { sheets: true })[0]?.label).toBe("Ask AI");
+    expect(filterSlashItems("bar", { sheets: true })[0]?.label).toBe("Bar chart");
+    expect(
+      filterSlashItems("chart", { sheets: true })
+        .map((item) => item.label)
+        .slice(0, 4),
+    ).toEqual(["Bar chart", "Line chart", "Area chart", "Pie chart"]);
   });
 });
 

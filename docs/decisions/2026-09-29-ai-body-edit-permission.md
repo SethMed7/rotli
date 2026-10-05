@@ -77,3 +77,23 @@ or was written by the person. On 2026-09-29 the owner decided:
   them (additive: it cannot make a note less safe than it was before).
 - The desktop menu owns the grant. Rotli Web reads it but, like Lock, cannot
   toggle it yet.
+
+## Addendum — 2026-10-05: Ask AI's consented insertion
+
+The owner chose, for `/ai`, an Accept that works on the person's own notes
+without the standing grant: their Insert click stands in for it, one
+insertion at a time.
+
+- The lane is `corpus_insert_ai`, the AI write in Insert mode. It refuses a
+  locked note and `ai_edit: false` with the same wording as the replace lane.
+  It still runs the read gate, the laundering rule, and the revision check.
+  Its one new power is that it ignores the default ("a person wrote this").
+- It accepts a body only when that body is the note plus exactly the accepted
+  passage at one place. Nothing of the person's can be removed or changed, so
+  this is not a backdoor rewrite.
+- The TypeScript twin is `consentedInsertRefusal`, pinned to Rust's
+  `consented_insert_refusal` by `parity.json` `consentedInsertCases`.
+- Rows are journaled with the actor `inline`.
+- Chat's `update_note`, agents, and the Librarian are unchanged: the 09-29
+  rules above still bind them.
+

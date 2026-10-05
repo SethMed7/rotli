@@ -2374,6 +2374,7 @@ pub fn run() {
             corpus::corpus_search_ai,
             corpus::corpus_notes_ai,
             corpus::corpus_write_ai,
+            corpus::ai_edit::corpus_insert_ai,
             corpus::corpus_write,
             corpus::corpus_create,
             corpus::corpus_delete,

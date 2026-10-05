@@ -100,6 +100,23 @@ const calendarGlyph = (
     <path d="M4 10h16M9 3v4M15 3v4" />
   </Gl>
 );
+// a spark: the model writes the next part
+const askAiGlyph = (
+  <svg
+    viewBox="0 0 24 24"
+    width={15}
+    height={15}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.7}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.5 6.5l2.5 2.5M15 15l2.5 2.5M17.5 6.5 15 9M9 15l-2.5 2.5" />
+  </svg>
+);
+
 const imageGenGlyph = (
   <svg
     viewBox="0 0 24 24"
@@ -328,6 +345,14 @@ export const SLASH_ITEMS: SlashItem[] = [
     // Keep the user's requested spelling executable while also supporting the
     // conventional spelling in search.
     keywords: ["attatch", "attach", "image", "picture", "photo", "finder", "upload"],
+  },
+  {
+    label: "Ask AI",
+    group: "Insert",
+    hint: "Writes the next part from your request",
+    glyph: askAiGlyph,
+    op: { kind: "ai" },
+    keywords: ["ai", "ask", "write", "sources", "chart", "draft"],
   },
   {
     label: "Generate image",

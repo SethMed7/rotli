@@ -16,10 +16,13 @@ export const MERMAID_STARTER = `flowchart LR
 
 /** Commands that open something (a picker, a popover, a panel) instead of
  * inserting text: their `/word` is cleared and the flow takes over. */
-type FlowOp = Extract<SlashOp, { kind: "picker" | "attachImage" | "imageGen" | "librarian" | "handToAi" }>;
+type FlowOp = Extract<
+  SlashOp,
+  { kind: "picker" | "attachImage" | "imageGen" | "ai" | "librarian" | "handToAi" }
+>;
 
 export function opensFlow(op: SlashOp): op is FlowOp {
-  return ["picker", "attachImage", "imageGen", "librarian", "handToAi"].includes(op.kind);
+  return ["picker", "attachImage", "imageGen", "ai", "librarian", "handToAi"].includes(op.kind);
 }
 
 /** Canonical scaffold for every immediate slash command. Picker commands — and

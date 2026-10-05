@@ -288,6 +288,14 @@ imports.
   show the alignment but treat the line as an HTML block, so inline Markdown
   inside it appears as literal text there and a line written directly below
   it, with no blank line between, joins that block.
+- **Ask AI** (`/ai`, also found by `/ask`) opens a request box at the cursor.
+  The Librarian's model writes a passage for that spot: a chart as a `chart`
+  fence, a list of sources, or a paragraph. The answer is shown read-only, and
+  nothing enters the note until **Insert**, which adds it on its own line where
+  the command was typed (indented to the list it sits in). **Discard** and
+  **Try again** leave the note as it was. A secure note is never sent to a
+  remote model, and a locked note or one with `ai_edit: false` refuses (see
+  `docs/design/ai-visibility-matrix.md`). Ask AI runs in the Mac app only.
 - A chart is a fenced code block whose language is `chart`. Its body is plain
   text any reader can follow: options first, one `key: value` per line, then a
   blank line, then the data as comma-separated rows. The first data row names

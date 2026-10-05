@@ -33,6 +33,8 @@ export type SlashOp =
   | { kind: "attachImage" }
   /** Opens the AI image popover (engine + prompt) — the maintainer, 2026-08-04. */
   | { kind: "imageGen" }
+  /** Ask AI: a request at the cursor, the answer inserted only on Insert (2026-10-05). */
+  | { kind: "ai" }
   /** Swaps the format bar for the Librarian bar (2026-09-28). */
   | { kind: "librarian" }
   /** Opens Hand to AI's prompt for this note (2026-09-28). */

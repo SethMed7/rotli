@@ -255,3 +255,9 @@ The browser twin can't prove these.
 - [ ] **Charts: insert one.** Type `/chart` in a note and pick Bar chart: a chart and its form appear. Edit a value, press Apply, and the chart redraws. ⌘Z undoes the Apply.
 - [ ] **Charts: themes.** Switch through a light and a dark theme: the chart's colors and axes follow.
 - [ ] **Charts: a narrow pane.** Split the pane: the chart and its form fit the narrow width, and the form scrolls sideways instead of overflowing.
+- [ ] **Ask AI: your own note.** In a note you wrote, on the Mac's model, type `/ai`, ask for "a closing sentence", then Insert. It lands on the line where you typed `/ai`, and ⌘Z removes it.
+- [ ] **Ask AI: a chart.** Ask for "a bar chart of: Mon 4, Tue 6, Wed 3". A `chart` fence is inserted and draws.
+- [ ] **Ask AI: refusals.** On a locked note, and on one with "Let AI edit the text" turned off, Ask is refused before anything is sent.
+- [ ] **Ask AI: a secure note.** With the Librarian on a connected model, a secure note is refused. With the Mac's model it works, unless Settings turns that off.
+- [ ] **Ask AI: a list item.** In a bullet, type `/ai` and Insert a two-line answer: the second line is indented under the bullet.
+- [ ] **Ask AI: the journal.** `rotli notes history ID` shows the insertion as an `inline` row.

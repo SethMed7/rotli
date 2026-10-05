@@ -49,10 +49,29 @@ export function filterSlashItems(
   const items = SLASH_ITEMS.filter(
     (it) =>
       (features.sheets || !(it.op.kind === "picker" && it.op.mode === "embedSheet")) &&
-      (features.librarian !== false || it.op.kind !== "librarian"),
+      // the Librarian and Ask AI both need the Mac app's model lanes
+      (features.librarian !== false || (it.op.kind !== "librarian" && it.op.kind !== "ai")),
   );
   if (q === "") return items;
-  return items.filter((it) => it.label.toLowerCase().includes(q) || it.keywords?.some((k) => k.includes(q)));
+  // best match first, catalog order within a rank (2026-10-05: `/ai` used to
+  // land on Mermaid and `/ask` on Checklist, whose keyword holds "tasks")
+  return items
+    .map((it) => ({ it, rank: slashRank(it, q) }))
+    .filter(({ rank }) => rank < SLASH_NO_MATCH)
+    .sort((a, b) => a.rank - b.rank)
+    .map(({ it }) => it);
+}
+
+const SLASH_NO_MATCH = 4;
+
+/** 0 the label starts with the query, 1 a word of it does, 2 the label holds
+ * it, 3 only a keyword does. */
+function slashRank(item: SlashItem, q: string): number {
+  const label = item.label.toLowerCase();
+  if (label.startsWith(q)) return 0;
+  if (label.split(/\s+/).some((word) => word.startsWith(q))) return 1;
+  if (label.includes(q)) return 2;
+  return item.keywords?.some((k) => k.includes(q)) ? 3 : SLASH_NO_MATCH;
 }
 
 export interface SlashLineTarget {

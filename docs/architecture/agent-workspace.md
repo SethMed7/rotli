@@ -125,12 +125,13 @@ maintaining separate file-manipulation implementations.
 ## AI edit history
 
 Every successful AI body write, through `write_for_ai_if_revision` (chat and
-chat memory) and `write_for_remote_agent_if_revision` (CLI, MCP, relay),
+chat memory), `insert_for_ai_if_revision` (an Ask AI passage the person
+accepted), and `write_for_remote_agent_if_revision` (CLI, MCP, relay),
 appends one row to `.rotli/ai-edit-journal.jsonl`
 (`src-tauri/src/corpus_ai_journal.rs`). Rows follow the brain journal's
 grammar: JSON per line, `id`, `ts`, `status`, and a same-id re-append is a
 status change (last line wins). A row records the note's id and path, the
-actor (`chat` or `agent`, with the MCP client name), the model lane, the
+actor (`chat`, `inline`, or `agent` with the MCP client name), the model lane, the
 before and after file revisions, and a one-hunk reversible patch of the
 editor body. A note no remote agent could read at write time (secure, in a
 protected lane, or secret-shaped) is journaled content-free: no patch, no

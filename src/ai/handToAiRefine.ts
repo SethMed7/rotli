@@ -7,6 +7,7 @@
 
 import { looksSecret } from "./guard";
 import refinePrompt from "./prompts/handToAiRefine.md?raw";
+import { modelFailure, stripThinking } from "./replyText";
 import type { CompleteReq, Host } from "./types";
 
 const HEADER = /^version:\s*(\d+)\s*\n/;
@@ -53,7 +54,7 @@ export function keepsPath(text: string, path: string): boolean {
  * a whole token, character for character, becomes the prompt. A thinking block or one fence around the whole reply is
  * unwrapped; anything else is taken as written. */
 export function parseRefinedReply(raw: string, basic: string, paths: readonly string[]): RefineVerdict {
-  let text = raw.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  let text = stripThinking(raw);
   const fenced = /^(```|~~~)[\w-]*\n([\s\S]*?)\n\1$/.exec(text);
   if (fenced?.[2]) text = fenced[2].trim();
   if (text.length < MIN_CHARS) return { ok: false, reason: "The model's answer was empty." };
@@ -91,10 +92,6 @@ export async function refineHandoff(
   try {
     return parseRefinedReply(await host.complete(request), basic, paths);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      ok: false,
-      reason: message ? `The model couldn't answer: ${message}` : "The model couldn't answer.",
-    };
+    return { ok: false, reason: modelFailure(error) };
   }
 }
