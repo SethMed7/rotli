@@ -59,13 +59,13 @@ id repeats (`site/src/roadmap.ts`).
   notes.
 - **Read aloud** <!-- id: read-aloud --> · M — select text and have it read
   to you, on-device.
-- **Hand to AI** <!-- id: hand-to-ai --> · S–M — turn the open note into a
-  prompt for Claude Code or another agent. Shipped in 1.6: "Hand to AI…" in
-  the palette and a note's menu writes the prompt from the note itself,
-  editable, with Copy; a secure note, or one that looks like it holds a
-  secret, is refused. Built since: the note's files listed as attachments
-  with their paths, and Refined, where the Librarian's model rewrites it into
-  a full prompt (Basic stays). Left: "Open in chat" to send it on in Rotli.
+- **Hand to AI, Refined** <!-- id: hand-to-ai --> · S–M — a fuller prompt
+  for Claude Code or another agent: Refined has the Librarian's model rewrite
+  it, and the note's files go along with their paths. Both are built for the
+  next release, and Basic stays. Left: "Open in chat" to send it on in Rotli.
+  Hand to AI itself shipped in 1.6: "Hand to AI…" in the palette and a note's
+  menu writes the prompt from the note, editable, with Copy; a secure note,
+  or one that looks like it holds a secret, is refused.
 - **Breve in public builds** <!-- id: breve-public --> · M — the morning brief
   and its routines, in the builds everyone downloads. Runs in development
   builds today.
