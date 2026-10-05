@@ -2,7 +2,11 @@
 // Why the Librarian exists, in two figures from other people's research and one sentence of
 // ours, beside a small scene from the film's island: four AI tools (the average subscriber's
 // four) idle on a bench by the sea, two of them asleep, until the quokka arrives with a stack
-// of notes and hands each one something to file. It plays once when revealed and rests on
+// of notes and hands each one something to file. The four read as the products people pay
+// for (the owner, 2026-10-05: "so people know we are talking about gemini/antigravity,
+// chatGPT, claude"): each bot wears its product's signature colour (the --bot-* tokens in
+// Base.astro), a generic cue on its head, and its name underneath. Nothing traces or copies a
+// product's logo artwork; the names are plain text. It plays once when revealed and rests on
 // everyone busy; reduced motion and no script show that resting state. The figures stay plain
 // text with their footnotes: no card, no chart, no count-up.
 //
@@ -27,13 +31,15 @@ const sources = [
     text: 'Bango, “The rise of the AI subscriber,” 2025',
   },
 ];
-/** The four tools on the bench, left to right; the first and third start asleep. */
+/** The four tools on the bench, left to right; the first and third start asleep. `cue` is the
+ * generic shape on each one's head: a speech bubble, an asterisk, a four-point sparkle, and a
+ * slanted antenna. */
 const tools = [
-  { x: 252, tone: 'olive', asleep: true },
-  { x: 336, tone: 'sea', asleep: false },
-  { x: 420, tone: 'lake', asleep: true },
-  { x: 504, tone: 'lantern', asleep: false },
-];
+  { x: 252, id: 'chatgpt', name: 'ChatGPT', asleep: true },
+  { x: 336, id: 'claude', name: 'Claude', asleep: false },
+  { x: 420, id: 'gemini', name: 'Gemini', asleep: true },
+  { x: 504, id: 'grok', name: 'Grok', asleep: false },
+] as const;
 ---
 
 <section class="section stat-band" id="waiting" aria-labelledby="waiting-title">
@@ -70,15 +76,38 @@ const tools = [
         <path class="sand-edge" d="M0 352C30 330 90 314 200 314S440 330 520 322C580 316 612 334 620 352"></path>
 
         <g class="bench">
-          <path class="bench-leg" d="M252 276V328M592 276V326"></path>
+          <path class="bench-leg" d="M243 276V328M592 276V326"></path>
           <rect class="bench-seat" x="232" y="262" width="376" height="16" rx="6"></rect>
         </g>
 
         {
           tools.map((tool, i) => (
-            <g class:list={['tool', `tool-${i + 1}`, `tone-${tool.tone}`, { asleep: tool.asleep }]}>
+            <g class:list={['tool', `tool-${i + 1}`, `bot-${tool.id}`, { asleep: tool.asleep }]}>
               <path class="tool-legs" d={`M${tool.x + 20} 262v22M${tool.x + 44} 262v22`}></path>
-              <path class="tool-pins" d={`M${tool.x + 16} 196v8M${tool.x + 32} 196v8M${tool.x + 48} 196v8`}></path>
+              {tool.id === 'chatgpt' && (
+                <g class="cue">
+                  <path class="cue-stem" d={`M${tool.x + 32} 196v8`}></path>
+                  <path class="cue-bubble" d={`M${tool.x + 22} 178h20a6 6 0 0 1 6 6v6a6 6 0 0 1-6 6h-9l-6 5v-5h-5a6 6 0 0 1-6-6v-6a6 6 0 0 1 6-6Z`}></path>
+                </g>
+              )}
+              {tool.id === 'claude' && (
+                <g class="cue">
+                  <path class="cue-stem" d={`M${tool.x + 32} 194v10`}></path>
+                  <path class="cue-star" d={`M${tool.x + 32} 176v16M${tool.x + 25} 180l14 8M${tool.x + 39} 180l-14 8`}></path>
+                </g>
+              )}
+              {tool.id === 'gemini' && (
+                <g class="cue">
+                  <path class="cue-stem" d={`M${tool.x + 32} 196v8`}></path>
+                  <path class="cue-spark" d={`M${tool.x + 32} 172Q${tool.x + 34} 182 ${tool.x + 44} 184Q${tool.x + 34} 186 ${tool.x + 32} 196Q${tool.x + 30} 186 ${tool.x + 20} 184Q${tool.x + 30} 182 ${tool.x + 32} 172Z`}></path>
+                </g>
+              )}
+              {tool.id === 'grok' && (
+                <g class="cue">
+                  <path class="cue-stem" d={`M${tool.x + 28} 204l12-20`}></path>
+                  <circle class="cue-tip" cx={tool.x + 41} cy="182" r="4.5"></circle>
+                </g>
+              )}
               <rect class="tool-body" x={tool.x} y="204" width="64" height="60" rx="15"></rect>
               <g class="face-idle">
                 {tool.asleep ? (
@@ -109,6 +138,9 @@ const tools = [
 
         <image class="quokka" href={working.src} x="6" y="122" width="232" height="232"></image>
       </svg>
+      <ul class="bot-names">
+        {tools.map((tool, i) => <li class={`bot-name bot-name-${i + 1}`}>{tool.name}</li>)}
+      </ul>
     </div>
 
     <ol class="sources">
@@ -259,8 +291,7 @@ const tools = [
     stroke-width: 3;
   }
   .bench-leg,
-  .tool-legs,
-  .tool-pins {
+  .tool-legs {
     fill: none;
     stroke: var(--ink);
     stroke-width: 4;
@@ -274,17 +305,87 @@ const tools = [
     stroke: var(--ink);
     stroke-width: 3.5;
   }
-  .tone-olive .tool-body {
-    fill: var(--olive-bright);
+  .bot-chatgpt .tool-body {
+    fill: var(--bot-chatgpt);
   }
-  .tone-sea .tool-body {
-    fill: var(--lantern);
+  .bot-claude .tool-body {
+    fill: var(--bot-claude);
   }
-  .tone-lake .tool-body {
-    fill: var(--lake);
+  .bot-gemini .tool-body {
+    fill: var(--bot-gemini);
   }
-  .tone-lantern .tool-body {
-    fill: var(--limestone);
+  .bot-grok .tool-body {
+    fill: var(--bot-grok);
+  }
+  /* Each bot's cue, drawn in the scene's own line weight. */
+  .cue-stem {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 4;
+    stroke-linecap: round;
+  }
+  .cue-bubble {
+    fill: var(--capture-ground);
+    stroke: var(--ink);
+    stroke-width: 3;
+    stroke-linejoin: round;
+  }
+  .cue-star {
+    fill: none;
+    stroke: var(--bot-claude);
+    stroke-width: 4.5;
+    stroke-linecap: round;
+  }
+  .cue-spark {
+    fill: var(--bot-gemini-spark);
+    stroke: var(--ink);
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+  }
+  .cue-tip {
+    fill: var(--bot-grok-ink);
+    stroke: var(--ink);
+    stroke-width: 3;
+  }
+  /* On the near-black bot the face is drawn light. */
+  .bot-grok .face-ink {
+    fill: var(--bot-grok-ink);
+  }
+  .bot-grok .face-line {
+    stroke: var(--bot-grok-ink);
+  }
+  /* The names, in plain text under each bot over the sea, in the art's ink (it holds when the
+     page passes into the night just below). Positions are each bot's centre in the 620 × 380
+     drawing, so they track it at every width. */
+  .bench-scene {
+    position: relative;
+  }
+  .bot-names {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .bot-name {
+    position: absolute;
+    top: calc(299 / 380 * 100%);
+    translate: -50% -50%;
+    color: var(--ink);
+    font-size: clamp(0.66rem, 1.1vw, 0.86rem);
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .bot-name-1 {
+    left: calc(284 / 620 * 100%);
+  }
+  .bot-name-2 {
+    left: calc(368 / 620 * 100%);
+  }
+  .bot-name-3 {
+    left: calc(452 / 620 * 100%);
+  }
+  .bot-name-4 {
+    left: calc(536 / 620 * 100%);
   }
   .face-ink {
     fill: var(--ink);

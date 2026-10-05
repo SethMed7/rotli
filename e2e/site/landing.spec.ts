@@ -143,3 +143,18 @@ test("under reduced motion the page switches to the night at once", async ({ bro
   expect(state).toEqual({ running: 0, header: "rgb(14, 23, 29)" });
   await context.close();
 });
+
+test("the bench's AI tools are named, and no two names touch at any width", async ({ page }) => {
+  for (const width of [390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+    const names = page.locator(".bench-scene .bot-name");
+    await expect(names).toHaveText(["ChatGPT", "Claude", "Gemini", "Grok"]);
+    const boxes = await names.evaluateAll((items) =>
+      items.map((item) => item.getBoundingClientRect().toJSON()),
+    );
+    for (let i = 1; i < boxes.length; i++) expect(boxes[i].left).toBeGreaterThan(boxes[i - 1].right + 2);
+    const scene = await page.locator(".bench-scene").evaluate((el) => el.getBoundingClientRect().toJSON());
+    for (const box of boxes) expect(box.right).toBeLessThanOrEqual(scene.right);
+  }
+});
