@@ -1,7 +1,8 @@
 ---
 // /blog/ (the index: readable posts newest first, then the ones announced as
 // coming soon, which are listed without a link) and /blog/<post>/, an article
-// with the "On this page" tree (WritingPage `toc`).
+// with the "On this page" tree (WritingPage `toc`) and the reading meter the guides
+// use (`progress`), so every article on the site reads the same way.
 import { render } from 'astro:content';
 import { twinPath, writingGraph, writingPath } from '../../agents';
 import WritingList from '../../components/WritingList.astro';
@@ -63,6 +64,7 @@ const toc = (rendered?.headings ?? [])
       lede={entry.data.description}
       meta={[formatDate(entry.data.date), `${readingMinutes(entry)} min read`]}
       toc={toc}
+      progress
     >
       <Content />
     </WritingPage>

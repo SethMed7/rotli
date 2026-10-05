@@ -56,3 +56,27 @@ test("an article that fits in the window shows no meter", async ({ page }) => {
   await expect(page.locator(".rscene.rscene-local")).toBeVisible();
   await expect(page.locator("[data-read-progress]")).toBeHidden();
 });
+
+// The same article flow on /privacy/ and on a published post: the meter is one system.
+for (const path of ["/privacy/", "/blog/rotli-web-and-your-mac/"]) {
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    test(`${path} carries the reading meter, 0% to 100% (${viewport.width}px)`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.goto(path);
+      const meter = page.locator("[data-read-progress]");
+      await expect(meter).toBeVisible();
+      await expect(meter.locator("[data-read-percent]")).toHaveText("0%");
+      await page.evaluate(() => {
+        const prose = document.querySelector<HTMLElement>("[data-prose]")!;
+        window.scrollTo(0, prose.getBoundingClientRect().bottom + window.scrollY - window.innerHeight + 2);
+      });
+      await expect.poll(() => percent(page)).toBe(100);
+      const header = (await page.locator(".site-header-bar").boundingBox())!;
+      const pinned = (await meter.boundingBox())!;
+      expect(Math.abs(pinned.y - (header.y + header.height))).toBeLessThan(2);
+    });
+  }
+}

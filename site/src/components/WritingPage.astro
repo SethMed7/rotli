@@ -7,7 +7,7 @@
 // slim rail that fills as you read; below 900px the tree folds into an
 // "On this page" disclosure above the text. The highlight and the rail are
 // script (progressive enhancement); without it the tree is plain links.
-// Pages that pass `progress` (resource articles) also get a reading meter pinned under the
+// Pages that pass `progress` (resource articles, blog posts, /privacy/) also get a reading meter pinned under the
 // header on every width: a bar and "N% through", measured over the article alone
 // (src/reading.ts, the same measure that fills the tree's rail). It shows only when the
 // article is longer than the window, and it is a position, never a record: nothing is kept.
@@ -39,7 +39,7 @@ interface Props {
   wide?: boolean;
   /** Center the head and the reading column on the page (About). */
   center?: boolean;
-  /** Pin a reading meter under the header (resource articles). */
+  /** Pin a reading meter under the header (resource articles, blog posts, /privacy/). */
   progress?: boolean;
   /** Passed through to Base: JSON-LD facts, the Markdown twin, and the link card (src/og.ts). */
   structuredData?: Record<string, unknown>[];
