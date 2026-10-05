@@ -100,3 +100,46 @@ test("the landing says rotli is more than notes and asks no extra AI fee", async
   await expect(faq.filter({ hasText: "Do I have to pay for AI?" })).toHaveCount(1);
   await expect(faq.filter({ hasText: "Is rotli just a notes app?" })).toHaveCount(1);
 });
+
+test("the page, its header, and its buttons cross into the night on one clock", async ({ page }) => {
+  await page.goto("/");
+  await scrollToPrivacy(page, 0.1);
+  await expect.poll(() => passage(page)).toBe("ocean-dark");
+  // Freeze the crossfade a third of the way in: the header is the page's own ground, and the
+  // night band's feathered edge is there to meet it.
+  const colours = await page.evaluate(() => {
+    const root = document.documentElement;
+    for (const animation of document.getAnimations()) {
+      if (animation.effect instanceof KeyframeEffect && animation.effect.target === root) {
+        animation.pause();
+        animation.currentTime = 300;
+      }
+    }
+    const header = getComputedStyle(document.querySelector(".site-header-bar")!).backgroundColor;
+    const body = getComputedStyle(document.body).backgroundColor;
+    const feather = getComputedStyle(document.getElementById("privacy")!, "::before").backgroundImage;
+    return { header, body, feather };
+  });
+  expect(colours.header).toBe(colours.body);
+  expect(colours.header).not.toBe("rgb(248, 242, 233)");
+  expect(colours.header).not.toBe("rgb(14, 23, 29)");
+  expect(colours.feather).toContain("linear-gradient");
+});
+
+test("under reduced motion the page switches to the night at once", async ({ browser }) => {
+  const context = await browser.newContext({ reducedMotion: "reduce" });
+  const page = await context.newPage();
+  await page.goto("/");
+  await scrollToPrivacy(page, 0.5);
+  await expect.poll(() => passage(page)).toBe("ocean-dark");
+  // No transition on the root: the very next frame is already the night.
+  const state = await page.evaluate(() => ({
+    running: document
+      .getAnimations()
+      .filter((a) => a.effect instanceof KeyframeEffect && a.effect.target === document.documentElement)
+      .length,
+    header: getComputedStyle(document.querySelector(".site-header-bar")!).backgroundColor,
+  }));
+  expect(state).toEqual({ running: 0, header: "rgb(14, 23, 29)" });
+  await context.close();
+});

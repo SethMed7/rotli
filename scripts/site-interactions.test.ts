@@ -1,5 +1,5 @@
-// The website's interactive rules, without a browser: the privacy passage's trigger
-// (site/src/passage.ts), the resource reading meter (site/src/reading.ts), the 404 game
+// The website's interactive rules, without a browser: the privacy passage's trigger and
+// crossfade (site/src/passage.ts), the resource reading meter (site/src/reading.ts), the 404 game
 // (site/src/runner/game.ts), and the footer scene's play (site/src/quokka/play.ts and the
 // traced-pose cleanup in art.ts). The pages wire these to the DOM; e2e/site/ proves the
 // wiring. Like site-agents.test.ts, the site's modules load through a computed path so
@@ -42,10 +42,24 @@ interface Game {
   best: number;
 }
 
+type Rgb = readonly [number, number, number];
+interface PassagePair {
+  text: readonly [string, string];
+  ground: readonly [string, string];
+  main?: readonly [string, string];
+}
 let passage: {
   passageActive(section: { top: number; bottom: number }, viewport: number, active: boolean): boolean;
-  FOCAL_LINE: number;
-  HYSTERESIS: number;
+  ENTER_SHARE: number;
+  LEAVE_SHARE: number;
+  PASSAGE_MS: number;
+  GROUND_EASE: readonly [number, number, number, number];
+  INK_AT: number;
+  LEAN_KEYS: readonly (readonly [number, number])[];
+  cubicBezier(x1: number, y1: number, x2: number, y2: number): (t: number) => number;
+  leanAt(t: number): number;
+  contrast(a: Rgb, b: Rgb): number;
+  passageFrame(pair: PassagePair, t: number): { text: Rgb; ground: Rgb };
 };
 let reading: {
   readingProgress(
@@ -100,28 +114,120 @@ beforeAll(async () => {
 
 describe("the privacy passage", () => {
   const viewport = 800;
-  const line = () => viewport * passage.FOCAL_LINE;
-  const margin = () => viewport * passage.HYSTERESIS;
+  // A band taller than the window, its top edge at `top`.
+  const band = (top: number, height = 1200) => ({ top, bottom: top + height });
 
-  test("turns on only once the section holds the middle of the window", () => {
-    expect(passage.passageActive({ top: 900, bottom: 1700 }, viewport, false)).toBe(false); // still below
-    expect(passage.passageActive({ top: line() - 1, bottom: 1300 }, viewport, false)).toBe(false); // edge: inside the margin
-    expect(passage.passageActive({ top: line() - margin() - 1, bottom: 1300 }, viewport, false)).toBe(true);
+  test("turns on once the band fills a good share of the window, not only its middle", () => {
+    expect(passage.passageActive(band(900), viewport, false)).toBe(false); // still below
+    const enter = viewport * (1 - passage.ENTER_SHARE);
+    expect(passage.passageActive(band(enter + 1), viewport, false)).toBe(false);
+    expect(passage.passageActive(band(enter - 1), viewport, false)).toBe(true);
+    // Earlier than the old focal line (the middle of the window, plus a margin).
+    expect(enter).toBeGreaterThan(viewport * 0.5);
   });
 
   test("holds near a boundary instead of flickering, then lets go in either direction", () => {
+    const enter = viewport * (1 - passage.ENTER_SHARE);
+    const leave = viewport * (1 - passage.LEAVE_SHARE);
     // Scrolling back up a little past the switch point keeps it on.
-    expect(passage.passageActive({ top: line() + margin() / 2, bottom: 1300 }, viewport, true)).toBe(true);
-    // Leaving upward (the section falls below the line) turns it off.
-    expect(passage.passageActive({ top: line() + margin() + 1, bottom: 1300 }, viewport, true)).toBe(false);
-    // Leaving downward (the section's end rises above the line) turns it off too.
-    expect(passage.passageActive({ top: -900, bottom: line() - margin() / 2 }, viewport, true)).toBe(true);
-    expect(passage.passageActive({ top: -900, bottom: line() - margin() - 1 }, viewport, true)).toBe(false);
+    expect(passage.passageActive(band(enter + 20), viewport, true)).toBe(true);
+    // Leaving upward (the band falls back down the window) turns it off.
+    expect(passage.passageActive(band(leave + 1), viewport, true)).toBe(false);
+    // Leaving downward (the band's end rises up the window) turns it off too.
+    const end = (bottom: number) => ({ top: bottom - 1200, bottom });
+    expect(passage.passageActive(end(viewport * passage.LEAVE_SHARE + 1), viewport, true)).toBe(true);
+    expect(passage.passageActive(end(viewport * passage.LEAVE_SHARE - 1), viewport, true)).toBe(false);
+    expect(passage.LEAVE_SHARE).toBeLessThan(passage.ENTER_SHARE);
+  });
+
+  test("a band shorter than the window counts its own height", () => {
+    // A 300px band wholly in an 800px window fills all of itself.
+    expect(passage.passageActive({ top: 200, bottom: 500 }, viewport, false)).toBe(true);
   });
 
   test("a hidden or empty section never turns it on", () => {
     expect(passage.passageActive({ top: 0, bottom: 0 }, viewport, false)).toBe(false);
     expect(passage.passageActive({ top: 0, bottom: 800 }, 0, true)).toBe(false);
+  });
+});
+
+describe("the privacy passage's crossfade", () => {
+  // Every text/ground pair the page shows, day then night (Base.astro's tokens).
+  const text = ["#3a3028", "#e7f0f4"] as const;
+  const pairs: Record<string, PassagePair> = {
+    "text on the ground": { text, ground: ["#f8f2e9", "#0e171d"] },
+    "text on the warm band": { text, ground: ["#f1e7d8", "#1c2d35"] },
+    "text on a surface": { text, ground: ["#fbf6ee", "#152229"] },
+    "muted text on the ground": { text: ["#6e6155", "#a1b6c0"], ground: ["#f8f2e9", "#0e171d"], main: text },
+    "muted text on the warm band": {
+      text: ["#6e6155", "#a1b6c0"],
+      ground: ["#f1e7d8", "#1c2d35"],
+      main: text,
+    },
+    "accent text on the ground": { text: ["#8f4e37", "#86c2e0"], ground: ["#f8f2e9", "#0e171d"], main: text },
+  };
+  const frames = (pair: PassagePair) =>
+    Array.from({ length: passage.PASSAGE_MS + 1 }, (_, ms) => {
+      const { text: ink, ground } = passage.passageFrame(pair, ms / passage.PASSAGE_MS);
+      return passage.contrast(ink, ground);
+    });
+
+  test("every pair stays readable in every frame of the dusk", () => {
+    for (const [name, pair] of Object.entries(pairs)) {
+      const worst = Math.min(...frames(pair));
+      expect({ name, readable: worst >= 3 }).toEqual({ name, readable: true });
+    }
+  });
+
+  test("text dips under 4.5:1 only for a moment, while the ground crosses mid-tone", () => {
+    for (const [name, pair] of Object.entries(pairs)) {
+      const dim = frames(pair).filter((ratio) => ratio < 4.5).length;
+      expect({ name, quick: dim <= 100 }).toEqual({ name, quick: true });
+    }
+  });
+
+  test("a primary button and its label switch together, so the label never fades through it", () => {
+    const css = readFileSync(site("layouts", "Base.astro"), "utf8");
+    expect(css).toMatch(/\.button\.primary \{\s*background: var\(--text\);\s*color: var\(--on-text\);/);
+    const rgb = (hex: string): Rgb =>
+      [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)) as unknown as Rgb;
+    expect(passage.contrast(rgb("#f8f2e9"), rgb("#3a3028"))).toBeGreaterThan(4.5);
+    expect(passage.contrast(rgb("#0e171d"), rgb("#e7f0f4"))).toBeGreaterThan(4.5);
+  });
+
+  test("a plain crossfade, text fading with the ground, would vanish halfway", () => {
+    const ease = passage.cubicBezier(...passage.GROUND_EASE);
+    const mixHex = (pair: readonly [string, string], k: number): Rgb => {
+      const [a, b] = pair.map((hex) => [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16)));
+      return [0, 1, 2].map((i) => a[i] + (b[i] - a[i]) * k) as unknown as Rgb;
+    };
+    const naive = Array.from({ length: 101 }, (_, i) => {
+      const k = ease(i / 100);
+      return passage.contrast(mixHex(text, k), mixHex(["#f8f2e9", "#0e171d"], k));
+    });
+    expect(Math.min(...naive)).toBeLessThan(1.5);
+  });
+
+  test("the grounds ease out and in, the inks switch about halfway, and the lean returns", () => {
+    const ease = passage.cubicBezier(...passage.GROUND_EASE);
+    expect(ease(0)).toBe(0);
+    expect(ease(1)).toBe(1);
+    expect(ease(0.5)).toBeCloseTo(0.5, 3);
+    expect(ease(0.1)).toBeLessThan(0.05); // a slow start
+    expect(passage.INK_AT).toBeCloseTo(0.5, 1);
+    expect(passage.leanAt(0)).toBe(0);
+    expect(passage.leanAt(0.5)).toBe(1);
+    expect(passage.leanAt(1)).toBe(0);
+  });
+
+  test("the stylesheet runs the same clock", () => {
+    const css = readFileSync(site("layouts", "Base.astro"), "utf8");
+    const [x1, y1, x2, y2] = passage.GROUND_EASE;
+    expect(css).toContain(`--passage-ms: ${passage.PASSAGE_MS}ms;`);
+    expect(css).toContain(`--passage-ease: cubic-bezier(${x1}, ${y1}, ${x2}, ${y2});`);
+    expect(css).toContain(`--passage-ink-at: ${Math.round(passage.PASSAGE_MS * passage.INK_AT)}ms;`);
+    for (const [share, lean] of passage.LEAN_KEYS)
+      expect(css).toContain(`${share * 100}% { --passage-lean: ${lean}; }`);
   });
 });
 
