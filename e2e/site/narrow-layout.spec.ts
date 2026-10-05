@@ -15,6 +15,7 @@ for (const width of [390, 768]) {
     "/changelog/",
     "/blog/rotli-web-and-your-mac/",
     "/about/",
+    "/roadmap/",
   ]) {
     test(`${path} never scrolls sideways at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
