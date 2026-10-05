@@ -3,8 +3,8 @@
 // product film) says what rotli is; three cards say what it does (write, keep, ask); the
 // StatBand and TwoKinds say why the Librarian exists (the AI you already pay for is idle, and
 // it can file your notes without touching your words); the tour shows each part up close and
-// holds Rotli Web and the Helper; then make it yours, privacy in brief, and questions, right
-// above the footer's quokka beach. Grounds
+// holds Rotli Web and the Helper; then make it yours, privacy in brief, questions, and one
+// closing panel that asks for a first note, right above the footer's quokka beach. Grounds
 // alternate plain and warm, with the privacy night between. Base.astro owns the tokens and
 // the section grammar.
 import { landingGraph } from '../agents';
@@ -13,6 +13,7 @@ import Base from '../layouts/Base.astro';
 import { site } from '../site';
 import SiteFooter from './SiteFooter.astro';
 import SiteHeader from './SiteHeader.astro';
+import Closing from './landing/Closing.astro';
 import Experiments from './landing/Experiments.astro';
 import Faq from './landing/Faq.astro';
 import Hero from './landing/Hero.astro';
@@ -36,6 +37,7 @@ import Tour from './landing/Tour.astro';
     <Personal />
     <PrivacyBrief />
     <Faq />
+    <Closing />
   </main>
   <SiteFooter />
 </Base>

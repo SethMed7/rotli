@@ -1,5 +1,5 @@
 // The landing page: what rotli is and costs before where it runs (Windows and Linux coming soon), the cardless
-// before/after, and the privacy passage that takes the whole page, header included, into
+// before/after, the close after the questions, and the privacy passage that takes the whole page, header included, into
 // Ocean Dark and back out in either direction.
 import { expect, test, type Page } from "@playwright/test";
 
@@ -33,13 +33,19 @@ test("the download page calls Windows and Linux coming soon, not available", asy
   }
 });
 
-test("the ways in say your computer, and the page ends on the questions", async ({ page }) => {
+test("Rotli Web lives in the tour, and the page closes on one banner after the questions", async ({
+  page,
+}) => {
   await page.goto("/");
-  // The ways in render only while WEB_APP_ENABLED; this suite's build may leave it off.
-  const ways = page.locator("#web-title");
-  if ((await ways.count()) > 0) await expect(ways).toHaveText("On your computer. In your browser.");
+  // The ways-in chapter folded into the tour (2026-10-05); its item renders only while
+  // WEB_APP_ENABLED, and this suite's build may leave it off.
+  await expect(page.locator("#web-title")).toHaveCount(0);
+  const web = page.locator("#tour-button-web");
+  if ((await web.count()) > 0) await expect(web).toContainText("Rotli Web and the Helper");
   await expect(page.locator("#final-title")).toHaveCount(0);
-  await expect(page.locator("main > section").last()).toHaveId("faq");
+  const sections = page.locator("main > section");
+  await expect(sections.last()).toHaveId("start");
+  await expect(sections.nth((await sections.count()) - 2)).toHaveId("faq");
 });
 
 test("the before and after are open columns: the same words, with added lines marked", async ({ page }) => {
