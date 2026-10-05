@@ -456,13 +456,28 @@ The Rust corpus boundary independently validates every write.
 - Rotli owns identity/provenance facts such as `id`, `created`, `updated`, and
   `pinned`. `id` is the primary key and never changes; paths, filenames, titles,
   and aliases are selectors rather than identity.
-- `created` and `updated` are calendar days (`YYYY-MM-DD`), stamped with the
-  writer's own day. A day is never read as an hour: Rotli shows a note's
-  age from the file's own time when that time falls on the stamped day
-  (anywhere on Earth), and otherwise from local midnight of that day. The Mac
-  app (`src-tauri/src/note_dates.rs`) and Rotli Web (`stampToMs`,
+- `created` and `updated` are either a calendar day (`YYYY-MM-DD`) or a full
+  RFC 3339 timestamp; every reader accepts both. Who writes which:
+  - Rotli Web stamps both with the writer's own calendar day.
+  - The Mac app stamps a new note's `created` and `updated` with a full UTC
+    RFC 3339 timestamp (owner decision, 2026-10-03: new notes keep full UTC
+    `created` timestamps). An edit to a memex note rewrites `updated` as the
+    writer's own calendar day; an edit in a plain folder vault keeps the full
+    UTC timestamp.
+  So a note made on the Mac carries timestamps until its first edit there or
+  on the web turns `updated` into a day; both shapes read the same age.
+- A full timestamp is taken as written. A day is never read as an hour: Rotli
+  shows a note's age from the file's own time when that time falls on the
+  stamped day (anywhere on Earth), and otherwise from local midnight of that
+  day. The Mac app (`src-tauri/src/note_dates.rs`) and Rotli Web (`stampToMs`,
   `src/memex/dates.ts`) implement this independently; the `noteDateStamps`
   parity fixture pins them to the same answers.
+- The file time each side supplies differs. The Mac app reads `created`
+  against the file's birth time and `updated` against its modification time.
+  Rotli Web reads both against the modification time, because the browser's
+  File API exposes only `lastModified` — there is no birth time to read. So a
+  date-only `created` can show a different hour on the web than on the Mac
+  (same rule, different input); the day itself always agrees.
 - `aliases` is a human-editable string list with Rotli-maintained rename
   history. A title/file rename appends the prior title and useful filename
   stem; the list is append-only, except that a rename strips placeholder
