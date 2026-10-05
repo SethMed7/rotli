@@ -242,6 +242,7 @@ edit journal. A note the owner typed is `person-written`. Three options:
 
 The browser twin can't prove these.
 
+- [ ] **Beta in the file header.** Open a `.xlsx` and a `.docx`: the header shows Beta beside the name. A read-only sheet shows its reason instead.
 - [ ] **Sheet round trip.** New Sheet, edit a cell, Save, quit, reopen: the value is kept and the header says Beta.
 - [ ] **Conflict banner.** Edit a sheet without saving, switch to another tab, change the file in Excel or Numbers, then come back. The banner offers the copy.
 - [ ] **The copy.** Save my edits as a copy opens a new workbook with your edits, and the original keeps the outside change.
