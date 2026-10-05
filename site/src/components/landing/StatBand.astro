@@ -59,6 +59,7 @@ const tools = [
         rotli gives that AI something useful to do: keep your notes in order while you write. There is no
         extra AI plan to buy. It uses the one you already have, or a model on your Mac.
       </p>
+      <p class="study"><a href="/blog/the-ai-you-already-pay-for/">Where these numbers come from <span aria-hidden="true">→</span></a></p>
     </div>
 
     <div class="bench-scene" data-reveal aria-hidden="true">
@@ -185,6 +186,24 @@ const tools = [
     font-size: var(--step-lede);
     font-weight: 600;
     line-height: 1.45;
+  }
+  /* The link to the post on these figures: text column only, a small aside after the claim. */
+  .study {
+    margin: 0.75rem 0 0;
+    font-size: 0.95rem;
+  }
+  .study a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 44px;
+    color: var(--accent-text);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .study a:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
   }
   .sources {
     grid-column: 1 / -1;

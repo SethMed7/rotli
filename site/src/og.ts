@@ -76,6 +76,7 @@ export type OgCardName = keyof typeof OG_CARDS;
 /** A post's card pose, by slug; posts not listed show the writing quokka. */
 export const POST_POSES: Record<string, Pose> = {
   'rotli-web-and-your-mac': 'stays_local',
+  'the-ai-you-already-pay-for': 'knowledge_system',
 };
 
 export function postPose(slug: string): Pose {

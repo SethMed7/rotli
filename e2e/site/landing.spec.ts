@@ -1,4 +1,4 @@
-// The landing page: where rotli runs (Mac first, Windows and Linux planned), the cardless
+// The landing page: what rotli is and costs before where it runs (Windows and Linux coming soon), the cardless
 // before/after, and the privacy passage that takes the whole page, header included, into
 // Ocean Dark and back out in either direction.
 import { expect, test, type Page } from "@playwright/test";
@@ -12,22 +12,34 @@ const scrollToPrivacy = (page: Page, share: number) =>
     window.scrollTo({ top: top + band.offsetHeight * s - window.innerHeight / 2, behavior: "instant" });
   }, share);
 
-test("the hero promises a workspace for notes and says the Mac comes first", async ({ page }) => {
+test("the hero says free before it says where rotli runs, and never leads with the Mac", async ({ page }) => {
   await page.goto("/");
   const hero = page.locator(".hero");
-  await expect(hero.locator(".hero-lede")).toContainText("a private workspace for your notes");
-  await expect(hero.locator(".hero-lede")).not.toContainText("for your Mac");
+  const lede = hero.locator(".hero-lede");
+  await expect(lede).toContainText("a free workspace built on plain Markdown files");
+  await expect(lede).toContainText("Docs and Sheets (beta)");
+  await expect(lede).not.toContainText("Mac");
+  await expect(hero.locator(".hero-cost")).toHaveText("Free. No account. Works offline.");
   await expect(hero.locator(".hero-platforms")).toHaveText(
-    /^Mac first.*Windows and Linux apps are planned\.$/,
+    /^(In your browser and on the Mac|On the Mac) today\. Windows and Linux apps are coming soon\.$/,
   );
 });
 
-test("the download page calls Windows and Linux planned, not available", async ({ page }) => {
+test("the download page calls Windows and Linux coming soon, not available", async ({ page }) => {
   await page.goto("/download/");
   for (const name of ["Windows", "Linux"]) {
     const row = page.locator(".all li", { has: page.getByRole("heading", { name, exact: true }) });
-    await expect(row.locator(".status")).toHaveText("Planned");
+    await expect(row.locator(".status")).toHaveText("Coming soon");
   }
+});
+
+test("the ways in say your computer, and the page ends on the questions", async ({ page }) => {
+  await page.goto("/");
+  // The ways in render only while WEB_APP_ENABLED; this suite's build may leave it off.
+  const ways = page.locator("#web-title");
+  if ((await ways.count()) > 0) await expect(ways).toHaveText("On your computer. In your browser.");
+  await expect(page.locator("#final-title")).toHaveCount(0);
+  await expect(page.locator("main > section").last()).toHaveId("faq");
 });
 
 test("the before and after are open columns: the same words, with added lines marked", async ({ page }) => {
@@ -94,8 +106,12 @@ test("the theme studio's steps sit on one row at phone width", async ({ page }) 
 
 test("the landing says rotli is more than notes and asks no extra AI fee", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator(".overview .section-lede")).toContainText("Notes are the foundation.");
+  await expect(page.locator(".overview .section-lede")).toContainText("Everything starts as a Markdown file");
   await expect(page.locator("#waiting .close")).toContainText("no extra AI plan to buy");
+  await expect(page.locator("#waiting .study a")).toHaveAttribute(
+    "href",
+    "/blog/the-ai-you-already-pay-for/",
+  );
   const faq = page.locator(".faq-list summary");
   await expect(faq.filter({ hasText: "Do I have to pay for AI?" })).toHaveCount(1);
   await expect(faq.filter({ hasText: "Is rotli just a notes app?" })).toHaveCount(1);
