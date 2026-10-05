@@ -409,8 +409,9 @@ function animate(scenery: HTMLElement) {
     }
     if (event.pointerType !== 'mouse') return;
     pointer = { x: event.clientX, y: event.clientY, at: now, mouse: true };
-    // The person comes onto the beach with the mouse and walks to it.
-    sceneRect = scenery.getBoundingClientRect();
+    // The person comes onto the beach with the mouse and walks to it. While the loop runs the
+    // boxes are the frame's; resting (reduced motion), they are measured now.
+    if (!raf) measure();
     if (near(pointer, sceneRect, 0)) sendPerson(event.clientX, now);
   }
   function onLeave() {
@@ -420,6 +421,7 @@ function animate(scenery: HTMLElement) {
     const now = performance.now();
     const at = { x: event.clientX, y: event.clientY };
     pointer = { ...at, at: now, mouse: event.pointerType === 'mouse' };
+    if (!raf) measure();
     wake();
     if (near(at, foodRect, 6) && !flight) {
       event.preventDefault();
@@ -894,20 +896,25 @@ function animate(scenery: HTMLElement) {
   }
   /** The keyboard's way in: the person appears in the middle of the beach. */
   function summon(now: number) {
-    sceneRect = scenery.getBoundingClientRect();
+    if (!raf) measure();
     sendPerson(sceneRect.left + (person.here ? person.walk.x : sceneRect.width * 0.42), now);
   }
 
   // ——— The loop ———
 
-  function tick(now: number) {
-    const dt = Math.min(64, now - last || 16);
-    last = now;
+  /** Where everything is on screen now: every frame, and on input while the loop rests. */
+  function measure() {
     sceneRect = scenery.getBoundingClientRect();
     foodRect = foodEl!.getBoundingClientRect();
     ballRect = ballEl!.getBoundingClientRect();
     for (const q of cast) q.box = q.svg.getBoundingClientRect();
     person.view.measure();
+  }
+
+  function tick(now: number) {
+    const dt = Math.min(64, now - last || 16);
+    last = now;
+    measure();
 
     const wasIn = inScene;
     inScene = !!pointer?.mouse && near(pointer, sceneRect, 0);

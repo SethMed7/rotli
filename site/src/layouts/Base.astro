@@ -247,6 +247,9 @@ const socialImageUrl = new URL(image, siteUrl).href;
       @property --accent-text { syntax: '<color>'; inherits: true; initial-value: #8f4e37; }
       @property --passage-lean { syntax: '<number>'; inherits: true; initial-value: 0; }
       :root {
+        /* Also a plain value, so muted and accent text keep their colours in a browser
+           without @property (the lean animation then simply never runs). */
+        --passage-lean: 0;
         --passage-ms: 900ms;
         --passage-ease: cubic-bezier(0.65, 0, 0.35, 1);
         --passage-ink-at: 459ms;

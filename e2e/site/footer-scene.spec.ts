@@ -197,6 +197,8 @@ test("under reduced motion nothing moves on its own, and the person steps straig
   await page.waitForTimeout(600);
   await expect(scene).not.toHaveClass(/is-live/);
   await expect(page.getByRole("button", { name: "Walk on the beach" })).toBeAttached();
+  // The page moves after the scene started listening: its resting boxes must not go stale.
+  await page.evaluate(() => window.scrollBy({ top: -30, behavior: "instant" }));
   const y = await sandY(page);
   const foodX = await centreX(page, "[data-food]");
   await page.mouse.move(foodX, y);
