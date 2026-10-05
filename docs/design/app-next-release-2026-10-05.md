@@ -6,6 +6,16 @@ does not touch `site/`). Branch `feat/app-next-release`, stacked on
 says today, the proposed order, the risks, and the questions the owner must
 answer before building.
 
+## Decisions (owner, 2026-10-05)
+
+| # | Question | Decision |
+|---|---|---|
+| 1 | Chart renderer | TanStack Charts 1.0 behind one adapter seam. The `chart` fence spec stays library-free, so an in-house SVG renderer can replace it. |
+| 2 | `/ai` Accept | Consented insertion: a one-time grant for that insertion. It goes through the AI write lane as actor `inline`, is never applied to a locked note, is secure-gated by model class, and is journaled. |
+| 3 | Sheets scope | Chat's sheet artifacts go to production with the editor. CSV gets the Beta badge too: everything that runs on Univer is Beta. |
+| 4 | Chat images on Rotli Web | Keep Helper's refusal. Fix the web strip, chips, and the two web bugs, and say plainly that sending images needs the Mac app. |
+| 5 | Slash form | Per-type commands (Bar chart, Line chart…). There is no colon grammar (the default; not asked). |
+
 ## Order
 
 1. Sheets and Docs: Beta badge, and Sheets on in production desktop builds.
