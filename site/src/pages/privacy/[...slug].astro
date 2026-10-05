@@ -16,7 +16,7 @@ export function getStaticPaths() {
   return site.showsFullSite ? [{ params: { slug: undefined } }] : [];
 }
 
-const UPDATED = 'October 2, 2026';
+const UPDATED = 'October 5, 2026';
 
 const toc = [
   { slug: 'short-version', text: 'The short version' },
@@ -214,9 +214,26 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
     address to deliver pages.
   </p>
   <p>
-    The footer's “Hear when it’s ready” list is optional. Only when you submit it, the address you type is
-    sent to Resend, our email provider, to keep the list. You can unsubscribe anytime, and nothing else is
-    collected or shared.
+    <strong>The email list.</strong> The footer's “Hear when it’s ready” list is optional. Only when you
+    submit it, the address you type is sent to Resend, our email provider, and kept there as a contact on
+    rotli's list, so we can email you when there's news about rotli. Every email has an unsubscribe link,
+    handled by Resend; one click takes you off. Your address isn't used for anything else, and nothing else
+    is collected or shared.
+  </p>
+  <p>
+    <strong>Roadmap votes.</strong> A vote on the <a href="/roadmap/">roadmap</a> adds one to that item's
+    count, and the count is all we keep: no record of who voted, or when. So that you vote once per item, your
+    browser remembers which items you voted for in its own storage on your computer (local storage, not a
+    cookie, and never sent anywhere); clearing this site's data forgets it. To stop repeat votes and spam,
+    the site briefly holds a scrambled key made from your IP address and the day, never the address itself.
+    It lives only in the server's memory, changes every day, and is gone when the server restarts.
+  </p>
+  <p>
+    <strong>Feature requests.</strong> A request keeps what you type in the form: a title, a description,
+    and an email address only if you give one, so we can follow up, plus when it arrived. It's stored in a small database on our
+    host, Railway, read only by the person building rotli, and never published; if an idea makes the
+    roadmap, it's written there in our own words. Your email is never added to the list above. To have a
+    request deleted, send another one saying so.
   </p>
   <p>
     <strong>Why:</strong> a site about keeping your work private shouldn't watch you read it.
