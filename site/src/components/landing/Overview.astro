@@ -1,7 +1,7 @@
 ---
 // What rotli does, in the three steps the story film takes: write it down, keep it in your
 // folder, ask it anything. Each step is one line and three facts the rest of the site
-// already states; the full tour, and the eight 30-second episodes, live on /features/.
+// already states; the full tour lives on /features/.
 // The quokkas are the app's own character art, and hop in once when the steps are revealed.
 import aiChat from '../../../../src/assets/characters/filled/cocoa/ai_chat.webp';
 import knowledge from '../../../../src/assets/characters/filled/cocoa/knowledge_system.webp';
@@ -64,8 +64,7 @@ const steps = [
       }
     </ol>
     <p class="overview-more">
-      <a class="button secondary" href="/features/#episodes">Watch the 30-second episodes</a>
-      <a class="text-link" href="/features/">See every feature <span aria-hidden="true">→</span></a>
+      <a class="button secondary" href="/features/">See every feature</a>
     </p>
   </div>
 </section>
@@ -118,14 +117,6 @@ const steps = [
     align-items: center;
     gap: 1rem 1.75rem;
     margin: clamp(2.5rem, 5vw, 3.5rem) 0 0;
-  }
-  .text-link {
-    color: var(--accent-text);
-    font-weight: 600;
-    text-decoration: none;
-  }
-  .text-link:hover {
-    text-decoration: underline;
   }
   /* The film's hop: each quokka lands with a small squash as its step comes in. */
   @media (prefers-reduced-motion: no-preference) {

@@ -327,9 +327,16 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
     color: var(--deep-text);
     font-weight: 600;
   }
+  /* Side by side, the words sit in the middle of the sky beside the dome
+     (the dome keeps its feet on the frame's bottom edge), so neither the
+     upper left nor the lower left is left empty. */
   @media (min-width: 900px) {
     .night {
       grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    }
+    .night-caption {
+      align-self: center;
+      padding-block: 0 clamp(1.75rem, 4vw, 3rem);
     }
   }
   /* The companion beside a section, the way the app shows it. */

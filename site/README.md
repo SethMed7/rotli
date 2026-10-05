@@ -88,7 +88,7 @@ the e2e lane), so run it by hand after changing those pages.
   bottom edge.
 - **The landing page** (`src/components/Landing.astro`) only composes its
   chapters from `src/components/landing/`: Hero (the product film) → Overview (Write. Keep. Ask.: three
-  steps with the app's quokkas, then links to the episodes and `/features/`)
+  steps with the app's quokkas, then one link to `/features/`)
   → TwoKinds ("You write for yourself. AI reads differently.": the same
   file as typed and as the Librarian files it, in two open columns on the band
   with no card around either; the added frontmatter lines carry a "+" and a
@@ -103,12 +103,14 @@ the e2e lane), so run it by hand after changing those pages.
   the copyable install line; only while `WEB_APP_ENABLED`) → Personal (the
   theme studio, with a faint island vignette) → Faq → FinalCta (the closing call; the footer's quokka beach ends the
   page). The landing page carries exactly one video. **`/features/`** has
-  one display headline, with "Rotli in 30 seconds" (`EpisodeShelf.astro`: the
-  eight episodes in one player, under a quiet heading; two columns of episodes
-  below the player on narrow screens) right under it, then the chapters in
-  full (Features with every smaller habit, Folder, Personal). Every chapter
-  opens with the same section head (one h2 at `--step-h2` and a lede), and the
-  chapters alternate plain and warm grounds. The landing page's dev-only
+  one display headline with the product film right under it (the hero's
+  `FilmPlayer`, the same real Rotli Web session: the real product leads, not
+  the illustrated story; visitors asked for it, 2026-10-05), then the chapters
+  in full (Features with every smaller habit, Folder, Personal). Every chapter
+  is one idea: the same section head (one h2 at `--step-h2` and a lede) and
+  one picture, with no second explanation of something another chapter or
+  page owns (Rotli Helper is explained by its guide; /features/ links there).
+  The chapters alternate plain and warm grounds. The landing page's dev-only
   Experiments chapter is not repeated there. On narrow screens the theme
   studio is a carousel (previous/next and a swipe on the capture).
   Each chapter owns its
@@ -171,7 +173,8 @@ the e2e lane), so run it by hand after changing those pages.
   off (`publishedWriting` vs `upcomingWriting`). Routes: `/resources/`, `/resources/<file>/`,
   `/blog/`, `/blog/<file>/`, and `/about/` (which holds the name story and
   links the `the-creation-of-rotli` post once it is published). Markdown code
-  blocks are not syntax-highlighted: Shiki writes inline `style=` attributes,
+  blocks wrap long lines at their spaces inside the box (the Helper's install
+  line included) and are not syntax-highlighted: Shiki writes inline `style=` attributes,
   which the production CSP drops. Keep article images local.
 - **`/download/`** is where the header's Download button goes. It leads with
   the visitor's own system (`Base.astro` stamps `data-os`: mac, windows,
@@ -363,23 +366,29 @@ the e2e lane), so run it by hand after changing those pages.
   - `board`: an Excalidraw board drawn with its own toolbar in Rotli Web
     (`bun run dev:web`, an origin-private test vault, the same path as
     `e2e/web/rotli-web-boards.spec.ts`).
-  - `chat` and `lock-menu`: frames of the Mac launch shoot's raw takes
-    (`_review/promo-v5/rec/R5d.mov` at 130.8 s, `R4.mov` at 73.6 s; synthetic
-    Notebook vault), cropped with the cursor painted out.
+  - `chat`: a frame of the Mac launch shoot's raw take
+    (`_review/promo-v5/rec/R5d.mov` at 130.8 s; synthetic Notebook vault),
+    cropped with the cursor painted out. The note menu beside "You decide what
+    AI may touch" is not a capture: it is drawn in HTML from the app's own
+    labels (`useNoteMenu.ts`, `noteProtectionItems.ts`); change it when they
+    change.
   Re-capture rather than hand-edit them. `--capture-ground` in `Base.astro` is
   the editor paper those captures sit on.
 - **The features area** (`landing/Features.astro`, on `/features/` under the
-  episode player) is organized as you meet the product:
-  RenderShowcase (the same note rendered and as raw Markdown, then tasks,
-  choices, diagrams, tables/code/math with their syntax) → ChatFlow (a real
-  reply; the four steps: asks, keeps "Conversation notes" after every reply,
-  writes notes and files on the Mac, you jump in or Lock it) → Formats
-  (Documents on Univer, Sheets coming soon, Boards on Excalidraw, with status
-  chips from `featurePolicy.ts`, and where Assets live) → the Librarian and
-  the smaller habits → ConnectAI (each provider's own CLI installed in
-  Terminal; rotli never signs in, reads login files, or stores credentials;
-  Rotli Helper runs the same tools for Rotli Web; the install lines mirror
-  `src/ai/connectorGuides.ts`).
+  product film) is organized as you meet the product:
+  RenderShowcase (the same note rendered and as raw Markdown, which already
+  shows tasks, results, switches, and choices; then only the two blocks the
+  pair cannot show, diagrams and tables/code/math, with their syntax) →
+  ChatFlow (a real reply; three steps: asks, keeps "Conversation notes" after
+  every reply, writes notes and files on the Mac; then "You decide what AI may
+  touch": notes you wrote are closed to AI edits until Let AI edit the text,
+  Lock, and Mark secure, beside the drawn note menu) → Formats (Documents on
+  Univer, Sheets coming soon, Boards on Excalidraw, with status chips from
+  `featurePolicy.ts`, and one line on where Assets live) → the Librarian and
+  the smaller habits → ConnectAI (each provider's own CLI in one terminal;
+  rotli never signs in, reads login files, or stores credentials; the install
+  lines mirror `src/ai/connectorGuides.ts`; one line links the Rotli Helper
+  guide while `WEB_APP_ENABLED`).
 - **Scenes from the film**, drawn in inline SVG on the film's palette (the
   `--sea*`, `--sand`, `--olive*`, `--limestone`, `--lake`,
   `--wood*`, and `--lantern` tokens in `Base.astro`) with the app's own
@@ -685,11 +694,12 @@ films (WebP, via `cwebp`).
 
 - **The story film** (`rotli-story.mp4`, 60 s) played in the hero until the
   product film replaced it; its files stay, and no page plays it now.
-- **"Rotli in 30 seconds"** (`epNN-*.mp4`, eight episodes) lives in one player
-  on `/features/` (`EpisodeShelf.astro`), `preload="none"`: no film downloads
-  until an episode is played (the poster and thumbnails do), and choosing one
-  plays it with sound. Without
-  script each episode is a plain link to its file.
+- **"Rotli in 30 seconds"** (`epNN-*.mp4`, eight episodes) is no longer
+  played by any page (2026-10-05): visitors asked for the real product over
+  the story, so `/features/` plays the product film instead. The files stay
+  for now. Episode 7's opening card burns in the retired line "AI is invited
+  in. It does not own the house." and episode 4 counts six theme families, so
+  neither may be shown again without a new cut from the studio.
 
 The earlier launch film still lives in `public/media/` for the holding page:
 `PromoFilm.astro` renders it there when `rotli-promo.mp4`, its poster, and its
@@ -697,7 +707,7 @@ captions all exist (click-to-play with native controls, `preload="none"`, no
 autoplay). Its opening card still reads "Mac beta in preparation" and needs a
 new cut before the holding page is used again.
 
-The theme studio previews twelve environments from `public/themes/` (six
+The theme studio previews fourteen environments from `public/themes/` (seven
 families × light/dark), one row per family with Light and Dark swatches.
 
 | Artifact | Path |

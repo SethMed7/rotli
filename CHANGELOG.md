@@ -81,6 +81,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **rotli.co's guides open on their own scene and show how far through you
   are.** Each guide starts with a small island scene about its subject, and a
   bar with "N% through" stays under the header as you scroll the article.
+- **rotli.co's Features page is shorter and shows the real app first.** It
+  opens on the same screen recording as the home page instead of the eight
+  illustrated episodes. Each section makes one point with one picture: the
+  repeated task and choice pictures, the conversation-notes example, and a
+  second explanation of Rotli Helper are gone. A new part, "You decide what
+  AI may touch", explains notes you wrote, Lock, and Mark secure beside the
+  note menu, replacing a cropped screenshot with text cut off behind it.
+- **Long commands fit their boxes on rotli.co.** The Rotli Helper install
+  line wraps inside its box in the guide and the blog post instead of being
+  cut off, and the privacy page's night scene sets its words beside the dome.
 - **Setup is four screens.** Your name and theme, where your notes live, who
   files them (the Librarian), and your three shortcuts, which now say plainly
   that you can change them. Then the thank-you card and the tour, and a small
