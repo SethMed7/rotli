@@ -166,8 +166,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   4h in New York) because its date was taken as midnight UTC. A
   note's created and updated dates stay plain days in the file; Rotli Web
   now uses the file's own time when it falls on that day, and otherwise
-  shows the day rather than an hour count. New notes are dated with your
-  own calendar day, not New York's.
+  counts from the start of that day in your time zone. Notes made in Rotli
+  Web are dated with your own calendar day; the Mac app still dates them in
+  UTC for now.
 - **Images dropped from Finder land where you drop them.** On Retina
   screens a dropped image went in about halfway up the note; Rotli now reads
   the drop position as the Mac reports it.
