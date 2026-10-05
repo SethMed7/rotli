@@ -23,14 +23,14 @@
 import { Database } from 'bun:sqlite';
 import { createHmac, randomBytes } from 'node:crypto';
 
+import { REQUEST_LIMITS } from '../src/roadmap';
 import { clientAddress, limiter, NO_STORE, page, readFields, wantsJson } from './http';
 import { normalizeEmail } from './subscribe';
 
 /** The hidden field only bots fill in (the page's request form). */
 export const HONEYPOT_FIELD = 'website';
 export const LIMITS = {
-  title: { min: 3, max: 120 },
-  description: { min: 10, max: 2000 },
+  ...REQUEST_LIMITS,
   voteBodyBytes: 1024,
   requestBodyBytes: 8192,
 } as const;

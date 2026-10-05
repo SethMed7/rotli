@@ -14,6 +14,13 @@ const collapse = (text: string) => text.replace(/\s+/g, " ");
 let agents: {
   robotsText(): string;
   llmsText(writing: { resources: never[]; posts: never[] }): string;
+  roadmapMarkdown(
+    sections: {
+      title: string;
+      slug: string;
+      items: { id: string; title: string; size: string | null; summary: string }[];
+    }[],
+  ): string;
 };
 
 beforeAll(async () => {
@@ -75,5 +82,26 @@ describe("llms.txt", () => {
       expect(text).toContain(`(https://rotli.co${page})`);
     }
     expect(text).toContain("The source is open under the MIT license.");
+  });
+
+  test("links the roadmap's Markdown twin, which lists each item with its size", () => {
+    expect(agents.llmsText({ resources: [], posts: [] })).toContain(
+      "[Roadmap](https://rotli.co/roadmap/index.md)",
+    );
+    const twin = agents.roadmapMarkdown([
+      {
+        title: "In the work",
+        slug: "in-the-work",
+        items: [{ id: "charts", title: "Charts", size: "L", summary: "Type `/chart`." }],
+      },
+      {
+        title: "Ideas",
+        slug: "ideas",
+        items: [{ id: "x", title: "No size", size: null, summary: "Just an idea." }],
+      },
+    ]);
+    expect(twin).toContain("## In the work\n\n- **Charts** (L): Type `/chart`.");
+    expect(twin).toContain("- **No size**: Just an idea.");
+    expect(twin).toContain("https://rotli.co/roadmap/");
   });
 });

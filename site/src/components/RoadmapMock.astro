@@ -1,0 +1,659 @@
+---
+// A small drawing of an "In the work" item, on top of its card on /roadmap/: a
+// window from the app as it will look, drawn in HTML with the site's semantic tokens
+// (no screenshots, so nothing goes stale with a capture). Decorative: the card's own
+// heading and sentence say what the item is, so the whole drawing is aria-hidden.
+// Keyed by the item's ROADMAP.md id; an id without a drawing gets a plain note.
+// No inline styles: production serves the page under `style-src 'self'`.
+interface Props {
+  id: string;
+}
+
+const { id } = Astro.props;
+const known = [
+  'sheets-beta',
+  'docs-beta',
+  'charts',
+  'ai-inline',
+  'chat-attachments',
+  'mermaid-visual',
+  'agents-mcp',
+  'read-aloud',
+  'hand-to-ai',
+  'breve-public',
+];
+const kind = known.includes(id) ? id : 'note';
+---
+
+<div class="stage" aria-hidden="true" data-mock={kind}>
+  {
+    kind === 'sheets-beta' && (
+      <div class="win">
+        <div class="win-bar">
+          <span>Budget.xlsx</span>
+          <span class="chip">Beta</span>
+        </div>
+        <div class="sheet">
+          <span class="head" />
+          <span class="head">A</span>
+          <span class="head">B</span>
+          <span class="head">C</span>
+          <span class="head">1</span>
+          <span>Rent</span>
+          <span class="num">1,200</span>
+          <span class="num">1,200</span>
+          <span class="head">2</span>
+          <span>Food</span>
+          <span class="num">340</span>
+          <span class="num picked">365</span>
+          <span class="head">3</span>
+          <span>Total</span>
+          <span class="num strong">1,540</span>
+          <span class="num strong">1,565</span>
+        </div>
+      </div>
+    )
+  }
+  {
+    kind === 'docs-beta' && (
+      <div class="win">
+        <div class="win-bar">
+          <span>Proposal.docx</span>
+          <span class="chip">Beta</span>
+        </div>
+        <div class="tools">
+          <b>B</b>
+          <i>I</i>
+          <u>U</u>
+          <span class="tool-sep" />
+          <span>1.</span>
+          <span>Link</span>
+        </div>
+        <div class="page">
+          <p class="doc-title">Spring proposal</p>
+          <span class="line w-90" />
+          <span class="line w-75" />
+          <p class="doc-item">1. Scope and timeline</p>
+          <p class="doc-item">2. Budget</p>
+        </div>
+      </div>
+    )
+  }
+  {
+    kind === 'charts' && (
+      <div class="win split">
+        <pre class="fence">```chart
+bar
+Mon  3
+Tue  5
+Wed  2
+Thu  4
+```</pre>
+        <div class="bars">
+          <span class="bar h-3" />
+          <span class="bar h-5" />
+          <span class="bar h-2" />
+          <span class="bar h-4" />
+        </div>
+      </div>
+    )
+  }
+  {
+    kind === 'ai-inline' && (
+      <div class="win">
+        <div class="win-bar">
+          <span>Thursday sync</span>
+        </div>
+        <div class="note">
+          <span class="line w-80" />
+          <span class="line w-60" />
+          <p class="typed">
+            <span class="slash">/ai</span> turn these into tasks<span class="caret" />
+          </p>
+          <div class="popover">
+            <p class="pop-head">On this Mac</p>
+            <p>[ ] Send the deck to Ana</p>
+            <p>[ ] Book the room</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+  {
+    kind === 'chat-attachments' && (
+      <div class="win">
+        <div class="thumbs">
+          <span class="thumb photo">
+            <span class="sun" />
+            <span class="hill" />
+          </span>
+          <span class="thumb file">PDF</span>
+        </div>
+        <p class="composer">
+          What changed between <span class="tag">plan.pdf</span> and <span class="tag">site.png</span>?
+        </p>
+        <div class="composer-foot">
+          <span class="send">Send</span>
+        </div>
+      </div>
+    )
+  }
+  {
+    kind === 'mermaid-visual' && (
+      <div class="win">
+        <div class="win-bar">
+          <span>Launch flow</span>
+          <span class="seg">
+            <span>Code</span>
+            <span class="on">Visual</span>
+          </span>
+        </div>
+        <div class="flow">
+          <span class="node">Idea</span>
+          <span class="edge" />
+          <span class="node picked">Draft</span>
+          <span class="edge" />
+          <span class="node">Ship</span>
+        </div>
+      </div>
+    )
+  }
+  {
+    kind === 'agents-mcp' && (
+      <div class="win term">
+        <p>
+          <span class="prompt">$</span> rotli notes create "Trip ideas"
+        </p>
+        <p class="ok">created wiki/trips/trip-ideas.md</p>
+        <p>
+          <span class="prompt">$</span> rotli notes query tag:trip
+        </p>
+        <p class="ok">2 notes · secure notes skipped</p>
+      </div>
+    )
+  }
+  {
+    kind === 'read-aloud' && (
+      <div class="win">
+        <p class="reading">
+          Notes are where work starts. <mark>They should live somewhere that is yours.</mark>
+        </p>
+        <div class="player">
+          <span class="play" />
+          <span class="wave">
+            <span class="w h-2" />
+            <span class="w h-4" />
+            <span class="w h-3" />
+            <span class="w h-5" />
+            <span class="w h-2" />
+            <span class="w h-4" />
+            <span class="w h-3" />
+          </span>
+          <span class="where">On this Mac</span>
+        </div>
+      </div>
+    )
+  }
+  {
+    kind === 'hand-to-ai' && (
+      <div class="win">
+        <div class="win-bar">
+          <span>Hand to AI</span>
+          <span class="seg">
+            <span>Basic</span>
+            <span class="on">Refined</span>
+          </span>
+        </div>
+        <div class="prompt-body">
+          <p>
+            <b>Goal</b> Ship the onboarding fixes
+          </p>
+          <p>
+            <b>Open</b> 3 tasks · <b>Done</b> 2
+          </p>
+          <p>
+            <b>Files</b> 2 attachments with paths
+          </p>
+        </div>
+        <div class="composer-foot">
+          <span class="send">Copy</span>
+        </div>
+      </div>
+    )
+  }
+  {
+    kind === 'breve-public' && (
+      <div class="win">
+        <div class="win-bar">
+          <span>Morning brief</span>
+          <span class="time">7:00</span>
+        </div>
+        <ul class="brief">
+          <li>Three notes you meant to finish</li>
+          <li>Two tasks due this week</li>
+          <li>What's new in the topics you follow</li>
+        </ul>
+      </div>
+    )
+  }
+  {
+    kind === 'note' && (
+      <div class="win">
+        <div class="win-bar">
+          <span>Note</span>
+        </div>
+        <div class="note">
+          <span class="line w-80" />
+          <span class="line w-90" />
+          <span class="line w-60" />
+        </div>
+      </div>
+    )
+  }
+</div>
+
+<style>
+  /* The stage: a quiet ground the window sits on, flush with the card's top edge. */
+  .stage {
+    display: grid;
+    place-items: center;
+    height: 14rem;
+    padding: 1.5rem 1.25rem;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .win {
+    width: min(100%, 17.5rem);
+    padding: 0.75rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.7rem;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.78rem;
+    line-height: 1.4;
+  }
+  .win p {
+    margin: 0;
+  }
+  .win-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+    font-weight: 600;
+  }
+  .chip,
+  .time {
+    padding: 0.05rem 0.45rem;
+    border: 1px solid var(--accent-text);
+    border-radius: 999px;
+    color: var(--accent-text);
+    font-size: 0.68rem;
+    font-weight: 600;
+  }
+  .time {
+    border-color: var(--border-strong);
+    color: var(--text-muted);
+  }
+  .line {
+    display: block;
+    height: 0.42rem;
+    margin: 0.45rem 0;
+    border-radius: 999px;
+    background: var(--border);
+  }
+  .w-60 {
+    width: 60%;
+  }
+  .w-75 {
+    width: 75%;
+  }
+  .w-80 {
+    width: 80%;
+  }
+  .w-90 {
+    width: 90%;
+  }
+
+  /* Sheets */
+  .sheet {
+    display: grid;
+    grid-template-columns: 1.4rem 1fr 1fr 1fr;
+    border-top: 1px solid var(--border);
+    border-left: 1px solid var(--border);
+  }
+  .sheet span {
+    padding: 0.2rem 0.35rem;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .sheet .head {
+    background: var(--surface-2);
+    color: var(--text-muted);
+    text-align: center;
+  }
+  .sheet .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .sheet .strong {
+    font-weight: 600;
+  }
+  .sheet .picked {
+    outline: 2px solid var(--accent-text);
+    outline-offset: -2px;
+  }
+
+  /* Docs */
+  .tools {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding-bottom: 0.45rem;
+    margin-bottom: 0.55rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+  .tool-sep {
+    width: 1px;
+    height: 0.8rem;
+    background: var(--border-strong);
+  }
+  .page .doc-title {
+    font-weight: 600;
+    font-size: 0.85rem;
+  }
+  .page .doc-item {
+    margin-top: 0.2rem;
+    color: var(--text-muted);
+  }
+
+  /* Charts */
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    align-items: end;
+  }
+  .fence {
+    margin: 0;
+    padding: 0.45rem 0.55rem;
+    border-radius: 0.45rem;
+    background: var(--surface-2);
+    color: var(--text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.68rem;
+    line-height: 1.45;
+    white-space: pre;
+  }
+  .bars,
+  .wave {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.3rem;
+  }
+  .bars {
+    height: 5.5rem;
+    padding-bottom: 0.2rem;
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .bar {
+    flex: 1;
+    border-radius: 0.25rem 0.25rem 0 0;
+    background: var(--accent);
+  }
+  .bar.h-2 {
+    height: 40%;
+  }
+  .bar.h-3 {
+    height: 60%;
+  }
+  .bar.h-4 {
+    height: 80%;
+  }
+  .bar.h-5 {
+    height: 100%;
+  }
+
+  /* /ai */
+  .typed {
+    margin-top: 0.55rem;
+  }
+  .slash {
+    padding: 0 0.25rem;
+    border-radius: 0.3rem;
+    background: var(--tint);
+    color: var(--accent-text);
+    font-weight: 600;
+  }
+  .caret {
+    display: inline-block;
+    width: 1px;
+    height: 0.85rem;
+    margin-left: 1px;
+    vertical-align: -0.12rem;
+    background: var(--text);
+  }
+  .popover {
+    margin-top: 0.45rem;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.5rem;
+    background: var(--ground);
+  }
+  .popover .pop-head {
+    color: var(--text-muted);
+    font-size: 0.68rem;
+  }
+
+  /* Chat attachments */
+  .thumbs {
+    display: flex;
+    gap: 0.45rem;
+    margin-bottom: 0.55rem;
+  }
+  .thumb {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 2.6rem;
+    height: 2.6rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.45rem;
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: 0.66rem;
+    font-weight: 600;
+  }
+  .thumb.photo {
+    background: var(--sea);
+  }
+  .sun {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.4rem;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: var(--surface);
+  }
+  .hill {
+    position: absolute;
+    right: -0.4rem;
+    bottom: -0.9rem;
+    left: -0.4rem;
+    height: 1.6rem;
+    border-radius: 50%;
+    background: var(--olive);
+  }
+  .thumb.file {
+    background: var(--surface-2);
+  }
+  .composer {
+    color: var(--text);
+  }
+  .tag {
+    padding: 0 0.3rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.3rem;
+    background: var(--surface-2);
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
+  .composer-foot {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.6rem;
+  }
+  .send {
+    padding: 0.15rem 0.6rem;
+    border-radius: 0.4rem;
+    background: var(--text);
+    color: var(--ground);
+    font-weight: 600;
+  }
+
+  /* Mermaid */
+  .seg {
+    display: inline-flex;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.4rem;
+    overflow: hidden;
+    font-size: 0.68rem;
+    font-weight: 500;
+  }
+  .seg span {
+    padding: 0.05rem 0.4rem;
+    color: var(--text-muted);
+  }
+  .seg .on {
+    background: var(--surface-2);
+    color: var(--text);
+    font-weight: 600;
+  }
+  .flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem 0 0.6rem;
+  }
+  .node {
+    padding: 0.3rem 0.55rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.4rem;
+    background: var(--ground);
+    font-weight: 600;
+  }
+  .node.picked {
+    border-color: var(--accent-text);
+    outline: 2px solid var(--tint);
+  }
+  .edge {
+    width: 1.1rem;
+    height: 1px;
+    background: var(--border-strong);
+  }
+
+  /* Agents: the terminal is the deep palette the night band uses. */
+  .term {
+    border-color: var(--deep-border);
+    background: var(--deep);
+    color: var(--deep-text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem;
+  }
+  .term p + p {
+    margin-top: 0.3rem;
+  }
+  .term .prompt {
+    color: var(--deep-muted);
+  }
+  .term .ok {
+    color: var(--deep-muted);
+  }
+
+  /* Read aloud */
+  .reading mark {
+    padding: 0 0.1rem;
+    background: var(--selection);
+    color: var(--text);
+  }
+  .player {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin-top: 0.7rem;
+    padding: 0.35rem 0.55rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+  }
+  .play {
+    width: 0;
+    height: 0;
+    border-top: 0.32rem solid transparent;
+    border-bottom: 0.32rem solid transparent;
+    border-left: 0.5rem solid var(--text);
+  }
+  .wave {
+    flex: 1;
+    height: 1rem;
+    gap: 0.22rem;
+  }
+  .w {
+    width: 3px;
+    border-radius: 999px;
+    background: var(--accent);
+  }
+  .w.h-2 {
+    height: 35%;
+  }
+  .w.h-3 {
+    height: 55%;
+  }
+  .w.h-4 {
+    height: 75%;
+  }
+  .w.h-5 {
+    height: 100%;
+  }
+  .where {
+    color: var(--text-muted);
+    font-size: 0.66rem;
+  }
+
+  /* Hand to AI */
+  .prompt-body p + p {
+    margin-top: 0.3rem;
+  }
+  .prompt-body b {
+    display: inline-block;
+    min-width: 2.6rem;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  /* Breve */
+  .brief {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .brief li {
+    position: relative;
+    padding: 0.3rem 0 0.3rem 0.9rem;
+    border-top: 1px solid var(--border);
+  }
+  .brief li::before {
+    content: '';
+    position: absolute;
+    top: 0.68rem;
+    left: 0.1rem;
+    width: 0.38rem;
+    height: 0.38rem;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+</style>

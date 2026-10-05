@@ -24,6 +24,12 @@ export const SIZES: { size: string; meaning: string }[] = [
   { size: "XL", meaning: "a month or more" },
 ];
 
+/** A feature request's limits: the page's form says them, the sidecar enforces them. */
+export const REQUEST_LIMITS = {
+  title: { min: 3, max: 120 },
+  description: { min: 10, max: 2000 },
+} as const;
+
 export interface RoadmapItem {
   id: string;
   /** Plain text; backticks mark code (`/chart`). */
