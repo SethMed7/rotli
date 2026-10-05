@@ -452,17 +452,24 @@ describe("a note's age (date-only created/updated)", () => {
   const NOW = Date.UTC(2026, 9, 2, 23, 30);
   beforeEach(() => setSystemTime(new Date(NOW)));
   afterEach(() => setSystemTime());
-  const ZONES = ["America/New_York", "UTC", "Asia/Tokyo", "Pacific/Kiritimati", "Pacific/Pago_Pago"];
+  // the zone's own calendar day at NOW — what a Rotli Web writer stamps there
+  const ZONES: Record<string, string> = {
+    "America/New_York": "2026-10-02",
+    UTC: "2026-10-02",
+    "Asia/Tokyo": "2026-10-03",
+    "Pacific/Kiritimati": "2026-10-03",
+    "Pacific/Pago_Pago": "2026-10-02",
+  };
 
   test("a brand-new note reads “just now” in every time zone", async () => {
-    for (const tz of ZONES) {
+    for (const [tz, day] of Object.entries(ZONES)) {
       await inZone(tz, async () => {
         const dir = new WallClockVaultDir(NOW);
         const notes = new FolderNotesService(dir);
         const note = await notes.createNote(DEST.inbox, "# Fresh\n");
         const path = (await notes.listNotes()).find((n) => n.id === note.id)?.diskFolderId ?? "";
         const fm = parseNoteDocument(await dir.readText(path ? `${path}/fresh.md` : "fresh.md")).frontmatter;
-        expect(fm?.created).toMatch(/^\d{4}-\d{2}-\d{2}$/); // the date-only contract holds
+        expect(fm?.created).toBe(day); // date-only, and the writer's own day
         expect(relativeLabel(note.updatedAt, NOW)).toBe("just now");
         expect(relativeLabel(note.createdAt, NOW)).toBe("just now");
       });
@@ -473,6 +480,34 @@ describe("a note's age (date-only created/updated)", () => {
     await inZone("Asia/Tokyo", () => {
       // 23:30 UTC on Oct 2 is already Oct 3 in Tokyo
       expect(today(new Date(NOW))).toBe("2026-10-03");
+    });
+  });
+
+  test("the stamp alone never reads as an hour count (the old UTC-midnight bug)", async () => {
+    await inZone("America/New_York", () => {
+      // read as UTC midnight (8pm the evening before, local), today's stamp
+      // already looked a day old at NOW
+      expect(relativeLabel(Date.UTC(2026, 9, 2), NOW)).toBe("1d");
+      expect(relativeLabel(stampToMs("2026-10-02", NOW) ?? 0, NOW)).toBe("just now");
+    });
+  });
+
+  test("yesterday's note whose file time was refreshed does not read “just now”", async () => {
+    // a move, rename, or copy bumps the file time but not `updated`; this one
+    // was touched just before noon UTC on Oct 2 — already Oct 2 in each zone
+    // below, and inside the old UTC-midnight −14h…+36h window
+    const TOUCHED = Date.UTC(2026, 9, 2, 11, 59);
+    for (const tz of ["America/New_York", "UTC", "Pacific/Pago_Pago", "Asia/Tokyo"]) {
+      await inZone(tz, () => {
+        const yesterday = stampToMs("2026-10-01", TOUCHED) ?? 0;
+        expect(yesterday).toBe(new Date(2026, 9, 1).getTime());
+        expect(relativeLabel(yesterday, TOUCHED)).not.toBe("just now");
+      });
+    }
+    await inZone("Asia/Tokyo", () => {
+      // the documented residual: east of UTC, until native stamps the local
+      // day, yesterday's local stamp is still today's UTC day and trusts the file
+      expect(stampToMs("2026-10-02", NOW)).toBe(NOW);
     });
   });
 

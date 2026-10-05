@@ -69,6 +69,17 @@ describe("folder mode (a connected or imported folder)", () => {
     expect(await store.imageUrl(".rotli/main.json")).toBe("");
   });
 
+  test("says whether any linked file is there, a PDF as well as an image", async () => {
+    const dir = new MemoryVaultDir();
+    const store = createWebFileStore(dir, kv);
+    await dir.writeBytes("storage/spec.pdf", new Uint8Array([1]));
+    await dir.writeBytes("Storage/old.pdf", new Uint8Array([1]));
+    expect(await store.fileExists("storage/spec.pdf")).toBe(true);
+    expect(await store.fileExists("storage/old.pdf")).toBe(true);
+    expect(await store.fileExists("storage/gone.pdf")).toBe(false);
+    expect(await store.fileExists("storage/../storage/spec.pdf")).toBe(false);
+  });
+
   test("refuses non-image names and oversized bytes without writing", async () => {
     const dir = new MemoryVaultDir();
     const store = createWebFileStore(dir, kv);
@@ -101,5 +112,7 @@ describe("browser storage mode", () => {
     expect(await store.createImageAsset("default", "shot.png", PNG_BASE64)).toBe("storage/images/shot-2.png");
     expect((await store.imageUrl(id)).startsWith("blob:")).toBe(true);
     expect(await store.imageUrl("storage/images/other.png")).toBe("");
+    expect(await store.fileExists(id)).toBe(true);
+    expect(await store.fileExists("storage/spec.pdf")).toBe(false);
   });
 });

@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use super::attachments::{TEXT_DEFAULT_BYTES, TEXT_MAX_BYTES};
 use super::{
     arg_required, arg_string, arg_usize, flag, json_value, positional, require_revision,
-    required_option, revision, usize_option, NoteReadResult, Workspace, CONNECTOR_ROOT,
+    required_option, usize_option, NoteReadResult, Workspace, CONNECTOR_ROOT,
 };
 use crate::corpus::ai_journal::{revert, unified, AiEditRow, AiEditor, APPLIED, EDIT, TRASH};
 
@@ -35,7 +35,7 @@ pub(super) fn tools(tool: fn(&str, &str, Value, bool) -> Value) -> Vec<Value> {
     rename["title"] = json!({"type":"string","maxLength":500});
     vec![
         tool(RENAME, "Rename one note: its H1 title and its physical file follow; the prior title stays in aliases. id may be the note id or an exact title, filename, or alias; ambiguous or missing selectors are refused. Pass expectedRevision from a read to refuse a stale rename. Person-written notes need the person's \"Let AI edit\" grant; secure and locked notes are refused.", schema(rename, json!(["id", "title"])), false),
-        tool(ATTACHMENTS, "List the files a note's Markdown links and images name (storage: and vault-relative paths), with MIME type, size, and kind; on this Mac also the absolute path for your own file tools. includeText returns small text attachments (capped, secret-shaped text withheld). Images and other binaries are never inlined. Secure notes are refused.", schema(json!({"includeText":{"type":"boolean"},"maxBytes":{"type":"integer","minimum":1,"maximum":TEXT_MAX_BYTES}}), json!(["id"])), true),
+        tool(ATTACHMENTS, "List the files a note's Markdown links and images name (storage: and vault-relative paths), with MIME type, size, and kind; on this Mac also the absolute path for your own file tools. includeText returns small text attachments (capped, secret-shaped text withheld). Images and other binaries are never inlined. Secure notes are refused, and a linked file an agent may not read (a secure note, anything in a secure folder) is listed with its link only.", schema(json!({"includeText":{"type":"boolean"},"maxBytes":{"type":"integer","minimum":1,"maximum":TEXT_MAX_BYTES}}), json!(["id"])), true),
         tool(TRASH_NOTE, "Move one note to Rotli's Trash, where the person can restore it; nothing is deleted. Only a note an AI made, or one the person granted \"Let AI edit\", may be trashed; secure and locked notes are refused. Requires the revision from the read just before. Requires approval.", gated(), false),
         tool(HISTORY, "List the AI body edits journaled for one note, newest first: who (chat or agent), when, the before and after revisions, and a unified diff when the edit was journaled with its text. Secure notes are refused.", schema(json!({"limit":{"type":"integer","minimum":1,"maximum":100}}), json!(["id"])), true),
         tool(UNDO_AI_EDIT, "Undo the last AI body edit of one note, only while the note is exactly as that edit left it (its revision matches). The undo is itself an AI edit under the same rules and is journaled. Requires approval.", gated(), false),
@@ -114,29 +114,13 @@ impl Workspace {
         }
     }
 
-    /// Move one note to Trash through the app's own soft delete
-    /// (`CorpusStore::delete`, the lane the note menu's Move to Trash rides),
-    /// after the same gates a body edit takes.
+    /// Move one note to Trash through the app's own soft delete (the lane the
+    /// note menu's Move to Trash rides), with the gates a body edit takes
+    /// checked under the note's file lock, around the move itself.
     pub(super) fn trash_note(&mut self, local_id: &str, expected: &str) -> Result<Trashed, String> {
-        require_revision(expected)?;
-        let text = self.store.read_for_ai(local_id, false)?;
         let rel = self.store.resolve_note_rel(local_id)?;
-        if !rel.ends_with(".md") {
-            return Err("agents trash Markdown notes only".into());
-        }
-        let fm = crate::corpus::parse_document(&text).0.unwrap_or_default();
-        if let Some(refusal) = crate::ai_edit_policy::body_edit(&fm.foreign).refusal() {
-            return Err(refusal.into());
-        }
-        let found = revision(text.as_bytes());
-        if found != expected {
-            return Err(conflict(expected, &found));
-        }
-        // The move takes the note's file lock itself, so this is check-then-move:
-        // a write landing in between still lands in Trash, never in oblivion.
-        self.store.delete(local_id)?;
-        let note_id = fm.id.clone().unwrap_or_else(|| rel.clone());
-        let row = AiEditRow { content_free: true, ..AiEditRow::new(TRASH, &note_id, &rel, &AiEditor::agent(None), expected) };
+        let moved = self.store.trash_for_remote_agent_if_revision(local_id, expected)?;
+        let row = AiEditRow { content_free: true, ..AiEditRow::new(TRASH, &moved.id, &rel, &AiEditor::agent(None), expected) };
         self.store.ai_journal_record(&row);
         Ok(Trashed {
             trashed: true,

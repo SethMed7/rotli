@@ -15,14 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Hand to AI brings the note's files along.** Images and files the note
   links to are listed under Attachments with where they are on your Mac, and
   the links in the note point there, so the agent can open them. A file that
-  isn't in your vault is listed as missing. A note that links to a file in a
-  secure folder isn't handed off at all.
+  isn't in your vault, or that Rotli Web can't confirm is there, is listed as
+  missing. A note that links to a file in a secure folder, however the link is
+  written, or with a link Rotli can't read safely, isn't handed off at all.
 - **Hand to AI has a Refined mode.** Next to Basic (the prompt built from
   the note, as before), Refined asks the Librarian's model to rewrite it as a
   full prompt: the task, the context, the constraints, the files, and how to
   check it's done. It uses the model on this Mac unless your Librarian is set
-  to a connected model. If it can't help this time, you get Basic and the
-  reason. Hand to AI remembers which one you chose last.
+  to a connected model. If it can't help this time, or its rewrite drops a
+  file path, you get Basic and the reason; edits you made to Basic stay. Hand to AI remembers which one you chose last.
 
 ### Changed
 
@@ -102,8 +103,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `rotli notes history` shows a note's AI edits; `rotli notes undo-ai-edit`
   undoes the last one only while the note is exactly as it left it. Renaming,
   trashing, and undoing follow the edit rule: only notes an AI made, or ones
-  you let AI edit, never locked or secure ones. `rotli open` and deep links
-  now reach notes in connected vaults.
+  you let AI edit, never locked or secure ones, checked again at the moment
+  of the move. A linked note an agent may not read (secure, in a secure
+  folder, or holding a secret) is listed with its link only, never its size
+  or where it is on your Mac. `rotli open` and deep links now reach notes in
+  connected vaults: Rotli switches to that vault, then opens the note. A
+  connected folder that isn't a vault is refused with a message saying so.
 - **Agents get the same tools** (development builds). `rotli mcp` gains
   `rotli_rename`, `rotli_note_attachments`, `rotli_trash_note`,
   `rotli_note_history`, and `rotli_undo_ai_edit`, and `rotli agent config`
@@ -166,8 +171,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   4h in New York) because its date was taken as midnight UTC. A
   note's created and updated dates stay plain days in the file; Rotli Web
   now uses the file's own time when it falls on that day, and otherwise
-  shows the day rather than an hour count. New notes are dated with your
-  own calendar day, not New York's.
+  counts from the start of that day in your time zone. Notes made in Rotli
+  Web are dated with your own calendar day; the Mac app still dates them in
+  UTC for now.
 - **Images dropped from Finder land where you drop them.** On Retina
   screens a dropped image went in about halfway up the note; Rotli now reads
   the drop position as the Mac reports it.
