@@ -137,8 +137,11 @@ bun run preview  # serve the built dist/ locally
   listed on its index with a "Coming soon" label and no link, and has no
   page, Markdown twin, sitemap entry, or llms.txt line until the field comes
   off (`publishedWriting` vs `upcomingWriting`). Routes: `/resources/`, `/resources/<file>/`,
-  `/blog/`, `/blog/<file>/`, and `/about/` (which holds the name story and
-  links the `the-creation-of-rotli` post once it is published). Markdown code
+  `/blog/`, `/blog/<file>/`, and `/about/` (the maker's first-person story of
+  why rotli exists: notes first, people and AI note differently, the vault
+  you own beside the "stays local" quokka, no extra AI fee, house rules for
+  AI, then the name story and who makes it; it links the
+  `the-creation-of-rotli` post once it is published). Markdown code
   blocks are not syntax-highlighted: Shiki writes inline `style=` attributes,
   which the production CSP drops. Keep article images local.
 - **`/download/`** is where the header's Download button goes. It leads with
@@ -291,7 +294,7 @@ bun run preview  # serve the built dist/ locally
   through `.band-night` (the landing privacy band and the night frame on
   `/privacy/`); `IslandScene.astro` is the island by
   day (a faint vignette behind Make it yours, and the framed scene opening
-  `/about/`); the FAQ has the searching quokka among question cards. The
+  the `/about/` story, captioned with where the name comes from); the FAQ has the searching quokka among question cards. The
   closing invitation has no scene of its own (2026-10-02): the footer's
   quokka beach right below it is the page's one closing scene. `/privacy/` and
   `/about/` place their scene through `WritingPage`'s `scene` slot; `/about/`

@@ -75,7 +75,7 @@ site message and structure follow. The story film (#21) comes last.
 - Resources becomes a dropdown: Guides · Blog · Developers (MCP/CLI, labelled coming soon) · Changelog. The blog gets "coming soon" stubs.
 - Features page cleanup using fresh demo-vault captures (keep-docs-fresh). The owner can supply cleaner shots instead.
 - Privacy page moves to the article flow: sticky left TOC with reading progress, a readable column, and the walking quokka in the footer.
-- About: a story rewrite. Needs an owner interview (questions below).
+- About: a story rewrite. Done in #161 as a first-person story; the owner can still add a personal moment (the `[[OWNER]]` notes in the page).
 
 ### PR 8 — Living footer + 404 (#7)
 - Newsletter form plus the Bun sidecar (CSP: `form-action`/`connect-src 'self'`). The owner sets `RESEND_API_KEY` + audience id on Railway.
@@ -131,7 +131,7 @@ Remaining:
 
 - #10 Tab (still needs the owner's answer on what feels wrong).
 - #14 the chat buddy (app half).
-- #18 About (needs the owner interview).
+- #18 About: written (#161); optional owner details remain.
 - #20 branding.
 - #21 the story film, last.
 - Native proofs: the Retina drop (#5) and Refined with a real model (#22).
@@ -141,6 +141,6 @@ Remaining:
 
 ## Still open (non-blocking)
 
-- About page: what story? (origin of the name, why local-first, who it's for). An interview gets the raw material.
+- About page: written (#161). Optional: one real moment that started it, and the true reason for the quokka.
 - #10: what feels wrong about Tab today?
 - #14 (app half): does the chat buddy's decoration live per-vault or per-Mac?

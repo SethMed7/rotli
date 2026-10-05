@@ -28,7 +28,8 @@ stays `site/README.md`; this records the decisions and their order.
    `draft`, `experiment`). Resources is an index of question-titled
    articles; the MCP guide moves to `/resources/mcp/` (still dev-only,
    `/mcp/` redirects). Blog posts are dated; drafts render only on the dev
-   site. About stays short and links to the "creation of rotli" post.
+   site. About tells the maker's first-person story (2026-10-05, replacing
+   the short name-only page) and links the "creation of rotli" post.
 
 ## Wording guard
 
