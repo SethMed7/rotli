@@ -91,3 +91,12 @@ test("the theme studio's steps sit on one row at phone width", async ({ page }) 
   expect(previous!.x).toBeLessThan(label!.x);
   expect(label!.x).toBeLessThan(next!.x);
 });
+
+test("the landing says rotli is more than notes and asks no extra AI fee", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".overview .section-lede")).toContainText("Notes are the foundation.");
+  await expect(page.locator("#waiting .close")).toContainText("no extra AI plan to buy");
+  const faq = page.locator(".faq-list summary");
+  await expect(faq.filter({ hasText: "Do I have to pay for AI?" })).toHaveCount(1);
+  await expect(faq.filter({ hasText: "Is rotli just a notes app?" })).toHaveCount(1);
+});

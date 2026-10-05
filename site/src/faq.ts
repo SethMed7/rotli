@@ -24,6 +24,14 @@ export const questions: { q: string; a: string }[] = [
     a: 'A model that runs on your Mac, or the tools you already use, like Claude Code and Codex, with Cursor for code chat. AI is optional; rotli is a complete workspace without it.',
   },
   {
+    q: 'Do I have to pay for AI?',
+    a: 'No. rotli has no AI plan of its own and charges nothing for AI. It uses a model that runs on your Mac, or the AI tools you already pay for. Without AI it is still a complete workspace.',
+  },
+  {
+    q: 'Is rotli just a notes app?',
+    a: 'Notes are the foundation. Around them, chat answers from your own notes, the Librarian files and links them, and documents and boards live as ordinary files in the same folder. The Features page says which parts run on the Mac and which in the browser.',
+  },
+  {
     q: 'Can I leave?',
     a: 'Your notes never left. The folder opens in any Markdown editor, and deleting rotli leaves every file where it was.',
   },
