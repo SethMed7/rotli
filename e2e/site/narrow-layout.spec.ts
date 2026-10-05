@@ -1,5 +1,5 @@
-// Phone and tablet widths (390 and 768, plus 1024 for the theme studio's island): nothing
-// widens the page, the theme studio's island never sits under its words, and the landing's
+// Phone and tablet widths (390 and 768, plus 1024 for the theme studio's island, and the
+// landing from 320 to 1920): nothing widens the page, the theme studio's island never sits under its words, and the landing's
 // smaller controls answer a 44px touch. The website prompt pass of 2026-10-05 found each of
 // these by sweep; this keeps them found.
 import { expect, test } from "@playwright/test";
@@ -25,6 +25,14 @@ for (const width of [390, 768]) {
   }
 }
 
+for (const width of [320, 1024, 1920]) {
+  test(`the landing never scrolls sideways at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+    expect(await overflow(page)).toBeLessThanOrEqual(0);
+  });
+}
+
 for (const width of [768, 1024, 1180, 1440]) {
   test(`the theme studio's island stays clear of its lede at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
@@ -37,14 +45,16 @@ for (const width of [768, 1024, 1180, 1440]) {
   });
 }
 
-test("the overview puts each quokka beside its step on a tablet", async ({ page }) => {
+test("each card puts its picture beside its words on a tablet", async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 1024 });
   await page.goto("/");
-  const step = page.locator(".overview .steps > li").first();
-  const art = (await step.locator("img").boundingBox())!;
-  const title = (await step.locator("h3").boundingBox())!;
-  expect(title.x).toBeGreaterThan(art.x + art.width);
-  expect(Math.abs(title.y - art.y)).toBeLessThan(art.height);
+  for (const card of await page.locator(".overview .card").all()) {
+    const art = (await card.locator(".stage").boundingBox())!;
+    const title = (await card.locator("h3").boundingBox())!;
+    expect(title.x).toBeGreaterThan(art.x + art.width);
+    expect(title.y).toBeGreaterThan(art.y);
+    expect(title.y + title.height).toBeLessThan(art.y + art.height);
+  }
 });
 
 test.describe("touch", () => {
