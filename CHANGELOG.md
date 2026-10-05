@@ -31,7 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A paragraph stops at one level, because Markdown reads four spaces as a
   code block. Tab on a bullet, number, or checklist item still nests it, and
   Shift-Tab brings any line back. Tab on a heading leaves it a heading
-  instead of turning it into plain text.
+  instead of turning it into plain text. Tab over several lines that include
+  a code block indents the code but leaves its ``` lines in place, so the
+  block stays a code block.
 - **rotli.co's home page opens on the app itself.** The film under the
   headline is now a real recording of rotli: a quick note, the Library,
   search, chat, and the same note as plain Markdown. It has no sound, so the

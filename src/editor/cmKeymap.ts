@@ -186,13 +186,16 @@ const tabIndent: Command = (view) => {
   const startLine = state.doc.lineAt(range.from);
   const endLine = state.doc.lineAt(range.to);
   // a multi-line selection indents every line it spans that takes an indent;
-  // blank lines stay blank rather than gaining trailing spaces
+  // blank lines stay blank rather than gaining trailing spaces, and a fence's
+  // own ``` lines stay at column 0 — an indented marker stops being a fence
   if (startLine.number !== endLine.number) {
     const fences = scanFences(state.doc);
+    const isMarker = (l: Line) => fences.some((f) => l.from === f.from || l.to === f.to);
     const changes = [];
     for (let n = startLine.number; n <= endLine.number; n++) {
       const l = state.doc.line(n);
-      const next = l.text.trim() === "" ? null : indentedPrefix(l.text, lineInFence(l.from, fences));
+      const skip = l.text.trim() === "" || isMarker(l);
+      const next = skip ? null : indentedPrefix(l.text, lineInFence(l.from, fences));
       if (next !== null)
         changes.push({ from: l.from, to: l.from + leadingIndent(l.text).length, insert: next });
     }

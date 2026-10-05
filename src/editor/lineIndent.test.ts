@@ -5,7 +5,13 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { indentColumns, indentedPrefix, indentRoleOf, PARAGRAPH_INDENT_MAX } from "./lineIndent";
+import {
+  indentColumns,
+  indentedPrefix,
+  indentRoleOf,
+  PARAGRAPH_INDENT_MAX,
+  paragraphIndentLevels,
+} from "./lineIndent";
 import { paragraphIndentStyle, STEP_EM, MARKER_EM } from "./listGeometry";
 
 describe("indentRoleOf", () => {
@@ -36,6 +42,8 @@ describe("indentRoleOf", () => {
     for (const line of [
       "# Title",
       "### Section",
+      " # Near heading",
+      "   ## Three deep",
       '<p align="center">hi</p>',
       "---",
       "![alt](storage:a.png)",
@@ -67,6 +75,18 @@ describe("indentedPrefix", () => {
   test("fenced code is the user's own indentation and always nests", () => {
     expect(indentedPrefix("    code", true)).toBe("      ");
     expect(indentedPrefix("# comment", true)).toBe("  ");
+  });
+
+  test("a heading one to three spaces deep stays put too", () => {
+    expect(indentedPrefix(" # Title")).toBeNull();
+    expect(indentRoleOf("    # four deep is code, not a heading")).toBe("paragraph");
+  });
+
+  test("a paragraph shows one level per two columns, and one space is still a level", () => {
+    expect(paragraphIndentLevels("text")).toBe(0);
+    expect(paragraphIndentLevels(" text")).toBe(1);
+    expect(paragraphIndentLevels("  text")).toBe(1);
+    expect(paragraphIndentLevels("     text")).toBe(2);
   });
 
   test("indentColumns counts a tab as one level", () => {

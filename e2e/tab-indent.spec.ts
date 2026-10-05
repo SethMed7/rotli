@@ -10,15 +10,15 @@ import { expect, type Page, test } from "@playwright/test";
 
 import { gotoApp } from "./support";
 
-/** The open note's Markdown, as the editor will save it. */
+/** The open note's Markdown, as the editor will save it. Imported by its dev
+ * path, the same module instance the app holds — never found through
+ * performance resource entries: Chromium's resource-timing buffer stops at 250
+ * entries, and the dev server's module graph fills it before the editor
+ * mounts, so a lookup there misses commands.ts on most runs. */
 async function noteText(page: Page): Promise<string> {
   return page.evaluate(async () => {
-    const url = performance
-      .getEntriesByType("resource")
-      .map((entry) => entry.name)
-      .find((name) => new URL(name).pathname === "/src/editor/commands.ts");
-    if (!url) throw new Error("the editor commands module is not mounted");
-    const { activeEditor } = await import(/* @vite-ignore */ url);
+    const commandsPath = "/src/editor/commands.ts";
+    const { activeEditor } = await import(/* @vite-ignore */ commandsPath);
     return activeEditor()?.getSelection?.()?.doc ?? "";
   });
 }
@@ -49,7 +49,7 @@ const NOTE =
 
 test("Tab indents prose visibly, nests lists, and leaves a heading alone", async ({ page }) => {
   await gotoApp(page);
-  await page.keyboard.press("Meta+T");
+  await page.getByRole("button", { name: /^New note in / }).click();
   const editor = page.locator(".cm-content").last();
   await editor.click();
   await page.keyboard.insertText(NOTE);
