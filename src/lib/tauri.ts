@@ -973,7 +973,7 @@ export function rootIdOf(id: string): string {
 /** Split a corpus wire id into its root + relative path. The default LOCAL root
  * emits BARE ids ("storage/x.mp3"); a non-default root prefixes "<rootid>:rel"
  * where rootid has no slash. Mirrors Rust `split_root_id`. */
-function splitRootId(id: string): { rootId: string; rel: string } {
+export function splitRootId(id: string): { rootId: string; rel: string } {
   const i = id.indexOf(":");
   if (i > 0 && !id.slice(0, i).includes("/")) {
     return { rootId: id.slice(0, i), rel: id.slice(i + 1) };
