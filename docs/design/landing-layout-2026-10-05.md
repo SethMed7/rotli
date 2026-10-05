@@ -107,8 +107,8 @@ only when the visitor picks one.
 - TwoKinds shows *that your words stay*: the same file before and after.
 - The tour item shows *where notes go*: filed into Library areas.
 
-Each one uses a different synthetic note from the film's vault, so none of
-them repeats another's example.
+Each one shows a different side of the same feature, so none of them
+repeats another's point.
 
 ## Closing banner headline
 

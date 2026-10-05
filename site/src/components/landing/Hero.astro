@@ -55,6 +55,10 @@ import FilmPlayer from '../FilmPlayer.astro';
   }
   /* Decoration only: the faint icon tile, hidden behind the words and
      strongest toward the edges (a mask, not a light effect). */
+  /* The film ends the first chapter: room under it before the cards' warm band begins. */
+  .below-fold {
+    padding-bottom: calc(var(--section-space) * 0.6);
+  }
   .hero-pattern {
     position: absolute;
     inset: 0;

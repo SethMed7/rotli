@@ -327,7 +327,11 @@ const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open
     width: 20px;
     height: 20px;
     margin-left: auto;
-    transition: transform 160ms ease-out;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .chevron {
+      transition: transform 160ms ease-out;
+    }
   }
   [aria-expanded='true'] .chevron {
     transform: rotate(90deg);
@@ -407,8 +411,8 @@ const command = 'curl -fsSL https://rotli.co/helper/install.sh | sh -s -- --open
     font-size: 1.05rem;
     font-weight: 600;
   }
-  .doc-h2 {
-    margin-top: 0.85rem !important;
+  .doc-page .doc-h2 {
+    margin-top: 0.85rem;
     font-weight: 600;
   }
   .formula {
