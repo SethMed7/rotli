@@ -148,8 +148,8 @@
 	handle_errors {
 		import security
 		# The sidecar is down (or still starting): the list reads as closed. The
-		# footer's probe sees a non-200 and hides its form; a plain form post gets
-		# this line instead of the site's 404 page.
+		# footer's probe sees a non-200, so a submit says the list isn't open yet;
+		# a plain form post gets this line instead of the site's 404 page.
 		@api path /api/*
 		handle @api {
 			header Cache-Control "no-store"

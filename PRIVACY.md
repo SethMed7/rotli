@@ -84,7 +84,8 @@ as the IP address to deliver pages.
 The footer's optional "Hear when it's ready" list sends the address a visitor
 types to Resend, Rotli's email provider, to keep the list, and only when the
 visitor submits it. Anyone on the list can unsubscribe at any time. Nothing
-else is collected or shared.
+else is collected or shared. Until the list opens, the form says so and the
+address is not kept or passed on.
 
 ## Secure notes and locked notes
 

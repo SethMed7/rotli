@@ -2,7 +2,7 @@
 // site's container on 127.0.0.1 behind Caddy (site/Caddyfile `handle /api/*`,
 // site/entrypoint.sh). It adds an email address to a Resend segment and nothing else.
 //
-//   GET/HEAD  /api/subscribe  → { live } — is the list open? The footer hides its form if not.
+//   GET/HEAD  /api/subscribe  → { live } — is the list open? If not, the footer says so on submit.
 //   POST      /api/subscribe  → adds the contact. JSON in and out for the footer's script;
 //                               a plain form post (no JavaScript) is redirected to /subscribed/.
 //

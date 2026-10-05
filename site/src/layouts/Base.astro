@@ -910,6 +910,33 @@ const socialImageUrl = new URL(image, siteUrl).href;
       .footer-bottom p {
         margin: 0;
       }
+      .footer-maker {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.25rem;
+      }
+      /* The maker's X mark: a drawn X (not the platform's artwork) in a 44px target. */
+      .footer-x {
+        display: inline-grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        margin-block: -12px;
+        border-radius: 0.5rem;
+        color: var(--text-muted);
+      }
+      .footer-x:hover {
+        color: var(--text);
+        background: var(--surface-2);
+      }
+      .footer-x svg {
+        width: 16px;
+        height: 16px;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+      }
       .footer-badges {
         display: flex;
         flex-wrap: wrap;
@@ -929,9 +956,6 @@ const socialImageUrl = new URL(image, siteUrl).href;
       .subscribe {
         max-width: 26rem;
         margin-top: 1.75rem;
-      }
-      .subscribe[hidden] {
-        display: none;
       }
       .subscribe h2 {
         margin: 0;
@@ -987,6 +1011,10 @@ const socialImageUrl = new URL(image, siteUrl).href;
       }
       .footer-lead .subscribe-status:empty {
         display: none;
+      }
+      .subscribe[data-state='closed'] .subscribe-status {
+        color: var(--text);
+        font-weight: 500;
       }
       .subscribe[data-state='error'] .subscribe-status {
         color: var(--accent-text);
