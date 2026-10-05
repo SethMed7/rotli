@@ -119,6 +119,27 @@ let cycle: {
   resume(c: Cycle, now: number): Cycle;
   wait(c: Cycle, now: number): number | null;
 };
+interface Walk {
+  x: number;
+  v: number;
+  facing: 1 | -1;
+  phase: number;
+}
+interface Spot {
+  pile: boolean;
+  quokka: string | null;
+  players: boolean;
+}
+let human: {
+  STRIDE: { speed: number; accel: number; near: number; cycle: number };
+  createWalk(x: number, facing?: 1 | -1): Walk;
+  stepWalk(walk: Walk, target: number, ms: number, teleport?: boolean): Walk;
+  arrived(walk: Walk, target: number): boolean;
+  limbs(walk: Walk): { leg: number; arm: number; bob: number };
+  deed(holding: boolean, spot: Spot): "pick" | "feed" | "join" | null;
+  onSand(x: number, width: number, bodyWidth: number): number;
+  entrance(target: number, width: number, bodyWidth: number): number;
+};
 let art: {
   tracedPose(svg: string): { line: string; silhouette: string; transform: string; viewBox: number };
 };
@@ -130,6 +151,7 @@ beforeAll(async () => {
   play = (await import(site("quokka", "play.ts"))) as typeof play;
   art = (await import(site("quokka", "art.ts"))) as typeof art;
   cycle = (await import(site("themeCycle.ts"))) as typeof cycle;
+  human = (await import(site("quokka", "human.ts"))) as typeof human;
 });
 
 describe("the privacy passage", () => {
@@ -399,6 +421,81 @@ describe("the 404 game", () => {
     expect(game.metres(game.WORLD.unitsPerMetre * 12.9)).toBe(12);
     const g = game.step(game.start(game.createGame(800)), 5000, never);
     expect(g.distance).toBeLessThan(40);
+  });
+});
+
+describe("the person on the footer beach", () => {
+  const walkTo = (from: number, target: number, ms = 16, frames = 2000) => {
+    let walk = human.createWalk(from);
+    const path: Walk[] = [];
+    for (let i = 0; i < frames && !human.arrived(walk, target); i++) {
+      walk = human.stepWalk(walk, target, ms);
+      path.push(walk);
+    }
+    return path;
+  };
+
+  test("walks to where it is sent, easing in and out, and stops exactly there", () => {
+    const path = walkTo(100, 900);
+    const last = path.at(-1)!;
+    expect(last.x).toBe(900);
+    expect(last.v).toBe(0);
+    expect(human.arrived(last, 900)).toBe(true);
+    const speeds = path.map((w) => w.v);
+    expect(speeds[0]).toBeLessThan(human.STRIDE.speed / 4); // it sets off gently
+    expect(Math.max(...speeds)).toBeCloseTo(human.STRIDE.speed, 5); // a walk, never a run
+    expect(speeds.at(-2)!).toBeLessThan(human.STRIDE.speed / 3); // and slows to arrive
+    // Never past the spot, never back again.
+    for (let i = 1; i < path.length; i++) expect(path[i].x).toBeGreaterThanOrEqual(path[i - 1].x);
+    expect(Math.max(...path.map((w) => w.x))).toBe(900);
+  });
+
+  test("faces the way it walks, and keeps facing that way standing still", () => {
+    const left = walkTo(500, 200);
+    expect(left[5].facing).toBe(-1);
+    expect(left.at(-1)!.facing).toBe(-1);
+    expect(walkTo(200, 500)[5].facing).toBe(1);
+  });
+
+  test("a long frame (a hidden tab) never teleports it", () => {
+    const walk = human.stepWalk({ x: 0, v: human.STRIDE.speed, facing: 1, phase: 0 }, 2000, 5000);
+    expect(walk.x).toBeLessThanOrEqual(64 * human.STRIDE.speed + 1);
+  });
+
+  test("under reduced motion it is simply there, standing", () => {
+    expect(human.stepWalk(human.createWalk(10), 700, 16, true)).toEqual({
+      x: 700,
+      v: 0,
+      facing: 1,
+      phase: 0,
+    });
+  });
+
+  test("legs and arms swing opposite ways while walking, and hang still when standing", () => {
+    expect(human.limbs(human.createWalk(0))).toEqual({ leg: 0, arm: 0, bob: 0 });
+    const striding = { x: 0, v: human.STRIDE.speed, facing: 1 as const, phase: Math.PI / 2 };
+    const swing = human.limbs(striding);
+    expect(swing.leg).toBeGreaterThan(15);
+    expect(swing.arm).toBeGreaterThan(10);
+    expect(human.limbs({ ...striding, phase: (3 * Math.PI) / 2 }).leg).toBeLessThan(-15);
+  });
+
+  test("stopping does the one thing that fits: pick, feed, or join", () => {
+    const none = { pile: false, quokka: null, players: false };
+    expect(human.deed(false, { ...none, pile: true })).toBe("pick");
+    expect(human.deed(true, { ...none, pile: true })).toBeNull(); // hands full
+    expect(human.deed(true, { ...none, quokka: "sitter" })).toBe("feed");
+    expect(human.deed(false, { ...none, quokka: "sitter" })).toBeNull(); // nothing to give
+    expect(human.deed(false, { ...none, players: true, quokka: "player-a" })).toBe("join");
+    expect(human.deed(true, { ...none, players: true, quokka: "player-a" })).toBe("feed");
+    expect(human.deed(false, none)).toBeNull();
+  });
+
+  test("it stays on the sand, and arrives from the nearer side", () => {
+    expect(human.onSand(-50, 1000, 80)).toBe(40);
+    expect(human.onSand(990, 1000, 80)).toBe(960);
+    expect(human.entrance(300, 1000, 80)).toBeLessThan(300);
+    expect(human.entrance(800, 1000, 80)).toBeGreaterThan(800);
   });
 });
 

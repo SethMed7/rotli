@@ -19,13 +19,20 @@
 // masks (src/assets/characters/concepts/layers/), filled with the scene's tokens and split
 // at the neck so heads can turn and dip. src/quokka/rig.ts holds every landmark.
 //
-// The visitor can pick a leaf off the pile and carry it (mouse, pen, or touch): the
-// residents watch it, and letting go over a quokka hands it over (it eats, and the guard is
-// pleased); letting go over open sand wastes it (it drifts down, and the guard is sad). The
-// button before the band does the same from the keyboard. src/quokka/scene.ts runs it all,
-// only while the band is on screen, the tab is visible, and motion is allowed; then, and
-// without script, the scene simply stands still and the button stays hidden. The band
-// itself is decoration (aria-hidden) and holds no text or links.
+// The visitor walks a person along the beach (the owner, 2026-10-05): it appears when the
+// pointer comes onto the sand and walks to where the pointer is (a tap on a touch screen; the
+// arrow keys from "Walk on the beach", the button before the band). Stopped at the leaf pile
+// it picks a leaf up, stopped at a quokka with a leaf it hands it over (the quokka eats, the
+// guard is pleased), and stopped by the two with the ball it joins their game of catch. The
+// person is the drawing below (code, in the scene's ink and tokens, no particular person:
+// a round face, a bucket hat, a shirt, and trousers). The older play stays alongside: a leaf
+// can still be dragged off the pile (mouse, pen, or touch) and dropped on a quokka, or on the
+// sand, where it is wasted and the guard is sad, and "Hand the quokkas a leaf" does that from
+// the keyboard. src/quokka/scene.ts runs it all, only while the band is on screen and the tab
+// is visible. Under reduced motion nothing moves on its own: the scene stands still until the
+// visitor plays, and then the person steps straight to where it is sent. Without script the
+// scene simply stands still and the buttons stay hidden. The band itself is decoration
+// (aria-hidden) and holds no text or links.
 import baseSvg from '../../../src/assets/characters/base.svg?raw';
 import celebratingSvg from '../../../src/assets/characters/celebrating.svg?raw';
 import wavingSvg from '../../../src/assets/characters/waving.svg?raw';
@@ -133,6 +140,11 @@ const mirror = `matrix(-1 0 0 1 ${2 * CENTER_X} 0)`;
 ---
 
 <div class="scenery-wrap">
+  <button type="button" class="scenery-feed" data-walk aria-describedby="walk-help" hidden>Walk on the beach</button>
+  <p class="visually-hidden" id="walk-help">
+    The left and right arrow keys walk you along the beach. Stop at the leaves to pick one up, at a quokka to
+    hand it over, or by the two with the ball to join their game.
+  </p>
   <button type="button" class="scenery-feed" data-feed hidden>Hand the quokkas a leaf</button>
   <p class="visually-hidden" aria-live="polite" data-feed-status></p>
   <div class="scenery" aria-hidden="true" data-scenery data-start-mood={mood}>
@@ -212,6 +224,45 @@ const mirror = `matrix(-1 0 0 1 ${2 * CENTER_X} 0)`;
 
     <svg class="qk qk-layered qk-walker" viewBox={layeredView('walking')} focusable="false" data-quokka="walker" data-pose-kind="walking">
       <g data-flip set:html={layeredRig('walking', false)} />
+    </svg>
+
+    <svg class="person" viewBox="0 0 100 170" focusable="false" data-person>
+      <g data-person-flip>
+        <g data-person-body>
+          <g data-person-arm="back">
+            <path class="person-limb-line person-arm-line" d="M50 84V108"></path>
+            <path class="person-sleeve" d="M50 84V108"></path>
+            <circle class="person-hand" cx="50" cy="110" r="5.5"></circle>
+          </g>
+          <g data-person-leg="back">
+            <path class="person-limb-line" d="M45 114V152"></path>
+            <path class="person-trouser" d="M45 114V152"></path>
+            <ellipse class="person-shoe" cx="49" cy="157" rx="9" ry="5.5"></ellipse>
+          </g>
+          <g data-person-leg="front">
+            <path class="person-limb-line" d="M55 114V152"></path>
+            <path class="person-trouser" d="M55 114V152"></path>
+            <ellipse class="person-shoe" cx="59" cy="157" rx="9" ry="5.5"></ellipse>
+          </g>
+          <rect class="person-shirt" x="31" y="72" width="38" height="48" rx="14"></rect>
+          <g class="person-head">
+            <circle class="person-face" cx="51" cy="50" r="20"></circle>
+            <circle class="person-cheek" cx="62" cy="56" r="3.4"></circle>
+            <circle class="person-ink" cx="61" cy="47.5" r="2.6"></circle>
+            <path class="person-line" d="M56 58q4.5 3.4 9 0"></path>
+            <path class="person-hat" d="M35 40Q36 21 51 20.5Q66 21 67 40Z"></path>
+            <path class="person-hat" d="M26 41.5Q51 34.5 76 41.5Q51 49 26 41.5Z"></path>
+          </g>
+          <g data-person-arm="front">
+            <path class="person-limb-line person-arm-line" d="M50 84V108"></path>
+            <path class="person-sleeve" d="M50 84V108"></path>
+            <g data-person-leaf visibility="hidden">
+              <use href="#qk-leaf" transform="translate(51 115) rotate(-35) scale(0.6)"></use>
+            </g>
+            <circle class="person-hand" cx="50" cy="110" r="5.5"></circle>
+          </g>
+        </g>
+      </g>
     </svg>
 
     <svg class="food" viewBox="0 0 150 72" focusable="false" data-food>
@@ -427,6 +478,85 @@ const mirror = `matrix(-1 0 0 1 ${2 * CENTER_X} 0)`;
     bottom: calc(16px + var(--qk-height) * 0.416 - var(--ball) / 2);
     width: var(--ball);
     height: var(--ball);
+    cursor: pointer;
+  }
+  /* The person the visitor walks: behind the residents (a quokka it stops at stays in view),
+     a little taller than a quokka, its lines in the scene's ink at about the art's weight.
+     Hidden until the visitor arrives; the script moves it with a CSSOM transform. */
+  .scenery .person {
+    position: absolute;
+    left: 0;
+    bottom: 16px;
+    height: calc(var(--qk-height) * 1.22);
+    width: calc(var(--qk-height) * 1.22 * 100 / 170);
+    overflow: visible;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      opacity 220ms ease-out,
+      visibility 0s linear 220ms;
+  }
+  .scenery .person.is-here {
+    visibility: visible;
+    opacity: 1;
+    transition:
+      opacity 220ms ease-out,
+      visibility 0s;
+  }
+  .person-limb-line {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 14;
+    stroke-linecap: round;
+  }
+  .person-arm-line {
+    stroke-width: 12.4;
+  }
+  .person-sleeve,
+  .person-trouser {
+    fill: none;
+    stroke-width: 9.4;
+    stroke-linecap: round;
+  }
+  .person-sleeve {
+    stroke: var(--lantern);
+    stroke-width: 8;
+  }
+  .person-trouser {
+    stroke: var(--wood-dark);
+  }
+  .person-shirt {
+    fill: var(--lantern);
+    stroke: var(--ink);
+    stroke-width: 2.2;
+  }
+  .person-hand,
+  .person-face {
+    fill: var(--capture-ground);
+    stroke: var(--ink);
+    stroke-width: 2.2;
+  }
+  .person-cheek {
+    fill: var(--lake);
+  }
+  .person-ink,
+  .person-shoe {
+    fill: var(--ink);
+  }
+  .person-line {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 2.2;
+    stroke-linecap: round;
+  }
+  .person-hat {
+    fill: var(--accent);
+    stroke: var(--ink);
+    stroke-width: 2.2;
+    stroke-linejoin: round;
+  }
+  .scenery.is-playing {
     cursor: pointer;
   }
   .scenery .carried-leaf {
