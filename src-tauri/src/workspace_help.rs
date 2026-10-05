@@ -41,6 +41,8 @@ Read/create/query/board results include a clickable deepLink
 (rotli://open?id=...&kind=note|board|file) that surfaces the item in the app;
 `rotli open` returns the same link. Print it so humans can jump to the item.
 Items in connected roots carry their root-prefixed id (ROOT:path) in the link.
+Opening an item in a connected vault switches Rotli to that vault first; a
+connected folder that isn't a vault can't be opened in the app.
 
 Agents edit a note's text only if an AI made it or the person turned on
 "Let AI edit"; the same rule governs rename and trash. Every AI body edit is

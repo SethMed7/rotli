@@ -52,6 +52,8 @@ export function currentWebMemexBridge(): WebMemexBridge | null {
 export interface WebFileStoreShape {
   createImageAsset(rootId: string, name: string, base64: string): Promise<string>;
   imageUrl(rel: string): Promise<string>;
+  /** Whether a vault-relative file is there (Hand to AI's attachment check). */
+  fileExists(rel: string): Promise<boolean>;
 }
 let webFileStore: WebFileStoreShape | null = null;
 export function registerWebFileStore(store: WebFileStoreShape | null): void {
