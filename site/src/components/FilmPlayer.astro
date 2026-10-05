@@ -249,5 +249,14 @@ const { src, poster, label, silent = false, captioned = false } = Astro.props;
       width: 32px;
       padding: 0;
     }
+    /* The chips stay small, but each one answers a 44px touch around it. */
+    .player-bar .player-chip {
+      position: relative;
+    }
+    .player-bar .player-chip::after {
+      content: '';
+      position: absolute;
+      inset: -6px;
+    }
   }
 </style>

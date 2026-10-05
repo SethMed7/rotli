@@ -262,6 +262,14 @@ const hasToc = toc.length > 1;
   .crumbs a:hover {
     color: var(--text);
   }
+  /* On touch the trail's links get a 44px-tall hit area; the text does not move. */
+  @media (pointer: coarse) {
+    .crumbs a {
+      display: inline-block;
+      padding: 0.7rem 0;
+      margin: -0.7rem 0;
+    }
+  }
   .kicker {
     margin: 0 0 0.9rem;
     color: var(--text-muted);
@@ -533,6 +541,8 @@ const hasToc = toc.length > 1;
     border-radius: 0.35rem;
     background: var(--surface-2);
     font-size: 0.92em;
+    /* A long identifier breaks inside the column on a phone instead of widening the page. */
+    overflow-wrap: anywhere;
   }
   /* Long shell lines (the Helper's install command) wrap at their spaces
      inside the box instead of running past it; newlines are kept. */

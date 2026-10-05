@@ -150,4 +150,20 @@ const steps = [
       grid-template-columns: 1fr;
     }
   }
+  /* Tablet widths: one step per row, the quokka beside its words instead of above them. */
+  @media (min-width: 560px) and (max-width: 900px) {
+    .steps > li {
+      display: grid;
+      grid-template-columns: 112px minmax(0, 1fr);
+      column-gap: clamp(1.25rem, 4vw, 2.5rem);
+      align-items: start;
+    }
+    .steps > li > img {
+      grid-row: 1 / span 3;
+      margin: 0;
+    }
+    .steps > li > :not(img) {
+      grid-column: 2;
+    }
+  }
 </style>

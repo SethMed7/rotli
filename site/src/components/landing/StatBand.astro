@@ -163,6 +163,16 @@ const tools = [
     letter-spacing: 0;
     vertical-align: super;
   }
+  /* A footnote mark is one digit; on touch it answers a 44px area around it. */
+  @media (pointer: coarse) {
+    .value sup a {
+      display: inline-block;
+      min-width: 44px;
+      padding: 1rem 0;
+      margin: -1rem -19px;
+      text-align: center;
+    }
+  }
   .text {
     margin: 0.6rem 0 0;
     color: var(--text);

@@ -171,7 +171,9 @@ const first = stops[0];
   .backdrop :global(.island) {
     height: 100%;
   }
-  @media (max-width: 760px) {
+  /* Below 1180px the backdrop's left edge reaches into the lede's line length (measured
+     2026-10-05: at 768 and 1024 the lede ran over the hill), so the island steps out. */
+  @media (max-width: 1179px) {
     .backdrop {
       display: none;
     }
