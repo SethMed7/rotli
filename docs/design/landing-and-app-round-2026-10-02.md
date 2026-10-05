@@ -202,6 +202,25 @@ On top of #165 now sit:
 Proof on the tip: `bun run verify` passed in one run (secrets, quality, app
 E2E 275, web E2E 66, Rust 692), and `bun run test:e2e:site` passed 20/20.
 
+### Website prompt pass (2026-10-05)
+
+A fidelity pass on `feat/website-prompt-pass`: each website item in the
+owner's prompt checked against the built site at 390, 768, and 1440, not
+against this log. Committed locally, not pushed.
+
+| Item | Found | Done |
+|---|---|---|
+| 2 | Hero and TwoKinds land the message; the landing never said notes are the foundation of more, or that AI costs nothing extra (only About did) | Overview lede, StatBand close, two FAQ entries (also the FAQPage JSON-LD); the closing lede "Warm enough… Quiet enough… Local enough…" replaced with one plain line |
+| 11, 12 | Both lines gone from pages, `llms.txt`, and the cards; the privacy page still said AI is "a visitor, not the owner" | That sentence cut. `rotli-promo.vtt` (holding page only) still carries "Room to think. Files you keep."; it waits on the promo re-cut |
+| 14 | No quokka carousel anywhere; the only carousel is the theme studio's | A stale comment fixed |
+| 16 | TOC and footer quokka in place; no reading meter on `/privacy/` or posts | Both pass `progress` |
+| 7, 19 | Hidden form leaves no gap at any width; no founder.best anywhere | Nothing |
+| 390/768 | Changelog scrolled sideways (inline code); the island ran under "Make it yours" from 761 to about 1100px; Overview steps sat in one sparse column on tablets; small touch targets | `overflow-wrap: anywhere`; island from 1180px; quokka beside its step 560–900px; coarse-pointer hit areas. `e2e/site/narrow-layout.spec.ts` holds them |
+| Theme captures | No script makes `public/themes/` | Left as is; re-capture by hand when the owner wants |
+
+Owner: accept or reword the new copy (Overview lede, StatBand close, the two
+FAQ answers, the closing line).
+
 ### Owner decisions now
 
 - Push the updated branches and open #166 (website round) and #167

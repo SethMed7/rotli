@@ -43,6 +43,14 @@ The unit file runs inside `bun run verify`; the site's E2E lane is not yet
 wired into `verify` or CI (an owner decision: it would add a site build to
 the e2e lane), so run it by hand after changing those pages.
 
+Narrow widths are part of that proof: `e2e/site/narrow-layout.spec.ts`
+checks that no page scrolls sideways at 390 and 768 (inline code in the
+changelog breaks inside the column), that the theme studio's island never
+sits under its lede, that each Overview quokka sits beside its step on a
+tablet, and that the landing's smallest controls (the footnote marks, the
+404's other ways in) answer a 44px touch. Small controls grow their hit
+area under `(pointer: coarse)`, never their glyphs.
+
 ## Production details
 
 - The canonical origin comes from `SITE_URL` (default `https://rotli.co`) in
@@ -101,7 +109,10 @@ the e2e lane), so run it by hand after changing those pages.
   it is the focal passage the whole page steps into its night, see "The
   privacy passage") → Everywhere (Rotli Web and how Rotli Helper connects it, with
   the copyable install line; only while `WEB_APP_ENABLED`) → Personal (the
-  theme studio, with a faint island vignette) → Faq → FinalCta (the closing call; the footer's quokka beach ends the
+  theme studio, with a faint island vignette from 1180px up; narrower, its
+  left edge would reach into the lede, so it steps out) → Faq (with the
+  Overview's lede, two entries carry the owner's item 2 message: notes are the
+  foundation of a workspace, and rotli charges nothing for AI) → FinalCta (the closing call; the footer's quokka beach ends the
   page). The landing page carries exactly one video. **`/features/`** has
   one display headline with the product film right under it (the hero's
   `FilmPlayer`, the same real Rotli Web session: the real product leads, not
@@ -144,7 +155,10 @@ the e2e lane), so run it by hand after changing those pages.
   bundled script; without it the tree is plain links). Below 900px the tree
   becomes an "On this page" disclosure above the text. Privacy, resource
   articles, and blog posts use it (articles and posts build it from their
-  `##` headings). Resource articles end with "More guides".
+  `##` headings), and all three pass `progress` for the reading meter below,
+  so every article on the site reads the same way (the owner's item 16:
+  the flow of the claude.dev mods post, with the footer's strolling quokka as
+  its walking character). Resource articles end with "More guides".
 - **Resource articles** open on their own scene (`ResourceScene.astro`, the
   guides' answer to the night frame on `/privacy/`): the island by day, the
   app's quokka in the pose that fits the question, and what the article is
@@ -159,8 +173,8 @@ the e2e lane), so run it by hand after changing those pages.
   and the related links and footer never count. It follows scrolling either
   way and jumps through the tree, re-measures when the article changes
   height, and hides when the whole article fits in the window. It is a
-  position, not proof of reading: nothing is recorded or sent. Posts and
-  `/privacy/` can opt in with the same prop after review. Index lists
+  position, not proof of reading: nothing is recorded or sent. Blog posts
+  and `/privacy/` carry the same meter (2026-10-05). Index lists
   (`WritingList.astro`) are plain entries in columns with a hairline above
   each, never boxes; an entry without a link is announced ("Coming soon").
 - **Writing.** Resources (evergreen, question-titled) and blog posts are
@@ -353,7 +367,7 @@ the e2e lane), so run it by hand after changing those pages.
   (the social card's faint note, folder, checklist, and chat icons, masked so
   they fade out behind the headline). The words land in one short CSS
   entrance and the clay line (`.inked`, `public/ink-underline.svg`)
-  draws itself under "Files you keep." Apart from the film, the landing page
+  draws itself under "the filing." Apart from the film, the landing page
   shows no capture; the theme studio does. `public/rotli-app-warm-light@3x.png` (the social
   card) and the theme studio's `public/themes/` are lossless browser-demo captures (1280 × 800 logical
   viewport at 3× and 2× density), never a live vault. The coming-soon page

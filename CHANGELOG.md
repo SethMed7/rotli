@@ -91,6 +91,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   second explanation of Rotli Helper are gone. A new part, "You decide what
   AI may touch", explains notes you wrote, Lock, and Mark secure beside the
   note menu, replacing a cropped screenshot with text cut off behind it.
+- **rotli.co says plainly that notes are the start, and AI costs nothing
+  extra.** The home page calls notes the foundation that chat, documents, and
+  boards build on, and says there is no extra AI plan to buy: rotli uses the
+  one you already have, or a model on your Mac. Two new questions, "Do I
+  have to pay for AI?" and "Is rotli just a notes app?", answer both. The
+  closing line and the privacy page's opening on AI are plainer.
+- **The privacy page and blog posts show how far through you are,** with the
+  same "N% through" bar as the guides, so every article reads the same way.
 - **Long commands fit their boxes on rotli.co.** The Rotli Helper install
   line wraps inside its box in the guide and the blog post instead of being
   cut off, and the privacy page's night scene sets its words beside the dome.
@@ -231,6 +239,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The theme studio's previous and next buttons on rotli.co sit on one row
   on phones** again, beside the theme's name.
+- **rotli.co fits phones and tablets better.** The changelog no longer
+  scrolls sideways on a phone, the island behind "Make it yours" no longer
+  sits under its words on a tablet, each home-page step puts its quokka
+  beside its words on a tablet, and the film's buttons, the source marks, and
+  the page-not-found links are easier to tap.
 - **A new note in Rotli Web says "just now".** It read hours old (at least
   4h in New York) because its date was taken as midnight UTC. A
   note's created and updated dates stay plain days in the file; Rotli Web
