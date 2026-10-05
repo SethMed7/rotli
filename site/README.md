@@ -36,8 +36,9 @@ bun run preview  # serve the built dist/ locally
 
 The interactive pieces have two proofs, both run from the repository root:
 `bun test scripts/site-interactions.test.ts` (the rules without a browser: the
-privacy passage's trigger, the reading meter, the 404 game, the footer scene's
-play) and `bun run test:e2e:site` (`playwright.site.config.ts`: builds the
+privacy passage's trigger and the contrast of every frame of its crossfade, the
+theme studio's autoplay, the reading meter, the 404 game, the footer scene's
+play and the visitor's person) and `bun run test:e2e:site` (`playwright.site.config.ts`: builds the
 site, serves it with `astro preview` on port 4392, and drives `e2e/site/`).
 The unit file runs inside `bun run verify`; the site's E2E lane is not yet
 wired into `verify` or CI (an owner decision: it would add a site build to
@@ -91,9 +92,11 @@ area under `(pointer: coarse)`, never their glyphs.
   choosing a link closes it), where the dropdown's pages are listed under its
   name; below 560px the GitHub mark and Download move into it too. The
   footer's lead column holds the brand, the tagline, and the "Hear when it's
-  ready." sign-up (see "The coming-soon list" below); its closing row holds
-  the maker line and the Launch Llama badge; the quokka scenery runs along its
-  bottom edge.
+  ready." sign-up, always shown (see "The coming-soon list" below); its
+  closing row holds the maker line, with a drawn X mark (not the platform's
+  artwork) linking to `https://x.com/iamsethmedina`, `rel="me"`, in a 44px
+  target, and the Launch Llama badge; the quokka scenery runs along its bottom
+  edge.
 - **The landing page** (`src/components/Landing.astro`) only composes its
   chapters from `src/components/landing/`: Hero (the product film) → Overview (Write. Keep. Ask.: three
   steps with the app's quokkas, then one link to `/features/`)
@@ -128,14 +131,33 @@ area under `(pointer: coarse)`, never their glyphs.
   markup, scoped styles, and script. `Base.astro` owns the tokens, the shared
   section grammar (`.wrap`, `.section`, `.section-title`, `.section-lede`,
   `.band-warm`, `.band-deep`, the spacing and type steps), and the one
-  scroll-reveal script. Nothing on the page moves on a timer: the theme studio
-  changes only when a visitor picks a swatch or steps the
-  carousel, and scroll reveals (the drawn scenes included) fire once and
-  rest. The sanctioned exceptions are the quokka scenery under the footer
-  (the owner's call, 2026-10-02), described below, which lives in its own
-  band, below every word, and stands still under reduced motion, and the 404
-  page's game, which moves only after the visitor presses Play. Two-column rows share a
+  scroll-reveal script. Scroll reveals (the drawn scenes included) fire once
+  and rest. Three things move on their own, each the owner's call: the theme
+  studio (2026-10-05, "Make it yours" below), the quokka scenery under the
+  footer (2026-10-02), described below, which lives in its own band, below
+  every word, and the 404 page's game, which moves only after the visitor
+  presses Play. None of them moves on its own under reduced motion. Two-column rows share a
   top edge so each heading starts level with its picture.
+- **The theme studio plays** (`landing/Personal.astro`, rules in
+  `src/themeCycle.ts`; the owner, 2026-10-05: "when you arrive it should be
+  going through them on its own and change on what you hover over"). The first
+  time the studio is on screen it steps through the fourteen environments
+  every 3.2 s. A hovered or focused swatch shows at once and holds the cycle;
+  leaving the swatches resumes it 2.4 s later from there. A click, the
+  carousel's previous or next, or a swipe pins the choice: the cycle stops for
+  good and a hover only previews. It never plays under reduced motion, off
+  screen, or in a hidden tab (one timeout, no frame loop), waits a full step on
+  coming back, and swaps only to a capture that has decoded. Its own steps
+  are not announced (`aria-live="off"`); the visitor's are.
+- **The bench's AI tools** (`landing/StatBand.astro`; the owner, 2026-10-05:
+  "so people know we are talking about gemini/antigravity, chatGPT, claude")
+  are ChatGPT, Claude, Gemini, and Grok: each bot wears its product's public
+  signature colour (the `--bot-*` tokens in `Base.astro`), a generic cue on its
+  head (a speech bubble, an asterisk, a four-point sparkle, a slanted antenna),
+  and its name in plain HTML under it, placed by the bot's centre in the
+  drawing so the names never touch at any width. Never trace or store a
+  product's logo artwork or wordmark here; the names are text, and the
+  colours are the only borrowed thing.
 - **`/privacy/`** is the full privacy policy in plain language: the short
   version, where notes live, every network connection and when it happens, AI
   and secure/locked notes (with the access table), Rotli Web and Rotli Helper,
@@ -256,25 +278,52 @@ area under `(pointer: coarse)`, never their glyphs.
   ball, pause to watch a visitor who comes close, and the catcher reaches up
   (the cheering pose) as it arrives; a click or tap on them or the ball sends
   it high. Everyone blinks.
-  **The drag** (the decision, 2026-10-05): the visitor can pick a leaf off
-  the pile and carry it (mouse, pen, or touch; `touch-action: none` only on
-  the pile). The residents watch it, a hungry eater perks up as it comes
-  near, and letting go over a quokka hands it over (it eats, the others hop,
-  the guard is pleased); letting go over open sand wastes it (it drifts down,
-  rests, fades, and the guard is sad). The leaves are their lunch, so the
-  drag gives the visitor a part in the scene's one story rather than moving
-  the quokkas around like objects. "Hand the quokkas a leaf", a button before
-  the band (outside its `aria-hidden`), does the same from the keyboard
-  (visible on focus, offered only while the scene runs, with a polite status
-  line saying who took it). The rules without the DOM (who receives a leaf,
-  the ball's arc, a falling leaf, the guard's mood) are `src/quokka/play.ts`.
-  It runs one `requestAnimationFrame` loop only while the scene is on
-  screen, the tab is visible, and motion is allowed, uses pointer events
-  only, and writes SVG attributes and CSSOM transforms (never an inline
-  `style` attribute, which the CSP would drop). Under reduced motion, or
-  without script, nothing runs, the scene stands at rest (each resident in its
-  pose, the sitter and nibbler holding a leaf, a player holding the ball),
-  and the keyboard button stays hidden. The band is decorative
+  **The person** (the owner, 2026-10-05: "when I am hovering over it with my
+  mouse it inserts a human I am controlling. I can walk my human all the way
+  to the food and feed the quokkas. I can also go play with the quokkas with
+  the ball"). A small person drawn in code in the scene's ink and tokens (a
+  round face, a bucket hat, a shirt in `--lantern`, trousers in
+  `--wood-dark`, outlines at about the art's weight; nobody in particular)
+  appears when the pointer comes onto the sand, a short walk in from the
+  nearer side, and walks to the pointer's x with an eased stride (it speeds
+  up, slows to arrive, never overshoots), legs and arms swinging, facing the
+  way it goes, on the sand line and behind the residents. Only where it
+  stops counts, so passing by does nothing: at the pile it picks a leaf up
+  (the guard is cross while it carries their lunch), at a quokka it stands
+  beside it (never in front) and hands the leaf over through the same feed
+  and guard-mood rules as the drag, and by the two with the ball it joins
+  their catch, which then goes player, person, other player until it walks
+  away (and it hands the ball back if it leaves holding it). It wanders off
+  seven seconds after the visitor stops playing. On a touch screen a tap
+  sends it; from the keyboard, "Walk on the beach", a button before the band
+  (visible on focus, with a described instruction), takes ← and →: held, it
+  walks, and let go near the pile or a quokka it stops at it. Its rules
+  without the DOM (the walk, the swing, what it does where it stops) are
+  `src/quokka/human.ts`; `src/quokka/person.ts` poses the drawing.
+  **The drag** (the decision, 2026-10-05) stays alongside as the second way to
+  play: the visitor can press on the pile and carry a leaf (mouse, pen, or
+  touch; `touch-action: none` only on the pile). The residents watch it, a
+  hungry eater perks up as it comes near, and letting go over a quokka hands
+  it over (it eats, the others hop, the guard is pleased); letting go over
+  open sand wastes it (it drifts down, rests, fades, and the guard is sad). A
+  tap on the pile without dragging carries nothing off (on touch it sends the
+  person). The leaves are their lunch, so both give the visitor a part in the
+  scene's one story rather than moving the quokkas around like objects. "Hand
+  the quokkas a leaf", the other button before the band (outside its
+  `aria-hidden`), does the same from the keyboard (visible on focus, with a
+  polite status line saying who took it, which the person's deeds use too).
+  The rules without the DOM (who receives a leaf, the ball's arc, a falling
+  leaf, the guard's mood) are `src/quokka/play.ts`. It runs one
+  `requestAnimationFrame` loop only while the scene is on screen and the tab
+  is visible, uses pointer events only, and writes SVG attributes and CSSOM
+  transforms (never an inline `style` attribute, which the CSP would drop).
+  Under reduced motion nothing moves on its own: no stroll, no game of catch
+  between the quokkas, no blinks, bites, hops, or heads following the
+  pointer; the scene stands at rest (each resident in its pose, the sitter
+  and nibbler holding a leaf, a player holding the ball) and the loop runs
+  only while the visitor plays. The person then steps straight to where it is
+  sent instead of walking, and leaves and the ball arrive at once. Without
+  script nothing runs and both buttons stay hidden. The band is decorative
   (`aria-hidden`), has a fixed height (no layout shift), clips its own
   content, and holds no text, so nothing can overlap a word or a link.
 - **The motion studio** lives at `studio.rotli.co` (`STUDIO_URL` in
@@ -331,11 +380,27 @@ area under `(pointer: coarse)`, never their glyphs.
   (`:root[data-passage='ocean-dark']`, values from `src/styles/themes.css`),
   the night's stars spread over the plain grounds, `color-scheme` and the
   `theme-color` meta follow, and it all fades back out on leaving the band in
-  either direction. The trigger is a line across the middle of the window
-  with a margin of hysteresis on both edges (8% of the window), so a page
-  resting near a boundary never flickers; a reload mid-band lands in the
-  night at once. Colours fade over 600 ms; reduced motion switches at once.
-  It is a passage, not a preference: nothing is stored. Lowest night pair:
+  either direction. It turns on once the band fills 40% of the window (or of
+  itself, if shorter) and off once it fills under 25%, so a page resting near
+  a boundary never flickers; a reload mid-band lands in the night at once.
+  It reads as one dusk (the owner's "more smooth and better polished",
+  2026-10-05). The cut the owner saw came from the band always painting its
+  own night while the page followed only once the middle of the window was
+  well inside it, with the header, buttons, stars, and ground each fading on
+  its own clock. Now the band's top and bottom edges are feathered into the
+  neighbours' empty section padding (`[data-passage]::before/::after`, the
+  band's own night to transparent; in the night they vanish into the ground),
+  and the crossfade runs on the tokens themselves, registered with
+  `@property` and transitioned on the root, so everything that reads them
+  changes in the same frame. Grounds ease over 900 ms
+  (`cubic-bezier(0.65, 0, 0.35, 1)`); text never fades through the ground
+  (where both cross, it would vanish), so the inks switch whole at 459 ms,
+  when the ground is mid-tone, while muted and accent text lean onto `--text`
+  around the switch and a primary button's label (`--on-text`) switches with
+  its button. `scripts/site-interactions.test.ts` measures every frame: never
+  under 3:1, and under 4.5:1 for under 80 ms. It is a time-based eased
+  crossfade at a threshold, not a scroll scrub (the owner rejected scrubbing
+  for the story). Reduced motion switches at once. It is a passage, not a preference: nothing is stored. Lowest night pair:
   muted text on `--surface-2`, 6.75:1. The site is flat like the app (DESIGN.md "Flat material"): no
   shadows, blur, or glows. The one deliberate exception is the theme studio's
   orb swatches (the owner's call, 2026-09-23):
@@ -593,12 +658,15 @@ process: a small Bun sidecar (`server/subscribe.ts`, one file, no
 dependencies) on `127.0.0.1:8787`. Caddy proxies `/api/*` to it under the
 site's own headers (`Cache-Control: no-store`); `entrypoint.sh` starts it in a
 retry loop and then execs Caddy, so Caddy is PID 1 and the sidecar fails soft:
-if it is down, `/api/*` answers 503, the footer hides its form, and every page
-keeps serving.
+if it is down, `/api/*` answers 503, the footer says the list isn't open yet,
+and every page keeps serving.
 
-- `GET /api/subscribe` → `{ "live": true | false }`. The footer hides the form
-  unless it reads `live: true` (so it is also hidden under `astro dev` and
-  `astro preview`, which have no sidecar).
+- `GET /api/subscribe` → `{ "live": true | false }`. The form is always shown
+  (the owner, 2026-10-05). Unless the probe reads `live: true` (as under
+  `astro dev` and `astro preview`, which have no sidecar), a submit says "The
+  list isn't open yet, so nothing was sent. Check back soon." and posts
+  nothing, so the address never leaves the browser; a 404 or 503 from the post
+  itself reads the same.
 - `POST /api/subscribe` (JSON from the footer's script, or a plain form post
   without JavaScript, which is redirected to `/subscribed/`): validates the
   address, drops a filled honeypot field (`website`) with a fake success,
