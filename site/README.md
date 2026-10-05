@@ -61,7 +61,7 @@ area under `(pointer: coarse)`, never their glyphs.
   | ------------- | ----------------------------- | ------------------------ | --------- | ------- |
   | `coming-soon` | holding page                  | holding page + 404       | no        | yes     |
   | `dev`         | live dev site · `dev.rotli.co`| full site + drafts + the full developer reference | no | no |
-  | `full`        | production · `rotli.co`       | landing, Features, Privacy, Resources (Guides, Blog, Developers, Changelog), About, 404 | yes | yes |
+  | `full`        | production · `rotli.co`       | landing, Features, Privacy, Resources (Guides, Blog, Developers, Changelog, Roadmap), About, 404 | yes | yes |
 
   An unknown value fails the build. Flipping production to launch is a variable
   change (`SITE_MODE=full`), not a code change — see "Going live" below. `dev` additionally sets
@@ -71,11 +71,12 @@ area under `(pointer: coarse)`, never their glyphs.
   pending fidelity review. Site labels do not enforce app access.
 - **Structure and navigation.** `src/nav.ts` is the one navigation policy.
   The header links real pages, never landing anchors: Features · Privacy ·
-  Resources · About. Resources is a dropdown of four pages, each with a
+  Resources · About. Resources is a dropdown of five pages, each with a
   one-line description: Guides (`/resources/`), Blog (`/blog/`, listed only
   once a post can be read, so an index of nothing but "coming soon" is never
   linked), Developers (`/resources/developers/`, marked "Coming soon" outside
-  the dev site), and Changelog (`/changelog/`). The dropdown is a disclosure:
+  the dev site), Changelog (`/changelog/`), and Roadmap (`/roadmap/`, see "The
+  roadmap: votes and requests" below). The dropdown is a disclosure:
   a button with `aria-expanded` (Enter/Space/click toggles; ArrowDown opens
   into the list; ArrowUp/ArrowDown, Home, End move; Escape closes and returns
   focus; tabbing away or an outside click closes). Without script the button
@@ -588,13 +589,15 @@ stay on with the SSL/TLS mode set to **Full** (not Full strict).
 ### The coming-soon list (Resend)
 
 The footer's "Hear when it's ready." sign-up adds an address to a Resend
-segment. The static site cannot hold an API key, so the image runs one more
-process: a small Bun sidecar (`server/subscribe.ts`, one file, no
-dependencies) on `127.0.0.1:8787`. Caddy proxies `/api/*` to it under the
-site's own headers (`Cache-Control: no-store`); `entrypoint.sh` starts it in a
-retry loop and then execs Caddy, so Caddy is PID 1 and the sidecar fails soft:
-if it is down, `/api/*` answers 503, the footer hides its form, and every page
-keeps serving.
+segment: the list the owner sends Broadcasts to. The static site cannot hold
+an API key, so the image runs one more process: a small Bun sidecar
+(`server/main.ts`, a few files, no dependencies) on `127.0.0.1:8787`. It
+answers the list (`server/subscribe.ts`) and the roadmap's votes and requests
+(`server/roadmap.ts`, below). Caddy proxies `/api/*` to it under the site's
+own headers (`Cache-Control: no-store`); `entrypoint.sh` starts it in a retry
+loop and then execs Caddy, so Caddy is PID 1 and the sidecar fails soft: if it
+is down, `/api/*` answers 503, the footer hides its form, the roadmap says
+voting opens soon, and every page keeps serving.
 
 - `GET /api/subscribe` → `{ "live": true | false }`. The footer hides the form
   unless it reads `live: true` (so it is also hidden under `astro dev` and
@@ -610,7 +613,35 @@ keeps serving.
   `POST /contacts/{email}/segments/{segment_id}` instead; a repeat signup is
   answered exactly like a new one, and an earlier unsubscribe is never
   overridden. Addresses are never logged (only Resend's status and error name).
+  This is Resend's current Contacts API: Audiences are now Segments, and
+  Broadcasts take a `segment_id` (checked against resend.com/docs, 2026-10-05).
+- Consent: one sign-up (single opt-in) with the footer's line ("Unsubscribe
+  anytime") and `/privacy/#website`, which says what is kept and how to leave.
+  Unsubscribing is Resend's own Broadcast link. Double opt-in is not built: it
+  needs a verified sending domain and a confirmation email (an owner decision).
 - Tests: `bun run test` (Resend mocked; part of `bun run verify` and CI).
+
+**Owner setup: the same Resend account as the portfolio.** The portfolio's
+contact relay only sends email (`POST /emails`) and has no list; rotli adds
+contacts to a segment so there is a list to broadcast to.
+
+1. In Resend (the account the portfolio uses) → Audience → Segments, create a
+   segment, e.g. "rotli updates", and copy its id.
+2. API keys: contacts need a **Full access** key. A sending-only key (which is
+   what a contact relay usually holds) is refused with 401/403. Either give the
+   portfolio's key full access or, better, create a dedicated full-access key
+   on the same account named for rotli.co. Never paste it into a file.
+3. Railway → `rotli-site` → `site` → Variables (production; dev too if wanted):
+   set `RESEND_API_KEY` and `RESEND_SEGMENT_ID` as runtime variables, then
+   redeploy. `GET https://rotli.co/api/subscribe` answers `{"live":true}` and
+   the footer shows the form.
+4. To send an update: Resend → Broadcasts → Create, choose the segment, write
+   it, and keep the unsubscribe link (`{{{RESEND_UNSUBSCRIBE_URL}}}`, which
+   Resend's editor inserts) in the footer. The **From** address must be on a
+   domain verified in that Resend account (the portfolio's verified domain
+   works; verify `rotli.co` there to send as rotli). Send a test to yourself,
+   then send or schedule. The API equivalent is `POST /broadcasts` with
+   `segment_id`, `from`, `subject`, and `html`, then `POST /broadcasts/{id}/send`.
 
 Set these as **runtime** service variables in Railway (never build args; the
 Dockerfile does not declare them, so no secret lands in an image layer):
@@ -619,11 +650,81 @@ Dockerfile does not declare them, so no secret lands in an image layer):
 | ------------------- | ----------------------------------------------------------------------- |
 | `RESEND_API_KEY`    | A Resend API key with full access (contacts need it; a sending-only key is refused). Unset: the list is off. |
 | `RESEND_SEGMENT_ID` | The segment new contacts join (Resend → Audience → Segments; the old Audiences API is deprecated). Unset: the list is off. |
+| `ROADMAP_DB_PATH`   | The roadmap's SQLite file on a Railway volume, e.g. `/data/roadmap.sqlite`. Unset or unwritable: votes and requests are off (503) and the page says they open soon. |
+| `ROADMAP_HASH_SALT` | Optional. A long random string keying the in-memory rate-limit hashes. Unset: a random salt per start (limits reset on restart). It is never stored or logged. |
+| `ROADMAP_FILE`      | Optional. Where the sidecar reads ROADMAP.md (default: the copy in the image, `/opt/rotli/ROADMAP.md`). |
 | `SUBSCRIBE_PORT`    | Optional. The sidecar's loopback port, read by both Caddy and the sidecar (default `8787`). |
 
 To rehearse it in the prod twin, pass the variables to `docker run`
-(`-e RESEND_API_KEY=… -e RESEND_SEGMENT_ID=…`); with a test key, use a test
-segment.
+(`-e RESEND_API_KEY=… -e RESEND_SEGMENT_ID=… -e ROADMAP_DB_PATH=/tmp/roadmap.sqlite`);
+with a test key, use a test segment.
+
+### The roadmap: votes and requests
+
+`/roadmap/` is `ROADMAP.md` (repository root) rendered at build time by
+`src/roadmap.ts`; the Dockerfile copies the file in, as it does the changelog.
+It shows the three public sections (In the work as cards with a small drawing
+from `RoadmapMock.astro`, Planned and Ideas as a list) and leaves the rest of
+the file (known bugs, web parity, platforms, later) in the repository. Each
+item carries a stable id (`<!-- id: … -->` after its title; the convention is at
+the top of ROADMAP.md), and votes attach to ids, so a retitle keeps its votes.
+The build fails on a missing or repeated id, and `astro.config.mjs`
+(`rotli-roadmap-guard`) fails it if the built page and the file disagree.
+`/roadmap/index.md` is its Markdown twin, linked from `llms.txt`.
+
+The sidecar keeps participation in one SQLite file (`bun:sqlite`, built into
+Bun; no ORM, no new service):
+
+- `GET /api/roadmap/votes` → `{ live: true, votes: { [id]: count } }`;
+  `POST /api/roadmap/vote` with `{ id }` → `{ ok, counted, count }`, where the id
+  must be one of the page's (read from ROADMAP.md at start);
+  `POST /api/roadmap/request` with `{ title, description, email? }` (3–120 and
+  10–2000 characters, the email optional) → `{ ok }`, or a redirect to
+  `/roadmap/#request-sent` for a form posted without JavaScript.
+- Kept: a count per item id (no row per vote), and each request's text, time,
+  and optional email. Requests are never published by any route.
+- Abuse limits, all in memory: one vote per item per browser (the page's
+  localStorage marker), one counted vote per item per visitor per UTC day, 30
+  votes per 10 minutes and 5 requests per hour per visitor (600 and 100
+  overall), a honeypot field, and body size limits. The visitor key is an HMAC
+  of the IP address and the UTC day under `ROADMAP_HASH_SALT`: never the raw
+  address, never on disk, new every day.
+- Off: without `ROADMAP_DB_PATH` (or if the file can't be opened, or
+  ROADMAP.md can't be read) every route answers 503 `{ live: false }`; the
+  page keeps its "Voting and requests open soon." line, the vote buttons stay
+  disabled, and the form says requests open soon. CSP is unchanged
+  (`connect-src 'self'`, `form-action 'self'`).
+- Tests: `bun run test` (`server/roadmap.test.ts`, `server/roadmap-file.test.ts`)
+  and `e2e/site/roadmap.spec.ts` (the API stubbed with Playwright routes).
+
+**Owner setup.**
+
+1. Railway → `rotli-site` → `site` → right-click the service (or Settings) →
+   **Attach volume**, mount path `/data`, the smallest size (the file stays in
+   the kilobytes for a long time). One volume per environment.
+2. Variables: `ROADMAP_DB_PATH=/data/roadmap.sqlite`, and optionally
+   `ROADMAP_HASH_SALT` set to a long random string (`openssl rand -hex 32`,
+   pasted straight into Railway, never into a file). Redeploy.
+   `GET https://rotli.co/api/roadmap/votes` answers `{"live":true,…}`.
+3. Read requests (never published; nothing emails them to you):
+
+   ```sh
+   railway ssh -s site -e production -- bun /opt/rotli/site/scripts/roadmap-requests.ts
+   railway ssh -s site -e production -- bun /opt/rotli/site/scripts/roadmap-requests.ts --all
+   railway ssh -s site -e production -- bun /opt/rotli/site/scripts/roadmap-requests.ts votes
+   railway ssh -s site -e production -- bun /opt/rotli/site/scripts/roadmap-requests.ts mark 3 read
+   railway ssh -s site -e production -- bun /opt/rotli/site/scripts/roadmap-requests.ts delete 3
+   ```
+
+   `railway ssh` runs inside the container, where the volume and
+   `ROADMAP_DB_PATH` are (`railway shell` runs on your own computer and cannot
+   see the file). If the session lacks the service variables, add
+   `--db /data/roadmap.sqlite`. Statuses: `new`, `read`, `planned`, `declined`. Locally, the
+   same script reads a copy with `--db <file>`. There is deliberately no admin
+   endpoint: nothing on the public origin can read requests, so there is no
+   token to leak.
+4. When an item ships or is dropped, remove it from ROADMAP.md with its id; its
+   count stays in the database, unread. Never reuse an id.
 
 ### Going live (turning off the holding page)
 
