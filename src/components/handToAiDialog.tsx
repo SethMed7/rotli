@@ -62,7 +62,13 @@ function HandToAiCard({ noteId }: { noteId: string }) {
   const promptRef = useRef<HTMLTextAreaElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const live = useRef(true);
+  // which refine is current: choosing Basic mid-refine (or closing) moves it on,
+  // and an answer for an older run is dropped. The model call itself can't be
+  // stopped (Host.complete takes no signal), so it is ignored, not aborted.
+  const run = useRef(0);
   const asking = useRef(false);
+  // the Basic text as it stands, so a fallback never overwrites the person's edits
+  const basicNow = useRef("");
 
   useEffect(() => {
     live.current = true;
@@ -70,7 +76,10 @@ function HandToAiCard({ noteId }: { noteId: string }) {
       .then((result) => {
         if (!live.current) return;
         setView(result);
-        if (result.kind === "ready") setDrafts({ basic: result.prompt, refined: "" });
+        if (result.kind === "ready") {
+          basicNow.current = result.prompt;
+          setDrafts({ basic: result.prompt, refined: "" });
+        }
         queueMicrotask(() => (result.kind === "ready" ? promptRef.current : closeRef.current)?.focus());
       })
       .catch((error) => {
@@ -79,6 +88,7 @@ function HandToAiCard({ noteId }: { noteId: string }) {
       });
     return () => {
       live.current = false;
+      run.current += 1;
     };
   }, [noteId]);
 
@@ -90,18 +100,25 @@ function HandToAiCard({ noteId }: { noteId: string }) {
   useEffect(() => {
     if (!wantsRefine || !model || asking.current) return;
     asking.current = true;
+    const token = ++run.current;
+    const asked = basicNow.current;
+    const current = () => live.current && run.current === token;
     setRefine({ kind: "working" });
     refineHandToAiFor(noteId, tauriHostFor(model))
       .finally(() => {
-        asking.current = false;
+        if (run.current === token) asking.current = false;
       })
       .then((result) => {
-        if (!live.current) return;
+        if (!current()) return;
         if (result.kind === "refined") {
           setDrafts((now) => ({ ...now, refined: result.prompt }));
           setRefine({ kind: "done", model: model.label, onDevice: modelIsOnDevice(model) });
         } else if (result.kind === "fallback") {
-          setDrafts((now) => ({ ...now, basic: result.prompt }));
+          // the note read again, unless Basic was edited since the ask
+          if (basicNow.current === asked) {
+            basicNow.current = result.prompt;
+            setDrafts((now) => ({ ...now, basic: result.prompt }));
+          }
           setRefine({ kind: "fallback", reason: result.reason });
           setMode("basic");
         } else {
@@ -109,7 +126,7 @@ function HandToAiCard({ noteId }: { noteId: string }) {
         }
       })
       .catch((error) => {
-        if (!live.current) return;
+        if (!current()) return;
         setRefine({ kind: "fallback", reason: error instanceof Error ? error.message : String(error) });
         setMode("basic");
       });
@@ -126,6 +143,12 @@ function HandToAiCard({ noteId }: { noteId: string }) {
     setCopy("idle");
     // a failed refine may be asked again by choosing Refined again
     if (next === "refined" && refine.kind === "fallback") setRefine({ kind: "idle" });
+    // choosing Basic mid-refine drops that answer; Refined again asks afresh
+    if (next === "basic" && refine.kind === "working") {
+      run.current += 1;
+      asking.current = false;
+      setRefine({ kind: "idle" });
+    }
   };
 
   const copyPrompt = async () => {
@@ -218,6 +241,7 @@ function HandToAiCard({ noteId }: { noteId: string }) {
               value={draft}
               onChange={(event) => {
                 const text = event.target.value;
+                if (showing === "basic") basicNow.current = text;
                 setDrafts((now) => ({ ...now, [showing]: text }));
                 setCopy("idle");
               }}
