@@ -27,7 +27,7 @@ type Refine =
 const REFUSAL: Record<Refusal, string> = {
   secure: "This note is secure, so Rotli won’t build a prompt from it: secure notes never go to a remote AI.",
   secureAttachment:
-    "This note links to a file in a secure place, so Rotli won’t build a prompt from it: secure files never go to a remote AI.",
+    "This note links to a file in a secure place, or by a link Rotli can’t read safely, so Rotli won’t build a prompt from it: secure files never go to a remote AI.",
   secret:
     "This note looks like it holds a secret, such as a key, a card number, or an ID number. Remove it, or make the note secure, before handing it off.",
   empty: "This note is empty, so there’s nothing to hand off yet.",
@@ -109,6 +109,11 @@ function HandToAiCard({ noteId }: { noteId: string }) {
         if (run.current === token) asking.current = false;
       })
       .then((result) => {
+        // a refusal from the re-read is never stale: it stands even after a cancel
+        if (result.kind !== "refined" && result.kind !== "fallback") {
+          if (live.current) setView(result);
+          return;
+        }
         if (!current()) return;
         if (result.kind === "refined") {
           setDrafts((now) => ({ ...now, refined: result.prompt }));
@@ -121,8 +126,6 @@ function HandToAiCard({ noteId }: { noteId: string }) {
           }
           setRefine({ kind: "fallback", reason: result.reason });
           setMode("basic");
-        } else {
-          setView(result);
         }
       })
       .catch((error) => {
