@@ -10,8 +10,10 @@
 //   _review/brand-images/contact-sheet.png  everything at a glance (gitignored)
 //
 // Every text block is fitted (shrunk to its line limit) and then checked: it
-// must sit inside the image's safe area and clear of the quokka, and every
-// text color must reach 4.5:1 on its ground. Any failure stops the run.
+// must sit inside the image's safe area and clear of the quokka. Contrast is a
+// token check only: the title and line colors (TEXT_PAIRS) must reach 4.5:1 on
+// the solid warm ground. Text over the pattern, sea, sand, or ink underline is
+// not sampled, so look at the contact sheet. Any failure stops the run.
 //
 //   bun run build:brand-images
 //   bun run build:brand-images --thumbnail "A title" [--pose notes] [--out path.png]
@@ -282,7 +284,10 @@ async function buildAll() {
 
   // The face mark, cropped at its shoulders so the body runs off the bottom edge.
   const face = await quokka("_logo-bold", { size: 1024, viewBox: "52 -74 1150 1150", openBottom: true });
-  const grounds = { rotli: C.ground, ocean: "#70b2d7", grove: "#82be96", midnight: "#050607" };
+  // Each family's signature ground from src/styles/themes.css: Rotli, Ocean, and
+  // Grove light (`--ground` of rotli/ocean-light/grove-light), Midnight dark
+  // (--swatch-midnight-dark); Midnight's light ground is a near-white grey.
+  const grounds = { rotli: C.ground, ocean: "#dfebf3", grove: "#e3eee4", midnight: "#050607" };
   for (const [family, ground] of Object.entries(grounds)) {
     await render(
       `brand/assets/pfp/rotli-pfp-${family}.png`,

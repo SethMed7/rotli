@@ -468,8 +468,11 @@ The Rust corpus boundary independently validates every write.
   on the web turns `updated` into a day; both shapes read the same age.
 - A full timestamp is taken as written. A day is never read as an hour: Rotli
   shows a note's age from the file's own time when that time falls on the
-  stamped day (anywhere on Earth), and otherwise from local midnight of that
-  day. The Mac app (`src-tauri/src/note_dates.rs`) and Rotli Web (`stampToMs`,
+  stamped day — the reader's local day, widened to the UTC day because Mac
+  builds before 2026-10 stamped the UTC day — and otherwise from local
+  midnight of that day. East of UTC, a note stamped yesterday whose file was
+  moved or copied before UTC midnight can still read fresh for at most the
+  zone's offset. The Mac app (`src-tauri/src/note_dates.rs`) and Rotli Web (`stampToMs`,
   `src/memex/dates.ts`) implement this independently; the `noteDateStamps`
   parity fixture pins them to the same answers.
 - The file time each side supplies differs. The Mac app reads `created`

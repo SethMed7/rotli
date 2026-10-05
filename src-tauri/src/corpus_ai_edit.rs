@@ -1,10 +1,13 @@
 //! The store's AI edit control (split out of corpus.rs, 2026-09-29; policy in
 //! ai_edit_policy.rs): `set_ai_edit` writes the person's grant,
-//! `ai_edit: true|false`.
+//! `ai_edit: true|false`; `trash_for_remote_agent_if_revision` is an agent's
+//! Trash under that same policy.
 
 use std::fs;
 
-use super::{atomic_write, compose_document, parse_document, CorpusStore};
+use super::{
+    atomic_write, compose_document, lifecycle_disk_folder, parse_document, CorpusStore, NoteMeta,
+};
 use crate::ai_edit_policy::ai_edit_field;
 
 impl CorpusStore {
@@ -25,5 +28,37 @@ impl CorpusStore {
             atomic_write(&path, &compose_document(&fm, body))
         })
     }
-}
 
+    /// Move one note to Trash for an agent: the soft delete `delete` performs,
+    /// with the read gate (secure), the body-edit policy (locked, a person's
+    /// note without "Let AI edit"), and the revision all checked UNDER the
+    /// note's file lock, around the move itself — a note locked, made secure,
+    /// or changed after the agent's read is refused, never trashed. Mirrors
+    /// `write_for_remote_agent_if_revision`. Returns the moved note's meta.
+    pub(crate) fn trash_for_remote_agent_if_revision(
+        &mut self,
+        id: &str,
+        expected_revision: &str,
+    ) -> Result<NoteMeta, String> {
+        crate::fsutil::require_revision(expected_revision)?;
+        let rel = self.resolve_note_rel(id)?;
+        if !rel.ends_with(".md") {
+            return Err("agents trash Markdown notes only".into());
+        }
+        let trash = lifecycle_disk_folder(self.layout, "Trash");
+        self.writable(&rel)?;
+        self.writable(&trash)?;
+        let path = self.abs(&rel);
+        crate::fsutil::with_file_lock(&path, || {
+            let text = self.read_for_ai(&rel, false)?;
+            let fm = parse_document(&text).0.unwrap_or_default();
+            if let Some(refusal) = crate::ai_edit_policy::body_edit(&fm.foreign).refusal() {
+                return Err(refusal.into());
+            }
+            crate::fsutil::compare_revision(expected_revision, text.as_bytes())?;
+            // the caller's id, never the rel: `relocate` stamps it back as the
+            // note's identity (see `delete`)
+            self.relocate(id, &rel, &trash)
+        })
+    }
+}

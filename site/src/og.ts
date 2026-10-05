@@ -56,8 +56,8 @@ export const OG_CARDS = {
     pose: 'notes',
   },
   about: {
-    title: 'About rotli',
-    line: 'A calm place to think, built on one folder of ordinary files you keep.',
+    title: 'Why I’m building rotli',
+    line: 'Notes are where work starts. They should live somewhere that is yours.',
     pose: 'rest',
   },
   download: {

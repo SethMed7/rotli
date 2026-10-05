@@ -76,17 +76,27 @@ maintaining separate file-manipulation implementations.
 - `rotli notes trash ID --revision REV` and `rotli_trash_note` move one
   Markdown note to Rotli's Trash through `CorpusStore::delete`, the soft
   delete the note menu uses; the person restores it from Trash, and nothing
-  is ever hard-deleted. Order: remote read gate (secure refuses), body-edit
-  policy (locked, person-written, and revoked refuse), then the revision.
+  is ever hard-deleted. Order, all under the note's file lock around the move
+  (`CorpusStore::trash_for_remote_agent_if_revision`, mirroring the write
+  seam): remote read gate (secure refuses), body-edit policy (locked,
+  person-written, and revoked refuse), then the revision. A note locked or
+  made secure while the call waits on the lock is refused.
 - `rotli notes attachments ID` and `rotli_note_attachments` list the files a
   note's Markdown links and images name, resolved as the editor resolves them
   (`storage:NAME` is `storage/NAME`; a bare relative path is vault-relative;
   traversal and absolute paths are refused; external URLs are listed, never
   fetched). The note passes the remote read gate first, so a secure note's
   attachments are never enumerated. Each file then takes the document lane's
-  records gate (agent-visible surface, no secure keyword in its name). Results
-  carry the vault-relative path, MIME type, size, and kind; local callers (CLI,
-  stdio, loopback) also get the absolute path, the relay connector does not.
+  records gate (agent-visible surface, no secure keyword in its name) and the
+  secure-home check (nothing under `wiki/_secure/` or `Secure notes/`, any
+  layout, any case); a linked `.md` also takes `read_for_ai` exactly as a
+  remote read of it would (secure flag, chat taint, body detector, name). A
+  refused file is answered with `source`, `path`, `available: false`, and one
+  reason, "not available to agents", even when a linked note is absent, so
+  the answer never tells a present secure note from a missing one; it never
+  carries a size, MIME type, or absolute path. Otherwise results carry the
+  vault-relative path, MIME type, size, and kind; local callers (CLI, stdio,
+  loopback) also get the absolute path, the relay connector does not.
   `--text`/`includeText` returns text attachments up to 20 KB by default
   (200 KB max), withholding secret-shaped text. Binaries are never base64.
 - External-agent updates and moves refuse secure and locked notes. Explicit
@@ -199,9 +209,14 @@ before it leaves Rust. A headless `rotli mcp` reaches the app through
 
 `rotli open` and the MCP `rotli_open` tool write one item ID and kind to the
 default corpus's rebuildable `.rotli/workspace-open.json` mailbox, then activate
-Rotli. An item in a connected root (`--root ID`, `rootId`, or an `ID:path`
+Rotli. An item in a connected vault (`--root ID`, `rootId`, or an `ID:path`
 wire id) is queued in the same default mailbox under its root-prefixed wire
-id, which the app routes to that root; the app must list that root. The main webview consumes and deletes the request and routes it through
+id. Panes show only the active vault, so the app switches to that vault first
+(`corpus_switch_vault`, the sidebar switcher's own path) and then opens the
+item by its id there (`src/state/openRequest.ts`); a failed switch opens
+nothing and says why. A connected folder that is not a vault is no switch
+target, so `rotli open` refuses it before anything is queued. The main
+webview consumes and deletes the request and routes it through
 `openSummary`, exactly like a sidebar or palette selection. The mailbox never
 contains note content.
 
