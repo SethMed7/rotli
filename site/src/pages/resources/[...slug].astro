@@ -1,9 +1,11 @@
 ---
-// /resources/ (the Guides index) and /resources/<article>/. The header's
+// /resources/ (the Guides index) and /resources/<article>/. Each article opens on its own
+// scene and pins a reading meter under the header (WritingPage `progress`). The header's
 // Resources dropdown also leads to the Blog, Developers (resources/developers/),
 // and the Changelog; this index lists the guides only.
 import { render } from 'astro:content';
 import { twinPath, writingGraph, writingPath } from '../../agents';
+import ResourceScene, { type SceneKind } from '../../components/ResourceScene.astro';
 import WritingList from '../../components/WritingList.astro';
 import WritingPage from '../../components/WritingPage.astro';
 import { ogImage } from '../../og';
@@ -32,6 +34,14 @@ const toc = (rendered?.headings ?? [])
   .filter((heading) => heading.depth === 2)
   .map((heading) => ({ slug: heading.slug, text: heading.text }));
 const more = entry ? items.filter((item) => item.href !== `/resources/${slugOf(entry)}/`) : [];
+/** Each guide's opening scene (ResourceScene.astro); a guide not listed gets the plain beach. */
+const scenes: Record<string, SceneKind> = {
+  'getting-started': 'start',
+  'why-local': 'local',
+  'ai-and-your-notes': 'ai',
+  'rotli-helper': 'helper',
+  'web-and-mac': 'web',
+};
 ---
 
 {
@@ -49,7 +59,9 @@ const more = entry ? items.filter((item) => item.href !== `/resources/${slugOf(e
       heading={entry.data.title}
       lede={entry.data.description}
       toc={toc}
+      progress
     >
+      <ResourceScene slot="scene" kind={scenes[slugOf(entry)] ?? 'beach'} />
       <Content />
       <section slot="after" class="more" aria-labelledby="more-title">
         <h2 id="more-title">More guides</h2>

@@ -52,6 +52,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Helper connects the browser to your folder and gives the one-line command to
   copy. The quokka carousel is gone from the landing and Features pages, and
   the About page's belief now reads "AI works for you, inside rules you set."
+- **rotli.co says rotli is for your notes, on the Mac first.** The home page
+  promises a private workspace for your notes and says where it runs under
+  the buttons: Mac first (and in your browser today), with Windows and Linux
+  apps planned. The download page lists Windows and Linux as planned rather
+  than coming soon.
+- **The before-and-after note on rotli.co is no longer two cards.** The same
+  file sits in two open columns, as you write it and after the Librarian: the
+  lines it adds are marked, and your words are marked unchanged. Its example
+  files the note in a real area.
+- **The unused-AI figures on rotli.co have a scene.** Four idle AI tools wait
+  on a bench by the sea until the quokka hands each one a note to file. The
+  survey footnote now says who was asked.
+- **Scrolling into "Some notes never leave this Mac" takes the whole of
+  rotli.co into the night.** The page, its header, menus, and buttons step
+  into Ocean Dark while the privacy section is in view, and step back out
+  when you scroll on or back. With reduced motion the change is immediate.
+- **The quokkas at the bottom of rotli.co each have something to do.** One
+  sits eating a leaf, one nibbles beside it, one minds the leaf pile (it
+  waves when you arrive and frowns if you reach for the leaves), two play
+  catch in the corner, and one strolls the dunes. You can pick up a leaf and
+  hand it to one of them, with the mouse, a finger, or the "Hand the quokkas a
+  leaf" button from the keyboard. The reaching arm is gone.
+- **rotli.co's page-not-found screen has a game.** Press Play and the quokka
+  runs along the beach: jump the rocks, bushes, logs, and sandcastles with
+  Space, ↑, or a tap, and see how far you get. It pauses when you leave it,
+  and "Take me home" works the whole time. Your best run is not saved.
+- **rotli.co's guides open on their own scene and show how far through you
+  are.** Each guide starts with a small island scene about its subject, and a
+  bar with "N% through" stays under the header as you scroll the article.
 - **Setup is four screens.** Your name and theme, where your notes live, who
   files them (the Librarian), and your three shortcuts, which now say plainly
   that you can change them. Then the thank-you card and the tour, and a small
@@ -176,6 +205,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The theme studio's previous and next buttons on rotli.co sit on one row
+  on phones** again, beside the theme's name.
 - **A new note in Rotli Web says "just now".** It read hours old (at least
   4h in New York) because its date was taken as midnight UTC. A
   note's created and updated dates stay plain days in the file; Rotli Web

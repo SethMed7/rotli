@@ -328,8 +328,15 @@ const first = stops[0];
     .studio-shot figcaption {
       display: none;
     }
+    /* Previous, the theme's name, next: one row (the #156 review: without the columns
+       they stacked into three rows at phone widths). */
     .studio-steps {
       display: grid;
+      grid-template-columns: 44px minmax(0, 1fr) 44px;
+      align-items: center;
+      gap: 0.75rem;
+      max-width: 24rem;
+      margin: 1rem auto 0;
     }
     .studio-shot img {
       touch-action: pan-y;

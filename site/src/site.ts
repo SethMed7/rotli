@@ -192,3 +192,19 @@ export const site = {
   /** The launch film, when its artifacts are present. */
   promo: readPromo(),
 } as const;
+
+/**
+ * Where rotli runs, said one way everywhere (the owner, 2026-10-05). The
+ * promise is a private workspace for your notes, not a Mac app: the Mac comes
+ * first, and native Windows and Linux apps are planned, with no date. Pages
+ * state availability with these words and never imply the Mac is the only
+ * platform rotli will ever have, or that Windows and Linux apps exist today.
+ */
+export const PLATFORMS = {
+  /** Beside the hero's ways in. */
+  availability: site.webAppEnabled
+    ? 'Mac first, and in your browser today. Windows and Linux apps are planned.'
+    : 'Mac first. Windows and Linux apps are planned.',
+  /** The status of a platform that is planned but not built. */
+  planned: 'Planned',
+} as const;

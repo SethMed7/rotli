@@ -139,3 +139,74 @@ Remaining, owner-blocked:
 Known follow-ups: nested ordered lists indent 2 spaces (CommonMark wants 3);
 an in-app viewer for the AI edit journal; `![[file]]` embeds as Hand to AI
 attachments; `public/night-stars.svg` is unused.
+
+## Status (2026-10-05)
+
+### Website round 2 (owner feedback of 2026-10-03)
+
+The owner reviewed the stack's preview and gave seven website notes
+(`_review/opus-website-feedback-2026-10-03.md`, local only). Opus built all
+seven on `feat/website-round-2026-10-05`, a branch off #165's tip, in
+`.claude/worktrees/opus-website-2026-10-05`. The full record is
+`_review/opus-website-result-2026-10-05.md`. **Not committed and not pushed.**
+The owner stopped the session and the preview at 2026-10-05 16:36.
+
+| # | Note | Built |
+|---|---|---|
+| 1 | Not Mac-only | "A private workspace for your notes" plus "Mac first. Windows and Linux apps are planned." (`PLATFORMS` in `site.ts`); download page says Planned; home card and banners re-rendered |
+| 2 | Before/after without cards | Two open columns; the Librarian's lines are tinted with a "+"; the example area is now `Clients` (fixes the #156 finding) |
+| 3 | Dead stat section | A bench scene: four idle AI tools, and the quokka hands each one a note; the footnote matches the source |
+| 4 | Privacy passage | The whole site, header included, steps into Ocean Dark while the band holds the middle of the window (`passage.ts`) |
+| 5 | Footer scene | Each quokka has its own pose: eating, nibbling, a guard, two playing catch, one strolling. The visitor drags a leaf to hand over; a keyboard button does the same |
+| 6 | 404 game | A canvas runner (`site/src/runner/`) that jumps obstacles and scores in metres; nothing is stored |
+| 7 | Living resources | `ResourceScene` per guide, and a pinned "N% through" meter (`reading.ts`) |
+
+Also fixed: theme-studio steps sit on one row at 390px (#156 finding), and the
+privacy line no longer mixes up locked and secure notes. Proof so far: 19 new
+rule tests, 20 new site specs (`bun run test:e2e:site`, 100/100 under repeat),
+and `astro check` clean. Full `verify` stopped only on the `tab-indent` flake
+(below); its later lanes passed when run on their own.
+
+### What blocks merging
+
+The stack is linear, so a hold on one PR blocks every PR above it. Only
+#151–#153 can merge today.
+
+1. **#154: a fail-open on the secure boundary.** Secure-folder matching skips
+   canonicalization, so `Secure%20notes/…` and `../Secure notes/…` read as
+   non-secure. Secure notes must fail closed. This is the most serious open item.
+2. **#155:** `describe_attachment` doesn't check a linked note's frontmatter
+   `secure`. Connected-root open is rejected by `canOpenVaultInPanes`. Trash has
+   a revision window.
+3. **#162: `e2e/tab-indent.spec.ts` flakes** (it fails 2–4 runs in 10, with
+   "editor commands module is not mounted"). #162 adds this spec, and it isn't
+   on `dev`, so the stack introduced the flake. Fix it before merging or CI
+   will flake.
+4. Reviewer polish on #156–#165: About wording, Tab across fence markers,
+   brand-image grounds and contrast claims, and chat-buddy pose states. Check
+   these against the tip.
+
+### Outside the stack
+
+- `fix/opening-never-hangs` (`ff63b64b`) and `fix/onboarding-polish`
+  (`f5a9c997`) are local only and unpushed. `ff63b64b` fixes a launch hang
+  that shipped in 1.7.1 on macOS 27, so it's a hotfix candidate. These branches
+  change 11 files that the stack also changes (onboarding, `thanksDialog`,
+  `settingsSurface`, `lib.rs`, CHANGELOG, DESIGN). Expect conflicts whichever
+  lands second.
+- The dev-registry backups `*.dev.json.before-dev-test-2026-10-02` in
+  `~/Library/Application Support/com.rotli.app/` still exist. Restore them
+  once the owner is done with the `~/test` dev vault.
+
+### Owner decisions next
+
+- Commit the website round and open it as #166 on `feat/chat-quokka-buddy`.
+  Accept or reword its proposed copy.
+- Decide whether `test:e2e:site` joins `verify` and CI.
+- Fix the #154/#155 holds and the #162 flake now. They gate every website PR,
+  so they come before more site polish.
+- Ship 1.7.2 from `fix/opening-never-hangs` alone, or fold it into the stack.
+- Owner-only steps: watch the hero cut, set the Resend segment and key on
+  Railway, build the site Docker image once (to check the sidecar), upload the
+  banners, do the native Retina-drop and Refined Hand to AI checks, and the
+  #21 story film last.

@@ -1,9 +1,18 @@
 ---
 // Why the Librarian exists, in two figures from other people's research and one sentence of
-// ours. Quiet on purpose: no card, no chart, no count-up. Each figure is checked against its
-// source (verified 2026-10-02): Self Financial found ChatGPT the most commonly unused paid AI
-// platform (50.4% of its paid users had not used it in the past 30 days); Bango's 2025 report
-// puts the average subscriber at about $66 a month across 4 AI tools. Never call it "wasted".
+// ours, beside a small scene from the film's island: four AI tools (the average subscriber's
+// four) idle on a bench by the sea, two of them asleep, until the quokka arrives with a stack
+// of notes and hands each one something to file. It plays once when revealed and rests on
+// everyone busy; reduced motion and no script show that resting state. The figures stay plain
+// text with their footnotes: no card, no chart, no count-up.
+//
+// Each figure is checked against its source (verified 2026-10-02, population wording corrected
+// 2026-10-05 per the #156 review): Self Financial surveyed 1,272 U.S. adults who pay for at least
+// one subscription of any kind, and among its respondents paying for ChatGPT, 50.4% had not used
+// it in the past 30 days; Bango's 2025 report puts the average AI subscriber at about $66 a month
+// across 4 AI tools. Never call it "wasted".
+import working from '../../../../src/assets/characters/filled/cocoa/knowledge_system.webp';
+
 const figures = [
   { value: 'Half', text: 'of people paying for ChatGPT hadn’t used it in the past 30 days.', note: 1 },
   { value: '4 tools', text: 'is what the average AI subscriber pays for, about $66 a month.', note: 2 },
@@ -11,34 +20,94 @@ const figures = [
 const sources = [
   {
     href: 'https://www.self.inc/info/cost-of-unused-paid-subscriptions/',
-    text: 'Self Financial, survey of 1,272 U.S. adults with a paid AI subscription, March 2026',
+    text: 'Self Financial, survey of 1,272 U.S. adults who pay for at least one subscription, March 2026. The figure is among respondents paying for ChatGPT (50.4%).',
   },
   {
     href: 'https://bango.com/its-not-a-bubble-over-three-quarters-say-their-ai-subscriptions-are-now-essential-to-everyday-life/',
     text: 'Bango, “The rise of the AI subscriber,” 2025',
   },
 ];
+/** The four tools on the bench, left to right; the first and third start asleep. */
+const tools = [
+  { x: 252, tone: 'olive', asleep: true },
+  { x: 336, tone: 'sea', asleep: false },
+  { x: 420, tone: 'lake', asleep: true },
+  { x: 504, tone: 'lantern', asleep: false },
+];
 ---
 
 <section class="section stat-band" id="waiting" aria-labelledby="waiting-title">
-  <div class="wrap">
-    <h2 class="section-title" id="waiting-title" data-reveal>The AI you already pay for is mostly waiting.</h2>
-    <ul class="figures" data-stagger>
-      {
-        figures.map((figure) => (
-          <li>
-            <p class="value">
-              {figure.value}
-              <sup>
-                <a href={`#fn-${figure.note}`} id={`fnref-${figure.note}`} aria-label={`Source ${figure.note}`}>{figure.note}</a>
-              </sup>
-            </p>
-            <p class="text">{figure.text}</p>
-          </li>
-        ))
-      }
-    </ul>
-    <p class="close" data-reveal>rotli gives that AI something useful to do: keep your notes in order while you write.</p>
+  <div class="wrap waiting-grid">
+    <div class="waiting-copy">
+      <h2 class="section-title" id="waiting-title" data-reveal>The AI you already pay for is mostly waiting.</h2>
+      <ul class="figures" data-stagger>
+        {
+          figures.map((figure) => (
+            <li>
+              <p class="value">
+                {figure.value}
+                <sup>
+                  <a href={`#fn-${figure.note}`} id={`fnref-${figure.note}`} aria-label={`Source ${figure.note}`}>{figure.note}</a>
+                </sup>
+              </p>
+              <p class="text">{figure.text}</p>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="close" data-reveal>rotli gives that AI something useful to do: keep your notes in order while you write.</p>
+    </div>
+
+    <div class="bench-scene" data-reveal aria-hidden="true">
+      <svg viewBox="0 0 620 380" role="presentation">
+        <rect class="sea" x="24" y="232" width="572" height="110" rx="40"></rect>
+        <path class="sea-edge" d="M64 232H556"></path>
+        <path class="waves" d="M64 252q9-5 18 0M150 268q9-5 18 0M300 246q9-5 18 0M470 262q9-5 18 0M548 250q9-5 18 0"></path>
+        <path class="sand" d="M0 352C30 330 90 314 200 314S440 330 520 322C580 316 612 334 620 352Z"></path>
+        <path class="sand-edge" d="M0 352C30 330 90 314 200 314S440 330 520 322C580 316 612 334 620 352"></path>
+
+        <g class="bench">
+          <path class="bench-leg" d="M252 276V328M592 276V326"></path>
+          <rect class="bench-seat" x="232" y="262" width="376" height="16" rx="6"></rect>
+        </g>
+
+        {
+          tools.map((tool, i) => (
+            <g class:list={['tool', `tool-${i + 1}`, `tone-${tool.tone}`, { asleep: tool.asleep }]}>
+              <path class="tool-legs" d={`M${tool.x + 20} 262v22M${tool.x + 44} 262v22`}></path>
+              <path class="tool-pins" d={`M${tool.x + 16} 196v8M${tool.x + 32} 196v8M${tool.x + 48} 196v8`}></path>
+              <rect class="tool-body" x={tool.x} y="204" width="64" height="60" rx="15"></rect>
+              <g class="face-idle">
+                {tool.asleep ? (
+                  <path class="face-line" d={`M${tool.x + 14} 225q6 5 12 0M${tool.x + 38} 225q6 5 12 0`}></path>
+                ) : (
+                  <>
+                    <circle class="face-ink" cx={tool.x + 20} cy="225" r="4.5"></circle>
+                    <circle class="face-ink" cx={tool.x + 44} cy="225" r="4.5"></circle>
+                  </>
+                )}
+                <path class="face-line" d={`M${tool.x + 25} 241h14`}></path>
+              </g>
+              <g class="face-busy">
+                <circle class="face-ink" cx={tool.x + 20} cy="223" r="4.5"></circle>
+                <circle class="face-ink" cx={tool.x + 44} cy="223" r="4.5"></circle>
+                <path class="face-line" d={`M${tool.x + 24} 236q8 7 16 0`}></path>
+              </g>
+              {tool.asleep && (
+                <text class="zz" x={tool.x + 58} y="196">z<tspan dx="2" dy="-10">z</tspan></text>
+              )}
+              <g class="note">
+                <rect class="note-card" x={tool.x + 10} y="244" width="44" height="28" rx="4"></rect>
+                <path class="note-line" d={`M${tool.x + 17} 253h28M${tool.x + 17} 261h18`}></path>
+              </g>
+            </g>
+          ))
+        }
+
+        <image class="quokka" href={working.src} x="6" y="122" width="232" height="232"></image>
+      </svg>
+    </div>
+
     <ol class="sources">
       {
         sources.map((source, index) => (
@@ -52,56 +121,65 @@ const sources = [
 </section>
 
 <style>
+  /* The words on the left, the bench on the right, sitting on the same baseline; the sources
+     run under both. One column, words first, on narrow widths. */
+  .waiting-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: clamp(1.5rem, 4vw, 4rem) clamp(2rem, 5vw, 5rem);
+    align-items: end;
+  }
   .section-title {
-    max-width: 24ch;
+    max-width: 16ch;
   }
   .figures {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 2rem clamp(2rem, 6vw, 5rem);
-    max-width: 52rem;
-    margin: clamp(2rem, 4vw, 3rem) 0 0;
+    gap: 1.5rem clamp(1.5rem, 3vw, 2.5rem);
+    margin: clamp(1.75rem, 3vw, 2.5rem) 0 0;
     padding: 0;
     list-style: none;
   }
   .figures li {
-    padding-top: 1.25rem;
+    padding-top: 1.1rem;
     border-top: 1px solid var(--border-strong);
   }
   .value {
     margin: 0;
-    font-size: clamp(2.4rem, 5vw, 3.6rem);
+    color: var(--accent-text);
+    font-size: clamp(2.2rem, 4vw, 3.2rem);
     font-weight: 600;
     line-height: 1;
     letter-spacing: -0.04em;
+    white-space: nowrap;
   }
   .value sup {
-    margin-left: 0.15em;
-    font-size: 1rem;
+    margin-left: 0.12em;
+    font-size: 0.95rem;
     font-weight: 600;
     letter-spacing: 0;
     vertical-align: super;
   }
   .text {
-    max-width: 22rem;
-    margin: 0.75rem 0 0;
-    color: var(--text-muted);
-    font-size: var(--step-lede);
+    margin: 0.6rem 0 0;
+    color: var(--text);
+    font-size: 1.08rem;
     line-height: 1.45;
   }
   .close {
-    max-width: 38rem;
-    margin: clamp(2rem, 4vw, 3rem) 0 0;
+    max-width: 30rem;
+    margin: clamp(1.75rem, 3vw, 2.5rem) 0 0;
     font-size: var(--step-lede);
     font-weight: 600;
     line-height: 1.45;
   }
   .sources {
+    grid-column: 1 / -1;
     display: grid;
     gap: 0.25rem;
-    max-width: 52rem;
-    margin: clamp(2rem, 4vw, 3rem) 0 0;
-    padding-left: 1.2rem;
+    margin: 0;
+    padding: 1rem 0 0 1.2rem;
+    border-top: 1px solid var(--border);
     color: var(--text-muted);
     font-size: 0.85rem;
     line-height: 1.5;
@@ -112,12 +190,10 @@ const sources = [
     text-underline-offset: 0.2em;
   }
   .value a {
+    position: relative;
     display: inline-block;
     min-width: 1.5ch;
     text-decoration: none;
-  }
-  .value a {
-    position: relative;
   }
   .value a::after {
     content: '';
@@ -133,7 +209,224 @@ const sources = [
       padding-block: 0.6rem;
     }
   }
-  @media (max-width: 700px) {
+
+  /* The bench by the sea, in the film's palette with the art's own ink (--ink, so the lines
+     hold when the page passes into the privacy night just below). */
+  .bench-scene svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+  .sea {
+    fill: var(--sea);
+  }
+  .sea-edge {
+    stroke: var(--sea-deep);
+    stroke-width: 2;
+  }
+  .waves {
+    fill: none;
+    stroke: var(--sea-line);
+    stroke-width: 3;
+    stroke-linecap: round;
+  }
+  .sand {
+    fill: var(--sand);
+  }
+  .sand-edge {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+  }
+  .bench-seat {
+    fill: var(--wood);
+    stroke: var(--ink);
+    stroke-width: 3;
+  }
+  .bench-leg,
+  .tool-legs,
+  .tool-pins {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 4;
+    stroke-linecap: round;
+  }
+  .bench-leg {
+    stroke: var(--wood-dark);
+    stroke-width: 7;
+  }
+  .tool-body {
+    stroke: var(--ink);
+    stroke-width: 3.5;
+  }
+  .tone-olive .tool-body {
+    fill: var(--olive-bright);
+  }
+  .tone-sea .tool-body {
+    fill: var(--lantern);
+  }
+  .tone-lake .tool-body {
+    fill: var(--lake);
+  }
+  .tone-lantern .tool-body {
+    fill: var(--limestone);
+  }
+  .face-ink {
+    fill: var(--ink);
+  }
+  .face-line {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 3.5;
+    stroke-linecap: round;
+  }
+  .zz {
+    fill: var(--text-muted);
+    font-family: var(--font-body);
+    font-size: 17px;
+    font-weight: 600;
+  }
+  .note-card {
+    fill: var(--capture-ground);
+    stroke: var(--ink);
+    stroke-width: 2.5;
+  }
+  .note-line {
+    stroke: var(--accent);
+    stroke-width: 3;
+    stroke-linecap: round;
+  }
+  /* At rest every tool is busy: idle faces and the z's are gone, each holds a note. */
+  .face-idle,
+  .zz {
+    opacity: 0;
+  }
+  .tool,
+  .note,
+  .quokka {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+  }
+
+  /* Once, when the scene comes into view: the quokka hops in with its stack, hands a note to
+     each tool in turn (they wake as theirs lands), and everyone settles in to file. */
+  @media (prefers-reduced-motion: no-preference) {
+    /* Before it is revealed: idle, two asleep, no notes yet. */
+    :global(.js) .bench-scene .face-idle,
+    :global(.js) .bench-scene .zz {
+      opacity: 1;
+    }
+    :global(.js) .bench-scene .face-busy,
+    :global(.js) .bench-scene .note {
+      opacity: 0;
+    }
+    :global(.js) .bench-scene:global(.is-visible) .face-idle,
+    :global(.js) .bench-scene:global(.is-visible) .zz {
+      opacity: 0;
+    }
+    :global(.js) .bench-scene:global(.is-visible) .face-busy,
+    :global(.js) .bench-scene:global(.is-visible) .note {
+      opacity: 1;
+    }
+    :global(.js) .bench-scene:global(.is-visible) .quokka {
+      animation: hop-in 900ms cubic-bezier(0.34, 1.4, 0.64, 1) 150ms backwards;
+    }
+    :global(.js) .bench-scene:global(.is-visible) .note {
+      animation: note-fly 720ms cubic-bezier(0.3, 0.7, 0.3, 1) backwards;
+    }
+    :global(.js) .bench-scene:global(.is-visible) .face-idle,
+    :global(.js) .bench-scene:global(.is-visible) .zz {
+      animation: hold-then-go 1ms linear backwards;
+    }
+    :global(.js) .bench-scene:global(.is-visible) .face-busy {
+      animation: wake 1ms linear backwards;
+    }
+    :global(.js) .bench-scene:global(.is-visible) .tool {
+      animation: perk 520ms cubic-bezier(0.34, 1.6, 0.64, 1) backwards;
+    }
+    .tool-1 {
+      --from: -150px;
+      --at: 1000ms;
+    }
+    .tool-2 {
+      --from: -234px;
+      --at: 1350ms;
+    }
+    .tool-3 {
+      --from: -318px;
+      --at: 1700ms;
+    }
+    .tool-4 {
+      --from: -402px;
+      --at: 2050ms;
+    }
+    :global(.js) .bench-scene:global(.is-visible) .note {
+      animation-delay: var(--at);
+    }
+    :global(.js) .bench-scene:global(.is-visible) :is(.face-idle, .zz, .face-busy) {
+      animation-delay: calc(var(--at) + 620ms);
+    }
+    :global(.js) .bench-scene:global(.is-visible) .tool {
+      animation-delay: calc(var(--at) + 600ms);
+    }
+  }
+  @keyframes hop-in {
+    0% {
+      transform: translateX(-90px) translateY(0);
+      opacity: 0;
+    }
+    35% {
+      transform: translateX(-50px) translateY(-26px);
+      opacity: 1;
+    }
+    60% {
+      transform: translateX(-16px) translateY(0) scale(1.04, 0.96);
+    }
+    80% {
+      transform: translateX(0) translateY(-10px);
+    }
+  }
+  @keyframes note-fly {
+    0% {
+      transform: translate(var(--from), -26px) rotate(-18deg) scale(0.8);
+      opacity: 0;
+    }
+    12% {
+      opacity: 1;
+    }
+    55% {
+      transform: translate(calc(var(--from) * 0.45), -92px) rotate(-6deg);
+    }
+  }
+  @keyframes hold-then-go {
+    from {
+      opacity: 1;
+    }
+  }
+  @keyframes wake {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes perk {
+    0% {
+      transform: none;
+    }
+    40% {
+      transform: translateY(-12px) scale(0.96, 1.05);
+    }
+  }
+  @media (max-width: 900px) {
+    .waiting-grid {
+      grid-template-columns: 1fr;
+    }
+    .bench-scene {
+      max-width: 34rem;
+    }
+  }
+  @media (max-width: 480px) {
     .figures {
       grid-template-columns: 1fr;
     }

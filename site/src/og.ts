@@ -32,7 +32,7 @@ export interface OgCard {
 export const OG_CARDS = {
   home: {
     title: 'Write like a person. Let AI do the filing.',
-    line: 'A private workspace for your Mac, in plain Markdown files you own.',
+    line: 'A private workspace for your notes, in plain Markdown files you own.',
     pose: 'waving',
   },
   features: {

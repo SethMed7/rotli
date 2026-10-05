@@ -33,6 +33,7 @@
     "test:e2e": "env -u NO_COLOR playwright test",
     "test:e2e:ui": "env -u NO_COLOR playwright test --ui",
     "test:e2e:web": "env -u NO_COLOR playwright test --config playwright.web.config.ts",
+    "test:e2e:site": "env -u NO_COLOR playwright test --config playwright.site.config.ts",
     "check:e2e-types": "tsc --noEmit -p tsconfig.e2e.json",
     "test:tooling": "bun test scripts/*.test.ts",
     "test:relay": "bun test services/rotli-mcp-relay/server.test.ts",

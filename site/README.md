@@ -1,7 +1,8 @@
 # Rotli — marketing site
 
-A product-led landing page for Rotli, the local-first Mac workspace where one
-ordinary folder remains the durable source of truth. The launch page explains
+A product-led landing page for Rotli, the local-first workspace for your notes
+where one ordinary folder remains the durable source of truth. The Mac comes
+first; native Windows and Linux apps are planned (see "Where rotli runs"). The launch page explains
 the Markdown workspace (tasks, links, views), the Playground, optional local or
 connected chat, the privacy boundary, theme families, the optional quokka
 companion, and local stdio MCP. Features under review (Breve, DOCX and
@@ -32,6 +33,15 @@ bun run check    # Astro + TypeScript diagnostics
 bun run build    # static output → site/dist/
 bun run preview  # serve the built dist/ locally
 ```
+
+The interactive pieces have two proofs, both run from the repository root:
+`bun test scripts/site-interactions.test.ts` (the rules without a browser: the
+privacy passage's trigger, the reading meter, the 404 game, the footer scene's
+play) and `bun run test:e2e:site` (`playwright.site.config.ts`: builds the
+site, serves it with `astro preview` on port 4392, and drives `e2e/site/`).
+The unit file runs inside `bun run verify`; the site's E2E lane is not yet
+wired into `verify` or CI (an owner decision: it would add a site build to
+the e2e lane), so run it by hand after changing those pages.
 
 ## Production details
 
@@ -79,12 +89,17 @@ bun run preview  # serve the built dist/ locally
 - **The landing page** (`src/components/Landing.astro`) only composes its
   chapters from `src/components/landing/`: Hero (the product film) → Overview (Write. Keep. Ask.: three
   steps with the app's quokkas, then links to the episodes and `/features/`)
-  → TwoKinds ("You write for yourself. AI reads differently.": a plain
-  HTML mock of one note as typed and as the Librarian files it) → StatBand
-  (two sourced figures, footnoted; keep the sources and "never wasted"
-  wording) → the dev-only Experiments → PrivacyBrief (the night scene in Ocean
-  Dark via `.band-night` in `Base.astro`, three facts, and a link to
-  `/privacy/`) → Everywhere (Rotli Web and how Rotli Helper connects it, with
+  → TwoKinds ("You write for yourself. AI reads differently.": the same
+  file as typed and as the Librarian files it, in two open columns on the band
+  with no card around either; the added frontmatter lines carry a "+" and a
+  tint, the body is marked unchanged, and `area` is a flat area as the memex
+  contract requires) → StatBand (two sourced figures, footnoted, beside a
+  bench by the sea where four idle AI tools, two asleep, are each handed a
+  note by the quokka; keep the sources and "never wasted" wording) → the
+  dev-only Experiments → PrivacyBrief (the night scene in Ocean Dark via
+  `.band-night` in `Base.astro`, three facts, and a link to `/privacy/`; while
+  it is the focal passage the whole page steps into its night, see "The
+  privacy passage") → Everywhere (Rotli Web and how Rotli Helper connects it, with
   the copyable install line; only while `WEB_APP_ENABLED`) → Personal (the
   theme studio, with a faint island vignette) → Faq → FinalCta (the closing call; the footer's quokka beach ends the
   page). The landing page carries exactly one video. **`/features/`** has
@@ -102,10 +117,11 @@ bun run preview  # serve the built dist/ locally
   `.band-warm`, `.band-deep`, the spacing and type steps), and the one
   scroll-reveal script. Nothing on the page moves on a timer: the theme studio
   changes only when a visitor picks a swatch or steps the
-  carousel, and scroll reveals fire once and rest. The one sanctioned
-  exception (the owner's call, 2026-10-02) is the quokka scenery under the
-  footer, described below: it lives in its own band, below every word, and
-  stands still under reduced motion. Two-column rows share a
+  carousel, and scroll reveals (the drawn scenes included) fire once and
+  rest. The sanctioned exceptions are the quokka scenery under the footer
+  (the owner's call, 2026-10-02), described below, which lives in its own
+  band, below every word, and stands still under reduced motion, and the 404
+  page's game, which moves only after the visitor presses Play. Two-column rows share a
   top edge so each heading starts level with its picture.
 - **`/privacy/`** is the full privacy policy in plain language: the short
   version, where notes live, every network connection and when it happens, AI
@@ -126,7 +142,23 @@ bun run preview  # serve the built dist/ locally
   bundled script; without it the tree is plain links). Below 900px the tree
   becomes an "On this page" disclosure above the text. Privacy, resource
   articles, and blog posts use it (articles and posts build it from their
-  `##` headings). Resource articles end with "More guides". Index lists
+  `##` headings). Resource articles end with "More guides".
+- **Resource articles** open on their own scene (`ResourceScene.astro`, the
+  guides' answer to the night frame on `/privacy/`): the island by day, the
+  app's quokka in the pose that fits the question, and what the article is
+  about around it (the folder and keys for Getting started, the folder at
+  home for Why local, the on-device model and a locked note for AI, the
+  browser and the folder for Rotli Helper, the laptop and the browser for
+  Web and Mac). `pages/resources/[...slug].astro` maps each guide to its
+  scene; a new guide without one gets the plain beach. They pass `progress`,
+  so a reading meter is pinned under the header on every width: a bar and
+  "N% through", measured over the article alone (`src/reading.ts`, the same
+  measure that fills the tree's rail), so the end of the article reads 100%
+  and the related links and footer never count. It follows scrolling either
+  way and jumps through the tree, re-measures when the article changes
+  height, and hides when the whole article fits in the window. It is a
+  position, not proof of reading: nothing is recorded or sent. Posts and
+  `/privacy/` can opt in with the same prop after review. Index lists
   (`WritingList.astro`) are plain entries in columns with a hairline above
   each, never boxes; an entry without a link is announced ("Coming soon").
 - **Writing.** Resources (evergreen, question-titled) and blog posts are
@@ -144,36 +176,85 @@ bun run preview  # serve the built dist/ locally
 - **`/download/`** is where the header's Download button goes. It leads with
   the visitor's own system (`Base.astro` stamps `data-os`: mac, windows,
   linux, mobile, or other): the Mac download on a Mac; on Windows and Linux,
-  "coming soon" with Rotli Web to use in the meantime and Rotli Helper for
-  browsers without folder access. Without script the Mac panel shows. Below,
-  "Every platform" lists Mac, Windows, Linux, and any browser with their
-  status. The hero's Download for Mac still fetches the DMG directly
+  a native app that is planned, with Rotli Web to use in the meantime and
+  Rotli Helper for browsers without folder access. Without script the Mac
+  panel shows. Below, "Every platform" lists Mac, Windows, Linux, and any
+  browser with their status (Windows and Linux: "Planned", never "Coming
+  soon", which would promise a date).
+- **Where rotli runs** (the owner, 2026-10-05). The promise is a private
+  workspace for your notes, not a Mac app: pages state availability
+  separately, with `PLATFORMS` in `src/site.ts` (the hero's line under the
+  ways in: "Mac first. Windows and Linux apps are planned.", plus "and in your
+  browser today" while `WEB_APP_ENABLED`). Never imply the Mac is the only
+  platform rotli will have, or that Windows or Linux apps exist today.
+  Sentences about what the Mac app does today (the on-device model, the
+  Keychain) stay about the Mac. The hero's Download for Mac still fetches the DMG directly
   (`DOWNLOAD_HREF`). The Helper guide is `/resources/rotli-helper/`; the 404
   page's `/helper` hint links there.
 - **The 404 page** (`src/pages/404.astro`) has no header or footer: "This
   note wandered off." in the middle of the window, one "Take me home" button
-  with a quiet line of other ways in, and the footer's quokka scenery along
-  the bottom edge. The missing path and a hint (`/app`, `/helper`) are chosen
+  with a quiet line of other ways in, and along the bottom edge a small game
+  on the footer's beach (`src/runner/`: `game.ts` is the game without a
+  screen, `stage.ts` draws it on a canvas). The quokka (the walking pose)
+  runs, Space, ↑, W, a click, or a tap jumps (letting go early makes a short
+  hop), and rocks, bushes, logs, and sandcastles come at a speed that grows;
+  the score is metres, and a fall shows the distance and "Play again". It
+  never starts by itself: Play starts a run and moves focus to the stage,
+  which alone reads the keys, so Space on "Take me home" or any other
+  control is never taken. Escape or P pauses; so does leaving the stage (a
+  Tab, a click elsewhere), hiding the tab, or scrolling it out of view. The
+  frame loop runs only during a run. Reduced motion keeps the game playable
+  (the visitor chose to start it) but stills the decorative layers (drifting
+  clouds, the run's bob, kicked-up sand). The best run lasts as long as the
+  page: no score is stored. Without script the footer's quokka scenery stands
+  there instead. The missing path and a hint (`/app`, `/helper`) are chosen
   in the browser.
 - **The quokka scenery** (`src/components/QuokkaScene.astro`, under every
-  footer, the 404, and `/subscribed/`) is a strip of Rottnest by day in the
-  film's palette (sea, the far lighthouse, scrub on the dunes, sand) with a
-  pile of leaves, four quokkas (three below 760px), and one that now and then
-  strolls along the dunes behind them, pausing to look at the pointer. The
-  quokkas are the app's canonical `base.svg` line art, rigged rather than
-  redrawn: `src/quokka/art.ts` thins the traced outline at build time and
-  takes its outer ring as the body fill (`--cocoa`, the app's Cocoa body);
-  `src/quokka/rig.ts` holds the pivots; overlays (eyes, brows, mouths, the
-  reaching arm, the leaves) use the art's own 14-unit ink. `src/quokka/scene.ts`
-  (one external module, about 7 KB) makes the head tilt and the eyes follow the
-  pointer, a paw reach for a pointer that comes close, brows go cross when the
-  pointer nears the leaves, faces fall when it is on them, and everyone cheers
-  when it leaves; they blink, hop, and nibble now and then, and a tap pokes
-  one. It runs one `requestAnimationFrame` loop only while the scene is on
-  screen and the tab is visible, uses pointer events only, and writes SVG
-  `transform` attributes and one CSSOM transform (never an inline `style`
-  attribute, which the CSP would drop). Under reduced motion, or without
-  script, nothing runs and the scene stands at rest. The band is decorative
+  footer, `/subscribed/`, and the 404 without script) is a strip of Rottnest
+  by day in the film's palette (sea, the far lighthouse, scrub on the dunes,
+  sand) where the quokkas live, each doing its own thing (the owner's brief,
+  2026-10-05): the sitter, up on its haunches by the leaf pile, eating a leaf
+  from its paws; the nibbler beside it, a paw at its mouth, chewing (hidden
+  below 760px); the guard, minding the pile; two players in the right-hand
+  corner tossing a beach ball between them; and now and then a stroller
+  walking the dunes behind them in profile. Every pose is the app's own art,
+  never redrawn: `base.svg` is rigged (`src/quokka/art.ts` thins its outline
+  and takes the outer ring as the body fill); `waving.svg` and
+  `celebrating.svg` are swapped in whole (their outer ring is their body
+  fill, and celebrating's confetti is dropped); the sitter, nibbler, and
+  stroller are the approved layered poses (`concepts/layers/`) as SVG masks
+  filled with the scene's tokens, split at the neck. `src/quokka/rig.ts`
+  holds every landmark (pivots, eyes, paws, the ball, each layered pose's
+  view, neck, and seam). There is no drawn reaching arm: arms move only as
+  the art does (the wave, the catch).
+  `src/quokka/scene.ts` (one external module) brings them to life. The guard's
+  eyes and head follow the pointer, it waves when the visitor arrives, frowns
+  when the pointer nears the pile, looks sad with a hand on it or a leaf
+  wasted, and cheers when a leaf reaches a friend. The eaters take bites (the
+  leaf shrinks), stop to look at a pointer that comes close, look to the pile
+  when theirs is gone, and fetch another after a while. The players watch the
+  ball, pause to watch a visitor who comes close, and the catcher reaches up
+  (the cheering pose) as it arrives; a click or tap on them or the ball sends
+  it high. Everyone blinks.
+  **The drag** (the decision, 2026-10-05): the visitor can pick a leaf off
+  the pile and carry it (mouse, pen, or touch; `touch-action: none` only on
+  the pile). The residents watch it, a hungry eater perks up as it comes
+  near, and letting go over a quokka hands it over (it eats, the others hop,
+  the guard is pleased); letting go over open sand wastes it (it drifts down,
+  rests, fades, and the guard is sad). The leaves are their lunch, so the
+  drag gives the visitor a part in the scene's one story rather than moving
+  the quokkas around like objects. "Hand the quokkas a leaf", a button before
+  the band (outside its `aria-hidden`), does the same from the keyboard
+  (visible on focus, offered only while the scene runs, with a polite status
+  line saying who took it). The rules without the DOM (who receives a leaf,
+  the ball's arc, a falling leaf, the guard's mood) are `src/quokka/play.ts`.
+  It runs one `requestAnimationFrame` loop only while the scene is on
+  screen, the tab is visible, and motion is allowed, uses pointer events
+  only, and writes SVG attributes and CSSOM transforms (never an inline
+  `style` attribute, which the CSP would drop). Under reduced motion, or
+  without script, nothing runs, the scene stands at rest (each resident in its
+  pose, the sitter and nibbler holding a leaf, a player holding the ball),
+  and the keyboard button stays hidden. The band is decorative
   (`aria-hidden`), has a fixed height (no layout shift), clips its own
   content, and holds no text, so nothing can overlap a word or a link.
 - **The motion studio** lives at `studio.rotli.co` (`STUDIO_URL` in
@@ -217,9 +298,25 @@ bun run preview  # serve the built dist/ locally
   release page. Do not construct a DMG URL from the app package version: a
   version bump can merge before its signed asset is published.
 - Site tokens in `src/layouts/Base.astro` keep every page in Rotli Light,
-  regardless of OS appearance or previously saved site preferences. The
-  theme showcase changes its own screenshot and caption; it never recolors
-  the site. The site is flat like the app (DESIGN.md "Flat material"): no
+  regardless of OS appearance or previously saved site preferences, with one
+  exception, the privacy passage below. The theme showcase changes its own
+  screenshot and caption; it never recolors the site. Drawn scenes use
+  `--ink` (the art's own line colour) rather than `--text`, so a drawing keeps
+  its lines in either environment.
+- **The privacy passage** (the owner's call, 2026-10-05; `src/passage.ts`).
+  A section marked `data-passage="ocean-dark"` (the landing's privacy band)
+  takes the whole page into the app's Ocean Dark while it is the focal
+  passage: the ground, text, accents, bands, buttons, and the sticky header
+  with its navigation, dropdown, and Menu all switch to Ocean Dark tokens
+  (`:root[data-passage='ocean-dark']`, values from `src/styles/themes.css`),
+  the night's stars spread over the plain grounds, `color-scheme` and the
+  `theme-color` meta follow, and it all fades back out on leaving the band in
+  either direction. The trigger is a line across the middle of the window
+  with a margin of hysteresis on both edges (8% of the window), so a page
+  resting near a boundary never flickers; a reload mid-band lands in the
+  night at once. Colours fade over 600 ms; reduced motion switches at once.
+  It is a passage, not a preference: nothing is stored. Lowest night pair:
+  muted text on `--surface-2`, 6.75:1. The site is flat like the app (DESIGN.md "Flat material"): no
   shadows, blur, or glows. The one deliberate exception is the theme studio's
   orb swatches (the owner's call, 2026-09-23):
   each orb is lit with radial gradients and an inset shadow so it reads as the
@@ -244,8 +341,9 @@ bun run preview  # serve the built dist/ locally
   `src/layouts/Base.astro`. Pages own only their sections.
 - The ways-in chapter (Mac app, Rotli Web, Rotli Helper) is three plain
   columns with no screenshot.
-- The hero is the promise, the two ways in, and the product film right under
-  them (`FilmPlayer.astro`, see "Films" below), on `public/hero-pattern.svg`
+- The hero is the promise (a private workspace for your notes), the two ways
+  in, where rotli runs (`PLATFORMS.availability`), and the product film right
+  under them (`FilmPlayer.astro`, see "Films" below), on `public/hero-pattern.svg`
   (the social card's faint note, folder, checklist, and chat icons, masked so
   they fade out behind the headline). The words land in one short CSS
   entrance and the clay line (`.inked`, `public/ink-underline.svg`)
@@ -291,7 +389,9 @@ bun run preview  # serve the built dist/ locally
   through `.band-night` (the landing privacy band and the night frame on
   `/privacy/`); `IslandScene.astro` is the island by
   day (a faint vignette behind Make it yours, and the framed scene opening
-  `/about/`); the FAQ has the searching quokka among question cards. The
+  `/about/`); the StatBand's bench by the sea and each resource article's
+  `ResourceScene.astro` are the island by day too; the FAQ has the searching
+  quokka among question cards. The
   closing invitation has no scene of its own (2026-10-02): the footer's
   quokka beach right below it is the page's one closing scene. `/privacy/` and
   `/about/` place their scene through `WritingPage`'s `scene` slot; `/about/`

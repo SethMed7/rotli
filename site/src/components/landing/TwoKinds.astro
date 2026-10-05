@@ -1,12 +1,15 @@
 ---
 // Two kinds of notes: the way a person writes, and the way an AI finds things again. The
-// mock is plain HTML on the site's tokens (not a capture): the same note twice, as typed and
-// as filed, with only the Librarian's frontmatter fields (area, summary, tags, links; see
-// docs/architecture/memex-data-contract.md) added above the words, which stay as written.
-// Synthetic people and text. The panes sit side by side and stack on narrow widths.
+// comparison is plain HTML on the site's tokens (not a capture): the same file twice, as typed
+// and as filed, set straight on the band with no card around either. The Librarian adds only
+// its frontmatter fields (area, summary, tags, links; see docs/architecture/memex-data-contract.md)
+// above the words, which stay byte for byte as written: the added lines carry a "+" and a tint,
+// the body is marked unchanged. `area` is a flat top-level area, as the contract requires (only
+// People/<group> may nest). Synthetic people and text. Two columns side by side; one after the
+// other, in reading order, on narrow widths.
 const typed = ['call w/ dana re pricing', '', 'she’s ok w/ annual. wants the', 'deck fri?? ask jo about the', 'discount thing'];
 const filed = [
-  { key: 'area', value: 'Clients/Dana Reyes' },
+  { key: 'area', value: 'Clients' },
   { key: 'summary', value: 'Dana agrees to annual pricing and wants the deck on Friday.' },
   { key: 'tags', value: '[pricing, annual, deck]' },
   { key: 'links', value: '["[[Discount policy]]", "[[Jo Park]]"]' },
@@ -28,29 +31,22 @@ const filed = [
     </header>
 
     <figure class="pair" data-reveal>
-      <div class="note">
-        <p class="note-label" id="typed-label">As you write it</p>
-        <div class="paper" role="group" aria-labelledby="typed-label">
-          <p class="name">dana-call.md</p>
-          <p class="body">{typed.join('\n')}</p>
-        </div>
+      <div class="state" role="group" aria-labelledby="typed-label">
+        <p class="state-label" id="typed-label">As you write it</p>
+        <p class="file">dana-call.md</p>
+        <pre class="lines"><code class="body">{typed.join('\n')}</code></pre>
       </div>
-      <div class="note">
-        <p class="note-label" id="filed-label">After the Librarian</p>
-        <div class="paper" role="group" aria-labelledby="filed-label">
-          <p class="name">dana-call.md</p>
-          <dl class="meta">
-            {
-              filed.map((field) => (
-                <div>
-                  <dt>{field.key}</dt>
-                  <dd>{field.value}</dd>
-                </div>
-              ))
-            }
-          </dl>
-          <p class="body">{typed.join('\n')}</p>
-        </div>
+      <div class="state filed" role="group" aria-labelledby="filed-label">
+        <p class="state-label" id="filed-label">After the Librarian</p>
+        <p class="file">dana-call.md</p>
+        <p class="note-mark added-mark">Added by the Librarian</p>
+        <pre class="lines added"><code><span class="row fence">---</span>{
+            filed.map((field) => (
+              <span class="row"><b>{field.key}:</b> {field.value}</span>
+            ))
+          }<span class="row fence">---</span></code></pre>
+        <p class="note-mark">Your words, unchanged</p>
+        <pre class="lines"><code class="body">{typed.join('\n')}</code></pre>
       </div>
       <figcaption>The same words. The Librarian’s fields sit above them in the file; nothing you typed is changed.</figcaption>
     </figure>
@@ -66,80 +62,102 @@ const filed = [
     font-size: 1.1rem;
     line-height: 1.65;
   }
+  /* Two open columns on the band, split by one hairline: no card, no fill, no frame. */
   .pair {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1.5rem clamp(1.5rem, 4vw, 3rem);
+    gap: 2rem 0;
     margin: 0;
   }
-  .note {
+  .state {
     min-width: 0;
+    padding-right: clamp(1.5rem, 4vw, 3.5rem);
   }
-  /* A data label for the mock's two panes, not a section eyebrow. */
-  .note-label {
-    margin: 0 0 0.6rem;
-    color: var(--text-muted);
-    font-size: 0.9rem;
-    font-weight: 600;
+  .state.filed {
+    padding-right: 0;
+    padding-left: clamp(1.5rem, 4vw, 3.5rem);
+    border-left: 1px solid var(--border-strong);
   }
-  .paper {
-    padding: 1.25rem 1.4rem 1.5rem;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-frame);
-    background: var(--surface);
-    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-    font-size: 0.9rem;
-    line-height: 1.65;
-  }
-  .name {
-    margin: 0 0 1rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--border);
-    color: var(--text-muted);
-    font-size: 0.8rem;
-  }
-  .body {
+  /* Data labels for the two states of one file, not section eyebrows. */
+  .state-label {
     margin: 0;
+    font-size: var(--step-h3);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+  .file {
+    margin: 0.35rem 0 1.25rem;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid var(--border-strong);
+    color: var(--text-muted);
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+  }
+  /* The file's own text: monospace because it is the literal file. */
+  .lines {
+    margin: 0;
+    font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.92rem;
+    line-height: 1.7;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
-  /* What the Librarian added: set apart by the one clay rule, as a list of facts. */
-  .meta {
-    margin: 0 0 1rem;
-    padding: 0.1rem 0 0.1rem 0.9rem;
-    border-left: 2px solid var(--accent);
+  .note-mark {
+    margin: 0 0 0.35rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
   }
-  .meta div {
-    display: grid;
-    grid-template-columns: 8ch minmax(0, 1fr);
-    gap: 0 1.5ch;
+  .added-mark {
+    color: var(--accent-text);
   }
-  .meta dt {
+  .lines + .note-mark {
+    margin-top: 1.1rem;
+  }
+  /* What the Librarian added reads like added lines in a diff: a tint behind the rows
+     and a "+" in the gutter. The body below them has neither. */
+  .added {
+    margin-inline: -0.6rem;
+    padding: 0.35rem 0.6rem 0.35rem 1.7rem;
+    border-radius: 0.5rem;
+    background: var(--tint);
+  }
+  .added .row {
+    position: relative;
+    display: block;
+  }
+  .added .row::before {
+    content: '+';
+    position: absolute;
+    left: -1.1rem;
     color: var(--accent-text);
     font-weight: 600;
   }
-  .meta dd {
-    margin: 0;
-    overflow-wrap: anywhere;
+  .added b {
+    color: var(--accent-text);
+    font-weight: 600;
+  }
+  .fence {
+    color: var(--text-muted);
   }
   figcaption {
     grid-column: 1 / -1;
     margin: 0;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
     color: var(--text-muted);
     font-size: 0.95rem;
   }
   @media (max-width: 800px) {
     .pair {
       grid-template-columns: 1fr;
+      gap: 2.25rem;
     }
-    .meta div {
-      grid-template-columns: 1fr;
-    }
-    .meta dt {
-      font-size: 0.8rem;
-    }
-    .meta div + div {
-      margin-top: 0.35rem;
+    .state,
+    .state.filed {
+      padding: 0;
+      border-left: 0;
     }
   }
 </style>

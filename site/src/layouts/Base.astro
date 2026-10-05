@@ -15,7 +15,7 @@ interface Props {
 
 const {
   title = 'rotli — write like a person, let AI do the filing',
-  description = 'A private workspace for your Mac. Write however you think, in plain Markdown files you own. The Librarian files, tags, and links them in the background, with no account required.',
+  description = 'A private workspace for your notes. Write however you think, in plain Markdown files you own. The Librarian files, tags, and links them in the background, with no account required. Mac first; Windows and Linux apps are planned.',
   canonicalPath = Astro.url.pathname,
   image = '/social-card.png',
   imageAlt = 'rotli — write like a person, let AI do the filing',
@@ -144,6 +144,9 @@ const socialImageUrl = new URL(image, siteUrl).href;
         --wood: #b98b62;
         --wood-dark: #8d6547;
         --lantern: #8fb9c9;
+        /* The ink of the drawn scenes: the art's own line colour. Scenes use it instead of --text
+           so a drawing keeps its lines when the page passes into another environment. */
+        --ink: #3a3028;
         /* The app's Cocoa companion body (scripts/build-character-fills.mjs): the footer quokkas. */
         --cocoa: #c6845f;
         /* The app's editor paper in Rotli Light: the ground behind product captures. */
@@ -181,6 +184,54 @@ const socialImageUrl = new URL(image, siteUrl).href;
       :root {
         color-scheme: light;
       }
+      /* The privacy passage (src/passage.ts): while the landing's privacy band is the focal
+         passage, the whole page, header, menus, and buttons included, steps into the app's
+         Ocean Dark environment (src/styles/themes.css; border-strong and selection derived the
+         way base.css derives them) and steps back out when the visitor leaves it either way.
+         Lowest pair: muted text on the night
+         --surface-2 at 6.75:1 (on the ground 8.60:1). The --deep-*
+         night of .band-night already matches, so the band and the page become one sky. */
+      :root[data-passage='ocean-dark'] {
+        color-scheme: dark;
+        --ground: #0e171d;
+        --surface: #152229;
+        --surface-2: #1c2d35;
+        --tint: #213843;
+        --text: #e7f0f4;
+        --text-muted: #a1b6c0;
+        --border: #263a43;
+        --border-strong: color-mix(in srgb, #e7f0f4 24%, #263a43);
+        --accent: #70b2d7;
+        --accent-text: #86c2e0;
+        --on-accent: #0e171d;
+        --selection: #213843;
+      }
+      /* The night sky spreads past the band: the band's own stars, over the whole page while
+         the passage lasts, faded in and out (bands with their own ground cover it). */
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        background: url('/night-stars-ocean.svg') 0 0 / 480px 480px;
+        opacity: 0;
+        transition: opacity 700ms ease-out;
+        pointer-events: none;
+      }
+      :root[data-passage='ocean-dark'] body::before {
+        opacity: 1;
+      }
+      /* Around a switch, everything that has no transition of its own fades its colours
+         (zero specificity, so a component's own transition list always wins). Reduced motion
+         collapses every duration below, so the switch is then immediate. */
+      :root.passage-fading :where(*) {
+        transition:
+          background-color 600ms ease-out,
+          border-color 600ms ease-out,
+          color 600ms ease-out,
+          fill 600ms ease-out,
+          stroke 600ms ease-out;
+      }
       * {
         box-sizing: border-box;
       }
@@ -197,7 +248,7 @@ const socialImageUrl = new URL(image, siteUrl).href;
         font-family: var(--font-body);
         font-size: 17px;
         line-height: 1.62;
-        transition: background-color 180ms ease-out, color 180ms ease-out;
+        transition: background-color 600ms ease-out, color 600ms ease-out;
       }
       a {
         color: inherit;
@@ -385,6 +436,7 @@ const socialImageUrl = new URL(image, siteUrl).href;
         z-index: 30;
         background: var(--ground);
         border-bottom: 1px solid var(--border);
+        transition: background-color 600ms ease-out, border-color 600ms ease-out;
       }
       .site-header,
       .site-footer {
@@ -935,6 +987,8 @@ const socialImageUrl = new URL(image, siteUrl).href;
     <a class="skip-link" href="#content">Skip to content</a>
     <slot />
     <script>
+      import { watchPassages } from '../passage';
+      watchPassages();
       // Scroll reveal (the [data-reveal] and [data-stagger] styles above): a
       // block rises in once as it enters the viewport, then rests; a staggered
       // list brings its items in one after another. Section heads below the
