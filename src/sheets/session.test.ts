@@ -73,8 +73,7 @@ describe("set-aside edits", () => {
     sheet.cellData = cells;
     const bytes = await setAsideCopyBytes({ wb, model, idMap, diskLen: 0, revision: "r", mode: "csv" });
     const back = await loadXlsx(bytes.buffer as ArrayBuffer);
-    const cell = back.worksheets[0]!.getCell(2, 2).value;
-    expect(String(cell)).toBe("42");
+    expect(back.worksheets[0]!.getCell(2, 2).value).toBe("42");
     expect(back.worksheets[0]!.getCell(2, 1).value).toBe("Ana");
   });
 
