@@ -78,3 +78,13 @@ export function tocTree(items: readonly TocItem[]): TocBranch[] {
   }
   return tree;
 }
+
+/**
+ * The post's title for its rail: the first sentence when the title has more than one ("Paid AI
+ * plans often sit unopened." of "Paid AI plans often sit unopened. rotli can put them to work."),
+ * else the whole title. The page's h1 always carries the whole title.
+ */
+export function railTitle(title: string): string {
+  const match = title.match(/^(.+?[.!?])\s+\S/);
+  return match ? match[1]! : title;
+}

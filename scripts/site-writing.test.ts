@@ -55,11 +55,20 @@ let blog: {
   tocTree(
     items: { slug: string; text: string; depth: number }[],
   ): { slug: string; text: string; children: { slug: string; text: string }[] }[];
+  railTitle(title: string): string;
 };
+interface Source {
+  number: number;
+  publisher: string;
+  title: string;
+  url?: string;
+}
+let sources: { sourcesOf(markdown: string): Source[] };
 
 beforeAll(async () => {
   figures = (await import(siteSrc("figures.ts"))) as typeof figures;
   blog = (await import(siteSrc("blog.ts"))) as typeof blog;
+  sources = (await import(siteSrc("sources.ts"))) as typeof sources;
 });
 
 const BAR = `kind: bar
@@ -285,6 +294,111 @@ describe("the blog index", () => {
         ],
       },
       { slug: "b", text: "B", children: [] },
+    ]);
+  });
+});
+
+describe("the rail's short title", () => {
+  test("is the first sentence of a title with more than one, else the whole title", () => {
+    expect(blog.railTitle("Paid AI plans often sit unopened. rotli can put them to work.")).toBe(
+      "Paid AI plans often sit unopened.",
+    );
+    expect(blog.railTitle("Why Rotli Web talks to your computer through Terminal")).toBe(
+      "Why Rotli Web talks to your computer through Terminal",
+    );
+    expect(blog.railTitle("Ends with a stop.")).toBe("Ends with a stop.");
+  });
+});
+
+// The rail's Sources (site/src/sources.ts) are read from the post's own `## Sources` list, so the
+// citations have one home. Held against the published post itself: change a citation there and
+// this list is what the rail will show.
+describe("a post's sources", () => {
+  const post = (slug: string) => readFileSync(siteSrc("content", "writing", "posts", `${slug}.md`), "utf8");
+
+  test("the unused-plans post: every citation, numbered, publisher and short title, linked", () => {
+    expect(sources.sourcesOf(post("the-ai-you-already-pay-for"))).toEqual([
+      {
+        number: 1,
+        publisher: "Self Financial",
+        title: "The Cost of Unused Paid Subscriptions 2026",
+        url: "https://www.self.inc/info/cost-of-unused-paid-subscriptions/",
+      },
+      {
+        number: 2,
+        publisher: "Menlo Ventures",
+        title: "2026: The State of Consumer AI",
+        url: "https://menlovc.com/perspective/2026-the-state-of-consumer-ai/",
+      },
+      {
+        // Two links in the citation: the first is the source; a long title keeps its main part.
+        number: 3,
+        publisher: "Bango",
+        title: "It’s not a bubble",
+        url: "https://bango.com/its-not-a-bubble-over-three-quarters-say-their-ai-subscriptions-are-now-essential-to-everyday-life/",
+      },
+      {
+        // An author list shortens.
+        number: 4,
+        publisher: "Chatterji et al.",
+        title: "How People Use ChatGPT",
+        url: "https://www.nber.org/papers/w34255",
+      },
+      {
+        number: 5,
+        publisher: "Anthropic",
+        title: "Economic Index report: Cadences",
+        url: "https://www.anthropic.com/research/economic-index-june-2026-report",
+      },
+      {
+        number: 6,
+        publisher: "JetBrains Research",
+        title: "Which AI coding tools do developers actually use at work?",
+        url: "https://blog.jetbrains.com/research/2026/04/which-ai-coding-tools-do-developers-actually-use-at-work/",
+      },
+      {
+        number: 7,
+        publisher: "Anthropic",
+        title: "Use Claude Code with your Pro or Max plan",
+        url: "https://support.claude.com/en/articles/11145838-use-claude-code-with-your-pro-or-max-plan",
+      },
+      {
+        // Link text without quotation marks is taken as written.
+        number: 8,
+        publisher: "OpenAI",
+        title: "ChatGPT plans and Codex usage",
+        url: "https://learn.chatgpt.com/docs/pricing",
+      },
+      {
+        number: 9,
+        publisher: "Stark Insider",
+        title: "Anthropic adds weekly limits to Claude, cites abuses",
+        url: "https://www.starkinsider.com/2025/07/anthropic-adds-weekly-limits-to-claude-cites-abuses.html",
+      },
+    ]);
+  });
+
+  test("a post without a Sources section has none, so the rail renders no block", () => {
+    expect(sources.sourcesOf(post("rotli-web-and-your-mac"))).toEqual([]);
+    expect(sources.sourcesOf("## Intro\n\nText.\n\n- [a](https://a.example/)\n")).toEqual([]);
+  });
+
+  test("the section ends at the next heading; bullets count; an item without a link is plain", () => {
+    const markdown = [
+      "Body with [a link](https://body.example/).",
+      "## Sources",
+      "",
+      "- Ministry, a report with no address, 2025.",
+      "- Lab, [*Findings*](https://lab.example/findings), with notes",
+      "  that run on to a second line.",
+      "",
+      "## Afterword",
+      "",
+      "1. Not a source, [x](https://x.example/).",
+    ].join("\n");
+    expect(sources.sourcesOf(markdown)).toEqual([
+      { number: 1, publisher: "Ministry", title: "a report with no address, 2025." },
+      { number: 2, publisher: "Lab", title: "Findings", url: "https://lab.example/findings" },
     ]);
   });
 });

@@ -29,6 +29,7 @@ import type { TocItem } from '../blog';
 import Base from '../layouts/Base.astro';
 import type { NavSection } from '../nav';
 import type { Banner } from '../og';
+import type { Source } from '../sources';
 import { site } from '../site';
 import ArticleCover from './blog/ArticleCover.astro';
 import ArticleRail from './blog/ArticleRail.astro';
@@ -67,6 +68,8 @@ interface Props {
     /** The page's absolute address and the post's Markdown twin, for Share. */
     url: string;
     markdown: string;
+    /** The post's `## Sources`, parsed at build time (src/sources.ts), for the rail. */
+    sources: Source[];
   };
   /** Passed through to Base: JSON-LD facts, the Markdown twin, and the link card (src/og.ts). */
   structuredData?: Record<string, unknown>[];
@@ -246,6 +249,7 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
           <ArticleRail
             title={heading}
             toc={flatToc}
+            sources={article.sources}
             share={{ url: article.url, title: heading, text: description, markdown: article.markdown }}
           />
         ) : (

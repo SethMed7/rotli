@@ -12,6 +12,7 @@ import BlogIndex, { type BlogPost, type UpcomingPost } from '../../components/bl
 import WritingPage from '../../components/WritingPage.astro';
 import { ogImage, postBanner, postOgImage, postThumbnail } from '../../og';
 import { site } from '../../site';
+import { sourcesOf } from '../../sources';
 import { publishedWriting, readingMinutes, slugOf, upcomingWriting, type Writing } from '../../writing';
 
 export async function getStaticPaths() {
@@ -81,6 +82,7 @@ const toc = (rendered?.headings ?? [])
         tags: entry.data.tags,
         url: `${site.url}/blog/${slugOf(entry)}/`,
         markdown: twinPath(writingPath(entry)),
+        sources: sourcesOf(entry.body ?? ''),
       }}
       toc={toc}
       progress
