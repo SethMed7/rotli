@@ -81,7 +81,7 @@ const hasToc = toc.length > 1;
   imageAlt={imageAlt}
 >
   <SiteHeader current={section} />
-  <main id="content" class:list={['wrap writing', { center }]}>
+  <main id="content" class:list={['wrap writing', { center, 'has-progress': progress }]}>
     <header class="writing-head">
       {
         crumbs.length > 0 && (
@@ -195,7 +195,9 @@ const hasToc = toc.length > 1;
     const update = () => {
       frame = 0;
       const header = document.querySelector('.site-header-bar')?.getBoundingClientRect().bottom ?? 0;
-      const line = header + window.innerHeight * 0.2;
+      // The meter covers the top of the reading area while it is pinned, so it counts as header.
+      const top = meter && !meter.hidden ? Math.max(header, meter.getBoundingClientRect().bottom) : header;
+      const line = top + window.innerHeight * 0.2;
       let active = -1;
       targets.forEach((target, index) => {
         if (target.getBoundingClientRect().top <= line) active = index;
@@ -204,8 +206,6 @@ const hasToc = toc.length > 1;
         if (index === active) link.setAttribute('aria-current', 'location');
         else link.removeAttribute('aria-current');
       });
-      // The meter covers the top of the reading area while it is pinned, so it counts as header.
-      const top = meter && !meter.hidden ? Math.max(header, meter.getBoundingClientRect().bottom) : header;
       const box = prose.getBoundingClientRect();
       const reading = readingProgress({ top: box.top, height: box.height }, window.innerHeight, top);
       if (rail) rail.style.transform = `scaleY(${reading.fraction})`;
@@ -235,8 +235,19 @@ const hasToc = toc.length > 1;
 </script>
 
 <style>
+  /* What is pinned over the top of an article: the header, and on pages with a reading meter
+     the meter under it (its height is fixed so everything below can clear it). The tree and
+     every jump target sit below that, with the same breathing room. */
   .writing {
+    --meter-height: 0px;
+    --pinned: calc(var(--header-height) + 1px + var(--meter-height));
     padding-block: clamp(3rem, 7vw, 5rem) var(--section-space);
+  }
+  .writing.has-progress {
+    --meter-height: 2.5rem;
+  }
+  .writing :global([id]) {
+    scroll-margin-top: calc(var(--pinned) + 1.5rem);
   }
   /* The rule under the head spans the page; the words keep a reading width. */
   .writing-head > * {
@@ -309,8 +320,9 @@ const hasToc = toc.length > 1;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 1rem;
+    box-sizing: border-box;
+    height: var(--meter-height);
     margin: calc(-1 * clamp(1.25rem, 3vw, 2rem)) 0 clamp(1.25rem, 3vw, 2rem);
-    padding: 0.6rem 0;
     background: var(--ground);
   }
   .read-progress[hidden] {
@@ -359,9 +371,9 @@ const hasToc = toc.length > 1;
   }
   .toc {
     position: sticky;
-    top: calc(var(--header-height) + 2rem);
+    top: calc(var(--pinned) + 1.5rem);
     align-self: start;
-    max-height: calc(100dvh - var(--header-height) - 4rem);
+    max-height: calc(100dvh - var(--pinned) - 3rem);
     overflow-y: auto;
     font-size: 0.9rem;
   }
@@ -516,7 +528,7 @@ const hasToc = toc.length > 1;
     font-size: 1.45rem;
     line-height: 1.2;
     letter-spacing: -0.02em;
-    scroll-margin-top: calc(var(--header-height) + 1.5rem);
+    scroll-margin-top: calc(var(--pinned) + 1.5rem);
   }
   .prose :global(h3) {
     margin: 2rem 0 0.6rem;
