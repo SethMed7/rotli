@@ -70,7 +70,7 @@ site's look:
 | 2 | What rotli does: three cards | warm | **New** (ref 1). Replaces the Overview trio and its nine bullets. Each card has a small HTML mock (a rendered note, a frontmatter panel the Librarian filled, a chat answer naming its notes), a heading and one sentence. The three quokkas stay, one in each mock's corner |
 | 3 | StatBand | plain | Moved up. It explains why the Librarian exists: the AI you already pay for is idle, and rotli gives it the filing |
 | 4 | TwoKinds | warm | Moved down one, so it follows the StatBand's "keep your notes in order" with the proof. Lede cut to the head grammar; the caption keeps "exactly what you typed" |
-| 5 | A closer look: accordion + preview | plain | **New** (ref 2). Six items: Notes and Markdown, Docs and Sheets (Beta), Chat with your notes, Boards, the Librarian, and Rotli Web and the Helper. It ends with the one link to `/features/` |
+| 5 | A closer look: list + preview | plain | **New** (ref 2; scroll-stepped since the owner's evening review, below). Six items: Notes and Markdown, Docs and Sheets (Beta), Chat with your notes, Boards, the Librarian, and Rotli Web and the Helper. It ends with the one link to `/features/` |
 | — | Experiments | plain | Dev only, unchanged, after the tour |
 | 6 | Personal (theme studio) | warm | Kept; moved above privacy so the grounds alternate |
 | 7 | PrivacyBrief | night | Kept as decided. It now sits just before the FAQ, which answers the trust questions it raises |
@@ -93,13 +93,40 @@ The Desktop app column goes, because the hero's Download button says it. The
 lede goes too, because the hero says it. Like the section before it, the item
 renders only while `WEB_APP_ENABLED`.
 
-### The tour doesn't autoplay
+### The tour follows the scroll, and never autoplays
 
 The page already has three things that move on their own, each an owner call:
 the theme studio, the footer quokkas, and the 404 game after Play. A fourth
-would compete with the theme studio two sections later, and an accordion that
-changes under the reader's eye moves the text they are reading. Items change
-only when the visitor picks one.
+would compete with the theme studio two sections later, so the tour never
+changes on a timer.
+
+Revised the same evening, from the owner's review ("make this work with the
+scroll. I also don't like the cards in cards or the animations"): the tour is
+scroll-driven. This overrides the standing no-scroll-scrub preference for
+this one section, and it still doesn't scrub. On wide, tall-enough windows
+the list and the preview are pinned under the header while a runway of
+per-part anchors scrolls behind them. The part whose anchor crosses the middle
+of the window is shown, and the preview changes by a calm crossfade between
+steps (an instant swap under reduced motion). Nothing moves between steps,
+the page scrolls natively, and a part's name scrolls to its step. The rules
+are in `site/src/tourSteps.ts`. Phones, short windows, and no script get a
+plain sequence of parts, each with its preview under its words. The
+accordion, its chevrons, and the framed preview well are gone. Each preview
+now sits on the ground: a capture with one hairline, or a drawn panel where a
+capture isn't honest or readable at that size (Docs and Sheets, the chat
+answer, the Librarian's filing).
+
+### The before and after plays once
+
+Also from that review ("more motion and alive like it actually happens and
+maybe shrink a little bit"): when the comparison comes into view the note is
+typed, the same words appear on the right, and the Librarian's lines open
+above them one by one like a live diff. It ends with the words marked
+unchanged. It plays once, holds off screen, and has a quiet Replay. Its
+markup is the finished state. It is a reveal that rests, not a fourth thing
+that moves on its own. Its type and width shrank so the whole comparison
+fits a 1440×900 window. The cards above lost their outer well in the same
+round, so each picture is one panel on the band.
 
 ### The Librarian appears three times, from three sides
 
