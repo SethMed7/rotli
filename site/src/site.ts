@@ -32,7 +32,8 @@ export const GITHUB_URL = 'https://github.com/SethMed7/rotli';
 export const RELEASES_URL = 'https://github.com/SethMed7/rotli-releases/releases/latest';
 // The newest notarized DMG, downloaded directly. scripts/release.sh publishes a
 // stable-named copy (Rotli.dmg) on every release, so this never needs editing.
-// Only /download/ links it: every other call to action is "Try now", to that page.
+// Only /download/ links it: every other call to action ("Download free" on the landing, "Try
+// now" in the header) goes to that page.
 export const DOWNLOAD_URL = `${RELEASES_URL}/download/Rotli.dmg`;
 /** Rotli Web, served from this same origin under /app/ (site/Caddyfile,
  * site/Dockerfile `app` stage). The path is fixed; whether pages link to it is

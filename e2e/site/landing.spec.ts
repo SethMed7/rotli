@@ -1,4 +1,5 @@
-// The landing page: what rotli is and costs and its one "Try now" (where it runs is /download/'s to say), the cardless
+// The landing page: what rotli is, its one "Download free" and the pointer to the privacy promise (where it runs is
+// /download/'s to say), the cardless
 // before/after, the close after the questions, and the privacy passage that takes the whole page, header included, into
 // Ocean Dark and back out in either direction.
 import { expect, test, type Page } from "@playwright/test";
@@ -19,19 +20,46 @@ test("the hero says what rotli is and costs, with one way in, and no platform li
   await expect(lede).toContainText("a free workspace built on plain Markdown files");
   await expect(lede).toContainText("Docs and Sheets (beta)");
   await expect(lede).not.toContainText("Mac");
-  await expect(hero.locator(".hero-cost")).toHaveText("Free. No account. Works offline.");
+  await expect(hero.locator(".hero-cost")).toHaveText("No account. Works offline.");
   // Where rotli runs is the download page's (and the FAQ's) to say (the owner, 2026-10-05).
   await expect(hero).not.toContainText("Windows");
   await expect(page.locator("#start")).not.toContainText("Windows");
-  // One way in, "Try now", to the page that offers the Mac app and Rotli Web; no direct DMG.
+  // One way in, "Download free", to the page that offers the Mac app and Rotli Web; no direct
+  // DMG. The header keeps its shorter "Try now" to the same page.
   const actions = hero.locator(".site-actions a");
   await expect(actions).toHaveCount(1);
-  await expect(actions).toHaveText("Try now");
+  await expect(actions).toHaveText("Download free");
   await expect(actions).toHaveAttribute("href", "/download/");
   await expect(page.locator("main a[href$='.dmg']")).toHaveCount(0);
   const header = page.locator(".site-header .header-download");
   await expect(header).toHaveText("Try now");
   await expect(header).toHaveAttribute("href", "/download/");
+});
+
+test("the hero points to the privacy promise, and the night band points to the same place", async ({
+  page,
+}) => {
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+    const promise = page.locator(".hero .hero-promise a");
+    await expect(promise).toBeVisible();
+    await expect(promise).toHaveText(/Our privacy promise: you decide what any AI can see or change/);
+    await expect(promise).toHaveAttribute("href", "/privacy/#promise");
+    // Under the button, inside the first window, and a full touch target.
+    const [button, link] = await Promise.all([
+      page.locator(".hero .site-actions a").boundingBox(),
+      promise.boundingBox(),
+    ]);
+    expect(link!.y).toBeGreaterThan(button!.y + button!.height);
+    expect(link!.y + link!.height).toBeLessThanOrEqual(900);
+    expect(link!.height).toBeGreaterThanOrEqual(44);
+  }
+  await expect(page.locator("#privacy .privacy-link")).toHaveAttribute("href", "/privacy/#promise");
+  // Following it lands on the promise, under the header.
+  await page.locator(".hero .hero-promise a").click();
+  await expect(page).toHaveURL(/\/privacy\/#promise$/);
+  await expect(page.locator("#promise")).toBeInViewport();
 });
 
 test("Rotli Web lives in the tour, and the page closes on one banner after the questions", async ({

@@ -1,18 +1,21 @@
 ---
-// The site's one way in, defined once: "Try now", to /download/, which offers the Mac app
-// and Rotli Web and leads with the visitor's own system (the owner, 2026-10-05: "Try now"
-// instead of "Download"). Direct DMG links live only on that page. A deployment that offers
-// neither (no downloads, no Rotli Web) says so instead of linking to an empty page.
+// The landing's one way in, defined once: "Download free", to /download/, which offers the Mac
+// app and Rotli Web and leads with the visitor's own system (the owner, 2026-10-06: "Download
+// free" in the hero, after "Try now" of 2026-10-05). The header keeps its shorter "Try now" to
+// the same page. A deployment without the Mac download but with Rotli Web says "Try now"
+// instead, so the button never promises a download that isn't there; one that offers neither
+// says so instead of linking to an empty page. Direct DMG links live only on /download/.
 import { site } from '../site';
 
 const offered = site.downloadsEnabled || site.webAppEnabled;
+const label = site.downloadsEnabled ? 'Download free' : 'Try now';
 ---
 
 <div class="site-actions">
   {
     offered ? (
       <a class="button primary action-try" href="/download/">
-        Try now
+        {label}
       </a>
     ) : (
       <span class="button primary pending" aria-disabled="true">
