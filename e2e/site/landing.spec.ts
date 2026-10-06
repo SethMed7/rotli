@@ -260,22 +260,27 @@ test("the bench shows each AI tool's own mark and name, readable and apart at ev
       expect(box.width, `mark at ${width}`).toBeGreaterThanOrEqual(width < 390 ? 26 : 32);
     const nameSize = await names.first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
     expect(nameSize).toBeGreaterThanOrEqual(10.5);
-    for (let i = 0; i < 4; i++) {
+    const tools = nameBoxes.map((name, i) => ({
+      name,
+      mark: markBoxes[i]!,
+      badge: badgeBoxes[i]!,
+      note: noteBoxes[i]!,
+    }));
+    tools.forEach((tool, i) => {
       // A name sits inside its badge, under its mark, and never runs past the badge.
-      expect(nameBoxes[i].left).toBeGreaterThanOrEqual(badgeBoxes[i].left);
-      expect(nameBoxes[i].right).toBeLessThanOrEqual(badgeBoxes[i].right);
-      expect(nameBoxes[i].top).toBeGreaterThanOrEqual(markBoxes[i].bottom);
-      // Badges, marks, and names never touch another tool's, and a handed note never covers a mark.
-      for (let j = 0; j < 4; j++) {
-        expect(apart(noteBoxes[i], markBoxes[j]), `note ${i} on mark ${j} at ${width}`).toBe(true);
-        expect(apart(noteBoxes[i], nameBoxes[j]), `note ${i} on name ${j} at ${width}`).toBe(true);
-        if (i === j) continue;
-        expect(apart(badgeBoxes[i], badgeBoxes[j]), `badges ${i} and ${j} at ${width}`).toBe(true);
-      }
+      expect(tool.name.left).toBeGreaterThanOrEqual(tool.badge.left);
+      expect(tool.name.right).toBeLessThanOrEqual(tool.badge.right);
+      expect(tool.name.top).toBeGreaterThanOrEqual(tool.mark.bottom);
+      // Badges never touch another tool's, and a handed note never covers a mark or a name.
+      tools.forEach((other, j) => {
+        expect(apart(tool.note, other.mark), `note ${i} on mark ${j} at ${width}`).toBe(true);
+        expect(apart(tool.note, other.name), `note ${i} on name ${j} at ${width}`).toBe(true);
+        if (i !== j) expect(apart(tool.badge, other.badge), `badges ${i} and ${j} at ${width}`).toBe(true);
+      });
       // Everything stays inside the page.
-      expect(noteBoxes[i].right).toBeLessThanOrEqual(width);
-      expect(badgeBoxes[i].left).toBeGreaterThanOrEqual(sceneBox.left);
-    }
+      expect(tool.note.right).toBeLessThanOrEqual(width);
+      expect(tool.badge.left).toBeGreaterThanOrEqual(sceneBox.left);
+    });
     // The quokka never stands on a badge.
     const quokka = await scene
       .locator(".bench-quokka")
