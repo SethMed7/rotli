@@ -1,0 +1,244 @@
+---
+// The top of a blog post (WritingPage `article`): the post's illustration contained at the page's
+// width in a rounded frame, and a card that overlaps its lower left, where the wide scenes keep
+// open sea and sand (scripts/brand-images/scenes.mjs). The card holds who wrote it and when, the
+// title, the summary, and the post's topics, all on the card's own opaque ground, never on the
+// art. Nothing is pinned and nothing moves as the page scrolls. Below 1100px (where the card
+// would cover the quokka) the picture comes first and the head follows it on the page's ground,
+// without a frame; below 700px the picture is the phone crop.
+import mark from '../../../../src/assets/characters/_logo.svg?raw';
+import type { Banner } from '../../og';
+
+interface Props {
+  cover?: Banner;
+  crumbs: { href: string; label: string }[];
+  kicker?: string;
+  heading: string;
+  lede?: string;
+  author: string;
+  /** The date and reading time. */
+  meta: string[];
+  tags: string[];
+}
+
+const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props;
+---
+
+<header class:list={['writing-head', 'cover-head', { 'no-cover': !cover }]} data-article-cover>
+  {
+    crumbs.length > 0 && (
+      <nav class="crumbs" aria-label="Breadcrumb">
+        {crumbs.map((crumb) => (
+          <>
+            <a href={crumb.href}>{crumb.label}</a>
+            <span aria-hidden="true">/</span>
+          </>
+        ))}
+      </nav>
+    )
+  }
+  {
+    cover && (
+      <picture class="cover-art" data-article-art>
+        <source
+          media="(max-width: 700px)"
+          srcset={cover.mobile}
+          width={cover.mobileWidth}
+          height={cover.mobileHeight}
+        />
+        <img
+          src={cover.src}
+          srcset={cover.srcset}
+          sizes="(min-width: 1300px) 76rem, calc(100vw - 2 * clamp(1.25rem, 4vw, 2.5rem))"
+          width={cover.width}
+          height={cover.height}
+          alt={cover.alt}
+          fetchpriority="high"
+          decoding="async"
+        />
+      </picture>
+    )
+  }
+  <div class="head-card">
+    <p class="byline">
+      <span class="avatar" set:html={mark} aria-hidden="true" />
+      <span class="author">{author}</span>
+      {
+        meta.map((part) => (
+          <>
+            <span aria-hidden="true">·</span>
+            <span>{part}</span>
+          </>
+        ))
+      }
+    </p>
+    {kicker && <p class="kicker">{kicker}</p>}
+    <h1>{heading}</h1>
+    {lede && <p class="lede">{lede}</p>}
+    {
+      tags.length > 0 && (
+        <ul class="tags" aria-label="Topics">
+          {tags.map((tag) => (
+            <li>{tag}</li>
+          ))}
+        </ul>
+      )
+    }
+  </div>
+</header>
+
+<style>
+  .cover-head {
+    --cover-overlap: clamp(4rem, 8vw, 6.5rem);
+    --card-pad: clamp(1.4rem, 3vw, 2.4rem);
+    display: grid;
+    margin-bottom: clamp(2.5rem, 5vw, 4rem);
+  }
+  .crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  .crumbs a {
+    color: var(--text-muted);
+    text-underline-offset: 0.2em;
+  }
+  .crumbs a:hover {
+    color: var(--text);
+  }
+  @media (pointer: coarse) {
+    .crumbs a {
+      display: inline-block;
+      padding: 0.7rem 0;
+      margin: -0.7rem 0;
+    }
+  }
+  /* The picture: the page's width, a calm height (the title stays in the first window), rounded
+     with a hairline, its quokka and props (the scene's right half) kept in view at every shape. */
+  .cover-art {
+    display: block;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-frame);
+    background: var(--surface-2);
+  }
+  .cover-art img {
+    display: block;
+    width: 100%;
+    height: clamp(15rem, min(38vw, 50svh), 30rem);
+    object-fit: cover;
+    object-position: 100% 100%;
+  }
+  /* The card: a solid surface with a strong hairline, flat (no shadow), rising over the
+     picture's lower left. Its words read on its own ground at full contrast. */
+  .head-card {
+    position: relative;
+    box-sizing: border-box;
+    width: min(100% - 2 * clamp(1rem, 4vw, 3rem), 42rem, 58%);
+    margin: calc(-1 * var(--cover-overlap)) 0 0 clamp(1rem, 4vw, 3rem);
+    padding: var(--card-pad);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-frame);
+    background: var(--surface);
+  }
+  .no-cover .head-card {
+    margin-top: 0;
+    margin-inline-start: 0;
+  }
+  .byline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem 0.55rem;
+    margin: 0 0 1.1rem;
+    color: var(--text-muted);
+    font-size: 0.92rem;
+  }
+  .avatar {
+    display: inline-grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    box-sizing: border-box;
+    padding: 0.3rem;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--ground);
+    color: var(--text);
+    line-height: 0;
+  }
+  .avatar :global(svg) {
+    width: 100%;
+    height: 100%;
+  }
+  .author {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .kicker {
+    margin: 0 0 0.8rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  h1 {
+    margin: 0;
+    font-size: clamp(2rem, 3.6vw, 3rem);
+    font-weight: 600;
+    line-height: 1.06;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+  }
+  .lede {
+    max-width: 42rem;
+    margin: 1rem 0 0;
+    color: var(--text-muted);
+    font-size: var(--step-lede);
+    line-height: 1.55;
+    text-wrap: pretty;
+  }
+  /* Topics: quiet labels, not links (no topic pages yet); the blog index filters by them. */
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1.3rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .tags li {
+    padding: 0.28rem 0.75rem;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 0.84rem;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+  /* Below 1100px the scene's quokka and props take most of the picture's width, so the card
+     would cover them: the picture comes first and the card follows as the page's own head. */
+  @media (max-width: 1100px) {
+    .head-card {
+      width: auto;
+      margin: 1.75rem 0 0;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: none;
+    }
+  }
+  /* Phones: the phone crop, the quokka and its props centred. */
+  @media (max-width: 700px) {
+    .cover-art img {
+      height: auto;
+      aspect-ratio: 1300 / 900;
+      max-height: 55svh;
+      object-position: 50% 100%;
+    }
+    .head-card {
+      margin-top: 1.5rem;
+    }
+  }
+</style>

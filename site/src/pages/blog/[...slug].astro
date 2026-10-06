@@ -28,6 +28,8 @@ const { entry, entries, upcoming } = Astro.props as {
   entries: Writing[];
   upcoming: Writing[];
 };
+/** Who writes the blog, on each post's card. */
+const AUTHOR = 'Seth Medina';
 const formatDate = (date: Date) =>
   date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 const posts: BlogEntry[] = entries.map((item) => ({
@@ -49,8 +51,8 @@ const [featured, ...more] = posts;
 const rendered = entry ? await render(entry) : null;
 const Content = rendered?.Content ?? null;
 const toc = (rendered?.headings ?? [])
-  .filter((heading) => heading.depth === 2)
-  .map((heading) => ({ slug: heading.slug, text: heading.text }));
+  .filter((heading) => heading.depth === 2 || heading.depth === 3)
+  .map((heading) => ({ slug: heading.slug, text: heading.text, depth: heading.depth }));
 ---
 
 {
@@ -68,7 +70,13 @@ const toc = (rendered?.headings ?? [])
       heading={entry.data.title}
       lede={entry.data.description}
       meta={[formatDate(entry.data.date), `${readingMinutes(entry)} min read`]}
-      banner={postBanner(slugOf(entry))}
+      article={{
+        cover: postBanner(slugOf(entry)),
+        author: AUTHOR,
+        tags: entry.data.tags,
+        url: `${site.url}/blog/${slugOf(entry)}/`,
+        markdown: twinPath(writingPath(entry)),
+      }}
       toc={toc}
       progress
     >

@@ -17,12 +17,21 @@
 // page's own ground that overlaps the banner's lower left, where the art is kept open, so
 // the title, date, and reading time are read on the ground, never on the picture. Phones
 // get a shorter crop with the panel just below it.
+// Blog posts pass `article` instead (opt-in; /privacy/ and the guides keep the layout above):
+// the post's picture contained at the page's width with a card over its lower left (author,
+// date, title, summary, topics; blog/ArticleCover.astro), and a left rail with the title, the
+// tree, the reading meter as a percent, and Share (blog/ArticleRail.astro), beside a reading
+// column set for long reading (blog/article.css). Under 900px the tree is the disclosure, the
+// meter a slim bar under the header, and Share follows the article.
 // Rendered Markdown arrives as children, so its typography is styled with
 // :global() in .prose.
+import type { TocItem } from '../blog';
 import Base from '../layouts/Base.astro';
 import type { NavSection } from '../nav';
 import type { Banner } from '../og';
 import { site } from '../site';
+import ArticleCover from './blog/ArticleCover.astro';
+import ArticleRail from './blog/ArticleRail.astro';
 import SiteFooter from './SiteFooter.astro';
 import SiteHeader from './SiteHeader.astro';
 
@@ -40,8 +49,8 @@ interface Props {
   lede?: string;
   /** The metadata line under the lede: a date, "Updated …", a reading time. */
   meta?: string[];
-  /** Headings for the "On this page" column (depth-2 headings only). */
-  toc?: { slug: string; text: string }[];
+  /** Headings for the "On this page" column: depth 2, and depth 3 under them in an article's tree. */
+  toc?: (Omit<TocItem, 'depth'> & { depth?: number })[];
   /** Let the body use the full page width (index pages, choosers). */
   wide?: boolean;
   /** Center the head and the reading column on the page (About). */
@@ -50,6 +59,15 @@ interface Props {
   progress?: boolean;
   /** A full-width picture above the head (a blog post's banner, src/og.ts); the `banner` slot takes a drawn one. */
   banner?: Banner;
+  /** A blog post's layout: the contained picture and its card, the left rail, the reading column. */
+  article?: {
+    cover?: Banner;
+    author: string;
+    tags: string[];
+    /** The page's absolute address and the post's Markdown twin, for Share. */
+    url: string;
+    markdown: string;
+  };
   /** Passed through to Base: JSON-LD facts, the Markdown twin, and the link card (src/og.ts). */
   structuredData?: Record<string, unknown>[];
   markdownPath?: string;
@@ -72,13 +90,17 @@ const {
   center = false,
   progress = false,
   banner,
+  article,
   structuredData,
   markdownPath,
   image,
   imageAlt,
 } = Astro.props;
-const hasToc = toc.length > 1;
-const hasBanner = banner !== undefined || Astro.slots.has('banner');
+const items: TocItem[] = toc.map((item) => ({ ...item, depth: item.depth ?? 2 }));
+// The guides' and /privacy/'s tree lists their `##` headings; an article's also its `###`.
+const flatToc = article ? items : items.filter((item) => item.depth === 2);
+const hasToc = flatToc.filter((item) => item.depth === 2).length > 1;
+const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner'));
 ---
 
 <Base
@@ -121,7 +143,22 @@ const hasBanner = banner !== undefined || Astro.slots.has('banner');
     )
   }
   <div class:list={{ sheet: hasBanner }}>
-  <main id="content" class:list={['wrap writing', { center, 'has-progress': progress, 'has-banner': hasBanner }]}>
+  <main
+    id="content"
+    class:list={['wrap writing', { center, 'has-progress': progress, 'has-banner': hasBanner, 'is-article': article }]}
+  >
+    {article ? (
+      <ArticleCover
+        cover={article.cover}
+        crumbs={crumbs}
+        kicker={kicker}
+        heading={heading}
+        lede={lede}
+        author={article.author}
+        meta={meta}
+        tags={article.tags}
+      />
+    ) : (
     <header class="writing-head">
       <div class="head-copy">
         {
@@ -166,12 +203,13 @@ const hasBanner = banner !== undefined || Astro.slots.has('banner');
         )}
       </div>
     </header>
+    )}
     <slot name="scene" />
     {
       progress && (
         <div
-          class="read-progress"
-          data-read-progress
+          class:list={['read-progress', { slim: article }]}
+          data-read-progress="bar"
           role="progressbar"
           aria-label="Position in this article"
           aria-valuemin="0"
@@ -188,26 +226,36 @@ const hasBanner = banner !== undefined || Astro.slots.has('banner');
         </div>
       )
     }
-    <div class:list={['writing-body', { 'has-toc': hasToc, wide }]}>
+    <div class:list={['writing-body', { 'has-toc': hasToc && !article, 'has-rail': article, wide }]}>
       {
         hasToc && (
-          <>
-            <details class="toc-compact">
-              <summary>On this page</summary>
-              <ul>
-                {toc.map((item) => (
-                  <li>
-                    <a href={`#${item.slug}`}>{item.text}</a>
-                  </li>
-                ))}
-              </ul>
-            </details>
+          <details class="toc-compact">
+            <summary>On this page</summary>
+            <ul>
+              {flatToc.map((item) => (
+                <li class:list={{ sub: item.depth === 3 }}>
+                  <a href={`#${item.slug}`}>{item.text}</a>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )
+      }
+      {
+        article ? (
+          <ArticleRail
+            title={heading}
+            toc={flatToc}
+            share={{ url: article.url, title: heading, text: description, markdown: article.markdown }}
+          />
+        ) : (
+          hasToc && (
             <nav class="toc" aria-label="On this page" data-toc>
               <p>On this page</p>
               <div class="toc-tree">
                 <span class="toc-rail" aria-hidden="true"><span class="toc-progress" data-toc-progress></span></span>
                 <ul>
-                  {toc.map((item) => (
+                  {flatToc.map((item) => (
                     <li>
                       <a href={`#${item.slug}`}>{item.text}</a>
                     </li>
@@ -215,7 +263,7 @@ const hasBanner = banner !== undefined || Astro.slots.has('banner');
                 </ul>
               </div>
             </nav>
-          </>
+          )
         )
       }
       <div class="prose" data-prose>
@@ -238,10 +286,15 @@ const hasBanner = banner !== undefined || Astro.slots.has('banner');
   const toc = document.querySelector<HTMLElement>('[data-toc]');
   const prose = document.querySelector<HTMLElement>('[data-prose]');
   const rail = document.querySelector<HTMLElement>('[data-toc-progress]');
-  const meter = document.querySelector<HTMLElement>('[data-read-progress]');
-  const fill = meter?.querySelector<HTMLElement>('[data-read-fill]') ?? null;
-  const percentLabel = meter?.querySelector<HTMLElement>('[data-read-percent]') ?? null;
-  if (prose && (toc || meter)) {
+  // The meters: the bar pinned under the header, and on a blog post the rail's percent too
+  // (only one of them shows at a width; both follow the same measure).
+  const meters = [...document.querySelectorAll<HTMLElement>('[data-read-progress]')].map((meter) => ({
+    meter,
+    fill: meter.querySelector<HTMLElement>('[data-read-fill]'),
+    label: meter.querySelector<HTMLElement>('[data-read-percent]'),
+  }));
+  const pinnedBar = document.querySelector<HTMLElement>('[data-read-progress="bar"]');
+  if (prose && (toc || meters.length > 0)) {
     const links = toc ? [...toc.querySelectorAll<HTMLAnchorElement>('a[href^="#"]')] : [];
     const targets = links
       .map((link) => document.getElementById(decodeURIComponent(link.hash.slice(1))))
@@ -251,8 +304,9 @@ const hasBanner = banner !== undefined || Astro.slots.has('banner');
     const update = () => {
       frame = 0;
       const header = document.querySelector('.site-header-bar')?.getBoundingClientRect().bottom ?? 0;
-      // The meter covers the top of the reading area while it is pinned, so it counts as header.
-      const top = meter && !meter.hidden ? Math.max(header, meter.getBoundingClientRect().bottom) : header;
+      // The pinned bar covers the top of the reading area while it shows, so it counts as header.
+      const barBottom = pinnedBar && !pinnedBar.hidden ? pinnedBar.getBoundingClientRect().bottom : 0;
+      const top = Math.max(header, barBottom);
       const line = top + window.innerHeight * 0.2;
       let active = -1;
       targets.forEach((target, index) => {
@@ -265,12 +319,13 @@ const hasBanner = banner !== undefined || Astro.slots.has('banner');
       const box = prose.getBoundingClientRect();
       const reading = readingProgress({ top: box.top, height: box.height }, window.innerHeight, top);
       if (rail) rail.style.transform = `scaleY(${reading.fraction})`;
-      if (meter && fill && percentLabel) {
+      const changed = reading.percent !== shown;
+      shown = reading.percent;
+      for (const { meter, fill, label } of meters) {
         meter.hidden = reading.fits;
-        fill.style.transform = `scaleX(${reading.fraction})`;
-        if (reading.percent !== shown) {
-          shown = reading.percent;
-          percentLabel.textContent = `${reading.percent}%`;
+        if (fill) fill.style.transform = `scaleX(${reading.fraction})`;
+        if (changed) {
+          if (label) label.textContent = `${reading.percent}%`;
           meter.setAttribute('aria-valuenow', String(reading.percent));
         }
       }
@@ -510,6 +565,56 @@ const hasBanner = banner !== undefined || Astro.slots.has('banner');
   .read-label b {
     color: var(--text);
     font-weight: 600;
+  }
+  /* A blog post (`article`): no pinned meter on a wide screen (the rail carries it), a slim
+     bar under the header below 900px; the rail beside the reading column, Share after it on
+     narrow screens. The column's type and the figures are blog/article.css. */
+  .writing.is-article {
+    padding-top: clamp(1.5rem, 3vw, 2.5rem);
+  }
+  .writing.is-article.has-progress {
+    --meter-height: 0px;
+  }
+  .read-progress.slim {
+    display: none;
+  }
+  .writing-body.has-rail {
+    grid-template-columns: 15rem minmax(0, 1fr);
+    gap: clamp(2.5rem, 6vw, 6rem);
+  }
+  @media (max-width: 900px) {
+    .writing.is-article.has-progress {
+      --meter-height: 3px;
+    }
+    .read-progress.slim {
+      display: block;
+      height: var(--meter-height);
+      margin: 0 0 1.75rem;
+      background: none;
+    }
+    .read-progress.slim[hidden] {
+      display: none;
+    }
+    /* Only the fill shows: at the top of the post the bar is not there at all. */
+    .read-progress.slim .read-track {
+      display: block;
+      height: 100%;
+      border-radius: 0;
+      background: none;
+    }
+    .read-progress.slim .read-label {
+      display: none;
+    }
+    .writing-body.has-rail {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+    }
+    .writing-body.has-rail > :global(.rail) {
+      order: 2;
+    }
+  }
+  .toc-compact li.sub {
+    padding-left: 1rem;
   }
   /* The body sits on the grid's left edge; with a table of contents it gets
      a narrow first column that stays in view while reading. */
