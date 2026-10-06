@@ -627,6 +627,40 @@
           "targets": [
             "after"
           ]
+        },
+        {
+          "body": "A ``code [[Spanned]] here`` and [[Kept]].",
+          "targets": [
+            "Kept"
+          ]
+        },
+        {
+          "body": "~~~\n[[Tilde fenced]]\n~~~\n[[After tilde]]",
+          "targets": [
+            "After tilde"
+          ]
+        },
+        {
+          "body": "````md\n```\n[[Inside longer]]\n```\n````\n[[After longer]]",
+          "targets": [
+            "After longer"
+          ]
+        },
+        {
+          "body": "a lone ` tick, then [[Still linked]]",
+          "targets": [
+            "Still linked"
+          ]
+        },
+        {
+          "body": "```\n[[Unclosed fence]]",
+          "targets": []
+        },
+        {
+          "body": "`one` and [[Between]] and `two`",
+          "targets": [
+            "Between"
+          ]
         }
       ]
     },

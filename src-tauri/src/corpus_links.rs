@@ -58,27 +58,87 @@ pub(crate) fn metadata_link_targets(fields: &str) -> Vec<String> {
 
 /// The raw `[[…]]` insides of a body: fenced blocks and inline code skipped,
 /// `![[…]]` counted (it names the note too), duplicates collapsed.
-pub(crate) fn body_link_targets(body: &str) -> Vec<String> {
-    let mut out: Vec<String> = Vec::new();
-    let mut fenced = false;
-    for line in body.lines() {
-        if line.trim_start().starts_with("```") {
-            fenced = !fenced;
+/// A fence line's run — three or more of one fence character, as CommonMark
+/// has it — and what follows it. An opening backtick run may not carry another
+/// backtick after it.
+fn fence_run(line: &str) -> Option<(char, usize, &str)> {
+    let trimmed = line.trim_start();
+    let first = trimmed.chars().next()?;
+    if first != '`' && first != '~' {
+        return None;
+    }
+    let len = trimmed.chars().take_while(|c| *c == first).count();
+    if len < 3 {
+        return None;
+    }
+    let rest = &trimmed[len..];
+    if first == '`' && rest.contains('`') {
+        return None;
+    }
+    Some((first, len, rest))
+}
+
+/// A line with its code spans blanked: a run of N backticks opens a span only
+/// when a run of exactly N closes it later on the line; a run with no match
+/// is literal text (CommonMark).
+fn outside_code(line: &str) -> String {
+    let chars: Vec<char> = line.chars().collect();
+    let mut prose = String::with_capacity(line.len());
+    let mut at = 0;
+    while at < chars.len() {
+        if chars[at] != '`' {
+            prose.push(chars[at]);
+            at += 1;
             continue;
         }
-        if fenced {
-            continue;
+        let run = chars[at..].iter().take_while(|c| **c == '`').count();
+        let mut close = None;
+        let mut next = at + run;
+        while next < chars.len() {
+            if chars[next] != '`' {
+                next += 1;
+                continue;
+            }
+            let other = chars[next..].iter().take_while(|c| **c == '`').count();
+            if other == run {
+                close = Some(next);
+                break;
+            }
+            next += other;
         }
-        // drop inline code spans first: `[[x]]` inside backticks is not a link
-        let mut prose = String::with_capacity(line.len());
-        let mut in_code = false;
-        for ch in line.chars() {
-            if ch == '`' {
-                in_code = !in_code;
-            } else if !in_code {
-                prose.push(ch);
+        match close {
+            None => {
+                prose.extend(&chars[at..at + run]);
+                at += run;
+            }
+            Some(end) => {
+                prose.push(' ');
+                at = end + run;
             }
         }
+    }
+    prose
+}
+
+pub(crate) fn body_link_targets(body: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    // the open fence: it closes only on the same character, at least as long
+    let mut fence: Option<(char, usize)> = None;
+    for line in body.lines() {
+        let found = fence_run(line);
+        if let Some((open_char, open_len)) = fence {
+            if let Some((c, len, rest)) = found {
+                if c == open_char && len >= open_len && rest.trim().is_empty() {
+                    fence = None;
+                }
+            }
+            continue;
+        }
+        if let Some((c, len, _)) = found {
+            fence = Some((c, len));
+            continue;
+        }
+        let prose = outside_code(line);
         let mut rest = prose.as_str();
         while let Some(start) = rest.find("[[") {
             let after = &rest[start + 2..];
