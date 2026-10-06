@@ -145,8 +145,15 @@ export const RESTING_LABELS = 12;
 
 export function restingLabels(graph: Graph): ReadonlySet<string> {
   if (graph.nodes.length <= LABEL_ALL_UP_TO) return new Set(graph.nodes.map((node) => node.id));
-  const ranked = graph.nodes.filter((node) => node.degree >= 2).sort((a, b) => b.degree - a.degree);
-  return new Set(ranked.slice(0, RESTING_LABELS).map((node) => node.id));
+  // the most-linked first; a sparse vault fills the rest from the most
+  // recent notes (the list's order), so it never rests with no names at all
+  const ranked = graph.nodes.filter((node) => node.degree >= 1).sort((a, b) => b.degree - a.degree);
+  const named = ranked.slice(0, RESTING_LABELS);
+  for (const node of graph.nodes) {
+    if (named.length >= RESTING_LABELS) break;
+    if (node.degree === 0) named.push(node);
+  }
+  return new Set(named.map((node) => node.id));
 }
 
 export interface LabelContext {

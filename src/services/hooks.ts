@@ -4,6 +4,7 @@
 import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
+import { bodyLinkTargets } from "../graph/linkTargets";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { isCanvasPath } from "../lib/fileKind";
 import { replaceTitleLine } from "../lib/noteTitle";
@@ -340,7 +341,14 @@ export async function invalidateTasks(): Promise<void> {
  * TabStrip, and the note lists don't re-derive per tick. */
 export function applyNoteWrite(note: Note, opts?: { tasksChanged?: boolean }): Promise<void> {
   const { body: _body, ...summary } = note;
+  const before = queryClient.getQueryData<Note>(keys.note(note.id));
   queryClient.setQueryData(keys.note(note.id), note);
+  // the Graph and canvas cards read the Links projection; mark it stale only
+  // when the save changed what this note links to — no walk now, the next
+  // reader refetches (audit 2026-10-06)
+  if (!before || bodyLinkTargets(before.body).join("\n") !== bodyLinkTargets(note.body).join("\n")) {
+    void queryClient.invalidateQueries({ queryKey: keys.links, refetchType: "none" });
+  }
   const entries = queryClient.getQueriesData<NoteSummary[]>({ queryKey: ["notes"] });
   // judge rowChanged against the FRESHEST cached copy across every list — if
   // caches ever diverged (an interrupted earlier patch), the stalest copy must

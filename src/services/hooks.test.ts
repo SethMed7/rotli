@@ -34,6 +34,18 @@ afterEach(() => {
 });
 
 describe("applyNoteWrite", () => {
+  test("a save marks the Links projection stale only when what the note links to changed", async () => {
+    queryClient.setQueryData(keys.links, []);
+    const stale = () => queryClient.getQueryState(keys.links)?.isInvalidated === true;
+    queryClient.setQueryData(keys.note("a"), note("a", { body: "# Title a\n\nSee [[B]]." }));
+    // typing that leaves the links alone keeps the projection fresh
+    await applyNoteWrite(note("a", { body: "# Title a\n\nSee [[B]]. More words." }));
+    expect(stale()).toBe(false);
+    // a new link marks it stale for its next reader, with no walk now
+    await applyNoteWrite(note("a", { body: "# Title a\n\nSee [[B]] and [[C]]." }));
+    expect(stale()).toBe(true);
+  });
+
   test("mid-body typing (row-invisible change) leaves every list identity untouched", async () => {
     const list = [summary("a"), summary("b")];
     queryClient.setQueryData(keys.notes(undefined), list);

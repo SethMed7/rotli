@@ -155,3 +155,26 @@ test("a small graph names every note; a big one names only its dozen most-linked
   expect(restingLineAlpha(10)).toBe(0.9);
   expect(restingLineAlpha(5000)).toBe(0.35);
 });
+
+test("a big sparse vault still rests with names: the most-linked, then the most recent", () => {
+  const many = Array.from({ length: 40 }, (_, at) => note(`n${at}`, `Note ${at}`));
+  const sparse = buildGraph(many, [
+    ...many.map((each) => ({
+      noteId: each.id,
+      secure: false,
+      targets: [] as string[],
+      suggested: [] as string[],
+    })),
+  ]);
+  // only one pair is linked
+  const linked = buildGraph(many, [
+    { noteId: "n5", secure: false, targets: ["Note 6"], suggested: [] },
+    ...many
+      .filter((each) => each.id !== "n5")
+      .map((each) => ({ noteId: each.id, secure: false, targets: [], suggested: [] })),
+  ]);
+  expect(restingLabels(sparse).size).toBe(RESTING_LABELS);
+  const resting = restingLabels(linked);
+  expect(resting.size).toBe(RESTING_LABELS);
+  expect(resting.has("n5") && resting.has("n6")).toBe(true);
+});

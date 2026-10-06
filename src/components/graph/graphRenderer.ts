@@ -68,12 +68,22 @@ function readPalette(element: HTMLElement): Palette {
   return { ground, line, accent, dot: muted, strong: text, font };
 }
 
-const graphFingerprint = (graph: Graph): string =>
+/** What the layout depends on — which notes (and their size) and which
+ * written links — in an order-free form. Exported for tests. */
+export const graphFingerprint = (graph: Graph): string =>
   [
-    ...graph.nodes.map((node) => `${node.id}\u0000${node.title}\u0000${node.secure ? 1 : 0}`),
+    // a dot's size follows its degree; its title only relabels
+    ...graph.nodes.map((node) => `${node.id}\u0000${node.degree}\u0000${node.secure ? 1 : 0}`).sort(),
     // the Librarian's lines don't pull on the layout, so switching them
     // on or off redraws without moving a dot
-    ...graph.edges.filter((edge) => !edge.suggested).map((edge) => `${edge.source}\u0001${edge.target}`),
+    ...graph.edges
+      .filter((edge) => !edge.suggested)
+      .map((edge) =>
+        edge.source < edge.target
+          ? `${edge.source}\u0001${edge.target}`
+          : `${edge.target}\u0001${edge.source}`,
+      )
+      .sort(),
   ].join("\n");
 
 const reducedMotion = (): boolean =>
@@ -116,7 +126,8 @@ export function createGraphRenderer(wrap: HTMLElement, canvas: HTMLCanvasElement
     const active = hovered ?? focused;
     const near = active ? (neighbors.get(active) ?? new Set<string>()) : null;
     const searching = input.matched.size > 0;
-    const lineAlpha = restingLineAlpha(input.graph.edges.length);
+    // written lines set the texture: the Librarian's switch never fades them
+    const lineAlpha = restingLineAlpha(input.graph.edges.filter((edge) => !edge.suggested).length);
     const position = new Map(layout.nodes.map((node) => [node.id, node] as const));
     const screen = (x: number | undefined, y: number | undefined) =>
       toScreen(view, width, height, x ?? 0, y ?? 0);
@@ -191,7 +202,9 @@ export function createGraphRenderer(wrap: HTMLElement, canvas: HTMLCanvasElement
         context.stroke();
       }
       context.lineWidth = 1;
-      if (labelVisible(meta, { zoom: view.k, resting, emphasized, matched: input.matched })) {
+      // a label off screen is never measured or placed (zoomed in on a big vault)
+      const onScreen = sx > -240 && sx < width + 240 && sy > -40 && sy < height + 40;
+      if (onScreen && labelVisible(meta, { zoom: view.k, resting, emphasized, matched: input.matched })) {
         labels.push({
           x: sx,
           y: sy + r + 4,
@@ -238,6 +251,16 @@ export function createGraphRenderer(wrap: HTMLElement, canvas: HTMLCanvasElement
 
   function setFocused(id: string | null) {
     focused = id;
+    // keyboard travel keeps the focused note on screen
+    const node = id ? layout?.nodes.find((each) => each.id === id) : undefined;
+    if (node) {
+      const [sx, sy] = toScreen(view, width, height, node.x ?? 0, node.y ?? 0);
+      const margin = 48;
+      if (sx < margin || sx > width - margin || sy < margin || sy > height - margin) {
+        autoFit = false;
+        view = { ...view, x: view.x + width / 2 - sx, y: view.y + height / 2 - sy };
+      }
+    }
     callbacks.onFocus(id ? (byId.get(id) ?? null) : null);
     requestDraw();
   }
@@ -260,6 +283,8 @@ export function createGraphRenderer(wrap: HTMLElement, canvas: HTMLCanvasElement
   }
 
   function onPointerMove(event: PointerEvent) {
+    // the button came up somewhere this canvas never heard about
+    if (drag && event.buttons === 0) endDrag();
     const [sx, sy] = local(event);
     if (!drag) {
       const id = nodeAt(sx, sy);
@@ -282,9 +307,17 @@ export function createGraphRenderer(wrap: HTMLElement, canvas: HTMLCanvasElement
     }
   }
 
-  function onPointerUp(event: PointerEvent) {
+  /** End a drag however it ends — a release, a cancelled pointer, a lost
+   * capture — so nothing is left following a pointer no one is pressing. */
+  function endDrag(): typeof drag {
     const current = drag;
     drag = null;
+    if (current?.id && current.moved) layout?.rest();
+    return current;
+  }
+
+  function onPointerUp(event: PointerEvent) {
+    const current = endDrag();
     if (!current?.id) return;
     // a dragged dot stays where it was put (until the layout is rebuilt)
     if (current.moved) return;
@@ -321,6 +354,8 @@ export function createGraphRenderer(wrap: HTMLElement, canvas: HTMLCanvasElement
   }
 
   function onKeyDown(event: KeyboardEvent) {
+    // app shortcuts (⌘0, ⌘=, ⌘←, ⌘⌥ arrows…) pass through; only ⌘↩ is ours
+    if ((event.metaKey || event.ctrlKey || event.altKey) && event.key !== "Enter") return;
     const direction = KEY_DIRECTIONS[event.key];
     if (direction) {
       event.preventDefault();
@@ -365,6 +400,8 @@ export function createGraphRenderer(wrap: HTMLElement, canvas: HTMLCanvasElement
   canvas.addEventListener("pointerdown", onPointerDown);
   canvas.addEventListener("pointermove", onPointerMove);
   canvas.addEventListener("pointerup", onPointerUp);
+  canvas.addEventListener("pointercancel", endDrag);
+  canvas.addEventListener("lostpointercapture", endDrag);
   canvas.addEventListener("pointerleave", onPointerLeave);
   canvas.addEventListener("wheel", onWheel, { passive: false });
   canvas.addEventListener("keydown", onKeyDown);
@@ -373,8 +410,9 @@ export function createGraphRenderer(wrap: HTMLElement, canvas: HTMLCanvasElement
   return {
     /** New data or scope. A changed graph re-lays out, keeping known positions. */
     update(next: GraphInput) {
-      // the note list's identity churns on every refetch (a window refocus);
-      // only a real change in notes, titles, or links re-lays the graph out
+      // the note list's identity churns on every refetch, and its order on
+      // every edit or pin; only a real change in which notes and links there
+      // are re-lays the graph out (titles only relabel)
       const fingerprint = graphFingerprint(next.graph);
       const graphChanged = fingerprint !== laidOut;
       laidOut = fingerprint;
@@ -386,9 +424,9 @@ export function createGraphRenderer(wrap: HTMLElement, canvas: HTMLCanvasElement
         neighbors.set(source, (neighbors.get(source) ?? new Set()).add(target));
         neighbors.set(target, (neighbors.get(target) ?? new Set()).add(source));
       }
+      byId = new Map(next.graph.nodes.map((node) => [node.id, node] as const));
+      resting = restingLabels(next.graph);
       if (graphChanged) {
-        byId = new Map(next.graph.nodes.map((node) => [node.id, node] as const));
-        resting = restingLabels(next.graph);
         const previous = new Map(
           (layout?.nodes ?? []).map((node) => [node.id, { x: node.x ?? 0, y: node.y ?? 0 }] as const),
         );
@@ -416,6 +454,8 @@ export function createGraphRenderer(wrap: HTMLElement, canvas: HTMLCanvasElement
       canvas.removeEventListener("pointerdown", onPointerDown);
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerup", onPointerUp);
+      canvas.removeEventListener("pointercancel", endDrag);
+      canvas.removeEventListener("lostpointercapture", endDrag);
       canvas.removeEventListener("pointerleave", onPointerLeave);
       canvas.removeEventListener("wheel", onWheel);
       canvas.removeEventListener("keydown", onKeyDown);

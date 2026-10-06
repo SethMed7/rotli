@@ -25,7 +25,8 @@ export interface Layout {
   nodes: readonly LayoutNode[];
   /** Pin a node under the pointer while dragging, and wake the layout. */
   hold: (id: string, x: number, y: number) => void;
-  release: (id: string) => void;
+  /** The drag ended: let the layout settle and sleep, the dot staying put. */
+  rest: () => void;
   stop: () => void;
 }
 
@@ -61,11 +62,16 @@ export function createLayout(
     .force("x", forceX<LayoutNode>(0).strength(0.045))
     .force("y", forceY<LayoutNode>(0).strength(0.045))
     .alphaDecay(0.035);
+  // re-laying out a graph that already has places only nudges it
+  const known = items.filter((node) => node.x !== undefined).length;
+  if (items.length > 0 && known / items.length >= 0.5) simulation.alpha(0.3);
   if (options.animate) {
     simulation.on("tick", options.onTick);
   } else {
     simulation.stop();
-    const steps = Math.ceil(Math.log(simulation.alphaMin()) / Math.log(1 - simulation.alphaDecay()));
+    const steps = Math.ceil(
+      Math.log(simulation.alphaMin() / simulation.alpha()) / Math.log(1 - simulation.alphaDecay()),
+    );
     simulation.tick(steps);
     options.onTick();
   }
@@ -83,11 +89,9 @@ export function createLayout(
         options.onTick();
       }
     },
-    release(id) {
-      const node = byId.get(id);
-      if (!node) return;
-      node.fx = null;
-      node.fy = null;
+    rest() {
+      // hold() raised the target so the layout follows the pointer; left
+      // there, the simulation never sleeps and redraws every frame (audit P0)
       if (options.animate) simulation.alphaTarget(0);
     },
     stop: () => simulation.stop(),
