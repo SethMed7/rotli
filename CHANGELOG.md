@@ -10,12 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- **A vault opens on your freshest note.** When the newest file in a vault
-  was an Excalidraw board, Rotli opened the board as a broken, empty note tab
-  on start. It now opens the most recent note.
-
 ### Added
 
 - **A graph of your notes.** Search "Graph" in ⌘K to see every note as a
@@ -177,13 +171,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lost the menu-bar-only app mid-setup; the quiet visitor is a choice in
   Settings → General.
 
-### Fixed
-
-- **The window no longer scrolls sideways.** The hover labels on the theme
-  button and on a tab strip's **+** reached past the right edge of the window,
-  so picking something from ⌘K could slide the whole app 50 px to the left.
-  Both labels now open toward the window.
-
 ### Added
 
 - **rotli.co has a "hear when it's ready" list and quokkas at the bottom.**
@@ -293,6 +280,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A vault opens on your freshest note.** When the newest file in a vault
+  was an Excalidraw board, Rotli opened the board as a broken, empty note tab
+  on start. It now opens the most recent note.
+- **The window no longer scrolls sideways.** The hover labels on the theme
+  button and on a tab strip's **+** reached past the right edge of the window,
+  so picking something from ⌘K could slide the whole app 50 px to the left.
+  Both labels now open toward the window.
 - **Rotli Web says plainly that chat images need the Mac app.** Choosing a
   photo, or pasting one, used to attach it and then fail on send. Images in
   a chat written on the Mac now show when you open it on the web, instead of
@@ -1697,7 +1691,6 @@ Three fixes from a computer-use test of the installed 0.94.0.
 - Librarian Activity rows now name the lane and model that filed the note
   ("Claude · Claude Opus"), not only the day and time.
 
-
 ## [0.94.0] - 2026-09-12
 
 The Librarian lane actually works: the choice persists and reaches the
@@ -1722,7 +1715,6 @@ is.
   Librarian choice, so the daemon never used a connected lane and the
   Settings control reverted to On this Mac on relaunch. The choice now
   persists and reaches the daemon.
-
 
 ## [0.93.0] - 2026-09-12
 
@@ -1863,7 +1855,6 @@ wikilinks, typed tables, and placeable choice panels.
 - Repository and deployment-context privacy tripwires, redacted secret-scan
   commands, and owner-only main/dev protection payloads are available. Actual
   branch protection still requires an eligible private-repository GitHub plan.
-
 
 ### Added
 
