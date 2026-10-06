@@ -73,14 +73,59 @@ export const OG_CARDS = {
 } as const satisfies Record<string, OgCard>;
 export type OgCardName = keyof typeof OG_CARDS;
 
-/** A post's card pose, by slug; posts not listed show the writing quokka. */
-export const POST_POSES: Record<string, Pose> = {
-  'rotli-web-and-your-mac': 'stays_local',
-  'the-ai-you-already-pay-for': 'knowledge_system',
+/**
+ * A post's picture, by slug: the quokka's pose and the scene around it
+ * (scripts/brand-images/scenes.mjs). One definition, two renders by
+ * `bun run build:brand-images`: the title-free scene is the post's thumbnail
+ * (public/thumbs/blog/, on /blog/ and the post's head), and its link card
+ * stands the same pose beside the scene's first prop, under the title it
+ * reads from the post's frontmatter. Neither stores a title here, so a
+ * retitled post needs only a re-render. A post not listed gets the writing
+ * quokka on the plain beach.
+ */
+export interface PostArt {
+  pose: Pose;
+  scene: 'bench' | 'helper' | 'memory' | 'two-notes' | 'making' | 'beach';
+  /** What is drawn around the quokka, for the alt text. */
+  around: string;
+}
+
+export const POST_ART: Record<string, PostArt> = {
+  'the-ai-you-already-pay-for': {
+    pose: 'knowledge_system',
+    scene: 'bench',
+    around: 'between a bench of three idle AI helpers, two of them asleep, and a stack of coins',
+  },
+  'rotli-web-and-your-mac': {
+    pose: 'stays_local',
+    scene: 'helper',
+    around: 'between a browser window and a laptop open on Terminal, a dotted path joining them',
+  },
+  'rotli-as-ai-memory': {
+    pose: 'ai_chat',
+    scene: 'memory',
+    around: 'between a small AI chip with a speech bubble and three notes joined by links',
+  },
+  'two-kinds-of-notes': {
+    pose: 'notes',
+    scene: 'two-notes',
+    around: 'between a scribbled page and the same page filed, with a block of fields on top',
+  },
+  'the-creation-of-rotli': {
+    pose: 'excalidraw_board',
+    scene: 'making',
+    around: 'beside sketches laid out on the sand, the lighthouse behind',
+  },
 };
 
+const DEFAULT_ART: PostArt = { pose: 'notes', scene: 'beach', around: 'on the beach' };
+
+export function postArt(slug: string): PostArt {
+  return POST_ART[slug] ?? DEFAULT_ART;
+}
+
 export function postPose(slug: string): Pose {
-  return POST_POSES[slug] ?? 'notes';
+  return postArt(slug).pose;
 }
 
 function alt(title: string, pose: Pose): string {
@@ -91,6 +136,39 @@ function alt(title: string, pose: Pose): string {
 export function ogImage(name: OgCardName): { image: string; imageAlt: string } {
   const card: OgCard = OG_CARDS[name];
   return { image: `/og/${name}.png`, imageAlt: alt(card.title, card.pose) };
+}
+
+/** A post's thumbnail: its scene without words, 1200 × 630 with a 600-wide copy. */
+export interface Thumbnail {
+  src: string;
+  srcset: string;
+  width: number;
+  height: number;
+  alt: string;
+}
+
+export const THUMBNAIL = { width: 1200, height: 630 } as const;
+
+/** Where a post's thumbnail is written (the build script) and served (the pages). */
+export function thumbnailPath(slug: string, width: 600 | 1200 = 1200): string {
+  return width === 1200 ? `/thumbs/blog/${slug}.webp` : `/thumbs/blog/${slug}-600.webp`;
+}
+
+export function thumbnailAlt(slug: string): string {
+  const art = postArt(slug);
+  return `The rotli quokka ${POSES[art.pose]}, ${art.around}`;
+}
+
+/** A post's thumbnail, or undefined until `bun run build:brand-images` has rendered it. */
+export function postThumbnail(slug: string): Thumbnail | undefined {
+  const src = thumbnailPath(slug);
+  if (!hasPublicFile(src)) return undefined;
+  return {
+    src,
+    srcset: `${thumbnailPath(slug, 600)} 600w, ${src} 1200w`,
+    ...THUMBNAIL,
+    alt: thumbnailAlt(slug),
+  };
 }
 
 /** A post's own card (public/og/blog/<slug>.png), or the blog's until it is rendered. */

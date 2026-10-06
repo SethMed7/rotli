@@ -24,9 +24,14 @@ export const C = {
   oliveDark: "#6d7a58",
   lantern: "#8fb9c9",
   cloud: "#fffaf2",
+  oliveBright: "#a9b78f",
+  wood: "#b98b62",
+  lake: "#f0a7a0",
+  paper: "#ffffff",
+  sky: "#f3e7d6",
 };
 
-const esc = (text) =>
+export const esc = (text) =>
   String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const markPaths = readFileSync(join(root, "src/assets/characters/_logo-bold.svg"), "utf8")
   .replace(/^[\s\S]*?<svg[^>]*>/, "")
@@ -51,7 +56,7 @@ function filePattern({ w, h, fade, k = 1 }) {
 }
 
 /** The bay: a deep edge line, then shallow water with a scatter of wave marks. */
-function sea({ w, h, top, k = 1 }) {
+export function sea({ w, h, top, k = 1 }) {
   const waves = [];
   const rows = Math.max(1, Math.floor((h - top - 30 * k) / (26 * k)));
   for (let i = 0; i < Math.ceil(w / (90 * k)); i += 1) {
@@ -69,7 +74,7 @@ function sea({ w, h, top, k = 1 }) {
  * the film's ink line along its top, ending at `bottom` (a sand bar with a rounded
  * underside when that is above the image's edge).
  */
-function beach({ x, footY, bottom, k = 1 }) {
+export function beach({ x, footY, bottom, k = 1 }) {
   const top = footY - 18 * k;
   const left = x - 300 * k;
   const right = x + 340 * k;
@@ -78,7 +83,7 @@ function beach({ x, footY, bottom, k = 1 }) {
 }
 
 /** The lighthouse on its limestone hill, anchored at the hill's base center. */
-function lighthouse({ x, y, s }) {
+export function lighthouse({ x, y, s }) {
   return `<g transform="translate(${x} ${y}) scale(${s})" stroke-linejoin="round">
     <path d="M-195 0C-117 -30 -60 -88 0 -88S126.75 -26 195 0Z" fill="${C.limestone}" stroke="${C.line}" stroke-width="3"/>
     <ellipse cx="-90" cy="-48" rx="22" ry="9" fill="${C.olive}"/><ellipse cx="-60" cy="-58" rx="18" ry="8" fill="${C.oliveDark}"/><ellipse cx="55" cy="-60" rx="20" ry="8" fill="${C.olive}"/><ellipse cx="95" cy="-44" rx="24" ry="9" fill="${C.oliveDark}"/>
@@ -91,7 +96,7 @@ function lighthouse({ x, y, s }) {
   </g>`;
 }
 
-function cloud({ x, y, s }) {
+export function cloud({ x, y, s }) {
   return `<g transform="translate(${x} ${y}) scale(${s})"><ellipse cx="0" cy="0" rx="56" ry="16" fill="${C.cloud}"/><ellipse cx="-34" cy="4" rx="30" ry="13" fill="${C.cloud}"/><ellipse cx="26" cy="-9" rx="32" ry="15" fill="${C.cloud}"/><path d="M-66 12q50 9 128 1" fill="none" stroke="${C.muted}" stroke-opacity="0.45" stroke-width="2.5" stroke-linecap="round"/></g>`;
 }
 
@@ -103,7 +108,7 @@ function wordmark({ x, y, size }) {
 }
 
 /** The quokka at (x, y, size), with its visible bounds as a keep-out for text. */
-function character(art, { x, y, size }) {
+export function character(art, { x, y, size }) {
   const { left, top, right, bottom } = art.box;
   return `<image href="${art.uri}" x="${x}" y="${y}" width="${size}" height="${size}"/>
   <rect data-keepout="quokka" x="${x + left * size}" y="${y + top * size}" width="${(right - left) * size}" height="${(bottom - top) * size}" fill="none"/>`;
@@ -157,6 +162,7 @@ export function card({
   titleSize = title.length <= 16 ? 88 : 68,
   scenery = false,
   label,
+  beside,
 }) {
   const k = h / 630;
   const pad = 72 * k;
@@ -166,14 +172,19 @@ export function card({
   const footY = h - 34 * k;
   const qx = footX - qSize / 2;
   const qy = footY - art.box.bottom * qSize;
-  const textW = Math.min(qx + art.box.left * qSize - pad - 36 * k, 660 * k);
+  // `beside({ footX, footY, k })`: a prop on its own stretch of beach left of the quokka; the text keeps clear of it.
+  const prop = beside?.({ footX, footY, k });
+  const artLeft = Math.min(qx + art.box.left * qSize, prop?.left ?? Infinity);
+  const textW = Math.min(artLeft - pad - 36 * k, 660 * k);
   const textTop = 150 * k;
   return `${svgOpen(w, h, label ?? title)}
   <rect width="${w}" height="${h}" fill="${C.ground}"/>
   ${filePattern({ w, h, k, fade: [pad + textW / 2, textTop + 170 * k, textW * 0.95, 330 * k] })}
   ${scenery ? `${cloud({ x: w * 0.56, y: 96 * k, s: 0.9 * k })}${lighthouse({ x: footX - 250 * k, y: seaTop + 2 * k, s: 0.6 * k })}` : ""}
   ${sea({ w, h, top: seaTop, k })}
+  ${prop?.ground ?? ""}
   ${beach({ x: footX, footY, bottom: h + 30 * k, k })}
+  ${prop?.svg ?? ""}
   ${character(art, { x: qx, y: qy, size: qSize })}
   ${wordmark({ x: pad, y: 52 * k, size: 40 * k })}
   ${textBlock({ x: pad, y: textTop, w: textW, h: seaTop - textTop - 30 * k, title, line, size: titleSize * k, minSize: 44 * k, maxLines: 3, lineSize: 26 * k, inked })}
