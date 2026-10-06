@@ -2,7 +2,8 @@
 // a matrix of who may read and change a note you wrote (on-device model, connected AI, the
 // Librarian) for an everyday, a secure, and a locked note, then five plain points. It is the
 // page's first section and its one access table. On a phone each row is a block whose cells
-// name their reader, and nothing runs off the side at any width.
+// name their reader, and nothing runs off the side at any width. Where the reading column's middle
+// has room, the matrix breaks out of the words like a post's table, never into the rail.
 import { expect, test } from "@playwright/test";
 
 const READERS = ["On-device model", "Connected AI", "The Librarian"];
@@ -12,7 +13,8 @@ test("the promise is the policy's first section, with its matrix and five points
   const promise = page.locator("#promise");
   await expect(promise).toHaveText("Our privacy promise");
   await expect(page.locator("main h2").first()).toHaveId("promise");
-  await expect(page.locator("nav.toc a").first()).toHaveAttribute("href", "#promise");
+  // First in the rail's tree (the page reads like a blog post: privacy-page.spec.ts).
+  await expect(page.locator("[data-article-rail] .rail-toc a").first()).toHaveAttribute("href", "#promise");
   // One access table on the page: the promise's.
   await expect(page.locator("main table")).toHaveCount(1);
 
@@ -50,7 +52,8 @@ test("the promise is the policy's first section, with its matrix and five points
   await expect(page.locator(".promise-note")).toContainText("not encryption");
 });
 
-for (const width of [320, 390, 768, 1440, 1920]) {
+// 660: four columns in the narrowest reading column that still shows them.
+for (const width of [320, 390, 660, 768, 1024, 1440, 1920, 2560]) {
   test(`the promise's matrix reads at ${width}px with nothing off the side`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/privacy/#promise");
@@ -61,6 +64,13 @@ for (const width of [320, 390, 768, 1440, 1920]) {
     const box = (await matrix.boundingBox())!;
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.x + box.width).toBeLessThanOrEqual(width);
+    if (width > 900) {
+      // Beside the rail, never under it, and never narrower than the words above it.
+      const rail = (await page.locator("[data-article-rail]").boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(rail.x + rail.width);
+      const lede = (await page.locator(".promise-lede").boundingBox())!;
+      expect(box.width).toBeGreaterThanOrEqual(lede.width - 1);
+    }
 
     const cells = page.locator(".promise-matrix tbody td");
     await expect(cells).toHaveCount(9);

@@ -1,23 +1,14 @@
-// The top of an article. /privacy/ keeps the banner (WritingPage `banner`): a full-width picture
-// under the header that takes most of the first window, a head panel on the page's ground whose
-// title and date are in that first window at full contrast, and the page rising over the pinned
-// banner as it scrolls (the meter and the tree still pinned and clear of each other).
-// Blog posts open on their head instead (WritingPage `article`, blog/ArticleCover.astro), on the
-// header's edges: from 1000px (SIDE_BY_SIDE) "Blog /", the title, the summary, the meta line, and
-// the topics on the left and the post's picture on the right, whole (never cropped), the two
-// centred on each other; below it, stacked as on a phone, the picture across the page and the
-// words under it (on the page's edge from 901px, the reading column's below). Rounded and still,
-// nothing over the picture, contrast measured, the title in the first window.
+// The top of an article (WritingPage `article`, blog/ArticleCover.astro). The full-width pinned
+// banner /privacy/ once opened on is gone: it now opens like a post (privacy-page.spec.ts).
+// Blog posts open on their head, on the header's edges: from 1000px (SIDE_BY_SIDE) "Blog /", the
+// title, the summary, the meta line, and the topics on the left and the post's picture on the
+// right, whole (never cropped), the two centred on each other; below it, stacked as on a phone,
+// the picture across the page and the words under it (on the page's edge from 901px, the reading
+// column's below). Rounded and still, nothing over the picture, contrast measured, the title in the
+// first window.
 import { expect, test, type Page } from "@playwright/test";
 
 const POSTS = ["/blog/rotli-web-and-your-mac/", "/blog/the-ai-you-already-pay-for/"];
-const VIEWPORTS = [
-  { width: 1920, height: 1080 },
-  { width: 1440, height: 900 },
-  { width: 1280, height: 720 },
-  { width: 768, height: 1024 },
-  { width: 390, height: 844 },
-];
 
 /** WCAG contrast of two computed colours (rgb()/rgba() or color(srgb …)); throws on transparency. */
 function contrastOf(fg: string, bg: string): number {
@@ -49,85 +40,6 @@ const colours = (page: Page, text: string, ground: string) =>
 
 async function box(page: Page, selector: string) {
   return (await page.locator(selector).first().boundingBox())!;
-}
-
-for (const path of ["/privacy/"]) {
-  for (const viewport of VIEWPORTS) {
-    test(`${path} opens on its banner with the title readable in the first window (${viewport.width}px)`, async ({
-      page,
-    }) => {
-      await page.setViewportSize(viewport);
-      await page.goto(path);
-      const header = await box(page, ".site-header-bar");
-      const banner = await box(page, "[data-article-banner]");
-      // Under the header, full width, and most of the window on a desktop; shorter on a phone.
-      expect(Math.abs(banner.y - (header.y + header.height))).toBeLessThan(2);
-      expect(banner.width).toBeGreaterThanOrEqual(viewport.width - 1);
-      if (viewport.width > 900) expect(banner.height).toBeGreaterThan(viewport.height * 0.5);
-      else expect(banner.height).toBeLessThan(viewport.height * 0.62);
-
-      // The title and the date line are inside the first window, with no scrolling.
-      for (const selector of [".writing-head h1", ".writing-head .meta"]) {
-        const part = await box(page, selector);
-        expect(part.y).toBeGreaterThanOrEqual(header.y + header.height);
-        expect(part.y + part.height).toBeLessThanOrEqual(viewport.height);
-      }
-      // The panel rises over the banner's bottom edge, more on a wide screen than on a phone.
-      const panel = await box(page, ".writing-head .head-copy");
-      const overlap = banner.y + banner.height - panel.y;
-      expect(overlap).toBeGreaterThan(viewport.width > 900 ? 80 : 12);
-      expect(overlap).toBeLessThan(viewport.width > 900 ? 160 : 40);
-
-      // Read on the panel's own opaque ground: measured, at least 4.5:1.
-      for (const text of [".writing-head h1", ".writing-head .meta", ".writing-head .lede"]) {
-        const { fg, bg } = await colours(page, text, ".writing-head .head-copy");
-        expect(contrastOf(fg, bg), `${text} on the panel`).toBeGreaterThanOrEqual(4.5);
-      }
-      if (path === "/privacy/") {
-        // The caption in the night sky: its own ground, never the stars or the clouds.
-        const { fg, bg } = await colours(page, ".night-caption", ".night-caption");
-        expect(contrastOf(fg, bg)).toBeGreaterThanOrEqual(4.5);
-        const caption = await box(page, ".night-caption");
-        const dome = await box(page, ".dome-frame");
-        if (viewport.width > 900) expect(caption.x + caption.width).toBeLessThanOrEqual(dome.x);
-        else expect(caption.y + caption.height).toBeLessThanOrEqual(dome.y);
-        expect(caption.y + caption.height).toBeLessThanOrEqual(panel.y);
-      }
-      expect(
-        await page.evaluate(
-          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        ),
-      ).toBeLessThanOrEqual(0);
-    });
-  }
-
-  test(`${path}: the page rises over the pinned banner, and the meter and tree stay clear`, async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto(path);
-    await page.evaluate(() => {
-      document.documentElement.style.scrollBehavior = "auto";
-      const prose = document.querySelector<HTMLElement>("[data-prose]")!;
-      window.scrollTo(0, prose.getBoundingClientRect().top + window.scrollY + prose.offsetHeight / 3);
-    });
-    const header = await box(page, ".site-header-bar");
-    // The banner stays where it was, under the header, and the sheet covers it.
-    const banner = await box(page, "[data-article-banner]");
-    expect(Math.abs(banner.y - (header.y + header.height))).toBeLessThan(2);
-    const covered = await page.evaluate(
-      ({ x, y }) => !document.elementFromPoint(x, y)?.closest("[data-article-banner]"),
-      { x: 720, y: banner.y + banner.height / 2 },
-    );
-    expect(covered).toBe(true);
-    const meter = await box(page, "[data-read-progress]");
-    expect(Math.abs(meter.y - (header.y + header.height))).toBeLessThan(2);
-    await expect
-      .poll(() => page.locator("[data-read-progress]").getAttribute("aria-valuenow").then(Number))
-      .toBeGreaterThan(0);
-    const label = await box(page, "[data-toc] > p");
-    expect(label.y).toBeGreaterThanOrEqual(meter.y + meter.height + 8);
-  });
 }
 
 const POST_VIEWPORTS = [
