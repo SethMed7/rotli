@@ -284,6 +284,11 @@ export function figureMarkdown(figure: Figure): string {
 
 const FENCE = /^```figure[^\S\n]*\n([\s\S]*?)\n```[^\S\n]*$/gm;
 
+/** A post's Markdown without its figures: the prose a reading time counts. */
+export function withoutFigures(markdown: string): string {
+  return markdown.replace(FENCE, '');
+}
+
 /** A post's Markdown with every ```figure fence replaced by its Markdown reading (the twin). */
 export function figuresToMarkdown(markdown: string): string {
   return markdown.replace(FENCE, (_, body: string) => figureMarkdown(parseFigure(body)));

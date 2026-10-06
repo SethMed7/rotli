@@ -2,6 +2,7 @@
 // drafts and experiments appear only on the dev site (site.showsExperiments).
 // An entry with `status: coming-soon` is announced on its index but has no page.
 import { getCollection, type CollectionEntry } from 'astro:content';
+import { withoutFigures } from './figures';
 import { site } from './site';
 
 export type Writing = CollectionEntry<'writing'>;
@@ -36,8 +37,9 @@ export async function upcomingWriting(section: Writing['data']['section']): Prom
   return (await visibleWriting(section)).filter((entry) => entry.data.status === 'coming-soon');
 }
 
-/** About how long a piece takes to read, at 230 words a minute. */
+/** About how long a piece takes to read, at 230 words a minute (its prose; a figure's fence
+ * of settings and rows is not reading). */
 export function readingMinutes(entry: Writing): number {
-  const words = (entry.body ?? '').split(/\s+/).filter(Boolean).length;
+  const words = withoutFigures(entry.body ?? '').split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.round(words / 230));
 }

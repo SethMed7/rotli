@@ -29,6 +29,7 @@ let figures: {
   figureHtml(figure: Figure, id: string): string;
   figureMarkdown(figure: Figure): string;
   figuresToMarkdown(markdown: string): string;
+  withoutFigures(markdown: string): string;
   figureId(title: string, taken: Set<string>): string;
   scaleMax(figure: Figure): number;
   figurePlugin(): {
@@ -153,6 +154,15 @@ describe("a figure fence", () => {
     expect(figures.figuresToMarkdown(`\`\`\`figure\n${FLOW}\n\`\`\``)).toContain(
       "2. **The Librarian**: Files it. Either: Your plan (Claude Code or Codex), or A model on your Mac (No network).",
     );
+  });
+
+  test("a reading time counts the prose, not a figure's settings and rows", () => {
+    expect(
+      figures
+        .withoutFigures(`Before.\n\n\`\`\`figure\n${BAR}\n\`\`\`\n\nAfter.`)
+        .split(/\s+/)
+        .filter(Boolean),
+    ).toEqual(["Before.", "After."]);
   });
 
   test("a spec it can't read fails the build, saying why", () => {
