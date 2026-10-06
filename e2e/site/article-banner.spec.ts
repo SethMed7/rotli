@@ -3,9 +3,9 @@
 // title and date are in that first window at full contrast, and the page rising over the pinned
 // banner as it scrolls (the meter and the tree still pinned and clear of each other).
 // Blog posts open on their cover instead (WritingPage `article`, blog/ArticleCover.astro): the
-// scene contained at the page's width, rounded and still, with a card over its lower left on a
-// wide screen (author, date, title, summary, topics, contrast measured on the card's ground) and
-// the picture first, then the head, below 1100px.
+// scene across the article's columns, rounded and still, then the title, the summary, the meta
+// line, and the topics on the page's ground, nothing over the picture, the words on the reading
+// column's edge and "Blog /" on the rail's, contrast measured, the title in the first window.
 import { expect, test, type Page } from "@playwright/test";
 
 const POSTS = ["/blog/rotli-web-and-your-mac/", "/blog/the-ai-you-already-pay-for/"];
@@ -128,9 +128,20 @@ for (const path of ["/privacy/"]) {
   });
 }
 
+const POST_VIEWPORTS = [
+  { width: 1920, height: 1080 },
+  { width: 1440, height: 900 },
+  { width: 1280, height: 800 },
+  { width: 1024, height: 768 },
+  { width: 768, height: 1024 },
+  { width: 390, height: 844 },
+];
+
 for (const path of POSTS) {
-  for (const viewport of VIEWPORTS) {
-    test(`${path} opens on its contained cover and its card (${viewport.width}px)`, async ({ page }) => {
+  for (const viewport of POST_VIEWPORTS) {
+    test(`${path} opens on its picture, then its title, summary, and meta line (${viewport.width}px)`, async ({
+      page,
+    }) => {
       await page.setViewportSize(viewport);
       await page.goto(path);
       // No banner, no pinned picture: the cover sits inside the page's width.
@@ -151,42 +162,57 @@ for (const path of POSTS) {
         .toBe(true);
       expect((await img.getAttribute("alt"))?.length ?? 0).toBeGreaterThan(20);
 
-      // The card: the author, the date, the title, the summary, and the topics.
-      const card = page.locator(".head-card");
-      await expect(card.locator(".author")).toHaveText("Seth Medina");
-      await expect(card.locator(".byline")).toContainText("min read");
-      await expect(card.locator(".byline")).toContainText(/2026/);
-      await expect(card.getByRole("heading", { level: 1 })).toBeVisible();
-      await expect(card.locator(".lede")).toBeVisible();
-      expect(await card.getByRole("list", { name: "Topics" }).getByRole("listitem").count()).toBeGreaterThan(
+      // The head: title, then summary, then the meta line (author, date, reading time), then topics.
+      const head = page.locator("[data-article-cover] .head-copy");
+      await expect(head.locator(".author")).toHaveText("Seth Medina");
+      await expect(head.locator(".byline")).toContainText("min read");
+      await expect(head.locator(".byline")).toContainText(/2026/);
+      await expect(head.getByRole("heading", { level: 1 })).toBeVisible();
+      await expect(head.locator(".lede")).toBeVisible();
+      expect(await head.getByRole("list", { name: "Topics" }).getByRole("listitem").count()).toBeGreaterThan(
         0,
       );
+      const [title, lede, byline, tags] = await Promise.all(
+        ["h1", ".lede", ".byline", ".tags"].map((selector) =>
+          box(page, `[data-article-cover] .head-copy ${selector}`),
+        ),
+      );
+      expect(lede!.y).toBeGreaterThanOrEqual(title!.y + title!.height - 1);
+      expect(byline!.y).toBeGreaterThanOrEqual(lede!.y + lede!.height - 1);
+      expect(tags!.y).toBeGreaterThanOrEqual(byline!.y + byline!.height - 1);
+      // The type steps down: title, summary, meta.
+      const size = (selector: string) =>
+        page
+          .locator(`[data-article-cover] .head-copy ${selector}`)
+          .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+      expect(await size("h1")).toBeGreaterThan(await size(".lede"));
+      expect(await size(".lede")).toBeGreaterThan(await size(".byline"));
 
-      const cardBox = await box(page, ".head-card");
-      if (viewport.width > 1100) {
-        // Over the picture's lower edge, from the left, leaving the quokka's half clear.
-        const overlap = art.y + art.height - cardBox.y;
-        expect(overlap).toBeGreaterThan(48);
-        expect(overlap).toBeLessThan(140);
-        expect(cardBox.x).toBeGreaterThan(art.x);
-        expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(art.x + art.width * 0.62);
-      } else {
-        // The picture first, then the head.
-        expect(cardBox.y).toBeGreaterThanOrEqual(art.y + art.height);
+      // Nothing over the picture: the words start below it, at every width.
+      const copy = await box(page, "[data-article-cover] .head-copy");
+      expect(copy.y).toBeGreaterThanOrEqual(art.y + art.height);
+      // The title is in the first window.
+      expect(title!.y + title!.height).toBeLessThanOrEqual(viewport.height);
+
+      if (viewport.width > 900) {
+        // On the article's tracks: the words on the reading column's edge, "Blog /" on the rail's,
+        // the picture across the columns.
+        const prose = await box(page, "[data-prose]");
+        const rail = await box(page, "[data-article-rail]");
+        expect(Math.abs(copy.x - prose.x)).toBeLessThan(1.5);
+        expect(Math.abs((await box(page, "[data-article-cover] .crumbs")).x - rail.x)).toBeLessThan(1.5);
+        expect(Math.abs(art.x - rail.x)).toBeLessThan(1.5);
+        if (viewport.width >= 1280) {
+          const aside = await box(page, "[data-article-more]");
+          expect(Math.abs(art.x + art.width - (aside.x + aside.width))).toBeLessThan(1.5);
+        }
       }
-      // The byline and the title are in the first window.
-      for (const selector of [".head-card .byline", ".head-card h1"]) {
-        const part = await box(page, selector);
-        expect(part.y + part.height).toBeLessThanOrEqual(viewport.height);
+
+      // Read on the page's own ground: measured, at least 4.5:1, topics included.
+      for (const text of ["h1", ".byline", ".lede", ".author", ".tags li"]) {
+        const { fg, bg } = await colours(page, `[data-article-cover] .head-copy ${text}`, "body");
+        expect(contrastOf(fg, bg), text).toBeGreaterThanOrEqual(4.5);
       }
-      // Read on the card's own opaque ground (the page's, below 1100px): measured, at least 4.5:1.
-      const ground = viewport.width > 1100 ? ".head-card" : "body";
-      for (const text of [".head-card h1", ".head-card .byline", ".head-card .lede", ".head-card .author"]) {
-        const { fg, bg } = await colours(page, text, ground);
-        expect(contrastOf(fg, bg), `${text}`).toBeGreaterThanOrEqual(4.5);
-      }
-      const tag = await colours(page, ".head-card .tags li", ".head-card .tags li");
-      expect(contrastOf(tag.fg, tag.bg)).toBeGreaterThanOrEqual(4.5);
       expect(
         await page.evaluate(
           () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
