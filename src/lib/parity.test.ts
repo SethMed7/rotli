@@ -29,7 +29,7 @@ import { BOARD_LANE, EMPTY_BOARD_FILE } from "../services/folderBoards";
 import { TEMPLATES_BRAIN_FOLDER } from "../services/templates";
 import { VIEW_FOLDER_FORBIDDEN_CHARS } from "../services/viewTree";
 import { SHEET_EDIT_MAX_BYTES } from "../sheets/kinds";
-import { AI_CREATORS, type AiBodyEdit, bodyEdit } from "./aiEditPolicy";
+import { AI_CREATORS, type AiBodyEdit, bodyEdit, consentedInsertRefusal } from "./aiEditPolicy";
 import { CHAT_IMAGE_ASSET_EXTS, CHAT_IMAGE_ASSET_MAX_BYTES } from "./chatWork";
 import { VIDEO_EXTS } from "./fileKind";
 import { PEOPLE_AREA } from "./librarianActions";
@@ -78,6 +78,12 @@ describe("parity.json ↔ TS constants", () => {
   test("aiBodyEditCases", () => {
     for (const c of entries.aiBodyEditCases.value) {
       expect(bodyEdit(c.fields)).toBe(c.verdict as AiBodyEdit);
+    }
+  });
+
+  test("consentedInsertCases", () => {
+    for (const c of entries.consentedInsertCases.value) {
+      expect(consentedInsertRefusal(bodyEdit(c.fields)) !== null).toBe(c.refused);
     }
   });
 

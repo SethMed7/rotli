@@ -3,12 +3,12 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import { dispatch } from "../keys/registry";
 import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import { type MenuSpec, useContextMenu } from "../state/contextMenu";
-import { availableNewItems } from "./model";
+import { availableNewItems, withBetaLabel } from "./model";
 
 export function newItemMenuItems(): MenuSpec[] {
   return availableNewItems(LAUNCH_FEATURES).map((item) => ({
     kind: "action" as const,
-    label: item.label,
+    label: withBetaLabel(item.label, item.kind),
     onClick: () =>
       dispatch(
         item.kind === "board" ? "boards.new" : `items.new${item.kind[0]!.toUpperCase()}${item.kind.slice(1)}`,

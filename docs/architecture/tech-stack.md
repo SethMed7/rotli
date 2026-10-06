@@ -53,6 +53,7 @@ Interaction and visual law is [`../../DESIGN.md`](../../DESIGN.md).
 | DOCX and sheets | Univer presets (docs core, docs drawing, sheets core) | `src/documents/`, `src/sheets/` |
 | Spreadsheet and archive I/O | exceljs, jszip | `src/documents/codec/`, `src/sheets/engine/` |
 | Math, diagrams, graphs | KaTeX, Mermaid 11, JSXGraph | `src/editor/`, render layer |
+| Charts (the ```` ```chart ```` fence) | TanStack Charts 1.0 (SVG, pinned exact) | `src/editor/chartRender.ts` only |
 | Syntax trees and highlighting | Lezer common and highlight | `src/editor/` |
 
 Every vendor enters through one adapter listed in `vendorSeams`

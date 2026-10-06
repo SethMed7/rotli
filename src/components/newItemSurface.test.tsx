@@ -21,14 +21,16 @@ test("withheld kinds keep their slot but lose their digit, in both channels", ()
   expect(web.find((card) => card.kind === "board")).toMatchObject({ digit: "6", comingSoon: false });
 });
 
-test("the stable chooser renders Sheet and Mermaid diagram as disabled coming-soon cards", () => {
+test("the stable chooser offers Sheet and Document as Beta and Mermaid diagram as coming soon", () => {
   // bun test compiles as the stable channel
   const markup = renderToStaticMarkup(<NewItemSurface paneId="p" tabId="t" />);
   const soon = markup.match(/<button[^>]*ni-card-soon[^>]*>/g) ?? [];
-  expect(soon.length).toBe(2);
+  expect(soon.length).toBe(1);
   expect(soon.every((button) => button.includes('aria-disabled="true"'))).toBe(true);
-  expect(markup.includes("New Sheet — Coming soon — not in this release yet")).toBe(true);
   expect(markup.includes("New Mermaid diagram — Coming soon")).toBe(true);
+  expect(markup.includes("New Sheet, Beta (press 5)")).toBe(true);
+  expect(markup.includes("New Document, Beta (press 4)")).toBe(true);
   expect(markup.includes("New Board (press 6)")).toBe(true);
-  expect(markup.includes("press 5")).toBe(false);
+  // one Beta mark per Beta card, none on Markdown, Board, or a coming-soon card
+  expect(markup.match(/class="beta-badge"/g)?.length).toBe(2);
 });

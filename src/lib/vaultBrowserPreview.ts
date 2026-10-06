@@ -1,26 +1,16 @@
-export interface VaultBrowserEntry {
-  name: string;
-}
-
-export interface VaultBrowserView {
-  absolutePath: string;
-  displayPath: string;
-  homePath: string;
-  directories: VaultBrowserEntry[];
-  canGoBack: boolean;
-  canSelect: boolean;
-  selectDisabledReason: string | null;
-}
+// The browser twin's stand-in for the macOS folder panel (the twin has no
+// filesystem). A pick is a fresh empty folder under the example Home, so setup
+// can be walked end to end; folders it made read as empty until a vault is
+// created there.
 
 export const browserEmptyFolders = new Set<string>();
-export const browserVaultHome: VaultBrowserView = {
-  absolutePath: "/Users/example",
-  displayPath: "~",
-  homePath: "/Users/example",
-  directories: ["Applications", "Desktop", "Documents", "Downloads", "Library"].map((name) => ({ name })),
-  canGoBack: false,
-  canSelect: false,
-  selectDisabledReason:
-    "Choose or create a folder inside Home. Home itself includes private app and credential data.",
-};
-export const browserVaultPreview = { view: browserVaultHome };
+
+let picks = 0;
+
+/** What the twin's folder panel returns: a new, empty folder. */
+export function browserPickFolder(): string {
+  picks += 1;
+  const path = `/Users/example/Rotli Vault ${picks}`;
+  browserEmptyFolders.add(path);
+  return path;
+}

@@ -7,13 +7,13 @@
 
 import { looksSecret } from "./guard";
 import refinePrompt from "./prompts/handToAiRefine.md?raw";
+import { modelFailure, promptAsset, stripThinking } from "./replyText";
 import type { CompleteReq, Host } from "./types";
 
-const HEADER = /^version:\s*(\d+)\s*\n/;
-
+const ASSET = promptAsset(refinePrompt);
 /** The asset's `version:` line. Bump it whenever the instructions change. */
-export const HAND_TO_AI_REFINE_VERSION = Number(HEADER.exec(refinePrompt)?.[1] ?? Number.NaN);
-const SYSTEM = refinePrompt.replace(HEADER, "").trim();
+export const HAND_TO_AI_REFINE_VERSION = ASSET.version;
+const SYSTEM = ASSET.system;
 
 /** A reply can't be shorter than a task line, and a runaway reply is not a prompt. */
 const MIN_CHARS = 40;
@@ -53,7 +53,7 @@ export function keepsPath(text: string, path: string): boolean {
  * a whole token, character for character, becomes the prompt. A thinking block or one fence around the whole reply is
  * unwrapped; anything else is taken as written. */
 export function parseRefinedReply(raw: string, basic: string, paths: readonly string[]): RefineVerdict {
-  let text = raw.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  let text = stripThinking(raw);
   const fenced = /^(```|~~~)[\w-]*\n([\s\S]*?)\n\1$/.exec(text);
   if (fenced?.[2]) text = fenced[2].trim();
   if (text.length < MIN_CHARS) return { ok: false, reason: "The model's answer was empty." };
@@ -91,10 +91,6 @@ export async function refineHandoff(
   try {
     return parseRefinedReply(await host.complete(request), basic, paths);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return {
-      ok: false,
-      reason: message ? `The model couldn't answer: ${message}` : "The model couldn't answer.",
-    };
+    return { ok: false, reason: modelFailure(error) };
   }
 }

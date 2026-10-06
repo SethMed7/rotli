@@ -25,11 +25,16 @@ export type SlashOp =
   | { kind: "table" }
   | { kind: "divider" }
   | { kind: "fence"; lang: "" | "math" | "mermaid" }
+  /** Opens the chart picker; the chosen kind's starter fence lands and its
+   * Edit form opens (SYNTAX.md). */
+  | { kind: "chart" }
   | { kind: "picker"; mode: SlashPickerMode }
   /** Opens Finder and inserts copied vault image assets at this position. */
   | { kind: "attachImage" }
   /** Opens the AI image popover (engine + prompt) — the maintainer, 2026-08-04. */
   | { kind: "imageGen" }
+  /** Ask AI: a request at the cursor, the answer inserted only on Insert (2026-10-05). */
+  | { kind: "ai" }
   /** Swaps the format bar for the Librarian bar (2026-09-28). */
   | { kind: "librarian" }
   /** Opens Hand to AI's prompt for this note (2026-09-28). */

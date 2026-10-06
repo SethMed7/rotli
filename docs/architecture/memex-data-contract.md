@@ -200,6 +200,13 @@ second user-visible product or storage location.
   acknowledge the attempt; failure or timeout cancels exit/restart and restores
   the main window with an error. Forced process/OS termination can still lose
   unsaved in-memory debounce work; no durable draft journal exists yet.
+- A sheet's unsaved edits are written when the window hides and at quit; a
+  background save that fails says why. Edits parked from an earlier session
+  whose file changed on disk since are never written over the newer file and
+  never dropped silently: the sheet opens the version on disk and offers
+  **Save my edits as a copy** (a new `.xlsx` in the managed lane; edits set
+  aside by more than one conflict each get their own copy, never overwritten)
+  or **Discard my edits**.
 
 ## Editing capabilities
 
@@ -227,6 +234,13 @@ second user-visible product or storage location.
   final layout. The secondary `Convert copy to Excalidraw…` action creates a new
   user-owned `.excalidraw` file in the active creation context and leaves the
   Mermaid fence unchanged.
+- A Markdown `chart` fence owns its chart as plain text (SYNTAX.md): options,
+  a blank line, then comma-separated rows. `/chart` opens a list of ten kinds;
+  the chosen kind's starter lands and opens its Edit form. Apply replaces only the fence body,
+  in the canonical form, after the same stale-source guard as Mermaid. A chart
+  Rotli can't read fails closed with its reason and its source and is never
+  rewritten. The renderer (TanStack Charts) sits behind one adapter
+  (`src/editor/chartRender.ts`), so it can be replaced without touching a note.
 - Documents are conventional DOCX files. They do not host Markdown slash
   commands or embed syntax. Rotli creates and edits them locally through a
   structured document model, including native Word tables. The DOCX codec
@@ -330,6 +344,16 @@ second user-visible product or storage location.
   both attached to the originating assistant turn. Rust keeps both in the same
   registered root and refuses secure, secret-shaped, locked, read-only, or
   oversized sources before invoking the local macOS renderer.
+- An attached image is referenced where it was attached: attaching (picker,
+  drop, or a pasted screenshot, which is image bytes with no text) types its
+  `[Image #n]` tag at the composer's caret, or at the end when the composer
+  isn't focused. Removing its thumbnail removes the tag and numbers the later
+  ones down. On send each tag becomes the image's portable link in place (the
+  tag followed by its `storage:` target); an untagged image leads the message.
+  A sent message draws each tag as a chip with the image, its vault file name,
+  and its size when the vault can say. Rotli Web resolves the image in the
+  connected folder. It never attaches one to a chat: Rotli Helper carries text
+  only, so the picker and a paste say that sending images needs the Mac app.
 - Unsent chat title, text, and image attachments are session state owned by the
   stable tab id. Switching tabs or temporarily unmounting a chat surface never
   clears that draft; sending it does. The first successful save binds the
@@ -854,7 +878,7 @@ but it must remain rebuildable, optional, and behind the retrieval port.
 - **Connect vault refuses no folder.** The switcher's Connect creates a vault in
   an empty folder, links an existing vault as a switch target, and opens any
   other folder (Markdown, Obsidian, ZenNotes) in place without a marker, the
-  same as onboarding's "Open an existing folder". An open plain folder is still
+  same as picking a folder that already holds notes in setup. An open plain folder is still
   the switcher's current row and names its header.
 - **A vault may be raw** (vault-vs-brain, 2026-07-26): the per-vault
   `brainEnabled` setting (missing ⇒ on) turns the Librarian layer off entirely.

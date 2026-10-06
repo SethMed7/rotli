@@ -47,7 +47,6 @@ import { findHighlight, passageHighlight, setFindMarks, setPassageMark } from ".
 import { fmBlock } from "./fmBlock";
 import { focusDim } from "./focusMode";
 import { headingFolding, toggleHeadingFold } from "./headingFold";
-import { ImageGenPopover } from "./imageGenPopover";
 import { linkOpener } from "./linkOpener";
 import { listNumbering } from "./listNumbers";
 import { livePreview, noteIdFacet } from "./livePreview";
@@ -55,6 +54,7 @@ import { markSelectionSpec } from "./markSelection";
 import { ensureDocument, getDocumentText, onDocumentChange, setDocumentText } from "./model";
 import { rawMarkdown } from "./rawMarkdown";
 import { opensFlow, pickerFence, slashInsertion } from "./slashActions";
+import { SlashInsertPopover, insertAtSlashPoint } from "./slashInsertPopover";
 import {
   adaptSlashInsertion,
   filterSlashItems,
@@ -470,9 +470,10 @@ function CmEditorImpl({
           openSlashPanel(item.op.kind, paneId, noteId);
           return;
         }
-        if (item.op.kind === "imageGen") {
+        if (item.op.kind === "imageGen" || item.op.kind === "ai" || item.op.kind === "chart") {
           setSlash((s) => ({ ...s, open: false }));
-          setImageGen({ insertAt: contentFrom, continuation: span.continuation, left, top, up });
+          const kind = item.op.kind;
+          setImageGen({ kind, insertAt: contentFrom, continuation: span.continuation, left, top, up });
           return;
         }
         if (item.op.kind === "picker")
@@ -868,19 +869,13 @@ function CmEditorImpl({
           className={imageGen.up ? "rotli-slash-anchor up" : "rotli-slash-anchor"}
           style={{ left: imageGen.left, top: imageGen.top }}
         >
-          <ImageGenPopover
+          <SlashInsertPopover
+            state={imageGen}
+            noteId={noteId}
+            view={() => viewRef.current}
             onDone={(markdown) => {
-              const view = viewRef.current;
-              const at = imageGen.insertAt;
               setImageGen(null);
-              if (!view) return;
-              const clamped = Math.min(at, view.state.doc.length);
-              const adapted = adaptSlashInsertion(markdown, markdown.length, imageGen.continuation);
-              view.dispatch({
-                changes: { from: clamped, to: clamped, insert: adapted.insert },
-                selection: EditorSelection.cursor(clamped + adapted.caret),
-              });
-              view.focus();
+              insertAtSlashPoint(viewRef.current, imageGen.insertAt, imageGen.continuation, markdown);
             }}
             onClose={() => {
               setImageGen(null);

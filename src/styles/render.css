@@ -1209,3 +1209,125 @@
     animation: none;
   }
 }
+
+/* ── the ```chart fence (2026-10-05, SYNTAX.md) ─────────────────────────────
+   TanStack Charts paints with currentColor and the --ts-chart-n palette, so
+   the theme's semantic tokens tune every chart in every environment. */
+.rotli-render-chart {
+  width: 100%;
+  color: var(--text);
+  --ts-chart-1: var(--accent);
+  --ts-chart-2: var(--accent-swatch-blue);
+  --ts-chart-3: var(--success);
+  --ts-chart-4: var(--accent-swatch-orange);
+  --ts-chart-5: var(--accent-swatch-violet);
+  --ts-chart-6: var(--accent-swatch-cyan);
+}
+.rotli-render-chart-title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.rotli-render-chart-canvas {
+  width: 100%;
+  min-height: 260px;
+}
+.rotli-render-chart-refused pre {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+/* the Edit form under a chart: the same surface voice as the table editor */
+.chart-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-inner);
+  font-size: 12.5px;
+}
+.chart-form-head,
+.chart-form-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.chart-form-spacer {
+  flex: 1 1 auto;
+}
+.chart-form-select,
+.chart-form-input {
+  min-width: 0;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  padding: 3px 6px;
+}
+.chart-form-head .chart-form-input {
+  flex: 1 1 10rem;
+}
+.chart-form-head .chart-form-unit {
+  flex: 0 1 6rem;
+}
+.chart-form-grid {
+  border-collapse: collapse;
+  align-self: flex-start;
+}
+.chart-form {
+  overflow-x: auto;
+}
+.chart-form-grid th,
+.chart-form-grid td {
+  padding: 2px;
+  white-space: nowrap;
+}
+.chart-form-grid .chart-form-input {
+  width: 7rem;
+}
+.chart-form-grid th .chart-form-input {
+  font-weight: 600;
+}
+.chart-form-btn {
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--tint);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  padding: 2px 10px;
+  cursor: pointer;
+}
+.chart-form-apply {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.chart-form-select:focus-visible,
+.chart-form-input:focus-visible,
+.chart-form-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.chart-form-status {
+  margin: 0;
+  min-height: 1em;
+  color: var(--failure);
+}
+.chart-form-status:empty {
+  display: none;
+}

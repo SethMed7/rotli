@@ -74,11 +74,8 @@ test("nothing sounds during setup; afterward the player waits for Play", async (
   // no corner player anywhere in setup
   await expect(page.getByRole("region", { name: "Now playing" })).toHaveCount(0);
   await page.getByRole("button", { name: "Choose where notes live" }).click();
-  await page.getByRole("button", { name: "Choose an empty folder" }).click();
-  await page.getByRole("button", { name: "New folder", exact: true }).click();
-  await page.getByLabel("New folder name").fill("Music Vault");
-  await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
+  // the macOS folder panel; the twin picks a fresh empty folder
+  await page.getByRole("button", { name: "Choose a folder" }).click();
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Finish setup" }).click();
   // the player is there, quiet, until the person presses Play

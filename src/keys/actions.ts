@@ -24,7 +24,7 @@ import {
   createManagedItemInTabOptimistically,
   requestNamedItemCreation,
 } from "../newItems/composition";
-import { type NewItemKind, isNameFirstKind, isNewItemAvailable } from "../newItems/model";
+import { type NewItemKind, isNameFirstKind, isNewItemAvailable, withBetaLabel } from "../newItems/model";
 import { openChatForNoteId } from "../noteChat/composition";
 import { summonChat } from "../services/chatSummon";
 import { focusChatWindow } from "../services/chatWindowShell";
@@ -369,7 +369,7 @@ export function registerDefaultActions(): void {
     if (!isNewItemAvailable(kind, LAUNCH_FEATURES)) continue;
     registerAction({
       id,
-      title,
+      title: withBetaLabel(title, kind),
       defaultChord: null,
       run: () => {
         if (useUiStore.getState().sidebarMode !== "breve") runCreate(kind, true);

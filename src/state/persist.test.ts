@@ -257,10 +257,12 @@ describe("parseSettings — creation and Brain model", () => {
     expect(parseSettings('{"newTabDefault":"document"}').newTabDefault).toBe("document");
     expect(parseSettings('{"newTabDefault":"database"}').newTabDefault).toBe("markdown");
     // tests run as the stable channel: withheld kinds and voice never load as on
-    expect(parseSettings('{"newTabDefault":"sheet","readAloud":true}')).toMatchObject({
+    expect(parseSettings('{"newTabDefault":"mermaid","readAloud":true}')).toMatchObject({
       newTabDefault: "markdown",
       readAloud: false,
     });
+    // Sheets ship on the stable desktop channel as Beta (2026-10-05)
+    expect(parseSettings('{"newTabDefault":"sheet"}').newTabDefault).toBe("sheet");
   });
 
   test("tab layout defaults to scroll and only accepts the two visible modes", () => {

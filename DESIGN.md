@@ -320,6 +320,15 @@ destructive states, plus narrow-window behavior. Long content, missing content,
 keyboard-only navigation, and focus recovery are normal cases rather than
 polish work.
 
+A capability that ships but is still being finished wears one **Beta** mark,
+defined once (`beta` on its `NEW_ITEM_DEFINITIONS` entry). Where it is offered
+or open (a New chooser card, the open file's header), the mark is the shared
+`BetaBadge`: a calm pill (muted text on a hairline, never accent), next to
+the name and never inside another badge. Text-only surfaces (a menu row, a
+select option, a palette title, a slash hint) append ` · Beta`. A coming-soon
+card or a read-only view does not wear it. Sheets (XLSX and CSV) and DOCX
+documents, both on Univer, are Beta.
+
 ## Chat artifacts
 
 - Creating an image, board, document, or other artifact leaves the conversation
@@ -394,8 +403,12 @@ polish work.
   naming what else is there.
   Everything else waits where it is used: the window behavior and the quokka's
   look in Settings, music in the sidebar player (shown from the first run,
-  quiet until Play), and chat models the first time Chat has none. Skipping
-  the first screen still lands on the vault decision. A successful vault
+  quiet until Play), and chat models the first time Chat has none. A vault is
+  the only required step (the owner, 2026-10-05): **Skip setup** on the first
+  screen keeps the defaults and goes to the vault screen ("One thing before
+  you start"), and once a folder is picked the app opens with no Librarian or
+  shortcuts screen; on the screens after the vault, **Skip the rest** finishes
+  setup with what is chosen so far. A successful vault
   switch keeps the native shell alive and rebinds vault-owned state in place,
   so the machine-level checkpoint resumes on the Librarian instead of
   repeating or silently finishing setup.
@@ -424,17 +437,17 @@ polish work.
   user's selection; only the isolated development vault binding does, so setup
   never offers to keep the borrowed vault, and opening it moves setup on only
   once a vault is really recorded. A configured installation can explicitly
-  keep its current vault, create a tagged Rotli vault, or open an existing
-  folder. Outside setup, creating a vault asks about the Librarian on the same
-  screen; in setup the Librarian screen does.
-- Vault selection opens Rotli's flat, directory-only navigator at the user's
-  Home folder (`~`, with the absolute `/Users/…` path visible). It lists visible
-  direct-child directories, supports arrow navigation, Enter, Backspace, Esc,
-  refresh, and new-folder creation, and never makes Home itself selectable as a
-  vault because Home contains private credential and application state. Desktop
-  and ordinary folders beneath Home remain valid. Finder is an explicit reveal
-  action; **More locations…** is the deliberate native-picker fallback for
-  external volumes and locations outside the contained Home session.
+  keep its current vault. Outside setup, creating a vault asks about the
+  Librarian on the same screen; in setup the Librarian screen does.
+- Every vault choice (setup, Settings → Location, the sidebar's Connect) is
+  the macOS folder panel, never an in-app browser (the owner, 2026-10-05:
+  "people know exactly what to do"). One button, **Choose a folder**; New
+  Folder in the panel makes a fresh vault. The folder decides what happens: an
+  empty one becomes a Rotli vault, one that already holds notes (Markdown,
+  Obsidian, ZenNotes, an existing vault) is used in place with only a hidden
+  `.rotli` folder. Rust authorizes the pick and refuses Home itself, its
+  ancestors, and private subtrees (`.ssh`, Keychains, …), because Home holds
+  credential and application state.
 - Chat's model chooser (the first time Chat has no model that can answer)
   distinguishes on-device installs from connected subscription CLIs. Installing or connecting is always explicit, connected lanes are named
   as remote, unavailable CLIs show actionable setup guidance, and the user can

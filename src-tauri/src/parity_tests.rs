@@ -346,6 +346,18 @@ fn ai_body_edit_cases_match_fixture() {
     }
 }
 
+#[test]
+fn consented_insert_cases_match_fixture() {
+    for case in entry("consentedInsertCases").as_array().expect("cases") {
+        let fields = string_list(&case["fields"]);
+        assert_eq!(
+            crate::ai_edit_policy::consented_insert_refusal(&fields).is_some(),
+            case["refused"].as_bool().unwrap(),
+            "{case}"
+        );
+    }
+}
+
 /// A note's date stamps read and write alike in the Mac app and Rotli Web
 /// (docs/architecture/memex-data-contract.md, "Metadata ownership").
 /// `localMidnight` is each side's own zone, so here it is the no-file reading:

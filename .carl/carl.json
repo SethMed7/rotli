@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_modified": "2026-09-22T19:48:49.757Z",
+  "last_modified": "2026-10-05T22:25:03.344Z",
   "config": {
     "devmode": false,
     "post_compact_gate": true,
@@ -722,6 +722,15 @@
       "rationale": "2026-09-22 the owner reversed the helper's 'no vault access' threat model so Zen/Firefox write real files, required a vault on the web, and made privacy (nothing leaves the computer) the top rule. Contract: docs/architecture/web-vault-connection.md.",
       "source": "docs/architecture/web-vault-connection.md",
       "proposed_at": "2026-09-22T19:48:49.756Z",
+      "status": "pending"
+    },
+    {
+      "id": "stg-010",
+      "proposed_domain": "ROTLI_MODELS",
+      "rule_text": "Model CLASS decides data access, derived from endpoint + provider registry, never an asserted flag. On-device models may see secure notes; a frontier model never may. Class buys VISIBILITY only: no class edits a locked note. Every AI body write rides the AI write lane: corpus_write_ai (replace, under the ai_edit grant) or corpus_insert_ai (Ask AI: only adds a passage the person accepted; skips the default grant, never a lock or ai_edit: false; journaled inline). Headless agents count as remote.",
+      "rationale": "2026-10-05 the owner chose consented insertion for /ai. Rule 2 says every AI write rides corpus_write_ai; the insert lane is a second, narrower entry to the same write path (corpus_ai_edit.rs, AiWrite::Insert), so the summary should name it and its limits.",
+      "source": "docs/design/ai-visibility-matrix.md",
+      "proposed_at": "2026-10-05T22:25:03.343Z",
       "status": "pending"
     }
   ]

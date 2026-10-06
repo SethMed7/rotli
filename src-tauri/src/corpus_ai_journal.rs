@@ -32,7 +32,8 @@ pub(crate) const REVERTED: &str = "reverted";
 
 /// Who made a body edit, recorded on its journal row.
 pub(crate) struct AiEditor<'a> {
-    /// `chat` (the in-app chat and its memory) or `agent` (CLI/MCP/relay).
+    /// `chat` (the in-app chat and its memory), `inline` (a `/ai` insertion
+    /// the person accepted), or `agent` (CLI/MCP/relay).
     pub actor: &'a str,
     /// The MCP client's name for an agent; none for the chat.
     pub agent: Option<String>,
@@ -47,6 +48,12 @@ impl<'a> AiEditor<'a> {
     pub(crate) fn chat(model_is_local: bool) -> Self {
         let lane = if model_is_local { "on-device" } else { "remote" };
         AiEditor { actor: "chat", agent: None, lane, undo_of: None }
+    }
+
+    /// A `/ai` insertion the person read and accepted in the editor.
+    pub(crate) fn inline(model_is_local: bool) -> Self {
+        let lane = if model_is_local { "on-device" } else { "remote" };
+        AiEditor { actor: "inline", agent: None, lane, undo_of: None }
     }
 
     /// An external agent (CLI, MCP, relay), named by its MCP client.

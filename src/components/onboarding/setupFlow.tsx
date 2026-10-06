@@ -27,6 +27,10 @@ export function useSetupFront(onboardingActive: boolean, native: boolean): React
   const [vaultPending, setVaultPending] = useState(false);
   // back from a later screen keeps what was chosen (no intro, no reset)
   const [resumed, setResumed] = useState(false);
+  // Skip (the owner, 2026-10-05): "only required thing is a vault" — after it
+  // the app opens, with every other choice at its default
+  const [skipping, setSkipping] = useState(false);
+  const finish = () => finishFirstRun(APP_VERSION);
   const go = (next: OnboardingPhase, back = false) => {
     setResumed(back);
     useUiStore.getState().setOnboardingPhase(next);
@@ -40,7 +44,17 @@ export function useSetupFront(onboardingActive: boolean, native: boolean): React
   );
 
   if (onboardingActive && phase === "preferences") {
-    return screen(<Onboarding step="you" resumed={resumed} onDone={() => go("vault")} />);
+    return screen(
+      <Onboarding
+        step="you"
+        resumed={resumed}
+        onDone={() => go("vault")}
+        onSkip={() => {
+          setSkipping(true);
+          go("vault");
+        }}
+      />,
+    );
   }
 
   const vaultUnconfigured = native && vaultStatus === "unconfigured" && !onboardingActive;
@@ -48,12 +62,14 @@ export function useSetupFront(onboardingActive: boolean, native: boolean): React
     return screen(
       <VaultActivation
         onboarding={onboardingActive}
+        skipping={skipping}
         allowCurrent={vaultStatus === "configured"}
         {...(onboardingActive
           ? {
               onBack: () => go("preferences", true),
               onDone: () => {
                 setVaultPending(false);
+                if (skipping) return finish();
                 useUiStore.getState().setOnboardingPhase("librarian");
                 return flushSettingsNow();
               },
@@ -75,16 +91,17 @@ export function useSetupFront(onboardingActive: boolean, native: boolean): React
 
   if (onboardingActive && phase === "librarian") {
     return screen(
-      <Onboarding step="librarian" onBack={() => go("vault", true)} onDone={() => go("shortcuts")} />,
+      <Onboarding
+        step="librarian"
+        onBack={() => go("vault", true)}
+        onDone={() => go("shortcuts")}
+        onSkip={finish}
+      />,
     );
   }
   if (onboardingActive && phase === "shortcuts") {
     return screen(
-      <Onboarding
-        step="shortcuts"
-        onBack={() => go("librarian", true)}
-        onDone={() => finishFirstRun(APP_VERSION)}
-      />,
+      <Onboarding step="shortcuts" onBack={() => go("librarian", true)} onDone={finish} onSkip={finish} />,
     );
   }
   return null;

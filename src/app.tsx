@@ -31,7 +31,6 @@ import { RenameDialog } from "./components/renameDialog";
 import { BoardNameDialog } from "./components/boardNameDialog";
 import { Titlebar } from "./components/titlebar";
 import { WhichKey } from "./components/whichKey";
-import { VaultFolderBrowser } from "./components/vaultFolderBrowserDialog";
 import { AppOpening } from "./components/onboarding/appOpening";
 import { PinPanel } from "./components/pinnedSites/pinPanel";
 import { WebVaultOverlays } from "./components/onboarding/webVaultOverlays";
@@ -485,7 +484,6 @@ export default function App() {
   return (
     <>
       <MainShell />
-      <VaultFolderBrowser />
       {isWebVault() && <WebVaultOverlays />}
       {isWebVault() && <WebChatSetupDialog />}
     </>

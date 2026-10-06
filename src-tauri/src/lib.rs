@@ -65,7 +65,6 @@ mod search_index; mod search_match;
 mod secret;
 mod spellcheck;
 mod usage;
-mod vault_browser;
 mod vault_location;
 mod web;
 mod web_page;
@@ -2255,7 +2254,6 @@ pub fn run() {
         .manage(corpus::ImportAuthorizations::default())
         .manage(pasteboard::PasteboardGrants::default())
         .manage(memex::FolderAuthorizations::default())
-        .manage(vault_browser::VaultBrowserState::default())
         .manage(provider::ProviderState::default())
         .manage(claude_session::SessionState::default())
         .manage(localmodel::LocalModelState::default())
@@ -2287,15 +2285,6 @@ pub fn run() {
             hide_chat_window,
             hide_quick_window,
             corpus_reveal,
-            vault_browser::vault_browser_start,
-            vault_browser::vault_browser_open_child,
-            vault_browser::vault_browser_go_back,
-            vault_browser::vault_browser_refresh,
-            vault_browser::vault_browser_create_folder,
-            vault_browser::vault_browser_select,
-            vault_browser::vault_browser_select_child,
-            vault_browser::vault_browser_cancel,
-            vault_browser::vault_browser_reveal,
             corpus_add_folder,
             corpus_forget_folder,
             corpus_list_config,
@@ -2374,6 +2363,7 @@ pub fn run() {
             corpus::corpus_search_ai,
             corpus::corpus_notes_ai,
             corpus::corpus_write_ai,
+            corpus::ai_edit::corpus_insert_ai,
             corpus::corpus_write,
             corpus::corpus_create,
             corpus::corpus_delete,

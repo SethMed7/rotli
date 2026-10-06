@@ -5,15 +5,9 @@
 
 import { describe, expect, test } from "bun:test";
 
+import { formatBytes } from "../lib/formatBytes";
 import type { FileStat } from "../lib/tauri";
-import {
-  deriveSheetFacts,
-  describeShape,
-  formatBytes,
-  formatStamp,
-  sheetFormatLabel,
-  sizeLine,
-} from "./facts";
+import { deriveSheetFacts, describeShape, formatStamp, sheetFormatLabel, sizeLine } from "./facts";
 import type { SheetTable } from "./view";
 
 const table = (over: Partial<SheetTable>): SheetTable => ({

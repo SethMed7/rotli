@@ -58,20 +58,16 @@ describe("statusFor — enriched, safe live labels", () => {
   });
 });
 
-test("a build without sheets refuses a workbook artifact before the host runs", async () => {
-  // bun test compiles as the stable channel
+test("the stable desktop build lets chat create a workbook artifact (Sheets ship as Beta)", async () => {
+  // bun test compiles as the stable channel; artifacts.test.ts covers a build without sheets
   let calls = 0;
   const host = { createArtifact: async () => `created ${++calls}` } as unknown as Host;
   const budget = budgetFor({ id: "gemma-3-12b-it-qat-4bit" });
-  const refused = await runTool(
-    host,
-    "create_artifact",
-    { kind: "sheet", title: "T", content: "a,b" },
-    budget,
-  );
-  expect(refused).toBe('error: create_artifact needs a supported kind: "document", "pdf".');
-  expect(await runTool(host, "create_artifact", { kind: "pdf", title: "T", content: "# T" }, budget)).toBe(
+  expect(await runTool(host, "create_artifact", { kind: "sheet", title: "T", content: "a,b" }, budget)).toBe(
     "created 1",
+  );
+  expect(await runTool(host, "create_artifact", { kind: "bogus", title: "T", content: "x" }, budget)).toBe(
+    'error: create_artifact needs a supported kind: "document", "sheet", "pdf".',
   );
   expect(calls).toBe(1);
 });

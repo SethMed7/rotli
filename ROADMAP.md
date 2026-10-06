@@ -28,23 +28,25 @@ id repeats (`site/src/roadmap.ts`).
 
 ## 1. In the work
 
-- **Sheets (Beta)** <!-- id: sheets-beta --> · M — spreadsheets (XLSX)
-  inside Rotli, leaving development builds to ship as Beta in the next
-  release. CSV editing already ships. Left: the last polish, and the Beta
-  label in the app.
+- **Sheets (Beta)** <!-- id: sheets-beta --> · L — spreadsheets (XLSX and CSV)
+  inside Rotli, built for the next release in Beta beside Word documents. Left:
+  keep undo across a theme or tab switch, carry dropdowns and colour rules
+  through the grid, then drop the Beta mark.
 - **Word documents (Beta)** <!-- id: docs-beta --> · M — DOCX files open and
   edit in Rotli, marked Beta in the next release. Chat already reads and edits
   the Word documents it made, and links, numbered lists, and comments
   survive an edit. Univer is the engine under both Sheets and Docs.
-- **Charts (`/chart`)** <!-- id: charts --> · L — type `/chart` and get a
-  chart drawn from a plain-text fence in the note, so the data stays readable
-  Markdown. The charting library is still being evaluated.
-- **`/ai` in a note** <!-- id: ai-inline --> · M — an inline helper: type `/ai`,
-  say what you want, and the answer lands in the note where you typed it.
-  Secure and locked notes follow the same AI rules as everywhere else.
-- **Chat attachments you can see** <!-- id: chat-attachments --> · M — files
-  you attach to a chat show as thumbnails in the composer and as small inline
-  tags in the message, so you can tell what went with each question.
+- **Charts (`/chart`)** <!-- id: charts --> · L — type `/chart`, pick one of
+  ten kinds, and the chart is drawn from a plain-text fence in the note, so
+  the data stays readable Markdown. Built for the next release.
+- **`/ai` in a note** <!-- id: ai-inline --> · M — type `/ai` (or `/ask`), say
+  what you want, and the answer lands in the note where you typed it. Secure
+  and locked notes follow the same AI rules as everywhere else. Built for the
+  next release.
+- **Chat attachments you can see** <!-- id: chat-attachments --> · M — an image
+  you attach to a chat sits where you mention it, so you can tell what went
+  with each question. Built for the next release; in Rotli Web, chat images
+  still need the Mac app.
 - **Mermaid visual editor** <!-- id: mermaid-visual --> · M — edit a Mermaid
   diagram by hand on a canvas instead of only in code. View and Code already
   ship.
@@ -167,8 +169,8 @@ id repeats (`site/src/roadmap.ts`).
   tree), and the same secret gate the vault has (a remote model never sees a
   secret-shaped file).
 - **Beta channel** <!-- id: beta-channel --> · M — a setting that lets testers opt into in-the-work
-  features like Breve or Read aloud. Today those only exist in development
-  builds.
+  features like the Mermaid visual editor, Breve, or Read aloud. Today those
+  only exist in development builds.
 - **Shortcuts and Raycast hooks** <!-- id: shortcuts-raycast --> · M — extend the `rotli://` link so other
   apps can create a note or a capture, for example `rotli://new?title=`. Only
   open and reveal exist today.
@@ -201,8 +203,7 @@ id repeats (`site/src/roadmap.ts`).
   habit.
 - **Sheet templates** <!-- id: sheet-templates --> · M — "New from template": task tracker, weekly planner,
   habit tracker, with status dropdowns, colours, and a frozen header, saved as
-  real .xlsx. Needs Sheets out of Beta, and dropdowns and colour rules carried
-  through the grid first.
+  real .xlsx. Needs dropdowns and colour rules carried through the grid first.
 - **Block references** <!-- id: block-references --> · L — point at one paragraph with `^id` and show it
   elsewhere with `![[note#^id]]`, in the same syntax Obsidian reads.
 - **Librarian questions** <!-- id: librarian-questions --> · L — the Librarian asks about what it can't place.

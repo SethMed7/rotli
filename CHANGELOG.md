@@ -12,6 +12,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Ask AI from the note.** Type `/ai` (or `/ask`), say what you want ("a bar
+  chart of these hours", "three sources on this", "a closing paragraph"), and
+  the Librarian's model writes it for that spot. You read the answer first;
+  only **Insert** puts it in the note, and only as an addition, never a change
+  to what you wrote. It works on your own notes without turning on "Let AI
+  edit the text", but never on a locked note or one where you turned AI
+  editing off, and a secure note never goes to a connected model. ⌘Z takes it
+  back. Mac app only.
+- **Charts in your notes.** Type `/chart` and pick one of ten kinds (bar,
+  horizontal bar, stacked bar, line, area, pie, donut, scatter, radar, or
+  heatmap): Rotli drops in a small example and opens a form
+  where you set the type, title, unit, and rows. The chart lives in the note
+  as plain text you can read and edit by hand (a `chart` block of options and
+  comma-separated rows), so the file stays portable. If Rotli can't read a
+  chart, it shows why and leaves the text alone. Charts follow your theme's
+  colors.
+- **Images in a chat sit where you mention them.** Attaching an image types
+  its tag, `[Image #1]`, where your cursor is, so you can write "compare
+  [Image #1] with [Image #2]". The sent message shows each tag as a chip
+  with the picture, its file name, and its size. Thumbnails in the composer
+  are bigger, with the remove × inside the corner, and removing one removes
+  its tag. A screenshot you paste into the chat attaches the same way.
+- **Spreadsheets are in Rotli, in Beta.** New Sheet makes a real `.xlsx`, and
+  `.xlsx` files open to edit in the Mac app the way `.csv` files already did.
+  Chat can make a workbook for you, and `/Sheet` embeds one in a note. Undo
+  starts over when you switch themes or tabs, and dropdowns and colour rules
+  aren't editable yet; that's what Beta means here. Rotli Web doesn't open
+  workbooks yet.
+
 - **Hand to AI brings the note's files along.** Images and files the note
   links to are listed under Attachments with where they are on your Mac, and
   the links in the note point there, so the agent can open them. A file that
@@ -34,6 +63,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Choosing where your notes live opens the macOS folder panel.** Setup,
+  Settings, and the sidebar's Connect all use the Finder panel you know, with
+  one button, Choose a folder. Make a new folder there for a fresh vault, or
+  pick the Markdown folder you already use and Rotli works in it as it is.
+  Rotli's own folder browser is gone.
+- **Setup can be skipped; only a folder is needed.** Skip setup on the first
+  screen asks for a folder and opens the app. After the folder, Skip the rest
+  finishes setup with what you chose so far.
+- **Documents and spreadsheets wear a Beta mark.** Both run on Univer and
+  are still being finished, so the New chooser, the New… menu, Settings, the
+  slash menu, and an open document or sheet say Beta.
 - **The quokka is your chat buddy.** Every chat has its quokka: it waves on a
   new chat, thinks while a reply is on its way, cheers when it lands, and
   listens when it's your turn. It picks its own expression; you decorate it
@@ -360,6 +400,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Rotli Web says plainly that chat images need the Mac app.** Choosing a
+  photo, or pasting one, used to attach it and then fail on send. Images in
+  a chat written on the Mac now show when you open it on the web, instead of
+  coming back blank.
+- **Setup keeps the Librarian you picked.** With Gemini signed in, choosing
+  On this Mac could be switched back to Gemini: when Rotli finished checking
+  this Mac after your pick, or when you went Back and returned to the screen.
+  Rotli now suggests Gemini once, and only before you choose.
+- **A spreadsheet that changed on disk keeps your unsaved edits.** Edits you
+  hadn't saved when the file changed outside Rotli used to be set aside and
+  lost. Now the sheet shows the version on disk and offers **Save my edits as
+  a copy** (a new workbook, opened in a tab) or **Discard my edits**.
+- **A spreadsheet that can't save in the background says so.** When Rotli
+  saves your sheet as the window hides and that save fails, you see why,
+  instead of nothing.
 - **The theme studio's previous and next buttons on rotli.co sit on one row
   on phones** again, beside the theme's name.
 - **"On this page" on rotli.co's articles is no longer cut off.** The reading

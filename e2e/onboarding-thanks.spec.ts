@@ -9,12 +9,9 @@ import { expect, type Page, test } from "@playwright/test";
 async function onboardAs(page: Page, name: string) {
   await page.goto("/?onboarding");
   await page.getByPlaceholder("Your first name").fill(name);
-  await page.getByRole("button", { name: "Skip app setup" }).click();
-  await page.getByRole("button", { name: "Choose an empty folder" }).click();
-  await page.getByRole("button", { name: "New folder", exact: true }).click();
-  await page.getByLabel("New folder name").fill("Thanks Practice");
-  await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
+  await page.getByRole("button", { name: "Choose where notes live" }).click();
+  // the macOS folder panel; the twin picks a fresh empty folder
+  await page.getByRole("button", { name: "Choose a folder" }).click();
   // the Librarian, then the shortcuts, then the thank-you card
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Finish setup" }).click();
@@ -146,11 +143,8 @@ test("the banner wears their theme, Grove Dark, with the plain quokka setup give
     .click();
   await page.getByRole("radio", { name: "Dark", exact: true }).first().click();
   await page.getByRole("button", { name: "Choose where notes live" }).click();
-  await page.getByRole("button", { name: "Choose an empty folder" }).click();
-  await page.getByRole("button", { name: "New folder", exact: true }).click();
-  await page.getByLabel("New folder name").fill("Banner Practice");
-  await page.getByRole("button", { name: "Create", exact: true }).click();
-  await page.getByRole("button", { name: "Create vault here", exact: true }).click();
+  // the macOS folder panel; the twin picks a fresh empty folder
+  await page.getByRole("button", { name: "Choose a folder" }).click();
   // the Librarian, then the shortcuts, then the thank-you card
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Finish setup" }).click();
