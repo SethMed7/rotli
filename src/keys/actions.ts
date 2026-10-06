@@ -45,6 +45,7 @@ import { startTour } from "../state/tour";
 import { ALL_NOTES, SIDEBAR_ZOOM_STEP, TASKS, useUiStore } from "../state/ui";
 import { registerAlignActions } from "./alignActions";
 import { registerAppLinkActions } from "./appLinkActions";
+import { registerCanvasActions } from "./canvasActions";
 import { registerCaptureActions } from "./captureActions";
 import { registerChatWindowActions } from "./chatWindowActions";
 import { EDITOR_ACTION } from "./editorActionIds";
@@ -446,6 +447,7 @@ export function registerDefaultActions(): void {
   registerAlignActions();
   registerLeaderActions();
   registerGraphActions();
+  if (LAUNCH_FEATURES.jsonCanvas) registerCanvasActions();
 
   // — tabs (created only by explicit gestures; plain click replaces). ⌘T uses
   //   the configured item default in the workspace and a fresh private sibling

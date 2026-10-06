@@ -15,7 +15,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { type View, fitView, toGraph, zoomAt } from "../../graph/viewport";
+import { type Direction, type View, fitView, nextInDirection, toGraph, zoomAt } from "../../graph/viewport";
 import { type CanvasDoc, type CanvasNode, fileTitle } from "../../jsonCanvas/model";
 import {
   addFile,
@@ -29,6 +29,7 @@ import {
   removeItems,
   resizeNode,
 } from "../../jsonCanvas/workflow";
+import { setActiveCanvas } from "../../lib/canvasCommands";
 import { registerCanvasDrop } from "../../lib/canvasDrop";
 import { Card, type CanvasEditing, type CanvasNoteView } from "./canvasCard";
 import { EdgeHandles, EdgeLines } from "./canvasEdges";
@@ -78,6 +79,10 @@ export function CanvasEditor({
   // the card a line is being drawn from (state, so the draft line renders)
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
   const drag = useRef<Drag | null>(null);
+  // the plane (or a card in it) has focus: its keyboard commands are live
+  const [hasFocus, setHasFocus] = useState(false);
+  // "connect by keyboard": the card a line will start from, waiting for an arrow
+  const [keyConnectFrom, setKeyConnectFrom] = useState<string | null>(null);
   const fitted = useRef(false);
 
   // size + first fit
@@ -143,6 +148,40 @@ export function CanvasEditor({
       setSelectedEdge(null);
     });
   }, [doc, view, notePathFor, onChange, readOnly]);
+
+  // the remappable keys (keys/canvasActions.ts) act on the focused canvas
+  useEffect(() => {
+    if (!hasFocus) return;
+    const only = () => (selected.size === 1 ? doc.nodes.find((node) => selected.has(node.id)) : undefined);
+    return setActiveCanvas({
+      newCard: () => {
+        if (readOnly || selected.size > 0 || editing !== null) return;
+        const [x, y] = toGraph(view, size.width, size.height, size.width / 2, size.height / 2);
+        const added = addText(doc, x, y, "");
+        onChange(added.doc);
+        setSelected(new Set([added.id]));
+        setDraft("");
+        setEditing({ id: added.id, field: "text" });
+      },
+      startConnect: () => {
+        const from = only();
+        if (!readOnly && from && from.type !== "group") setKeyConnectFrom(from.id);
+      },
+      group: () => {
+        if (readOnly || selected.size === 0) return;
+        const grouped = groupAround(doc, [...selected]);
+        if (grouped.id === null) return;
+        onChange(grouped.doc);
+        setSelected(new Set([grouped.id]));
+        setDraft("");
+        setEditing({ id: grouped.id, field: "label" });
+      },
+      resize: (dw, dh) => {
+        const card = only();
+        if (!readOnly && card) onChange(resizeNode(doc, card.id, card.width + dw, card.height + dh));
+      },
+    });
+  }, [hasFocus, doc, view, size, selected, editing, readOnly, onChange]);
 
   const world = (clientX: number, clientY: number): [number, number] => {
     const rect = viewportRef.current?.getBoundingClientRect();
@@ -359,6 +398,20 @@ export function CanvasEditor({
       }
       return;
     }
+    if (keyConnectFrom !== null) {
+      // C was pressed: an arrow picks the nearest card that way; anything
+      // else stands the connection down
+      const direction = ARROW_DIRECTIONS[event.key];
+      event.preventDefault();
+      setKeyConnectFrom(null);
+      if (!direction) return;
+      const centers = doc.nodes
+        .filter((node) => node.type !== "group")
+        .map((node) => ({ id: node.id, x: node.x + node.width / 2, y: node.y + node.height / 2, r: 0 }));
+      const target = nextInDirection(centers, keyConnectFrom, direction);
+      if (target) onChange(connect(doc, keyConnectFrom, target).doc);
+      return;
+    }
     if (selectedEdge) {
       if (event.key === "Delete" || event.key === "Backspace") {
         event.preventDefault();
@@ -383,7 +436,8 @@ export function CanvasEditor({
       ArrowUp: [0, -step],
       ArrowDown: [0, step],
     };
-    const delta = nudge[event.key];
+    // ⌥ arrows are the resize keys (keys/canvasActions.ts), never a nudge
+    const delta = event.altKey ? undefined : nudge[event.key];
     if (delta && ids.length > 0) {
       event.preventDefault();
       onChange(moveNodes(doc, ids, delta[0], delta[1]));
@@ -400,14 +454,6 @@ export function CanvasEditor({
         event.preventDefault();
         startEdit(node);
       }
-    } else if (event.key.toLowerCase() === "g" && !event.metaKey && !event.ctrlKey && ids.length > 0) {
-      event.preventDefault();
-      const grouped = groupAround(doc, ids);
-      if (grouped.id === null) return;
-      onChange(grouped.doc);
-      pickCards(new Set([grouped.id]));
-      setDraft("");
-      setEditing({ id: grouped.id, field: "label" });
     } else if (event.key === "Escape" && ids.length > 0) {
       event.preventDefault();
       setSelected(new Set());
@@ -436,7 +482,14 @@ export function CanvasEditor({
       tabIndex={0}
       role="application"
       aria-roledescription="canvas"
-      aria-label={`Canvas with ${doc.nodes.length} cards and ${doc.edges.length} lines. Double-click to write a card; Tab moves between cards and lines; G groups the selected cards.`}
+      aria-label={`Canvas with ${doc.nodes.length} cards and ${doc.edges.length} lines. Double-click or press Enter to write a card; Tab moves between cards and lines; C then an arrow connects; G groups; Shift-Option-arrows resize.`}
+      onFocus={() => setHasFocus(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setHasFocus(false);
+          setKeyConnectFrom(null);
+        }
+      }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -488,6 +541,11 @@ export function CanvasEditor({
           onSelect={pickEdge}
         />
       </div>
+      {keyConnectFrom !== null && (
+        <p className="jc-key-hint" role="status">
+          Press an arrow to connect to the nearest card that way. Esc stops.
+        </p>
+      )}
       {doc.nodes.length === 0 && (
         <p className="jc-empty">
           Double-click anywhere to write a card. A card holding just <code>[[a note]]</code> becomes that
@@ -497,6 +555,13 @@ export function CanvasEditor({
     </div>
   );
 }
+
+const ARROW_DIRECTIONS: Record<string, Direction> = {
+  ArrowLeft: "left",
+  ArrowRight: "right",
+  ArrowUp: "up",
+  ArrowDown: "down",
+};
 
 function toggled(set: ReadonlySet<string>, id: string): ReadonlySet<string> {
   const next = new Set(set);

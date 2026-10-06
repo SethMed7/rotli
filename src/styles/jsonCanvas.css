@@ -269,6 +269,21 @@
 .jc-card.is-selected > .jc-resize {
   opacity: 1;
 }
+/* the one quiet line while C waits for an arrow */
+.jc-key-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  pointer-events: none;
+}
 .jc-empty {
   position: absolute;
   left: 50%;
