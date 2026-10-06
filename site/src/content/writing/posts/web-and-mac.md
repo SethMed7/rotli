@@ -1,7 +1,8 @@
 ---
 title: rotli in the browser and on the Mac
 description: What Rotli Web does, where its notes live, and what stays in the Mac app.
-section: resource
+section: post
+tags: [Guide, Rotli Web]
 date: 2026-09-17
 ---
 
@@ -20,7 +21,7 @@ asks for that folder before anything opens.
 
 - **Chrome, Edge, or Arc** open the folder directly.
 - **Firefox, Zen, and Brave** can't write to a folder themselves, so they use
-  [Rotli Helper](/resources/rotli-helper/), a small program on your computer that reads and writes the
+  [Rotli Helper](/blog/rotli-helper/), a small program on your computer that reads and writes the
   one folder you pick.
 - **Safari, phones, and tablets** aren't supported yet: they can't reach a folder on your computer.
 

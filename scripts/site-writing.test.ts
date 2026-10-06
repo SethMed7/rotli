@@ -49,17 +49,56 @@ interface Post {
 let blog: {
   isNew(date: Date, now: Date, days?: number): boolean;
   NEW_FOR_DAYS: number;
-  arrangeBlog(posts: Post[]): { featured: Post | undefined; secondary: Post[]; all: Post[] };
+  arrangeBlog<T extends { date: Date; featured: boolean; guide?: boolean }>(
+    posts: T[],
+  ): { featured: T | undefined; secondary: T[]; all: T[] };
+  GUIDE: string;
   topicsOf(posts: { tags: string[] }[]): string[];
   topicKey(topic: string): string;
   tocTree(
     items: { slug: string; text: string; depth: number }[],
   ): { slug: string; text: string; children: { slug: string; text: string }[] }[];
+  railTitle(title: string): string;
+  morePosts<T>(current: T, published: T[], upcoming: T[], count?: number): { item: T; soon: boolean }[];
+  MORE_POSTS: number;
 };
+interface Promo {
+  id: string;
+  label: string;
+  title: string;
+  text: string;
+  href: string;
+  pose: string;
+  external?: boolean;
+  needs?: "downloads" | "webApp";
+}
+let promos: {
+  PROMOS: Promo[];
+  PROMO_LABEL: string;
+  RAIL_PROMOS: number;
+  availablePromos(promos?: Promo[], offers?: { downloads: boolean; webApp: boolean }): Promo[];
+  promosFor(index: number, count?: number, promos?: Promo[]): Promo[];
+};
+let poses: Record<string, string>;
+interface Source {
+  number: number;
+  publisher: string;
+  title: string;
+  url?: string;
+}
+let sources: { sourcesOf(markdown: string): Source[] };
 
 beforeAll(async () => {
+  // promos.ts reads src/site.ts, which reads the environment once per process: the same full,
+  // public build the other site tests set (site-agents, site-features), whichever loads it first.
+  process.env.SITE_MODE = "full";
+  process.env.SITE_URL = "https://rotli.co";
+  process.env.SOURCE_REPOSITORY_PUBLIC = "true";
   figures = (await import(siteSrc("figures.ts"))) as typeof figures;
   blog = (await import(siteSrc("blog.ts"))) as typeof blog;
+  sources = (await import(siteSrc("sources.ts"))) as typeof sources;
+  promos = (await import(siteSrc("promos.ts"))) as typeof promos;
+  poses = ((await import(siteSrc("og.ts"))) as { POSES: Record<string, string> }).POSES;
 });
 
 const BAR = `kind: bar
@@ -256,6 +295,19 @@ describe("the blog index", () => {
     expect(blog.arrangeBlog([]).featured).toBeUndefined();
   });
 
+  test("a guide never leads on its date alone: the newest other post does, unless one is marked", () => {
+    const guide = { date: day("2026-10-09"), featured: false, guide: true };
+    const older: { date: Date; featured: boolean; guide?: boolean } = {
+      date: day("2026-10-01"),
+      featured: false,
+    };
+    expect(blog.GUIDE).toBe("Guide");
+    expect(blog.arrangeBlog([guide, older]).featured).toBe(older);
+    expect(blog.arrangeBlog([guide, older]).secondary).toEqual([guide]);
+    expect(blog.arrangeBlog([{ ...guide, featured: true }, older]).featured!.guide).toBe(true);
+    expect(blog.arrangeBlog([guide]).featured).toBe(guide);
+  });
+
   test("topics come in the order they appear, once each, with a stable key", () => {
     expect(blog.topicsOf([{ tags: ["AI", "Research"] }, { tags: ["Rotli Web", "AI"] }])).toEqual([
       "AI",
@@ -286,5 +338,178 @@ describe("the blog index", () => {
       },
       { slug: "b", text: "B", children: [] },
     ]);
+  });
+});
+
+describe("the rail's short title", () => {
+  test("is the first sentence of a title with more than one, else the whole title", () => {
+    expect(blog.railTitle("Paid AI plans often sit unopened. rotli can put them to work.")).toBe(
+      "Paid AI plans often sit unopened.",
+    );
+    expect(blog.railTitle("Why Rotli Web talks to your computer through Terminal")).toBe(
+      "Why Rotli Web talks to your computer through Terminal",
+    );
+    expect(blog.railTitle("Ends with a stop.")).toBe("Ends with a stop.");
+  });
+});
+
+// The rail's Sources (site/src/sources.ts) are read from the post's own `## Sources` list, so the
+// citations have one home. Held against the published post itself: change a citation there and
+// this list is what the rail will show.
+describe("a post's sources", () => {
+  const post = (slug: string) => readFileSync(siteSrc("content", "writing", "posts", `${slug}.md`), "utf8");
+
+  test("the unused-plans post: every citation, numbered, publisher and short title, linked", () => {
+    expect(sources.sourcesOf(post("the-ai-you-already-pay-for"))).toEqual([
+      {
+        number: 1,
+        publisher: "Self Financial",
+        title: "The Cost of Unused Paid Subscriptions 2026",
+        url: "https://www.self.inc/info/cost-of-unused-paid-subscriptions/",
+      },
+      {
+        number: 2,
+        publisher: "Menlo Ventures",
+        title: "2026: The State of Consumer AI",
+        url: "https://menlovc.com/perspective/2026-the-state-of-consumer-ai/",
+      },
+      {
+        // Two links in the citation: the first is the source; a long title keeps its main part.
+        number: 3,
+        publisher: "Bango",
+        title: "It’s not a bubble",
+        url: "https://bango.com/its-not-a-bubble-over-three-quarters-say-their-ai-subscriptions-are-now-essential-to-everyday-life/",
+      },
+      {
+        // An author list shortens.
+        number: 4,
+        publisher: "Chatterji et al.",
+        title: "How People Use ChatGPT",
+        url: "https://www.nber.org/papers/w34255",
+      },
+      {
+        number: 5,
+        publisher: "Anthropic",
+        title: "Economic Index report: Cadences",
+        url: "https://www.anthropic.com/research/economic-index-june-2026-report",
+      },
+      {
+        number: 6,
+        publisher: "JetBrains Research",
+        title: "Which AI coding tools do developers actually use at work?",
+        url: "https://blog.jetbrains.com/research/2026/04/which-ai-coding-tools-do-developers-actually-use-at-work/",
+      },
+      {
+        number: 7,
+        publisher: "Anthropic",
+        title: "Use Claude Code with your Pro or Max plan",
+        url: "https://support.claude.com/en/articles/11145838-use-claude-code-with-your-pro-or-max-plan",
+      },
+      {
+        // Link text without quotation marks is taken as written.
+        number: 8,
+        publisher: "OpenAI",
+        title: "ChatGPT plans and Codex usage",
+        url: "https://learn.chatgpt.com/docs/pricing",
+      },
+      {
+        number: 9,
+        publisher: "Stark Insider",
+        title: "Anthropic adds weekly limits to Claude, cites abuses",
+        url: "https://www.starkinsider.com/2025/07/anthropic-adds-weekly-limits-to-claude-cites-abuses.html",
+      },
+    ]);
+  });
+
+  test("a post without a Sources section has none, so the rail renders no block", () => {
+    expect(sources.sourcesOf(post("rotli-web-and-your-mac"))).toEqual([]);
+    expect(sources.sourcesOf("## Intro\n\nText.\n\n- [a](https://a.example/)\n")).toEqual([]);
+  });
+
+  test("the section ends at the next heading; bullets count; an item without a link is plain", () => {
+    const markdown = [
+      "Body with [a link](https://body.example/).",
+      "## Sources",
+      "",
+      "- Ministry, a report with no address, 2025.",
+      "- Lab, [*Findings*](https://lab.example/findings), with notes",
+      "  that run on to a second line.",
+      "",
+      "## Afterword",
+      "",
+      "1. Not a source, [x](https://x.example/).",
+    ].join("\n");
+    expect(sources.sourcesOf(markdown)).toEqual([
+      { number: 1, publisher: "Ministry", title: "a report with no address, 2025." },
+      { number: 2, publisher: "Lab", title: "Findings", url: "https://lab.example/findings" },
+    ]);
+  });
+});
+
+describe("more posts beside a post", () => {
+  const published = ["a", "b", "c", "d", "e"];
+  test("the newest other published posts, never the post itself", () => {
+    expect(blog.MORE_POSTS).toBe(3);
+    expect(blog.morePosts("b", published, ["soon"])).toEqual([
+      { item: "a", soon: false },
+      { item: "c", soon: false },
+      { item: "d", soon: false },
+    ]);
+  });
+  test("announced posts fill in only when there are too few published ones", () => {
+    expect(blog.morePosts("a", ["a", "b"], ["s1", "s2", "s3"])).toEqual([
+      { item: "b", soon: false },
+      { item: "s1", soon: true },
+      { item: "s2", soon: true },
+    ]);
+    expect(blog.morePosts("a", ["a"], [])).toEqual([]);
+  });
+});
+
+// rotli's own spots (site/src/promos.ts): house promotions only, every one a first-party or
+// rotli-owned link with local art, so a post loads nothing from anyone else.
+describe("the From rotli spots", () => {
+  test("each entry is complete, labelled as rotli's, and pictured with the site's own art", () => {
+    const ids = new Set<string>();
+    for (const promo of promos.PROMOS) {
+      expect(ids.has(promo.id)).toBe(false);
+      ids.add(promo.id);
+      expect(promo.label).toBe(promos.PROMO_LABEL);
+      expect(promos.PROMO_LABEL).toBe("From rotli");
+      expect(promo.title.length).toBeGreaterThan(3);
+      expect(promo.text.length).toBeGreaterThan(10);
+      expect(promo.text.length).toBeLessThanOrEqual(90);
+      expect(Object.keys(poses)).toContain(promo.pose);
+      // On this site, or (marked external) on rotli's own studio; never anyone else's.
+      if (promo.external) expect(new URL(promo.href).hostname).toMatch(/(^|\.)rotli\.co$/);
+      else expect(promo.href).toMatch(/^[/#]/);
+      expect(JSON.stringify(promo)).not.toMatch(/sponsor/i);
+    }
+    expect([...ids]).toEqual(expect.arrayContaining(["download", "roadmap", "newsletter", "web", "studio"]));
+    const studio = promos.PROMOS.find((promo) => promo.id === "studio")!;
+    expect(studio.href).toBe("https://studio.rotli.co/");
+    expect(studio.external).toBe(true);
+  });
+
+  test("a build offers only what it has: no Download without downloads, no Rotli Web without it", () => {
+    const ids = (offers: { downloads: boolean; webApp: boolean }) =>
+      promos.availablePromos(promos.PROMOS, offers).map((promo) => promo.id);
+    expect(ids({ downloads: false, webApp: false })).not.toContain("download");
+    expect(ids({ downloads: false, webApp: false })).not.toContain("web");
+    expect(ids({ downloads: true, webApp: true })).toEqual(promos.PROMOS.map((promo) => promo.id));
+  });
+
+  test("posts rotate through the spots, two at a time, so every spot is shown across the blog", () => {
+    const list = promos.PROMOS;
+    expect(promos.RAIL_PROMOS).toBe(2);
+    expect(promos.promosFor(0, 2, list).map((p) => p.id)).toEqual([list[0]!.id, list[1]!.id]);
+    expect(promos.promosFor(1, 2, list).map((p) => p.id)).toEqual([list[2]!.id, list[3]!.id]);
+    const shown = new Set<string>();
+    for (let index = 0; index < Math.ceil(list.length / 2); index++) {
+      for (const promo of promos.promosFor(index, 2, list)) shown.add(promo.id);
+    }
+    expect(shown.size).toBe(list.length);
+    expect(promos.promosFor(3, 2, [])).toEqual([]);
+    expect(promos.promosFor(0, 2, [list[0]!])).toHaveLength(1);
   });
 });

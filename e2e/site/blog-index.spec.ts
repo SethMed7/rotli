@@ -139,15 +139,22 @@ test("the topic filters narrow the list, say how many, and keep the choice in th
   await filters.getByRole("button", { name: "Rotli Web" }).click();
   await expect(filters.getByRole("button", { name: "Rotli Web" })).toHaveAttribute("aria-pressed", "true");
   await expect(all).toHaveAttribute("aria-pressed", "false");
+  // Exactly the posts tagged Rotli Web (the post on the Helper, and the guides about the web).
+  const tagged = await rows.evaluateAll(
+    (items) =>
+      items.filter((item) => (item.getAttribute("data-topics") ?? "").split(" ").includes("rotli-web"))
+        .length,
+  );
+  expect(tagged).toBeGreaterThan(1);
   const visible = page.locator("[data-post-list] > li:visible");
-  await expect(visible).toHaveCount(1);
-  await expect(visible.locator("a")).toHaveAttribute("href", "/blog/rotli-web-and-your-mac/");
-  await expect(page.locator("[data-filter-status]")).toHaveText("1 post about Rotli Web");
+  await expect(visible).toHaveCount(tagged);
+  await expect(visible.locator('a[href="/blog/rotli-web-and-your-mac/"]')).toHaveCount(1);
+  await expect(page.locator("[data-filter-status]")).toHaveText(`${tagged} posts about Rotli Web`);
   expect(new URL(page.url()).searchParams.get("topic")).toBe("rotli-web");
 
   // The address brings the choice back.
   await page.reload();
-  await expect(page.locator("[data-post-list] > li:visible")).toHaveCount(1);
+  await expect(page.locator("[data-post-list] > li:visible")).toHaveCount(tagged);
 
   await page.getByRole("group", { name: "Show posts about" }).getByRole("button", { name: "All" }).click();
   await expect(page.locator("[data-post-list] > li:visible")).toHaveCount(total);

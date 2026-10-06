@@ -1,7 +1,8 @@
 ---
 title: Why local?
 description: Your notes are ordinary files in a folder you choose. Here is why rotli is built that way, and what it means day to day.
-section: resource
+section: post
+tags: [Guide, Privacy]
 date: 2026-09-18
 ---
 
@@ -31,5 +32,5 @@ secure never go to a remote model. A locked note can be read, but no AI can edit
 ## And the browser?
 
 Rotli Web follows the same rule: every note is a file in a folder on your computer. Chrome, Edge, and Arc
-open the folder directly; Firefox, Zen, and Brave use [Rotli Helper](/resources/rotli-helper/). See
-[rotli in the browser and on the Mac](/resources/web-and-mac/).
+open the folder directly; Firefox, Zen, and Brave use [Rotli Helper](/blog/rotli-helper/). See
+[rotli in the browser and on the Mac](/blog/web-and-mac/).

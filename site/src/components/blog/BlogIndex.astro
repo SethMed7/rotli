@@ -304,13 +304,15 @@ const shortDate = (post: BlogPost) =>
     flex-wrap: wrap;
     gap: 0.45rem;
   }
+  /* Topics: the same light outlined label a post's head uses (blog/ArticleCover.astro). */
   .tag {
-    padding: 0.25rem 0.7rem;
+    padding: 0.14rem 0.6rem;
+    border: 1px solid var(--border-strong);
     border-radius: 999px;
-    background: var(--surface-2);
-    color: var(--text);
-    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
     font-weight: 500;
+    line-height: 1.4;
   }
 
   /* 1. The featured story: the picture large, the words beside its middle. */

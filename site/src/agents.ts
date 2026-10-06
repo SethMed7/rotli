@@ -4,6 +4,7 @@
 // here restates a claim the pages already make; nothing here may promise more.
 // site/Caddyfile answers `Accept: text/markdown` with these twins, and the
 // build (astro.config.mjs) fails if an llms.txt link points at a missing page.
+import { GUIDE } from "./blog";
 import { questions } from "./faq";
 import { figuresToMarkdown } from "./figures";
 import { catalog, featurePath, statusLine } from "./features";
@@ -68,12 +69,16 @@ const link = (title: string, path: string, note: string) => `- [${title}](${site
 /** The Markdown twin's address for a writing page at `/<section>/<slug>/`. */
 export const twinPath = (pagePath: string) => `${pagePath}index.md`;
 
+/** Every piece of writing is a blog post (the guides joined the blog on 2026-10-06). */
 export function writingPath(entry: Writing): string {
-  return `/${entry.data.section === "post" ? "blog" : "resources"}/${slugOf(entry)}/`;
+  return `/blog/${slugOf(entry)}/`;
 }
 
+/** A guide: the evergreen how-to posts, tagged GUIDE (src/blog.ts). */
+const isGuide = (entry: Writing) => entry.data.tags.includes(GUIDE);
+
 /** /llms.txt (llmstxt.org): a title, a one-paragraph summary, then links. */
-export function llmsText(writing: { resources: Writing[]; posts: Writing[] }): string {
+export function llmsText(writing: { posts: Writing[] }): string {
   const facts = [
     site.sourcePublic
       ? "Free, with no account. The source is open under the MIT license."
@@ -135,7 +140,13 @@ export function llmsText(writing: { resources: Writing[]; posts: Writing[] }): s
         ),
       ),
     );
-    lines.push(...section("Resources", writing.resources), ...section("Blog", writing.posts));
+    lines.push(
+      ...section("Guides", writing.posts.filter(isGuide)),
+      ...section(
+        "Blog",
+        writing.posts.filter((entry) => !isGuide(entry)),
+      ),
+    );
   }
   const optional = [
     ...(site.sourcePublic ? [`- [Source code](${GITHUB_URL}): the repository`] : []),
@@ -236,13 +247,10 @@ export function landingGraph(): Ld[] {
 
 export function writingGraph(entry: Writing): Ld[] {
   const path = writingPath(entry);
-  const index =
-    entry.data.section === "post"
-      ? { path: "/blog/", name: "Blog" }
-      : { path: "/resources/", name: "Resources" };
+  const index = { path: "/blog/", name: "Blog" };
   return [
     {
-      "@type": entry.data.section === "post" ? "BlogPosting" : "Article",
+      "@type": "BlogPosting",
       headline: entry.data.title,
       description: entry.data.description,
       datePublished: entry.data.date.toISOString().slice(0, 10),

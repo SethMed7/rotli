@@ -1,11 +1,16 @@
 ---
-// The top of a blog post (WritingPage `article`): the post's illustration contained at the page's
-// width in a rounded frame, and a card that overlaps its lower left, where the wide scenes keep
-// open sea and sand (scripts/brand-images/scenes.mjs). The card holds who wrote it and when, the
-// title, the summary, and the post's topics, all on the card's own opaque ground, never on the
-// art. Nothing is pinned and nothing moves as the page scrolls. Below 1100px (where the card
-// would cover the quokka) the picture comes first and the head follows it on the page's ground,
-// without a frame; below 700px the picture is the phone crop.
+// The top of a blog post (WritingPage `article`; the owner, 2026-10-06: "the blog page headers, I
+// still needed that cleaned up"). Calm and on the article's own columns (WritingPage's --col-*
+// tracks), so the head lines up with what follows it:
+//   - the post's illustration across the full width of the three columns, in a rounded frame,
+//     short enough that the title is in the first window (1440 × 900, 1280 × 800);
+//   - under it, "Blog /" in the left rail's column and, from the reading column's edge, the title
+//     (which may run on over the right rail's column from 1280px), the summary, then one meta line (the author's mark and name, the date, the reading time), then
+//     the topics as light outlined labels;
+//   - a hairline across all three columns before the article begins.
+// Nothing overlaps the picture at any width, nothing is pinned, and nothing moves. Below 900px it
+// is one column: the trail, the picture (the phone crop below 700px), then the words. A post
+// without art (`cover` undefined) is the same head without the picture.
 import mark from '../../../../src/assets/characters/_logo.svg?raw';
 import type { Banner } from '../../og';
 
@@ -24,7 +29,7 @@ interface Props {
 const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props;
 ---
 
-<header class:list={['writing-head', 'cover-head', { 'no-cover': !cover }]} data-article-cover>
+<header class:list={['cover-head', { 'no-cover': !cover }]} data-article-cover>
   {
     crumbs.length > 0 && (
       <nav class="crumbs" aria-label="Breadcrumb">
@@ -59,22 +64,22 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
       </picture>
     )
   }
-  <div class="head-card">
+  <div class="head-copy">
+    {kicker && <p class="kicker">{kicker}</p>}
+    <h1>{heading}</h1>
+    {lede && <p class="lede">{lede}</p>}
     <p class="byline">
       <span class="avatar" set:html={mark} aria-hidden="true" />
       <span class="author">{author}</span>
       {
         meta.map((part) => (
           <>
-            <span aria-hidden="true">·</span>
+            <span class="dot" aria-hidden="true">·</span>
             <span>{part}</span>
           </>
         ))
       }
     </p>
-    {kicker && <p class="kicker">{kicker}</p>}
-    <h1>{heading}</h1>
-    {lede && <p class="lede">{lede}</p>}
     {
       tags.length > 0 && (
         <ul class="tags" aria-label="Topics">
@@ -88,15 +93,20 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
 </header>
 
 <style>
+  /* One column on a phone and a tablet; from 901px the article's tracks (WritingPage). */
   .cover-head {
-    --cover-overlap: clamp(4rem, 8vw, 6.5rem);
-    --card-pad: clamp(1.4rem, 3vw, 2.4rem);
     display: grid;
-    margin-bottom: clamp(2.5rem, 5vw, 4rem);
+    grid-template-areas: 'crumbs' 'art' 'copy';
+    grid-template-columns: minmax(0, 1fr);
+    margin-bottom: clamp(2rem, 4vw, 3rem);
+    padding-bottom: clamp(1.75rem, 3.5vw, 2.5rem);
+    border-bottom: 1px solid var(--border-strong);
   }
   .crumbs {
+    grid-area: crumbs;
     display: flex;
     flex-wrap: wrap;
+    align-items: baseline;
     gap: 0.5rem;
     margin-bottom: 1rem;
     color: var(--text-muted);
@@ -116,11 +126,13 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
       margin: -0.7rem 0;
     }
   }
-  /* The picture: the page's width, a calm height (the title stays in the first window), rounded
-     with a hairline, its quokka and props (the scene's right half) kept in view at every shape. */
+  /* The picture: the columns' full width, rounded with a hairline, short enough that the title
+     is in the first window; its quokka and props (the scene's right half) stay in view. */
   .cover-art {
+    grid-area: art;
     display: block;
     overflow: hidden;
+    margin-bottom: clamp(1.5rem, 3vw, 2.25rem);
     border: 1px solid var(--border);
     border-radius: var(--radius-frame);
     background: var(--surface-2);
@@ -128,45 +140,56 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
   .cover-art img {
     display: block;
     width: 100%;
-    height: clamp(15rem, min(38vw, 50svh), 30rem);
+    height: clamp(13rem, min(32vw, 46svh), 26rem);
     object-fit: cover;
-    object-position: 100% 100%;
+    /* Most of the crop comes off the sky, a little off the sand: the quokka keeps its ears. */
+    object-position: 100% 88%;
   }
-  /* The card: a solid surface with a strong hairline, flat (no shadow), rising over the
-     picture's lower left. Its words read on its own ground at full contrast. */
-  .head-card {
-    position: relative;
-    box-sizing: border-box;
-    width: min(100% - 2 * clamp(1rem, 4vw, 3rem), 42rem, 58%);
-    margin: calc(-1 * var(--cover-overlap)) 0 0 clamp(1rem, 4vw, 3rem);
-    padding: var(--card-pad);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-frame);
-    background: var(--surface);
+  .head-copy {
+    grid-area: copy;
+    min-width: 0;
   }
-  .no-cover .head-card {
-    margin-top: 0;
-    margin-inline-start: 0;
+  .kicker {
+    margin: 0 0 0.8rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  /* Title, then summary, then the meta line: three steps of size and strength. */
+  h1 {
+    margin: 0;
+    font-size: clamp(2.1rem, 3.4vw, 3rem);
+    font-weight: 600;
+    line-height: 1.06;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+  }
+  .lede {
+    max-width: 38rem;
+    margin: 1rem 0 0;
+    color: var(--text-muted);
+    font-size: var(--step-lede);
+    line-height: 1.55;
+    text-wrap: pretty;
   }
   .byline {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.3rem 0.55rem;
-    margin: 0 0 1.1rem;
+    margin: 1.4rem 0 0;
     color: var(--text-muted);
-    font-size: 0.92rem;
+    font-size: 0.9rem;
   }
   .avatar {
     display: inline-grid;
     place-items: center;
-    width: 2rem;
-    height: 2rem;
+    width: 1.75rem;
+    height: 1.75rem;
     box-sizing: border-box;
-    padding: 0.3rem;
+    padding: 0.28rem;
     border: 1px solid var(--border);
     border-radius: 50%;
-    background: var(--ground);
+    background: var(--surface);
     color: var(--text);
     line-height: 0;
   }
@@ -178,55 +201,53 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
     color: var(--text);
     font-weight: 600;
   }
-  .kicker {
-    margin: 0 0 0.8rem;
-    color: var(--text-muted);
-    font-size: 0.9rem;
-  }
-  h1 {
-    margin: 0;
-    font-size: clamp(2rem, 3.6vw, 3rem);
-    font-weight: 600;
-    line-height: 1.06;
-    letter-spacing: -0.035em;
-    text-wrap: balance;
-  }
-  .lede {
-    max-width: 42rem;
-    margin: 1rem 0 0;
-    color: var(--text-muted);
-    font-size: var(--step-lede);
-    line-height: 1.55;
-    text-wrap: pretty;
-  }
-  /* Topics: quiet labels, not links (no topic pages yet); the blog index filters by them. */
+  /* Topics: light outlined labels, not links (the blog index filters by them). */
   .tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    margin: 1.3rem 0 0;
+    gap: 0.4rem;
+    margin: 0.9rem 0 0;
     padding: 0;
     list-style: none;
   }
   .tags li {
-    padding: 0.28rem 0.75rem;
+    padding: 0.14rem 0.6rem;
+    border: 1px solid var(--border-strong);
     border-radius: 999px;
-    background: var(--surface-2);
-    color: var(--text);
-    font-size: 0.84rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
     font-weight: 500;
-    line-height: 1.3;
+    line-height: 1.4;
   }
-  /* Below 1100px the scene's quokka and props take most of the picture's width, so the card
-     would cover them: the picture comes first and the card follows as the page's own head. */
-  @media (max-width: 1100px) {
-    .head-card {
-      width: auto;
-      margin: 1.75rem 0 0;
-      padding: 0;
-      border: 0;
-      border-radius: 0;
-      background: none;
+  /* From 901px: the picture across the columns, "Blog /" in the left rail's column, the words in
+     the reading column, on the same tracks as the article below. */
+  @media (min-width: 901px) {
+    .cover-head {
+      grid-template-areas: 'art art' 'crumbs copy';
+      grid-template-columns: var(--col-left) minmax(0, 1fr);
+      column-gap: var(--col-gap);
+    }
+    .crumbs {
+      margin: 0.55rem 0 0;
+      align-self: start;
+    }
+  }
+  @media (min-width: 1280px) {
+    .cover-head {
+      grid-template-areas: 'art art art' 'crumbs copy copy';
+      grid-template-columns: var(--col-left) minmax(0, 42rem) var(--col-right);
+      justify-content: space-between;
+    }
+    /* The title may run on over the right rail's column; the summary keeps the reading width. */
+    .lede {
+      max-width: 42rem;
+    }
+  }
+  /* Narrow screens: the "On this page" disclosure's own rules close the head. */
+  @media (max-width: 900px) {
+    .cover-head {
+      padding-bottom: 0;
+      border-bottom: 0;
     }
   }
   /* Phones: the phone crop, the quokka and its props centred. */
@@ -236,9 +257,6 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
       aspect-ratio: 1300 / 900;
       max-height: 55svh;
       object-position: 50% 100%;
-    }
-    .head-card {
-      margin-top: 1.5rem;
     }
   }
 </style>

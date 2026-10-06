@@ -1,7 +1,8 @@
 ---
 title: What does AI see in rotli?
 description: AI is optional, and you decide what it can read and what it can change. Secure and locked, explained.
-section: resource
+section: post
+tags: [Guide, AI, Privacy]
 date: 2026-09-15
 ---
 

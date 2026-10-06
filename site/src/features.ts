@@ -133,11 +133,11 @@ export interface Feature {
 }
 
 const ROADMAP = { href: '/roadmap/', label: 'The roadmap' };
-const GETTING_STARTED = { href: '/resources/getting-started/', label: 'Getting started' };
-const AI_GUIDE = { href: '/resources/ai-and-your-notes/', label: 'AI and your notes' };
-const WHY_LOCAL = { href: '/resources/why-local/', label: 'Why local' };
-const HELPER_GUIDE = { href: '/resources/rotli-helper/', label: 'The Rotli Helper guide' };
-const WEB_AND_MAC = { href: '/resources/web-and-mac/', label: 'Rotli Web and the Mac app' };
+const GETTING_STARTED = { href: '/blog/getting-started/', label: 'Getting started' };
+const AI_GUIDE = { href: '/blog/ai-and-your-notes/', label: 'AI and your notes' };
+const WHY_LOCAL = { href: '/blog/why-local/', label: 'Why local' };
+const HELPER_GUIDE = { href: '/blog/rotli-helper/', label: 'The Rotli Helper guide' };
+const WEB_AND_MAC = { href: '/blog/web-and-mac/', label: 'Rotli Web and the Mac app' };
 const PRIVACY = { href: '/privacy/', label: 'Privacy, in full' };
 const DEVELOPERS = { href: '/resources/developers/', label: 'Developers' };
 

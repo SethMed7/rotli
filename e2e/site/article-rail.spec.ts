@@ -1,7 +1,7 @@
 // A blog post's left rail (blog/ArticleRail.astro): in view beside the text on a wide screen
-// with the title, the "On this page" tree, the reading meter as a percent, the J/K hint, and
-// Share (plain links, Copy link, Copy Markdown from the post's twin); J and K move between
-// sections and never act while typing; jumps land below the header; and on a phone the tree is
+// with the title, the "On this page" tree, the reading meter as a percent, and Share (plain
+// links, Copy link, Copy Markdown from the post's twin); J and K do nothing (the owner,
+// 2026-10-06); jumps land below the header; and on a phone the tree is
 // the disclosure, the meter a slim bar under the header, and Share follows the article.
 import { expect, test, type Page } from "@playwright/test";
 
@@ -30,6 +30,7 @@ const headerBottom = async (page: Page) => {
 for (const viewport of [
   { width: 1920, height: 1080 },
   { width: 1440, height: 900 },
+  { width: 1280, height: 800 },
   { width: 1024, height: 768 },
 ]) {
   test(`the rail stays beside the post with its tree, meter, and Share (${viewport.width}px)`, async ({
@@ -38,7 +39,8 @@ for (const viewport of [
     await page.setViewportSize(viewport);
     await page.goto(POST);
     const aside = rail(page);
-    await expect(aside.locator(".rail-title")).toHaveText(/Paid AI plans/);
+    // The short title: the first sentence of the post's.
+    await expect(aside.locator(".rail-title")).toHaveText("Paid AI plans often sit unopened.");
     const tree = aside.getByRole("navigation", { name: "On this page" });
     await expect(tree.getByRole("link")).toHaveText([
       "What the numbers say",
@@ -48,14 +50,12 @@ for (const viewport of [
       "Putting the idle part to work",
       "Which path fits you",
       "Limits worth knowing",
-      "Sources",
     ]);
     // No meter pinned over the text on a wide screen: the rail carries it.
     await expect(page.locator('[data-read-progress="bar"]')).toBeHidden();
     const meter = page.locator('[data-read-progress="rail"]');
     await expect(meter).toBeVisible();
     await expect(meter.locator("[data-read-percent]")).toHaveText("0%");
-    await expect(aside.locator("[data-section-keys-hint]")).toBeVisible();
 
     // Mid-article: the rail is still in view under the header, whole (nothing clipped), and the
     // percent has moved.
@@ -87,6 +87,110 @@ for (const viewport of [
     await expect.poll(() => percent(page, "rail")).toBe(100);
   });
 }
+
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 1280, height: 800 },
+  { width: 1024, height: 640 },
+]) {
+  test(`the rail reads title, tree, meter, Sources, Share, and fits the window (${viewport.width}×${viewport.height})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await page.goto(POST);
+    await page.evaluate(() => {
+      document.documentElement.style.scrollBehavior = "auto";
+      const prose = document.querySelector<HTMLElement>("[data-prose]")!;
+      window.scrollTo(0, prose.getBoundingClientRect().top + window.scrollY + 400);
+    });
+    const aside = rail(page);
+    const blocks = [
+      ".rail-title",
+      "[data-toc]",
+      '[data-read-progress="rail"]',
+      "[data-rail-sources]",
+      "[data-share]",
+    ];
+    const tops: number[] = [];
+    for (const selector of blocks) {
+      const block = aside.locator(selector);
+      await expect(block).toBeVisible();
+      tops.push((await block.boundingBox())!.y);
+    }
+    expect([...tops].sort((a, b) => a - b)).toEqual(tops);
+    // Never taller than the window. Share is whole at its foot; in a window too short for even
+    // that, the rail itself scrolls and Share is reached by scrolling it (nothing is cut off).
+    const box = (await aside.boundingBox())!;
+    expect(box.y).toBeGreaterThanOrEqual((await headerBottom(page)) + 8);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+    const shareBottom = async () => {
+      const share = (await aside.locator("[data-share]").boundingBox())!;
+      return share.y + share.height;
+    };
+    if (viewport.height >= 800) expect(await shareBottom()).toBeLessThanOrEqual(box.y + box.height + 1);
+    else {
+      expect(await aside.evaluate((el) => getComputedStyle(el).overflowY)).toBe("auto");
+      await aside.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+      expect(await shareBottom()).toBeLessThanOrEqual(box.y + box.height + 1);
+    }
+    // The sources list keeps a few rows in view; when it is cut short it scrolls inside itself.
+    const list = aside.locator("[data-rail-sources] ol");
+    const listBox = (await list.boundingBox())!;
+    expect(listBox.height).toBeGreaterThanOrEqual(60);
+    const { scrollHeight, clientHeight, overflowY } = await list.evaluate((el) => ({
+      scrollHeight: el.scrollHeight,
+      clientHeight: el.clientHeight,
+      overflowY: getComputedStyle(el).overflowY,
+    }));
+    if (scrollHeight > clientHeight + 1) expect(overflowY).toBe("auto");
+  });
+}
+
+test("the rail's Sources come from the post's own list and link out in a new tab", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(POST);
+  const block = rail(page).locator("[data-rail-sources]");
+  await expect(block.getByText("Sources", { exact: true })).toBeVisible();
+  // The article's list is the one source of truth: same count, same order, same addresses.
+  const articleLinks = await page
+    .locator("[data-prose] h2#sources + ol > li")
+    .evaluateAll((items) => items.map((item) => item.querySelector("a")!.getAttribute("href")));
+  expect(articleLinks).toHaveLength(9);
+  const links = block.locator("ol a");
+  await expect(links).toHaveCount(articleLinks.length);
+  expect(await links.evaluateAll((all) => all.map((a) => a.getAttribute("href")))).toEqual(articleLinks);
+  for (const link of await links.all()) {
+    await expect(link).toHaveAttribute("target", "_blank");
+    await expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(new URL((await link.getAttribute("href"))!).protocol).toBe("https:");
+  }
+  await expect(links.first()).toContainText("Self Financial");
+  await expect(links.first()).toContainText("The Cost of Unused Paid Subscriptions 2026");
+  await expect(links.nth(3)).toContainText("Chatterji et al.");
+  // The tree leaves the Sources heading to this block, which links to the full citations.
+  await expect(rail(page).locator("[data-toc] a", { hasText: /^Sources$/ })).toHaveCount(0);
+  await block.getByRole("link", { name: "Full citations" }).click();
+  await settled(page);
+  const landed = (await page.locator("h2#sources").boundingBox())!.y;
+  expect(landed).toBeGreaterThanOrEqual(await headerBottom(page));
+  expect(landed).toBeLessThan(400);
+});
+
+test("a post without a Sources section shows no Sources block", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/blog/rotli-web-and-your-mac/");
+  await expect(rail(page).locator("[data-toc]")).toBeVisible();
+  await expect(page.locator("[data-rail-sources]")).toHaveCount(0);
+});
+
+test("Share has its five ways, each with an icon", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(POST);
+  const share = rail(page).locator("[data-share]");
+  const items = share.locator("li:visible");
+  await expect(items).toHaveText(["X", "LinkedIn", "Email", "Copy link", "Copy Markdown"]);
+  for (const item of await items.all()) await expect(item.locator("svg.icon")).toBeVisible();
+});
 
 test("Share is plain links that carry the post, and loads nothing from those sites", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -150,45 +254,24 @@ test("without script, Share keeps its links and hides the copy buttons", async (
   const share = page.locator("[data-share]");
   await expect(share.getByRole("link", { name: "X" })).toBeVisible();
   await expect(share.getByRole("button", { name: "Copy Markdown" })).toBeHidden();
-  await expect(page.locator("[data-section-keys-hint]")).toBeHidden();
   await context.close();
 });
 
-test("J and K move between sections, and never act while typing or with a modifier", async ({ page }) => {
+test("J and K are plain keys: no section jumps, no hint", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto(POST);
-  const headings = page.locator("[data-prose] h2");
-  const top = async (index: number) => (await headings.nth(index).boundingBox())!.y;
-  const header = await headerBottom(page);
-
-  await page.keyboard.press("j");
+  await expect(page.locator("kbd")).toHaveCount(0);
+  await expect(page.getByText(/to move between sections/)).toHaveCount(0);
+  await page.evaluate(() => {
+    document.documentElement.style.scrollBehavior = "auto";
+    window.scrollTo(0, 600);
+  });
   await settled(page);
-  expect(Math.abs((await top(0)) - header - 24)).toBeLessThan(6);
-  await page.keyboard.press("j");
-  await settled(page);
-  expect(Math.abs((await top(1)) - header - 24)).toBeLessThan(6);
-  await page.keyboard.press("k");
-  await settled(page);
-  expect(Math.abs((await top(0)) - header - 24)).toBeLessThan(6);
-
-  // Typing a "j" in a field types it; the page does not move.
-  const field = page.getByRole("textbox").first();
-  await field.focus();
   const before = await page.evaluate(() => window.scrollY);
-  await page.keyboard.type("jkjk");
-  await expect(field).toHaveValue("jkjk");
-  await page.waitForTimeout(200);
+  for (const key of ["j", "j", "k", "J", "K"]) await page.keyboard.press(key);
+  await page.waitForTimeout(250);
   expect(await page.evaluate(() => window.scrollY)).toBe(before);
-  // A modifier passes the key through to the browser.
-  await field.blur();
-  await page.keyboard.press("Control+j");
-  await page.waitForTimeout(200);
-  expect(await page.evaluate(() => window.scrollY)).toBe(before);
-  // The arrow keys still scroll the page as they always do.
-  await page.evaluate(() => window.scrollTo(0, 1000));
-  await page.keyboard.press("ArrowDown");
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(1000);
 });
 
 test("a jump from the rail's tree lands below the header", async ({ page }) => {

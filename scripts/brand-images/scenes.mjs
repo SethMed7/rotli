@@ -1,5 +1,5 @@
-// The blog's illustrated scenes: the film's island by day (site/src/components/ResourceScene.astro
-// draws the guides' version in the page), the app's quokka, and the things a post is about.
+// The blog's illustrated scenes: the film's island by day, the app's quokka, and the things a post
+// is about (guides included: they are posts tagged Guide since 2026-10-06).
 // One scene per post (`scene` in site/src/og.ts POST_ART), drawn in two compositions:
 //   thumb  1200 × 630   the post's thumbnail (the blog index and the link card's prop): the
 //                       quokka on the right third, the post's main prop on the left third, the

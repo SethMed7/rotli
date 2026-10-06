@@ -7,11 +7,14 @@
 // and Share, and its figures (src/figures.ts).
 import { render } from 'astro:content';
 import { twinPath, writingGraph, writingPath } from '../../agents';
-import { arrangeBlog, isNew } from '../../blog';
+import { arrangeBlog, GUIDE, isNew, morePosts } from '../../blog';
+import type { MorePost } from '../../components/blog/ArticleAside.astro';
 import BlogIndex, { type BlogPost, type UpcomingPost } from '../../components/blog/BlogIndex.astro';
 import WritingPage from '../../components/WritingPage.astro';
 import { ogImage, postBanner, postOgImage, postThumbnail } from '../../og';
+import { promosFor } from '../../promos';
 import { site } from '../../site';
+import { sourcesOf } from '../../sources';
 import { publishedWriting, readingMinutes, slugOf, upcomingWriting, type Writing } from '../../writing';
 
 export async function getStaticPaths() {
@@ -35,7 +38,9 @@ const formatDate = (date: Date) =>
   date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 // "New" is decided when the site is built: a post wears it for 14 days after its date.
 const builtAt = new Date();
-const arranged = arrangeBlog(entries.map((item) => ({ item, date: item.data.date, featured: item.data.featured })));
+const arranged = arrangeBlog(
+  entries.map((item) => ({ item, date: item.data.date, featured: item.data.featured, guide: item.data.tags.includes(GUIDE) })),
+);
 const toPost = ({ item }: { item: Writing }): BlogPost => ({
   href: `/blog/${slugOf(item)}/`,
   title: item.data.title,
@@ -53,6 +58,21 @@ const announced: UpcomingPost[] = upcoming.map((item) => ({
   description: item.data.description,
   thumbnail: postThumbnail(slugOf(item)),
 }));
+const shortDate = (date: Date) =>
+  date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
+// Beside a post: the other posts (announced ones only to fill in) and rotli's own spots, which
+// rotate through the blog by the post's place in it (src/promos.ts).
+const more: MorePost[] = entry
+  ? morePosts(entry, entries, upcoming).map(({ item, soon }) => ({
+      title: item.data.title,
+      href: soon ? undefined : `/blog/${slugOf(item)}/`,
+      date: soon ? undefined : shortDate(item.data.date),
+      dateTime: soon ? undefined : item.data.date.toISOString().slice(0, 10),
+      thumbnail: postThumbnail(slugOf(item)),
+      soon,
+    }))
+  : [];
+const promos = entry ? promosFor(entries.indexOf(entry)) : [];
 const rendered = entry ? await render(entry) : null;
 const Content = rendered?.Content ?? null;
 const toc = (rendered?.headings ?? [])
@@ -81,6 +101,9 @@ const toc = (rendered?.headings ?? [])
         tags: entry.data.tags,
         url: `${site.url}/blog/${slugOf(entry)}/`,
         markdown: twinPath(writingPath(entry)),
+        sources: sourcesOf(entry.body ?? ''),
+        more,
+        promos,
       }}
       toc={toc}
       progress

@@ -668,6 +668,17 @@ const socialImageUrl = new URL(image, siteUrl).href;
         font-size: 0.84rem;
         line-height: 1.4;
       }
+      /* Another site (rotli's studio): an outward arrow after its name, in the dropdown, the
+         Menu, and the footer (src/nav.ts `external`). */
+      .external-mark {
+        margin-left: 0.3em;
+        color: var(--text-muted);
+        font-size: 0.85em;
+        font-weight: 500;
+      }
+      .nav-dropdown-panel b .external-mark {
+        margin-left: -0.25rem;
+      }
       /* A status beside a page's name, in the dropdown and the Menu. Text, not a chip. */
       .nav-dropdown-panel small,
       .nav-menu-group small {

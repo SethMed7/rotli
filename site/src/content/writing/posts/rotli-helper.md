@@ -1,7 +1,8 @@
 ---
 title: What is Rotli Helper?
 description: A small program on your own computer that lets Rotli Web save notes into your vault folder, in browsers that can't, and chat through the AI tools you already have.
-section: resource
+section: post
+tags: [Guide, Rotli Web]
 date: 2026-09-16
 ---
 
