@@ -1,6 +1,6 @@
 ---
-// Why the Librarian exists, in two figures from other people's research and one sentence of
-// ours, beside a small scene from the film's island: four AI tools idle on a bench by the sea,
+// Why rotli exists, right after the hero (the owner, 2026-10-06), in four figures from other
+// people's research and one sentence of ours, beside a small scene from the film's island: four AI tools idle on a bench by the sea,
 // two of them asleep, until the quokka arrives with a stack of notes and hands each one something
 // to file. The four read as the products people pay for (the owner, 2026-10-05: "so people know
 // we are talking about gemini/antigravity, chatGPT, claude"): each bot wears its product's
@@ -10,29 +10,34 @@
 // everyone busy; reduced motion and no script show that resting state. The figures stay plain
 // text with their footnotes: no card, no chart, no count-up.
 //
-// Each figure is checked against its source (re-fetched 2026-10-05; the post
-// the-ai-you-already-pay-for carries the full audit). Self Financial (March 2026) surveyed 1,272
-// U.S. adults who pay for at least one subscription of any kind, and among its respondents paying
-// for ChatGPT, 50.4% had not used it in the past 30 days. Menlo Ventures / Morning Consult (July
-// 2026, 5,067 U.S. adults, published 2026-09-16): among AI users who pay for AI, 50% use AI daily,
-// so half don't (our arithmetic on Menlo's figure). The earlier "4 tools, about $66 a month"
-// figure (Bango) came out: it is a paying-for-several-tools number from a report whose headline is
-// that the plans are essential, so it is context in the post, not evidence of idle plans.
-// Never call it "wasted".
+// Lead with the figures (the owner, 2026-10-06: "more numbers backed"). Each is checked against
+// its source and keeps its exact population; the post the-ai-you-already-pay-for carries the full
+// audit and is the link under the close. Self Financial (March 2026) surveyed 1,272 U.S. adults
+// who pay for at least one subscription of any kind: among its respondents paying for ChatGPT,
+// 50.4% had not used it in the past 30 days, and 59.9% of all respondents had at least one paid
+// subscription (of any kind, not only AI) going unused each month, 2.6 on average. Menlo Ventures /
+// Morning Consult (July 2026, 5,067 U.S. adults, published 2026-09-16): among AI users who pay for
+// AI, 50% use AI daily, so half don't (our arithmetic on Menlo's figure), and the average AI user
+// uses 3.0 general assistants, up from 2.2 a year earlier. Bango's "4 tools, about $66 a month"
+// stays out: it is a paying-for-several-tools number from a report whose headline is that the
+// plans are essential, so it is context in the post, not evidence of idle plans. Never call any
+// of it "wasted". Footnote numbers are per source, so two figures share each.
 import working from '../../../../src/assets/characters/filled/cocoa/knowledge_system.webp';
 
 const figures = [
-  { value: '50.4%', text: 'of paying ChatGPT users hadn’t used it in the past 30 days.', note: 1 },
-  { value: 'Half', text: 'of paying AI users don’t use AI every day.', note: 2 },
+  { value: '50.4%', text: 'of people paying for ChatGPT hadn’t used it in the past 30 days.', note: 1 },
+  { value: 'Half', text: 'of people who pay for AI don’t use it every day.', note: 2 },
+  { value: '3.0', text: 'general AI assistants used by the average AI user, up from 2.2 a year earlier.', note: 2 },
+  { value: '59.9%', text: 'of subscribers had at least one paid subscription, of any kind, unused each month (2.6 on average).', note: 1 },
 ];
 const sources = [
   {
     href: 'https://www.self.inc/info/cost-of-unused-paid-subscriptions/',
-    text: 'Self Financial, survey of 1,272 U.S. adults who pay for at least one subscription, March 2026. The figure is among respondents paying for ChatGPT.',
+    text: 'Self Financial, survey of 1,272 U.S. adults who pay for at least one subscription, March 2026. The 50.4% is among respondents paying for ChatGPT; the 59.9% and the 2.6 count subscriptions of any kind, not only AI.',
   },
   {
     href: 'https://menlovc.com/perspective/2026-the-state-of-consumer-ai/',
-    text: 'Menlo Ventures and Morning Consult, survey of 5,067 U.S. adults, July 2026. Among AI users who pay for AI, 50% use it daily; the other half use it less often.',
+    text: 'Menlo Ventures and Morning Consult, survey of 5,067 U.S. adults, July 2026. Among AI users who pay for AI, 50% use it daily; the other half use it less often (our arithmetic). The 3.0 is general AI assistants per AI user.',
   },
 ];
 /** The four tools on the bench, left to right; the first and third start asleep. `cue` is the
@@ -52,12 +57,12 @@ const tools = [
       <h2 class="section-title" id="waiting-title" data-reveal>The AI you already pay for is mostly waiting.</h2>
       <ul class="figures" data-stagger>
         {
-          figures.map((figure) => (
+          figures.map((figure, i) => (
             <li>
               <p class="value">
                 {figure.value}
                 <sup>
-                  <a href={`#fn-${figure.note}`} id={`fnref-${figure.note}`} aria-label={`Source ${figure.note}`}>{figure.note}</a>
+                  <a href={`#fn-${figure.note}`} id={`fnref-${i + 1}`} aria-label={`Source ${figure.note}`}>{figure.note}</a>
                 </sup>
               </p>
               <p class="text">{figure.text}</p>
@@ -213,7 +218,7 @@ const tools = [
   .text {
     margin: 0.6rem 0 0;
     color: var(--text);
-    font-size: 1.08rem;
+    font-size: clamp(0.95rem, 0.6rem + 1vw, 1.08rem);
     line-height: 1.45;
   }
   .close {
@@ -563,7 +568,8 @@ const tools = [
       max-width: 34rem;
     }
   }
-  @media (max-width: 480px) {
+  /* Two figures a row down to a small phone, so the four stay one short block above the scene. */
+  @media (max-width: 359px) {
     .figures {
       grid-template-columns: 1fr;
     }

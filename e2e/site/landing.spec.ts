@@ -139,6 +139,24 @@ test("the theme studio's steps sit on one row at phone width", async ({ page }) 
   expect(label!.x).toBeLessThan(next!.x);
 });
 
+test("the figures lead the band, each with its population and its source", async ({ page }) => {
+  await page.goto("/");
+  const figures = page.locator("#waiting .figures li");
+  await expect(figures.locator(".value")).toHaveText([/^50\.4%/, /^Half/, /^3\.0/, /^59\.9%/]);
+  await expect(figures.nth(0)).toContainText("paying for ChatGPT");
+  await expect(figures.nth(1)).toContainText("pay for AI");
+  await expect(figures.nth(2)).toContainText("average AI user");
+  await expect(figures.nth(3)).toContainText("of any kind");
+  // Footnotes are per source: Self Financial (1) and Menlo (2).
+  const marks = await figures
+    .locator("sup a")
+    .evaluateAll((links) => links.map((a) => a.getAttribute("href")));
+  expect(marks).toEqual(["#fn-1", "#fn-2", "#fn-2", "#fn-1"]);
+  await expect(page.locator("#fn-1")).toContainText("Self Financial");
+  await expect(page.locator("#fn-2")).toContainText("Menlo Ventures");
+  await expect(page.locator("#waiting")).not.toContainText(/wasted/i);
+});
+
 test("the landing says rotli is more than notes and asks no extra AI fee", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator(".overview .section-lede")).toContainText("Everything starts as a Markdown file");
