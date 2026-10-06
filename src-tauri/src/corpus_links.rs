@@ -14,7 +14,10 @@
 //! switch). Only the one-line form the Librarian writes (`links: [[a]], [[b]]`)
 //! is read; a multi-line YAML list never reaches the cached metadata
 //! projection and draws nothing. Secure notes are INCLUDED with their `secure` flag (the
-//! user's own local screen, like Tasks) and never carry text. This projection
+//! user's own local screen, like Tasks); their raw link targets reach only
+//! the webview's Graph and Canvas, which show a secure note's title and never
+//! its text. Secure = the flag, the chat taint, the secret detector, or a
+//! secure folder — the same rule as Rotli Web (webLinks.ts). This projection
 //! is not agent-exposed: no AI tool or MCP verb may return it.
 //!
 //! Declared as a CHILD of `corpus` (`#[path]` mod in corpus.rs) so it reuses
@@ -90,6 +93,14 @@ pub(crate) fn body_link_targets(body: &str) -> Vec<String> {
     out
 }
 
+/// A note filed in a secure folder — the legacy `Secure notes` or a memex's
+/// `wiki/_secure` — is secure whatever its frontmatter says.
+pub(crate) fn in_secure_folder(folder: &str) -> bool {
+    [super::SECURE_NOTES_FOLDER, "wiki/_secure"]
+        .iter()
+        .any(|root| folder == *root || folder.starts_with(&format!("{root}/")))
+}
+
 impl CorpusStore {
     pub(crate) fn links(&mut self) -> Result<Vec<NoteLinks>, String> {
         self.ensure_walked()?;
@@ -112,7 +123,9 @@ impl CorpusStore {
             };
             out.push(NoteLinks {
                 note_id: meta.id.clone(),
-                secure: text.secure,
+                // one rule on the Mac and the web (audit 2026-10-06): the flag,
+                // the chat taint, the secret detector, or a secure folder
+                secure: text.secure || in_secure_folder(&meta.folder_id) || in_secure_folder(&meta.disk_folder_id),
                 targets: body_link_targets(&text.body),
                 suggested: metadata_link_targets(&text.metadata),
             });
@@ -155,6 +168,17 @@ mod tests {
             body_link_targets(body),
             vec!["Books", "Philosophy|phil", "Diagram", "René Descartes#Life"]
         );
+    }
+
+    #[test]
+    fn a_secure_folder_makes_a_note_secure() {
+        assert!(in_secure_folder("Secure notes"));
+        assert!(in_secure_folder("Secure notes/Banking"));
+        assert!(in_secure_folder("wiki/_secure"));
+        assert!(in_secure_folder("wiki/_secure/2026/q4"));
+        assert!(!in_secure_folder("Secure notesX"));
+        assert!(!in_secure_folder("wiki/_securely"));
+        assert!(!in_secure_folder("Inbox"));
     }
 
     #[test]
