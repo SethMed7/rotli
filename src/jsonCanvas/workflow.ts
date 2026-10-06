@@ -3,7 +3,16 @@
 // the editor saves whatever comes back. No note is ever touched — a note card
 // only names the note's path.
 
-import type { CanvasDoc, CanvasEdge, CanvasNode, CanvasSide, FileNode, GroupNode, TextNode } from "./model";
+import {
+  type CanvasDoc,
+  type CanvasEdge,
+  type CanvasNode,
+  type CanvasSide,
+  type FileNode,
+  type GroupNode,
+  type TextNode,
+  lonelyWikilink,
+} from "./model";
 
 export const CARD = { width: 260, height: 140 } as const;
 export const NOTE_CARD = { width: 320, height: 220 } as const;
@@ -156,6 +165,30 @@ export function groupAround(doc: CanvasDoc, ids: readonly string[], makeId = ran
     height: box.height + pad * 2,
   };
   return { doc: { ...doc, nodes: [group, ...doc.nodes] }, id: group.id };
+}
+
+/** What finishing an edit makes of the doc. A text card holding just
+ * `[[a note]]` that resolves becomes that note's card (same place, note-card
+ * size); an emptied text card goes; a group's or line's name is set. The same
+ * doc comes back when nothing changed. */
+export function applyEdit(
+  doc: CanvasDoc,
+  id: string,
+  field: "text" | "label",
+  draft: string,
+  resolveLink: (target: string) => string | null,
+): CanvasDoc {
+  if (field === "label") return setLabel(doc, id, draft);
+  const node = doc.nodes.find((each) => each.id === id);
+  if (!node || node.type !== "text") return doc;
+  const target = lonelyWikilink(draft);
+  const path = target ? resolveLink(target) : null;
+  if (path) {
+    const card: FileNode = { id: node.id, type: "file", file: path, x: node.x, y: node.y, ...NOTE_CARD };
+    return { ...doc, nodes: doc.nodes.map((each) => (each.id === id ? card : each)) };
+  }
+  if (draft.trim() === "") return removeItems(doc, [id]);
+  return draft === node.text ? doc : setText(doc, id, draft);
 }
 
 /** Grow a group just enough to hold a card written on its floor. */

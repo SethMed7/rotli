@@ -287,3 +287,10 @@ export function fileTitle(path: string): string {
   const name = path.slice(path.lastIndexOf("/") + 1);
   return name.toLowerCase().endsWith(".md") ? name.slice(0, -3) : name;
 }
+
+/** `[[Note]]` alone in a text card turns that card into a note card when you
+ * finish typing — Rotli's own link grammar, so adding a note needs no button. */
+export function lonelyWikilink(text: string): string | null {
+  const match = /^\s*\[\[([^\]]+)\]\]\s*$/.exec(text);
+  return match ? (match[1] ?? null) : null;
+}

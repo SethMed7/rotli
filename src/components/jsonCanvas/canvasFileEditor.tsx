@@ -4,7 +4,8 @@
 import "../../styles/jsonCanvas.css";
 import { useMemo } from "react";
 
-import { useCanvasFile, useCanvasNotes } from "../../jsonCanvas/composition";
+import { useCanvasNotes } from "../../jsonCanvas/canvasNotes";
+import { useCanvasFile } from "../../jsonCanvas/composition";
 import { usePanesStore } from "../../state/panes";
 import { CanvasEditor } from "./canvasEditor";
 
@@ -23,7 +24,7 @@ export function CanvasFileEditor({ fileId }: { fileId: string }) {
   if (state.status === "error") return <p className="file-err jc-error">⚠ {state.error}</p>;
   return (
     <div className="jc-host">
-      {!state.writable && (
+      {!state.writable && !state.saveError && (
         <p className="jc-banner">This canvas is in a read-only place. Changes won’t be saved.</p>
       )}
       {state.saveError && (
@@ -33,6 +34,7 @@ export function CanvasFileEditor({ fileId }: { fileId: string }) {
       )}
       <CanvasEditor
         doc={state.doc}
+        readOnly={!state.writable}
         onChange={change}
         noteFor={noteFor}
         resolveLink={resolveLink}

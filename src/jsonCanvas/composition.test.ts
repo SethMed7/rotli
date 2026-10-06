@@ -43,6 +43,8 @@ test("it fails closed: no fake blank canvas with nowhere to keep it, no half a f
   );
   // neither refusal read a byte
   expect(reads).toEqual([]);
+  // a file that went away between the look and the read is gone, never empty
+  expect(await refused(io({ read: async () => null }))).toBe(CANVAS_LOAD_REFUSAL.gone);
   // a parse failure surfaces the parser's own reason
   expect(await refused(io({ read: async () => "[1," }))).toBe(CANVAS_REFUSAL.notJson);
 });

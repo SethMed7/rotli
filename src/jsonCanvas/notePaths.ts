@@ -39,10 +39,3 @@ export function noteAtPath(notes: readonly NoteSummary[], path: string): NoteSum
     ) ?? null
   );
 }
-
-/** `[[Note]]` alone in a text card turns that card into a note card when you
- * finish typing — Rotli's own link grammar, so adding a note needs no button. */
-export function lonelyWikilink(text: string): string | null {
-  const match = /^\s*\[\[([^\]]+)\]\]\s*$/.exec(text);
-  return match ? (match[1] ?? null) : null;
-}

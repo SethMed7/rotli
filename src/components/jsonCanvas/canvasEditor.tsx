@@ -17,11 +17,10 @@ import { useEffect, useRef, useState } from "react";
 
 import { type View, fitView, toGraph, zoomAt } from "../../graph/viewport";
 import { type CanvasDoc, type CanvasNode, fileTitle } from "../../jsonCanvas/model";
-import { lonelyWikilink } from "../../jsonCanvas/notePaths";
 import {
-  NOTE_CARD,
   addFile,
   addText,
+  applyEdit,
   bringToFront,
   connect,
   groupAround,
@@ -29,8 +28,6 @@ import {
   moveNodes,
   removeItems,
   resizeNode,
-  setLabel,
-  setText,
 } from "../../jsonCanvas/workflow";
 import { registerCanvasDrop } from "../../lib/canvasDrop";
 import { Card, type CanvasEditing, type CanvasNoteView } from "./canvasCard";
@@ -50,13 +47,16 @@ export interface CanvasEditorProps {
   /** The vault path a dragged note's card names, or null for anything that
    * isn't a note (a folder, a board, a file). */
   notePathFor?: (noteId: string) => string | null;
+  /** Look, pan, zoom, and open notes; change nothing (a read-only place, or
+   * a canvas whose file changed on disk). */
+  readOnly?: boolean;
 }
 
 type Drag =
   | { kind: "pan"; sx: number; sy: number; view: View }
   | { kind: "move"; sx: number; sy: number; ids: string[]; origin: CanvasDoc; moved: boolean }
   | { kind: "resize"; sx: number; sy: number; id: string; width: number; height: number; origin: CanvasDoc }
-  | { kind: "connect"; from: string };
+  | { kind: "connect"; from: string; origin: CanvasDoc };
 
 export function CanvasEditor({
   doc,
@@ -65,6 +65,7 @@ export function CanvasEditor({
   resolveLink,
   onOpenNote,
   notePathFor,
+  readOnly = false,
 }: CanvasEditorProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 });
@@ -125,7 +126,7 @@ export function CanvasEditor({
   // several fan out a step apart
   useEffect(() => {
     const plane = viewportRef.current;
-    if (!plane || !notePathFor) return;
+    if (!plane || !notePathFor || readOnly) return;
     return registerCanvasDrop(plane, (noteIds, clientX, clientY) => {
       const rect = plane.getBoundingClientRect();
       const [x, y] = toGraph(view, rect.width, rect.height, clientX - rect.left, clientY - rect.top);
@@ -141,7 +142,7 @@ export function CanvasEditor({
       setSelected(new Set(added));
       setSelectedEdge(null);
     });
-  }, [doc, view, notePathFor, onChange]);
+  }, [doc, view, notePathFor, onChange, readOnly]);
 
   const world = (clientX: number, clientY: number): [number, number] => {
     const rect = viewportRef.current?.getBoundingClientRect();
@@ -158,32 +159,21 @@ export function CanvasEditor({
     if (id) setSelected(new Set());
   };
 
-  const commitEdit = () => {
-    if (editing === null) return;
+  /** Save the open edit, and answer the doc it produced — a gesture that
+   * starts in the same breath (a drag) must build on THAT doc, not the one
+   * this render saw, or the typed text is written back over (audit P0). */
+  const commitEdit = (): CanvasDoc => {
+    if (editing === null) return doc;
     const { id, field } = editing;
     setEditing(null);
-    if (field === "label") {
-      onChange(setLabel(doc, id, draft));
-      return;
-    }
-    const node = doc.nodes.find((each) => each.id === id);
-    if (!node || node.type !== "text") return;
-    const target = lonelyWikilink(draft);
-    const path = target ? resolveLink(target) : null;
-    if (path) {
-      // the card becomes the note's card, same place, note-card size
-      const index = doc.nodes.indexOf(node);
-      const card: CanvasNode = { id: node.id, type: "file", file: path, x: node.x, y: node.y, ...NOTE_CARD };
-      onChange({ ...doc, nodes: doc.nodes.map((each, at) => (at === index ? card : each)) });
-    } else if (draft.trim() === "") {
-      onChange(removeItems(doc, [id]));
-    } else if (draft !== node.text) {
-      onChange(setText(doc, id, draft));
-    }
+    const next = applyEdit(doc, id, field, draft, resolveLink);
+    if (next !== doc) onChange(next);
+    return next;
   };
   const cancelEdit = () => setEditing(null);
 
   const startEdit = (node: CanvasNode) => {
+    if (readOnly) return;
     if (node.type === "text") {
       pickCards(new Set([node.id]));
       setDraft(node.text);
@@ -195,12 +185,14 @@ export function CanvasEditor({
     }
   };
   const startEdgeEdit = (id: string) => {
+    if (readOnly) return;
     pickEdge(id);
     setDraft(doc.edges.find((edge) => edge.id === id)?.label ?? "");
     setEditing({ id, field: "label" });
   };
 
   const writeCardAt = (clientX: number, clientY: number, groupId?: string) => {
+    if (readOnly) return;
     const [x, y] = world(clientX, clientY);
     const added = addText(doc, x, y, "");
     // a card written on a group's floor stays inside it
@@ -216,7 +208,7 @@ export function CanvasEditor({
     const target = event.target as HTMLElement;
     if (target.closest("textarea, input")) return;
     const edgeId = target.closest<HTMLElement>("[data-edge-id]")?.dataset.edgeId;
-    if (editing !== null) commitEdit();
+    const base = commitEdit();
     if (edgeId) {
       pickEdge(edgeId);
       return;
@@ -224,9 +216,9 @@ export function CanvasEditor({
     const handle = target.closest<HTMLElement>("[data-handle]");
     const id = target.closest<HTMLElement>("[data-card-id]")?.dataset.cardId;
     viewportRef.current?.setPointerCapture(event.pointerId);
-    if (handle && id) {
+    if (handle && id && !readOnly) {
       if (handle.dataset.handle === "resize") {
-        const node = doc.nodes.find((each) => each.id === id);
+        const node = base.nodes.find((each) => each.id === id);
         if (node) {
           drag.current = {
             kind: "resize",
@@ -235,11 +227,11 @@ export function CanvasEditor({
             id,
             width: node.width,
             height: node.height,
-            origin: doc,
+            origin: base,
           };
         }
       } else {
-        drag.current = { kind: "connect", from: id };
+        drag.current = { kind: "connect", from: id, origin: base };
         setConnectFrom(id);
         setPointer(null);
       }
@@ -248,12 +240,14 @@ export function CanvasEditor({
     if (id) {
       const next = event.shiftKey ? toggled(selected, id) : selected.has(id) ? selected : new Set([id]);
       pickCards(next);
+      // looking at a read-only canvas still selects; it never moves
+      if (readOnly) return;
       drag.current = {
         kind: "move",
         sx: event.clientX,
         sy: event.clientY,
         ids: [...next],
-        origin: doc,
+        origin: base,
         moved: false,
       };
       return;
@@ -307,7 +301,7 @@ export function CanvasEditor({
       .elementsFromPoint(event.clientX, event.clientY)
       .map((element) => (element as HTMLElement).closest<HTMLElement>("[data-card-id]")?.dataset.cardId)
       .find((id) => id !== undefined && id !== current.from);
-    if (under) onChange(connect(doc, current.from, under).doc);
+    if (under) onChange(connect(current.origin, current.from, under).doc);
   };
 
   const onDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -321,6 +315,7 @@ export function CanvasEditor({
     const node = cardElement ? doc.nodes.find((each) => each.id === cardElement.dataset.cardId) : undefined;
     if (node?.type === "text") return startEdit(node);
     if (node?.type === "file") return onOpenNote(node.file);
+    if (readOnly) return;
     if (node?.type === "group" && target.closest("[data-group-label]")) return startEdit(node);
     // empty space, or the open floor of a group: write a card there
     if (!node || node.type === "group") writeCardAt(event.clientX, event.clientY, node?.id);
@@ -336,6 +331,21 @@ export function CanvasEditor({
         event.stopPropagation();
         commitEdit();
         target.closest<HTMLElement>("[data-card-id]")?.focus();
+      }
+      return;
+    }
+    if (readOnly) {
+      // looking only: open a note, deselect, fit — nothing that edits
+      const only = selected.size === 1 ? doc.nodes.find((each) => selected.has(each.id)) : undefined;
+      if (event.key === "Enter" && only?.type === "file") {
+        event.preventDefault();
+        onOpenNote(only.file);
+      } else if (event.key === "Escape") {
+        setSelected(new Set());
+        setSelectedEdge(null);
+      } else if (event.key === "0" && event.target === viewportRef.current) {
+        event.preventDefault();
+        setView(fitDoc(doc, size.width, size.height));
       }
       return;
     }

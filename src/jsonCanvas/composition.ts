@@ -1,18 +1,16 @@
 // Wires a `.canvas` file to the Canvas editor — on the Mac app or a connected
 // Rotli Web folder (services/canvasFiles.ts picks): read the file,
-// parse it, and save edits back (debounced, revision-checked — a canvas
-// changed on disk since it was read refuses instead of overwriting). Note
-// cards resolve through the note list the editor already holds.
+// parse it, and save edits back through canvasSaver.ts (debounced, one write
+// at a time, revision-checked — a canvas changed on disk since it was read
+// stops taking edits instead of overwriting). Note cards resolve in
+// canvasNotes.ts.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { resolveWikilink, buildWikilinkIndex } from "../editor/wikilink";
 import { onQuitFlush } from "../lib/quitFlush";
 import { type CanvasFileIo, canvasFileIo } from "../services/canvasFiles";
-import { useNoteLinks, useSearchableNotes } from "../services/hooks";
-import { notesService } from "../services/notes";
-import { type CanvasDoc, parseCanvas, serializeCanvas } from "./model";
-import { noteAtPath, notePath } from "./notePaths";
+import { type CanvasSaver, createCanvasSaver } from "./canvasSaver";
+import { type CanvasDoc, parseCanvas } from "./model";
 
 export type CanvasFileState =
   | { status: "loading" }
@@ -43,7 +41,10 @@ export async function loadCanvasFile(
   const stat = await io.stat(fileId);
   if (!stat) return refuse(CANVAS_LOAD_REFUSAL.gone);
   if (stat.len > CANVAS_MAX_BYTES) return refuse(CANVAS_LOAD_REFUSAL.tooLarge);
-  const parsed = parseCanvas(await io.read(fileId, stat.len));
+  const text = await io.read(fileId, stat.len);
+  // a file that went away between the look and the read is gone, never empty
+  if (text === null) return refuse(CANVAS_LOAD_REFUSAL.gone);
+  const parsed = parseCanvas(text);
   if (!parsed.ok) return refuse(parsed.error);
   return {
     state: { status: "ready", doc: parsed.doc, writable: stat.writable, saveError: null },
@@ -56,120 +57,56 @@ export function useCanvasFile(fileId: string): {
   change: (doc: CanvasDoc) => void;
 } {
   const [state, setState] = useState<CanvasFileState>({ status: "loading" });
-  const revision = useRef<string | null>(null);
-  const pending = useRef<CanvasDoc | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const flush = useCallback(async () => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-    const doc = pending.current;
-    if (!doc || revision.current === null) return;
-    pending.current = null;
-    try {
-      const io = canvasFileIo();
-      if (!io) throw new Error(CANVAS_LOAD_REFUSAL.notHere);
-      revision.current = await io.write(fileId, serializeCanvas(doc), revision.current);
-      setState((current) => (current.status === "ready" ? { ...current, saveError: null } : current));
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setState((current) => (current.status === "ready" ? { ...current, saveError: message } : current));
-    }
-  }, [fileId]);
+  const saver = useRef<CanvasSaver | null>(null);
 
   useEffect(() => {
     // a different file remounts the host (keyed by fileId), so the first
     // state is always "loading" — no reset here
     let cancelled = false;
-    loadCanvasFile(fileId)
+    let unregister = () => {};
+    const io = canvasFileIo();
+    loadCanvasFile(fileId, io)
       .then((loaded) => {
         if (cancelled) return;
-        revision.current = loaded.revision;
+        if (io && loaded.revision !== null) {
+          const ready = (patch: Partial<Extract<CanvasFileState, { status: "ready" }>>) =>
+            setState((current) => (current.status === "ready" ? { ...current, ...patch } : current));
+          saver.current = createCanvasSaver({
+            revision: loaded.revision,
+            delayMs: SAVE_AFTER_MS,
+            write: (text, revision) => io.write(fileId, text, revision),
+            onSaved: () => ready({ saveError: null }),
+            // a conflict ends editing: the file on disk is newer than this view
+            onError: (message, conflicted) =>
+              ready(conflicted ? { saveError: message, writable: false } : { saveError: message }),
+          });
+          // quit waits for the save and stops if it fails
+          unregister = onQuitFlush(() => saver.current?.flush());
+        }
         setState(loaded.state);
       })
       .catch((err: unknown) => {
         if (!cancelled)
           setState({ status: "error", error: err instanceof Error ? err.message : String(err) });
       });
-    const unregister = onQuitFlush(flush);
     return () => {
       cancelled = true;
       unregister();
-      void flush();
+      // a failure on close is already on screen through onError
+      void saver.current?.flush().catch(() => {});
+      saver.current = null;
     };
-  }, [fileId, flush]);
+  }, [fileId]);
 
   const change = useCallback(
     (doc: CanvasDoc) => {
-      setState((current) => (current.status === "ready" ? { ...current, doc } : current));
+      // a read-only canvas, or one that conflicted, takes no edits at all
       if (state.status !== "ready" || !state.writable) return;
-      pending.current = doc;
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => void flush(), SAVE_AFTER_MS);
+      if (!saver.current?.queue(doc)) return;
+      setState((current) => (current.status === "ready" ? { ...current, doc } : current));
     },
-    [flush, state],
+    [state],
   );
 
   return { state, change };
-}
-
-/** Note cards' view of the vault: a path's note (title, body, secure), and
- * what `[[target]]` resolves to — the editor's own resolver. */
-export function useCanvasNotes(paths: readonly string[]) {
-  const { notes } = useSearchableNotes();
-  const links = useNoteLinks();
-  const [bodies, setBodies] = useState<ReadonlyMap<string, string>>(new Map());
-  const index = useMemo(() => buildWikilinkIndex(notes), [notes]);
-  const secure = useMemo(
-    () => new Set((links.data ?? []).filter((row) => row.secure).map((row) => row.noteId)),
-    [links.data],
-  );
-  const wanted = useMemo(
-    () => paths.map((path) => noteAtPath(notes, path)).filter((note) => note !== null),
-    [paths, notes],
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    const missing = wanted.filter((note) => !bodies.has(note.id) && !secure.has(note.id));
-    if (missing.length === 0) return;
-    void Promise.all(missing.map((note) => notesService.getNote(note.id))).then((loaded) => {
-      if (cancelled) return;
-      setBodies((current) => {
-        const next = new Map(current);
-        for (const note of loaded) if (note) next.set(note.id, note.body);
-        return next;
-      });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [wanted, bodies, secure]);
-
-  const noteFor = useCallback(
-    (path: string) => {
-      const note = noteAtPath(notes, path);
-      if (!note) return null;
-      return { title: note.title, body: bodies.get(note.id) ?? null, secure: secure.has(note.id) };
-    },
-    [notes, bodies, secure],
-  );
-  const resolveLink = useCallback(
-    (target: string) => {
-      const id = resolveWikilink(target, index);
-      const note = id ? notes.find((each) => each.id === id) : undefined;
-      return note ? notePath(note) : null;
-    },
-    [index, notes],
-  );
-  const noteIdAt = useCallback((path: string) => noteAtPath(notes, path)?.id ?? null, [notes]);
-  // a dragged row's id → its card's path; only Markdown notes become note cards
-  const notePathFor = useCallback(
-    (noteId: string) => {
-      const note = notes.find((each) => each.id === noteId);
-      return note && (note.kind ?? "note") === "note" ? notePath(note) : null;
-    },
-    [notes],
-  );
-  return { noteFor, resolveLink, noteIdAt, notePathFor };
 }

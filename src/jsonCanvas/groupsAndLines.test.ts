@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 
 import type { CanvasDoc } from "./model";
-import { edgeMidpoint, groupAround, growGroupAround, setLabel } from "./workflow";
+import { applyEdit, edgeMidpoint, groupAround, growGroupAround, setLabel } from "./workflow";
 
 const two: CanvasDoc = {
   nodes: [
@@ -45,4 +45,21 @@ test("a card written on a group's floor grows the group to hold it", () => {
   const grown = growGroupAround(spilled, "g", "n");
   expect(grown.nodes[0]).toMatchObject({ x: -32, y: -32, width: 198, height: 188 });
   expect(growGroupAround(spilled, "g", "missing")).toBe(spilled);
+});
+
+test("finishing an edit: a lone [[link]] becomes its note's card, an emptied card goes, a name is set", () => {
+  const resolve = (target: string) => (target === "Books" ? "wiki/Books.md" : null);
+  const asNote = applyEdit(two, "a", "text", " [[Books]] ", resolve);
+  expect(asNote.nodes[0]).toMatchObject({ id: "a", type: "file", file: "wiki/Books.md", x: 0, y: 0 });
+  // an unresolved link stays text
+  expect(applyEdit(two, "a", "text", "[[Nowhere]]", resolve).nodes[0]).toMatchObject({ text: "[[Nowhere]]" });
+  expect(applyEdit(two, "a", "text", "  ", resolve).nodes.map((n) => n.id)).toEqual(["b"]);
+  expect(applyEdit(two, "e", "label", "cites", resolve).edges[0]?.label).toBe("cites");
+  // nothing changed, the same doc comes back (no save)
+  expect(applyEdit(two, "a", "text", "", resolve)).not.toBe(two);
+  const same = {
+    ...two,
+    nodes: [{ ...two.nodes[0]!, text: "same" } as (typeof two.nodes)[number], two.nodes[1]!],
+  };
+  expect(applyEdit(same, "a", "text", "same", resolve)).toBe(same);
 });

@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test";
 
 import type { NoteSummary } from "../types";
-import { lonelyWikilink, noteAtPath, notePath } from "./notePaths";
+import { lonelyWikilink } from "./model";
+import { noteAtPath, notePath } from "./notePaths";
 
 const note = (id: string, title: string, extra: Partial<NoteSummary> = {}): NoteSummary => ({
   id,

@@ -16,8 +16,9 @@ import { activeWebVaultDir } from "./webNotes";
 
 export interface CanvasFileIo {
   stat: (id: string) => Promise<{ len: number; revision: string; writable: boolean } | null>;
-  /** The whole file: `len` from stat, so no default cap cuts it short. */
-  read: (id: string, len: number) => Promise<string>;
+  /** The whole file (`len` from stat, so no default cap cuts it short), or
+   * null when it went away between the stat and the read. */
+  read: (id: string, len: number) => Promise<string | null>;
   /** Save over `revision` only; answers the new revision. */
   write: (id: string, text: string, revision: string) => Promise<string>;
 }
@@ -47,7 +48,7 @@ function webIo(store: FolderCanvasStore): CanvasFileIo {
       const stat = await store.stat(id);
       return stat ? { ...stat, writable: true } : null;
     },
-    read: async (id) => (await store.read(id))?.text ?? "",
+    read: async (id) => (await store.read(id))?.text ?? null,
     write: (id, text, revision) => store.write(id, text, revision),
   };
 }
