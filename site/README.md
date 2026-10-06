@@ -43,7 +43,7 @@ crossfade, the theme studio's autoplay, the reading meter, the footer scene's
 play and the visitor's person), `bun test scripts/site-motion.test.ts` (the
 tour's scroll steps and the before and after's filing play) and
 `bun test scripts/site-runner.test.ts` (the 404 game), `bun test scripts/site-writing.test.ts`
-(post figures, the blog's arrangement, "New", and the article tree), `bun test scripts/site-github.test.ts`
+(post figures, the blog's arrangement, "New", the article tree, a post's sources, and the From rotli spots), `bun test scripts/site-github.test.ts`
 (the header's star count), and `bun run test:e2e:site` (`playwright.site.config.ts`: builds
 the site as production does, with `SOURCE_REPOSITORY_PUBLIC=true`, plus
 `SITE_GITHUB_STARS=1234` so the build never asks GitHub, serves it with `astro preview` on port 4392, and drives
@@ -377,33 +377,85 @@ whose art never touches its words from 320 to 1920.
   lazily. `e2e/site/blog-index.spec.ts` holds the order, the pictures, the
   list's order and rules, the filters with and without script, and "New" at
   1920, 1440, 768, and 390.
-- **The blog post** (`WritingPage`'s `article`, the owner's 2026-10-06 "fix the
-  top of blogs" with Untitled UI's blog and claude.dev's posts as references):
-  the post's banner art (`postBanner(slug)`) contained at the page's width,
-  rounded, with a hairline, `clamp(15rem, min(38vw, 50svh), 30rem)` tall and
-  still (nothing pinned, nothing scales), and a card over its lower left
-  (`blog/ArticleCover.astro`: `--surface`, `--border-strong`, flat; at most
-  42rem and 58% of the picture, so the scene's quokka and props stay clear)
-  holding the author (the face mark as avatar), date, reading time, title,
-  summary, and the post's `tags`. Below 1100px the picture comes first and the
-  head follows on the page's ground without a frame; below 700px the picture
-  is the phone crop. Beside the text on wide screens a sticky rail
-  (`blog/ArticleRail.astro`) holds the title, "On this page" as a tree (`###`
-  headings under their `##`, `tocTree` in `src/blog.ts`), the reading meter as
-  a bar and a percent (the same `src/reading.ts` measure; no meter is pinned
-  over the text), and Share: X, LinkedIn, and Email as
-  plain links carrying the canonical address and title (no third-party
-  script, image, or request), and Copy link and Copy Markdown (fetches the
-  post's same-origin twin, `connect-src 'self'`), which appear only where the
-  clipboard can be written. There are no J/K section jumps (removed 2026-10-06 at
-  the owner's request); the page scrolls with the browser's own keys. Under 900px the tree is the "On this page"
-  disclosure, the meter a 3px bar under the header (only its fill shows), and
-  Share follows the article. The reading column (`blog/article.css`, global
-  under `.writing.is-article`) is 18px at about 70 characters a line (40rem),
-  with h2/h3 spacing, pull quotes, a numbered Sources list (`## Sources` then
-  a list) and footnotes, and the figures' styles. `e2e/site/article-banner.spec.ts`
-  holds the cover and the card's measured contrast; `article-rail.spec.ts` the
-  rail, Share, the copy buttons, that J and K do nothing, jumps, and the narrow layout.
+- **The blog post** (`WritingPage`'s `article`; the owner's 2026-10-06 "fix the
+  top of blogs", then "clean up left screen ... sources on the left side ...
+  on right side ... ad spots [and] promoting other blogs"). Three columns on
+  one set of tracks (`--col-left` 13rem, the reading column up to 42rem,
+  `--col-right` 14.5rem, in `WritingPage.astro`): the left rail from 901px,
+  the right side from 1280px, `justify-content: space-between`.
+  - **The head** (`blog/ArticleCover.astro`) uses the same tracks: the post's
+    banner art (`postBanner(slug)`) across all three columns, rounded, with a
+    hairline, `clamp(13rem, min(32vw, 46svh), 26rem)` tall (`object-position:
+    100% 88%`, so the crop comes off the sky and the quokka keeps its ears),
+    still. Under it "Blog /" sits on the rail's edge and the words on the
+    reading column's edge: the title (which may run over the right column from
+    1280px), the summary, one meta line (the face mark as avatar, the author,
+    date, reading time), and the `tags` as light outlined labels (the blog
+    index's topics share that style). A hairline across the columns closes
+    the head. Nothing overlaps the picture at any width, and the title is in
+    the first window at 1440 × 900 and 1280 × 800. Under 900px it is one
+    column (trail, picture, words); under 700px the picture is the phone crop.
+    A post without art gets the same head without the picture.
+  - **The left rail** (`blog/ArticleRail.astro`, sticky) reads, top to
+    bottom: the short title (`railTitle`: a title's first sentence), "On this
+    page" as a tree (`###` under `##`, `tocTree`), the reading meter as a bar
+    and a percent (`src/reading.ts`; no meter is pinned over the text),
+    **Sources**, and **Share** at the foot. Sources are parsed at build time
+    from the post's own `## Sources` list (`src/sources.ts`): one entry per
+    list item, numbered as in the article, the text before the first link as
+    the publisher (an author list shortens to "First et al."), the link text
+    without its quotes as the title (a long one keeps its main title before
+    a colon), each opening in a new tab with `rel="noopener noreferrer"`. No
+    `## Sources`, no block. The article keeps its full Sources list (for no
+    script, print, phones, and the details the rail leaves out); the tree
+    leaves out its "Sources" heading and the block ends with "Full citations"
+    linking to it, so the rail says Sources once. The rail is never taller
+    than the window: the sources list gives up height down to a floor and
+    scrolls inside itself (its last line fades while there is more, a scroll
+    timeline, none where unsupported), and below that floor the whole rail
+    scrolls; nothing is cut off. Share is X, LinkedIn, and Email as plain
+    links carrying the canonical address and title (no third-party script,
+    image, or request), and Copy link and Copy Markdown (the post's
+    same-origin twin, `connect-src 'self'`), shown only where the clipboard
+    can be written; each has an inline SVG icon on `currentColor`. There are
+    no J/K section jumps (removed 2026-10-06 at the owner's request). Under
+    900px the tree is the "On this page" disclosure, the meter a 3px bar under
+    the header, and Share follows the article.
+  - **The right side** (`blog/ArticleAside.astro`): from 1280px a third
+    column with "More posts" (up to three, `morePosts` in `src/blog.ts`: the
+    newest other published posts, never the post itself; announced posts fill
+    in only when too few are published, marked "Coming soon" and not linked)
+    as small thumbnails with title and date, and two **From rotli** spots. It
+    stays in view while reading when the window is at least 760px tall and
+    scrolls with the page when not. Below 1280px the same block follows the
+    article (after Share on a phone) as "More from rotli", with one spot.
+  - **From rotli spots** are `src/promos.ts`, the one file to edit: `id`,
+    `label` ("From rotli"), `title`, `text`, `href`, `pose` (a quokka from
+    `src/assets/characters/filled/cocoa/`, the site's own art), `external`,
+    and `needs` (`downloads` or `webApp`, so a build never offers what it
+    doesn't have). They are rotli's own promotions only: Download, the
+    roadmap, the newsletter (`#newsletter`, the footer's sign-up), and Rotli
+    Web. Posts rotate through them two at a time by their place in the blog
+    (`promosFor`), so every spot is seen. They are plain links with local
+    pictures: no script, frame, pixel, or remote image, so the CSP and the
+    privacy page stay true. A real advertiser or ad network would need a CSP
+    change, a `/privacy/` and `PRIVACY.md` change, and the owner's decision
+    first; none is planned (the owner, 2026-10-06: house promos only).
+  - **The reading column** (`blog/article.css`, global under
+    `.writing.is-article`) is 18px, up to 42rem: at least 62ch (the width of
+    62 zeros) beside both rails, about 70 characters of running text a line,
+    with h2/h3 spacing, pull quotes, a numbered Sources list (`## Sources`
+    then a list), footnotes, and the figures' styles; long words and bare
+    addresses break instead of widening a phone's page.
+  - Specs: `e2e/site/article-banner.spec.ts` (the head's order, alignment,
+    first-window title, and measured contrast at 1920 to 390),
+    `article-rail.spec.ts` (the rail's order and fit, Sources linking out,
+    Share, copying, J and K doing nothing, jumps, the narrow layout), and
+    `article-aside.spec.ts` (the right side, the spots, the stacked "More
+    from rotli", 62ch at 1280 and 1440, no overlap or overflow from 320 to
+    1920); `scripts/site-writing.test.ts` holds `sourcesOf` against the
+    published post, `railTitle`, `morePosts`, and the promos' data and
+    rotation.
 - **The article banner** (`WritingPage`'s `banner`, the owner's 2026-10-05
   "almost takes over the top and you scroll in"; blog posts left it for their
   cover on 2026-10-06): `/privacy/` opens on a full-width picture under the header, `clamp(20rem, 100svh −

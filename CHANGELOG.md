@@ -317,15 +317,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A new install lives in the Dock** and stays open like any app. Testers
   lost the menu-bar-only app mid-setup; the quiet visitor is a choice in
   Settings → General.
-- **Blog posts on rotli.co open on a picture with a card, beside a reading
-  rail.** The post's scene sits inside the page, rounded and still, with a
-  card over its corner for the author, date, reading time, title, summary,
-  and topics (on a phone, the picture and then the title). The full-width
-  banner stays on the privacy page only. On a wide screen a rail beside the
-  text holds the post's title, its sections as a tree, how far through you
-  are as a percent, and Share: X, LinkedIn, Email, Copy link, and Copy
-  Markdown (the post's own Markdown). The text is larger, about 70 characters a line, with
-  clearer headings, quotes, and a numbered sources list.
+- **Blog posts on rotli.co are laid out in three calm columns.** The post's
+  picture runs across the top, short enough that the title shows without
+  scrolling, and under it the title, summary, author, date, reading time, and
+  topics line up with the text below. On the left, a rail holds a short
+  title, the sections as a tree, how far through you are, the post's sources
+  (each opening the original in a new tab), and Share: X, LinkedIn, Email,
+  Copy link, and Copy Markdown. On a wide screen the right side suggests
+  other posts and a couple of things from rotli itself, such as the download
+  and the roadmap; on a smaller screen they follow the article as "More from
+  rotli". Nothing there tracks you or loads from anywhere else. The text is
+  larger, about 70 characters a line, with clearer headings, quotes, and a
+  numbered sources list.
 - **Blog posts on rotli.co have charts and diagrams.** The post on unused AI
   plans shows the Self Financial 30-day figures and Menlo's daily-use
   comparison as bar charts, each with its source and a table of the numbers,
