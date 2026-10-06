@@ -327,6 +327,17 @@ The seven open questions, answered by the owner on 2026-10-06:
 6. **Entry points:** ⌘K and the note menu only. No sidebar or Home row.
 7. **Canvas colours:** six roles (`--canvas-1`…`--canvas-6`) in every theme
    family, light and dark, so JSON Canvas colours paint.
+   - **Built:** they map to the label palette (`--accent-swatch-rose`,
+     `orange`, `amber`, `green`, `cyan`, `violet`), which is already tuned
+     separately for light and dark.
+   - So every theme paints them with no new colour values, and they match
+     `[Label:orange]` in notes.
+   - A coloured card gets a coloured border and a faint wash; its text
+     stays in the theme's ink.
+   - Another app's hex colour paints the same way, but only when it is a
+     valid `#rgb` or `#rrggbb`.
+   - Not done: tuning per theme family. In light themes, orange and yellow
+     sit close together.
 
 8. **Canvas in search and lists** (2026-10-06): yes, like a board — found
    by name in ⌘K and listed in All notes, with its own icon.

@@ -130,11 +130,21 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-/* a JSON Canvas color is kept in the file; until the brand layer names the
-   six preset roles, a colored card shows a heavier border, never a raw hue */
+/* a coloured card: its colour on the edge and a faint wash, never on the
+   text. Presets 1–6 are theme tokens; another app's hex arrives as
+   --card-colour from the card itself (canvasCard.tsx validates it). */
+.jc-card[data-colour="1"] { --card-colour: var(--canvas-1); }
+.jc-card[data-colour="2"] { --card-colour: var(--canvas-2); }
+.jc-card[data-colour="3"] { --card-colour: var(--canvas-3); }
+.jc-card[data-colour="4"] { --card-colour: var(--canvas-4); }
+.jc-card[data-colour="5"] { --card-colour: var(--canvas-5); }
+.jc-card[data-colour="6"] { --card-colour: var(--canvas-6); }
 .jc-card.has-color {
-  border-color: var(--border-strong);
-  border-width: 2px;
+  border-color: var(--card-colour, var(--border-strong));
+  background: color-mix(in srgb, var(--card-colour, var(--surface)) 9%, var(--surface));
+}
+.jc-group.has-color {
+  background: color-mix(in srgb, var(--card-colour, transparent) 5%, transparent);
 }
 .jc-group {
   background: transparent;

@@ -668,6 +668,19 @@
   --on-accent: #161616;
 }
 
+/* JSON Canvas colours (owner decision 2026-10-06): the format's six presets —
+   1 red, 2 orange, 3 yellow, 4 green, 5 cyan, 6 purple — painted with the
+   label palette below, so they follow light and dark the way [Label:orange]
+   does and need no colour of their own */
+:root {
+  --canvas-1: var(--accent-swatch-rose);
+  --canvas-2: var(--accent-swatch-orange);
+  --canvas-3: var(--accent-swatch-amber);
+  --canvas-4: var(--accent-swatch-green);
+  --canvas-5: var(--accent-swatch-cyan);
+  --canvas-6: var(--accent-swatch-violet);
+}
+
 /* picker swatches for the accent row (Settings + onboarding) — the LIGHT
    values; the dark scheme derives at apply time via data-accent itself */
 :root {

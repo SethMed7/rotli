@@ -2,6 +2,8 @@
 // card, a note's card, a link, a group's frame, or a card from another app.
 // Connect dots and the resize corner show only where attention already is.
 
+import type { CSSProperties } from "react";
+
 import { type CanvasNode, type CanvasSide, colorName, fileTitle } from "../../jsonCanvas/model";
 import { MarkdownPeek } from "../markdownPeek";
 
@@ -93,13 +95,21 @@ export function Card({
   onCancel: () => void;
   onFocus: () => void;
 }) {
-  const style = { left: node.x, top: node.y, width: node.width, height: node.height };
+  const custom = node.color && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(node.color) ? node.color : null;
+  const style = {
+    left: node.x,
+    top: node.y,
+    width: node.width,
+    height: node.height,
+    ...(custom ? { "--card-colour": custom } : {}),
+  } as CSSProperties;
   const className = `jc-card jc-${node.type}${selected ? " is-selected" : ""}${node.color ? " has-color" : ""}`;
   return (
     <div
       className={className}
       style={style}
       data-card-id={node.id}
+      data-colour={node.color && /^[1-6]$/.test(node.color) ? node.color : undefined}
       tabIndex={0}
       role="group"
       aria-roledescription="card"
