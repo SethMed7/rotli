@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import sitemap from "@astrojs/sitemap";
 import { defineConfig } from "astro/config";
 
+import { movedFeatures } from "./src/features";
 import { figurePlugin } from "./src/figures";
 import { votableIds } from "./src/roadmap";
 import { readRoadmapFile } from "./src/roadmap-file";
@@ -213,11 +214,14 @@ export default defineConfig({
   // guides joined the blog as posts tagged Guide (2026-10-06). The static build
   // writes a small refresh page at each old address (any host, `astro
   // preview`, the e2e lane); in production the Caddyfile answers the same
-  // addresses, Markdown twins included, with a permanent redirect first.
+  // addresses, Markdown twins included, with a permanent redirect first. The
+  // feature catalog was condensed the same day: each entry folded into another
+  // redirects to its section there (src/features.ts movedFeatures).
   redirects: site.showsFullSite
     ? {
         "/resources/mcp": "/resources/developers/",
         ...Object.fromEntries(MOVED_GUIDES.map((slug) => [`/resources/${slug}`, `/blog/${slug}/`])),
+        ...movedFeatures(),
       }
     : {},
   vite: { server: { proxy: localWebApp }, preview: { proxy: localWebApp } },

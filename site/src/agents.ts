@@ -7,7 +7,7 @@
 import { GUIDE } from "./blog";
 import { questions } from "./faq";
 import { figuresToMarkdown } from "./figures";
-import { catalog, featurePath, statusLine } from "./features";
+import { alsoCovers, availabilityOf, catalog, featurePath } from "./features";
 import type { RoadmapSection } from "./roadmap";
 import { DOCS_AND_SHEETS, DOWNLOAD_URL, GITHUB_URL, LICENSE_URL, PLATFORMS, site } from "./site";
 import { slugOf, type Writing } from "./writing";
@@ -136,7 +136,7 @@ export function llmsText(writing: { posts: Writing[] }): string {
       "",
       ...catalog().flatMap(({ features }) =>
         features.map((feature) =>
-          link(feature.name, featurePath(feature), `${statusLine(feature)}. ${feature.line}`),
+          link(feature.name, featurePath(feature), `${availabilityOf(feature)}. ${feature.line}${alsoCovers(feature)}`),
         ),
       ),
     );

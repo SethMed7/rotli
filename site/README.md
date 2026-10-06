@@ -949,13 +949,31 @@ there, and the closing panel, whose art never touches its words from 320 to
   Features lines in `/llms.txt` all read `visibleFeatures()`, so they cannot
   disagree, and the build's llms.txt guard proves every link. The page keeps
   its headline (the link card in `src/og.ts` restates it) and a one-line
-  status legend; under it the tiles (`components/features/FeatureTile.astro`)
-  sit in six areas, Writing, Organizing, AI and chat, Files, Privacy and
-  control, and Rotli Web and agents, each headed by its quokka (the app's
-  filled art, `areaArt.ts`). A tile is one link with an icon (a stroke
-  drawing in a hairline square), the name, one sentence, the status chip (`StatusChip.astro`:
-  Shipped quiet, Beta tinted, Coming soon dashed), and where it runs; a
-  hairline above it, never a box. With script, a search box and area chips
+  legend (Beta and Coming soon explained), with a picture beside it
+  (`FeaturesScene.astro`, the owner, 2026-10-06: "put some imagery at the top
+  of features page"): the `ai_chat` quokka at a drawn desk among three
+  windows in the panel language below, a note with its tasks and a chat
+  answering from it (drawn in HTML from the synthetic launch vault, so their
+  words stay legible at any size) and the real `public/shots/board.webp`
+  board. It is sized in container units so it scales as one picture, sits
+  beside the headline from 960px and under it below that, drops the board
+  on a phone, and is `aria-hidden` (the headline says it in words); no
+  script, no motion, no inline style. Under it the tiles
+  (`components/features/FeatureTile.astro`) sit in six areas, Writing,
+  Organizing, AI and chat, Files, Privacy and control, and Rotli Web and
+  agents, each headed by its quokka (the app's filled art, `areaArt.ts`). A
+  tile is one link with a bare stroke icon in the ink, level with the name's
+  first line (no square around it), the name, one sentence, and one plain
+  availability line; a hairline above it, never a box, and hover only
+  underlines the name (the owner, 2026-10-06: "remove cards around all of the
+  icons and the dot by shipped"). The availability line is
+  `availabilityOf()` in `src/features.ts`, one function over the entry's
+  status and `runs`: Shipped "Available on Mac and Web" / "Available on Mac"
+  / "Available on Web", Beta "Beta on Mac", Coming soon "Coming soon to Mac",
+  In development just that. Platforms join as "Mac, Windows and Web" (no
+  serial comma) in a fixed order; Web is named only while `WEB_APP_ENABLED`,
+  and Windows and Linux never, since no rotli app runs there yet. The tile,
+  the page, the Markdown twin, and `llms.txt` all say it the same way. With script, a search box and area chips
   (toggle buttons, `aria-pressed`) filter in place by toggling `hidden`, the
   count is announced, an emptied area steps out, nothing matching says so
   with "Show every feature", and the filter lives in the address
@@ -963,15 +981,35 @@ there, and the closing panel, whose art never touches its words from 320 to
   the tools stay hidden and the areas are jump links over the complete list.
   Three columns, two under 1080px, one on a phone; nothing animates.
   A feature's page (`FeatureDetail.astro`) has a breadcrumb back to the
-  catalog and its area, the name, status, and where it runs beside the
+  catalog and its area, the name and its availability line beside the
   area's quokka, a picture (`FeatureArt.astro`: a `public/shots/` or
   `public/themes/` capture at no more than its logical size, or a drawing in
   one panel language (a surface, a hairline, a file name on top): tasks, a
   link and its preview, the Librarian's
   filing, the note menu, the vault folder, a document, a workbook, the AI
   tools' terminal lines from `src/ai/connectorGuides.ts`), then What it
-  does, How to use it (keys and commands as written), Limits, Read more, and
-  the rest of its area as compact tiles.
+  does, How to use it (keys and commands as written), Limits, Read more, the
+  sections it took in, and the rest of its area as compact tiles.
+  **The list was condensed on 2026-10-06** (the owner: "condense the list, I
+  feel some things can be combined"), from 32 entries to 20 with Rotli Web
+  (19 without, plus four dev-only): Markdown took in tables, code, and math
+  and Mermaid diagrams; Search took in links; Templates took in slash
+  commands; "Make it yours" took in themes and panes and keys; the Librarian
+  took in Talk to the Librarian; "Your choice of AI" (`connected-ai`) took in
+  AI on your Mac; Word and Excel files (`docs`) took in Excel workbooks;
+  Boards and pictures took in pictures and files; One folder you own took in
+  Bring the folder you have; "You decide what AI sees and changes"
+  (`secure-notes`) took in What AI may change; Rotli Web took in Rotli Helper.
+  Each one taken in is a `sections` entry on the surviving page (its words,
+  picture, and keys), its old id the section's anchor; its basis quotes and
+  limits moved with it, and a Mac-only part of an entry that is "both" says
+  so in Limits. Themes' words lead "Make it yours", so it is `formerly`
+  there. `movedFrom()` turns sections and `formerly` into the map of old
+  addresses: `astro.config.mjs` writes a refresh page for each whose target
+  this build has (`movedFeatures()`), and the Caddyfile's `fold*` matchers
+  answer the same paths with a permanent redirect in production
+  (`scripts/site-features.test.ts` holds the two against one list;
+  `e2e/site/features-catalog.spec.ts` follows each redirect to its section).
   **Honesty** is a test, `scripts/site-features.test.ts`: a Shipped entry
   quotes README.md or a released CHANGELOG.md section (never Unreleased);
   Docs and Sheets take `DOCS_AND_SHEETS.status`; anything else names its
@@ -980,7 +1018,7 @@ there, and the closing panel, whose art never touches its words from 320 to
   only on the dev site (`showsExperiments`); the public catalog ends on a
   link to `/roadmap/` instead. Rotli Web and the Helper appear only while
   `WEB_APP_ENABLED`, and `runs` names Rotli Web only where a release says the
-  web has it; otherwise a feature reads "Mac app". There is no separate
+  web has it; otherwise a feature reads "Available on Mac". There is no separate
   "features doc" in Resources: the catalog is the one home for what rotli
   can do. `e2e/site/features-catalog.spec.ts` holds the filters, deep links,
   keys, the no-script list, and the phone column.

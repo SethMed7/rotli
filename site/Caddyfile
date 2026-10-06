@@ -82,6 +82,35 @@
 	# the fallback on any other host).
 	@movedGuide path_regexp movedGuide ^/resources/(getting-started|why-local|ai-and-your-notes|rotli-helper|web-and-mac)(/.*)?$
 	redir @movedGuide /blog/{re.movedGuide.1}{re.movedGuide.2} permanent
+	# The feature catalog was condensed on 2026-10-06: an entry folded into another
+	# goes to its section on the surviving page (its old id is the anchor), or to
+	# the top where its words now lead the page. The same map as `movedFrom` in
+	# src/features.ts, whose refresh pages are the fallback on any other host
+	# (scripts/site-features.test.ts holds the two together).
+	redir /features/themes /features/make-it-yours/ permanent
+	redir /features/themes/ /features/make-it-yours/ permanent
+	@foldMarkdown path_regexp foldMarkdown ^/features/(tables-code-math|diagrams)/?$
+	redir @foldMarkdown "/features/markdown/#{re.foldMarkdown.1}" permanent
+	@foldSearch path_regexp foldSearch ^/features/(links)/?$
+	redir @foldSearch "/features/search/#{re.foldSearch.1}" permanent
+	@foldTemplates path_regexp foldTemplates ^/features/(slash-commands)/?$
+	redir @foldTemplates "/features/templates/#{re.foldTemplates.1}" permanent
+	@foldMakeItYours path_regexp foldMakeItYours ^/features/(panes-and-keys)/?$
+	redir @foldMakeItYours "/features/make-it-yours/#{re.foldMakeItYours.1}" permanent
+	@foldLibrarian path_regexp foldLibrarian ^/features/(ask-the-librarian)/?$
+	redir @foldLibrarian "/features/librarian/#{re.foldLibrarian.1}" permanent
+	@foldConnectedAi path_regexp foldConnectedAi ^/features/(on-device-ai)/?$
+	redir @foldConnectedAi "/features/connected-ai/#{re.foldConnectedAi.1}" permanent
+	@foldDocs path_regexp foldDocs ^/features/(sheets)/?$
+	redir @foldDocs "/features/docs/#{re.foldDocs.1}" permanent
+	@foldBoards path_regexp foldBoards ^/features/(pictures-and-files)/?$
+	redir @foldBoards "/features/boards/#{re.foldBoards.1}" permanent
+	@foldYourFolder path_regexp foldYourFolder ^/features/(open-a-folder)/?$
+	redir @foldYourFolder "/features/your-folder/#{re.foldYourFolder.1}" permanent
+	@foldSecureNotes path_regexp foldSecureNotes ^/features/(what-ai-may-change)/?$
+	redir @foldSecureNotes "/features/secure-notes/#{re.foldSecureNotes.1}" permanent
+	@foldRotliWeb path_regexp foldRotliWeb ^/features/(rotli-helper)/?$
+	redir @foldRotliWeb "/features/rotli-web/#{re.foldRotliWeb.1}" permanent
 	# The motion studio lives on its own subdomain; people type the path.
 	redir /studio https://studio.rotli.co/ permanent
 	redir /studio/ https://studio.rotli.co/ permanent

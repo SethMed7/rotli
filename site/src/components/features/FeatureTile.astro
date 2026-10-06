@@ -1,39 +1,51 @@
 ---
 // One capability in the catalog: the whole tile is the link to its page, so a click, a tap,
-// or Enter opens it. An icon (a stroke drawing in a hairline square),
-// the name, one sentence, and a status line: the chip from src/features.ts and where it runs.
-// No box around it: a hairline above, like the guides' index, and a quiet ground on hover.
-// The catalog's filter reads the data attributes; nothing here needs script.
-import { areaOf, featurePath, isOut, runsLabel, type Feature } from '../../features';
-import StatusChip from './StatusChip.astro';
+// or Enter opens it. A bare line icon in the ink, level with the name's first line, then the
+// name, one sentence, and one plain availability line ("Available on Mac and Web",
+// `availabilityOf` in src/features.ts). No box anywhere (the owner, 2026-10-06: "remove cards
+// around all of the icons and the dot by shipped"): a hairline above, like the guides' index,
+// and on hover only the name underlines. The catalog's filter reads the data attributes;
+// nothing here needs script.
+import { areaOf, availabilityOf, featurePath, type Feature } from '../../features';
 
 interface Props {
   feature: Feature;
-  /** Name and status only, for "More in …" under a feature's page. */
+  /** Name and availability only, for "More in …" under a feature's page. */
   compact?: boolean;
 }
 
 const { feature, compact = false } = Astro.props;
 const area = areaOf(feature);
-const shipping = isOut(feature);
-const search = [feature.name, feature.line, feature.keywords ?? '', area.name, feature.status]
+const available = availabilityOf(feature);
+const search = [
+  feature.name,
+  feature.line,
+  feature.keywords ?? '',
+  ...(feature.sections ?? []).map((section) => section.title),
+  area.name,
+  available,
+]
   .join(' ')
   .toLowerCase();
 ---
 
 <li class:list={['tile', { compact }]} data-feature={feature.id} data-area={feature.area} data-search={search}>
   <a href={featurePath(feature)}>
-    <span class="icon" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-        <path d={feature.icon} />
-      </svg>
-    </span>
+    <svg
+      class="icon"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.6"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d={feature.icon} />
+    </svg>
     <h3 class="name">{feature.name}</h3>
     {!compact && <p class="line">{feature.line}</p>}
-    <p class="meta">
-      <StatusChip status={feature.status} />
-      {shipping && <span class="runs">{runsLabel(feature)}</span>}
-    </p>
+    <p class="availability" data-status={feature.status.toLowerCase().replace(/\s+/g, '-')}>{available}</p>
   </a>
 </li>
 
@@ -50,48 +62,37 @@ const search = [feature.name, feature.line, feature.keywords ?? '', area.name, f
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
     grid-template-rows: auto 1fr auto;
-    gap: 0.35rem 0.9rem;
+    gap: 0.35rem 0.85rem;
     width: 100%;
-    margin-top: 0.5rem;
-    padding: 0.85rem 0.75rem 1rem;
-    border-radius: 0.7rem;
+    padding: 1.25rem 0 1.4rem;
     color: var(--text);
     text-decoration: none;
-  }
-  a:hover {
-    background: var(--surface-2);
   }
   a:focus-visible {
     outline: 2px solid var(--accent-text);
     outline-offset: 2px;
+    border-radius: 0.25rem;
   }
+  /* The icon sits on the name's first line: the name is 1.08rem at line-height 1.3, so its
+     line box is about 1.4rem tall, and a 22px icon centred in it starts ~0.1rem down. */
   .icon {
     grid-row: 1 / span 3;
-    display: grid;
-    place-items: center;
-    width: 40px;
-    height: 40px;
-    border: 1px solid var(--border-strong);
-    border-radius: 0.6rem;
-    color: var(--text-muted);
-  }
-  a:hover .icon,
-  a:focus-visible .icon {
-    border-color: var(--accent);
-    background: var(--tint);
-    color: var(--accent-text);
-  }
-  svg {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
+    margin-top: 0.12rem;
+    color: var(--text);
   }
   .name {
     margin: 0;
-    padding-top: 0.45rem;
     font-size: 1.08rem;
     font-weight: 600;
     line-height: 1.3;
     letter-spacing: -0.01em;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+  }
+  a:hover .name {
+    text-decoration-line: underline;
   }
   .line {
     margin: 0;
@@ -99,14 +100,11 @@ const search = [feature.name, feature.line, feature.keywords ?? '', area.name, f
     font-size: 0.95rem;
     line-height: 1.5;
   }
-  .meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.35rem 0.75rem;
+  .availability {
     margin: 0.35rem 0 0;
     color: var(--text-muted);
-    font-size: 0.82rem;
+    font-size: 0.85rem;
+    line-height: 1.45;
   }
   .compact a {
     grid-template-rows: auto auto;

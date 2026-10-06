@@ -127,6 +127,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   tile for its own page: what it does, how to use it, its limits, and where
   to read more. The pages can be linked to on their own, and the list works
   without JavaScript.
+- **rotli.co's Features page is shorter and says where each thing works.**
+  Related entries are now one: Markdown covers tables, code, math, and
+  diagrams; Search covers links; Templates covers slash commands; "Make it
+  yours" covers themes, panes, and your own keys; and the Librarian, your
+  choice of AI, Word and Excel files, boards and pictures, your folder, and
+  what AI may see and change each became a single entry. Every merged part
+  keeps its words and pictures as a section of the page that took it in, and
+  its old address leads straight there. Each entry now says plainly where it
+  works ("Available on Mac and Web", "Beta on Mac", "Coming soon to Mac")
+  instead of a dot and a status, the icons stand bare without boxes, and the
+  page opens on a picture of the quokka at its desk among a note, a chat, and
+  a board.
 - **rotli.co's home page opens on the app itself.** The film under the
   headline is now a real recording of rotli: a quick note, the Library,
   search, chat, and the same note as plain Markdown. It has no sound, so the
