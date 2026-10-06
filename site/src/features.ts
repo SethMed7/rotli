@@ -811,7 +811,7 @@ const FEATURES: Feature[] = [
     id: 'secure-notes',
     area: 'privacy',
     name: 'You decide what AI sees and changes',
-    line: 'Secure notes never reach remote AI or the web, notes you wrote stay as you wrote them, and Lock stops every AI.',
+    line: 'Secure notes never reach remote AI or the web, notes you wrote stay as you wrote them until you allow edits, and Lock stops every AI.',
     status: 'Shipped',
     runs: 'both',
     icon: ICON.shield,
@@ -1004,6 +1004,10 @@ export const availabilityOf = (feature: Feature) =>
 
 export const featurePath = (feature: Feature) => `/features/${feature.id}/`;
 
+/** What a merged entry also covers, for text-only lists (the twin, llms.txt): " Also: Mermaid diagrams." */
+export const alsoCovers = (feature: Feature): string =>
+  feature.sections?.length ? ` Also: ${feature.sections.map((section) => section.title).join('; ')}.` : '';
+
 /** The catalog as Markdown: /features/index.md, linked from /llms.txt. */
 export function catalogMarkdown(origin: string): string {
   const lines = [
@@ -1014,9 +1018,8 @@ export function catalogMarkdown(origin: string): string {
   for (const { area, features } of catalog()) {
     lines.push('', `## ${area.name}`, '', area.line, '');
     for (const feature of features) {
-      const parts = feature.sections?.length ? ` Also: ${feature.sections.map((s) => s.title).join('; ')}.` : '';
       lines.push(
-        `- [${feature.name}](${origin}${featurePath(feature)}) (${availabilityOf(feature)}): ${feature.line}${parts}`,
+        `- [${feature.name}](${origin}${featurePath(feature)}) (${availabilityOf(feature)}): ${feature.line}${alsoCovers(feature)}`,
       );
     }
   }
