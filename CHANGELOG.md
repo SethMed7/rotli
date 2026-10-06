@@ -240,10 +240,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rest in a grid; posts that are coming soon are labelled on their picture. A
   post shows the same picture at the top, and its link preview uses the same
   scene.
-- **The privacy page opens on a full-width banner.** The night fills most of
-  the first screen under the header, and the page rises over it as you
-  scroll, with the title, date, and reading time on a panel at the bottom
-  left so they're always easy to read.
+- **rotli.co's privacy page reads like a blog post.** The title, the
+  summary, and the date sit beside the night scene, in a rounded frame like
+  a post's picture, where the full-width banner used to be. Below that the
+  contents and how far through you are stay on the left, with Copy link,
+  and the policy is on the right at a comfortable line; the privacy promise
+  and its table still come first, and the promise button on the home page
+  still lands on it. The page ends with the posts about privacy and where to
+  get rotli. On a phone the scene goes above the title, the contents fold
+  into "On this page", and nothing scrolls sideways at any width. The words
+  of the policy haven't changed.
 - **The blog's pictures are redrawn.** The quokka is larger and crisper, at
   the same size in every picture, and what it holds (a notepad, a shield, a
   laptop, a folder of notes, a drawing board) is drawn like the things around
