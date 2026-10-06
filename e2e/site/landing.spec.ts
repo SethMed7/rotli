@@ -331,9 +331,7 @@ test("the band keeps two figures, each with its population and its source", asyn
     .locator("sup a")
     .evaluateAll((links) => links.map((a) => a.getAttribute("href")));
   expect(marks).toEqual(["#fn-1", "#fn-2"]);
-  await expect(page.locator("#fn-1")).toContainText(
-    "1,272 U.S. adults who pay for at least one subscription",
-  );
+  await expect(page.locator("#fn-1")).toContainText("1,272 U.S. adults about their subscriptions");
   await expect(page.locator("#fn-1")).toContainText("among respondents paying for ChatGPT");
   await expect(page.locator("#fn-2")).toContainText("Menlo Ventures");
   await expect(page.locator("#fn-2")).toContainText("Among AI users who pay for AI, 50% use it daily");
