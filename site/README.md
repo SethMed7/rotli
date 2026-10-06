@@ -367,8 +367,11 @@ there, and the closing panel, whose art never touches its words from 320 to
   newest first, one row each (date, its first tag as the topic, title,
   one-line summary) between hairlines, never boxes, the title and summary
   held to 46rem so a row never becomes one long line on a wide screen. The
-  index sits on the blog's wider page (see "The blog post") and lays itself
-  out by its own width (a container, `blog-index`), not the window's. Topic filters over the list are buttons with
+  index sits on the site's standard 76rem page (only a post has the wider
+  one; the owner, 2026-10-06: "I meant the page where we read the blog, not
+  the catalog page"), where four posts in the row are about 17.5rem each,
+  and lays itself out by its own width (a container, `blog-index`), not the
+  window's. Topic filters over the list are buttons with
   `aria-pressed` that appear only with script (without it the whole list
   shows); a choice narrows the rows, says how many in a status line, and is
   kept in the address as `?topic=`. Announced (`coming-soon`) posts sit apart
@@ -381,56 +384,73 @@ there, and the closing panel, whose art never touches its words from 320 to
   list's order and rules, the filters with and without script, and "New" at
   1920, 1440, 768, and 390; `article-width.spec.ts` sweeps it from 320 to 2560
   (no sideways scroll, the feature beside or above its words, the list's
-  measure, the row's column rule at one to four posts).
+  measure, the index never wider than 76rem, the row's column rule at one to
+  four posts).
 - **The blog post** (`WritingPage`'s `article`; the owner's 2026-10-06 "fix the
   top of blogs", then "clean up left screen ... sources on the left side ...
   on right side ... ad spots [and] promoting other blogs"; then "for blogs
   let's use more width, we have more space to use, and let's consider
-  responsiveness").
-  - **The page and the grid** (`WritingPage.astro`). Posts and `/blog/` use
-    the blog's wider page, `--page-max-wide` in `Base.astro` (96rem, growing
-    to 104rem from about 2360px; the site's other pages stay at 76rem).
-    `WritingPage` passes `widePage` to `Base`, which sets it on `<body>`, so
-    the header and the footer take the same width and the brand stands over
-    the post's picture. The post's grid is named tracks,
-    `--article-tracks`, shared by the cover and the body: `rail`, a gap,
-    `main` (the middle) holding `text` centred in it, a gap, and `side`.
-    The reading column is a measure, `--measure`: `--prose-size` (18px,
-    easing to 20px at 2560 by a clamp) × 39.5, about 68 characters. The rails
-    and gaps are fluid in the article's own width (`cqi`; the article is
-    the container): the left rail 10rem at 901px, 13rem by 1280, held to
-    1440, 16rem by about 1620; the right side 14.5rem to 1440, 18rem by about
-    1620; the gaps 2rem to 4rem. The middle is what they leave. By window
-    width: phones and tablets (to 900px) one column, the text centred at the
-    measure (full width under about 770px); 901 to 1279 the left rail and the
-    middle (the column 61 to 68 characters); 1280 and up both rails (63
-    characters at 1280, then 68). The middle is 808px at 1440, 864 at 1680
-    and 1920, and 992 at 2560. The rails fold in that order: the right side
-    under the article below 1280px, then the left rail below 901px (its tree
-    the disclosure, its meter the slim bar, its Share after the article).
-    `/privacy/` keeps the site's 76rem page: it uses the tree layout, not
-    `article`, and its column is already about 70 characters beside its
-    tree, so a wider page would only add empty margin to its right.
+  responsiveness"; then "now the blog width is too much ... just the blog
+  itself, so the left and right panels use more width to clear up visual
+  clutter. I also want the right side to only show at top, not with the
+  scroll").
+  - **The page and the grid** (`WritingPage.astro`). A post has its own page,
+    `--page-max-wide` in `Base.astro`: 88rem, fixed (it never grows on a wide
+    screen). `WritingPage` passes `widePage` to `Base` for posts only, which
+    sets it on `<body>`; `/blog/` and every other page stay at 76rem, and the
+    header and footer keep 76rem on every page, so from about 1300px the
+    post's picture runs up to 6rem past the header's brand and button on each
+    side (the cost of a fixed header over a wider post). The post's grid is
+    named tracks, `--article-tracks`, shared by the cover and the body:
+    `rail`, a gap, `main` (the middle) holding `text` centred in it, a gap,
+    and `side`. The reading column is a measure, `--measure`: 18px type at
+    every width (the growth to 20px on the widest screens is gone: on a
+    fixed 88rem page it only took room from the rails) × 38.5, about 66
+    characters. The rails are what the page gives beyond the column, and are
+    fluid in the article's own width (`cqi`; the article is the container).
+    By window width:
+
+    | Window      | Page         | Left rail        | Right rail       | Gaps      | Line         |
+    | ----------- | ------------ | ---------------- | ---------------- | --------- | ------------ |
+    | to 900      | window − gutters | (disclosure) | (after the post) | none      | to 66 chars  |
+    | 901 – 1359  | window − gutters | 10rem → 16rem by ~1180 | (after the post) | 2 → 2.5rem | 61 – 66   |
+    | 1360 – 1487 | window − 5rem (80–87rem) | 16.5rem → 19.5rem | same as left    | 2.5rem    | 64 – 66      |
+    | 1488 and up | 88rem        | 19.5rem          | 19.5rem          | 2.5rem    | 66           |
+
+    At 1440 the rails are 18.4rem each and the middle 692px; from 1488 they
+    are 19.5rem and the middle 704px. The rails fold in that order: the
+    right side under the article below 1360px (where both rails would drop
+    under 16.5rem beside a 64-character line), then the left rail below 901px
+    (its tree the disclosure, its meter the slim bar, its Share after the
+    article). `/privacy/` keeps the site's 76rem page: it uses the tree
+    layout, not `article`, and its column is already about 70 characters
+    beside its tree, so a wider page would only add empty margin to its right.
   - **What breaks out.** Every block of the post keeps the measure, centred
-    in the middle; figures, tables, and code blocks take the middle's full
-    width, but only when the middle is at least 48.5rem (a container query on
-    the prose), so a figure is never a sliver wider than the text. Nothing
-    reaches into a rail: both are sticky, so a figure there would pass under
-    them. The cover's picture spans every track.
-  - **The head** (`blog/ArticleCover.astro`) uses the same tracks: the post's
-    banner art (`postBanner(slug)`) across all of them, rounded, with a
-    hairline, `clamp(13rem, min(31cqi, 46svh), 33rem)` tall (about 3.2 to 1
+    in the middle; figures, tables, and code blocks may break out, but only
+    when the middle is at least 48.5rem (a container query on the prose), so
+    a figure is never a sliver wider than the text, and never by more than
+    5rem a side (`min(100%, --measure + 10rem)`), so nothing is over-wide.
+    Beside both rails the middle is the column and a little more, so they keep
+    the measure there; with the left rail alone (901 to 1359px) and on a
+    tablet they spread. Nothing reaches into a rail. The cover's picture spans
+    every track.
+  - **The head** (`blog/ArticleCover.astro`; the owner, 2026-10-06: "a lot of
+    awkward space, especially where the 'blog/' is") uses the same tracks: the
+    post's banner art (`postBanner(slug)`) across all of them, rounded, with a
+    hairline, `clamp(12rem, min(30cqi, 44svh), 27rem)` tall (about 3.3 to 1
     whatever the page's width, capped by the window's height; `object-position:
-    100% 88%`, so the crop comes off the sky and the quokka keeps its ears),
-    still. Under it "Blog /" sits on the rail's edge and the words on the
-    reading column's edge: the title (which may run over the right column from
-    1280px), the summary (at the measure), one meta line (the face mark as avatar, the author,
-    date, reading time), and the `tags` as light outlined labels (the blog
-    index's topics share that style). A hairline across the columns closes
-    the head. Nothing overlaps the picture at any width, and the title is in
-    the first window at 1440 × 900 and 1280 × 800. Under 901px it is one
-    column (trail and words on the text's edge, the picture across); under
-    700px the picture is the phone crop.
+    100% 70%`, so the quokka keeps its ears and its feet), still. Under it one
+    block from the page's left edge, the picture's and the left rail's (not
+    the reading column's, which left the head indented into empty space):
+    "Blog /", small and quiet, straight above the title (wrapping at about
+    22em), the summary (at the measure), one meta line (the face mark as
+    avatar, the author, date, reading time), and the `tags` as light outlined
+    labels (the blog index's topics share that style), in one tight rhythm.
+    Nothing sits alone in the rail's column. A hairline across the columns
+    closes the head. Nothing overlaps the picture at any width, and the title
+    is in the first window at 1440 × 900 and 1280 × 800. Under 901px it is one
+    column (the picture across, the words on the text's edge); under 700px the
+    picture is the phone crop.
     A post without art gets the same head without the picture.
   - **The left rail** (`blog/ArticleRail.astro`, sticky) reads, top to
     bottom: the short title (`railTitle`: a title's first sentence), "On this
@@ -457,13 +477,14 @@ there, and the closing panel, whose art never touches its words from 320 to
     no J/K section jumps (removed 2026-10-06 at the owner's request). Under
     900px the tree is the "On this page" disclosure, the meter a 3px bar under
     the header, and Share follows the article.
-  - **The right side** (`blog/ArticleAside.astro`): from 1280px a third
-    column with "More posts" (up to three, `morePosts` in `src/blog.ts`: the
+  - **The right side** (`blog/ArticleAside.astro`): from 1360px a third
+    column, beside the start of the article, with "More posts" (up to three, `morePosts` in `src/blog.ts`: the
     newest other published posts, never the post itself; announced posts fill
     in only when too few are published, marked "Coming soon" and not linked)
     as small thumbnails with title and date, and two **From rotli** spots. It
-    stays in view while reading when the window is at least 760px tall and
-    scrolls with the page when not. Below 1280px the same block follows the
+    is never pinned: it shows at the top of the post and scrolls away with
+    the page, so while reading there is only the text and the left rail.
+    Below 1360px the same block follows the
     article (after Share on a phone, on the text's edges) as "More from
     rotli", with one spot.
   - **From rotli spots** are `src/promos.ts`, the one file to edit: `id`,
@@ -480,9 +501,9 @@ there, and the closing panel, whose art never touches its words from 320 to
     change, a `/privacy/` and `PRIVACY.md` change, and the owner's decision
     first; none is planned (the owner, 2026-10-06: house promos only).
   - **The reading column** (`blog/article.css`, global under
-    `.writing.is-article`) is `--prose-size` (18px to 20px) at `--measure`:
-    60 to 80ch (the width of that many zeros) at every width from 768px,
-    about 68 characters of running text a line, with h2/h3 spacing, pull quotes, a numbered Sources list (`## Sources`
+    `.writing.is-article`) is `--prose-size` (18px) at `--measure`:
+    60 to 80ch (the width of that many zeros) at every width from 768px and
+    62 to 70 beside both rails, about 66 characters of running text a line, with h2/h3 spacing, pull quotes, a numbered Sources list (`## Sources`
     then a list), footnotes, and the figures' styles; long words and bare
     addresses break instead of widening a phone's page.
   - Specs: `e2e/site/article-banner.spec.ts` (the head's order, alignment,
@@ -490,14 +511,17 @@ there, and the closing panel, whose art never touches its words from 320 to
     `article-rail.spec.ts` (the rail's order and fit, Sources linking out,
     Share, copying, J and K doing nothing, jumps, the narrow layout), and
     `article-aside.spec.ts` (the right side, the spots, the stacked "More
-    from rotli" on the text's edges, 60 to 80ch at 1280 and 1440, no overlap
-    or overflow from 320 to 1920), and `article-width.spec.ts` (the sweep at
-    320, 390, 600, 768, 900, 1024, 1180, 1280, 1440, 1680, 1920, and 2560: no
-    sideways scroll, rails and figures never over the text, 60 to 80
-    characters a line from 768px, the head on the text's edge, the rails'
-    folding order, figures breaking out from 1680; the page's widths, the
-    type's clamp, a live resize matching a fresh load, and both rails whole
-    at 1440 × 700); `scripts/site-writing.test.ts` holds `sourcesOf` against the
+    from rotli" on the text's edges, the right side scrolled away far down
+    the post while the left rail is still in view, 62 to 70ch at 1360, 1440,
+    and 1920, no overlap or overflow from 320 to 1920), and
+    `article-width.spec.ts` (the sweep at 320, 390, 600, 768, 900, 1024, 1180,
+    1280, 1359, 1360, 1440, 1680, 1920, and 2560: no sideways scroll, rails
+    and figures never over the text, 60 to 80 characters a line from 768px
+    and 62 to 70 beside both rails, 18px type, the head on the page's edge,
+    the rails' folding order, figures breaking out with the left rail alone
+    and never by more than 5rem a side; both rails at least 18rem at 1440 and
+    1920, a post's 88rem page and the index's 76rem, a live resize matching a
+    fresh load, and the left rail whole at 1440 × 700); `scripts/site-writing.test.ts` holds `sourcesOf` against the
     published post, `railTitle`, `morePosts`, and the promos' data and
     rotation.
 - **The article banner** (`WritingPage`'s `banner`, the owner's 2026-10-05
