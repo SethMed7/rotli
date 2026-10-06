@@ -11,6 +11,7 @@ for (const width of [390, 768]) {
   for (const path of [
     "/",
     "/features/",
+    "/features/connected-ai/",
     "/privacy/",
     "/changelog/",
     "/blog/",
