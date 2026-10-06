@@ -1691,6 +1691,7 @@ Three fixes from a computer-use test of the installed 0.94.0.
 - Librarian Activity rows now name the lane and model that filed the note
   ("Claude · Claude Opus"), not only the day and time.
 
+
 ## [0.94.0] - 2026-09-12
 
 The Librarian lane actually works: the choice persists and reaches the
@@ -1715,6 +1716,7 @@ is.
   Librarian choice, so the daemon never used a connected lane and the
   Settings control reverted to On this Mac on relaunch. The choice now
   persists and reaches the daemon.
+
 
 ## [0.93.0] - 2026-09-12
 
@@ -1855,6 +1857,7 @@ wikilinks, typed tables, and placeable choice panels.
 - Repository and deployment-context privacy tripwires, redacted secret-scan
   commands, and owner-only main/dev protection payloads are available. Actual
   branch protection still requires an eligible private-repository GitHub plan.
+
 
 ### Added
 
