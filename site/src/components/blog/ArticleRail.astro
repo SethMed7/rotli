@@ -244,8 +244,10 @@ const shareLinks = [
   const sourcesBlock = document.querySelector<HTMLElement>('[data-rail-sources]');
   const sourcesToggle = document.querySelector<HTMLButtonElement>('[data-sources-toggle]');
   if (sourcesBlock && sourcesToggle) {
+    const first = Number(sourcesToggle.dataset.first);
+    const entries = [...sourcesBlock.querySelectorAll<HTMLLIElement>('.sources > li')];
     const setOpen = (open: boolean) => {
-      sourcesBlock.toggleAttribute('data-folded', !open);
+      entries.forEach((entry, index) => (entry.hidden = !open && index >= first));
       sourcesToggle.setAttribute('aria-expanded', String(open));
       sourcesToggle.textContent = (open ? sourcesToggle.dataset.showFewer : sourcesToggle.dataset.showAll) ?? '';
     };
@@ -410,7 +412,7 @@ const shareLinks = [
     font-variant-numeric: tabular-nums;
     text-align: right;
   }
-  /* Sources: every entry whole, the first four until "Show all" (script folds the rest). */
+  /* Sources: every entry whole; the script hides those past FIRST_SOURCES until "Show all". */
   .rail-sources {
     padding-top: 0.9rem;
     border-top: 1px solid var(--border);
@@ -422,7 +424,7 @@ const shareLinks = [
     padding: 0;
     list-style: none;
   }
-  .rail-sources[data-folded] .sources > li:nth-child(n + 5) {
+  .sources > li[hidden] {
     display: none;
   }
   .sources li {
