@@ -2,7 +2,8 @@
 // /features/ and /features/<id>/: the capability catalog and one page per capability, all from
 // src/features.ts, so the catalog, the pages, their Markdown twin (/features/index.md), and
 // /llms.txt list the same things with the same status. /features/ opens on the page's one
-// headline (the link card in src/og.ts restates it) and the catalog under it: tiles grouped by
+// headline (the link card in src/og.ts restates it) beside its picture (FeaturesScene.astro: the
+// quokka at its desk among windows of the real app), and the catalog under it: tiles grouped by
 // area, filtered in place with script, a plain grouped list without. A tile opens the
 // capability's own page (FeatureDetail.astro), which can be linked and indexed on its own.
 // The landing page's story section (the Overview) ends on "See every feature", here.
@@ -12,6 +13,7 @@ import SiteFooter from '../../components/SiteFooter.astro';
 import SiteHeader from '../../components/SiteHeader.astro';
 import Catalog from '../../components/features/Catalog.astro';
 import FeatureDetail from '../../components/features/FeatureDetail.astro';
+import FeaturesScene from '../../components/features/FeaturesScene.astro';
 import { areaOf, visibleFeatures, type Feature } from '../../features';
 import { ogImage } from '../../og';
 import { DOCS_AND_SHEETS, site } from '../../site';
@@ -54,16 +56,21 @@ const { feature } = Astro.props as { feature: Feature | undefined };
       <SiteHeader current="features" />
       <main id="content">
         <header class="wrap page-head">
-          <h1>Everything rotli does, in plain files.</h1>
-          <p>
-            Every part of rotli, grouped by what it is for. Open one to see what it does, how to use it, and where it
-            stops.
-          </p>
-          <p class="legend">
-            <b>Shipped</b> is in the app today. <b>{DOCS_AND_SHEETS.status}</b> is usable and still being finished.{' '}
-            <b>Coming soon</b> is in the next release.
-            {site.showsExperiments && <> <b>In development</b> runs in development builds only.</>}
-          </p>
+          <div class="head-copy">
+            <h1>Everything rotli does, in plain files.</h1>
+            <p>
+              Every part of rotli, grouped by what it is for. Open one to see what it does, how to use it, and where it
+              stops.
+            </p>
+            <p class="legend">
+              Each one says where you can use it today. <b>{DOCS_AND_SHEETS.status}</b> is usable and still being
+              finished; <b>Coming soon</b> is in the next release.
+              {site.showsExperiments && <> <b>In development</b> runs in development builds only.</>}
+            </p>
+          </div>
+          <div class="head-scene" data-features-scene>
+            <FeaturesScene />
+          </div>
         </header>
         <Catalog />
       </main>
@@ -74,8 +81,26 @@ const { feature } = Astro.props as { feature: Feature | undefined };
 
 <style>
   .page-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 2rem clamp(2rem, 5vw, 4.5rem);
     padding-top: clamp(3rem, 7vw, 5rem);
     padding-bottom: clamp(1.75rem, 3.5vw, 2.5rem);
+  }
+  .head-scene {
+    width: 100%;
+    max-width: 36rem;
+    justify-self: end;
+  }
+  @media (max-width: 960px) {
+    .page-head {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .head-scene {
+      max-width: 30rem;
+      justify-self: start;
+    }
   }
   h1 {
     max-width: 16ch;
