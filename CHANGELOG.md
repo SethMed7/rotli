@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A vault opens on your freshest note.** When the newest file in a vault
+  was an Excalidraw board, Rotli opened the board as a broken, empty note tab
+  on start. It now opens the most recent note.
+
 ### Added
 
 - **A graph of your notes.** Search "Graph" in ⌘K to see every note as a

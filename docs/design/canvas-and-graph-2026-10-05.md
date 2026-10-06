@@ -7,9 +7,18 @@ branch** (owner decisions 2026-10-06, below).
   links (decision 4). The Rust projection is covered by cargo tests and the
   IPC contract check; the TypeScript side by unit tests and the browser-twin
   Playwright lane.
-- **Canvas:** a working spike in development builds. Next: the owner's
-  decisions plus New → Canvas, dragging notes in, groups and lines, and
-  Rotli Web, as a second PR.
+- **Canvas:** built for development builds on the Mac and Rotli Web, as a
+  second PR stacked on the Graph's:
+  - New → Canvas makes a canvas beside your notes.
+  - Canvases are found in ⌘K and All notes, and archive and restore like a
+    note.
+  - Drag a note in from the sidebar to make its card.
+  - G groups the selected cards, and a line can be picked, named, and
+    removed on its own.
+  - Colours come from the label palette.
+  - Rotli Web lists, opens, saves, makes, and archives canvases in the
+    connected folder.
+  - The real editor inside a note card is on the roadmap.
 
 The ask (the owner, 2026-10-05): explore a canvas and a graph "like other apps
 have" ([Obsidian Canvas](https://obsidian.md/canvas), Obsidian's graph), but
