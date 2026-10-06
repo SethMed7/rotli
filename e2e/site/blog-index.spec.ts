@@ -1,6 +1,6 @@
 // /blog/: the newest post as the feature, the rest in a grid, every entry with its thumbnail
 // (the post's scene from build:brand-images), one aspect ratio, real sizes, and the announced
-// posts marked "Coming soon" on their picture. A post's page shows the same picture in its head.
+// posts marked "Coming soon" on their picture. A post's page opens on the same scene, composed wide.
 import { expect, test, type Locator } from "@playwright/test";
 
 async function expectThumbnail(img: Locator) {
@@ -50,12 +50,20 @@ for (const viewport of [
   });
 }
 
-test("a post shows its thumbnail in the head, beside the title on a wide screen", async ({ page }) => {
+test("a post opens on its banner: the same scene as its thumbnail, composed wide", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/blog/");
+  const tile = page.locator('a[href="/blog/rotli-web-and-your-mac/"] img').first();
+  const tileAlt = await tile.getAttribute("alt");
   await page.goto("/blog/rotli-web-and-your-mac/");
-  const cover = page.locator(".writing-head .cover");
-  await expectThumbnail(cover);
-  const title = (await page.locator(".writing-head h1").boundingBox())!;
-  const picture = (await cover.boundingBox())!;
-  expect(picture.x).toBeGreaterThan(title.x + title.width);
+  const art = page.locator("[data-article-banner] img");
+  await expect(art).toHaveAttribute("width", "2400");
+  await expect(art).toHaveAttribute("height", "1000");
+  await expect(art).toHaveAttribute("src", "/banners/blog/rotli-web-and-your-mac.webp");
+  await expect(art).toHaveAttribute("alt", tileAlt!);
+  await expect(page.locator("[data-article-banner] source")).toHaveAttribute(
+    "srcset",
+    "/banners/blog/rotli-web-and-your-mac-mobile.webp",
+  );
+  await expect(page.locator(".writing-head .cover")).toHaveCount(0);
 });
