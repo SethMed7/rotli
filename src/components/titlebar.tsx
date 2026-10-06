@@ -232,8 +232,11 @@ export function Titlebar() {
           </IconButton>
         )}
         {/* The sun steps through environments as Appearance → Theme button says. */}
+        {/* second from the right with the longest label: it anchors right
+            too, or its centred tip reaches past the window (2026-10-06) */}
         {!hidden.themeButton && (
           <IconButton
+            className="tb-trail"
             label={`Theme — ${themeLabel} · click for ${nextLabel}`}
             onClick={() => dispatch("theme.cycle")}
           >

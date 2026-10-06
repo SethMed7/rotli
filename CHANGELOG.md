@@ -174,6 +174,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lost the menu-bar-only app mid-setup; the quiet visitor is a choice in
   Settings → General.
 
+### Fixed
+
+- **The window no longer scrolls sideways.** The hover labels on the theme
+  button and on a tab strip's **+** reached past the right edge of the window,
+  so picking something from ⌘K could slide the whole app 50 px to the left.
+  Both labels now open toward the window.
+
 ### Added
 
 - **rotli.co has a "hear when it's ready" list and quokkas at the bottom.**

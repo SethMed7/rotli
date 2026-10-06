@@ -2261,6 +2261,13 @@
   opacity: 1;
   transition-delay: 300ms;
 }
+/* the + ends its tab strip, so its label opens leftward from its right edge:
+   centred, it reached past the window at the rightmost pane (2026-10-06) */
+.tabplus .tip {
+  left: auto;
+  right: 0;
+  transform: none;
+}
 
 /* User-selectable crowding rules. Scroll is the readable default and keeps a
    96px floor. Fit lets every tab share the available strip, down to its glyph
