@@ -11,7 +11,7 @@ export const MILESTONES: readonly Milestone[] = [
   {
     version: '1.0.0',
     title: 'rotli 1.0',
-    line: 'Notes, tasks, and links on the Mac, every one a plain file in your folder.',
+    line: 'Notes, tasks, and links on the Mac, all in plain files in your folder.',
   },
   {
     version: '1.1.0',
