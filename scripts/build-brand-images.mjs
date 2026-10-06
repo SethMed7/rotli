@@ -5,6 +5,8 @@
 //   site/public/og/<page>.png             1200×630  each page's link card (site/src/og.ts)
 //   site/public/og/blog/<slug>.png        1200×630  each published post's card, from its title
 //   site/public/thumbs/blog/<slug>.webp   1200×630  every post's thumbnail (and -600.webp): its scene, no words
+//   site/public/banners/blog/<slug>.webp  2400×1000 every published post's banner (and -1200.webp), the
+//                                         same scene composed wide, and -mobile.webp (1300×900), its phone crop
 //   brand/assets/banners/*.png            X, LinkedIn, GitHub, YouTube
 //   brand/assets/pfp/*.png                1024×1024 face mark on four theme-family grounds
 //   brand/assets/thumbnails/*.png         1280×720  the title-slot template and one per post
@@ -25,9 +27,17 @@ import { parseArgs } from "node:util";
 import { chromium } from "@playwright/test";
 import sharp from "sharp";
 
-import { OG_CARDS, POSES, postArt, postPose, thumbnailAlt, thumbnailPath } from "../site/src/og.ts";
+import {
+  bannerPath,
+  OG_CARDS,
+  POSES,
+  postArt,
+  postPose,
+  thumbnailAlt,
+  thumbnailPath,
+} from "../site/src/og.ts";
 import { quokka } from "./brand-images/quokka.mjs";
-import { cardBeside, scene } from "./brand-images/scenes.mjs";
+import { cardBeside, MOBILE_CROP, quokkaSize, scene } from "./brand-images/scenes.mjs";
 import { banner, C, card, pfp, TEXT_PAIRS, textCss } from "./brand-images/templates.mjs";
 
 const root = join(import.meta.dir, "..");
@@ -129,7 +139,7 @@ const page = await browser.newPage({ deviceScaleFactor: 1 });
 await page.route("**/*", (route) => route.abort());
 const rendered = [];
 
-async function render(path, svg, { width, height, group }) {
+async function render(path, svg, { width, height, group, half = true }) {
   await page.setViewportSize({ width, height });
   await page.setContent(`<!doctype html><style>${fontFaces}${textCss}body{margin:0}</style>${svg}`);
   await page.evaluate(() => document.fonts.ready);
@@ -143,7 +153,7 @@ async function render(path, svg, { width, height, group }) {
   const problems = await page.evaluate(fitAndCheck);
   if (problems.length > 0) throw new Error(`${path}:\n  ${problems.join("\n  ")}`);
   const raw = await page.screenshot({ clip: { x: 0, y: 0, width, height } });
-  if (path.endsWith(".webp")) return writeWebp(path, raw, { width, height, group });
+  if (path.endsWith(".webp")) return writeWebp(path, raw, { width, height, group, half });
   const png = await sharp(raw)
     .png({ palette: true, quality: 95, effort: 10, compressionLevel: 9 })
     .toBuffer();
@@ -154,9 +164,9 @@ async function render(path, svg, { width, height, group }) {
   console.log(`${path}  ${width}×${height}  ${Math.round(png.length / 1024)} KB`);
 }
 
-// The site's thumbnails: webp at the rendered width and at half of it (`<name>-600.webp`), for srcset.
-async function writeWebp(path, raw, { width, height, group }) {
-  for (const size of [width, width / 2]) {
+// The site's pictures: webp at the rendered width and at half of it (`<name>-600.webp`), for srcset.
+async function writeWebp(path, raw, { width, height, group, half }) {
+  for (const size of half ? [width, width / 2] : [width]) {
     const out = size === width ? path : path.replace(/\.webp$/, `-${size}.webp`);
     const webp = await sharp(raw).resize(size).webp({ quality: 80, effort: 6 }).toBuffer();
     await mkdir(dirname(join(root, out)), { recursive: true });
@@ -217,7 +227,11 @@ async function buildAll() {
     const art = postArt(post.slug);
     await render(
       `site/public${thumbnailPath(post.slug)}`,
-      scene({ kind: art.scene, art: await pose(art.pose), label: thumbnailAlt(post.slug) }),
+      scene({
+        kind: art.scene,
+        art: await pose(art.pose, quokkaSize(art.scene, "thumb")),
+        label: thumbnailAlt(post.slug),
+      }),
       { width: 1200, height: 630, group: "Post thumbnails (site/public/thumbs/blog/)" },
     );
   }
@@ -236,6 +250,27 @@ async function buildAll() {
       height: 630,
       group: "Link cards (site/public/og/)",
     });
+  }
+
+  // Only a published post has a page, so only it gets a banner.
+  for (const post of everyPost.filter((item) => item.status === "published")) {
+    const art = postArt(post.slug);
+    const wide = {
+      kind: art.scene,
+      art: await pose(art.pose, quokkaSize(art.scene, "wide")),
+      layout: "wide",
+    };
+    const group = { group: "Post banners (site/public/banners/blog/)" };
+    await render(`site/public${bannerPath(post.slug)}`, scene({ ...wide, label: thumbnailAlt(post.slug) }), {
+      width: 2400,
+      height: 1000,
+      ...group,
+    });
+    await render(
+      `site/public${bannerPath(post.slug, "mobile")}`,
+      scene({ ...wide, label: thumbnailAlt(post.slug), crop: MOBILE_CROP }),
+      { width: MOBILE_CROP[2], height: MOBILE_CROP[3], half: false, ...group },
+    );
   }
 
   const home = OG_CARDS.home;

@@ -75,10 +75,11 @@ export type OgCardName = keyof typeof OG_CARDS;
 
 /**
  * A post's picture, by slug: the quokka's pose and the scene around it
- * (scripts/brand-images/scenes.mjs). One definition, two renders by
+ * (scripts/brand-images/scenes.mjs). One definition, three renders by
  * `bun run build:brand-images`: the title-free scene is the post's thumbnail
- * (public/thumbs/blog/, on /blog/ and the post's head), and its link card
- * stands the same pose beside the scene's first prop, under the title it
+ * (public/thumbs/blog/, on /blog/), the same scene composed wide is its
+ * banner (public/banners/blog/, the top of the post's page), and its link
+ * card stands the same pose beside the scene's first prop, under the title it
  * reads from the post's frontmatter. Neither stores a title here, so a
  * retitled post needs only a re-render. A post not listed gets the writing
  * quokka on the plain beach.
@@ -167,6 +168,44 @@ export function postThumbnail(slug: string): Thumbnail | undefined {
     src,
     srcset: `${thumbnailPath(slug, 600)} 600w, ${src} 1200w`,
     ...THUMBNAIL,
+    alt: thumbnailAlt(slug),
+  };
+}
+
+/**
+ * A post's banner: the same scene composed wide (2400 × 1000, with a 1200-wide copy), its
+ * quokka and props in the right half so the article's title panel rises over open sea and
+ * sand on the left, and a phone crop (1300 × 900) of the quokka and its props. The article's
+ * head (WritingPage `banner`) shows it full width.
+ */
+export interface Banner {
+  src: string;
+  srcset: string;
+  mobile: string;
+  width: number;
+  height: number;
+  mobileWidth: number;
+  mobileHeight: number;
+  alt: string;
+}
+
+export const BANNER = { width: 2400, height: 1000, mobileWidth: 1300, mobileHeight: 900 } as const;
+
+/** Where a post's banner is written (the build script) and served (the pages). */
+export function bannerPath(slug: string, variant: 'wide' | 'half' | 'mobile' = 'wide'): string {
+  const suffix = { wide: '', half: '-1200', mobile: '-mobile' }[variant];
+  return `/banners/blog/${slug}${suffix}.webp`;
+}
+
+/** A post's banner, or undefined until `bun run build:brand-images` has rendered it. */
+export function postBanner(slug: string): Banner | undefined {
+  const src = bannerPath(slug);
+  if (!hasPublicFile(src) || !hasPublicFile(bannerPath(slug, 'mobile'))) return undefined;
+  return {
+    src,
+    srcset: `${bannerPath(slug, 'half')} 1200w, ${src} 2400w`,
+    mobile: bannerPath(slug, 'mobile'),
+    ...BANNER,
     alt: thumbnailAlt(slug),
   };
 }
