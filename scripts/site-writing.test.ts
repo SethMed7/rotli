@@ -213,7 +213,7 @@ describe("a figure fence", () => {
     const fences = [...post.matchAll(/```figure\n([\s\S]*?)\n```/g)].map((match) =>
       figures.parseFigure(match[1]!),
     );
-    expect(fences.map((figure) => figure.kind)).toEqual(["bar", "bar", "flow"]);
+    expect(fences.map((figure) => figure.kind)).toEqual(["bar", "bar", "bar", "flow"]);
     const prose = post.replace(/```figure[\s\S]*?```/g, "");
     for (const figure of fences.filter((each) => each.kind === "bar")) {
       for (const row of figure.rows!) expect(prose).toContain(`${row.value}%`);

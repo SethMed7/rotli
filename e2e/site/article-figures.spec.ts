@@ -10,7 +10,7 @@ test("each chart has an accessible name, a description, a cited caption, and its
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(POST);
   const charts = page.locator('figure[data-figure="bar"]');
-  await expect(charts).toHaveCount(2);
+  await expect(charts).toHaveCount(3);
 
   const thirty = page.getByRole("img", { name: "Paying users who hadn't used the tool in the past 30 days" });
   await expect(thirty).toBeVisible();

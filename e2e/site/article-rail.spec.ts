@@ -43,7 +43,11 @@ for (const viewport of [
     await expect(tree.getByRole("link")).toHaveText([
       "What the numbers say",
       "What they don’t say",
+      "Two readers, two kinds of use",
+      "What your plan may already include",
       "Putting the idle part to work",
+      "Which path fits you",
+      "Limits worth knowing",
       "Sources",
     ]);
     // No meter pinned over the text on a wide screen: the rail carries it.
