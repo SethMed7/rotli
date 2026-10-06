@@ -13,6 +13,7 @@ for (const width of [390, 768]) {
     "/features/",
     "/privacy/",
     "/changelog/",
+    "/blog/",
     "/blog/rotli-web-and-your-mac/",
     "/about/",
     "/roadmap/",

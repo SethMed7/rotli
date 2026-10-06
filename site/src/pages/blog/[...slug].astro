@@ -1,13 +1,14 @@
 ---
-// /blog/ (the index: readable posts newest first, then the ones announced as
-// coming soon, which are listed without a link) and /blog/<post>/, an article
-// with the "On this page" tree (WritingPage `toc`) and the reading meter the guides
-// use (`progress`), so every article on the site reads the same way.
+// /blog/ (the index: the newest readable post as the feature, then the rest in a
+// grid, with the ones announced as coming soon last and without a link; every
+// entry shows its thumbnail, src/og.ts) and /blog/<post>/, an article with its
+// thumbnail in the head, the "On this page" tree (WritingPage `toc`), and the
+// reading meter the guides use (`progress`), so every article reads the same way.
 import { render } from 'astro:content';
 import { twinPath, writingGraph, writingPath } from '../../agents';
-import WritingList from '../../components/WritingList.astro';
+import BlogIndex, { type BlogEntry } from '../../components/BlogIndex.astro';
 import WritingPage from '../../components/WritingPage.astro';
-import { ogImage, postOgImage } from '../../og';
+import { ogImage, postOgImage, postThumbnail } from '../../og';
 import { site } from '../../site';
 import { publishedWriting, readingMinutes, slugOf, upcomingWriting, type Writing } from '../../writing';
 
@@ -28,19 +29,22 @@ const { entry, entries, upcoming } = Astro.props as {
 };
 const formatDate = (date: Date) =>
   date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
-const items = [
-  ...entries.map((item) => ({
-    href: `/blog/${slugOf(item)}/`,
-    title: item.data.title,
-    description: item.data.description,
-    meta: item.data.draft ? 'Draft · dev site only' : `${formatDate(item.data.date)} · ${readingMinutes(item)} min read`,
-  })),
-  ...upcoming.map((item) => ({
-    title: item.data.title,
-    description: item.data.description,
-    meta: 'Coming soon',
-  })),
-];
+const posts: BlogEntry[] = entries.map((item) => ({
+  href: `/blog/${slugOf(item)}/`,
+  title: item.data.title,
+  description: item.data.description,
+  meta: item.data.draft
+    ? ['Draft · dev site only']
+    : [formatDate(item.data.date), `${readingMinutes(item)} min read`],
+  thumbnail: postThumbnail(slugOf(item)),
+}));
+const announced: BlogEntry[] = upcoming.map((item) => ({
+  title: item.data.title,
+  description: item.data.description,
+  meta: ['Coming soon'],
+  thumbnail: postThumbnail(slugOf(item)),
+}));
+const [featured, ...more] = posts;
 const rendered = entry ? await render(entry) : null;
 const Content = rendered?.Content ?? null;
 const toc = (rendered?.headings ?? [])
@@ -63,6 +67,7 @@ const toc = (rendered?.headings ?? [])
       heading={entry.data.title}
       lede={entry.data.description}
       meta={[formatDate(entry.data.date), `${readingMinutes(entry)} min read`]}
+      cover={postThumbnail(slugOf(entry))}
       toc={toc}
       progress
     >
@@ -79,7 +84,7 @@ const toc = (rendered?.headings ?? [])
       lede="Notes from building rotli: how it works, and why it works that way."
       wide
     >
-      <WritingList items={items} empty="The first post is on its way." />
+      <BlogIndex featured={featured} rest={[...more, ...announced]} empty="The first post is on its way." />
     </WritingPage>
   )
 }

@@ -15,6 +15,7 @@
 // :global() in .prose.
 import Base from '../layouts/Base.astro';
 import type { NavSection } from '../nav';
+import type { Thumbnail } from '../og';
 import { site } from '../site';
 import SiteFooter from './SiteFooter.astro';
 import SiteHeader from './SiteHeader.astro';
@@ -41,6 +42,8 @@ interface Props {
   center?: boolean;
   /** Pin a reading meter under the header (resource articles, blog posts, /privacy/). */
   progress?: boolean;
+  /** A picture beside the head (a blog post's thumbnail, src/og.ts); under it on narrow screens. */
+  cover?: Thumbnail;
   /** Passed through to Base: JSON-LD facts, the Markdown twin, and the link card (src/og.ts). */
   structuredData?: Record<string, unknown>[];
   markdownPath?: string;
@@ -62,6 +65,7 @@ const {
   wide = false,
   center = false,
   progress = false,
+  cover,
   structuredData,
   markdownPath,
   image,
@@ -82,32 +86,49 @@ const hasToc = toc.length > 1;
 >
   <SiteHeader current={section} />
   <main id="content" class:list={['wrap writing', { center, 'has-progress': progress }]}>
-    <header class="writing-head">
+    <header class:list={['writing-head', { 'has-cover': cover }]}>
+      <div class="head-copy">
+        {
+          crumbs.length > 0 && (
+            <nav class="crumbs" aria-label="Breadcrumb">
+              {crumbs.map((crumb) => (
+                <>
+                  <a href={crumb.href}>{crumb.label}</a>
+                  <span aria-hidden="true">/</span>
+                </>
+              ))}
+            </nav>
+          )
+        }
+        {kicker && <p class="kicker">{kicker}</p>}
+        <h1>{heading}</h1>
+        {lede && <p class="lede">{lede}</p>}
+        {
+          meta.length > 0 && (
+            <p class="meta">
+              {meta.map((part, index) => (
+                <>
+                  {index > 0 && <span aria-hidden="true">·</span>}
+                  <span>{part}</span>
+                </>
+              ))}
+            </p>
+          )
+        }
+      </div>
       {
-        crumbs.length > 0 && (
-          <nav class="crumbs" aria-label="Breadcrumb">
-            {crumbs.map((crumb) => (
-              <>
-                <a href={crumb.href}>{crumb.label}</a>
-                <span aria-hidden="true">/</span>
-              </>
-            ))}
-          </nav>
-        )
-      }
-      {kicker && <p class="kicker">{kicker}</p>}
-      <h1>{heading}</h1>
-      {lede && <p class="lede">{lede}</p>}
-      {
-        meta.length > 0 && (
-          <p class="meta">
-            {meta.map((part, index) => (
-              <>
-                {index > 0 && <span aria-hidden="true">·</span>}
-                <span>{part}</span>
-              </>
-            ))}
-          </p>
+        cover && (
+          <img
+            class="cover"
+            src={cover.src}
+            srcset={cover.srcset}
+            sizes="(min-width: 1080px) 26rem, (min-width: 640px) 36rem, calc(100vw - 2.5rem)"
+            width={cover.width}
+            height={cover.height}
+            alt={cover.alt}
+            fetchpriority="high"
+            decoding="async"
+          />
         )
       }
     </header>
@@ -250,8 +271,34 @@ const hasToc = toc.length > 1;
     scroll-margin-top: calc(var(--pinned) + 1.5rem);
   }
   /* The rule under the head spans the page; the words keep a reading width. */
-  .writing-head > * {
+  .head-copy {
     max-width: 48rem;
+  }
+  /* A post's picture sits beside its words, level with the title block's middle; on narrower
+     screens it follows the words at a moderate size. */
+  .writing-head.has-cover {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 26rem);
+    align-items: center;
+    gap: clamp(2rem, 5vw, 4rem);
+  }
+  .cover {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1200 / 630;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-frame);
+    background: var(--surface-2);
+  }
+  @media (max-width: 1080px) {
+    .writing-head.has-cover {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 2rem;
+    }
+    .cover {
+      max-width: 36rem;
+    }
   }
   .writing-head {
     padding-bottom: clamp(2rem, 4vw, 3rem);

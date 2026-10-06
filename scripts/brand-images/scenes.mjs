@@ -188,7 +188,7 @@ export function scene({ kind, art, label, w = 1200, h = 630 }) {
   const qy = 598 - art.box.bottom * qSize;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 1200 630" role="img" aria-label="${esc(label)}">
   <rect width="1200" height="630" fill="${C.sky}"/>
-  ${spec.sun ? `<circle cx="460" cy="96" r="54" fill="${C.cloud}" stroke="${C.accent}" stroke-width="5"/>` : ""}
+  ${spec.sun ? `<circle cx="700" cy="92" r="54" fill="${C.cloud}" stroke="${C.accent}" stroke-width="5"/>` : ""}
   ${cloud({ x: 220, y: 96, s: 1.3 })}${cloud({ x: 880, y: 70, s: 0.9 })}
   ${spec.lighthouse ? lighthouse({ x: 1000, y: seaTop + 2, s: 1.05 }) : ""}
   ${sea({ w: 1200, h: 520, top: seaTop, k: 1.2 })}
