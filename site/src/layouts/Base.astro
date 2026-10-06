@@ -12,7 +12,7 @@ interface Props {
   structuredData?: Record<string, unknown>[];
   /** The page's Markdown twin, declared for agents (src/agents.ts). */
   markdownPath?: string;
-  /** The wider page (--page-max-wide) for the blog's content; the header and footer keep the standard width. */
+  /** A blog post's wider page (--page-max-wide); the header and footer keep the standard width. */
   widePage?: boolean;
 }
 
@@ -117,10 +117,12 @@ const socialImageUrl = new URL(image, siteUrl).href;
         --font-wordmark: 'Baloo 2', var(--font-body);
         --page-max-standard: 76rem;
         --page-max: var(--page-max-standard);
-        /* The blog's page (widePage): 96rem, growing to 104rem on the widest screens, so posts
-           and the index use the room a large window has. The header and footer keep the standard
-           width on every page (the owner, 2026-10-06), so nothing shifts between pages. */
-        --page-max-wide: clamp(96rem, 65vw, 104rem);
+        /* A blog post's page (widePage): 88rem, a little wider than the site's so the post's two
+           side rails have room beside a comfortable reading column (the owner, 2026-10-06: "the
+           blog width is too much ... the left and right panels use more width"). Fixed, so it
+           never grows on a wide screen. Only posts use it; /blog/ and every other page are 76rem,
+           and the header and footer keep the standard width on every page, so nothing shifts. */
+        --page-max-wide: 88rem;
         --copy-max: 68ch;
         --ground: #f8f2e9;
         --surface: #fbf6ee;

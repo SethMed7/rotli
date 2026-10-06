@@ -1,12 +1,14 @@
 /* A blog post's reading column and its figures (WritingPage `article`). Global, because the
    post's Markdown and the figures src/figures.ts draws arrive as HTML outside any component's
    scoped styles; every rule is held under .is-article so other pages are untouched. Tokens only.
-   Measured in the article specs: about 70 characters a line, every text pair at 4.5:1 or more. */
+   Measured in the article specs: about 66 characters a line, every text pair at 4.5:1 or more. */
 
-/* The column: 18px type (easing to 20px on the widest screens, --prose-size in WritingPage),
-   generous leading. .prose fills the grid's middle track; the words keep the measure, about 68
-   characters a line (60 to 80 at every width, e2e/site/article-width.spec.ts), centred in it,
-   and figures, tables, and code break out to the middle's full width, never into a rail. */
+/* The column: 18px type at every width (--prose-size in WritingPage; it no longer grows on the
+   widest screens, where the page stops at 88rem and the room goes to the rails), generous
+   leading. .prose fills the grid's middle track; the words keep the measure, about 66 characters
+   a line (60 to 80 at every width, 62 to 70 beside both rails, e2e/site/article-width.spec.ts),
+   centred in it, and figures, tables, and code may break out a little into the middle, never
+   into a rail. */
 .writing.is-article .prose {
   font-size: var(--prose-size);
   line-height: 1.72;
@@ -23,11 +25,14 @@
   max-width: var(--measure);
   margin-inline: auto;
 }
-/* Figures, tables, and code break out to the middle's full width, but only where that is at least
-   about 2rem past the words on each side; a sliver wider than the text would read as a mistake. */
+/* Figures, tables, and code break out of the words, but only where the middle is at least about
+   2rem past them on each side (a sliver wider than the text would read as a mistake), and never by
+   more than 5rem a side, so nothing feels over-wide. Beside both rails (from 1360px) the middle is
+   only the column and a little more, so they keep the measure there; with the left rail alone
+   (901 to 1359px), and on a tablet, they may spread. */
 @container article-prose (min-width: 48.5rem) {
   .writing.is-article .prose > :is(.figure, table, pre) {
-    max-width: none;
+    max-width: min(100%, var(--measure) + 10rem);
   }
 }
 .writing.is-article .prose h2 {

@@ -16,15 +16,15 @@
 // page's own ground that overlaps the banner's lower left, where the art is kept open, so
 // the title, date, and reading time are read on the ground, never on the picture. Phones
 // get a shorter crop with the panel just below it.
-// Blog posts pass `article` instead (opt-in; /privacy/ keeps the layout above), on the blog's
-// wider page (Base `widePage`, which the index asks for too): named tracks (--article-tracks:
-// rail, main with the text centred in it, side) shared by the head across them
-// (blog/ArticleCover.astro), a left rail with the short title, the tree, the meter as a percent,
-// Sources, and Share (blog/ArticleRail.astro), the middle with its reading column of about 68
-// characters and the figures that break out of it (blog/article.css), and from 1280px the right
-// side, more posts and rotli's own spots (blog/ArticleAside.astro). Under 1280px the right side
-// follows the article; under 901px the tree is the disclosure, the meter a slim bar under the
-// header, and Share follows the article, all on the text's edges.
+// Blog posts pass `article` instead (opt-in; /privacy/ keeps the layout above), on a post's own
+// page (Base `widePage`, 88rem; /blog/ itself is the standard 76rem): named tracks
+// (--article-tracks: rail, main with the text centred in it, side) shared by the head across them
+// (blog/ArticleCover.astro), a sticky left rail with the short title, the tree, the meter as a
+// percent, Sources, and Share (blog/ArticleRail.astro), the middle with its reading column of
+// about 66 characters (blog/article.css), and from 1360px the right side, more posts and rotli's
+// own spots (blog/ArticleAside.astro), beside the start of the post and scrolling away with it.
+// Under 1360px the right side follows the article; under 901px the tree is the disclosure, the
+// meter a slim bar under the header, and Share follows the article, all on the text's edges.
 // Rendered Markdown arrives as children, so its typography is styled with
 // :global() in .prose.
 import type { TocItem } from '../blog';
@@ -58,8 +58,6 @@ interface Props {
   toc?: (Omit<TocItem, 'depth'> & { depth?: number })[];
   /** Let the body use the full page width (index pages, choosers). */
   wide?: boolean;
-  /** The blog's wider page (Base `widePage`) for the header, the page, and the footer; a post (`article`) always has it. */
-  widePage?: boolean;
   /** Center the head and the reading column on the page (About). */
   center?: boolean;
   /** Pin a reading meter under the header (blog posts, /privacy/). */
@@ -99,7 +97,6 @@ const {
   meta = [],
   toc = [],
   wide = false,
-  widePage = false,
   center = false,
   progress = false,
   banner,
@@ -125,7 +122,7 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
   markdownPath={markdownPath}
   image={image}
   imageAlt={imageAlt}
-  widePage={widePage || article !== undefined}
+  widePage={article !== undefined}
 >
   <SiteHeader current={section} />
   {
@@ -594,29 +591,28 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
   .read-progress.slim {
     display: none;
   }
-  /* The article's grid (the owner, 2026-10-06: "for blogs let's use more width ... and let's
-     consider responsiveness"). The page is the blog's wider one (Base `widePage`), and the tracks
-     are named so the cover (blog/ArticleCover.astro) and the body share them exactly:
+  /* The article's grid (the owner, 2026-10-06: first "for blogs let's use more width", then "now
+     the blog width is too much ... the left and right panels use more width to clear up visual
+     clutter"). The page is a post's own (Base `widePage`, 88rem), and the tracks are named so the
+     cover (blog/ArticleCover.astro) and the body share them exactly:
        [rail] the left rail · a gap · [main] the middle, holding [text] the reading column centred
-       in it · a gap · [side] the right side, from 1280px.
-     The reading column is a measure, not a share of the page: --prose-size (18px, easing to 20px
-     on the widest screens) times 39.5, about 68 characters of the column's own type. The middle
-     is whatever the rails leave, so figures, tables, and code break out of the text to its full
-     width while words keep the measure. The rails and gaps are fluid in the page's own width
-     (cqi: main is the container), growing from a 10rem rail on a tablet to 16rem and 18rem on a
-     wide screen, so the column never drops below 60 characters beside them. A figure breaks out
-     only where the middle is wide enough for it to read as deliberate (blog/article.css). Below 901px it is one
-     column (the rail's Share and the right side follow the article, on the text's edges). */
+       in it · a gap · [side] the right side, from 1360px.
+     The reading column is a measure, not a share of the page: 18px type times 38.5, about 66
+     characters. The rails are the room the page gives beyond that, so they are wide enough for a
+     source's title or a spot's words to wrap on two lines, not five. Rails and gaps are fluid in
+     the page's own width (cqi: main is the container):
+       - 901 to 1359px, two columns: the left rail 10rem at 901px to 16rem by about 1180px, the
+         middle the rest (the column 61 to 66 characters; figures may break out a little);
+       - from 1360px, three: both rails 16.5rem at 1360px to 19.5rem from about 1490px (where the
+         page stops at 88rem), the middle 42rem to 44rem, so the column is 64 to 66 characters.
+     The gaps are 2rem to 2.5rem. Below 901px it is one column (the rail's Share and the right side
+     follow the article, on the text's edges). */
   .writing.is-article {
     container-type: inline-size;
-    --prose-size: clamp(1.125rem, 0.964rem + 0.179vw, 1.25rem);
-    --measure: calc(var(--prose-size) * 39.5);
-    /* The left rail: 10rem at 901px, 13rem by a 1280px window, held there to 1440px (so the
-       middle there is wide enough for figures to break out), then 16rem by about 1620px. */
-    --col-left: clamp(10rem, max(min(13rem, 3.3rem + 12.94cqi), 27.27cqi - 10.18rem), 16rem);
-    /* The right side: 14.5rem to a 1440px window, then 18rem by about 1620px. */
-    --col-right: clamp(14.5rem, 31.82cqi - 12.55rem, 18rem);
-    --col-gap: clamp(2rem, 4.53cqi - 0.35rem, 4rem);
+    --prose-size: 1.125rem;
+    --measure: calc(var(--prose-size) * 38.5);
+    --col-left: clamp(10rem, 35.42cqi - 8.35rem, 16rem);
+    --col-gap: clamp(2rem, 4.53cqi - 0.35rem, 2.5rem);
     --article-tracks: [main-start] minmax(0, 1fr) [text-start] minmax(0, var(--measure)) [text-end] minmax(0, 1fr)
       [main-end];
   }
@@ -626,11 +622,13 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
         [text-start] minmax(0, var(--measure)) [text-end] minmax(0, 1fr) [main-end];
     }
   }
-  @media (min-width: 1280px) {
+  /* Three columns where both rails get at least 16.5rem beside a 64-character column. */
+  @media (min-width: 1360px) {
     .writing.is-article {
+      --col-left: clamp(16.5rem, 37.5cqi - 13.5rem, 19.5rem);
       --article-tracks: [rail-start] var(--col-left) [rail-end] var(--col-gap) [main-start] minmax(0, 1fr)
         [text-start] minmax(0, var(--measure)) [text-end] minmax(0, 1fr) [main-end] var(--col-gap) [side-start]
-        var(--col-right) [side-end];
+        var(--col-left) [side-end];
     }
   }
   .writing-body.has-rail {
@@ -655,12 +653,12 @@ const hasBanner = !article && (banner !== undefined || Astro.slots.has('banner')
     .writing-body.has-rail > .prose {
       grid-row: 1;
     }
-    /* Below 1280px the right side follows the article, on the text's edges. */
+    /* Below 1360px the right side follows the article, on the text's edges. */
     .writing-body.has-rail > :global([data-article-more]) {
       grid-row: 2;
     }
   }
-  @media (min-width: 1280px) {
+  @media (min-width: 1360px) {
     .writing-body.has-rail > :global([data-article-more]) {
       grid-column: side;
       grid-row: 1;

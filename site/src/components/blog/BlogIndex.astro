@@ -10,8 +10,8 @@
 //   4. "Coming soon": announced posts, quieter and apart, never links.
 // A post from the last 14 days, as of the build, wears "New" (src/blog.ts `isNew`). Pictures are
 // the posts' thumbnails (src/og.ts), one 1200 × 630 shape with real sizes, so nothing shifts.
-// The blog has the site's wider page (Base `widePage`), and the index lays itself out by its own
-// width (a container), not the window's: the feature beside its words from 52rem, the row as many
+// The index is on the site's standard 76rem page (only a post has the wider one), and it lays
+// itself out by its own width (a container), not the window's: the feature beside its words from 52rem, the row as many
 // columns as fit (up to four, never more than it has posts), the list's words at a reading measure.
 import type { Thumbnail } from '../../og';
 import { topicKey, topicsOf } from '../../blog';

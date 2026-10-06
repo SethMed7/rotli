@@ -1,16 +1,18 @@
 ---
 // The top of a blog post (WritingPage `article`; the owner, 2026-10-06: "the blog page headers, I
-// still needed that cleaned up"). Calm and on the article's own columns (WritingPage's --col-*
-// tracks), so the head lines up with what follows it:
-//   - the post's illustration across the full width of the three columns, in a rounded frame,
-//     short enough that the title is in the first window (1440 × 900, 1280 × 800);
-//   - under it, "Blog /" in the left rail's column and, from the reading column's edge, the title
-//     (which may run on over the right rail's column from 1280px), the summary, then one meta line (the author's mark and name, the date, the reading time), then
-//     the topics as light outlined labels;
-//   - a hairline across all three columns before the article begins.
-// Nothing overlaps the picture at any width, nothing is pinned, and nothing moves. Below 900px it
-// is one column: the trail, the picture (the phone crop below 700px), then the words. A post
-// without art (`cover` undefined) is the same head without the picture.
+// still needed that cleaned up", then "it has a lot of awkward space, especially where the 'blog/'
+// is"). Calm and on the article's own columns (WritingPage's --article-tracks), so the head lines
+// up with what follows it:
+//   - the post's illustration across the page's full width (the edges of the rails below), in a
+//     rounded frame, short enough that the title is well inside the first window;
+//   - under it one block from the page's left edge, the left rail's edge: "Blog /" small and quiet,
+//     then the title, the summary (at the reading measure), one meta line (the author's mark and
+//     name, the date, the reading time), and the topics as light outlined labels, in one tight
+//     rhythm. Nothing sits alone in the rail's column and nothing is indented into empty space;
+//   - a hairline across the page before the article begins.
+// Nothing overlaps the picture at any width, nothing is pinned, and nothing moves. Below 901px it
+// is one column on the text's edges: the picture (the phone crop below 700px), then the words. A
+// post without art (`cover` undefined) is the same head without the picture.
 import mark from '../../../../src/assets/characters/_logo.svg?raw';
 import type { Banner } from '../../og';
 
@@ -31,18 +33,6 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
 
 <header class:list={['cover-head', { 'no-cover': !cover }]} data-article-cover>
   {
-    crumbs.length > 0 && (
-      <nav class="crumbs" aria-label="Breadcrumb">
-        {crumbs.map((crumb) => (
-          <>
-            <a href={crumb.href}>{crumb.label}</a>
-            <span aria-hidden="true">/</span>
-          </>
-        ))}
-      </nav>
-    )
-  }
-  {
     cover && (
       <picture class="cover-art" data-article-art>
         <source
@@ -54,7 +44,7 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
         <img
           src={cover.src}
           srcset={cover.srcset}
-          sizes="(min-width: 2400px) 104rem, (min-width: 1616px) 96rem, calc(100vw - 2 * clamp(1.25rem, 4vw, 2.5rem))"
+          sizes="(min-width: 1488px) 88rem, calc(100vw - 2 * clamp(1.25rem, 4vw, 2.5rem))"
           width={cover.width}
           height={cover.height}
           alt={cover.alt}
@@ -65,6 +55,18 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
     )
   }
   <div class="head-copy">
+    {
+      crumbs.length > 0 && (
+        <nav class="crumbs" aria-label="Breadcrumb">
+          {crumbs.map((crumb) => (
+            <>
+              <a href={crumb.href}>{crumb.label}</a>
+              <span aria-hidden="true">/</span>
+            </>
+          ))}
+        </nav>
+      )
+    }
     {kicker && <p class="kicker">{kicker}</p>}
     <h1>{heading}</h1>
     {lede && <p class="lede">{lede}</p>}
@@ -94,24 +96,24 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
 
 <style>
   /* On the article's named tracks (WritingPage --article-tracks) at every width: the picture
-     across all of them, the words from the reading column's edge, "Blog /" in the left rail from
-     901px and on the text's edge below that. */
+     across all of them, the words from the page's left edge from 901px (the left rail's edge) and
+     on the text's edges below that. */
   .cover-head {
     display: grid;
     grid-template-columns: var(--article-tracks);
-    margin-bottom: clamp(2rem, 4vw, 3rem);
-    padding-bottom: clamp(1.75rem, 3.5vw, 2.5rem);
+    margin-bottom: clamp(1.75rem, 3.5vw, 2.5rem);
+    padding-bottom: clamp(1.5rem, 3vw, 2rem);
     border-bottom: 1px solid var(--border-strong);
   }
+  /* The trail: small and quiet, straight above the title. */
   .crumbs {
-    grid-column: text;
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
+    gap: 0.4rem;
+    margin: 0 0 0.6rem;
     color: var(--text-muted);
-    font-size: 0.9rem;
+    font-size: 0.84rem;
   }
   .crumbs a {
     color: var(--text-muted);
@@ -133,7 +135,7 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
     grid-column: 1 / -1;
     display: block;
     overflow: hidden;
-    margin-bottom: clamp(1.5rem, 3vw, 2.25rem);
+    margin-bottom: clamp(1.25rem, 2.5vw, 1.75rem);
     border: 1px solid var(--border);
     border-radius: var(--radius-frame);
     background: var(--surface-2);
@@ -141,24 +143,26 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
   .cover-art img {
     display: block;
     width: 100%;
-    /* Its height follows its width (cqi: the article's width), about 3.2 to 1 (the art is 2.4 to 1),
-       so a wider page crops no more of the quokka; the window's height caps it. */
-    height: clamp(13rem, min(31cqi, 46svh), 33rem);
+    /* Its height follows its width (cqi: the article's width), about 3.3 to 1 (the art is 2.4 to 1),
+       so a wider page crops no more of the quokka; the window's height caps it (44svh, a little
+       under the old 46svh), leaving the title, summary, and meta line room in the first window. */
+    height: clamp(12rem, min(30cqi, 44svh), 27rem);
     object-fit: cover;
-    /* Most of the crop comes off the sky, a little off the sand: the quokka keeps its ears. */
-    object-position: 100% 88%;
+    /* Most of the crop comes off the sky, some off the sand: the quokka keeps its ears. */
+    object-position: 100% 70%;
   }
   .head-copy {
-    grid-column: text-start / -1;
+    grid-column: text;
     min-width: 0;
   }
   .kicker {
-    margin: 0 0 0.8rem;
+    margin: 0 0 0.6rem;
     color: var(--text-muted);
     font-size: 0.9rem;
   }
   /* Title, then summary, then the meta line: three steps of size and strength. */
   h1 {
+    max-width: 22em;
     margin: 0;
     font-size: clamp(2.1rem, 3.4vw, 3rem);
     font-weight: 600;
@@ -168,7 +172,7 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
   }
   .lede {
     max-width: var(--measure);
-    margin: 1rem 0 0;
+    margin: 0.85rem 0 0;
     color: var(--text-muted);
     font-size: var(--step-lede);
     line-height: 1.55;
@@ -179,7 +183,7 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
     flex-wrap: wrap;
     align-items: center;
     gap: 0.3rem 0.55rem;
-    margin: 1.4rem 0 0;
+    margin: 1.1rem 0 0;
     color: var(--text-muted);
     font-size: 0.9rem;
   }
@@ -209,7 +213,7 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
     display: flex;
     flex-wrap: wrap;
     gap: 0.4rem;
-    margin: 0.9rem 0 0;
+    margin: 0.75rem 0 0;
     padding: 0;
     list-style: none;
   }
@@ -222,17 +226,12 @@ const { cover, crumbs, kicker, heading, lede, author, meta, tags } = Astro.props
     font-weight: 500;
     line-height: 1.4;
   }
-  /* From 901px "Blog /" sits in the left rail's column, level with the title. From 1280px the
-     title may run on over the right side's column; the summary keeps the measure. */
+  /* From 901px the words start on the page's left edge, the picture's and the left rail's, so the
+     head reads as one block under the picture; the title wraps at about 22em and the summary
+     keeps the reading measure. */
   @media (min-width: 901px) {
-    .crumbs {
-      grid-column: rail;
-      grid-row: 2;
-      margin: 0.55rem 0 0;
-      align-self: start;
-    }
     .head-copy {
-      grid-row: 2;
+      grid-column: 1 / -1;
     }
   }
   /* Narrow screens: the "On this page" disclosure's own rules close the head. */
