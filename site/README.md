@@ -260,7 +260,7 @@ from 320 to 1920.
   600-wide copy in `srcset`), with its size and alt text; the feature loads
   first and the grid lazily. No entry has a box: a framed picture with its
   words under it. A post's own head shows the same picture beside its title
-  from 1080px, under its words below that (`WritingPage`'s `cover`).
+  above 1080px, under its words below that (`WritingPage`'s `cover`).
   `e2e/site/blog-index.spec.ts` holds the feature, every tile's picture at
   one shape, the labels, and the cover at 1440, 768, and 390.
 - **Writing.** Resources (evergreen, question-titled) and blog posts are
