@@ -41,6 +41,9 @@ export function launchFeatures(development: boolean, platform: Platform = "deskt
     // handshake) is proven in the Mac app, not CI; Rotli Web never gets it — a
     // second browser tab would be a second, uncoordinated writer.
     chatWindow: desktop,
+    // JSON Canvas `.canvas` files (spike, 2026-10-05): development only, and
+    // desktop only until Rotli Web's folder vault lists and saves them.
+    jsonCanvas: desktop && development,
   } as const;
 }
 

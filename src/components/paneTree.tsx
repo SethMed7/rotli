@@ -18,6 +18,7 @@ import {
 
 import { EditorSurface } from "../editor/editorSurface";
 import { evictDocument, pendingNoteDocumentId } from "../editor/model";
+import { LAUNCH_FEATURES } from "../lib/featurePolicy";
 import {
   MIN_PANE_HEIGHT,
   MIN_PANE_WIDTH,
@@ -40,6 +41,12 @@ import { TabStrip } from "./tabStrip";
 // Excalidraw is heavy (~3.5MB with its mermaid/katex deps) and most sessions
 // never open a board — code-split it so it loads only when a canvas tab mounts,
 // keeping the main bundle lean (the maintainer, 2026-06-24).
+// a .canvas file opens in the Canvas editor (development builds only, spike 2026-10-05)
+const CanvasFileEditor = lazy(() =>
+  import("./jsonCanvas/canvasFileEditor").then((m) => ({ default: m.CanvasFileEditor })),
+);
+const opensAsJsonCanvas = (fileId: string): boolean =>
+  LAUNCH_FEATURES.jsonCanvas && fileId.toLowerCase().endsWith(".canvas");
 const CanvasSurface = lazy(() => import("./canvasSurface").then((m) => ({ default: m.CanvasSurface })));
 
 function PendingNoteSurface({ paneId, tabId }: { paneId: string; tabId: string }) {
@@ -153,7 +160,14 @@ function LeafView({ node }: { node: LeafNode }) {
                   {...(heavyTab.vaultId ? { vaultId: heavyTab.vaultId } : {})}
                 />
               )}
-              {heavyTab.surfaceKind === "file" && <FileSurface paneId={node.id} fileId={heavyTab.fileId} />}
+              {heavyTab.surfaceKind === "file" &&
+                (opensAsJsonCanvas(heavyTab.fileId) ? (
+                  <Suspense fallback={null}>
+                    <CanvasFileEditor key={heavyTab.fileId} fileId={heavyTab.fileId} />
+                  </Suspense>
+                ) : (
+                  <FileSurface paneId={node.id} fileId={heavyTab.fileId} />
+                ))}
               {heavyTab.surfaceKind === "browser" && (
                 <BrowserSurface paneId={node.id} tabId={heavyTab.id} active={active} />
               )}

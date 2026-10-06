@@ -1,0 +1,154 @@
+// Wires a `.canvas` file to the Canvas editor on the Mac app: read the file,
+// parse it, and save edits back (debounced, revision-checked — a canvas
+// changed on disk since it was read refuses instead of overwriting). Note
+// cards resolve through the note list the editor already holds.
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { resolveWikilink, buildWikilinkIndex } from "../editor/wikilink";
+import { onQuitFlush } from "../lib/quitFlush";
+import { corpusFileStat, corpusFileText, corpusWriteFileBytes } from "../lib/tauri";
+import { useNoteLinks, useSearchableNotes } from "../services/hooks";
+import { notesService } from "../services/notes";
+import { type CanvasDoc, parseCanvas, serializeCanvas } from "./model";
+import { noteAtPath, notePath } from "./notePaths";
+
+export type CanvasFileState =
+  | { status: "loading" }
+  | { status: "error"; error: string }
+  | { status: "ready"; doc: CanvasDoc; writable: boolean; saveError: string | null };
+
+const SAVE_AFTER_MS = 500;
+
+async function base64Of(text: string): Promise<string> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => reject(reader.error ?? new Error("couldn’t encode the canvas"));
+    reader.readAsDataURL(new Blob([text], { type: "application/json" }));
+  });
+  return dataUrl.slice(dataUrl.indexOf(",") + 1);
+}
+
+export function useCanvasFile(fileId: string): {
+  state: CanvasFileState;
+  change: (doc: CanvasDoc) => void;
+} {
+  const [state, setState] = useState<CanvasFileState>({ status: "loading" });
+  const revision = useRef<string | null>(null);
+  const pending = useRef<CanvasDoc | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flush = useCallback(async () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    const doc = pending.current;
+    if (!doc || revision.current === null) return;
+    pending.current = null;
+    try {
+      revision.current = await corpusWriteFileBytes(
+        fileId,
+        await base64Of(serializeCanvas(doc)),
+        false,
+        revision.current,
+      );
+      setState((current) => (current.status === "ready" ? { ...current, saveError: null } : current));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setState((current) => (current.status === "ready" ? { ...current, saveError: message } : current));
+    }
+  }, [fileId]);
+
+  useEffect(() => {
+    // a different file remounts the host (keyed by fileId), so the first
+    // state is always "loading" — no reset here
+    let cancelled = false;
+    Promise.all([corpusFileText(fileId), corpusFileStat(fileId)])
+      .then(([text, stat]) => {
+        if (cancelled) return;
+        const parsed = parseCanvas(text);
+        revision.current = stat?.revision ?? null;
+        setState(
+          parsed.ok
+            ? { status: "ready", doc: parsed.doc, writable: stat?.writable === true, saveError: null }
+            : { status: "error", error: parsed.error },
+        );
+      })
+      .catch((err: unknown) => {
+        if (!cancelled)
+          setState({ status: "error", error: err instanceof Error ? err.message : String(err) });
+      });
+    const unregister = onQuitFlush(flush);
+    return () => {
+      cancelled = true;
+      unregister();
+      void flush();
+    };
+  }, [fileId, flush]);
+
+  const change = useCallback(
+    (doc: CanvasDoc) => {
+      setState((current) => (current.status === "ready" ? { ...current, doc } : current));
+      if (state.status !== "ready" || !state.writable) return;
+      pending.current = doc;
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => void flush(), SAVE_AFTER_MS);
+    },
+    [flush, state],
+  );
+
+  return { state, change };
+}
+
+/** Note cards' view of the vault: a path's note (title, body, secure), and
+ * what `[[target]]` resolves to — the editor's own resolver. */
+export function useCanvasNotes(paths: readonly string[]) {
+  const { notes } = useSearchableNotes();
+  const links = useNoteLinks();
+  const [bodies, setBodies] = useState<ReadonlyMap<string, string>>(new Map());
+  const index = useMemo(() => buildWikilinkIndex(notes), [notes]);
+  const secure = useMemo(
+    () => new Set((links.data ?? []).filter((row) => row.secure).map((row) => row.noteId)),
+    [links.data],
+  );
+  const wanted = useMemo(
+    () => paths.map((path) => noteAtPath(notes, path)).filter((note) => note !== null),
+    [paths, notes],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    const missing = wanted.filter((note) => !bodies.has(note.id) && !secure.has(note.id));
+    if (missing.length === 0) return;
+    void Promise.all(missing.map((note) => notesService.getNote(note.id))).then((loaded) => {
+      if (cancelled) return;
+      setBodies((current) => {
+        const next = new Map(current);
+        for (const note of loaded) if (note) next.set(note.id, note.body);
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [wanted, bodies, secure]);
+
+  const noteFor = useCallback(
+    (path: string) => {
+      const note = noteAtPath(notes, path);
+      if (!note) return null;
+      return { title: note.title, body: bodies.get(note.id) ?? null, secure: secure.has(note.id) };
+    },
+    [notes, bodies, secure],
+  );
+  const resolveLink = useCallback(
+    (target: string) => {
+      const id = resolveWikilink(target, index);
+      const note = id ? notes.find((each) => each.id === id) : undefined;
+      return note ? notePath(note) : null;
+    },
+    [index, notes],
+  );
+  const noteIdAt = useCallback((path: string) => noteAtPath(notes, path)?.id ?? null, [notes]);
+  return { noteFor, resolveLink, noteIdAt };
+}

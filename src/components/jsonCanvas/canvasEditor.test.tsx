@@ -1,0 +1,68 @@
+import { expect, test } from "bun:test";
+
+import { renderToStaticMarkup } from "react-dom/server";
+
+import { parseCanvas } from "../../jsonCanvas/model";
+import { CanvasEditor, edgePath } from "./canvasEditor";
+
+const parsed = parseCanvas(`{
+\t"nodes":[
+\t\t{"id":"t","type":"text","text":"# Idea\\n\\nWrite it down","x":0,"y":0,"width":200,"height":120,"color":"3"},
+\t\t{"id":"n","type":"file","file":"wiki/Books.md","x":400,"y":0,"width":300,"height":200},
+\t\t{"id":"s","type":"file","file":"wiki/Secret.md","x":0,"y":300,"width":300,"height":200},
+\t\t{"id":"m","type":"file","file":"wiki/Gone.md","x":400,"y":300,"width":300,"height":200}
+\t],
+\t"edges":[{"id":"e","fromNode":"t","fromSide":"right","toNode":"n","toSide":"left","label":"cites"}]
+}`);
+if (!parsed.ok) throw new Error(parsed.error);
+const doc = parsed.doc;
+
+const render = () =>
+  renderToStaticMarkup(
+    <CanvasEditor
+      doc={doc}
+      onChange={() => {}}
+      noteFor={(path) =>
+        path === "wiki/Books.md"
+          ? { title: "Books", body: "# Books\n\nThe shelf.", secure: false }
+          : path === "wiki/Secret.md"
+            ? { title: "Secret", body: "the code is 1234", secure: true }
+            : null
+      }
+      resolveLink={() => null}
+      onOpenNote={() => {}}
+    />,
+  );
+
+test("cards name themselves for screen readers, color and kind included", () => {
+  const markup = render();
+  expect(markup).toContain('aria-label="Text card, yellow: Idea"');
+  expect(markup).toContain('aria-label="Note card: Books"');
+  expect(markup).toContain('aria-label="Note card: Gone (missing)"');
+  expect(markup).toContain("Canvas with 4 cards and 1 lines.");
+});
+
+test("a note card shows the note; a secure one shows only its title; a missing one keeps its place", () => {
+  const markup = render();
+  expect(markup).toContain("The shelf.");
+  expect(markup).toContain("Secure note. Open it to read.");
+  expect(markup).not.toContain("the code is 1234");
+  expect(markup).toContain("This note isn’t in the vault anymore.");
+  // no toolbar at rest: the only text outside cards is the edge label
+  expect(markup).not.toContain("jc-empty");
+  expect(markup).toContain(">cites<");
+});
+
+test("an empty canvas says how to begin, and lines curve out of the sides they name", () => {
+  const empty = renderToStaticMarkup(
+    <CanvasEditor
+      doc={{ nodes: [], edges: [] }}
+      onChange={() => {}}
+      noteFor={() => null}
+      resolveLink={() => null}
+      onOpenNote={() => {}}
+    />,
+  );
+  expect(empty).toContain("Double-click anywhere to write a card.");
+  expect(edgePath(doc, doc.edges[0]!)).toBe("M 200 60 C 282 60, 318 100, 400 100");
+});
