@@ -4,7 +4,7 @@
 // choose"), and a lane that isn't ready yet is finished later from the
 // sidebar's Librarian.
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 import {
   LANE_STATUS_LABELS,
@@ -19,7 +19,7 @@ import {
 import { providerCatalog } from "../../ai/models";
 import { readyFrom, useConnectedCatalog } from "../../services/connectedModels";
 import { setLibrarianOn } from "../../services/librarianSwitch";
-import { useSetupDetection } from "../../state/setupDetection";
+import { settleLibrarianChoice, useSetupDetection } from "../../state/setupDetection";
 import { useUiStore } from "../../state/ui";
 import { LIBRARIAN_ON_DESCRIPTION, SetupChoiceGroup } from "./setupControls";
 
@@ -30,16 +30,16 @@ export function LibrarianScreen() {
   // detection began on the first screen; by now the answers are usually in
   const detections = useSetupDetection((state) => state.detections);
 
-  // Gemini is proposed once (per mount) when it is signed in and nothing was
-  // chosen; picking any client below is the consent to use it
-  const proposed = useRef(false);
+  // Gemini is proposed once per setup when it is signed in and nothing was
+  // chosen; picking any client below is the consent to use it, and a pick —
+  // even one made before detection answered — is never overridden
+  const chosen = useSetupDetection((state) => state.librarianChosen);
   useEffect(() => {
-    if (proposed.current) return;
-    const proposal = suggestedLibrarian(detections, organizerModel);
+    const proposal = suggestedLibrarian(detections, organizerModel, { chosen });
     if (proposal === organizerModel) return;
-    proposed.current = true;
+    settleLibrarianChoice();
     setOrganizerModel(proposal);
-  }, [detections, organizerModel, setOrganizerModel]);
+  }, [chosen, detections, organizerModel, setOrganizerModel]);
 
   return (
     <>
@@ -103,6 +103,7 @@ function LibrarianModel() {
             aria-pressed={organizerModel === lane}
             data-status={statuses[index]}
             onClick={() => {
+              settleLibrarianChoice();
               setOrganizerModel(lane);
               if (lane !== "local") setAiProvider(lane, true);
             }}

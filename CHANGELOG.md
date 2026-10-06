@@ -264,6 +264,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   photo, or pasting one, used to attach it and then fail on send. Images in
   a chat written on the Mac now show when you open it on the web, instead of
   coming back blank.
+- **Setup keeps the Librarian you picked.** With Gemini signed in, choosing
+  On this Mac could be switched back to Gemini: when Rotli finished checking
+  this Mac after your pick, or when you went Back and returned to the screen.
+  Rotli now suggests Gemini once, and only before you choose.
 - **A spreadsheet that changed on disk keeps your unsaved edits.** Edits you
   hadn't saved when the file changed outside Rotli used to be set aside and
   lost. Now the sheet shows the version on disk and offers **Save my edits as

@@ -68,6 +68,12 @@ test("Gemini is suggested only when signed in and nothing else was chosen", () =
   expect(suggestedLibrarian({ antigravity: signedIn }, "claude")).toBe("claude");
 });
 
+test("an explicit pick of On this Mac is never switched to Gemini (feedback 2026-10-05)", () => {
+  // the person chose before detection answered, or came Back to the screen
+  expect(suggestedLibrarian({ antigravity: signedIn }, "local", { chosen: true })).toBe("local");
+  expect(suggestedLibrarian({ antigravity: signedIn }, "local", { chosen: false })).toBe("antigravity");
+});
+
 test("the caption says whether notes leave the Mac", () => {
   expect(librarianCaption("local", false)).toMatch(/never enters/);
   expect(librarianCaption("antigravity", true)).toMatch(/^Gemini files your notes/);

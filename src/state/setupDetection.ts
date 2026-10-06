@@ -19,6 +19,9 @@ interface SetupDetectionState {
   /** The local list has answered at least once ([] before it does means "not yet"). */
   localChecked: boolean;
   detections: Detections;
+  /** The Librarian's lane was picked by the person, or suggested once: from
+   * then on setup never changes it (a Back and return remounts the screen). */
+  librarianChosen: boolean;
 }
 
 export const useSetupDetection = create<SetupDetectionState>(() => ({
@@ -26,7 +29,12 @@ export const useSetupDetection = create<SetupDetectionState>(() => ({
   local: [],
   localChecked: false,
   detections: {},
+  librarianChosen: false,
 }));
+
+export function settleLibrarianChoice(): void {
+  useSetupDetection.setState({ librarianChosen: true });
+}
 
 const NOT_INSTALLED: CliDetect = { installed: false, authenticated: false, version: null };
 

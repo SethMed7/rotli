@@ -105,7 +105,10 @@ export function librarianSetupStep(lane: LibrarianChoice, status: LaneStatus): s
 export function suggestedLibrarian(
   detections: Partial<Record<ProviderId, CliDetect>>,
   current: LibrarianChoice,
+  setup: { chosen: boolean } = { chosen: false },
 ): LibrarianChoice {
+  // a pick the person made, or a suggestion already made once, stands
+  if (setup.chosen) return current;
   return current === "local" && ready(detections.antigravity) ? "antigravity" : current;
 }
 

@@ -262,3 +262,4 @@ The browser twin can't prove these.
 - [ ] **Ask AI: a secure note.** With the Librarian on a connected model, a secure note is refused. With the Mac's model it works, unless Settings turns that off.
 - [ ] **Ask AI: a list item.** In a bullet, type `/ai` and Insert a two-line answer: the second line is indented under the bullet.
 - [ ] **Ask AI: the journal.** `rotli notes history ID` shows the insertion as an `inline` row.
+- [ ] **Setup: your Librarian pick stands.** With Gemini signed in, pick On this Mac on the Librarian screen, then go Back and return: it is still On this Mac.
