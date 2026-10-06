@@ -2,6 +2,7 @@
 title: Why Rotli Web talks to your computer through Terminal
 description: Rotli Web keeps your notes in a folder on your computer, not on a server. How Rotli Helper makes that work, what its one-line install does, and what it can and can't reach.
 section: post
+tags: [Rotli Web, Privacy]
 date: 2026-10-02
 ---
 
@@ -34,6 +35,18 @@ How the page reaches the folder depends on the browser:
   secure page talk to a program on your computer.
 
 Above either road the code is the same, so notes and chats behave alike.
+
+```figure
+kind: flow
+title: How Rotli Web reaches the folder on your computer
+caption: Safari, phones, and tablets aren't supported yet. Rotli Helper listens only on your computer and reads and writes only the folder you choose.
+---
+Rotli Web | The editor, served from rotli.co, open in your browser
+One of two roads | Which one depends on your browser
+- Chrome, Edge, or Arc | The browser's own folder picker and folder API
+- Rotli Helper | A small program you install, for Firefox, Zen, and Brave
+Your folder | Plain Markdown files on your computer, the same ones the Mac app reads
+```
 
 ## Why not a sync server
 

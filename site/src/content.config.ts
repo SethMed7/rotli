@@ -27,6 +27,13 @@ const writing = defineCollection({
      * until it becomes `published` (src/writing.ts).
      */
     status: z.enum(['published', 'coming-soon']).default('published'),
+    /**
+     * Topic labels: shown on a post's card and its row on /blog/, where they
+     * filter the list. A few short words, the first one the post's category.
+     */
+    tags: z.array(z.string().min(1).max(24)).max(4).default([]),
+    /** Leads /blog/ as the featured story instead of the newest post. */
+    featured: z.boolean().default(false),
   }),
 });
 

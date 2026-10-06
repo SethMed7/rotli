@@ -2,6 +2,7 @@
 title: Paid AI plans often sit unopened. rotli can put them to work.
 description: What recent surveys say about paid AI plans that go unused, what they can't say, and how rotli's Librarian files your notes with the plan or tool you already have, or a model on your Mac.
 section: post
+tags: [AI, Research, Librarian]
 date: 2026-10-05
 ---
 
@@ -25,6 +26,23 @@ respondents who had each one, the share who hadn't used it in the past 30 days w
 The other five (Grammarly AI, Jasper AI, Notion AI, Writesonic, and Perplexity) fell between 35.8% and
 38.7%. Every tool in the survey had at least a quarter of its paying users unused for the month.
 
+```figure
+kind: bar
+title: Paying users who hadn't used the tool in the past 30 days
+caption: Five of the ten paid AI services in the survey, each among the respondents who had it. Self Financial surveyed 1,272 U.S. adults who pay for at least one subscription, in March 2026.
+source: Self Financial, “The Cost of Unused Paid Subscriptions 2026” | https://www.self.inc/info/cost-of-unused-paid-subscriptions/
+label: AI service
+value: Hadn't used it in the past 30 days
+unit: %
+max: 100
+---
+ChatGPT | 50.4
+Midjourney | 42.6
+Canva AI | 40.2
+Gemini | 35.3
+Claude | 27.2
+```
+
 **It isn't only AI.** In the same survey, 59.9% of respondents said they had at least one paid
 subscription going unused each month. Self Financial's report puts the average at 2.6 unused
 subscriptions per person.
@@ -33,6 +51,20 @@ subscriptions per person.
 adults in July 2026. Among people who use AI, 55% pay for at least one AI product, and 50% of those
 payers use AI daily (against 26% of non-payers). The other half use it less often than daily. That is
 our arithmetic on Menlo's figure, not a number Menlo prints.
+
+```figure
+kind: bar
+title: People who use AI daily, by whether they pay for it
+caption: Among people who use AI, from a Morning Consult survey of 5,067 U.S. adults in July 2026.
+source: Menlo Ventures, “2026: The State of Consumer AI” | https://menlovc.com/perspective/2026-the-state-of-consumer-ai/
+label: AI users
+value: Use AI daily
+unit: %
+max: 100
+---
+Pay for at least one AI product | 50
+Don't pay | 26
+```
 
 **People use several assistants.** In the same Menlo survey, the average AI user now uses 3.0 general AI
 assistants, up from 2.2 a year earlier. Bango asked 2,000 U.S. adults
@@ -81,6 +113,18 @@ When the Librarian files a note, it gives the note a place in your Library and w
 top of the file, called frontmatter: an area, a one-line summary, tags, and links. It never rewrites
 what you wrote. The note is still a plain Markdown file in your folder, so any other app can read it, and
 so can the AI you chat with later.
+
+```figure
+kind: flow
+title: How the Librarian puts an idle plan to work
+caption: The Librarian runs in the Mac app. It adds fields at the top of the file and never rewrites what you wrote. Secure notes never reach a remote model.
+---
+Your note | A plain Markdown file, written quickly
+The Librarian | Files it in the background, with the AI you choose
+- Your AI plan | Claude Code or Codex, signed in with your own account
+- A model on your Mac | Runs on your computer, without a network
+Frontmatter | An area, a one-line summary, tags, and links at the top of the file
+```
 
 Some limits worth knowing:
 
