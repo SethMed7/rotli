@@ -11,11 +11,17 @@
 // header on every width: a bar and "N% through", measured over the article alone
 // (src/reading.ts, the same measure that fills the tree's rail). It shows only when the
 // article is longer than the window, and it is a position, never a record: nothing is kept.
+// Blog posts and /privacy/ open on a banner (`banner`, or the `banner` slot for a
+// drawn scene): a full-width picture under the header that takes most of the first
+// window, held in place while the page rises over it. The head becomes a panel on the
+// page's own ground that overlaps the banner's lower left, where the art is kept open, so
+// the title, date, and reading time are read on the ground, never on the picture. Phones
+// get a shorter crop with the panel just below it.
 // Rendered Markdown arrives as children, so its typography is styled with
 // :global() in .prose.
 import Base from '../layouts/Base.astro';
 import type { NavSection } from '../nav';
-import type { Thumbnail } from '../og';
+import type { Banner } from '../og';
 import { site } from '../site';
 import SiteFooter from './SiteFooter.astro';
 import SiteHeader from './SiteHeader.astro';
@@ -42,8 +48,8 @@ interface Props {
   center?: boolean;
   /** Pin a reading meter under the header (resource articles, blog posts, /privacy/). */
   progress?: boolean;
-  /** A picture beside the head (a blog post's thumbnail, src/og.ts); under it on narrow screens. */
-  cover?: Thumbnail;
+  /** A full-width picture above the head (a blog post's banner, src/og.ts); the `banner` slot takes a drawn one. */
+  banner?: Banner;
   /** Passed through to Base: JSON-LD facts, the Markdown twin, and the link card (src/og.ts). */
   structuredData?: Record<string, unknown>[];
   markdownPath?: string;
@@ -65,13 +71,14 @@ const {
   wide = false,
   center = false,
   progress = false,
-  cover,
+  banner,
   structuredData,
   markdownPath,
   image,
   imageAlt,
 } = Astro.props;
 const hasToc = toc.length > 1;
+const hasBanner = banner !== undefined || Astro.slots.has('banner');
 ---
 
 <Base
@@ -85,8 +92,37 @@ const hasToc = toc.length > 1;
   imageAlt={imageAlt}
 >
   <SiteHeader current={section} />
-  <main id="content" class:list={['wrap writing', { center, 'has-progress': progress }]}>
-    <header class:list={['writing-head', { 'has-cover': cover }]}>
+  {
+    hasBanner && (
+      <div class:list={['article-banner', { drawn: !banner }]} data-article-banner>
+        {banner ? (
+          <picture class="banner-art">
+            <source
+              media="(max-width: 900px)"
+              srcset={banner.mobile}
+              width={banner.mobileWidth}
+              height={banner.mobileHeight}
+            />
+            <img
+              src={banner.src}
+              srcset={banner.srcset}
+              sizes="100vw"
+              width={banner.width}
+              height={banner.height}
+              alt={banner.alt}
+              fetchpriority="high"
+              decoding="async"
+            />
+          </picture>
+        ) : (
+          <slot name="banner" />
+        )}
+      </div>
+    )
+  }
+  <div class:list={{ sheet: hasBanner }}>
+  <main id="content" class:list={['wrap writing', { center, 'has-progress': progress, 'has-banner': hasBanner }]}>
+    <header class="writing-head">
       <div class="head-copy">
         {
           crumbs.length > 0 && (
@@ -102,8 +138,8 @@ const hasToc = toc.length > 1;
         }
         {kicker && <p class="kicker">{kicker}</p>}
         <h1>{heading}</h1>
-        {lede && <p class="lede">{lede}</p>}
-        {
+        {/* Under a banner the date and reading time sit with the title, inside the panel's first lines. */}
+        {hasBanner && (
           meta.length > 0 && (
             <p class="meta">
               {meta.map((part, index) => (
@@ -114,23 +150,21 @@ const hasToc = toc.length > 1;
               ))}
             </p>
           )
-        }
+        )}
+        {lede && <p class="lede">{lede}</p>}
+        {!hasBanner && (
+          meta.length > 0 && (
+            <p class="meta">
+              {meta.map((part, index) => (
+                <>
+                  {index > 0 && <span aria-hidden="true">·</span>}
+                  <span>{part}</span>
+                </>
+              ))}
+            </p>
+          )
+        )}
       </div>
-      {
-        cover && (
-          <img
-            class="cover"
-            src={cover.src}
-            srcset={cover.srcset}
-            sizes="(min-width: 1080px) 26rem, (min-width: 640px) 36rem, calc(100vw - 2.5rem)"
-            width={cover.width}
-            height={cover.height}
-            alt={cover.alt}
-            fetchpriority="high"
-            decoding="async"
-          />
-        )
-      }
     </header>
     <slot name="scene" />
     {
@@ -191,6 +225,7 @@ const hasToc = toc.length > 1;
     <slot name="after" />
   </main>
   <SiteFooter />
+  </div>
 </Base>
 
 <script>
@@ -270,35 +305,112 @@ const hasToc = toc.length > 1;
   .writing :global([id]) {
     scroll-margin-top: calc(var(--pinned) + 1.5rem);
   }
+  /* The banner: under the pinned header, most of the first window tall (enough of the window
+     is left for the title and the date), and held in place while the sheet below (the article
+     and the footer, on the page's own ground) scrolls up over it. Phones get the shorter crop. */
+  .article-banner {
+    --banner-height: clamp(20rem, calc(100svh - var(--header-height) - 12rem), 54rem);
+    position: sticky;
+    top: calc(var(--header-height) + 1px);
+    z-index: 0;
+    height: var(--banner-height);
+    overflow: hidden;
+    background: var(--surface-2);
+  }
+  .banner-art,
+  .banner-art img {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  /* The picture keeps its quokka and props (its right half) and its sand in view at every width:
+     the scenes (scripts/brand-images/scenes.mjs, `wide`) keep the lower left open for the panel. */
+  .banner-art img {
+    object-fit: cover;
+    object-position: 100% 100%;
+    transform-origin: 80% 100%;
+  }
+  /* flow-root: the head's pull upward stays inside the sheet instead of collapsing through
+     it, so the sheet's ground starts at the banner's bottom edge and only the panel overlaps. */
+  .sheet {
+    position: relative;
+    z-index: 1;
+    display: flow-root;
+    background: var(--ground);
+  }
+  /* The head is a panel on the ground that rises over the banner's lower left, where the art
+     is open sea and sand: the title and the date are read on the ground, at full contrast. */
+  .article-banner,
+  .writing.has-banner {
+    --banner-overlap: 7rem;
+  }
+  .writing.has-banner {
+    --panel-pad: clamp(1.25rem, 2.5vw, 2.5rem);
+    padding-top: 0;
+  }
+  .has-banner .writing-head {
+    margin-top: calc(-1 * var(--banner-overlap));
+  }
+  .has-banner .head-copy {
+    position: relative;
+    max-width: 36rem;
+    margin-inline-start: calc(-1 * var(--panel-pad));
+    padding: clamp(1.5rem, 3vw, 2.25rem) var(--panel-pad) 0;
+    border-radius: var(--radius-frame) var(--radius-frame) 0 0;
+    background: var(--ground);
+  }
+  .has-banner h1 {
+    font-size: clamp(2.2rem, 4vw, 3.25rem);
+  }
+  .has-banner .meta {
+    margin-top: 1rem;
+  }
+  .has-banner .lede {
+    margin-top: 1.25rem;
+  }
+  @media (max-width: 900px) {
+    .article-banner {
+      --banner-height: min(calc(100vw * 900 / 1300), 55svh);
+    }
+    .banner-art img {
+      object-position: 50% 100%;
+    }
+    .article-banner,
+    .writing.has-banner {
+      --banner-overlap: 1.5rem;
+    }
+    /* A drawn banner (the slot) sizes to its scene and words on a phone. */
+    .article-banner.drawn {
+      height: auto;
+    }
+    .has-banner .head-copy {
+      max-width: none;
+      margin-inline: calc(-1 * var(--panel-pad));
+    }
+  }
+  /* A slow settle as the page rises over it: the art grows a few percent toward its sand.
+     Scroll-driven, so it is CSS only; still where reduced motion is asked for or unsupported. */
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: scroll()) {
+      /* Longhands, never the shorthand: the minifier folds a following animation-timeline into
+         `animation`, which does not accept a timeline, and the whole declaration is dropped. */
+      .banner-art img {
+        animation-name: banner-settle;
+        animation-timing-function: linear;
+        animation-fill-mode: both;
+        animation-timeline: scroll(root);
+        animation-range: 0 80svh;
+      }
+    }
+  }
+  @keyframes banner-settle {
+    to {
+      transform: scale(1.06);
+    }
+  }
   /* The rule under the head spans the page; the words keep a reading width. */
   .head-copy {
     max-width: 48rem;
-  }
-  /* A post's picture sits beside its words, level with the title block's middle; on narrower
-     screens it follows the words at a moderate size. */
-  .writing-head.has-cover {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 26rem);
-    align-items: center;
-    gap: clamp(2rem, 5vw, 4rem);
-  }
-  .cover {
-    display: block;
-    width: 100%;
-    height: auto;
-    aspect-ratio: 1200 / 630;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-frame);
-    background: var(--surface-2);
-  }
-  @media (max-width: 1080px) {
-    .writing-head.has-cover {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 2rem;
-    }
-    .cover {
-      max-width: 36rem;
-    }
   }
   .writing-head {
     padding-bottom: clamp(2rem, 4vw, 3rem);

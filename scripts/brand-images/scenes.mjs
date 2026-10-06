@@ -5,8 +5,8 @@
 //                       quokka on the right third, the post's main prop on the left third, the
 //                       second prop further up the beach
 //   wide   2400 × 1000  the post's banner: the same quokka and props gathered in the right half,
-//                       so the left and the bottom stay open sea and sand where the article's
-//                       title panel rises over the picture; `mobile` is its right half
+//                       so the lower left stays open sea and sand where the article's title
+//                       panel rises over the picture; MOBILE_CROP is its phone crop
 // Every line is the quokka's own ink at the quokka's own weight (ART_LINE, scaled to the size it
 // is drawn at), so a prop never reads heavier or lighter than the character beside it, and the
 // colours are the site's tokens (templates.mjs reads them from Base.astro).
@@ -148,9 +148,15 @@ export const lineFor = (size) => (ART_LINE / ART) * size;
 
 /**
  * Each post scene, per composition: where the quokka stands (centre x, foot y, square size),
- * each prop (`at`: foot x, y, scale; the nearer first), a dotted path between two points, and
- * the scenery. Feet sit on the sand, a prop further up the beach is smaller (it is further
- * away), and nothing touches the frame or another shape's edge.
+ * each prop in `props` order (`at`: foot x, foot y, scale), a dotted path between two points
+ * (with how high it arcs), and the scenery. Feet sit on the sand; a prop further up the beach
+ * is smaller and drawn behind (it is further away); nothing touches the frame or another
+ * shape's edge.
+ *   thumb  the main prop on the left third, the quokka on the right third, the second prop
+ *          up the beach behind them
+ *   wide   the quokka at about two thirds across, the post's front prop beside it on the
+ *          right and the other up the beach on its left, all clear of the lower left, which
+ *          the title panel covers (x under ~1400, y over ~790 at any banner shape)
  */
 const SCENES = {
   bench: {
@@ -163,16 +169,15 @@ const SCENES = {
       ],
     },
     wide: {
-      quokka: [1520, 958, 820],
+      quokka: [1660, 958, 780],
       at: [
-        [2010, 950, 1.3],
-        [2300, 800, 0.7],
+        [2130, 950, 1.15],
+        [1300, 780, 1.0],
       ],
     },
   },
   helper: {
     props: ["browser", "terminal"],
-    path: true,
     thumb: {
       quokka: [800, 604, 560],
       at: [
@@ -182,12 +187,12 @@ const SCENES = {
       path: [[330, 330], [1075, 400], 230],
     },
     wide: {
-      quokka: [1540, 958, 820],
+      quokka: [1660, 958, 780],
       at: [
-        [1980, 950, 1.5],
-        [2280, 790, 0.95],
+        [2140, 950, 1.4],
+        [1300, 780, 1.05],
       ],
-      path: [[1900, 712], [2290, 630], 210],
+      path: [[1300, 628], [2140, 735], 520],
     },
   },
   memory: {
@@ -200,10 +205,10 @@ const SCENES = {
       ],
     },
     wide: {
-      quokka: [1540, 958, 820],
+      quokka: [1660, 958, 780],
       at: [
-        [1980, 950, 1.5],
-        [2240, 820, 0.9],
+        [2140, 950, 1.4],
+        [1280, 782, 0.95],
       ],
     },
   },
@@ -217,25 +222,22 @@ const SCENES = {
       ],
     },
     wide: {
-      quokka: [1540, 958, 820],
+      quokka: [1660, 958, 780],
       at: [
-        [2010, 950, 1.55],
-        [2285, 800, 0.9],
+        [1300, 782, 1.0],
+        [2140, 950, 1.5],
       ],
     },
   },
   making: {
     props: ["sketches"],
-    lighthouse: true,
-    sun: true,
     thumb: { quokka: [650, 604, 600], at: [[230, 600, 1.3]], lighthouse: [1080, 0.9], sun: [880, 104] },
-    wide: { quokka: [1590, 958, 860], at: [[2200, 950, 1.3]], lighthouse: [2250, 1.2], sun: [1960, 170] },
+    wide: { quokka: [1690, 958, 800], at: [[2230, 950, 1.1]], lighthouse: [2250, 1.15], sun: [2010, 170] },
   },
   beach: {
     props: [],
-    lighthouse: true,
     thumb: { quokka: [760, 604, 600], at: [], lighthouse: [1060, 0.95] },
-    wide: { quokka: [1560, 958, 860], at: [], lighthouse: [2120, 1.2] },
+    wide: { quokka: [1720, 958, 800], at: [], lighthouse: [2160, 1.15] },
   },
 };
 export const SCENE_NAMES = Object.keys(SCENES);
@@ -285,8 +287,7 @@ function shore({ w, h, horizon, dune, sand, k, lw }) {
   };
   const scrub = [
     [0.07, dune - 4 * k, 52],
-    [0.47, dune + 2 * k, 44],
-    [0.93, dune - 6 * k, 46],
+    [0.36, dune + 2 * k, 44],
   ]
     .map(
       ([fx, y, r]) =>
@@ -312,9 +313,14 @@ export function scene({ kind, art, label, layout = "thumb", crop, w, h }) {
   const [qx, footY, qSize] = place.quokka;
   const lw = lineFor(qSize);
   const view = crop ?? [0, 0, canvas.w, canvas.h];
+  // Further up the beach is further away: drawn first, so the nearer things overlap it.
   const props = place.at
-    .map(([x, y, s], index) => prop(spec.props[index], { x, y, s, lw: lw * (y < footY - 40 * k ? 0.85 : 1) }))
-    .reverse()
+    .map(([x, y, s], index) => ({
+      y,
+      svg: prop(spec.props[index], { x, y, s, lw: lw * (y < footY - 40 * k ? 0.85 : 1) }),
+    }))
+    .sort((a, b) => a.y - b.y)
+    .map((item) => item.svg)
     .join("");
   const path = place.path
     ? (() => {
@@ -326,7 +332,7 @@ export function scene({ kind, art, label, layout = "thumb", crop, w, h }) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w ?? view[2]}" height="${h ?? view[3]}" viewBox="${view.join(" ")}" role="img" aria-label="${esc(label)}">
   <rect width="${canvas.w}" height="${canvas.h}" fill="${C.sky}"/>
   ${place.sun ? `<circle cx="${place.sun[0]}" cy="${place.sun[1]}" r="${52 * k}" fill="${C.cloud}" stroke="${C.accent}" stroke-width="${lw * 0.8}"/>` : ""}
-  ${canvas.clouds.map(([x, y, s]) => cloud({ x, y, s: s * (layout === "wide" ? 1 : 1) })).join("")}
+  ${canvas.clouds.map(([x, y, s]) => cloud({ x, y, s })).join("")}
   ${canvas.isle ? isle({ x: canvas.isle, y: canvas.horizon, k, lw: lw * 0.5 }) : ""}
   ${place.lighthouse ? lighthouse({ x: place.lighthouse[0], y: canvas.horizon + 2 * k, s: place.lighthouse[1] * k }) : ""}
   ${shore({ ...canvas, k, lw: lw * 0.6 })}

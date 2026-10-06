@@ -51,12 +51,12 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   toc={toc}
   progress
 >
-  <div slot="scene" class="night band-night" data-reveal>
+  <div slot="banner" class="night band-night" data-reveal>
     <p class="night-caption">
       <span class="inked">Secure notes stay home.</span> A model on your own Mac may read them. Remote models,
       the clouds outside, never see them, and no model can edit a note you lock.
     </p>
-    <SecureScene />
+    <div class="dome-frame"><SecureScene /></div>
   </div>
 
   <h2 id="short-version">The short version</h2>
@@ -319,24 +319,30 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
   .access td[data-access='read'] {
     color: var(--text-muted);
   }
-  /* The story film's night: the dome of "on this Mac", on a starry frame above the policy.
-     The sky and its Ocean stars come from .band-night (Base.astro), like the landing's
-     PrivacyBrief; only the colour is set here, so the stars are never overridden. */
+  /* The story film's night, as the page's banner (WritingPage's `banner` slot): the dome of
+     "on this Mac" on the right, standing on the line where the title panel rises, and the
+     caption in the open sky on the left, so neither ever sits under the panel. The sky and
+     its Ocean stars come from .band-night (Base.astro), like the landing's PrivacyBrief; only
+     the colour is set here, so the stars are never overridden. Measured: the caption's
+     --deep-muted on the night --deep is 8.6:1, its inked phrase --deep-text 15.7:1. */
   .night {
+    box-sizing: border-box;
     display: grid;
-    gap: 1.5rem 2rem;
-    align-items: end;
-    margin-bottom: clamp(2.5rem, 5vw, 4rem);
-    padding: clamp(1.75rem, 4vw, 3rem) clamp(1.5rem, 4vw, 3rem) 0;
-    overflow: hidden;
-    border-radius: var(--radius-frame);
+    grid-template-columns: minmax(0, 26rem) minmax(0, 1fr);
+    gap: 2rem;
+    height: 100%;
+    padding: clamp(2rem, 4vw, 3rem) max(var(--gutter), calc((100% - var(--page-max)) / 2))
+      calc(var(--banner-overlap) + 0.5rem);
     background-color: var(--deep);
     color: var(--deep-text);
   }
+  /* The caption sits on the plain night, never on the stars: its own ground covers them. */
   .night-caption {
-    max-width: 26rem;
+    align-self: start;
+    justify-self: start;
     margin: 0;
-    padding-bottom: clamp(1.5rem, 4vw, 3rem);
+    background-color: var(--deep);
+    box-shadow: 0 0 0 0.6rem var(--deep);
     color: var(--deep-muted);
     font-size: var(--step-lede);
     line-height: 1.5;
@@ -345,16 +351,37 @@ const label: Record<Access, string> = { full: 'Reads and edits', read: 'Reads on
     color: var(--deep-text);
     font-weight: 600;
   }
-  /* Side by side, the words sit in the middle of the sky beside the dome
-     (the dome keeps its feet on the frame's bottom edge), so neither the
-     upper left nor the lower left is left empty. */
-  @media (min-width: 900px) {
+  /* The dome fills its column's height and hugs its right and bottom edges; the column clips,
+     so the remote-AI clouds that drift in never pass over the caption beside it. */
+  .dome-frame {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .dome-frame :global(.scene) {
+    height: 100%;
+  }
+  .dome-frame :global(.scene svg) {
+    width: auto;
+    max-width: 100%;
+    height: 100%;
+  }
+  @media (max-width: 900px) {
     .night {
-      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1.25rem;
+      height: auto;
     }
-    .night-caption {
-      align-self: center;
-      padding-block: 0 clamp(1.75rem, 4vw, 3rem);
+    .dome-frame {
+      justify-self: center;
+      width: min(100%, 26rem);
+    }
+    .dome-frame :global(.scene),
+    .dome-frame :global(.scene svg) {
+      width: 100%;
+      height: auto;
     }
   }
   /* The companion beside a section, the way the app shows it. */

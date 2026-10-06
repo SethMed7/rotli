@@ -1,14 +1,15 @@
 ---
 // /blog/ (the index: the newest readable post as the feature, then the rest in a
 // grid, with the ones announced as coming soon last and without a link; every
-// entry shows its thumbnail, src/og.ts) and /blog/<post>/, an article with its
-// thumbnail in the head, the "On this page" tree (WritingPage `toc`), and the
-// reading meter the guides use (`progress`), so every article reads the same way.
+// entry shows its thumbnail, src/og.ts) and /blog/<post>/, an article that opens on
+// its banner (the same scene composed wide, WritingPage `banner`), with the "On this
+// page" tree (WritingPage `toc`) and the reading meter the guides use (`progress`),
+// so every article reads the same way.
 import { render } from 'astro:content';
 import { twinPath, writingGraph, writingPath } from '../../agents';
 import BlogIndex, { type BlogEntry } from '../../components/BlogIndex.astro';
 import WritingPage from '../../components/WritingPage.astro';
-import { ogImage, postOgImage, postThumbnail } from '../../og';
+import { ogImage, postBanner, postOgImage, postThumbnail } from '../../og';
 import { site } from '../../site';
 import { publishedWriting, readingMinutes, slugOf, upcomingWriting, type Writing } from '../../writing';
 
@@ -67,7 +68,7 @@ const toc = (rendered?.headings ?? [])
       heading={entry.data.title}
       lede={entry.data.description}
       meta={[formatDate(entry.data.date), `${readingMinutes(entry)} min read`]}
-      cover={postThumbnail(slugOf(entry))}
+      banner={postBanner(slugOf(entry))}
       toc={toc}
       progress
     >
