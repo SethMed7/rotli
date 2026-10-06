@@ -53,8 +53,8 @@ export function navEntryHolds(entry: NavEntry, current: NavSection | undefined):
 }
 
 /**
- * Header links: real pages, never landing-page anchors. Download is not
- * listed; it is the header's one button (SiteHeader.astro). Resources is a
+ * Header links: real pages, never landing-page anchors. /download/ is not
+ * listed; it is the header's one button, "Try now" (SiteHeader.astro). Resources is a
  * dropdown (Guides, Blog, Developers, Changelog, Roadmap) whose label links to
  * /resources/ when script is off. Blog appears only once a post can be read,
  * so the header never leads to an index of nothing but "coming soon". The

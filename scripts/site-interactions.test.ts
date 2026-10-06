@@ -1,8 +1,8 @@
 // The website's interactive rules, without a browser: the privacy passage's trigger and
 // crossfade (site/src/passage.ts), the theme studio's autoplay (site/src/themeCycle.ts), the
-// resource reading meter (site/src/reading.ts), the 404 game (site/src/runner/game.ts), and
-// the footer scene's play (site/src/quokka/play.ts, the person in human.ts, and the
-// traced-pose cleanup in art.ts). The pages wire these to the DOM; e2e/site/ proves the
+// resource reading meter (site/src/reading.ts), and the footer scene's play
+// (site/src/quokka/play.ts, the person in human.ts, and the traced-pose cleanup in art.ts).
+// The 404 game has its own file, site-runner.test.ts. The pages wire these to the DOM; e2e/site/ proves the
 // wiring. Like site-agents.test.ts, the site's modules load through a computed path so
 // their types stay out of the root typecheck; only the functions under test are typed here.
 import { beforeAll, describe, expect, test } from "bun:test";
@@ -21,28 +21,6 @@ interface Box {
   right: number;
   bottom: number;
 }
-interface Obstacle {
-  kind: string;
-  x: number;
-  w: number;
-  h: number;
-}
-interface Runner {
-  y: number;
-  vy: number;
-  grounded: boolean;
-}
-interface Game {
-  status: "ready" | "running" | "paused" | "over";
-  distance: number;
-  speed: number;
-  runner: Runner;
-  obstacles: Obstacle[];
-  untilNext: number;
-  width: number;
-  best: number;
-}
-
 type Rgb = readonly [number, number, number];
 interface PassagePair {
   text: readonly [string, string];
@@ -70,26 +48,6 @@ let reading: {
     viewport: number,
     header: number,
   ): { fraction: number; percent: number; fits: boolean };
-};
-let game: {
-  WORLD: {
-    jumpSpeed: number;
-    gravity: number;
-    runnerX: number;
-    runnerW: number;
-    maxSpeed: number;
-    unitsPerMetre: number;
-  };
-  createGame(width: number, best?: number): Game;
-  start(g: Game): Game;
-  jump(g: Game): Game;
-  release(g: Game): Game;
-  pause(g: Game): Game;
-  resume(g: Game): Game;
-  step(g: Game, ms: number, random: () => number): Game;
-  collides(runner: Runner, obstacle: Obstacle): boolean;
-  nextGap(speed: number, random: () => number): number;
-  metres(distance: number): number;
 };
 let play: {
   dropTarget<T extends { box: Box }>(point: Point, residents: readonly T[], reach: number): T | null;
@@ -141,6 +99,11 @@ let human: {
   deed(holding: boolean, spot: Spot): "pick" | "feed" | "join" | null;
   onSand(x: number, width: number, bodyWidth: number): number;
   entrance(target: number, width: number, bodyWidth: number): number;
+  command(
+    holding: "leaf" | "ball" | null,
+    hit: "pile" | "ball" | "quokka" | "sand",
+    context: { joined: boolean; player: boolean },
+  ): string | null;
 };
 let art: {
   tracedPose(svg: string): { line: string; silhouette: string; transform: string; viewBox: number };
@@ -149,7 +112,6 @@ let art: {
 beforeAll(async () => {
   passage = (await import(site("passage.ts"))) as typeof passage;
   reading = (await import(site("reading.ts"))) as typeof reading;
-  game = (await import(site("runner", "game.ts"))) as typeof game;
   play = (await import(site("quokka", "play.ts"))) as typeof play;
   art = (await import(site("quokka", "art.ts"))) as typeof art;
   cycle = (await import(site("themeCycle.ts"))) as typeof cycle;
@@ -356,75 +318,6 @@ describe("the reading meter", () => {
   });
 });
 
-describe("the 404 game", () => {
-  const never = () => 0.99;
-  const run = (g: Game, ms: number, random = never) => {
-    let next = g;
-    for (let t = 0; t < ms; t += 16) next = game.step(next, 16, random);
-    return next;
-  };
-
-  test("never moves until Play, and a paused run stands still", () => {
-    const ready = game.createGame(800);
-    expect(game.step(ready, 1000, never)).toBe(ready);
-    const running = run(game.start(ready), 500);
-    expect(running.distance).toBeGreaterThan(0);
-    const paused = game.pause(running);
-    expect(game.step(paused, 1000, never).distance).toBe(running.distance);
-    expect(game.resume(paused).status).toBe("running");
-  });
-
-  test("a jump rises, comes back down onto the sand, and cannot be repeated in the air", () => {
-    let g = game.jump(game.start(game.createGame(800)));
-    expect(g.runner.grounded).toBe(false);
-    const again = game.jump(g);
-    expect(again.runner.vy).toBe(g.runner.vy);
-    g = run(g, 200);
-    expect(g.runner.y).toBeGreaterThan(0);
-    g = run(g, 1500);
-    expect(g.runner).toEqual({ y: 0, vy: 0, grounded: true });
-  });
-
-  test("letting go early makes a lower hop", () => {
-    const full = run(game.jump(game.start(game.createGame(800))), 340);
-    const short = run(game.release(run(game.jump(game.start(game.createGame(800))), 60)), 280);
-    expect(short.runner.y).toBeLessThan(full.runner.y);
-  });
-
-  test("running into an obstacle ends the run, keeps the distance, and records the best", () => {
-    const g = {
-      ...game.start(game.createGame(800, 3)),
-      obstacles: [{ kind: "rock", x: game.WORLD.runnerX + 30, w: 44, h: 30 }],
-    };
-    const over = game.step(g, 16, never);
-    expect(over.status).toBe("over");
-    expect(over.best).toBe(3); // a short run does not lower the best
-    const replay = game.start(over);
-    expect(replay.status).toBe("running");
-    expect(replay.obstacles).toEqual([]);
-    expect(replay.best).toBe(3);
-  });
-
-  test("clearing an obstacle in the air is safe", () => {
-    const rock = { kind: "rock", x: game.WORLD.runnerX, w: 44, h: 30 };
-    expect(game.collides({ y: 0, vy: 0, grounded: true }, rock)).toBe(true);
-    expect(game.collides({ y: 40, vy: 0, grounded: false }, rock)).toBe(false);
-  });
-
-  test("there is always room to land before the next obstacle, at any speed", () => {
-    for (const speed of [330, 500, game.WORLD.maxSpeed]) {
-      const airtime = (2 * game.WORLD.jumpSpeed) / game.WORLD.gravity;
-      expect(game.nextGap(speed, () => 0)).toBeGreaterThan(speed * airtime);
-    }
-  });
-
-  test("the score is metres, and a long frame (a hidden tab) never teleports the run", () => {
-    expect(game.metres(game.WORLD.unitsPerMetre * 12.9)).toBe(12);
-    const g = game.step(game.start(game.createGame(800)), 5000, never);
-    expect(g.distance).toBeLessThan(40);
-  });
-});
-
 describe("the person on the footer beach", () => {
   const walkTo = (from: number, target: number, ms = 16, frames = 2000) => {
     let walk = human.createWalk(from);
@@ -490,6 +383,31 @@ describe("the person on the footer beach", () => {
     expect(human.deed(false, { ...none, players: true, quokka: "player-a" })).toBe("join");
     expect(human.deed(true, { ...none, players: true, quokka: "player-a" })).toBe("feed");
     expect(human.deed(false, none)).toBeNull();
+  });
+
+  test("sets off briskly: near full speed within a few frames", () => {
+    let walk = human.createWalk(0);
+    for (let i = 0; i < 7; i++) walk = human.stepWalk(walk, 1000, 16);
+    expect(walk.v).toBeGreaterThan(human.STRIDE.speed * 0.9);
+  });
+
+  test("a click asks for the one thing that fits what it lands on and what is in hand", () => {
+    const loose = { joined: false, player: false };
+    // The pile: fetch a leaf with empty hands; with something in hand, just go there.
+    expect(human.command(null, "pile", loose)).toBe("fetch");
+    expect(human.command("leaf", "pile", loose)).toBe("walk");
+    // A quokka: feed it a leaf in hand; throw it the ball in hand (or while in the game).
+    expect(human.command("leaf", "quokka", loose)).toBe("feed");
+    expect(human.command("ball", "quokka", { joined: true, player: false })).toBe("throw");
+    expect(human.command(null, "quokka", { joined: true, player: true })).toBe("throw");
+    // Empty hands, out of the game: a player means joining; anyone else, a visit.
+    expect(human.command(null, "quokka", { joined: false, player: true })).toBe("join");
+    expect(human.command(null, "quokka", loose)).toBe("visit");
+    // The ball: join the game; already holding it, nothing; a leaf in hand, just go there.
+    expect(human.command(null, "ball", loose)).toBe("join");
+    expect(human.command("ball", "ball", loose)).toBeNull();
+    expect(human.command("leaf", "ball", loose)).toBe("walk");
+    expect(human.command(null, "sand", loose)).toBe("walk");
   });
 
   test("it stays on the sand, and arrives from the nearer side", () => {

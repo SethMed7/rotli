@@ -1,7 +1,7 @@
 ---
 // The one site header: brand, the site's pages (src/nav.ts), the GitHub mark
-// while the source is public, and one Download button that opens /download/,
-// which picks the right download for the visitor's system. It stays pinned to
+// while the source is public, and one "Try now" button that opens /download/,
+// which offers the Mac app and Rotli Web and leads with the visitor's system. It stays pinned to
 // the top on a solid ground (flat: no blur, no shadow). Resources is a
 // disclosure dropdown (a button with aria-expanded); without script its label
 // is a plain link to /resources/. Below 1080px the sections fold into a Menu
@@ -84,7 +84,7 @@ const links = primaryNav({ hasPosts: (await publishedWriting('post')).length > 0
                 </svg>
               </a>
             )}
-            <a class="button primary header-download" href="/download/" aria-current={current === 'download' ? 'page' : undefined}>Download</a>
+            <a class="button primary header-download" href="/download/" aria-current={current === 'download' ? 'page' : undefined}>Try now</a>
             <details class="nav-menu">
               <summary>Menu</summary>
               <nav class="nav-menu-panel" aria-label="Site sections">
@@ -106,7 +106,7 @@ const links = primaryNav({ hasPosts: (await publishedWriting('post')).length > 0
                   ),
                 )}
                 {github && <a href={GITHUB_URL} rel="noopener">GitHub</a>}
-                <a class="button primary" href="/download/">Download</a>
+                <a class="button primary" href="/download/">Try now</a>
               </nav>
             </details>
           </div>

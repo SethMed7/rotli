@@ -1,5 +1,6 @@
 ---
 import { jsonLd } from '../agents';
+import { PLATFORMS } from '../site';
 interface Props {
   title?: string;
   description?: string;
@@ -15,7 +16,7 @@ interface Props {
 
 const {
   title = 'rotli — write like a person, let AI do the filing',
-  description = 'A free workspace built on plain Markdown files you own, with no account. Write however you think; the Librarian files, tags, and links your notes in the background. On the Mac today; Windows and Linux apps are coming soon.',
+  description = `A free workspace built on plain Markdown files you own, with no account. Write however you think; the Librarian files, tags, and links your notes in the background. ${PLATFORMS.availability}`,
   canonicalPath = Astro.url.pathname,
   image = '/social-card.png',
   imageAlt = 'rotli — write like a person, let AI do the filing',
@@ -62,9 +63,8 @@ const socialImageUrl = new URL(image, siteUrl).href;
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <!-- data-platform: SiteActions leads with the browser on anything but a Mac
-         (iPads report a Mac user agent, so touch points rule them out).
-         data-os: /download/ leads with the visitor's own system. -->
+    <!-- data-os: /download/ leads with the visitor's own system (iPads report a
+         Mac user agent, so touch points rule them out). -->
     <script is:inline>
       (function () {
         var root = document.documentElement;
@@ -72,7 +72,6 @@ const socialImageUrl = new URL(image, siteUrl).href;
         var touch = navigator.maxTouchPoints > 1;
         root.classList.add('js');
         var mac = /Macintosh/.test(ua) && !touch;
-        root.dataset.platform = mac ? 'mac' : 'other';
         root.dataset.os = mac
           ? 'mac'
           : /Windows/.test(ua)
@@ -736,38 +735,11 @@ const socialImageUrl = new URL(image, siteUrl).href;
         cursor: default;
         opacity: 0.82;
       }
-      /* The two ways in (SiteActions.astro). Off a Mac the browser leads and the
-         download names the Mac; without script the Mac order stays. */
+      /* The way in (SiteActions.astro): one primary button, or the pending label. */
       .site-actions {
         display: flex;
         flex-wrap: wrap;
         gap: 0.75rem;
-      }
-      .action-download .for-other,
-      :root[data-platform='other'] .action-download .for-mac {
-        display: none;
-      }
-      :root[data-platform='other'] .action-download .for-other {
-        display: inline;
-      }
-      :root[data-platform='other'] .action-web {
-        order: -1;
-        background: var(--text);
-        color: var(--on-text);
-        border-color: var(--text);
-      }
-      :root[data-platform='other'] .action-web:hover {
-        background: var(--accent-text);
-        border-color: var(--accent-text);
-        color: var(--on-accent);
-      }
-      :root[data-platform='other'] .action-download {
-        background: transparent;
-        color: var(--text);
-        border-color: var(--border-strong);
-      }
-      :root[data-platform='other'] .action-download:hover {
-        background: var(--surface-2);
       }
       .site-header .button {
         min-height: 40px;

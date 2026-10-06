@@ -103,6 +103,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runs along the beach: jump the rocks, bushes, logs, and sandcastles with
   Space, ↑, or a tap, and see how far you get. It pauses when you leave it,
   and "Take me home" works the whole time. Your best run is not saved.
+- **You steer your person on rotli.co's quokka beach.** With the mouse over
+  the beach, the arrow keys walk it, and a click says what to do: click the
+  leaves to pick one up, then a quokka to walk over and feed it (a little
+  heart rises). Holding the ball, or in the game of catch, click any quokka
+  to throw it the ball; it catches it and throws it back. A pointer and a
+  ring on the sand show what a click would act on. Your person no longer
+  follows the mouse around, walks off more briskly, and taps work the same
+  on a phone.
+- **The game on rotli.co's page-not-found screen has more to it.** The
+  quokka can duck now: hold ↓ or S (or swipe down on a phone) to slide under
+  the gulls and low branches that start coming along after the first few
+  metres. The run gets faster a level at a time, and the level shows beside
+  the score. The game is taller, and the page around it says less: the
+  headline, "Take me home", and "Try rotli · Resources".
+- **rotli.co says "Try now" and keeps where it runs on the download page.**
+  The header, the home page's top, and its closing panel each have one
+  "Try now" button. It opens the download page, which offers the Mac app and
+  Rotli Web and leads with your system: on Windows or Linux it says their apps
+  are coming soon and offers Rotli Web in the meantime. The home page no
+  longer repeats where rotli runs under its buttons, and the Mac download
+  link lives only on the download page.
 - **rotli.co's guides open on their own scene and show how far through you
   are.** Each guide starts with a small island scene about its subject, and a
   bar with "N% through" stays under the header as you scroll the article.

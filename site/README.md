@@ -37,13 +37,14 @@ bun run preview  # serve the built dist/ locally
 ```
 
 The interactive pieces have two proofs, both run from the repository root:
-`bun test scripts/site-interactions.test.ts` (the rules without a browser: the
-privacy passage's trigger and the contrast of every frame of its crossfade, the
-theme studio's autoplay, the reading meter, the 404 game, the footer scene's
-play and the visitor's person; `scripts/site-motion.test.ts` holds the tour's
-scroll steps and the before and after's filing play) and `bun run test:e2e:site` (`playwright.site.config.ts`: builds the
-site, serves it with `astro preview` on port 4392, and drives `e2e/site/`).
-The unit files run inside `bun run verify`; the site's E2E lane is not yet
+the rules without a browser, `bun test scripts/site-interactions.test.ts`
+(the privacy passage's trigger and the contrast of every frame of its
+crossfade, the theme studio's autoplay, the reading meter, the footer scene's
+play and the visitor's person), `bun test scripts/site-motion.test.ts` (the
+tour's scroll steps and the before and after's filing play) and
+`bun test scripts/site-runner.test.ts` (the 404 game), and `bun run test:e2e:site` (`playwright.site.config.ts`: builds
+the site, serves it with `astro preview` on port 4392, and drives
+`e2e/site/`). The unit files run inside `bun run verify`; the site's E2E lane is not yet
 wired into `verify` or CI (an owner decision: it would add a site build to
 the e2e lane), so run it by hand after changing those pages.
 
@@ -92,8 +93,8 @@ whose art never touches its words from 320 to 1920.
   into the list; ArrowUp/ArrowDown, Home, End move; Escape closes and returns
   focus; tabbing away or an outside click closes). Without script the button
   is hidden and "Resources" is a plain link to `/resources/`. On the right sit
-  the GitHub mark (icon only, while the source is public) and one Download
-  button, which opens `/download/`. Download is not also a menu item. The
+  the GitHub mark (icon only, while the source is public) and one "Try now"
+  button, which opens `/download/`. That page is not also a menu item. The
   footer's link columns (Product · Learn · Open source, the last only while
   the source is public) and tagline default from the same file. Pages pass
   only `current` (a dropdown's label is marked current when any of its pages
@@ -101,7 +102,7 @@ whose art never touches its words from 320 to 1920.
   `[id]` targets carry a matching `scroll-margin-top`. Below 1080px the pages
   fold into a Menu disclosure (`<details>`; Escape, an outside click, or
   choosing a link closes it), where the dropdown's pages are listed under its
-  name; below 560px the GitHub mark and Download move into it too. The
+  name; below 560px the GitHub mark and Try now move into it too. The
   footer's lead column holds the brand, the tagline, and the "Hear when it's
   ready." sign-up, always shown (see "The coming-soon list" below); its
   closing row holds the maker line, with a drawn X mark (not the platform's
@@ -180,8 +181,9 @@ whose art never touches its words from 320 to 1920.
      foundation of a workspace, and rotli charges nothing for AI.
   10. Closing (plain, one framed panel on the warm colour). The two-tone
       headline "Start with one note." / "It stays in your folder." has its
-      first line in full ink and the second muted. Under it are "Free, with no
-      account to make." and the hero's two ways in (`SiteActions`). The writing
+      first line in full ink and the second muted. Under it are "Free, with
+      no account to make." and the hero's one way in, "Try now"
+      (`SiteActions`). The writing
       quokka comes in from the right, cut off by the frame. Under 900px it
       steps below the words, never onto them. It asks for a first step rather
       than repeating the hero (the earlier invitation was cut for that). Right
@@ -289,23 +291,28 @@ whose art never touches its words from 320 to 1920.
   blocks wrap long lines at their spaces inside the box (the Helper's install
   line included) and are not syntax-highlighted: Shiki writes inline `style=` attributes,
   which the production CSP drops. Keep article images local.
-- **`/download/`** is where the header's Download button goes. It leads with
-  the visitor's own system (`Base.astro` stamps `data-os`: mac, windows,
-  linux, mobile, or other): the Mac download on a Mac; on Windows and Linux,
-  a native app that is coming soon, with Rotli Web to use in the meantime and
-  Rotli Helper for browsers without folder access. Without script the Mac
-  panel shows. Below, "Every platform" lists Mac, Windows, Linux, and any
-  browser with their status (Windows and Linux: "Coming soon", the owner's
-  call on 2026-10-05, replacing the earlier "Planned").
+- **`/download/`** is where every "Try now" goes (the header, the hero, the
+  closing panel; the 404's "Try rotli" and the About page's too). It offers
+  the two real ways in, the Mac app and Rotli Web, and leads with the
+  visitor's own system (`Base.astro` stamps `data-os`: mac, windows, linux,
+  mobile, or other): the Mac download on a Mac, with Rotli Web beside it; on
+  Windows and Linux, "rotli for Windows is coming soon" and a prominent Open
+  Rotli Web button ("Use Rotli Web in the meantime"), with Rotli Helper for
+  browsers without folder access and no Mac download. Without script the Mac
+  panel shows. Below, "Every platform" lists Mac and Rotli Web (Available)
+  and then Windows and Linux ("Coming soon", each pointing to Rotli Web for
+  now). This is the only page that links the DMG (`DOWNLOAD_URL`).
 - **Where rotli runs** (the owner, 2026-10-05). The promise is a free
-  workspace, not a Mac app: pages lead with what it is and what it costs
-  ("Free. No account. Works offline." under the hero's ways in) and state
-  availability separately, with `PLATFORMS` in `src/site.ts` ("On the Mac
-  today. Windows and Linux apps are coming soon.", or "In your browser and on
-  the Mac today. …" while `WEB_APP_ENABLED`; `PLATFORMS.soon` is the status
-  label). The ways-in section is "On your computer. In your browser." Never
-  imply the Mac is the only platform rotli will have, or that Windows or
-  Linux apps exist today.
+  workspace, not a Mac app. The landing page says what it is and what it
+  costs ("Free. No account. Works offline." under the hero's "Try now") and
+  never where it runs: that line was clutter (the owner's second call that
+  day, "clean up some clutter on the website and improve readability").
+  Availability is `/download/`'s, the FAQ's, the meta description's, and
+  `llms.txt`'s to say, all from `PLATFORMS` in `src/site.ts`
+  (`availability` for one-sentence summaries, `soon` for the status label,
+  `meantime` for where Windows and Linux visitors go). Never imply the Mac is
+  the only platform rotli will have, or that Windows or Linux apps exist
+  today.
 - **Docs and Sheets** (Word `.docx` and Excel `.xlsx`, edited with Univer in
   the Mac app) are named as beta (the owner, 2026-10-05; Sheets leaves
   development builds in the same release). The word comes from
@@ -314,27 +321,45 @@ whose art never touches its words from 320 to 1920.
   they open and edit. The hero, the Overview, the Features page's formats,
   the FAQ, and `llms.txt` use it.
   Sentences about what the Mac app does today (the on-device model, the
-  Keychain) stay about the Mac. The hero's Download for Mac still fetches the DMG directly
-  (`DOWNLOAD_HREF`). The Helper guide is `/resources/rotli-helper/`; the 404
+  Keychain) stay about the Mac. The Helper guide is `/resources/rotli-helper/`; the 404
   page's `/helper` hint links there.
-- **The 404 page** (`src/pages/404.astro`) has no header or footer: "This
-  note wandered off." in the middle of the window, one "Take me home" button
-  with a quiet line of other ways in, and along the bottom edge a small game
-  on the footer's beach (`src/runner/`: `game.ts` is the game without a
-  screen, `stage.ts` draws it on a canvas). The quokka (the walking pose)
-  runs, Space, ↑, W, a click, or a tap jumps (letting go early makes a short
-  hop), and rocks, bushes, logs, and sandcastles come at a speed that grows;
-  the score is metres, and a fall shows the distance and "Play again". It
+- **The 404 page** (`src/pages/404.astro`) has no header or footer, and few
+  words (the owner, 2026-10-05: "simplify the text, remove the mac"): "This
+  note wandered off." in the middle of the window, one "Take me home" button,
+  and a quiet "Try rotli · Resources" (to `/download/` and `/resources/`; no
+  Mac-specific link). A line under the headline appears only for `/app`
+  (Rotli Web is not switched on here) and `/helper` (a link to the Helper
+  guide), chosen in the browser from the path. Along the bottom edge is a
+  small game on the footer's beach (`src/runner/`: `game.ts` is the game
+  without a screen, `stage.ts` draws it on a canvas). The quokka (the walking
+  pose) runs; Space, ↑, W, a click, or a tap jumps (letting go early makes a
+  short hop); ↓ or S, a press on the sand (the stage's lower third), or a
+  swipe down ducks while held: it slides low along the sand, or tucks and
+  drops fast in the air. Rocks, bushes, logs, and sandcastles come along the
+  sand; after the first 30 m gulls and low branches come over it, reaching
+  past the top of any jump, so they can only be ducked under. Generation
+  always leaves a whole jump's length plus the quokka and a moment to react
+  between one thing and the next, so a run never asks for a jump and a duck
+  at once (`scripts/site-runner.test.ts` proves it with a seeded player that
+  survives every run to the top speed). It gets faster a level at a time: a
+  new level every 75 m, each 38 units a second quicker, up to level 10; the
+  level shows beside the score and lights up for a moment when it goes up.
+  The stage is taller than before (`min(clamp(300px, 50svh, 460px), 86vw)`,
+  300 world units of mostly sky), and still fits a laptop's window under the
+  words. The score is metres; it shows (with the level and the best run)
+  only during a run, and a fall shows the distance and "Play again". It
   never starts by itself: Play starts a run and moves focus to the stage,
-  which alone reads the keys, so Space on "Take me home" or any other
-  control is never taken. Escape or P pauses; so does leaving the stage (a
-  Tab, a click elsewhere), hiding the tab, or scrolling it out of view. The
-  frame loop runs only during a run. Reduced motion keeps the game playable
-  (the visitor chose to start it) but stills the decorative layers (drifting
-  clouds, the run's bob, kicked-up sand). The best run lasts as long as the
-  page: no score is stored. Without script the footer's quokka scenery stands
-  there instead. The missing path and a hint (`/app`, `/helper`) are chosen
-  in the browser.
+  which alone reads the keys, so Space or ↓ on "Take me home" or anywhere else
+  is never taken; during a run a swipe on the stage is the game's, not a
+  scroll. Escape or P pauses; so does leaving the stage (a Tab, a click
+  elsewhere), hiding the tab, or scrolling it out of view, and a pause lets go
+  of a duck. Paused or over, the sky behind the overlay is washed back so
+  nothing passing behind it crosses its words. The frame loop runs only
+  during a run. Reduced motion keeps the game playable (the visitor chose to
+  start it) but stills the decorative layers (drifting clouds, the run's bob,
+  kicked-up sand, the gull's wings). The best run lasts as long as the page:
+  no score is stored. Without script the footer's quokka scenery stands there
+  instead.
 - **The quokka scenery** (`src/components/QuokkaScene.astro`, under every
   footer, `/subscribed/`, and the 404 without script) is a strip of Rottnest
   by day in the film's palette (sea, the far lighthouse, scrub on the dunes,
@@ -360,38 +385,55 @@ whose art never touches its words from 320 to 1920.
   leaf shrinks), stop to look at a pointer that comes close, look to the pile
   when theirs is gone, and fetch another after a while. The players watch the
   ball, pause to watch a visitor who comes close, and the catcher reaches up
-  (the cheering pose) as it arrives; a click or tap on them or the ball sends
-  it high. Everyone blinks.
+  (the cheering pose) as it arrives. Everyone blinks.
   **The person** (the owner, 2026-10-05: "when I am hovering over it with my
   mouse it inserts a human I am controlling. I can walk my human all the way
   to the food and feed the quokkas. I can also go play with the quokkas with
-  the ball"). A small person drawn in code in the scene's ink and tokens (a
-  round face, a bucket hat, a shirt in `--lantern`, trousers in
-  `--wood-dark`, outlines at about the art's weight; nobody in particular)
-  appears when the pointer comes onto the sand, a short walk in from the
-  nearer side, and walks to the pointer's x with an eased stride (it speeds
-  up, slows to arrive, never overshoots), legs and arms swinging, facing the
-  way it goes, on the sand line and behind the residents. Only where it
-  stops counts, so passing by does nothing: at the pile it picks a leaf up
-  (the guard is cross while it carries their lunch), at a quokka it stands
-  beside it (never in front) and hands the leaf over through the same feed
-  and guard-mood rules as the drag, and by the two with the ball it joins
-  their catch, which then goes player, person, other player until it walks
-  away (and it hands the ball back if it leaves holding it). It wanders off
-  seven seconds after the visitor stops playing. On a touch screen a tap
-  sends it; from the keyboard, "Walk on the beach", a button before the band
-  (visible on focus, with a described instruction), takes ← and →: held, it
-  walks, and let go near the pile or a quokka it stops at it. Its rules
-  without the DOM (the walk, the swing, what it does where it stops) are
-  `src/quokka/human.ts`; `src/quokka/person.ts` poses the drawing.
+  the ball"; and later that day: "when my mouse is there let me use arrows to
+  move ... I can click what quokka to throw the ball to or give feed to"). A
+  small person drawn in code in the scene's ink and tokens (a round face, a
+  bucket hat, a shirt in `--lantern`, trousers in `--wood-dark`, outlines at
+  about the art's weight; nobody in particular) appears when the mouse comes
+  onto the sand, a short walk in from the nearer side to the pointer, and
+  then stays put: it no longer chases the pointer, which let the arrow keys
+  and clicks steer it without fighting the mouse. It walks with a brisk start
+  and a soft arrival (it never overshoots), legs and arms swinging, facing the
+  way it goes, on the sand line and behind the residents. What a click (a tap
+  on a touch screen) asks of it is `command` in `src/quokka/human.ts`:
+  - the leaf pile: walk there and pick a leaf up (the pile gives a little and
+    the leaf flies up into its hand);
+  - a quokka, with a leaf in hand: walk beside it (never in front) and hand
+    it over, through the same feed and guard-mood rules as the drag; a small
+    heart rises over the quokka;
+  - a quokka, with the ball in hand or while in the game: throw it the ball in
+    an arc (at once, or on its next catch). Any resident catches it (the
+    guard and the players reach up in the cheering pose; the sitter and the
+    nibbler take it in their paws), hops, and throws it back to the person;
+  - the ball, or a player with empty hands: walk to the two with the ball and
+    join their catch, which then goes player, person, other player until it
+    walks away (and it hands the ball back if it leaves holding it);
+  - any other quokka with empty hands: walk over to it; open sand: walk there.
+  Under the mouse, whatever a click would act on (a quokka, the pile, the
+  ball) shows a pointer and a small ring on the sand at its feet. The arrow
+  keys walk it whenever the pointer is over the beach (`:hover`, so a page
+  scrolled under a still mouse counts right) or focus is on its buttons:
+  held, it walks, and let go near the pile or a quokka it stops at it. They
+  are never taken from a form field or with a modifier held, and ↑ and ↓ stay
+  the page's, so scrolling works. From the keyboard alone, "Walk on the
+  beach", a button before the band (visible on focus, with a described
+  instruction), brings it in and takes ← and →. It wanders off seven seconds
+  after the visitor stops playing and the pointer leaves the beach. Its rules
+  without the DOM (the walk, the swing, what a click asks, what it does where
+  it stops) are `src/quokka/human.ts`; `src/quokka/person.ts` poses the
+  drawing.
   **The drag** (the decision, 2026-10-05) stays alongside as the second way to
   play: the visitor can press on the pile and carry a leaf (mouse, pen, or
   touch; `touch-action: none` only on the pile). The residents watch it, a
   hungry eater perks up as it comes near, and letting go over a quokka hands
   it over (it eats, the others hop, the guard is pleased); letting go over
   open sand wastes it (it drifts down, rests, fades, and the guard is sad). A
-  tap on the pile without dragging carries nothing off (on touch it sends the
-  person). The leaves are their lunch, so both give the visitor a part in the
+  click or tap on the pile without dragging sends the person to pick a leaf
+  up. The leaves are their lunch, so both give the visitor a part in the
   scene's one story rather than moving the quokkas around like objects. "Hand
   the quokkas a leaf", the other button before the band (outside its
   `aria-hidden`), does the same from the keyboard (visible on focus, with a
@@ -413,16 +455,17 @@ whose art never touches its words from 320 to 1920.
 - **The motion studio** lives at `studio.rotli.co` (`STUDIO_URL` in
   `src/site.ts`): the footer's Learn column links it whatever the source flag, and the Caddyfile
   sends `/studio` there.
-- **Download and the browser.** `SiteActions.astro` renders the two ways in —
-  Open in browser and Download — in the hero (the header has only its
-  Download button to `/download/`). `DOWNLOAD_HREF` in
-  `src/site.ts` is where those Download buttons go (today the newest Mac DMG,
-  directly). `Base.astro` stamps `data-platform` on `<html>`; off a
-  Mac (iPads included) the browser action leads and the download reads
-  "Download for Mac". Without script the Mac order stays.
+- **The way in.** `SiteActions.astro` renders the one call to action, "Try
+  now", to `/download/`, in the hero and the closing panel (the header has its
+  own). The earlier pair (Open in browser and Download for Mac, reordered by
+  platform) is gone: the download page makes that choice with the visitor's
+  system in view, so the hero keeps one primary button and no second one. A
+  deployment that offers neither the Mac download nor Rotli Web shows "Mac
+  alpha coming soon" in its place.
 - `WEB_APP_ENABLED` decides whether pages link to **Rotli Web**, the app bundle
   served from `/app/` on this origin. Fails closed: only the exact string
-  `"true"` shows the hero action, the navigation entry, and the footer link.
+  `"true"` shows the download page's Rotli Web options, the navigation entry,
+  and the footer link.
   The bundle is built by the `app` stage of `site/Dockerfile` (repository
   root, `ROTLI_WEB_BASE=/app/ ROTLI_PLATFORM=web bun run build`) and served
   by the `handle /app/*` block in `site/Caddyfile` under its own headers
@@ -511,9 +554,9 @@ whose art never touches its words from 320 to 1920.
 - Rotli Web and Rotli Helper are the tour's last part on the landing page
   (only while `WEB_APP_ENABLED`): words, the copyable install line, and links,
   with no screenshot.
-- The hero is the promise (a private workspace for your notes), the two ways
-  in, where rotli runs (`PLATFORMS.availability`), and the product film right
-  under them (`FilmPlayer.astro`, see "Films" below), on `public/hero-pattern.svg`
+- The hero is the promise (a private workspace for your notes), one way in
+  ("Try now"), what it costs, and the product film right under them
+  (`FilmPlayer.astro`, see "Films" below), on `public/hero-pattern.svg`
   (the social card's faint note, folder, checklist, and chat icons, masked so
   they fade out behind the headline). The words land in one short CSS
   entrance and the clay line (`.inked`, `public/ink-underline.svg`)

@@ -1,16 +1,22 @@
 // The person in the footer scene (the owner, 2026-10-05: "when I am hovering over it with my
 // mouse it inserts a human I am controlling. I can walk my human all the way to the food and
-// feed the quokkas. I can also go play with the quokkas with the ball"). These are its rules
-// without the DOM, so they can be tested (scripts/site-interactions.test.ts): how it walks
-// toward where the visitor points (easing in and out, never overshooting), how its legs and
-// arms swing, and what it does where it stops. src/quokka/scene.ts draws it.
+// feed the quokkas. I can also go play with the quokkas with the ball"; and later the same day:
+// "when my mouse is there let me use arrows to move ... I can click what quokka to throw the
+// ball to or give feed to"). These are its rules without the DOM, so they can be tested
+// (scripts/site-interactions.test.ts): how it walks where it is sent (setting off briskly,
+// slowing to arrive, never overshooting), how its legs and arms swing, what a click asks of
+// it, and what it does where it stops. src/quokka/scene.ts draws it.
 
 /** Walking: top speed and how quickly it gets there or stops, in px and ms. */
 export const STRIDE = {
-  /** Top speed, px per ms (a brisk stroll across a 1440px beach takes about five seconds). */
-  speed: 0.3,
-  /** How fast it speeds up and slows down, px per ms². */
-  accel: 0.0011,
+  /** Top speed, px per ms (a brisk walk across a 1440px beach takes about four seconds). */
+  speed: 0.36,
+  /** How fast it speeds up and slows down, px per ms²: up to speed in about a tenth of a
+   * second, so a click or an arrow key feels answered at once. */
+  accel: 0.0034,
+  /** How gently it slows to arrive, px per ms²: softer than setting off, so it settles
+   * onto the spot rather than braking hard. */
+  brake: 0.0012,
   /** Close enough to where it was going to count as there, px. */
   near: 4,
   /** px walked per full cycle of both legs. */
@@ -43,7 +49,7 @@ export function stepWalk(walk: Walk, target: number, ms: number, teleport = fals
   if (distance <= STRIDE.near && Math.abs(walk.v) < STRIDE.accel * 40) {
     return { ...walk, x: target, v: 0, phase: 0 };
   }
-  const want = Math.sign(gap) * Math.min(STRIDE.speed, Math.sqrt(2 * STRIDE.accel * distance));
+  const want = Math.sign(gap) * Math.min(STRIDE.speed, Math.sqrt(2 * STRIDE.brake * distance));
   const dv = Math.max(-STRIDE.accel * dt, Math.min(STRIDE.accel * dt, want - walk.v));
   let v = walk.v + dv;
   let x = walk.x + v * dt;
@@ -106,4 +112,30 @@ export function onSand(x: number, width: number, bodyWidth: number): number {
 export function entrance(target: number, width: number, bodyWidth: number): number {
   const from = target < width / 2 ? target - 140 : target + 140;
   return onSand(from, width, bodyWidth);
+}
+
+/** What the visitor clicked or tapped on the beach. */
+export type Hit = 'pile' | 'ball' | 'quokka' | 'sand';
+/** What the person has in hand. */
+export type Holding = 'leaf' | 'ball' | null;
+/**
+ * What a click asks of the person:
+ *   fetch  walk to the pile and pick a leaf up
+ *   feed   walk to the quokka and hand it the leaf
+ *   throw  throw the ball to that quokka (now, if it holds the ball; else its next catch)
+ *   join   walk to the two with the ball and join their game
+ *   visit  walk to stand beside that quokka (it is pleased to see you)
+ *   walk   walk there
+ */
+export type Command = 'fetch' | 'feed' | 'throw' | 'join' | 'visit' | 'walk' | null;
+
+export function command(holding: Holding, hit: Hit, context: { joined: boolean; player: boolean }): Command {
+  if (hit === 'pile') return holding === null ? 'fetch' : 'walk';
+  if (hit === 'ball') return holding === null ? 'join' : holding === 'ball' ? null : 'walk';
+  if (hit === 'quokka') {
+    if (holding === 'leaf') return 'feed';
+    if (holding === 'ball' || context.joined) return 'throw';
+    return context.player ? 'join' : 'visit';
+  }
+  return 'walk';
 }

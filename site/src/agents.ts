@@ -82,7 +82,7 @@ export function llmsText(writing: { resources: Writing[]; posts: Writing[] }): s
     "rotli charges nothing for AI and sells no AI plan: it uses a model on your Mac or the AI tools you already pay for.",
     "No analytics, ads, or crash uploads.",
     site.webAppEnabled
-      ? "Platforms: the Mac app, and Rotli Web in the browser. Chrome, Edge, and Arc open your folder directly; Firefox, Zen, and Brave use Rotli Helper. Safari and phones are not supported yet. Native Windows and Linux apps are coming soon."
+      ? "Platforms: the Mac app, and Rotli Web in the browser. Chrome, Edge, and Arc open your folder directly; Firefox, Zen, and Brave use Rotli Helper. Safari and phones are not supported yet. Native Windows and Linux apps are coming soon; until then, Windows and Linux use Rotli Web."
       : "Platforms: the Mac app. Native Windows and Linux apps are coming soon.",
   ];
   const lines = [`# ${NAME}`, "", `> ${SUMMARY}`, "", ...facts.map((fact) => `- ${fact}`)];

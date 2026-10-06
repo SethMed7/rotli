@@ -1,27 +1,23 @@
 ---
-// The site's two ways in, defined once: open Rotli Web, or download the app.
-// Base.astro stamps data-platform on <html>; on anything but a Mac the browser
-// action leads and the download says it is the Mac app (styles in Base.astro).
-import { DOWNLOAD_HREF, WEB_APP_PATH, site } from '../site';
+// The site's one way in, defined once: "Try now", to /download/, which offers the Mac app
+// and Rotli Web and leads with the visitor's own system (the owner, 2026-10-05: "Try now"
+// instead of "Download"). Direct DMG links live only on that page. A deployment that offers
+// neither (no downloads, no Rotli Web) says so instead of linking to an empty page.
+import { site } from '../site';
 
-interface Props {
-  webLabel?: string;
-  downloadLabel?: string;
-}
-
-const { webLabel = 'Open in browser', downloadLabel = 'Download' } = Astro.props;
+const offered = site.downloadsEnabled || site.webAppEnabled;
 ---
 
 <div class="site-actions">
-  {site.webAppEnabled && <a class="button secondary action-web" href={WEB_APP_PATH}>{webLabel}</a>}
   {
-    site.downloadsEnabled ? (
-      <a class="button primary action-download" href={DOWNLOAD_HREF} rel="noopener">
-        <span class="for-mac">{downloadLabel}</span>
-        <span class="for-other">Download for Mac</span>
+    offered ? (
+      <a class="button primary action-try" href="/download/">
+        Try now
       </a>
     ) : (
-      <span class="button primary pending" aria-disabled="true">Mac alpha coming soon</span>
+      <span class="button primary pending" aria-disabled="true">
+        Mac alpha coming soon
+      </span>
     )
   }
 </div>

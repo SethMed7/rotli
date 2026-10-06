@@ -32,11 +32,8 @@ export const GITHUB_URL = 'https://github.com/SethMed7/rotli';
 export const RELEASES_URL = 'https://github.com/SethMed7/rotli-releases/releases/latest';
 // The newest notarized DMG, downloaded directly. scripts/release.sh publishes a
 // stable-named copy (Rotli.dmg) on every release, so this never needs editing.
+// Only /download/ links it: every other call to action is "Try now", to that page.
 export const DOWNLOAD_URL = `${RELEASES_URL}/download/Rotli.dmg`;
-/** Where the hero's "Download for Mac" button goes: the
- * newest Mac DMG, fetched directly. The header's Download button always opens
- * /download/, which picks by the visitor's system (SiteHeader.astro). */
-export const DOWNLOAD_HREF = DOWNLOAD_URL;
 /** Rotli Web, served from this same origin under /app/ (site/Caddyfile,
  * site/Dockerfile `app` stage). The path is fixed; whether pages link to it is
  * the WEB_APP_ENABLED knob below. */
@@ -194,22 +191,25 @@ export const site = {
 } as const;
 
 /**
- * Where rotli runs, said one way everywhere (the owner, 2026-10-05, second
- * call that day). The promise is a free workspace, not a Mac app, so pages
- * lead with what it is and what it costs and state availability separately:
- * the Mac app and Rotli Web exist today, and native Windows and Linux apps are
- * "Coming soon" (this replaces the earlier "Planned"). Never imply the Mac is
- * the only platform rotli will have, or that Windows or Linux apps exist
- * today. Sentences about what the Mac app alone does (the on-device model,
- * the Keychain) stay about the Mac.
+ * Where rotli runs, said one way everywhere it is said (the owner, 2026-10-05).
+ * The promise is a free workspace, not a Mac app, so the landing page says what
+ * it is and what it costs and leaves availability to /download/, the FAQ, the
+ * meta description, and llms.txt. The Mac app and Rotli Web are the two real
+ * options today; native Windows and Linux apps are "Coming soon", and until
+ * then Rotli Web is the way in on those systems. Never imply the Mac is the
+ * only platform rotli will have, or that Windows or Linux apps exist today.
+ * Sentences about what the Mac app alone does (the on-device model, the
+ * Keychain) stay about the Mac.
  */
 export const PLATFORMS = {
-  /** Under the hero's ways in, after what it costs. */
+  /** One sentence for summaries (llms.txt, the meta description). */
   availability: site.webAppEnabled
-    ? 'In your browser and on the Mac today. Windows and Linux apps are coming soon.'
+    ? 'On the Mac and in your browser today. Windows and Linux apps are coming soon; use Rotli Web in the meantime.'
     : 'On the Mac today. Windows and Linux apps are coming soon.',
   /** The status of a platform whose app is not out yet. */
   soon: 'Coming soon',
+  /** Where a Windows or Linux visitor goes for now (only while Rotli Web is offered). */
+  meantime: 'Use Rotli Web in the meantime',
 } as const;
 
 /**

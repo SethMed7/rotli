@@ -20,16 +20,19 @@
 // at the neck so heads can turn and dip. src/quokka/rig.ts holds every landmark.
 //
 // The visitor walks a person along the beach (the owner, 2026-10-05): it appears when the
-// pointer comes onto the sand and walks to where the pointer is (a tap on a touch screen; the
-// arrow keys from "Walk on the beach", the button before the band). Stopped at the leaf pile
-// it picks a leaf up, stopped at a quokka with a leaf it hands it over (the quokka eats, the
-// guard is pleased), and stopped by the two with the ball it joins their game of catch. The
-// person is the drawing below (code, in the scene's ink and tokens, no particular person:
-// a round face, a bucket hat, a shirt, and trousers). The older play stays alongside: a leaf
-// can still be dragged off the pile (mouse, pen, or touch) and dropped on a quokka, or on the
-// sand, where it is wasted and the guard is sad, and "Hand the quokkas a leaf" does that from
-// the keyboard. src/quokka/scene.ts runs it all, only while the band is on screen and the tab
-// is visible. Under reduced motion nothing moves on its own: the scene stands still until the
+// mouse comes onto the sand and walks in to it. From then a click (a tap on a touch screen)
+// sends it, and the arrow keys walk it while the pointer is over the beach or focus is on
+// "Walk on the beach", the button before the band. Clicking the leaf pile fetches a leaf; with
+// a leaf in hand, clicking a quokka walks over and feeds it (a heart rises, the guard is
+// pleased); with the ball in hand, or in the game of catch, clicking a quokka throws it the
+// ball, which it catches and throws back; clicking the ball or the players joins their game.
+// What a click would act on shows a pointer and a small ring on the sand. The person is the
+// drawing below (code, in the scene's ink and tokens, no particular person: a round face, a
+// bucket hat, a shirt, and trousers). The older play stays alongside: a leaf can still be
+// dragged off the pile (mouse, pen, or touch) and dropped on a quokka, or on the sand, where
+// it is wasted and the guard is sad, and "Hand the quokkas a leaf" does that from the
+// keyboard. src/quokka/scene.ts runs it all, only while the band is on screen and the tab is
+// visible. Under reduced motion nothing moves on its own: the scene stands still until the
 // visitor plays, and then the person steps straight to where it is sent. Without script the
 // scene simply stands still and the buttons stay hidden. The band itself is decoration
 // (aria-hidden) and holds no text or links.
@@ -143,7 +146,7 @@ const mirror = `matrix(-1 0 0 1 ${2 * CENTER_X} 0)`;
   <button type="button" class="scenery-feed" data-walk aria-describedby="walk-help" hidden>Walk on the beach</button>
   <p class="visually-hidden" id="walk-help">
     The left and right arrow keys walk you along the beach. Stop at the leaves to pick one up, at a quokka to
-    hand it over, or by the two with the ball to join their game.
+    hand it over, or by the two with the ball to join their game of catch.
   </p>
   <button type="button" class="scenery-feed" data-feed hidden>Hand the quokkas a leaf</button>
   <p class="visually-hidden" aria-live="polite" data-feed-status></p>
@@ -284,7 +287,7 @@ const mirror = `matrix(-1 0 0 1 ${2 * CENTER_X} 0)`;
       <g data-flip set:html={layeredRig('thoughtful', true)} />
     </svg>
     <svg class="qk qk-guard" viewBox={viewBox} focusable="false" data-quokka="guard" data-mood={mood}>
-      <g data-flip set:html={rig(traced('wave', wave))} />
+      <g data-flip set:html={rig(traced('wave', wave) + traced('cheer', cheer))} />
     </svg>
     <svg class="qk qk-player qk-player-a" viewBox={viewBox} focusable="false" data-quokka="player-a" data-mood={mood}>
       <g data-flip set:html={rig(traced('cheer', cheer))} />
@@ -294,6 +297,10 @@ const mirror = `matrix(-1 0 0 1 ${2 * CENTER_X} 0)`;
     </svg>
     <svg class="ball" viewBox={`${-BALL.r - 10} ${-BALL.r - 10} ${2 * BALL.r + 20} ${2 * BALL.r + 20}`} focusable="false" data-ball>
       <use href="#qk-ball"></use>
+    </svg>
+    <div class="target-mark" data-target-mark></div>
+    <svg class="pop" viewBox="0 0 24 22" focusable="false" data-pop>
+      <path d="M12 20C5 15 2 11 2 7.2 2 4.3 4.2 2 7 2c2 0 3.6 1.1 5 3 1.4-1.9 3-3 5-3 2.8 0 5 2.3 5 5.2C22 11 19 15 12 20Z"></path>
     </svg>
     <svg class="carried-leaf" viewBox="-30 -20 60 40" focusable="false" data-carried visibility="hidden">
       <use href="#qk-leaf" transform="translate(-23 0) rotate(-20 23 0)"></use>
@@ -584,6 +591,78 @@ const mirror = `matrix(-1 0 0 1 ${2 * CENTER_X} 0)`;
   .scenery.is-carrying,
   .scenery.is-carrying .food {
     cursor: grabbing;
+  }
+  /* What a click would act on: a pointer, and a small ring on the sand under it. */
+  .scenery[data-hover='quokka'],
+  .scenery[data-hover='ball'] {
+    cursor: pointer;
+  }
+  .scenery .target-mark {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 12px;
+    border: 2.5px solid var(--accent-text);
+    border-radius: 50%;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 140ms ease-out;
+  }
+  .scenery .target-mark.is-on {
+    opacity: 0.9;
+  }
+  /* A fed quokka's heart: it rises and fades once. */
+  .scenery .pop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 22px;
+    height: 20px;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .scenery .pop path {
+    fill: var(--accent);
+    stroke: var(--ink);
+    stroke-width: 1.8;
+    stroke-linejoin: round;
+  }
+  .scenery .pop.is-popping {
+    animation: qk-pop 1100ms ease-out;
+  }
+  @keyframes qk-pop {
+    0% {
+      opacity: 0;
+      translate: 0 6px;
+      scale: 0.6;
+    }
+    20% {
+      opacity: 1;
+      scale: 1.1;
+    }
+    70% {
+      opacity: 1;
+      scale: 1;
+    }
+    100% {
+      opacity: 0;
+      translate: 0 -18px;
+    }
+  }
+  /* The pile gives a little as a leaf comes off it. */
+  .scenery .food.is-picked {
+    animation: qk-pick 300ms ease-out;
+  }
+  @keyframes qk-pick {
+    40% {
+      scale: 1.06 0.9;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .scenery .pop.is-popping,
+    .scenery .food.is-picked {
+      animation: none;
+    }
   }
   @media (max-width: 760px) {
     .scenery .qk-nibbler {
