@@ -63,19 +63,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **rotli.co's blog posts are calmer to read.** A post is a little wider
-  than the rest of the site, and the room goes to its side columns, so the
-  sources, contents, and suggestions wrap far less. The text keeps a
-  comfortable line of about 66 characters at one size on every screen. The
-  suggestions on the right show beside the start of a post and scroll away
-  as you read; the contents, progress, sources, and Share on the left stay
-  with you. The top of a post is tidier: a shorter picture, then "Blog",
-  the title, summary, author, and topics together in one block under it.
-  On a narrower window the right column moves under the post first, then
-  the left one, and nothing overlaps or scrolls sideways at any width. The
-  blog page keeps the site's usual width, with a bigger featured post, a
-  row of up to four more, and each line of the post list short enough to
-  scan.
+- **rotli.co's blog posts are calmer to read.** A post lines up with the
+  header: the title, summary, author, and topics sit beside the post's
+  picture, shown whole, with "Blog" above the title, and the title is in
+  view without scrolling. Below that are two columns: the contents,
+  progress, sources, and Share on the left, and the text in the room to its
+  right, at a comfortable line of about 66 characters on every screen. The
+  sources show four at a time with "Show all", every one whole, and the
+  left column stays with you as you read without ever cutting anything off.
+  The suggestions that sat on the right now close the post as "More from
+  rotli". On a narrower window the picture goes above the title and the
+  left column folds away, and nothing overlaps or scrolls sideways at any
+  width. The blog page keeps the site's usual width, with a bigger featured
+  post, a row of up to four more, and each line of the post list short
+  enough to scan.
 - **rotli.co's guides are on the blog.** Getting started, Why local?, What
   does AI see in rotli?, What is Rotli Helper?, and rotli in the browser and
   on the Mac are blog posts marked Guide, each with its own picture, and the
@@ -332,18 +333,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A new install lives in the Dock** and stays open like any app. Testers
   lost the menu-bar-only app mid-setup; the quiet visitor is a choice in
   Settings → General.
-- **Blog posts on rotli.co are laid out in three calm columns.** The post's
-  picture runs across the top, short enough that the title shows without
-  scrolling, and under it the title, summary, author, date, reading time, and
-  topics line up with the text below. On the left, a rail holds a short
-  title, the sections as a tree, how far through you are, the post's sources
-  (each opening the original in a new tab), and Share: X, LinkedIn, Email,
-  Copy link, and Copy Markdown. On a wide screen the right side suggests
-  other posts and a couple of things from rotli itself, such as the download
-  and the roadmap; on a smaller screen they follow the article as "More from
-  rotli". Nothing there tracks you or loads from anywhere else. The text is
-  larger, about 70 characters a line, with clearer headings, quotes, and a
-  numbered sources list.
+- **Blog posts on rotli.co have a rail for finding your way.** The title,
+  summary, author, date, reading time, and topics sit beside the post's
+  picture. On the left, a rail holds a short title, the sections as a tree,
+  how far through you are, the post's sources (each opening the original in
+  a new tab), and Share: X, LinkedIn, Email, Copy link, and Copy Markdown.
+  Each post ends with "More from rotli": other posts and a couple of things
+  from rotli itself, such as the download and the roadmap. Nothing there
+  tracks you or loads from anywhere else. The text is larger, about 66
+  characters a line, with clearer headings, quotes, and, on phones and in
+  print, a numbered sources list.
 - **Blog posts on rotli.co have charts and diagrams.** The post on unused AI
   plans shows the Self Financial 30-day figures and Menlo's daily-use
   comparison as bar charts, each with its source and a table of the numbers,
