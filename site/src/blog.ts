@@ -11,7 +11,7 @@ export interface Dated {
 }
 
 /** The tag that marks a guide: the evergreen how-to posts, which were /resources/ until 2026-10-06. */
-export const GUIDE = 'Guide';
+export const GUIDE = "Guide";
 
 /** How long a post wears "New": computed when the site is built, so it ages out by rebuilding. */
 export const NEW_FOR_DAYS = 14;
@@ -34,14 +34,15 @@ export interface Arranged<T> {
 
 /**
  * The featured story is the newest post marked `featured`, or else the newest post that is not a
- * guide (a guide leads only when marked, or when there is nothing else); the next posts (newest
- * first, up to SECONDARY, guides included) form the row under it. The list holds every post, the
+ * guide (a guide leads only when marked, or when there is nothing else); the next posts that are
+ * not guides (newest first, up to SECONDARY) form the row under it (the owner, 2026-10-06: posts
+ * only up top; guides live in the list and under the Guide filter). The list holds every post, the
  * featured ones included, so filtering by a topic never hides a post that matches it.
  */
 export function arrangeBlog<T extends Dated>(posts: readonly T[]): Arranged<T> {
   const all = [...posts].sort((a, b) => b.date.getTime() - a.date.getTime());
   const featured = all.find((post) => post.featured) ?? all.find((post) => !post.guide) ?? all[0];
-  const secondary = all.filter((post) => post !== featured).slice(0, SECONDARY);
+  const secondary = all.filter((post) => post !== featured && !post.guide).slice(0, SECONDARY);
   return { featured, secondary, all };
 }
 
@@ -54,8 +55,8 @@ export function topicsOf(posts: readonly { tags: readonly string[] }[]): string[
 export function topicKey(topic: string): string {
   return topic
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 /** A heading the article's tree lists: a `##` (depth 2) or a `###` under it (depth 3). */
@@ -80,7 +81,8 @@ export function tocTree(items: readonly TocItem[]): TocBranch[] {
   for (const item of items) {
     const parent = tree.at(-1);
     if (item.depth === 3 && parent) parent.children.push({ slug: item.slug, text: item.text });
-    else if (item.depth === 2 || item.depth === 3) tree.push({ slug: item.slug, text: item.text, children: [] });
+    else if (item.depth === 2 || item.depth === 3)
+      tree.push({ slug: item.slug, text: item.text, children: [] });
   }
   return tree;
 }

@@ -303,7 +303,9 @@ describe("the blog index", () => {
     };
     expect(blog.GUIDE).toBe("Guide");
     expect(blog.arrangeBlog([guide, older]).featured).toBe(older);
-    expect(blog.arrangeBlog([guide, older]).secondary).toEqual([guide]);
+    // Posts only up top (the owner, 2026-10-06): a guide never fills the row under the story.
+    expect(blog.arrangeBlog([guide, older]).secondary).toEqual([]);
+    expect(blog.arrangeBlog([guide, older]).all).toContain(guide);
     expect(blog.arrangeBlog([{ ...guide, featured: true }, older]).featured!.guide).toBe(true);
     expect(blog.arrangeBlog([guide]).featured).toBe(guide);
   });

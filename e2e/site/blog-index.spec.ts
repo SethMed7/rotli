@@ -62,7 +62,14 @@ for (const viewport of [
     const secondaryHrefs = await secondary.evaluateAll((links) =>
       links.map((link) => link.getAttribute("href")),
     );
-    expect(secondaryHrefs).toEqual(hrefs.filter((href) => href !== featuredHref).slice(0, 3));
+    // Posts only up top (the owner, 2026-10-06): guides stay in the list, never in the row.
+    const guideHrefs = await page
+      .locator("[data-topics~='guide'] a")
+      .evaluateAll((links) => links.map((link) => link.getAttribute("href")));
+    expect(guideHrefs.length).toBeGreaterThan(0);
+    expect(secondaryHrefs).toEqual(
+      hrefs.filter((href) => href !== featuredHref && !guideHrefs.includes(href)).slice(0, 3),
+    );
     for (const img of await page.locator("[data-secondary] img").all()) await expectThumbnail(img);
 
     // The section order on the page.
